@@ -16,9 +16,13 @@ import "context"
 // and reported to the subscriptions that cover it and to
 // [Observers].OnAttributeChanged with contract.OriginHostSet.
 //
-// It works before [Node.Start] as well: the label is the one the node
-// serves when it starts. Either way it is persisted, so the next [New] on
-// the same store restores it — over [Config].BasicInformation.NodeLabel,
+// Before [Node.Start] the label is configuration: it is the one the node
+// serves when it starts, and it is persisted, but no subscription exists
+// yet and the observers are not told — the notifier is wired when the
+// node starts. matter.js would emit `$Changed` on the behavior before the
+// node is online; reporting only a running node's changes is the facade's
+// decision. Either way the label is persisted, so the next [New] on the
+// same store restores it — over [Config].BasicInformation.NodeLabel,
 // as it restores a controller's written label; that restore at New is not
 // a change and reports nothing. A controller's later write wins in turn,
 // and reaches the observers with contract.OriginControllerWrite. The

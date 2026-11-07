@@ -152,7 +152,10 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 }
 
 // TestSetNodeLabelBeforeStartAndRefusedParity (issue 414, cases c and d): a
-// label set between New and Start is the one the node serves at start; a
+// label set between New and Start is configuration — the one the node
+// serves at start, persisted across a restart, and told to no observer
+// (the notifier is wired at Start; matter.js would emit `$Changed` before
+// the node is online, a facade decision); a
 // label over 32 bytes is refused with the status a controller's write of
 // it gets, CONSTRAINT_ERROR ("max 32", basic-information.element.ts:35-38
 // at db021da0), and the served label stays.
@@ -160,8 +163,17 @@ func TestSetNodeLabelBeforeStartAndRefusedParity(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)
 	var prepErr error
+	prepared := false
+	changes := &nodeLabelChanges{}
 	p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
-		Prepare: func(n *node.Node) { prepErr = n.SetNodeLabel(context.Background(), "Früh") },
+		Configure: func(cfg *node.Config) { cfg.Observers.OnAttributeChanged = changes.observe },
+		// The first start only: the restart below serves what the store kept.
+		Prepare: func(n *node.Node) {
+			if !prepared {
+				prepared = true
+				prepErr = n.SetNodeLabel(context.Background(), "Früh")
+			}
+		},
 	}})
 	if prepErr != nil {
 		t.Fatalf("SetNodeLabel before Start: %v", prepErr)
@@ -170,6 +182,15 @@ func TestSetNodeLabelBeforeStartAndRefusedParity(t *testing.T) {
 	label := lifecycleAttr(0, bidef.ClusterID, bidef.AttrNodeLabel)
 	if got, err := fabrictest.Read(ctx, p, label); err != nil || got.Value.El.String != "Früh" {
 		t.Fatalf("NodeLabel at start = %+v (%v), want Früh", got.Value.El, err)
+	}
+	if got := changes.snapshot(); len(got) != 0 {
+		t.Errorf("observers heard %v for a label set before Start, want nothing", got)
+	}
+	if err := p.Device.Restart(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := fabrictest.Read(ctx, p, label); err != nil || got.Value.El.String != "Früh" {
+		t.Fatalf("NodeLabel after the restart = %+v (%v), want the persisted Früh", got.Value.El, err)
 	}
 
 	long := strings.Repeat("x", 33)

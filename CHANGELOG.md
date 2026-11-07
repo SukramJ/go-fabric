@@ -12,7 +12,7 @@ pseudo-version of `main`.
 
 ### Added
 
-- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` — and works before `Start` as well. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.SetNodeLabel(ctx, label)` is the server's host write, `BasicInformation.RestoreNodeLabel` the silent boot-time restore (below).
+- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` once the node runs; before `Start` the label is configuration, served at start and persisted, and no observer is told. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.SetNodeLabel(ctx, label)` is the server's host write, `BasicInformation.RestoreNodeLabel` the silent boot-time restore (below).
 
 ### Changed
 

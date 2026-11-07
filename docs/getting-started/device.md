@@ -218,8 +218,9 @@ controller's write semantics: a label over 32 bytes is refused with
 `CONSTRAINT_ERROR` (an `im.StatusCodeError`), and an accepted one is
 persisted where a controller's written label is, reported to every
 subscription that covers it and to `Observers.OnAttributeChanged` with
-`contract.OriginHostSet`. It works before `Start` as well, and the label is
-then the one the node serves when it starts. `node.New` restores the
+`contract.OriginHostSet`. Before `Start` the label is configuration: it is
+the one the node serves when it starts and it is persisted, but no
+subscription exists yet and the observers are not told. `node.New` restores the
 persisted label — the host's or a controller's, whichever wrote last —
 over the configured one without reporting a change, and a controller's
 later write wins and reaches the observers with
