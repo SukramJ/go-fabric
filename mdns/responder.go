@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/internal/clockvar"
+	"github.com/SukramJ/go-fabric/internal/netwatch"
 )
 
 // Responder is the production [Advertiser]: the module's own mDNS
@@ -36,7 +38,15 @@ import (
 //   - announces it on Publish and keeps announcing on matter.js's broadcast
 //     schedule — 1 s, doubling, at most 90 s apart — until an operational
 //     connection ends the run or two days pass (announce.go);
-//   - says goodbye with the same records at TTL 0 on Withdraw and Close.
+//   - says goodbye (TTL 0) to exactly the records peers may cache that no
+//     published service holds any more — on Withdraw, Close and a changed
+//     re-Publish, never to a host address or a shared pointer another
+//     service still publishes — and retries a goodbye that did not leave
+//     (publication.go);
+//   - follows the host's interfaces while services are published: on an
+//     address change it says goodbye to the lost addresses and announces
+//     the current records on the changed interfaces, again a second later
+//     (follow.go).
 //
 // It does not probe, as neither matter.js nor chip does. The multicast
 // sockets are opened on the first Publish, so constructing a Responder
@@ -77,14 +87,29 @@ type Responder struct {
 	services map[string]*entry
 	// order is the publish order of the service keys — matter.js's
 	// generator Map iterates in insertion order.
-	order   []string
-	links   map[int]*linkRecords
-	answers answerState
+	order []string
+	links map[int]*linkRecords
+	// linkStates is what peers may cache on each interface and its
+	// goodbye retry (publication.go).
+	linkStates map[int]*linkState
+	answers    answerState
+	// repeatOn are the interfaces the change repeat publishes on again,
+	// nil when none waits; changeRepeat is its timer (follow.go).
+	repeatOn     map[int]bool
+	changeRepeat clock.Timer
+	// changeRepeatGen tells a fired repeat timer from the current one.
+	changeRepeatGen uint64
 	// wire is the transport; nil until the first Publish opens the
 	// sockets (or a test installs a fake).
 	wire wire
 	// socks are the real sockets behind wire, nil with a test wire.
 	socks *sockets
+
+	// watch compares the interfaces while services are published
+	// (follow.go); followMu serialises starting and stopping it, outside
+	// mu.
+	watch    *netwatch.Watcher
+	followMu sync.Mutex
 }
 
 // entry is one published service.
@@ -115,21 +140,26 @@ type wire interface {
 	// addrs is what the advertise policy publishes for the interface:
 	// none for one it excludes (loopback, tunnel, container bridge, down).
 	addrs(ifIndex int) []net.IP
-	// multicast sends pkt to the mDNS groups on the interface.
-	multicast(pkt []byte, ifIndex int)
-	// unicast sends pkt to dst through the interface.
-	unicast(pkt []byte, ifIndex int, dst *net.UDPAddr)
+	// multicast sends pkt to the mDNS groups on the interface and reports
+	// how far it reached.
+	multicast(pkt []byte, ifIndex int) reach
+	// unicast sends pkt to dst through the interface and reports whether
+	// it left.
+	unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach
 }
 
 // NewResponder returns the module's mDNS responder. It binds nothing until
 // the first Publish; the caller closes it ([Responder.Close]).
 func NewResponder() *Responder {
-	return &Responder{
+	r := &Responder{
 		InterfaceFilter: isVirtualInterfaceName,
 		services:        map[string]*entry{},
 		links:           map[int]*linkRecords{},
+		linkStates:      map[int]*linkState{},
 		answers:         newAnswerState(),
 	}
+	r.watch = netwatch.New(r.clock.Load, r.interfaceSnapshot, r.interfacesChanged)
+	return r
 }
 
 // SetClock sets the clock the broadcast schedule and the answer windows run
@@ -189,9 +219,12 @@ func (r *Responder) receive(buf []byte, ifIndex int, src *net.UDPAddr) {
 // one with the same instance and service type, and announces it on the
 // broadcast schedule. A re-Publish of an unchanged record set only starts
 // the schedule again when none runs (Advertisement.start); a changed one
-// says goodbye to the old records first, as matter.js closes the
-// advertisement and creates a new one (DeviceAdvertiser.ts:206-222 at
-// 862ad75f).
+// replaces the registration in place and starts the schedule afresh, whose
+// first publication says goodbye to the records that left and announces
+// the new ones in one message — matter.js registers the new generator
+// under the service's name (MdnsServer.register, MdnsServer.ts:123-155 at
+// db021da0) and its broadcast carries the goodbyes
+// (InterfaceResponder.ts:271-302).
 //
 // The advertised addresses are the host's, chosen per interface by the
 // advertise policy; the copy [Responder.Active] returns carries the union.
@@ -199,6 +232,7 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	if err := svc.Validate(); err != nil {
 		return err
 	}
+	defer r.follow()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
@@ -223,13 +257,14 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	fp := fmt.Sprintf("%s|%d|%s|%s|%s",
 		strings.Join(txt, "\x1f"), svc.Port, host,
 		strings.Join(ips, ","), strings.Join(svc.Subtypes, ","))
-	if prev, ok := r.services[key]; ok {
+	prev, replacing := r.services[key]
+	if replacing {
 		if prev.fingerprint == fp {
 			prev.svc = svc
 			r.startLocked(prev, eventStartup)
 			return nil
 		}
-		r.removeLocked(prev)
+		r.stopLocked(prev)
 	}
 	e := &entry{
 		key:         key,
@@ -240,24 +275,24 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 		fingerprint: fp,
 	}
 	r.services[key] = e
-	r.order = append(r.order, key)
+	if !replacing {
+		// A Map keeps a replaced key's position (MdnsServer.ts:142).
+		r.order = append(r.order, key)
+	}
 	r.resetLocked()
 	r.startLocked(e, eventStartup)
 	return nil
 }
 
-// removeLocked stops e's run, says goodbye and drops it. Caller holds r.mu.
+// removeLocked stops e's run, drops it and publishes the goodbyes of the
+// records no remaining service holds on every interface (MdnsServer.ts
+// #withdraw, :165-178 at db021da0). Caller holds r.mu.
 func (r *Responder) removeLocked(e *entry) {
 	r.stopLocked(e)
-	r.goodbyeLocked(e)
 	delete(r.services, e.key)
-	for i, k := range r.order {
-		if k == e.key {
-			r.order = append(r.order[:i], r.order[i+1:]...)
-			break
-		}
-	}
+	r.order = slices.DeleteFunc(r.order, func(k string) bool { return k == e.key })
 	r.resetLocked()
+	r.publishEverywhereLocked(nil, false)
 }
 
 // resetLocked drops the cached record sets and the answer engine's memory
@@ -268,9 +303,11 @@ func (r *Responder) resetLocked() {
 	r.answers.reset()
 }
 
-// Withdraw implements [Advertiser]: it says goodbye — the record set with
-// TTL 0 — and stops answering for the service.
+// Withdraw implements [Advertiser]: it stops answering for the service and
+// says goodbye — TTL 0 — to its records that no remaining service
+// publishes.
 func (r *Responder) Withdraw(_ context.Context, instanceName, serviceType string) error {
+	defer r.follow()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.services[noopKey(instanceName, serviceType)]
@@ -293,10 +330,13 @@ func (r *Responder) Active() []Service {
 }
 
 // TriggerReannounce announces every published service now, outside the
-// broadcast schedule — for a host that observed a link change (interface
-// up, address assigned). The interfaces' addresses are read again. It is
-// matter.js MdnsAdvertisement.broadcast, "a single announcement
-// immediately" (MdnsAdvertisement.ts:82-95 at 862ad75f), for each service.
+// broadcast schedule, with the goodbyes of the records that left — for a
+// host that observed a link change (interface up, address assigned). The
+// interfaces' addresses are read again. It is matter.js
+// MdnsServer.broadcast with no service named: one publication per
+// interface (MdnsServer.ts:210-223 at db021da0). [Responder.CheckInterfaces]
+// is the narrower call, which publishes only on the interfaces that
+// changed and repeats it a second later.
 func (r *Responder) TriggerReannounce(context.Context) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -345,8 +385,9 @@ func (r *Responder) ServiceRetransmission(instanceName, serviceType string) {
 	}
 }
 
-// Close implements [Advertiser]: every service says goodbye, then the
-// sockets close. Idempotent.
+// Close implements [Advertiser]: every service is withdrawn — one goodbye
+// per interface for every record peers may cache there — then the sockets
+// close. No goodbye is retried after Close. Idempotent.
 func (r *Responder) Close() error {
 	r.mu.Lock()
 	if r.closed {
@@ -354,9 +395,7 @@ func (r *Responder) Close() error {
 		return nil
 	}
 	for _, k := range r.order {
-		e := r.services[k]
-		r.stopLocked(e)
-		r.goodbyeLocked(e)
+		r.stopLocked(r.services[k])
 	}
 	for _, t := range r.answers.truncated {
 		t.timer.Stop()
@@ -365,9 +404,14 @@ func (r *Responder) Close() error {
 	clear(r.services)
 	r.order = nil
 	r.resetLocked()
+	r.publishEverywhereLocked(nil, false)
+	r.stopAllGoodbyeRetriesLocked()
+	clear(r.linkStates)
+	r.stopChangeRepeatLocked()
 	r.closed = true
 	socks := r.socks
 	r.mu.Unlock()
+	r.follow()
 	// The receive loops take r.mu; they are waited for outside it.
 	if socks != nil {
 		return socks.close()

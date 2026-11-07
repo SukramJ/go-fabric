@@ -14,9 +14,11 @@ import (
 // that observes a link change (interface up, address assigned) and should
 // not wait for the advertiser's broadcast schedule. It forwards to the
 // advertiser's TriggerReannounce (mdns.Responder.TriggerReannounce: one
-// broadcast of every published service, matter.js
-// MdnsAdvertisement.broadcast) and is a no-op on an advertiser without one
-// (mdns.Noop, a custom Advertiser).
+// publication of every published service per interface, with the goodbyes
+// of the addresses that left, matter.js MdnsServer.broadcast) and is a
+// no-op on an advertiser without one (mdns.Noop, a custom Advertiser). The
+// responder also follows the interfaces itself at
+// [Network].InterfaceCheck.
 func (n *Node) TriggerReannounce(ctx context.Context) {
 	if r, ok := n.advertiser.(interface{ TriggerReannounce(context.Context) }); ok {
 		r.TriggerReannounce(ctx)

@@ -591,7 +591,12 @@ func TestGenDiag_TestEventTriggersEnabled(t *testing.T) {
 	if s := status(map[uint8]any{0: key, 1: uint64(0xdead)}); s != im.StatusUnsupportedCommand {
 		t.Errorf("handler status: %v, want the handler's UnsupportedCommand", s)
 	}
-	if err := g.EnableTestEventTriggers(make([]byte, 16), func(context.Context, uint64) error { return nil }); err == nil {
-		t.Error("an all-zero key was accepted")
+	// An all-zero key is matter.js's "not enabled" (GeneralDiagnosticsServer.ts
+	// initialize, :143-157 at db021da0): it disables the test commands again.
+	if err := g.EnableTestEventTriggers(make([]byte, 16), func(context.Context, uint64) error { return nil }); err != nil {
+		t.Errorf("an all-zero key: %v", err)
+	}
+	if v, _ := g.MatterRead(0x0008); v != false {
+		t.Errorf("TestEventTriggersEnabled after an all-zero key = %v", v)
 	}
 }

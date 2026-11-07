@@ -586,6 +586,30 @@ already did (`bridge/privacy.go` `maybeUnmaskPrivacy`). The two
 implementations agree; no code moved here. Pinned by `transport/message`'s
 header tests and `bridge/privacy_test.go` (review 2026-11 W1-wire-05).
 
+### BD-Matter-MdnsFollowsAdvertisedAddresses — the responder follows the advertised addresses per interface; the host name stays the Service's
+
+matter.js's MdnsServer follows `Network.interfacesChanged`, which compares
+the MAC and every address of each interface every 60 s while observed
+(`packages/general/src/net/Network.ts:142-215` at `db021da0`), and on a
+change reads the details again, chooses the host name again and publishes
+on the changed interfaces — or on every interface when the host name moved
+(`packages/protocol/src/mdns/MdnsServer.ts:321-339` at `db021da0`). The
+module's responder (`mdns/follow.go`) compares, per interface index, the
+addresses its advertise policy publishes there — the inputs of its records,
+so a change on an excluded container bridge moves nothing — and publishes
+on the changed interfaces with the repeat a second later, as matter.js
+does; every record rebuild reads the addresses again, so it keeps no
+details-retry interval of its own (`InterfaceResponder.ts:43-44`,
+`:166-221` at `db021da0`). It never re-chooses the host name: the SRV target is the
+`mdns.Service`'s (the MAC-derived default the `Build*` helpers fill in, or
+`Responder.HostName`), a host decision the responder does not override,
+so matter.js's every-interface publication after a host-name move has no
+counterpart (`MdnsServerAddressChangeTest.ts` "publishes on every interface
+when the host name changes" is a `left` row). Reasoning: the host name is
+part of the Service the host builds, and the advertised addresses are what
+a peer caches.
+
+
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 
 The commissionable `DT` TXT key + `_T<id>` subtype advertise RootNode

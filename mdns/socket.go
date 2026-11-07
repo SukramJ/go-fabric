@@ -213,11 +213,13 @@ func (s *sockets) addrs(ifIndex int) []net.IP {
 }
 
 // multicast implements [wire]: the IPv4 group when the interface has an
-// IPv4 address, the IPv6 group when it has an IPv6 one.
-func (s *sockets) multicast(pkt []byte, ifIndex int) {
+// IPv4 address, the IPv6 group when it has an IPv6 one. It reports how far
+// the datagram reached — matter.js UdpMulticastServer.send's reach
+// (packages/general/src/net/dns-sd/MdnsSocket.ts:102-127 at db021da0).
+func (s *sockets) multicast(pkt []byte, ifIndex int) reach {
 	ifi, err := net.InterfaceByIndex(ifIndex)
 	if err != nil {
-		return
+		return reachNone
 	}
 	has4, has6 := false, false
 	if addrs, err := ifi.Addrs(); err == nil {
@@ -234,41 +236,53 @@ func (s *sockets) multicast(pkt []byte, ifIndex int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
-		return
+		return reachNone
 	}
+	tried, ok := 0, 0
 	if has4 && s.pc4 != nil {
+		tried++
 		if _, err := s.pc4.WriteTo(pkt, &ipv4.ControlMessage{IfIndex: ifIndex}, mdnsGroup4); err != nil {
 			s.log.Debug("mdns.responder.write4_err", slog.String("iface", ifi.Name), slog.Any("err", err))
+		} else {
+			ok++
 		}
 	}
 	if has6 && s.pc6 != nil {
+		tried++
 		if _, err := s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: ifIndex}, mdnsGroup6); err != nil {
 			s.log.Debug("mdns.responder.write6_err", slog.String("iface", ifi.Name), slog.Any("err", err))
+		} else {
+			ok++
 		}
 	}
+	return reachOf(tried, ok)
 }
 
 // unicast implements [wire]: the querier at its source address and port —
 // 5353 for an mDNS querier, the legacy querier's own port otherwise
 // (RFC 6762 §6.7).
-func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) {
+func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
 	if dst == nil {
-		return
+		return reachNone
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
-		return
+		return reachNone
 	}
-	if dst.IP.To4() != nil {
-		if s.pc4 != nil {
-			_, _ = s.pc4.WriteTo(pkt, &ipv4.ControlMessage{IfIndex: ifIndex}, dst)
-		}
-		return
+	var err error
+	switch {
+	case dst.IP.To4() != nil && s.pc4 != nil:
+		_, err = s.pc4.WriteTo(pkt, &ipv4.ControlMessage{IfIndex: ifIndex}, dst)
+	case dst.IP.To4() == nil && s.pc6 != nil:
+		_, err = s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: ifIndex}, dst)
+	default:
+		return reachNone
 	}
-	if s.pc6 != nil {
-		_, _ = s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: ifIndex}, dst)
+	if err != nil {
+		return reachNone
 	}
+	return reachAll
 }
 
 func isTimeout(err error) bool {

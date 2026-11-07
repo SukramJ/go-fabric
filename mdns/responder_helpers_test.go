@@ -36,6 +36,10 @@ type fakeWire struct {
 	mu          sync.Mutex
 	addrsByLink map[int][]net.IP
 	sent        []sentPacket
+	// fail, when set, decides how far a multicast reaches: reachAll sends
+	// it, reachNone drops it, reachSome records it as sent on some
+	// families only (matter.js MdnsServerTransportTest's failing socket).
+	fail func(m *dns.Msg) reach
 }
 
 func newFakeWire(addrsByLink map[int][]string) *fakeWire {
@@ -65,7 +69,7 @@ func (w *fakeWire) addrs(ifIndex int) []net.IP {
 	return w.addrsByLink[ifIndex]
 }
 
-func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr) {
+func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
 	m := new(dns.Msg)
 	if err := m.Unpack(pkt); err != nil {
 		panic(err)
@@ -74,13 +78,45 @@ func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr) {
 		panic("packet exceeds the mDNS message size")
 	}
 	w.mu.Lock()
-	w.sent = append(w.sent, sentPacket{msg: m, ifIndex: ifIndex, dst: dst})
+	defer w.mu.Unlock()
+	rc := reachAll
+	if w.fail != nil {
+		rc = w.fail(m)
+	}
+	if rc != reachNone {
+		w.sent = append(w.sent, sentPacket{msg: m, ifIndex: ifIndex, dst: dst})
+	}
+	return rc
+}
+
+func (w *fakeWire) multicast(pkt []byte, ifIndex int) reach { return w.record(pkt, ifIndex, nil) }
+
+func (w *fakeWire) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
+	return w.record(pkt, ifIndex, dst)
+}
+
+// setFail installs the multicast failure rule (nil: every send leaves).
+func (w *fakeWire) setFail(f func(m *dns.Msg) reach) {
+	w.mu.Lock()
+	w.fail = f
 	w.mu.Unlock()
 }
 
-func (w *fakeWire) multicast(pkt []byte, ifIndex int) { w.record(pkt, ifIndex, nil) }
-
-func (w *fakeWire) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) { w.record(pkt, ifIndex, dst) }
+// setAddrs replaces the advertised addresses of an interface (none
+// removes it from the links).
+func (w *fakeWire) setAddrs(ifIndex int, addrs ...string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(addrs) == 0 {
+		delete(w.addrsByLink, ifIndex)
+		return
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, a := range addrs {
+		ips = append(ips, net.ParseIP(a))
+	}
+	w.addrsByLink[ifIndex] = ips
+}
 
 // take returns the packets sent since the last take.
 func (w *fakeWire) take() []sentPacket {
@@ -248,4 +284,32 @@ func expectSent(t *testing.T, got []sentPacket, n int) {
 		}
 		t.Fatalf("%d packets sent, want %d:%s", len(got), n, b.String())
 	}
+}
+
+// goodbyeRecords returns copies of rrs with TTL 0, the cache-flush bits
+// kept — the goodbye of a record set whose unique records carry the bit
+// (MdnsTest.ts:359 at db021da0: "unique records keep the cache-flush
+// bit").
+func goodbyeRecords(rrs []dns.RR) []dns.RR {
+	out := make([]dns.RR, len(rrs))
+	for i, rr := range rrs {
+		c := dns.Copy(rr)
+		c.Header().Ttl = 0
+		out[i] = c
+	}
+	return out
+}
+
+// goodbyeOf is the goodbye the responder sends for rrs once no published
+// record is left of their sets: TTL 0, the cache-flush bit on the unique
+// types only (InterfaceResponder.ts:503-507 at db021da0).
+func goodbyeOf(rrs []dns.RR) []dns.RR {
+	out := goodbyeRecords(rrs)
+	for _, rr := range out {
+		rr.Header().Class &^= classCacheFlush
+		if isUniqueType(rr.Header().Rrtype) {
+			rr.Header().Class |= classCacheFlush
+		}
+	}
+	return out
 }
