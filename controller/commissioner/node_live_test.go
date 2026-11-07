@@ -43,6 +43,10 @@ func TestCommissionLiveThroughMulticast(t *testing.T) {
 	other := mdns.NewResponder()
 	defer func() { _ = other.Close() }()
 	startNodeWith(t, other, "[::]:0", nodePasscode+1, ownD^0x800)
+	// The node to pass over is advertised, so passing over it is shown.
+	if otherInstance := commissionableInstance(t, other); strings.EqualFold(otherInstance, instance) {
+		t.Fatalf("both nodes advertise instance %s", instance)
+	}
 	names, err := discovery.Open(nil)
 	if err != nil {
 		t.Skipf("no multicast here: %v", err)
