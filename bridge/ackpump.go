@@ -57,6 +57,7 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 	b.ackTracker = t
 	if b.outboundReliable == nil {
 		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
+		b.outboundReliable.wake = b.wakeAckPump
 		b.outboundReliable.fixedBackoff.Store(b.icd.fixedBackoff.Load())
 	}
 	b.mu.Unlock()
@@ -161,6 +162,7 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	// packages/protocol/src/protocol/ExchangeManager.ts:324), leaving
 	// the peer to retransmit until its cap fires.
 	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, b.clk().Now())
+	b.wakeAckPump()
 }
 
 // refreshAckCounter rewrites requestHdr.MessageCounter to the latest
@@ -328,12 +330,48 @@ func (b *Bridge) runAckPump(ctx context.Context) {
 	ticker := b.clk().NewTicker(ackPumpInterval)
 	defer ticker.Stop()
 	for {
+		if b.ackPumpIdle(tracker, outbound) {
+			// Nothing to acknowledge, retransmit or sweep: the pump
+			// stops ticking until work arrives, so an idle node does not
+			// wake every ackPumpInterval and a fake clock moves to its
+			// next real deadline rather than in ackPumpInterval steps
+			// (brief FP2 §2: a test site waiting a subscription's max
+			// interval stepped 50 ms at a time). matter.js arms a timer per
+			// exchange instead of polling — the ack receipt timer and the
+			// retransmission timer (packages/protocol/src/protocol/MessageExchange.ts:258,
+			// :789 at db021da0) — so its idle exchange layer holds no timer.
+			ticker.Stop()
+			select {
+			case <-ctx.Done():
+				return
+			case <-b.ackPumpWake:
+			}
+			ticker.Reset(ackPumpInterval)
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case now := <-ticker.C():
 			b.ackPumpTick(tracker, outbound, now)
 		}
+	}
+}
+
+// ackPumpIdle reports whether the pump has nothing to do: no
+// acknowledgement owed, no reliable message awaiting its ack and no
+// timed deadline left to sweep. A producer records its work before it
+// wakes the pump (wakeAckPump), so a wake that races this check is
+// buffered and not lost.
+func (b *Bridge) ackPumpIdle(tracker *mrp.AckTracker, outbound *outboundReliableTracker) bool {
+	return tracker.Pending() == 0 && (outbound == nil || outbound.Pending() == 0) && !b.routing.hasTimedDeadlines()
+}
+
+// wakeAckPump wakes an idle ACK pump; a pending wake stands for any
+// number of them.
+func (b *Bridge) wakeAckPump() {
+	select {
+	case b.ackPumpWake <- struct{}{}:
+	default:
 	}
 }
 

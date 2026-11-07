@@ -296,8 +296,29 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 			return
 		}
 		n.noteICDActive()
-		if s != nil && s.ID() != interaction.NoSubscription && n.cfg.Hooks.SubscriptionAlive != nil {
-			n.cfg.Hooks.SubscriptionAlive()
+		if h := n.cfg.Hooks.SubscriptionAlive; s != nil && s.ID() != interaction.NoSubscription && h != nil {
+			// The hook runs on the node's job queue, behind the report's
+			// store writes and hooks: matter.js's updated iterates the
+			// whole mutate — its drained queue, the structural
+			// announcements, the delayed events — before it emits
+			// subscriptionAlive (packages/node/src/behavior/system/network/NetworkClient.ts:179-190,
+			// packages/node/src/node/client/ClientStructure.ts:482-497 at
+			// db021da0), so a consumer's batch end follows every change and
+			// event of the batch. Called inline, it ran before the report's
+			// EndpointInstalled and Event hooks, and the camera service's
+			// sweep missed an endpoint the batch added (brief FP2 §2). A
+			// keepalive's queues behind the reports before it. matter.js
+			// asks isCurrent after the drain; so does the job, and a
+			// subscription ended meanwhile (Stop, a replacement) emits no
+			// alive for its successor.
+			n.jobs.enqueue(func() {
+				n.mu.RLock()
+				still := n.subOwner == owner
+				n.mu.RUnlock()
+				if still {
+					h()
+				}
+			})
 		}
 	}
 	n.icdSustainHooks(&sreq)

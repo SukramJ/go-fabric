@@ -11,10 +11,14 @@ package bridge
 // available because they share the same compilation unit.
 
 import (
+	"context"
 	"net"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -635,4 +639,44 @@ func TestAckPump_AttachAckTrackerAlsoSetsAckHandler(t *testing.T) {
 	if tracker.Pending() != 0 {
 		t.Errorf("tracker.Pending() = %d after dispatchSecureChannel with HasAck=true; want 0 (discharged)", tracker.Pending())
 	}
+}
+
+// TestAckPump_SleepsWhileIdle: with nothing owed, tracked or timed the
+// pump holds no ticker, so an idle node does not wake every
+// ackPumpInterval and a fake clock moves to its next real deadline
+// (brief FP2 §2); an owed acknowledgement wakes it, the obligation goes
+// out at the next tick, and the pump sleeps again.
+func TestAckPump_SleepsWhileIdle(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		fake := clocktest.New(time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC))
+		b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: fake}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tracker := mrp.NewAckTracker(0)
+		b.AttachAckTracker(tracker)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() { defer close(done); b.runAckPump(ctx) }()
+		defer func() { cancel(); <-done }()
+
+		synctest.Wait()
+		if armed := fake.Armed(); len(armed) != 0 {
+			t.Fatalf("an idle pump holds timers %v", armed)
+		}
+		b.owedInboundAck(loopbackSrc(), buildMsgHdr(9), buildNeedsAckProto(9, 9))
+		synctest.Wait()
+		if armed := fake.Armed(); len(armed) != 1 || armed[0] != ackPumpInterval {
+			t.Fatalf("a woken pump arms %v, want its %v ticker", armed, ackPumpInterval)
+		}
+		fake.Advance(ackPumpInterval)
+		synctest.Wait()
+		if tracker.Pending() != 0 {
+			t.Fatalf("%d obligations left after the tick", tracker.Pending())
+		}
+		if armed := fake.Armed(); len(armed) != 0 {
+			t.Fatalf("the pump holds timers %v once the work is done", armed)
+		}
+	})
 }

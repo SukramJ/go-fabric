@@ -118,6 +118,9 @@ type Hooks struct {
 	SubscriptionStatusChanged func(active bool)
 	// SubscriptionAlive: the default subscription delivered a report or a
 	// keepalive, or was established (NetworkClient.ts:157-172, :185-187).
+	// For a report it runs after the report's other hooks — its
+	// EndpointInstalled, cluster and Event hooks — as matter.js emits
+	// subscriptionAlive once the report's mutate has finished.
 	SubscriptionAlive func()
 	// Event: an event the peer reported, for every cluster. value is the
 	// payload decoded through the event's definition, the raw [spec.Node]

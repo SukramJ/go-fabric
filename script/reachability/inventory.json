@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7761,
+  "entry_points": 7764,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17731,
+    "total_exported": 17733,
     "reachable": 12335,
-    "whitelisted": 5396,
+    "whitelisted": 5398,
     "unreachable": 0
   },
   "by_package": [],
@@ -503,84 +503,91 @@
       "identifier": "TestAckPumpStandaloneAckCarriesTheBridgeExchangeRole",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 370
+      "line": 374
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_AttachAckTrackerAlsoSetsAckHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 603
+      "line": 607
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_Discharge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 239
+      "line": 243
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_EchoesPeerSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 144
+      "line": 148
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 529
+      "line": 533
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck_UnknownObligationNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 587
+      "line": 591
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_MultipleExchanges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 434
+      "line": 438
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_NoSrcDropsObligation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 457
+      "line": 461
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_NoTrackerNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 58
+      "line": 62
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_OweAndEmit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 76
+      "line": 80
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_SessionScopedExchangeCollision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 274
+      "line": 278
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAckPump_SleepsWhileIdle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ackpump_test.go",
+      "line": 649
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_SourceFromTheInboundDestination",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 202
+      "line": 206
     },
     {
       "package": "bridge",
@@ -5578,7 +5585,7 @@
       "identifier": "TestTickOutboundReliable_NilListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 494
+      "line": 498
     },
     {
       "package": "bridge",
@@ -23148,7 +23155,7 @@
       "identifier": "TestDeviceIOImageParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 346
+      "line": 368
     },
     {
       "package": "controller/camera",
@@ -23968,6 +23975,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 39
+    },
+    {
+      "package": "controller/client",
+      "identifier": "HoldsDefaultSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 177
     },
     {
       "package": "controller/client",
