@@ -135,6 +135,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 | BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
 | BD-Matter-Commissioner-TermsRequirementRead | `ControllerCommissioningFlow.ts:570` at `db021da0` leaves the terms-and-conditions consent a TODO after step 8.2 and the flow reads no TC attribute (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"// TODO Step 9: If device and Controller supports T&C Feature then User consent is handled"` | this module: connectedhomeip sends the acknowledgement as a parameter and reads no TC attribute either (`src/controller/CHIPDeviceController.cpp:2592-2603`, `:3946-3957` at `6170af84`); the device side it reads is its own TC server (`BD-chip-GeneralCommissioning-TermsAndConditions`) | no |
+| BD-matterjs-mdns-interface-allowlist | `MdnsServer.ts:211` at `db021da0` announces "on every multicast interface", one `InterfaceResponder` per listed interface (`:36-38`), with no choice of interfaces (presence) | `packages/protocol/src/mdns/MdnsServer.ts` | `"Announce the named services, or all registered services if none are named, on every multicast interface."` | this module: an operator's allow-list by interface name within the default container filter (owner decision on issue 450); matter.js-based bridges offer the option at the host level | no |
 
 ---
 
@@ -6427,3 +6428,30 @@ the information step, no step of its own. Pinned by
 `TestGeneralCommissioningErrorTyped` (`controller/commissioner/terms_test.go`)
 and `TestPairTermsRequired` (`controller/pair_terms_test.go`). Retire when
 matter.js's flow reads the requirement (the marker goes).
+
+### BD-matterjs-mdns-interface-allowlist — the mDNS responder can be restricted to named host interfaces
+
+matter.js's `MdnsServer` keeps one `InterfaceResponder` per network
+interface and announces "on every multicast interface", re-reading the
+interfaces on `Network.interfacesChanged`
+(`packages/protocol/src/mdns/MdnsServer.ts:36-43`, `:209-214` at
+`db021da0`); it has no allow-list. `node.MDNS.Interfaces` restricts the
+module's responder to the named host interfaces: `defaultAdvertiser`
+composes `mdns.Responder.InterfaceFilter` as the default container filter
+(`mdns.DefaultInterfaceFilter`) or "not named", so a named `docker0` or
+`hassio` stays filtered, and an interface outside the list is announced on
+and answered on as one the advertise policy excludes — listed, no
+addresses, no records (`BD-Matter-MdnsFollowsAdvertisedAddresses`). An
+unknown name is accepted (the interface check picks it up when it appears)
+and `Node.DiagnoseMDNS` names it (`mdns.DiagnoseInterfaces`:
+`interface_not_found`, `interface_filtered`, `interface_no_addresses`). It
+does not scope `Network.Listen`. The case is a dual-homed host whose
+gateway relays mDNS between its networks, so controllers cache the far
+network's address too (go-ha2fabric issue 40); matter.js-based bridges
+offer the same choice to operators at the host level. Owner decisions
+2026-11-07 (issue 450): by name, within the default filter, `Listen`
+untouched. Pinned by `TestMDNSInterfacesFilter`, `TestMDNSInterfacesValidate`,
+`TestDiagnoseMDNSNamesUnknownInterface` (`node/mdns_interfaces_test.go`),
+`TestDiagnoseInterfaces` and `TestAllowListAdvertisesOnNamedInterfaceOnly`
+(`mdns/diagnose_interfaces_test.go`). Retire when matter.js's server takes
+a choice of interfaces (the marker goes).

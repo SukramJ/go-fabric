@@ -39,10 +39,12 @@ var virtualIfacePrefixes = []string{
 	"cni-podman",
 }
 
-// isVirtualInterfaceName reports whether name looks like a container /
-// virtualisation bridge whose addresses are not routable from peers. It is
-// the default [Responder.InterfaceFilter].
-func isVirtualInterfaceName(name string) bool {
+// DefaultInterfaceFilter reports whether name looks like a container /
+// virtualisation bridge whose addresses are not routable from peers
+// (virtualIfacePrefixes, matched case-insensitively). It is the default
+// [Responder.InterfaceFilter]; a filter of the host's own composes it, so
+// a narrower choice of interfaces keeps the bridges out as well.
+func DefaultInterfaceFilter(name string) bool {
 	n := strings.ToLower(name)
 	for _, p := range virtualIfacePrefixes {
 		if strings.HasPrefix(n, p) {

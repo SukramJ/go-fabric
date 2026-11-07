@@ -190,7 +190,7 @@ Defaults worth knowing:
 | --- | --- |
 | `Network.Listen` | `:5540` |
 | `Advertiser` | the node's own `mdns.Responder` (`mdns.NewResponder`); `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
-| `Network.MDNS` | the mDNS responder, SRV target from the interface's MAC, every record 120 s, announced on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days); `Off` publishes nothing, `HostName` sets an SRV target whose address records the OS responder publishes |
+| `Network.MDNS` | the mDNS responder, SRV target from the interface's MAC, every record 120 s, announced on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days); `Off` publishes nothing, `HostName` sets an SRV target whose address records the OS responder publishes, `Interfaces` restricts it to the named host interfaces (the container filter still applies) |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |

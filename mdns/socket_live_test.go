@@ -80,7 +80,7 @@ func TestJoinMcast6_ProbeAndClose(t *testing.T) {
 func TestSockets_Lifecycle(t *testing.T) {
 	skipUnlessMulticastV4(t)
 	r := NewResponder()
-	s, err := openSockets(isVirtualInterfaceName, r.logger(), &r.clock, func([]byte, int, *net.UDPAddr) {})
+	s, err := openSockets(DefaultInterfaceFilter, r.logger(), &r.clock, func([]byte, int, *net.UDPAddr) {})
 	if err != nil {
 		t.Skipf("the responder opened no multicast socket on any interface of this host: %v", err)
 	}

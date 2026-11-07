@@ -104,9 +104,34 @@ then discovers the node, and a controller reaches it by address alone.
 `Node.DiagnoseMDNS()` reports what would keep a controller from finding or
 commissioning it.
 
+The responder announces and answers on every multicast-capable interface,
+each with that interface's own addresses, and leaves container and
+virtualisation bridges out by name (`docker*`, `br-*`, `veth*`, `hassio*`,
+… — `mdns.DefaultInterfaceFilter`). `Network.MDNS.Interfaces` restricts it
+to the named interfaces: `[]string{"br30"}` announces and answers on `br30`
+alone. The default filter still applies to a named interface, so naming
+`docker0` or `hassio` does not publish its address. A name the host does
+not have is accepted — interfaces come and go, and the interface check
+picks it up when it appears — and `Node.DiagnoseMDNS()` reports it
+(`interface_not_found`), as it does a named bridge (`interface_filtered`)
+and a named interface without an advertised address
+(`interface_no_addresses`). The list does not scope the UDP listen socket;
+`Network.Listen` takes a host address for that.
+
+The case for it is a dual-homed host behind a gateway that relays mDNS
+between its networks (an mDNS reflector or proxy): the node answers each
+network with that network's address, the gateway relays the other
+network's answer as well, and the controllers cache two addresses for one
+host, one of them across the router. Advertising on the controllers'
+network alone keeps the second address out. matter.js publishes on every
+interface; the allow-list is this module's (*Ahead of matter.js*,
+`BD-matterjs-mdns-interface-allowlist`).
+
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
 [`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
 [`node/mdns.go`](https://github.com/SukramJ/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
+[`mdns/interface_filter.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/interface_filter.go) (`DefaultInterfaceFilter`),
+[`mdns/diagnose_interfaces.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/diagnose_interfaces.go) (`DiagnoseInterfaces`),
 [`internal/chiptool/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/internal/chiptool/doc.go) (the harness).*
 
 ## Logs

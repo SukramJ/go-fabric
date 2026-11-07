@@ -179,7 +179,7 @@ func (l link) addrsFunc() func() []net.IP { return func() []net.IP { return l.ad
 // the first Publish; the caller closes it ([Responder.Close]).
 func NewResponder() *Responder {
 	r := &Responder{
-		InterfaceFilter: isVirtualInterfaceName,
+		InterfaceFilter: DefaultInterfaceFilter,
 		services:        map[string]*entry{},
 		links:           map[int]*linkRecords{},
 		linkStates:      map[int]*linkState{},
@@ -214,7 +214,7 @@ func (r *Responder) filter() func(string) bool {
 	if r.InterfaceFilter != nil {
 		return r.InterfaceFilter
 	}
-	return isVirtualInterfaceName
+	return DefaultInterfaceFilter
 }
 
 // ensureWireLocked opens the sockets on first use. Caller holds r.mu.

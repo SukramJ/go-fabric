@@ -335,31 +335,7 @@ type hostIface struct {
 // records should publish (see filterPrimaryHostIPs for the policy).
 // exclude may be nil; see filterPrimaryHostIPs.
 func primaryHostIPs(exclude func(string) bool) []string {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil
-	}
-	infos := make([]hostIface, 0, len(ifaces))
-	for _, ifi := range ifaces {
-		info := hostIface{
-			name:         ifi.Name,
-			up:           ifi.Flags&net.FlagUp != 0,
-			multicast:    ifi.Flags&net.FlagMulticast != 0,
-			loopback:     ifi.Flags&net.FlagLoopback != 0,
-			pointToPoint: ifi.Flags&net.FlagPointToPoint != 0,
-		}
-		addrs, aerr := ifi.Addrs()
-		if aerr != nil {
-			continue
-		}
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok {
-				info.ips = append(info.ips, ipn.IP)
-			}
-		}
-		infos = append(infos, info)
-	}
-	return filterPrimaryHostIPs(infos, exclude)
+	return filterPrimaryHostIPs(hostIfaces(), exclude)
 }
 
 // parseHostIPs turns the advertised address strings back into net.IP so a
@@ -389,7 +365,7 @@ func parseHostIPs(ips []string) []net.IP {
 // bridges (docker0, hassio, br-<hex>, veth*, …) pass the flag checks —
 // they are UP and multicast-capable — but their addresses are unroutable
 // from LAN peers, so they are dropped by exclude — nil means
-// [isVirtualInterfaceName], which holds the same policy the daemon's
+// [DefaultInterfaceFilter], which holds the same policy the daemon's
 // client-discovery advertiser applies.
 //
 // Collecting from all valid NICs (multi-homed hosts have multiple
@@ -401,7 +377,7 @@ func parseHostIPs(ips []string) []net.IP {
 // addresses by selection preference (records.go addressRecords).
 func filterPrimaryHostIPs(ifaces []hostIface, exclude func(string) bool) []string {
 	if exclude == nil {
-		exclude = isVirtualInterfaceName
+		exclude = DefaultInterfaceFilter
 	}
 	seen := make(map[string]struct{})
 	var v4s, v6s []string
@@ -490,23 +466,7 @@ func hostAddrsFor(exclude func(string) bool) func(ifIndex int) []net.IP {
 		if err != nil {
 			return nil
 		}
-		info := hostIface{
-			name:         ifi.Name,
-			up:           ifi.Flags&net.FlagUp != 0,
-			multicast:    ifi.Flags&net.FlagMulticast != 0,
-			loopback:     ifi.Flags&net.FlagLoopback != 0,
-			pointToPoint: ifi.Flags&net.FlagPointToPoint != 0,
-		}
-		addrs, err := ifi.Addrs()
-		if err != nil {
-			return nil
-		}
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok {
-				info.ips = append(info.ips, ipn.IP)
-			}
-		}
-		return parseHostIPs(filterPrimaryHostIPs([]hostIface{info}, exclude))
+		return parseHostIPs(filterPrimaryHostIPs([]hostIface{hostIfaceOf(*ifi)}, exclude))
 	}
 }
 

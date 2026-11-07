@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -688,6 +689,14 @@ func (c *Config) optionalErrors() []error {
 	}
 	if c.Network.WiFi != nil && c.Network.WiFi.Reporter == nil {
 		errs = append(errs, errors.New("node: Network.WiFi needs its Reporter"))
+	}
+	for i, name := range c.Network.MDNS.Interfaces {
+		switch {
+		case strings.TrimSpace(name) == "":
+			errs = append(errs, fmt.Errorf("node: Network.MDNS.Interfaces[%d] is empty", i))
+		case slices.Contains(c.Network.MDNS.Interfaces[:i], name):
+			errs = append(errs, fmt.Errorf("node: Network.MDNS.Interfaces names %q twice", name))
+		}
 	}
 	if c.TLS != nil && c.TLS.CertificatePort == nil {
 		errs = append(errs, errNoCertificatePort)

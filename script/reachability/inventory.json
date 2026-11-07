@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7792,
+  "entry_points": 7797,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17751,
-    "reachable": 12339,
-    "whitelisted": 5412,
+    "total_exported": 17758,
+    "reachable": 12341,
+    "whitelisted": 5417,
     "unreachable": 0
   },
   "by_package": [],
@@ -31909,6 +31909,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestAllowListAdvertisesOnNamedInterfaceOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/diagnose_interfaces_test.go",
+      "line": 82
+    },
+    {
+      "package": "mdns",
       "identifier": "TestDeriveUniqueIDFromIdentityIsStableAndDistinct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
@@ -31934,6 +31941,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
       "line": 21
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestDiagnoseInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/diagnose_interfaces_test.go",
+      "line": 47
     },
     {
       "package": "mdns",
@@ -32437,7 +32451,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 31
+      "line": 32
     },
     {
       "package": "node",
@@ -32563,7 +32577,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "node",
@@ -32577,14 +32591,14 @@
       "identifier": "MDNSFinding",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 30
+      "line": 61
     },
     {
       "package": "node",
       "identifier": "MDNSService",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 34
+      "line": 65
     },
     {
       "package": "node",
@@ -32858,6 +32872,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/mdns_internal_test.go",
       "line": 45
+    },
+    {
+      "package": "node",
+      "identifier": "TestDiagnoseMDNSNamesUnknownInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 68
+    },
+    {
+      "package": "node",
+      "identifier": "TestMDNSInterfacesFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 19
+    },
+    {
+      "package": "node",
+      "identifier": "TestMDNSInterfacesValidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 41
     },
     {
       "package": "node",
