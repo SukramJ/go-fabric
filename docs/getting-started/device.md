@@ -205,7 +205,7 @@ Defaults worth knowing:
 | `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
-| `TimeSynchronization` | mounted, UTCTime, Granularity and TimeSource of the node's UTC; `Off` leaves it off the root, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
+| `TimeSynchronization` | mounted, UTCTime, Granularity and TimeSource of the node's UTC; `Off` leaves it off the root — the node then has no UTC, and `Aggregator.Add` and `Replace` refuse a Valve with TimeSync —, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
@@ -464,6 +464,19 @@ is never set:
 The offset lives in memory: after a restart the node serves its host clock
 again, where chip's node keeps the time its system clock was set to. GeneralDiagnostics'
 TimeSnapshot reads the same UTC. The reference daemon turns no feature on.
+
+The node's UTC is also the Matter time of the Thermostat's suggestions
+(TSUGGEST) and the Valve's AutoCloseTime (TS): the node hands it to them
+as their endpoints join the topology (`AttachMatterTime`) and tells them
+whenever it adopts a time — a valve still counting down sets AutoCloseTime
+anew, the Thermostat re-evaluates its suggestions. A move of the host clock
+or of `PlatformTime` tells nobody. With `TimeSynchronization.Off` the node
+has no UTC: suggestions answer INVALID_IN_STATE, and `Aggregator.Add` and
+`Replace` refuse a Valve with TimeSync, naming the endpoint and the
+cluster, as connectedhomeip's valve refuses TimeSync without the cluster.
+Other device-side timestamps (event EpochTimestamp, ResourceMonitoring's
+LastChangedTime, DiagnosticLogs, the energy servers) still read the host
+clock ([issue 445](https://github.com/SukramJ/go-fabric/issues/445)).
 
 ## Persistence
 
