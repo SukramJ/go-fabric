@@ -574,14 +574,17 @@ func pollSleep(wall clock.Clock, d time.Duration, done <-chan struct{}) {
 // busyHolds is the strict goroutine check of a loopback or wall-clock
 // site: whether a working goroutine of the process holds the site, still
 // is how long nothing on the site moved. It holds for at most
-// holdBudget of stillness: past it, the work is the tests' beside this
-// one — the site's own real-socket work moves a counter or ends sooner —
-// and holding longer let a busy package starve a loopback site's steps
-// until its context ended (TestControllerServesTheCameraRequestor's
-// Restart and Close in the controller package's full run, brief FP2 §2).
-// matter.js MockTime bounds a host operation the same way
+// holdBudget of stillness: past it, the work is taken to be the tests'
+// beside this one, and holding longer let a busy package starve a
+// loopback site's steps until its context ended
+// (TestControllerServesTheCameraRequestor's Restart and Close in the
+// controller package's full run, brief FP2 §2). It does not tell whose
+// goroutine works: uncounted work of the site's own, starved past
+// holdBudget, can be overtaken by the next step, and the site logs it, as
+// it logs abandoned counted work (which this check does not touch).
+// matter.js MockTime abandons a host operation the same way
 // (MAX_HOST_ASYNC_MS, packages/testing/src/mocks/time.ts:63-70 at
-// 862ad75f). The site logs the first time it moves on in one wait.
+// db021da0). The site logs the first time it moves on in one wait.
 func (s *Site) busyHolds(samples []metrics.Sample, still time.Duration, starved *bool) bool {
 	if !busy(samples, &s.inSyscall, true) {
 		return false
