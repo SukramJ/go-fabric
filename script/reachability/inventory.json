@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7754,
+  "entry_points": 7755,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17728,
+    "total_exported": 17729,
     "reachable": 12334,
-    "whitelisted": 5394,
+    "whitelisted": 5395,
     "unreachable": 0
   },
   "by_package": [],
@@ -32172,6 +32172,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_internal_test.go",
       "line": 160
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestRecordsForAddresslessInterfaceAreEmpty",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/addressless_interface_test.go",
+      "line": 21
     },
     {
       "package": "mdns",

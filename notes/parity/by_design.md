@@ -609,6 +609,26 @@ when the host name changes" is a `left` row). Reasoning: the host name is
 part of the Service the host builds, and the advertised addresses are what
 a peer caches.
 
+An interface the policy leaves without advertised addresses carries no
+service records at all (`mdns/answer.go` `recordsForLocked`). matter.js's
+generator yields PTR, SRV and TXT for details with no addresses
+(`packages/protocol/src/advertisement/mdns/MdnsAdvertisement.ts:154-177` at
+`db021da0`), but its details are every address of the interface
+(`packages/nodejs/src/net/NodeJsNetwork.ts:188-205`), so that case is an
+interface that has none. Here the advertise policy can leave an interface
+with addresses it does not publish — a carrier-less container bridge, say —
+and a multicast sent there loops back to the host, so a controller on the
+same host receives an SRV with no A or AAAA; connectedhomeip's resolver
+keeps the lookup per interface and gives up with `CHIP_ERROR_TIMEOUT` once
+no address arrived (`src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:115-125`
+at `6170af84`). Observed 2026-11-07 against the chip harness on a host with
+Docker bridges: the review fix of PR #437 answered the service records on
+such an interface and every commissioning failed after AddNOC; the rule
+was restored the same day with a regression test
+(`TestRecordsForAddresslessInterfaceAreEmpty`). A goodbye for an
+interface left without advertised addresses therefore names the service
+records too, where matter.js's names the addresses alone.
+
 
 ### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
 

@@ -136,14 +136,21 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 		byService: map[string][]dns.RR{}, owned: map[string]bool{},
 		byKey: map[string]bool{}, setKeys: map[string]bool{}, at: now,
 	}
-	// A listed interface gets its service records whatever its address
-	// list — matter.js's generator yields PTR, SRV and TXT for details with
-	// no addresses (MdnsAdvertisement.ts:154-185 at db021da0), only the
-	// view of an unlisted interface is missing (InterfaceResponder.ts:796-800)
-	// — so a goodbye for an interface left without advertised addresses
-	// names the addresses alone, not the service.
+	// An interface without advertised addresses carries no service records,
+	// listed or not. matter.js's generator yields PTR, SRV and TXT for
+	// details with no addresses (MdnsAdvertisement.ts:154-177 at db021da0),
+	// but its details are every address of the interface, so that case is
+	// an interface that has none; here the advertise policy can leave a
+	// carrier-less container bridge with addresses it does not publish, and
+	// a multicast sent there loops back to the host. A controller on the
+	// host — chip's resolver keyed by interface — then holds an SRV without
+	// an A or AAAA and times out (connectedhomeip
+	// src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:115-125 at
+	// 6170af84, CHIP_ERROR_TIMEOUT once no address arrived). A goodbye for
+	// an interface left without addresses therefore names the service
+	// records too (BD-Matter-MdnsFollowsAdvertisedAddresses).
 	addrs := r.wire.addrs(ifIndex)
-	if len(addrs) > 0 || r.isListedLocked(ifIndex) {
+	if len(addrs) > 0 {
 		for _, key := range r.order {
 			e := r.services[key]
 			var hostAddrs []net.IP
