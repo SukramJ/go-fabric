@@ -61,7 +61,7 @@ func (c *nodeLabelChanges) snapshot() []contract.Origin {
 // test of its own for a host's set: its host assigns
 // state.basicInformation.nodeLabel, and the datasource commits, persists
 // and reports it as it does a controller's write
-// (mattercore.BasicInformation.WriteNodeLabel cites the lines).
+// (mattercore.BasicInformation.SetNodeLabel cites the lines).
 func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)

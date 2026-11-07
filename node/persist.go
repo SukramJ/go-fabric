@@ -166,10 +166,10 @@ func (p persisted) NodeLabel(ctx context.Context, key device.SourceKey) string {
 // ConfigurationVersion and wires their persistence.
 func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) {
 	if v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey); err == nil && ok {
-		_ = b.SetNodeLabel(v)
+		_ = b.RestoreNodeLabel(v)
 	}
 	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
-		_ = b.SetLocation(v)
+		_ = b.RestoreLocation(v)
 	}
 	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
 	b.SetOnPersistentWrite(func(nodeLabel, location string) {

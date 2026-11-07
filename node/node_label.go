@@ -28,7 +28,7 @@ import "context"
 // A bridged device's NodeLabel is device.Device.Rename's. Mirrors matter.js,
 // whose host assigns state.basicInformation.nodeLabel on the server node
 // and whose datasource commits it as it commits a controller's write
-// (mattercore.BasicInformation.WriteNodeLabel cites the lines).
+// (mattercore.BasicInformation.SetNodeLabel cites the lines).
 func (n *Node) SetNodeLabel(ctx context.Context, label string) error {
-	return n.root.BasicInformation.WriteNodeLabel(ctx, label)
+	return n.root.BasicInformation.SetNodeLabel(ctx, label)
 }

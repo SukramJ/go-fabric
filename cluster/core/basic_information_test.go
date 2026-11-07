@@ -419,11 +419,11 @@ func TestBasicInfo_WriteReadOnlyAttrSentinelViaIs(t *testing.T) {
 	}
 }
 
-func TestBasicInfo_SetNodeLabelValid(t *testing.T) {
+func TestBasicInfo_RestoreNodeLabelValid(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
-	if err := b.SetNodeLabel("updated"); err != nil {
-		t.Fatalf("SetNodeLabel: %v", err)
+	if err := b.RestoreNodeLabel("updated"); err != nil {
+		t.Fatalf("RestoreNodeLabel: %v", err)
 	}
 	v, _ := b.MatterRead(0x0005)
 	if v.(tlv.BoundedString).Value != "updated" {
@@ -431,12 +431,12 @@ func TestBasicInfo_SetNodeLabelValid(t *testing.T) {
 	}
 }
 
-func TestBasicInfo_SetNodeLabelTooLong(t *testing.T) {
+func TestBasicInfo_RestoreNodeLabelTooLong(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
-	err := b.SetNodeLabel(strings.Repeat("y", 33))
+	err := b.RestoreNodeLabel(strings.Repeat("y", 33))
 	if err == nil {
-		t.Fatal("expected error for SetNodeLabel > 32 bytes, got nil")
+		t.Fatal("expected error for RestoreNodeLabel > 32 bytes, got nil")
 	}
 }
 
@@ -850,37 +850,37 @@ func TestBasicInfo_PersistentWriteHook_FiresOnLocationWrite(t *testing.T) {
 	}
 }
 
-// TestBasicInfo_PersistentWriteHook_NotFiredBySetNodeLabel verifies that
-// the out-of-band SetNodeLabel restore path does NOT invoke the
+// TestBasicInfo_PersistentWriteHook_NotFiredByRestoreNodeLabel verifies that
+// the out-of-band RestoreNodeLabel restore path does NOT invoke the
 // persistence hook — restores must not echo back into the store.
-func TestBasicInfo_PersistentWriteHook_NotFiredBySetNodeLabel(t *testing.T) {
+func TestBasicInfo_PersistentWriteHook_NotFiredByRestoreNodeLabel(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	var calls int
 	b.SetOnPersistentWrite(func(string, string) { calls++ })
 
-	if err := b.SetNodeLabel("restored-label"); err != nil {
-		t.Fatalf("SetNodeLabel: %v", err)
+	if err := b.RestoreNodeLabel("restored-label"); err != nil {
+		t.Fatalf("RestoreNodeLabel: %v", err)
 	}
 	if calls != 0 {
-		t.Fatalf("hook fired %d times for out-of-band SetNodeLabel, want 0", calls)
+		t.Fatalf("hook fired %d times for out-of-band RestoreNodeLabel, want 0", calls)
 	}
 }
 
-// TestBasicInfo_PersistentWriteHook_NotFiredBySetLocation verifies that
-// the out-of-band SetLocation restore path does NOT invoke the
+// TestBasicInfo_PersistentWriteHook_NotFiredByRestoreLocation verifies that
+// the out-of-band RestoreLocation restore path does NOT invoke the
 // persistence hook.
-func TestBasicInfo_PersistentWriteHook_NotFiredBySetLocation(t *testing.T) {
+func TestBasicInfo_PersistentWriteHook_NotFiredByRestoreLocation(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	var calls int
 	b.SetOnPersistentWrite(func(string, string) { calls++ })
 
-	if err := b.SetLocation("FR"); err != nil {
-		t.Fatalf("SetLocation: %v", err)
+	if err := b.RestoreLocation("FR"); err != nil {
+		t.Fatalf("RestoreLocation: %v", err)
 	}
 	if calls != 0 {
-		t.Fatalf("hook fired %d times for out-of-band SetLocation, want 0", calls)
+		t.Fatalf("hook fired %d times for out-of-band RestoreLocation, want 0", calls)
 	}
 }
 
@@ -1296,8 +1296,8 @@ func TestBasicInfo_UniqueIDSurvivesRestoredNodeLabel(t *testing.T) {
 	uidBefore, _ := b.MatterRead(0x0012)
 	serialBefore, _ := b.MatterRead(0x000F)
 
-	if err := b.SetNodeLabel("Wohnzimmer"); err != nil {
-		t.Fatalf("SetNodeLabel: %v", err)
+	if err := b.RestoreNodeLabel("Wohnzimmer"); err != nil {
+		t.Fatalf("RestoreNodeLabel: %v", err)
 	}
 
 	if uidAfter, _ := b.MatterRead(0x0012); uidAfter != uidBefore {

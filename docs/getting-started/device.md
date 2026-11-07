@@ -227,7 +227,7 @@ later write wins and reaches the observers with
 A bridged device's NodeLabel is `Device.Rename`'s ([The
 Aggregator](#the-aggregator)).
 
-*Source: `node/node_label.go`, `cluster/core/basic_information.go` (`WriteNodeLabel`, `SetNodeLabel`, `MatterWrite`), `node/persist.go` (`restoreRoot`).*
+*Source: `node/node_label.go`, `cluster/core/basic_information.go` (`SetNodeLabel`, `RestoreNodeLabel`, `MatterWrite`), `node/persist.go` (`restoreRoot`).*
 
 ## Devices
 

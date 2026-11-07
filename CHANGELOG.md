@@ -12,7 +12,11 @@ pseudo-version of `main`.
 
 ### Added
 
-- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` — and works before `Start` as well. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.WriteNodeLabel` is the server's host write, `BasicInformation.SetNodeLabel` stays the silent boot-time restore.
+- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` — and works before `Start` as well. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.SetNodeLabel(ctx, label)` is the server's host write, `BasicInformation.RestoreNodeLabel` the silent boot-time restore (below).
+
+### Changed
+
+- **Break** — `cluster/core`: the root BasicInformation's boot-time restores are named as `RestoreConfigurationVersion` is: `BasicInformation.SetNodeLabel(string) error` → `BasicInformation.RestoreNodeLabel(string) error`, `BasicInformation.SetLocation(string) error` → `BasicInformation.RestoreLocation(string) error`; `BasicInformation.SetNodeLabel(ctx, label) error` is now the host's run-time write (validated, persisted, reported with `contract.OriginHostSet`), the server half of `Node.SetNodeLabel` (owner decision on #454, issue 414). A host that restored a label itself calls `RestoreNodeLabel`; one that meant a rename calls `SetNodeLabel(ctx, label)` or `Node.SetNodeLabel`. [Migrating to the facade](docs/guides/migrating-to-the-facade.md) §"Changed after v0.18.0: the BasicInformation restores".
 
 ### Fixed
 
