@@ -5,7 +5,9 @@ package node_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -175,13 +178,14 @@ func TestOneMatterTimePerNode(t *testing.T) {
 }
 
 // TestTimeSyncValveNeedsTheNodesTime: a Valve with TimeSync on a node with
-// TimeSynchronization off fails the topology, naming its endpoint and
-// cluster — the node's fail-closed form of connectedhomeip's Startup,
-// which refuses TS without a time tracker
-// (ValveConfigurationAndControlCluster.cpp:46-50 at 6170af84) —, at Start
-// as at a later Add; a valve without TS and a Thermostat with TSUGGEST
-// (chip gates each suggestion, ThermostatClusterSuggestions.cpp:173-178)
-// are served without the time.
+// TimeSynchronization off is refused at the Aggregator's Add and Replace —
+// before Start as after it, naming its endpoint and cluster — and never
+// joins the set, so the next change goes through: the node's fail-closed
+// form of connectedhomeip's Startup, which refuses TS without a time
+// tracker (ValveConfigurationAndControlCluster.cpp:46-50 at 6170af84). A
+// valve without TS and a Thermostat with TSUGGEST (chip gates each
+// suggestion, ThermostatClusterSuggestions.cpp:173-178) are served
+// without the time.
 func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -195,25 +199,39 @@ func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
 		}
 		return v
 	}
-	config := func(name string) node.Config {
-		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), name+".db")))
-		cfg.TimeSynchronization.Off = true
-		cfg.Surface.Extensions = rows
-		return cfg
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
+	cfg.TimeSynchronization.Off = true
+	cfg.Surface.Extensions = rows
+	n := newNode(t, cfg)
+	keys := func() []string {
+		eps := n.Aggregator().Endpoints()
+		out := make([]string, 0, len(eps))
+		for _, ep := range eps {
+			out = append(out, endpoint.RenderSourceKey(ep.Spec().StableKey))
+		}
+		return out
+	}
+	refused := func(when, key string, err error) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("%s: the TS valve %q was taken, want the refusal", when, key)
+		}
+		for _, want := range []string{"TimeSynchronization is off", fmt.Sprintf("endpoint %q", key), "cluster 0x0081"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: %v, want it to name %s", when, err, want)
+			}
+		}
+		if slices.Contains(keys(), key) {
+			t.Errorf("%s: the refused valve %q is in the set %v", when, key, keys())
+		}
 	}
 
-	// At Start.
-	n := newNode(t, config("n"))
-	if err := n.Aggregator().Add(ctx, newValve("ts-valve", valvedef.FeatureTimeSync)); err != nil {
-		t.Fatal(err)
+	// Before Start: refused at Add; the plain valve and the TSUGGEST
+	// thermostat after it are taken.
+	refused("Add before Start", "ts-valve", n.Aggregator().Add(ctx, newValve("ts-valve", valvedef.FeatureTimeSync)))
+	if err := n.Aggregator().Add(ctx, newValve("plain-valve", 0)); err != nil {
+		t.Fatalf("a plain valve after the refusal: %v", err)
 	}
-	err := n.Start(ctx)
-	if err == nil || !strings.Contains(err.Error(), "TimeSynchronization is off") || !strings.Contains(err.Error(), "cluster 0x0081") {
-		t.Fatalf("Start with a TS valve and TimeSynchronization off: %v, want the refusal naming the cluster", err)
-	}
-
-	// At a later Add; the plain valve and the TSUGGEST thermostat are served.
-	m := newNode(t, config("m"))
 	handle := []byte("Home")
 	heat := int16(2100)
 	count := uint8(1)
@@ -227,17 +245,24 @@ func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := m.Aggregator().Add(ctx, newValve("plain-valve", 0)); err != nil {
+	if err := n.Aggregator().Add(ctx, thermostat); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.Aggregator().Add(ctx, thermostat); err != nil {
-		t.Fatal(err)
-	}
-	if err := m.Start(ctx); err != nil {
+	if err := n.Start(ctx); err != nil {
 		t.Fatalf("Start with a plain valve and a TSUGGEST thermostat: %v", err)
 	}
-	err = m.Aggregator().Add(ctx, newValve("late-ts-valve", valvedef.FeatureTimeSync))
-	if err == nil || !strings.Contains(err.Error(), "TimeSynchronization is off") {
-		t.Errorf("Add of a TS valve after Start: %v, want the refusal", err)
+
+	// After Start: refused at Add and at Replace; the next Add goes through.
+	refused("Add after Start", "late-ts-valve", n.Aggregator().Add(ctx, newValve("late-ts-valve", valvedef.FeatureTimeSync)))
+	if err := n.Aggregator().Replace(ctx, device.StringKey("plain-valve"), newValve("plain-valve", valvedef.FeatureTimeSync)); err == nil {
+		t.Error("Replace of the plain valve by a TS valve was taken, want the refusal")
+	} else if !strings.Contains(err.Error(), `endpoint "plain-valve", cluster 0x0081`) {
+		t.Errorf("Replace: %v, want it to name the endpoint and cluster", err)
+	}
+	if err := n.Aggregator().Add(ctx, newValve("second-plain-valve", 0)); err != nil {
+		t.Errorf("a plain valve after the refusals: %v", err)
+	}
+	if got := keys(); !slices.Contains(got, "plain-valve") || !slices.Contains(got, "second-plain-valve") || !slices.Contains(got, "thermostat") {
+		t.Errorf("the set %v, want plain-valve, second-plain-valve and thermostat", got)
 	}
 }

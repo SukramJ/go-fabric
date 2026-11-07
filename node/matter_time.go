@@ -57,10 +57,37 @@ type matterTimeSync struct {
 // on a node without the root TimeSynchronization.
 var errNoMatterTime = errors.New("node: the server needs the node's Matter time, and TimeSynchronization is off")
 
+// checkMatterTime refuses ep when it, or one of its parts, serves a
+// participant that requires the node's Matter time on a node without the
+// root TimeSynchronization — before the endpoint joins the Aggregator's
+// set, as [Node.checkSurface] refuses, so one such device neither stays
+// in the set nor fails every later change. The error names the endpoint's
+// stable key (its number is assigned at the reassembly) and the cluster.
+func (n *Node) checkMatterTime(ep Endpoint) error {
+	if n.root.TimeSynchronization != nil {
+		return nil
+	}
+	entries := surfaceEntries(ep)
+	for i := range entries {
+		e := &entries[i]
+		if e.spec.Source == nil {
+			continue
+		}
+		for _, srv := range e.spec.Source.MatterClusterServers() {
+			if p, ok := srv.(matterTimeParticipant); ok && p.RequiresMatterTime() {
+				return fmt.Errorf("%w: endpoint %q, cluster 0x%04X", errNoMatterTime, e.key, srv.MatterClusterID())
+			}
+		}
+	}
+	return nil
+}
+
 // attachMatterTime hands the topology's Matter time participants the
 // root TimeSynchronization's UTC and records them. On a node without the
 // root cluster a participant that requires the time fails the topology,
-// naming its endpoint and cluster — the node's fail-closed form of
+// naming its endpoint and cluster — the backstop behind
+// [Node.checkMatterTime], which refuses it at the Aggregator's Add and
+// Replace; the node's fail-closed form of
 // connectedhomeip's Startup refusal (ValveConfigurationAndControlCluster.cpp:
 // 46-50 at 6170af84).
 func (n *Node) attachMatterTime(t *endpoint.Topology) error {

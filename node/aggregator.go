@@ -415,6 +415,9 @@ func (b *Batch) Add(ep Endpoint) error {
 	if err := a.n.checkSurface(b.ctx, ep); err != nil {
 		return err
 	}
+	if err := a.n.checkMatterTime(ep); err != nil {
+		return err
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if p, _ := a.findLocked(key); p != nil {
@@ -450,6 +453,9 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	}
 	a := b.a
 	if err := a.n.checkSurface(b.ctx, ep); err != nil {
+		return err
+	}
+	if err := a.n.checkMatterTime(ep); err != nil {
 		return err
 	}
 	a.mu.Lock()
