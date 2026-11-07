@@ -61,7 +61,7 @@ func TestThermostatDeclaresSuggestions(t *testing.T) {
 	if !ok {
 		t.Fatal("the kit's Thermostat takes no Matter time")
 	}
-	participant.AttachMatterTime(func() (uint32, bool) { return 800_000_000, true })
+	participant.AttachMatterTime(clock.MatterTimeOf(nil)) // the host clock, as a host attaches it
 	resp, err := add()
 	if err != nil {
 		t.Fatal(err)

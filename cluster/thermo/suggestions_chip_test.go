@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
@@ -30,9 +31,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
-
-// matterEpochUnix is the Matter epoch (2000-01-01 UTC) in Unix seconds.
-const matterEpochUnix = 946684800
 
 // suggestClock is a fake clock and the Matter time read from it, which a
 // test may hold unsynchronised.
@@ -54,7 +52,7 @@ func (c *suggestClock) matterTime() (uint32, bool) {
 	if c.unsynced {
 		return 0, false
 	}
-	return uint32(c.Now().Unix() - matterEpochUnix), true //nolint:gosec // a time after the Matter epoch
+	return clock.MatterTimeOf(c.Fake)()
 }
 
 func (c *suggestClock) setSynced(synced bool) {
