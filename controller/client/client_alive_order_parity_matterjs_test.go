@@ -93,12 +93,14 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 		if slices.Contains(early, "alive") {
 			t.Fatalf("the alive hook ran while the report's Changed hook held the queue: %v", early)
 		}
-		client.WaitRegistry(sr.reg)
 		waitUntil(t, "the alive hook", func() bool {
 			mu.Lock()
 			defer mu.Unlock()
 			return slices.Contains(order, "alive")
 		})
+		// The StartUp event's registry reaction started before the alive;
+		// it ends before the test does.
+		client.WaitRegistry(sr.reg)
 		mu.Lock()
 		got := slices.Clone(order)
 		mu.Unlock()
