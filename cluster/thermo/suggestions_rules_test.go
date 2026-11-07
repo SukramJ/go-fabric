@@ -344,3 +344,38 @@ func TestSuggestionsFollowAMovedMatterTime(t *testing.T) {
 		t.Errorf("suggestions %+v after the time passed their expiry, want none", got)
 	}
 }
+
+// TestAMovedMatterTimeDuringAReevaluationIsKept: a change of the Matter
+// time that lands while a re-evaluation runs — after it read the time —
+// keeps its own scheduled re-evaluation; the running one does not replace
+// that timer, so the moved time is evaluated and the expired suggestion
+// leaves.
+func TestAMovedMatterTimeDuringAReevaluationIsKept(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	var jump uint32
+	trigger := false
+	srv.AttachMatterTime(func() (uint32, bool) {
+		v, ok := clk.matterTime()
+		old := v + jump
+		if trigger {
+			// The time moves after this read: the change is told while the
+			// re-evaluation that read the old time still runs.
+			trigger = false
+			jump = 31 * 60
+			srv.MatterTimeChanged()
+		}
+		return old, ok
+	})
+	if _, err := addSuggestion(srv, handleB, nil, 30); err != nil {
+		t.Fatal(err)
+	}
+	trigger = true
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	clk.Advance(0)
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Errorf("current suggestion %+v: the change told during a re-evaluation was lost", c)
+	}
+}

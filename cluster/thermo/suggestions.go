@@ -85,6 +85,11 @@ type suggestions struct {
 	// timer re-evaluates the suggestions when the current one expires or
 	// a later one takes effect; nil when nothing is due.
 	timer clock.Timer
+	// pending marks a re-evaluation scheduled (scheduleSuggestionReevaluation)
+	// that has not started: a re-evaluation already running read the Matter
+	// time before it was scheduled, so it leaves the scheduled timer armed
+	// instead of replacing it (armSuggestionTimerLocked).
+	pending bool
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
@@ -415,6 +420,11 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 	if s.features&ThermostatFeatureTSUGGEST == 0 {
 		return
 	}
+	// A scheduled re-evaluation is this one from here on; one scheduled
+	// after this point re-reads the time itself.
+	s.mu.Lock()
+	s.suggest.pending = false
+	s.mu.Unlock()
 	now, synced := s.matterNow()
 	if !synced {
 		return
@@ -492,6 +502,12 @@ func equalReason(a, b *uint16) bool {
 // fires at the Matter epoch second wake (0: none), measured from now on the
 // server's clock. The caller holds s.mu.
 func (s *ThermostatServer) armSuggestionTimerLocked(now, wake uint32) {
+	if s.suggest.pending {
+		// A re-evaluation was scheduled after this one read the time (a
+		// moved Matter time, a hold, a reason): its timer stays, and it
+		// arms the next one from the time it reads.
+		return
+	}
 	if s.suggest.timer != nil {
 		s.suggest.timer.Stop()
 		s.suggest.timer = nil
@@ -527,5 +543,6 @@ func (s *ThermostatServer) scheduleSuggestionReevaluation() {
 	if s.suggest.timer != nil {
 		s.suggest.timer.Stop()
 	}
+	s.suggest.pending = true
 	s.suggest.timer = s.clk.AfterFunc(0, s.suggestionTimerFired)
 }
