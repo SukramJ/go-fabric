@@ -935,6 +935,9 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	if ts := n.root.TimeSynchronization; ts != nil {
 		ts.Stop()
 	}
+	if gd := n.root.GeneralDiagnostics; gd != nil {
+		gd.Stop()
+	}
 	if n.root.otaApplier != nil {
 		n.root.otaApplier.close()
 	}

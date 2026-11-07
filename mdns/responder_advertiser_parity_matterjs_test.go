@@ -245,16 +245,26 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 						t.Errorf("empty TXT = %q, want one empty string", txt.Txt)
 					}
 				}
-				// Expiry for all.
+				// Expiry for all: one publication with each shared record
+				// once, split into datagrams by size
+				// (InterfaceResponder.ts:445-490 at db021da0).
 				if err := r.Close(); err != nil {
 					t.Fatal(err)
 				}
 				got = w.take()
-				expectSent(t, got, 3)
+				if len(got) == 0 {
+					t.Fatal("no expiry sent")
+				}
+				seen := map[string]bool{}
 				for i, p := range got {
 					for _, rr := range p.msg.Answer {
 						if rr.Header().Ttl != 0 {
 							t.Errorf("expiry %d carries %v with TTL %d", i+1, rr, rr.Header().Ttl)
+						}
+						if id := recordIdentity(rr); seen[id] {
+							t.Errorf("expiry repeats %v", rr)
+						} else {
+							seen[id] = true
 						}
 					}
 				}

@@ -501,10 +501,12 @@ func TestMdnsServerClose(t *testing.T) {
 		if err := r.Close(); err != nil {
 			t.Fatal(err)
 		}
-		// The goodbye of "foo": its records with TTL 0.
+		// The goodbye of "foo": its records with TTL 0, the cache-flush
+		// bit on the unique ones whose set is left empty
+		// (InterfaceResponder.ts:503-507 at db021da0).
 		got := w.take()
 		expectSent(t, got, 1)
-		expectResponse(t, got[0], 1, nil, goodbyeRecords([]dns.RR{fooPTR(), fooSRV(), fooTXT(), fooA()}), nil)
+		expectResponse(t, got[0], 1, nil, goodbyeOf([]dns.RR{fooPTR(), fooSRV(), fooTXT(), fooA()}), nil)
 		expectQuiet(t, levels)
 	})
 }

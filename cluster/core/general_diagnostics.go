@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -23,6 +22,7 @@ import (
 	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/netwatch"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -111,9 +111,9 @@ type GeneralDiagnostics struct {
 	dataVersion cluster.DataVersionTracker
 
 	// testEnableKey and testTrigger are set by [EnableTestEventTriggers]:
-	// the device's 16-byte test enable key and the host's trigger handler.
-	// Without them TestEventTriggersEnabled reads false and every
-	// TestEventTrigger fails the enable-key check.
+	// the device's 16-byte test enable key and the host's trigger handler
+	// (nil: no trigger is supported). Without a key TestEventTriggersEnabled
+	// reads false and both test commands fail the enable-key check.
 	testEnableKey []byte
 	testTrigger   TestEventTriggerHandler
 
@@ -148,6 +148,23 @@ type GeneralDiagnostics struct {
 	// can fire the §11.12.8.1 BootReason event.
 	endpoint uint16
 	emitter  contract.EventEmitter
+
+	// changes are the listeners [GeneralDiagnostics.OnAttributeChange]
+	// registers; NetworkInterfaces is reported through them when the
+	// interfaces change.
+	changes cluster.AttributeChanges
+	// ifWatch compares the interfaces while changes has a listener — the
+	// observation of Network.interfacesChanged matter.js
+	// GeneralDiagnosticsServer.initialize starts
+	// (GeneralDiagnosticsServer.ts:168-171 at db021da0).
+	ifWatch *netwatch.Watcher
+	// observers counts the change listeners, guarded by obsMu (taken
+	// without mu).
+	obsMu     sync.Mutex
+	observers int
+	// interfaces lists NetworkInterfaces; nil is the host's
+	// (enumerateNetworkInterfaces). A test seam.
+	interfaces func() []NetworkInterfaceStruct
 }
 
 // BootReason values per Matter §11.12.5.4.
@@ -260,6 +277,7 @@ func NewGeneralDiagnosticsWith(bootReason uint8, features GeneralDiagnosticsFeat
 	}
 	g.startTime = g.clock.Now()
 	g.opLast = g.startTime
+	g.ifWatch = netwatch.New(g.currentClock, g.interfaceSnapshot, g.interfacesChanged)
 	// Seed DataVersion at a non-zero sentinel so DataVersionFilter=0 does not
 	// produce false-positive cache hits.
 	g.dataVersion.Bump()
@@ -420,6 +438,7 @@ var (
 	_ contract.ClusterCommandLister          = (*GeneralDiagnostics)(nil)
 	_ contract.ClusterDataVersion            = (*GeneralDiagnostics)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*GeneralDiagnostics)(nil)
+	_ contract.AttributeChangeNotifier       = (*GeneralDiagnostics)(nil)
 )
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -460,8 +479,10 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		// at least one entry so HAP-ServiceMapper can resolve the link
 		// layer type. Mirrors matter.js
 		// packages/node/src/behaviors/general-diagnostics/
-		// GeneralDiagnosticsServer.ts:networkInterfaces.
-		return enumerateNetworkInterfaces(), true
+		// GeneralDiagnosticsServer.ts:networkInterfaces. Read on every
+		// read; a change is reported to subscribers by the interface
+		// watcher (interfacesChanged).
+		return g.listInterfaces(), true
 	case gendiagAttrRebootCount:
 		// Seeded by the daemon via [SetPersistedCounters]; 0 when
 		// persistence is not wired, as matter.js starts an unset
@@ -498,7 +519,11 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	case gendiagAttrActiveNetworkFaults:
 		return nil, false
 	case gendiagAttrTestEventTriggersEnabled:
-		return g.testTrigger != nil, true
+		// True exactly when a non-zero enable key is configured:
+		// matter.js GeneralDiagnosticsServer.ts initialize derives the
+		// attribute from deviceTestEnableKey (:143-157 at db021da0, Core
+		// §11.12.6.9).
+		return g.testEnableKey != nil, true
 
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return g.def().ReadGlobal(attrID)
@@ -520,14 +545,19 @@ func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value
 //   - 0x01 TimeSnapshot — returns SystemTimeMs (monotonic since boot)
 //     and PosixTimeMs (wall clock; null when the bridge is pre-time-sync).
 //
-// TestEventTrigger (0x00, conformance M) is enumerated but always fails
-// enable-key validation with ConstraintError (see the handler); the bridge
-// configures no test-event enable key. PayloadTestRequest (0x03, DMTEST) is
-// not implemented.
+// TestEventTrigger (0x00) and PayloadTestRequest (0x03, DMTEST) pass one
+// enable-key gate (assertEnableKey); without a key configured by
+// [GeneralDiagnostics.EnableTestEventTriggers] both answer ConstraintError.
 func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case gendiagCmdTimeSnapshot:
-		systemMs := uint64(elapsedSince(g.startTime, g.clock.Now()).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
+		// SystemTimeMs reads the System Time UpTime reads, so both share
+		// one base: matter.js GeneralDiagnosticsServer.ts systemTime
+		// (:61-85 at db021da0), used by timeSnapshot (:235-251), Core
+		// §11.12.6.3.
+		g.mu.RLock()
+		systemMs := uint64(g.upTime().Milliseconds()) //nolint:gosec // G115: upTime is never negative
+		g.mu.RUnlock()
 		// PosixTimeMs only when the node's TimeSynchronization cluster holds
 		// a UTC time: matter.js GeneralDiagnosticsServer.ts timeSnapshot
 		// (agent.has(TimeSynchronizationBehavior) && utcTime !== null), and
@@ -561,8 +591,9 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 // deviceLoadStatus).
 type DeviceLoadStruct = gendiagdef.DeviceLoadStruct
 
-// upTime is the time since the node came up. Mirrors matter.js
-// GeneralDiagnosticsServer.ts upTime (c0a7978d, #4614): the larger of the
+// upTime is the node's System Time, the time since the node came up, which
+// UpTime and TimeSnapshot's SystemTimeMs both read. Mirrors matter.js
+// GeneralDiagnosticsServer.ts systemTime (:61-85 at db021da0): the larger of the
 // elapsed time on the monotonic clock and on the wall clock — Go's
 // monotonic reading, like Time.nowUs, stops while the host is suspended,
 // and the wall clock folds the suspend back in — never below the highest
@@ -637,51 +668,78 @@ type TestEventTriggerHandler func(ctx context.Context, eventTrigger uint64) erro
 // test enable key (general-diagnostics.element.ts, "16" octets).
 const TestEnableKeySize = 16
 
-// EnableTestEventTriggers arms TestEventTrigger: TestEventTriggersEnabled
-// reads true, and a TestEventTrigger carrying key reaches handler. A device
-// in the field never calls this — the specification reserves test event
-// triggers for certification and development (§11.12.6.9), which is why
-// matter.js leaves them off unless a deviceTestEnableKey is configured
-// (GeneralDiagnosticsServer.ts initialize). key must be 16 bytes and not
-// all zero, the value matter.js treats as "not enabled".
+// EnableTestEventTriggers configures the device's test enable key:
+// TestEventTriggersEnabled reads true, and TestEventTrigger and
+// PayloadTestRequest accept a request carrying key. A TestEventTrigger then
+// reaches handler; a nil handler supports no trigger and answers each with
+// InvalidCommand, matter.js triggerTestEvent's default
+// (GeneralDiagnosticsServer.ts:231-233 at db021da0). A device in the field
+// never calls this — the specification reserves test event triggers for
+// certification and development (§11.12.6.9), which is why matter.js
+// derives TestEventTriggersEnabled from a configured deviceTestEnableKey
+// (:143-157). An all-zero key, of any length, is the value matter.js
+// treats as "not enabled": it disables the test commands again. Any other
+// key must be 16 bytes.
 func (g *GeneralDiagnostics) EnableTestEventTriggers(key []byte, handler TestEventTriggerHandler) error {
-	if len(key) != TestEnableKeySize {
-		return fmt.Errorf("core: test enable key is %d bytes, want %d", len(key), TestEnableKeySize)
-	}
 	if allZero(key) {
-		return errors.New("core: an all-zero test enable key means test event triggers are disabled")
+		g.mu.Lock()
+		g.testEnableKey, g.testTrigger = nil, nil
+		g.mu.Unlock()
+		g.dataVersion.Bump()
+		g.changes.Notify(gendiagAttrTestEventTriggersEnabled) // the attribute it reads
+		return nil
 	}
-	if handler == nil {
-		return errors.New("core: test event triggers need a handler")
+	if len(key) != TestEnableKeySize {
+		return fmt.Errorf("core: the test enable key must be %d bytes long, but it has %d", TestEnableKeySize, len(key))
 	}
 	g.mu.Lock()
 	g.testEnableKey = append([]byte(nil), key...)
 	g.testTrigger = handler
 	g.mu.Unlock()
 	g.dataVersion.Bump()
+	g.changes.Notify(gendiagAttrTestEventTriggersEnabled)
 	return nil
 }
 
-// testEventTrigger validates the enable key and runs the trigger. Mirrors
-// matter.js GeneralDiagnosticsServer.ts #validateTestEnabledKey and
-// testEventTrigger: an all-zero or mismatching key answers ConstraintError,
-// an unsupported trigger InvalidCommand.
+// assertEnableKey is the gate of both test commands, so they accept exactly
+// when TestEventTriggersEnabled reads true — matter.js
+// GeneralDiagnosticsServer.ts #assertEnableKey (:206-223 at db021da0, Core
+// §11.12.7.1.1, §11.12.7.4): ConstraintError while no key is configured,
+// for an all-zero key and for a key that does not match. The comparison
+// covers the whole key in constant time, and a key of any length other
+// than 16 bytes never matches (enableKeysMatch, :103-118).
+func (g *GeneralDiagnostics) assertEnableKey(cmd string, key []byte) error {
+	g.mu.RLock()
+	want := g.testEnableKey
+	g.mu.RUnlock()
+	switch {
+	case want == nil:
+		return gendiagStatusErr{im.StatusConstraintError, cmd + ": test event triggers are disabled"}
+	case allZero(key):
+		return gendiagStatusErr{im.StatusConstraintError, cmd + ": invalid test enable key, all zeros"}
+	case len(key) != TestEnableKeySize || len(want) != TestEnableKeySize || subtle.ConstantTimeCompare(key, want) != 1:
+		return gendiagStatusErr{im.StatusConstraintError, cmd + ": invalid test enable key"}
+	}
+	return nil
+}
+
+// testEventTrigger passes the enable-key gate and runs the trigger. Mirrors
+// matter.js GeneralDiagnosticsServer.ts testEventTrigger (:225-233 at
+// db021da0): the gate's ConstraintError first, an unsupported trigger
+// InvalidCommand.
 func (g *GeneralDiagnostics) testEventTrigger(ctx context.Context, fields any) error {
 	key, trigger, ok := decodeTestEventTrigger(fields)
 	if !ok {
 		return gendiagStatusErr{im.StatusInvalidCommand, "TestEventTrigger: malformed fields"}
 	}
-	if len(key) != TestEnableKeySize {
-		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: EnableKey must be 16 bytes"}
-	}
-	if allZero(key) {
-		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: invalid test enable key, all zeros"}
+	if err := g.assertEnableKey("TestEventTrigger", key); err != nil {
+		return err
 	}
 	g.mu.RLock()
-	want, handler := g.testEnableKey, g.testTrigger
+	handler := g.testTrigger
 	g.mu.RUnlock()
-	if handler == nil || subtle.ConstantTimeCompare(key, want) != 1 {
-		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: invalid test enable key"}
+	if handler == nil {
+		return gendiagStatusErr{im.StatusInvalidCommand, fmt.Sprintf("TestEventTrigger: unsupported test event trigger 0x%016X", trigger)}
 	}
 	if err := handler(ctx, trigger); err != nil {
 		if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
@@ -697,11 +755,11 @@ func (g *GeneralDiagnostics) testEventTrigger(ctx context.Context, fields any) e
 type PayloadTestResponse = gendiagdef.PayloadTestResponse
 
 // payloadTestRequest implements PayloadTestRequest, mirroring matter.js
-// GeneralDiagnosticsServer.ts payloadTestRequest: the enable key is checked
-// as for TestEventTrigger, test event triggers must be enabled
-// (ConstraintError otherwise), and a payload too large for one message is
-// ResourceExhausted. Fields: [0] EnableKey octets, [1] Value uint8,
-// [2] Count uint16 (max 2048).
+// GeneralDiagnosticsServer.ts payloadTestRequest (:253-298 at db021da0):
+// Count's constraint is checked as the schema checks it, the enable key
+// passes the gate TestEventTrigger passes (assertEnableKey), and a payload
+// too large for one message is ResourceExhausted. Fields: [0] EnableKey
+// octets, [1] Value uint8, [2] Count uint16 (max 2048).
 func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
 	key, value, count, ok := decodePayloadTestRequest(fields)
 	if !ok {
@@ -710,14 +768,8 @@ func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
 	if count > payloadTestMaxCount {
 		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: Count above 2048"}
 	}
-	if len(key) != TestEnableKeySize || allZero(key) {
-		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: invalid test enable key"}
-	}
-	g.mu.RLock()
-	want, enabled := g.testEnableKey, g.testTrigger != nil
-	g.mu.RUnlock()
-	if !enabled || subtle.ConstantTimeCompare(key, want) != 1 {
-		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: test event triggers are disabled or the key does not match"}
+	if err := g.assertEnableKey("PayloadTestRequest", key); err != nil {
+		return nil, err
 	}
 	if count > payloadTestMaxResponse {
 		return nil, gendiagStatusErr{im.StatusResourceExhausted, "PayloadTestRequest: response too large"}
@@ -1066,6 +1118,109 @@ func classifyInterface(name string) uint8 {
 		return InterfaceTypeEthernet
 	}
 	return InterfaceTypeUnspecified
+}
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: cb sees
+// NetworkInterfaces whenever the host's interfaces change. While at least
+// one listener is registered the server compares the interfaces every
+// interface check interval ([GeneralDiagnostics.SetInterfaceCheckInterval])
+// and reports a change — matter.js GeneralDiagnosticsServer.ts reacts to
+// Network.interfacesChanged and reads the interfaces again
+// (#interfacesChanged, :447-457 at db021da0), and the Network polls only
+// while observed (Network.ts:142-171). The bridge registers here when it
+// mounts the root endpoint.
+func (g *GeneralDiagnostics) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	unsub := g.changes.OnAttributeChange(cb)
+	// Start and Stop run under obsMu, so a register racing an unregister
+	// cannot leave the watcher running with no observer or stopped with one.
+	g.obsMu.Lock()
+	g.observers++
+	if g.observers == 1 {
+		g.ifWatch.Start()
+	}
+	g.obsMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			unsub()
+			g.obsMu.Lock()
+			g.observers--
+			if g.observers == 0 {
+				g.ifWatch.Stop()
+			}
+			g.obsMu.Unlock()
+		})
+	}
+}
+
+// SetInterfaceCheckInterval sets how often the server compares the host's
+// interfaces while its changes are observed; zero or negative disables the
+// comparison, and NetworkInterfaces is then current only on read. The
+// default is 60 s, matter.js INTERFACE_CHECK_INTERVAL (Network.ts:91-95 at
+// db021da0).
+func (g *GeneralDiagnostics) SetInterfaceCheckInterval(d time.Duration) {
+	g.ifWatch.SetInterval(d)
+}
+
+// Stop ends the interface comparison: matter.js closes the Network, and
+// with it the periodic check, when the node's environment shuts down
+// (Network.ts close, :239-244 at db021da0). The node calls it from Stop,
+// after which no listener registers (a stopped node is ErrStopped), so no
+// interface check stays armed on its clock; the observer count is not
+// reset, a later registration does not restart the watcher.
+func (g *GeneralDiagnostics) Stop() {
+	g.ifWatch.Stop()
+}
+
+// currentClock is the server's clock, for the interface watcher.
+func (g *GeneralDiagnostics) currentClock() clock.Clock {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.clock
+}
+
+// listInterfaces is the NetworkInterfaces value.
+func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
+	if g.interfaces != nil {
+		return g.interfaces()
+	}
+	return enumerateNetworkInterfaces()
+}
+
+// interfaceSnapshot describes each listed interface by its hardware
+// address and addresses, the comparison matter.js's Network makes
+// (Network.ts:188-195, :251-254 at db021da0).
+func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
+	// A failed listing keeps the previous snapshot (nil, the Watcher's
+	// contract), as matter.js keeps its state (Network.ts:174-177 at
+	// db021da0); enumerateNetworkInterfaces would turn it into the
+	// synthetic Ethernet entry and report a change twice.
+	if _, err := net.Interfaces(); err != nil {
+		return nil
+	}
+	out := map[string]string{}
+	for _, iface := range g.listInterfaces() {
+		v4 := make([]string, 0, len(iface.IPv4Addresses))
+		for _, a := range iface.IPv4Addresses {
+			v4 = append(v4, net.IP(a).String())
+		}
+		v6 := make([]string, 0, len(iface.IPv6Addresses))
+		for _, a := range iface.IPv6Addresses {
+			v6 = append(v6, net.IP(a).String())
+		}
+		out[iface.Name] = netwatch.Describe(net.HardwareAddr(iface.HardwareAddress).String(), v4, v6)
+	}
+	return out
+}
+
+// interfacesChanged reports NetworkInterfaces after the interfaces
+// changed: the root's own DataVersion advances before the listeners mark
+// the attribute dirty (bridge wireAttributeNotifiersLocked), as matter.js
+// assigns the re-read list to the attribute state (#updateNetworkList,
+// GeneralDiagnosticsServer.ts:469-525 at db021da0).
+func (g *GeneralDiagnostics) interfacesChanged([]string) {
+	g.dataVersion.Bump()
+	g.changes.Notify(gendiagAttrNetworkInterfaces)
 }
 
 // SetLogger sets the logger the server's diagnostics go to; nil is

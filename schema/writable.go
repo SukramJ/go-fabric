@@ -117,6 +117,14 @@ var readOnlyAttributes = map[uint32]map[uint32]struct{}{
 	0x003F: newReadOnlySet(
 		0x0001, 0x0002, 0x0003,
 	),
+	// FixedLabel (0x0040) — 1 read-only: a controller's write of LabelList,
+	// the list ADD included, is UNSUPPORTED_WRITE before the value is
+	// decoded (FixedLabelServerTest.ts, "refuses a controller REPLACE_ALL
+	// followed by ADD with UNSUPPORTED_WRITE and keeps the labels", at
+	// db021da0)
+	0x0040: newReadOnlySet(
+		0x0000,
+	),
 	// BooleanState (0x0045) — 1 read-only
 	0x0045: newReadOnlySet(
 		0x0000,

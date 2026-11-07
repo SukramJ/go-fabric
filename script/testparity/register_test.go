@@ -46,7 +46,11 @@ import (
 // DistinguishedNameTest, OperationalCertificateVerifyTest) as partial: 16.
 // // Pin lift wave P2 (#431) ports AttestationCertificateProfileTest.ts (in
 // part), CdSignersTest.ts and DeviceAttestationValidatorChipCdTest.ts as well: 13.
-const testparityPlannedRatchet = 13
+//
+// Pin lift wave P3 (#432) decided seven of the lift's planned files (the
+// GeneralDiagnostics, mDNS address-change and transport, label and
+// localisation tests); CommissionableMdnsScannerWindowChangeTest.ts stays: 6.
+const testparityPlannedRatchet = 6
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -114,9 +118,14 @@ const testparityPlannedRatchet = 13
 // DclCertificateServiceTest.ts leave missing, the 23 distinguished-name
 // cases of AttestationCertificateProfileTest.ts (#4880, wave P1) join it:
 // merged with wave P1: 149 ported, 1024 missing.
+// Pin lift wave P3 (#432): NetworkInterfaceChangesTest.ts, MdnsServerAddressChangeTest.ts,
+// GeneralDiagnosticsNetworkInterfacesTest.ts, UserLabelServerTest.ts and FixedLabelServerTest.ts
+// ported; 18 MdnsServerTest.ts/MdnsTest.ts goodbye cases out of missing, ten
+// MdnsServerTransportTest.ts and five GeneralDiagnosticsServerTest.ts fault cases in,
+// merged with waves P1 and P2: 154 ported, 1021 missing.
 const (
-	testparityPortedRatchet  = 149
-	testparityMissingRatchet = 1024
+	testparityPortedRatchet  = 154
+	testparityMissingRatchet = 1021
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -158,7 +167,12 @@ const (
 // by design: the unreadable stored DER (the Go index holds it) and the
 // test signer, which the validator knows built in
 // (BD-Matter-Attestation-CDSignerTrust) — merged with wave P1: 606.
-const testparityLeftRatchet = 606
+// Pin lift wave P3 (#432) leaves 13 cases, each with class and reason: five
+// JS Network lifecycle cases, four address-change cases (two by design,
+// BD-Matter-MdnsFollowsAdvertisedAddresses), three state-field cases of
+// GeneralDiagnosticsServerTest.ts and the lone-ADD skip (findings T3-P3-1),
+// merged with waves P1 and P2: 619.
+const testparityLeftRatchet = 619
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -3188,7 +3188,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 278,
+    "line": 300,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",

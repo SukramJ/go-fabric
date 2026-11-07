@@ -263,6 +263,28 @@ type Network struct {
 	// [Config].Advertiser is nil; the zero value advertises (the module's
 	// mDNS responder, which announces on matter.js's broadcast schedule).
 	MDNS MDNS
+	// InterfaceCheck is how often the node compares the host's network
+	// interfaces: the mDNS responder while it publishes, to say goodbye to
+	// a lost address and announce the current ones, and GeneralDiagnostics
+	// while NetworkInterfaces is observed, to report the change. Zero is
+	// matter.js's 60 s (INTERFACE_CHECK_INTERVAL, Network.ts:91-95 at
+	// db021da0); negative disables the periodic check — a host that
+	// learns of changes itself calls [Node.TriggerReannounce], which
+	// re-announces the mDNS records; GeneralDiagnostics' NetworkInterfaces
+	// is then current on each read and reports no change of its own.
+	InterfaceCheck time.Duration
+}
+
+// interfaceCheck is the interval [Network.InterfaceCheck] selects: the
+// 60 s default for zero, a disabled check (0) for a negative value.
+func (n Network) interfaceCheck() time.Duration {
+	switch {
+	case n.InterfaceCheck < 0:
+		return 0
+	case n.InterfaceCheck == 0:
+		return netwatchDefaultInterval
+	}
+	return n.InterfaceCheck
 }
 
 // TimeSynchronization is the root TimeSynchronization cluster (0x0038),

@@ -20,7 +20,7 @@ A host names none of the packages below for these:
 | Need | Facade route |
 | --- | --- |
 | The store | `Config.Store.Path` (the node opens and closes the SQLite file), or `Store.DB` for the host's own handle |
-| DNS-SD | a nil `Config.Advertiser`: the module's mDNS responder, shaped by `Network.MDNS` (`Off`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS`, `TriggerReannounce` |
+| DNS-SD | a nil `Config.Advertiser`: the module's mDNS responder, shaped by `Network.MDNS` (`Off`, `HostName`) and `Network.InterfaceCheck` (how often it and GeneralDiagnostics compare the host's interfaces; negative disables); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS`, `TriggerReannounce` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
 | Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
 | The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` replaces the facade's own hook |
