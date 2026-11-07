@@ -518,3 +518,33 @@ func TestOTAProvider_ApplyWhileTheTransferCloses(t *testing.T) {
 		<-done
 	}
 }
+
+// TestOTAProvider_ClosedTransferCancelsOnlyUnsettled: the transfer
+// session's closed listener (OP:348-364) cancels an update that is
+// querying or downloading and leaves one that waits for its apply or
+// applies; it decides and writes under one hold of the provider's lock,
+// so an apply between the two is not overwritten.
+func TestOTAProvider_ClosedTransferCancelsOnlyUnsettled(t *testing.T) {
+	t.Parallel()
+	token := []byte{1, 2, 3}
+	for _, tc := range []struct {
+		state OTAUpdateStatus
+		want  OTAUpdateStatus
+	}{
+		{OTAUpdateQuerying, OTAUpdateCancelled},
+		{OTAUpdateDownloading, OTAUpdateCancelled},
+		{OTAUpdateWaitForApply, OTAUpdateWaitForApply},
+		{OTAUpdateApplying, OTAUpdateApplying},
+	} {
+		f := newOTAFixture(t, nil)
+		f.p.updateInProgress(otaTestPeer, token, tc.state, nil, false)
+		f.p.cancelUnlessSettled(otaTestPeer, token, 2)
+		got := OTAUpdateCancelled // a cancelled entry is removed (OP:614-618)
+		if d := f.p.detailsForPeer(otaTestPeer, token); d != nil {
+			got = d.lastState
+		}
+		if got != tc.want {
+			t.Errorf("closed in %v: %v, want %v", tc.state, got, tc.want)
+		}
+	}
+}

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7768,
+  "entry_points": 7769,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17735,
+    "total_exported": 17736,
     "reachable": 12335,
-    "whitelisted": 5400,
+    "whitelisted": 5401,
     "unreachable": 0
   },
   "by_package": [],
@@ -8421,6 +8421,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 243
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_ClosedTransferCancelsOnlyUnsettled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 527
     },
     {
       "package": "cluster/core",

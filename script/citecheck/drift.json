@@ -1714,7 +1714,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 642,
+    "line": 634,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
