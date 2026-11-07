@@ -13,11 +13,13 @@ package bridge
 import (
 	"context"
 	"net"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -641,35 +643,50 @@ func TestAckPump_AttachAckTrackerAlsoSetsAckHandler(t *testing.T) {
 	}
 }
 
+// startIdlePump runs the ACK pump of a bridge on a fake clock with an
+// attached tracker (delay 0) and waits until it is idle; call it inside a
+// synctest bubble.
+func startIdlePump(t *testing.T) (*Bridge, *clocktest.Fake, *mrp.AckTracker) {
+	t.Helper()
+	fake := clocktest.New(time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC))
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: fake}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tracker := mrp.NewAckTracker(0)
+	b.AttachAckTracker(tracker)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); b.runAckPump(ctx) }()
+	t.Cleanup(func() { cancel(); <-done })
+	synctest.Wait()
+	if armed := fake.Armed(); len(armed) != 0 {
+		t.Fatalf("an idle pump holds timers %v", armed)
+	}
+	return b, fake, tracker
+}
+
+// requireTicker fails unless the pump's ticker is armed, now — in the
+// producer's call, before the pump goroutine ran (wakeAckPump).
+func requireTicker(t *testing.T, fake *clocktest.Fake, what string) {
+	t.Helper()
+	if armed := fake.Armed(); !slices.Contains(armed, ackPumpInterval) {
+		t.Fatalf("%s left the pump idle: armed %v, want its %v ticker", what, armed, ackPumpInterval)
+	}
+}
+
 // TestAckPump_SleepsWhileIdle: with nothing owed, tracked or timed the
 // pump holds no ticker, so an idle node does not wake every
 // ackPumpInterval and a fake clock moves to its next real deadline
-// (brief FP2 §2); an owed acknowledgement wakes it, the obligation goes
-// out at the next tick, and the pump sleeps again.
+// (brief FP2 §2); an owed acknowledgement re-arms it in the producer's own
+// call, the obligation goes out at the next tick, and the pump sleeps
+// again.
 func TestAckPump_SleepsWhileIdle(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		fake := clocktest.New(time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC))
-		b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: fake}, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tracker := mrp.NewAckTracker(0)
-		b.AttachAckTracker(tracker)
-		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan struct{})
-		go func() { defer close(done); b.runAckPump(ctx) }()
-		defer func() { cancel(); <-done }()
-
-		synctest.Wait()
-		if armed := fake.Armed(); len(armed) != 0 {
-			t.Fatalf("an idle pump holds timers %v", armed)
-		}
+		b, fake, tracker := startIdlePump(t)
 		b.owedInboundAck(loopbackSrc(), buildMsgHdr(9), buildNeedsAckProto(9, 9))
-		synctest.Wait()
-		if armed := fake.Armed(); len(armed) != 1 || armed[0] != ackPumpInterval {
-			t.Fatalf("a woken pump arms %v, want its %v ticker", armed, ackPumpInterval)
-		}
+		requireTicker(t, fake, "an owed acknowledgement")
 		fake.Advance(ackPumpInterval)
 		synctest.Wait()
 		if tracker.Pending() != 0 {
@@ -678,5 +695,30 @@ func TestAckPump_SleepsWhileIdle(t *testing.T) {
 		if armed := fake.Armed(); len(armed) != 0 {
 			t.Fatalf("the pump holds timers %v once the work is done", armed)
 		}
+	})
+}
+
+// TestAckPump_TrackedMessageWakesThePump: a reliable message tracked for
+// retransmission re-arms an idle pump (outboundReliableTracker.track).
+func TestAckPump_TrackedMessageWakesThePump(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		b, fake, _ := startIdlePump(t)
+		b.outboundReliable.Track(1, 0x10, 7, []byte{1}, loopbackSrc(), fake.Now())
+		requireTicker(t, fake, "a tracked reliable message")
+	})
+}
+
+// TestAckPump_TimedRequestWakesThePump: a timed deadline re-arms an idle
+// pump, whose sweep reclaims it when the follow-up never comes
+// (dispatchTimedRequest).
+func TestAckPump_TimedRequestWakesThePump(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		b, fake, _ := startIdlePump(t)
+		hdr := &message.Header{SessionID: 0x20, MessageCounter: 5}
+		proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeTimedRequest, ExchangeID: 11, Initiator: true, NeedsAck: true}
+		_ = b.dispatchTimedRequest(loopbackSrc(), hdr, proto, im.TimedRequest{TimeoutMs: 1000})
+		requireTicker(t, fake, "a timed deadline")
 	})
 }

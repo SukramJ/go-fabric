@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -327,51 +329,77 @@ func (b *Bridge) runAckPump(ctx context.Context) {
 	if tracker == nil {
 		return
 	}
-	ticker := b.clk().NewTicker(ackPumpInterval)
-	defer ticker.Stop()
+	p := &ackPumpTicker{ticker: b.clk().NewTicker(ackPumpInterval)}
+	b.ackPump.Store(p)
+	defer func() {
+		b.ackPump.CompareAndSwap(p, nil)
+		p.mu.Lock()
+		p.ticker.Stop()
+		p.mu.Unlock()
+	}()
 	for {
-		if b.ackPumpIdle(tracker, outbound) {
-			// Nothing to acknowledge, retransmit or sweep: the pump
-			// stops ticking until work arrives, so an idle node does not
-			// wake every ackPumpInterval and a fake clock moves to its
-			// next real deadline rather than in ackPumpInterval steps
-			// (brief FP2 §2: a test site waiting a subscription's max
-			// interval stepped 50 ms at a time). matter.js arms a timer per
-			// exchange instead of polling — the ack receipt timer and the
-			// retransmission timer (packages/protocol/src/protocol/MessageExchange.ts:258,
+		p.mu.Lock()
+		if !p.idle && b.ackPumpIdle(tracker, outbound) {
+			// Nothing to acknowledge, retransmit or sweep: the pump stops
+			// ticking until work arrives, so an idle node does not wake
+			// every ackPumpInterval and a fake clock moves to its next real
+			// deadline rather than in ackPumpInterval steps (brief FP2 §2:
+			// a test site waiting a subscription's max interval stepped
+			// 50 ms at a time). matter.js arms a timer per exchange instead
+			// of polling — the ack receipt timer and the retransmission
+			// timer (packages/protocol/src/protocol/MessageExchange.ts:258,
 			// :789 at db021da0) — so its idle exchange layer holds no timer.
-			ticker.Stop()
-			select {
-			case <-ctx.Done():
-				return
-			case <-b.ackPumpWake:
-			}
-			ticker.Reset(ackPumpInterval)
+			p.idle = true
+			p.ticker.Stop()
 		}
+		p.mu.Unlock()
 		select {
 		case <-ctx.Done():
 			return
-		case now := <-ticker.C():
+		case now := <-p.ticker.C():
 			b.ackPumpTick(tracker, outbound, now)
 		}
 	}
 }
 
+// ackPumpTicker is the running pump's ticker and whether it is idle, the
+// ticker stopped. mu orders the pump's idle decision against a producer's
+// wake.
+type ackPumpTicker struct {
+	mu     sync.Mutex
+	idle   bool
+	ticker clock.Ticker
+}
+
 // ackPumpIdle reports whether the pump has nothing to do: no
 // acknowledgement owed, no reliable message awaiting its ack and no
-// timed deadline left to sweep. A producer records its work before it
-// wakes the pump (wakeAckPump), so a wake that races this check is
-// buffered and not lost.
+// timed deadline left to sweep. The pump decides it under its ticker's
+// mutex, and a producer records its work before it wakes the pump
+// (wakeAckPump): a wake that races the decision waits for it and re-arms.
 func (b *Bridge) ackPumpIdle(tracker *mrp.AckTracker, outbound *outboundReliableTracker) bool {
 	return tracker.Pending() == 0 && (outbound == nil || outbound.Pending() == 0) && !b.routing.hasTimedDeadlines()
 }
 
-// wakeAckPump wakes an idle ACK pump; a pending wake stands for any
-// number of them.
+// wakeAckPump re-arms an idle ACK pump's ticker in the producer's own
+// call, not on the pump goroutine: the ticker's first tick is then
+// ackPumpInterval after the work was recorded whatever the scheduler
+// does, on the system clock as on a fake one — a pump goroutine
+// scheduled late would otherwise let a fake site clock pass an owed
+// acknowledgement for a later deadline before the ticker existed. It
+// keeps the pump's tick rather than arming a timer at the earliest due
+// time: the pump's cadence while it has work stays what it was, and a
+// timer per deadline would need a next-due query of the AckTracker, the
+// retransmission tracker and the timed table.
 func (b *Bridge) wakeAckPump() {
-	select {
-	case b.ackPumpWake <- struct{}{}:
-	default:
+	p := b.ackPump.Load()
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.idle {
+		p.idle = false
+		p.ticker.Reset(ackPumpInterval)
 	}
 }
 

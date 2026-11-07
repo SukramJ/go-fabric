@@ -461,11 +461,10 @@ type Bridge struct {
 	serveDone           chan struct{}
 	pumpCancel          context.CancelFunc // optional; nil when no AckTracker wired
 	pumpDone            chan struct{}
-	// ackPumpWake wakes an idle ACK pump (runAckPump): an obligation
-	// owed, a reliable message tracked or a timed deadline registered
-	// signals it, buffered one deep. Set in New, never replaced.
-	ackPumpWake chan struct{}
-	started     bool
+	// ackPump is the running ACK pump's ticker state (runAckPump), nil
+	// while no pump runs; wakeAckPump re-arms an idle one.
+	ackPump atomic.Pointer[ackPumpTicker]
+	started bool
 	// reannounces is the session re-announce goroutines
 	// (triggerSessionReannounce), added under mu while started and waited
 	// for by Stop before the advertiser closes.
@@ -794,7 +793,6 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	}
 
 	br := &Bridge{
-		ackPumpWake:    make(chan struct{}, 1),
 		clock:          clock.Or(cfg.Clock),
 		cfg:            cfg,
 		snapshotter:    snap,
