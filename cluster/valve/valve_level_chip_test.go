@@ -8,6 +8,8 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -95,12 +97,11 @@ func TestValveSelectionRefusalNamesTheInterface(t *testing.T) {
 // AttributeTestTimeSync and AttributeTestAll list them.
 func TestValveLevelServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
-	clock := func() (uint32, bool) { return 1000, true }
 	for _, cfg := range []valve.Config{
 		{Source: newLevelHost(), Features: valve.FeatureLevel},
-		{Source: newLevelHost(), Features: valve.FeatureTimeSync, MatterTime: clock},
+		{Source: newLevelHost(), Features: valve.FeatureTimeSync},
 		{
-			Source: newLevelHost(), Features: valve.FeatureLevel | valve.FeatureTimeSync, MatterTime: clock,
+			Source: newLevelHost(), Features: valve.FeatureLevel | valve.FeatureTimeSync,
 			Attributes: []uint32{valvedef.AttrDefaultOpenLevel, valvedef.AttrLevelStep}, LevelStep: 10,
 		},
 	} {
@@ -230,7 +231,8 @@ func TestValveAutoCloseTimeChip(t *testing.T) {
 	const now = uint32(1700000000 - 946684800)
 	synced := true
 	h := fullyObservedHost()
-	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync, MatterTime: func() (uint32, bool) { return now, synced }})
+	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync})
+	srv.AttachMatterTime(func() (uint32, bool) { return now, synced })
 	read := func() any { v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); return v }
 	if v := read(); v != nil {
 		t.Errorf("AutoCloseTime before an Open = %v, want null", v)
@@ -277,8 +279,8 @@ func TestValveAutoCloseTimeChip(t *testing.T) {
 // AutoCloseTime null, as connectedhomeip's SetAutoCloseTime does while
 // the node's TimeSynchronization has no time
 // (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
-// 46-57 at 6170af84); the time the node attaches as the server joins its
-// topology replaces the configured one, and a nil attach changes nothing.
+// 46-58 at 6170af84); AttachMatterTime is its one input of the time, and
+// a nil attach changes nothing.
 func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -308,15 +310,152 @@ func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
 	if want := uint64(1060) * 1_000_000; read() != want {
 		t.Errorf("AutoCloseTime on the node's time = %v, want %d", read(), want)
 	}
-	configured, err := valve.New(valve.Config{Source: fullyObservedHost(), Features: valve.FeatureTimeSync, MatterTime: func() (uint32, bool) { return 1, true }})
-	if err != nil {
+	srv.AttachMatterTime(func() (uint32, bool) { return 2000, true })
+	open()
+	if want := uint64(2060) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime after a second attach = %v, want %d", read(), want)
+	}
+}
+
+// TestValveAutoCloseTimeFollowsTheMatterTime ports chip's UpdateAutoCloseTime
+// (ValveConfigurationAndControlCluster.cpp:415-423 at 6170af84), which the
+// reference application's UTCTimeAvailabilityChanged calls
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73): when
+// the Matter time moves, AutoCloseTime becomes the new time plus
+// RemainingDuration — also for an opening that began without a time —
+// and stays as it is without a time, while the valve does not count down,
+// or without TS.
+func TestValveAutoCloseTimeFollowsTheMatterTime(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	h := fullyObservedHost() // RemainingDuration 120
+	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync})
+	read := func() any { v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); return v }
+	if _, err := srv.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 600}}); err != nil {
 		t.Fatal(err)
 	}
-	configured.AttachMatterTime(func() (uint32, bool) { return 2000, true })
-	if _, err := configured.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 60}}); err != nil {
-		t.Fatal(err)
+	srv.MatterTimeChanged() // no time attached
+	if v := read(); v != nil {
+		t.Fatalf("AutoCloseTime without a time = %v, want null", v)
 	}
-	if v, _ := configured.MatterRead(valvedef.AttrAutoCloseTime); v != uint64(2060)*1_000_000 {
-		t.Errorf("AutoCloseTime with an attached time over a configured one = %v, want the node's", v)
+	now, synced := uint32(1000), false
+	srv.AttachMatterTime(func() (uint32, bool) { return now, synced })
+	srv.MatterTimeChanged() // not synchronized
+	if v := read(); v != nil {
+		t.Fatalf("AutoCloseTime without a synchronized time = %v, want null", v)
 	}
+	synced = true
+	srv.MatterTimeChanged()
+	if want := uint64(1120) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime once the time arrives = %v, want %d", read(), want)
+	}
+	now = 5000
+	srv.MatterTimeChanged()
+	if want := uint64(5120) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime after the time moved = %v, want %d", read(), want)
+	}
+	h.remaining = 0
+	now = 9000
+	srv.MatterTimeChanged()
+	h.remaining = 120
+	if read() == uint64(9120)*1_000_000 {
+		t.Error("a new AutoCloseTime was written while the valve did not count down")
+	}
+	plain := valve.NewServer(valve.Config{Source: fullyObservedHost()})
+	plain.AttachMatterTime(func() (uint32, bool) { return 1000, true })
+	plain.MatterTimeChanged()
+	if v, ok := plain.MatterRead(valvedef.AttrAutoCloseTime); ok && v != nil {
+		t.Errorf("AutoCloseTime without TS = %v", v)
+	}
+}
+
+// TestValveAutoCloseTimeWritersAreSerialised: Open, Close and
+// MatterTimeChanged write AutoCloseTime one after the other (run with
+// -race); once they are done, a last change of the time sets it from that
+// time.
+func TestValveAutoCloseTimeWritersAreSerialised(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := valve.NewServer(valve.Config{Source: &lockedHost{h: fullyObservedHost()}, Features: valve.FeatureTimeSync})
+	var now atomic.Uint32
+	now.Store(1000)
+	srv.AttachMatterTime(func() (uint32, bool) { return now.Load(), true })
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range 50 {
+				switch (i + j) % 3 {
+				case 0:
+					_, _ = srv.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 600}})
+				case 1:
+					now.Add(1)
+					srv.MatterTimeChanged()
+				default:
+					_, _ = srv.MatterInvoke(ctx, valve.CmdClose, nil)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	now.Store(7000)
+	srv.MatterTimeChanged()
+	if v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); v != uint64(7120)*1_000_000 {
+		t.Errorf("AutoCloseTime after the writers = %v, want %d", v, uint64(7120)*1_000_000)
+	}
+}
+
+// lockedHost is a fakeHost safe for concurrent commands.
+type lockedHost struct {
+	mu sync.Mutex
+	h  *fakeHost
+}
+
+func (l *lockedHost) CurrentState() (valvedef.ValveStateEnum, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.CurrentState()
+}
+
+func (l *lockedHost) TargetState() (valvedef.ValveStateEnum, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.TargetState()
+}
+
+func (l *lockedHost) OpenDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.OpenDuration()
+}
+
+func (l *lockedHost) RemainingDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.RemainingDuration()
+}
+
+func (l *lockedHost) DefaultOpenDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.DefaultOpenDuration()
+}
+
+func (l *lockedHost) SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.SetDefaultOpenDuration(ctx, seconds)
+}
+
+func (l *lockedHost) Open(ctx context.Context, req valvedef.OpenRequest) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.Open(ctx, req)
+}
+
+func (l *lockedHost) Close(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.Close(ctx)
 }

@@ -164,9 +164,10 @@ var hostCases = map[uint32]hostCase{
 	h_switch.ClusterID:  {kit: kitOf[*switchserver.Server](), host: hostOf[h_switch.Host](h_switch.Wrap), covered: []string{"CurrentPosition", "Endpoint"}},
 	h_lock.ClusterID:    {kit: kitOf[*lock.DoorLockServer](), host: hostOf[h_lock.Host](h_lock.Wrap), covered: []string{"ReportAlarm", "SetLockState", "User"}},
 	h_wc.ClusterID:      {kit: kitOf[*cover.WindowCoveringServer](), covered: []string{"SetCurrentPosition", "SetOperationalStatus", "SetTargetPosition"}},
-	// Thermostat and Valve: AttachMatterTime is the node's wiring.
+	// Thermostat and Valve: AttachMatterTime and RequiresMatterTime are the
+	// node's wiring.
 	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), covered: []string{
-		"ActivePresetHandle", "ActiveScheduleHandle", "AttachMatterTime", "CurrentSuggestion", "Presets", "Schedules",
+		"ActivePresetHandle", "ActiveScheduleHandle", "AttachMatterTime", "CurrentSuggestion", "Presets", "RequiresMatterTime", "Schedules",
 		"SetAbsoluteSetpointLimit", "SetActivePresetHandle", "SetActiveScheduleHandle", "SetLocalTemperature",
 		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
@@ -242,7 +243,7 @@ var hostCases = map[uint32]hostCase{
 	h_basic.ClusterID:    {kit: kitOf[*media.AppBasicServer]()},
 	h_content.ClusterID:  {kit: kitOf[*media.ContentControlServer](), covered: []string{"EmitEnteringBlockContentTimeWindow", "EmitRemainingScreenTimeExpired"}},
 	h_pump.ClusterID:     {kit: kitOf[*pump.Server](), covered: []string{"Endpoint", "SupportsControlMode", "SupportsOperationMode"}},
-	h_valve.ClusterID:    {kit: kitOf[*valve.Server](), covered: []string{"AttachMatterTime", "FeatureMap"}},
+	h_valve.ClusterID:    {kit: kitOf[*valve.Server](), covered: []string{"AttachMatterTime", "FeatureMap", "RequiresMatterTime"}},
 	h_ms.ClusterID:       {kit: kitOf[*modeselect.Server]()},
 	h_sa.ClusterID: {kit: kitOf[*servicearea.Server](), host: hostOf[h_sa.Host](h_sa.Wrap), covered: []string{
 		"SetCurrentArea", "SetEstimatedEndTime", "SetProgress", "SetSelectedAreas", "SetSupportedAreas", "SetSupportedMaps",

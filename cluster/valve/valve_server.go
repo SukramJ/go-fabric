@@ -36,6 +36,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -96,7 +97,7 @@ const (
 const (
 	// FeatureTimeSync is the TS bit — the valve expresses AutoCloseTime
 	// against synchronized UTC time (resource :21-26), the node's Matter
-	// time ([Server.AttachMatterTime], [Config].MatterTime outside a node).
+	// time ([Server.AttachMatterTime]).
 	FeatureTimeSync = uint32(valvedef.FeatureTimeSync)
 	// FeatureLevel is the LVL bit — the valve can be driven to a
 	// percentage of its range (resource :29-32); it needs a [LevelSource].
@@ -204,14 +205,6 @@ type Config struct {
 	// definition's default 1 when zero) where Attributes carries it: a
 	// TargetLevel or DefaultOpenLevel must then be 100 or a multiple of it.
 	LevelStep uint8
-	// MatterTime is the Matter time of a server outside a node with TS, in
-	// epoch seconds, false while it is not synchronised. An Open while it
-	// is false, or without a time, leaves AutoCloseTime null, as
-	// connectedhomeip's SetAutoCloseTime does without a valid UTC time. On
-	// a node the node's own time replaces it as the server joins the
-	// topology ([Server.AttachMatterTime]): the root TimeSynchronization's
-	// UTC, the one Matter time of the node.
-	MatterTime func() (epochS uint32, ok bool)
 }
 
 // Server implements [contract.ClusterServer] for
@@ -227,10 +220,15 @@ type Server struct {
 	defaults  DefaultOpenLevelSource // nil without DefaultOpenLevel
 	levelStep uint8                  // zero without LevelStep
 	timeSync  bool                   // TS
-	// matterTime is the node's Matter time with TS ([Config].MatterTime,
-	// replaced by [Server.AttachMatterTime]); nil without one.
-	matterTime atomic.Pointer[func() (uint32, bool)]
+	// matterTime is the Matter time TS reads ([Server.AttachMatterTime]);
+	// nil without one.
+	matterTime atomic.Pointer[clock.MatterTime]
 
+	// cmd serialises what writes AutoCloseTime: Open, Close and
+	// MatterTimeChanged, each held across its reads of the time and of the
+	// source, so a moved time neither overwrites a fresher Open or Close
+	// nor is overwritten by an Open that read the time before it moved.
+	cmd sync.Mutex
 	// mu guards autoClose, the AutoCloseTime the last Open set (TS),
 	// epoch-us; nil is null.
 	mu        sync.Mutex
@@ -263,12 +261,7 @@ func New(cfg Config) (*Server, error) {
 		}
 		s.level = l
 	}
-	if cfg.Features&FeatureTimeSync != 0 {
-		s.timeSync = true
-		if cfg.MatterTime != nil {
-			s.matterTime.Store(&cfg.MatterTime)
-		}
-	}
+	s.timeSync = cfg.Features&FeatureTimeSync != 0
 	if slices.Contains(cfg.Attributes, valvedef.AttrDefaultOpenLevel) {
 		d, ok := cfg.Source.(DefaultOpenLevelSource)
 		if !ok {
@@ -519,6 +512,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if s.src == nil {
 			return nil, errNoSource("Open")
 		}
+		s.cmd.Lock()
+		defer s.cmd.Unlock()
 		at := s.autoCloseFor(req)
 		if err := s.src.Open(ctx, req); err != nil {
 			return nil, fmt.Errorf("valve: Open: %w", err)
@@ -530,6 +525,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if s.src == nil {
 			return nil, errNoSource("Close")
 		}
+		s.cmd.Lock()
+		defer s.cmd.Unlock()
 		if err := s.src.Close(ctx); err != nil {
 			return nil, fmt.Errorf("valve: Close: %w", err)
 		}
@@ -605,21 +602,63 @@ func (s *Server) autoCloseFor(req OpenRequest) *uint64 {
 	return &at
 }
 
-// AttachMatterTime hands the server the node's Matter time, the one an
-// Open's AutoCloseTime is set on with TS: the node calls it as the server
-// joins its topology, with the root TimeSynchronization's UTC in epoch
-// seconds (core.TimeSynchronization.MatterEpochSeconds, false while the
-// node has no time), and it replaces [Config].MatterTime —
-// connectedhomeip's valve asks the node's TimeSynchronization whether the
-// time is valid and reads the system clock SetUTCTime sets
+// AttachMatterTime hands the server the Matter time an Open's
+// AutoCloseTime is set on with TS — the server's only input of it. A node
+// calls it as the server joins its topology, with the root
+// TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds, false while the node has
+// no time): connectedhomeip's valve asks the node's TimeSynchronization
+// whether the time is valid and reads the system clock SetUTCTime sets
 // (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
-// 46-57, TimeSynchronizationCluster.cpp:856-872 at 6170af84). A server
-// outside a node keeps its configured time; nil leaves it unchanged.
-func (s *Server) AttachMatterTime(matterTime func() (epochS uint32, ok bool)) {
+// 46-58, TimeSynchronizationCluster.cpp:856-872 at 6170af84). A TS server
+// outside a node has no Matter time until its host attaches one: every
+// Open leaves AutoCloseTime null, where chip's Startup refuses TS without
+// a time tracker (ValveConfigurationAndControlCluster.cpp:46-50). nil
+// leaves the time unchanged.
+func (s *Server) AttachMatterTime(matterTime clock.MatterTime) {
 	if matterTime != nil {
 		s.matterTime.Store(&matterTime)
 	}
 }
+
+// MatterTimeChanged sets AutoCloseTime anew on the moved Matter time: the
+// time now plus RemainingDuration, while the valve counts down
+// (RemainingDuration known and not zero) and the time is synchronized; an
+// opening that began without a time gets its AutoCloseTime here. A node
+// calls it whenever it adopts a time; the host of a server outside a node
+// calls it when its time does. Mirrors connectedhomeip's UpdateAutoCloseTime
+// (ValveConfigurationAndControlCluster.cpp:415-423 at 6170af84), which the
+// reference application's UTCTimeAvailabilityChanged calls
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73), with
+// the epoch-s the Matter time carries.
+func (s *Server) MatterTimeChanged() {
+	if !s.timeSync || s.src == nil {
+		return
+	}
+	s.cmd.Lock()
+	defer s.cmd.Unlock()
+	matterTime := s.matterTime.Load()
+	if matterTime == nil {
+		return
+	}
+	now, ok := (*matterTime)()
+	if !ok {
+		return
+	}
+	left, known := s.src.RemainingDuration()
+	if !known || left == 0 {
+		return
+	}
+	at := (uint64(now) + uint64(left)) * 1_000_000
+	s.setAutoClose(&at)
+	s.tracker().Bump()
+}
+
+// RequiresMatterTime reports whether the server cannot be served without
+// the node's Matter time: with TS, as connectedhomeip's Startup refuses TS
+// without a time tracker (ValveConfigurationAndControlCluster.cpp:46-50
+// at 6170af84) — a node without TimeSynchronization refuses such a valve.
+func (s *Server) RequiresMatterTime() bool { return s.timeSync }
 
 // setAutoClose records the AutoCloseTime of the last Open (nil: null).
 func (s *Server) setAutoClose(at *uint64) {

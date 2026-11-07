@@ -30,27 +30,10 @@ type fabricRemovedParticipant interface {
 	OnFabricRemoved(ctx context.Context, fabricIndex uint8)
 }
 
-// matterTimeParticipant is a cluster server of an endpoint that reads the
-// node's Matter time: the Thermostat with ThermostatSuggestions
-// (cluster/thermo) and the Valve with TimeSync (cluster/valve). The node
-// hands each the root TimeSynchronization's UTC in epoch seconds
-// (core.TimeSynchronization.MatterEpochSeconds) as its endpoint joins the
-// topology, so a controller reads one time from the node — the UTCTime
-// SetUTCTime, the trusted time source and the NTP fallback move — as
-// connectedhomeip's servers read the one system clock SetUTCTime sets
-// (SystemClock.cpp:284-306, TimeSynchronizationCluster.cpp:856-872 at
-// 6170af84). A node without the root cluster
-// ([TimeSynchronization].Off) has no UTC and hands none.
-type matterTimeParticipant interface {
-	AttachMatterTime(matterTime func() (epochS uint32, synced bool))
-}
-
-// attachNodeServices hands the topology's participants the node's store,
-// its commissioning window and its Matter time, and records the
-// fabric-removal ones.
+// attachNodeServices hands the topology's participants the node's store
+// and its commissioning window, and records the fabric-removal ones.
 func (n *Node) attachNodeServices(t *endpoint.Topology) {
 	var removed []fabricRemovedParticipant
-	ts := n.root.TimeSynchronization
 	for _, ep := range t.Endpoints {
 		if ep == nil {
 			continue
@@ -62,10 +45,7 @@ func (n *Node) attachNodeServices(t *endpoint.Topology) {
 			// The node's reach of an announcing commissioner, over its
 			// client stack, where the declaration names none (brief 27-B §7).
 			if p, ok := srv.(commissionerReachParticipant); ok && n.client != nil {
-				p.AttachCommissionerReach(commissionerReach{n})
-			}
-			if p, ok := srv.(matterTimeParticipant); ok && ts != nil {
-				p.AttachMatterTime(ts.MatterEpochSeconds)
+				p.AttachCommissionerReach(commissionerReach{n: n})
 			}
 			if p, ok := srv.(fabricRemovedParticipant); ok {
 				removed = append(removed, p)

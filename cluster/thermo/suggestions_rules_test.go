@@ -267,12 +267,15 @@ func TestSuggestionConfiguration(t *testing.T) {
 		t.Error("the removed suggestion is current")
 	}
 
-	never := newTSUGGEST(t, tsuggestConfig(clk, func(cfg *thermo.ThermostatConfig) { cfg.MatterTime = nil }))
+	never, err := thermo.New(tsuggestConfig(clk)) // no Matter time attached
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
 		t.Errorf("no Matter time: %v, want INVALID_IN_STATE", err)
 	}
-	// The node's time replaces the configured one as the server joins the
-	// topology (AttachMatterTime); nil leaves it as it is.
+	// The time arrives with AttachMatterTime, a node's as the server joins
+	// its topology; nil leaves it as it is.
 	never.AttachMatterTime(nil)
 	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
 		t.Errorf("no Matter time after a nil attach: %v, want INVALID_IN_STATE", err)
@@ -301,5 +304,123 @@ func TestSuggestionConfiguration(t *testing.T) {
 	plain.SetTemperatureSetpointHold(uint8(tdef.TemperatureSetpointHoldSetpointHoldOn)) // arms nothing
 	if n := plainClk.Pending(); n != 0 {
 		t.Errorf("%d timers armed by a thermostat without TSUGGEST", n)
+	}
+}
+
+// TestSuggestionsFollowAMovedMatterTime: when the Matter time moves
+// (MatterTimeChanged, a node's on every move of its UTC) the suggestions
+// are re-evaluated against the new time — a jump past the current
+// suggestion's ExpirationTime removes it and leaves no current one, ahead
+// of connectedhomeip, whose expiration timer runs on the monotonic clock
+// (thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84) and does
+// not see a change of UTC; the server's own timer has not fired.
+func TestSuggestionsFollowAMovedMatterTime(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	var jump uint32
+	srv.AttachMatterTime(func() (uint32, bool) {
+		v, ok := clk.matterTime()
+		return v + jump, ok
+	})
+	if _, err := addSuggestion(srv, handleB, nil, 30); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := srv.CurrentSuggestion(); !ok {
+		t.Fatal("the suggestion is not current")
+	}
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if _, ok := srv.CurrentSuggestion(); !ok {
+		t.Error("an unmoved time dropped the current suggestion")
+	}
+	jump = 31 * 60
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Errorf("current suggestion %+v after the time passed its expiry", c)
+	}
+	if got := srv.Suggestions(); len(got) != 0 {
+		t.Errorf("suggestions %+v after the time passed their expiry, want none", got)
+	}
+}
+
+// TestAMovedMatterTimeDuringAReevaluationIsKept: a change of the Matter
+// time that lands while a re-evaluation runs — after it read the time —
+// keeps its own scheduled re-evaluation; the running one does not replace
+// that timer, so the moved time is evaluated and the expired suggestion
+// leaves.
+func TestAMovedMatterTimeDuringAReevaluationIsKept(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	var jump uint32
+	trigger := false
+	srv.AttachMatterTime(func() (uint32, bool) {
+		v, ok := clk.matterTime()
+		old := v + jump
+		if trigger {
+			// The time moves after this read: the change is told while the
+			// re-evaluation that read the old time still runs.
+			trigger = false
+			jump = 31 * 60
+			srv.MatterTimeChanged()
+		}
+		return old, ok
+	})
+	if _, err := addSuggestion(srv, handleB, nil, 30); err != nil {
+		t.Fatal(err)
+	}
+	trigger = true
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	clk.Advance(0)
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Errorf("current suggestion %+v: the change told during a re-evaluation was lost", c)
+	}
+}
+
+// TestSuggestionsFollowAMovedMatterTimeBothWays: a jump to a suggestion's
+// EffectiveTime makes it current — its preset followed — before the
+// server's timer fires; a jump back before it takes the current status
+// away again, while the preset it activated stays active (chip never sees
+// the case: its timer is monotonic,
+// thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84).
+func TestSuggestionsFollowAMovedMatterTimeBothWays(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	var jump uint32
+	srv.AttachMatterTime(func() (uint32, bool) {
+		v, ok := clk.matterTime()
+		return v + jump, ok
+	})
+	effective := clk.epoch() + 2*60*60
+	if _, err := addSuggestion(srv, handleB, &effective, 30); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Fatalf("a suggestion effective in 2 h is current: %+v", c)
+	}
+	jump = 2*60*60 + 60
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if _, ok := srv.CurrentSuggestion(); !ok {
+		t.Fatal("the jump to its EffectiveTime did not make the suggestion current")
+	}
+	if got := srv.ActivePresetHandle(); !bytes.Equal(got, handleB) {
+		t.Errorf("ActivePresetHandle %q after the jump, want %q", got, handleB)
+	}
+	jump = 0
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Errorf("current suggestion %+v after the jump back before its EffectiveTime", c)
+	}
+	if got := srv.Suggestions(); len(got) != 1 {
+		t.Errorf("suggestions %+v after the jump back, want the one still pending", got)
+	}
+	if got := srv.ActivePresetHandle(); !bytes.Equal(got, handleB) {
+		t.Errorf("ActivePresetHandle %q after the jump back, want the preset it activated, %q", got, handleB)
 	}
 }
