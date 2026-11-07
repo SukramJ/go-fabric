@@ -3449,21 +3449,15 @@
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsServerTest.ts",
-      "status": "partial",
-      "reason": "The enable-key gate of both test commands (#4881), TestEventTriggersEnabled derived from the key, PayloadTestRequest's constraints and TimeSnapshot's SystemTimeMs on the UpTime base are ported on the server. Missing: the faults describe — the Go server serves none of the optional fault attributes or fault events (general_diagnostics.go), a feature gap.",
+      "status": "ported",
+      "reason": "The enable-key gate of both test commands (#4881), TestEventTriggersEnabled derived from the key, PayloadTestRequest's constraints and TimeSnapshot's SystemTimeMs on the UpTime base are ported on the server; the faults describe on the server with a contract.FaultSource whose notification stands in for register/clear (issue 439).",
       "snapshotSha": "d5b64d9fd9b849b5dcf7872703d16f5642c9ebd3",
       "go": [
         "cluster/core:TestGeneralDiagnosticsServerTestEventTrigger",
         "cluster/core:TestGeneralDiagnosticsServerTestEventTriggersEnabled",
         "cluster/core:TestGeneralDiagnosticsServerPayloadTestRequest",
-        "cluster/core:TestGeneralDiagnosticsServerTimeSnapshot"
-      ],
-      "missing": [
-        "registers and clears hardware faults with one event per change",
-        "registers and clears radio faults with one event per change",
-        "registers and clears network faults with one event per change",
-        "emits nothing when an active fault is registered again",
-        "emits nothing when an absent fault is cleared"
+        "cluster/core:TestGeneralDiagnosticsServerTimeSnapshot",
+        "cluster/core:TestGeneralDiagnosticsFaultsParityMatterJS"
       ],
       "left": [
         {

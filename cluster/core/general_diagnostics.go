@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -73,9 +74,9 @@ const (
 // the Root endpoint. Reports basic runtime diagnostics: uptime,
 // reboot reason, hardware faults, network faults.
 //
-// go-fabric emits stub values for the fault lists (the bridge
-// itself does not surface hardware-fault events to Matter); UpTime
-// and TotalOperationalHours come from a monotonic clock.
+// The fault lists and their change events are served when the host
+// supplies its faults ([GeneralDiagnostics.SetFaultSource]); UpTime and
+// TotalOperationalHours come from a monotonic clock.
 type GeneralDiagnostics struct {
 	// mu guards clock, startTime, rebootCount, baseOperationalTime,
 	// persistedSeeded, testEnableKey, testTrigger, deviceLoad, utcClock,
@@ -153,6 +154,19 @@ type GeneralDiagnostics struct {
 	// registers; NetworkInterfaces is reported through them when the
 	// interfaces change.
 	changes cluster.AttributeChanges
+	// faults is the host's fault port ([SetFaultSource]); nil serves no
+	// fault list. activeFaults are the lists it served last — hardware,
+	// radio, network — and faultsUnsub detaches its notifier. Guarded
+	// by mu; faultsMu serialises the re-reads so the change events
+	// leave in the order of the lists.
+	faults       contract.FaultSource
+	activeFaults [3][]uint8
+	faultsUnsub  func()
+	faultsMu     sync.Mutex
+	// faultsGen counts the attached ports, so a notification of a
+	// detached one changes nothing (a source need not be comparable).
+	faultsGen uint64
+
 	// ifWatch compares the interfaces while changes has a listener — the
 	// observation of Network.interfacesChanged matter.js
 	// GeneralDiagnosticsServer.initialize starts
@@ -227,8 +241,8 @@ const (
 	payloadTestMaxResponse = 1100
 
 	// BootReason is event 0x03; the lower three (HardwareFaultChange,
-	// RadioFaultChange, NetworkFaultChange) are optional and not emitted
-	// by the bridge.
+	// RadioFaultChange, NetworkFaultChange) are optional and emitted with
+	// a fault port ([GeneralDiagnostics.SetFaultSource]).
 	gendiagEventBootReason = gendiagdef.EventBootReason
 )
 
@@ -247,6 +261,34 @@ var gendiagInst = mustInstance(gendiagdef.Definition, spec.Options{
 var gendiagInstNoFeatures = mustInstance(gendiagdef.Definition, spec.Options{
 	Attributes: []uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus},
 })
+
+// gendiagFaultAttrs and gendiagFaultEvents are the fault lists and their
+// change events, served with a fault port: matter.js serves the three
+// optional attributes once they are enabled and emits each list's change
+// event from its $Changed reactor (GeneralDiagnosticsServer.ts:173-177,
+// :296-411 at db021da0).
+var (
+	gendiagFaultAttrs = []uint32{
+		gendiagdef.AttrActiveHardwareFaults, gendiagdef.AttrActiveRadioFaults, gendiagdef.AttrActiveNetworkFaults,
+	}
+	gendiagFaultEvents = []uint32{
+		gendiagdef.EventHardwareFaultChange, gendiagdef.EventRadioFaultChange, gendiagdef.EventNetworkFaultChange,
+	}
+)
+
+// gendiagInstFaults and gendiagInstFaultsNoFeatures are gendiagInst and
+// gendiagInstNoFeatures with the fault lists and events.
+var (
+	gendiagInstFaults = mustInstance(gendiagdef.Definition, spec.Options{
+		Features:   gendiagFeatureDataModelTest,
+		Attributes: append([]uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus}, gendiagFaultAttrs...),
+		Events:     gendiagFaultEvents,
+	})
+	gendiagInstFaultsNoFeatures = mustInstance(gendiagdef.Definition, spec.Options{
+		Attributes: append([]uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus}, gendiagFaultAttrs...),
+		Events:     gendiagFaultEvents,
+	})
+)
 
 // GeneralDiagnosticsFeatures is the feature selection of a
 // GeneralDiagnostics server, matter.js GeneralDiagnosticsServer.with(…).
@@ -364,7 +406,15 @@ func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
 
 // def is the definition bound to the server's feature selection.
 func (g *GeneralDiagnostics) def() *spec.Instance {
-	if g.noDataModelTest {
+	g.mu.RLock()
+	faults := g.faults != nil
+	g.mu.RUnlock()
+	switch {
+	case faults && g.noDataModelTest:
+		return gendiagInstFaultsNoFeatures
+	case faults:
+		return gendiagInstFaults
+	case g.noDataModelTest:
 		return gendiagInstNoFeatures
 	}
 	return gendiagInst
@@ -512,12 +562,13 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	// not needed when the event flows.
 	case gendiagAttrBootReason:
 		return nil, false
-	case gendiagAttrActiveHardwareFaults:
-		return nil, false
-	case gendiagAttrActiveRadioFaults:
-		return nil, false
-	case gendiagAttrActiveNetworkFaults:
-		return nil, false
+	case gendiagAttrActiveHardwareFaults, gendiagAttrActiveRadioFaults, gendiagAttrActiveNetworkFaults:
+		// Served with the host's fault port ([SetFaultSource]), absent
+		// without one.
+		if g.faults == nil {
+			return nil, false
+		}
+		return faultList(slices.Clone(g.activeFaults[attrID-gendiagAttrActiveHardwareFaults])), true
 	case gendiagAttrTestEventTriggersEnabled:
 		// True exactly when a non-zero enable key is configured:
 		// matter.js GeneralDiagnosticsServer.ts initialize derives the
@@ -526,9 +577,22 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		return g.testEnableKey != nil, true
 
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return g.def().ReadGlobal(attrID)
+		return g.defLocked().ReadGlobal(attrID)
 	}
 	return nil, false
+}
+
+// defLocked is def with mu held.
+func (g *GeneralDiagnostics) defLocked() *spec.Instance {
+	switch {
+	case g.faults != nil && g.noDataModelTest:
+		return gendiagInstFaultsNoFeatures
+	case g.faults != nil:
+		return gendiagInstFaults
+	case g.noDataModelTest:
+		return gendiagInstNoFeatures
+	}
+	return gendiagInst
 }
 
 // MatterWrite always rejects — GeneralDiagnostics is read-only: a served
@@ -1218,6 +1282,139 @@ func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
 // the attribute dirty (bridge wireAttributeNotifiersLocked), as matter.js
 // assigns the re-read list to the attribute state (#updateNetworkList,
 // GeneralDiagnosticsServer.ts:469-525 at db021da0).
+// faultList is a fault list on the wire: an array of enum8 values.
+type faultList []uint8
+
+// EncodeTLV implements spec.Encodable.
+func (l faultList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	enc.StartArray(tag)
+	for _, v := range l {
+		enc.PutUint(tlv.AnonymousTag(), uint64(v))
+	}
+	_ = enc.EndContainer()
+}
+
+// SetFaultSource attaches the host's fault port: the server serves
+// ActiveHardwareFaults, ActiveRadioFaults and ActiveNetworkFaults from
+// it, lists HardwareFaultChange, RadioFaultChange and NetworkFaultChange
+// in its EventList, and on each of the source's notifications reads the
+// lists again and, for each list that changed, reports the attribute and
+// emits its change event with the current and the previous list — what
+// matter.js GeneralDiagnosticsServer's register…Fault / clear…Fault
+// convenience methods drive through the lists' $Changed reactors
+// (GeneralDiagnosticsServer.ts:173-177, :296-411 at db021da0). A value a
+// list names twice is served once, at its first place (§11.12.6.6). The
+// fault lists change the server's attribute and event lists, so call it
+// before the node assembles its topology; nil detaches the port.
+func (g *GeneralDiagnostics) SetFaultSource(src contract.FaultSource) {
+	g.faultsMu.Lock()
+	defer g.faultsMu.Unlock()
+	g.mu.Lock()
+	unsub := g.faultsUnsub
+	g.faults, g.faultsUnsub, g.activeFaults = src, nil, [3][]uint8{}
+	g.faultsGen++
+	gen := g.faultsGen
+	g.mu.Unlock()
+	if unsub != nil {
+		unsub()
+	}
+	if src == nil {
+		return
+	}
+	lists := faultListsOf(src.MatterActiveFaults())
+	g.mu.Lock()
+	g.activeFaults = lists
+	g.mu.Unlock()
+	off := src.OnMatterValueChanged(func() { g.faultsChanged(gen) })
+	g.mu.Lock()
+	if g.faultsGen == gen {
+		g.faultsUnsub = off
+		off = nil
+	}
+	g.mu.Unlock()
+	if off != nil {
+		off()
+	}
+}
+
+// faultListsOf is the three lists of f, each without a repeated value.
+func faultListsOf(f contract.Faults) [3][]uint8 {
+	dedupe := func(in []uint8) []uint8 {
+		out := make([]uint8, 0, len(in))
+		for _, v := range in {
+			if !slices.Contains(out, v) {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	return [3][]uint8{dedupe(f.Hardware), dedupe(f.Radio), dedupe(f.Network)}
+}
+
+// faultsChanged reads the host's lists again and reports each list that
+// changed: the attribute to subscribers and its change event with the
+// current and the previous list (GeneralDiagnosticsServer.ts
+// #triggerActiveHardwareFaultsChangedEvent and siblings, :325-337,
+// :363-375, :401-413 at db021da0). A list that did not change emits
+// nothing, as a register of an active fault or a clear of an absent one
+// does not change matter.js's state.
+func (g *GeneralDiagnostics) faultsChanged(gen uint64) {
+	g.faultsMu.Lock()
+	defer g.faultsMu.Unlock()
+	g.mu.RLock()
+	src := g.faults
+	current := g.faultsGen == gen
+	g.mu.RUnlock()
+	if src == nil || !current {
+		return
+	}
+	next := faultListsOf(src.MatterActiveFaults())
+	g.mu.Lock()
+	if g.faultsGen != gen {
+		g.mu.Unlock()
+		return
+	}
+	prev := g.activeFaults
+	g.activeFaults = next
+	emitter, endpoint, inst := g.emitter, g.endpoint, g.defLocked()
+	g.mu.Unlock()
+	for i := range next {
+		if slices.Equal(prev[i], next[i]) {
+			continue
+		}
+		attr, event := gendiagFaultAttrs[i], gendiagFaultEvents[i]
+		g.dataVersion.Bump()
+		g.changes.Notify(attr)
+		if emitter == nil {
+			g.logger().Warn("matter.general_diagnostics.fault_event_skipped", slog.Uint64("event", uint64(event)),
+				slog.String("reason", "no event emitter wired"))
+			continue
+		}
+		emitter.MatterEmitEvent(endpoint, gendiagClusterID, event, faultChangeEvent(i, next[i], prev[i]),
+			inst.EventPriority(event))
+	}
+}
+
+// faultChangeEvent is the change event payload of fault list i.
+func faultChangeEvent(i int, current, previous []uint8) spec.Encodable {
+	switch i {
+	case 0:
+		return gendiagdef.HardwareFaultChangeEvent{Current: enums[gendiagdef.HardwareFaultEnum](current), Previous: enums[gendiagdef.HardwareFaultEnum](previous)}
+	case 1:
+		return gendiagdef.RadioFaultChangeEvent{Current: enums[gendiagdef.RadioFaultEnum](current), Previous: enums[gendiagdef.RadioFaultEnum](previous)}
+	}
+	return gendiagdef.NetworkFaultChangeEvent{Current: enums[gendiagdef.NetworkFaultEnum](current), Previous: enums[gendiagdef.NetworkFaultEnum](previous)}
+}
+
+// enums converts a fault list to its enum type.
+func enums[E ~uint8](in []uint8) []E {
+	out := make([]E, len(in))
+	for i, v := range in {
+		out[i] = E(v)
+	}
+	return out
+}
+
 func (g *GeneralDiagnostics) interfacesChanged([]string) {
 	g.dataVersion.Bump()
 	g.changes.Notify(gendiagAttrNetworkInterfaces)

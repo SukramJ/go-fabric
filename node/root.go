@@ -162,6 +162,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
 	r.GeneralDiagnostics.SetLogger(d.logger)
 	r.GeneralDiagnostics.SetInterfaceCheckInterval(cfg.Network.interfaceCheck())
+	if cfg.Faults != nil {
+		r.GeneralDiagnostics.SetFaultSource(cfg.Faults)
+	}
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)

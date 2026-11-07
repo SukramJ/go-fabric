@@ -132,9 +132,11 @@ const testparityPlannedRatchet = 3
 // Pin lift wave P4 (#433): InitialContactScheduleTest.ts ported, ClientConnectivityTest.ts's Sigma1 refresh: 152 ported, 997 missing.
 // Pin lift wave P4 (#433): VendorIdVerificationTest.ts ported, the VVSC rows of OperationalCertificateVerifyTest.ts: 153 ported, 988 missing.
 // Merged with wave P3: 158 ported, 985 missing.
+// Issue 439 (wave W7): GeneralDiagnosticsServerTest.ts's five fault cases
+// ported over contract.FaultSource: 159 ported, 980 missing.
 const (
-	testparityPortedRatchet  = 158
-	testparityMissingRatchet = 985
+	testparityPortedRatchet  = 159
+	testparityMissingRatchet = 980
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

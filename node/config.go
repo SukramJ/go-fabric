@@ -170,6 +170,15 @@ type Config struct {
 	// MaxPathsPerInvoke above one fails [Node.Start]
 	// (mattercore.GeneralDiagnostics.CheckDataModelTest).
 	GeneralDiagnosticsFeatures *GeneralDiagnosticsFeatures
+	// Faults is the host's port of the faults the device detects
+	// (contract.FaultSource): the root GeneralDiagnostics serves
+	// ActiveHardwareFaults, ActiveRadioFaults and ActiveNetworkFaults
+	// from it and emits HardwareFaultChange, RadioFaultChange and
+	// NetworkFaultChange with the current and the previous list when one
+	// changes, as matter.js GeneralDiagnosticsServer's register…Fault and
+	// clear…Fault do (GeneralDiagnosticsServer.ts:296-411 at db021da0).
+	// nil serves neither the lists nor the events.
+	Faults contract.FaultSource
 	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
 	// the root BasicInformation advertises it, the PASE and CASE session
 	// parameters carry it and the invoke path refuses a larger batch with
