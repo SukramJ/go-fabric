@@ -4927,7 +4927,7 @@
         "controller:TestLargeMessageReadOverTCP",
         "client/peer:TestPeerTransportGateParity"
       ],
-      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session.",
+      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session. Pin lift wave P4 (#433) ported the client half of matter.js #4793 (client/exchange, transport/tcp) and left the five maxMessageSize cases missing, not left: they configure the node's own TCP limit (network.tcp.maxMessageSize, its validation and its announcement), the device side, which a later wave ports with the device-side TCP cap of notes/parity/matter_behaviour_findings.md F-db021da0-1.",
       "snapshotSha": "4cedd1b21ab6b6f8301cee7f8351965da37795e1",
       "missing": [
         "accepts and announces the configured TCP maxMessageSize",

@@ -10,7 +10,7 @@ package client
 // WaitingForDeviceDiscovery, because with nothing to try no establishment
 // runs and its unresponsive signal never fires (NetworkClient.ts:390-392,
 // :541-546 hasAnyAddress); once discovery finds an address the node is
-// Reconnecting (the service's change recomputes the state, :87). matter.js
+// Reconnecting (the service's change recomputes the state, :88). matter.js
 // blocks the device's DNS-SD and lets the cached records expire; here the
 // node is stored without an address and DNS-SD stays silent until the case
 // answers it.

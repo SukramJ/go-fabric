@@ -11,7 +11,7 @@ import (
 
 // FramingHeaderSize is the size of the length prefix in front of every
 // message. Mirrors matter.js
-// packages/protocol/src/transport/tcp/TcpChannel.ts:28
+// packages/protocol/src/transport/tcp/TcpChannel.ts:29 at db021da0
 // (FRAMING_HEADER_SIZE = 4).
 const FramingHeaderSize = 4
 
@@ -32,11 +32,11 @@ var (
 	// MessageTooLargeError (TcpChannel.ts:116-120 at db021da0).
 	ErrMessageTooLarge = errors.New("tcp: message exceeds the TCP limit")
 	// ErrConnClosed is returned by [Conn.Send] after the connection
-	// closed (TcpChannel.ts:120-122).
+	// closed (TcpChannel.ts:111-113 at db021da0).
 	ErrConnClosed = errors.New("tcp: connection closed")
 	// ErrZeroLengthFrame closes a connection that announced an empty
 	// message: one can never hold the mandatory message header
-	// (TcpChannel.ts:257-264).
+	// (TcpChannel.ts:245-249 at db021da0).
 	ErrZeroLengthFrame = errors.New("tcp: zero-length frame")
 	// ErrFrameTooLarge closes a connection that announced a message
 	// above the limit (TcpChannel.ts:251-256 at db021da0).

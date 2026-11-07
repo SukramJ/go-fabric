@@ -51,9 +51,10 @@ const (
 // attempt makes the next one refresh; every other end of an attempt — the
 // peer answered, a kick restart, another error, an abort — returns the
 // schedule to the identical phase. Mirrors matter.js
-// InitialContactSchedule (InitialContactSchedule.ts:20-177 at db021da0,
-// matter.js #4794): "a fresh Sigma1 is cheap and CHIP never sends one
-// more than MRP_MAX_TRANSMISSIONS times".
+// InitialContactSchedule (InitialContactSchedule.ts:20-177 at db021da0).
+// Why, in the words of matter.js #4794's commit message (cf651e6a), not
+// of the source: "a fresh Sigma1 is cheap and CHIP never sends one more
+// than MRP_MAX_TRANSMISSIONS times".
 type initialContactSchedule struct {
 	timing         Timing
 	onUnresponsive func()

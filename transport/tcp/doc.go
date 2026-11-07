@@ -9,8 +9,8 @@
 // connection registry).
 //
 // Framing: every Matter message is preceded by its length as a 4-byte
-// little-endian uint32 (TcpChannel.ts:37-41, FRAMING_HEADER_SIZE = 4 at
-// :28). The configured maximum payload size is MAX_TCP_MESSAGE_SIZE,
+// little-endian uint32 (TcpChannel.ts:31-36, FRAMING_HEADER_SIZE = 4 at
+// :29 at db021da0). The configured maximum payload size is MAX_TCP_MESSAGE_SIZE,
 // the length prefix not counted, so a message may carry MaxPayloadSize
 // bytes (TcpChannel.ts:37-41 at db021da0); a larger send is refused
 // (:116-120) and a larger announced length, or a zero one, closes the

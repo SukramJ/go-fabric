@@ -627,7 +627,8 @@ func (x *Exchange) sendAdditionalDelay() time.Duration {
 // interval for the peer's state, plus InitialRetransmissionTime, capped
 // at max(MaxRetransmissionTime, peer idle interval), and on a BDX exchange
 // at [bdxMaxRetransmissionInterval] even below the idle interval — matter.js
-// MessageExchange.ts:1234-1251 (#backOffFor).
+// MessageExchange.ts:1274-1297 (#backOffFor) at db021da0, the offset
+// added to n.
 func (x *Exchange) backoffLocked(n int) time.Duration {
 	return x.backoffForLocked(n+x.sendOpts.BackoffOffset, x.sendOpts.InitialRetransmissionTime)
 }
@@ -657,7 +658,8 @@ func (x *Exchange) backoffForLocked(n int, initial time.Duration) time.Duration 
 	iv, active := x.session.timing()
 	d := RetransmissionIntervalPadded(n, iv, active, x.m.rand(), x.sendPad())
 	// Saturating: d is MaxInt64 once the unbounded fallback's backoff
-	// saturated (W4-ctlnet-01); matter.js MessageExchange.ts:1242-1250.
+	// saturated (W4-ctlnet-01); matter.js MessageExchange.ts:1288-1290 at
+	// db021da0.
 	d = satAdd(d, initial)
 	if x.sendOpts.MaxRetransmissionTime > 0 {
 		d = min(d, max(x.sendOpts.MaxRetransmissionTime, iv.Idle))
