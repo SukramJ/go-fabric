@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -42,7 +43,7 @@ type fabricRemovedParticipant interface {
 // 6170af84). A node without the root cluster
 // ([TimeSynchronization].Off) has no UTC and hands none.
 type matterTimeParticipant interface {
-	AttachMatterTime(matterTime func() (epochS uint32, synced bool))
+	AttachMatterTime(matterTime clock.MatterTime)
 }
 
 // attachNodeServices hands the topology's participants the node's store,

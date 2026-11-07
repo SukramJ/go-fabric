@@ -17,7 +17,7 @@
 // [SchedulePort] (schedules.go), and ThermostatSuggestions (the presets a
 // controller suggests for a span of time, the one the thermostat follows)
 // after connectedhomeip's ThermostatSuggestions, on the node's Matter time
-// ([ThermostatConfig.MatterTime], suggestions.go).
+// ([ThermostatServer.AttachMatterTime], suggestions.go).
 //
 // The server holds its own state. Without a host port it answers every
 // write and command without forwarding it anywhere — the reference daemon
@@ -237,15 +237,6 @@ type ThermostatConfig struct {
 	// thermostat holds with ThermostatSuggestions (TSUGGEST, which needs
 	// PRES): at least 5, 0 for 5. The suggestions live in memory.
 	MaxThermostatSuggestions uint8
-	// MatterTime is the Matter time of a server outside a node with
-	// TSUGGEST: the current Matter epoch second and whether the time is
-	// synchronised. A suggestion is refused with INVALID_IN_STATE while it
-	// is not, and nil is a time never synchronised — connectedhomeip's
-	// GetClock_MatterEpochS gate (ThermostatClusterSuggestions.cpp:173-178
-	// at 6170af84). On a node the node's own time replaces it as the server
-	// joins the topology ([ThermostatServer.AttachMatterTime]): the root
-	// TimeSynchronization's UTC, the one Matter time of the node.
-	MatterTime func() (epochS uint32, synced bool)
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
@@ -369,10 +360,9 @@ type ThermostatServer struct {
 	// runs.
 	mu       sync.RWMutex
 	features uint32
-	// matterTime is the node's Matter time with TSUGGEST
-	// ([ThermostatConfig.MatterTime], replaced by
-	// [ThermostatServer.AttachMatterTime]); nil without one.
-	matterTime atomic.Pointer[func() (epochS uint32, synced bool)]
+	// matterTime is the Matter time TSUGGEST reads
+	// ([ThermostatServer.AttachMatterTime]); nil without one.
+	matterTime atomic.Pointer[clock.MatterTime]
 	inst       *spec.Instance
 	sink       Sink
 

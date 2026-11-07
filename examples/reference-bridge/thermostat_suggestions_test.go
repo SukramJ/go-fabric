@@ -8,6 +8,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/device"
@@ -45,7 +46,7 @@ func TestDemoThermostatSuggestionsAreGated(t *testing.T) {
 	}
 	handle := []byte("UserDef")
 	participant, ok := srv.Underlying().(interface {
-		AttachMatterTime(func() (uint32, bool))
+		AttachMatterTime(clock.MatterTime)
 	})
 	if !ok {
 		t.Fatal("the demo thermostat takes no Matter time")

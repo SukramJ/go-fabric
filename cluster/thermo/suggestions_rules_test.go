@@ -267,12 +267,15 @@ func TestSuggestionConfiguration(t *testing.T) {
 		t.Error("the removed suggestion is current")
 	}
 
-	never := newTSUGGEST(t, tsuggestConfig(clk, func(cfg *thermo.ThermostatConfig) { cfg.MatterTime = nil }))
+	never, err := thermo.New(tsuggestConfig(clk)) // no Matter time attached
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
 		t.Errorf("no Matter time: %v, want INVALID_IN_STATE", err)
 	}
-	// The node's time replaces the configured one as the server joins the
-	// topology (AttachMatterTime); nil leaves it as it is.
+	// The time arrives with AttachMatterTime, a node's as the server joins
+	// its topology; nil leaves it as it is.
 	never.AttachMatterTime(nil)
 	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
 		t.Errorf("no Matter time after a nil attach: %v, want INVALID_IN_STATE", err)

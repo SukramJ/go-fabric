@@ -36,6 +36,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -96,7 +97,7 @@ const (
 const (
 	// FeatureTimeSync is the TS bit — the valve expresses AutoCloseTime
 	// against synchronized UTC time (resource :21-26), the node's Matter
-	// time ([Server.AttachMatterTime], [Config].MatterTime outside a node).
+	// time ([Server.AttachMatterTime]).
 	FeatureTimeSync = uint32(valvedef.FeatureTimeSync)
 	// FeatureLevel is the LVL bit — the valve can be driven to a
 	// percentage of its range (resource :29-32); it needs a [LevelSource].
@@ -204,14 +205,6 @@ type Config struct {
 	// definition's default 1 when zero) where Attributes carries it: a
 	// TargetLevel or DefaultOpenLevel must then be 100 or a multiple of it.
 	LevelStep uint8
-	// MatterTime is the Matter time of a server outside a node with TS, in
-	// epoch seconds, false while it is not synchronised. An Open while it
-	// is false, or without a time, leaves AutoCloseTime null, as
-	// connectedhomeip's SetAutoCloseTime does without a valid UTC time. On
-	// a node the node's own time replaces it as the server joins the
-	// topology ([Server.AttachMatterTime]): the root TimeSynchronization's
-	// UTC, the one Matter time of the node.
-	MatterTime func() (epochS uint32, ok bool)
 }
 
 // Server implements [contract.ClusterServer] for
@@ -227,9 +220,9 @@ type Server struct {
 	defaults  DefaultOpenLevelSource // nil without DefaultOpenLevel
 	levelStep uint8                  // zero without LevelStep
 	timeSync  bool                   // TS
-	// matterTime is the node's Matter time with TS ([Config].MatterTime,
-	// replaced by [Server.AttachMatterTime]); nil without one.
-	matterTime atomic.Pointer[func() (uint32, bool)]
+	// matterTime is the Matter time TS reads ([Server.AttachMatterTime]);
+	// nil without one.
+	matterTime atomic.Pointer[clock.MatterTime]
 
 	// mu guards autoClose, the AutoCloseTime the last Open set (TS),
 	// epoch-us; nil is null.
@@ -263,12 +256,7 @@ func New(cfg Config) (*Server, error) {
 		}
 		s.level = l
 	}
-	if cfg.Features&FeatureTimeSync != 0 {
-		s.timeSync = true
-		if cfg.MatterTime != nil {
-			s.matterTime.Store(&cfg.MatterTime)
-		}
-	}
+	s.timeSync = cfg.Features&FeatureTimeSync != 0
 	if slices.Contains(cfg.Attributes, valvedef.AttrDefaultOpenLevel) {
 		d, ok := cfg.Source.(DefaultOpenLevelSource)
 		if !ok {
@@ -605,17 +593,20 @@ func (s *Server) autoCloseFor(req OpenRequest) *uint64 {
 	return &at
 }
 
-// AttachMatterTime hands the server the node's Matter time, the one an
-// Open's AutoCloseTime is set on with TS: the node calls it as the server
-// joins its topology, with the root TimeSynchronization's UTC in epoch
-// seconds (core.TimeSynchronization.MatterEpochSeconds, false while the
-// node has no time), and it replaces [Config].MatterTime —
-// connectedhomeip's valve asks the node's TimeSynchronization whether the
-// time is valid and reads the system clock SetUTCTime sets
+// AttachMatterTime hands the server the Matter time an Open's
+// AutoCloseTime is set on with TS — the server's only input of it. A node
+// calls it as the server joins its topology, with the root
+// TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds, false while the node has
+// no time): connectedhomeip's valve asks the node's TimeSynchronization
+// whether the time is valid and reads the system clock SetUTCTime sets
 // (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
-// 46-57, TimeSynchronizationCluster.cpp:856-872 at 6170af84). A server
-// outside a node keeps its configured time; nil leaves it unchanged.
-func (s *Server) AttachMatterTime(matterTime func() (epochS uint32, ok bool)) {
+// 46-58, TimeSynchronizationCluster.cpp:856-872 at 6170af84). A TS server
+// outside a node has no Matter time until its host attaches one: every
+// Open leaves AutoCloseTime null, where chip's Startup refuses TS without
+// a time tracker (ValveConfigurationAndControlCluster.cpp:46-50). nil
+// leaves the time unchanged.
+func (s *Server) AttachMatterTime(matterTime clock.MatterTime) {
 	if matterTime != nil {
 		s.matterTime.Store(&matterTime)
 	}

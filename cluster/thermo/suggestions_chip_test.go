@@ -93,7 +93,7 @@ func tsuggestConfig(clk *suggestClock, edit ...func(*thermo.ThermostatConfig)) t
 	}
 	off := uint8(tdef.TemperatureSetpointHoldSetpointHoldOff)
 	cfg.TemperatureSetpointHold = &off
-	cfg.Clock, cfg.MatterTime = clk, clk.matterTime
+	cfg.Clock = clk
 	for _, e := range edit {
 		e(&cfg)
 	}
@@ -105,6 +105,10 @@ func newTSUGGEST(t *testing.T, cfg thermo.ThermostatConfig) *thermo.ThermostatSe
 	srv, err := thermo.New(cfg)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The Matter time is attached, as a node attaches its own.
+	if c, ok := cfg.Clock.(*suggestClock); ok {
+		srv.AttachMatterTime(c.matterTime)
 	}
 	return srv
 }

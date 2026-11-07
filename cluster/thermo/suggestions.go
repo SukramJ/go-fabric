@@ -98,30 +98,28 @@ func (s *ThermostatServer) seedSuggestions(cfg ThermostatConfig) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: MaxThermostatSuggestions %d: %v", limit, err)
 	}
 	s.suggest = suggestions{max: limit}
-	if cfg.MatterTime != nil {
-		s.matterTime.Store(&cfg.MatterTime)
-	}
 	return nil
 }
 
-// AttachMatterTime hands the server the node's Matter time, the one its
-// suggestions are judged against: the node calls it as the server joins
-// its topology, with the root TimeSynchronization's UTC in epoch seconds
-// (core.TimeSynchronization.MatterEpochSeconds, null while the node has
-// no time), and it replaces [ThermostatConfig.MatterTime] — connectedhomeip
-// gates every suggestion on the one system clock SetUTCTime sets
-// (ThermostatClusterSuggestions.cpp:173-178, TimeSynchronizationCluster.cpp:
-// 856-872 at 6170af84). A server outside a node keeps its configured time;
-// nil leaves the time unchanged.
-func (s *ThermostatServer) AttachMatterTime(matterTime func() (epochS uint32, synced bool)) {
+// AttachMatterTime hands the server the Matter time its suggestions
+// (TSUGGEST) are judged against — the server's only input of it. A node
+// calls it as the server joins its topology, with the root
+// TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds, false while the node has
+// no time): connectedhomeip gates every suggestion on the one system clock
+// SetUTCTime sets (ThermostatClusterSuggestions.cpp:173-178,
+// TimeSynchronizationCluster.cpp:856-872 at 6170af84). A server outside a
+// node has no Matter time until its host attaches one: every
+// AddThermostatSuggestion answers INVALID_IN_STATE, as chip's does while
+// GetClock_MatterEpochS fails. nil leaves the time unchanged.
+func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 	if matterTime != nil {
 		s.matterTime.Store(&matterTime)
 	}
 }
 
-// matterNow is the node's Matter time in epoch seconds; false while it is
-// not synchronised — always without a time ([ThermostatConfig.MatterTime],
-// [ThermostatServer.AttachMatterTime]).
+// matterNow is the Matter time in epoch seconds; false while it is not
+// synchronised — always before [ThermostatServer.AttachMatterTime].
 func (s *ThermostatServer) matterNow() (uint32, bool) {
 	f := s.matterTime.Load()
 	if f == nil {

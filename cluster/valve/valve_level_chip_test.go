@@ -95,12 +95,11 @@ func TestValveSelectionRefusalNamesTheInterface(t *testing.T) {
 // AttributeTestTimeSync and AttributeTestAll list them.
 func TestValveLevelServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
-	clock := func() (uint32, bool) { return 1000, true }
 	for _, cfg := range []valve.Config{
 		{Source: newLevelHost(), Features: valve.FeatureLevel},
-		{Source: newLevelHost(), Features: valve.FeatureTimeSync, MatterTime: clock},
+		{Source: newLevelHost(), Features: valve.FeatureTimeSync},
 		{
-			Source: newLevelHost(), Features: valve.FeatureLevel | valve.FeatureTimeSync, MatterTime: clock,
+			Source: newLevelHost(), Features: valve.FeatureLevel | valve.FeatureTimeSync,
 			Attributes: []uint32{valvedef.AttrDefaultOpenLevel, valvedef.AttrLevelStep}, LevelStep: 10,
 		},
 	} {
@@ -230,7 +229,8 @@ func TestValveAutoCloseTimeChip(t *testing.T) {
 	const now = uint32(1700000000 - 946684800)
 	synced := true
 	h := fullyObservedHost()
-	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync, MatterTime: func() (uint32, bool) { return now, synced }})
+	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync})
+	srv.AttachMatterTime(func() (uint32, bool) { return now, synced })
 	read := func() any { v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); return v }
 	if v := read(); v != nil {
 		t.Errorf("AutoCloseTime before an Open = %v, want null", v)
@@ -277,8 +277,8 @@ func TestValveAutoCloseTimeChip(t *testing.T) {
 // AutoCloseTime null, as connectedhomeip's SetAutoCloseTime does while
 // the node's TimeSynchronization has no time
 // (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
-// 46-57 at 6170af84); the time the node attaches as the server joins its
-// topology replaces the configured one, and a nil attach changes nothing.
+// 46-58 at 6170af84); AttachMatterTime is its one input of the time, and
+// a nil attach changes nothing.
 func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -308,15 +308,9 @@ func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
 	if want := uint64(1060) * 1_000_000; read() != want {
 		t.Errorf("AutoCloseTime on the node's time = %v, want %d", read(), want)
 	}
-	configured, err := valve.New(valve.Config{Source: fullyObservedHost(), Features: valve.FeatureTimeSync, MatterTime: func() (uint32, bool) { return 1, true }})
-	if err != nil {
-		t.Fatal(err)
-	}
-	configured.AttachMatterTime(func() (uint32, bool) { return 2000, true })
-	if _, err := configured.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 60}}); err != nil {
-		t.Fatal(err)
-	}
-	if v, _ := configured.MatterRead(valvedef.AttrAutoCloseTime); v != uint64(2060)*1_000_000 {
-		t.Errorf("AutoCloseTime with an attached time over a configured one = %v, want the node's", v)
+	srv.AttachMatterTime(func() (uint32, bool) { return 2000, true })
+	open()
+	if want := uint64(2060) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime after a second attach = %v, want %d", read(), want)
 	}
 }
