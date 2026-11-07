@@ -5760,28 +5760,28 @@
       "identifier": "TestBrowse_AsksForWhatAnInstanceLacks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_CachedInstancesAndWithdrawals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 97
+      "line": 98
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_FindsAForeignServiceType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_Refusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 144
+      "line": 160
     },
     {
       "package": "client/discovery",
