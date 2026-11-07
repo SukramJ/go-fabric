@@ -7132,14 +7132,14 @@
       "identifier": "TestInitialContactRefreshKickBeforeSend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
-      "line": 452
+      "line": 455
     },
     {
       "package": "client/peer",
       "identifier": "TestInitialContactScheduleParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/initial_contact_schedule_parity_matterjs_test.go",
-      "line": 162
+      "line": 165
     },
     {
       "package": "client/peer",

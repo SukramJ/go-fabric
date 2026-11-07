@@ -875,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 575,
+    "line": 583,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -884,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 616,
+    "line": 624,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",

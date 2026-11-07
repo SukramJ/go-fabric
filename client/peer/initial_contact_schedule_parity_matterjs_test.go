@@ -129,7 +129,10 @@ func (r *scheduleRig) transmitted(t *testing.T, s *sigma1Send, count int) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	for len(s.transmissions()) == 0 {
+	// The first transmission is complete — its retransmission timer armed,
+	// under the exchange's lock — once the exchange reports the message
+	// unacknowledged; only then does the clock move.
+	for len(s.transmissions()) == 0 || !s.x.HasUnackedMessage() {
 		if ctx.Err() != nil {
 			t.Fatal("Sigma1 was never sent")
 		}

@@ -504,11 +504,20 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	if err := x.session.checkSize(datagram); err != nil {
 		return nil, err
 	}
+	reliable := requiresAck && !x.sendOpts.DisableMRP
+	if reliable {
+		// The first transmission's time, taken before the send notifier
+		// runs, as matter.js sets #firstTransmissionAt before #onSend
+		// (MessageExchange.ts:801-804 at db021da0): RetransmissionTimeLimit
+		// counts from the moment the notifier reports, whatever happens on
+		// the clock before the retransmission timer is armed.
+		x.firstTransmitAt = x.m.clock.Now()
+	}
 	if x.onSend != nil {
 		x.onSend(0)
 	}
 	var p *pending
-	if requiresAck && !x.sendOpts.DisableMRP {
+	if reliable {
 		p = &pending{
 			counter:    counter,
 			datagram:   datagram,
@@ -527,7 +536,6 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	}
 	if p != nil {
 		x.retransCount = 0
-		x.firstTransmitAt = x.m.clock.Now()
 		x.armRetransLocked(p, x.backoffLocked(0), x.expectedProcessingTimeLocked())
 	}
 	return p, nil
