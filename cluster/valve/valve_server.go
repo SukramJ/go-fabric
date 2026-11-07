@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -94,8 +95,8 @@ const (
 // carries "O" and constraint "1" (element :24-25).
 const (
 	// FeatureTimeSync is the TS bit — the valve expresses AutoCloseTime
-	// against synchronized UTC time (resource :21-26); it needs the node's
-	// Matter time ([Config].MatterTime).
+	// against synchronized UTC time (resource :21-26), the node's Matter
+	// time ([Server.AttachMatterTime], [Config].MatterTime outside a node).
 	FeatureTimeSync = uint32(valvedef.FeatureTimeSync)
 	// FeatureLevel is the LVL bit — the valve can be driven to a
 	// percentage of its range (resource :29-32); it needs a [LevelSource].
@@ -192,7 +193,8 @@ type Config struct {
 	// typed server's Emit.
 	Events []uint32
 	// Features is the FeatureMap: zero, [FeatureLevel] (the Source
-	// implements [LevelSource]) and [FeatureTimeSync] (MatterTime is set).
+	// implements [LevelSource]) and [FeatureTimeSync] (AutoCloseTime on the
+	// node's Matter time).
 	Features uint32
 	// Attributes are the optional attributes the server serves beyond the
 	// selection's mandatory ones: DefaultOpenLevel (the Source implements
@@ -202,10 +204,13 @@ type Config struct {
 	// definition's default 1 when zero) where Attributes carries it: a
 	// TargetLevel or DefaultOpenLevel must then be 100 or a multiple of it.
 	LevelStep uint8
-	// MatterTime is the node's Matter time in epoch seconds, false while
-	// UTCTime is null (core.MatterEpochSeconds over the node's clock); TS
-	// needs it. An Open while it is false leaves AutoCloseTime null, as
-	// connectedhomeip's SetAutoCloseTime does without a valid UTC time.
+	// MatterTime is the Matter time of a server outside a node with TS, in
+	// epoch seconds, false while it is not synchronised. An Open while it
+	// is false, or without a time, leaves AutoCloseTime null, as
+	// connectedhomeip's SetAutoCloseTime does without a valid UTC time. On
+	// a node the node's own time replaces it as the server joins the
+	// topology ([Server.AttachMatterTime]): the root TimeSynchronization's
+	// UTC, the one Matter time of the node.
 	MatterTime func() (epochS uint32, ok bool)
 }
 
@@ -218,10 +223,13 @@ type Server struct {
 	inst     *spec.Instance // the definition with the selection and Config.Events
 	hooks    spec.Hooks
 
-	level      LevelSource            // nil without LVL
-	defaults   DefaultOpenLevelSource // nil without DefaultOpenLevel
-	levelStep  uint8                  // zero without LevelStep
-	matterTime func() (uint32, bool)  // nil without TS
+	level     LevelSource            // nil without LVL
+	defaults  DefaultOpenLevelSource // nil without DefaultOpenLevel
+	levelStep uint8                  // zero without LevelStep
+	timeSync  bool                   // TS
+	// matterTime is the node's Matter time with TS ([Config].MatterTime,
+	// replaced by [Server.AttachMatterTime]); nil without one.
+	matterTime atomic.Pointer[func() (uint32, bool)]
 
 	// mu guards autoClose, the AutoCloseTime the last Open set (TS),
 	// epoch-us; nil is null.
@@ -240,8 +248,9 @@ var (
 // New constructs a [Server] over the host port in cfg. A selection the
 // server cannot serve is refused with [ErrSelection], naming the missing
 // interface: LVL without a [LevelSource], DefaultOpenLevel without a
-// [DefaultOpenLevelSource], TS without MatterTime, a LevelStep outside 1
-// to 50, or a selection the definition refuses.
+// [DefaultOpenLevelSource], a LevelStep outside 1 to 50, or a selection
+// the definition refuses. TS reads the node's Matter time, which the node
+// hands the server as it joins the topology ([Server.AttachMatterTime]).
 func New(cfg Config) (*Server, error) {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
 	if cfg.Features&^(FeatureLevel|FeatureTimeSync) != 0 {
@@ -255,10 +264,10 @@ func New(cfg Config) (*Server, error) {
 		s.level = l
 	}
 	if cfg.Features&FeatureTimeSync != 0 {
-		if cfg.MatterTime == nil {
-			return nil, fmt.Errorf("%w: TimeSync needs Config.MatterTime, the node's Matter time", ErrSelection)
+		s.timeSync = true
+		if cfg.MatterTime != nil {
+			s.matterTime.Store(&cfg.MatterTime)
 		}
-		s.matterTime = cfg.MatterTime
 	}
 	if slices.Contains(cfg.Attributes, valvedef.AttrDefaultOpenLevel) {
 		d, ok := cfg.Source.(DefaultOpenLevelSource)
@@ -568,7 +577,7 @@ func (s *Server) resolveLevel(req *OpenRequest) error {
 // src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:391-413
 // at 6170af84 (SetAutoCloseTime), with the epoch-s the node's time carries.
 func (s *Server) autoCloseFor(req OpenRequest) *uint64 {
-	if s.matterTime == nil {
+	if !s.timeSync {
 		return nil
 	}
 	var seconds uint32
@@ -584,12 +593,32 @@ func (s *Server) autoCloseFor(req OpenRequest) *uint64 {
 		}
 		seconds = d
 	}
-	now, ok := s.matterTime()
+	matterTime := s.matterTime.Load()
+	if matterTime == nil {
+		return nil
+	}
+	now, ok := (*matterTime)()
 	if !ok {
 		return nil
 	}
 	at := (uint64(now) + uint64(seconds)) * 1_000_000
 	return &at
+}
+
+// AttachMatterTime hands the server the node's Matter time, the one an
+// Open's AutoCloseTime is set on with TS: the node calls it as the server
+// joins its topology, with the root TimeSynchronization's UTC in epoch
+// seconds (core.TimeSynchronization.MatterEpochSeconds, false while the
+// node has no time), and it replaces [Config].MatterTime —
+// connectedhomeip's valve asks the node's TimeSynchronization whether the
+// time is valid and reads the system clock SetUTCTime sets
+// (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
+// 46-57, TimeSynchronizationCluster.cpp:856-872 at 6170af84). A server
+// outside a node keeps its configured time; nil leaves it unchanged.
+func (s *Server) AttachMatterTime(matterTime func() (epochS uint32, ok bool)) {
+	if matterTime != nil {
+		s.matterTime.Store(&matterTime)
+	}
 }
 
 // setAutoClose records the AutoCloseTime of the last Open (nil: null).
@@ -720,7 +749,7 @@ func asUint32(v any) (uint32, bool) {
 // the endpoint's DataVersion; LevelStep is fixed.
 func (s *Server) MatterReportable() []uint32 {
 	out := []uint32{AttrOpenDuration}
-	if s.matterTime != nil {
+	if s.timeSync {
 		out = append(out, valvedef.AttrAutoCloseTime)
 	}
 	out = append(out, AttrRemainingDuration, AttrCurrentState, AttrTargetState)

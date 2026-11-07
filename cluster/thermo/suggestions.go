@@ -85,8 +85,6 @@ type suggestions struct {
 	// timer re-evaluates the suggestions when the current one expires or
 	// a later one takes effect; nil when nothing is due.
 	timer clock.Timer
-	// matterTime is [ThermostatConfig.MatterTime].
-	matterTime func() (epochS uint32, synced bool)
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
@@ -99,17 +97,37 @@ func (s *ThermostatServer) seedSuggestions(cfg ThermostatConfig) error {
 	if _, err := s.inst.CheckValue(tdef.AttrMaxThermostatSuggestions, limit, nil); err != nil {
 		return spec.Errorf(im.StatusConstraintError, "thermo: MaxThermostatSuggestions %d: %v", limit, err)
 	}
-	s.suggest = suggestions{max: limit, matterTime: cfg.MatterTime}
+	s.suggest = suggestions{max: limit}
+	if cfg.MatterTime != nil {
+		s.matterTime.Store(&cfg.MatterTime)
+	}
 	return nil
 }
 
+// AttachMatterTime hands the server the node's Matter time, the one its
+// suggestions are judged against: the node calls it as the server joins
+// its topology, with the root TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds, null while the node has
+// no time), and it replaces [ThermostatConfig.MatterTime] — connectedhomeip
+// gates every suggestion on the one system clock SetUTCTime sets
+// (ThermostatClusterSuggestions.cpp:173-178, TimeSynchronizationCluster.cpp:
+// 856-872 at 6170af84). A server outside a node keeps its configured time;
+// nil leaves the time unchanged.
+func (s *ThermostatServer) AttachMatterTime(matterTime func() (epochS uint32, synced bool)) {
+	if matterTime != nil {
+		s.matterTime.Store(&matterTime)
+	}
+}
+
 // matterNow is the node's Matter time in epoch seconds; false while it is
-// not synchronised — always without [ThermostatConfig.MatterTime].
+// not synchronised — always without a time ([ThermostatConfig.MatterTime],
+// [ThermostatServer.AttachMatterTime]).
 func (s *ThermostatServer) matterNow() (uint32, bool) {
-	if s.suggest.matterTime == nil {
+	f := s.matterTime.Load()
+	if f == nil {
 		return 0, false
 	}
-	return s.suggest.matterTime()
+	return (*f)()
 }
 
 // readSuggestionLocked reads the four TSUGGEST attributes; false for any

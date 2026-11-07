@@ -115,19 +115,19 @@ func utcOf(c clock.Clock) (time.Time, bool) {
 	return now, true
 }
 
-// MatterEpochSeconds is the UTCTime a TimeSynchronization server on clock
-// c serves while no source has set an offset, in Matter epoch seconds
-// (§A.2, epoch-s), and false while it is null — before the Matter epoch,
-// or past what epoch-s holds. The node's root server runs on the node's
-// clock ([TimeSynchronization.SetClock]), so a server on an endpoint of
-// the node that is given the node's clock reads the root's UTCTime through
-// it without holding the root — until SetUTCTime, the trusted time source
-// or the NTP fallback set the root's offset, which it does not see: the
-// device kit hands it to the Thermostat's suggestions
-// (thermo.ThermostatConfig.MatterTime), which connectedhomeip gates on
-// System::Clock::GetClock_MatterEpochS.
-func MatterEpochSeconds(c clock.Clock) (uint32, bool) {
-	now, ok := utcOf(c)
+// MatterEpochSeconds is the node's UTC ([TimeSynchronization.UTC]: the
+// clock plus the offset SetUTCTime, the trusted time source or the NTP
+// fallback set) in Matter epoch seconds (§A.2, epoch-s), and false while
+// UTCTime is null or past what epoch-s holds. It is the one Matter time
+// of the node: connectedhomeip's servers read the system clock through
+// System::Clock::GetClock_MatterEpochS (src/system/SystemClock.cpp:284-306
+// at 6170af84), the clock SetUTCTime sets (TimeSynchronizationCluster.cpp:
+// 856-872, UpdateUTCTime :74-86 at 6170af84). Its method value is the
+// MatterTime the node hands its participants at attach — the Thermostat's
+// suggestions (thermo.ThermostatServer.AttachMatterTime) and the Valve's
+// AutoCloseTime (valve.Server.AttachMatterTime).
+func (t *TimeSynchronization) MatterEpochSeconds() (epochS uint32, synced bool) {
+	now, ok := t.UTC()
 	if !ok {
 		return 0, false
 	}

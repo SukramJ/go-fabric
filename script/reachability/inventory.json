@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7736,
+  "entry_points": 7739,
   "entry_packages": [
     ".",
     "bdx",
@@ -281,8 +281,8 @@
   ],
   "summary": {
     "total_exported": 17714,
-    "reachable": 12328,
-    "whitelisted": 5386,
+    "reachable": 12327,
+    "whitelisted": 5387,
     "unreachable": 0
   },
   "by_package": [],
@@ -22154,7 +22154,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 336
+      "line": 338
     },
     {
       "package": "cluster/thermo",
@@ -22287,35 +22287,35 @@
       "identifier": "DefaultOpenLevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 177
+      "line": 178
     },
     {
       "package": "cluster/valve",
       "identifier": "LevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 172
+      "line": 173
     },
     {
       "package": "cluster/valve",
       "identifier": "OpenRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 150
+      "line": 151
     },
     {
       "package": "cluster/valve",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 127
+      "line": 128
     },
     {
       "package": "cluster/valve",
       "identifier": "StateSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 168
+      "line": 169
     },
     {
       "package": "cluster/wire",
@@ -26578,7 +26578,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 376
+      "line": 377
     },
     {
       "package": "device",
@@ -26641,7 +26641,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 411
+      "line": 412
     },
     {
       "package": "device",
@@ -28573,7 +28573,7 @@
       "identifier": "TestDemoThermostatSuggestionsAreGated",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/thermostat_suggestions_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "examples/reference-bridge",
@@ -32315,6 +32315,13 @@
     },
     {
       "package": "node",
+      "identifier": "CommissionerReachReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 26
+    },
+    {
+      "package": "node",
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
@@ -32549,14 +32556,14 @@
       "identifier": "Reassemblies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 11
+      "line": 20
     },
     {
       "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 8
+      "line": 17
     },
     {
       "package": "node",
