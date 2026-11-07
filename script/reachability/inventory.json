@@ -24821,7 +24821,7 @@
       "identifier": "TestAcceptedFailedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 385
+      "line": 391
     },
     {
       "package": "controller/commissioner",
@@ -24863,14 +24863,14 @@
       "identifier": "TestCommissionForgetsTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 433
+      "line": 439
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissionLiveThroughMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_live_test.go",
-      "line": 20
+      "line": 32
     },
     {
       "package": "controller/commissioner",
@@ -24884,7 +24884,7 @@
       "identifier": "TestCommissionTheNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 220
+      "line": 226
     },
     {
       "package": "controller/commissioner",
@@ -24982,7 +24982,7 @@
       "identifier": "TestEstablishPASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 354
+      "line": 360
     },
     {
       "package": "controller/commissioner",
@@ -25038,7 +25038,7 @@
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 296
+      "line": 302
     },
     {
       "package": "controller/commissioner",
@@ -25241,7 +25241,7 @@
       "identifier": "TestRejectedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 328
+      "line": 334
     },
     {
       "package": "controller/commissioner",
