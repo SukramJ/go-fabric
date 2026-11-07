@@ -804,6 +804,22 @@ with a port of the named case.
   alone (`bridge/ota_provider_link.go:558-566` `MaxPayloadSize`). Fix:
   the session's peer cap in both and the refusal before the send. Found in
   the review of wave P4 (#433); left out of that wave's scope.
+- **F-db021da0-2: an unchanged controller write is still reported.**
+  matter.js reports, persists and advances a DataVersion only when a value
+  changed: `#noteIfChanged` returns early for an equal value
+  (`packages/node/src/behavior/state/managed/Datasource.ts:1477-1495` at
+  `db021da0`) and `#computePostCommitChanges` advances the version only
+  when something changed (`:1456-1466`). Since #454 the root
+  BasicInformation's own write path does the same for NodeLabel and
+  Location, but the bridge's write path marks every written attribute of
+  every cluster dirty regardless of the server's verdict
+  (`bridge/receive_dispatch.go:726-739` `reportWrittenAttributes`), so a
+  subscriber receives a report item with the same value and the same
+  DataVersion where matter.js sends nothing. Fix: the dispatcher reports a
+  written attribute only when the server says it changed (the generated
+  servers' `MatterWrite` would have to return that verdict, or the
+  dispatcher compares the encoded value before and after the write). Found in the review
+  of #454 (issue 414); a bridge-wide change, left out of that PR.
 
 ## Tier 3 — LOW
 
