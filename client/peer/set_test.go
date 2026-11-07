@@ -81,7 +81,6 @@ func TestAddKnownPeerMergeAndCoalescedSave(t *testing.T) {
 			OperationalAddress:        udpAddr("[fd00::1]:5540"),
 			DiscoveryData:             &discovery.TXTData{SII: dur(800 * time.Millisecond), DN: str("old")},
 			ReportedSessionParameters: &sessionparams.Parameters{SessionIdleInterval: 900},
-			CaseAuthenticatedTags:     []uint32{1},
 		}
 		p, err := h.set.AddKnownPeer(first)
 		if err != nil {
@@ -96,12 +95,11 @@ func TestAddKnownPeerMergeAndCoalescedSave(t *testing.T) {
 			OperationalAddress:        udpAddr("[fd00::2]:5540"),
 			DiscoveryData:             &discovery.TXTData{SII: dur(time.Second), SAI: dur(400 * time.Millisecond)},
 			ReportedSessionParameters: &sessionparams.Parameters{SessionIdleInterval: 100},
-			CaseAuthenticatedTags:     []uint32{2},
 		}); err != nil {
 			t.Fatal(err)
 		}
 		d := p.Descriptor()
-		if d.OperationalAddress.String() != "[fd00::2]:5540" || d.CaseAuthenticatedTags[0] != 2 ||
+		if d.OperationalAddress.String() != "[fd00::2]:5540" ||
 			*d.DiscoveryData.SII != 800*time.Millisecond || *d.DiscoveryData.SAI != 400*time.Millisecond || *d.DiscoveryData.DN != "old" ||
 			d.ReportedSessionParameters.SessionIdleInterval != 900 {
 			t.Fatalf("merged descriptor %+v / %+v", d, *d.DiscoveryData)
@@ -112,7 +110,7 @@ func TestAddKnownPeerMergeAndCoalescedSave(t *testing.T) {
 			t.Fatalf("%d saves for one burst, want 1", n-before)
 		}
 		// A descriptor that changes nothing saves nothing.
-		if _, err := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr("[fd00::2]:5540"), CaseAuthenticatedTags: []uint32{2}}); err != nil {
+		if _, err := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr("[fd00::2]:5540")}); err != nil {
 			t.Fatal(err)
 		}
 		synctest.Wait()

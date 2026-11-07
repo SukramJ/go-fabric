@@ -13,6 +13,7 @@ package tcp
 // MockTcpConnection pair is net.Pipe, its remote address overridden.
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -36,9 +37,16 @@ func (p tcpChannelPipe) RemoteAddr() net.Addr { return p.remote }
 // ip:port. Every delivered message lands on msgs.
 func tcpChannelPair(t *testing.T, ip string, port int) (client net.Conn, c *Conn, msgs chan []byte) {
 	t.Helper()
+	return tcpChannelPairLimit(t, ip, port, 0)
+}
+
+// tcpChannelPairLimit is tcpChannelPair with the channel's maximum
+// payload size (0 the default).
+func tcpChannelPairLimit(t *testing.T, ip string, port, limit int) (client net.Conn, c *Conn, msgs chan []byte) {
+	t.Helper()
 	a, b := net.Pipe()
 	t.Cleanup(func() { _ = a.Close(); _ = b.Close() })
-	c = newConn(tcpChannelPipe{b, &net.TCPAddr{IP: net.ParseIP(ip), Port: port}}, 0, false, nil, nil)
+	c = newConn(tcpChannelPipe{b, &net.TCPAddr{IP: net.ParseIP(ip), Port: port}}, limit, false, nil, nil)
 	msgs = make(chan []byte, 8)
 	go c.serve(func(_ *Conn, msg []byte, _ func()) { msgs <- msg })
 	t.Cleanup(func() { _ = c.Close() })
@@ -108,8 +116,8 @@ func TestTcpChannelChannelProperties(t *testing.T) {
 		}
 		// supportsLargeMessages: the TCP frame carries far more than a
 		// UDP datagram's 1280 bytes.
-		if got := c.MaxMessageSize(); got != DefaultMaxPayloadSize-FramingHeaderSize {
-			t.Fatalf("MaxMessageSize = %d, want %d", got, DefaultMaxPayloadSize-FramingHeaderSize)
+		if got := c.MaxMessageSize(); got != DefaultMaxPayloadSize {
+			t.Fatalf("MaxMessageSize = %d, want %d", got, DefaultMaxPayloadSize)
 		}
 	})
 	t.Run("is recognized as ConnectedChannel", func(t *testing.T) {
@@ -149,19 +157,21 @@ func TestTcpChannelName(t *testing.T) {
 }
 
 func TestTcpChannelOversizedMessageHandling(t *testing.T) {
-	t.Run("rejects message at the size limit", func(t *testing.T) {
+	// The four cases of matter.js #4793 (TcpChannelTest.ts:226-311 at
+	// db021da0): MAX_TCP_MESSAGE_SIZE excludes the length header, and
+	// several complete frames in one read are all taken.
+	t.Run("rejects a message one byte over MAX_TCP_MESSAGE_SIZE", func(t *testing.T) {
 		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)
-		// 64000 exceeds the 63996-byte message limit (TcpChannelTest.ts:238).
-		tcpChannelWrite(t, client, tcpChannelLengthHeader(DefaultMaxPayloadSize))
+		tcpChannelWrite(t, client, tcpChannelLengthHeader(DefaultMaxPayloadSize+1))
 		tcpChannelAwaitClosed(t, c)
 		tcpChannelNoMsg(t, msgs)
 		if !errors.Is(c.Err(), ErrFrameTooLarge) {
 			t.Fatalf("close reason %v", c.Err())
 		}
 	})
-	t.Run("accepts message just under the size limit", func(t *testing.T) {
+	t.Run("accepts a message of exactly MAX_TCP_MESSAGE_SIZE, which excludes the length header", func(t *testing.T) {
 		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)
-		size := DefaultMaxPayloadSize - 4 - 1 // 63995, TcpChannelTest.ts:258
+		size := DefaultMaxPayloadSize
 		payload := make([]byte, size)
 		for i := range payload {
 			payload[i] = byte(i)
@@ -169,6 +179,36 @@ func TestTcpChannelOversizedMessageHandling(t *testing.T) {
 		tcpChannelWrite(t, client, append(tcpChannelLengthHeader(size), payload...))
 		if got := tcpChannelAwaitMsg(t, msgs); len(got) != size || got[size-1] != byte(size-1) {
 			t.Fatalf("delivered %d bytes, want %d", len(got), size)
+		}
+		select {
+		case <-c.Closed():
+			t.Fatalf("closed: %v", c.Err())
+		default:
+		}
+	})
+	t.Run("accepts two maximum-size messages arriving in one chunk", func(t *testing.T) {
+		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)
+		payload := make([]byte, DefaultMaxPayloadSize)
+		tcpChannelWrite(t, client, append(frameOf(payload), frameOf(payload)...))
+		for range 2 {
+			if got := tcpChannelAwaitMsg(t, msgs); len(got) != DefaultMaxPayloadSize {
+				t.Fatalf("delivered %d bytes", len(got))
+			}
+		}
+		select {
+		case <-c.Closed():
+			t.Fatalf("closed: %v", c.Err())
+		default:
+		}
+	})
+	t.Run("accepts several messages at a small limit arriving in one chunk", func(t *testing.T) {
+		client, c, msgs := tcpChannelPairLimit(t, "1.2.3.4", 5000, 1526)
+		payload := make([]byte, 1526)
+		tcpChannelWrite(t, client, bytes.Repeat(frameOf(payload), 3))
+		for range 3 {
+			if got := tcpChannelAwaitMsg(t, msgs); len(got) != 1526 {
+				t.Fatalf("delivered %d bytes", len(got))
+			}
 		}
 		select {
 		case <-c.Closed():

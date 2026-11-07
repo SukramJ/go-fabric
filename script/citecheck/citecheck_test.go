@@ -63,7 +63,10 @@ import (
 //
 // 418 after pin lift wave P2 (#431): the testSignerInfo citation of
 // controller/attestation/store.go left with the built-in test CD signer.
-const citecheckDriftRatchet = 418
+//
+// 416 after pin lift wave P4 (#433): the retransmissionRestartSaving and
+// #recomputeConnectionState citations re-cited at db021da0.
+const citecheckDriftRatchet = 416
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

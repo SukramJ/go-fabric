@@ -136,7 +136,7 @@ func restartRecorder(t *testing.T, over *Timing) (h *harness, handle func(kickOr
 	t.Helper()
 	h = newHarness(t, func(c *Context) { c.Timing = over })
 	p, _ := h.set.For(testAddr)
-	c := &connection{p: p, setTiming: h.set.Timing()}
+	c := &connection{p: p, timing: h.set.Timing()}
 	restarts = &[]string{}
 	handle = func(o kickOrigin) bool {
 		c.mu.Lock()
@@ -220,27 +220,14 @@ func TestPeerConnectionKickRateLimiting(t *testing.T) {
 	}
 }
 
-// TestPeerConnectionKickGate is the describe "kick gate (count + saving)".
-func TestPeerConnectionKickGate(t *testing.T) {
-	t.Parallel()
+// kickOpen reports whether a kick may restart the first try's exchange x:
+// retransmitted often enough and a restart saving enough — the gate the
+// schedule's attempt applies (kickBlocker, InitialContactSchedule.ts:112-126
+// at db021da0; matter.js #4794 moved it there from the connection, its
+// "kick gate" describe to InitialContactScheduleTest.ts).
+func kickOpen(x *exchange.Exchange) bool {
 	timing := DefaultTiming()
-	for _, tc := range []struct {
-		name   string
-		count  int
-		saving time.Duration
-		want   bool
-	}{
-		{"suppresses while the exchange has not retransmitted enough", 1, 2 * time.Minute, false},
-		{"suppresses when a restart would save too little time (e.g. idle/sleepy peer)", 5, 10 * time.Second, false},
-		{"restarts once both retransmission count and restart saving clear their thresholds", 2, 90 * time.Second, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got, _ := kickGate(timing, tc.count, tc.saving); got != tc.want {
-				t.Fatalf("gate(%d, %v) = %v, want %v", tc.count, tc.saving, got, tc.want)
-			}
-		})
-	}
+	return x.RetransmissionCount() >= timing.KickMinRetransmissions && x.RetransmissionRestartSaving() >= timing.KickMinRestartSaving
 }
 
 // kickableTry starts a process at addr1 and retransmits its Sigma1 until
@@ -260,7 +247,7 @@ func kickableTry(t *testing.T, h *harness, p *Peer) (*connection, *attempt, *exc
 		x = att.exchange.Load()
 		return x != nil && x.RetransmissionCount() == 0
 	})
-	for ok, _ := kickGate(DefaultTiming(), x.RetransmissionCount(), x.RetransmissionRestartSaving()); !ok; ok, _ = kickGate(DefaultTiming(), x.RetransmissionCount(), x.RetransmissionRestartSaving()) {
+	for !kickOpen(x) {
 		h.clock.Advance(5 * time.Second)
 	}
 	return c, att, x
@@ -329,7 +316,7 @@ func TestPeerConnectionKickLocalAbort(t *testing.T) {
 				return x != nil && !ids[x.ID()]
 			})
 			ids[x.ID()] = true
-			for ok, _ := kickGate(DefaultTiming(), x.RetransmissionCount(), x.RetransmissionRestartSaving()); !ok; ok, _ = kickGate(DefaultTiming(), x.RetransmissionCount(), x.RetransmissionRestartSaving()) {
+			for !kickOpen(x) {
 				h.clock.Advance(5 * time.Second)
 			}
 		}

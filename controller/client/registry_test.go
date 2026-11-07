@@ -61,6 +61,7 @@ type regHooks struct {
 	mu             sync.Mutex
 	decommissioned []string
 	events         []uint32
+	data           []interaction.EventData
 	alive          int
 }
 
@@ -71,9 +72,10 @@ func (h *regHooks) hooksFor(id string) client.Hooks {
 			h.decommissioned = append(h.decommissioned, id)
 			h.mu.Unlock()
 		},
-		Event: func(_ uint16, _, event uint32, _ interaction.EventData, _ any) {
+		Event: func(_ uint16, _, event uint32, e interaction.EventData, _ any) {
 			h.mu.Lock()
 			h.events = append(h.events, event)
+			h.data = append(h.data, e)
 			h.mu.Unlock()
 		},
 		SubscriptionAlive: func() {

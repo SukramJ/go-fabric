@@ -67,7 +67,7 @@ type Conn struct {
 var _ transport.Conn = (*Conn)(nil)
 
 func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger, panics *panicCounter) *Conn {
-	if maxPayloadSize <= FramingHeaderSize {
+	if maxPayloadSize <= 0 {
 		maxPayloadSize = DefaultMaxPayloadSize
 	}
 	if logger == nil {
@@ -121,9 +121,10 @@ func (c *Conn) Reliable() bool { return true }
 // Incoming reports whether the peer opened the connection.
 func (c *Conn) Incoming() bool { return c.incoming }
 
-// MaxMessageSize is the largest message [Conn.Send] accepts: the
-// maximum payload size minus the length prefix (TcpChannel.ts:114-117).
-func (c *Conn) MaxMessageSize() int { return c.maxPayloadSize - FramingHeaderSize }
+// MaxMessageSize is the largest message [Conn.Send] accepts and the
+// largest the connection receives: the maximum payload size, the length
+// prefix not counted (TcpChannel.ts:37-41, :47 at db021da0).
+func (c *Conn) MaxMessageSize() int { return c.maxPayloadSize }
 
 // Closed is closed once the connection is.
 func (c *Conn) Closed() <-chan struct{} { return c.closed }

@@ -113,7 +113,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Thread-TND-FromBorderRouter | `ThreadNetworkDiagnosticsServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts` | `"export class ThreadNetworkDiagnosticsServer extends ThreadNetworkDiagnosticsBehavior {}"` | connectedhomeip `src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp` at `6170af84` (`ReadAttribute` :59, the unconfigured nulls :65-92, `RoutingRole` :104-145, OverrunCount :178-182, the tables :184-293, the counts :325-571, the dataset attributes :577-689, `ResetCounts` :735-738), `ThreadNetworkDiagnosticsCluster.cpp` | no |
 | BD-Thread-NetComm-ThreadVariant | `NetworkCommissioningServer.ts:18` is the empty subclass: no network-type branch, no Thread logic (absence: the class line, 18 lines in all) | `packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts` | `"export class NetworkCommissioningServer extends NetworkCommissioningBehavior {}"` | connectedhomeip `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp` at `6170af84` (the Thread paths: `HandleScanNetworks` :349-367, `HandleAddOrUpdateThreadNetwork` :561-587, `OnFinished` :904-928, `ReadAttribute` :1102-1108) over `src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp` | yes |
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
-| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
+| BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, `src/system/SystemClock.cpp:284-306` (`GetClock_MatterEpochS`, the node's one Matter time), tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
 | BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
@@ -133,6 +133,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
 | BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
+| BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
 
 ---
 
@@ -5211,7 +5212,9 @@ suggestion runs `SetActivePresetRequest`'s path: the setpoints take the
 preset's through the Sink, as this server's `setActivePresetRequest` moves
 them after matter.js, and ActivePresetChange is emitted with TEVT, where the delegate sets the
 handle on the presets delegate alone (:261). The Matter time is the node's
-UTCTime (`cluster/core.MatterEpochSeconds`, the device kit's wiring);
+UTC, which the node hands the server as its endpoint joins the topology
+(`thermo.ThermostatServer.AttachMatterTime` with the root
+TimeSynchronization's `MatterEpochSeconds`, so SetUTCTime moves it);
 without it every Add answers INVALID_IN_STATE. Pinned by
 `suggestions_chip_test.go` (`TestThermostatSuggestionsAndHold.cpp:161-242`
 and TC_TSTAT_4_3's steps) and `suggestions_rules_test.go`; hosts serve the
@@ -5547,10 +5550,16 @@ not carry), an absent OpenDuration means DefaultOpenDuration and a present
 null an indefinite opening (`:300-310`). Phase 38 adds Level (LVL) and
 TimeSync (TS), behind the row (`valve.Ahead`, surface yes). LVL needs the
 source's `LevelSource` (CurrentLevel, TargetLevel), DefaultOpenLevel its
-`DefaultOpenLevelSource`, TS the node's Matter time (`valve.Config.MatterTime`,
-the kit's `core.MatterEpochSeconds` over the device clock — chip's Startup
-refuses TS without a time tracker, `:46-50`), each refused with
-`ErrSelection` naming what is missing. A DefaultOpenLevel write is 1 to 100
+`DefaultOpenLevelSource`, each refused with `ErrSelection` naming what is
+missing. TS reads the node's Matter time, the root TimeSynchronization's
+UTC, which the node hands the server as its endpoint joins the topology
+(`valve.Server.AttachMatterTime`; `valve.Config.MatterTime` outside a
+node), as chip's tracker asks the node's TimeSynchronization for a valid
+time and reads the clock SetUTCTime sets (`CodegenIntegration.cpp:45-58`,
+`:391-400`). Chip's Startup refuses TS on a node without
+TimeSynchronization (`:46-50`); the server here is built before it joins a
+node, so it serves TS, and on a node with `TimeSynchronization.Off` every
+Open leaves AutoCloseTime null. A DefaultOpenLevel write is 1 to 100
 and 100 or a multiple of LevelStep, an unchanged one a no-op (`:175-192`,
 `ValueCompliesWithLevelStep` `:483-490`); an Open resolves its level — the
 command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
@@ -6047,13 +6056,18 @@ updated (`UpdateUTCTime` :82; the module keeps none); an NTP answer
 before the Matter epoch or past 32-bit seconds is a failed query; each
 read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
 server's clock, a bound of the module's because the ports are a host's
-and an attempt that never ended would hold every later one. The
-Thermostat's and the Valve's Matter time (`core.MatterEpochSeconds` over
-the device's clock) does not see the offset. TimeSource and
+and an attempt that never ended would hold every later one. The node's UTC
+is its one Matter time (issue 428): the node hands
+`TimeSynchronization.MatterEpochSeconds` to the Thermostat's suggestions
+and the Valve's AutoCloseTime as their endpoints join the topology
+(`AttachMatterTime`), as chip's servers read the system clock SetUTCTime
+sets through `GetClock_MatterEpochS` (`src/system/SystemClock.cpp:284-306`
+at `6170af84`). TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
-time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire)
-and `node`'s client wire test.
+time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,
+1 epoch-seconds case), `node`'s client wire test and its
+`TestOneMatterTimePerNode`.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
 
@@ -6267,3 +6281,47 @@ not divergences: TimeSynchronization's optional features (milestone 6 wave
 27-B) and AirQuality's feature-gated values. Re-read at every pin lift
 together with the Ahead-of-matter.js markers: a `*Server.ts` of one of
 these clusters growing past the shell reopens the question.
+
+### BD-Matter-NoConfiguredCATs — the client stack keeps no configured CATs for a peer; matter.js keeps its ignored option
+
+Since the db021da0 lift a CASE session's CATs are the peer's NOC's on both
+sides of the handshake (wave P1, #435), and matter.js documents its own
+`PairOptions.caseAuthenticatedTags` as "Not applied yet; the option is
+ignored" (`packages/protocol/src/session/case/CaseClient.ts:396-404` at
+`db021da0`) while `PeerSet.addKnownPeer` still replaces a known peer's
+descriptor CATs (`packages/protocol/src/peer/PeerSet.ts:321-323`). This
+module removes the field instead (owner decision 2026-11-06 on #433):
+`peer.Descriptor.CaseAuthenticatedTags`, `client.CommissionOptions` and
+`client.Record`'s set are gone, a stored record's field 1 is read and
+ignored and dropped by the next save — a facade option that does nothing
+is no option. Proof: `controller/client:TestRecordIgnoresRetiredCATs`; the
+`client/peer` merge row "CATs replace" (`PeerSet.ts:321-323`) is dropped
+from `client/peer:TestParityKnownPeerMerge`'s table.
+
+### BD-Matter-VIDStatementVerification — the VID Verification Statement path fails closed where matter.js's is open
+
+matter.js `VendorIdVerification.verifyData` (`packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts:230-293`
+at `db021da0`) decodes a VVSC and checks its profile (`Vvsc.ts:25-30`,
+`:45-80`), compares its SubjectKeyID with the statement's signer and checks
+the statement signature; but it accepts a statement without a VVSC
+("TODO Fail if not available!", `:263-271`), leaves the path of the VVSC
+to a trust anchor of the vendor a TODO (`:232-240`), signs over the whole
+to-be-signed message where `createStatementBytes` names the fabric binding
+message (`:282-286` against `:311-322`), and parses a 76-byte binding
+message inside the statement (`:324-339`) that chip's 85-byte statement
+(`src/crypto/CHIPCryptoPAL.h:137-141` at `6170af84`, `version ||
+signer_skid || signature`) does not carry; chip does not support the
+statement at all (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104`).
+`client/jcm.Verify` takes the statement path when `Info` carries one: the
+statement in chip's 85-byte form, appended to the to-be-signed message
+(`CHIPCryptoPAL.h:150-155`), the VVSC through `mattercert.DecodeVVSC`, the
+signer key identifier, the statement signature over `version ||
+vendor_fabric_binding_message || signer_skid`, and the VVSC signed by the
+trust anchor `TrustAnchorLookup` returns for the vendor id and the VVSC's
+AuthorityKeyID (`mattercert.VerifyVVSCIssuedBy`; an intermediate is
+refused). Each difference fails closed: a statement anyone can sign with a
+self-made VVSC would otherwise verify any vendor id. The JCM trust
+verification still refuses a statement, as chip's does. Proof:
+`client/jcm:TestVendorIdVerificationParity`; Ahead row above. Retires when
+matter.js closes its TODOs — the statement message then follows matter.js
+or is recorded against it.

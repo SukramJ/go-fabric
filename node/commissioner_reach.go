@@ -46,11 +46,7 @@ func (r commissionerReach) interaction(ctx context.Context, p jointfabric.Commis
 // read reads one attribute unfiltered and returns its value; a status in
 // its place is an error.
 func (r commissionerReach) read(ctx context.Context, p jointfabric.CommissionerPeer, path im.ConcreteAttributePath) (spec.Node, error) {
-	ia, err := r.interaction(ctx, p)
-	if err != nil {
-		return spec.Node{}, err
-	}
-	rep, err := ia.ReadWith(ctx, interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{path}, NoFabricFilter: true})
+	rep, err := r.readReport(ctx, p, path)
 	if err != nil {
 		return spec.Node{}, err
 	}
@@ -65,14 +61,39 @@ func (r commissionerReach) read(ctx context.Context, p jointfabric.CommissionerP
 	return spec.Node{}, fmt.Errorf("node: commissioner read of 0x%04X/0x%04X carried no value", path.Cluster, path.Attribute)
 }
 
+// readReport is read's Read of path, unfiltered: its report.
+func (r commissionerReach) readReport(ctx context.Context, p jointfabric.CommissionerPeer, path im.ConcreteAttributePath) (*interaction.Report, error) {
+	ia, err := r.interaction(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return ia.ReadWith(ctx, interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{path}, NoFabricFilter: true})
+}
+
+// commissionerPath is the concrete request path of an attribute the reach
+// reads: every Has* flag set, as connectedhomeip's JCMCommissionee reads
+// each attribute by its type on one endpoint (ReadAttribute<…>,
+// JCMCommissionee.cpp:46-69 at 6170af84). A path without them is a
+// wildcard on the wire — the whole node in the report (#429).
+func commissionerPath(endpointID uint16, clusterID, attrID uint32) im.ConcreteAttributePath {
+	return im.ConcreteAttributePath{
+		Endpoint: endpointID, Cluster: clusterID, Attribute: attrID,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+}
+
 func opCredsPath(attr uint32) im.ConcreteAttributePath {
-	return im.ConcreteAttributePath{Endpoint: 0, Cluster: opcreds.ClusterID, Attribute: attr}
+	return commissionerPath(0, opcreds.ClusterID, attr)
+}
+
+func administratorFabricIndexPath(endpointID uint16) im.ConcreteAttributePath {
+	return commissionerPath(endpointID, jfadef.ClusterID, jfadef.AttrAdministratorFabricIndex)
 }
 
 // ReadAdministratorFabricIndex reads the commissioner's
 // AdministratorFabricIndex on endpointID (JCMCommissionee.cpp:183-224).
 func (r commissionerReach) ReadAdministratorFabricIndex(ctx context.Context, p jointfabric.CommissionerPeer, endpointID uint16) (fabricIndex uint8, null bool, err error) {
-	v, err := r.read(ctx, p, im.ConcreteAttributePath{Endpoint: endpointID, Cluster: jfadef.ClusterID, Attribute: jfadef.AttrAdministratorFabricIndex})
+	v, err := r.read(ctx, p, administratorFabricIndexPath(endpointID))
 	if err != nil {
 		return 0, false, err
 	}

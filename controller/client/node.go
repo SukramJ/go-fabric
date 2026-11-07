@@ -88,7 +88,7 @@ type Node struct {
 	// current default subscription — subscriptionActive as
 	// #endDefaultSubscription reads it (NetworkClient.ts:242-250).
 	subReported bool
-	// likelyOffline is the latch of :393-398.
+	// likelyOffline is the latch of NetworkClient.ts:404-407 at db021da0.
 	likelyOffline bool
 	seeded        bool
 	// labelReconciled is NetworkClient's fabricLabelReconciled latch
@@ -440,7 +440,8 @@ func (n *Node) Start(ctx context.Context) error {
 		// The peer coming online is proof it is awake (IcdClient.ts:156-158).
 		n.icd.noteActive()
 	}
-	stop := n.observePeer()
+	stop := n.observePeer() //nolint:contextcheck // the observation outlives Start's ctx; Stop ends it
+
 	n.mu.Lock()
 	n.stopObserve = stop
 	n.mu.Unlock()

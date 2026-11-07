@@ -16,7 +16,9 @@ import (
 // TestDemoThermostatSuggestionsAreGated: the demo thermostat serves
 // ThermostatSuggestions only when --extensions names
 // BD-chip-Thermostat-Suggestions, and with it a suggestion of one of its
-// presets is taken and followed on the host clock's Matter time.
+// presets is taken and followed on the node's Matter time, which the node
+// hands the server as the device joins its topology (attached here as the
+// node attaches it).
 func TestDemoThermostatSuggestionsAreGated(t *testing.T) {
 	t.Parallel()
 	opts := device.Options{StableKey: device.StringKey("demo-thermostat"), Name: "Thermostat"}
@@ -42,6 +44,13 @@ func TestDemoThermostatSuggestionsAreGated(t *testing.T) {
 		t.Errorf("MaxThermostatSuggestions %d, want 5", got)
 	}
 	handle := []byte("UserDef")
+	participant, ok := srv.Underlying().(interface {
+		AttachMatterTime(func() (uint32, bool))
+	})
+	if !ok {
+		t.Fatal("the demo thermostat takes no Matter time")
+	}
+	participant.AttachMatterTime(func() (uint32, bool) { return 800_000_000, true })
 	if _, err := srv.Underlying().MatterInvoke(context.Background(), thermostatdef.CmdAddThermostatSuggestion,
 		thermostatdef.AddThermostatSuggestionRequest{PresetHandle: handle, EffectiveTime: spec.Nullable[uint32]{Null: true}, ExpirationInMinutes: 30}); err != nil {
 		t.Fatal(err)

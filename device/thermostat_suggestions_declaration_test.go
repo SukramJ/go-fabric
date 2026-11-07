@@ -12,15 +12,17 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/surface"
 )
 
 // TestThermostatDeclaresSuggestions: ThermostatSuggestions is ahead of
 // matter.js (thermo.Ahead), refused without its register row; with it the
 // declaration's Initial gives MaxThermostatSuggestions, and the server
-// reads the node's Matter time through the device's clock (before the
-// device joins a node the system clock, synchronised), so a suggestion is
-// taken and followed.
+// reads the node's Matter time, which the node hands it as the device
+// joins the topology: before that a suggestion answers INVALID_IN_STATE,
+// with the node's time it is taken and followed (the node's own wiring is
+// node's TestOneMatterTimePerNode).
 func TestThermostatDeclaresSuggestions(t *testing.T) {
 	t.Parallel()
 	handle := []byte("Home")
@@ -45,8 +47,21 @@ func TestThermostatDeclaresSuggestions(t *testing.T) {
 	if got := srv.Get().MaxThermostatSuggestions; got != limit {
 		t.Errorf("MaxThermostatSuggestions %d, want %d", got, limit)
 	}
-	resp, err := srv.Underlying().MatterInvoke(context.Background(), thermostatdef.CmdAddThermostatSuggestion,
-		thermostatdef.AddThermostatSuggestionRequest{PresetHandle: handle, EffectiveTime: spec.Nullable[uint32]{Null: true}, ExpirationInMinutes: 30})
+	add := func() (any, error) {
+		return srv.Underlying().MatterInvoke(context.Background(), thermostatdef.CmdAddThermostatSuggestion,
+			thermostatdef.AddThermostatSuggestionRequest{PresetHandle: handle, EffectiveTime: spec.Nullable[uint32]{Null: true}, ExpirationInMinutes: 30})
+	}
+	if _, err := add(); spec.StatusOf(err) != im.StatusInvalidInState {
+		t.Fatalf("before the node's time: %v, want INVALID_IN_STATE", err)
+	}
+	participant, ok := srv.Underlying().(interface {
+		AttachMatterTime(func() (uint32, bool))
+	})
+	if !ok {
+		t.Fatal("the kit's Thermostat takes no Matter time")
+	}
+	participant.AttachMatterTime(func() (uint32, bool) { return 800_000_000, true })
+	resp, err := add()
 	if err != nil {
 		t.Fatal(err)
 	}
