@@ -5,7 +5,10 @@ package exchange
 
 import (
 	"errors"
+	"fmt"
 	"net"
+
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
 // Channel is a connected carrier a session sends on in place of the
@@ -187,11 +190,60 @@ func (s *Session) Transport() Transport {
 func (s *Session) Channel() Channel { return s.channel }
 
 // MaxPayloadSize is the largest message payload an exchange of the
-// session sends: [MaxPayloadSize] over UDP, the channel's limit less the
-// Matter message overhead over TCP (MessageExchange.ts:435-439, :156).
+// session sends: [MaxPayloadSize] over UDP, over TCP the largest message
+// the session sends ([Session.PeerMaxTCPMessageSize] under the channel's
+// own limit) less the Matter message overhead (MessageExchange.ts:435-439,
+// :156).
 func (s *Session) MaxPayloadSize() int {
 	if s.channel != nil {
-		return s.channel.MaxMessageSize() - (26 + 12 + 16)
+		return s.maxTCPMessageSize() - (26 + 12 + 16)
 	}
 	return MaxPayloadSize
+}
+
+// MaxUDPMessageSize is the largest Matter message a UDP datagram carries:
+// the IPv6 minimum MTU less the IP and UDP headers. Every node accepts it,
+// so a peer's TCP limit is never taken below it. Mirrors matter.js
+// packages/general/src/net/udp/UdpSocket.ts:12 at db021da0
+// (MAX_UDP_MESSAGE_SIZE = 1280 - 48).
+const MaxUDPMessageSize = 1280 - 48
+
+// PeerMaxTCPMessageSize is the largest message the peer accepts over TCP:
+// the MAX_TCP_MESSAGE_SIZE it announced, the spec default of 64000 when it
+// announced none or 0, and never below [MaxUDPMessageSize] — "a smaller
+// value would leave no room to send anything". Only meaningful for a
+// session on a TCP channel. Mirrors matter.js Session.peerMaxTcpMessageSize
+// (packages/protocol/src/session/Session.ts:229-239 at db021da0, matter.js
+// #4793; the fallback SessionParameters.ts:66-73, :187).
+func (s *Session) PeerMaxTCPMessageSize() int {
+	s.mu.Lock()
+	announced := s.params.MaxTCPMessageSize
+	s.mu.Unlock()
+	if announced == 0 {
+		announced = sessionparams.DefaultMaxTCPMessageSize
+	}
+	return max(int(announced), MaxUDPMessageSize)
+}
+
+// maxTCPMessageSize is the largest message the session sends on its TCP
+// channel: the channel's own limit, capped at what the peer accepts,
+// "because the peer closes the connection when it receives a larger
+// message" (MessageChannel.ts:77-92 maxPayloadSize at db021da0).
+func (s *Session) maxTCPMessageSize() int {
+	return min(s.channel.MaxMessageSize(), s.PeerMaxTCPMessageSize())
+}
+
+// checkSize refuses a datagram above the session's TCP limit instead of
+// sending it: the peer would close the connection, which ends every
+// exchange on it. A session without a channel is not checked here.
+// Mirrors matter.js MessageChannel.send (MessageChannel.ts:104-112 at
+// db021da0).
+func (s *Session) checkSize(datagram []byte) error {
+	if s.channel == nil {
+		return nil
+	}
+	if limit := s.maxTCPMessageSize(); len(datagram) > limit {
+		return fmt.Errorf("%w: %d bytes to %s, the TCP limit is %d; split it by MaxPayloadSize", ErrMessageTooLarge, len(datagram), s.channel.Remote(), limit)
+	}
+	return nil
 }

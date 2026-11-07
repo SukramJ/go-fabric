@@ -94,13 +94,13 @@ func TestListenerEchoRoundTrip(t *testing.T) {
 	if string(r.msg) != "hello" || !r.conn.Reliable() || !r.conn.Incoming() || r.conn.Remote() == nil {
 		t.Fatalf("received %q reliable=%v incoming=%v", r.msg, r.conn.Reliable(), r.conn.Incoming())
 	}
-	if r.conn.MaxMessageSize() != 60 {
-		t.Fatalf("MaxMessageSize = %d, want 60", r.conn.MaxMessageSize())
+	if r.conn.MaxMessageSize() != 64 {
+		t.Fatalf("MaxMessageSize = %d, want 64", r.conn.MaxMessageSize())
 	}
 	if reply := readFrame(t, c); string(reply) != "re:hello" {
 		t.Fatalf("reply %q", reply)
 	}
-	if err := r.conn.Send(make([]byte, 61)); !errors.Is(err, ErrMessageTooLarge) {
+	if err := r.conn.Send(make([]byte, 65)); !errors.Is(err, ErrMessageTooLarge) {
 		t.Fatalf("oversized send: %v", err)
 	}
 	if r.conn.String() == "" {
@@ -160,7 +160,7 @@ func TestListenerClosesOnMalformedLength(t *testing.T) {
 	}
 
 	c2 := dialRaw(t, l)
-	if _, err := c2.Write([]byte{61, 0, 0, 0}); err != nil { // 61 > 64-4
+	if _, err := c2.Write([]byte{65, 0, 0, 0}); err != nil { // 65 > 64
 		t.Fatal(err)
 	}
 	expectEOF(t, c2)

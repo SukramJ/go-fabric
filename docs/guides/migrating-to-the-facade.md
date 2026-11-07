@@ -269,8 +269,33 @@ its NOC, as matter.js's does since db021da0, and a configured set is not
 applied — delete the field from the literal. `handshake.ResumptionRecord`
 loses `PeerCATs`; its `CaseAuthenticatedTags` are the peer's CATs on both
 sides of the handshake — a `ResumptionStore` that persisted both keeps one.
-`peer.Descriptor.CaseAuthenticatedTags` is still recorded and no longer
-reaches the handshake.
+The configured set itself is removed as well — see "Changed after v0.17.0:
+the configured CATs" below.
+
+## Changed after v0.17.0: the TCP message limit
+
+`tcp.Config.MaxPayloadSize` and `tcp.Dialer.MaxPayloadSize` are the
+largest message a connection sends or receives, the 4-byte length prefix
+not counted — MAX_TCP_MESSAGE_SIZE as the specification and matter.js
+define it. A value that was raised by four to make room for the prefix
+drops the four; `Conn.MaxMessageSize` returns the value itself. A host
+that matched `tcp.ErrReceiveBufferExceeded` drops the match: the received
+bytes have no cap of their own any more, a length header above the limit
+still closes the connection with `tcp.ErrFrameTooLarge`. A session's
+sends over TCP are capped at the peer's announced size as well
+(`exchange.Session.PeerMaxTCPMessageSize`); a message above it fails with
+`exchange.ErrMessageTooLarge`.
+
+## Changed after v0.17.0: the configured CATs
+
+`peer.Descriptor.CaseAuthenticatedTags`, `client.CommissionOptions.CaseAuthenticatedTags`
+and `client.Record.CaseAuthenticatedTags` are removed. Since the CASE
+options above, a session's CATs are the peer's NOC's and the configured set
+reached nothing; delete the field from the literal. A node record a
+registry stored before carries the set at its field 1: it is read with the
+field ignored, and the record's next save drops it. matter.js keeps its
+ignored `caseAuthenticatedTags` option only for its legacy API
+(`CaseClient.ts:396-404` at db021da0).
 
 ## Changed after v0.17.0: `DatastoreSync.SyncEndpointBindings`
 

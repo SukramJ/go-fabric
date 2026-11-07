@@ -27,8 +27,12 @@ import (
 const (
 	recordCluster uint32 = 0xFFFF_FFFE
 
-	recPeerAddress               uint32 = 0  // :931-932
-	recCaseAuthenticatedTags     uint32 = 1  // :939-940
+	recPeerAddress uint32 = 0 // :931-932
+	// recRetiredCATs held the configured CATs (:939-940) until the
+	// db021da0 lift: a CASE session's CATs are the peer's NOC's since
+	// (CaseClient.ts:396-404 at db021da0), so a stored value is read and
+	// ignored, and the next save clears it.
+	recRetiredCATs               uint32 = 1
 	recAddresses                 uint32 = 2  // :946-947
 	recHostname                  uint32 = 3  // :958-959
 	recDiscoveredAt              uint32 = 4  // :964-965
@@ -62,9 +66,6 @@ type Record struct {
 	// PeerAddress is our fabric index and the node's node id; nil while
 	// the node is not commissioned (:928-932).
 	PeerAddress *PeerAddress
-	// CaseAuthenticatedTags are our CATs for CASE sessions to the node,
-	// nil when unknown (:934-940).
-	CaseAuthenticatedTags []uint32
 	// Addresses are the node's known network addresses; nil when the node
 	// has not been located (:942-947).
 	Addresses []NetworkAddress
@@ -161,7 +162,6 @@ func (r Record) clone() Record {
 		a := *r.PeerAddress
 		c.PeerAddress = &a
 	}
-	c.CaseAuthenticatedTags = slices.Clone(r.CaseAuthenticatedTags)
 	c.Addresses = slices.Clone(r.Addresses)
 	c.Discriminator = clonePtr(r.Discriminator)
 	c.VendorID, c.ProductID = clonePtr(r.VendorID), clonePtr(r.ProductID)
@@ -217,13 +217,6 @@ func (r Record) encode() (map[uint32][]byte, error) {
 		e.StartStruct(anon)
 		e.PutUint(tlv.ContextTag(0), uint64(r.PeerAddress.FabricIndex))
 		e.PutUint(tlv.ContextTag(1), r.PeerAddress.NodeID)
-		_ = e.EndContainer()
-	})
-	add(r.CaseAuthenticatedTags != nil, recCaseAuthenticatedTags, func(e *tlv.Encoder) {
-		e.StartArray(anon)
-		for _, c := range r.CaseAuthenticatedTags {
-			e.PutUint(anon, uint64(c))
-		}
 		_ = e.EndContainer()
 	})
 	add(r.Addresses != nil, recAddresses, func(e *tlv.Encoder) {
@@ -361,11 +354,8 @@ func (r *Record) decodeField(id uint32, n spec.Node) error {
 			spec.Bind(0, "fabricIndex", true, &a.FabricIndex, spec.DecodeUint[uint8](8)),
 			spec.Bind(1, "nodeId", true, &a.NodeID, spec.DecodeUint[uint64](64)))
 		r.PeerAddress = &a
-	case recCaseAuthenticatedTags:
-		r.CaseAuthenticatedTags, err = spec.DecodeList(spec.DecodeUint[uint32](32))(n)
-		if r.CaseAuthenticatedTags == nil {
-			r.CaseAuthenticatedTags = []uint32{}
-		}
+	case recRetiredCATs:
+		// A record stored before the db021da0 lift: the field is ignored.
 	case recAddresses:
 		r.Addresses, err = spec.DecodeList(decodeNetworkAddress)(n)
 		if r.Addresses == nil {
@@ -615,15 +605,16 @@ func (r *Record) applyPeer(d peer.Descriptor) {
 		ap := a.AddrPort()
 		r.Addresses = []NetworkAddress{{IP: ap.Addr(), Port: ap.Port()}}
 	}
-	r.CaseAuthenticatedTags = slices.Clone(d.CaseAuthenticatedTags)
 }
 
 // knownDescriptor is the protocol peer the record describes —
 // CommissioningClient.#bindPeer's addKnownPeer (CommissioningClient.ts:699-706):
-// the first address as the operational one, the discovery data, the CATs,
-// the reported session parameters.
+// the first address as the operational one, the discovery data, the
+// reported session parameters. The CATs it hands matter.js's legacy option
+// are not kept: a session's CATs are the peer's NOC's (CaseClient.ts:396-404
+// at db021da0).
 func (r Record) knownDescriptor() peer.Descriptor {
-	d := peer.Descriptor{CaseAuthenticatedTags: slices.Clone(r.CaseAuthenticatedTags), ReportedSessionParameters: clonePtr(r.ReportedSessionParameters), TCPUnsupported: r.TCPUnsupported}
+	d := peer.Descriptor{ReportedSessionParameters: clonePtr(r.ReportedSessionParameters), TCPUnsupported: r.TCPUnsupported}
 	if r.PeerAddress != nil {
 		d.Address = *r.PeerAddress
 	}

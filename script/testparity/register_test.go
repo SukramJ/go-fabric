@@ -50,7 +50,10 @@ import (
 // Pin lift wave P3 (#432) decided seven of the lift's planned files (the
 // GeneralDiagnostics, mDNS address-change and transport, label and
 // localisation tests); CommissionableMdnsScannerWindowChangeTest.ts stays: 6.
-const testparityPlannedRatchet = 6
+// Pin lift wave P4 (#433) ports CommissioningClosedSessionReArmTest.ts,
+// InitialContactScheduleTest.ts and VendorIdVerificationTest.ts, merged
+// with wave P3: 3.
+const testparityPlannedRatchet = 3
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -123,9 +126,15 @@ const testparityPlannedRatchet = 6
 // ported; 18 MdnsServerTest.ts/MdnsTest.ts goodbye cases out of missing, ten
 // MdnsServerTransportTest.ts and five GeneralDiagnosticsServerTest.ts fault cases in,
 // merged with waves P1 and P2: 154 ported, 1021 missing.
+// Pin lift wave P4 (#433): CommissioningClosedSessionReArmTest.ts ported, ConnectionStateTest.ts's two no-address cases: 150 ported, 1022 missing.
+// Pin lift wave P4 (#433): InputChunkTest.ts completed by the nine resolved-timestamp cases, ClientEventNotificationTest.ts's resolved delivery: 151 ported, 1012 missing.
+// Pin lift wave P4 (#433): the TCP limit cases of matter.js #4793 in MessageChannelTest.ts, TcpChannelTest.ts, SessionParametersTest.ts and BdxTest.ts: 998 missing.
+// Pin lift wave P4 (#433): InitialContactScheduleTest.ts ported, ClientConnectivityTest.ts's Sigma1 refresh: 152 ported, 997 missing.
+// Pin lift wave P4 (#433): VendorIdVerificationTest.ts ported, the VVSC rows of OperationalCertificateVerifyTest.ts: 153 ported, 988 missing.
+// Merged with wave P3: 158 ported, 985 missing.
 const (
-	testparityPortedRatchet  = 154
-	testparityMissingRatchet = 1021
+	testparityPortedRatchet  = 158
+	testparityMissingRatchet = 985
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

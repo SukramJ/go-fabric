@@ -4,6 +4,7 @@
 package jcm
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -46,6 +47,23 @@ var (
 	// public key, challenge or binding version chip refuses
 	// (CHIP_ERROR_INVALID_ARGUMENT, CHIPCryptoPAL.cpp:936-943, :964-971).
 	ErrBindingInput = errors.New("jcm: VID verification input out of form")
+	// ErrStatement is a VID Verification Statement that does not hold: not
+	// version 1 of its 85-byte form, no VVSC to check it with, a signer
+	// key identifier other than the VVSC's, or a VVSC that fails its
+	// profile (matter.js VendorIdVerification.ts:230-293 at db021da0).
+	ErrStatement = errors.New("jcm: VID Verification Statement does not verify")
+)
+
+// Statement layout, version 1 — VIDVerificationStatement := statement_version
+// || vid_verification_signer_skid || vid_verification_statement_signature
+// (chip CHIPCryptoPAL.h:127-141 at 6170af84, kVendorIdVerificationStatementV1Size
+// == 85; matter.js VERIFICATION_STATEMENT_VERSION 0x21,
+// VendorIdVerification.ts:36, VERIFICATION_STATEMENT_SIZE :44).
+const (
+	statementVersion1    = 0x21
+	statementSize        = 1 + 20 + 64
+	fabricBindingSize    = 1 + 65 + 8 + 2
+	tbsBindingMessageOff = 1 + ClientChallengeSize + attestationChallengeSize + 1
 )
 
 // Signer sends SignVIDVerificationRequest to the peer and returns its
@@ -88,13 +106,15 @@ func VerifyVendorID(ctx context.Context, signer Signer, info *Info, lookup Trust
 // Verify checks a SignVIDVerificationResponse against info: the fabric
 // binding message over the RCAC's public key, fabric id and vendor id; the
 // signature by the NOC's key over the to-be-signed message; the NOC chain
-// against the fabric's RCAC; and the chain against the globally trusted
-// root lookup finds for the vendor id and the RCAC's SubjectKeyID. A
-// VIDVerificationStatement is not supported (step 12a): the statement is
-// empty. Mirrors VendorIdVerificationClient.cpp:51-125 (Verify), :28-49
+// against the fabric's RCAC; and — without a VID Verification Statement —
+// the chain against the globally trusted root lookup finds for the vendor
+// id and the RCAC's SubjectKeyID (step 12b). Mirrors
+// VendorIdVerificationClient.cpp:51-125 (Verify), :28-49
 // (VerifyNOCCertificateChain), CHIPCryptoPAL.cpp:933-958
 // (GenerateVendorFabricBindingMessage) and :960-990
-// (GenerateVendorIdVerificationToBeSigned).
+// (GenerateVendorIdVerificationToBeSigned). With a statement in info
+// (step 12a, which chip does not support, :103-104) the to-be-signed
+// message carries it, and [verifyStatement] checks it.
 func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallenge []byte, resp opcreds.SignVidVerificationResponse, lookup TrustAnchorLookup) error {
 	rcac, err := mattercert.Decode(info.AdminRCAC) // :64-66
 	if err != nil {
@@ -103,6 +123,12 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 	tbs, err := toBeSigned(info.AdminFabricIndex, clientChallenge, attestationChallenge, rcac.PublicKey, info.AdminFabricID, info.AdminVendorID) // :68-82
 	if err != nil {
 		return err
+	}
+	statement := info.AdminVIDVerificationStatement
+	if len(statement) > 0 {
+		// vendor_id_verification_tbs ends with the statement
+		// (CHIPCryptoPAL.h:150-155; VendorIdVerification.ts:89-91).
+		tbs = append(tbs, statement...)
 	}
 	noc, err := mattercert.Decode(info.AdminNOC) // :84-87
 	if err != nil {
@@ -118,6 +144,9 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 	if err := verifyChain(info.AdminNOC, info.AdminICAC, rcac.PublicKey); err != nil { // :98-101
 		return err
 	}
+	if len(statement) > 0 {
+		return verifyStatement(ctx, info, tbs[tbsBindingMessageOff:tbsBindingMessageOff+fabricBindingSize], lookup)
+	}
 	if lookup == nil {
 		return ErrNoTrustAnchor
 	}
@@ -130,6 +159,72 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 		return fmt.Errorf("jcm: globally trusted root: %w", err)
 	}
 	return verifyChain(info.AdminNOC, info.AdminICAC, trusted.PublicKey) // :116-120
+}
+
+// verifyStatement is step 12a, the VID Verification Statement path: the
+// statement is version 1 of its 85-byte form; the administrator's VVSC
+// holds the VVSC profile (mattercert.DecodeVVSC, Vvsc.ts at db021da0); its
+// SubjectKeyID is the statement's signer key identifier; its key signed
+// statement_version || vendor_fabric_binding_message || signer_skid; and
+// a trust anchor of the vendor — lookup for the vendor id and the VVSC's
+// AuthorityKeyID — signed the VVSC. Mirrors matter.js
+// VendorIdVerification.verifyData (VendorIdVerification.ts:177-293 at
+// db021da0, the statement part :230-293) with three differences, each failing closed where matter.js
+// does not: a statement without a VVSC fails (matter.js returns true,
+// "TODO Fail if not available!", :263-271); the VVSC's issuer is checked
+// against a trust anchor (a TODO at :232-240); and the statement signature
+// covers the 76-byte fabric binding message, as createStatementBytes
+// names its input (:311-322), where matter.js passes the whole
+// to-be-signed message (:282-286) — a message that carries the client
+// and attestation challenges of one request, which a statement set once
+// per fabric (SetVIDVerificationStatement, FabricDescriptorStruct field
+// 6) cannot have been signed over. A VVSC under an intermediate
+// certificate is refused: lookup's answer must have signed it.
+func verifyStatement(ctx context.Context, info *Info, binding []byte, lookup TrustAnchorLookup) error {
+	s := info.AdminVIDVerificationStatement
+	if len(s) != statementSize {
+		return fmt.Errorf("%w: %d bytes, want %d", ErrStatement, len(s), statementSize)
+	}
+	if s[0] != statementVersion1 {
+		return fmt.Errorf("%w: version %#x", ErrStatement, s[0])
+	}
+	skid, sig := s[1:21], s[21:]
+	if len(info.AdminVVSC) == 0 {
+		return fmt.Errorf("%w: no VVSC", ErrStatement)
+	}
+	vvsc, err := mattercert.DecodeVVSC(info.AdminVVSC)
+	if err != nil {
+		return fmt.Errorf("%w: VVSC: %w", ErrStatement, err)
+	}
+	if !bytes.Equal(vvsc.Extensions.SubjectKeyID, skid) {
+		return fmt.Errorf("%w: the signer key identifier is not the VVSC's", ErrStatement)
+	}
+	key, err := vvsc.PublicKeyECDSA()
+	if err != nil {
+		return fmt.Errorf("%w: VVSC: %w", ErrStatement, err)
+	}
+	msg := make([]byte, 0, 1+fabricBindingSize+len(skid))
+	msg = append(msg, statementVersion1)
+	msg = append(msg, binding...)
+	msg = append(msg, skid...)
+	if !verifyRaw(key, msg, sig) {
+		return ErrSignature
+	}
+	if lookup == nil {
+		return ErrNoTrustAnchor
+	}
+	anchor, err := lookup(ctx, info.AdminVendorID, vvsc.Extensions.AuthorityKeyID)
+	if err != nil {
+		return err
+	}
+	root, err := mattercert.Decode(anchor)
+	if err != nil {
+		return fmt.Errorf("jcm: VVSC trust anchor: %w", err)
+	}
+	if err := mattercert.VerifyVVSCIssuedBy(vvsc, root.PublicKey); err != nil {
+		return fmt.Errorf("%w: VVSC issuer: %w", ErrStatement, err)
+	}
+	return nil
 }
 
 // toBeSigned is vendor_id_verification_tbs := version || client_challenge

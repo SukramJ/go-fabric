@@ -142,7 +142,10 @@ func (f *inboundFlow) fail(ctx context.Context, err error) error {
 
 func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveOptions) (Result, error) {
 	// buildInitMessage, receiver branch (bdx-session-initiator.ts:155-178).
-	maxBlockSize := f.m.MaxPayloadSize() - blockCounterOverhead
+	// At most a 16-bit block size: a TCP exchange may carry more than the
+	// field holds (bdx-session-initiator.ts:155 at db021da0, matter.js
+	// #4793).
+	maxBlockSize := min(f.m.MaxPayloadSize()-blockCounterOverhead, 0xFFFF)
 	if opts.MaxBlockSize != 0 && maxBlockSize > int(opts.MaxBlockSize) {
 		maxBlockSize = int(opts.MaxBlockSize)
 	}

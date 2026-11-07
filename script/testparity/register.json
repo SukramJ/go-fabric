@@ -3000,14 +3000,13 @@
       "path": "packages/node/test/behavior/system/network/ConnectionStateTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestConnectionStateParityMatterJS"
+        "controller/client:TestConnectionStateParityMatterJS",
+        "controller/client:TestConnectionStateWithoutAddressParity"
       ],
       "missing": [
-        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in",
-        "reports WaitingForDeviceDiscovery while a peer has no address to try",
-        "returns to Reconnecting when discovery finds an address for a peer without a subscription"
+        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in"
       ],
-      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate.",
+      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate. Pin lift wave P4 (#433): a peer with no session, no operational address and no service address reports WaitingForDeviceDiscovery and returns to Reconnecting once DNS-SD finds an address (NetworkClient.ts:390-392, :541-546 at db021da0), on the registry harness with a node stored without an address (controller/client:TestConnectionStateWithoutAddressParity).",
       "snapshotSha": "83f5ea26601b2afee3b43f36a446375aae88d6b2"
     },
     {
@@ -3725,8 +3724,11 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/VendorIdVerificationTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "client/jcm:TestVendorIdVerificationParity"
+      ],
+      "reason": "The six verifyData cases against client/jcm.Verify (chip's procedure with the statement path of BD-Matter-VIDStatementVerification): a conformant chain verifies; a NOC that repeats or lacks a subject attribute, an RCAC that repeats one, a VVSC that repeats its matter-vvs-id and a VVSC that fails its profile do not (an error where matter.js returns false); the statement path itself is checked end to end beyond matter.js's cases (client/jcm:TestVendorIdVerificationParity). Pin lift wave P4 (#433).",
       "snapshotSha": "42b8ce78e7007002e15da083f3657d5d1dba7204"
     },
     {
@@ -4822,17 +4824,17 @@
         "client/peer:TestTwoAddressesStaggered",
         "client/peer:TestOperationalAddressStaysAsFallback",
         "client/peer:TestConnectDiscoveredAddress",
-        "controller/client:TestClientConnectivityParity"
+        "controller/client:TestClientConnectivityParity",
+        "client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity"
       ],
       "missing": [
         "connects via last known address when MDNS is unavailable",
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "subscribes to a peer that is not initially available (recreate)",
-        "refreshes a Sigma1 that is never acknowledged"
+        "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282).",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282). Pin lift wave P4 (#433): a peer whose Sigma1 messages are all lost gets one Sigma1 for at least the MRP budget, then fresh ones three times each with the backoff continued, on the connection process over a silent socket (client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity).",
       "snapshotSha": "3dda3d0109c1d6ed85f5da3832c848b7a7ff3171"
     },
     {
@@ -4842,16 +4844,16 @@
         "controller/client:TestClientEventNotificationEventsOfParity",
         "controller/client:TestClientEventNotificationEventNumbersParity",
         "controller/client:TestHostReadDoesNotEmitEvents",
-        "controller/client:TestClientEventNotificationLocalParity"
+        "controller/client:TestClientEventNotificationLocalParity",
+        "controller/client:TestClientEventNotificationResolvedTimestampsParity"
       ],
       "missing": [
         "ignores events and event numbers of a replaced default subscription",
         "stores the number of the events the commissioning read emitted when the read fails",
         "does not store the number of an event dropped because the node is being deleted",
-        "delivers the timestamps the report decoder resolved",
         "warns once per kind of failure when a change observer fails for each event report"
       ],
-      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission).",
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity).",
       "snapshotSha": "fa5b481efe35f50215d352674667b90e6df420c2",
       "left": [
         {
@@ -5002,7 +5004,7 @@
         "controller:TestLargeMessageReadOverTCP",
         "client/peer:TestPeerTransportGateParity"
       ],
-      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session.",
+      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session. Pin lift wave P4 (#433) ported the client half of matter.js #4793 (client/exchange, transport/tcp) and left the five maxMessageSize cases missing, not left: they configure the node's own TCP limit (network.tcp.maxMessageSize, its validation and its announcement), the device side, which a later wave ports with the device-side TCP cap of notes/parity/matter_behaviour_findings.md F-db021da0-1.",
       "snapshotSha": "4cedd1b21ab6b6f8301cee7f8351965da37795e1",
       "missing": [
         "accepts and announces the configured TCP maxMessageSize",
@@ -5505,8 +5507,11 @@
     },
     {
       "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCommissioningClosedSessionReArmParity"
+      ],
+      "reason": "The flow's between-steps re-arm skips a closed commissioning session (ControllerCommissioningFlow.ts:835-849 at db021da0), after a step that left less than half the failsafe and before a step that re-arms first; the Go flow runs over a scripted device on a fake clock, the closing step its own (controller/commissioner:TestCommissioningClosedSessionReArmParity). Pin lift wave P4 (#433).",
       "snapshotSha": "b08e549f5ba36963dec113deac0cc568c0fd2151"
     },
     {
@@ -6694,26 +6699,16 @@
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "client/interaction:TestInputChunkAttributes",
         "client/interaction:TestInputChunkEvents",
         "client/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
-        "client/interaction:TestInputChunkRelaxedIntegerTypeChecks"
+        "client/interaction:TestInputChunkRelaxedIntegerTypeChecks",
+        "client/interaction:TestInputChunkResolvedTimestampsParity"
       ],
-      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
-      "snapshotSha": "0931349a63e7e21320af3a28ade520ec565597d3",
-      "missing": [
-        "adds each system delta to the event before it, as the CHIP SDK encodes a report",
-        "does not skip back over an event without a timestamp",
-        "does not skip back over an unresolved delta to an older absolute timestamp",
-        "keeps the chain across an entry whose payload fails to decode",
-        "keeps the chain across an entry with an invalid path",
-        "leaves a delta unresolved when no absolute timestamp precedes it in the message",
-        "leaves a delta unresolved when the prior event used the other clock",
-        "resolves epoch deltas against the prior epoch timestamp",
-        "starts each report message without a prior timestamp"
-      ]
+      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. Pin lift wave P4 (#433): the nine resolved-timestamp cases of matter.js #4832 against the assembler's EventTimestampChain (client/interaction:TestInputChunkResolvedTimestampsParity); the Go assembler keeps every payload as a node tree, so the case of a payload that fails to decode runs as the chain through a payload of an unexpected type.",
+      "snapshotSha": "0931349a63e7e21320af3a28ade520ec565597d3"
     },
     {
       "path": "packages/protocol/test/action/client/LargeMessageTransportTest.ts",
@@ -6932,15 +6927,15 @@
         "bdx:TestServe_AbortedTransfers",
         "bdx:TestBdxSuccessfulTransfers",
         "bdx:TestBdxPerBlockDebugLogging",
-        "bdx:TestBdxErrorCases"
+        "bdx:TestBdxErrorCases",
+        "bdx:TestReceive_BlockSizeAtMost16Bit"
       ],
       "missing": [
         "Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)",
         "BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)",
-        "sessionId and sessionActiveTimestamp are accessible after transfer completes",
-        "Proposes at most a 16-bit maxBlockSize on a channel with a larger payload size"
+        "sessionId and sessionActiveTimestamp are accessible after transfer completes"
       ],
-      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have.",
+      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have. Pin lift wave P4 (#433): an exchange carrying more than 65539 bytes offers a 16-bit block size (bdx:TestReceive_BlockSizeAtMost16Bit, the receiving initiator; the sending one shares the computation).",
       "snapshotSha": "33029b4c048a97b9e01895c6f3cad0076b501c20"
     },
     {
@@ -7277,11 +7272,11 @@
         "secure/mattercert:TestDecodeDNRulesPinDB021da0",
         "secure/mattercert:TestDERDistinguishedNameEdges",
         "secure/mattercert:TestVerifierConstructionAndExtractionRefusals",
-        "cluster/core:TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID"
+        "cluster/core:TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID",
+        "secure/mattercert:TestVVSCProfileParity"
       ],
       "missing": [
         "verifies a NOC with node ID 0xFFFF_FFEF_FFFF_FFFF, the top of the operational range",
-        "verifies a VVSC",
         "verifies a NOC with an additional key usage flag",
         "verifies a NOC whose key usage bitmap has a bit that has no name",
         "verifies an issuer DN with exactly five RDNs",
@@ -7293,14 +7288,6 @@
         "refuses a matter-vvs-id",
         "refuses a key usage flag beyond keyCertSign, cRLSign and digitalSignature",
         "accepts the optional digitalSignature flag",
-        "refuses a VVSC that is a CA",
-        "refuses a VVSC with a key usage flag besides digitalSignature",
-        "refuses a VVSC key usage bitmap with a bit that has no name",
-        "refuses a decoded VVSC whose key usage flags were changed afterwards",
-        "refuses a VVSC with an empty key usage",
-        "refuses a VVSC without digitalSignature",
-        "refuses a VVSC without a matter-vvs-id",
-        "refuses a matter-fabric-id",
         "refuses a CAT that is not eight hexadecimal digits",
         "parses a NOC with ${count} CASE Authenticated Tags",
         "refuses ${field} text that is ${name}",
@@ -7321,7 +7308,7 @@
           "reason": "the object view of a DN reading the first value; the Go DN keeps every value in Attributes, in order"
         }
       ],
-      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the NOC, ICAC and RCAC rules matter.js holds at the pin that the module shares — the chain, serverAuth required of a NOC, five RDNs, a repeated Matter attribute refused in TLV and DER, the firmware signing id decoded in both and counted, matter-vvs-id refused in an operational subject, the node-id range, fabric id 0, CAT version 0 — are ported. Missing: the VVSC kind (wave P4's peer VID verification, #433), the issuer-DN limit cases, the key-usage bitmap cases (the Go RCAC check is chip's ValidateRCAC, keyCertSign required and other flags tolerated — to be weighed against matter.js's named-flags rule), the DER parsing cases of the Matter attribute text, and the missing-mandatory-attribute cases per certificate kind. Two titles ('refuses fabric ID 0', 'refuses a second matter-fabric-id' …) appear under several describes; the RCAC describe's own rows are among the missing ones named once.",
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the NOC, ICAC and RCAC rules matter.js holds at the pin that the module shares — the chain, serverAuth required of a NOC, five RDNs, a repeated Matter attribute refused in TLV and DER, the firmware signing id decoded in both and counted, matter-vvs-id refused in an operational subject, the node-id range, fabric id 0, CAT version 0 — are ported. Pin lift wave P4 (#433): the VVSC kind — not a CA, key usage exactly digitalSignature (an unnamed bit counted), a matter-vvs-id and no node id, fabric id or CAT in the subject, also on a certificate changed after decoding (secure/mattercert:TestVVSCProfileParity, mattercert.DecodeVVSC / ValidateVVSC); its \"refuses a matter-node-id\" shares the title with the RCAC describe's, which stays missing. Missing: the issuer-DN limit cases, the key-usage bitmap cases (the Go RCAC check is chip's ValidateRCAC, keyCertSign required and other flags tolerated — to be weighed against matter.js's named-flags rule), the DER parsing cases of the Matter attribute text, and the missing-mandatory-attribute cases per certificate kind. Two titles ('refuses fabric ID 0', 'refuses a second matter-fabric-id' …) appear under several describes; the RCAC describe's own rows are among the missing ones named once.",
       "snapshotSha": "471755ea6549b21d946b85baf1dd1c48311f5de1"
     },
     {
@@ -8339,8 +8326,11 @@
     },
     {
       "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P4 (#433, the TCP size cap, the Sigma1 refresh schedule, delta event timestamps, the discovery state and the between-steps re-arm after #4793/#4794/#4832/#4808/#4815; the peer VID verification of #4880) ports it by meaning.",
+      "status": "ported",
+      "go": [
+        "client/peer:TestInitialContactScheduleParity"
+      ],
+      "reason": "The Sigma1 schedule of one address (client/peer initial_contact.go after InitialContactSchedule.ts at db021da0, matter.js #4794): the identical phase for the MRP budget and the retry delay, fresh Sigma1 messages three times each with the backoff continued, the unresponsive signal once per run counted across attempts, the other ends of an attempt and the kick blocker, on an exchange.Manager over a silent socket and a fake clock; matter.js's PeerAckMissingError is exchange's *PeerUnresponsiveError (client/peer:TestInitialContactScheduleParity). Pin lift wave P4 (#433).",
       "snapshotSha": "454f6c02c901fbed7421d7e3de896f49bdb15b2d"
     },
     {
@@ -8450,14 +8440,13 @@
         "client/peer:TestPeerConnectionKickTiming",
         "client/peer:TestPeerConnectionKickOrigin",
         "client/peer:TestPeerConnectionKickRateLimiting",
-        "client/peer:TestPeerConnectionKickGate",
         "client/peer:TestPeerConnectionKickLocalAbort",
         "client/peer:TestPeerConnectionKickObserver"
       ],
       "missing": [
         "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>"
       ],
-      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
+      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart. Pin lift wave P4 (#433): the kick gate describe left this file for InitialContactScheduleTest.ts with matter.js #4794 (the attempt's kick blocker), and client/peer:TestPeerConnectionKickGate with it.",
       "snapshotSha": "f1f5581c208632561936cf7b4c862d4cca46a6e4"
     },
     {
@@ -8612,20 +8601,14 @@
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
       "status": "partial",
       "go": [
-        "client/exchange:TestMessageChannelSocketSwap"
+        "client/exchange:TestMessageChannelSocketSwap",
+        "client/exchange:TestMessageChannelTCPLimitParity"
       ],
       "missing": [
         "stops observing the transport channel address without closing the channel",
-        "closes the transport channel of an unreliable transport on close",
-        "caps a TCP channel at the MAX_TCP_MESSAGE_SIZE the peer announced",
-        "does not cap a TCP channel below the UDP message size",
-        "ignores the peer",
-        "keeps the own TCP limit when the peer announces a larger one",
-        "refuses a message above the peer",
-        "uses the spec default for a TCP peer that announces no limit",
-        "uses the spec default for a peer that announces no TCP support"
+        "closes the transport channel of an unreliable transport on close"
       ],
-      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close.",
+      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close. Pin lift wave P4 (#433): the TCP limit of matter.js #4793 — the peer's MAX_TCP_MESSAGE_SIZE under the channel's own, the spec default without one, never below the UDP message size, a larger message refused with ErrMessageTooLarge before it reaches the channel — on a session bound to a fake TCP channel; the two non-TCP cases as a session without a channel (client/exchange:TestMessageChannelTCPLimitParity).",
       "snapshotSha": "59cf9deb0ce2a262ea2ab36284f76100dd5f1f0d"
     },
     {
@@ -8950,15 +8933,14 @@
         "client/exchange:TestSessionParameters",
         "client/exchange:TestSessionParametersMaxPathsPerInvoke",
         "client/exchange:TestSessionParametersTCPSpecVersionGate",
-        "client/exchange:TestSessionParametersReported"
+        "client/exchange:TestSessionParametersReported",
+        "client/exchange:TestSessionParametersMaxTCPMessageSizeParity"
       ],
       "missing": [
         "assumes one for a persisted limit the wire could not have carried",
-        "keeps supported transports given as an object",
-        "honors a peer-reported limit below the default",
-        "uses the spec default when the peer reports zero"
+        "keeps supported transports given as an object"
       ],
-      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold.",
+      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold. Pin lift wave P4 (#433): a TCP peer's limit below the default kept, 0 taking the default (client/exchange:TestSessionParametersMaxTCPMessageSizeParity).",
       "snapshotSha": "dc94995d451ae0b0e6c2637e8015e28c140d95b9"
     },
     {
@@ -9046,13 +9028,9 @@
         "transport/tcp:TestTcpChannelAsyncIteration"
       ],
       "missing": [
-        "callback listeners take priority over iterator queue",
-        "accepts a message of exactly MAX_TCP_MESSAGE_SIZE, which excludes the length header",
-        "accepts several messages at a small limit arriving in one chunk",
-        "accepts two maximum-size messages arriving in one chunk",
-        "rejects a message one byte over MAX_TCP_MESSAGE_SIZE"
+        "callback listeners take priority over iterator queue"
       ],
-      "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler).",
+      "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler). Pin lift wave P4 (#433): MAX_TCP_MESSAGE_SIZE excludes the length header and several complete frames in one read are all taken (transport/tcp:TestTcpChannelOversizedMessageHandling, matter.js #4793).",
       "snapshotSha": "9fbb1298c1a469d731d088e2d30b02ae87323ce9"
     },
     {

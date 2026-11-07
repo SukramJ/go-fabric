@@ -231,7 +231,7 @@ func (f *flow) execute(ctx context.Context) error {
 		var err error
 		if f.reArmBefore[[2]int{s.number, s.sub}] && !rearmedAfterPrevious && !f.armIntervalRunning() {
 			f.log.Debug("matter.controller.commissioning.rearm_before_step", slog.String("name", s.name))
-			_, err = f.armFailsafe(ctx, 0)
+			_, err = f.reArmFailsafeBetweenSteps(ctx)
 		}
 		rearmedAfterPrevious = false
 		var res stepResult
@@ -305,12 +305,28 @@ func (f *flow) afterStep(ctx context.Context, s step) (bool, error) {
 	}
 	if left := end.Sub(f.now()); left < f.defaultFailSafe/2 {
 		f.log.Info("matter.controller.commissioning.rearm_failsafe", slog.String("after", s.name), slog.Duration("left", left))
-		if _, err := f.armFailsafe(ctx, 0); err != nil {
-			return false, err
-		}
-		return true, nil
+		return f.reArmFailsafeBetweenSteps(ctx)
 	}
 	return false, nil
+}
+
+// reArmFailsafeBetweenSteps re-arms the failsafe between two steps and
+// reports whether it did. It skips the re-arm once the commissioning
+// session is closed — for example after the device left BLE for its
+// operational network, the Reconnect step then continuing over CASE.
+// Mirrors matter.js ControllerCommissioningFlow.ts:835-849
+// (#reArmFailsafeBetweenSteps), called before a step with reArmFailsafe
+// (:385-393) and after a step that left less than half the failsafe
+// (:409-423) at db021da0.
+func (f *flow) reArmFailsafeBetweenSteps(ctx context.Context) (bool, error) {
+	if s := f.interaction().Session(); s != nil && s.IsClosed() {
+		f.log.Debug("matter.controller.commissioning.rearm_skipped", slog.String("reason", "session closed"))
+		return false, nil
+	}
+	if _, err := f.armFailsafe(ctx, 0); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // failsafeTimes are the failsafe's end and the cumulative expiry.
