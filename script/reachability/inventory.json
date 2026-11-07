@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7778,
+  "entry_points": 7779,
   "entry_packages": [
     ".",
     "bdx",
@@ -8147,7 +8147,7 @@
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 589
+      "line": 594
     },
     {
       "package": "cluster/core",
@@ -8175,14 +8175,14 @@
       "identifier": "ShutDownEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 586
+      "line": 591
     },
     {
       "package": "cluster/core",
       "identifier": "StartUpEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 581
+      "line": 586
     },
     {
       "package": "cluster/core",

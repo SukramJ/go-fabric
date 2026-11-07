@@ -6,14 +6,14 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 8328 |
+| Citations | 8327 |
 | Go files citing | 1418 |
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 1972 |
 | Resolved: unique suffix | 228 |
-| Resolved: unique basename | 6128 |
-| Checked at their own `at <sha>` | 1610 |
+| Resolved: unique basename | 6127 |
+| Checked at their own `at <sha>` | 1609 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 646 |
-| Drift-checked (the sentence names a name the file contains) | 3845 |
+| Drift-checked (the sentence names a name the file contains) | 3844 |
 | Hard-checked only | 4483 |
 | **Hard errors** | 0 |
 | **Drift** | 416 |

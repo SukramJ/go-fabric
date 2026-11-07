@@ -58,6 +58,9 @@ func TestBasicInfo_HostSetNodeLabel(t *testing.T) {
 	if err := b.SetNodeLabel(context.Background(), ""); err != nil {
 		t.Errorf("SetNodeLabel(\"\"): %v", err)
 	}
+	if v, _ := b.MatterRead(0x0005); v.(tlv.BoundedString).Value != "" {
+		t.Errorf("NodeLabel = %v after the empty write, want empty", v)
+	}
 }
 
 // TestBasicInfo_HostWriteNodeLabelTooLong (issue 414): a label over 32 bytes

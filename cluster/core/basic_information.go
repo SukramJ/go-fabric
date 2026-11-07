@@ -782,14 +782,17 @@ func (b *BasicInformation) uniqueID() string {
 // attribute before this method runs (review 2026-11 W3-clucore-10: the
 // arm that accepted and discarded the value was unreachable).
 //
-// A successful write advances the DataVersion, runs the persistence hook
-// and then reports the attribute to [BasicInformation.OnAttributeChange]
-// with the origin the context carries (contract.OriginFrom): the
-// dispatcher's OriginControllerWrite, or [BasicInformation.SetNodeLabel]'s
-// OriginHostSet. Mirrors matter.js Datasource.ts:1456-1466 at db021da0
-// (#computePostCommitChanges: the store fields go to the store, then
-// advanceVersion and the changed properties' events), the one commit path
-// a controller's write and a host's set of the behavior state share.
+// A write that moves the value is stored through the persistence hook,
+// then served with its DataVersion advanced, and then reported to
+// [BasicInformation.OnAttributeChange] with the origin the context
+// carries (contract.OriginFrom): the dispatcher's OriginControllerWrite,
+// or [BasicInformation.SetNodeLabel]'s OriginHostSet; an unchanged value
+// and a store failure commit nothing (commitLabel). Mirrors matter.js's
+// one commit path for a controller's write and a host's set of the
+// behavior state, Datasource.ts at db021da0: #computePostCommitChanges
+// (:1427-1466) collects the changed store fields (:1446-1454) and calls
+// advanceVersion (:1456-1466), commit1 (:1232, store.set :1261) writes
+// the store fields, and postCommit (:1286) emits the change events.
 func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
@@ -925,7 +928,8 @@ func (b *BasicInformation) MatterAttributes() []uint32 { return b.inst().MatterA
 // controller's write is), set, the DataVersion advanced, the persistence
 // hook run ([BasicInformation.SetOnPersistentWrite]) and the change
 // reported to [BasicInformation.OnAttributeChange] with
-// contract.OriginHostSet. A host reaches it as node.Node.SetNodeLabel.
+// contract.OriginHostSet — whatever origin ctx carries, the host's write
+// is the host's. A host reaches it as node.Node.SetNodeLabel.
 // matter.js has no separate host API: a host assigns
 // state.basicInformation.nodeLabel, which BasicInformationServer.ts:68 at
 // db021da0 only defaults (setDefault to the productName), and the

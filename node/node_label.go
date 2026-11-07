@@ -12,10 +12,12 @@ import "context"
 // status a controller's write gets (CONSTRAINT_ERROR, an
 // im.StatusCodeError) — the server's error is returned unchanged — and
 // otherwise persisted where a controller's written label is (the store's
-// basic_information.node_label; a store failure is returned, wrapped, with
-// nothing served changed), then set, the cluster's DataVersion advanced
-// and reported to the subscriptions that cover it and to
-// [Observers].OnAttributeChanged with contract.OriginHostSet.
+// basic_information.node_label, written under New's context without its
+// cancellation, so cancelling ctx does not abort the store write; a store
+// failure is returned, wrapped, with nothing served changed), then set,
+// the cluster's DataVersion advanced and reported to the subscriptions that cover it and to
+// [Observers].OnAttributeChanged with contract.OriginHostSet, whatever
+// origin ctx carries.
 //
 // Before [Node.Start] the label is configuration: it is the one the node
 // serves when it starts, and it is persisted, but no subscription exists

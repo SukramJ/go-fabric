@@ -75,14 +75,18 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 
 	var mu sync.Mutex
 	var reported []string
+	versions := map[string]uint32{}
 	sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
 		Attributes:       []im.ConcreteAttributePath{label},
 		MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Hour),
 		Updated: func(r *interaction.Report) error {
-			if v, ok := r.Value(0, bidef.ClusterID, bidef.AttrNodeLabel); ok {
-				mu.Lock()
-				reported = append(reported, v.El.String)
-				mu.Unlock()
+			for _, a := range r.Attributes {
+				if a.Path.Endpoint == 0 && a.Path.Cluster == bidef.ClusterID && a.Path.Attribute == bidef.AttrNodeLabel {
+					mu.Lock()
+					reported = append(reported, a.Value.El.String)
+					versions[a.Value.El.String] = a.DataVersion
+					mu.Unlock()
+				}
 			}
 			return nil
 		},
@@ -104,6 +108,12 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 	}
 	if got := changes.count(contract.OriginHostSet); got != 1 {
 		t.Errorf("observers heard %d host changes of NodeLabel, want 1 (%v)", got, changes.snapshot())
+	}
+	mu.Lock()
+	primed, renamed := versions[reported[0]], versions["Wohnzimmer"]
+	mu.Unlock()
+	if renamed == primed {
+		t.Errorf("the report of the host's label carries DataVersion %d, the priming report's; want it advanced", renamed)
 	}
 
 	// The same label again commits nothing: no second report, no second
