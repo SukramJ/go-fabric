@@ -108,6 +108,12 @@ type BasicInformation struct {
 	// the bump, controllers that cache via DataVersionFilter never
 	// re-read post-write.
 	dataVersion cluster.DataVersionTracker
+
+	// changes tells the bridge and the host of a NodeLabel or Location
+	// write, a controller's or the host's ([BasicInformation.WriteNodeLabel]),
+	// after the DataVersion advanced and the persistence hook ran
+	// ([BasicInformation.OnAttributeChange]).
+	changes cluster.AttributeChanges
 }
 
 // ProductAppearanceStruct mirrors Matter §11.1.5.20 (added in 1.4 as
@@ -589,6 +595,7 @@ var (
 	_ contract.EventReceiver                  = (*BasicInformation)(nil)
 	_ contract.ClusterDataVersion             = (*BasicInformation)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*BasicInformation)(nil)
+	_ contract.AttributeChangeNotifier        = (*BasicInformation)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -769,7 +776,16 @@ func (b *BasicInformation) uniqueID() string {
 // the fall-through below, as the dispatcher answers it for an unlisted
 // attribute before this method runs (review 2026-11 W3-clucore-10: the
 // arm that accepted and discarded the value was unreachable).
-func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value any) error {
+//
+// A successful write advances the DataVersion, runs the persistence hook
+// and then reports the attribute to [BasicInformation.OnAttributeChange]
+// with the origin the context carries (contract.OriginFrom): the
+// dispatcher's OriginControllerWrite, or [BasicInformation.WriteNodeLabel]'s
+// OriginHostSet. Mirrors matter.js Datasource.ts:1456-1466 at db021da0
+// (#computePostCommitChanges: the store fields go to the store, then
+// advanceVersion and the changed properties' events), the one commit path
+// a controller's write and a host's set of the behavior state share.
+func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
@@ -784,6 +800,7 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		b.mu.Unlock()
 		b.dataVersion.Bump()
 		b.firePersistentWrite()
+		b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 		return nil
 	case basicInfoAttrLocation:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
@@ -798,6 +815,7 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		b.mu.Unlock()
 		b.dataVersion.Bump()
 		b.firePersistentWrite()
+		b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 		return nil
 	}
 	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
@@ -848,11 +866,34 @@ func (b *BasicInformation) MatterReportable() []uint32 {
 // are merged in by the dispatcher.
 func (b *BasicInformation) MatterAttributes() []uint32 { return b.inst().MatterAttributes() }
 
-// SetNodeLabel updates NodeLabel out-of-band (e.g. from the config
-// UI or the boot-time restore of a persisted commissioner write, not
-// from a Matter write). Goes through the same length check as the
-// Matter write path. Does NOT fire the persistence hook — restores
-// must not echo back into the store.
+// WriteNodeLabel is the host's write of NodeLabel at run time — a rename
+// that reaches controllers without a restart. It has a controller's write
+// semantics, through [BasicInformation.MatterWrite]: the value is held to
+// the attribute's constraint (refused with CONSTRAINT_ERROR as a
+// controller's write is), set, the DataVersion advanced, the persistence
+// hook run ([BasicInformation.SetOnPersistentWrite]) and the change
+// reported to [BasicInformation.OnAttributeChange] with
+// contract.OriginHostSet. A host reaches it as node.Node.SetNodeLabel.
+// matter.js has no separate host API: a host assigns
+// state.basicInformation.nodeLabel, which BasicInformationServer.ts:68 at
+// db021da0 only defaults (setDefault to the productName), and the
+// datasource persists the non-volatile attribute (quality N,
+// basic-information.element.ts:35-38 at db021da0, NodeLabel "max 32") and
+// reports the change as it does a controller's write.
+//
+// [BasicInformation.SetNodeLabel] is the boot-time restore and stays
+// distinct: it neither persists nor reports.
+func (b *BasicInformation) WriteNodeLabel(ctx context.Context, label string) error {
+	return b.MatterWrite(contract.WithOrigin(ctx, contract.OriginHostSet), basicInfoAttrNodeLabel, label)
+}
+
+// SetNodeLabel is the boot-time restore of a persisted NodeLabel (a
+// controller's or the host's earlier write, node.New reads it back before
+// the node serves). Goes through the same length check as the Matter
+// write path. Does NOT fire the persistence hook — restores must not echo
+// back into the store — and neither advances the DataVersion nor reports
+// a change: nothing has been served yet. A run-time rename is
+// [BasicInformation.WriteNodeLabel].
 func (b *BasicInformation) SetNodeLabel(s string) error {
 	if len(s) > 32 {
 		return errors.New("core: NodeLabel exceeds 32 utf-8 bytes")
@@ -941,6 +982,15 @@ func (b *BasicInformation) firePersistentWrite() {
 // event's conformance is "Reachable" — present exactly when the attribute
 // is present.
 func (b *BasicInformation) MatterEvents() []uint32 { return b.inst().MatterEvents() }
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: a
+// NodeLabel or Location write, a controller's or the host's
+// ([BasicInformation.WriteNodeLabel]). The bridge marks the attribute for
+// the subscriptions that cover it and tells the node's observers; the
+// root's DataVersion this server advanced itself before it fired.
+func (b *BasicInformation) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return b.changes.OnAttributeChange(cb)
+}
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 // Bumped on every successful NodeLabel / Location write so
