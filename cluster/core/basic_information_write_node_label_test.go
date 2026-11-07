@@ -125,3 +125,39 @@ func TestBasicInfo_RestoreNodeLabelIsSilent(t *testing.T) {
 		t.Errorf("restore moved: version %d→%d, changes %+v", before, b.MatterDataVersion(), *changes)
 	}
 }
+
+// TestBasicInfo_UnchangedWriteCommitsNothing (issue 414): writing the value
+// a label already has succeeds and commits nothing — no DataVersion
+// advance, no persistence, no report — as matter.js's #noteIfChanged
+// skips an unchanged property (Datasource.ts:1477-1495 at db021da0); the
+// host's write and a controller's alike, NodeLabel and Location alike.
+func TestBasicInfo_UnchangedWriteCommitsNothing(t *testing.T) {
+	t.Parallel()
+	b := newValidBasicInfo(t)
+	changes := labelChanges(t, b)
+	var persisted int
+	b.SetOnPersistentWrite(func(string, string) { persisted++ })
+	ctx := context.Background()
+	controller := contract.WithOrigin(ctx, contract.OriginControllerWrite)
+
+	for range 2 {
+		if err := b.SetNodeLabel(ctx, "Wohnzimmer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	afterHost := b.MatterDataVersion()
+	if err := b.MatterWrite(controller, 0x0005, "Wohnzimmer"); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := b.MatterWrite(controller, 0x0006, "DE"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if persisted != 2 || len(*changes) != 2 {
+		t.Errorf("persisted %d, changes %+v; want one each for NodeLabel and Location", persisted, *changes)
+	}
+	if b.MatterDataVersion() != afterHost+1 {
+		t.Errorf("DataVersion %d after the unchanged writes, want %d (only Location's first write advances)", b.MatterDataVersion(), afterHost+1)
+	}
+}

@@ -795,12 +795,7 @@ func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value
 		if !ok {
 			return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 		}
-		b.mu.Lock()
-		b.nodeLabel = s
-		b.mu.Unlock()
-		b.dataVersion.Bump()
-		b.firePersistentWrite()
-		b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
+		b.commitLabel(ctx, attrID, s)
 		return nil
 	case basicInfoAttrLocation:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
@@ -810,18 +805,38 @@ func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value
 		if !ok {
 			return fmt.Errorf("core: Location write expected string, got %T", value)
 		}
-		b.mu.Lock()
-		b.location = s
-		b.mu.Unlock()
-		b.dataVersion.Bump()
-		b.firePersistentWrite()
-		b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
+		b.commitLabel(ctx, attrID, s)
 		return nil
 	}
 	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
 	// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 	_, err := b.inst().ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
+}
+
+// commitLabel sets NodeLabel or Location to s and, when the value moved,
+// advances the DataVersion, runs the persistence hook and reports the
+// attribute with the context's origin. An unchanged value commits nothing:
+// no advance, no store write, no report — the write still succeeds.
+// Mirrors matter.js Datasource.ts:1477-1495 at db021da0 (#noteIfChanged
+// returns early when oldval === newval or isDeepEqual(newval, oldval)), so
+// a commit without a change neither advances the version nor broadcasts
+// (:1456-1466).
+func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) {
+	b.mu.Lock()
+	field := &b.nodeLabel
+	if attrID == basicInfoAttrLocation {
+		field = &b.location
+	}
+	if *field == s {
+		b.mu.Unlock()
+		return
+	}
+	*field = s
+	b.mu.Unlock()
+	b.dataVersion.Bump()
+	b.firePersistentWrite()
+	b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 }
 
 // checkLabelWrite holds a NodeLabel or Location write to the attribute's

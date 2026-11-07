@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -75,7 +76,8 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 	var mu sync.Mutex
 	var reported []string
 	sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
-		Attributes: []im.ConcreteAttributePath{label},
+		Attributes:       []im.ConcreteAttributePath{label},
+		MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Hour),
 		Updated: func(r *interaction.Report) error {
 			if v, ok := r.Value(0, bidef.ClusterID, bidef.AttrNodeLabel); ok {
 				mu.Lock()
@@ -102,6 +104,26 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 	}
 	if got := changes.count(contract.OriginHostSet); got != 1 {
 		t.Errorf("observers heard %d host changes of NodeLabel, want 1 (%v)", got, changes.snapshot())
+	}
+
+	// The same label again commits nothing: no second report, no second
+	// observation (Datasource.ts:1477-1495 at db021da0, #noteIfChanged).
+	if err := p.Device.Act(func(n *node.Node) error { return n.SetNodeLabel(ctx, "Wohnzimmer") }); err != nil {
+		t.Fatalf("SetNodeLabel again: %v", err)
+	}
+	if err := site.Step(ctx, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	again := 0
+	for _, v := range reported {
+		if v == "Wohnzimmer" {
+			again++
+		}
+	}
+	mu.Unlock()
+	if again != 1 || changes.count(contract.OriginHostSet) != 1 {
+		t.Errorf("the unchanged label: %d reports, %d observations; want 1 each", again, changes.count(contract.OriginHostSet))
 	}
 
 	// Persisted: the node restarted on its store serves the host's label.
