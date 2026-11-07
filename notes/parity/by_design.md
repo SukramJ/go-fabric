@@ -6072,14 +6072,18 @@ before the Matter epoch or past 32-bit seconds is a failed query; each
 read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
 server's clock, a bound of the module's because the ports are a host's
 and an attempt that never ended would hold every later one. The node's UTC
-is its one Matter time (issue 428): the node hands
+is the Matter time of Thermostat TSUGGEST and Valve TS (issue 428): the node hands
 `TimeSynchronization.MatterEpochSeconds` to the Thermostat's suggestions
 and the Valve's AutoCloseTime as their endpoints join the topology
 (`AttachMatterTime`) and tells them when it moves (`MatterTimeChanged`,
 on every report of UTCTime), as chip's servers read the system clock
 SetUTCTime sets through `GetClock_MatterEpochS`
 (`src/system/SystemClock.cpp:284-306` at `6170af84`) and SetUTCTime calls
-the delegate's `UTCTimeAvailabilityChanged` (`TimeSynchronizationCluster.cpp:865`). TimeSource and
+the delegate's `UTCTimeAvailabilityChanged` (`TimeSynchronizationCluster.cpp:865`). Difference,
+until issue 445: the other device-side readers of real time — the event
+log's EpochTimestamp, ResourceMonitoring's LastChangedTime, DiagnosticLogs,
+the energy servers — read the host clock without the offset, where chip
+reads the one system clock for them too. TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
 time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,

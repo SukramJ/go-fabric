@@ -17,8 +17,11 @@ import (
 
 // matterTimeParticipant is a cluster server of an endpoint that reads the
 // node's Matter time: the Thermostat with ThermostatSuggestions (TSUGGEST,
-// cluster/thermo) and the Valve with TimeSync (TS, cluster/valve) — no
-// other server of the module reads it. The node hands each the root
+// cluster/thermo) and the Valve with TimeSync (TS, cluster/valve). The
+// scope is these two: the module's other device-side readers of real
+// time — the event log's EpochTimestamp, ResourceMonitoring's
+// LastChangedTime, DiagnosticLogs, the energy servers — still read the
+// host clock without the offset (issue 445). The node hands each the root
 // TimeSynchronization's UTC in epoch seconds
 // (core.TimeSynchronization.MatterEpochSeconds) as its endpoint joins the
 // topology, and tells each when that UTC moves — SetUTCTime, the trusted
