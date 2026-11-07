@@ -3189,7 +3189,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 634,
+    "line": 638,
     "citation": "SessionManager.ts:491",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecordsForFabric",

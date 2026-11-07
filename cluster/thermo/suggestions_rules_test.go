@@ -306,3 +306,41 @@ func TestSuggestionConfiguration(t *testing.T) {
 		t.Errorf("%d timers armed by a thermostat without TSUGGEST", n)
 	}
 }
+
+// TestSuggestionsFollowAMovedMatterTime: when the Matter time moves
+// (MatterTimeChanged, a node's on every move of its UTC) the suggestions
+// are re-evaluated against the new time — a jump past the current
+// suggestion's ExpirationTime removes it and leaves no current one, ahead
+// of connectedhomeip, whose expiration timer runs on the monotonic clock
+// (thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84) and does
+// not see a change of UTC; the server's own timer has not fired.
+func TestSuggestionsFollowAMovedMatterTime(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	var jump uint32
+	srv.AttachMatterTime(func() (uint32, bool) {
+		v, ok := clk.matterTime()
+		return v + jump, ok
+	})
+	if _, err := addSuggestion(srv, handleB, nil, 30); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := srv.CurrentSuggestion(); !ok {
+		t.Fatal("the suggestion is not current")
+	}
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if _, ok := srv.CurrentSuggestion(); !ok {
+		t.Error("an unmoved time dropped the current suggestion")
+	}
+	jump = 31 * 60
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if c, ok := srv.CurrentSuggestion(); ok {
+		t.Errorf("current suggestion %+v after the time passed its expiry", c)
+	}
+	if got := srv.Suggestions(); len(got) != 0 {
+		t.Errorf("suggestions %+v after the time passed their expiry, want none", got)
+	}
+}

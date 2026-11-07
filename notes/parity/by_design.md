@@ -5215,7 +5215,15 @@ handle on the presets delegate alone (:261). The Matter time is the node's
 UTC, which the node hands the server as its endpoint joins the topology
 (`thermo.ThermostatServer.AttachMatterTime` with the root
 TimeSynchronization's `MatterEpochSeconds`, so SetUTCTime moves it);
-without it every Add answers INVALID_IN_STATE. Pinned by
+without it every Add answers INVALID_IN_STATE. Ahead of chip: when the
+node's UTC moves, the node tells the server (`MatterTimeChanged`) and the
+suggestions are re-evaluated against the new time — a jump past a
+suggestion's ExpirationTime removes it, one to its EffectiveTime makes it
+current — where chip's expiration timer runs on the monotonic clock and
+does not see a change of UTC
+(`thermostat-suggestions-delegate-impl.cpp:264-269`); the times a
+controller wrote are Matter epoch seconds, so a moved time moves what is
+due. Pinned by
 `suggestions_chip_test.go` (`TestThermostatSuggestionsAndHold.cpp:161-242`
 and TC_TSTAT_4_3's steps) and `suggestions_rules_test.go`; hosts serve the
 feature behind the register row, the reference bridge with
@@ -5567,7 +5575,11 @@ TargetLevel off the LevelStep grid is CONSTRAINT_ERROR (`:312-341`); the
 resolved level reaches the source in the request's TargetLevel, as chip
 hands it to `HandleOpenValve(level)`
 (`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
-Matter time at the Open plus the opening's duration (`:391-413`), null for
+Matter time at the Open plus the opening's duration (`:391-413`), set anew
+as the time plus RemainingDuration whenever the node's UTC moves while
+the valve counts down — chip's `UpdateAutoCloseTime` (`:415-423`), which
+the reference application's `UTCTimeAvailabilityChanged` calls
+(`examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73`) —, null for
 an indefinite opening, without a synchronized time (`:394`), after a Close
 (`:243-247`), and — where chip's countdown closes the valve — once the
 source reports no RemainingDuration. Differences: the Matter time carries
@@ -6060,9 +6072,11 @@ and an attempt that never ended would hold every later one. The node's UTC
 is its one Matter time (issue 428): the node hands
 `TimeSynchronization.MatterEpochSeconds` to the Thermostat's suggestions
 and the Valve's AutoCloseTime as their endpoints join the topology
-(`AttachMatterTime`), as chip's servers read the system clock SetUTCTime
-sets through `GetClock_MatterEpochS` (`src/system/SystemClock.cpp:284-306`
-at `6170af84`). TimeSource and
+(`AttachMatterTime`) and tells them when it moves (`MatterTimeChanged`,
+on every report of UTCTime), as chip's servers read the system clock
+SetUTCTime sets through `GetClock_MatterEpochS`
+(`src/system/SystemClock.cpp:284-306` at `6170af84`) and SetUTCTime calls
+the delegate's `UTCTimeAvailabilityChanged` (`TimeSynchronizationCluster.cpp:865`). TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
 time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,

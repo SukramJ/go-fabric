@@ -50,7 +50,9 @@ func (timedValve) Close(context.Context) error                      { return nil
 // no time (its host clock is no source) a suggestion answers
 // INVALID_IN_STATE and an Open leaves AutoCloseTime null; SetUTCTime moves
 // the root's UTCTime, and the suggestion's EffectiveTime and the
-// AutoCloseTime follow it, not the host clock — twice.
+// AutoCloseTime follow it, not the host clock — twice; the opening made
+// before the time arrived gets its AutoCloseTime without a new Open, and
+// it moves again with the second SetUTCTime.
 func TestOneMatterTimePerNode(t *testing.T) {
 	t.Parallel()
 	rows := surface.NewExtensions(append([]string{"BD-chip-TimeSynchronization-Features", "BD-chip-Thermostat-Suggestions"}, valve.Ahead.IDs()...)...)
@@ -94,6 +96,14 @@ func TestOneMatterTimePerNode(t *testing.T) {
 			thermostatdef.AddThermostatSuggestionRequest{PresetHandle: handle, EffectiveTime: spec.Nullable[uint32]{Null: true}, ExpirationInMinutes: 30})
 		return res.Status, err
 	}
+	autoClose := func() tlv.Element {
+		t.Helper()
+		v, err := fabrictest.Read(ctx, pair, client.AttributeAt(valveEP, valvedef.ClusterID, valvedef.AttrAutoCloseTime))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v.Value.El
+	}
 	autoCloseAfterOpen := func() tlv.Element {
 		t.Helper()
 		res, err := fabrictest.Invoke(ctx, pair, im.ConcreteCommandPath{Endpoint: valveEP, Cluster: valvedef.ClusterID, Command: valvedef.CmdOpen},
@@ -101,11 +111,7 @@ func TestOneMatterTimePerNode(t *testing.T) {
 		if err != nil || res.Status != im.StatusSuccess {
 			t.Fatalf("Open: %+v %v", res, err)
 		}
-		v, err := fabrictest.Read(ctx, pair, client.AttributeAt(valveEP, valvedef.ClusterID, valvedef.AttrAutoCloseTime))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return v.Value.El
+		return autoClose()
 	}
 	setUTC := func(at time.Time) {
 		t.Helper()
@@ -136,6 +142,15 @@ func TestOneMatterTimePerNode(t *testing.T) {
 		v, err := fabrictest.Read(ctx, pair, client.AttributeAt(0, tsdef.ClusterID, tsdef.AttrUtcTime))
 		if err != nil || !near(v.Value.El.Uint/1_000_000, at) {
 			t.Fatalf("#%d: UTCTime %+v %v, want about %v", i, v.Value, err, at)
+		}
+		// The opening still counting down takes the moved time without a
+		// new Open: once the time arrives (#0), and as it moves (#1) —
+		// chip's UpdateAutoCloseTime on UTCTimeAvailabilityChanged.
+		if err := site.Eventually(ctx, "AutoCloseTime follows the node's UTC", func() bool {
+			el := autoClose()
+			return el.Type != tlv.TypeNull && near(el.Uint/1_000_000, at.Add(600*time.Second))
+		}); err != nil {
+			t.Errorf("#%d: AutoCloseTime %+v without a new Open, want the node's UTC %v plus 600 s", i, autoClose(), at)
 		}
 		if el := autoCloseAfterOpen(); el.Type == tlv.TypeNull || !near(el.Uint/1_000_000, at.Add(600*time.Second)) {
 			t.Errorf("#%d: AutoCloseTime %+v, want the node's UTC %v plus 600 s", i, el, at)

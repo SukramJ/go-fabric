@@ -118,6 +118,18 @@ func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 	}
 }
 
+// MatterTimeChanged re-evaluates the suggestions on the moved Matter time,
+// on the command queue: a suggestion whose ExpirationTime the new time
+// has passed leaves the list, one whose EffectiveTime it reached becomes
+// current, and the timer is armed anew from the new time. A node calls it
+// whenever its UTC moves; the host of a server outside a node calls it
+// when its time does. Beyond connectedhomeip, whose suggestion timer runs
+// on the monotonic clock and does not see a change of UTC
+// (thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84): the
+// times a controller wrote are Matter epoch seconds, so a moved time
+// moves what is due.
+func (s *ThermostatServer) MatterTimeChanged() { s.scheduleSuggestionReevaluation() }
+
 // matterNow is the Matter time in epoch seconds; false while it is not
 // synchronised — always before [ThermostatServer.AttachMatterTime].
 func (s *ThermostatServer) matterNow() (uint32, bool) {

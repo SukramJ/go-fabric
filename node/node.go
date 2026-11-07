@@ -127,6 +127,9 @@ type Node struct {
 	bindSync bindingSync
 	// failSafe holds the topology's fail-safe participants (failsafe.go).
 	failSafe failSafeSync
+	// matterTime holds the topology's Matter time participants
+	// (matter_time.go).
+	matterTime matterTimeSync
 	// userLabels keeps the bridged endpoints' UserLabel lists in the
 	// store (user_labels.go).
 	userLabels userLabelSync
@@ -400,6 +403,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 			ts.AttachTimePeerReader(timePeerReader{n})
 		}
 	}
+	n.watchMatterTime()
 	if n.bindings, err = n.newBindings(); err != nil {
 		if n.client != nil {
 			n.client.close(ctx)

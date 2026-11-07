@@ -314,3 +314,55 @@ func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
 		t.Errorf("AutoCloseTime after a second attach = %v, want %d", read(), want)
 	}
 }
+
+// TestValveAutoCloseTimeFollowsTheMatterTime ports chip's UpdateAutoCloseTime
+// (ValveConfigurationAndControlCluster.cpp:415-423 at 6170af84), which the
+// reference application's UTCTimeAvailabilityChanged calls
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73): when
+// the Matter time moves, AutoCloseTime becomes the new time plus
+// RemainingDuration — also for an opening that began without a time —
+// and stays as it is without a time, while the valve does not count down,
+// or without TS.
+func TestValveAutoCloseTimeFollowsTheMatterTime(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	h := fullyObservedHost() // RemainingDuration 120
+	srv := valve.NewServer(valve.Config{Source: h, Features: valve.FeatureTimeSync})
+	read := func() any { v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); return v }
+	if _, err := srv.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 600}}); err != nil {
+		t.Fatal(err)
+	}
+	srv.MatterTimeChanged() // no time attached
+	if v := read(); v != nil {
+		t.Fatalf("AutoCloseTime without a time = %v, want null", v)
+	}
+	now, synced := uint32(1000), false
+	srv.AttachMatterTime(func() (uint32, bool) { return now, synced })
+	srv.MatterTimeChanged() // not synchronized
+	if v := read(); v != nil {
+		t.Fatalf("AutoCloseTime without a synchronized time = %v, want null", v)
+	}
+	synced = true
+	srv.MatterTimeChanged()
+	if want := uint64(1120) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime once the time arrives = %v, want %d", read(), want)
+	}
+	now = 5000
+	srv.MatterTimeChanged()
+	if want := uint64(5120) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime after the time moved = %v, want %d", read(), want)
+	}
+	h.remaining = 0
+	now = 9000
+	srv.MatterTimeChanged()
+	h.remaining = 120
+	if want := uint64(5120) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime moved while the valve did not count down: %v, want %d", read(), want)
+	}
+	plain := valve.NewServer(valve.Config{Source: fullyObservedHost()})
+	plain.AttachMatterTime(func() (uint32, bool) { return 1000, true })
+	plain.MatterTimeChanged()
+	if v, ok := plain.MatterRead(valvedef.AttrAutoCloseTime); ok && v != nil {
+		t.Errorf("AutoCloseTime without TS = %v", v)
+	}
+}

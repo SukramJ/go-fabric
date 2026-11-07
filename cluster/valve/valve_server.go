@@ -612,6 +612,37 @@ func (s *Server) AttachMatterTime(matterTime clock.MatterTime) {
 	}
 }
 
+// MatterTimeChanged sets AutoCloseTime anew on the moved Matter time: the
+// time now plus RemainingDuration, while the valve counts down
+// (RemainingDuration known and not zero) and the time is synchronized; an
+// opening that began without a time gets its AutoCloseTime here. A node
+// calls it whenever its UTC moves; the host of a server outside a node
+// calls it when its time does. Mirrors connectedhomeip's UpdateAutoCloseTime
+// (ValveConfigurationAndControlCluster.cpp:415-423 at 6170af84), which the
+// reference application's UTCTimeAvailabilityChanged calls
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73), with
+// the epoch-s the Matter time carries.
+func (s *Server) MatterTimeChanged() {
+	if !s.timeSync || s.src == nil {
+		return
+	}
+	matterTime := s.matterTime.Load()
+	if matterTime == nil {
+		return
+	}
+	now, ok := (*matterTime)()
+	if !ok {
+		return
+	}
+	left, known := s.src.RemainingDuration()
+	if !known || left == 0 {
+		return
+	}
+	at := (uint64(now) + uint64(left)) * 1_000_000
+	s.setAutoClose(&at)
+	s.tracker().Bump()
+}
+
 // setAutoClose records the AutoCloseTime of the last Open (nil: null).
 func (s *Server) setAutoClose(at *uint64) {
 	s.mu.Lock()
