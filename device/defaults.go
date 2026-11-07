@@ -464,9 +464,9 @@ const coverMoveStep = 950 * time.Millisecond
 // (thermostatdef.Declare) is told every change it admits. An Initial that
 // sets TemperatureSetpointHold or ThermostatRunningState serves it
 // (thermo.ThermostatConfig takes both by their attribute names). With
-// ThermostatSuggestions the server reads the node's Matter time: the
-// UTCTime the root's TimeSynchronization serves, which is the node's clock
-// the device's servers run on (core.MatterEpochSeconds).
+// ThermostatSuggestions the server reads the node's Matter time, the
+// root TimeSynchronization's UTC, which the node hands it as the device
+// joins the topology (thermo.ThermostatServer.AttachMatterTime).
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// The element's defaults: the absolute limits 7 / 30 °C (heat) and
 	// 16 / 32 °C (cool), the occupied setpoints 20 and 26 °C (matter.js
@@ -474,7 +474,6 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 	// 44-72) — thermo.DefaultThermostatConfig's.
 	cfg := thermo.DefaultThermostatConfig()
 	cfg.Features, cfg.Clock = b.opts.Features, b.clock
-	cfg.MatterTime = func() (uint32, bool) { return core.MatterEpochSeconds(b.clock) }
 	if d, ok := b.ports.(thermostatdef.Declare); ok {
 		if d.Sink != nil {
 			cfg.Sink = d.Sink

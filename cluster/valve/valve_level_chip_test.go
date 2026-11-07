@@ -60,10 +60,11 @@ func status(err error) im.StatusCode {
 	return im.StatusFailure
 }
 
-// TestValveSelectionRefusalNamesTheInterface: a declared LVL,
-// DefaultOpenLevel or TS the source or the configuration cannot carry is
-// ErrSelection naming what is missing (chip's Startup refuses TS without
-// a TimeSyncTracker, ValveConfigurationAndControlCluster.cpp:46-50).
+// TestValveSelectionRefusalNamesTheInterface: a declared LVL or
+// DefaultOpenLevel the source or the configuration cannot carry is
+// ErrSelection naming what is missing. TS is not refused without a time:
+// the node hands its time as the server joins the topology
+// (TestValveTimeSyncTakesTheNodesTime).
 func TestValveSelectionRefusalNamesTheInterface(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -72,7 +73,6 @@ func TestValveSelectionRefusalNamesTheInterface(t *testing.T) {
 	}{
 		{valve.Config{Source: fullyObservedHost(), Features: valve.FeatureLevel}, "LevelSource"},
 		{valve.Config{Source: fullyObservedHost(), Attributes: []uint32{valvedef.AttrDefaultOpenLevel}, Features: valve.FeatureLevel}, "LevelSource"},
-		{valve.Config{Source: &levelHost{fakeHost: fullyObservedHost()}, Features: valve.FeatureTimeSync}, "MatterTime"},
 		{valve.Config{Source: newLevelHost(), Features: valve.FeatureLevel, Attributes: []uint32{valvedef.AttrLevelStep}, LevelStep: 51}, "LevelStep"},
 		{valve.Config{Source: newLevelHost(), Features: 1 << 2}, "undefined"},
 		{valve.Config{Source: newLevelHost(), Attributes: []uint32{valvedef.AttrLevelStep}}, "valve:"},
@@ -270,5 +270,53 @@ func TestValveAutoCloseTimeChip(t *testing.T) {
 	}
 	if got := srv.MatterReportable(); !slices.Contains(got, valvedef.AttrAutoCloseTime) {
 		t.Errorf("MatterReportable = %v, want AutoCloseTime", got)
+	}
+}
+
+// TestValveTimeSyncTakesTheNodesTime: a TS valve without a time leaves
+// AutoCloseTime null, as connectedhomeip's SetAutoCloseTime does while
+// the node's TimeSynchronization has no time
+// (ValveConfigurationAndControlCluster.cpp:391-400, CodegenIntegration.cpp:
+// 46-57 at 6170af84); the time the node attaches as the server joins its
+// topology replaces the configured one, and a nil attach changes nothing.
+func TestValveTimeSyncTakesTheNodesTime(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	h := fullyObservedHost()
+	srv, err := valve.New(valve.Config{Source: h, Features: valve.FeatureTimeSync})
+	if err != nil {
+		t.Fatalf("TS without a time: %v, want a server", err)
+	}
+	read := func() any { v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); return v }
+	open := func() {
+		t.Helper()
+		if _, err := srv.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 60}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	open()
+	if v := read(); v != nil {
+		t.Errorf("AutoCloseTime without a time = %v, want null", v)
+	}
+	srv.AttachMatterTime(nil)
+	open()
+	if v := read(); v != nil {
+		t.Errorf("AutoCloseTime after a nil attach = %v, want null", v)
+	}
+	srv.AttachMatterTime(func() (uint32, bool) { return 1000, true })
+	open()
+	if want := uint64(1060) * 1_000_000; read() != want {
+		t.Errorf("AutoCloseTime on the node's time = %v, want %d", read(), want)
+	}
+	configured, err := valve.New(valve.Config{Source: fullyObservedHost(), Features: valve.FeatureTimeSync, MatterTime: func() (uint32, bool) { return 1, true }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	configured.AttachMatterTime(func() (uint32, bool) { return 2000, true })
+	if _, err := configured.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 60}}); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := configured.MatterRead(valvedef.AttrAutoCloseTime); v != uint64(2060)*1_000_000 {
+		t.Errorf("AutoCloseTime with an attached time over a configured one = %v, want the node's", v)
 	}
 }

@@ -54,6 +54,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
@@ -236,13 +237,14 @@ type ThermostatConfig struct {
 	// thermostat holds with ThermostatSuggestions (TSUGGEST, which needs
 	// PRES): at least 5, 0 for 5. The suggestions live in memory.
 	MaxThermostatSuggestions uint8
-	// MatterTime is the node's Matter time with TSUGGEST: the current
-	// Matter epoch second and whether the node's time is synchronised. A
-	// suggestion is refused with INVALID_IN_STATE while it is not, and nil
-	// is a time never synchronised — connectedhomeip's
+	// MatterTime is the Matter time of a server outside a node with
+	// TSUGGEST: the current Matter epoch second and whether the time is
+	// synchronised. A suggestion is refused with INVALID_IN_STATE while it
+	// is not, and nil is a time never synchronised — connectedhomeip's
 	// GetClock_MatterEpochS gate (ThermostatClusterSuggestions.cpp:173-178
-	// at 6170af84). The device kit reads the root TimeSynchronization's
-	// UTCTime through the node's clock (cluster/core.MatterEpochSeconds).
+	// at 6170af84). On a node the node's own time replaces it as the server
+	// joins the topology ([ThermostatServer.AttachMatterTime]): the root
+	// TimeSynchronization's UTC, the one Matter time of the node.
 	MatterTime func() (epochS uint32, synced bool)
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
@@ -367,8 +369,12 @@ type ThermostatServer struct {
 	// runs.
 	mu       sync.RWMutex
 	features uint32
-	inst     *spec.Instance
-	sink     Sink
+	// matterTime is the node's Matter time with TSUGGEST
+	// ([ThermostatConfig.MatterTime], replaced by
+	// [ThermostatServer.AttachMatterTime]); nil without one.
+	matterTime atomic.Pointer[func() (epochS uint32, synced bool)]
+	inst       *spec.Instance
+	sink       Sink
 
 	localTemp      *int16 // nullable per Matter §4.3.6.1
 	localTempCalib int16
