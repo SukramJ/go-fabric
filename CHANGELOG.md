@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` — and works before `Start` as well. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.WriteNodeLabel` is the server's host write, `BasicInformation.SetNodeLabel` stays the silent boot-time restore.
+
 ## [0.18.0] — 2026-11-07
 
 Milestone 10 (The rest of the standard), phases 36–39 (owner decision 2026-11-07; phase 40, the 1.7 pin, waits for matter.js's snapshot to move): the parity features matter.js serves and this module refused — DoorLock FACE, AdministratorCommissioning BC, OccupancySensing beyond PIR, PowerSource WIRED; the controller side of Matter cameras on one operational identity; the consumer features after connectedhomeip — ClosureControl, Valve LVL/TS, Thermostat TSUGGEST, GeneralCommissioning TC, ColorControl primaries, concentration levels; the protocol remainder — the OTA requestor over HTTPS, the BTP renegotiation, the trusted-time-source client, one Matter time per node; and the matter.js pin lift 862ad75f → db021da0 in four waves — the message codec and operational-certificate rules, the attestation profile and CD signers, mDNS goodbyes and interface following, the Sigma1 refresh and the peer's TCP message size.

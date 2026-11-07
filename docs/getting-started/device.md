@@ -210,6 +210,25 @@ Defaults worth knowing:
 
 *Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
 
+### The node's own name
+
+`BasicInformation.NodeLabel` is the label the node serves on its first
+boot. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
+controller's write semantics: a label over 32 bytes is refused with
+`CONSTRAINT_ERROR` (an `im.StatusCodeError`), and an accepted one is
+persisted where a controller's written label is, reported to every
+subscription that covers it and to `Observers.OnAttributeChanged` with
+`contract.OriginHostSet`. It works before `Start` as well, and the label is
+then the one the node serves when it starts. `node.New` restores the
+persisted label — the host's or a controller's, whichever wrote last —
+over the configured one without reporting a change, and a controller's
+later write wins and reaches the observers with
+`contract.OriginControllerWrite`. `UniqueID` does not follow the label.
+A bridged device's NodeLabel is `Device.Rename`'s ([The
+Aggregator](#the-aggregator)).
+
+*Source: `node/node_label.go`, `cluster/core/basic_information.go` (`WriteNodeLabel`, `SetNodeLabel`, `MatterWrite`), `node/persist.go` (`restoreRoot`).*
+
 ## Devices
 
 The `device/` package has one constructor per Matter device type in scope:
