@@ -134,6 +134,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 | BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
+| BD-Matter-Commissioner-TermsRequirementRead | `ControllerCommissioningFlow.ts:570` at `db021da0` leaves the terms-and-conditions consent a TODO after step 8.2 and the flow reads no TC attribute (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"// TODO Step 9: If device and Controller supports T&C Feature then User consent is handled"` | this module: connectedhomeip sends the acknowledgement as a parameter and reads no TC attribute either (`src/controller/CHIPDeviceController.cpp:2592-2603`, `:3946-3957` at `6170af84`); the device side it reads is its own TC server (`BD-chip-GeneralCommissioning-TermsAndConditions`) | no |
 
 ---
 
@@ -6375,3 +6376,39 @@ verification still refuses a statement, as chip's does. Proof:
 `client/jcm:TestVendorIdVerificationParity`; Ahead row above. Retires when
 matter.js closes its TODOs — the statement message then follows matter.js
 or is recorded against it.
+
+### BD-Matter-Commissioner-TermsRequirementRead — the commissioner reads the device's terms-and-conditions requirement and fails early with it
+
+matter.js's commissioning flow has no terms-and-conditions step: it goes
+from `GeneralCommissioning.ConfigureRegulatoryInformation` (8.1) to
+`TimeSynchronization.SynchronizeTime` (8.2) and leaves the consent a TODO
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:556-570` at
+`db021da0`). connectedhomeip sends SetTCAcknowledgements when its
+parameters carry an acknowledgement and skips the stage otherwise
+(`src/controller/CHIPDeviceController.cpp:3946-3957` at `6170af84`;
+`AutoCommissioner.cpp:485-487` orders it after the regulatory
+configuration), and its `kReadCommissioningInfo` reads GeneralCommissioning's
+SupportsConcurrentConnection, Breadcrumb, BasicCommissioningInfo,
+RegulatoryConfig, LocationCapability and IsCommissioningWithoutPower — no TC
+attribute (`:2592-2603`). Neither learns that a device requires terms before
+the device refuses CommissioningComplete with TCAcknowledgementsNotReceived,
+after AddNOC. `controller/commissioner`'s step 0.1 (`getInitialData`) adds
+the root GeneralCommissioning's FeatureMap, TCMinRequiredVersion,
+TCAcknowledgementsRequired and TCUpdateDeadline to its second read (seven
+paths, within the nine a server has to accept, `:2581-2582`), and when the
+device has the TC feature, holds no satisfying acceptance and the options'
+acknowledgement is absent or below TCMinRequiredVersion, ends the
+commissioning right after that step with `*commissioner.TermsRequiredError`
+(`Version`, `Deadline` as Matter epoch seconds) — before ArmFailSafe, so the
+device is left as found. The error's `Acknowledgements` is 0: a device
+serves no attribute naming the bits it requires (TCAcknowledgements is the
+accepted set; the required set is the vendor's DCL entry), so a missing bit
+stays the device's RequiredTCNotAccepted at SetTCAcknowledgements, typed as
+`*commissioner.GeneralCommissioningError` like every refused
+GeneralCommissioning command. `controller.PairOptions.TermsAndConditions`
+carries the acknowledgement. Owner decision 2026-11-07 (issue 449): read in
+the information step, no step of its own. Pinned by
+`TestTermsRequirementRead`, `TestTermsRequiredBeforeArmFailSafe`,
+`TestGeneralCommissioningErrorTyped` (`controller/commissioner/terms_test.go`)
+and `TestPairTermsRequired` (`controller/pair_terms_test.go`). Retire when
+matter.js's flow reads the requirement (the marker goes).

@@ -595,6 +595,46 @@ a supported input of `Registry.ForDevice`, which creates a new node for
 it, as matter.js commissions a `knownAddress`. `Address` with `BLE` is
 `controller.ErrConfiguration`.
 
+### Terms and conditions
+
+A device that serves GeneralCommissioning's TermsAndConditions feature
+refuses CommissioningComplete until the commissioner acknowledged its
+terms. `PairOptions.TermsAndConditions` (a
+`*commissioner.TermsAndConditionsAcknowledgement{Version, Acknowledgements}`)
+carries the user's acknowledgement; the commissioning sends it with
+SetTCAcknowledgements after the regulatory configuration. The information
+step reads the device's requirement — TCMinRequiredVersion,
+TCAcknowledgementsRequired and TCUpdateDeadline — and when the device holds
+no satisfying acceptance and the option is absent or names a lower
+version, `Pair` fails right after that step, before ArmFailSafe and
+AddNOC, with a `*commissioner.TermsRequiredError`: `Version` is the
+version to acknowledge, `Deadline` the TCUpdateDeadline in Matter epoch
+seconds (nil when null). A device serves no attribute naming the
+acknowledgement bits it requires, so `Acknowledgements` is 0; the bits
+come from the terms the host shows. A host shows the terms and pairs again
+with the acknowledgement:
+
+```go
+_, err := c.Pair(ctx, code, controller.PairOptions{})
+var terms *commissioner.TermsRequiredError
+if errors.As(err, &terms) {
+	// show the vendor's terms of version terms.Version, then
+	_, err = c.Pair(ctx, code, controller.PairOptions{
+		TermsAndConditions: &commissioner.TermsAndConditionsAcknowledgement{Version: terms.Version, Acknowledgements: accepted},
+	})
+}
+```
+
+Every GeneralCommissioning command the device refuses — ArmFailSafe,
+SetRegulatoryConfig, SetTCAcknowledgements, CommissioningComplete — is a
+`*commissioner.GeneralCommissioningError` with the `Command` and the
+device's `Code` (`RequiredTcNotAccepted` for a missing bit). Both errors
+match `commissioner.ErrCommissioning`. matter.js and connectedhomeip read
+no terms requirement; the early failure is this module's (*Ahead of
+matter.js*, `BD-Matter-Commissioner-TermsRequirementRead`).
+
+*Source: `controller/controller.go` (`PairOptions.TermsAndConditions`), `controller/commissioner/flow.go` (`readTerms`, `checkTerms`), `controller/commissioner/errors.go` (`TermsRequiredError`, `GeneralCommissioningError`).*
+
 ### Pairing codes
 
 `controller.ParsePairingCode(code)` decodes a QR code (`MT:…`) or a manual

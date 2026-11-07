@@ -2475,7 +2475,7 @@
   },
   {
     "file": "controller/commissioner/errors.go",
-    "line": 147,
+    "line": 228,
     "citation": "DeviceAttestationValidator.ts:67",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "DeviceAttestationError",

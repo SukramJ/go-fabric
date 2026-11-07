@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `controller`, `controller/commissioner`: the commissioner reads a device's terms-and-conditions requirement and fails early with it (issue 449). The information step (0.1) adds the root GeneralCommissioning's FeatureMap, TCMinRequiredVersion, TCAcknowledgementsRequired and TCUpdateDeadline to its second read; a device with the TC feature that holds no satisfying acceptance, commissioned without an acknowledgement or with one below its version, ends the commissioning right after that step — before ArmFailSafe and AddNOC — with `*commissioner.TermsRequiredError{Version, Acknowledgements, Deadline}` (`Acknowledgements` 0: a device serves no attribute naming the bits it requires; `Deadline` in Matter epoch seconds). `controller.PairOptions.TermsAndConditions` carries the acknowledgement as a first-class field (the `Edit` seam stays). Every GeneralCommissioning command the device refuses (ArmFailSafe, SetRegulatoryConfig, SetTCAcknowledgements, CommissioningComplete) is a `*commissioner.GeneralCommissioningError{Command, Code, DebugText}`, its message matter.js's, still matching `ErrCommissioning` and a `*CommissioningError`. Ahead of matter.js and connectedhomeip, neither of which reads the requirement (`BD-Matter-Commissioner-TermsRequirementRead`).
+
 ### Fixed
 
 - `cluster/core`: the OTA provider no longer races its own transfer listeners. `ApplyUpdateRequest` and the BDX session's close listener read the update in progress through a pointer held past the provider's lock while the other path wrote it; the race detector flagged it under `TestReferenceControllerOTA` (CI race leg, 2026-11-05 to 2026-11-07). Every reader now decides on a copy taken under the lock; the progress listener alone writes the entry, under the lock.

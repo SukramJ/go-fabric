@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7769,
+  "entry_points": 7774,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17736,
-    "reachable": 12335,
-    "whitelisted": 5401,
+    "total_exported": 17742,
+    "reachable": 12337,
+    "whitelisted": 5405,
     "unreachable": 0
   },
   "by_package": [],
@@ -22546,14 +22546,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 635
+      "line": 645
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 631
+      "line": 641
     },
     {
       "package": "controller",
@@ -25098,6 +25098,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestGeneralCommissioningErrorTyped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 205
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestInitialDataFullFabricTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -25284,6 +25291,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/progress_test.go",
       "line": 70
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequiredBeforeArmFailSafe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 173
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequirementRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 92
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequirementReadPaths",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 147
     },
     {
       "package": "controller/commissioner",

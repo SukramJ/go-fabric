@@ -5,8 +5,10 @@ package commissioner
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
+	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 )
 
@@ -94,6 +96,85 @@ func (e *CommissioningError) Unwrap() []error {
 	}
 	return out
 }
+
+// GeneralCommissioningError is a GeneralCommissioning command the device
+// refused: ArmFailSafe, SetRegulatoryConfig, SetTCAcknowledgements or
+// CommissioningComplete answered with an ErrorCode other than OK. It is
+// matter.js's CommissioningError of #ensureGeneralCommissioningSuccess
+// (ControllerCommissioningFlow.ts:712-719 at 0ceb202d), its message
+// unchanged, with the command and the code as data: errors.As finds it,
+// and it unwraps to that [*CommissioningError] of kind
+// [ErrCommissioning]. A device that requires terms and conditions answers
+// CommissioningComplete with RequiredTCNotAccepted, TCAcknowledgementsNotReceived
+// or TCMinVersionNotMet when they were not acknowledged — the flow
+// returns a [*TermsRequiredError] earlier when the device says so.
+type GeneralCommissioningError struct {
+	// Command is the refused command in matter.js's naming:
+	// "armFailSafe", "setRegulatoryConfig", "setTCAcknowledgements" or
+	// "commissioningComplete".
+	Command string
+	// Code is the response's ErrorCode.
+	Code gencomm.CommissioningErrorEnum
+	// DebugText is the response's DebugText, "" when it carries none.
+	DebugText string
+}
+
+func (e *GeneralCommissioningError) message() string {
+	msg := fmt.Sprintf("Commission error for %q: %s (%d)", e.Command, enumName(gencomm.CommissioningErrorEnumDef, uint64(e.Code)), e.Code)
+	if e.DebugText != "" {
+		msg += ", " + e.DebugText
+	}
+	return msg
+}
+
+func (e *GeneralCommissioningError) Error() string { return "commissioner: " + e.message() }
+
+// Unwrap is matter.js's CommissioningError with the same message, so
+// errors.Is matches [ErrCommissioning] and errors.As a
+// [*CommissioningError].
+func (e *GeneralCommissioningError) Unwrap() error {
+	return newError(ErrCommissioning, e.message(), nil)
+}
+
+// TermsRequiredError is a device that requires an acknowledgement of its
+// terms and conditions the commissioning does not carry: its root
+// GeneralCommissioning serves the TermsAndConditions feature,
+// TCAcknowledgementsRequired is true, and [Options.TermsAndConditions] is
+// nil or its Version below the device's TCMinRequiredVersion. The flow
+// reads the requirement in step 0.1 and returns this right after it,
+// before ArmFailSafe and AddNOC, so a caller can obtain the user's
+// consent and commission again with the acknowledgement. Neither
+// matter.js nor connectedhomeip reads the requirement (register row
+// BD-Matter-Commissioner-TermsRequirementRead). It unwraps to a
+// [*CommissioningError] of kind [ErrCommissioning].
+type TermsRequiredError struct {
+	// Version is the device's TCMinRequiredVersion, the lowest version an
+	// acknowledgement has to name.
+	Version uint16
+	// Acknowledgements are the acknowledgement bits the device requires.
+	// A device serves no attribute that names them — TCAcknowledgements
+	// is the set it has accepted, and the required set is the vendor's
+	// Distributed Compliance Ledger entry, outside the commissioning — so
+	// the flow reports 0: the caller takes the bits from the terms it
+	// shows the user, and a missing bit is the device's
+	// RequiredTCNotAccepted at SetTCAcknowledgements, a
+	// [*GeneralCommissioningError].
+	Acknowledgements uint16
+	// Deadline is the device's TCUpdateDeadline in Matter epoch seconds,
+	// the time by which a commissioned device expects an updated
+	// acceptance; nil when the attribute is null.
+	Deadline *uint32
+}
+
+func (e *TermsRequiredError) message() string {
+	return fmt.Sprintf("Device requires acknowledgement of its terms and conditions, version %d or later", e.Version)
+}
+
+func (e *TermsRequiredError) Error() string { return "commissioner: " + e.message() }
+
+// Unwrap is a CommissioningError with the same message, so errors.Is
+// matches [ErrCommissioning] and errors.As a [*CommissioningError].
+func (e *TermsRequiredError) Unwrap() error { return newError(ErrCommissioning, e.message(), nil) }
 
 // PairRetransmissionLimitReachedError is a PASE connection that reached no
 // candidate before its budget — matter.js PairRetransmissionLimitReachedError
