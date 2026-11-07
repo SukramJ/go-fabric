@@ -5243,7 +5243,9 @@ current — where chip's expiration timer runs on the monotonic clock and
 does not see a change of UTC
 (`thermostat-suggestions-delegate-impl.cpp:264-269`); the times a
 controller wrote are Matter epoch seconds, so a moved time moves what is
-due. Pinned by
+due. A jump back before the current suggestion's EffectiveTime takes its
+current status away while the preset it activated stays active — kept as
+is, chip never sees the case. Pinned by
 `suggestions_chip_test.go` (`TestThermostatSuggestionsAndHold.cpp:161-242`
 and TC_TSTAT_4_3's steps) and `suggestions_rules_test.go`; hosts serve the
 feature behind the register row, the reference bridge with
