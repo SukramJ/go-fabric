@@ -18,7 +18,8 @@ import (
 )
 
 // TestCommissionerReachReadsConcretePaths (#429): every read of the node's
-// commissioner reach goes out as a concrete path — endpoint, cluster and
+// commissioner reach — its production methods, driven through the test
+// seam that captures their reports — goes out as a concrete path — endpoint, cluster and
 // attribute flagged — so its report carries the one attribute it names:
 // Fabrics, TrustedRootCertificates and NOCs a value each, and the
 // AdministratorFabricIndex of a peer that serves no Joint Fabric
@@ -49,9 +50,16 @@ func TestCommissionerReachReadsConcretePaths(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	reports, err := node.CommissionerReachReports(ctx, reader.Node(), pairR.Address.FabricIndex, pairC.Address.NodeID, 0)
-	if err != nil {
-		t.Fatal(err)
+	reports, errs := node.CommissionerReachReports(ctx, reader.Node(), pairR.Address.FabricIndex, pairC.Address.NodeID, 0)
+	// The peer serves no Joint Fabric Administrator: the first read's
+	// status is its error; the other three succeed.
+	if errs[0] == nil {
+		t.Error("ReadAdministratorFabricIndex of a peer without the cluster succeeded")
+	}
+	for i, err := range errs[1:] {
+		if err != nil {
+			t.Errorf("read #%d: %v", i+1, err)
+		}
 	}
 	want := []struct {
 		cluster, attr uint32

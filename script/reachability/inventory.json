@@ -32367,7 +32367,7 @@
       "identifier": "CommissionerReachReports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 26
+      "line": 25
     },
     {
       "package": "node",
@@ -32605,14 +32605,14 @@
       "identifier": "Reassemblies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 20
+      "line": 18
     },
     {
       "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 17
+      "line": 15
     },
     {
       "package": "node",

@@ -45,7 +45,7 @@ func (n *Node) attachNodeServices(t *endpoint.Topology) {
 			// The node's reach of an announcing commissioner, over its
 			// client stack, where the declaration names none (brief 27-B §7).
 			if p, ok := srv.(commissionerReachParticipant); ok && n.client != nil {
-				p.AttachCommissionerReach(commissionerReach{n})
+				p.AttachCommissionerReach(commissionerReach{n: n})
 			}
 			if p, ok := srv.(fabricRemovedParticipant); ok {
 				removed = append(removed, p)
