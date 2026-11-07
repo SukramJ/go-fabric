@@ -38,8 +38,8 @@ func (levelValve) SetDefaultOpenLevel(context.Context, uint8) error { return nil
 // ClosureControl server with LT, SP and CL on a Mover with their
 // interfaces and the valve with LVL and TS — behind their "Ahead of
 // matter.js" rows, which the device layer refuses until the host enables
-// them (ADR 0030 decision 3) — and the valve's AutoCloseTime reads the
-// device's clock as the node's Matter time.
+// them (ADR 0030 decision 3); the valve's AutoCloseTime reads the node's
+// Matter time, which the node hands it as the device joins the topology.
 func TestDeclaredClosureAndValveAheadFeatures(t *testing.T) {
 	t.Parallel()
 	ccDecl := func() ccldef.Declare {

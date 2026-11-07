@@ -271,6 +271,18 @@ func TestSuggestionConfiguration(t *testing.T) {
 	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
 		t.Errorf("no Matter time: %v, want INVALID_IN_STATE", err)
 	}
+	// The node's time replaces the configured one as the server joins the
+	// topology (AttachMatterTime); nil leaves it as it is.
+	never.AttachMatterTime(nil)
+	if _, err := addSuggestion(never, handleB, nil, 30); statusOfErr(t, err) != im.StatusInvalidInState {
+		t.Errorf("no Matter time after a nil attach: %v, want INVALID_IN_STATE", err)
+	}
+	never.AttachMatterTime(clk.matterTime)
+	clk.setSynced(true)
+	if _, err := addSuggestion(never, handleB, nil, 30); err != nil {
+		t.Errorf("the node's attached time: %v, want success", err)
+	}
+	clk.setSynced(false)
 	if _, err := never.MatterInvoke(context.Background(), tdef.CmdAddThermostatSuggestion, "junk"); statusOfErr(t, err) != im.StatusInvalidCommand {
 		t.Errorf("a junk payload: %v, want INVALID_COMMAND", err)
 	}
