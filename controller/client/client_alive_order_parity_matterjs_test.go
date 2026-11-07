@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -170,6 +171,107 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 		client.WaitRegistry(sr.reg)
 		if alive.Load() {
 			t.Fatal("the alive hook queued behind the report ran after the node stopped")
+		}
+	})
+}
+
+// TestEstablishedAliveFollowsThePrimingReportsHooks: the alive of a
+// subscription going live runs after the priming report's hooks — here the
+// EndpointInstalled of an endpoint the priming report adds. matter.js goes
+// live only once the priming report's updated drained
+// (ClientInteraction.ts:1173-1174, SustainedSubscription.ts:224, :282 at
+// db021da0) and then emits alive (NetworkClient.ts:224-234). The priming
+// report's own alive has no subscription id yet, so the established alive
+// is the batch end of the priming report.
+func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var (
+			armed atomic.Bool
+			mu    sync.Mutex
+			order []string
+		)
+		record := func(s string) {
+			mu.Lock()
+			order = append(order, s)
+			mu.Unlock()
+		}
+		entered := make(chan struct{}, 1)
+		release := make(chan struct{})
+		sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) {
+			c.HooksFor = func(string) client.Hooks {
+				return client.Hooks{
+					EndpointInstalled: func(ep *client.Endpoint) {
+						if !armed.Load() || ep.Number() != 1 {
+							return
+						}
+						entered <- struct{}{}
+						<-release
+						record("endpoint 1")
+					},
+					SubscriptionAlive: func() {
+						if armed.Load() {
+							record("alive")
+						}
+					},
+				}
+			}
+		})
+		n := sr.reg.Get("peer1")
+		// The bootstrap read knows the root only; the priming report adds
+		// endpoint 1 and the root's PartsList naming it.
+		var root, light []im.AttributeReport
+		for _, r := range sr.imageWithOpCreds("ours") {
+			switch {
+			case r.Path.Endpoint == 1:
+				light = append(light, r)
+			case r.Path.Cluster == descriptor.ClusterID && r.Path.Attribute == descriptor.AttrPartsList:
+				light = append(light, value(0, descriptor.ClusterID, descriptor.AttrPartsList, r.DataVersion+1, listN(1)))
+				root = append(root, value(0, descriptor.ClusterID, descriptor.AttrPartsList, r.DataVersion, listN()))
+			default:
+				root = append(root, r)
+			}
+		}
+		if err := client.SaveSettingsAutoSubscribe(n); err != nil {
+			t.Fatal(err)
+		}
+		started := make(chan error, 1)
+		go func() { started <- n.Start(context.Background()) }()
+		boot := sr.next(t)
+		readRequestOf(t, boot)
+		sr.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, root))
+		if err := <-started; err != nil {
+			t.Fatal(err)
+		}
+		armed.Store(true)
+		const id = 0x54
+		sub := sr.next(t)
+		subscribeRequestOf(t, sub)
+		sr.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, id, light))
+		<-entered // a bubble that deadlocks fails the test
+		sr.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, id))
+		waitUntil(t, "the subscription", n.SubscriptionActive)
+		mu.Lock()
+		early := slices.Clone(order)
+		mu.Unlock()
+		close(release)
+		if len(early) != 0 {
+			t.Fatalf("hooks %v ran while the priming report's EndpointInstalled held the queue", early)
+		}
+		client.WaitRegistry(sr.reg)
+		waitUntil(t, "the alive hook", func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return slices.Contains(order, "alive")
+		})
+		mu.Lock()
+		got := slices.Clone(order)
+		mu.Unlock()
+		if len(got) < 2 || got[0] != "endpoint 1" {
+			t.Fatalf("hooks %v, want the endpoint before any alive", got)
+		}
+		if err := n.Stop(context.Background()); err != nil {
+			t.Fatal(err)
 		}
 	})
 }

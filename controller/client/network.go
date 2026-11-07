@@ -57,7 +57,7 @@ func (n *Node) endDefaultSubscription() {
 		s.Close()
 	}
 	if wasActive {
-		n.announceSubscriptionStatus(false)
+		n.announceSubscriptionStatus(false, nil)
 	}
 }
 
@@ -290,36 +290,13 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	// successor (NetworkClient.ts:162-166, :176-200, :216-232 at 862ad75f).
 	alive := func() {
 		n.mu.RLock()
-		s, current := n.sub, n.subOwner == owner
+		current := n.subOwner == owner
 		n.mu.RUnlock()
 		if !current {
 			return
 		}
 		n.noteICDActive()
-		if h := n.cfg.Hooks.SubscriptionAlive; s != nil && s.ID() != interaction.NoSubscription && h != nil {
-			// The hook runs on the node's job queue, behind the report's
-			// store writes and hooks: matter.js's updated iterates the
-			// whole mutate — its drained queue, the structural
-			// announcements, the delayed events — before it emits
-			// subscriptionAlive (packages/node/src/behavior/system/network/NetworkClient.ts:179-190,
-			// packages/node/src/node/client/ClientStructure.ts:482-497 at
-			// db021da0), so a consumer's batch end follows every change and
-			// event of the batch. Called inline, it ran before the report's
-			// EndpointInstalled and Event hooks, and the camera service's
-			// sweep missed an endpoint the batch added (brief FP2 §2). A
-			// keepalive's queues behind the reports before it. matter.js
-			// asks isCurrent after the drain; so does the job, and a
-			// subscription ended meanwhile (Stop, a replacement) emits no
-			// alive for its successor.
-			n.jobs.enqueue(func() {
-				n.mu.RLock()
-				still := n.subOwner == owner
-				n.mu.RUnlock()
-				if still {
-					h()
-				}
-			})
-		}
+		n.queueAlive(owner, true)
 	}
 	n.icdSustainHooks(&sreq)
 	sreq.Updated = func(*Report) error { alive(); return nil }
@@ -337,7 +314,7 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 		}
 		n.subReported = active
 		n.mu.Unlock()
-		n.announceSubscriptionStatus(active)
+		n.announceSubscriptionStatus(active, owner)
 	}
 	// A Stop (or Close) that ran during the initial read leaves the node
 	// stopped: no default subscription is established on it. Mirrors
@@ -370,8 +347,9 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 
 // announceSubscriptionStatus is subscriptionStatusChanged with its
 // reactions (NetworkClient.ts:226-235): the status hook, the ICD client,
-// and on going live the alive hook and a flush of the cache.
-func (n *Node) announceSubscriptionStatus(active bool) {
+// and on going live the alive hook of owner's subscription and a flush of
+// the cache.
+func (n *Node) announceSubscriptionStatus(active bool, owner *subscriptionOwner) {
 	if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
 		h(active)
 	}
@@ -379,14 +357,48 @@ func (n *Node) announceSubscriptionStatus(active bool) {
 		n.icd.onSubscriptionActive(active)
 	}
 	if active {
-		if h := n.cfg.Hooks.SubscriptionAlive; h != nil {
-			h()
-		}
+		// matter.js goes live only once the priming report's updated has
+		// drained (ClientInteraction.ts:1173-1174, SustainedSubscription.ts:224,
+		// :282 at db021da0), and emits alive after that
+		// (NetworkClient.ts:224-234); here the priming report's hooks may
+		// still be queued, so the alive queues behind them. It needs no
+		// subscription id: the priming report's own alive has none yet.
+		n.queueAlive(owner, false)
 		if n.cfg.FlushInterval > 0 {
 			n.persist.flush()
 		}
 	}
 	n.recompute()
+}
+
+// queueAlive runs Hooks.SubscriptionAlive on the node's job queue, behind
+// the store writes and hooks of the reports before it: matter.js's
+// updated iterates the whole mutate — its drained queue, the structural
+// announcements, the delayed events — before it emits subscriptionAlive
+// (packages/node/src/behavior/system/network/NetworkClient.ts:179-190,
+// packages/node/src/node/client/ClientStructure.ts:482-497 at db021da0),
+// so a consumer's batch end follows every change and event of the batch.
+// Called inline, it ran before the report's EndpointInstalled and Event
+// hooks, and the camera service's sweep missed an endpoint the batch added
+// (brief FP2 §2). A keepalive's alive queues behind the reports before it.
+// The job asks what matter.js asks after the drain (NetworkClient.ts:184-187):
+// whether owner's subscription is still the node's, and, for a report's
+// alive (needID), whether it has a subscription id — so a subscription
+// ended meanwhile (Stop, a replacement) emits no alive for its successor.
+func (n *Node) queueAlive(owner *subscriptionOwner, needID bool) {
+	h := n.cfg.Hooks.SubscriptionAlive
+	if h == nil {
+		return
+	}
+	n.jobs.enqueue(func() {
+		n.mu.RLock()
+		s, current := n.sub, n.subOwner == owner
+		n.mu.RUnlock()
+		if !current || (needID && (s == nil || s.ID() == interaction.NoSubscription)) {
+			return
+		}
+		h()
+	})
 }
 
 // subscriptionOwner is the identity of one default subscription; not
