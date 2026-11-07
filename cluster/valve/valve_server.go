@@ -224,6 +224,11 @@ type Server struct {
 	// nil without one.
 	matterTime atomic.Pointer[clock.MatterTime]
 
+	// cmd serialises what writes AutoCloseTime: Open, Close and
+	// MatterTimeChanged, each held across its reads of the time and of the
+	// source, so a moved time neither overwrites a fresher Open or Close
+	// nor is overwritten by an Open that read the time before it moved.
+	cmd sync.Mutex
 	// mu guards autoClose, the AutoCloseTime the last Open set (TS),
 	// epoch-us; nil is null.
 	mu        sync.Mutex
@@ -507,6 +512,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if s.src == nil {
 			return nil, errNoSource("Open")
 		}
+		s.cmd.Lock()
+		defer s.cmd.Unlock()
 		at := s.autoCloseFor(req)
 		if err := s.src.Open(ctx, req); err != nil {
 			return nil, fmt.Errorf("valve: Open: %w", err)
@@ -518,6 +525,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		if s.src == nil {
 			return nil, errNoSource("Close")
 		}
+		s.cmd.Lock()
+		defer s.cmd.Unlock()
 		if err := s.src.Close(ctx); err != nil {
 			return nil, fmt.Errorf("valve: Close: %w", err)
 		}
@@ -626,6 +635,8 @@ func (s *Server) MatterTimeChanged() {
 	if !s.timeSync || s.src == nil {
 		return
 	}
+	s.cmd.Lock()
+	defer s.cmd.Unlock()
 	matterTime := s.matterTime.Load()
 	if matterTime == nil {
 		return

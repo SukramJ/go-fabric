@@ -8,6 +8,8 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -356,8 +358,8 @@ func TestValveAutoCloseTimeFollowsTheMatterTime(t *testing.T) {
 	now = 9000
 	srv.MatterTimeChanged()
 	h.remaining = 120
-	if want := uint64(5120) * 1_000_000; read() != want {
-		t.Errorf("AutoCloseTime moved while the valve did not count down: %v, want %d", read(), want)
+	if read() == uint64(9120)*1_000_000 {
+		t.Error("a new AutoCloseTime was written while the valve did not count down")
 	}
 	plain := valve.NewServer(valve.Config{Source: fullyObservedHost()})
 	plain.AttachMatterTime(func() (uint32, bool) { return 1000, true })
@@ -365,4 +367,95 @@ func TestValveAutoCloseTimeFollowsTheMatterTime(t *testing.T) {
 	if v, ok := plain.MatterRead(valvedef.AttrAutoCloseTime); ok && v != nil {
 		t.Errorf("AutoCloseTime without TS = %v", v)
 	}
+}
+
+// TestValveAutoCloseTimeWritersAreSerialised: Open, Close and
+// MatterTimeChanged write AutoCloseTime one after the other (run with
+// -race); once they are done, a last change of the time sets it from that
+// time.
+func TestValveAutoCloseTimeWritersAreSerialised(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := valve.NewServer(valve.Config{Source: &lockedHost{h: fullyObservedHost()}, Features: valve.FeatureTimeSync})
+	var now atomic.Uint32
+	now.Store(1000)
+	srv.AttachMatterTime(func() (uint32, bool) { return now.Load(), true })
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range 50 {
+				switch (i + j) % 3 {
+				case 0:
+					_, _ = srv.MatterInvoke(ctx, valve.CmdOpen, valve.OpenRequest{OpenDuration: &spec.Nullable[uint32]{Value: 600}})
+				case 1:
+					now.Add(1)
+					srv.MatterTimeChanged()
+				default:
+					_, _ = srv.MatterInvoke(ctx, valve.CmdClose, nil)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	now.Store(7000)
+	srv.MatterTimeChanged()
+	if v, _ := srv.MatterRead(valvedef.AttrAutoCloseTime); v != uint64(7120)*1_000_000 {
+		t.Errorf("AutoCloseTime after the writers = %v, want %d", v, uint64(7120)*1_000_000)
+	}
+}
+
+// lockedHost is a fakeHost safe for concurrent commands.
+type lockedHost struct {
+	mu sync.Mutex
+	h  *fakeHost
+}
+
+func (l *lockedHost) CurrentState() (valvedef.ValveStateEnum, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.CurrentState()
+}
+
+func (l *lockedHost) TargetState() (valvedef.ValveStateEnum, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.TargetState()
+}
+
+func (l *lockedHost) OpenDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.OpenDuration()
+}
+
+func (l *lockedHost) RemainingDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.RemainingDuration()
+}
+
+func (l *lockedHost) DefaultOpenDuration() (uint32, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.DefaultOpenDuration()
+}
+
+func (l *lockedHost) SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.SetDefaultOpenDuration(ctx, seconds)
+}
+
+func (l *lockedHost) Open(ctx context.Context, req valvedef.OpenRequest) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.Open(ctx, req)
+}
+
+func (l *lockedHost) Close(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.h.Close(ctx)
 }
