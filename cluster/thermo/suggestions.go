@@ -320,6 +320,9 @@ func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context,
 	if err != nil {
 		return err
 	}
+	// The Matter time is a host's callback chain: read before s.mu, as Add
+	// and reevaluateSuggestions read it.
+	now, synced := s.matterNow()
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
@@ -333,7 +336,7 @@ func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context,
 	if currentGone {
 		s.suggest.has = false
 	}
-	if now, ok := s.matterNow(); ok {
+	if synced {
 		if _, gone := s.removeExpiredLocked(now); gone {
 			currentGone = true
 		}
