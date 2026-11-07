@@ -524,14 +524,14 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string
 		}
 		// OP:314-320: a failed download is retried on a fresh session, so
 		// the listener stays for the whole update.
-		details := p.detailsForPeer(peer, token)
-		if details == nil {
+		entry, _ := p.inProgressForPeer(peer, token)
+		if entry == nil {
 			return
 		}
 		p.updateInProgress(peer, token, OTAUpdateDownloading, &version, false)
 		s.OnProgress(func(uint64, *uint64) { // OP:329-331
 			p.mu.Lock()
-			details.timestamp = p.cfg.Clock.Now()
+			entry.timestamp = p.cfg.Clock.Now()
 			p.mu.Unlock()
 		})
 		s.OnFinished(func(uint64) { p.updateInProgress(peer, token, OTAUpdateWaitForApply, &version, false) })
@@ -669,7 +669,22 @@ func (p *OTAProvider) hasUpdateConsent(peer OTAPeer, version uint32) bool {
 
 // detailsForPeer is #inProgressDetailsForPeer (OP:511-534): the entry of
 // the token, or the peer's first; a stale one is removed and not returned.
+// The result is a copy taken under p.mu, without the entry's cleanup: its
+// readers — the invoke path, the transfer sessions' listeners on the
+// responder's goroutines — decide on it while updateInProgress writes the
+// entry. matter.js reads the live object because its provider runs on one
+// thread; here the entry's fields are p.mu's, and a reader that held the
+// pointer past the lock raced ApplyUpdateRequest's write.
 func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress {
+	_, snapshot := p.inProgressForPeer(peer, token)
+	return snapshot
+}
+
+// inProgressForPeer is detailsForPeer with the live entry beside the copy,
+// for the one caller that writes the entry it looked up (the transfer's
+// progress listener, OP:329-331, which matter.js gives the object itself).
+// The live entry's fields are read and written only under p.mu.
+func (p *OTAProvider) inProgressForPeer(peer OTAPeer, token []byte) (live, snapshot *otaInProgress) {
 	p.mu.Lock()
 	var cleanup func()
 	var out *otaInProgress
@@ -697,11 +712,16 @@ func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress 
 			}
 		}
 	}
+	if out != nil {
+		c := *out // versionToApply is replaced, never written through
+		c.cleanup = nil
+		snapshot = &c
+	}
 	p.mu.Unlock()
 	if cleanup != nil {
 		cleanup()
 	}
-	return out
+	return out, snapshot
 }
 
 // sortedKeysLocked returns the entry keys in a stable order (a JavaScript

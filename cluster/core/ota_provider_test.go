@@ -483,3 +483,38 @@ func TestOTAProvider_NeedsACASEPeer(t *testing.T) {
 		t.Fatalf("designator with a slash: %v", err)
 	}
 }
+
+// TestOTAProvider_ApplyWhileTheTransferCloses: the requestor's
+// ApplyUpdateRequest arrives while the responder still closes the transfer
+// that just ended — the invoke runs on its exchange goroutine, the
+// session's OnClosed listener on the responder's. The listener's decision
+// reads the update's state under the provider's lock; before it did, the
+// race detector flagged the read against ApplyUpdateRequest's write
+// (TestReferenceControllerOTA, CI race leg 2026-11-05…07). The interleaving
+// is the scheduler's, so the test repeats the window; under -race one
+// unsynchronised read is enough to fail it.
+func TestOTAProvider_ApplyWhileTheTransferCloses(t *testing.T) {
+	t.Parallel()
+	for range 40 {
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		m, done := f.startDownload(t, 7, *r.ImageUri)
+		ctx := context.Background()
+		for c := uint32(0); ; c++ {
+			_ = m.SendBlockQuery(ctx, c)
+			typ, _, err := m.ReadBlock(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if typ == bdx.MessageBlockEOF {
+				_ = m.SendBlockAckEOF(ctx, c)
+				break
+			}
+		}
+		// No wait for done: the apply races the responder's close.
+		if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
+			t.Fatalf("ApplyUpdateResponse %+v", a)
+		}
+		<-done
+	}
+}

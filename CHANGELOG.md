@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cluster/core`: the OTA provider no longer races its own transfer listeners. `ApplyUpdateRequest` and the BDX session's close listener read the update in progress through a pointer held past the provider's lock while the other path wrote it; the race detector flagged it under `TestReferenceControllerOTA` (CI race leg, 2026-11-05 to 2026-11-07). Every reader now decides on a copy taken under the lock; the progress listener alone writes the entry, under the lock.
+
 ## [0.18.0] — 2026-11-07
 
 Milestone 10 (The rest of the standard), phases 36–39 (owner decision 2026-11-07; phase 40, the 1.7 pin, waits for matter.js's snapshot to move): the parity features matter.js serves and this module refused — DoorLock FACE, AdministratorCommissioning BC, OccupancySensing beyond PIR, PowerSource WIRED; the controller side of Matter cameras on one operational identity; the consumer features after connectedhomeip — ClosureControl, Valve LVL/TS, Thermostat TSUGGEST, GeneralCommissioning TC, ColorControl primaries, concentration levels; the protocol remainder — the OTA requestor over HTTPS, the BTP renegotiation, the trusted-time-source client, one Matter time per node; and the matter.js pin lift 862ad75f → db021da0 in four waves — the message codec and operational-certificate rules, the attestation profile and CD signers, mDNS goodbyes and interface following, the Sigma1 refresh and the peer's TCP message size.
