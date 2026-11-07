@@ -397,8 +397,12 @@ func (a *assembler) emitEvents(rd *im.ReportData) {
 	var chain eventTimestampChain
 	for i := range rd.EventReports {
 		ev := &rd.EventReports[i]
+		// An entry with neither data nor a status (Received nil) is
+		// skipped without touching the chain, as matter.js yields nothing
+		// for it (InputChunk.ts:341-351 at db021da0); its missing path
+		// drops it below.
 		var resolved *uint64
-		if !ev.IsStatus {
+		if !ev.IsStatus && ev.Received != nil {
 			resolved = chain.resolve(ev)
 		}
 		if !ev.Path.HasEndpoint || !ev.Path.HasCluster || !ev.Path.HasEvent {
@@ -471,12 +475,11 @@ type eventTimestampChain struct {
 
 // resolve is EventTimestampChain.resolve (InputChunk.ts:373-392): the
 // epoch timestamp, else the system one, else the epoch delta, else the
-// system delta. A locally built report (Received nil) carries its epoch
-// timestamp.
+// system delta. ev carries what the decoder read (Received non-nil).
 func (c *eventTimestampChain) resolve(ev *im.EventReport) *uint64 {
 	r := ev.Received
 	switch {
-	case r == nil || r.HasEpochTimestamp:
+	case r.HasEpochTimestamp:
 		return c.advance(clockEpoch, ev.Timestamp)
 	case r.HasSystemTimestamp:
 		return c.advance(clockSystem, r.SystemTimestamp)

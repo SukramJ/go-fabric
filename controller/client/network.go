@@ -490,6 +490,14 @@ func hasAnyAddress(p *peer.Peer) bool {
 // (:386-389), the latch or a peer without any address to try
 // WaitingForDeviceDiscovery (:390-392), anything else Reconnecting; a
 // transition calls ConnectionStateChanged (ClientNodeLifecycle.ts:101-107).
+//
+// Invariant: recompute never runs on the discovery cache's loop goroutine.
+// hasAnyAddress reads the service's addresses through the loop
+// (discovery.Service.Addresses, a loop call that is not re-entrant), so a
+// recompute from inside a loop callback would deadlock; the callers are
+// the peer's observers, the service's Changes channel drained on a
+// goroutine of its own, and the node's own lifecycle and subscription
+// paths.
 func (n *Node) recompute() {
 	p := n.peer()
 	noAddress := p != nil && !hasAnyAddress(p)

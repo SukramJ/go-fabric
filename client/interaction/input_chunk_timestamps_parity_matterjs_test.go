@@ -141,3 +141,15 @@ func TestInputChunkResolvedTimestampsParity(t *testing.T) {
 			[]int64{1000, -1})
 	})
 }
+
+// TestInputChunkTimestampsSkipEmptyEntry: an EventReportIB with neither
+// data nor a status is skipped without touching the chain, as matter.js
+// yields nothing for it (InputChunk.ts:341-351 at db021da0).
+func TestInputChunkTimestampsSkipEmptyEntry(t *testing.T) {
+	t.Parallel()
+	p := icEventPath(0, icBasic, icStartUp)
+	got := resolvedOf(t, []im.EventReport{tsEvent(1, sys(1000), p), {}, tsEvent(3, dsys(7), p)})
+	if !slices.Equal(got, []int64{1000, 1007}) {
+		t.Fatalf("resolved %v, want [1000 1007]", got)
+	}
+}

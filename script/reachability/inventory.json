@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7733,
+  "entry_points": 7734,
   "entry_packages": [
     ".",
     "bdx",
@@ -279,9 +279,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17716,
+    "total_exported": 17717,
     "reachable": 12329,
-    "whitelisted": 5387,
+    "whitelisted": 5388,
     "unreachable": 0
   },
   "by_package": [],
@@ -6943,6 +6943,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
       "line": 70
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkTimestampsSkipEmptyEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_timestamps_parity_matterjs_test.go",
+      "line": 148
     },
     {
       "package": "client/interaction",
