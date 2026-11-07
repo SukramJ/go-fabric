@@ -9,6 +9,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/device"
@@ -55,12 +56,12 @@ func TestThermostatDeclaresSuggestions(t *testing.T) {
 		t.Fatalf("before the node's time: %v, want INVALID_IN_STATE", err)
 	}
 	participant, ok := srv.Underlying().(interface {
-		AttachMatterTime(func() (uint32, bool))
+		AttachMatterTime(clock.MatterTime)
 	})
 	if !ok {
 		t.Fatal("the kit's Thermostat takes no Matter time")
 	}
-	participant.AttachMatterTime(func() (uint32, bool) { return 800_000_000, true })
+	participant.AttachMatterTime(clock.MatterTimeOf(nil)) // the host clock, as a host attaches it
 	resp, err := add()
 	if err != nil {
 		t.Fatal(err)

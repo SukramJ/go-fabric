@@ -5235,7 +5235,17 @@ handle on the presets delegate alone (:261). The Matter time is the node's
 UTC, which the node hands the server as its endpoint joins the topology
 (`thermo.ThermostatServer.AttachMatterTime` with the root
 TimeSynchronization's `MatterEpochSeconds`, so SetUTCTime moves it);
-without it every Add answers INVALID_IN_STATE. Pinned by
+without it every Add answers INVALID_IN_STATE. Ahead of chip: whenever the
+node adopts a time, the node tells the server (`MatterTimeChanged`) and the
+suggestions are re-evaluated against the new time — a jump past a
+suggestion's ExpirationTime removes it, one to its EffectiveTime makes it
+current — where chip's expiration timer runs on the monotonic clock and
+does not see a change of UTC
+(`thermostat-suggestions-delegate-impl.cpp:264-269`); the times a
+controller wrote are Matter epoch seconds, so a moved time moves what is
+due. A jump back before the current suggestion's EffectiveTime takes its
+current status away while the preset it activated stays active — kept as
+is, chip never sees the case. Pinned by
 `suggestions_chip_test.go` (`TestThermostatSuggestionsAndHold.cpp:161-242`
 and TC_TSTAT_4_3's steps) and `suggestions_rules_test.go`; hosts serve the
 feature behind the register row, the reference bridge with
@@ -5573,13 +5583,17 @@ source's `LevelSource` (CurrentLevel, TargetLevel), DefaultOpenLevel its
 `DefaultOpenLevelSource`, each refused with `ErrSelection` naming what is
 missing. TS reads the node's Matter time, the root TimeSynchronization's
 UTC, which the node hands the server as its endpoint joins the topology
-(`valve.Server.AttachMatterTime`; `valve.Config.MatterTime` outside a
-node), as chip's tracker asks the node's TimeSynchronization for a valid
-time and reads the clock SetUTCTime sets (`CodegenIntegration.cpp:45-58`,
-`:391-400`). Chip's Startup refuses TS on a node without
-TimeSynchronization (`:46-50`); the server here is built before it joins a
-node, so it serves TS, and on a node with `TimeSynchronization.Off` every
-Open leaves AutoCloseTime null. A DefaultOpenLevel write is 1 to 100
+(`valve.Server.AttachMatterTime`, the server's one input of it), as chip's
+tracker asks the node's TimeSynchronization for a valid time and reads the
+clock SetUTCTime sets (`CodegenIntegration.cpp:46-58`, `:391-400`). Chip's
+Startup refuses TS without a time tracker (`:46-50`): a node with
+`TimeSynchronization.Off` refuses a TS valve in the same way: the
+Aggregator's Add and Replace refuse it before it joins the set, with an
+error naming the endpoint and cluster (`valve.Server.RequiresMatterTime`;
+the topology check behind them is a backstop); a TS server outside a node is built
+without a time and, until its host attaches one, every Open leaves
+AutoCloseTime null — the standalone case's recorded divergence, since
+`valve.New` cannot know whether the host will attach. A DefaultOpenLevel write is 1 to 100
 and 100 or a multiple of LevelStep, an unchanged one a no-op (`:175-192`,
 `ValueCompliesWithLevelStep` `:483-490`); an Open resolves its level — the
 command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
@@ -5587,7 +5601,11 @@ TargetLevel off the LevelStep grid is CONSTRAINT_ERROR (`:312-341`); the
 resolved level reaches the source in the request's TargetLevel, as chip
 hands it to `HandleOpenValve(level)`
 (`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
-Matter time at the Open plus the opening's duration (`:391-413`), null for
+Matter time at the Open plus the opening's duration (`:391-413`), set anew
+as the time plus RemainingDuration whenever the node adopts a time while
+the valve counts down — chip's `UpdateAutoCloseTime` (`:415-423`), which
+the reference application's `UTCTimeAvailabilityChanged` calls
+(`examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73`) —, null for
 an indefinite opening, without a synchronized time (`:394`), after a Close
 (`:243-247`), and — where chip's countdown closes the valve — once the
 source reports no RemainingDuration. Differences: the Matter time carries
@@ -6077,12 +6095,24 @@ before the Matter epoch or past 32-bit seconds is a failed query; each
 read and NTP query ends after `core.TimeSyncAttemptTimeout` (30 s) on the
 server's clock, a bound of the module's because the ports are a host's
 and an attempt that never ended would hold every later one. The node's UTC
-is its one Matter time (issue 428): the node hands
+is the Matter time of Thermostat TSUGGEST and Valve TS (issue 428): the node hands
 `TimeSynchronization.MatterEpochSeconds` to the Thermostat's suggestions
 and the Valve's AutoCloseTime as their endpoints join the topology
-(`AttachMatterTime`), as chip's servers read the system clock SetUTCTime
-sets through `GetClock_MatterEpochS` (`src/system/SystemClock.cpp:284-306`
-at `6170af84`). TimeSource and
+(`AttachMatterTime`) and tells them whenever it adopts a time
+(`MatterTimeChanged`: SetUTCTime, the trusted time source, the NTP
+fallback; a move of the host clock or of `PlatformTime` tells nobody), as
+chip's SetUTCTime calls `UTCTimeAvailabilityChanged` for SetUTCTime
+(`TimeSynchronizationCluster.cpp:1129`) and the trusted source's time
+(`:479`) — chip's NTP fallback (`:510-522`) makes no such call, the node
+tells of that adoption too because it moves the time the participants
+read —, and as chip's servers read the system clock
+SetUTCTime sets through `GetClock_MatterEpochS`
+(`src/system/SystemClock.cpp:284-306` at `6170af84`; the delegate call is
+`TimeSynchronizationCluster.cpp:865`). Difference,
+until issue 445: the other device-side readers of real time — the event
+log's EpochTimestamp, ResourceMonitoring's LastChangedTime, DiagnosticLogs,
+the energy servers — read the host clock without the offset, where chip
+reads the one system clock for them too. TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
 time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,

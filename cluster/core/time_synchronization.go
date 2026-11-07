@@ -131,11 +131,11 @@ func (t *TimeSynchronization) MatterEpochSeconds() (epochS uint32, synced bool) 
 	if !ok {
 		return 0, false
 	}
-	s := now.Unix() - matterEpochOffsetSec
-	if s < 0 || s > math.MaxUint32 {
+	s := now.Unix() - matterEpochOffsetSec // UTC is null before the epoch
+	if s > math.MaxUint32 {
 		return 0, false
 	}
-	return uint32(s), true //nolint:gosec // bounded above
+	return uint32(s), true //nolint:gosec // bounded: 0 ≤ s ≤ MaxUint32
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:

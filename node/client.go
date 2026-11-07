@@ -236,6 +236,11 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		if err != nil || t == nil {
 			return t, err
 		}
+		// A server the node cannot serve fails the topology before any
+		// participant is wired (matter_time.go).
+		if err := n.attachMatterTime(t); err != nil {
+			return nil, err
+		}
 		n.persistBindings(ctx, t)
 		n.persistUserLabels(ctx, t)
 		n.attachFailSafe(ctx, t)

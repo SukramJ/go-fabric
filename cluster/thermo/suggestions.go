@@ -85,6 +85,11 @@ type suggestions struct {
 	// timer re-evaluates the suggestions when the current one expires or
 	// a later one takes effect; nil when nothing is due.
 	timer clock.Timer
+	// pending marks a re-evaluation scheduled (scheduleSuggestionReevaluation)
+	// that has not started: a re-evaluation already running read the Matter
+	// time before it was scheduled, so it leaves the scheduled timer armed
+	// instead of replacing it (armSuggestionTimerLocked).
+	pending bool
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
@@ -98,30 +103,48 @@ func (s *ThermostatServer) seedSuggestions(cfg ThermostatConfig) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: MaxThermostatSuggestions %d: %v", limit, err)
 	}
 	s.suggest = suggestions{max: limit}
-	if cfg.MatterTime != nil {
-		s.matterTime.Store(&cfg.MatterTime)
-	}
 	return nil
 }
 
-// AttachMatterTime hands the server the node's Matter time, the one its
-// suggestions are judged against: the node calls it as the server joins
-// its topology, with the root TimeSynchronization's UTC in epoch seconds
-// (core.TimeSynchronization.MatterEpochSeconds, null while the node has
-// no time), and it replaces [ThermostatConfig.MatterTime] — connectedhomeip
-// gates every suggestion on the one system clock SetUTCTime sets
-// (ThermostatClusterSuggestions.cpp:173-178, TimeSynchronizationCluster.cpp:
-// 856-872 at 6170af84). A server outside a node keeps its configured time;
-// nil leaves the time unchanged.
-func (s *ThermostatServer) AttachMatterTime(matterTime func() (epochS uint32, synced bool)) {
+// AttachMatterTime hands the server the Matter time its suggestions
+// (TSUGGEST) are judged against — the server's only input of it. A node
+// calls it as the server joins its topology, with the root
+// TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds, false while the node has
+// no time): connectedhomeip gates every suggestion on the one system clock
+// SetUTCTime sets (ThermostatClusterSuggestions.cpp:173-178,
+// TimeSynchronizationCluster.cpp:856-872 at 6170af84). A server outside a
+// node has no Matter time until its host attaches one: every
+// AddThermostatSuggestion answers INVALID_IN_STATE, as chip's does while
+// GetClock_MatterEpochS fails. nil leaves the time unchanged.
+func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 	if matterTime != nil {
 		s.matterTime.Store(&matterTime)
 	}
 }
 
-// matterNow is the node's Matter time in epoch seconds; false while it is
-// not synchronised — always without a time ([ThermostatConfig.MatterTime],
-// [ThermostatServer.AttachMatterTime]).
+// MatterTimeChanged re-evaluates the suggestions on the moved Matter time,
+// on the command queue: a suggestion whose ExpirationTime the new time
+// has passed leaves the list, one whose EffectiveTime it reached becomes
+// current, and the timer is armed anew from the new time. A node calls it
+// whenever it adopts a time; the host of a server outside a node calls it
+// when its time does. Beyond connectedhomeip, whose suggestion timer runs
+// on the monotonic clock and does not see a change of UTC
+// (thermostat-suggestions-delegate-impl.cpp:264-269 at 6170af84): the
+// times a controller wrote are Matter epoch seconds, so a moved time
+// moves what is due.
+func (s *ThermostatServer) MatterTimeChanged() { s.scheduleSuggestionReevaluation() }
+
+// RequiresMatterTime is false: the Thermostat serves TSUGGEST without the
+// node's time, each suggestion refused with INVALID_IN_STATE while there
+// is none — connectedhomeip's thermostat has no TimeSynchronization
+// dependency and gates each AddThermostatSuggestion on
+// GetClock_MatterEpochS (ThermostatClusterSuggestions.cpp:173-178 at
+// 6170af84).
+func (s *ThermostatServer) RequiresMatterTime() bool { return false }
+
+// matterNow is the Matter time in epoch seconds; false while it is not
+// synchronised — always before [ThermostatServer.AttachMatterTime].
 func (s *ThermostatServer) matterNow() (uint32, bool) {
 	f := s.matterTime.Load()
 	if f == nil {
@@ -302,6 +325,9 @@ func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context,
 	if err != nil {
 		return err
 	}
+	// The Matter time is a host's callback chain: read before s.mu, as Add
+	// and reevaluateSuggestions read it.
+	now, synced := s.matterNow()
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
@@ -315,7 +341,7 @@ func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context,
 	if currentGone {
 		s.suggest.has = false
 	}
-	if now, ok := s.matterNow(); ok {
+	if synced {
 		if _, gone := s.removeExpiredLocked(now); gone {
 			currentGone = true
 		}
@@ -394,6 +420,11 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 	if s.features&ThermostatFeatureTSUGGEST == 0 {
 		return
 	}
+	// A scheduled re-evaluation is this one from here on; one scheduled
+	// after this point re-reads the time itself.
+	s.mu.Lock()
+	s.suggest.pending = false
+	s.mu.Unlock()
 	now, synced := s.matterNow()
 	if !synced {
 		return
@@ -471,6 +502,12 @@ func equalReason(a, b *uint16) bool {
 // fires at the Matter epoch second wake (0: none), measured from now on the
 // server's clock. The caller holds s.mu.
 func (s *ThermostatServer) armSuggestionTimerLocked(now, wake uint32) {
+	if s.suggest.pending {
+		// A re-evaluation was scheduled after this one read the time (a
+		// moved Matter time, a hold, a reason): its timer stays, and it
+		// arms the next one from the time it reads.
+		return
+	}
 	if s.suggest.timer != nil {
 		s.suggest.timer.Stop()
 		s.suggest.timer = nil
@@ -506,5 +543,6 @@ func (s *ThermostatServer) scheduleSuggestionReevaluation() {
 	if s.suggest.timer != nil {
 		s.suggest.timer.Stop()
 	}
+	s.suggest.pending = true
 	s.suggest.timer = s.clk.AfterFunc(0, s.suggestionTimerFired)
 }

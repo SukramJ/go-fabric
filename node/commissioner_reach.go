@@ -30,7 +30,12 @@ import (
 // node mounts it on every Administrator whose declaration names no reach
 // ([jointfabric.Administrator.AttachCommissionerReach]) while
 // [Config].Client is on.
-type commissionerReach struct{ n *Node }
+type commissionerReach struct {
+	n *Node
+	// observe, when set, sees the report of every read — the test seam
+	// (export_test.go) that holds the reads to one attribute each.
+	observe func(*interaction.Report)
+}
 
 var _ jointfabric.CommissionerReach = commissionerReach{}
 
@@ -49,6 +54,9 @@ func (r commissionerReach) read(ctx context.Context, p jointfabric.CommissionerP
 	rep, err := r.readReport(ctx, p, path)
 	if err != nil {
 		return spec.Node{}, err
+	}
+	if r.observe != nil {
+		r.observe(rep)
 	}
 	if v, ok := rep.Value(path.Endpoint, path.Cluster, path.Attribute); ok {
 		return v, nil

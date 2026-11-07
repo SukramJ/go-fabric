@@ -8,8 +8,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // RemoveFabricBindings is the node's removal of a fabric's Binding entries,
@@ -19,23 +17,21 @@ func RemoveFabricBindings(n *Node, fabricIndex uint8) { n.removeFabricBindings(f
 // Reassemblies is the number of reassemblies the Aggregator completed.
 func Reassemblies(a *Aggregator) int64 { return a.reassemblies.Load() }
 
-// CommissionerReachReports are the reports of the commissioner reach's
-// reads of the node nodeID of fabric fabricIndex — AdministratorFabricIndex
-// on adminEndpoint, then Fabrics, TrustedRootCertificates and NOCs — over
-// n's client stack, each with the path the reach builds.
-func CommissionerReachReports(ctx context.Context, n *Node, fabricIndex uint8, nodeID uint64, adminEndpoint uint16) ([]*interaction.Report, error) {
-	r := commissionerReach{n}
+// CommissionerReachReports drives the commissioner reach's reads of the
+// node nodeID of fabric fabricIndex over n's client stack — its
+// ReadAdministratorFabricIndex on adminEndpoint, ReadFabrics,
+// ReadTrustedRootCertificates and ReadNOCs, in that order — and returns
+// the report each received, with each read's error.
+func CommissionerReachReports(ctx context.Context, n *Node, fabricIndex uint8, nodeID uint64, adminEndpoint uint16) (reports []*interaction.Report, errs []error) {
+	r := commissionerReach{n: n, observe: func(rep *interaction.Report) { reports = append(reports, rep) }}
 	p := jointfabric.CommissionerPeer{FabricIndex: fabricIndex, NodeID: nodeID}
-	var out []*interaction.Report
-	for _, path := range []im.ConcreteAttributePath{
-		administratorFabricIndexPath(adminEndpoint),
-		opCredsPath(opcreds.AttrFabrics), opCredsPath(opcreds.AttrTrustedRootCertificates), opCredsPath(opcreds.AttrNocs),
-	} {
-		rep, err := r.readReport(ctx, p, path)
-		if err != nil {
-			return out, err
-		}
-		out = append(out, rep)
-	}
-	return out, nil
+	_, _, err := r.ReadAdministratorFabricIndex(ctx, p, adminEndpoint)
+	errs = append(errs, err)
+	_, err = r.ReadFabrics(ctx, p)
+	errs = append(errs, err)
+	_, err = r.ReadTrustedRootCertificates(ctx, p)
+	errs = append(errs, err)
+	_, err = r.ReadNOCs(ctx, p)
+	errs = append(errs, err)
+	return reports, errs
 }

@@ -1,0 +1,167 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package node
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"sync"
+
+	"github.com/SukramJ/go-fabric/clock"
+	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
+)
+
+// matterTimeParticipant is a cluster server of an endpoint that reads the
+// node's Matter time: the Thermostat with ThermostatSuggestions (TSUGGEST,
+// cluster/thermo) and the Valve with TimeSync (TS, cluster/valve). The
+// scope is these two: the module's other device-side readers of real
+// time — the event log's EpochTimestamp, ResourceMonitoring's
+// LastChangedTime, DiagnosticLogs, the energy servers — still read the
+// host clock without the offset (issue 445). The node hands each the root
+// TimeSynchronization's UTC in epoch seconds
+// (core.TimeSynchronization.MatterEpochSeconds) as its endpoint joins the
+// topology, and tells each whenever the node adopts a time — SetUTCTime,
+// the trusted time source, the NTP fallback — so a controller reads one time from
+// the node, as connectedhomeip's servers read the one system clock
+// SetUTCTime sets (SystemClock.cpp:284-306, TimeSynchronizationCluster.cpp:
+// 856-872 at 6170af84). A node without the root cluster
+// ([TimeSynchronization].Off) has no UTC: it hands none, and refuses a
+// participant that requires it ([matterTimeParticipant.RequiresMatterTime]).
+type matterTimeParticipant interface {
+	// AttachMatterTime hands the server the node's Matter time.
+	AttachMatterTime(matterTime clock.MatterTime)
+	// MatterTimeChanged tells the server the node adopted a time: the Valve sets
+	// AutoCloseTime anew from RemainingDuration, the Thermostat
+	// re-evaluates its suggestions.
+	MatterTimeChanged()
+	// RequiresMatterTime reports whether the server cannot be served
+	// without the node's time: the Valve with TS, which connectedhomeip's
+	// Startup refuses without a time tracker
+	// (ValveConfigurationAndControlCluster.cpp:46-50 at 6170af84). The node
+	// refuses such a server when TimeSynchronization is off.
+	RequiresMatterTime() bool
+}
+
+// matterTimeSync is the topology's Matter time participants, the ones
+// told of a change of the root's UTC.
+type matterTimeSync struct {
+	mu           sync.Mutex
+	participants []matterTimeParticipant
+	// unwatch ends the watch of the root's UTC (watchMatterTime); nil
+	// when nothing is watched.
+	unwatch func()
+}
+
+// errNoMatterTime is a topology server that needs the node's Matter time
+// on a node without the root TimeSynchronization.
+var errNoMatterTime = errors.New("node: the server needs the node's Matter time, and TimeSynchronization is off")
+
+// checkMatterTime refuses ep when it, or one of its parts, serves a
+// participant that requires the node's Matter time on a node without the
+// root TimeSynchronization — before the endpoint joins the Aggregator's
+// set, as [Node.checkSurface] refuses, so one such device neither stays
+// in the set nor fails every later change. The error names the endpoint's
+// stable key (its number is assigned at the reassembly) and the cluster.
+func (n *Node) checkMatterTime(ep Endpoint) error {
+	if n.root.TimeSynchronization != nil {
+		return nil
+	}
+	entries := surfaceEntries(ep)
+	for i := range entries {
+		e := &entries[i]
+		if e.spec.Source == nil {
+			continue
+		}
+		for _, srv := range e.spec.Source.MatterClusterServers() {
+			if p, ok := srv.(matterTimeParticipant); ok && p.RequiresMatterTime() {
+				return fmt.Errorf("%w: endpoint %q, cluster 0x%04X", errNoMatterTime, e.key, srv.MatterClusterID())
+			}
+		}
+	}
+	return nil
+}
+
+// attachMatterTime hands the topology's Matter time participants the
+// root TimeSynchronization's UTC and records them. On a node without the
+// root cluster a participant that requires the time fails the topology,
+// naming its endpoint and cluster — the backstop behind
+// [Node.checkMatterTime], which refuses it at the Aggregator's Add and
+// Replace; the node's fail-closed form of
+// connectedhomeip's Startup refusal (ValveConfigurationAndControlCluster.cpp:
+// 46-50 at 6170af84).
+func (n *Node) attachMatterTime(t *endpoint.Topology) error {
+	ts := n.root.TimeSynchronization
+	var ps []matterTimeParticipant
+	for _, ep := range t.Endpoints {
+		if ep == nil {
+			continue
+		}
+		for _, srv := range endpoint.ClusterServers(ep) {
+			p, ok := srv.(matterTimeParticipant)
+			switch {
+			case !ok:
+				continue
+			case ts == nil && p.RequiresMatterTime():
+				return fmt.Errorf("%w: endpoint %d, cluster 0x%04X", errNoMatterTime, ep.ID, srv.MatterClusterID())
+			case ts == nil:
+				continue
+			}
+			p.AttachMatterTime(ts.MatterEpochSeconds)
+			ps = append(ps, p)
+		}
+	}
+	n.matterTime.mu.Lock()
+	n.matterTime.participants = ps
+	n.matterTime.mu.Unlock()
+	return nil
+}
+
+// watchMatterTime tells the participants whenever the node adopts a time:
+// each adoption (core.TimeSynchronization's adoptLocked — SetUTCTime, the
+// trusted time source, the NTP fallback) reports UTCTime. A move of the
+// host clock or of the PlatformTime source is no adoption and tells
+// nobody. Mirrors connectedhomeip's SetUTCTime, which reports UTCTime and
+// calls the delegate's UTCTimeAvailabilityChanged
+// (TimeSynchronizationCluster.cpp:856-872, the call :865 at 6170af84) —
+// for SetUTCTime (:1129) and the trusted source's time (:479) — and which
+// the reference application hands to the valve
+// (examples/all-clusters-app/linux/ValveControlDelegate.cpp:70-73). chip's
+// NTP fallback sets the time through its delegate without the call
+// (:510-522); the node tells its participants of that adoption too, since
+// it moves the one time they read.
+func (n *Node) watchMatterTime() {
+	ts := n.root.TimeSynchronization
+	if ts == nil {
+		return
+	}
+	unwatch := ts.OnAttributeChange(func(c contract.Change) {
+		if !slices.Contains(c.Attributes, tsdef.AttrUtcTime) {
+			return
+		}
+		n.matterTime.mu.Lock()
+		ps := slices.Clone(n.matterTime.participants)
+		n.matterTime.mu.Unlock()
+		for _, p := range ps {
+			p.MatterTimeChanged()
+		}
+	})
+	n.matterTime.mu.Lock()
+	n.matterTime.unwatch = unwatch
+	n.matterTime.mu.Unlock()
+}
+
+// unwatchMatterTime ends the watch: an adoption after [Node.Stop] — a late
+// NTP answer — reaches no participant.
+func (n *Node) unwatchMatterTime() {
+	n.matterTime.mu.Lock()
+	unwatch := n.matterTime.unwatch
+	n.matterTime.unwatch = nil
+	n.matterTime.mu.Unlock()
+	if unwatch != nil {
+		unwatch()
+	}
+}
