@@ -11,8 +11,9 @@ import "context"
 // constraint (at most 32 bytes; empty is allowed) and refused with the
 // status a controller's write gets (CONSTRAINT_ERROR, an
 // im.StatusCodeError) — the server's error is returned unchanged — and
-// otherwise set, the cluster's DataVersion advanced, persisted where a
-// controller's written label is (the store's basic_information.node_label)
+// otherwise persisted where a controller's written label is (the store's
+// basic_information.node_label; a store failure is returned, wrapped, with
+// nothing served changed), then set, the cluster's DataVersion advanced
 // and reported to the subscriptions that cover it and to
 // [Observers].OnAttributeChanged with contract.OriginHostSet.
 //

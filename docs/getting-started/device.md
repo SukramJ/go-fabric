@@ -216,7 +216,8 @@ Defaults worth knowing:
 boot. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
 controller's write semantics: a label over 32 bytes is refused with
 `CONSTRAINT_ERROR` (an `im.StatusCodeError`), and an accepted one is
-persisted where a controller's written label is, reported to every
+persisted where a controller's written label is — a store failure fails
+the call with nothing changed and nothing reported — and then reported to every
 subscription that covers it and to `Observers.OnAttributeChanged` with
 `contract.OriginHostSet`. Before `Start` the label is configuration: it is
 the one the node serves when it starts and it is persisted, but no

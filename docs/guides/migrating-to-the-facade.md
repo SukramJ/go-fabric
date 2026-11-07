@@ -259,6 +259,9 @@ otherwise), persisted and reported with `contract.OriginHostSet`. A host
 that restored a value it stored itself renames the call; a host that meant a
 rename passes a context, or calls `Node.SetNodeLabel`, the facade's route
 ([The node's own name](../getting-started/device.md#the-nodes-own-name)).
+`SetOnPersistentWrite` takes a hook that returns an error: return the
+store's, and the write fails with nothing served changed; return nil when
+the values are stored.
 
 ## Changed after v0.17.0: the attestation checks
 

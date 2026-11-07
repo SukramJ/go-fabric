@@ -34,7 +34,7 @@ func TestBasicInfo_HostSetNodeLabel(t *testing.T) {
 	b := newValidBasicInfo(t)
 	changes := labelChanges(t, b)
 	var persisted []string
-	b.SetOnPersistentWrite(func(nodeLabel, _ string) { persisted = append(persisted, nodeLabel) })
+	b.SetOnPersistentWrite(func(nodeLabel, _ string) error { persisted = append(persisted, nodeLabel); return nil })
 	before := b.MatterDataVersion()
 
 	if err := b.SetNodeLabel(context.Background(), "Wohnzimmer"); err != nil {
@@ -66,7 +66,7 @@ func TestBasicInfo_HostWriteNodeLabelTooLong(t *testing.T) {
 	b := newValidBasicInfo(t)
 	changes := labelChanges(t, b)
 	var persisted int
-	b.SetOnPersistentWrite(func(string, string) { persisted++ })
+	b.SetOnPersistentWrite(func(string, string) error { persisted++; return nil })
 	before := b.MatterDataVersion()
 	long := strings.Repeat("y", 33)
 
@@ -136,7 +136,7 @@ func TestBasicInfo_UnchangedWriteCommitsNothing(t *testing.T) {
 	b := newValidBasicInfo(t)
 	changes := labelChanges(t, b)
 	var persisted int
-	b.SetOnPersistentWrite(func(string, string) { persisted++ })
+	b.SetOnPersistentWrite(func(string, string) error { persisted++; return nil })
 	ctx := context.Background()
 	controller := contract.WithOrigin(ctx, contract.OriginControllerWrite)
 
@@ -186,5 +186,42 @@ func TestBasicInfo_RestoresUseTheDefinition(t *testing.T) {
 	}
 	if v, _ := b.MatterRead(0x0006); v.(tlv.BoundedString).Value != "FR" {
 		t.Errorf("Location = %v, want FR", v)
+	}
+}
+
+// TestBasicInfo_StoreFailureFailsTheWrite (issue 414, review L2): when the
+// store refuses the value, the write fails and nothing served changes — no
+// value, no DataVersion advance, no report — as matter.js rolls the
+// transaction back when its store write fails (Datasource.ts:1227-1261,
+// :1329-1340 at db021da0). The host gets the store's error; a controller's
+// write gets an error with no IM status, which the dispatcher answers
+// FAILURE.
+func TestBasicInfo_StoreFailureFailsTheWrite(t *testing.T) {
+	t.Parallel()
+	b := newValidBasicInfo(t)
+	changes := labelChanges(t, b)
+	errStore := errors.New("disk full")
+	b.SetOnPersistentWrite(func(string, string) error { return errStore })
+	before := b.MatterDataVersion()
+
+	hostErr := b.SetNodeLabel(context.Background(), "Wohnzimmer")
+	if !errors.Is(hostErr, errStore) {
+		t.Errorf("host: %v, want the store's error", hostErr)
+	}
+	controllerErr := b.MatterWrite(contract.WithOrigin(context.Background(), contract.OriginControllerWrite), 0x0006, "DE")
+	if !errors.Is(controllerErr, errStore) {
+		t.Errorf("controller: %v, want the store's error", controllerErr)
+	}
+	if _, ok := errors.AsType[im.StatusCodeError](controllerErr); ok {
+		t.Errorf("controller: %v carries an IM status, want none (FAILURE)", controllerErr)
+	}
+	if v, _ := b.MatterRead(0x0005); v.(tlv.BoundedString).Value != "go-fabric-bridge" {
+		t.Errorf("NodeLabel = %v, want unchanged", v)
+	}
+	if v, _ := b.MatterRead(0x0006); v.(tlv.BoundedString).Value != "XX" {
+		t.Errorf("Location = %v, want unchanged", v)
+	}
+	if b.MatterDataVersion() != before || len(*changes) != 0 {
+		t.Errorf("a failed store write moved: version %d→%d, changes %+v", before, b.MatterDataVersion(), *changes)
 	}
 }

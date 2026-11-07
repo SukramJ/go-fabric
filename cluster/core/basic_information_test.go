@@ -802,10 +802,11 @@ func TestBasicInfo_PersistentWriteHook_FiresOnNodeLabelWrite(t *testing.T) {
 	b := newValidBasicInfo(t)
 	var calls int
 	var gotLabel, gotLoc string
-	b.SetOnPersistentWrite(func(nodeLabel, location string) {
+	b.SetOnPersistentWrite(func(nodeLabel, location string) error {
 		calls++
 		gotLabel = nodeLabel
 		gotLoc = location
+		return nil
 	})
 
 	if err := b.MatterWrite(context.Background(), 0x0005, "living-room"); err != nil {
@@ -830,10 +831,11 @@ func TestBasicInfo_PersistentWriteHook_FiresOnLocationWrite(t *testing.T) {
 	b := newValidBasicInfo(t)
 	var calls int
 	var gotLabel, gotLoc string
-	b.SetOnPersistentWrite(func(nodeLabel, location string) {
+	b.SetOnPersistentWrite(func(nodeLabel, location string) error {
 		calls++
 		gotLabel = nodeLabel
 		gotLoc = location
+		return nil
 	})
 
 	if err := b.MatterWrite(context.Background(), 0x0006, "DE"); err != nil {
@@ -857,7 +859,7 @@ func TestBasicInfo_PersistentWriteHook_NotFiredByRestoreNodeLabel(t *testing.T) 
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	var calls int
-	b.SetOnPersistentWrite(func(string, string) { calls++ })
+	b.SetOnPersistentWrite(func(string, string) error { calls++; return nil })
 
 	if err := b.RestoreNodeLabel("restored-label"); err != nil {
 		t.Fatalf("RestoreNodeLabel: %v", err)
@@ -874,7 +876,7 @@ func TestBasicInfo_PersistentWriteHook_NotFiredByRestoreLocation(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	var calls int
-	b.SetOnPersistentWrite(func(string, string) { calls++ })
+	b.SetOnPersistentWrite(func(string, string) error { calls++; return nil })
 
 	if err := b.RestoreLocation("FR"); err != nil {
 		t.Fatalf("RestoreLocation: %v", err)
@@ -891,7 +893,7 @@ func TestBasicInfo_PersistentWriteHook_DetachedByNil(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
 	var calls int
-	b.SetOnPersistentWrite(func(string, string) { calls++ })
+	b.SetOnPersistentWrite(func(string, string) error { calls++; return nil })
 	b.SetOnPersistentWrite(nil)
 
 	if err := b.MatterWrite(context.Background(), 0x0005, "no-hook"); err != nil {
@@ -1410,7 +1412,7 @@ func TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute(t *testing.T) 
 		t.Fatal(err)
 	}
 	var calls int
-	b.SetOnPersistentWrite(func(string, string) { calls++ })
+	b.SetOnPersistentWrite(func(string, string) error { calls++; return nil })
 	before := b.MatterDataVersion()
 	err = b.MatterWrite(context.Background(), 0x0010, true)
 	var sc interface{ MatterStatusCode() im.StatusCode }
