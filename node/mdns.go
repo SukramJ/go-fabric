@@ -122,15 +122,13 @@ func (n *Node) DiagnoseMDNS() []MDNSFinding {
 	out := mdns.Diagnose(n.advertiser.Active())
 	if n.ownsAdvertiser {
 		out = append(out, mdns.DiagnoseInterfaces(n.cfg.Network.MDNS.Interfaces)...)
-		slices.SortStableFunc(out, func(a, b MDNSFinding) int {
-			switch {
-			case a.Severity == b.Severity:
+		rank := func(f MDNSFinding) int {
+			if f.Severity == mdns.SeverityError {
 				return 0
-			case a.Severity == mdns.SeverityError:
-				return -1
 			}
 			return 1
-		})
+		}
+		slices.SortStableFunc(out, func(a, b MDNSFinding) int { return rank(a) - rank(b) })
 	}
 	return out
 }

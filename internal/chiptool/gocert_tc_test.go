@@ -62,10 +62,10 @@ func (r *termsRun) refused(th *goTH) error {
 	_, err = r.pair(th, nil)
 	var te *commissioner.TermsRequiredError
 	if !errors.As(err, &te) {
-		return fmt.Errorf("Pair without the acknowledgement: %v, want a *commissioner.TermsRequiredError", err)
+		return fmt.Errorf("Pair without the acknowledgement: %w, want a *commissioner.TermsRequiredError", err)
 	}
 	if te.Version != 1 || te.Deadline != nil {
-		return fmt.Errorf("the requirement %+v, want version 1, no deadline", te)
+		return fmt.Errorf("the requirement version %d, deadline %v; want version 1, no deadline", te.Version, te.Deadline)
 	}
 	return nil
 }
