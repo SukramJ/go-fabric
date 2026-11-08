@@ -4,6 +4,7 @@
 package mdns
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -53,10 +54,20 @@ import (
 // binds nothing; Close releases them.
 //
 // The host's A/AAAA records are published for the host name the module
-// owns — the MAC-derived default. A host name the OS responder owns, the
-// [Responder.HostName] override or the OS host name kept on macOS
-// (notes/parity/by_design.md L7-D03), is left to the OS: its address
-// records are not published or answered here.
+// owns — the MAC-derived default, matter.js's name on every platform
+// (MdnsServer.ts:80 `hostnameFor`, :608-610 `hostnameForMac` at db021da0).
+// A host name the OS responder owns is left to the OS: its address records
+// are not published or answered here. That is the [Responder.HostName]
+// override, always — with it nothing is looked up — and on macOS the OS
+// host name in place of a default the Build* helpers filled in, kept when
+// the system resolver answers it with an address of this host within a
+// second (notes/parity/by_design.md L7-D03, [defaultHostName]). The
+// verdict is taken at Publish, outside the lock, and again on every
+// interface change, when a moved host name is published on every
+// interface with the goodbyes of the old one, as matter.js chooses its
+// host name again on every interface change (MdnsServer.ts:40-43,
+// #publishChange :321-339 at db021da0). When mDNSResponder serves a
+// different Bonjour name, the MAC-derived name and its own records apply.
 type Responder struct {
 	// InterfaceFilter decides which host interfaces are kept out of the
 	// advertised records: it reports true for an interface name whose
@@ -79,6 +90,9 @@ type Responder struct {
 	clock clockvar.Var
 	// random32, when set, replaces the schedule's jitter source (tests).
 	random32 func() uint32
+	// policy, when set, replaces the process's host-name policy (tests);
+	// nil is defaultHostPolicy.
+	policy *hostNamePolicy
 
 	// mu guards everything below and serialises every send, so a goodbye
 	// cannot overtake an announcement of the same records.
@@ -100,6 +114,9 @@ type Responder struct {
 	// nil when none waits; changeRepeat is its timer (follow.go).
 	repeatOn     map[int]bool
 	changeRepeat clock.Timer
+	// repeatAll is set when the change repeat publishes on every
+	// interface, after the host name moved (matter.js #repeatOn "all").
+	repeatAll bool
 	// changeRepeatGen tells a fired repeat timer from the current one.
 	changeRepeatGen uint64
 	// wire is the transport; nil until the first Publish opens the
@@ -122,6 +139,10 @@ type entry struct {
 	svc   Service
 	names serviceNames
 	txt   []string
+	// host is the SRV target the records name; ips are the advertised
+	// addresses at Publish. Both enter the fingerprint.
+	host string
+	ips  []string
 	// ownsHost is false when the OS responder owns the host name, whose
 	// address records are then left out.
 	ownsHost bool
@@ -259,6 +280,16 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	if err := svc.Validate(); err != nil {
 		return err
 	}
+	// The macOS verdict on a defaulted host name, before r.mu: the lookup
+	// may take up to osHostNameLookupTimeout. An override is never looked
+	// up.
+	host := svc.HostName
+	switch {
+	case r.HostName != "":
+		host = r.HostName
+	case svc.hostNameDefaulted:
+		host = cmp.Or(r.hostPolicy().keptHostName(r.logger(), svc.HostName), svc.HostName)
+	}
 	defer r.follow()
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -269,21 +300,12 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 		return fmt.Errorf("mdns: responder %s/%s: %w", svc.InstanceName, svc.ServiceType, err)
 	}
 	key := noopKey(svc.InstanceName, svc.ServiceType)
-	host := svc.HostName
-	if r.HostName != "" {
-		host = r.HostName
-	}
-	if host == "" {
-		host = defaultHostName()
-	}
 	ips := primaryHostIPs(r.filter())
 	// The copy kept for Active carries the addresses the A/AAAA records
 	// carry: the operator-facing diagnostics (Diagnose) inspect them.
 	svc.Addresses = parseHostIPs(ips)
 	txt := svc.MarshalTXT()
-	fp := fmt.Sprintf("%s|%d|%s|%s|%s",
-		strings.Join(txt, "\x1f"), svc.Port, host,
-		strings.Join(ips, ","), strings.Join(svc.Subtypes, ","))
+	fp := fingerprintOf(txt, svc, host, ips)
 	prev, replacing := r.services[key]
 	if replacing {
 		if prev.fingerprint == fp {
@@ -298,7 +320,9 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 		svc:         svc,
 		names:       namesOf(svc, host),
 		txt:         txt,
-		ownsHost:    r.HostName == "" && !strings.EqualFold(strings.TrimSuffix(strings.Trim(host, "."), ".local"), osHostName()),
+		host:        host,
+		ips:         ips,
+		ownsHost:    r.ownsHostName(host),
 		fingerprint: fp,
 	}
 	r.services[key] = e
@@ -309,6 +333,29 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	r.resetLocked()
 	r.startLocked(e, eventStartup)
 	return nil
+}
+
+// fingerprintOf is the identity of a record set: a re-Publish with the
+// same one only re-announces.
+func fingerprintOf(txt []string, svc Service, host string, ips []string) string {
+	return fmt.Sprintf("%s|%d|%s|%s|%s",
+		strings.Join(txt, "\x1f"), svc.Port, host,
+		strings.Join(ips, ","), strings.Join(svc.Subtypes, ","))
+}
+
+// ownsHostName reports whether the responder publishes and answers the
+// address records of host: not with an override, and not for the OS host
+// name, whose records the OS responder owns.
+func (r *Responder) ownsHostName(host string) bool {
+	return r.HostName == "" && !strings.EqualFold(strings.TrimSuffix(strings.Trim(host, "."), ".local"), osHostName())
+}
+
+// hostPolicy is the injected host-name policy or the process's.
+func (r *Responder) hostPolicy() *hostNamePolicy {
+	if r.policy != nil {
+		return r.policy
+	}
+	return defaultHostPolicy
 }
 
 // removeLocked stops e's run, drops it and publishes the goodbyes of the

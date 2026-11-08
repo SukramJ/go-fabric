@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -365,6 +366,210 @@ func TestMdnsAdvertisementHostOwnedByOS(t *testing.T) {
 	// A bare host question is left to the OS responder.
 	deliver(t, r, queryMsg([]dns.Question{question("os-host.local", dns.TypeAAAA, false)}), 1, dummySource)
 	expectSent(t, w.take(), 0)
+}
+
+// TestMdnsAdvertisementOSHostNameVerdict is the macOS verdict of
+// notes/parity/by_design.md L7-D03 (issue 465) on the published record
+// set, the Responder's for a Service whose host name the builders
+// defaulted: an OS host name the system resolver does not answer for this
+// host gives way to the MAC-derived name, whose address records this
+// responder publishes and answers (ownsHost), as matter.js does on every
+// platform (MdnsServer.ts:80, :608-610 at db021da0); a served one is kept
+// and its address records left to the OS responder. The verdict is taken
+// again on an interface change, and a moved host name is published on
+// every interface (MdnsServer.ts:40-43, :321-339).
+func TestMdnsAdvertisementOSHostNameVerdict(t *testing.T) {
+	t.Parallel()
+	osName := osHostName()
+	if osName == "" {
+		t.Skip("no OS host name")
+	}
+	// defaulted is a Service as the builders return it with HostName left
+	// empty: the MAC-derived name, marked.
+	defaulted := func() Service {
+		svc := operationalFixture(port1)
+		svc.HostName, svc.hostNameDefaulted = eth0HostName, true
+		return svc
+	}
+	// published is the SRV target and the address records of one packet.
+	published := func(p sentPacket) (target string, addrs int) {
+		for _, rr := range append(slices.Clone(p.msg.Answer), p.msg.Extra...) {
+			switch rr := rr.(type) {
+			case *dns.A, *dns.AAAA:
+				if rr.Header().Ttl != 0 {
+					addrs++
+				}
+			case *dns.SRV:
+				if rr.Header().Ttl != 0 {
+					target = rr.Target
+				}
+			}
+		}
+		return target, addrs
+	}
+
+	for _, served := range []bool{false, true} {
+		t.Run(fmt.Sprintf("defaulted, served=%v", served), func(t *testing.T) {
+			t.Parallel()
+			r, w, _ := newWiredResponder(serverAddrs(true))
+			res := newFakeResolver()
+			if served {
+				res.set(localTestAddr)
+			}
+			r.policy = testPolicy(t, "darwin", res, true)
+			if err := r.Publish(context.Background(), defaulted()); err != nil {
+				t.Fatal(err)
+			}
+			host := eth0HostName
+			if served {
+				host = osName
+			}
+			target, addrs := published(w.take()[0])
+			if target != host+".local." {
+				t.Errorf("SRV target %q, want %s.local.", target, host)
+			}
+			deliver(t, r, queryMsg([]dns.Question{question(host+".local", dns.TypeAAAA, false)}), 1, dummySource)
+			answered := len(w.take())
+			if served {
+				if addrs != 0 || answered != 0 {
+					t.Errorf("served OS host name: %d address records announced, %d answers, want none (left to the OS)", addrs, answered)
+				}
+				return
+			}
+			if addrs == 0 || answered == 0 {
+				t.Errorf("fallback host name: %d address records announced, %d answers, want both (ownsHost)", addrs, answered)
+			}
+		})
+	}
+
+	t.Run("override: nothing looked up, nothing logged", func(t *testing.T) {
+		t.Parallel()
+		r, w, _ := newWiredResponder(serverAddrs(true))
+		log, buf := testLog()
+		r.SetLogger(log)
+		res := newFakeResolver()
+		r.policy = testPolicy(t, "darwin", res, true)
+		r.HostName = "os-host"
+		if err := r.Publish(context.Background(), defaulted()); err != nil {
+			t.Fatal(err)
+		}
+		if target, _ := published(w.take()[0]); target != "os-host.local." {
+			t.Errorf("SRV target %q, want os-host.local.", target)
+		}
+		if n := res.calls.Load(); n != 0 {
+			t.Errorf("resolver asked %d times with an override, want 0", n)
+		}
+		if out := buf.String(); strings.Contains(out, "mdns.hostname") {
+			t.Errorf("a host-name verdict logged with an override:\n%s", out)
+		}
+	})
+
+	t.Run("a host name set by hand is never looked up", func(t *testing.T) {
+		t.Parallel()
+		r, w, _ := newWiredResponder(serverAddrs(true))
+		res := newFakeResolver(localTestAddr)
+		r.policy = testPolicy(t, "darwin", res, true)
+		if err := r.Publish(context.Background(), operationalFixture(port1)); err != nil {
+			t.Fatal(err)
+		}
+		if target, _ := published(w.take()[0]); target != serverHost+".local." {
+			t.Errorf("SRV target %q, want %s.local.", target, serverHost)
+		}
+		if n := res.calls.Load(); n != 0 {
+			t.Errorf("resolver asked %d times for a Service built by hand, want 0", n)
+		}
+	})
+
+	t.Run("an interface change takes the verdict again and moves the host on every interface", func(t *testing.T) {
+		t.Parallel()
+		r, w, clk := newWiredResponder(map[int][]string{1: {serverIPv4, serverIPv6}, 2: {"10.1.0.2"}})
+		t.Cleanup(func() { _ = r.Close() })
+		res := newFakeResolver(localTestAddr)
+		r.policy = testPolicy(t, "darwin", res, true)
+		svc := defaulted()
+		if err := r.Publish(context.Background(), svc); err != nil {
+			t.Fatal(err)
+		}
+		r.ServiceConnected(svc.InstanceName, svc.ServiceType)
+		clk.Advance(2 * time.Second)
+		w.take()
+
+		// change publishes after an address change on interface 2 and
+		// reports, per interface, the SRV targets announced and said
+		// goodbye to and the address records announced and said goodbye to.
+		type view struct {
+			srv, srvGoodbye    []string
+			addrs, addrGoodbye int
+		}
+		change := func(addr string) map[int]view {
+			w.setAddrs(2, addr)
+			r.CheckInterfaces()
+			out := map[int]view{}
+			for _, p := range w.take() {
+				v := out[p.ifIndex]
+				for _, rr := range p.msg.Answer {
+					gone := rr.Header().Ttl == 0
+					switch rr := rr.(type) {
+					case *dns.SRV:
+						if gone {
+							v.srvGoodbye = append(v.srvGoodbye, rr.Target)
+						} else {
+							v.srv = append(v.srv, rr.Target)
+						}
+					case *dns.A, *dns.AAAA:
+						if gone {
+							v.addrGoodbye++
+						} else {
+							v.addrs++
+						}
+					}
+				}
+				out[p.ifIndex] = v
+			}
+			return out
+		}
+
+		// Served → unanswered: the SRV target moves to the MAC-derived
+		// name on both interfaces, the old target gets its goodbye, the
+		// new name's address records are announced.
+		res.set()
+		got := change("10.1.0.3")
+		for _, i := range []int{1, 2} {
+			v := got[i]
+			if !slices.Equal(v.srv, []string{eth0HostName + ".local."}) || !slices.Equal(v.srvGoodbye, []string{osName + ".local."}) || v.addrs == 0 {
+				t.Errorf("interface %d after the move to the MAC name: %+v, want the new SRV target, the old one's goodbye and address records", i, v)
+			}
+		}
+		if n := res.calls.Load(); n != 2 {
+			t.Errorf("resolver asked %d times, want 2 (Publish, interface change)", n)
+		}
+		clk.Advance(time.Second)
+		repeated := map[int]bool{}
+		for _, p := range w.take() {
+			repeated[p.ifIndex] = true
+		}
+		if !repeated[1] || !repeated[2] {
+			t.Errorf("the change repeat went out on %v, want both interfaces", repeated)
+		}
+
+		// Unanswered → served: back to the OS host name, whose address
+		// records are the OS responder's — the MAC name's get their
+		// goodbye.
+		res.set(localTestAddr)
+		got = change("10.1.0.4")
+		for _, i := range []int{1, 2} {
+			v := got[i]
+			if !slices.Equal(v.srv, []string{osName + ".local."}) || !slices.Equal(v.srvGoodbye, []string{eth0HostName + ".local."}) || v.addrs != 0 || v.addrGoodbye == 0 {
+				t.Errorf("interface %d after the move to the OS name: %+v, want the OS name, the MAC name's goodbyes and no address records", i, v)
+			}
+		}
+
+		// An unchanged verdict publishes only on the changed interface.
+		got = change("10.1.0.5")
+		if _, ok := got[1]; ok {
+			t.Errorf("published on interface 1 for a change on 2 without a host move: %+v", got)
+		}
+	})
 }
 
 // TestMdnsAdvertisementInterfaceScope: an interface the advertise policy

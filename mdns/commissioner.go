@@ -74,17 +74,18 @@ func BuildCommissionerService(cfg CommissionerServiceConfig) Service {
 	if cfg.DeviceTypeID != 0 {
 		subtypes = append(subtypes, fmt.Sprintf("_T%d", cfg.DeviceTypeID))
 	}
-	host := cfg.HostName
+	host, defaulted := cfg.HostName, false
 	if host == "" {
-		host = defaultHostName()
+		host, defaulted = defaultHostName(), true
 	}
 	return Service{
-		InstanceName: strings.ToUpper(hex.EncodeToString(cfg.InstanceID[:])),
-		ServiceType:  ServiceTypeCommissioner,
-		Port:         cfg.Port,
-		HostName:     host,
-		Addresses:    append([]net.IP(nil), cfg.Addresses...),
-		TXT:          txt,
-		Subtypes:     subtypes,
+		InstanceName:      strings.ToUpper(hex.EncodeToString(cfg.InstanceID[:])),
+		ServiceType:       ServiceTypeCommissioner,
+		Port:              cfg.Port,
+		HostName:          host,
+		Addresses:         append([]net.IP(nil), cfg.Addresses...),
+		TXT:               txt,
+		Subtypes:          subtypes,
+		hostNameDefaulted: defaulted,
 	}
 }

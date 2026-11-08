@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7834,
+  "entry_points": 7838,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17828,
+    "total_exported": 17832,
     "reachable": 12390,
-    "whitelisted": 5438,
+    "whitelisted": 5442,
     "unreachable": 0
   },
   "by_package": [],
@@ -32030,6 +32030,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestDefaultHostNameIsMACDerived",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/hostname_policy_test.go",
+      "line": 244
+    },
+    {
+      "package": "mdns",
       "identifier": "TestDeriveUniqueIDFromIdentityIsStableAndDistinct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
@@ -32135,6 +32142,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestHostNamePolicy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/hostname_policy_test.go",
+      "line": 118
+    },
+    {
+      "package": "mdns",
       "identifier": "TestIsPrimaryV4_AllSystemInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_internal_test.go",
@@ -32215,28 +32229,35 @@
       "identifier": "TestMdnsAdvertisementHostOwnedByOS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 347
+      "line": 348
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAdvertisementInterfaceScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 374
+      "line": 579
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsAdvertisementOSHostNameVerdict",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/responder_advertiser_parity_matterjs_test.go",
+      "line": 381
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAdvertisementParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 131
+      "line": 132
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAnnouncementOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 301
+      "line": 302
     },
     {
       "package": "mdns",
@@ -32363,6 +32384,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/rotating_id_test.go",
       "line": 95
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOSHostNameVerdictDeadline",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/hostname_policy_test.go",
+      "line": 258
     },
     {
       "package": "mdns",
