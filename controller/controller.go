@@ -57,6 +57,7 @@ import (
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -457,7 +458,20 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	served := make(chan struct{})
 	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
-	go func() { defer close(served); _ = l.Serve(serveCtx, handle) }()
+	// A secure session's datagrams are handled in arrival order
+	// (message.SessionOrderKey), as the node's are: matter.js runs one
+	// unawaited chain per datagram (ExchangeManager.ts:661 at db021da0) and
+	// its runtime finishes the earlier datagram's non-I/O continuation
+	// before the next I/O callback (a runtime property); chip dispatches
+	// run-to-completion on its one thread (ExchangeMgr.cpp:295-302 at
+	// 6170af84). So a request on a later exchange cannot overtake the
+	// acknowledgement that finished a BDX transfer. HandleDatagram never
+	// waits for a later datagram of its own session — protocol handlers run
+	// on goroutines of their own — so the turn is released on return.
+	go func() {
+		defer close(served)
+		_ = l.ServeOrdered(serveCtx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { handle(buf, src) })
+	}()
 	c.stop = func() { cancel(); <-served; _ = l.Close() }
 	if c.names, err = openNames(log); err != nil {
 		return err

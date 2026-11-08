@@ -281,6 +281,27 @@ func (h Header) AAD() []byte {
 	return h.Marshal()
 }
 
+// SessionOrderKey is the order key of a datagram for transport/udp's
+// ServeOrdered: the session id of a unicast secure message, read from the
+// unencrypted header without decoding it. The unsecured session (id 0, the
+// PASE and CASE handshakes) and group messages have none, and a datagram
+// too short for the header has none. A node and a controller both key
+// their receive path by it, so the messages of one session are handled in
+// arrival order.
+func SessionOrderKey(datagram []byte) (uint32, bool) {
+	if len(datagram) < 4 {
+		return 0, false
+	}
+	if SessionType(datagram[3]&secFlagSessionTypeMask) != SessionUnsecured {
+		return 0, false
+	}
+	sid := binary.LittleEndian.Uint16(datagram[1:3])
+	if sid == 0 {
+		return 0, false
+	}
+	return uint32(sid), true
+}
+
 // UnmarshalHeader decodes a Matter message header. Returns the
 // decoded header and the number of bytes consumed; the caller can
 // slice the buffer past that boundary to get the Protocol Header +

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7809,
+  "entry_points": 7811,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17768,
-    "reachable": 12343,
-    "whitelisted": 5425,
+    "total_exported": 17771,
+    "reachable": 12344,
+    "whitelisted": 5427,
     "unreachable": 0
   },
   "by_package": [],
@@ -3741,6 +3741,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestLeaveSessionOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/session_order_test.go",
+      "line": 13
+    },
+    {
+      "package": "bridge",
       "identifier": "TestMRPAckAdapter_DischargeIsSessionScoped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handlers_test.go",
@@ -5225,13 +5232,6 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestSessionOrderKey",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/session_order_test.go",
-      "line": 14
-    },
-    {
-      "package": "bridge",
       "identifier": "TestSessionParametersForStatesTCPOnlyWhenOffered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_session_params_test.go",
@@ -6566,6 +6566,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/hooks_test.go",
       "line": 63
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestOrderedServeKeepsASessionsDatagramsInOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/ordered_serve_test.go",
+      "line": 27
     },
     {
       "package": "client/exchange",
@@ -22623,14 +22630,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 645
+      "line": 659
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 641
+      "line": 655
     },
     {
       "package": "controller",
@@ -37695,6 +37702,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
       "line": 320
+    },
+    {
+      "package": "transport/message",
+      "identifier": "TestSessionOrderKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/message_test.go",
+      "line": 570
     },
     {
       "package": "transport/mrp",

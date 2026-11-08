@@ -563,3 +563,25 @@ func TestProtocolHeaderWithSecuredExt(t *testing.T) {
 		t.Errorf("wire[0]=0x%02X missing HasSecuredExt flag (bit3)", wire[0])
 	}
 }
+
+// TestSessionOrderKey: the order key is the session id of a unicast secure
+// message; the unsecured session (id 0, the PASE / CASE handshakes), group
+// messages and a datagram too short for the header have none.
+func TestSessionOrderKey(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		buf  []byte
+		key  uint32
+		want bool
+	}{
+		"unicast secure": {[]byte{0x00, 0x34, 0x12, 0x00}, 0x1234, true},
+		"unsecured":      {[]byte{0x00, 0x00, 0x00, 0x00}, 0, false},
+		"group":          {[]byte{0x00, 0x34, 0x12, 0x01}, 0, false},
+		"short":          {[]byte{0x00, 0x34}, 0, false},
+	} {
+		key, ok := SessionOrderKey(tc.buf)
+		if ok != tc.want || (ok && key != tc.key) {
+			t.Errorf("%s: (%#x, %v), want (%#x, %v)", name, key, ok, tc.key, tc.want)
+		}
+	}
+}
