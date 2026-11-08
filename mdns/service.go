@@ -32,24 +32,41 @@ import (
 // "0000"`), which satisfies the Matter host-name rule TC-SC-4.3 checks (12
 // or 16 uppercase hexadecimal characters derived from the MAC). Without a
 // hardware address the name is the same 16-digit shape, derived from the OS
-// host name so it is stable across restarts. log receives the one line of
-// the process's macOS verdict ([hostNamePolicy]); nil is slog.Default().
+// host name so it is stable across restarts. It is the same on every
+// platform and asks no resolver: the Build* helpers put it in and mark the
+// Service ([Service] hostNameDefaulted).
 //
-// On macOS the OS host name is kept when, and only when, the system
-// resolver answers `<OS host name>.local` ([keptOSHostName]): there
+// On macOS the [Responder] takes the verdict on the OS host name for a
+// Service so marked, at Publish and again on every interface change
+// ([hostNamePolicy]): it keeps the OS host name in place of this one, and
+// leaves its address records to mDNSResponder, when the system resolver
+// answers `<OS host name>.local` with an address of this host. There
 // mDNSResponder owns the host's address records, and a separately
 // published name was observed to lose its A/AAAA records, so Apple Home
-// tore the fabric down after CommissioningComplete; the [Responder] leaves
-// the address records of the OS host name to the OS responder. That is a
-// recorded divergence (notes/parity/by_design.md L7-D03); a product
-// certifies on its own platform. mDNSResponder serves the Bonjour
-// LocalHostName, which a conflict rename moves off the kernel host name
-// (issue 465); the kernel name then goes unanswered, and the host name
-// falls back to the MAC-derived one with the module's own A/AAAA records —
-// matter.js's behaviour on every platform (MdnsServer.ts:80 `hostnameFor`,
-// :608-610 `hostnameForMac` at db021da0).
-func defaultHostName(log *slog.Logger) string {
-	return defaultHostPolicy.hostName(log)
+// tore the fabric down after CommissioningComplete. That is a recorded
+// divergence (notes/parity/by_design.md L7-D03); a product certifies on its
+// own platform. mDNSResponder serves the Bonjour LocalHostName, which a
+// conflict rename moves off the kernel host name (issue 465); the kernel
+// name then goes unanswered, and this MAC-derived name applies with the
+// module's own A/AAAA records — matter.js's behaviour on every platform
+// (MdnsServer.ts:80 `hostnameFor`, :608-610 `hostnameForMac` at db021da0).
+func defaultHostName() string {
+	h, _ := macHostName(listHostNameIfaces, &defaultHostNames)
+	return h
+}
+
+// macHostName is the MAC-derived host name of chooser over the interfaces
+// list reads, or the 16-digit name hashed from the OS host name without a
+// usable MAC; addressed reports that the chooser found an up interface
+// with addresses and a non-zero MAC.
+func macHostName(list func() ([]hostNameIface, error), chooser *hostNameChooser) (name string, addressed bool) {
+	ifaces, err := list()
+	if h := chooser.choose(ifaces, err == nil); h != "" {
+		return h, true
+	}
+	h, _ := os.Hostname()
+	sum := sha256.Sum256([]byte("go-fabric host " + h))
+	return strings.ToUpper(hex.EncodeToString(sum[:8])), false
 }
 
 // osHostNameLookupTimeout bounds the system resolver's answer for the OS
@@ -60,17 +77,39 @@ const osHostNameLookupTimeout = time.Second
 // lookupIPAddrFunc is the shape of [net.Resolver.LookupIPAddr].
 type lookupIPAddrFunc func(ctx context.Context, host string) ([]net.IPAddr, error)
 
-// hostNamePolicy is the process's default host-name decision: the macOS
-// verdict on the OS host name, taken once and kept — a name that flipped
-// would re-announce every service, as the chooser's stability rule
-// ([hostNameChooser]) holds for the MAC — and the MAC-derived name
-// otherwise.
+// hostNameVerdict is the system resolver's verdict on the OS host name.
+type hostNameVerdict int
+
+const (
+	// verdictNone is no verdict taken yet.
+	verdictNone hostNameVerdict = iota
+	// verdictServed: `<name>.local` resolves to an address of this host.
+	verdictServed
+	// verdictUnanswered: `<name>.local` does not resolve in time.
+	verdictUnanswered
+	// verdictForeign: `<name>.local` resolves, but to no address of this
+	// host — another host answers the name.
+	verdictForeign
+)
+
+// hostNamePolicy is the macOS verdict on the OS host name, the
+// [Responder]'s for a Service whose host name the Build* helpers
+// defaulted. The verdict is kept until the next [hostNamePolicy.retake] —
+// the Responder re-takes it on every interface change, as matter.js
+// chooses its host name again on every one (MdnsServer.ts:40-43, :321-339
+// at db021da0) — so a name does not flip between two publications and
+// re-announce every service. A verdict that drops the OS host name is
+// kept only while an interface with addresses and a hardware address
+// exists; before that, the next request asks again.
 type hostNamePolicy struct {
 	// goos is runtime.GOOS, read once where the policy is built.
 	goos string
 	// lookup is the system resolver the macOS verdict asks; tests inject
 	// the verdict here.
 	lookup lookupIPAddrFunc
+	// localAddrs lists this host's interface addresses, which a served
+	// name must resolve to.
+	localAddrs func() ([]net.Addr, error)
 	// clock measures the lookup's deadline; nil is [clock.System].
 	clock clock.Clock
 	// list reads the host's interfaces ([listHostNameIfaces]).
@@ -78,81 +117,125 @@ type hostNamePolicy struct {
 	// chooser keeps the MAC-derived name stable.
 	chooser *hostNameChooser
 
-	// once guards kept.
-	once sync.Once
+	// mu guards everything below and serialises the lookups.
+	mu sync.Mutex
+	// verdict is the kept verdict, verdictNone when none is kept.
+	verdict hostNameVerdict
 	// kept is the OS host name kept as the SRV target, "" when the
 	// MAC-derived name applies.
 	kept string
+	// logged is the verdict last logged, so a re-take that confirms it
+	// does not log it again.
+	logged hostNameVerdict
 }
 
 // defaultHostPolicy is the process's policy; one advertiser per process
 // stands for matter.js's one MdnsServer.
 var defaultHostPolicy = &hostNamePolicy{
-	goos:    runtime.GOOS,
-	lookup:  net.DefaultResolver.LookupIPAddr,
-	list:    listHostNameIfaces,
-	chooser: &defaultHostNames,
+	goos:       runtime.GOOS,
+	lookup:     net.DefaultResolver.LookupIPAddr,
+	localAddrs: net.InterfaceAddrs,
+	list:       listHostNameIfaces,
+	chooser:    &defaultHostNames,
 }
 
-// hostName is the default SRV target host name; the first call takes the
-// macOS verdict and logs it.
-func (p *hostNamePolicy) hostName(log *slog.Logger) string {
-	p.once.Do(func() {
-		osName := osHostName()
-		p.kept = keptOSHostName(p.goos, osName, func(name string) bool { return osHostNameServed(p.clock, p.lookup, name) })
-		if p.goos != "darwin" || osName == "" {
-			return
-		}
-		log = cmp.Or(log, slog.Default())
-		if p.kept != "" {
-			log.Debug("mdns.hostname.os_served", slog.String("name", p.kept))
-			return
-		}
-		log.Warn("mdns.hostname.os_unanswered", slog.String("name", osName), slog.String("fallback", p.macHostName()))
-	})
-	if p.kept != "" {
+// keptHostName is the OS host name kept as the SRV target in place of
+// fallback, the MAC-derived name the Service carries, or "" when fallback
+// applies. Off darwin it is always "" and the resolver is not asked. The
+// verdict is taken on the first call after construction or a retake and
+// logged on log (nil is slog.Default()) when it differs from the last one
+// logged. The lookup may take up to [osHostNameLookupTimeout]: no caller
+// holds a lock the network path needs.
+func (p *hostNamePolicy) keptHostName(log *slog.Logger, fallback string) string {
+	if p.goos != "darwin" {
+		return ""
+	}
+	osName := osHostName()
+	if osName == "" {
+		return ""
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.verdict != verdictNone {
 		return p.kept
 	}
-	return p.macHostName()
-}
-
-// macHostName is the MAC-derived host name, or the 16-digit name hashed
-// from the OS host name without a usable MAC.
-func (p *hostNamePolicy) macHostName() string {
-	ifaces, err := p.list()
-	if h := p.chooser.choose(ifaces, err == nil); h != "" {
-		return h
+	log = cmp.Or(log, slog.Default())
+	v, resolved := osHostNameVerdict(p.clock, p.lookup, p.localAddrs, osName)
+	if v == verdictServed {
+		p.verdict, p.kept = v, osName
+		if p.logged != v {
+			log.Debug("mdns.hostname.os_served", slog.String("name", osName))
+		}
+		p.logged = v
+		return osName
 	}
-	h, _ := os.Hostname()
-	sum := sha256.Sum256([]byte("go-fabric host " + h))
-	return strings.ToUpper(hex.EncodeToString(sum[:8]))
-}
-
-// keptOSHostName is the OS host name kept as the SRV target, "" when the
-// MAC-derived name applies: on darwin the OS host name osName when served
-// reports that the system resolver answers it, nowhere else — served is
-// not called off darwin. goos is the caller's runtime.GOOS.
-func keptOSHostName(goos, osName string, served func(name string) bool) string {
-	if goos != "darwin" || osName == "" {
+	p.kept = ""
+	if _, addressed := macHostName(p.list, p.chooser); !addressed {
+		log.Debug("mdns.hostname.verdict_deferred", slog.String("name", osName),
+			slog.String("reason", "no up interface with addresses and a hardware address yet; asked again on the next publication"))
 		return ""
 	}
-	if !served(osName) {
-		return ""
+	p.verdict = v
+	if p.logged != v {
+		if v == verdictForeign {
+			log.Warn("mdns.hostname.os_foreign", slog.String("name", osName),
+				slog.String("addresses", joinIPAddrs(resolved)), slog.String("fallback", fallback))
+		} else {
+			log.Warn("mdns.hostname.os_unanswered", slog.String("name", osName), slog.String("fallback", fallback))
+		}
 	}
-	return osName
+	p.logged = v
+	return ""
 }
 
-// osHostNameServed reports whether lookup resolves `<name>.local` to at
-// least one address within [osHostNameLookupTimeout] on c (nil is
-// [clock.System]). The verdict is the process's, taken once and cached, so
-// no caller's context may cut it short: the lookup runs on its own.
+// retake drops the kept verdict; the next [hostNamePolicy.keptHostName]
+// asks the resolver again.
+func (p *hostNamePolicy) retake() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.verdict, p.kept = verdictNone, ""
+}
+
+// osHostNameVerdict asks lookup for `<name>.local` within
+// [osHostNameLookupTimeout] on c (nil is [clock.System]): served when one
+// of the resolved addresses is an address of this host (localAddrs; zones
+// ignored), foreign when none is, unanswered without an answer. resolved is
+// what the lookup returned. The verdict outlives the caller, so no
+// caller's context may cut it short: the lookup runs on its own.
 //
-//nolint:contextcheck // the process's verdict; see above
-func osHostNameServed(c clock.Clock, lookup lookupIPAddrFunc, name string) bool {
+//nolint:contextcheck // the verdict outlives the caller; see above
+func osHostNameVerdict(c clock.Clock, lookup lookupIPAddrFunc, localAddrs func() ([]net.Addr, error), name string) (v hostNameVerdict, resolved []net.IPAddr) {
 	ctx, cancel := clock.WithTimeout(context.Background(), clock.Or(c), osHostNameLookupTimeout)
 	defer cancel()
 	addrs, err := lookup(ctx, name+".local")
-	return err == nil && len(addrs) > 0
+	if err != nil || len(addrs) == 0 {
+		return verdictUnanswered, nil
+	}
+	local, _ := localAddrs()
+	for _, a := range addrs {
+		for _, l := range local {
+			var ip net.IP
+			switch l := l.(type) {
+			case *net.IPNet:
+				ip = l.IP
+			case *net.IPAddr:
+				ip = l.IP
+			}
+			if ip != nil && ip.Equal(a.IP) {
+				return verdictServed, addrs
+			}
+		}
+	}
+	return verdictForeign, addrs
+}
+
+// joinIPAddrs is addrs for a log line.
+func joinIPAddrs(addrs []net.IPAddr) string {
+	out := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		out = append(out, a.String())
+	}
+	return strings.Join(out, ",")
 }
 
 // hostNameIface is what the host-name choice reads of one interface.
@@ -255,6 +338,12 @@ type Service struct {
 	// service). Each subtype is the bare label without the
 	// `._sub.<service-type>` suffix.
 	Subtypes []string
+
+	// hostNameDefaulted is set by the builders when HostName was left
+	// empty and they filled in the MAC-derived default ([defaultHostName]);
+	// a Service built by hand never has it. Only for such a Service does
+	// the [Responder] take the macOS verdict on the OS host name.
+	hostNameDefaulted bool
 }
 
 // TXTRecord is one (key, value) entry. Matter TXT records use ASCII
@@ -439,9 +528,9 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	if cfg.ICD != nil {
 		txt = append(txt, TXTRecord{Key: "ICD", Value: strconv.FormatUint(uint64(*cfg.ICD), 10)})
 	}
-	host := cfg.HostName
+	host, defaulted := cfg.HostName, false
 	if host == "" {
-		host = defaultHostName(cfg.Logger)
+		host, defaulted = defaultHostName(), true
 	}
 	return Service{
 		InstanceName: instance,
@@ -458,7 +547,8 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 		// Publishing `_I<NodeID>` makes the freshly-paired bridge
 		// invisible to the controller's post-CommissioningComplete
 		// reachability probe and triggers RemoveFabric.
-		Subtypes: []string{"_I" + strings.ToUpper(hex.EncodeToString(cfg.CompressedFabricID[:]))},
+		Subtypes:          []string{"_I" + strings.ToUpper(hex.EncodeToString(cfg.CompressedFabricID[:]))},
+		hostNameDefaulted: defaulted,
 	}
 }
 
@@ -705,17 +795,18 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 	if cfg.VendorID != 0 {
 		subtypes = append(subtypes, fmt.Sprintf("_V%d", cfg.VendorID))
 	}
-	host := cfg.HostName
+	host, defaulted := cfg.HostName, false
 	if host == "" {
-		host = defaultHostName(cfg.Logger)
+		host, defaulted = defaultHostName(), true
 	}
 	return Service{
-		InstanceName: instance,
-		ServiceType:  ServiceTypeCommissionable,
-		Port:         cfg.Port,
-		HostName:     host,
-		Addresses:    append([]net.IP(nil), cfg.Addresses...),
-		TXT:          txt,
-		Subtypes:     subtypes,
+		InstanceName:      instance,
+		ServiceType:       ServiceTypeCommissionable,
+		Port:              cfg.Port,
+		HostName:          host,
+		Addresses:         append([]net.IP(nil), cfg.Addresses...),
+		TXT:               txt,
+		Subtypes:          subtypes,
+		hostNameDefaulted: defaulted,
 	}
 }

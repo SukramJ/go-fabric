@@ -4,6 +4,7 @@
 package mdns
 
 import (
+	"cmp"
 	"strconv"
 	"time"
 
@@ -22,10 +23,14 @@ import (
 // once more (RFC 6762 §8.3/§8.4; #publishChange and #repeatChange,
 // :321-349; CHANGE_REPEAT_INTERVAL, :32-33).
 //
-// The host name is the Service's (the MAC-derived default the Build*
-// helpers fill in, or [Responder.HostName]), not chosen again here, so a
-// change never moves every interface at once as matter.js's host-name
-// re-choice does (:331-333).
+// The MAC-derived host name is the Service's (the default the Build*
+// helpers fill in, or [Responder.HostName]) and not chosen again here. On
+// macOS the verdict on the OS host name of a defaulted Service is taken
+// again on every change ([hostNamePolicy]); when it moves the host name,
+// every service is published on every interface and repeated on every
+// interface, as matter.js does when its host name changed (:331-338;
+// #updateHost, :352-355). The publication carries the goodbyes of the old
+// host name's records, which no service holds any more (publication.go).
 
 // changeRepeatInterval is RFC 6762 §8.3's second announcement of a change,
 // matter.js CHANGE_REPEAT_INTERVAL (MdnsServer.ts:32-33 at db021da0).
@@ -90,12 +95,21 @@ func (r *Responder) interfaceSnapshot() map[string]string {
 	return out
 }
 
-// interfacesChanged publishes on the interfaces that changed and arms the
-// repeat (MdnsServer.ts #publishChange, :321-339 at db021da0).
+// interfacesChanged takes the host-name verdict again, then publishes on
+// the interfaces that changed — on every interface when the host name
+// moved — and arms the repeat (MdnsServer.ts #publishChange, :321-339 at
+// db021da0: previousHostname, #updateHost, "all" when the name changed).
 func (r *Responder) interfacesChanged(names []string) {
+	kept, retaken := r.retakeHostName()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed || len(r.order) == 0 || r.wire == nil {
+		return
+	}
+	if retaken && r.moveHostLocked(kept) {
+		r.repeatAll, r.repeatOn = true, nil
+		r.armChangeRepeatLocked()
+		r.publishEverywhereLocked(nil, true)
 		return
 	}
 	changed := map[int]bool{}
@@ -108,19 +122,82 @@ func (r *Responder) interfacesChanged(names []string) {
 		// The interface's records are built again from its addresses.
 		delete(r.links, ifIndex)
 	}
-	if r.repeatOn == nil {
-		r.repeatOn = map[int]bool{}
+	if !r.repeatAll {
+		if r.repeatOn == nil {
+			r.repeatOn = map[int]bool{}
+		}
+		for i := range changed {
+			r.repeatOn[i] = true
+		}
 	}
-	for i := range changed {
-		r.repeatOn[i] = true
-	}
+	r.armChangeRepeatLocked()
+	r.publishOnListedLocked(changed)
+}
+
+// armChangeRepeatLocked (re)starts the change repeat's timer. Caller holds
+// r.mu.
+func (r *Responder) armChangeRepeatLocked() {
 	r.stopChangeRepeatTimerLocked()
 	// The timer's generation: a repeat that fired before the re-arm and
 	// waits for r.mu is stale and must neither publish early nor drop the
 	// new timer (MdnsServer.ts:337 stop().start() at db021da0).
 	gen := r.changeRepeatGen
 	r.changeRepeat = r.clock.Load().AfterFunc(changeRepeatInterval, func() { r.repeatChange(gen) })
-	r.publishOnListedLocked(changed)
+}
+
+// retakeHostName takes the host-name verdict again, outside r.mu — the
+// lookup may take up to osHostNameLookupTimeout — when no override is set
+// and a published service carries a defaulted host name. kept is the OS
+// host name kept, "" when each service's own (MAC-derived) name applies;
+// retaken is false when there was nothing to take.
+func (r *Responder) retakeHostName() (kept string, retaken bool) {
+	if r.HostName != "" {
+		return "", false
+	}
+	r.mu.Lock()
+	var fallback string
+	for _, k := range r.order {
+		if e := r.services[k]; e.svc.hostNameDefaulted {
+			fallback = e.svc.HostName
+			break
+		}
+	}
+	r.mu.Unlock()
+	if fallback == "" {
+		return "", false
+	}
+	p := r.hostPolicy()
+	p.retake()
+	return p.keptHostName(r.logger(), fallback), true
+}
+
+// moveHostLocked gives every service with a defaulted host name the host
+// name of the verdict — kept, or its own MAC-derived one — and reports
+// whether one moved. A moved service keeps its place and its broadcast
+// run, as a matter.js registration outlives a host-name change; its
+// records, ownership of the address records and fingerprint follow the new
+// name. Caller holds r.mu.
+func (r *Responder) moveHostLocked(kept string) bool {
+	moved := false
+	for _, k := range r.order {
+		e := r.services[k]
+		if e.gen != nil || !e.svc.hostNameDefaulted {
+			continue
+		}
+		host := cmp.Or(kept, e.svc.HostName)
+		if host == e.host {
+			continue
+		}
+		e.host = host
+		e.names = namesOf(e.svc, host)
+		e.ownsHost = r.ownsHostName(host)
+		e.fingerprint = fingerprintOf(e.txt, e.svc, host, e.ips)
+		moved = true
+	}
+	if moved {
+		r.resetLocked()
+	}
+	return moved
 }
 
 // repeatChange publishes once more on the interfaces of the changes since
@@ -131,21 +208,24 @@ func (r *Responder) repeatChange(gen uint64) {
 	if gen != r.changeRepeatGen {
 		return // a stale timer; the current one repeats
 	}
-	on := r.repeatOn
-	r.repeatOn = nil
+	on, all := r.repeatOn, r.repeatAll
+	r.repeatOn, r.repeatAll = nil, false
 	r.changeRepeat = nil
-	if r.closed || on == nil || r.wire == nil {
+	if r.closed || (on == nil && !all) || r.wire == nil {
 		return
+	}
+	if all {
+		on = nil
 	}
 	r.publishOnListedLocked(on)
 }
 
 // publishOnListedLocked publishes every service on each listed interface
-// in only (MdnsServer.ts #publishOnListedInterfaces, :254-284 at
-// db021da0). Caller holds r.mu.
+// in only, on every one when only is nil (MdnsServer.ts
+// #publishOnListedInterfaces, :254-284 at db021da0). Caller holds r.mu.
 func (r *Responder) publishOnListedLocked(only map[int]bool) {
 	for _, l := range r.listLocked() {
-		if only[l.index] {
+		if only == nil || only[l.index] {
 			r.publishLocked(l, nil, true)
 		}
 	}
@@ -155,7 +235,7 @@ func (r *Responder) publishOnListedLocked(only map[int]bool) {
 // db021da0). Caller holds r.mu.
 func (r *Responder) stopChangeRepeatLocked() {
 	r.stopChangeRepeatTimerLocked()
-	r.repeatOn = nil
+	r.repeatOn, r.repeatAll = nil, false
 }
 
 func (r *Responder) stopChangeRepeatTimerLocked() {

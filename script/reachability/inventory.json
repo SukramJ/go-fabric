@@ -31981,6 +31981,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestDefaultHostNameIsMACDerived",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/hostname_policy_test.go",
+      "line": 244
+    },
+    {
+      "package": "mdns",
       "identifier": "TestDeriveUniqueIDFromIdentityIsStableAndDistinct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
@@ -32089,7 +32096,7 @@
       "identifier": "TestHostNamePolicy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/hostname_policy_test.go",
-      "line": 85
+      "line": 118
     },
     {
       "package": "mdns",
@@ -32163,13 +32170,6 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestKeptOSHostName",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "mdns/hostname_policy_test.go",
-      "line": 57
-    },
-    {
-      "package": "mdns",
       "identifier": "TestListMulticastInterfaces_ReturnsNonNilOnAnyOS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_internal_test.go",
@@ -32187,14 +32187,14 @@
       "identifier": "TestMdnsAdvertisementInterfaceScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 436
+      "line": 579
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAdvertisementOSHostNameVerdict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 378
+      "line": 381
     },
     {
       "package": "mdns",
@@ -32338,10 +32338,10 @@
     },
     {
       "package": "mdns",
-      "identifier": "TestOSHostNameServedDeadline",
+      "identifier": "TestOSHostNameVerdictDeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/hostname_policy_test.go",
-      "line": 145
+      "line": 258
     },
     {
       "package": "mdns",
