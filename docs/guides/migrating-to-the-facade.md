@@ -247,6 +247,25 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.18.0: the exchange receive notifier
+
+`exchange.Options.OnReceive` in `client/exchange` takes the message the
+exchange took and whether it is a duplicate:
+`func(msg *exchange.Message, duplicate bool)`, was `func()`. It is matter.js's
+receive notifier, which gets both, and it lets a protocol act on a message
+when it arrives rather than when its reader dequeues it — the BDX flow marks
+a transfer finished at its `BlockAckEOF` that way. A notifier that only
+counted receipts ignores both parameters:
+
+```go
+exchange.Options{OnReceive: func(*exchange.Message, bool) { receipts.Add(1) }}
+```
+
+An exchange the peer opened carries no options; `(*Exchange).SetReceiveNotifier`
+installs its notifier, and leaves one already in place. The notifier still
+runs on the receive path before the acknowledgement bookkeeping: it must not
+block and must not call back into the exchange or its manager.
+
 ## Changed after v0.18.0: the topology's border routers
 
 `controller/topology.Build(images, now)` is `Build(images, borderRouters,

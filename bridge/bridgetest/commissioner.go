@@ -27,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -229,7 +230,10 @@ func (c *Commissioner) start() error {
 	c.stop, c.served = stop, make(chan struct{})
 	go func() {
 		defer close(c.served)
-		_ = l.Serve(ctx, c.mgr.HandleDatagram)
+		// In arrival order per secure session, as controller.New serves
+		// its socket (controller/controller.go, openNetwork).
+		mgr := c.mgr
+		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
 	}()
 	c.conn = &queryConn{out: make(chan mdns.QueryResponse, 64), onQuery: c.feedOperational}
 	c.names = discovery.NewNames(c.conn, discard)

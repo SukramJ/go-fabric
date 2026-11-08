@@ -58,7 +58,8 @@ type Options struct {
 	// exchange with its retransmission number: 0 for a first
 	// transmission (a standalone ack included), n for the n-th
 	// retransmission — matter.js MessageExchange.Options.onSend
-	// (:1240-1243), called at :768 and :943. It runs on the sending
+	// (MessageExchange.ts:1321 at db021da0), a SendNotifier (:1367),
+	// called at :804 and :995. It runs on the sending
 	// goroutine, for a first transmission with the exchange locked, so it
 	// must not block for long or call back into the exchange.
 	OnSend func(retransmission int)
@@ -79,11 +80,17 @@ type Options struct {
 	// and the manager's [Config].LocalAdditionalMrpDelay (:1216-1222).
 	PeerAdditionalMrpDelay *time.Duration
 
-	// OnReceive is called for every message the exchange takes, a
-	// duplicate and a standalone ack included — matter.js
-	// MessageExchange.Options.onReceive (:1245-1248), called at :469
-	// after the protocol check.
-	OnReceive func()
+	// OnReceive is called with every message the exchange takes, a
+	// duplicate and a standalone ack included, and whether it is a
+	// duplicate — matter.js MessageExchange.Options.onReceive
+	// (MessageExchange.ts:1326 at db021da0), a ReceiveNotifier (:1372),
+	// stored at :326 and called at :499 after the protocol check with the
+	// duplicate flag onMessageReceived takes (:475). It runs on the
+	// receive goroutine before the acknowledgement bookkeeping, so it must
+	// not block and must not call back into the exchange or the manager.
+	// [Exchange.SetReceiveNotifier] installs one on an exchange the peer
+	// opened.
+	OnReceive func(msg *Message, duplicate bool)
 
 	// OnClosing is called once, when the exchange starts to close — a
 	// Close, an Abort or its final close, whichever comes first. A network
@@ -205,7 +212,8 @@ type Exchange struct {
 	onClosing       func()
 	onClosingOnce   sync.Once
 	onSend          func(retransmission int)
-	onReceive       func()
+	onReceive       func(msg *Message, duplicate bool)
+	onQueued        func(msg *Message) // [Exchange.SetQueueNotifier]
 	queue           []*Message
 	signal          chan struct{}
 	sentToAck       *pending
@@ -298,6 +306,38 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, op
 
 // ID is the exchange id.
 func (x *Exchange) ID() uint16 { return x.id }
+
+// SetQueueNotifier installs fn, called on the receive goroutine with every
+// message the exchange queues for [Exchange.Next], just before it is
+// queued: never a duplicate, a standalone acknowledgement or a message the
+// acknowledgement checks drop (MessageExchange.ts:501-561 at db021da0,
+// the queue write at :562), so fn sees exactly the messages Next will
+// return, before Next can return them. Unlike [Options].OnReceive, which matter.js calls for every
+// message before those checks (:499), it is Go only: a protocol that acts
+// on a message at its arrival — the BDX flow finishing a transfer at its
+// final BlockAckEof — must not act on one the exchange then drops. fn must
+// not block and must not call back into the exchange or the manager. A
+// later call replaces fn; nil removes it.
+func (x *Exchange) SetQueueNotifier(fn func(msg *Message)) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.onQueued = fn
+}
+
+// SetReceiveNotifier installs fn as the exchange's receive notifier when
+// none is set — the [Options].OnReceive of an exchange obtained after its
+// creation, such as one the peer opened, which the manager accepts
+// without options. Mirrors matter.js MessageExchange's onReceive setter
+// (MessageExchange.ts:385-389 at db021da0): a notifier already in place
+// stays. fn sees the messages that arrive after the call, with the same
+// contract as [Options].OnReceive.
+func (x *Exchange) SetReceiveNotifier(fn func(msg *Message, duplicate bool)) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.onReceive == nil {
+		x.onReceive = fn
+	}
+}
 
 // dest is where the exchange's messages go: the override, or the
 // session's current address.
@@ -813,7 +853,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	x.lastActive = x.m.clock.Now()
 	if onReceive := x.onReceive; onReceive != nil {
 		x.mu.Unlock()
-		onReceive()
+		onReceive(msg, duplicate)
 		x.mu.Lock()
 	}
 	if duplicate {
@@ -863,6 +903,18 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		}
 		x.receivedToAck = msg
 		x.ackTimer = x.m.clock.AfterFunc(StandaloneAckTimeout, func() { x.ackTimeout(msg) })
+	}
+	x.enqueueLocked(msg)
+}
+
+// enqueueLocked queues msg for [Exchange.Next] with x.mu held and releases
+// it: the queue notifier ([Exchange.SetQueueNotifier]) hears of msg first,
+// so it has run before Next can return msg.
+func (x *Exchange) enqueueLocked(msg *Message) {
+	if onQueued := x.onQueued; onQueued != nil {
+		x.mu.Unlock()
+		onQueued(msg)
+		x.mu.Lock()
 	}
 	x.queue = append(x.queue, msg)
 	x.countQueuedLocked()

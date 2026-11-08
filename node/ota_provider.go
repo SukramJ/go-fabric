@@ -108,8 +108,10 @@ type otaProviderStatus struct {
 // OnOTAProviderStatus registers fn for every update state a requestor of
 // the node's OTA provider ([Config].OTAProvider) reports: the peer, its
 // status and the version it concerns. fn runs inline on the provider's
-// goroutine and must not block; [Node.OnOTAProviderStatusAsync] queues it
-// instead. It returns the unsubscribe function (ADR 0025 principle 8).
+// goroutine and must not block — a download's WaitForApply is reported on
+// the receive path, when the requestor's final BlockAckEof arrives, so a
+// blocking fn stalls that session's datagrams; [Node.OnOTAProviderStatusAsync]
+// queues it instead. It returns the unsubscribe function (ADR 0025 principle 8).
 func (n *Node) OnOTAProviderStatus(fn func(peer OTAPeer, status OTAUpdateStatus, version uint32)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}

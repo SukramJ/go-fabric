@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -267,7 +268,9 @@ func (c *Controller) build() (*stack, error) {
 	st.stop, st.served = stop, served
 	go func() {
 		defer close(served)
-		_ = l.Serve(ctx, mgr.HandleDatagram)
+		// In arrival order per secure session, as controller.New serves
+		// its socket (controller/controller.go, openNetwork).
+		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
 	}()
 	st.names = discovery.NewNames(newQueryConn(c.site), log)
 	if st.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk, IntermediateCA: c.opts.IntermediateCA}); err != nil {

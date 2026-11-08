@@ -4,6 +4,9 @@
 package controller
 
 import (
+	"context"
+
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/peer"
 )
@@ -29,4 +32,15 @@ func PeerSessions(c *Controller, p exchange.PeerAddress) []*exchange.Session {
 		return pp.Sessions()
 	}
 	return nil
+}
+
+// HoldBDXReceive installs fn on c's OTA provider: every BDX exchange it
+// serves calls fn on the flow's goroutine with each message it hands the
+// flow, before the flow takes it. nil removes it.
+func HoldBDXReceive(c *Controller, fn func(context.Context, bdx.Message)) {
+	if fn == nil {
+		c.otaProvider.receiveHook.Store(nil)
+		return
+	}
+	c.otaProvider.receiveHook.Store(&fn)
 }

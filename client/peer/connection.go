@@ -818,7 +818,7 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 			}
 			a.onSend(n)
 		},
-		OnReceive: func() {
+		OnReceive: func(*exchange.Message, bool) {
 			p.status.SetLastReceiptAt(p.set.clock.Now())
 			a.onReceive()
 		},

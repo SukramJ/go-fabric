@@ -220,6 +220,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -878,7 +879,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := listener.ServeOrdered(serveCtx, sessionOrderKey, b.handleOrderedDatagram); err != nil {
+		if err := listener.ServeOrdered(serveCtx, message.SessionOrderKey, b.handleOrderedDatagram); err != nil {
 			// The listener's own close ends Serve with nil, so an error
 			// here means the socket is gone or failed every read: the node
 			// no longer receives, which the operator must see.

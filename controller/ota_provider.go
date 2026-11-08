@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -40,6 +41,10 @@ type otaProvider struct {
 	// ctx bounds the transfers the responder serves; stop ends them.
 	ctx  context.Context
 	stop context.CancelFunc
+	// receiveHook is a test seam (export_ota_test.go): when set, a BDX
+	// exchange calls it on the flow's goroutine with every message it
+	// hands the flow, before the flow takes it.
+	receiveHook atomic.Pointer[func(context.Context, bdx.Message)]
 }
 
 // newOTAProvider composes node/'s OTA provider ([mattercore.NewOTAProvider])
@@ -74,7 +79,7 @@ func (c *Controller) newOTAProvider(ctx context.Context, mgr *softwareupdate.Man
 	// Close; the exchange manager's handler itself carries none.
 	o.ctx, o.stop = context.WithCancel(context.WithoutCancel(ctx)) //nolint:contextcheck // bounded by the provider's lifetime, not the call's
 	o.restore = wrapProviderCommands(srv, p.Commands)
-	c.mgr.SetProtocolHandler(bdx.ProtocolID, serveBDX(o.ctx, responder)) //nolint:contextcheck // the handler has no context of its own
+	c.mgr.SetProtocolHandler(bdx.ProtocolID, serveBDX(o.ctx, responder, &o.receiveHook)) //nolint:contextcheck // the handler has no context of its own
 	return o, nil
 }
 
@@ -82,12 +87,13 @@ func (c *Controller) newOTAProvider(ctx context.Context, mgr *softwareupdate.Man
 // manager: a node that downloads an image opens a BDX exchange to the
 // provider, and the responder serves it over that exchange — the device
 // side's bridge.deliverRespondedBDX on the client stack's exchanges.
-func serveBDX(ctx context.Context, r *bdx.Responder) exchange.ProtocolHandler {
+func serveBDX(ctx context.Context, r *bdx.Responder, hook *atomic.Pointer[func(context.Context, bdx.Message)]) exchange.ProtocolHandler {
 	return func(x *exchange.Exchange, first *exchange.Message) {
 		sess := x.Session()
 		peer := bdx.Peer{FabricIndex: sess.FabricIndex(), NodeID: sess.PeerNodeID(), SessionID: sess.ID()}
 		msg := bdx.Message{ProtocolID: first.ProtocolID, Opcode: first.Opcode, Payload: first.Payload}
-		ex := &bdxExchange{x: x}
+		ex := &bdxExchange{x: x, hook: hook}
+		x.SetQueueNotifier(ex.queued)
 		defer func() { _ = ex.Close() }()
 		r.HandleExchange(ctx, peer, msg, ex)
 	}
@@ -95,8 +101,30 @@ func serveBDX(ctx context.Context, r *bdx.Responder) exchange.ProtocolHandler {
 
 // bdxExchange is a client-stack exchange as the BDX responder's
 // [bdx.Exchange]: a StatusReport travels on the Secure Channel protocol by
-// the exchange's own rule (exchange.Send), every other message on BDX.
-type bdxExchange struct{ x *exchange.Exchange }
+// the exchange's own rule (exchange.Send), every other message on BDX. It
+// is a [bdx.ReceiveNotifier] through the exchange's queue notifier
+// ([exchange.Exchange.SetQueueNotifier]), so the outbound flow finishes a
+// transfer when its final BlockAckEof is queued, before the receive path
+// decodes the requestor's ApplyUpdateRequest — and never on one the
+// exchange's acknowledgement checks drop.
+type bdxExchange struct {
+	x *exchange.Exchange
+	// notify is the flow's [bdx.ReceiveNotifier] callback.
+	notify atomic.Pointer[func(bdx.Message)]
+	// hook is the provider's receive seam ([otaProvider].receiveHook).
+	hook *atomic.Pointer[func(context.Context, bdx.Message)]
+}
+
+// OnReceive implements [bdx.ReceiveNotifier].
+func (e *bdxExchange) OnReceive(fn func(bdx.Message)) { e.notify.Store(&fn) }
+
+// queued is the exchange's queue notifier, on the receive goroutine: it
+// passes the flow each message the exchange queues for Receive.
+func (e *bdxExchange) queued(m *exchange.Message) {
+	if fn := e.notify.Load(); fn != nil {
+		(*fn)(bdx.Message{ProtocolID: m.ProtocolID, Opcode: m.Opcode, Payload: m.Payload})
+	}
+}
 
 func (e *bdxExchange) Send(ctx context.Context, _ uint16, opcode uint8, payload []byte) error {
 	return e.x.Send(ctx, opcode, payload, exchange.SendOptions{})
@@ -107,7 +135,13 @@ func (e *bdxExchange) Receive(ctx context.Context) (bdx.Message, error) {
 	if err != nil {
 		return bdx.Message{}, err
 	}
-	return bdx.Message{ProtocolID: m.ProtocolID, Opcode: m.Opcode, Payload: m.Payload}, nil
+	msg := bdx.Message{ProtocolID: m.ProtocolID, Opcode: m.Opcode, Payload: m.Payload}
+	if e.hook != nil {
+		if fn := e.hook.Load(); fn != nil {
+			(*fn)(ctx, msg)
+		}
+	}
+	return msg, nil
 }
 
 func (e *bdxExchange) MaxPayloadSize() int { return e.x.Session().MaxPayloadSize() }
@@ -116,6 +150,8 @@ func (e *bdxExchange) Close() error {
 	e.x.Close()
 	return nil
 }
+
+var _ bdx.ReceiveNotifier = (*bdxExchange)(nil)
 
 // wrapProviderCommands puts the manager's scripted commands
 // ([softwareupdate.ProviderCommands]) in front of the provider's own

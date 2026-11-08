@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -183,5 +185,116 @@ func TestBDXResponder_UnknownScope(t *testing.T) {
 	sr, err := bdx.DecodeStatusReport(m.Payload)
 	if err != nil || sr.GeneralStatus != bdx.GeneralFailure || sr.ProtocolStatus != bdx.StatusFileDesignatorUnknown || sr.ProtocolID != bdx.ProtocolID {
 		t.Fatalf("StatusReport %+v, %v", sr, err)
+	}
+}
+
+// notifyingResponder is a BDXResponder that installs a receive notifier on
+// the exchange and reads two messages, recording whether each reached the
+// notifier before Receive returned it.
+type notifyingResponder struct {
+	installed chan struct{}
+	result    chan notifyResult
+}
+
+type notifyResult struct {
+	notifier           bool
+	inOrder            bool
+	notified, received []uint8
+}
+
+func (r *notifyingResponder) HandleExchange(ctx context.Context, _ bdx.Peer, _ bdx.Message, ex bdx.Exchange) {
+	rn, ok := ex.(bdx.ReceiveNotifier)
+	if !ok {
+		r.result <- notifyResult{}
+		return
+	}
+	var mu sync.Mutex
+	var notified []uint8
+	rn.OnReceive(func(m bdx.Message) {
+		mu.Lock()
+		notified = append(notified, m.Opcode)
+		mu.Unlock()
+	})
+	close(r.installed)
+	res := notifyResult{notifier: true, inOrder: true}
+	for range 2 {
+		m, err := ex.Receive(ctx)
+		if err != nil {
+			break
+		}
+		res.received = append(res.received, m.Opcode)
+		mu.Lock()
+		if len(notified) < len(res.received) {
+			res.inOrder = false
+		}
+		mu.Unlock()
+	}
+	mu.Lock()
+	res.notified = slices.Clone(notified)
+	mu.Unlock()
+	r.result <- res
+}
+
+// TestBDXResponder_ExchangeNotifiesAtArrival: the exchange a peer opens is
+// a bdx.ReceiveNotifier, and the receive path tells it of each message
+// before the message is queued for Receive — the arrival at which the
+// outbound flow finishes a transfer on its final BlockAckEof (issue 462).
+func TestBDXResponder_ExchangeNotifiesAtArrival(t *testing.T) {
+	t.Parallel()
+	responder := &notifyingResponder{installed: make(chan struct{}), result: make(chan notifyResult, 1)}
+	peer, _ := newBDXSessionHarness(t, responder)
+	const exchangeID = 0x4343
+	init, err := bdx.Init{TransferControl: bdx.TransferControl{ReceiverDrive: true}, MaxBlockSize: 1024, FileDesignator: []byte("ota/image.bin")}.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendBDX(peer, exchangeID, bdx.MessageReceiveInit, init)
+	waitFor(t, "the responder's exchange", func() bool {
+		select {
+		case <-responder.installed:
+			return true
+		default:
+			return false
+		}
+	})
+	sendBDX(peer, exchangeID, bdx.MessageBlockQuery, bdx.CounterOnly{BlockCounter: 0}.Encode())
+	sendBDX(peer, exchangeID, bdx.MessageBlockAckEOF, bdx.CounterOnly{BlockCounter: 0}.Encode())
+	var res notifyResult
+	waitFor(t, "the responder's end", func() bool {
+		select {
+		case res = <-responder.result:
+			return true
+		default:
+			return false
+		}
+	})
+	want := []uint8{uint8(bdx.MessageBlockQuery), uint8(bdx.MessageBlockAckEOF)}
+	if !res.notifier || !res.inOrder || !slices.Equal(res.notified, want) || !slices.Equal(res.received, want) {
+		t.Fatalf("result %+v, want the notifier to see %v before Receive returned each", res, want)
+	}
+}
+
+// TestInitiatedSecureExchangeNotifiesOnlyQueued: the receive notifier hears
+// of a message only when the exchange queues it — a full queue and an ended
+// exchange drop the message without telling it, so a transfer is never
+// finished on a BlockAckEof that Receive will not return
+// (bdx.ReceiveNotifier).
+func TestInitiatedSecureExchangeNotifiesOnlyQueued(t *testing.T) {
+	t.Parallel()
+	ex := &initiatedSecureExchange{in: make(chan bdx.Message, 1), done: make(chan struct{})}
+	var notified []uint8
+	ex.OnReceive(func(m bdx.Message) { notified = append(notified, m.Opcode) })
+	first := bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageBlockQuery)}
+	second := bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageBlockAckEOF)}
+	if !ex.enqueue(first) || len(notified) != 1 {
+		t.Fatalf("first message: queued %d, notified %v", len(ex.in), notified)
+	}
+	if ex.enqueue(second) || len(notified) != 1 {
+		t.Fatalf("a full queue: notified %v, want the first alone", notified)
+	}
+	<-ex.in
+	close(ex.done)
+	if ex.enqueue(second) || len(notified) != 1 {
+		t.Fatalf("an ended exchange: notified %v, want the first alone", notified)
 	}
 }

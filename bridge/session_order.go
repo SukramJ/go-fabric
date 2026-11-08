@@ -5,10 +5,7 @@ package bridge
 
 import (
 	"context"
-	"encoding/binary"
 	"net"
-
-	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // A session's messages are handled in the order they arrive. The UDP
@@ -25,31 +22,15 @@ import (
 // (ExchangeManager #receiveMessage), chip on its device loop.
 //
 // The listener now keeps the datagrams of one unicast session in a queue
-// (transport/udp ServeOrdered) and hands them over one at a time. A handler
-// that sends and then waits for the peer's answer on the same session —
+// (transport/udp ServeOrdered, keyed by message.SessionOrderKey — the
+// controller keys its socket the same way) and hands them over one at a
+// time. A handler that sends and then waits for the peer's answer on the
+// same session —
 // a chunked report waiting for its StatusResponse, the subscription priming
 // loop — releases its turn first (leaveSessionOrder), so the answer it
 // waits for is not queued behind it. Unsecured messages (the PASE / CASE
 // handshakes, session id 0) and group messages, which the bridge
 // serialises itself, are not queued.
-
-// sessionOrderKey names the stream of a datagram: its local session id, for
-// a message of a unicast secure session.
-func sessionOrderKey(buf []byte) (uint32, bool) {
-	if len(buf) < 4 {
-		return 0, false
-	}
-	// Session type 0 is unicast (message.SessionUnsecured names the value);
-	// with session id 0 it is the unsecured session.
-	if message.SessionType(buf[3]&secFlagSessionTypeBits) != message.SessionUnsecured {
-		return 0, false
-	}
-	sid := binary.LittleEndian.Uint16(buf[1:3])
-	if sid == 0 {
-		return 0, false
-	}
-	return uint32(sid), true
-}
 
 type sessionTurnKey struct{}
 

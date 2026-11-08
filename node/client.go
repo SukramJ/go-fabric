@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -23,6 +24,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -120,7 +122,10 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	cs.stop, cs.served = stop, make(chan struct{})
 	go func() {
 		defer close(cs.served)
-		_ = l.Serve(ctx, cs.exchanges.HandleDatagram)
+		// In arrival order per secure session, as controller.New serves
+		// its socket (controller/controller.go, openNetwork).
+		mgr := cs.exchanges
+		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
 	}()
 	return cs, nil
 }

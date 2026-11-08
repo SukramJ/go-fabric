@@ -25,7 +25,7 @@ gate for these paths.
 | BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
 | BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
 | Binding manager | the first binding work (`Node.Start` registers the entries) | on change | `Node.Stop` |
-| Client stack socket | `node.New` with a non-nil `Config.Client` | per datagram | `Node.Stop` |
+| Client stack socket | `node.New` with a non-nil `Config.Client` | per datagram, in arrival order per secure session (below) | `Node.Stop` |
 
 `node.New` starts no goroutine of its own (only the opt-in client stack
 opens its socket there): a node built and dropped leaks nothing it began.
@@ -53,7 +53,7 @@ no host holds counted work in hand and no goroutine of the process is
 working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:22-28`, `bridge/ackpump.go:317-376`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go`, `mdns/announce.go`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:22-28`, `bridge/ackpump.go:317-376`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go`, `mdns/announce.go`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-130`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
@@ -66,6 +66,12 @@ handler that sends and then waits for the peer's answer on the same session
 releases its turn first, so the answer is not queued behind it. Examples
 are a chunked report waiting for its StatusResponse and the subscription
 priming loop. The TCP transport keeps the same contract per connection.
+The client stack — a controller's socket and a node's opt-in
+`Config.Client` — keys its datagrams the same way
+(`message.SessionOrderKey`), so a request on a later exchange cannot
+overtake the message that finished an earlier one: the BlockAckEof that
+completes an OTA download is handled before the ApplyUpdateRequest sent
+after it.
 
 **Everything else runs concurrently:** unsecured messages (the PASE and
 CASE handshakes, session id 0) and group messages. Concurrent unordered
@@ -76,7 +82,7 @@ taken is dropped, and the peer's MRP retransmits it. Per session, at most
 Between sessions there is no ordering. Two controllers act on the same
 server concurrently.
 
-*Source: `bridge/session_order.go:14-69`, `transport/udp/ordered.go:13-126`, `transport/udp/listener.go:38-47`, `transport/udp/listener.go:233-249`, `transport/tcp/doc.go:24-35`.*
+*Source: `bridge/session_order.go:11-50`, `transport/message/message.go:284-303`, `controller/controller.go:471-484`, `node/client.go:121-128`, `transport/udp/ordered.go:13-126`, `transport/udp/listener.go:38-47`, `transport/udp/listener.go:233-249`, `transport/tcp/doc.go:24-35`.*
 
 ## What a host callback may do
 
@@ -134,7 +140,7 @@ report to a channel.
 **`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:314`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:37-50`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:314`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
 
 ## Changing the topology
 

@@ -217,7 +217,10 @@ type Config struct {
 	// OnUpdateApplying, OnUpdateDone and OnUpdateFailed are
 	// events.updateApplying, updateDone and updateFailed (:1424-1438); [Manager.Observe] reports them too.
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p Peer)
-	// OnStatus observes each status the provider reports for a node.
+	// OnStatus observes each status the provider reports for a node. A
+	// download's WaitForApply is reported on the receive path, when the
+	// node's final BlockAckEof arrives, so it must not block and must not
+	// call back into the controller synchronously.
 	OnStatus func(p Peer, status Status, version uint32)
 
 	// ScriptQueryImage and ScriptApplyUpdate, when set, are asked before
