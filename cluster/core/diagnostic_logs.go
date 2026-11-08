@@ -287,8 +287,10 @@ func (d *DiagnosticLogs) SetClock(c clock.Clock) {
 // TimeSynchronization: utc returns its UTC time, false while it is null,
 // and a collected log then carries no UTCTimeStamp — TimeSinceBoot
 // alone, which the specification allows. A server outside a node stamps
-// its clock's time. Pass [TimeSynchronization.UTC] when both are
-// mounted, as the node does, so after SetUTCTime the stamp follows the
+// its clock's time. It takes the UTC as a time, not the participants'
+// clock.MatterTime: UTCTimeStamp is epoch-us, which Matter epoch seconds
+// cannot carry. Pass [TimeSynchronization.UTC] when both are mounted, as
+// the node does, so after SetUTCTime the stamp follows the
 // node's UTCTime as connectedhomeip's single system clock does
 // (TimeSynchronizationCluster.cpp:856-872 at 6170af84; issue 445).
 func (d *DiagnosticLogs) SetUTCClock(utc func() (time.Time, bool)) {

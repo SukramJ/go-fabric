@@ -115,6 +115,9 @@ var (
 	// while a delayed update waits for its StartDate (DataMgmt.h:563-566,
 	// :612-615).
 	ErrTariffUpdatePending = errors.New("energy: CommodityTariff: a delayed update is pending")
+	// ErrNoTime: the node has no time, the update and the sync need one
+	// (commodity-tariff-server.cpp:928-934 at 6170af84, CHIP_ERROR_INVALID_TIME).
+	ErrNoTime = errors.New("energy: CommodityTariff: no valid time")
 )
 
 // Tariff is the tariff data a host hands to [CommodityTariffServer.UpdateTariff]:
@@ -282,7 +285,7 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 
 // nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
 // clock's outside a node.
-func (s *CommodityTariffServer) nowEpoch() uint32 { return s.epochS(s.clock) }
+func (s *CommodityTariffServer) nowEpoch() (uint32, bool) { return s.epochS(s.clock) }
 
 // value reads a stored attribute.
 func (s *CommodityTariffServer) value(attrID uint32) any {
@@ -343,7 +346,10 @@ func (s *CommodityTariffServer) UpdateTariff(t Tariff) error {
 	if s.pending != nil {
 		return ErrTariffUpdatePending
 	}
-	now := s.nowEpoch()
+	now, ok := s.nowEpoch()
+	if !ok {
+		return ErrNoTime
+	}
 	ctx := &tariffUpdateCtx{
 		features: TariffFeature(s.FeatureMap()), blockMode: ct.BlockModeNoBlock,
 		tariffStart: t.StartDate, updateTS: now,
@@ -415,7 +421,9 @@ func (s *CommodityTariffServer) dataUpdatedLocked(erased bool) error {
 		return nil
 	}
 	s.active = true
-	_ = s.updateCurrentLocked(s.nowEpoch()) // InitCurrentAttrs logs a failure, :909-913
+	if now, ok := s.nowEpoch(); ok { // UpdateCurrentAttrs fails without a time, :928-934
+		_ = s.updateCurrentLocked(now) // InitCurrentAttrs logs a failure, :909-913
+	}
 	return nil
 }
 
@@ -453,7 +461,10 @@ func (s *CommodityTariffServer) ClearTariff() error {
 func (s *CommodityTariffServer) SyncTime() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := s.nowEpoch()
+	now, ok := s.nowEpoch()
+	if !ok { // UpdateCurrentAttrs, :928-934
+		return ErrNoTime
+	}
 	if s.pending != nil {
 		start, _ := s.pending[1].(uint32)
 		if now >= start {

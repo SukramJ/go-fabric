@@ -83,14 +83,19 @@ func reachOf(tried, ok int) reach {
 }
 
 // combine is the reach of a message from the reach of its datagrams: every
-// one all is all, every one none is none, anything else some — a message
-// that reached some families counts as reaching each of its records
-// (InterfaceResponder.ts:734-737 at db021da0).
+// one all is all; a datagram that reached some or all beside one that did
+// not makes some — a message that reached some families counts as
+// reaching each of its records (InterfaceResponder.ts:734-737 at
+// db021da0); and failed beside none is failed, a message no peer got.
 func (a reach) combine(b reach) reach {
-	if a == b {
+	switch {
+	case a == b:
 		return a
+	case a >= reachSome || b >= reachSome:
+		return reachSome
+	default:
+		return reachFailed
 	}
-	return reachSome
 }
 
 // peerEntry is one record peers on an interface may cache.

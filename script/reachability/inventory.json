@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7798,
+  "entry_points": 7801,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17759,
-    "reachable": 12341,
-    "whitelisted": 5418,
+    "total_exported": 17763,
+    "reachable": 12342,
+    "whitelisted": 5421,
     "unreachable": 0
   },
   "by_package": [],
@@ -5736,6 +5736,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestWriteTransactionTTLIsIdleTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_transaction_test.go",
+      "line": 49
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWriteTransactionsShareHolds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_hold_routing_test.go",
@@ -9467,10 +9474,17 @@
     },
     {
       "package": "cluster/energy",
+      "identifier": "TestEnergyServersWithoutTheNodesTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/energy/mattertime_internal_test.go",
+      "line": 59
+    },
+    {
+      "package": "cluster/energy",
       "identifier": "TestNodeTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/energy/mattertime_internal_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/energy",
@@ -31352,21 +31366,21 @@
       "identifier": "TestWriteRequestDecodeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "im",
       "identifier": "TestWriteRequestSuppressResponseType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 77
+      "line": 78
     },
     {
       "package": "im",
       "identifier": "TestWriteRequestWithoutClusterOrAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "im",
@@ -32305,6 +32319,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_internal_test.go",
       "line": 160
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestReachCombine",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/transport_parity_matterjs_test.go",
+      "line": 348
     },
     {
       "package": "mdns",

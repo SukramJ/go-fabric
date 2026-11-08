@@ -494,7 +494,7 @@ func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answer
 	case reachFailed:
 		r.multicastMissedLocked(st, l, "mdns.responder.multicast_not_sent", err)
 	case reachNone:
-		// No usable family: nothing was tried, no outage (#transmit, :745-748).
+		// No usable family: nothing was tried, no outage (#transmit, :752-754).
 	}
 	return rc
 }

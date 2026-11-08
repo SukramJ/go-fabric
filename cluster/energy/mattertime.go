@@ -21,7 +21,8 @@ import (
 // controller reads one time from the node (issue 445). Each reads the time
 // when a command or its own timer asks for it; none re-evaluates on a
 // change of the time, so MatterTimeChanged does nothing, and none refuses
-// to start without one.
+// to start without one; each does what its chip line does when
+// GetClock_MatterEpochS fails while the node's time is null.
 type nodeTime struct {
 	t atomic.Pointer[clock.MatterTime]
 }
@@ -43,14 +44,13 @@ func (n *nodeTime) MatterTimeChanged() {}
 // without a time and fail the one command that needs it.
 func (n *nodeTime) RequiresMatterTime() bool { return false }
 
-// epochS is the node's Matter time while it has one, else c's (nil:
-// [clock.System]).
-func (n *nodeTime) epochS(c clock.Clock) uint32 {
+// epochS is the node's Matter time, false while it is null — a node's
+// server does not fall back to another clock, as chip's callers test
+// GetClock_MatterEpochS's error. A server outside a node, with no time
+// attached, reads c (nil: [clock.System]).
+func (n *nodeTime) epochS(c clock.Clock) (uint32, bool) {
 	if p := n.t.Load(); p != nil {
-		if s, ok := (*p)(); ok {
-			return s
-		}
+		return (*p)()
 	}
-	s, _ := clock.MatterTimeOf(c)()
-	return s
+	return clock.MatterTimeOf(c)()
 }

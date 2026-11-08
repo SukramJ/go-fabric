@@ -340,3 +340,25 @@ func TestMdnsServerTransportNotices(t *testing.T) {
 		}
 	})
 }
+
+// TestReachCombine: a message's reach from its datagrams' — all only when
+// every one reached all, some when one reached anything, failed when the
+// datagrams failed or found no usable family, so records no peer got are
+// not noted as cached.
+func TestReachCombine(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct{ a, b, want reach }{
+		{reachAll, reachAll, reachAll},
+		{reachAll, reachFailed, reachSome},
+		{reachSome, reachNone, reachSome},
+		{reachAll, reachNone, reachSome},
+		{reachFailed, reachNone, reachFailed},
+		{reachNone, reachFailed, reachFailed},
+		{reachNone, reachNone, reachNone},
+		{reachFailed, reachFailed, reachFailed},
+	} {
+		if got := c.a.combine(c.b); got != c.want {
+			t.Errorf("combine(%d, %d) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+}

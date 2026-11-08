@@ -42,3 +42,23 @@ func TestWriteTransactionSpansTheChunksOfOneWrite(t *testing.T) {
 		t.Fatal("an abandoned chunked write was not pruned")
 	}
 }
+
+// TestWriteTransactionTTLIsIdleTime: the TTL counts from the last chunk,
+// so a chunked write whose chunks arrive within it keeps its transaction —
+// and with it the list-ADD marker — however long it runs in all.
+func TestWriteTransactionTTLIsIdleTime(t *testing.T) {
+	t.Parallel()
+	var r exchangeRouting
+	now := time.Unix(1000, 0)
+	a := mrp.ExchangeKey{SessionID: 1, ExchangeID: 7}
+	sweep := mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}
+	first := r.writeTransaction(a, true, now)
+	step := writeTxTTL * 3 / 4
+	for i := 1; i <= 3; i++ { // 2.25 TTLs in all, each gap within one
+		at := now.Add(time.Duration(i) * step)
+		r.writeTransaction(sweep, true, at)
+		if got := r.writeTransaction(a, true, at); got != first {
+			t.Fatalf("chunk %d after %v got a fresh transaction", i+1, time.Duration(i)*step)
+		}
+	}
+}

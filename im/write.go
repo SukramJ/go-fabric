@@ -559,17 +559,6 @@ func (tx *WriteTransaction) busyBefore(p ConcreteAttributePath) bool {
 	return p.ListAppend && !tx.followsLastQueued(p)
 }
 
-// holdUnlessBusy reports false when another interaction holds the
-// attribute (the write is answered BUSY); otherwise it accepts the path
-// ([WriteTransaction.accept]).
-func (tx *WriteTransaction) holdUnlessBusy(p ConcreteAttributePath, more bool) bool {
-	if tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
-		return false
-	}
-	tx.accept(p, more)
-	return true
-}
-
 // accept takes the hold [WriteTransaction.hold] decides on and records
 // the attribute as the interaction's last accepted one — matter.js's
 // previousProcessedAttributePath (InteractionServer.ts:533-537 at

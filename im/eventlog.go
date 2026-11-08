@@ -397,7 +397,9 @@ func (l *EventLog) SetClock(c clock.Clock) {
 // SetUTCClock stamps a record appended without a timestamp with the
 // node's UTC: utc returns its UTC time, false while it is null, when the
 // record takes the clock's time ([EventLog.SetClock]) — the record has no
-// system-time form. connectedhomeip stamps an event's EpochTimestamp from
+// system-time form. It takes the UTC as a time, not the participants'
+// clock.MatterTime: the stamp is POSIX milliseconds, which Matter epoch
+// seconds cannot carry. connectedhomeip stamps an event's EpochTimestamp from
 // the one system clock SetUTCTime sets (src/app/EventManagement.cpp:433-439
 // at 6170af84, GetClock_RealTimeMS), so after SetUTCTime the stamps
 // follow the node's UTCTime (issue 445). nil detaches it.

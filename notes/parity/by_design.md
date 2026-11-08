@@ -6126,7 +6126,10 @@ event log's EpochTimestamp (`im.EventLog`, chip `EventManagement.cpp:433-439`,
 which stamps a system time when the UTC is null; the Go record has no
 system-time form and takes the host clock then), GeneralDiagnostics'
 TimeSnapshot and DiagnosticLogs' UTCTimeStamp (omitted while the UTC is
-null). A server outside a node reads its own clock (`clock.MatterTimeOf`),
+null). While the node's time is null a participant does what its chip line
+does on GetClock_MatterEpochS's error (DEM fails the request, EVSE skips the
+stamp and re-checks in 30 s, the tariff refuses); only a server outside a
+node reads its own clock (`clock.MatterTimeOf`),
 and the duplicated Matter-epoch offsets of the readers are gone onto it.
 TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
