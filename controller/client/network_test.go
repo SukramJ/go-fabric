@@ -252,11 +252,15 @@ func TestDefaultSubscription(t *testing.T) {
 			t.Fatal("the priming report was not applied")
 		}
 		// The report's hooks run on the node's job queue, off its exchange
-		// (W4-ctlim-04): the event arrives after the image changed.
-		waitUntil(t, "the priming report's event", func() bool {
+		// (W4-ctlim-04): the event arrives after the image changed, and
+		// SubscriptionAlive after the report's own hooks, the event among
+		// them (client_alive_order_parity_matterjs_test.go; matter.js
+		// NetworkClient.ts:179-190 at db021da0 emits subscriptionAlive once
+		// the whole update is read) — the wait is for both (issue 467).
+		waitUntil(t, "the priming report's event and the alive hook", func() bool {
 			hl.mu.Lock()
 			defer hl.mu.Unlock()
-			return len(hl.events) > 0
+			return len(hl.events) > 0 && hl.alive > 0
 		})
 		// Copied under the lock and asserted after it: a Fatalf under hl.mu
 		// would leave it held for the cleanup's Close, whose drain of the
