@@ -614,16 +614,30 @@ func (s *ServerSession) progress(transferred uint64, total *uint64) {
 	}
 }
 
+// finished marks the session ended, then tells its observers. matter.js
+// emits progressFinished while its session is still active and drops the
+// session only in processTransfer's finally (BdxSession.ts:185, :197-198
+// at db021da0); here the session ends first, so an ApplyUpdateRequest
+// served on another goroutine as the observers run already finds it
+// ended. No observer in this module reads SessionFor inside the finished
+// hook, so the order is ours to choose.
 func (s *ServerSession) finished(total uint64) {
+	s.ended.Store(true)
 	s.mu.Lock()
 	fns := slices.Clone(s.onFinished)
 	s.mu.Unlock()
 	for _, fn := range fns {
 		fn(total)
 	}
-	s.ended.Store(true)
 }
 
+// cancelled tells the observers of a cancelled transfer, then marks the
+// session ended — matter.js's order (BdxSession.ts:183, :197-198 at
+// db021da0), kept here because an observer reads SessionFor inside this
+// hook: the controller's update manager, on the Cancelled status, looks
+// for the peer's running transfer before it triggers the next update
+// (controller/softwareupdate triggerQueuedUpdate). No ApplyUpdateRequest
+// races a cancelled transfer: the provider forces its close.
 func (s *ServerSession) cancelled() {
 	s.mu.Lock()
 	fns := slices.Clone(s.onCancelled)

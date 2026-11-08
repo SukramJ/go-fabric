@@ -309,7 +309,9 @@ func TestWrongBlockAckEOFCounterIsRefused(t *testing.T) {
 // provider's ApplyUpdateRequest for a transfer it knows as completed —
 // succeeds. matter.js closes the session in processTransfer's finally and
 // removes it from the active sessions before anything else is dispatched
-// (BdxSession.ts:197-198, BdxProtocol.ts:187-189 at db021da0).
+// (BdxSession.ts:197-198, BdxProtocol.ts:187-189 at db021da0). The session
+// is ended before the finished observers run, so one served meanwhile —
+// an ApplyUpdateRequest on another goroutine — finds it ended too.
 func TestTransferFinishedAtArrivalIsNoLongerActive(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -322,7 +324,12 @@ func TestTransferFinishedAtArrivalIsNoLongerActive(t *testing.T) {
 		var rec flowEvents
 		closed := make(chan struct{})
 		off := r.OnSessionStarted(func(s *bdx.ServerSession, _ string) {
-			s.OnFinished(func(uint64) { rec.add("finished") })
+			s.OnFinished(func(uint64) {
+				if r.SessionFor(testPeer, "ota") != nil {
+					rec.add("active in the finished hook")
+				}
+				rec.add("finished")
+			})
 			s.OnCancelled(func() { rec.add("cancelled") })
 			s.OnClosed(func() { close(closed) })
 		})
