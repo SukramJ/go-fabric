@@ -24296,7 +24296,7 @@
       "identifier": "TestClientBridgeStructureSeveralEndpointsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 559
+      "line": 560
     },
     {
       "package": "controller/client",

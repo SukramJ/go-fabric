@@ -507,10 +507,11 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 		}
 		n.apply(wildcard, &nestedInteraction(func(ep uint16) bool { return ep == silent }).r, true)
 		mu.Lock()
-		if len(announced) != 0 {
-			t.Fatalf("announced %v while an endpoint said nothing", announced)
-		}
+		early := slices.Clone(announced)
 		mu.Unlock()
+		if len(early) != 0 {
+			t.Fatalf("announced %v while an endpoint said nothing", early)
+		}
 		n.apply(wildcard, &bsDescriptor(silent, bridgedLight, nil, 10).r, true)
 		mu.Lock()
 		defer mu.Unlock()
