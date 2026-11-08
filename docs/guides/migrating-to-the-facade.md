@@ -247,6 +247,19 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.18.0: the topology's border routers
+
+`controller/topology.Build(images, now)` is `Build(images, borderRouters,
+now)`: the third input is the border-router registry's entries
+(`[]brdiscovery.Entry`, package `thread/brdiscovery`), nil for none. A
+caller that built without a registry passes nil and gets the graph it got
+before; one that has the controller's passes
+`ctrl.BorderRouters().List()`, and a neighbour the registry knows becomes a
+`border_router` node (`topology.KindBorderRouter`, id `br_<EXTADDR>`, with
+`HostName`, `VendorName`, `ModelName` and `LastSeen`). `topology.New`
+builds with the controller's registry without a change on the caller's
+side; `topology.Config.BorderRouters` names another.
+
 ## Changed after v0.18.0: the camera bounds
 
 `controller/camera.VideoBounds`' `MinFrameRate`, `MaxFrameRate`

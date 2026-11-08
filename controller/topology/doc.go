@@ -17,8 +17,10 @@
 // NetworkCommissioning, GeneralDiagnostics, ThreadNetworkDiagnostics and
 // WiFiNetworkDiagnostics states of its root endpoint, read with [ImageOf]
 // — it yields a [Topology]: a [Node] per commissioned node, a
-// thread_unknown [Node] for every Thread neighbour no commissioned node
-// matches, a wifi_ap [Node] per access point, and a [Connection] per
+// border_router [Node] for every Thread neighbour the border-router
+// registry knows (thread/brdiscovery, [Config].BorderRouters) and a
+// thread_unknown [Node] for every other one no commissioned node matches,
+// a wifi_ap [Node] per access point, and a [Connection] per
 // Thread pair (both directions folded, [Direction]) and per Wi-Fi station.
 // [Service] keeps it current over a controller.Controller: a trailing
 // debounce after a node's change, a periodic rebuild, [Service.Refresh]
@@ -29,12 +31,14 @@
 // [Service.AddSource] merges nodes the controller has not commissioned —
 // a [Source] the service builds from but never reads.
 //
-// Left out, as go-fabric-server's port leaves them out: the border-router
-// registry (matterjs-server's kind border_router, its br_ ids and the
-// network name by extended PAN id) and the route-table supplement (an
-// edge from a RouteTable entry, via_route_table, path_cost). The registry
-// browses _meshcop over mDNS; this module's border-router client is the
-// OTBR REST client of thread/otbr (ADR 0027 decision 1) and no _meshcop
-// browse exists. A neighbour that is a border router is therefore a
-// thread_unknown node. Each pin lift of matterjs-server re-reads both.
+// The border-router registry is thread/brdiscovery's, built on the
+// controller's DNS-SD cache: a neighbour it knows by extended address is
+// a border_router node (id br_<EXTADDR>, role router, its network, host,
+// vendor and model names), and its network names label the Thread nodes
+// and externals by extended PAN id.
+//
+// Left out: the route-table supplement (an edge from a RouteTable entry,
+// via_route_table, path_cost), and feeding thread/otbr's border-router
+// list from the registry, a separate decision. Each pin lift of
+// matterjs-server re-reads both.
 package topology

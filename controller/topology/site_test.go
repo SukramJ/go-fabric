@@ -117,6 +117,11 @@ func TestServiceOnASite(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The controller keeps a border-router registry by default, which
+	// the service builds with: none is on the site's LAN.
+	if c.BorderRouters() == nil || len(c.BorderRouters().List()) != 0 {
+		t.Fatalf("the controller's border-router registry: %v", c.BorderRouters())
+	}
 	svc := topology.New(c, topology.Config{Changes: &changes, Clock: cfg.Clock})
 	t.Cleanup(svc.Close)
 	var mu sync.Mutex

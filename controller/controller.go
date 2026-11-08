@@ -57,6 +57,7 @@ import (
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -187,6 +188,11 @@ type Config struct {
 	// controller's own UDP socket, as matter.js's node sends from its own
 	// interface. A test hands a redirecting transport here.
 	GroupTransport groups.MulticastTransport
+	// BorderRouters configures the passive Thread border-router registry
+	// the controller keeps on its DNS-SD cache ([Controller.BorderRouters],
+	// thread/brdiscovery); the zero value keeps one, as matterjs-server's
+	// controller always does.
+	BorderRouters BorderRouterConfig
 	// Camera, when set, turns on the controller side of Matter cameras
 	// ([CameraConfig]): the controller serves a Camera Controller endpoint
 	// with a WebRtcTransportRequestor under its own identity and
@@ -210,6 +216,7 @@ type Controller struct {
 	fabric *commissioner.Fabric
 	mgr    *exchange.Manager
 	names  *discovery.Names
+	brs    *brdiscovery.Registry
 	peers  *peer.Set
 	subs   *interaction.Subscriptions
 	com    *commissioner.Commissioner
@@ -424,6 +431,9 @@ func (c *Controller) openTransports(ctx context.Context, cfg Config, listen stri
 	}); err != nil {
 		return nil, err
 	}
+	if !cfg.BorderRouters.Disabled {
+		c.brs = brdiscovery.New(c.names, brdiscovery.Config{Clock: clk, Logger: log})
+	}
 	if cfg.TCP.Incoming {
 		if err := c.listenTCP(ctx); err != nil {
 			return nil, err
@@ -530,12 +540,30 @@ func (c *Controller) Close(ctx context.Context) error {
 	}
 	c.stop()
 	c.stop = func() {}
+	if c.brs != nil {
+		c.brs.Close()
+	}
 	if c.names != nil {
 		errs = append(errs, c.names.Close())
 		c.names = nil
 	}
 	return errors.Join(errs...)
 }
+
+// BorderRouterConfig configures the controller's border-router registry
+// ([Config].BorderRouters).
+type BorderRouterConfig struct {
+	// Disabled leaves the controller without a registry:
+	// [Controller.BorderRouters] is nil.
+	Disabled bool
+}
+
+// BorderRouters is the passive registry of the Thread border routers the
+// controller's DNS-SD cache sees (`_meshcop`, `_trel`), which
+// controller/topology classifies Thread neighbours by — matterjs-server's
+// controller keeps one always (NetworkTopologyService.ts:88-89 of
+// matterjs-server at 0bd06f2). Nil when [BorderRouterConfig].Disabled.
+func (c *Controller) BorderRouters() *brdiscovery.Registry { return c.brs }
 
 // Registry is the registry of the paired nodes: Commissioned lists them,
 // Get finds one by id. A seam of the role (docs/guides/advanced-seams.md).

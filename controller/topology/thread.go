@@ -6,6 +6,8 @@ package topology
 import (
 	"strconv"
 
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+
 	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 )
 
@@ -51,20 +53,24 @@ func (m threadMaps) node(nb *threaddiagdef.NeighborTableStruct) (string, bool) {
 // external is a Thread device commissioned nodes list as a neighbour and
 // no commissioned node matches.
 type external struct {
-	id       string
-	ext      uint64
-	extPanID uint64 // the first observer's that knows one
-	router   bool   // some observer saw it rx-on-when-idle
+	id          string
+	ext         uint64
+	extPanID    uint64 // the first observer's that knows one
+	router      bool   // some observer saw it rx-on-when-idle
+	networkName string // the registry's for extPanID
+	br          *brdiscovery.Entry
 }
 
 // unknowns are the neighbours no commissioned node matches, one per
 // extended address in the order first seen — matterjs-server's
-// findUnknownDevices at 0bd06f22 (topology-utils.ts:539-633) without the
-// border-router classification: the id is unknown_<EXTADDR>, a neighbour
-// seen rx-on-when-idle by any observer is a router, the extended PAN id
-// is the first observer's. The best RSSI and the observers it also keeps
-// do not reach the wire.
-func (m threadMaps) unknowns(nodes []*Image) []*external {
+// findUnknownDevices at 0bd06f22 (topology-utils.ts:539-633): a neighbour
+// the registry knows is its border router, id br_<EXTADDR> (:603-615);
+// any other is unknown_<EXTADDR>, named by the registry's network for its
+// extended PAN id (:592-600, :616-629); a neighbour seen rx-on-when-idle
+// by any observer is a router, the extended PAN id is the first
+// observer's. The best RSSI and the observers it also keeps do not reach
+// the wire.
+func (m threadMaps) unknowns(nodes []*Image, brs borderRouterIndex) []*external {
 	var out []*external
 	byExt := map[uint64]*external{}
 	for _, img := range nodes {
@@ -86,6 +92,13 @@ func (m threadMaps) unknowns(nodes []*Image) []*external {
 				e.extPanID = xp
 			}
 			e.router = e.router || nb.RxOnWhenIdle
+		}
+	}
+	for _, e := range out {
+		if br, ok := brs.byExt[e.ext]; ok {
+			e.br, e.id = br, "br_"+hex16(e.ext)
+		} else if e.extPanID != 0 {
+			e.networkName = brs.networkByXpan[e.extPanID]
 		}
 	}
 	return out

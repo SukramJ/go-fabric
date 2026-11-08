@@ -132,8 +132,9 @@ const testparityPlannedRatchet = 3
 // Pin lift wave P4 (#433): InitialContactScheduleTest.ts ported, ClientConnectivityTest.ts's Sigma1 refresh: 152 ported, 997 missing.
 // Pin lift wave P4 (#433): VendorIdVerificationTest.ts ported, the VVSC rows of OperationalCertificateVerifyTest.ts: 153 ported, 988 missing.
 // Merged with wave P3: 158 ported, 985 missing.
+// Wave W8 (#461): BorderRouterRegistryTest.ts ported by thread/brdiscovery: 159 ported.
 const (
-	testparityPortedRatchet  = 158
+	testparityPortedRatchet  = 159
 	testparityMissingRatchet = 985
 )
 
@@ -181,7 +182,11 @@ const (
 // BD-Matter-MdnsFollowsAdvertisedAddresses), three state-field cases of
 // GeneralDiagnosticsServerTest.ts and the lone-ADD skip (findings T3-P3-1),
 // merged with waves P1 and P2: 619.
-const testparityLeftRatchet = 619
+// Wave W8 (#461) leaves twelve BorderRouterRegistryTest.ts cases — the
+// addresses, ports and MeshCoP version fields thread/brdiscovery does not
+// keep (device-ble-thread, ADR 0027 decision 5) and the JS start/stop,
+// target-observer and log-flag mechanics (js-runtime-only): 631.
+const testparityLeftRatchet = 631
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
@@ -200,10 +205,13 @@ const testparityLeftRatchet = 619
 // JavaScript values the typed fields cannot hold, Observable and Logger
 // mechanics). The two topology files issue 380 ported joined the snapshot
 // as ported: 0 planned, 19 ported, 1 missing, 97 left.
+// Wave W8 (#461): NetworkTopologyServiceTest.ts's five border-router cases
+// ported on thread/brdiscovery's registry, the file ported: 19 ported, 1
+// missing.
 const (
 	serverPlannedRatchet = 0
-	serverPortedRatchet  = 18
-	serverMissingRatchet = 6
+	serverPortedRatchet  = 19
+	serverMissingRatchet = 1
 	serverLeftRatchet    = 97
 )
 

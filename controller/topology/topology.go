@@ -9,8 +9,7 @@ import (
 )
 
 // Kind is a node's kind — matterjs-server's TopologyNodeKind at 0bd06f22
-// (packages/ws-client/src/models/model.ts:237) without border_router,
-// which needs the border-router registry this port leaves out.
+// (packages/ws-client/src/models/model.ts:237).
 type Kind string
 
 // The kinds.
@@ -18,8 +17,11 @@ const (
 	// KindMatter is a node commissioned on the controller's fabric.
 	KindMatter Kind = "matter"
 	// KindThreadUnknown is a Thread device a commissioned node lists as a
-	// neighbour and no commissioned node matches.
+	// neighbour and no commissioned node or known border router matches.
 	KindThreadUnknown Kind = "thread_unknown"
+	// KindBorderRouter is a Thread neighbour the border-router registry
+	// knows by its extended address (thread/brdiscovery).
+	KindBorderRouter Kind = "border_router"
 	// KindWiFiAP is the pseudo-node of one Wi-Fi access point (BSSID).
 	KindWiFiAP Kind = "wifi_ap"
 )
@@ -84,14 +86,13 @@ type Topology struct {
 }
 
 // Node is one node of the graph — matterjs-server's NetworkTopologyNode
-// at 0bd06f22 (packages/ws-client/src/models/model.ts:273-315) without the
-// border-router fields (host_name, vendor_name, model_name, last_seen),
-// with the node's operational addresses as go-fabric-server's port
-// carries them.
+// at 0bd06f22 (packages/ws-client/src/models/model.ts:273-315), with the
+// node's operational addresses as go-fabric-server's port carries them.
 type Node struct {
 	// ID is the graph id: the decimal node id of a commissioned node,
-	// unknown_<extended address, 16 upper-case hex digits> of a Thread
-	// external, ap_<BSSID hex without colons> of an access point.
+	// br_<extended address, 16 upper-case hex digits> of a known border
+	// router, unknown_<extended address> of another Thread external,
+	// ap_<BSSID hex without colons> of an access point.
 	ID          string
 	Kind        Kind
 	NetworkType NetworkType
@@ -123,6 +124,14 @@ type Node struct {
 	// Addresses are a commissioned node's known operational addresses,
 	// sorted.
 	Addresses []netip.Addr
+	// HostName is a border router's mDNS host name as a display label,
+	// without the trailing dot and ".local"; empty when nothing is left.
+	HostName string
+	// VendorName and ModelName are a border router's `_meshcop` vn and mn.
+	VendorName, ModelName string
+	// LastSeen is when the registry last saw the border router; zero for
+	// the other kinds.
+	LastSeen time.Time
 }
 
 // Connection is one edge — matterjs-server's NetworkTopologyConnection at
