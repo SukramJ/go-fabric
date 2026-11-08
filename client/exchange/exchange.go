@@ -904,6 +904,13 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.receivedToAck = msg
 		x.ackTimer = x.m.clock.AfterFunc(StandaloneAckTimeout, func() { x.ackTimeout(msg) })
 	}
+	x.enqueueLocked(msg)
+}
+
+// enqueueLocked queues msg for [Exchange.Next] with x.mu held and releases
+// it: the queue notifier ([Exchange.SetQueueNotifier]) hears of msg first,
+// so it has run before Next can return msg.
+func (x *Exchange) enqueueLocked(msg *Message) {
 	if onQueued := x.onQueued; onQueued != nil {
 		x.mu.Unlock()
 		onQueued(msg)
