@@ -6,9 +6,7 @@ package mdns_test
 import (
 	"errors"
 	"net"
-	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -738,17 +736,10 @@ func TestBuildOperationalService_EmptyHostName_UsesDefault(t *testing.T) {
 	cfg := operationalCfg()
 	cfg.HostName = ""
 	svc := mdns.BuildOperationalService(cfg)
-	// On macOS the default is the OS host name, without ".local": the
-	// recorded divergence L7-D03 (notes/parity/by_design.md, mDNSResponder
-	// owns the host's address records). The test held every platform to
-	// the hex shape and failed on any Mac whose name is not 16 hex digits
-	// (nightly run 41816797999, macos-latest).
-	if h, err := os.Hostname(); runtime.GOOS == "darwin" && err == nil && h != "" {
-		if want := strings.TrimSuffix(h, ".local"); svc.HostName != want {
-			t.Fatalf("default HostName %q, want the OS host name %q (L7-D03)", svc.HostName, want)
-		}
-		return
-	}
+	// The builders' default is the MAC-derived name on every platform; on
+	// macOS the Responder may keep the OS host name in its place at
+	// publish time (notes/parity/by_design.md L7-D03, issue 465), which
+	// this builder test does not reach.
 	// 16 uppercase hex digits — the MAC plus "0000", as matter.js
 	// MdnsAdvertisement.ts:155 names its host; TC-SC-4.3 rejects any
 	// other shape (12 or 16 uppercase hexadecimal characters).
