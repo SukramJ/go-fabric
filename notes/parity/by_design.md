@@ -6416,10 +6416,11 @@ device has the TC feature, holds no satisfying acceptance and the options'
 acknowledgement is absent or below TCMinRequiredVersion, ends the
 commissioning right after that step with `*commissioner.TermsRequiredError`
 (`Version`, `Deadline` as Matter epoch seconds) — before ArmFailSafe, so the
-device is left as found. The error's `Acknowledgements` is 0: a device
-serves no attribute naming the bits it requires (TCAcknowledgements is the
-accepted set; the required set is the vendor's DCL entry), so a missing bit
-stays the device's RequiredTCNotAccepted at SetTCAcknowledgements, typed as
+device is left as found. The error names no acknowledgement bits (owner
+decision 2026-11-08): a device serves no attribute naming the bits it
+requires (TCAcknowledgements is the accepted set; the required set is the
+vendor's DCL entry), so a missing bit stays the device's
+RequiredTCNotAccepted at SetTCAcknowledgements, typed as
 `*commissioner.GeneralCommissioningError` like every refused
 GeneralCommissioning command. `controller.PairOptions.TermsAndConditions`
 carries the acknowledgement. Owner decision 2026-11-07 (issue 449): read in

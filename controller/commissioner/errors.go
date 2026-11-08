@@ -147,19 +147,18 @@ func (e *GeneralCommissioningError) Unwrap() error {
 // matter.js nor connectedhomeip reads the requirement (register row
 // BD-Matter-Commissioner-TermsRequirementRead). It unwraps to a
 // [*CommissioningError] of kind [ErrCommissioning].
+//
+// It names no acknowledgement bits: a device serves no attribute that
+// names the bits it requires — TCAcknowledgements is the set it has
+// accepted, and the required set is the vendor's Distributed Compliance
+// Ledger entry, outside the commissioning. The caller takes the bits from
+// the terms it shows the user; a missing bit is the device's
+// RequiredTCNotAccepted at SetTCAcknowledgements, a
+// [*GeneralCommissioningError].
 type TermsRequiredError struct {
 	// Version is the device's TCMinRequiredVersion, the lowest version an
 	// acknowledgement has to name.
 	Version uint16
-	// Acknowledgements are the acknowledgement bits the device requires.
-	// A device serves no attribute that names them — TCAcknowledgements
-	// is the set it has accepted, and the required set is the vendor's
-	// Distributed Compliance Ledger entry, outside the commissioning — so
-	// the flow reports 0: the caller takes the bits from the terms it
-	// shows the user, and a missing bit is the device's
-	// RequiredTCNotAccepted at SetTCAcknowledgements, a
-	// [*GeneralCommissioningError].
-	Acknowledgements uint16
 	// Deadline is the device's TCUpdateDeadline in Matter epoch seconds,
 	// the time by which a commissioned device expects an updated
 	// acceptance; nil when the attribute is null.

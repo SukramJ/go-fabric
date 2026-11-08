@@ -131,7 +131,7 @@ func TestTermsRequirementRead(t *testing.T) {
 			if !errors.As(err, &te) {
 				t.Fatalf("step 0.1: %v, want a *TermsRequiredError", err)
 			}
-			if te.Version != r.want.Version || te.Acknowledgements != 0 || (te.Deadline == nil) != (r.want.Deadline == nil) ||
+			if te.Version != r.want.Version || (te.Deadline == nil) != (r.want.Deadline == nil) ||
 				(te.Deadline != nil && *te.Deadline != *r.want.Deadline) {
 				t.Fatalf("requirement %+v, want %+v", te, r.want)
 			}

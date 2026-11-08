@@ -609,9 +609,9 @@ no satisfying acceptance and the option is absent or names a lower
 version, `Pair` fails right after that step, before ArmFailSafe and
 AddNOC, with a `*commissioner.TermsRequiredError`: `Version` is the
 version to acknowledge, `Deadline` the TCUpdateDeadline in Matter epoch
-seconds (nil when null). A device serves no attribute naming the
-acknowledgement bits it requires, so `Acknowledgements` is 0; the bits
-come from the terms the host shows. A host shows the terms and pairs again
+seconds (nil when null). The error names no acknowledgement bits: a device
+serves no attribute naming the bits it requires, so they come from the
+terms the host shows. A host shows the terms and pairs again
 with the acknowledgement:
 
 ```go

@@ -46,7 +46,7 @@ func TestPairTermsRequired(t *testing.T) {
 		t.Fatalf("Pair with the acknowledgement: %v", err)
 	}
 	var te *commissioner.TermsRequiredError
-	if !errors.As(refused, &te) || te.Version != 1 || te.Acknowledgements != 0 || te.Deadline != nil {
+	if !errors.As(refused, &te) || te.Version != 1 || te.Deadline != nil {
 		t.Fatalf("Pair without the acknowledgement: %v, want a *TermsRequiredError of version 1", refused)
 	}
 	if !errors.Is(refused, commissioner.ErrCommissioning) {
