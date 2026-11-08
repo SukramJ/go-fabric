@@ -115,6 +115,14 @@ func (s *FakeStore) RemoveEndpoint(_ context.Context, key endpoint.SourceKey) er
 	return nil
 }
 
+// EraseEndpoints implements [endpoint.Store]: every row goes and the
+// next-id counter restarts at 2.
+func (s *FakeStore) EraseEndpoints(context.Context) error {
+	clear(s.rows)
+	s.nextID = 2
+	return nil
+}
+
 // Identity the test assembler stamps on the root endpoint. Any non-zero
 // vendor / product pair and a non-empty label satisfy the assembler's
 // validation; the values carry no other meaning.

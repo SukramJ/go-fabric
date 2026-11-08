@@ -1491,6 +1491,12 @@ func (s *internalFakeStore) RemoveEndpoint(_ context.Context, key SourceKey) err
 	return nil
 }
 
+func (s *internalFakeStore) EraseEndpoints(context.Context) error {
+	clear(s.rows)
+	s.nextID = 2
+	return nil
+}
+
 var _ Store = (*internalFakeStore)(nil)
 
 // TestInvokeUnsupportedCommandMapsTo0x81 pins that a cluster server

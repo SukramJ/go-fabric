@@ -10,7 +10,8 @@
         "controller/topology:TestBuildExternals",
         "controller/topology:TestNetworkTypeAndThresholds",
         "controller/topology:TestThreadMatching",
-        "controller/topology:TestWiFiFields"
+        "controller/topology:TestWiFiFields",
+        "controller/topology:TestBuildBorderRouters"
       ],
       "reason": "The topology-utils functions controller/topology ports (issue 380; notes/parity/by_design.md, the network topology entry): network type, signal buckets, neighbour and route matching, Wi-Fi fields, unknown devices.",
       "snapshotSha": "18cc8e04aeb5f9ef3d427b796b685d80ecdff0c2"
@@ -506,7 +507,7 @@
     },
     {
       "path": "packages/ws-controller/test/NetworkTopologyServiceTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/topology:TestBuildSyntheticMesh",
         "controller/topology:TestBuildLikeTheServerPort",
@@ -521,17 +522,13 @@
         "controller/topology:TestServiceClose",
         "controller/topology:TestServiceSourceMerges",
         "controller/topology:TestServiceSourceChanged",
-        "controller/topology:TestServiceOnASite"
+        "controller/topology:TestServiceOnASite",
+        "controller/topology:TestBuildThreadPair",
+        "controller/topology:TestBuildBorderRouters",
+        "controller/topology:TestServiceBorderRouters"
       ],
-      "reason": "NetworkTopologyService as controller/topology ports it (issue 380; notes/parity/by_design.md, the network topology entry): getTopology, change-driven emission, node sources, refresh, stop. The five border-router and host-name cases are missing: the module has no border-router registry (controller/topology builds without one; notes/parity/by_design.md, the network topology entry) — route: the registry with the server's host-name rules, when a consumer needs it.",
-      "snapshotSha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2",
-      "missing": [
-        "omits host_name when the Border Router has no mDNS hostname",
-        "omits host_name when the mDNS hostname strips to nothing",
-        "prefers the node's own Thread network name over the Border Router registry",
-        "rebuilds against the current Border Router registry when a BR is discovered",
-        "rebuilds when a Border Router entry is updated (e.g. its network name resolves)"
-      ]
+      "reason": "NetworkTopologyService as controller/topology ports it (issues 380 and 461; notes/parity/by_design.md, the network topology entry): getTopology, change-driven emission, node sources, refresh, stop, and the border-router cases on thread/brdiscovery's registry — the border_router node, the host-name rules, the network name by extended PAN id and the rebuild on the registry's events.",
+      "snapshotSha": "c7414f2618576185fadb1ebd5e23b5133b3ec8f2"
     },
     {
       "path": "packages/ws-controller/test/OverlayPolicyTest.ts",

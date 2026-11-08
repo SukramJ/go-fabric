@@ -364,3 +364,60 @@ func TestWithoutAKeyDecoderTheNumberIsStillStable(t *testing.T) {
 		t.Errorf("without a decoder the store lists %v, want one row with a StringKey", rows)
 	}
 }
+
+// TestEraseEndpointsRestartsTheNumbering is the factory reset's erase:
+// every row goes and the next allocation is the first bridged number
+// again, as matter.js ServerEndpointStores.ts erase (:63-77) sets
+// #nextNumber back; a removal alone still does not reissue.
+func TestEraseEndpointsRestartsTheNumbering(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	for i := range 5 {
+		assign(t, s, fmt.Sprintf("src:%d", i), "scope", 0x0100)
+	}
+	last := assign(t, s, "src:last", "other", 0x0100)
+	if err := s.RemoveEndpoint(t.Context(), endpoint.StringKey("src:last")); err != nil {
+		t.Fatalf("RemoveEndpoint: %v", err)
+	}
+	if got := assign(t, s, "src:after-remove", "scope", 0x0100); got <= last {
+		t.Fatalf("a removal reissued %d (the removed number was %d)", got, last)
+	}
+
+	if err := s.EraseEndpoints(t.Context()); err != nil {
+		t.Fatalf("EraseEndpoints: %v", err)
+	}
+	if recs, err := s.ListEndpoints(t.Context(), ""); err != nil || len(recs) != 0 {
+		t.Fatalf("records after the erase %v (%v), want none", recs, err)
+	}
+	if got := assign(t, s, "src:0", "scope", 0x0100); got != 2 {
+		t.Fatalf("first number after the erase %d, want 2", got)
+	}
+	if got := assign(t, s, "src:1", "scope", 0x0100); got != 3 {
+		t.Fatalf("second number after the erase %d, want 3", got)
+	}
+	if err := s.RemoveEndpoint(t.Context(), endpoint.StringKey("src:1")); err != nil {
+		t.Fatalf("RemoveEndpoint: %v", err)
+	}
+	if got := assign(t, s, "src:2", "scope", 0x0100); got == 3 {
+		t.Fatal("after the erase a removal reissued its number 3")
+	}
+}
+
+// TestEraseEndpointsRefusals: an erase on a database Apply never ran on
+// says so instead of leaving a store that allocates nothing, and a closed
+// database's error is returned.
+func TestEraseEndpointsRefusals(t *testing.T) {
+	t.Parallel()
+	db := openAt(t, filepath.Join(t.TempDir(), "endpoints.db"))
+	if _, err := db.ExecContext(t.Context(), `DELETE FROM matter_endpoint_allocation`); err != nil {
+		t.Fatal(err)
+	}
+	s := sqlitestore.New(db)
+	if err := s.EraseEndpoints(t.Context()); err == nil || !strings.Contains(err.Error(), "allocation row missing") {
+		t.Fatalf("erase without the allocation row: %v", err)
+	}
+	_ = db.Close()
+	if err := s.EraseEndpoints(t.Context()); err == nil {
+		t.Fatal("erase on a closed database succeeded")
+	}
+}

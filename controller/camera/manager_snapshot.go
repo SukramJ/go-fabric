@@ -6,25 +6,11 @@ package camera
 import (
 	"context"
 	"slices"
-	"strconv"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	"github.com/SukramJ/go-fabric/im"
 )
-
-// imageCodecName is an image codec's wire name. Mirrors matterjs-server
-// packages/ws-controller/src/camera/wireNames.ts:64-66 at 0bd06f2.
-func imageCodecName(codec csdef.ImageCodecEnum) string {
-	switch codec {
-	case csdef.ImageCodecJpeg:
-		return "JPEG"
-	case csdef.ImageCodecHeic:
-		return "HEIC"
-	default:
-		return strconv.Itoa(int(codec))
-	}
-}
 
 // snapshotArgs is one snapshot request: a zero maxResolution, a nil
 // target and a nil codec state none.
@@ -99,7 +85,7 @@ func (m *manager) snapshot(ctx context.Context, args snapshotArgs) (*snapshotRes
 			}
 			requestedCodecs := []string{}
 			if args.codec != nil {
-				requestedCodecs = []string{imageCodecName(*args.codec)}
+				requestedCodecs = []string{ImageCodecName(*args.codec)}
 			}
 			if lacksFeature(st.features, csdef.FeatureSnapshot) {
 				return nil, &IncompatibleError{Reason: ReasonFeature, Feature: featureName(csdef.FeatureSnapshot), Device: []string{}, Requested: requestedCodecs}
@@ -119,7 +105,7 @@ func (m *manager) snapshot(ctx context.Context, args snapshotArgs) (*snapshotRes
 			})
 			deviceCodecs := []string{}
 			for _, c := range st.snapshotCapabilities {
-				if name := imageCodecName(c.imageCodec); !slices.Contains(deviceCodecs, name) {
+				if name := ImageCodecName(c.imageCodec); !slices.Contains(deviceCodecs, name) {
 					deviceCodecs = append(deviceCodecs, name)
 				}
 			}

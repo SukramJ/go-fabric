@@ -701,3 +701,34 @@ func decodeRequest[T spec.Encodable, P interface {
 	}
 	return v, nil
 }
+
+// ParseICECandidates converts a host's JSON list of ICE candidates — the
+// ice_candidates of matterjs-server's camera_provide_ice_candidates, each
+// an object of ICECandidateStruct's fields (candidate, sdpMid,
+// sdpMLineIndex; keys matched with case and word separators ignored) —
+// into the cluster's structs for [Session.ProvideICECandidates]. It runs
+// the converter [Provider.Send] runs for ProvideIceCandidates'
+// iceCandidates field, so a refusal is worded as there ("ice_candidates[0]
+// requires sdpMid") and matches [ErrInvalidArgument]. Mirrors
+// matterjs-server packages/ws-controller/src/camera/cameraCommands.ts:342-366
+// (parseIceCandidatesArgs, which converts ice_candidates through
+// toProviderCommandFields) at 0bd06f2.
+func ParseICECandidates(candidates json.RawMessage) ([]wpdef.ICECandidateStruct, error) {
+	contract := providerContracts[cmdProvideIceCandidates]
+	f := contract.byKey[canonicalKey("iceCandidates")]
+	list, err := f.convert(candidates, "ice_candidates")
+	if err != nil {
+		return nil, err
+	}
+	session := contract.byKey[canonicalKey("webRtcSessionId")]
+	fields := &convertedFields{contract: contract, values: map[string]wireValue{session.property: uintValue(0), f.property: list}}
+	req, err := (&providerFields{name: cmdProvideIceCandidates, fields: fields}).request(0)
+	if err != nil {
+		return nil, err
+	}
+	got, ok := req.(wpdef.ProvideIceCandidatesRequest)
+	if !ok {
+		return nil, fmt.Errorf("camera: ProvideIceCandidates decoded as %T", req)
+	}
+	return got.IceCandidates, nil
+}

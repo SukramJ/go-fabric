@@ -39,15 +39,22 @@ const (
 	stagedIPPruneInterval = time.Minute
 )
 
-// matterServiceSuffixes are the DNS-SD service types whose records enter
-// the cache. Mirrors matter.js 0ceb202d
+// admittedServiceSuffixes are the DNS-SD service types whose records enter
+// the cache: Matter's three — matter.js 0ceb202d
 // packages/protocol/src/mdns/MdnsService.ts:25-27 (MATTER_SERVICE_SUFFIXES)
-// and its ingress filter :90-95.
-var matterServiceSuffixes = []string{"._matter._tcp.local", "._matterc._udp.local", "._matterd._udp.local"}
+// and its ingress filter :90-95 — and the Thread border routers' two,
+// which matter.js's border-router registry adds to the same cache when it
+// starts (matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:34-37
+// and :121-126 at db021da0), admitted here from the start so a registry
+// (thread/brdiscovery) and [Names.Browse] find them cached.
+var admittedServiceSuffixes = []string{
+	"._matter._tcp.local", "._matterc._udp.local", "._matterd._udp.local",
+	"._meshcop._udp.local", "._trel._udp.local",
+}
 
-func isMatterServiceRecord(r *Record) bool {
+func isAdmittedServiceRecord(r *Record) bool {
 	lower := strings.ToLower(r.Name)
-	for _, s := range matterServiceSuffixes {
+	for _, s := range admittedServiceSuffixes {
 		if strings.HasSuffix(lower, s) {
 			return true
 		}
@@ -77,7 +84,9 @@ type discoveredObserver struct {
 //
 // Records enter the cache when their name ends with `._matter._tcp.local`,
 // `._matterc._udp.local` or `._matterd._udp.local` (the ingress filter of
-// matter.js MdnsService), when a scanner's filter accepts them, or when
+// matter.js MdnsService) or with a Thread border router's
+// `._meshcop._udp.local` or `._trel._udp.local` (the filter matter.js's
+// BorderRouterRegistry adds), when a scanner's filter accepts them, or when
 // their name is already in the cache (an SRV target, a name someone
 // observes). An A/AAAA record for a host not yet in the cache is staged
 // and replayed once an SRV names that host — but only from a packet that
@@ -167,7 +176,7 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 		n.interfaceName = interfaceNameOf
 	}
 	n.ctx, n.cancel = context.WithCancel(context.Background())
-	n.filters = append(n.filters, &ingressFilter{accept: isMatterServiceRecord})
+	n.filters = append(n.filters, &ingressFilter{accept: isAdmittedServiceRecord})
 	n.solicitor = newSolicitor(n)
 	n.armPrune()
 	go n.run()

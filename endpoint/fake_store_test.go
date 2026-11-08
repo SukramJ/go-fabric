@@ -54,3 +54,9 @@ func (s *fakeStore) RemoveEndpoint(_ context.Context, key endpoint.SourceKey) er
 	delete(s.rows, key)
 	return nil
 }
+
+func (s *fakeStore) EraseEndpoints(context.Context) error {
+	clear(s.rows)
+	s.nextID = 2
+	return nil
+}

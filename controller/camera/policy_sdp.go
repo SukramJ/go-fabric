@@ -368,7 +368,7 @@ func decodableVideoCodecs(sdp *sdpVideoConstraints) (decodable, unreadable []str
 func videoCodecLimitsOf(sdp *sdpVideoConstraints, codec csdef.VideoCodecEnum) selectedVideoCodecLimits {
 	out := selectedVideoCodecLimits{codec: codec}
 	if sdp != nil {
-		out.videoCodecLimits = sdp.limitsByCodec[videoCodecName(codec)]
+		out.videoCodecLimits = sdp.limitsByCodec[VideoCodecName(codec)]
 	}
 	return out
 }
@@ -782,43 +782,4 @@ func parseSDPAttribute(content string, session *sdpSession, media *sdpMedia) {
 			media.bundleOnly = true
 		}
 	}
-}
-
-// videoCodecNames are the wire names of the video codecs, written out
-// because the enum member names (Hevc, …) differ from the SDP spelling
-// (H265, …). Mirrors matterjs-server
-// packages/ws-controller/src/camera/wireNames.ts:11-21 at 0bd06f2.
-var videoCodecNames = map[csdef.VideoCodecEnum]string{
-	csdef.VideoCodecH264: "H264",
-	csdef.VideoCodecHevc: "H265",
-	csdef.VideoCodecVvc:  "H266",
-	csdef.VideoCodecAv1:  "AV1",
-}
-
-// audioCodecNames are the wire names of the audio codecs. Mirrors
-// matterjs-server packages/ws-controller/src/camera/wireNames.ts:23-26 at
-// 0bd06f2.
-var audioCodecNames = map[csdef.AudioCodecEnum]string{
-	csdef.AudioCodecOpus:  "OPUS",
-	csdef.AudioCodecAacLc: "AAC",
-}
-
-// videoCodecName is a video codec's wire name, its number for one without a
-// name. Mirrors matterjs-server packages/ws-controller/src/camera/wireNames.ts:44-58
-// at 0bd06f2.
-func videoCodecName(codec csdef.VideoCodecEnum) string {
-	if name, ok := videoCodecNames[codec]; ok {
-		return name
-	}
-	return strconv.Itoa(int(codec))
-}
-
-// audioCodecName is an audio codec's wire name, its number for one without
-// a name. Mirrors matterjs-server packages/ws-controller/src/camera/wireNames.ts:60-62
-// at 0bd06f2.
-func audioCodecName(codec csdef.AudioCodecEnum) string {
-	if name, ok := audioCodecNames[codec]; ok {
-		return name
-	}
-	return strconv.Itoa(int(codec))
 }

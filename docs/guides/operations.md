@@ -30,9 +30,10 @@ controllers' automations do not know.
 
 A factory reset on purpose is `Node.FactoryReset`: it removes every fabric
 the way RemoveFabric does (each controller's Leave event, its sessions and
-subscriptions), stops the node and erases its store and endpoint records;
-the host then builds a new node on the same store, which starts
-uncommissioned. A controller's counterpart is `Controller.Erase`, which
+subscriptions), stops the node and erases its store and endpoint records
+(`endpoint.Store.EraseEndpoints`, which restarts the numbering); the host
+then builds a new node on the same store, which starts uncommissioned and
+numbers its bridged endpoints from 2, as a fresh install does. A controller's counterpart is `Controller.Erase`, which
 drops its paired nodes, its fabric and its CA key material.
 
 So the operator's rules are the persistence guide's

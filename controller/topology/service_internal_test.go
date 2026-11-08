@@ -15,6 +15,7 @@ import (
 	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 )
 
 // fakeMember is a node with a fixed image; read runs onRead.
@@ -604,5 +605,99 @@ func TestServiceSourceClosed(t *testing.T) {
 	h.want(0, "a closed service")
 	if got := nodeIDs(h.svc.Topology()); !slices.Equal(got, []string{"1"}) {
 		t.Errorf("nodes after Close = %v", got)
+	}
+}
+
+// fakeBorderRouters is the test's BrEvents and makeBrEvents with its brs list
+// (NetworkTopologyServiceTest.ts:108-119, matterjs-server at 0bd06f22).
+type fakeBorderRouters struct {
+	mu      sync.Mutex
+	entries []brdiscovery.Entry
+	fns     map[int]func(brdiscovery.Event)
+	next    int
+}
+
+func (f *fakeBorderRouters) List() []brdiscovery.Entry {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.entries)
+}
+
+func (f *fakeBorderRouters) OnChange(fn func(brdiscovery.Event)) func() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fns == nil {
+		f.fns = map[int]func(brdiscovery.Event){}
+	}
+	id := f.next
+	f.next++
+	f.fns[id] = fn
+	return func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		delete(f.fns, id)
+	}
+}
+
+func (f *fakeBorderRouters) set(kind brdiscovery.EventKind, entries ...brdiscovery.Entry) {
+	f.mu.Lock()
+	f.entries = entries
+	fns := make([]func(brdiscovery.Event), 0, len(f.fns))
+	for _, fn := range f.fns {
+		fns = append(fns, fn)
+	}
+	f.mu.Unlock()
+	for _, fn := range fns {
+		fn(brdiscovery.Event{Kind: kind, Entry: entries[0]})
+	}
+}
+
+func (f *fakeBorderRouters) observers() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.fns)
+}
+
+// TestServiceBorderRouters ports "rebuilds against the current Border
+// Router registry when a BR is discovered" and "rebuilds when a Border
+// Router entry is updated (e.g. its network name resolves)"
+// (NetworkTopologyServiceTest.ts:535-570, matterjs-server at 0bd06f22):
+// the registry's events schedule a debounced rebuild
+// (NetworkTopologyService.ts:170-172), and Close stops listening.
+func TestServiceBorderRouters(t *testing.T) {
+	brs := &fakeBorderRouters{}
+	node1 := mkThread(1, threadOpts{role: role(5), rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(brExt, 61440, 2, ptr[int8](-70), true),
+	}})
+	h := newHarness(t, Config{BorderRouters: brs}, node1)
+	h.svc.changed()
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(1, "the first build")
+	if n := byID(h.last())[brUnkID]; n.Kind != KindThreadUnknown {
+		t.Fatalf("before the registry knows it: %+v", n)
+	}
+
+	unnamed := makeBr()
+	unnamed.NetworkName = ""
+	brs.set(brdiscovery.EventAdded, unnamed)
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(2, "a border router added")
+	m := byID(h.last())
+	if m[brID].Kind != KindBorderRouter || slices.ContainsFunc(h.last().Nodes, func(n Node) bool { return n.Kind == KindThreadUnknown }) {
+		t.Fatalf("after the registry added it: %+v", h.last().Nodes)
+	}
+
+	named := makeBr()
+	named.NetworkName = "ResolvedNet"
+	brs.set(brdiscovery.EventUpdated, named)
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(3, "a border router updated")
+	if got := byID(h.last())[brID].NetworkName; got != "ResolvedNet" {
+		t.Fatalf("network name %q", got)
+	}
+
+	h.svc.Close()
+	if brs.observers() != 0 {
+		t.Fatal("Close kept listening to the registry")
 	}
 }

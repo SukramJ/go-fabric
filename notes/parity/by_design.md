@@ -2171,9 +2171,11 @@ over typed images of the root endpoint's NetworkCommissioning,
 GeneralDiagnostics, ThreadNetworkDiagnostics and WiFiNetworkDiagnostics,
 the same node and connection rules, thresholds and ids; `Service` with the
 2 s trailing debounce, the 60 s periodic rebuild, the shared refresh with
-its 30 s deadline and concurrency 4, and the hash gate. Left out as
-go-fabric-server's port leaves them out: the border-router registry (a
-`_meshcop` browse this module does not have; ADR 0027 decision 1) and the
+its 30 s deadline and concurrency 4, and the hash gate. The border-router
+registry is `thread/brdiscovery`'s (issue #461), a port of matter.js's
+`BorderRouterRegistry` (`packages/thread-br-client/src/discovery/BorderRouterRegistry.ts`
+at `db021da0`) on the controller's DNS-SD cache, which admits `_meshcop`
+and `_trel`; parity with matter.js, so no row of its own. Left out: the
 route-table supplement. Differences in the Go form: the node-change hook
 (`client.Hooks.Changed`) carries no path, so every applied report schedules
 a debounced rebuild where matterjs-server filters to clusters 49/51/53/54;
@@ -2181,7 +2183,7 @@ the network type falls back to `client.Properties` while the root's
 NetworkCommissioning is not in the image; a refresh's reads in flight are
 cancelled by `Service.Close`. Parity cases: matterjs-server's
 `NetworkTopologyServiceTest.ts` (getTopology, change-driven emission,
-refresh, stop; the border-router and host-name cases adapted or missing)
+refresh, stop, the border-router and host-name cases)
 and the `TopologyUtilsTest.ts` cases of the ported functions, in
 `controller/topology/*_test.go`. Reason: the UI and go-fabric-server need
 one implementation of Matter knowledge (neighbour matching, LQI/RSSI

@@ -295,9 +295,24 @@ which keeps it current — a 2 s debounce after a node's change, a 60 s
 periodic rebuild, `Refresh` re-reading the diagnostics of every online
 Thread and Wi-Fi node (four at a time, 30 s at most, concurrent callers
 sharing one run) — and calls `OnChanged` observers only when the graph
-moved. Nodes carry matterjs-server's ids (`"<node id>"`,
+moved. Nodes carry matterjs-server's ids (`"<node id>"`, `br_<EXTADDR>`,
 `unknown_<EXTADDR>`, `ap_<BSSID>`), kinds, roles and strengths, so a JSON
 mapping is one field per field.
+
+**Border routers.** The controller keeps a passive registry of the Thread
+border routers on the LAN (`Controller.BorderRouters`, package
+`thread/brdiscovery`, after matter.js's `BorderRouterRegistry`): its DNS-SD
+cache admits `_meshcop._udp.local` and `_trel._udp.local`, and the registry
+keys each border router by its extended address (TXT `xa`, or a TREL
+instance's name) with its extended PAN id, network, vendor and model names,
+host name and when it was last seen; an entry no instance carries any more
+is pruned 24 h later. `topology.New` builds with it — a neighbour the
+registry knows is a `border_router` node with those fields, a Thread node
+without a network name of its own takes the registry's for its extended
+PAN id — and rebuilds on its events. `controller.Config.BorderRouters`
+`{Disabled: true}` turns it off; `topology.Config.BorderRouters` names
+another registry, and `topology.Build(images, entries, now)` takes the
+entries directly.
 
 **When.** A host that shows the mesh — the UI's topology page, a server's
 `get_network_topology`:
@@ -315,9 +330,8 @@ svc.OnChanged(func(t topology.Topology) { /* push it */ })
 **Costs.** A node's change hook says that a report applied, not which
 cluster: every report schedules a debounced rebuild (matterjs-server
 filters to the four network clusters); the hash keeps an unchanged graph
-from the observers. The border-router registry and the route-table edges
-of matterjs-server are not built (no `_meshcop` browse, ADR 0027); a
-neighbouring border router is a `thread_unknown` node.
+from the observers. The route-table edges of matterjs-server are not
+built.
 
 **Further sources.** Nodes the controller has not commissioned join the
 graph through `Service.AddSource`, matterjs-server's `addNodeSource`: a
@@ -334,4 +348,4 @@ defer remove()
 svc.Changed() // a debounced rebuild
 ```
 
-*Source: `controller/topology/build.go`, `controller/topology/thread.go`, `controller/topology/service.go`.*
+*Source: `controller/topology/build.go`, `controller/topology/thread.go`, `controller/topology/service.go`, `thread/brdiscovery/registry.go`, `client/discovery/watch.go`, `controller/controller.go` (`BorderRouters`).*

@@ -89,7 +89,7 @@ func cmdErrRes(w, h uint16) *csdef.VideoResolutionStruct {
 func TestCommandsErrorsParseStartStreamArgsParityMatterjsServer(t *testing.T) { //nolint:maintidx // one subtest per ported case
 	t.Run("reads snake_case resolution ranges into internal hints", func(t *testing.T) {
 		a := cmdErrStarted(t, func(r *StartRequest) {
-			r.Video = &VideoBounds{MinResolution: cmdErrRes(1280, 720), MaxResolution: cmdErrRes(1920, 1080), MaxFrameRate: 15}
+			r.Video = &VideoBounds{MinResolution: cmdErrRes(1280, 720), MaxResolution: cmdErrRes(1920, 1080), MaxFrameRate: ptr[uint16](15)}
 		})
 		want := videoRangeBounds{minResolution: resolution{1280, 720}, maxResolution: resolution{1920, 1080}, maxFrameRate: 15}
 		if a.videoState != trackDemanded || a.video == nil || a.video.videoRangeBounds != want || a.video.overlays != (overlayBounds{}) {
@@ -138,7 +138,7 @@ func TestCommandsErrorsParseStartStreamArgsParityMatterjsServer(t *testing.T) { 
 	})
 	t.Run("reads audio hints from snake_case fields", func(t *testing.T) {
 		a := cmdErrStarted(t, func(r *StartRequest) {
-			r.Audio = &AudioBounds{Codecs: []string{"OPUS"}, ChannelCount: 1, SampleRate: 16000, BitRate: 32000}
+			r.Audio = &AudioBounds{Codecs: []string{"OPUS"}, ChannelCount: ptr[uint8](1), SampleRate: ptr[uint32](16000), BitRate: ptr[uint32](32000)}
 		})
 		want := &audioHints{codecs: []string{"OPUS"}, channelCount: 1, sampleRate: 16000, bitRate: 32000}
 		if a.audioState != trackDemanded || !reflect.DeepEqual(a.audio, want) {
@@ -252,13 +252,46 @@ func TestCommandsErrorsParseStartStreamArgsParityMatterjsServer(t *testing.T) { 
 		}
 	})
 	t.Run("rejects a channel count above the eight the cluster allows, not merely a non-positive one", func(t *testing.T) {
-		_, err := cmdErrStart(t, func(r *StartRequest) { r.Audio = &AudioBounds{ChannelCount: 9} })
+		_, err := cmdErrStart(t, func(r *StartRequest) { r.Audio = &AudioBounds{ChannelCount: ptr[uint8](9)} })
 		cmdErrRefused(t, err, "channel_count 9")
+	})
+	// A stated 0 is held to the model's floor of 1, as matterjs-server's
+	// toOptionalNumber holds it (matterjs-server
+	// packages/ws-controller/src/camera/cameraCommands.ts:378-382 and
+	// packages/ws-controller/src/camera/cameraFieldRanges.ts:48-56 at
+	// 0bd06f2); an unstated (nil) bound passes.
+	t.Run("rejects a stated zero below each bound's floor, and passes an unstated one", func(t *testing.T) {
+		zero16, zero32, zero8 := ptr[uint16](0), ptr[uint32](0), ptr[uint8](0)
+		for _, c := range []struct {
+			field string
+			set   func(r *StartRequest)
+		}{
+			{"video.min_frame_rate", func(r *StartRequest) { r.Video = &VideoBounds{MinFrameRate: zero16} }},
+			{"video.max_frame_rate", func(r *StartRequest) { r.Video = &VideoBounds{MaxFrameRate: zero16} }},
+			{"video.min_bit_rate", func(r *StartRequest) { r.Video = &VideoBounds{MinBitRate: zero32} }},
+			{"video.max_bit_rate", func(r *StartRequest) { r.Video = &VideoBounds{MaxBitRate: zero32} }},
+			{"audio.channel_count", func(r *StartRequest) { r.Audio = &AudioBounds{ChannelCount: zero8} }},
+			{"audio.sample_rate", func(r *StartRequest) { r.Audio = &AudioBounds{SampleRate: zero32} }},
+			{"audio.bit_rate", func(r *StartRequest) { r.Audio = &AudioBounds{BitRate: zero32} }},
+		} {
+			_, err := cmdErrStart(t, c.set)
+			cmdErrRefused(t, err, c.field+" 0")
+			if err == nil || !strings.Contains(err.Error(), c.field+" must be an integer between 1 and ") {
+				t.Errorf("%s 0: %v", c.field, err)
+			}
+		}
+		a := cmdErrStarted(t, func(r *StartRequest) {
+			r.Video = &VideoBounds{}
+			r.Audio = &AudioBounds{}
+		})
+		if a.video == nil || a.video.minFrameRate != 0 || a.video.maxBitRate != 0 || a.audio == nil || a.audio.sampleRate != 0 {
+			t.Fatalf("unstated bounds: video %+v, audio %+v", a.video, a.audio)
+		}
 	})
 	t.Run("accepts the largest value each field can carry", func(t *testing.T) {
 		a := cmdErrStarted(t, func(r *StartRequest) {
-			r.Video = &VideoBounds{MaxResolution: cmdErrRes(65535, 65535), MaxFrameRate: 65535, MaxBitRate: 4294967295}
-			r.Audio = &AudioBounds{ChannelCount: 8, SampleRate: 4294967295}
+			r.Video = &VideoBounds{MaxResolution: cmdErrRes(65535, 65535), MaxFrameRate: ptr[uint16](65535), MaxBitRate: ptr[uint32](4294967295)}
+			r.Audio = &AudioBounds{ChannelCount: ptr[uint8](8), SampleRate: ptr[uint32](4294967295)}
 		})
 		if a.video == nil || a.video.maxFrameRate != 65535 || a.audio == nil || a.audio.channelCount != 8 {
 			t.Fatalf("video %+v, audio %+v", a.video, a.audio)

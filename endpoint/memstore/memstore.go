@@ -49,7 +49,8 @@ type Store struct {
 	mu   sync.Mutex
 	rows map[string]endpoint.Record // by rendered key, as sqlitestore keys them
 	byID map[uint16]string
-	// next is the allocation counter in [2, 65535], never rewound.
+	// next is the allocation counter in [2, 65535], rewound only by
+	// EraseEndpoints.
 	next uint32
 	// highest is the highest number a row holds, 0 for none.
 	highest uint16
@@ -146,6 +147,19 @@ func (s *Store) ListEndpoints(_ context.Context, scope string) ([]endpoint.Recor
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].EndpointID < out[j].EndpointID })
 	return out, nil
+}
+
+// EraseEndpoints implements [endpoint.Store]: every record goes and the
+// counter restarts at the first bridged number, as sqlitestore's does
+// (matter.js ServerEndpointStores.ts erase, :63-77).
+func (s *Store) EraseEndpoints(context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rows = map[string]endpoint.Record{}
+	s.byID = map[uint16]string{}
+	s.next = uint32(allocMin)
+	s.highest = 0
+	return nil
 }
 
 // RemoveEndpoint implements [endpoint.Store]; a missing key is no error.

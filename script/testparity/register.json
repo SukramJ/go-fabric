@@ -9055,9 +9055,74 @@
     },
     {
       "path": "packages/thread-br-client/test/BorderRouterRegistryTest.ts",
-      "status": "excluded",
-      "class": "device-ble-thread",
-      "reason": "MeshCoP over CoAP/DTLS with EC-JPAKE, its crypto, the _meshcop discovery, the border-router selection or the credentials registry: out of the module (ADR 0027 decision 5; the host names its border router).",
+      "status": "ported",
+      "go": [
+        "thread/brdiscovery:TestBorderRouterRegistryParityMatterJS",
+        "thread/brdiscovery:TestRegistryOnTheCache"
+      ],
+      "left": [
+        {
+          "it": "stop() before start() is a no-op",
+          "class": "js-runtime-only",
+          "reason": "matter.js's asynchronous start/stop lifecycle and its generation counter; a Go Registry runs from New to an idempotent Close."
+        },
+        {
+          "it": "start() is idempotent",
+          "class": "js-runtime-only",
+          "reason": "matter.js's asynchronous start/stop lifecycle and its generation counter; a Go Registry runs from New to an idempotent Close."
+        },
+        {
+          "it": "populates addresses retroactively when target's A/AAAA arrive later",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps no addresses or ports of a border router: they serve a MeshCoP or TREL connection the module does not make (ADR 0027 decision 5), and the topology reads the extended address, PAN id and names alone."
+        },
+        {
+          "it": "replaces addresses when the target changes its A records",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps no addresses or ports of a border router: they serve a MeshCoP or TREL connection the module does not make (ADR 0027 decision 5), and the topology reads the extended address, PAN id and names alone."
+        },
+        {
+          "it": "keeps last-known addresses when the target's A/AAAA records transiently expire",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps no addresses or ports of a border router: they serve a MeshCoP or TREL connection the module does not make (ADR 0027 decision 5), and the topology reads the extended address, PAN id and names alone."
+        },
+        {
+          "it": "releases trel's old target observer when meshcop overwrites the hostname",
+          "class": "js-runtime-only",
+          "reason": "the refcounted SRV-target observers that carry the addresses; client/discovery's Names.Watch reports an instance's own records and the registry attaches no target observer."
+        },
+        {
+          "it": "resets the eviction-warned flag across stop/start cycles",
+          "class": "js-runtime-only",
+          "reason": "a once-per-cycle log flag of the JavaScript logger; the Go registry logs an eviction at debug level."
+        },
+        {
+          "it": "parses sv (software version) from meshcop TXT",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps the five MeshCoP TXT fields a topology reads (xa, xp, nn, vn, mn); the versions and the border-agent id serve MeshCoP, which stays out of the module (ADR 0027 decision 5)."
+        },
+        {
+          "it": "parses rv (record version) from meshcop TXT",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps the five MeshCoP TXT fields a topology reads (xa, xp, nn, vn, mn); the versions and the border-agent id serve MeshCoP, which stays out of the module (ADR 0027 decision 5)."
+        },
+        {
+          "it": "prefers ai over dd for borderAgentIdHex when both present",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps the five MeshCoP TXT fields a topology reads (xa, xp, nn, vn, mn); the versions and the border-agent id serve MeshCoP, which stays out of the module (ADR 0027 decision 5)."
+        },
+        {
+          "it": "falls back to dd when ai is absent",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps the five MeshCoP TXT fields a topology reads (xa, xp, nn, vn, mn); the versions and the border-agent id serve MeshCoP, which stays out of the module (ADR 0027 decision 5)."
+        },
+        {
+          "it": "falls back to ai when dd is absent",
+          "class": "device-ble-thread",
+          "reason": "thread/brdiscovery keeps the five MeshCoP TXT fields a topology reads (xa, xp, nn, vn, mn); the versions and the border-agent id serve MeshCoP, which stays out of the module (ADR 0027 decision 5)."
+        }
+      ],
+      "reason": "The passive border-router registry thread/brdiscovery ports for controller/topology (issue 461): TXT parsing of xa, xp, nn, vn and mn, the TREL fallback, merging with the meshcop precedence, source loss, the 24 h expiry, eviction and the events.",
       "snapshotSha": "bd9a74954f4ff4e7d1d37576e04a600c27620d04"
     },
     {
