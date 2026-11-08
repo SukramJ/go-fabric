@@ -196,6 +196,8 @@ func (s *oneEndpointStore) ListEndpoints(context.Context, string) ([]Record, err
 
 func (s *oneEndpointStore) RemoveEndpoint(context.Context, SourceKey) error { return nil }
 
+func (s *oneEndpointStore) EraseEndpoints(context.Context) error { s.rec = nil; return nil }
+
 // TestScenesServerReplacesTheStub pins the stack's ScenesManagement server
 // on a light endpoint with group state: it replaces a source's stub, serves
 // matter.js's SceneTableSize (128) and SceneNames feature, and is tied to the

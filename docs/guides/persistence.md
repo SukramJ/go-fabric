@@ -156,7 +156,7 @@ idempotent.
 | Table | Holds |
 | --- | --- |
 | `matter_endpoints` | one row per source: its stable key's string form, its scope, its endpoint number and device type |
-| `matter_endpoint_allocation` | the high-water mark of endpoint numbers. A number is never reused, because a controller caches accessories by number |
+| `matter_endpoint_allocation` | the high-water mark of endpoint numbers. A removed source's number is never reused, because a controller caches accessories by number; only the factory reset (`endpoint.Store.EraseEndpoints`) restarts it, so the node that comes back numbers from 2 as a fresh install |
 
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.

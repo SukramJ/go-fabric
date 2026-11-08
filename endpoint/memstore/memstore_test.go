@@ -85,6 +85,32 @@ func TestRemovedNumberIsNotReissued(t *testing.T) {
 	}
 }
 
+// TestEraseRestartsTheNumbering: the factory reset's erase drops every
+// record and the next number is 2 again (matter.js ServerEndpointStores.ts
+// erase, :63-77); a removal afterwards still does not reissue.
+func TestEraseRestartsTheNumbering(t *testing.T) {
+	s := memstore.New()
+	for i := range 4 {
+		upsert(t, s, strconv.Itoa(i), 0)
+	}
+	if err := s.EraseEndpoints(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if recs, err := s.ListEndpoints(ctx, ""); err != nil || len(recs) != 0 {
+		t.Fatalf("records after the erase %v (%v), want none", recs, err)
+	}
+	if id := upsert(t, s, "0", 0); id != 2 {
+		t.Fatalf("first number after the erase %d, want 2", id)
+	}
+	b := upsert(t, s, "1", 0)
+	if err := s.RemoveEndpoint(ctx, endpoint.StringKey("1")); err != nil {
+		t.Fatal(err)
+	}
+	if id := upsert(t, s, "2", 0); id == b {
+		t.Fatalf("after the erase a removal reissued %d", b)
+	}
+}
+
 func TestExplicitNumber(t *testing.T) {
 	s := memstore.New()
 	if id := upsert(t, s, "a", 100); id != 100 {

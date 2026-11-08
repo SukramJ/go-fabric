@@ -247,6 +247,19 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.18.0: the endpoint store erases
+
+`endpoint.Store` has a fifth method, `EraseEndpoints(ctx) error`: delete
+every record in every scope and restart the allocation counter at the first
+bridged number (2), atomically. `Node.FactoryReset` calls it instead of
+listing and removing the records, so the node that comes back on the erased
+store numbers its endpoints from 2 as a fresh install, as matter.js's erase
+restarts its counter. A host that implements the port adds the method; a
+SQL store deletes its rows and sets its counter back in one transaction
+rather than dropping the counter's row. `endpoint/sqlitestore`,
+`endpoint/memstore` and `endpoint/endpointtest.FakeStore` implement it.
+`RemoveEndpoint` keeps the never-reissue rule.
+
 ## Changed after v0.18.0: the BasicInformation restores
 
 `mattercore.BasicInformation.SetNodeLabel(string) error` and

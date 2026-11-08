@@ -89,6 +89,12 @@ var ErrNotFound = errors.New("endpoint: no persisted identity for this source")
 // (:101-103, :156-158, :170-183): the next number is persisted and lifted
 // past every assigned one, wraps to the first part number after 0xFFFE
 // and skips the holders.
+//
+// The one case the counter restarts is a factory reset: [Store.EraseEndpoints]
+// drops every record and puts the counter back to the first bridged number,
+// so the node that comes back numbers as a fresh install does. Mirrors
+// matter.js ServerEndpointStores.ts erase (:63-77): storage.clearAll(), a
+// fresh holder map, #nextNumber = 1, then load. A removal never rewinds it.
 type Store interface {
 	// GetEndpoint returns the record for key, or [ErrNotFound].
 	GetEndpoint(ctx context.Context, key SourceKey) (Record, error)
@@ -102,4 +108,8 @@ type Store interface {
 	// row is not an error, because an owner's removals do not
 	// coordinate with each other.
 	RemoveEndpoint(ctx context.Context, key SourceKey) error
+	// EraseEndpoints deletes every record in every scope and restarts the
+	// allocation counter at the first bridged number (2), atomically: the
+	// factory reset's erase (node.Node.FactoryReset), never a removal.
+	EraseEndpoints(ctx context.Context) error
 }

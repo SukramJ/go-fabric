@@ -6,11 +6,13 @@ package node_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/endpoint"
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -252,6 +254,67 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 		}
 		if _, ok := d.EndpointOf("first"); !ok {
 			t.Fatal("the present endpoint has no number after the reset")
+		}
+	})
+
+	// Go's own case (matter.js has no erase-then-assign test at the pin;
+	// EndpointNumberConflictTest.ts covers conflicts only): the reset
+	// restarts the numbering, as ServerEndpointStores.ts erase (:63-77) sets
+	// #nextNumber back, so the node that comes back on the erased store
+	// numbers the same sources from 2 as a fresh install — not from the
+	// old high-water mark.
+	t.Run("restarts the endpoint numbering after a factory reset", func(t *testing.T) {
+		t.Parallel()
+		s := newResetStores(t)
+		site := quietSite(t)
+		keys := []string{"first", "second", "third"}
+		lights := make([]node.Endpoint, 0, len(keys))
+		for _, k := range keys {
+			lights = append(lights, newLight(t, site, k))
+		}
+		p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: s.configure, Bridged: lights}})
+		ctx := parityCtx(t)
+		partsList := client.AttributeAt(1, 0x001D, 0x0003)
+		parts := func(p *fabrictest.Pair) []uint64 {
+			t.Helper()
+			got, err := fabrictest.Read(ctx, p, partsList)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listed := make([]uint64, 0, len(got.Value.Children))
+			for _, c := range got.Value.Children {
+				listed = append(listed, c.El.Uint)
+			}
+			slices.Sort(listed)
+			return listed
+		}
+		want := []uint64{2, 3, 4}
+		if got := parts(p); !slices.Equal(got, want) {
+			t.Fatalf("PartsList before the reset %v, want %v", got, want)
+		}
+		// A removed source lifts the high-water mark past every number
+		// the topology holds.
+		extra := newLight(t, site, "extra")
+		if err := p.Device.Act(func(n *node.Node) error { return n.Aggregator().Add(ctx, extra) }); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.Device.Act(func(n *node.Node) error { return n.Aggregator().Remove(ctx, endpoint.StringKey("extra")) }); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.Device.FactoryReset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		again, err := p.Controller.Commission(ctx, p.Device, fabrictest.CommissionOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := parts(again); !slices.Equal(got, want) {
+			t.Fatalf("PartsList after the reset %v, want %v (a fresh install's numbering)", got, want)
+		}
+		for _, k := range keys {
+			if id, ok := again.Device.EndpointOf(k); !ok || !slices.Contains(want, uint64(id)) {
+				t.Errorf("endpoint of %s after the reset %d (%v), want one of %v", k, id, ok, want)
+			}
 		}
 	})
 }

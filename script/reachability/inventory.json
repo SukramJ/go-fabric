@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7779,
+  "entry_points": 7781,
   "entry_packages": [
     ".",
     "bdx",
@@ -27747,7 +27747,7 @@
       "identifier": "TestInvokeUnsupportedCommandMapsTo0x81",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
-      "line": 1503
+      "line": 1509
     },
     {
       "package": "endpoint",
@@ -28062,14 +28062,14 @@
       "identifier": "TestScenesMountWiresOnOffScenesPort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 286
+      "line": 288
     },
     {
       "package": "endpoint",
       "identifier": "TestScenesServerReplacesTheStub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 204
+      "line": 206
     },
     {
       "package": "endpoint",
@@ -28090,7 +28090,7 @@
       "identifier": "TestStackClustersMountWhereTheEndpointOptsIn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 242
+      "line": 244
     },
     {
       "package": "endpoint",
