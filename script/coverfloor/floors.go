@@ -264,7 +264,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/valuejson", min: 87},
 	{pkg: "github.com/SukramJ/go-fabric/logring", min: 99},
-	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
+	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node",
 		min: 85,
