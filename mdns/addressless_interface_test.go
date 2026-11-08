@@ -31,12 +31,12 @@ func TestRecordsForAddresslessInterfaceAreEmpty(t *testing.T) {
 	setRecords(r, "svc", srv)
 
 	r.mu.Lock()
-	if !r.isListedLocked(addressless) {
+	if !w.link(addressless).listed {
 		r.mu.Unlock()
 		t.Fatal("the addressless interface must be listed for the case to hold")
 	}
-	empty := r.recordsForLocked(addressless)
-	full := r.recordsForLocked(withAddrs)
+	empty := r.recordsForLocked(addressless, w.link(addressless).addrsFunc())
+	full := r.recordsForLocked(withAddrs, w.link(withAddrs).addrsFunc())
 	r.mu.Unlock()
 	if n := len(empty.byService); n != 0 {
 		t.Fatalf("addressless interface carries %d service record sets, want none", n)

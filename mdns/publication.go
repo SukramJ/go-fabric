@@ -55,8 +55,12 @@ const (
 type reach int
 
 const (
-	// reachNone: the send left on no address family, or was refused.
+	// reachNone: no address family was usable — the interface has no
+	// address of a family a socket is bound for; nothing was tried.
 	reachNone reach = iota
+	// reachFailed: every family it was tried on refused it, or it could
+	// not be encoded (matter.js's rejected send).
+	reachFailed
 	// reachSome: it left on some of the interface's address families.
 	reachSome
 	// reachAll: it left on every address family it was sent on.
@@ -67,8 +71,10 @@ const (
 // took it.
 func reachOf(tried, ok int) reach {
 	switch {
-	case ok == 0:
+	case tried == 0:
 		return reachNone
+	case ok == 0:
+		return reachFailed
 	case ok < tried:
 		return reachSome
 	default:
@@ -95,6 +101,12 @@ type peerEntry struct {
 	// seq orders the entries as first noted: matter.js's peer cache is a
 	// Map, which keeps a key's position when its value is replaced.
 	seq uint64
+	// lastMulticast is when a multicast last carried the record as an
+	// answer to a query or as its goodbye, zero when none did;
+	// lastIsGoodbye says it was the goodbye (InterfaceResponder.ts
+	// PeerCacheEntry lastMulticastAt, lastMulticastIsGoodbye at db021da0).
+	lastMulticast time.Time
+	lastIsGoodbye bool
 }
 
 // linkState is the responder's memory of one interface — matter.js's
@@ -105,6 +117,22 @@ type linkState struct {
 	seq   uint64
 	// retry is the pending goodbye retry, nil while none is needed.
 	retry *goodbyeRetry
+	// deferred are the records the one-second rule held back, by
+	// recordIdentity (hold.go); deferredTimer sends them when the
+	// earliest is due, deferredGen tells a fired timer from the current
+	// one, deferSeq orders them as first deferred (matter.js's Map).
+	deferred      map[string]*deferral
+	deferredTimer clock.Timer
+	deferredGen   uint64
+	deferSeq      uint64
+	// usedAt is when the interface last answered or published: its state
+	// goes only after recordCacheLifetime unused (InterfaceResponder.ts
+	// #usedAt, :100, :142-160 at db021da0).
+	usedAt time.Time
+	// outage is set by a multicast that failed or missed an address
+	// family and cleared by one that reached every family: only the first
+	// miss of an outage logs at Info (#isMulticastOutage, :105-106).
+	outage bool
 }
 
 // goodbyeRetry is one interface's retry schedule (InterfaceResponder.ts
@@ -120,21 +148,28 @@ type goodbyeRetry struct {
 func (r *Responder) linkStateLocked(ifIndex int) *linkState {
 	st, ok := r.linkStates[ifIndex]
 	if !ok {
-		st = &linkState{peers: map[string]peerEntry{}}
+		st = &linkState{peers: map[string]peerEntry{}, usedAt: r.clock.Load().Now()}
 		r.linkStates[ifIndex] = st
 	}
 	return st
 }
 
-// noteSentLocked records what a message that reached as far as rc carried:
-// a record with a TTL is cached by the peers until the TTL ends; a goodbye
-// that reached every family ends the record, one that reached only some
-// leaves it to be said again; a send that reached nothing changes nothing
-// (InterfaceResponder.ts #transmit, :727-772 at db021da0). Caller holds
-// r.mu.
-func (r *Responder) noteSentLocked(ifIndex int, msgs []*dns.Msg, rc reach, now time.Time) {
-	if rc == reachNone {
+// noteSentLocked records what a message that reached as far as rc carried
+// (InterfaceResponder.ts #transmit, :700-789 at db021da0): a record with
+// a TTL is cached by the peers until the TTL ends; a goodbye that reached
+// every family ends the record at once, one that reached only some counts
+// as its last multicast and leaves it to be said again; a send that
+// reached nothing changes nothing. Of a multicast, only goodbyes and the
+// records in answered — the answers to a query — count as the record's
+// last multicast; announcements and additional records do not. Caller
+// holds r.mu.
+func (r *Responder) noteSentLocked(ifIndex int, msgs []*dns.Msg, rc reach, now time.Time, multicast bool, answered []dns.RR) {
+	if rc == reachNone || rc == reachFailed {
 		return
+	}
+	answeredKeys := make(map[string]bool, len(answered))
+	for _, rr := range answered {
+		answeredKeys[recordIdentity(rr)] = true
 	}
 	st := r.linkStateLocked(ifIndex)
 	for _, m := range msgs {
@@ -142,20 +177,23 @@ func (r *Responder) noteSentLocked(ifIndex int, msgs []*dns.Msg, rc reach, now t
 			for _, rr := range section {
 				key := recordIdentity(rr)
 				ttl := rr.Header().Ttl
-				switch {
-				case ttl == 0 && rc == reachSome:
-					continue
-				case ttl == 0:
-					delete(st.peers, key)
-				default:
-					p, ok := st.peers[key]
-					if !ok {
-						st.seq++
-						p.seq = st.seq
+				p, ok := st.peers[key]
+				if ttl == 0 && rc == reachSome {
+					if ok {
+						p.lastMulticast, p.lastIsGoodbye = now, true
+						st.peers[key] = p
 					}
-					p.rr, p.until = rr, now.Add(time.Duration(ttl)*time.Second)
-					st.peers[key] = p
+					continue
 				}
+				if !ok {
+					st.seq++
+					p.seq = st.seq
+				}
+				p.rr, p.until = rr, now.Add(time.Duration(ttl)*time.Second)
+				if multicast && (ttl == 0 || answeredKeys[key]) {
+					p.lastMulticast, p.lastIsGoodbye = now, ttl == 0
+				}
+				st.peers[key] = p
 			}
 		}
 	}
@@ -168,7 +206,7 @@ func (r *Responder) noteSentLocked(ifIndex int, msgs []*dns.Msg, rc reach, now t
 func (r *Responder) goodbyesLocked(st *linkState, lr *linkRecords, now time.Time) []dns.RR {
 	keys := make([]string, 0, len(st.peers))
 	for key, p := range st.peers {
-		if p.until.After(now) && !lr.byKey[key] {
+		if p.until.After(now) && lr.byKey[key] == nil {
 			keys = append(keys, key)
 		}
 	}
@@ -195,22 +233,18 @@ func (r *Responder) goodbyesLocked(st *linkState, lr *linkRecords, now time.Time
 // goodbye while the interface is listed. Nothing is sent when there is
 // nothing to say. A goodbye that did not reach every family is retried.
 // Caller holds r.mu.
-func (r *Responder) publishLocked(ifIndex int, services map[string]bool, all bool) {
+func (r *Responder) publishLocked(l link, services map[string]bool, all bool) {
 	if r.wire == nil {
 		return
 	}
 	now := r.clock.Load().Now()
-	// Prune on every publication, as matter.js prunes on every interface
-	// listing (MdnsServer.ts:405-411, InterfaceResponder.ts:142-160 at
-	// db021da0), so a record whose TTL ended without a goodbye leaves the
-	// cache on a long-running node.
-	r.pruneLinkStatesLocked()
-	lr := r.recordsForLocked(ifIndex)
-	st := r.linkStateLocked(ifIndex)
+	lr := r.recordsForLocked(l.index, l.addrsFunc())
+	st := r.linkStateLocked(l.index)
+	st.usedAt = now
 	goodbye := r.goodbyesLocked(st, lr, now)
 
 	replaced := map[string]bool{}
-	if r.isListedLocked(ifIndex) {
+	if l.listed {
 		for _, g := range goodbye {
 			if isUniqueType(g.Header().Rrtype) && lr.setKeys[setKeyOf(g)] {
 				replaced[setKeyOf(g)] = true
@@ -237,18 +271,18 @@ func (r *Responder) publishLocked(ifIndex int, services map[string]bool, all boo
 	answers := make([]dns.RR, 0, len(goodbye)+len(announced))
 	answers = append(answers, goodbye...)
 	answers = append(answers, sendable(announced, complete, false)...)
-	if rc := r.sendLocked(splitResponse(0, answers, nil), ifIndex, nil); rc != reachAll && len(goodbye) > 0 {
-		r.logger().Debug("mdns.responder.goodbye_not_sent", slog.Int("iface", ifIndex))
+	if rc := r.sendLocked(splitResponse(0, answers, nil), l, nil, nil); rc != reachAll && len(goodbye) > 0 {
+		r.logger().Debug("mdns.responder.goodbye_not_sent", slog.Int("iface", l.index))
 	}
-	r.settleGoodbyesLocked(ifIndex, st)
+	r.settleGoodbyesLocked(l, st)
 }
 
 // settleGoodbyesLocked retries the goodbyes peers may still need on the
 // interface, or ends the retry when none remain (InterfaceResponder.ts
 // #settleGoodbyes, :534-542 at db021da0). Caller holds r.mu.
-func (r *Responder) settleGoodbyesLocked(ifIndex int, st *linkState) {
-	if len(r.goodbyesLocked(st, r.recordsForLocked(ifIndex), r.clock.Load().Now())) > 0 {
-		r.retryGoodbyesLocked(ifIndex, st)
+func (r *Responder) settleGoodbyesLocked(l link, st *linkState) {
+	if len(r.goodbyesLocked(st, r.recordsForLocked(l.index, l.addrsFunc()), r.clock.Load().Now())) > 0 {
+		r.retryGoodbyesLocked(l.index, st)
 		return
 	}
 	r.stopGoodbyeRetryLocked(st)
@@ -276,7 +310,7 @@ func (r *Responder) retryGoodbyesLocked(ifIndex int, st *linkState) {
 			return
 		}
 		retry.waiting = false
-		r.publishLocked(ifIndex, nil, false)
+		r.publishLocked(r.wire.link(ifIndex), nil, false)
 	})
 }
 
@@ -297,51 +331,65 @@ func (r *Responder) publishEverywhereLocked(services map[string]bool, all bool) 
 	if r.wire == nil {
 		return
 	}
-	for _, ifIndex := range r.knownLinksLocked() {
-		r.publishLocked(ifIndex, services, all)
+	for _, l := range r.knownLinksLocked(r.listLocked()) {
+		r.publishLocked(l, services, all)
 	}
 	r.pruneLinkStatesLocked()
 }
 
-// knownLinksLocked lists the listed interfaces and those with state, in
-// index order. Caller holds r.mu.
-func (r *Responder) knownLinksLocked() []int {
+// listLocked lists the interfaces once and prunes the interface states,
+// as matter.js prunes its responders on every interface listing
+// (MdnsServer.ts #listInterfaces and #currentResponders, :405-421 at
+// db021da0), so a record whose TTL ended without a goodbye leaves the
+// cache on a long-running node. Caller holds r.mu.
+func (r *Responder) listLocked() []link {
+	ls := r.wire.links()
+	for i := range ls {
+		ls[i].listed = true
+	}
+	r.pruneLinkStatesLocked()
+	return ls
+}
+
+// knownLinksLocked is the listed interfaces ls and those with state the
+// listing misses, in index order. Caller holds r.mu.
+func (r *Responder) knownLinksLocked(ls []link) []link {
 	seen := map[int]bool{}
-	var out []int
-	for _, i := range r.wire.links() {
-		if !seen[i] {
-			seen[i] = true
-			out = append(out, i)
+	out := make([]link, 0, len(ls)+len(r.linkStates))
+	for _, l := range ls {
+		if !seen[l.index] {
+			seen[l.index] = true
+			out = append(out, l)
 		}
 	}
 	for i := range r.linkStates {
 		if !seen[i] {
 			seen[i] = true
-			out = append(out, i)
+			l := r.wire.link(i)
+			l.listed = false
+			out = append(out, l)
 		}
 	}
-	slices.Sort(out)
+	slices.SortFunc(out, func(a, b link) int { return cmp.Compare(a.index, b.index) })
 	return out
 }
 
-// isListedLocked reports whether the interface is among the wire's links.
-// Caller holds r.mu.
-func (r *Responder) isListedLocked(ifIndex int) bool {
-	return slices.Contains(r.wire.links(), ifIndex)
-}
-
-// pruneLinkStatesLocked forgets the records whose TTL ended and drops the
-// state of an interface peers cache nothing on and no retry waits for
+// pruneLinkStatesLocked forgets the records whose TTL ended and whose last
+// multicast is more than a second ago, and drops the state of an
+// interface peers cache nothing on, with nothing deferred, no goodbye
+// retry waiting and unused for recordCacheLifetime
 // (InterfaceResponder.prune, :142-160 at db021da0). Caller holds r.mu.
 func (r *Responder) pruneLinkStatesLocked() {
 	now := r.clock.Load().Now()
 	for i, st := range r.linkStates {
 		for key, p := range st.peers {
-			if !p.until.After(now) {
+			if !p.until.After(now) && (p.lastMulticast.IsZero() || now.Sub(p.lastMulticast) >= multicastInterval) {
 				delete(st.peers, key)
 			}
 		}
-		if len(st.peers) == 0 && st.retry == nil {
+		if len(st.peers) == 0 && len(st.deferred) == 0 && (st.retry == nil || !st.retry.waiting) &&
+			now.Sub(st.usedAt) > recordCacheLifetime {
+			r.stopGoodbyeRetryLocked(st)
 			delete(r.linkStates, i)
 		}
 	}
@@ -352,6 +400,7 @@ func (r *Responder) pruneLinkStatesLocked() {
 func (r *Responder) stopAllGoodbyeRetriesLocked() {
 	for _, st := range r.linkStates {
 		r.stopGoodbyeRetryLocked(st)
+		st.stopDeferred()
 	}
 }
 

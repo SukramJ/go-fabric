@@ -8130,7 +8130,6 @@
         "answers a query for a name registered after the names were claimed",
         "answers a question after a goodbye and registration again once the second after the goodbye passed",
         "answers a repeated question at 950 ms once the second has passed",
-        "answers a repeated question at once a second after the answer",
         "answers again at once after a multicast whose send failed",
         "answers for the remaining service a query that arrives while the goodbye is sent",
         "answers from the last details when they cannot be read again",
@@ -8139,9 +8138,7 @@
         "claims no names after close, for a registration that the close interrupts or a withdrawal",
         "claims no names on the socket for a refresh after close",
         "closes only after the send in flight settled",
-        "combines the announcements of the same turn into one message",
         "counts a deferred additional record sent alone as an answer",
-        "does not answer a repeated question that arrives in the tick of the answer",
         "does not call the generators again when the handle of a replaced registration refreshes",
         "does not multicast an unchanged record again within a second of a refresh",
         "does not read a failed interface again for a registration within the retry interval",
@@ -8204,9 +8201,6 @@
         "sends the goodbye after an answer in flight and leaves out what was registered meanwhile",
         "sends the next packet of an answer after a failed multicast send and notices the outage once",
         "server answers the same ANY query within a second once the second has passed",
-        "server defers an additional record multicast less than a second ago",
-        "server does not answer a different query for the same records in the tick of the answer",
-        "server does not answer the same ANY query again when it arrives in the tick of the answer",
         "skips the remaining announcements after a failed send and notices the outage",
         "still holds back a record answered by multicast less than a second ago",
         "stops an answer that waits between packets when the server closes",
@@ -8219,28 +8213,17 @@
         "waits 20 to 120 ms between the packets of one answer",
         "withdraws a service when its registration is disposed"
       ],
-      "reason": "Ported against the module's own responder (issue #362): its answer engine runs over a fake transport and the fake clock with matter.js's record-generator fixtures, so the standard, cache-flush, known-answer, duplicate, unicast, split, TC-continuation, unknown-name and Close cases assert the same responses; the host-name choice runs against hostNameChooser. Missing stay the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03).",
+      "reason": "Ported against the module's own responder (issue #362): its answer engine runs over a fake transport and the fake clock with matter.js's record-generator fixtures, so the standard, cache-flush, known-answer, duplicate, unicast, split, TC-continuation, unknown-name and Close cases assert the same responses; the host-name choice runs against hostNameChooser. Issue 440 ports the one-second rule of db021da0 in place of the 999 ms question window and the 900 ms rate limit: the repeated question in the tick of the answer and a second later, the deferred additional record and the announcements of one turn in one message. Missing stay the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03).",
       "snapshotSha": "c8ccfd9850c809bea4bf88aa014204b9ccbca65b"
     },
     {
       "path": "packages/protocol/test/mdns/MdnsServerTransportTest.ts",
-      "status": "partial",
-      "reason": "The goodbye retry of #4844 is ported on the fake wire, whose failure rule is the test network's failing multicast (reach none) and its IPv4-failing multicast on an interface with IPv6 (reach some): the failed goodbye with the next publication, the retry without a further publication, its end once peers dropped the records or the goodbyes left, no retry for an announcement, the 1 s doubling to 1 min gaps, one schedule for two failures, a retry with only the goodbyes, none after close, a fresh schedule after an earlier one ended, records whose announcement or goodbye left on IPv6 only. Missing: the notice-once-per-outage logging, the deferred answer (the one-second rule's deferral is not ported), the per-datagram reach of a split message and the details-read cases.",
+      "status": "ported",
+      "reason": "Ported on the fake wire, whose failure rule is the test network's refused multicast (reach failed), its IPv4-failing multicast on an interface with IPv6 (reach some) and a send with no usable family (reach none): the goodbye retry of #4844 (the failed goodbye with the next publication, the retry without a further publication, its end once peers dropped the records or the goodbyes left, no retry for an announcement, the 1 s doubling to 1 min gaps, one schedule for two failures, a retry with only the goodbyes, none after close, a fresh schedule after an earlier one ended, records whose announcement or goodbye left on IPv6 only) and, with issue 440, the notice once per outage (Info, matter.js's notice), the deferred answer of the one-second rule, the per-datagram reach of a split announcement and of a split unicast answer, the state a waiting retry keeps past the interface's 15 minutes (checked at 15 min 30 s: matter.js's check at 16 min 5 s relies on the drift of its 100 ms steps), no goodbye for records sent on no usable family, an address the interface gained (the record cache read again after 15 minutes) and the multicast answer to a QU query after a goodbye that left on IPv6 only.",
       "snapshotSha": "4663aa6f30574b7b7dcb524ef94a9f8a19be13c0",
       "go": [
-        "mdns:TestMdnsServerTransport"
-      ],
-      "missing": [
-        "notices a failing multicast answer once even when a unicast answer succeeds in between",
-        "notices a failing deferred answer",
-        "says goodbye to the records of an announcement whose later datagram failed",
-        "logs at debug level a unicast answer whose later datagram failed, and notices nothing",
-        "keeps the state of an interface whose goodbye retry waits, so close stops the retry",
-        "does not try a goodbye again that failed while the server closes",
-        "neither notices nor says goodbye on an interface with only a family the server does not use",
-        "publishes an address the interface gained after its details were read",
-        "notices once per outage, whether multicasts reach some address families or none",
-        "multicasts the answer to a QU query after a goodbye that left on IPv6 only"
+        "mdns:TestMdnsServerTransport",
+        "mdns:TestMdnsServerTransportNotices"
       ]
     },
     {
@@ -8257,7 +8240,6 @@
       ],
       "missing": [
         "has correct crypto installed",
-        "announces devices that start together in one announcement with each shared record once",
         "broadcasts the controller commissioner on one port",
         "broadcasts the device commissionable info on one port",
         "broadcasts the device fabric on one port and expires",

@@ -85,14 +85,14 @@ func TestSockets_Lifecycle(t *testing.T) {
 		t.Skipf("the responder opened no multicast socket on any interface of this host: %v", err)
 	}
 	pkt, _ := newResponse(0).Pack()
-	for _, i := range s.links() {
-		s.multicast(pkt, i)
-		_ = s.addrs(i)
+	for _, l := range s.links() {
+		_, _ = s.multicast(pkt, l)
+		_ = s.link(l.index)
 	}
-	s.unicast(pkt, 1, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5353})
-	s.unicast(pkt, 1, &net.UDPAddr{IP: net.IPv6loopback, Port: 5353})
-	s.unicast(pkt, 1, nil)
-	s.multicast(pkt, 1<<30)
+	_, _ = s.unicast(pkt, 1, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5353})
+	_, _ = s.unicast(pkt, 1, &net.UDPAddr{IP: net.IPv6loopback, Port: 5353})
+	_, _ = s.unicast(pkt, 1, nil)
+	_, _ = s.multicast(pkt, s.link(1<<30))
 	done := make(chan error, 1)
 	go func() { done <- s.close() }()
 	select {

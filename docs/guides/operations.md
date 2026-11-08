@@ -84,6 +84,18 @@ chip-tool send for a pairing code, and the address questions for the node's
 own host name. It joins the mDNS multicast groups beside the main responder
 on UDP 5353, which is how it shares the port.
 
+The responder answers a record by multicast at most once a second on an
+interface (RFC 6762 §6), as matter.js does: a query that asks again
+within the second is answered when the second has passed, in one deferred
+message, unless the querier already received the record. Services
+published together — the commissionable and the operational record of a
+starting node — share one announcement per interface. A multicast that an
+interface refuses, or that reaches only one of its address families, logs
+one `mdns.responder.multicast_not_sent` or
+`mdns.responder.multicast_some_families` line at Info per outage; the
+following misses log at Debug until a multicast reaches every family
+again.
+
 A host that already runs avahi-daemon keeps it: this project's own
 chip-tool harness runs the node on hosts with a running avahi-daemon. A
 host that must not answer mDNS sets `Network.MDNS.Off`; no controller

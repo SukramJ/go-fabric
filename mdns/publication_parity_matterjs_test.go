@@ -20,7 +20,7 @@ import (
 // mdns/MdnsServerTest.ts (:1663-2640), the retry cases of
 // MdnsServerTransportTest.ts (:215-541) and the goodbye-scope cases of
 // MdnsTest.ts (:909-1000). The fake wire stands in for the UDP transport;
-// its failure rule is the test network's failing multicast (reachNone) and
+// its failure rule is the test network's failing multicast (reachFailed) and
 // its IPv4-failing multicast on an interface with IPv6 (reachSome).
 
 const (
@@ -74,16 +74,16 @@ func withdrawKey(r *Responder, keys ...string) {
 func broadcastKey(r *Responder, keys ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, ifIndex := range r.wire.links() {
+	for _, l := range r.listLocked() {
 		if len(keys) == 0 {
-			r.publishLocked(ifIndex, nil, true)
+			r.publishLocked(l, nil, true)
 			continue
 		}
 		named := map[string]bool{}
 		for _, k := range keys {
 			named[k] = true
 		}
-		r.publishLocked(ifIndex, named, false)
+		r.publishLocked(l, named, false)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestMdnsServerGoodbye(t *testing.T) {
 		r, w, _ := newGoodbyeFixture(t)
 		w.setFail(func(m *dns.Msg) reach {
 			if len(m.Answer) > 0 && m.Answer[0].Header().Ttl == 0 {
-				return reachNone
+				return reachFailed
 			}
 			return reachAll
 		})
@@ -359,7 +359,7 @@ func TestMdnsServerGoodbye(t *testing.T) {
 // :512-547).
 func TestMdnsServerTransport(t *testing.T) {
 	t.Parallel()
-	failAll := func(*dns.Msg) reach { return reachNone }
+	failAll := func(*dns.Msg) reach { return reachFailed }
 	goodbyesOf := func(sent []sentPacket, qname string) []dns.RR {
 		var out []dns.RR
 		for _, rr := range goodbyesIn(sent) {
@@ -409,7 +409,7 @@ func TestMdnsServerTransport(t *testing.T) {
 		t.Parallel()
 		r, w, clk := newGoodbyeFixture(t)
 		var tries int
-		w.setFail(func(*dns.Msg) reach { tries++; return reachNone })
+		w.setFail(func(*dns.Msg) reach { tries++; return reachFailed })
 		withdrawKey(r, "foo", "window")
 		for range 120 {
 			clk.Advance(time.Second)
@@ -464,7 +464,7 @@ func TestMdnsServerTransport(t *testing.T) {
 		broadcastKey(r, "long")
 		clk.Advance(2 * time.Second)
 		var failedAt []time.Time
-		w.setFail(func(*dns.Msg) reach { failedAt = append(failedAt, clk.Now()); return reachNone })
+		w.setFail(func(*dns.Msg) reach { failedAt = append(failedAt, clk.Now()); return reachFailed })
 		withdrawKey(r, "long")
 		for range 2500 {
 			clk.Advance(100 * time.Millisecond)
@@ -480,7 +480,7 @@ func TestMdnsServerTransport(t *testing.T) {
 		t.Parallel()
 		r, w, clk := newGoodbyeFixture(t)
 		var failedAt []time.Time
-		w.setFail(func(*dns.Msg) reach { failedAt = append(failedAt, clk.Now()); return reachNone })
+		w.setFail(func(*dns.Msg) reach { failedAt = append(failedAt, clk.Now()); return reachFailed })
 		withdrawKey(r, "window")
 		clk.Advance(500 * time.Millisecond)
 		withdrawKey(r, "foo")
@@ -522,7 +522,7 @@ func TestMdnsServerTransport(t *testing.T) {
 		t.Parallel()
 		r, w, clk := newGoodbyeFixture(t)
 		var tries int
-		w.setFail(func(*dns.Msg) reach { tries++; return reachNone })
+		w.setFail(func(*dns.Msg) reach { tries++; return reachFailed })
 		withdrawKey(r, "window")
 		if err := r.Close(); err != nil {
 			t.Fatal(err)
@@ -549,7 +549,7 @@ func TestMdnsServerTransport(t *testing.T) {
 			t.Fatal("the first goodbye did not leave")
 		}
 		var tries int
-		w.setFail(func(*dns.Msg) reach { tries++; return reachNone })
+		w.setFail(func(*dns.Msg) reach { tries++; return reachFailed })
 		withdrawKey(r, "foo")
 		n := tries
 		clk.Advance(1500 * time.Millisecond)

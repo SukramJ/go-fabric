@@ -16,6 +16,7 @@ package mdns
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -211,10 +212,12 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 					expectAnnouncement(t, got[0], expectedRecords(svc, withIPv4, ptrs...))
 				})
 			}
-			t.Run("it allows announcements of multiple devices on different ports", func(t *testing.T) {
+			t.Run("it announces devices that start together in one announcement with each shared record once", func(t *testing.T) {
 				t.Parallel()
-				// Three advertisers on three ports (:714-990): one
-				// announcement message per service, never merged.
+				// Three advertisers on three ports started together
+				// (MdnsTest.ts:720-748 at db021da0): one publication,
+				// split into datagrams by size, every SRV, the host
+				// addresses once.
 				r, w, _ := newWiredResponder(serverAddrs(withIPv4))
 				svcs := []Service{operationalFixture(port1), commissionableFixture(port2), commissionerFixture(port3, false)}
 				for _, svc := range svcs {
@@ -223,14 +226,36 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 					}
 				}
 				got := w.take()
-				expectSent(t, got, 3)
-				for i, svc := range svcs {
-					instance := svc.InstanceName + "." + svc.ServiceType + ".local."
-					for _, rr := range got[i].msg.Answer {
-						if srv, ok := rr.(*dns.SRV); ok && (srv.Hdr.Name != instance || srv.Port != svc.Port) {
-							t.Errorf("message %d carries SRV %v, want %s port %d", i+1, srv, instance, svc.Port)
+				var ports []int
+				var addrs []string
+				for _, p := range got {
+					if p.dst != nil || p.ifIndex != 1 {
+						t.Fatalf("announcement to %v on %d", p.dst, p.ifIndex)
+					}
+					for _, rr := range p.msg.Answer {
+						switch v := rr.(type) {
+						case *dns.SRV:
+							ports = append(ports, int(v.Port))
+						case *dns.A:
+							addrs = append(addrs, v.A.String())
+						case *dns.AAAA:
+							addrs = append(addrs, v.AAAA.String())
 						}
 					}
+				}
+				slices.Sort(ports)
+				if want := []int{int(port1), int(port2), int(port3)}; !slices.Equal(ports, slices.Sorted(slices.Values(want))) {
+					t.Errorf("SRV ports %v, want %v", ports, want)
+				}
+				if len(got) > 2 {
+					t.Errorf("%d datagrams, want the one announcement split by size", len(got))
+				}
+				announced := map[string]bool{}
+				for _, a := range addrs {
+					if announced[a] {
+						t.Errorf("host address %s announced twice", a)
+					}
+					announced[a] = true
 				}
 				// The operational record with an empty TXT carries one
 				// zero byte (RFC 6763 §6.1, :782-783).

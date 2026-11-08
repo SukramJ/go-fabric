@@ -134,9 +134,13 @@ const testparityPlannedRatchet = 3
 // Merged with wave P3: 158 ported, 985 missing.
 // Issue 439 (wave W7): GeneralDiagnosticsServerTest.ts's five fault cases
 // ported over contract.FaultSource: 159 ported, 980 missing.
+// Issue 440 (wave W7): MdnsServerTransportTest.ts's ten remaining cases
+// ported, six MdnsServerTest.ts cases of the one-second rule and the
+// turn's announcement and MdnsTest.ts's announcement of devices that
+// start together: 160 ported, 963 missing.
 const (
-	testparityPortedRatchet  = 159
-	testparityMissingRatchet = 980
+	testparityPortedRatchet  = 160
+	testparityMissingRatchet = 963
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

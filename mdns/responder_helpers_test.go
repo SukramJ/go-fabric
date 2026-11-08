@@ -4,8 +4,10 @@
 package mdns
 
 import (
+	"errors"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -37,9 +39,15 @@ type fakeWire struct {
 	addrsByLink map[int][]net.IP
 	sent        []sentPacket
 	// fail, when set, decides how far a multicast reaches: reachAll sends
-	// it, reachNone drops it, reachSome records it as sent on some
-	// families only (matter.js MdnsServerTransportTest's failing socket).
+	// it, reachFailed and reachNone drop it, reachSome records it as sent
+	// on some families only (matter.js MdnsServerTransportTest's failing
+	// socket).
 	fail func(m *dns.Msg) reach
+	// failUnicast, when set, decides how far a unicast datagram reaches.
+	failUnicast func(m *dns.Msg) reach
+	// turn lets the clock's due timers run — the announcement of this
+	// turn — before take reads the wire (newWiredResponder sets it).
+	turn func()
 }
 
 func newFakeWire(addrsByLink map[int][]string) *fakeWire {
@@ -52,24 +60,37 @@ func newFakeWire(addrsByLink map[int][]string) *fakeWire {
 	return w
 }
 
-func (w *fakeWire) links() []int {
+func (w *fakeWire) links() []link {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	out := make([]int, 0, len(w.addrsByLink))
+	idx := make([]int, 0, len(w.addrsByLink))
 	for i := range w.addrsByLink {
-		out = append(out, i)
+		idx = append(idx, i)
 	}
-	slices.Sort(out)
+	slices.Sort(idx)
+	out := make([]link, 0, len(idx))
+	for _, i := range idx {
+		out = append(out, w.linkLocked(i))
+	}
 	return out
 }
 
-func (w *fakeWire) addrs(ifIndex int) []net.IP {
+func (w *fakeWire) link(ifIndex int) link {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.addrsByLink[ifIndex]
+	return w.linkLocked(ifIndex)
 }
 
-func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
+func (w *fakeWire) linkLocked(ifIndex int) link {
+	addrs, listed := w.addrsByLink[ifIndex]
+	l := link{index: ifIndex, name: "fake" + strconv.Itoa(ifIndex), addrs: addrs, listed: listed, has4: true, has6: true}
+	return l
+}
+
+// addrs is the advertised addresses of an interface.
+func (w *fakeWire) addrs(ifIndex int) []net.IP { return w.link(ifIndex).addrs }
+
+func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr, fail func(*dns.Msg) reach) (reach, error) {
 	m := new(dns.Msg)
 	if err := m.Unpack(pkt); err != nil {
 		panic(err)
@@ -80,19 +101,38 @@ func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	rc := reachAll
-	if w.fail != nil {
-		rc = w.fail(m)
+	if fail != nil {
+		rc = fail(m)
 	}
-	if rc != reachNone {
+	var err error
+	switch rc {
+	case reachNone:
+	case reachFailed:
+		err = errSendFailed
+	case reachSome:
+		err = errSendFailed
+		w.sent = append(w.sent, sentPacket{msg: m, ifIndex: ifIndex, dst: dst})
+	default:
 		w.sent = append(w.sent, sentPacket{msg: m, ifIndex: ifIndex, dst: dst})
 	}
-	return rc
+	return rc, err
 }
 
-func (w *fakeWire) multicast(pkt []byte, ifIndex int) reach { return w.record(pkt, ifIndex, nil) }
+// errSendFailed is the fake wire's refused send.
+var errSendFailed = errors.New("send ENETUNREACH")
 
-func (w *fakeWire) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
-	return w.record(pkt, ifIndex, dst)
+func (w *fakeWire) multicast(pkt []byte, l link) (reach, error) {
+	w.mu.Lock()
+	fail := w.fail
+	w.mu.Unlock()
+	return w.record(pkt, l.index, nil, fail)
+}
+
+func (w *fakeWire) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) (reach, error) {
+	w.mu.Lock()
+	fail := w.failUnicast
+	w.mu.Unlock()
+	return w.record(pkt, ifIndex, dst, fail)
 }
 
 // setFail installs the multicast failure rule (nil: every send leaves).
@@ -118,8 +158,12 @@ func (w *fakeWire) setAddrs(ifIndex int, addrs ...string) {
 	w.addrsByLink[ifIndex] = ips
 }
 
-// take returns the packets sent since the last take.
+// take returns the packets sent since the last take, once the turn's
+// announcement went out.
 func (w *fakeWire) take() []sentPacket {
+	if w.turn != nil {
+		w.turn()
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	out := w.sent
@@ -143,6 +187,7 @@ func newWiredResponder(addrsByLink map[int][]string) (*Responder, *fakeWire, *cl
 	r.SetClock(clk)
 	r.wire = w
 	r.random32 = func() uint32 { return 0 }
+	w.turn = func() { clk.Advance(0) }
 	return r, w, clk
 }
 

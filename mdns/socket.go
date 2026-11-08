@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -182,93 +183,103 @@ func (s *sockets) survivesReadError(ctx context.Context, family string, err erro
 	return true
 }
 
-// links implements [wire].
-func (s *sockets) links() []int {
-	ifaces := listMulticastInterfaces()
-	out := make([]int, 0, len(ifaces))
+// links implements [wire]: one listing of the host's interfaces, each
+// up, multicast-capable one with what the advertise policy publishes
+// there.
+func (s *sockets) links() []link {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	out := make([]link, 0, len(ifaces))
 	for _, ifi := range ifaces {
-		out = append(out, ifi.Index)
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 {
+			continue
+		}
+		out = append(out, s.linkOf(ifi))
 	}
 	return out
 }
 
-// addrs implements [wire]: the advertise policy's addresses of the
-// interface, IPv4 dropped when no IPv4 socket bound (matter.js
-// MdnsAdvertisement.ts:166-169 supportsIpv4 at 862ad75f).
-func (s *sockets) addrs(ifIndex int) []net.IP {
-	ips := hostAddrsFor(s.exclude)(ifIndex)
+// link implements [wire].
+func (s *sockets) link(ifIndex int) link {
+	ifi, err := net.InterfaceByIndex(ifIndex)
+	if err != nil {
+		return link{index: ifIndex}
+	}
+	l := s.linkOf(*ifi)
+	l.listed = ifi.Flags&net.FlagUp != 0 && ifi.Flags&net.FlagMulticast != 0
+	return l
+}
+
+// linkOf is ifi as a [link]: the advertise policy's addresses, IPv4
+// dropped when no IPv4 socket bound (matter.js MdnsAdvertisement.ts:166-169
+// supportsIpv4 at 862ad75f), and the families of all its addresses.
+func (s *sockets) linkOf(ifi net.Interface) link {
+	h := hostIfaceOf(ifi)
+	l := link{index: ifi.Index, name: ifi.Name, listed: true}
+	for _, ip := range h.ips {
+		if ip.To4() != nil {
+			l.has4 = true
+		} else {
+			l.has6 = true
+		}
+	}
+	ips := parseHostIPs(filterPrimaryHostIPs([]hostIface{h}, s.exclude))
 	s.mu.RLock()
 	has4 := s.pc4 != nil
 	s.mu.RUnlock()
-	if has4 {
-		return ips
+	if !has4 {
+		ips = slices.DeleteFunc(ips, func(ip net.IP) bool { return ip.To4() != nil })
 	}
-	out := ips[:0:0]
-	for _, ip := range ips {
-		if ip.To4() == nil {
-			out = append(out, ip)
-		}
-	}
-	return out
+	l.addrs = ips
+	return l
 }
 
 // multicast implements [wire]: the IPv4 group when the interface has an
-// IPv4 address, the IPv6 group when it has an IPv6 one. It reports how far
-// the datagram reached — matter.js UdpMulticastServer.send's reach
-// (packages/general/src/net/dns-sd/MdnsSocket.ts:102-127 at db021da0).
-func (s *sockets) multicast(pkt []byte, ifIndex int) reach {
-	ifi, err := net.InterfaceByIndex(ifIndex)
-	if err != nil {
-		return reachNone
-	}
-	has4, has6 := false, false
-	if addrs, err := ifi.Addrs(); err == nil {
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok {
-				if ipn.IP.To4() != nil {
-					has4 = true
-				} else {
-					has6 = true
-				}
-			}
-		}
-	}
+// IPv4 address and an IPv4 socket bound, the IPv6 group likewise. It
+// reports how far the datagram reached — matter.js UdpMulticastServer.send's
+// reach (packages/general/src/net/dns-sd/MdnsSocket.ts:102-127 at
+// db021da0): none when no family was usable, failed when every family it
+// tried refused it, with the refusals joined.
+func (s *sockets) multicast(pkt []byte, l link) (reach, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
-		return reachNone
+		return reachNone, nil
 	}
 	tried, ok := 0, 0
-	if has4 && s.pc4 != nil {
+	var errs []error
+	if l.has4 && s.pc4 != nil {
 		tried++
-		if _, err := s.pc4.WriteTo(pkt, &ipv4.ControlMessage{IfIndex: ifIndex}, mdnsGroup4); err != nil {
-			s.log.Debug("mdns.responder.write4_err", slog.String("iface", ifi.Name), slog.Any("err", err))
+		if _, err := s.pc4.WriteTo(pkt, &ipv4.ControlMessage{IfIndex: l.index}, mdnsGroup4); err != nil {
+			errs = append(errs, fmt.Errorf("%s (IPv4): %w", l.name, err))
 		} else {
 			ok++
 		}
 	}
-	if has6 && s.pc6 != nil {
+	if l.has6 && s.pc6 != nil {
 		tried++
-		if _, err := s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: ifIndex}, mdnsGroup6); err != nil {
-			s.log.Debug("mdns.responder.write6_err", slog.String("iface", ifi.Name), slog.Any("err", err))
+		if _, err := s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: l.index}, mdnsGroup6); err != nil {
+			errs = append(errs, fmt.Errorf("%s (IPv6): %w", l.name, err))
 		} else {
 			ok++
 		}
 	}
-	return reachOf(tried, ok)
+	return reachOf(tried, ok), errors.Join(errs...)
 }
 
 // unicast implements [wire]: the querier at its source address and port —
 // 5353 for an mDNS querier, the legacy querier's own port otherwise
 // (RFC 6762 §6.7).
-func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
+func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) (reach, error) {
 	if dst == nil {
-		return reachNone
+		return reachNone, nil
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
-		return reachNone
+		return reachNone, nil
 	}
 	var err error
 	switch {
@@ -277,12 +288,12 @@ func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach {
 	case dst.IP.To4() == nil && s.pc6 != nil:
 		_, err = s.pc6.WriteTo(pkt, &ipv6.ControlMessage{IfIndex: ifIndex}, dst)
 	default:
-		return reachNone
+		return reachNone, nil
 	}
 	if err != nil {
-		return reachNone
+		return reachFailed, fmt.Errorf("to %s: %w", dst, err)
 	}
-	return reachAll
+	return reachAll, nil
 }
 
 func isTimeout(err error) bool {
@@ -444,6 +455,28 @@ func hasRoutableIPv6(ips []net.IP) bool {
 		}
 	}
 	return false
+}
+
+// hostIfaceOf is ifi with its unicast addresses; an interface whose
+// addresses cannot be read has none.
+func hostIfaceOf(ifi net.Interface) hostIface {
+	info := hostIface{
+		name:         ifi.Name,
+		up:           ifi.Flags&net.FlagUp != 0,
+		multicast:    ifi.Flags&net.FlagMulticast != 0,
+		loopback:     ifi.Flags&net.FlagLoopback != 0,
+		pointToPoint: ifi.Flags&net.FlagPointToPoint != 0,
+	}
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		return info
+	}
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok {
+			info.ips = append(info.ips, ipn.IP)
+		}
+	}
+	return info
 }
 
 // hostAddrsFor returns the address source of the host-name answers: the
