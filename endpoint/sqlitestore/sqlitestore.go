@@ -416,7 +416,11 @@ func (s *Store) EraseEndpoints(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("sqlitestore: reset allocation counter: %w", err)
 	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("sqlitestore: reset allocation counter: rows affected: %w", err)
+	}
+	if n == 0 {
 		return errors.New("sqlitestore: allocation row missing — was Apply run on this database?")
 	}
 	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {

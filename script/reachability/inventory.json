@@ -5860,7 +5860,7 @@
       "identifier": "TestIngress_BorderRouterInstancesEnterTheCache",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/watch_test.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "client/discovery",
@@ -6266,14 +6266,14 @@
       "identifier": "TestWatch",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/watch_test.go",
-      "line": 49
+      "line": 57
     },
     {
       "package": "client/discovery",
       "identifier": "TestWatch_OnAClosedCache",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/watch_test.go",
-      "line": 103
+      "line": 111
     },
     {
       "package": "client/exchange",

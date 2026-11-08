@@ -20,10 +20,11 @@ const (
 // TestIngress_BorderRouterInstancesEnterTheCache: a _meshcop instance's
 // records enter the cache without a browse or a filter of its own
 // (BorderRouterRegistry.ts:34-37, :121-126 of matter.js at db021da0), and a
-// browse of Matter's operational type does not return it.
+// browse of Matter's operational type returns the operational instance its
+// PTR names, not the border router's.
 func TestIngress_BorderRouterInstancesEnterTheCache(t *testing.T) {
 	t.Parallel()
-	n, _, _ := testNames(t)
+	n, conn, _ := testNames(t)
 	deliver(t, n, 0,
 		[]dns.RR{srvRR(brInst, brHost, 49154, 120, true), txtRR(brInst, 4500, true, "nn=Home", "vn=ACME")},
 		aaaaRR(brHost, "fd00::1", 120, true),
@@ -32,14 +33,21 @@ func TestIngress_BorderRouterInstancesEnterTheCache(t *testing.T) {
 	if !n.Has(brInst) || !n.Has("aabbccddeeff0011._trel._udp.local") {
 		t.Fatal("the border router's instances are not cached")
 	}
+	const opInst = "AABBCCDDEEFF0011-0000000000000001._matter._tcp.local"
 	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startBrowse(ctx, n, "_matter._tcp.local")
+	waitFor(t, func() bool { return asked(t, conn, "_matter._tcp.local", TypePTR) })
+	inject(t, conn, 0,
+		[]dns.RR{ptrRR("_matter._tcp.local", opInst, 4500)},
+		srvRR(opInst, "node.local", 5540, 120, true),
+		aaaaRR("node.local", "fd00::2", 120, true),
+	)
+	waitFor(t, func() bool { return n.Has(opInst) })
 	cancel()
-	got, err := n.Browse(ctx, "_matter._tcp.local")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("a _matter browse returned %+v", got)
+	r := <-done
+	if r.err != nil || len(r.instances) != 1 || r.instances[0].QName != opInst {
+		t.Fatalf("a _matter browse returned %+v, want only %s", r, opInst)
 	}
 }
 
