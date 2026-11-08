@@ -1254,7 +1254,7 @@ func TestSliceCReuseBeforeTheDeviceHasReportedParityMatterjsServer(t *testing.T)
 		sdp := &sdpVideoConstraints{
 			video:                   mediaDisposition{state: mediaReceiving},
 			audio:                   mediaDisposition{state: mediaAbsent},
-			limitsByCodec:           map[string]videoCodecLimits{videoCodecName(h265): {maxPixels: stated(1280 * 720)}},
+			limitsByCodec:           map[string]videoCodecLimits{VideoCodecName(h265): {maxPixels: stated(1280 * 720)}},
 			unreadableCeilingCodecs: map[string]bool{},
 		}
 		_, err := m.resolveVideoStream(t.Context(), videoRequest{t: tTarget, usage: liveView, limits: videoCodecLimitsOf(sdp, h265), allowEviction: true})

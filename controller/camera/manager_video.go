@@ -102,11 +102,11 @@ func preferredVideoCodec(deviceCodecs []csdef.VideoCodecEnum, sdp *sdpVideoConst
 		if decodable, unreadable, ok := decodableVideoCodecs(sdp); ok {
 			var narrowed []csdef.VideoCodecEnum
 			for _, c := range candidates {
-				if slices.Contains(decodable, videoCodecName(c)) {
+				if slices.Contains(decodable, VideoCodecName(c)) {
 					narrowed = append(narrowed, c)
 				}
 			}
-			if len(narrowed) == 0 && slices.ContainsFunc(candidates, func(c csdef.VideoCodecEnum) bool { return slices.Contains(unreadable, videoCodecName(c)) }) {
+			if len(narrowed) == 0 && slices.ContainsFunc(candidates, func(c csdef.VideoCodecEnum) bool { return slices.Contains(unreadable, VideoCodecName(c)) }) {
 				return 0, &IncompatibleError{Reason: ReasonLevel, Track: TrackVideo, Device: videoCodecNamesOf(candidates), Requested: slices.Clone(unreadable)}
 			}
 			var err error
@@ -118,7 +118,7 @@ func preferredVideoCodec(deviceCodecs []csdef.VideoCodecEnum, sdp *sdpVideoConst
 	if hintCodecs != nil {
 		var preferred []csdef.VideoCodecEnum
 		for _, name := range hintCodecs {
-			if i := slices.IndexFunc(candidates, func(c csdef.VideoCodecEnum) bool { return videoCodecName(c) == name }); i >= 0 {
+			if i := slices.IndexFunc(candidates, func(c csdef.VideoCodecEnum) bool { return VideoCodecName(c) == name }); i >= 0 {
 				preferred = append(preferred, candidates[i])
 			}
 		}
@@ -189,7 +189,7 @@ func (m *manager) resolveVideoStreamLocked(ctx context.Context, req videoRequest
 	}
 	deviceCodecs := st.codecs()
 	incompatible := func(reason IncompatibleReason) *IncompatibleError {
-		return &IncompatibleError{Reason: reason, Track: TrackVideo, Device: videoCodecNamesOf(deviceCodecs), Requested: []string{videoCodecName(codec)}}
+		return &IncompatibleError{Reason: reason, Track: TrackVideo, Device: videoCodecNamesOf(deviceCodecs), Requested: []string{VideoCodecName(codec)}}
 	}
 	if len(deviceCodecs) > 0 && !slices.Contains(deviceCodecs, codec) {
 		return nil, incompatible(ReasonCodec)

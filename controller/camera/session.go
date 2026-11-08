@@ -57,14 +57,19 @@ type StartRequest struct {
 	Key   string
 }
 
-// VideoBounds are a start's video bounds; each stated one is hard.
+// VideoBounds are a start's video bounds; each stated one is hard. A nil
+// field is unstated; a stated one is held to its field's range in the
+// cluster's model, so a stated 0 is refused where the floor is 1, as
+// matterjs-server refuses it (toOptionalNumber against
+// CAMERA_FIELD_RANGES, cameraCommands.ts:378-382 and
+// cameraFieldRanges.ts:48-56 at 0bd06f2).
 type VideoBounds struct {
 	// Codecs are the codecs the host accepts, in its order of preference,
 	// as SDP spells them (H264, H265, …); nil is any.
 	Codecs                       []string
 	MinResolution, MaxResolution *csdef.VideoResolutionStruct
-	MinFrameRate, MaxFrameRate   uint16
-	MinBitRate, MaxBitRate       uint32
+	MinFrameRate, MaxFrameRate   *uint16
+	MinBitRate, MaxBitRate       *uint32
 	Overlays                     Overlays
 }
 
@@ -75,12 +80,14 @@ type Overlays struct {
 	OSD       *bool
 }
 
-// AudioBounds are a start's audio values; each stated one is exact.
+// AudioBounds are a start's audio values; each stated one is exact. A
+// nil field is unstated; a stated one is held to its field's range, as
+// [VideoBounds]' are.
 type AudioBounds struct {
 	Codecs       []string
-	ChannelCount uint8
-	SampleRate   uint32
-	BitRate      uint32
+	ChannelCount *uint8
+	SampleRate   *uint32
+	BitRate      *uint32
 }
 
 // VideoEnvelope is what a video stream delivers.
@@ -468,32 +475,41 @@ func checkResolution(r *csdef.VideoResolutionStruct, field string) (resolution, 
 	return resolutionOf(*r), nil
 }
 
-// checkRange refuses a stated value outside its field's range; 0 is
-// unstated.
-func checkRange(v int64, field string, r fieldRange) error {
-	if v == 0 || (v >= r.min && v <= r.max) {
-		return nil
+// checkRange refuses a stated value outside its field's range and is the
+// value, 0 for an unstated (nil) one — every range's floor is at least 1,
+// so 0 stays free to mean unstated inside the policy. Mirrors
+// matterjs-server's toOptionalNumber (cameraCommands.ts:378-382 at
+// 0bd06f2): undefined is unstated, a stated value is held to the range
+// fieldRange takes from the constraint (cameraFieldRanges.ts:48-56).
+func checkRange[T ~uint8 | ~uint16 | ~uint32](v *T, field string, r fieldRange) (int, error) {
+	if v == nil {
+		return 0, nil
 	}
-	return invalidArguments("%s must be %s", field, rangeText(r))
+	if n := int64(*v); n < r.min || n > r.max {
+		return 0, invalidArguments("%s must be %s", field, rangeText(r))
+	}
+	return int(*v), nil
 }
 
 // hints converts the video bounds. Mirrors matterjs-server
 // packages/ws-controller/src/camera/cameraCommands.ts:427-458 at 0bd06f2.
 func (b *VideoBounds) hints() (*videoHints, []string, error) {
 	r := cameraFieldRanges
-	for _, c := range []struct {
-		v     int64
-		field string
-		r     fieldRange
-	}{
-		{int64(b.MinFrameRate), "video.min_frame_rate", r.minFrameRate},
-		{int64(b.MaxFrameRate), "video.max_frame_rate", r.maxFrameRate},
-		{int64(b.MinBitRate), "video.min_bit_rate", r.minBitRate},
-		{int64(b.MaxBitRate), "video.max_bit_rate", r.maxBitRate},
-	} {
-		if err := checkRange(c.v, c.field, c.r); err != nil {
-			return nil, nil, err
-		}
+	minFrameRate, err := checkRange(b.MinFrameRate, "video.min_frame_rate", r.minFrameRate)
+	if err != nil {
+		return nil, nil, err
+	}
+	maxFrameRate, err := checkRange(b.MaxFrameRate, "video.max_frame_rate", r.maxFrameRate)
+	if err != nil {
+		return nil, nil, err
+	}
+	minBitRate, err := checkRange(b.MinBitRate, "video.min_bit_rate", r.minBitRate)
+	if err != nil {
+		return nil, nil, err
+	}
+	maxBitRate, err := checkRange(b.MaxBitRate, "video.max_bit_rate", r.maxBitRate)
+	if err != nil {
+		return nil, nil, err
 	}
 	minRes, err := checkResolution(b.MinResolution, "video.min_resolution")
 	if err != nil {
@@ -506,8 +522,8 @@ func (b *VideoBounds) hints() (*videoHints, []string, error) {
 	h := &videoHints{
 		videoRangeBounds: videoRangeBounds{
 			minResolution: minRes, maxResolution: maxRes,
-			minFrameRate: int(b.MinFrameRate), maxFrameRate: int(b.MaxFrameRate),
-			minBitRate: int(b.MinBitRate), maxBitRate: int(b.MaxBitRate),
+			minFrameRate: minFrameRate, maxFrameRate: maxFrameRate,
+			minBitRate: minBitRate, maxBitRate: maxBitRate,
 		},
 		overlays: overlayBoundsOf(b.Overlays.Watermark, b.Overlays.OSD),
 	}
@@ -518,16 +534,19 @@ func (b *VideoBounds) hints() (*videoHints, []string, error) {
 // packages/ws-controller/src/camera/cameraCommands.ts:460-475 at 0bd06f2.
 func (b *AudioBounds) hints() (*audioHints, error) {
 	r := cameraFieldRanges
-	if err := checkRange(int64(b.ChannelCount), "audio.channel_count", r.channelCount); err != nil {
+	channelCount, err := checkRange(b.ChannelCount, "audio.channel_count", r.channelCount)
+	if err != nil {
 		return nil, err
 	}
-	if err := checkRange(int64(b.SampleRate), "audio.sample_rate", r.sampleRate); err != nil {
+	sampleRate, err := checkRange(b.SampleRate, "audio.sample_rate", r.sampleRate)
+	if err != nil {
 		return nil, err
 	}
-	if err := checkRange(int64(b.BitRate), "audio.bit_rate", r.audioBitRate); err != nil {
+	bitRate, err := checkRange(b.BitRate, "audio.bit_rate", r.audioBitRate)
+	if err != nil {
 		return nil, err
 	}
-	return &audioHints{codecs: upperCodecs(b.Codecs), channelCount: int(b.ChannelCount), sampleRate: int(b.SampleRate), bitRate: int(b.BitRate)}, nil
+	return &audioHints{codecs: upperCodecs(b.Codecs), channelCount: channelCount, sampleRate: sampleRate, bitRate: bitRate}, nil
 }
 
 // validateICEServers holds typed ICE servers to the struct's ceilings and

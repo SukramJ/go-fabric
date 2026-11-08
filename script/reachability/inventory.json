@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7781,
+  "entry_points": 7786,
   "entry_packages": [
     ".",
     "bdx",
@@ -197,6 +197,7 @@
     "controller/ca",
     "controller/ca/keyfile",
     "controller/camera",
+    "controller/camera/cameratest",
     "controller/client",
     "controller/client/sqlstore",
     "controller/commissioner",
@@ -280,8 +281,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17736,
-    "reachable": 12335,
+    "total_exported": 17768,
+    "reachable": 12367,
     "whitelisted": 5401,
     "unreachable": 0
   },
@@ -23113,21 +23114,21 @@
       "identifier": "TestCommandsErrorsCameraServerErrorsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
-      "line": 480
+      "line": 513
     },
     {
       "package": "controller/camera",
       "identifier": "TestCommandsErrorsParseReleaseStreamArgsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
-      "line": 346
+      "line": 379
     },
     {
       "package": "controller/camera",
       "identifier": "TestCommandsErrorsParseSnapshotArgsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
-      "line": 299
+      "line": 332
     },
     {
       "package": "controller/camera",
@@ -23141,14 +23142,14 @@
       "identifier": "TestCommandsErrorsToWireCapabilitiesParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
-      "line": 374
+      "line": 407
     },
     {
       "package": "controller/camera",
       "identifier": "TestCommandsErrorsToWireStartStreamResultParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/commands_errors_parity_matterjsserver_test.go",
-      "line": 427
+      "line": 460
     },
     {
       "package": "controller/camera",
@@ -23960,7 +23961,7 @@
       "identifier": "Encodable",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/json.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "controller/client",
@@ -24772,7 +24773,7 @@
       "identifier": "Value",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/json.go",
-      "line": 43
+      "line": 44
     },
     {
       "package": "controller/client",

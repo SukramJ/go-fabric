@@ -677,7 +677,7 @@ func ladderReactionOf(status im.StatusCode, ok bool) ladderReaction {
 func videoCodecNamesOf(codecs []csdef.VideoCodecEnum) []string {
 	out := make([]string, len(codecs))
 	for i, c := range codecs {
-		out[i] = videoCodecName(c)
+		out[i] = VideoCodecName(c)
 	}
 	return out
 }

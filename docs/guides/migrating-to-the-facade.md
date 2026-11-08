@@ -247,6 +247,18 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.18.0: the camera bounds
+
+`controller/camera.VideoBounds`' `MinFrameRate`, `MaxFrameRate`
+(`*uint16`), `MinBitRate`, `MaxBitRate` (`*uint32`) and `AudioBounds`'
+`ChannelCount` (`*uint8`), `SampleRate` and `BitRate` (`*uint32`) are
+pointers now: nil is unstated, and a stated value is held to its field's
+range, so a stated 0 is refused with `ErrInvalidArgument` where the
+model's floor is 1 — as matterjs-server refuses it. A 0 used to read as
+unstated. A host that maps an optional JSON number sets the field only
+when the number is present (`v := uint16(n); b.MaxFrameRate = &v`); one
+that wrote 0 for "unstated" leaves the field nil.
+
 ## Changed after v0.18.0: the endpoint store erases
 
 `endpoint.Store` has a fifth method, `EraseEndpoints(ctx) error`: delete
