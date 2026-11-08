@@ -213,6 +213,9 @@ var ErrNoDemManager = errors.New("energy: DeviceEnergyManagement needs an DemMan
 // here is chip's cluster checks and its shared delegate's state machine.
 type DeviceEnergyManagementServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	spec.SelfHeld
 
 	srv     *spec.Server
@@ -302,16 +305,9 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	return s, nil
 }
 
-// matterEpochOffset is the Unix time of the Matter epoch,
-// 2000-01-01T00:00:00Z.
-const matterEpochOffset = 946684800
-
-// matterEpochS is t in Matter epoch seconds.
-func matterEpochS(t time.Time) uint32 {
-	return uint32(t.Unix() - matterEpochOffset) //nolint:gosec // a wall clock after 2000 and before 2136
-}
-
-func (s *DeviceEnergyManagementServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *DeviceEnergyManagementServer) nowEpoch() uint32 { return s.epochS(s.clock) }
 
 // --- reads --------------------------------------------------------------
 

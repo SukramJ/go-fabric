@@ -210,6 +210,9 @@ type CommodityTariffConfig struct {
 // attributes and the two commands are chip's.
 type CommodityTariffServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	spec.SelfHeld
 
 	srv       *spec.Server
@@ -277,7 +280,9 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 	return s, nil
 }
 
-func (s *CommodityTariffServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *CommodityTariffServer) nowEpoch() uint32 { return s.epochS(s.clock) }
 
 // value reads a stored attribute.
 func (s *CommodityTariffServer) value(attrID uint32) any {
@@ -907,10 +912,11 @@ func (s *CommodityTariffServer) componentByID(id uint32) *TariffComponent {
 }
 
 // dayOfWeek is GetDayOfWeek (Server.cpp:658-667): the UTC weekday of a
-// Matter epoch-s time as a DayPatternDayOfWeekBitmap bit.
+// Matter epoch-s time as a DayPatternDayOfWeekBitmap bit, Sunday bit 0.
+// The Matter epoch, 2000-01-01, is a Saturday.
 func dayOfWeek(epochS uint32) ct.DayPatternDayOfWeekBitmap {
-	wd := time.Unix(int64(epochS)+matterEpochOffset, 0).UTC().Weekday()
-	return ct.DayPatternDayOfWeekBitmap(1) << uint(wd)
+	wd := (epochS/86400 + uint32(time.Saturday)) % 7
+	return ct.DayPatternDayOfWeekBitmap(1) << wd
 }
 
 // findDay is FindDay (Server.cpp:669-730): the individual day whose date

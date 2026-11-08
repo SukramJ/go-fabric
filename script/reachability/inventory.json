@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7780,
+  "entry_points": 7782,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17750,
+    "total_exported": 17751,
     "reachable": 12339,
-    "whitelisted": 5411,
+    "whitelisted": 5412,
     "unreachable": 0
   },
   "by_package": [],
@@ -9460,6 +9460,13 @@
     },
     {
       "package": "cluster/energy",
+      "identifier": "TestNodeTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/energy/mattertime_internal_test.go",
+      "line": 32
+    },
+    {
+      "package": "cluster/energy",
       "identifier": "ThreeLevel",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/gridconditions.go",
@@ -9558,10 +9565,10 @@
     },
     {
       "package": "cluster/filter",
-      "identifier": "TestMatterEpochSeconds",
+      "identifier": "TestMatterNow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/filter/epoch_internal_test.go",
-      "line": 13
+      "line": 17
     },
     {
       "package": "cluster/jointfabric",

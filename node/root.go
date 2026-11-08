@@ -271,6 +271,10 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.DiagnosticLogs.SetClock(cfg.Clock)
+	if r.TimeSynchronization != nil {
+		// The logs' UTCTimeStamp is the node's UTC (issue 445).
+		r.DiagnosticLogs.SetUTCClock(r.TimeSynchronization.UTC)
+	}
 	var netComm contract.ClusterServer
 	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once

@@ -6109,16 +6109,31 @@ tells of that adoption too because it moves the time the participants
 read —, and as chip's servers read the system clock
 SetUTCTime sets through `GetClock_MatterEpochS`
 (`src/system/SystemClock.cpp:284-306` at `6170af84`; the delegate call is
-`TimeSynchronizationCluster.cpp:865`). Difference,
-until issue 445: the other device-side readers of real time — the event
-log's EpochTimestamp, ResourceMonitoring's LastChangedTime, DiagnosticLogs,
-the energy servers — read the host clock without the offset, where chip
-reads the one system clock for them too. TimeSource and
+`TimeSynchronizationCluster.cpp:865`). Since issue 445 every device-side
+reader of real time reads the node's UTC, as chip's read the one system
+clock: the participants — Thermostat TSUGGEST, Valve TS, ResourceMonitoring's
+LastChangedTime (`cluster/filter`, chip `ResourceMonitoringCluster.cpp:379`,
+`GetClock_RealTimeMS`), DeviceEnergyManagement's forecast and pause times
+(`DeviceEnergyManagementCluster.cpp:449`, `:698`), CommodityTariff's
+current day and period (`commodity-tariff-server.cpp:928`) and EnergyEVSE's
+targets and session times — through `AttachMatterTime`; of these only the
+Valve re-evaluates on `MatterTimeChanged` (the others read the time per
+command or timer, as chip's) and only the Valve requires the time (chip's
+Startup refuses it, `ValveConfigurationAndControlCluster.cpp:46-50`); and
+the root's readers through `SetUTCClock(TimeSynchronization.UTC)` — the
+event log's EpochTimestamp (`im.EventLog`, chip `EventManagement.cpp:433-439`,
+which stamps a system time when the UTC is null; the Go record has no
+system-time form and takes the host clock then), GeneralDiagnostics'
+TimeSnapshot and DiagnosticLogs' UTCTimeStamp (omitted while the UTC is
+null). A server outside a node reads its own clock (`clock.MatterTimeOf`),
+and the duplicated Matter-epoch offsets of the readers are gone onto it.
+TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
 time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,
-1 epoch-seconds case), `node`'s client wire test and its
-`TestOneMatterTimePerNode`.
+1 epoch-seconds case), `node`'s client wire test, its
+`TestOneMatterTimePerNode` and `TestRootReadersFollowTheNodesUTC`,
+`cluster/filter:TestMatterNow` and `cluster/energy:TestNodeTime`.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
 

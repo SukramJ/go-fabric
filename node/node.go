@@ -382,6 +382,12 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
+	// The events' EpochTimestamp is the node's UTC, the root
+	// TimeSynchronization's (issue 445).
+	if ts := n.root.TimeSynchronization; ts != nil {
+		n.br.EventLog().SetUTCClock(ts.UTC)
+	}
+
 	// Event numbers continue across a reboot (main.go:416-426 at b4ea1f96^).
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
 		n.br.EventLog().SeedNumber(ceiling)

@@ -173,13 +173,11 @@ func (d *demoEnergyTariff) device(opts device.Options) (*device.ElectricalEnergy
 	return dev, nil
 }
 
-func matterEpochOf(t time.Time) uint32 { return uint32(t.Unix() - 946684800) } //nolint:gosec // a clock after 2000
-
 // setPriceUpdate is SetTestEventTrigger_PriceUpdate
 // (commodity-price/src/CommodityPriceEventTriggers.cpp:34-76): 15.916 p/kWh
 // for 30 minutes from now, level 3, "Medium", ExVAT 95 % and VAT 5 %.
 func (d *demoEnergyTariff) setPriceUpdate() {
-	start := matterEpochOf(time.Now())
+	start := matterEpochNow()
 	amount := int64(15916)
 	p := cp.CommodityPriceStruct{
 		PeriodStart: start, PeriodEnd: spec.ValueOf(start + 30*60),
@@ -214,7 +212,7 @@ func priceComponents(amount int64) []cp.CommodityPriceComponentStruct {
 // setForecastUpdate is SetTestEventTrigger_ForecastUpdate (:78-142): 56
 // half-hour entries from now, each a random 4 p to 32 p.
 func (d *demoEnergyTariff) setForecastUpdate() {
-	start := matterEpochOf(time.Now())
+	start := matterEpochNow()
 	forecast := make([]cp.CommodityPriceStruct, 56)
 	for i := range forecast {
 		amount := int64(4000 + rand.IntN(32000-4000+1)) //nolint:gosec // demo data, as the app's rand()
@@ -253,7 +251,7 @@ func carbonLevel(level int16) egc.ThreeLevelEnum {
 // (ElectricalGridConditionsEventTriggers.cpp:31-60): 230 g/kWh Medium on
 // the grid, 0 g/kWh Low locally, for 30 minutes from now.
 func (d *demoEnergyTariff) setGridCurrentConditions() {
-	start := matterEpochOf(time.Now())
+	start := matterEpochNow()
 	c := egc.ElectricalGridConditionsStruct{
 		PeriodStart: start, PeriodEnd: spec.ValueOf(start + 30*60),
 		GridCarbonIntensity: 230, GridCarbonLevel: egc.ThreeLevelMedium,
@@ -267,7 +265,7 @@ func (d *demoEnergyTariff) setGridCurrentConditions() {
 // setGridForecastConditions is SetTestEventTrigger_ForecastConditionsUpdate
 // (:62-114): 48 half-hour entries from now, each a random 0 to 600 g/kWh.
 func (d *demoEnergyTariff) setGridForecastConditions() {
-	start := matterEpochOf(time.Now())
+	start := matterEpochNow()
 	forecast := make([]egc.ElectricalGridConditionsStruct, 48)
 	for i := range forecast {
 		level := int16(rand.IntN(601)) //nolint:gosec // demo data, as the app's rand()
@@ -541,7 +539,7 @@ func (m *demoElectricalMeter) update() {
 	if !m.saved {
 		m.saved, m.unit = true, m.metering.Get().TariffUnit
 	}
-	ts := matterEpochOf(time.Now())
+	ts := matterEpochNow()
 	unit := commtr.TariffUnitKVAh
 	if m.unit != nil && *m.unit == commtr.TariffUnitKVAh {
 		unit = commtr.TariffUnitKWh
@@ -759,7 +757,7 @@ func (r *fakeReadings) updateLocked() {
 	} else {
 		r.exported += -power * seconds / 3600
 	}
-	now := matterEpochOf(time.Now())
+	now := matterEpochNow()
 	for _, t := range r.targets {
 		if err := t.power.Set(epmdef.Patch{ActivePower: &power, Voltage: &voltage, ActiveCurrent: &current}); err != nil {
 			slog.Warn("meter.fakereadings", slog.String("cluster", "power"), slog.Any("err", err))

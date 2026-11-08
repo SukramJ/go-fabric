@@ -174,6 +174,9 @@ type evseSession struct {
 // EvseServer implements [contract.ClusterServer] for EnergyEvse.
 type EvseServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	// SelfHeld is the typed server's command handlers, event path and
 	// write veto over srv (evse_typed.go).
 	spec.SelfHeld
@@ -318,7 +321,9 @@ func (s *EvseServer) unlock() {
 
 func (s *EvseServer) notifyLocked(c EvseChange) { s.pending = append(s.pending, c) }
 
-func (s *EvseServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *EvseServer) nowEpoch() uint32 { return s.epochS(s.clock) }
 
 // --- attribute access -----------------------------------------------------
 
