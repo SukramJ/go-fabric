@@ -35764,7 +35764,7 @@
       "identifier": "TestBorderRouterRegistryParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_parity_matterjs_internal_test.go",
-      "line": 91
+      "line": 97
     },
     {
       "package": "thread/brdiscovery",

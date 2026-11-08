@@ -35,6 +35,12 @@ type txt map[string]string
 
 func (s *stubNames) discover(t *testing.T, qname string, entries txt, srvTarget string) {
 	t.Helper()
+	s.fn(instanceState(t, qname, entries, srvTarget))
+}
+
+// instanceState is a discovered instance's state as discover hands it on.
+func instanceState(t *testing.T, qname string, entries txt, srvTarget string) discovery.NameState {
+	t.Helper()
 	p := discovery.Parameters{}
 	for k, v := range entries {
 		if k == "xa" || k == "xp" {
@@ -51,7 +57,7 @@ func (s *stubNames) discover(t *testing.T, qname string, entries txt, srvTarget 
 	if srvTarget != "" {
 		st.Records = append(st.Records, discovery.Record{Name: qname, Type: discovery.TypeSRV, SRV: mdns.DNSSRV{Target: srvTarget, Port: 49154}})
 	}
-	s.fn(st)
+	return st
 }
 
 func (s *stubNames) gone(qname string) { s.fn(discovery.NameState{QName: qname}) }

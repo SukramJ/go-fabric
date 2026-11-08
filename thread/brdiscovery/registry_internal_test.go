@@ -49,7 +49,8 @@ func TestRegistryCloseStopsDelivery(t *testing.T) {
 		var late atomic.Int32
 		r.OnChange(func(Event) { late.Add(1) })
 
-		go stub.discover(t, brMeshcop, txt{"xa": brXA, "nn": "Home"}, "otbr.local")
+		st := instanceState(t, brMeshcop, txt{"xa": brXA, "nn": "Home"}, "otbr.local")
+		go stub.fn(st)
 		<-entered
 		r.Close()
 		close(release)
