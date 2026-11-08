@@ -212,6 +212,7 @@ type Exchange struct {
 	onClosingOnce   sync.Once
 	onSend          func(retransmission int)
 	onReceive       func(msg *Message, duplicate bool)
+	onQueued        func(msg *Message) // [Exchange.SetQueueNotifier]
 	queue           []*Message
 	signal          chan struct{}
 	sentToAck       *pending
@@ -304,6 +305,23 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, op
 
 // ID is the exchange id.
 func (x *Exchange) ID() uint16 { return x.id }
+
+// SetQueueNotifier installs fn, called on the receive goroutine with every
+// message the exchange queues for [Exchange.Next], just before it is
+// queued: never a duplicate, a standalone acknowledgement or a message the
+// acknowledgement checks drop (MessageExchange.ts:501-561 at db021da0,
+// the queue write at :562), so fn sees exactly the messages Next will
+// return, before Next can return them. Unlike [Options].OnReceive, which matter.js calls for every
+// message before those checks (:499), it is Go only: a protocol that acts
+// on a message at its arrival — the BDX flow finishing a transfer at its
+// final BlockAckEof — must not act on one the exchange then drops. fn must
+// not block and must not call back into the exchange or the manager. A
+// later call replaces fn; nil removes it.
+func (x *Exchange) SetQueueNotifier(fn func(msg *Message)) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.onQueued = fn
+}
 
 // SetReceiveNotifier installs fn as the exchange's receive notifier when
 // none is set — the [Options].OnReceive of an exchange obtained after its
@@ -884,6 +902,11 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		}
 		x.receivedToAck = msg
 		x.ackTimer = x.m.clock.AfterFunc(StandaloneAckTimeout, func() { x.ackTimeout(msg) })
+	}
+	if onQueued := x.onQueued; onQueued != nil {
+		x.mu.Unlock()
+		onQueued(msg)
+		x.mu.Lock()
 	}
 	x.queue = append(x.queue, msg)
 	x.countQueuedLocked()

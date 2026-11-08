@@ -19,7 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // The OTA provider on the controller's own identity: the provider
@@ -94,7 +93,7 @@ func serveBDX(ctx context.Context, r *bdx.Responder, hook *atomic.Pointer[func(c
 		peer := bdx.Peer{FabricIndex: sess.FabricIndex(), NodeID: sess.PeerNodeID(), SessionID: sess.ID()}
 		msg := bdx.Message{ProtocolID: first.ProtocolID, Opcode: first.Opcode, Payload: first.Payload}
 		ex := &bdxExchange{x: x, hook: hook}
-		x.SetReceiveNotifier(ex.arrived)
+		x.SetQueueNotifier(ex.queued)
 		defer func() { _ = ex.Close() }()
 		r.HandleExchange(ctx, peer, msg, ex)
 	}
@@ -103,10 +102,11 @@ func serveBDX(ctx context.Context, r *bdx.Responder, hook *atomic.Pointer[func(c
 // bdxExchange is a client-stack exchange as the BDX responder's
 // [bdx.Exchange]: a StatusReport travels on the Secure Channel protocol by
 // the exchange's own rule (exchange.Send), every other message on BDX. It
-// is a [bdx.ReceiveNotifier] through the exchange's receive notifier
-// ([exchange.Exchange.SetReceiveNotifier]), so the outbound flow finishes
-// a transfer when its final BlockAckEof arrives, before the receive path
-// decodes the requestor's ApplyUpdateRequest.
+// is a [bdx.ReceiveNotifier] through the exchange's queue notifier
+// ([exchange.Exchange.SetQueueNotifier]), so the outbound flow finishes a
+// transfer when its final BlockAckEof is queued, before the receive path
+// decodes the requestor's ApplyUpdateRequest — and never on one the
+// exchange's acknowledgement checks drop.
 type bdxExchange struct {
 	x *exchange.Exchange
 	// notify is the flow's [bdx.ReceiveNotifier] callback.
@@ -118,13 +118,9 @@ type bdxExchange struct {
 // OnReceive implements [bdx.ReceiveNotifier].
 func (e *bdxExchange) OnReceive(fn func(bdx.Message)) { e.notify.Store(&fn) }
 
-// arrived is the exchange's receive notifier, on the receive goroutine:
-// it passes the flow the messages Receive returns — a duplicate and a
-// standalone acknowledgement are not among them (exchange.Next).
-func (e *bdxExchange) arrived(m *exchange.Message, duplicate bool) {
-	if duplicate || (m.ProtocolID == mrp.SecureChannelProtocolID && m.Opcode == mrp.StandaloneAckOpcode) {
-		return
-	}
+// queued is the exchange's queue notifier, on the receive goroutine: it
+// passes the flow each message the exchange queues for Receive.
+func (e *bdxExchange) queued(m *exchange.Message) {
 	if fn := e.notify.Load(); fn != nil {
 		(*fn)(bdx.Message{ProtocolID: m.ProtocolID, Opcode: m.Opcode, Payload: m.Payload})
 	}

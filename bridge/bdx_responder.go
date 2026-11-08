@@ -121,13 +121,11 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
 	if raw, ok := b.bdx.exchanges.Load(key); ok {
 		if ex, ok := raw.(*initiatedSecureExchange); ok {
-			ex.arrived(msg)
 			k := ex.turn.deliver()
-			select {
-			case ex.in <- msg:
+			switch {
+			case ex.enqueue(msg):
 				ex.turn.await(k, ex.done)
-			case <-ex.done:
-			default:
+			case !ex.ended():
 				b.logger.Debug("matter.exchange.bdx.overflow",
 					slog.Int("session_id", int(hdr.SessionID)), slog.Int("exchange_id", int(proto.ExchangeID)))
 			}
@@ -178,7 +176,10 @@ const responderTurnBound = 2 * time.Second
 // (OtaSoftwareUpdateProviderServer.ts:332-339, :418-424). Here the
 // responder runs on a goroutine of its own; the dispatch of a message to it
 // waits, bounded, until the responder has taken it and is waiting for the
-// next one or has finished.
+// next one or has finished. The session order (transport/udp ServeOrdered,
+// message.SessionOrderKey) and the flow's finish at the BlockAckEof's
+// arrival (bdx.ReceiveNotifier) now carry that guarantee for BDX; the turn
+// remains for the order of the responder's own replies.
 type responderTurn struct {
 	// mu guards changed, delivered, idleAt and taken.
 	mu        sync.Mutex

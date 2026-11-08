@@ -269,16 +269,41 @@ type initiatedSecureExchange struct {
 }
 
 // OnReceive implements [bdx.ReceiveNotifier]: fn is called with every
-// message the receive path hands the exchange, at its arrival, before the
-// message is queued for Receive ([initiatedSecureExchange.arrived]) — so a
-// transfer finished by its final BlockAckEof is finished before the
-// session's next datagram is dispatched.
+// message the receive path queues for Receive, just before it is queued
+// ([initiatedSecureExchange.enqueue]) — so a transfer finished by its
+// final BlockAckEof is finished before the session's next datagram is
+// dispatched.
 func (e *initiatedSecureExchange) OnReceive(fn func(bdx.Message)) { e.notify.Store(&fn) }
 
-// arrived calls the receive notifier with msg, on the receive goroutine.
-func (e *initiatedSecureExchange) arrived(msg bdx.Message) {
+// ended reports whether the exchange ended (Close, or fail).
+func (e *initiatedSecureExchange) ended() bool {
+	select {
+	case <-e.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// enqueue queues msg for Receive and reports whether it did. The receive
+// notifier hears of msg first, so the flow acts on it before Receive can
+// return it — but only when it is queued: a full queue, or an ended
+// exchange, drops msg without telling the notifier ([bdx.ReceiveNotifier]).
+// A session's messages arrive one at a time on its ordered turn
+// (ServeOrdered, message.SessionOrderKey), so the room checked before the
+// notifier is the room the send finds.
+func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
+	if e.ended() || len(e.in) == cap(e.in) {
+		return false
+	}
 	if fn := e.notify.Load(); fn != nil {
 		(*fn)(msg)
+	}
+	select {
+	case e.in <- msg:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -454,11 +479,7 @@ func (b *Bridge) deliverInitiatedSecure(hdr *message.Header, proto message.Proto
 		return false
 	}
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
-	ex.arrived(msg)
-	select {
-	case ex.in <- msg:
-	case <-ex.done:
-	default:
+	if !ex.enqueue(msg) && !ex.ended() {
 		b.logger.Debug("matter.exchange.initiated.overflow",
 			slog.Int("session_id", int(hdr.SessionID)), slog.Int("exchange_id", int(proto.ExchangeID)))
 	}

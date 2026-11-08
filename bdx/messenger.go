@@ -55,12 +55,15 @@ type Exchange interface {
 // final BlockAckEof arrives rather than when its reader dequeues it; an
 // exchange without it finishes the transfer at the read.
 //
-// The notifier is matter.js MessageExchange.ReceiveNotifier
-// (MessageExchange.ts:1372 at db021da0, called at :499 for every message
-// the exchange takes) in BDX's terms: fn sees each message Receive would
-// return — not a duplicate, not a standalone acknowledgement. It runs on
-// the receive goroutine, so it must not block and must not call back into
-// the exchange. A later call replaces fn.
+// The notifier has matter.js MessageExchange.ReceiveNotifier's shape
+// (MessageExchange.ts:1372 at db021da0) but a narrower contract: fn sees
+// exactly the messages Receive will return, each when it is queued and
+// before Receive can return it — never a duplicate, a standalone
+// acknowledgement, a message the exchange's acknowledgement checks drop or
+// one a full queue drops. A transfer finished at its arrival can then
+// always read the ack from the queue. fn runs on the receive goroutine, so
+// it must not block and must not call back into the exchange. A later
+// call replaces fn.
 type ReceiveNotifier interface {
 	Exchange
 	OnReceive(fn func(Message))

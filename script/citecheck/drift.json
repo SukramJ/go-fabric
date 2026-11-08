@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 353,
+    "line": 378,
     "citation": "ExchangeManager.ts:561-585",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "peerLost",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 575,
+    "line": 596,
     "citation": "MessageExchange.ts:435-439",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "at": "db021da0",
@@ -848,7 +848,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 350,
+    "line": 368,
     "citation": "MessageExchange.ts:410-413",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "retransmissionCount",
@@ -857,7 +857,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 377,
+    "line": 395,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -866,7 +866,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 387,
+    "line": 405,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -875,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 604,
+    "line": 622,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -884,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 645,
+    "line": 663,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",

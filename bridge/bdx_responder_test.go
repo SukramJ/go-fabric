@@ -273,3 +273,28 @@ func TestBDXResponder_ExchangeNotifiesAtArrival(t *testing.T) {
 		t.Fatalf("result %+v, want the notifier to see %v before Receive returned each", res, want)
 	}
 }
+
+// TestInitiatedSecureExchangeNotifiesOnlyQueued: the receive notifier hears
+// of a message only when the exchange queues it — a full queue and an ended
+// exchange drop the message without telling it, so a transfer is never
+// finished on a BlockAckEof that Receive will not return
+// (bdx.ReceiveNotifier).
+func TestInitiatedSecureExchangeNotifiesOnlyQueued(t *testing.T) {
+	t.Parallel()
+	ex := &initiatedSecureExchange{in: make(chan bdx.Message, 1), done: make(chan struct{})}
+	var notified []uint8
+	ex.OnReceive(func(m bdx.Message) { notified = append(notified, m.Opcode) })
+	first := bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageBlockQuery)}
+	second := bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageBlockAckEOF)}
+	if !ex.enqueue(first) || len(notified) != 1 {
+		t.Fatalf("first message: queued %d, notified %v", len(ex.in), notified)
+	}
+	if ex.enqueue(second) || len(notified) != 1 {
+		t.Fatalf("a full queue: notified %v, want the first alone", notified)
+	}
+	<-ex.in
+	close(ex.done)
+	if ex.enqueue(second) || len(notified) != 1 {
+		t.Fatalf("an ended exchange: notified %v, want the first alone", notified)
+	}
+}

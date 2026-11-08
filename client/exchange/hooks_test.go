@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"context"
 	"slices"
 	"sync"
 	"testing"
@@ -159,5 +160,65 @@ func testSetReceiveNotifierOnAPeerOpenedExchange(t *testing.T) {
 	}
 	if got := other.receivedSnapshot(); len(got) != 0 {
 		t.Fatalf("second notifier saw %+v, want nothing: the first stays", got)
+	}
+}
+
+// TestQueueNotifierSeesOnlyQueuedMessages: the queue notifier hears of a
+// message only when the exchange queues it for Next — a BDX BlockAckEof
+// whose piggybacked acknowledgement names the wrong counter is dropped by
+// the acknowledgement checks (MessageExchange.ts:522-534 at db021da0) and
+// never reaches it, a standalone ack and a duplicate neither; the
+// BlockAckEof with the right acknowledgement does, before Next returns it.
+// The receive notifier, matter.js's (:499), sees all of them.
+func TestQueueNotifierSeesOnlyQueuedMessages(t *testing.T) {
+	t.Parallel()
+	const bdxProtocol, blockEOF, blockAckEOF = 2, 0x12, 0x14
+	m, conn, _ := newTestManager(t, Config{})
+	s, p := newSecurePair(t, m, 0x0315, false)
+	var rec hookRecorder
+	var mu sync.Mutex
+	var queued []uint32
+	x, _ := m.Initiate(s, bdxProtocol, Options{OnReceive: rec.onReceive})
+	x.SetQueueNotifier(func(msg *Message) {
+		mu.Lock()
+		queued = append(queued, msg.Counter)
+		mu.Unlock()
+	})
+	queuedSnapshot := func() []uint32 {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(queued)
+	}
+	done := sendAsync(x, blockEOF, []byte{0, 0, 0, 0}, SendOptions{})
+	eof := p.decode(t, conn.nextOn(t, x).bytes)
+
+	wrong := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: eof.hdr.MessageCounter + 7, Opcode: blockAckEOF, ExchangeID: x.ID(), ProtocolID: bdxProtocol}
+	p.send(t, s.ID(), wrong, []byte{0, 0, 0, 0})
+	if got := queuedSnapshot(); len(got) != 0 {
+		t.Fatalf("queue notifier saw %v for a BlockAckEof with the wrong acknowledgement", got)
+	}
+	right := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: eof.hdr.MessageCounter, Opcode: blockAckEOF, ExchangeID: x.ID(), ProtocolID: bdxProtocol}
+	b := p.send(t, s.ID(), right, []byte{0, 0, 0, 0})
+	if err := waitErr(t, done); err != nil {
+		t.Fatal(err)
+	}
+	got := queuedSnapshot()
+	if len(got) != 1 {
+		t.Fatalf("queue notifier saw %v, want the BlockAckEof once", got)
+	}
+	m.HandleDatagram(b, peerAddr) // a duplicate: acknowledged, not queued
+	ack := message.ProtocolHeader{HasAck: true, AckCounter: eof.hdr.MessageCounter, Opcode: mrp.StandaloneAckOpcode, ExchangeID: x.ID(), ProtocolID: mrp.SecureChannelProtocolID}
+	p.send(t, s.ID(), ack, nil)
+	if after := queuedSnapshot(); !slices.Equal(after, got) {
+		t.Fatalf("queue notifier saw %v after a duplicate and a standalone ack, want %v", after, got)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	msg, err := x.Next(ctx, ReceiveOptions{})
+	if err != nil || msg.Counter != got[0] || msg.Opcode != blockAckEOF {
+		t.Fatalf("Next %+v, %v; want the notified BlockAckEof", msg, err)
+	}
+	if n := len(rec.receivedSnapshot()); n != 4 {
+		t.Fatalf("receive notifier saw %d messages, want all 4", n)
 	}
 }
