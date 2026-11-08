@@ -402,3 +402,22 @@ func TestEraseEndpointsRestartsTheNumbering(t *testing.T) {
 		t.Fatal("after the erase a removal reissued its number 3")
 	}
 }
+
+// TestEraseEndpointsRefusals: an erase on a database Apply never ran on
+// says so instead of leaving a store that allocates nothing, and a closed
+// database's error is returned.
+func TestEraseEndpointsRefusals(t *testing.T) {
+	t.Parallel()
+	db := openAt(t, filepath.Join(t.TempDir(), "endpoints.db"))
+	if _, err := db.ExecContext(t.Context(), `DELETE FROM matter_endpoint_allocation`); err != nil {
+		t.Fatal(err)
+	}
+	s := sqlitestore.New(db)
+	if err := s.EraseEndpoints(t.Context()); err == nil || !strings.Contains(err.Error(), "allocation row missing") {
+		t.Fatalf("erase without the allocation row: %v", err)
+	}
+	_ = db.Close()
+	if err := s.EraseEndpoints(t.Context()); err == nil {
+		t.Fatal("erase on a closed database succeeded")
+	}
+}

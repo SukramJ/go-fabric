@@ -55,3 +55,25 @@ func TestAssertDeviceTypeConformance(t *testing.T) {
 		t.Errorf("an empty topology: %v / %v", got, r.errs)
 	}
 }
+
+// TestFakeStoreErase: the fake's EraseEndpoints drops every row and the
+// next assignment is 2 again, as the factory reset expects of a store.
+func TestFakeStoreErase(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := endpointtest.NewFakeStore()
+	for _, k := range []string{"a", "b"} {
+		if _, err := s.UpsertEndpointAssigning(ctx, endpoint.Record{Key: endpoint.StringKey(k), Scope: "s"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.EraseEndpoints(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if recs, _ := s.ListEndpoints(ctx, ""); len(recs) != 0 {
+		t.Fatalf("records after the erase: %v", recs)
+	}
+	if id, err := s.UpsertEndpointAssigning(ctx, endpoint.Record{Key: endpoint.StringKey("c"), Scope: "s"}); err != nil || id != 2 {
+		t.Fatalf("first number after the erase %d (%v), want 2", id, err)
+	}
+}
