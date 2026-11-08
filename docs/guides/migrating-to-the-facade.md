@@ -254,7 +254,8 @@ now)`: the third input is the border-router registry's entries
 (`[]brdiscovery.Entry`, package `thread/brdiscovery`), nil for none. A
 caller that built without a registry passes nil and gets the graph it got
 before; one that has the controller's passes
-`ctrl.BorderRouters().List()`, and a neighbour the registry knows becomes a
+`ctrl.BorderRouters().List()` — which returns nil, without a panic, when the
+controller's registry is disabled — and a neighbour the registry knows becomes a
 `border_router` node (`topology.KindBorderRouter`, id `br_<EXTADDR>`, with
 `HostName`, `VendorName`, `ModelName` and `LastSeen`). `topology.New`
 builds with the controller's registry without a change on the caller's

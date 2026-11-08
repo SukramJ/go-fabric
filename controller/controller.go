@@ -562,7 +562,8 @@ type BorderRouterConfig struct {
 // controller's DNS-SD cache sees (`_meshcop`, `_trel`), which
 // controller/topology classifies Thread neighbours by — matterjs-server's
 // controller keeps one always (NetworkTopologyService.ts:88-89 of
-// matterjs-server at 0bd06f2). Nil when [BorderRouterConfig].Disabled.
+// matterjs-server at 0bd06f2). Nil when [BorderRouterConfig].Disabled;
+// the registry's methods are safe on nil (no entries, no events).
 func (c *Controller) BorderRouters() *brdiscovery.Registry { return c.brs }
 
 // Registry is the registry of the paired nodes: Commissioned lists them,

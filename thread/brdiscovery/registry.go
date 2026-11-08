@@ -175,9 +175,14 @@ func newRegistry(w watcher, cfg Config) *Registry {
 	return r
 }
 
-// Close stops watching and clears the registry; nothing is told
-// afterwards. It is idempotent.
+// Close stops watching and clears the registry; no observer is called
+// once it returned — an observer call that had already begun is not
+// waited for. It is idempotent, and a no-op on a nil *Registry (the
+// controller's when its registry is disabled).
 func (r *Registry) Close() {
+	if r == nil {
+		return
+	}
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -193,8 +198,12 @@ func (r *Registry) Close() {
 }
 
 // List is every entry in the order it was first seen, after pruning the
-// stale ones. Mirrors matter.js BorderRouterRegistry.ts:170-173.
+// stale ones; nil on a nil *Registry (the controller's when its registry
+// is disabled). Mirrors matter.js BorderRouterRegistry.ts:170-173.
 func (r *Registry) List() []Entry {
+	if r == nil {
+		return nil
+	}
 	r.mu.Lock()
 	r.pruneLocked()
 	out := make([]Entry, 0, len(r.order))
@@ -207,8 +216,12 @@ func (r *Registry) List() []Entry {
 }
 
 // Get is the entry of extAddress, matched ignoring case, after pruning
-// the stale ones. Mirrors matter.js BorderRouterRegistry.ts:175-179.
+// the stale ones; not found on a nil *Registry (the controller's when its
+// registry is disabled). Mirrors matter.js BorderRouterRegistry.ts:175-179.
 func (r *Registry) Get(extAddress string) (Entry, bool) {
+	if r == nil {
+		return Entry{}, false
+	}
 	r.mu.Lock()
 	r.pruneLocked()
 	rec, ok := r.entries[strings.ToUpper(extAddress)]
@@ -223,9 +236,17 @@ func (r *Registry) Get(extAddress string) (Entry, bool) {
 
 // OnChange calls fn with every event until the returned function is
 // called. fn runs one call at a time, on the goroutine that caused the
-// event — the DNS-SD cache's for an instance, a caller of List or Get for
-// a prune; it may call List and Get, and must not block.
+// event — the DNS-SD cache's loop for an instance, a caller of List or Get
+// for a prune; it may call List and Get, and must not block. The cache's
+// loop is not re-entrant (client/discovery/loop.go:75), so fn must not
+// call [Registry.Close], controller.Controller.Close or anything else
+// that reaches the DNS-SD cache ([discovery.Names]): that deadlocks the
+// cache. On a nil *Registry (the controller's when its registry is
+// disabled) fn is never called and unsubscribe is a no-op.
 func (r *Registry) OnChange(fn func(Event)) (unsubscribe func()) {
+	if r == nil {
+		return func() {}
+	}
 	r.mu.Lock()
 	id := r.nextObs
 	r.nextObs++
@@ -251,7 +272,8 @@ func (r *Registry) emitLocked(kind EventKind, rec *record) {
 }
 
 // deliver hands the queued events to the observers, one at a time; a
-// delivery already running (an observer's own List) takes the rest.
+// delivery already running (an observer's own List) takes the rest. It
+// checks for Close before each observer call.
 func (r *Registry) deliver() {
 	r.mu.Lock()
 	if r.emitting {
@@ -273,6 +295,14 @@ func (r *Registry) deliver() {
 		}
 		r.mu.Unlock()
 		for _, fn := range fns {
+			// Close may have run while an earlier observer was called:
+			// nobody is told after it.
+			r.mu.Lock()
+			closed := r.closed
+			r.mu.Unlock()
+			if closed {
+				break
+			}
 			fn(ev)
 		}
 		r.mu.Lock()
@@ -339,7 +369,7 @@ func (r *Registry) observeLocked(st discovery.NameState) {
 
 // goneLocked is an instance whose last record went: its source no longer
 // carries the entry, which keeps its fields and its LastSeen. Mirrors
-// matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:280-303
+// matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:269-304
 // (#onInstanceChanged) at db021da0.
 func (r *Registry) goneLocked(key, source string) {
 	delete(r.evicted, key)
@@ -409,6 +439,10 @@ func (r *Registry) upsertLocked(st discovery.NameState, inst *instance) {
 		r.order = append(r.order, xa)
 		r.emitLocked(EventAdded, rec)
 	}
+	// An instance whose xa changed is repointed without its source leaving
+	// the previous entry, so that entry keeps the source (and is never
+	// pruned as stale) until it is evicted. Mirrors matter.js
+	// BorderRouterRegistry.ts:470-472 (tracking.xaKey = xaKey) at db021da0.
 	inst.xa = xa
 }
 

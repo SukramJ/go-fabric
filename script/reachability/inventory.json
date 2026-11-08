@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7818,
+  "entry_points": 7821,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17815,
+    "total_exported": 17817,
     "reachable": 12388,
-    "whitelisted": 5427,
+    "whitelisted": 5429,
     "unreachable": 0
   },
   "by_package": [],
@@ -22618,14 +22618,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 673
+      "line": 674
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 669
+      "line": 670
     },
     {
       "package": "controller",
@@ -35758,6 +35758,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_parity_matterjs_internal_test.go",
       "line": 91
+    },
+    {
+      "package": "thread/brdiscovery",
+      "identifier": "TestRegistryCloseStopsDelivery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 39
+    },
+    {
+      "package": "thread/brdiscovery",
+      "identifier": "TestRegistryNilReceiver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 18
     },
     {
       "package": "thread/otbr",
