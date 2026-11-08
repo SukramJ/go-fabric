@@ -213,6 +213,9 @@ var ErrNoDemManager = errors.New("energy: DeviceEnergyManagement needs an DemMan
 // here is chip's cluster checks and its shared delegate's state machine.
 type DeviceEnergyManagementServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	spec.SelfHeld
 
 	srv     *spec.Server
@@ -302,16 +305,9 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	return s, nil
 }
 
-// matterEpochOffset is the Unix time of the Matter epoch,
-// 2000-01-01T00:00:00Z.
-const matterEpochOffset = 946684800
-
-// matterEpochS is t in Matter epoch seconds.
-func matterEpochS(t time.Time) uint32 {
-	return uint32(t.Unix() - matterEpochOffset) //nolint:gosec // a wall clock after 2000 and before 2136
-}
-
-func (s *DeviceEnergyManagementServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *DeviceEnergyManagementServer) nowEpoch() (uint32, bool) { return s.epochS(s.clock) }
 
 // --- reads --------------------------------------------------------------
 
@@ -614,7 +610,11 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 		s.stopPowerAdjustTimerLocked()
 	} else { // :110-122
 		generateEvent = true
-		s.powerAdjustStartUtc = s.nowEpoch()
+		start, ok := s.nowEpoch()
+		if !ok { // DelegateImpl.cpp:115-120: no time, the request fails
+			return demFailure("PowerAdjustRequest: unable to get the time")
+		}
+		s.powerAdjustStartUtc = start
 	}
 	if err := s.hook(func() error { return s.manager.PowerAdjust(ctx, r.Power, r.Duration, r.Cause) }); err != nil { // :125-132
 		return demFailure("PowerAdjustRequest: %v", err)
@@ -676,9 +676,13 @@ func (s *DeviceEnergyManagementServer) powerAdjustExpired() {
 func (s *DeviceEnergyManagementServer) powerAdjustEndLocked(cause DemCause) error {
 	var energy int64
 	_ = s.hook(func() error { energy = s.manager.ApproxEnergyDuringSession(); return nil })
+	var duration uint32
+	if now, ok := s.nowEpoch(); ok { // DelegateImpl.cpp:310-318: without a time the duration stays 0
+		duration = now - s.powerAdjustStartUtc
+	}
 	return s.emitLocked(dem.EventPowerAdjustEnd, dem.PowerAdjustEndEvent{
 		Cause:     cause,
-		Duration:  s.nowEpoch() - s.powerAdjustStartUtc,
+		Duration:  duration,
 		EnergyUse: energy,
 	})
 }
@@ -736,7 +740,11 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	}
 	earliest := f.EarliestStartTime.Value
 	if f.EarliestStartTime.Null { // :446-456: null means now
-		earliest = s.nowEpoch()
+		now, ok := s.nowEpoch()
+		if !ok { // :449-453
+			return nil, demFailure("unable to get the current time")
+		}
+		earliest = now
 	}
 	duration := f.EndTime - f.StartTime  // :462
 	if r.RequestedStartTime < earliest { // :463-468
@@ -991,7 +999,10 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 	if err := s.checkOptOut(r.Cause); err != nil { // :695
 		return nil, err
 	}
-	now := s.nowEpoch() // :697-703
+	now, ok := s.nowEpoch() // :697-703
+	if !ok {
+		return nil, demFailure("failed to get the UTC time")
+	}
 	if len(r.Constraints) > 0 {
 		c := r.Constraints[0]
 		if c.StartTime < now { // :713-716

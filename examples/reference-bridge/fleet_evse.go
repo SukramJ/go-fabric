@@ -262,7 +262,7 @@ func (e *demoEvse) computeChargingSchedule() {
 	local := now.Local()
 	dayMap := uint8(1) << uint(local.Weekday())            // GetLocalDayOfWeekNow (EnergyTimeUtils.cpp:51-66)
 	minutesNow := uint16(local.Hour()*60 + local.Minute()) //nolint:gosec // < 1440; GetMinutesPastMidnight (:94-113)
-	nowEpoch := uint32(now.Unix() - 946684800)             //nolint:gosec // the Matter epoch, a clock after 2000
+	nowEpoch := matterEpochAt(now)
 	var sched energy.ChargeSchedule
 	if e.evse.IsPluggedIn() && e.evse.SupplyState() == energy.SupplyChargingEnabled { // :375
 		var (
@@ -564,7 +564,17 @@ func (d *demoDem) ChangeToMode(_ context.Context, newMode uint8) (status uint8, 
 	return uint8(demmdef.ModeChangeStatusSuccess), "", nil
 }
 
-func matterEpochNow() uint32 { return uint32(time.Now().Unix() - 946684800) } //nolint:gosec // a clock after 2000
+// matterEpochNow is the host clock in Matter epoch seconds
+// (clock.MatterTimeOf); 0 before the epoch.
+func matterEpochNow() uint32 {
+	s, _ := clock.MatterTimeOf(nil)()
+	return s
+}
+
+// matterEpochAt is t in Matter epoch seconds, 0 before the epoch.
+func matterEpochAt(t time.Time) uint32 {
+	return uint32(max(t.Sub(matterEpoch)/time.Second, 0)) //nolint:gosec // a clock before 2136
+}
 
 // configureForecast is ConfigureForecast (DEMTestEventTriggers.cpp:51-135).
 // The slots persist between calls as chip's static array does, and slot

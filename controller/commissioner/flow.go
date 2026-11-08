@@ -104,6 +104,19 @@ type collectedData struct {
 	vendorID, productID          uint16
 	supportsConcurrentConnection *bool
 	fabricIndex                  uint8
+	// terms is the device's terms-and-conditions requirement, nil when
+	// its root GeneralCommissioning has no TC feature (readTerms).
+	terms *termsRequirement
+}
+
+// termsRequirement is what the root GeneralCommissioning's TC attributes
+// say of the device's terms and conditions: TCMinRequiredVersion,
+// TCAcknowledgementsRequired (true while no acceptance satisfies the
+// requirement) and TCUpdateDeadline (nil when null or absent).
+type termsRequirement struct {
+	minVersion uint16
+	required   bool
+	deadline   *uint32
 }
 
 // transitionFunc is the flow's transitionToCase callback (:316-319).
@@ -405,17 +418,14 @@ func rootAttr(cluster, attribute uint32) im.ConcreteAttributePath {
 	return im.ConcreteAttributePath{Endpoint: rootEndpoint, Cluster: cluster, Attribute: attribute, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 }
 
-// ensureGeneralCommissioningSuccess is :712-719.
+// ensureGeneralCommissioningSuccess is :712-719, the refusal typed as a
+// [*GeneralCommissioningError] that keeps matter.js's message.
 func (f *flow) ensureGeneralCommissioningSuccess(what string, code gencomm.CommissioningErrorEnum, debugText string) error {
 	f.log.Debug("matter.controller.commissioning.general_commissioning_result", slog.String("context", what), slog.Int("code", int(code)), slog.String("debug", debugText))
 	if code == gencomm.CommissioningErrorOk {
 		return nil
 	}
-	msg := fmt.Sprintf("Commission error for %q: %s (%d)", what, enumName(gencomm.CommissioningErrorEnumDef, uint64(code)), code)
-	if debugText != "" {
-		msg += ", " + debugText
-	}
-	return newError(ErrCommissioning, msg, nil)
+	return &GeneralCommissioningError{Command: what, Code: code, DebugText: debugText}
 }
 
 // ensureOperationalCredentialsSuccess is :674-709.
@@ -458,7 +468,11 @@ func enumName(e *spec.Enum, v uint64) string {
 // NetworkCommissioning FeatureMap of every endpoint (the wildcard read of
 // :773-784, which also names networks and the OTA requestor's default
 // providers — read for the wire's sake, used by steps the IP channel does
-// not run).
+// not run). That second read also carries the root GeneralCommissioning's
+// FeatureMap and its terms-and-conditions requirement (readTerms), and a
+// requirement the options do not meet ends the step with a
+// [*TermsRequiredError] — before ArmFailSafe, so the device is left as
+// it was found (checkTerms).
 func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 	v, ok, err := f.readValues(ctx,
 		rootAttr(opCredsCluster, opCredsAttrSupportedFabrics),
@@ -519,8 +533,15 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: spec.AttrFeatureMap, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: netcomm.AttrNetworks, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: otareq.ClusterID, Attribute: otareq.AttrDefaultOtaProviders, HasCluster: true, HasAttribute: true},
+		rootAttr(gencomm.ClusterID, spec.AttrFeatureMap),
+		rootAttr(gencomm.ClusterID, gencomm.AttrTcMinRequiredVersion),
+		rootAttr(gencomm.ClusterID, gencomm.AttrTcAcknowledgementsRequired),
+		rootAttr(gencomm.ClusterID, gencomm.AttrTcUpdateDeadline),
 	)
 	if err != nil {
+		return 0, err
+	}
+	if d.terms, err = readTerms(report); err != nil {
 		return 0, err
 	}
 	d.networkFeatures = []networkFeature{}
@@ -545,7 +566,81 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 			d.networkStatus = append(d.networkStatus, networkStatus{endpoint: a.Path.Endpoint, networks: nets})
 		}
 	}
+	if err := f.checkTerms(); err != nil {
+		return 0, err
+	}
 	return stepSuccess, nil
+}
+
+// readTerms is the device's terms-and-conditions requirement from the
+// second read of step 0.1: nil without the root GeneralCommissioning's
+// TC feature, whose attributes a device without it does not serve.
+// Neither matter.js nor connectedhomeip reads these: matter.js's flow
+// leaves the consent a TODO (ControllerCommissioningFlow.ts:570 at
+// db021da0), and connectedhomeip's kReadCommissioningInfo reads
+// GeneralCommissioning's SupportsConcurrentConnection, Breadcrumb,
+// BasicCommissioningInfo, RegulatoryConfig, LocationCapability and
+// IsCommissioningWithoutPower and no TC attribute
+// (CHIPDeviceController.cpp:2592-2603 at 6170af84) — register row
+// BD-Matter-Commissioner-TermsRequirementRead. The four paths join the
+// three of the wildcard read, seven in all: a server has to accept no
+// more than nine per read (CHIPDeviceController.cpp:2581-2582), which
+// the first read's eight would pass.
+func readTerms(report *interaction.Report) (*termsRequirement, error) {
+	fmNode, ok := report.Value(rootEndpoint, gencomm.ClusterID, spec.AttrFeatureMap)
+	if !ok {
+		return nil, nil
+	}
+	fm, err := spec.DecodeUint[uint32](32)(fmNode)
+	if err != nil {
+		return nil, fmt.Errorf("%w: GeneralCommissioning FeatureMap: %w", errUnexpectedResponse, err)
+	}
+	if fm&uint32(gencomm.FeatureTermsAndConditions) == 0 {
+		return nil, nil
+	}
+	t := &termsRequirement{required: true}
+	var errs []error
+	if v, ok := report.Value(rootEndpoint, gencomm.ClusterID, gencomm.AttrTcMinRequiredVersion); ok {
+		t.minVersion, err = spec.DecodeUint[uint16](16)(v)
+		errs = append(errs, err)
+	}
+	if v, ok := report.Value(rootEndpoint, gencomm.ClusterID, gencomm.AttrTcAcknowledgementsRequired); ok {
+		t.required, err = spec.DecodeBool(v)
+		errs = append(errs, err)
+	}
+	if v, ok := report.Value(rootEndpoint, gencomm.ClusterID, gencomm.AttrTcUpdateDeadline); ok {
+		var n spec.Nullable[uint32]
+		n, err = spec.DecodeNullable(spec.DecodeUint[uint32](32))(v)
+		if err == nil && !n.Null {
+			t.deadline = &n.Value
+		}
+		errs = append(errs, err)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, fmt.Errorf("%w: GeneralCommissioning terms and conditions: %w", errUnexpectedResponse, err)
+	}
+	return t, nil
+}
+
+// checkTerms fails the commissioning early when the device requires
+// terms the options do not acknowledge: its TCAcknowledgementsRequired is
+// true — no acceptance it holds satisfies its requirement — and
+// [Options.TermsAndConditions] is nil or below TCMinRequiredVersion. The
+// device's own verdict would come only at SetTCAcknowledgements or at
+// CommissioningComplete (TCAcknowledgementsNotReceived), after AddNOC.
+// An acknowledgement at or above the version passes: the bits the device
+// requires are not on the wire, so a missing bit is the device's
+// RequiredTCNotAccepted at step 8.3, a [*GeneralCommissioningError].
+func (f *flow) checkTerms() error {
+	t := f.data.terms
+	if t == nil || !t.required {
+		return nil
+	}
+	tc := f.opts.TermsAndConditions
+	if tc != nil && tc.Version >= t.minVersion {
+		return nil
+	}
+	return &TermsRequiredError{Version: t.minVersion, Deadline: t.deadline}
 }
 
 // armFailsafe is step 7.1 and the re-arm (:844-886): on the first arm the

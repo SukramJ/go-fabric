@@ -59,9 +59,10 @@ func TestWriteTransactionRelease(t *testing.T) {
 	holds := &WriteHolds{}
 	p := ConcreteAttributePath{Cluster: 0x0028, Attribute: 5, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 	holder, other := NewWriteTransaction(holds), NewWriteTransaction(holds)
-	if !holder.holdUnlessBusy(p, true) {
+	if holder.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
 		t.Fatal("the first hold was refused")
 	}
+	holder.accept(p, true)
 	if !other.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
 		t.Fatal("the attribute is not held for the other exchange")
 	}

@@ -258,11 +258,15 @@ func TestDefaultSubscription(t *testing.T) {
 			defer hl.mu.Unlock()
 			return len(hl.events) > 0
 		})
+		// Copied under the lock and asserted after it: a Fatalf under hl.mu
+		// would leave it held for the cleanup's Close, whose drain of the
+		// connection states blocks on it in the hook (issue 459).
 		hl.mu.Lock()
-		if len(hl.events) != 1 || hl.events[0].(basicinfo.StartUpEvent).SoftwareVersion != 3 || hl.seeded != 1 || hl.alive == 0 || !slices.Equal(hl.status, []bool{true}) {
-			t.Fatalf("events %v seeded %d alive %d status %v", hl.events, hl.seeded, hl.alive, hl.status)
-		}
+		events, seeded, alive, status := slices.Clone(hl.events), hl.seeded, hl.alive, slices.Clone(hl.status)
 		hl.mu.Unlock()
+		if len(events) != 1 || events[0].(basicinfo.StartUpEvent).SoftwareVersion != 3 || seeded != 1 || alive == 0 || !slices.Equal(status, []bool{true}) {
+			t.Fatalf("events %v seeded %d alive %d status %v", events, seeded, alive, status)
+		}
 		// The delivered event is in the node's history (G-C2, issue #388).
 		if h := sn.node.EventHistory(0, 0); len(h) != 1 || h[0].Number != 7 || h[0].Decoded.(basicinfo.StartUpEvent).SoftwareVersion != 3 {
 			t.Fatalf("event history %+v, want StartUp 7", h)
@@ -283,14 +287,15 @@ func TestDefaultSubscription(t *testing.T) {
 		sn.reply(t, again, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 34))
 		hl.wait(t, client.Connected)
 		mu.Lock()
+		seen := slices.Clone(observed)
+		mu.Unlock()
 		// The refreshed request keeps the default subscription's own event
 		// filter; the sustained subscription raises it past the event it
 		// delivered on the wire (ar above) — ClientNodeInteraction.ts:162-168,
 		// SustainedSubscription.ts:379-384 (W4-ctlim-05).
-		if len(observed) != 2 || len(observed[1].EventFilters) != 1 || observed[1].EventFilters[0].EventMin != 1 {
-			t.Fatalf("observed requests %d", len(observed))
+		if len(seen) != 2 || len(seen[1].EventFilters) != 1 || seen[1].EventFilters[0].EventMin != 1 {
+			t.Fatalf("observed requests %d", len(seen))
 		}
-		mu.Unlock()
 		if err := sn.node.Close(ctx); err != nil {
 			t.Fatal(err)
 		}

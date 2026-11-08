@@ -93,6 +93,9 @@ type Responder struct {
 	// goodbye retry (publication.go).
 	linkStates map[int]*linkState
 	answers    answerState
+	// pending is the announcement collecting this turn's requests, nil
+	// when none waits (announce.go).
+	pending *pendingAnnouncement
 	// repeatOn are the interfaces the change repeat publishes on again,
 	// nil when none waits; changeRepeat is its timer (follow.go).
 	repeatOn     map[int]bool
@@ -135,24 +138,48 @@ type entry struct {
 // wire is the responder's transport: the interfaces it sends on, the
 // addresses it advertises on each, and the two send paths.
 type wire interface {
-	// links lists the indices of the up, multicast-capable interfaces.
-	links() []int
-	// addrs is what the advertise policy publishes for the interface:
-	// none for one it excludes (loopback, tunnel, container bridge, down).
-	addrs(ifIndex int) []net.IP
-	// multicast sends pkt to the mDNS groups on the interface and reports
-	// how far it reached.
-	multicast(pkt []byte, ifIndex int) reach
+	// links lists the up, multicast-capable interfaces once — one host
+	// listing, handed down to every interface of a publication round, as
+	// matter.js lists the interfaces once per round and hands each
+	// responder its own (MdnsServer.ts #publishOnListedInterfaces and
+	// #listInterfaces, :248-275, :413-421 at db021da0).
+	links() []link
+	// link is one interface's entry, the zero link for one not listed:
+	// the answer path's single interface.
+	link(ifIndex int) link
+	// multicast sends pkt to the mDNS groups on the interface, on the
+	// families it has an address of, and reports how far it reached with
+	// the failure of a family that refused it.
+	multicast(pkt []byte, l link) (reach, error)
 	// unicast sends pkt to dst through the interface and reports whether
 	// it left.
-	unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) reach
+	unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) (reach, error)
 }
+
+// link is one interface of a listing: its index and name, the addresses
+// the advertise policy publishes there (none for one it excludes:
+// loopback, tunnel, container bridge, down), and the address families it
+// has an address of, which a multicast is sent on.
+type link struct {
+	index      int
+	name       string
+	addrs      []net.IP
+	has4, has6 bool
+	// listed says the interface is in the current listing (up and
+	// multicast-capable): matter.js's InterfaceResponder.isListed. A
+	// goodbye still goes to one that is not; announcements and the
+	// services that replace a goodbye's record do not.
+	listed bool
+}
+
+// addrsFunc is l's addresses as the record builder reads them.
+func (l link) addrsFunc() func() []net.IP { return func() []net.IP { return l.addrs } }
 
 // NewResponder returns the module's mDNS responder. It binds nothing until
 // the first Publish; the caller closes it ([Responder.Close]).
 func NewResponder() *Responder {
 	r := &Responder{
-		InterfaceFilter: isVirtualInterfaceName,
+		InterfaceFilter: DefaultInterfaceFilter,
 		services:        map[string]*entry{},
 		links:           map[int]*linkRecords{},
 		linkStates:      map[int]*linkState{},
@@ -187,7 +214,7 @@ func (r *Responder) filter() func(string) bool {
 	if r.InterfaceFilter != nil {
 		return r.InterfaceFilter
 	}
-	return isVirtualInterfaceName
+	return DefaultInterfaceFilter
 }
 
 // ensureWireLocked opens the sockets on first use. Caller holds r.mu.
@@ -295,12 +322,12 @@ func (r *Responder) removeLocked(e *entry) {
 	r.publishEverywhereLocked(nil, false)
 }
 
-// resetLocked drops the cached record sets and the answer engine's memory
-// after the records changed (matter.js #resetServices, MdnsServer.ts:282-291
-// at 862ad75f). Caller holds r.mu.
+// resetLocked drops the cached record sets after the records changed; what
+// peers cache stays, as matter.js rebuilds an interface's view and keeps
+// its peer cache (InterfaceResponder.ts #currentView, :791-830 at
+// db021da0). Caller holds r.mu.
 func (r *Responder) resetLocked() {
 	clear(r.links)
-	r.answers.reset()
 }
 
 // Withdraw implements [Advertiser]: it stops answering for the service and

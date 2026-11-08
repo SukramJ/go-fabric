@@ -262,10 +262,11 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		// delivery below shows the wire minimum: event first is not
 		// delivered again.
 		mu.Lock()
-		if mins[0] > first+1 {
-			t.Fatalf("the replacement asks for events from %d, above %d", mins[0], first+1)
-		}
+		min0 := mins[0]
 		mu.Unlock()
+		if min0 > first+1 {
+			t.Fatalf("the replacement asks for events from %d, above %d", min0, first+1)
+		}
 		sp.press(t)
 		got := sp.seen(t, 2)
 		if len(got) != 2 || got[1].number <= got[0].number || client.MaxEventNumber(sp.node) != got[1].number {

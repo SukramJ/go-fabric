@@ -4,6 +4,8 @@
 package node
 
 import (
+	"slices"
+
 	"github.com/SukramJ/go-fabric/internal/netwatch"
 	"github.com/SukramJ/go-fabric/mdns"
 )
@@ -24,6 +26,35 @@ type MDNS struct {
 	// name the advertiser derives from the interface's MAC, whose address
 	// records it publishes itself.
 	HostName string
+	// Interfaces, when non-empty, restricts the advertiser to the named
+	// host interfaces ("eth0", "br30"): it announces and answers on them
+	// alone, with their addresses. Empty advertises on every
+	// multicast-capable interface. The default filter still applies to a
+	// named interface — a container or virtualisation bridge (docker0,
+	// hassio, veth…, mdns.DefaultInterfaceFilter) stays out when named. A
+	// name the host does not have is allowed, as interfaces come and go:
+	// nothing is announced on it until it appears (the interface check),
+	// and [Node.DiagnoseMDNS] names it. The UDP listen socket is not
+	// scoped by it ([Network].Listen takes a host address). The case for
+	// it is a dual-homed host whose gateway relays mDNS between its
+	// networks: the controllers on one network cache the other network's
+	// address as well; advertising on the controllers' network alone
+	// keeps it out. Ahead of matter.js, whose MdnsServer publishes on
+	// every multicast interface (BD-matterjs-mdns-interface-allowlist).
+	Interfaces []string
+}
+
+// interfaceFilter is the responder's InterfaceFilter for the
+// configuration: the default container filter, and with Interfaces every
+// interface not named as well.
+func (m MDNS) interfaceFilter() func(string) bool {
+	if len(m.Interfaces) == 0 {
+		return mdns.DefaultInterfaceFilter
+	}
+	allow := slices.Clone(m.Interfaces)
+	return func(name string) bool {
+		return mdns.DefaultInterfaceFilter(name) || !slices.Contains(allow, name)
+	}
 }
 
 // MDNSFinding is one result of [Node.DiagnoseMDNS] (mdns.Finding).
@@ -53,6 +84,7 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 	r := mdns.NewResponder()
 	r.SetLogger(n.logger)
 	r.HostName = m.HostName
+	r.InterfaceFilter = m.interfaceFilter()
 	r.SetInterfaceCheckInterval(n.cfg.Network.interfaceCheck())
 	return r
 }
@@ -78,11 +110,25 @@ func (n *Node) MDNSServices() []MDNSService { return n.advertiser.Active() }
 
 // DiagnoseMDNS inspects the records the node currently advertises and
 // reports what would keep a controller from finding or commissioning it
-// (mdns.Diagnose); nil when the advertiser publishes nothing on purpose
-// ([MDNS].Disabled, or a host's Noop).
+// (mdns.Diagnose), and with [MDNS].Interfaces each named interface the
+// host does not have, the default filter keeps out or that carries no
+// advertised address (mdns.DiagnoseInterfaces); nil when the advertiser
+// publishes nothing on purpose ([MDNS].Off, or a host's Noop). Errors
+// come first.
 func (n *Node) DiagnoseMDNS() []MDNSFinding {
 	if !n.MDNSEnabled() {
 		return nil
 	}
-	return mdns.Diagnose(n.advertiser.Active())
+	out := mdns.Diagnose(n.advertiser.Active())
+	if n.ownsAdvertiser {
+		out = append(out, mdns.DiagnoseInterfaces(n.cfg.Network.MDNS.Interfaces)...)
+		rank := func(f MDNSFinding) int {
+			if f.Severity == mdns.SeverityError {
+				return 0
+			}
+			return 1
+		}
+		slices.SortStableFunc(out, func(a, b MDNSFinding) int { return rank(a) - rank(b) })
+	}
+	return out
 }

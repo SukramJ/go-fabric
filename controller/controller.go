@@ -608,6 +608,16 @@ type PairOptions struct {
 	// none.
 	WiFi   *commissioner.WiFiNetwork
 	Thread *commissioner.ThreadNetwork
+	// TermsAndConditions is the user's acknowledgement of the device's
+	// terms and conditions (commissioner.Options.TermsAndConditions): the
+	// commissioning sends it with SetTCAcknowledgements before
+	// CommissioningComplete. A device that requires terms this does not
+	// acknowledge — nil, or a Version below the device's
+	// TCMinRequiredVersion — fails Pair early, before AddNOC, with a
+	// *commissioner.TermsRequiredError naming the version; a caller shows
+	// the terms and pairs again with the acknowledgement. nil acknowledges
+	// nothing, as a device without terms needs.
+	TermsAndConditions *commissioner.TermsAndConditionsAcknowledgement
 	// Progress, when set, is called on Pair's goroutine as each step of
 	// the pairing starts and ends ([PairingStep]): the search for the
 	// device (skipped with Address), PASE, the commissioning steps under
@@ -697,13 +707,14 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 }
 
 // pairOptions are the commissioner's options of a Pair: the passcode,
-// the channel (nil over IP), the network, progress and the attestation
-// policy (Reject by default), then opts.Edit.
+// the channel (nil over IP), the network, the terms acknowledgement,
+// progress and the attestation policy (Reject by default), then
+// opts.Edit.
 func (c *Controller) pairOptions(passcode uint32, channel commissioner.Channel, opts PairOptions, progress func(PairingStep)) commissioner.Options {
 	o := commissioner.Options{
 		Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure,
 		Channel: channel, WiFiNetwork: opts.WiFi, ThreadNetwork: opts.Thread,
-		Progress: progress,
+		TermsAndConditions: opts.TermsAndConditions, Progress: progress,
 	}
 	if o.OnAttestationFailure.Decide == nil && o.OnAttestationFailure.OnFailure == nil {
 		o.OnAttestationFailure = attestation.Reject()

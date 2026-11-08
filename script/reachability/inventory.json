@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7779,
+  "entry_points": 7801,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17736,
-    "reachable": 12335,
-    "whitelisted": 5401,
+    "total_exported": 17763,
+    "reachable": 12342,
+    "whitelisted": 5421,
     "unreachable": 0
   },
   "by_package": [],
@@ -5736,6 +5736,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestWriteTransactionTTLIsIdleTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_transaction_test.go",
+      "line": 49
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWriteTransactionsShareHolds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_hold_routing_test.go",
@@ -5803,6 +5810,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/scanner_parity_matterjs_test.go",
       "line": 105
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestCommissionableMdnsScannerWindowChange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/window_change_parity_matterjs_test.go",
+      "line": 199
     },
     {
       "package": "client/discovery",
@@ -7398,14 +7412,14 @@
       "identifier": "TestPeerConnectionKickLocalAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 269
+      "line": 297
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionKickObserver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 331
+      "line": 363
     },
     {
       "package": "client/peer",
@@ -8126,7 +8140,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 592
+      "line": 657
     },
     {
       "package": "cluster/core",
@@ -8154,7 +8168,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 755
+      "line": 820
     },
     {
       "package": "cluster/core",
@@ -8357,7 +8371,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 783
+      "line": 848
     },
     {
       "package": "cluster/core",
@@ -8365,6 +8379,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
       "line": 184
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGeneralDiagnosticsFaultsAbsentWithoutPort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
+      "line": 293
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGeneralDiagnosticsFaultsHostCallbacks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
+      "line": 328
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGeneralDiagnosticsFaultsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
+      "line": 192
     },
     {
       "package": "cluster/core",
@@ -9439,6 +9474,20 @@
     },
     {
       "package": "cluster/energy",
+      "identifier": "TestEnergyServersWithoutTheNodesTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/energy/mattertime_internal_test.go",
+      "line": 59
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TestNodeTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/energy/mattertime_internal_test.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/energy",
       "identifier": "ThreeLevel",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/gridconditions.go",
@@ -9537,10 +9586,10 @@
     },
     {
       "package": "cluster/filter",
-      "identifier": "TestMatterEpochSeconds",
+      "identifier": "TestMatterNow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/filter/epoch_internal_test.go",
-      "line": 13
+      "line": 17
     },
     {
       "package": "cluster/jointfabric",
@@ -22546,14 +22595,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 635
+      "line": 645
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 631
+      "line": 641
     },
     {
       "package": "controller",
@@ -24247,7 +24296,7 @@
       "identifier": "TestClientBridgeStructureSeveralEndpointsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 559
+      "line": 560
     },
     {
       "package": "controller/client",
@@ -25098,6 +25147,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestGeneralCommissioningErrorTyped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 210
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestInitialDataFullFabricTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -25284,6 +25340,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/progress_test.go",
       "line": 70
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequiredBeforeArmFailSafe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 178
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequirementRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 97
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestTermsRequirementReadPaths",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/terms_test.go",
+      "line": 152
     },
     {
       "package": "controller/commissioner",
@@ -26669,7 +26746,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 378
+      "line": 379
     },
     {
       "package": "device",
@@ -26732,7 +26809,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 413
+      "line": 414
     },
     {
       "package": "device",
@@ -29994,7 +30071,7 @@
       "identifier": "TestChunkedWriteIsAuthorizedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_chunked_acl_test.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "im",
@@ -30607,10 +30684,17 @@
     },
     {
       "package": "im",
+      "identifier": "TestListAddMarkerParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_list_add_parity_matterjs_test.go",
+      "line": 15
+    },
+    {
+      "package": "im",
       "identifier": "TestListAppendWriteMark",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_chunked_acl_test.go",
-      "line": 81
+      "line": 83
     },
     {
       "package": "im",
@@ -31282,21 +31366,21 @@
       "identifier": "TestWriteRequestDecodeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "im",
       "identifier": "TestWriteRequestSuppressResponseType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 77
+      "line": 78
     },
     {
       "package": "im",
       "identifier": "TestWriteRequestWithoutClusterOrAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "im",
@@ -31846,6 +31930,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestAllowListAdvertisesOnNamedInterfaceOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/diagnose_interfaces_test.go",
+      "line": 82
+    },
+    {
+      "package": "mdns",
       "identifier": "TestDeriveUniqueIDFromIdentityIsStableAndDistinct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
@@ -31871,6 +31962,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/diagnose_identity_test.go",
       "line": 21
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestDiagnoseInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/diagnose_interfaces_test.go",
+      "line": 47
     },
     {
       "package": "mdns",
@@ -32024,28 +32122,28 @@
       "identifier": "TestMdnsAdvertisementHostOwnedByOS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 322
+      "line": 347
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAdvertisementInterfaceScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 349
+      "line": 374
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAdvertisementParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 130
+      "line": 131
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsAnnouncementOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_advertiser_parity_matterjs_test.go",
-      "line": 276
+      "line": 301
     },
     {
       "package": "mdns",
@@ -32066,28 +32164,28 @@
       "identifier": "TestMdnsServerAnswerSuppression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 191
+      "line": 193
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerCacheFlushBit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 105
+      "line": 107
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 470
+      "line": 496
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerDuplicateQuestionSuppression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 359
+      "line": 385
     },
     {
       "package": "mdns",
@@ -32101,35 +32199,35 @@
       "identifier": "TestMdnsServerHandleDuplicateMessages",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 223
+      "line": 225
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerHostName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 518
+      "line": 544
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerRespondsAsUnicast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 267
+      "line": 280
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerRespondsToStandardQueries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 50
+      "line": 52
     },
     {
       "package": "mdns",
       "identifier": "TestMdnsServerSplitsResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 332
+      "line": 349
     },
     {
       "package": "mdns",
@@ -32140,10 +32238,17 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestMdnsServerTransportNotices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/transport_parity_matterjs_test.go",
+      "line": 61
+    },
+    {
+      "package": "mdns",
       "identifier": "TestMdnsServerUnknownNameQueryRejection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_server_parity_matterjs_test.go",
-      "line": 381
+      "line": 407
     },
     {
       "package": "mdns",
@@ -32217,6 +32322,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestReachCombine",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/transport_parity_matterjs_test.go",
+      "line": 348
+    },
+    {
+      "package": "mdns",
       "identifier": "TestRecordsForAddresslessInterfaceAreEmpty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/addressless_interface_test.go",
@@ -32248,7 +32360,7 @@
       "identifier": "TestResponder_ConcurrentUse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_test.go",
-      "line": 299
+      "line": 303
     },
     {
       "package": "mdns",
@@ -32290,7 +32402,7 @@
       "identifier": "TestResponder_QUThenQMGetsOneMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/responder_test.go",
-      "line": 278
+      "line": 282
     },
     {
       "package": "mdns",
@@ -32367,7 +32479,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 31
+      "line": 32
     },
     {
       "package": "node",
@@ -32493,7 +32605,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "node",
@@ -32507,14 +32619,14 @@
       "identifier": "MDNSFinding",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 30
+      "line": 61
     },
     {
       "package": "node",
       "identifier": "MDNSService",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 34
+      "line": 65
     },
     {
       "package": "node",
@@ -32770,6 +32882,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestConfigFaultsServedByRootGeneralDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/faults_test.go",
+      "line": 24
+    },
+    {
+      "package": "node",
       "identifier": "TestCountBootAndOperationalTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
@@ -32781,6 +32900,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/mdns_internal_test.go",
       "line": 45
+    },
+    {
+      "package": "node",
+      "identifier": "TestDiagnoseMDNSNamesUnknownInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 68
+    },
+    {
+      "package": "node",
+      "identifier": "TestMDNSInterfacesFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 19
+    },
+    {
+      "package": "node",
+      "identifier": "TestMDNSInterfacesValidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_interfaces_test.go",
+      "line": 41
     },
     {
       "package": "node",

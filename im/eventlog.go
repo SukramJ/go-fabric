@@ -6,6 +6,7 @@ package im
 import (
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 )
@@ -160,6 +161,9 @@ type EventLog struct {
 	// clock stamps a record that carries no timestamp; nil is
 	// [clock.System]. See [EventLog.SetClock].
 	clock clock.Clock
+	// utcClock, when set, is the node's UTC, which stamps a record while
+	// it is not null ([EventLog.SetUTCClock]).
+	utcClock func() (time.Time, bool)
 }
 
 // NewEventLog constructs an EventLog with [defaultBufferConfig].
@@ -199,7 +203,13 @@ func (l *EventLog) AppendRecord(rec EventRecord) EventRecord {
 	l.next++
 	rec.Number = l.next
 	if rec.EpochMS == 0 {
-		rec.EpochMS = uint64(clock.Or(l.clock).Now().UnixMilli()) //nolint:gosec // the clock's time is non-negative; see #20
+		now := clock.Or(l.clock).Now()
+		if l.utcClock != nil {
+			if utc, ok := l.utcClock(); ok {
+				now = utc
+			}
+		}
+		rec.EpochMS = uint64(now.UnixMilli()) //nolint:gosec // the clock's time is non-negative; see #20
 	}
 	l.occurrences = append(l.occurrences, rec)
 	l.harvestLocked()
@@ -382,6 +392,21 @@ func (l *EventLog) SetClock(c clock.Clock) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.clock = c
+}
+
+// SetUTCClock stamps a record appended without a timestamp with the
+// node's UTC: utc returns its UTC time, false while it is null, when the
+// record takes the clock's time ([EventLog.SetClock]) — the record has no
+// system-time form. It takes the UTC as a time, not the participants'
+// clock.MatterTime: the stamp is POSIX milliseconds, which Matter epoch
+// seconds cannot carry. connectedhomeip stamps an event's EpochTimestamp from
+// the one system clock SetUTCTime sets (src/app/EventManagement.cpp:433-439
+// at 6170af84, GetClock_RealTimeMS), so after SetUTCTime the stamps
+// follow the node's UTCTime (issue 445). nil detaches it.
+func (l *EventLog) SetUTCClock(utc func() (time.Time, bool)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.utcClock = utc
 }
 
 // SetCounterPersistence wires the durable half of the EventNumber
