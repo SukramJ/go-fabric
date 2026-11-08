@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -166,18 +167,26 @@ func (p persisted) NodeLabel(ctx context.Context, key device.SourceKey) string {
 // ConfigurationVersion and wires their persistence.
 func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) {
 	if v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey); err == nil && ok {
-		_ = b.SetNodeLabel(v)
+		_ = b.RestoreNodeLabel(v)
 	}
 	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
-		_ = b.SetLocation(v)
+		_ = b.RestoreLocation(v)
 	}
 	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
-	b.SetOnPersistentWrite(func(nodeLabel, location string) {
+	// A store failure fails the write (mattercore.BasicInformation
+	// SetOnPersistentWrite): the host's SetNodeLabel returns it, a
+	// controller's write answers FAILURE. The write uses New's context
+	// without its cancellation, so a caller's cancelled context does not
+	// abort a store write already begun.
+	b.SetOnPersistentWrite(func(nodeLabel, location string) error {
+		var errs []error
 		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
 			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
 				p.logger.Warn("label.persist", slog.Any("err", err))
+				errs = append(errs, err)
 			}
 		}
+		return errors.Join(errs...)
 	})
 }
 

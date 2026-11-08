@@ -170,7 +170,7 @@ facade's own state.
 
 | Key | Written by | Holds |
 | --- | --- | --- |
-| `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them |
+| `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them, the NodeLabel also as `Node.SetNodeLabel` set it |
 | `basic_information.configuration_version` | the facade | the root's ConfigurationVersion |
 | `basic_information.unique_id` | the facade | UniqueID, derived on the first boot and pinned |
 | `bridged_node_label.<key>` | the facade | a bridged endpoint's NodeLabel |
