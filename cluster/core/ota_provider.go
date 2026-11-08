@@ -191,7 +191,10 @@ type OTAProviderConfig struct {
 	NodeID func(fabricIndex uint8) (uint64, bool)
 	// OnStatusChange is told every change of a requestor's update state —
 	// matter.js SoftwareUpdateManager.onOtaStatusChange (OP:608-612) — with
-	// the version the update brings; nil observes nothing.
+	// the version the update brings; nil observes nothing. It runs with no
+	// lock of the provider held, and the WaitForApply of a transfer runs on
+	// the receive path — the final BlockAckEof finishes the download at its
+	// arrival — so it must not block.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
 	// RebootQuery, when set, learns a QueryImage the provider took for the
 	// requestor's restart — another session than the transfer's, which
@@ -586,7 +589,10 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 	}
 	if p.cfg.BDX != nil {
 		// OP:418-428: the transfer is closed — forced when it is not known
-		// to have completed.
+		// to have completed. A completed transfer is known: its final
+		// BlockAckEof finished it — WaitForApply — at its arrival, before
+		// the receive path took the ApplyUpdateRequest sent after it, so
+		// the force is left for a transfer that did not complete.
 		force := details == nil || details.lastState != OTAUpdateWaitForApply
 		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, force); err != nil {
 			p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
