@@ -81,7 +81,7 @@ func (r *scheduleRig) sendSigma1(t *testing.T, s *initialContactSchedule, isDela
 			send.mu.Unlock()
 			a.onSend(n)
 		},
-		OnReceive: a.onReceive,
+		OnReceive: func(*exchange.Message, bool) { a.onReceive() },
 	})
 	if err != nil {
 		t.Fatal(err)

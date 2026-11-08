@@ -848,7 +848,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 329,
+    "line": 350,
     "citation": "MessageExchange.ts:410-413",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "retransmissionCount",
@@ -857,7 +857,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 356,
+    "line": 377,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -866,7 +866,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 366,
+    "line": 387,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -875,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 583,
+    "line": 604,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -884,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 624,
+    "line": 645,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",

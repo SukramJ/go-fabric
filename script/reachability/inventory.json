@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7801,
+  "entry_points": 7803,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17763,
+    "total_exported": 17765,
     "reachable": 12342,
-    "whitelisted": 5421,
+    "whitelisted": 5423,
     "unreachable": 0
   },
   "by_package": [],
@@ -6558,7 +6558,7 @@
       "identifier": "TestOnSendAndOnReceive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/hooks_test.go",
-      "line": 43
+      "line": 62
     },
     {
       "package": "client/exchange",
@@ -6646,6 +6646,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestReceiveNotifierSeesEveryMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/hooks_test.go",
+      "line": 93
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestReliableManagerRunsNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/reliable_test.go",
@@ -6727,6 +6734,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messagechannel_tcp_parity_matterjs_test.go",
       "line": 140
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSetReceiveNotifierOnAPeerOpenedExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/hooks_test.go",
+      "line": 131
     },
     {
       "package": "client/exchange",

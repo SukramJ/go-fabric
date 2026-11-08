@@ -81,7 +81,7 @@ func TestCASEAndResumption(t *testing.T) {
 		Resumption: store,
 		Exchange: exchange.Options{
 			OnSend:    func(int) { sends.Add(1) },
-			OnReceive: func() { receipts.Add(1) },
+			OnReceive: func(*exchange.Message, bool) { receipts.Add(1) },
 		},
 		OnExchange: opened.Store,
 	})
