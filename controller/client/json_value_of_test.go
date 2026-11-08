@@ -16,7 +16,7 @@ import (
 // ProvideOfferResponse renders through ValueOf and DecodeJSON as a
 // response read off the wire does — keyed by matter.js's property names
 // (webRtcSessionId, the spelling of matterjs-server
-// docs/websockets_api.md:1878 at 0bd06f2) in the name form, by field id in
+// docs/websockets_api.md:1881 at 0bd06f2) in the name form, by field id in
 // the tag form, an explicit null kept and an absent field left out.
 func TestValueOfRendersAGeneratedResponse(t *testing.T) {
 	t.Parallel()
