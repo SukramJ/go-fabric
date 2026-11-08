@@ -24,8 +24,8 @@ import (
 // The listener now keeps the datagrams of one unicast session in a queue
 // (transport/udp ServeOrdered, keyed by message.SessionOrderKey — the
 // controller keys its socket the same way) and hands them over one at a
-// time. A handler
-// that sends and then waits for the peer's answer on the same session —
+// time. A handler that sends and then waits for the peer's answer on the
+// same session —
 // a chunked report waiting for its StatusResponse, the subscription priming
 // loop — releases its turn first (leaveSessionOrder), so the answer it
 // waits for is not queued behind it. Unsecured messages (the PASE / CASE
