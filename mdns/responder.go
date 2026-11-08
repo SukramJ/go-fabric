@@ -53,10 +53,14 @@ import (
 // binds nothing; Close releases them.
 //
 // The host's A/AAAA records are published for the host name the module
-// owns — the MAC-derived default. A host name the OS responder owns, the
-// [Responder.HostName] override or the OS host name kept on macOS
-// (notes/parity/by_design.md L7-D03), is left to the OS: its address
-// records are not published or answered here.
+// owns — the MAC-derived default, matter.js's name on every platform
+// (MdnsServer.ts:80 `hostnameFor`, :608-610 `hostnameForMac` at db021da0).
+// A host name the OS responder owns is left to the OS: its address records
+// are not published or answered here. That is the [Responder.HostName]
+// override, always, and on macOS the OS host name, kept only when the
+// system resolver answers it — when mDNSResponder serves a different
+// Bonjour name the MAC-derived name and its own records apply
+// (notes/parity/by_design.md L7-D03, [defaultHostName]).
 type Responder struct {
 	// InterfaceFilter decides which host interfaces are kept out of the
 	// advertised records: it reports true for an interface name whose
@@ -274,7 +278,7 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 		host = r.HostName
 	}
 	if host == "" {
-		host = defaultHostName()
+		host = defaultHostName(r.logger())
 	}
 	ips := primaryHostIPs(r.filter())
 	// The copy kept for Active carries the addresses the A/AAAA records

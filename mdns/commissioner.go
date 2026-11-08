@@ -76,7 +76,7 @@ func BuildCommissionerService(cfg CommissionerServiceConfig) Service {
 	}
 	host := cfg.HostName
 	if host == "" {
-		host = defaultHostName()
+		host = defaultHostName(nil)
 	}
 	return Service{
 		InstanceName: strings.ToUpper(hex.EncodeToString(cfg.InstanceID[:])),

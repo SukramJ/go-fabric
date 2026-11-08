@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -365,6 +366,67 @@ func TestMdnsAdvertisementHostOwnedByOS(t *testing.T) {
 	// A bare host question is left to the OS responder.
 	deliver(t, r, queryMsg([]dns.Question{question("os-host.local", dns.TypeAAAA, false)}), 1, dummySource)
 	expectSent(t, w.take(), 0)
+}
+
+// TestMdnsAdvertisementOSHostNameVerdict is the macOS verdict of
+// notes/parity/by_design.md L7-D03 (issue 465) on the published record
+// set: an OS host name the system resolver does not answer gives way to
+// the MAC-derived name, whose address records this responder publishes
+// and answers (ownsHost), as matter.js does on every platform
+// (MdnsServer.ts:80, :608-610 at db021da0); a served one is kept and its
+// address records left to the OS responder.
+func TestMdnsAdvertisementOSHostNameVerdict(t *testing.T) {
+	t.Parallel()
+	osName := osHostName()
+	if osName == "" {
+		t.Skip("no OS host name")
+	}
+	for _, served := range []bool{false, true} {
+		t.Run(fmt.Sprintf("served=%v", served), func(t *testing.T) {
+			t.Parallel()
+			r, w, _ := newWiredResponder(serverAddrs(true))
+			var calls atomic.Int32
+			// The builders fill an unset host name from the policy
+			// (defaultHostName); the responder decides ownsHost on it.
+			svc := operationalFixture(port1)
+			svc.HostName = policyWithEth0(t, "darwin", fakeLookup(served, &calls, nil)).hostName(nil)
+			if err := r.Publish(context.Background(), svc); err != nil {
+				t.Fatal(err)
+			}
+			host := eth0HostName
+			if served {
+				host = osName
+			}
+			var target string
+			var addrs int
+			p := w.take()[0].msg
+			for _, rr := range append(p.Answer, p.Extra...) {
+				switch rr := rr.(type) {
+				case *dns.A, *dns.AAAA:
+					addrs++
+					if rr.Header().Name != host+".local." {
+						t.Errorf("address record %v, want one for %s.local.", rr, host)
+					}
+				case *dns.SRV:
+					target = rr.Target
+				}
+			}
+			if target != host+".local." {
+				t.Errorf("SRV target %q, want %s.local.", target, host)
+			}
+			deliver(t, r, queryMsg([]dns.Question{question(host+".local", dns.TypeAAAA, false)}), 1, dummySource)
+			answered := len(w.take())
+			if served {
+				if addrs != 0 || answered != 0 {
+					t.Errorf("served OS host name: %d address records announced, %d answers, want none (left to the OS)", addrs, answered)
+				}
+				return
+			}
+			if addrs == 0 || answered == 0 {
+				t.Errorf("fallback host name: %d address records announced, %d answers, want both (ownsHost)", addrs, answered)
+			}
+		})
+	}
 }
 
 // TestMdnsAdvertisementInterfaceScope: an interface the advertise policy
