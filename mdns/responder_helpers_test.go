@@ -87,9 +87,6 @@ func (w *fakeWire) linkLocked(ifIndex int) link {
 	return l
 }
 
-// addrs is the advertised addresses of an interface.
-func (w *fakeWire) addrs(ifIndex int) []net.IP { return w.link(ifIndex).addrs }
-
 func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr, fail func(*dns.Msg) reach) (reach, error) {
 	m := new(dns.Msg)
 	if err := m.Unpack(pkt); err != nil {

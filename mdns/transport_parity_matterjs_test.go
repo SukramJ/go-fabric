@@ -41,8 +41,8 @@ func (h logRecorder) at(level slog.Level) []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var out []string
-	for _, r := range *h.recs {
-		if r.Level == level {
+	for i := range *h.recs {
+		if r := &(*h.recs)[i]; r.Level == level {
 			out = append(out, r.Message)
 		}
 	}

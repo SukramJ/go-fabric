@@ -309,28 +309,8 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	defer func() { tx.lastWritten = lastWritten }()
 	var wr WriteResponse
 	for _, w := range req.Writes {
-		concrete := w.Path.HasEndpoint && w.Path.HasCluster && w.Path.HasAttribute
-		// An attribute another interaction's chunked write holds is
-		// answered BUSY (matter.js packages/node/src/node/server/
-		// InteractionServer.ts:505-508 at db021da0, #isHeldByOther →
-		// Status.Busy).
-		if concrete && tx.heldByOther(w.Path.Endpoint, w.Path.Cluster, w.Path.Attribute) {
-			wr.Responses = append(wr.Responses, AttributeStatus{
-				Path:   w.Path,
-				Status: StatusIB{Status: StatusBusy},
-			})
-			continue
-		}
-		// A list ADD (null list index) is valid only right after a write
-		// path of the same attribute in this interaction — across its
-		// chunks — whatever that write's outcome; otherwise it is answered
-		// BUSY, as chip does, and leaves the marker where it was. It comes
-		// before every other check, the writability and the ACL included:
-		// a lone ADD to a read-only list is BUSY too. Mirrors matter.js
-		// InteractionServer.ts:511-531 at db021da0 (the marker
-		// previousProcessedAttributePath, :456-458, not moved by a BUSY
-		// path, :529).
-		if w.Path.ListAppend && !tx.followsLastQueued(w.Path) {
+		// The interaction's BUSY checks come first (busyBefore).
+		if tx.busyBefore(w.Path) {
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   w.Path,
 				Status: StatusIB{Status: StatusBusy},
@@ -559,6 +539,24 @@ func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint
 	defer tx.holds.mu.Unlock()
 	holder, ok := tx.holds.held[writeHoldKey{endpoint, cluster, attribute}]
 	return ok && holder != tx
+}
+
+// busyBefore reports whether the write element p is answered BUSY before
+// anything else is checked, the writability and the ACL included:
+//   - a concrete attribute another interaction's chunked write holds
+//     (matter.js packages/node/src/node/server/InteractionServer.ts:505-508
+//     at db021da0, #isHeldByOther → Status.Busy);
+//   - a list ADD (null list index) that does not follow a write path of
+//     the same attribute in this interaction — across its chunks —
+//     whatever that write's outcome, as chip answers it; a lone ADD to a
+//     read-only list is BUSY too, and a BUSY path leaves the marker where
+//     it was (:511-531, the marker previousProcessedAttributePath
+//     :456-458, not moved by a BUSY path, :529).
+func (tx *WriteTransaction) busyBefore(p ConcreteAttributePath) bool {
+	if p.HasEndpoint && p.HasCluster && p.HasAttribute && tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
+		return true
+	}
+	return p.ListAppend && !tx.followsLastQueued(p)
 }
 
 // holdUnlessBusy reports false when another interaction holds the

@@ -1301,8 +1301,8 @@ func (l faultList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // lists again and, for each list that changed, reports the attribute and
 // emits its change event with the current and the previous list — what
 // matter.js GeneralDiagnosticsServer's register…Fault / clear…Fault
-// convenience methods drive through the lists' $Changed reactors
-// (GeneralDiagnosticsServer.ts:173-177, :296-411 at db021da0). A value a
+// convenience methods drive (GeneralDiagnosticsServer.ts:296-411 at
+// db021da0) through the lists' $Changed reactors (:173-177). A value a
 // list names twice is served once, at its first place (§11.12.6.6). The
 // fault lists change the server's attribute and event lists, so call it
 // before the node assembles its topology; nil detaches the port.

@@ -5809,7 +5809,7 @@
       "identifier": "TestCommissionableMdnsScannerWindowChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/window_change_parity_matterjs_test.go",
-      "line": 197
+      "line": 199
     },
     {
       "package": "client/discovery",
@@ -25129,7 +25129,7 @@
       "identifier": "TestGeneralCommissioningErrorTyped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/terms_test.go",
-      "line": 205
+      "line": 210
     },
     {
       "package": "controller/commissioner",
@@ -25325,21 +25325,21 @@
       "identifier": "TestTermsRequiredBeforeArmFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/terms_test.go",
-      "line": 173
+      "line": 178
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestTermsRequirementRead",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/terms_test.go",
-      "line": 92
+      "line": 97
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestTermsRequirementReadPaths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/terms_test.go",
-      "line": 147
+      "line": 152
     },
     {
       "package": "controller/commissioner",
@@ -26725,7 +26725,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 378
+      "line": 379
     },
     {
       "package": "device",
@@ -26788,7 +26788,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 413
+      "line": 414
     },
     {
       "package": "device",

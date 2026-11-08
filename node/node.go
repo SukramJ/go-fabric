@@ -382,11 +382,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
-	// The events' EpochTimestamp is the node's UTC, the root
-	// TimeSynchronization's (issue 445).
-	if ts := n.root.TimeSynchronization; ts != nil {
-		n.br.EventLog().SetUTCClock(ts.UTC)
-	}
+	n.wireEventsUTC()
 
 	// Event numbers continue across a reboot (main.go:416-426 at b4ea1f96^).
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
@@ -1161,6 +1157,14 @@ func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 // Groups servers, the bridge's group-message routing and the root's
 // GroupKeyManagement share one state.
 func (n *Node) Groups() *Groups { return n.groups }
+
+// wireEventsUTC stamps the events' EpochTimestamp with the node's UTC,
+// the root TimeSynchronization's, when it is mounted (issue 445).
+func (n *Node) wireEventsUTC() {
+	if ts := n.root.TimeSynchronization; ts != nil {
+		n.br.EventLog().SetUTCClock(ts.UTC)
+	}
+}
 
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic
 // event ring, one line per event (the daemon's ringLogs, wiring.go:

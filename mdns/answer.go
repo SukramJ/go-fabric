@@ -481,6 +481,7 @@ func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answer
 			r.logger().Debug("mdns.responder.response_not_sent", slog.String("to", dst.String()), slog.Any("err", err))
 		case reachSome:
 			r.logger().Debug("mdns.responder.response_part_not_sent", slog.String("to", dst.String()), slog.Any("err", err))
+		case reachNone, reachAll:
 		}
 		return rc
 	}
@@ -492,6 +493,8 @@ func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answer
 		r.multicastMissedLocked(st, l, "mdns.responder.multicast_some_families", err)
 	case reachFailed:
 		r.multicastMissedLocked(st, l, "mdns.responder.multicast_not_sent", err)
+	case reachNone:
+		// No usable family: nothing was tried, no outage (#transmit, :745-748).
 	}
 	return rc
 }
@@ -504,7 +507,7 @@ func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answer
 // peer that makes the reach change between some and none cannot repeat
 // the line. Caller holds r.mu.
 func (r *Responder) multicastMissedLocked(st *linkState, l link, msg string, err error) {
-	attrs := []any{slog.String("iface", l.name), slog.Int("index", l.index), slog.Any("err", err)}
+	attrs := []any{slog.String("iface", l.name), slog.Any("err", err)}
 	if st.outage || r.closed || !l.listed {
 		r.logger().Debug(msg, attrs...)
 		return

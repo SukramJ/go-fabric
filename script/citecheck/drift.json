@@ -1587,16 +1587,6 @@
     "occurrences": 1
   },
   {
-    "file": "cluster/core/general_diagnostics.go",
-    "line": 1305,
-    "citation": "GeneralDiagnosticsServer.ts:173-177",
-    "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
-    "at": "db021da0",
-    "identifier": "NetworkFaultChange",
-    "nearest": 378,
-    "occurrences": 2
-  },
-  {
     "file": "cluster/core/group_key_management_failure_test.go",
     "line": 121,
     "citation": "packages/model/src/standard/elements/group-key-management.element.ts:58",
@@ -2893,7 +2883,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 419,
+    "line": 399,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",
@@ -3199,7 +3189,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 644,
+    "line": 640,
     "citation": "SessionManager.ts:491",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecordsForFabric",

@@ -137,8 +137,9 @@ func (h *wcHarness) state(instance string) wcState {
 	})
 	sort.Strings(st.hostAddresses)
 	st.scannerAddresses = []string{}
-	for _, d := range h.s.Discovered(ByInstanceID(instance)) {
-		st.scannerAddresses = append(st.scannerAddresses, ipsOf(d.Addresses)...)
+	devs := h.s.Discovered(ByInstanceID(instance))
+	for i := range devs {
+		st.scannerAddresses = append(st.scannerAddresses, ipsOf(devs[i].Addresses)...)
 	}
 	return st
 }
@@ -166,9 +167,10 @@ func (h *wcHarness) discover(t *testing.T, d time.Duration) []wcFound {
 	h.elapse(d)
 	h.s.Cancel(id)
 	r.result(t)
-	out := []wcFound{}
-	for _, dev := range r.found.snapshot() {
-		out = append(out, wcFound{dev.InstanceID, ipsOf(dev.Addresses)})
+	devs := r.found.snapshot()
+	out := make([]wcFound, 0, len(devs))
+	for i := range devs {
+		out = append(out, wcFound{devs[i].InstanceID, ipsOf(devs[i].Addresses)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].instance < out[j].instance })
 	return out
@@ -219,6 +221,7 @@ func TestCommissionableMdnsScannerWindowChange(t *testing.T) {
 	// the previous window is the device's last service, so its goodbye
 	// names the host addresses as well.
 	goodbyeFirst := func(t *testing.T) *wcHarness {
+		t.Helper()
 		h := newWCHarness(t)
 		h.openPreviousWindow(t)
 		deliver(t, h.names, 0, wcGoodbye(wcPreviousWindow, true))
@@ -246,6 +249,7 @@ func TestCommissionableMdnsScannerWindowChange(t *testing.T) {
 	// the next window publishes the host addresses, so the goodbye leaves
 	// them out.
 	nextFirst := func(t *testing.T) *wcHarness {
+		t.Helper()
 		h := newWCHarness(t)
 		h.openPreviousWindow(t)
 		h.announce(t, wcNextWindow)
@@ -270,6 +274,7 @@ func TestCommissionableMdnsScannerWindowChange(t *testing.T) {
 	// uses" (:277-308): the controller honours the goodbye and finds the
 	// addresses again with a query.
 	hostGoodbye := func(t *testing.T) *wcHarness {
+		t.Helper()
 		h := newWCHarness(t)
 		h.openPreviousWindow(t)
 		h.announce(t, wcNextWindow)

@@ -283,9 +283,10 @@ var hostCases = map[uint32]hostCase{
 
 var (
 	alarmBaseCovered = []string{"Latch", "Mask", "SetMask", "SetState", "SetThresholds", "State", "Supported", "Thresholds"}
-	filterCovered    = []string{"Notify", "SetState", "State"}
-	modeCovered      = []string{"Revision", "SetCurrentMode"}
-	opstateCovered   = []string{"EmitOperationCompletion", "SetCountdownTime", "SetCurrentPhase", "SetOperationalError", "SetOperationalState", "SetPhaseList"}
+	// AttachMatterTime and RequiresMatterTime are the node's wiring (issue 445).
+	filterCovered  = []string{"AttachMatterTime", "Notify", "RequiresMatterTime", "SetState", "State"}
+	modeCovered    = []string{"Revision", "SetCurrentMode"}
+	opstateCovered = []string{"EmitOperationCompletion", "SetCountdownTime", "SetCurrentPhase", "SetOperationalError", "SetOperationalState", "SetPhaseList"}
 )
 
 // typedLayer are the interfaces whose methods are the typed layer's and

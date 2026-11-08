@@ -24,10 +24,7 @@ func (v termsValue) EncodeTLV(e *tlv.Encoder, tag tlv.Tag) { v(e, tag) }
 // the TC feature, its three requirement attributes to every read, and
 // counts the commands it is sent.
 type termsDevice struct {
-	tc       bool
-	min      uint16
-	required bool
-	deadline *uint32
+	termsConfig
 
 	mu       sync.Mutex
 	invokes  int
@@ -84,6 +81,14 @@ func (d *termsDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bo
 	}), true
 }
 
+// termsConfig is what a termsDevice serves.
+type termsConfig struct {
+	tc       bool
+	min      uint16
+	required bool
+	deadline *uint32
+}
+
 // TestTermsRequirementRead: step 0.1 reads the root GeneralCommissioning's
 // FeatureMap and, with the TC feature, the requirement; a requirement the
 // options do not meet is a *TermsRequiredError naming the version and the
@@ -94,22 +99,22 @@ func TestTermsRequirementRead(t *testing.T) {
 	deadline := uint32(812_345_678)
 	rows := []struct {
 		name   string
-		dev    termsDevice
+		dev    termsConfig
 		ack    *TermsAndConditionsAcknowledgement
 		want   *TermsRequiredError
 		noTerm bool
 	}{
-		{name: "no TC feature", dev: termsDevice{}, noTerm: true},
-		{name: "required, no acknowledgement", dev: termsDevice{tc: true, min: 1, required: true}, want: &TermsRequiredError{Version: 1}},
-		{name: "required, version met", dev: termsDevice{tc: true, min: 1, required: true}, ack: &TermsAndConditionsAcknowledgement{Version: 1, Acknowledgements: 1}},
-		{name: "required, a later version", dev: termsDevice{tc: true, min: 2, required: true}, ack: &TermsAndConditionsAcknowledgement{Version: 3}},
-		{name: "required, version below", dev: termsDevice{tc: true, min: 2, required: true, deadline: &deadline}, ack: &TermsAndConditionsAcknowledgement{Version: 1, Acknowledgements: 1}, want: &TermsRequiredError{Version: 2, Deadline: &deadline}},
-		{name: "accepted before, no acknowledgement", dev: termsDevice{tc: true, min: 1, required: false}},
+		{name: "no TC feature", dev: termsConfig{}, noTerm: true},
+		{name: "required, no acknowledgement", dev: termsConfig{tc: true, min: 1, required: true}, want: &TermsRequiredError{Version: 1}},
+		{name: "required, version met", dev: termsConfig{tc: true, min: 1, required: true}, ack: &TermsAndConditionsAcknowledgement{Version: 1, Acknowledgements: 1}},
+		{name: "required, a later version", dev: termsConfig{tc: true, min: 2, required: true}, ack: &TermsAndConditionsAcknowledgement{Version: 3}},
+		{name: "required, version below", dev: termsConfig{tc: true, min: 2, required: true, deadline: &deadline}, ack: &TermsAndConditionsAcknowledgement{Version: 1, Acknowledgements: 1}, want: &TermsRequiredError{Version: 2, Deadline: &deadline}},
+		{name: "accepted before, no acknowledgement", dev: termsConfig{tc: true, min: 1, required: false}},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
 			t.Parallel()
-			dev := r.dev
+			dev := &termsDevice{termsConfig: r.dev}
 			f, _ := newTestFlow(t, dev.handle)
 			f.opts.TermsAndConditions = r.ack
 			res, err := f.getInitialData(context.Background())
@@ -172,7 +177,7 @@ func TestTermsRequirementReadPaths(t *testing.T) {
 // device — and reports step 0.1 failed with it.
 func TestTermsRequiredBeforeArmFailSafe(t *testing.T) {
 	t.Parallel()
-	dev := &termsDevice{tc: true, min: 1, required: true}
+	dev := &termsDevice{termsConfig: termsConfig{tc: true, min: 1, required: true}}
 	f, _ := newTestFlow(t, dev.handle)
 	var failed []Step
 	f.opts.Progress = func(s Step) {
