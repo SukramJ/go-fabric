@@ -249,19 +249,25 @@ func TestBDXResponder_ExchangeNotifiesAtArrival(t *testing.T) {
 		t.Fatal(err)
 	}
 	sendBDX(peer, exchangeID, bdx.MessageReceiveInit, init)
-	select {
-	case <-responder.installed:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the responder did not get the exchange")
-	}
+	waitFor(t, "the responder's exchange", func() bool {
+		select {
+		case <-responder.installed:
+			return true
+		default:
+			return false
+		}
+	})
 	sendBDX(peer, exchangeID, bdx.MessageBlockQuery, bdx.CounterOnly{BlockCounter: 0}.Encode())
 	sendBDX(peer, exchangeID, bdx.MessageBlockAckEOF, bdx.CounterOnly{BlockCounter: 0}.Encode())
 	var res notifyResult
-	select {
-	case res = <-responder.result:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the responder did not finish")
-	}
+	waitFor(t, "the responder's end", func() bool {
+		select {
+		case res = <-responder.result:
+			return true
+		default:
+			return false
+		}
+	})
 	want := []uint8{uint8(bdx.MessageBlockQuery), uint8(bdx.MessageBlockAckEOF)}
 	if !res.notifier || !res.inOrder || !slices.Equal(res.notified, want) || !slices.Equal(res.received, want) {
 		t.Fatalf("result %+v, want the notifier to see %v before Receive returned each", res, want)

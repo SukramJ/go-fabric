@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -177,31 +178,33 @@ func awaitDone(t *testing.T, done <-chan error) error {
 // fires once.
 func TestBlockAckEOFFinishesAtArrival(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	e := newArrivalEnd()
-	data := testData(300)
-	var rec flowEvents
-	done := serveSenderDrive(ctx, e, data, &rec)
-	awaitSent(t, e, bdx.MessageReceiveAccept)
-	awaitSent(t, e, bdx.MessageBlockEOF)
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		e := newArrivalEnd()
+		data := testData(300)
+		var rec flowEvents
+		done := serveSenderDrive(ctx, e, data, &rec)
+		awaitSent(t, e, bdx.MessageReceiveAccept)
+		awaitSent(t, e, bdx.MessageBlockEOF)
 
-	e.arrive(ackEOF(0))
-	if got := rec.snapshot(); len(got) == 0 || got[len(got)-1] != "finished" {
-		t.Fatalf("hooks when the arrival returned %v, want finished last", got)
-	}
-	if err := awaitDone(t, done); err != nil {
-		t.Fatalf("Serve: %v", err)
-	}
-	want := []string{"progress", "progress", "finished"}
-	if got := rec.snapshot(); !equalStrings(got, want) {
-		t.Fatalf("hooks %v, want %v", got, want)
-	}
-	rec.mu.Lock()
-	defer rec.mu.Unlock()
-	if rec.queued != 0 || rec.total != uint64(len(data)) {
-		t.Fatalf("finished saw %d queued messages, final progress %d; want 0 and %d", rec.queued, rec.total, len(data))
-	}
+		e.arrive(ackEOF(0))
+		if got := rec.snapshot(); len(got) == 0 || got[len(got)-1] != "finished" {
+			t.Fatalf("hooks when the arrival returned %v, want finished last", got)
+		}
+		if err := awaitDone(t, done); err != nil {
+			t.Fatalf("Serve: %v", err)
+		}
+		want := []string{"progress", "progress", "finished"}
+		if got := rec.snapshot(); !equalStrings(got, want) {
+			t.Fatalf("hooks %v, want %v", got, want)
+		}
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		if rec.queued != 0 || rec.total != uint64(len(data)) {
+			t.Fatalf("finished saw %d queued messages, final progress %d; want 0 and %d", rec.queued, rec.total, len(data))
+		}
+	})
 }
 
 // TestScopeDisabledDuringTheEOFWaitIsCancelled: a scope disabled while the
@@ -213,56 +216,60 @@ func TestScopeDisabledDuringTheEOFWaitIsCancelled(t *testing.T) {
 	t.Parallel()
 	t.Run("in the send", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		e := newArrivalEnd()
-		var rec flowEvents
-		done := serveSenderDrive(ctx, e, testData(300), &rec)
-		awaitSent(t, e, bdx.MessageReceiveAccept)
-		awaitSent(t, e, bdx.MessageBlockEOF)
-		cancel(bdx.ErrScopeDisabled)
-		if err := awaitDone(t, done); !errors.Is(err, bdx.ErrScopeDisabled) {
-			t.Fatalf("Serve: %v, want the disabled scope", err)
-		}
-		if got := rec.snapshot(); !equalStrings(got, []string{"progress", "cancelled"}) {
-			t.Fatalf("hooks %v, want cancelled and no finished", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			e := newArrivalEnd()
+			var rec flowEvents
+			done := serveSenderDrive(ctx, e, testData(300), &rec)
+			awaitSent(t, e, bdx.MessageReceiveAccept)
+			awaitSent(t, e, bdx.MessageBlockEOF)
+			cancel(bdx.ErrScopeDisabled)
+			if err := awaitDone(t, done); !errors.Is(err, bdx.ErrScopeDisabled) {
+				t.Fatalf("Serve: %v, want the disabled scope", err)
+			}
+			if got := rec.snapshot(); !equalStrings(got, []string{"progress", "cancelled"}) {
+				t.Fatalf("hooks %v, want cancelled and no finished", got)
+			}
+		})
 	})
 	t.Run("in the read", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		a, b := newPipe(1178)
-		var rec flowEvents
-		done := make(chan error, 1)
-		go func() {
-			_, err := bdx.Serve(ctx, bdx.NewMessenger(a, 0), bdx.ServeOptions{
-				InitType: bdx.MessageReceiveInit,
-				Init: bdx.Init{
-					TransferControl: bdx.TransferControl{Version: bdx.Version, SenderDrive: true},
-					MaxBlockSize:    1024, FileDesignator: []byte("ota/f"),
-				},
-				TransferFileDesignator: bdx.FileDesignator("ota/f"),
-				Open:                   blobOpener(testData(300)),
-				Progress:               func(uint64, *uint64) { rec.add("progress") },
-				Finished:               func(uint64) { rec.add("finished") },
-				Cancelled:              func() { rec.add("cancelled") },
-			})
-			done <- err
-		}()
-		for _, want := range []bdx.MessageType{bdx.MessageReceiveAccept, bdx.MessageBlockEOF} {
-			m, err := b.Receive(ctx)
-			if err != nil || bdx.MessageType(m.Opcode) != want {
-				t.Fatalf("peer got %+v, %v; want %s", m, err, want)
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			a, b := newPipe(1178)
+			var rec flowEvents
+			done := make(chan error, 1)
+			go func() {
+				_, err := bdx.Serve(ctx, bdx.NewMessenger(a, 0), bdx.ServeOptions{
+					InitType: bdx.MessageReceiveInit,
+					Init: bdx.Init{
+						TransferControl: bdx.TransferControl{Version: bdx.Version, SenderDrive: true},
+						MaxBlockSize:    1024, FileDesignator: []byte("ota/f"),
+					},
+					TransferFileDesignator: bdx.FileDesignator("ota/f"),
+					Open:                   blobOpener(testData(300)),
+					Progress:               func(uint64, *uint64) { rec.add("progress") },
+					Finished:               func(uint64) { rec.add("finished") },
+					Cancelled:              func() { rec.add("cancelled") },
+				})
+				done <- err
+			}()
+			for _, want := range []bdx.MessageType{bdx.MessageReceiveAccept, bdx.MessageBlockEOF} {
+				m, err := b.Receive(ctx)
+				if err != nil || bdx.MessageType(m.Opcode) != want {
+					t.Fatalf("peer got %+v, %v; want %s", m, err, want)
+				}
 			}
-		}
-		cancel(bdx.ErrScopeDisabled)
-		if err := awaitDone(t, done); err == nil {
-			t.Fatal("Serve succeeded with the scope disabled before the BlockAckEof")
-		}
-		if got := rec.snapshot(); len(got) == 0 || got[len(got)-1] != "cancelled" || contains(got, "finished") {
-			t.Fatalf("hooks %v, want cancelled and no finished", got)
-		}
+			cancel(bdx.ErrScopeDisabled)
+			if err := awaitDone(t, done); err == nil {
+				t.Fatal("Serve succeeded with the scope disabled before the BlockAckEof")
+			}
+			if got := rec.snapshot(); len(got) == 0 || got[len(got)-1] != "cancelled" || contains(got, "finished") {
+				t.Fatalf("hooks %v, want cancelled and no finished", got)
+			}
+		})
 	})
 }
 
@@ -272,25 +279,27 @@ func TestScopeDisabledDuringTheEOFWaitIsCancelled(t *testing.T) {
 // Flow.ts:103-111 at db021da0), and the transfer is cancelled.
 func TestWrongBlockAckEOFCounterIsRefused(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	e := newArrivalEnd()
-	var rec flowEvents
-	done := serveSenderDrive(ctx, e, testData(300), &rec)
-	awaitSent(t, e, bdx.MessageReceiveAccept)
-	awaitSent(t, e, bdx.MessageBlockEOF)
-	e.arrive(ackEOF(1))
-	if got := rec.snapshot(); contains(got, "finished") {
-		t.Fatalf("hooks %v after a wrong counter arrived", got)
-	}
-	err := awaitDone(t, done)
-	var be *bdx.Error
-	if !errors.As(err, &be) || be.Code != bdx.StatusBadBlockCounter {
-		t.Fatalf("Serve: %v, want BadBlockCounter", err)
-	}
-	if got := rec.snapshot(); contains(got, "finished") || got[len(got)-1] != "cancelled" {
-		t.Fatalf("hooks %v, want cancelled and no finished", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		e := newArrivalEnd()
+		var rec flowEvents
+		done := serveSenderDrive(ctx, e, testData(300), &rec)
+		awaitSent(t, e, bdx.MessageReceiveAccept)
+		awaitSent(t, e, bdx.MessageBlockEOF)
+		e.arrive(ackEOF(1))
+		if got := rec.snapshot(); contains(got, "finished") {
+			t.Fatalf("hooks %v after a wrong counter arrived", got)
+		}
+		err := awaitDone(t, done)
+		var be *bdx.Error
+		if !errors.As(err, &be) || be.Code != bdx.StatusBadBlockCounter {
+			t.Fatalf("Serve: %v, want BadBlockCounter", err)
+		}
+		if got := rec.snapshot(); contains(got, "finished") || got[len(got)-1] != "cancelled" {
+			t.Fatalf("hooks %v, want cancelled and no finished", got)
+		}
+	})
 }
 
 // TestTransferFinishedAtArrivalIsNoLongerActive: once the BlockAckEof
@@ -303,59 +312,61 @@ func TestWrongBlockAckEOFCounterIsRefused(t *testing.T) {
 // (BdxSession.ts:197-198, BdxProtocol.ts:187-189 at db021da0).
 func TestTransferFinishedAtArrivalIsNoLongerActive(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	r := bdx.NewResponder(nil)
-	if !r.EnablePeerForScope(testPeer, "ota", memStorage{"img": testData(300)}, bdx.ScopeConfig{PreferredDriverModes: []bdx.DriverMode{bdx.SenderDrive}, MessageTimeout: time.Minute}) {
-		t.Fatal("enable refused")
-	}
-	var rec flowEvents
-	closed := make(chan struct{})
-	off := r.OnSessionStarted(func(s *bdx.ServerSession, _ string) {
-		s.OnFinished(func(uint64) { rec.add("finished") })
-		s.OnCancelled(func() { rec.add("cancelled") })
-		s.OnClosed(func() { close(closed) })
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		r := bdx.NewResponder(nil)
+		if !r.EnablePeerForScope(testPeer, "ota", memStorage{"img": testData(300)}, bdx.ScopeConfig{PreferredDriverModes: []bdx.DriverMode{bdx.SenderDrive}, MessageTimeout: time.Minute}) {
+			t.Fatal("enable refused")
+		}
+		var rec flowEvents
+		closed := make(chan struct{})
+		off := r.OnSessionStarted(func(s *bdx.ServerSession, _ string) {
+			s.OnFinished(func(uint64) { rec.add("finished") })
+			s.OnCancelled(func() { rec.add("cancelled") })
+			s.OnClosed(func() { close(closed) })
+		})
+		defer off()
+		e := newArrivalEnd()
+		e.hold = make(chan struct{})
+		init := bdx.Init{TransferControl: bdx.TransferControl{SenderDrive: true}, MaxBlockSize: 1024, FileDesignator: []byte("ota/img")}
+		payload, _ := init.Encode()
+		served := make(chan struct{})
+		go func() {
+			r.HandleExchange(ctx, testPeer, bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageReceiveInit), Payload: payload}, e)
+			close(served)
+		}()
+		awaitSent(t, e, bdx.MessageReceiveAccept)
+		awaitSent(t, e, bdx.MessageBlockEOF)
+		if r.SessionFor(testPeer, "ota") == nil {
+			t.Fatal("no running session while the BlockEof waits for its ack")
+		}
+		e.arrive(ackEOF(0))
+		if got := rec.snapshot(); !equalStrings(got, []string{"finished"}) {
+			t.Fatalf("hooks %v when the arrival returned, want finished", got)
+		}
+		if s := r.SessionFor(testPeer, "ota"); s != nil {
+			t.Fatal("the finished transfer still counts as running")
+		}
+		if err := r.DisablePeerForScope(testPeer, "ota", false); err != nil {
+			t.Fatalf("non-forced disable after the finish: %v", err)
+		}
+		select {
+		case <-closed:
+			t.Fatal("session closed before its goroutine took the queued ack")
+		default:
+		}
+		close(e.hold)
+		select {
+		case <-served:
+		case <-time.After(5 * time.Second):
+			t.Fatal("HandleExchange did not return")
+		}
+		<-closed
+		if got := rec.snapshot(); !equalStrings(got, []string{"finished"}) {
+			t.Fatalf("hooks %v, want finished alone", got)
+		}
 	})
-	defer off()
-	e := newArrivalEnd()
-	e.hold = make(chan struct{})
-	init := bdx.Init{TransferControl: bdx.TransferControl{SenderDrive: true}, MaxBlockSize: 1024, FileDesignator: []byte("ota/img")}
-	payload, _ := init.Encode()
-	served := make(chan struct{})
-	go func() {
-		r.HandleExchange(ctx, testPeer, bdx.Message{ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageReceiveInit), Payload: payload}, e)
-		close(served)
-	}()
-	awaitSent(t, e, bdx.MessageReceiveAccept)
-	awaitSent(t, e, bdx.MessageBlockEOF)
-	if r.SessionFor(testPeer, "ota") == nil {
-		t.Fatal("no running session while the BlockEof waits for its ack")
-	}
-	e.arrive(ackEOF(0))
-	if got := rec.snapshot(); !equalStrings(got, []string{"finished"}) {
-		t.Fatalf("hooks %v when the arrival returned, want finished", got)
-	}
-	if s := r.SessionFor(testPeer, "ota"); s != nil {
-		t.Fatal("the finished transfer still counts as running")
-	}
-	if err := r.DisablePeerForScope(testPeer, "ota", false); err != nil {
-		t.Fatalf("non-forced disable after the finish: %v", err)
-	}
-	select {
-	case <-closed:
-		t.Fatal("session closed before its goroutine took the queued ack")
-	default:
-	}
-	close(e.hold)
-	select {
-	case <-served:
-	case <-time.After(5 * time.Second):
-		t.Fatal("HandleExchange did not return")
-	}
-	<-closed
-	if got := rec.snapshot(); !equalStrings(got, []string{"finished"}) {
-		t.Fatalf("hooks %v, want finished alone", got)
-	}
 }
 
 func equalStrings(a, b []string) bool {

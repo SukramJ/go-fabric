@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -130,6 +131,10 @@ func TestReceiveNotifierSeesEveryMessage(t *testing.T) {
 // (MessageExchange.ts:385-389 at db021da0).
 func TestSetReceiveNotifierOnAPeerOpenedExchange(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testSetReceiveNotifierOnAPeerOpenedExchange)
+}
+
+func testSetReceiveNotifierOnAPeerOpenedExchange(t *testing.T) {
 	m, _, _ := newTestManager(t, Config{})
 	s, p := newSecurePair(t, m, 0x0313, false)
 	var rec, other hookRecorder

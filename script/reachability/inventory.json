@@ -6565,7 +6565,7 @@
       "identifier": "TestOnSendAndOnReceive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/hooks_test.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "client/exchange",
@@ -6656,7 +6656,7 @@
       "identifier": "TestReceiveNotifierSeesEveryMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/hooks_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "client/exchange",
@@ -6747,7 +6747,7 @@
       "identifier": "TestSetReceiveNotifierOnAPeerOpenedExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/hooks_test.go",
-      "line": 131
+      "line": 132
     },
     {
       "package": "client/exchange",

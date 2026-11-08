@@ -283,7 +283,6 @@ func TestOTAPushApplyServedBeforeTheQueuedEOFAck(t *testing.T) {
 		case <-applying:
 			held.Store(true)
 		case <-ctx.Done():
-		case <-time.After(time.Minute):
 		}
 	})
 	r.storeImage(t, 2)
