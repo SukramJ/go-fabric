@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/internal/valuejson"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // The JSON value route: a value of the image, a report, an event or a
@@ -289,6 +290,27 @@ func memberByKey(s *spec.Struct, key string) *spec.Field {
 		}
 	}
 	return nil
+}
+
+// ValueOf is e as the [Value] tree the role hands out — e's TLV read back —
+// so a generated struct a call returns (camera.Provider.Send's result, a
+// response a host built) renders through [DecodeJSON] like a value off the
+// wire, without an encoder of the host's own. A nil e is [ErrNoValue].
+func ValueOf(e Encodable) (Value, error) {
+	if e == nil {
+		return Value{}, ErrNoValue
+	}
+	enc := tlv.NewEncoder()
+	e.EncodeTLV(enc, tlv.AnonymousTag())
+	raw, err := enc.Bytes()
+	if err != nil {
+		return Value{}, fmt.Errorf("client: encode value: %w", err)
+	}
+	v, err := spec.ReadElement(tlv.NewDecoder(raw))
+	if err != nil {
+		return Value{}, fmt.Errorf("client: read value: %w", err)
+	}
+	return v, nil
 }
 
 // DecodeJSON renders v, a value of f, as JSON in form: a struct keyed by

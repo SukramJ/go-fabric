@@ -183,6 +183,18 @@ optional feature `PC` (:22). The REST contract needs `net/http` only, which
    needs it: everything the three servers read is on the REST surface.
    `_meshcop` discovery is not needed either — the host names its border
    router.
+   *Amended 2026-11-08 (owner decision, issue #461, wave W8): the second
+   sentence is overtaken. The controller's network topology needs a
+   border router as a `border_router` node with its name, as
+   matterjs-server's `NetworkTopologyService` draws it, so the controller
+   gained a passive registry, `thread/brdiscovery` — a port of matter.js's
+   `BorderRouterRegistry` (`packages/thread-br-client/src/discovery/BorderRouterRegistry.ts`
+   at `db021da0`) on the controller's DNS-SD cache, which now admits
+   `_meshcop._udp` and `_trel._udp` beside the three Matter names. Nothing
+   else of this decision moves: no CoAP/DTLS, no MeshCoP commissioner;
+   `thread/otbr` stays the border-router client and the registry does not
+   feed its border-router list (a separate decision, named in
+   `controller/topology/doc.go` "Left out").*
 
 6. **The reference daemon** gains an optional flag (working name
    `--otbr http://[host]:8081`) that adds one `ThreadBorderRouter`

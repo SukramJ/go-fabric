@@ -11,15 +11,14 @@ import (
 	"testing"
 	"time"
 
-	clustercamera "github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/camera"
+	"github.com/SukramJ/go-fabric/controller/camera/cameratest"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -42,9 +41,12 @@ const acceptanceOffer = "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=vi
 func TestServiceOnTheFabric(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true})
-	port := newCameraPort()
-	cam := newAcceptanceCamera(t, port)
-	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{cam}, Configure: func(cfg *node.Config) {
+	cam, err := cameratest.New(cameratest.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := cam.Port()
+	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{cam.Device()}, Configure: func(cfg *node.Config) {
 		cfg.Network.TCP = node.TCPConfig{Incoming: true}
 	}})
 	cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
@@ -102,7 +104,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 			client.InvokeOptions{})
 		return err
 	})
-	leftover := port.lastOffer().SessionID
+	leftover := port.LastOffer().SessionID
 	eventually("the leftover in the controller's image", func() bool { return sessionListed(n, ep, leftover) })
 
 	var (
@@ -119,7 +121,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 
 	// The sweep: the camera's next report ends the leftover with
 	// UnknownReason.
-	eventually("the sweep's EndSession", func() bool { return port.ended(leftover) == 12 })
+	eventually("the sweep's EndSession", func() bool { return endedWith(port, leftover, 12) })
 
 	// A start with an offer allocates or reuses, as RootNodeID.
 	var first *camera.Session
@@ -131,7 +133,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 	if first.Mode != camera.ModeProvideOffer || len(first.Streams) != 1 || first.Streams[0].Kind != camera.StreamVideo {
 		t.Fatalf("first session %+v", first)
 	}
-	if got := port.lastOffer(); got.PeerNodeID != root || got.OriginatingEndpointID != controller.CameraControllerEndpoint {
+	if got := port.LastOffer(); got.PeerNodeID != root || got.OriginatingEndpointID != controller.CameraControllerEndpoint {
 		t.Fatalf("the camera stored peer 0x%X endpoint %d, want RootNodeID 0x%X endpoint %d", got.PeerNodeID, got.OriginatingEndpointID, root, controller.CameraControllerEndpoint)
 	}
 	if !requestorHolds(c, first.ID) {
@@ -141,15 +143,14 @@ func TestServiceOnTheFabric(t *testing.T) {
 
 	// The camera answers on the controller's session: the answer is
 	// narrowed to the offer's directions.
-	provider := providerOf(t, cam)
 	run(func(ctx context.Context) error {
-		return provider.Answer(ctx, first.ID, "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendrecv\r\n")
+		return cam.Answer(ctx, first.ID, "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendrecv\r\n")
 	})
 	if sig := next(t, first.Signals()); sig.Kind != camera.SignalAnswer || !strings.Contains(sig.SDP, "a=sendonly") {
 		t.Fatalf("answer %+v", sig)
 	}
 	run(func(ctx context.Context) error {
-		return provider.IceCandidates(ctx, first.ID, []clustercamera.ProviderICECandidate{{Candidate: "candidate:1 1 UDP 1 192.0.2.1 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
+		return cam.IceCandidates(ctx, first.ID, []wpdef.ICECandidateStruct{{Candidate: "candidate:1 1 UDP 1 192.0.2.1 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
 	})
 	if sig := next(t, first.Signals()); sig.Kind != camera.SignalICECandidates || len(sig.Candidates) != 1 {
 		t.Fatalf("candidates %+v", sig)
@@ -157,7 +158,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 	run(func(ctx context.Context) error {
 		return first.ProvideICECandidates(ctx, []wpdef.ICECandidateStruct{{Candidate: "candidate:2 1 UDP 1 192.0.2.2 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
 	})
-	if port.candidates(first.ID) != 1 {
+	if len(port.Candidates(first.ID)) != 1 {
 		t.Fatal("the host's candidates did not reach the camera")
 	}
 
@@ -181,7 +182,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 		}
 		return err
 	})
-	if port.ended(first.ID) != 2 || requestorHolds(c, first.ID) {
+	if !endedWith(port, first.ID, 2) || requestorHolds(c, first.ID) {
 		t.Fatal("Stop did not end the session on both sides")
 	}
 	if _, open := <-first.Signals(); open {
@@ -190,7 +191,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 
 	// The camera ends the second: End arrives, then Signals close and the
 	// observer hears the peer's end.
-	run(func(ctx context.Context) error { return provider.End(ctx, second.ID, 3) })
+	run(func(ctx context.Context) error { return cam.End(ctx, second.ID, 3) })
 	if sig := next(t, second.Signals()); sig.Kind != camera.SignalEnd || sig.Reason != 3 {
 		t.Fatalf("end %+v", sig)
 	}
@@ -224,12 +225,12 @@ func TestServiceOnTheFabric(t *testing.T) {
 	if solicited.Mode != camera.ModeSolicitOffer {
 		t.Fatalf("mode %s", solicited.Mode)
 	}
-	run(func(ctx context.Context) error { return provider.Offer(ctx, solicited.ID, "v=0 camera offer") })
+	run(func(ctx context.Context) error { return cam.Offer(ctx, solicited.ID, "v=0 camera offer") })
 	if sig := next(t, solicited.Signals()); sig.Kind != camera.SignalOffer {
 		t.Fatalf("offer %+v", sig)
 	}
 	run(func(ctx context.Context) error { return solicited.ProvideAnswer(ctx, "v=0 host answer") })
-	if port.answer(solicited.ID) != "v=0 host answer" {
+	if !answeredWith(port, solicited.ID, "v=0 host answer") {
 		t.Fatal("the host's answer did not reach the camera")
 	}
 
@@ -256,7 +257,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if ended, err := svc.StopByKey(ctx, n, ep, "host", "keyed"); err != nil || !ended || port.ended(keyed.ID) != 2 {
+		if ended, err := svc.StopByKey(ctx, n, ep, "host", "keyed"); err != nil || !ended || !endedWith(port, keyed.ID, 2) {
 			return errors.New("StopByKey")
 		}
 		byID, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer})
@@ -271,7 +272,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 			return err
 		}
 		svc.Release(ctx, "leaving")
-		if port.ended(owned.ID) != 2 {
+		if !endedWith(port, owned.ID, 2) {
 			return errors.New("Release")
 		}
 		raw, err := svc.StartStream(ctx, camera.StartRequest{Node: n, Endpoint: ep, Usage: csdef.StreamUsageLiveView, Offer: &offer})
@@ -282,7 +283,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err := p.EndSession(ctx, wpdef.EndSessionRequest{WebRtcSessionId: raw.ID, Reason: 4}, "host"); err != nil || port.ended(raw.ID) != 4 {
+		if err := p.EndSession(ctx, wpdef.EndSessionRequest{WebRtcSessionId: raw.ID, Reason: 4}, "host"); err != nil || !endedWith(port, raw.ID, 4) {
 			return errors.New("Provider.EndSession")
 		}
 		return svc.ReleaseStream(ctx, n, ep, camera.StreamSnapshot, snap.StreamID)
@@ -294,7 +295,7 @@ func TestServiceOnTheFabric(t *testing.T) {
 	run(n.Disable)
 	run(dev.Restart)
 	run(func(ctx context.Context) error {
-		return provider.IceCandidates(ctx, solicited.ID, []clustercamera.ProviderICECandidate{{Candidate: "candidate:3 1 UDP 1 192.0.2.3 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
+		return cam.IceCandidates(ctx, solicited.ID, []wpdef.ICECandidateStruct{{Candidate: "candidate:3 1 UDP 1 192.0.2.3 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
 	})
 	if sig := next(t, solicited.Signals()); sig.Kind != camera.SignalICECandidates {
 		t.Fatalf("after the restart %+v", sig)
@@ -373,15 +374,6 @@ func next(t *testing.T, signals <-chan camera.Signal) camera.Signal {
 	}
 }
 
-func providerOf(t *testing.T, cam *device.Camera) *clustercamera.Provider {
-	t.Helper()
-	p, ok := cam.WebRtcTransportProvider().Underlying().(*clustercamera.Provider)
-	if !ok {
-		t.Fatal("the device serves no camera.Provider")
-	}
-	return p
-}
-
 func requestorHolds(c *controller.Controller, id uint16) bool {
 	for _, s := range c.CameraRequestor().Sessions() {
 		if s.Id == id {
@@ -405,162 +397,12 @@ func sessionListed(n *client.Node, ep, id uint16) bool {
 	return false
 }
 
-// newAcceptanceCamera is a camera with H.264 up to 1920x1080 at 30 fps,
-// one allocated live-view stream, and the Provider on port.
-func newAcceptanceCamera(t *testing.T, port *cameraPort) *device.Camera {
-	t.Helper()
-	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, csdef.StreamUsageRecording}
-	off := false
-	streams := []csdef.VideoStreamStruct{{
-		VideoStreamId: 1, StreamUsage: csdef.StreamUsageLiveView, VideoCodec: csdef.VideoCodecH264,
-		MinFrameRate: 15, MaxFrameRate: 30,
-		MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxResolution: csdef.VideoResolutionStruct{Width: 1280, Height: 720},
-		MinBitRate: 100_000, MaxBitRate: 2_000_000, KeyFrameInterval: 4000, WatermarkEnabled: &off, OsdEnabled: &off,
-	}}
-	points := []csdef.RateDistortionTradeOffPointsStruct{{Codec: csdef.VideoCodecH264, Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MinBitRate: 100_000}}
-	sensor := csdef.VideoSensorParamsStruct{SensorWidth: 1920, SensorHeight: 1080, MaxFps: 30}
-	minView := csdef.VideoResolutionStruct{Width: 640, Height: 480}
-	snapshots := []csdef.SnapshotCapabilitiesStruct{{Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxFrameRate: 1, ImageCodec: csdef.ImageCodecJpeg}}
-	encoders := uint8(4)
-	pixelRate := uint32(1920 * 1080 * 30 * 4)
-	bandwidth := uint32(20_000_000)
-	cam, err := device.NewCamera(device.Options{StableKey: device.StringKey("camera"), Name: "Camera"},
-		csdef.Declare{
-			Features: csdef.FeatureVideo | csdef.FeatureAudio | csdef.FeatureSnapshot,
-			Initial: csdef.Patch{
-				SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &streams,
-				RateDistortionTradeOffPoints: &points, VideoSensorParams: &sensor, MinViewportResolution: &minView, SnapshotCapabilities: &snapshots,
-				MaxConcurrentEncoders: &encoders, MaxEncodedPixelRate: &pixelRate, MaxNetworkBandwidth: &bandwidth,
-			},
-			VideoStreamPort: port, AudioStreamPort: port, SnapshotStreamPort: port, SnapshotCapturePort: port,
-		},
-		wpdef.Declare{ProviderPort: port},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cam
+func endedWith(p *cameratest.Port, id uint16, reason uint8) bool {
+	r, ok := p.Ended(id)
+	return ok && r == reason
 }
 
-// cameraPort is the camera's WebRTC stack and encoders: every offer
-// becomes a session, every allocate a new stream id.
-type cameraPort struct {
-	mu      sync.Mutex
-	offers  []wpdef.OfferArgs
-	nextID  uint16
-	ends    map[uint16]uint8
-	cands   map[uint16]int
-	answers map[uint16]string
-	nextVid uint16
-}
-
-func newCameraPort() *cameraPort {
-	return &cameraPort{nextID: 1, nextVid: 10, ends: map[uint16]uint8{}, cands: map[uint16]int{}, answers: map[uint16]string{}}
-}
-
-func (p *cameraPort) lastOffer() wpdef.OfferArgs {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.offers[len(p.offers)-1]
-}
-
-func (p *cameraPort) ended(id uint16) uint8 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if r, ok := p.ends[id]; ok {
-		return r
-	}
-	return 0xFF
-}
-
-func (p *cameraPort) candidates(id uint16) int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.cands[id]
-}
-
-func (p *cameraPort) answer(id uint16) string {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.answers[id]
-}
-
-func (p *cameraPort) session(args wpdef.OfferArgs) wpdef.WebRTCSessionStruct {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.offers = append(p.offers, args)
-	return wpdef.WebRTCSessionStruct{
-		Id: args.SessionID, PeerNodeId: args.PeerNodeID, PeerEndpointId: args.OriginatingEndpointID,
-		StreamUsage: args.StreamUsage, VideoStreams: args.VideoStreams, AudioStreams: args.AudioStreams, FabricIndex: args.FabricIndex,
-	}
-}
-
-func (p *cameraPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
-	return p.session(args), false, nil
-}
-
-func (p *cameraPort) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
-	return p.session(args), nil
-}
-
-func (p *cameraPort) ProvideAnswer(_ context.Context, id uint16, sdp string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.answers[id] = sdp
-	return nil
-}
-
-func (p *cameraPort) ProvideIceCandidates(_ context.Context, id uint16, c []wpdef.ICECandidateStruct) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.cands[id] += len(c)
-	return nil
-}
-
-func (p *cameraPort) EndSession(_ context.Context, id uint16, reason uint8) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.ends[id] = reason
-	return nil
-}
-
-func (p *cameraPort) VideoStreamAllocate(_ context.Context, args csdef.VideoStreamStruct) (uint16, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if args.VideoStreamId != 0 {
-		return args.VideoStreamId, nil
-	}
-	p.nextVid++
-	return p.nextVid, nil
-}
-
-func (p *cameraPort) VideoStreamAllocated(context.Context, csdef.VideoStreamStruct, csdef.StreamAllocationAction) {
-}
-
-func (p *cameraPort) VideoStreamModify(context.Context, uint16, *bool, *bool) error { return nil }
-
-func (p *cameraPort) VideoStreamDeallocate(context.Context, uint16) error { return nil }
-
-func (p *cameraPort) AudioStreamAllocate(context.Context, csdef.AudioStreamStruct) (uint16, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.nextVid++
-	return p.nextVid, nil
-}
-
-func (p *cameraPort) AudioStreamDeallocate(context.Context, uint16) error { return nil }
-
-func (p *cameraPort) SnapshotStreamAllocate(context.Context, csdef.SnapshotStreamStruct) (uint16, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.nextVid++
-	return p.nextVid, nil
-}
-
-func (p *cameraPort) SnapshotStreamModify(context.Context, uint16, *bool, *bool) error { return nil }
-
-func (p *cameraPort) SnapshotStreamDeallocate(context.Context, uint16) error { return nil }
-
-func (p *cameraPort) CaptureSnapshot(_ context.Context, _ *uint16, r csdef.VideoResolutionStruct) (csdef.CaptureSnapshotResponse, error) {
-	return csdef.CaptureSnapshotResponse{Data: []byte{0xFF, 0xD8}, ImageCodec: csdef.ImageCodecJpeg, Resolution: r}, nil
+func answeredWith(p *cameratest.Port, id uint16, sdp string) bool {
+	got, ok := p.Answered(id)
+	return ok && got == sdp
 }

@@ -169,8 +169,11 @@ func TestParityDiscovery_TXTParameters(t *testing.T) {
 // TestParityDiscovery_IngressFilter pins which records enter the cache:
 // names ending in ._matter._tcp.local, ._matterc._udp.local or
 // ._matterd._udp.local (matter.js packages/protocol/src/mdns/MdnsService.ts
-// :25-27, :90-95), case-insensitively; the bare service-type name is not
-// one of them (a scanner adds its own filter for that).
+// :25-27, :90-95), and the border routers' ._meshcop._udp.local and
+// ._trel._udp.local (matter.js
+// packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:34-37 at
+// db021da0), case-insensitively; the bare service-type name is not one of
+// them (a scanner adds its own filter for that).
 func TestParityDiscovery_IngressFilter(t *testing.T) {
 	t.Parallel()
 	for name, want := range map[string]bool{
@@ -180,8 +183,13 @@ func TestParityDiscovery_IngressFilter(t *testing.T) {
 		"_matterc._udp.local":        false,
 		"printer._ipp._tcp.local":    false,
 		"x._matterc._udp.local.evil": false,
+		// The border routers' two (BorderRouterRegistry.ts:34-37).
+		"BR._meshcop._udp.local":     true,
+		"AABB._TREL._UDP.LOCAL":      true,
+		"_meshcop._udp.local":        false,
+		"x._meshcop._udp.local.evil": false,
 	} {
-		if got := isMatterServiceRecord(&Record{Name: name}); got != want {
+		if got := isAdmittedServiceRecord(&Record{Name: name}); got != want {
 			t.Errorf("%s: %v, want %v", name, got, want)
 		}
 	}

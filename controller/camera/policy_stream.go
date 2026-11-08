@@ -719,7 +719,7 @@ type audioHints struct {
 // packages/ws-controller/src/camera/streamPolicy.ts:561-567 at 0bd06f2.
 func satisfiesAudioCallerBounds(c *allocatedAudioStream, b *audioHints) bool {
 	switch {
-	case b.codecs != nil && !slices.Contains(b.codecs, audioCodecName(c.audioCodec)),
+	case b.codecs != nil && !slices.Contains(b.codecs, AudioCodecName(c.audioCodec)),
 		b.channelCount != 0 && c.channelCount != b.channelCount,
 		b.sampleRate != 0 && c.sampleRate != b.sampleRate,
 		b.bitRate != 0 && c.bitRate != b.bitRate:
@@ -764,13 +764,13 @@ func computeAudioEnvelope(caps audioCapabilities, sdp *sdpVideoConstraints, hint
 	if sdp != nil {
 		if offered := receivableCodecs(sdp.audio); offered != nil {
 			codecs = slices.DeleteFunc(slices.Clone(codecs), func(c csdef.AudioCodecEnum) bool {
-				return !slices.Contains(offered, audioCodecName(c))
+				return !slices.Contains(offered, AudioCodecName(c))
 			})
 		}
 	}
 	if h.codecs != nil {
 		codecs = slices.DeleteFunc(slices.Clone(codecs), func(c csdef.AudioCodecEnum) bool {
-			return !slices.Contains(h.codecs, audioCodecName(c))
+			return !slices.Contains(h.codecs, AudioCodecName(c))
 		})
 	}
 	if len(codecs) == 0 {

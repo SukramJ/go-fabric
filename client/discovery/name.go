@@ -159,19 +159,27 @@ type Parameters map[string][]byte
 // packages/general/src/net/dns-sd/DnssdParameters.ts:36-46 (get/raw fold
 // the key to lower case).
 func (p Parameters) Get(key string) (string, bool) {
-	v, ok := p[key]
+	v, ok := p.Raw(key)
 	if !ok {
-		for k, kv := range p {
-			if strings.EqualFold(k, key) {
-				v, ok = kv, true
-				break
-			}
-		}
-		if !ok {
-			return "", false
-		}
+		return "", false
 	}
 	return decodeUTF8(v), true
+}
+
+// Raw returns the raw bytes of key and whether the key is present, the
+// key matched as [Parameters.Get] matches it. The bytes are the cache's:
+// do not modify them. Mirrors matter.js
+// packages/general/src/net/dns-sd/DnssdParameters.ts:36-46 (raw).
+func (p Parameters) Raw(key string) ([]byte, bool) {
+	if v, ok := p[key]; ok {
+		return v, true
+	}
+	for k, kv := range p {
+		if strings.EqualFold(k, key) {
+			return kv, true
+		}
+	}
+	return nil, false
 }
 
 // signature is the canonical form matter.js compares parameter sets by:

@@ -458,6 +458,35 @@ onto matterjs-server's `camera_*` error codes (`*IncompatibleError`,
 
 *Source: `controller/serve.go`, `controller/camera/service.go`, `session.go`, `manager*.go`, `provider_sessions.go`, `session_watch.go`, `errors.go`; `client/interaction/server.go`.*
 
+**The host's JSON.** A host that speaks matterjs-server's JSON to its own
+clients takes the names from the package rather than writing them out:
+`VideoCodecName` / `VideoCodecByName` (H264, H265, H266, AV1),
+`AudioCodecName` / `AudioCodecByName` (OPUS, AAC), `ImageCodecName` /
+`ImageCodecByName` (JPEG, HEIC), `StreamUsageName` / `StreamUsageByName`
+and `TwoWayTalkSupportName` — a value without a name is its decimal
+spelling, a byName matches ignoring case and, for a codec, accepts that
+decimal spelling back; a usage takes member names only. `ParseICECandidates`
+turns a client's `ice_candidates` list into the structs
+`Session.ProvideICECandidates` takes, through the converter `Provider.Send`
+runs, so a refusal reads as there. `client.ValueOf` turns what
+`Provider.Send` returns (a generated response such as
+`wpdef.ProvideOfferResponse`) into a value `client.DecodeJSON` renders. In
+`VideoBounds` and `AudioBounds` a nil field is unstated and a stated one is
+held to its field's range, so a stated 0 is refused where the model's floor
+is 1, as matterjs-server refuses it.
+
+**Testing a host.** `controller/camera/cameratest` is the test camera this
+module's own acceptance test runs against: `cameratest.New` builds a camera
+device (H.264 video, audio and snapshots, one allocated live-view stream)
+on a scripted `cameratest.Port` that answers every offer with a session,
+numbers its allocations, records the host's answers, candidates and ends
+(`Offers`, `Answered`, `Candidates`, `Ended`) and refuses an operation on
+request (`Refuse`). Bridge `cam.Device()` into a `fabrictest` site, and send
+the camera's own signals with `cam.Offer`, `cam.Answer`, `cam.IceCandidates`
+and `cam.End` inside `Site.Run` — no import of `cluster/camera`.
+
+*Source: `controller/camera/wire_names.go`, `provider_arguments.go` (`ParseICECandidates`), `session.go` (`VideoBounds`, `checkRange`), `cameratest/cameratest.go`; `controller/client/json.go` (`ValueOf`).*
+
 ## The ecosystem gate
 
 Concept v10 §D (owner decision, 2026-10-27), verbatim:

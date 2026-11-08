@@ -15,28 +15,33 @@ import (
 	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 )
 
-// Build derives the graph of images, collected at now. It is pure: the
-// same images give the same graph, whatever their order (they are taken
-// in node-id order).
+// Build derives the graph of images and the border routers the registry
+// lists (thread/brdiscovery; nil for none), collected at now. It is pure:
+// the same inputs give the same graph, whatever the images' order (they
+// are taken in node-id order).
 //
 // It is matterjs-server's #build at 0bd06f22
-// (NetworkTopologyService.ts:305-431) without the border-router registry:
-// a node per image (:325-375), the Thread externals and pairs from the
-// neighbour tables (:377-395), the Wi-Fi star (:397-428).
-func Build(images []Image, now time.Time) Topology {
+// (NetworkTopologyService.ts:305-431): the registry by extended address
+// and the network name by extended PAN id (:309-317), a node per image
+// (:325-375), the Thread externals — a neighbour the registry knows a
+// border_router node — and pairs from the neighbour tables (:377-395), the
+// Wi-Fi star (:397-428).
+func Build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) Topology {
 	imgs := slices.Clone(images)
 	// matterjs-server keys its Thread nodes by the decimal id in a
 	// Record, which JavaScript iterates in ascending numeric order; the
 	// node-id order makes every "first" and "last" below the same.
 	slices.SortStableFunc(imgs, func(a, b Image) int { return cmp.Compare(a.NodeID, b.NodeID) })
 
+	brs := borderRoutersOf(borderRouters)
 	t := Topology{CollectedAt: now, Nodes: []Node{}, Connections: []Connection{}}
 	var thread []*Image
 	var radios []radio
 	for i := range imgs {
-		n := matterNode(&imgs[i])
+		n := matterNode(&imgs[i], brs)
 		switch n.NetworkType {
 		case NetworkThread:
 			thread = append(thread, &imgs[i])
@@ -46,9 +51,53 @@ func Build(images []Image, now time.Time) Topology {
 		}
 		t.Nodes = append(t.Nodes, n)
 	}
-	addThread(&t, thread)
+	addThread(&t, thread, brs)
 	addWiFi(&t, radios)
 	return t
+}
+
+// borderRouterIndex is the registry as the build reads it.
+type borderRouterIndex struct {
+	byExt         map[uint64]*brdiscovery.Entry
+	networkByXpan map[uint64]string
+}
+
+// borderRoutersOf indexes the registry's entries by extended address and
+// their network names by extended PAN id — matterjs-server's brByExt and
+// networkNameByXp at 0bd06f22 (NetworkTopologyService.ts:309-317). An
+// entry whose address is not 16 hex digits matches no neighbour.
+func borderRoutersOf(entries []brdiscovery.Entry) borderRouterIndex {
+	idx := borderRouterIndex{byExt: map[uint64]*brdiscovery.Entry{}, networkByXpan: map[uint64]string{}}
+	for i := range entries {
+		e := &entries[i]
+		if ext, ok := parseHex16(e.ExtAddress); ok {
+			idx.byExt[ext] = e
+		}
+		if xp, ok := parseHex16(e.ExtPanID); ok && e.NetworkName != "" {
+			idx.networkByXpan[xp] = e.NetworkName
+		}
+	}
+	return idx
+}
+
+// parseHex16 reads 16 hex digits.
+func parseHex16(s string) (uint64, bool) {
+	if len(s) != 16 {
+		return 0, false
+	}
+	v, err := strconv.ParseUint(s, 16, 64)
+	return v, err == nil
+}
+
+// stripHostName is an mDNS host name as a display label: the trailing dot
+// and a ".local" suffix removed — matterjs-server's stripMdnsHostname at
+// 0bd06f22 (packages/ws-client/src/topology/topology-utils.ts:1114-1116).
+func stripHostName(h string) string {
+	h = strings.TrimSuffix(h, ".")
+	if len(h) >= len(".local") && strings.EqualFold(h[len(h)-len(".local"):], ".local") {
+		h = h[:len(h)-len(".local")]
+	}
+	return h
 }
 
 // radio is a Wi-Fi station's link to its access point.
@@ -59,9 +108,10 @@ type radio struct {
 
 // matterNode is the node of a commissioned image — matterjs-server's node
 // build at 0bd06f22 (NetworkTopologyService.ts:325-375): a Thread node with
-// its role, extended address, RLOC16, extended PAN id and network name, a
+// its role, extended address, RLOC16, extended PAN id and network name —
+// its own, else the registry's for its extended PAN id (:346-348) — a
 // Wi-Fi station with its SSID and BSSID, any other node bare.
-func matterNode(img *Image) Node {
+func matterNode(img *Image, brs borderRouterIndex) Node {
 	n := Node{
 		ID: strconv.FormatUint(img.NodeID, 10), Kind: KindMatter, NodeID: img.NodeID,
 		NetworkType: networkType(img.NetworkFeatures), Available: img.Available, IsBridge: img.IsBridge,
@@ -79,8 +129,11 @@ func matterNode(img *Image) Node {
 		if td.ExtendedPanId != nil {
 			n.ExtPanID = *td.ExtendedPanId
 		}
-		if td.NetworkName != nil {
+		switch {
+		case td.NetworkName != nil:
 			n.NetworkName = *td.NetworkName
+		case td.ExtendedPanId != nil:
+			n.NetworkName = brs.networkByXpan[*td.ExtendedPanId]
 		}
 	case NetworkWiFi:
 		n.Role = RoleStation
@@ -93,10 +146,11 @@ func matterNode(img *Image) Node {
 
 // addThread adds the Thread externals and one connection per kept pair;
 // an external is published only when a kept pair links it
-// (NetworkTopologyService.ts:377-395, matterjs-server at 0bd06f22).
-func addThread(t *Topology, thread []*Image) {
+// (NetworkTopologyService.ts:377-395, matterjs-server at 0bd06f22), a
+// known border router as mapExternal draws it (:454-479).
+func addThread(t *Topology, thread []*Image, brs borderRouterIndex) {
 	m := newThreadMaps(thread)
-	externals := m.unknowns(thread)
+	externals := m.unknowns(thread, brs)
 	linked := map[string]bool{}
 	for _, p := range m.pairs(thread, externals) {
 		c, ok := connectionOf(p)
@@ -110,7 +164,16 @@ func addThread(t *Topology, thread []*Image) {
 		if !linked[e.id] {
 			continue
 		}
-		n := Node{ID: e.id, Kind: KindThreadUnknown, NetworkType: NetworkThread, ExtAddress: e.ext, ExtPanID: e.extPanID}
+		if br := e.br; br != nil {
+			xp, _ := parseHex16(br.ExtPanID)
+			t.Nodes = append(t.Nodes, Node{
+				ID: e.id, Kind: KindBorderRouter, NetworkType: NetworkThread, Role: RoleRouter,
+				ExtAddress: e.ext, ExtPanID: xp, NetworkName: br.NetworkName, HostName: stripHostName(br.HostName),
+				VendorName: br.VendorName, ModelName: br.ModelName, LastSeen: br.LastSeen,
+			})
+			continue
+		}
+		n := Node{ID: e.id, Kind: KindThreadUnknown, NetworkType: NetworkThread, ExtAddress: e.ext, ExtPanID: e.extPanID, NetworkName: e.networkName}
 		if e.router {
 			n.Role = RoleRouter
 		}

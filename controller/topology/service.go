@@ -20,6 +20,7 @@ import (
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 )
 
 // The defaults of [Config] — matterjs-server's at 0bd06f22
@@ -53,6 +54,18 @@ type Config struct {
 	// Changes carries the nodes' hooks to the service; nil leaves the
 	// service with its periodic rebuild and [Service.Refresh] alone.
 	Changes *Changes
+	// BorderRouters is the border-router registry the service builds
+	// with and rebuilds on; nil is the controller's own
+	// (controller.Controller.BorderRouters) for [New], none otherwise.
+	BorderRouters BorderRouters
+}
+
+// BorderRouters is what the service reads of a border-router registry —
+// matterjs-server's Pick<BorderRouterRegistry, "list" | "events"> at
+// 0bd06f22 (NetworkTopologyService.ts:88-89): *brdiscovery.Registry.
+type BorderRouters interface {
+	List() []brdiscovery.Entry
+	OnChange(fn func(brdiscovery.Event)) (unsubscribe func())
 }
 
 // The refresh paths, endpoint 0 — matterjs-server's THREAD_REFRESH_PATHS
@@ -130,6 +143,7 @@ type Service struct {
 	observers map[int]func(Topology)
 	nextObs   int
 	sources   []Source
+	unwatchBR func()
 	life      context.Context //nolint:containedctx // the service's lifetime, cancelled by Close: a refresh's reads outlive their caller
 	cancel    context.CancelFunc
 }
@@ -142,8 +156,15 @@ type flight struct {
 
 // New starts a service over ctrl's commissioned nodes (controller.Nodes).
 // cfg.Changes, installed on ctrl's configuration before controller.New,
-// brings the nodes' changes; the periodic rebuild starts at once.
+// brings the nodes' changes; the controller's border-router registry,
+// unless cfg.BorderRouters names another, classifies the Thread
+// neighbours; the periodic rebuild starts at once.
 func New(ctrl *controller.Controller, cfg Config) *Service {
+	if cfg.BorderRouters == nil {
+		if r := ctrl.BorderRouters(); r != nil {
+			cfg.BorderRouters = r
+		}
+	}
 	return newService(func() []member {
 		nodes := ctrl.Nodes()
 		out := make([]member, len(nodes))
@@ -175,6 +196,11 @@ func newService(members func() []member, cfg Config) *Service {
 	if cfg.Changes != nil {
 		cfg.Changes.attach(s)
 	}
+	if cfg.BorderRouters != nil {
+		// A border router added, updated or removed schedules a rebuild
+		// (NetworkTopologyService.ts:170-172, matterjs-server at 0bd06f22).
+		s.unwatchBR = cfg.BorderRouters.OnChange(func(brdiscovery.Event) { s.changed() })
+	}
 	return s
 }
 
@@ -195,7 +221,11 @@ func (s *Service) armPeriodicLocked() {
 // telling the observers — matterjs-server's getTopology at 0bd06f22
 // (NetworkTopologyService.ts:179-182).
 func (s *Service) Topology() Topology {
-	return Build(s.images(), s.clk.Now())
+	var brs []brdiscovery.Entry
+	if s.cfg.BorderRouters != nil {
+		brs = s.cfg.BorderRouters.List()
+	}
+	return Build(s.images(), brs, s.clk.Now())
 }
 
 // images lists the members' images, then every source's in registration
@@ -458,6 +488,9 @@ func (s *Service) Close() {
 	s.cancel()
 	if s.cfg.Changes != nil {
 		s.cfg.Changes.detach(s)
+	}
+	if s.unwatchBR != nil {
+		s.unwatchBR()
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 )
 
 // The fixtures of matterjs-server's NetworkTopologyServiceTest.ts at
@@ -23,12 +24,23 @@ const (
 	node1Ext = uint64(0xAABBCCDDEEFF0001)
 	node2Ext = uint64(0xAABBCCDDEEFF0002)
 	brExt    = uint64(0x1122AABBCC334455)
-	brID     = "unknown_1122AABBCC334455" // matterjs-server's br_ node, a thread_unknown here
+	brID     = "br_1122AABBCC334455"
+	brUnkID  = "unknown_1122AABBCC334455" // the same neighbour with no registry entry
 	apID     = "ap_112233445566"
 	bssidStr = "11:22:33:44:55:66"
 )
 
 var bssidBytes = []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
+
+// makeBr is the test's makeBr (NetworkTopologyServiceTest.ts:93-106,
+// matterjs-server at 0bd06f22), the registry entry of the border router
+// node 1 neighbours.
+func makeBr() brdiscovery.Entry {
+	return brdiscovery.Entry{
+		ExtAddress: "1122AABBCC334455", ExtPanID: "1122334455667788", NetworkName: "OpenThread",
+		VendorName: "Apple", ModelName: "eero", HostName: "Cuisine.local.", LastSeen: time.UnixMilli(1000),
+	}
+}
 
 func ptr[T any](v T) *T { return &v }
 
@@ -127,17 +139,16 @@ func connection(t Topology, source, target string) (Connection, bool) {
 
 // TestBuildSyntheticMesh ports "maps a synthetic mesh to matter /
 // border_router / wifi_ap wire nodes" (NetworkTopologyServiceTest.ts:235-282,
-// matterjs-server at 0bd06f22) without the border-router registry: the
-// neighbour the registry would name is a thread_unknown router, and node
-// 1's network name, which the registry supplied by extended PAN id, is
-// empty.
+// matterjs-server at 0bd06f22): the neighbour the registry knows is its
+// border_router node, its host name stripped to a label, and node 1's
+// network name is the registry's for its extended PAN id.
 func TestBuildSyntheticMesh(t *testing.T) {
-	topo := Build(fullMesh(), at)
+	topo := Build(fullMesh(), []brdiscovery.Entry{makeBr()}, at)
 	if len(topo.Nodes) != 5 || !topo.CollectedAt.Equal(at) {
 		t.Fatalf("nodes %d, collected %v; want 5 at %v", len(topo.Nodes), topo.CollectedAt, at)
 	}
 	m := byID(topo)
-	want := Node{ID: "1", Kind: KindMatter, NetworkType: NetworkThread, NodeID: 1, Role: RoleLeader, Available: true, ExtAddress: node1Ext, Rloc16: ptr[uint16](1024), ExtPanID: extPan}
+	want := Node{ID: "1", Kind: KindMatter, NetworkType: NetworkThread, NodeID: 1, Role: RoleLeader, Available: true, ExtAddress: node1Ext, Rloc16: ptr[uint16](1024), ExtPanID: extPan, NetworkName: "OpenThread"}
 	if got := m["1"]; !reflect.DeepEqual(got, want) {
 		t.Errorf("node 1 = %+v\nwant %+v", got, want)
 	}
@@ -151,9 +162,12 @@ func TestBuildSyntheticMesh(t *testing.T) {
 	if wifi.Kind != KindMatter || wifi.NetworkType != NetworkWiFi || wifi.Role != RoleStation || wifi.SSID != "MyWiFi" || wifi.BSSID != bssidStr {
 		t.Errorf("station = %+v", wifi)
 	}
-	br := m[brID]
-	if br.Kind != KindThreadUnknown || br.NetworkType != NetworkThread || br.Role != RoleRouter || br.ExtAddress != brExt || br.ExtPanID != extPan {
-		t.Errorf("external = %+v", br)
+	wantBR := Node{
+		ID: brID, Kind: KindBorderRouter, NetworkType: NetworkThread, Role: RoleRouter, ExtAddress: brExt, ExtPanID: extPan,
+		NetworkName: "OpenThread", HostName: "Cuisine", VendorName: "Apple", ModelName: "eero", LastSeen: time.UnixMilli(1000),
+	}
+	if br := m[brID]; !reflect.DeepEqual(br, wantBR) {
+		t.Errorf("border router = %+v\nwant %+v", br, wantBR)
 	}
 	ap := m[apID]
 	if want := (Node{ID: apID, Kind: KindWiFiAP, NetworkType: NetworkWiFi, Role: RoleAP, NetworkName: bssidStr, SSID: "MyWiFi", BSSID: bssidStr}); !reflect.DeepEqual(ap, want) {
@@ -164,9 +178,9 @@ func TestBuildSyntheticMesh(t *testing.T) {
 // TestBuildThreadPair ports "folds both directions of a Thread link and
 // summarises the strongest" and "links a Matter node to the external
 // Border Router it neighbours" (NetworkTopologyServiceTest.ts:347-368,
-// matterjs-server at 0bd06f22), the external a thread_unknown here.
+// matterjs-server at 0bd06f22).
 func TestBuildThreadPair(t *testing.T) {
-	topo := Build(fullMesh(), at)
+	topo := Build(fullMesh(), []brdiscovery.Entry{makeBr()}, at)
 	link, ok := connection(topo, "1", "2")
 	if !ok || link.Network != NetworkThread || link.Strength != StrengthStrong {
 		t.Fatalf("link 1-2 = %+v (%v)", link, ok)
@@ -191,24 +205,24 @@ func TestBuildThreadPair(t *testing.T) {
 // (NetworkTopologyServiceTest.ts:284-311, :370-388, matterjs-server at
 // 0bd06f22).
 func TestBuildWiFiStar(t *testing.T) {
-	topo := Build(fullMesh(), at)
+	topo := Build(fullMesh(), nil, at)
 	c, ok := connection(topo, "5", apID)
 	if !ok || c.Network != NetworkWiFi || c.Strength != StrengthStrong ||
 		!reflect.DeepEqual(c.SourceToTarget, &Direction{Strength: StrengthStrong, RSSI: ptr[int8](-55)}) || c.TargetToSource != nil {
 		t.Errorf("Wi-Fi link = %+v (%v)", c, ok)
 	}
 
-	topo = Build([]Image{mkWifi(5, nil, false)}, at)
+	topo = Build([]Image{mkWifi(5, nil, false)}, nil, at)
 	if c, _ := connection(topo, "5", apID); c.Strength != StrengthUnknown || c.SourceToTarget != nil {
 		t.Errorf("unmeasured RSSI: %+v", c)
 	}
 
-	m := byID(Build([]Image{mkWifi(5, ptr[int8](-55), true)}, at))
+	m := byID(Build([]Image{mkWifi(5, ptr[int8](-55), true)}, nil, at))
 	if m[apID].SSID != "" || m[apID].BSSID != bssidStr || m["5"].SSID != "" {
 		t.Errorf("no network: AP %+v, station %+v", m[apID], m["5"])
 	}
 
-	topo = Build([]Image{mkWifi(5, ptr[int8](-55), true), mkWifi(6, ptr[int8](-55), false)}, at)
+	topo = Build([]Image{mkWifi(5, ptr[int8](-55), true), mkWifi(6, ptr[int8](-55), false)}, nil, at)
 	m = byID(topo)
 	if len(topo.Nodes) != 3 || len(topo.Connections) != 2 ||
 		topo.Connections[0].Source != "5" || topo.Connections[1].Source != "6" || topo.Connections[1].Target != apID {
@@ -231,15 +245,15 @@ func TestBuildExternals(t *testing.T) {
 	one := mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{
 		neighbour(brExt, 61440, 1, ptr[int8](-90), true),
 	}})
-	topo := Build([]Image{one}, at)
-	if n := byID(topo)[brID]; n.Kind != KindThreadUnknown || n.NetworkType != NetworkThread || n.Role != RoleRouter {
+	topo := Build([]Image{one}, nil, at)
+	if n := byID(topo)[brUnkID]; n.Kind != KindThreadUnknown || n.NetworkType != NetworkThread || n.Role != RoleRouter {
 		t.Errorf("unmatched neighbour = %+v", n)
 	}
 
 	dead := mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{
 		neighbour(brExt, 61440, 0, nil, true),
 	}})
-	topo = Build([]Image{dead}, at)
+	topo = Build([]Image{dead}, nil, at)
 	if len(topo.Connections) != 0 || len(topo.Nodes) != 1 || topo.Nodes[0].ID != "1" {
 		t.Errorf("dead link: %+v", topo)
 	}
@@ -247,7 +261,7 @@ func TestBuildExternals(t *testing.T) {
 	a := mkThread(1, threadOpts{rloc16: ptr[uint16](0x0400), neighbours: []threaddiagdef.NeighborTableStruct{neighbour(0xDEADBEEF, 0, 1, nil, false)}})
 	b := mkThread(2, threadOpts{rloc16: ptr[uint16](0x0800), neighbours: []threaddiagdef.NeighborTableStruct{neighbour(0xDEADBEEF, 0, 3, nil, true)}})
 	b.ThreadNetworkDiagnostics.ExtendedPanId = ptr[uint64](0x99)
-	topo = Build([]Image{b, a}, at)
+	topo = Build([]Image{b, a}, nil, at)
 	var ext []Node
 	for _, n := range topo.Nodes {
 		if n.Kind == KindThreadUnknown {
@@ -270,18 +284,18 @@ func TestBuildExternals(t *testing.T) {
 // (NetworkTopologyServiceTest.ts:418-444, matterjs-server at 0bd06f22),
 // and a node without the clusters, whose network is unknown.
 func TestBuildNodeFlags(t *testing.T) {
-	m := byID(Build([]Image{mkThread(1, threadOpts{networkName: ptr("OwnNet")})}, at))
+	m := byID(Build([]Image{mkThread(1, threadOpts{networkName: ptr("OwnNet")})}, nil, at))
 	if m["1"].NetworkName != "OwnNet" {
 		t.Errorf("network name %q", m["1"].NetworkName)
 	}
 	m = byID(Build([]Image{
 		mkThread(1, threadOpts{rloc16: ptr[uint16](1024), bridge: true}),
 		mkThread(2, threadOpts{rloc16: ptr[uint16](1025), offline: true}),
-	}, at))
+	}, nil, at))
 	if !m["1"].IsBridge || m["1"].Available != true || m["2"].Available {
 		t.Errorf("flags: %+v %+v", m["1"], m["2"])
 	}
-	topo := Build([]Image{{NodeID: 1, Available: true, NetworkFeatures: netcommdef.FeatureEthernetNetworkInterface}, {NodeID: 7}}, at)
+	topo := Build([]Image{{NodeID: 1, Available: true, NetworkFeatures: netcommdef.FeatureEthernetNetworkInterface}, {NodeID: 7}}, nil, at)
 	if len(topo.Nodes) != 2 || topo.Nodes[0].NetworkType != NetworkEthernet || topo.Nodes[1].NetworkType != NetworkUnknown || len(topo.Connections) != 0 {
 		t.Errorf("ethernet and bare nodes: %+v", topo)
 	}
@@ -312,7 +326,7 @@ func TestBuildLikeTheServerPort(t *testing.T) {
 	n3.WiFiNetworkDiagnostics.Rssi = ptr[int8](-60)
 	n3.NetworkCommissioning.Networks = []netcommdef.NetworkInfoStruct{{NetworkId: []byte("home"), Connected: true}}
 	n4 := Image{NodeID: 4, Available: true, NetworkFeatures: netcommdef.FeatureEthernetNetworkInterface}
-	topo := Build([]Image{n4, n3, n2, n1}, at)
+	topo := Build([]Image{n4, n3, n2, n1}, nil, at)
 
 	want := Topology{CollectedAt: at, Nodes: []Node{
 		{ID: "1", Kind: KindMatter, NetworkType: NetworkThread, NodeID: 1, Role: RoleRouter, Available: true, ExtAddress: 0x0102030405060708, Rloc16: ptr[uint16](1024), ExtPanID: 0x1111111111111111, NetworkName: "Mesh"},
@@ -391,7 +405,7 @@ func TestThreadMatching(t *testing.T) {
 	}
 	self := mkThread(1, threadOpts{rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{neighbour(0, 1024, 3, nil, false)}})
 	m = newThreadMaps([]*Image{&self})
-	if ps := m.pairs([]*Image{&self}, m.unknowns([]*Image{&self})); len(ps) != 0 {
+	if ps := m.pairs([]*Image{&self}, m.unknowns([]*Image{&self}, borderRouterIndex{})); len(ps) != 0 {
 		t.Errorf("self-edge: %+v", ps)
 	}
 
@@ -454,5 +468,51 @@ func TestWiFiFields(t *testing.T) {
 		if got := wifiSSID(c.nets); got != c.want {
 			t.Errorf("%s: SSID %q, want %q", c.name, got, c.want)
 		}
+	}
+}
+
+// TestBuildBorderRouters ports "omits host_name when the Border Router has
+// no mDNS hostname", "omits host_name when the mDNS hostname strips to
+// nothing" and "prefers the node's own Thread network name over the Border
+// Router registry" (NetworkTopologyServiceTest.ts:313-345, :418-423,
+// matterjs-server at 0bd06f22), "promotes a neighbor that matches the
+// border-router registry" (TopologyUtilsTest.ts:248-262), and an unknown
+// neighbour named by the registry's network for its extended PAN id
+// (topology-utils.ts:592-600, :616-629).
+func TestBuildBorderRouters(t *testing.T) {
+	node1 := mkThread(1, threadOpts{role: role(5), rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(brExt, 61440, 2, ptr[int8](-70), true),
+	}})
+	for host, want := range map[string]string{"": "", ".local.": "", "Cuisine.LOCAL": "Cuisine", "br.example.": "br.example"} {
+		br := makeBr()
+		br.HostName = host
+		n := byID(Build([]Image{node1}, []brdiscovery.Entry{br}, at))[brID]
+		if n.Kind != KindBorderRouter || n.HostName != want || n.VendorName != "Apple" {
+			t.Errorf("host %q: %+v, want host name %q", host, n, want)
+		}
+	}
+
+	own := mkThread(1, threadOpts{role: role(5), rloc16: ptr[uint16](1024), networkName: ptr("OwnNet")})
+	if got := Build([]Image{own}, []brdiscovery.Entry{makeBr()}, at).Nodes[0].NetworkName; got != "OwnNet" {
+		t.Errorf("network name %q, want the node's own", got)
+	}
+
+	br := makeBr()
+	br.NetworkName, br.ExtPanID = "TestNet", "1122334455667788"
+	n := byID(Build([]Image{node1}, []brdiscovery.Entry{br}, at))[brID]
+	if n.Kind != KindBorderRouter || n.ID != "br_1122AABBCC334455" || n.NetworkName != "TestNet" {
+		t.Errorf("promoted neighbour = %+v", n)
+	}
+
+	other := makeBr()
+	other.ExtAddress = "00000000DEADBEEF"
+	unk := byID(Build([]Image{node1}, []brdiscovery.Entry{other}, at))[brUnkID]
+	if unk.Kind != KindThreadUnknown || unk.NetworkName != "OpenThread" || unk.HostName != "" {
+		t.Errorf("unknown neighbour = %+v, want named OpenThread by its PAN", unk)
+	}
+	bad := makeBr()
+	bad.ExtAddress, bad.ExtPanID = "not hex", "short"
+	if n := byID(Build([]Image{node1}, []brdiscovery.Entry{bad}, at))[brUnkID]; n.Kind != KindThreadUnknown || n.NetworkName != "" {
+		t.Errorf("a malformed entry matched: %+v", n)
 	}
 }

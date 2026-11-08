@@ -117,6 +117,11 @@ func TestServiceOnASite(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The controller keeps a border-router registry by default, which
+	// the service builds with: none is on the site's LAN.
+	if c.BorderRouters() == nil || len(c.BorderRouters().List()) != 0 {
+		t.Fatalf("the controller's border-router registry: %v", c.BorderRouters())
+	}
 	svc := topology.New(c, topology.Config{Changes: &changes, Clock: cfg.Clock})
 	t.Cleanup(svc.Close)
 	var mu sync.Mutex
@@ -194,4 +199,39 @@ func id(n uint64) string {
 		b = append([]byte{digits[n%10]}, b...)
 	}
 	return string(b)
+}
+
+// TestServiceWithTheRegistryDisabled: a controller built with its
+// border-router registry disabled hands out a nil *brdiscovery.Registry;
+// wired into topology.New through Config.BorderRouters — where the nil
+// pointer is a non-nil interface — the service builds a topology without
+// border routers and closes without a panic.
+func TestServiceWithTheRegistryDisabled(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
+	cfg.BorderRouters.Disabled = true
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	var c *controller.Controller
+	if err := site.Run(ctx, func(ctx context.Context) (err error) {
+		c, err = controller.New(ctx, cfg)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = site.Run(context.Background(), c.Close) })
+	if c.BorderRouters() != nil {
+		t.Fatalf("the disabled registry: %v, want nil", c.BorderRouters())
+	}
+	if got := c.BorderRouters().List(); len(got) != 0 {
+		t.Fatalf("the disabled registry lists %v", got)
+	}
+	svc := topology.New(c, topology.Config{BorderRouters: c.BorderRouters(), Clock: cfg.Clock})
+	for _, n := range svc.Topology().Nodes {
+		if n.Kind == topology.KindBorderRouter {
+			t.Fatalf("a border router without a registry: %+v", n)
+		}
+	}
+	svc.Close()
 }

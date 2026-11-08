@@ -114,18 +114,15 @@ func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {
 	return st.SetSetting(ctx, store.SettingUniqueID, hex.EncodeToString(b[:]))
 }
 
-// eraseEndpointRecords removes every endpoint record (matter.js erases the
-// node store, ServerNodeStore.erase, which holds the endpoint numbers).
+// eraseEndpointRecords erases every endpoint record and restarts the
+// numbering at the first bridged number, so the node that comes back
+// numbers as a fresh install. Mirrors matter.js
+// packages/node/src/storage/server/ServerNodeStore.ts erase (:134-139),
+// which erases the endpoint stores, and ServerEndpointStores.ts erase
+// (:63-77): storage.clearAll(), a fresh holder map, #nextNumber = 1.
 func eraseEndpointRecords(ctx context.Context, s endpoint.Store) error {
-	recs, err := s.ListEndpoints(ctx, "")
-	if err != nil {
-		return fmt.Errorf("node: factory reset: list endpoints: %w", err)
+	if err := s.EraseEndpoints(ctx); err != nil {
+		return fmt.Errorf("node: factory reset: erase endpoints: %w", err)
 	}
-	var errs []error
-	for _, rec := range recs {
-		if err := s.RemoveEndpoint(ctx, rec.Key); err != nil {
-			errs = append(errs, fmt.Errorf("node: factory reset: remove endpoint %d: %w", rec.EndpointID, err))
-		}
-	}
-	return errors.Join(errs...)
+	return nil
 }

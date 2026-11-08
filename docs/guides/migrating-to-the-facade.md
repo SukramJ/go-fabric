@@ -266,6 +266,45 @@ installs its notifier, and leaves one already in place. The notifier still
 runs on the receive path before the acknowledgement bookkeeping: it must not
 block and must not call back into the exchange or its manager.
 
+## Changed after v0.18.0: the topology's border routers
+
+`controller/topology.Build(images, now)` is `Build(images, borderRouters,
+now)`: the third input is the border-router registry's entries
+(`[]brdiscovery.Entry`, package `thread/brdiscovery`), nil for none. A
+caller that built without a registry passes nil and gets the graph it got
+before; one that has the controller's passes
+`ctrl.BorderRouters().List()` — which returns nil, without a panic, when the
+controller's registry is disabled — and a neighbour the registry knows becomes a
+`border_router` node (`topology.KindBorderRouter`, id `br_<EXTADDR>`, with
+`HostName`, `VendorName`, `ModelName` and `LastSeen`). `topology.New`
+builds with the controller's registry without a change on the caller's
+side; `topology.Config.BorderRouters` names another.
+
+## Changed after v0.18.0: the camera bounds
+
+`controller/camera.VideoBounds`' `MinFrameRate`, `MaxFrameRate`
+(`*uint16`), `MinBitRate`, `MaxBitRate` (`*uint32`) and `AudioBounds`'
+`ChannelCount` (`*uint8`), `SampleRate` and `BitRate` (`*uint32`) are
+pointers now: nil is unstated, and a stated value is held to its field's
+range, so a stated 0 is refused with `ErrInvalidArgument` where the
+model's floor is 1 — as matterjs-server refuses it. A 0 used to read as
+unstated. A host that maps an optional JSON number sets the field only
+when the number is present (`v := uint16(n); b.MaxFrameRate = &v`); one
+that wrote 0 for "unstated" leaves the field nil.
+
+## Changed after v0.18.0: the endpoint store erases
+
+`endpoint.Store` has a fifth method, `EraseEndpoints(ctx) error`: delete
+every record in every scope and restart the allocation counter at the first
+bridged number (2), atomically. `Node.FactoryReset` calls it instead of
+listing and removing the records, so the node that comes back on the erased
+store numbers its endpoints from 2 as a fresh install, as matter.js's erase
+restarts its counter. A host that implements the port adds the method; a
+SQL store deletes its rows and sets its counter back in one transaction
+rather than dropping the counter's row. `endpoint/sqlitestore`,
+`endpoint/memstore` and `endpoint/endpointtest.FakeStore` implement it.
+`RemoveEndpoint` keeps the never-reissue rule.
+
 ## Changed after v0.18.0: the BasicInformation restores
 
 `mattercore.BasicInformation.SetNodeLabel(string) error` and

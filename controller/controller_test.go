@@ -88,6 +88,32 @@ func TestNewKeepsTheFabric(t *testing.T) {
 	}
 }
 
+// TestBorderRouterRegistry: the controller keeps a border-router registry
+// on its DNS-SD cache by default, as matterjs-server's controller does
+// (NetworkTopologyService.ts:88-89 of matterjs-server at 0bd06f2), and
+// none when the configuration disables it; Close closes it.
+func TestBorderRouterRegistry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, disabled := range []bool{false, true} {
+		cfg := config(openDB(t))
+		cfg.BorderRouters.Disabled = disabled
+		c, err := controller.New(ctx, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.BorderRouters() != nil; got == disabled {
+			t.Errorf("disabled %v: registry %v", disabled, got)
+		}
+		if err := c.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if r := c.BorderRouters(); r != nil && len(r.List()) != 0 {
+			t.Error("a closed registry lists entries")
+		}
+	}
+}
+
 // TestNewRequires refuses a configuration without its database or its
 // trust store: attestation has no default.
 func TestNewRequires(t *testing.T) {

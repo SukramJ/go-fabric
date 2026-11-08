@@ -110,6 +110,7 @@ var floors = []packageFloor{
 		min: 94,
 		why: "phase 37 waves B and C: measured 95.0–95.2; the sweep and give-back paths run on the fabrictest clock and a tick lands on either side of a branch, so one point of margin",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/controller/camera/cameratest", min: 98},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 92, spread: 3.3,
 		why: "measures 92.6 or 95.9 (review 2026-11 W6): the virtual central's teardown closes sessions and drops connections on fire-and-forget goroutines (bletest.go drop, UnsubscribeC2, the pipe loop's stop arm), and whether they run before the test binary exits is scheduling, which no clock drives. The floor is the whole percent below the lowest measurement",
@@ -155,6 +156,7 @@ var floors = []packageFloor{
 		why: "brief CM §2/§3: measured 91.5 (was 93). The TCP initiator's and the network profiles' remaining paths — a TCP dial, a profile's run-time Configure, the cooling of a released slot — run through the controller's TCP and network tests (controller:TestClientNodeTcpParity, client/peer's profile tests on a harness without TCP)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/thread", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/thread/brdiscovery", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr/otbrtest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 100},
@@ -167,8 +169,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 54,
-		why: "review 2026-11 W6-test-13: measured 54.1. Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper) reach",
+		min: 77,
+		why: "wave W8 (#457): measured 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},

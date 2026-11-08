@@ -375,12 +375,58 @@ func (s *Store) ListEndpoints(ctx context.Context, scope string) ([]endpoint.Rec
 
 // RemoveEndpoint implements [endpoint.Store]. Idempotent by contract, and
 // deliberately does NOT return the number to the pool: the counter only
-// ever advances.
+// ever advances, until [Store.EraseEndpoints] restarts it.
 func (s *Store) RemoveEndpoint(ctx context.Context, key endpoint.SourceKey) error {
 	if _, err := s.db.ExecContext(ctx,
 		`DELETE FROM matter_endpoints WHERE source_key = ?`, key.String()); err != nil {
 		return fmt.Errorf("sqlitestore: remove endpoint %q: %w", key.String(), err)
 	}
+	return nil
+}
+
+// EraseEndpoints implements [endpoint.Store]: every row goes and the
+// counter restarts at allocMin, in one BEGIN IMMEDIATE transaction (see
+// [Store.UpsertEndpointAssigning] for why IMMEDIATE). The allocation row is
+// reset rather than deleted, because [allocate] reads a missing row as
+// "Apply was not run". Mirrors matter.js
+// packages/node/src/storage/server/ServerEndpointStores.ts erase (:63-77),
+// which clears the storage and sets #nextNumber back to 1 (the Aggregator
+// is 1 here, so the first bridged number is 2).
+func (s *Store) EraseEndpoints(ctx context.Context) error {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("sqlitestore: acquire connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		return fmt.Errorf("sqlitestore: begin immediate: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_, _ = conn.ExecContext(context.WithoutCancel(ctx), `ROLLBACK`)
+		}
+	}()
+	if _, err := conn.ExecContext(ctx, `DELETE FROM matter_endpoints`); err != nil {
+		return fmt.Errorf("sqlitestore: erase endpoints: %w", err)
+	}
+	res, err := conn.ExecContext(ctx,
+		`UPDATE matter_endpoint_allocation SET next_endpoint_id = ? WHERE id = 1`, int64(allocMin))
+	if err != nil {
+		return fmt.Errorf("sqlitestore: reset allocation counter: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("sqlitestore: reset allocation counter: rows affected: %w", err)
+	}
+	if n == 0 {
+		return errors.New("sqlitestore: allocation row missing — was Apply run on this database?")
+	}
+	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {
+		return fmt.Errorf("sqlitestore: commit: %w", err)
+	}
+	committed = true
 	return nil
 }
 

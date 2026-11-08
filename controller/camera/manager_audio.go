@@ -114,7 +114,7 @@ func (m *manager) resolveAudioStreamLocked(ctx context.Context, req audioRequest
 	}
 	deviceCodecs := make([]string, len(mic.supportedCodecs))
 	for i, c := range mic.supportedCodecs {
-		deviceCodecs[i] = audioCodecName(c)
+		deviceCodecs[i] = AudioCodecName(c)
 	}
 	sel := computeAudioEnvelope(*mic, req.sdp, req.hints)
 	if sel.unsatisfiable != nil {
