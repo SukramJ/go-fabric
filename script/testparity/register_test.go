@@ -53,7 +53,8 @@ import (
 // Pin lift wave P4 (#433) ports CommissioningClosedSessionReArmTest.ts,
 // InitialContactScheduleTest.ts and VendorIdVerificationTest.ts, merged
 // with wave P3: 3.
-const testparityPlannedRatchet = 3
+// Issue 441 (wave W7) ports CommissionableMdnsScannerWindowChangeTest.ts: 2.
+const testparityPlannedRatchet = 2
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -138,8 +139,10 @@ const testparityPlannedRatchet = 3
 // ported, six MdnsServerTest.ts cases of the one-second rule and the
 // turn's announcement and MdnsTest.ts's announcement of devices that
 // start together: 160 ported, 963 missing.
+// Issue 441 (wave W7): CommissionableMdnsScannerWindowChangeTest.ts
+// ported, no scanner change: 161 ported.
 const (
-	testparityPortedRatchet  = 160
+	testparityPortedRatchet  = 161
 	testparityMissingRatchet = 963
 )
 

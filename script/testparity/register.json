@@ -8056,9 +8056,12 @@
     },
     {
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerWindowChangeTest.ts",
-      "status": "planned",
-      "reason": "matter.js pin lift 862ad75f → db021da0 (2026-11-06): wave P3 (#432, mDNS goodbye scope and interface following, GeneralDiagnostics after #4844/#4842/#4881; the label and localisation server tests of #4900 read for server fixes) ports it by meaning.",
-      "snapshotSha": "65ac23f88c838fd746be94397757be933a2b7753"
+      "status": "ported",
+      "reason": "Ported by meaning against client/discovery's cache and scanner (issue 441): the packets matter.js's responder sends — a window's record set in one announcement, the goodbye of a withdrawal with the host addresses only when no other window publishes them (InterfaceResponder.ts #goodbyesFor at db021da0), and a responder's goodbye that names them anyway — are injected into the cache's fake connection, and the device's answer to the address query is scripted. All six cases pass without a scanner change: both windows delivered with addresses to a discovery 6 ms after either order, the next window's host addresses kept once the goodbye takes effect, and the addresses dropped and found again by a query after the host goodbye.",
+      "snapshotSha": "65ac23f88c838fd746be94397757be933a2b7753",
+      "go": [
+        "client/discovery:TestCommissionableMdnsScannerWindowChange"
+      ]
     },
     {
       "path": "packages/protocol/test/mdns/MdnsServerAddressChangeTest.ts",

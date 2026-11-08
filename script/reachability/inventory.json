@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7779,
+  "entry_points": 7780,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17749,
+    "total_exported": 17750,
     "reachable": 12339,
-    "whitelisted": 5410,
+    "whitelisted": 5411,
     "unreachable": 0
   },
   "by_package": [],
@@ -5803,6 +5803,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/scanner_parity_matterjs_test.go",
       "line": 105
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestCommissionableMdnsScannerWindowChange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/window_change_parity_matterjs_test.go",
+      "line": 197
     },
     {
       "package": "client/discovery",
