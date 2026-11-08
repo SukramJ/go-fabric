@@ -48,7 +48,12 @@ type OTAConfig struct {
 	BDXAdditionalMrpDelay     *time.Duration
 	ApplyDelay                time.Duration
 	// RequestConsent, OnUpdateAvailable, OnUpdateApplying, OnUpdateDone,
-	// OnUpdateFailed and OnStatus are the manager's hooks.
+	// OnUpdateFailed and OnStatus are the manager's hooks. OnStatus may run
+	// on the receive path: a download's WaitForApply is reported when the
+	// node's final BlockAckEof arrives, on that session's turn of the
+	// controller's socket. It must not block and must not call back into
+	// the controller synchronously; a blocking hook stalls the session's
+	// datagrams.
 	RequestConsent                                 func(ctx context.Context, p softwareupdate.Peer, req softwareupdate.QueryImageRequest, d softwareupdate.AvailableDetails) (softwareupdate.ConsentState, time.Duration)
 	OnUpdateAvailable                              func(p softwareupdate.Peer, info softwareupdate.SoftwareUpdateInfo)
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p softwareupdate.Peer)

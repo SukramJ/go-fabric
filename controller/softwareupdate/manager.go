@@ -219,7 +219,8 @@ type Config struct {
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p Peer)
 	// OnStatus observes each status the provider reports for a node. A
 	// download's WaitForApply is reported on the receive path, when the
-	// node's final BlockAckEof arrives, so it must not block.
+	// node's final BlockAckEof arrives, so it must not block and must not
+	// call back into the controller synchronously.
 	OnStatus func(p Peer, status Status, version uint32)
 
 	// ScriptQueryImage and ScriptApplyUpdate, when set, are asked before

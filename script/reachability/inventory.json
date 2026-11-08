@@ -26125,7 +26125,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 501
+      "line": 502
     },
     {
       "package": "controller/softwareupdate",
