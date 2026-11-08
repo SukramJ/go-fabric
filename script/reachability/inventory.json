@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7797,
+  "entry_points": 7798,
   "entry_packages": [
     ".",
     "bdx",
@@ -280,9 +280,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17758,
+    "total_exported": 17759,
     "reachable": 12341,
-    "whitelisted": 5417,
+    "whitelisted": 5418,
     "unreachable": 0
   },
   "by_package": [],
@@ -8133,7 +8133,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 656
+      "line": 657
     },
     {
       "package": "cluster/core",
@@ -8161,7 +8161,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 819
+      "line": 820
     },
     {
       "package": "cluster/core",
@@ -8364,7 +8364,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 847
+      "line": 848
     },
     {
       "package": "cluster/core",
@@ -8378,14 +8378,21 @@
       "identifier": "TestGeneralDiagnosticsFaultsAbsentWithoutPort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
-      "line": 248
+      "line": 293
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGeneralDiagnosticsFaultsHostCallbacks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
+      "line": 328
     },
     {
       "package": "cluster/core",
       "identifier": "TestGeneralDiagnosticsFaultsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_faults_parity_matterjs_test.go",
-      "line": 147
+      "line": 192
     },
     {
       "package": "cluster/core",

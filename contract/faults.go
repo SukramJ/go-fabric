@@ -28,7 +28,11 @@ type Faults struct {
 //
 // MatterActiveFaults returns the faults detected now; the source fires
 // its [ChangeNotifier] callback after a change, and the node reads the
-// lists again. A notification that changes nothing emits nothing.
+// lists again later, on a goroutine of its own: the callback returns at
+// once and calls nothing back, so the host may fire it under the lock its
+// MatterActiveFaults takes, or synchronously while the node subscribes. A
+// notification that changes nothing emits nothing. The node detaches the
+// callback when it stops.
 type FaultSource interface {
 	MatterActiveFaults() Faults
 	ChangeNotifier

@@ -5,9 +5,11 @@ package core
 
 import (
 	"reflect"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
@@ -22,6 +24,9 @@ type faultHost struct {
 	mu     sync.Mutex
 	faults contract.Faults
 	cbs    []func()
+	// underLock fires the callbacks while mu is held, the lock
+	// MatterActiveFaults takes; onSubscribe fires a callback at once.
+	underLock, onSubscribe bool
 }
 
 func (h *faultHost) MatterActiveFaults() contract.Faults {
@@ -33,8 +38,16 @@ func (h *faultHost) MatterActiveFaults() contract.Faults {
 func (h *faultHost) OnMatterValueChanged(cb func()) func() {
 	h.mu.Lock()
 	h.cbs = append(h.cbs, cb)
+	n := len(h.cbs) - 1
 	h.mu.Unlock()
-	return func() {}
+	if h.onSubscribe {
+		cb()
+	}
+	return func() {
+		h.mu.Lock()
+		h.cbs[n] = nil
+		h.mu.Unlock()
+	}
 }
 
 // change edits one list and notifies.
@@ -42,9 +55,41 @@ func (h *faultHost) change(edit func(f *contract.Faults)) {
 	h.mu.Lock()
 	edit(&h.faults)
 	cbs := slices.Clone(h.cbs)
-	h.mu.Unlock()
+	if h.underLock {
+		defer h.mu.Unlock()
+	} else {
+		h.mu.Unlock()
+	}
 	for _, cb := range cbs {
-		cb()
+		if cb != nil {
+			cb()
+		}
+	}
+}
+
+// changeAndSettle edits the host's faults, notifies and waits for the
+// server's re-read.
+func changeAndSettle(t *testing.T, g *GeneralDiagnostics, h *faultHost, edit func(f *contract.Faults)) {
+	t.Helper()
+	h.change(edit)
+	settle(t, g)
+}
+
+// settle waits until the server's worker read every notification through.
+func settle(t *testing.T, g *GeneralDiagnostics) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		g.mu.RLock()
+		w := g.faultsWorker
+		g.mu.RUnlock()
+		if w == nil || (w.pending.Load() == 0 && len(w.signal) == 0) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the fault worker did not settle")
+		}
+		runtime.Gosched()
 	}
 }
 
@@ -156,9 +201,9 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 	t.Run("registers and clears hardware faults with one event per change", func(t *testing.T) {
 		t.Parallel()
 		g, host, events := newFaultDevice(t)
-		host.change(func(f *contract.Faults) { register(&f.Hardware, hwRadio) })
-		host.change(func(f *contract.Faults) { register(&f.Hardware, hwSensor) })
-		host.change(func(f *contract.Faults) { clearFault(&f.Hardware, hwRadio) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Hardware, hwRadio) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Hardware, hwSensor) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { clearFault(&f.Hardware, hwRadio) })
 		if got := readFaults(t, g, gendiagAttrActiveHardwareFaults); !slices.Equal(got, []uint8{hwSensor}) {
 			t.Fatalf("ActiveHardwareFaults %v", got)
 		}
@@ -173,8 +218,8 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 	t.Run("registers and clears radio faults with one event per change", func(t *testing.T) {
 		t.Parallel()
 		g, host, events := newFaultDevice(t)
-		host.change(func(f *contract.Faults) { register(&f.Radio, wifiFault) })
-		host.change(func(f *contract.Faults) { clearFault(&f.Radio, wifiFault) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Radio, wifiFault) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { clearFault(&f.Radio, wifiFault) })
 		if got := readFaults(t, g, gendiagAttrActiveRadioFaults); len(got) != 0 {
 			t.Fatalf("ActiveRadioFaults %v", got)
 		}
@@ -188,8 +233,8 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 	t.Run("registers and clears network faults with one event per change", func(t *testing.T) {
 		t.Parallel()
 		g, host, events := newFaultDevice(t)
-		host.change(func(f *contract.Faults) { register(&f.Network, jammed) })
-		host.change(func(f *contract.Faults) { clearFault(&f.Network, jammed) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Network, jammed) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { clearFault(&f.Network, jammed) })
 		if got := readFaults(t, g, gendiagAttrActiveNetworkFaults); len(got) != 0 {
 			t.Fatalf("ActiveNetworkFaults %v", got)
 		}
@@ -203,7 +248,7 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 	t.Run("emits nothing when an active fault is registered again", func(t *testing.T) {
 		t.Parallel()
 		g, host, events := newFaultDevice(t)
-		host.change(func(f *contract.Faults) {
+		changeAndSettle(t, g, host, func(f *contract.Faults) {
 			register(&f.Hardware, hwRadio)
 			register(&f.Hardware, hwSensor)
 			register(&f.Radio, wifiFault)
@@ -212,11 +257,11 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 			register(&f.Network, connectionFailed)
 		})
 		events.take()
-		host.change(func(f *contract.Faults) { register(&f.Hardware, hwRadio) })
-		host.change(func(f *contract.Faults) { register(&f.Radio, wifiFault) })
-		host.change(func(f *contract.Faults) { register(&f.Network, jammed) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Hardware, hwRadio) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Radio, wifiFault) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { register(&f.Network, jammed) })
 		// A host that lists a value twice is served it once.
-		host.change(func(f *contract.Faults) { f.Hardware = append(f.Hardware, hwRadio) })
+		changeAndSettle(t, g, host, func(f *contract.Faults) { f.Hardware = append(f.Hardware, hwRadio) })
 		for attr, want := range map[uint32][]uint8{
 			gendiagAttrActiveHardwareFaults: {hwRadio, hwSensor},
 			gendiagAttrActiveRadioFaults:    {wifiFault, threadFault},
@@ -232,8 +277,8 @@ func TestGeneralDiagnosticsFaultsParityMatterJS(t *testing.T) {
 	// :521-533.
 	t.Run("emits nothing when an absent fault is cleared", func(t *testing.T) {
 		t.Parallel()
-		_, host, events := newFaultDevice(t)
-		host.change(func(f *contract.Faults) {
+		g, host, events := newFaultDevice(t)
+		changeAndSettle(t, g, host, func(f *contract.Faults) {
 			clearFault(&f.Hardware, hwRadio)
 			clearFault(&f.Radio, wifiFault)
 			clearFault(&f.Network, jammed)
@@ -273,4 +318,68 @@ func TestGeneralDiagnosticsFaultsAbsentWithoutPort(t *testing.T) {
 	if slices.Contains(g.MatterAttributes(), gendiagdef.AttrActiveHardwareFaults) {
 		t.Fatal("the lists stay after the port is detached")
 	}
+}
+
+// TestGeneralDiagnosticsFaultsHostCallbacks: the host may fire its
+// notification under the lock its MatterActiveFaults takes, or
+// synchronously while the server subscribes — the server re-reads on its
+// own goroutine and neither deadlocks; after Stop a notification emits
+// nothing; a value outside its enum or past the list's maximum is dropped.
+func TestGeneralDiagnosticsFaultsHostCallbacks(t *testing.T) {
+	t.Parallel()
+	const sensor = uint8(gendiagdef.HardwareFaultSensor)
+	t.Run("fires under the host's own lock", func(t *testing.T) {
+		t.Parallel()
+		g := NewGeneralDiagnostics(BootReasonPowerOnReboot)
+		events := &faultEvents{}
+		g.SetMatterEventEmitter(events)
+		host := &faultHost{underLock: true}
+		g.SetFaultSource(host)
+		changeAndSettle(t, g, host, func(f *contract.Faults) { f.Hardware = []uint8{sensor} })
+		wantEmitted(t, events.take(), []faultEmitted{{"hardware", []uint8{sensor}, []uint8{}}})
+		g.Stop()
+	})
+	t.Run("fires synchronously on subscribe", func(t *testing.T) {
+		t.Parallel()
+		g := NewGeneralDiagnostics(BootReasonPowerOnReboot)
+		host := &faultHost{onSubscribe: true, faults: contract.Faults{Hardware: []uint8{sensor}}}
+		g.SetFaultSource(host)
+		settle(t, g)
+		if got := readFaults(t, g, gendiagAttrActiveHardwareFaults); !slices.Equal(got, []uint8{sensor}) {
+			t.Fatalf("ActiveHardwareFaults %v", got)
+		}
+		g.Stop()
+	})
+	t.Run("emits nothing after Stop", func(t *testing.T) {
+		t.Parallel()
+		g, host, events := newFaultDevice(t)
+		g.Stop()
+		host.mu.Lock()
+		detached := !slices.ContainsFunc(host.cbs, func(cb func()) bool { return cb != nil })
+		host.mu.Unlock()
+		if !detached {
+			t.Fatal("Stop left the host's notifier attached")
+		}
+		host.change(func(f *contract.Faults) { f.Hardware = []uint8{sensor} })
+		settle(t, g)
+		wantEmitted(t, events.take(), nil)
+		if got := readFaults(t, g, gendiagAttrActiveHardwareFaults); len(got) != 0 {
+			t.Fatalf("ActiveHardwareFaults %v after Stop, want the last read", got)
+		}
+	})
+	t.Run("drops values outside the enum and past the maximum", func(t *testing.T) {
+		t.Parallel()
+		g, host, _ := newFaultDevice(t)
+		changeAndSettle(t, g, host, func(f *contract.Faults) {
+			f.Hardware = []uint8{sensor, 200}
+			f.Network = []uint8{0, 1, 2, 3, 0, 1} // four values, the list's maximum
+		})
+		if got := readFaults(t, g, gendiagAttrActiveHardwareFaults); !slices.Equal(got, []uint8{sensor}) {
+			t.Errorf("ActiveHardwareFaults %v, want the unknown value dropped", got)
+		}
+		if got := readFaults(t, g, gendiagAttrActiveNetworkFaults); !slices.Equal(got, []uint8{0, 1, 2, 3}) {
+			t.Errorf("ActiveNetworkFaults %v", got)
+		}
+		g.Stop()
+	})
 }

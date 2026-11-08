@@ -156,16 +156,17 @@ type GeneralDiagnostics struct {
 	changes cluster.AttributeChanges
 	// faults is the host's fault port ([SetFaultSource]); nil serves no
 	// fault list. activeFaults are the lists it served last — hardware,
-	// radio, network — and faultsUnsub detaches its notifier. Guarded
-	// by mu; faultsMu serialises the re-reads so the change events
-	// leave in the order of the lists.
+	// radio, network — faultsUnsub detaches its notifier, and
+	// faultsWorker re-reads the lists off the host's stack. faultsGen
+	// counts the attached ports, so a read of a detached one changes
+	// nothing (a source need not be comparable). Guarded by mu.
 	faults       contract.FaultSource
 	activeFaults [3][]uint8
 	faultsUnsub  func()
-	faultsMu     sync.Mutex
-	// faultsGen counts the attached ports, so a notification of a
-	// detached one changes nothing (a source need not be comparable).
-	faultsGen uint64
+	faultsWorker *faultsWorker
+	faultsGen    uint64
+	// faultsWarned are the out-of-range values already logged, per list.
+	faultsWarned [3]map[uint8]bool
 
 	// ifWatch compares the interfaces while changes has a listener — the
 	// observation of Network.interfacesChanged matter.js
@@ -1231,9 +1232,12 @@ func (g *GeneralDiagnostics) SetInterfaceCheckInterval(d time.Duration) {
 // (Network.ts close, :239-244 at db021da0). The node calls it from Stop,
 // after which no listener registers (a stopped node is ErrStopped), so no
 // interface check stays armed on its clock; the observer count is not
-// reset, a later registration does not restart the watcher.
+// reset, a later registration does not restart the watcher. It also
+// detaches the host's fault notifier and ends the re-read worker, so a
+// removed node emits no fault event; the lists of the last read stay.
 func (g *GeneralDiagnostics) Stop() {
 	g.ifWatch.Stop()
+	g.stopFaults()
 }
 
 // currentClock is the server's clock, for the interface watcher.
@@ -1277,11 +1281,6 @@ func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
 	return out
 }
 
-// interfacesChanged reports NetworkInterfaces after the interfaces
-// changed: the root's own DataVersion advances before the listeners mark
-// the attribute dirty (bridge wireAttributeNotifiersLocked), as matter.js
-// assigns the re-read list to the attribute state (#updateNetworkList,
-// GeneralDiagnosticsServer.ts:469-525 at db021da0).
 // faultList is a fault list on the wire: an array of enum8 values.
 type faultList []uint8
 
@@ -1294,61 +1293,140 @@ func (l faultList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	_ = enc.EndContainer()
 }
 
+// faultsWorker re-reads the host's fault lists on its own goroutine: the
+// host's notification only signals it, so the host may fire it under the
+// lock its MatterActiveFaults takes, or synchronously while the server
+// subscribes, without deadlocking (contract.FaultSource).
+type faultsWorker struct {
+	signal chan struct{}
+	done   chan struct{}
+	exited chan struct{}
+	// pending counts the signals sent and not yet read through, so a
+	// caller can tell the worker is idle.
+	pending atomic.Int32
+}
+
+// notify signals a re-read; one pending signal covers any number of
+// notifications, since its read comes after them.
+func (w *faultsWorker) notify() {
+	select {
+	case w.signal <- struct{}{}:
+		w.pending.Add(1)
+	default:
+	}
+}
+
+// stop ends the worker and waits for its exit.
+func (w *faultsWorker) stop() {
+	close(w.done)
+	<-w.exited
+}
+
 // SetFaultSource attaches the host's fault port: the server serves
 // ActiveHardwareFaults, ActiveRadioFaults and ActiveNetworkFaults from
 // it, lists HardwareFaultChange, RadioFaultChange and NetworkFaultChange
-// in its EventList, and on each of the source's notifications reads the
-// lists again and, for each list that changed, reports the attribute and
-// emits its change event with the current and the previous list — what
-// matter.js GeneralDiagnosticsServer's register…Fault / clear…Fault
-// convenience methods drive (GeneralDiagnosticsServer.ts:296-411 at
-// db021da0) through the lists' $Changed reactors (:173-177). A value a
-// list names twice is served once, at its first place (§11.12.6.6). The
-// fault lists change the server's attribute and event lists, so call it
-// before the node assembles its topology; nil detaches the port.
+// in its EventList, and after each of the source's notifications reads the
+// lists again — on a goroutine of its own, never on the host's stack — and,
+// for each list that changed, reports the attribute and emits its change
+// event with the current and the previous list — what matter.js
+// GeneralDiagnosticsServer's register…Fault / clear…Fault convenience
+// methods drive (GeneralDiagnosticsServer.ts:296-411 at db021da0) through
+// the lists' $Changed reactors (:173-177). A value a list names twice is
+// served once, at its first place (§11.12.6.6); a value outside its enum,
+// and an entry past the list's maximum (11, 7, 4), is dropped and logged
+// once, as matter.js validates its state against the schema. The fault
+// lists change the server's attribute and event lists, so call it before
+// the node assembles its topology; nil detaches the port.
 func (g *GeneralDiagnostics) SetFaultSource(src contract.FaultSource) {
-	g.faultsMu.Lock()
-	defer g.faultsMu.Unlock()
 	g.mu.Lock()
-	unsub := g.faultsUnsub
-	g.faults, g.faultsUnsub, g.activeFaults = src, nil, [3][]uint8{}
+	unsub, worker := g.faultsUnsub, g.faultsWorker
+	g.faults, g.faultsUnsub, g.faultsWorker, g.activeFaults = src, nil, nil, [3][]uint8{}
 	g.faultsGen++
 	gen := g.faultsGen
 	g.mu.Unlock()
 	if unsub != nil {
 		unsub()
 	}
+	if worker != nil {
+		worker.stop()
+	}
 	if src == nil {
 		return
 	}
-	lists := faultListsOf(src.MatterActiveFaults())
+	lists := g.faultListsOf(src.MatterActiveFaults())
+	w := &faultsWorker{signal: make(chan struct{}, 1), done: make(chan struct{}), exited: make(chan struct{})}
+	off := src.OnMatterValueChanged(w.notify)
 	g.mu.Lock()
-	g.activeFaults = lists
-	g.mu.Unlock()
-	off := src.OnMatterValueChanged(func() { g.faultsChanged(gen) })
-	g.mu.Lock()
-	if g.faultsGen == gen {
-		g.faultsUnsub = off
-		off = nil
-	}
-	g.mu.Unlock()
-	if off != nil {
+	if g.faultsGen != gen {
+		g.mu.Unlock()
 		off()
+		return
+	}
+	g.activeFaults, g.faultsUnsub, g.faultsWorker = lists, off, w
+	g.mu.Unlock()
+	go g.runFaults(w, gen)
+}
+
+// runFaults is the worker's loop: one re-read per signal until stopped.
+func (g *GeneralDiagnostics) runFaults(w *faultsWorker, gen uint64) {
+	defer close(w.exited)
+	for {
+		select {
+		case <-w.done:
+			return
+		case <-w.signal:
+			g.faultsChanged(gen)
+			w.pending.Add(-1)
+		}
 	}
 }
 
-// faultListsOf is the three lists of f, each without a repeated value.
-func faultListsOf(f contract.Faults) [3][]uint8 {
-	dedupe := func(in []uint8) []uint8 {
-		out := make([]uint8, 0, len(in))
+// faultListsOf is the three lists of f, each without a repeated value, an
+// unknown enum value or an entry past the list's maximum; a dropped value
+// is logged once per list.
+func (g *GeneralDiagnostics) faultListsOf(f contract.Faults) [3][]uint8 {
+	enums := [3]*spec.Enum{gendiagdef.HardwareFaultEnumDef, gendiagdef.RadioFaultEnumDef, gendiagdef.NetworkFaultEnumDef}
+	limits := [3]int{11, 7, 4} // the lists' constraints, "max 11", "max 7", "max 4"
+	var out [3][]uint8
+	for i, in := range [3][]uint8{f.Hardware, f.Radio, f.Network} {
+		list := make([]uint8, 0, len(in))
 		for _, v := range in {
-			if !slices.Contains(out, v) {
-				out = append(out, v)
+			switch {
+			case slices.Contains(list, v):
+			case !enumHas(enums[i], v) || len(list) == limits[i]:
+				g.warnFault(i, v)
+			default:
+				list = append(list, v)
 			}
 		}
-		return out
+		out[i] = list
 	}
-	return [3][]uint8{dedupe(f.Hardware), dedupe(f.Radio), dedupe(f.Network)}
+	return out
+}
+
+// enumHas reports whether e names v.
+func enumHas(e *spec.Enum, v uint8) bool {
+	for i := range e.Values {
+		if e.Values[i].Value == uint64(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// warnFault logs a dropped fault value once per list.
+func (g *GeneralDiagnostics) warnFault(list int, v uint8) {
+	g.mu.Lock()
+	if g.faultsWarned[list] == nil {
+		g.faultsWarned[list] = map[uint8]bool{}
+	}
+	seen := g.faultsWarned[list][v]
+	g.faultsWarned[list][v] = true
+	g.mu.Unlock()
+	if !seen {
+		g.logger().Warn("matter.general_diagnostics.fault_dropped", slog.Uint64("event", uint64(gendiagFaultEvents[list])),
+			slog.Uint64("value", uint64(v)))
+	}
 }
 
 // faultsChanged reads the host's lists again and reports each list that
@@ -1357,18 +1435,16 @@ func faultListsOf(f contract.Faults) [3][]uint8 {
 // #triggerActiveHardwareFaultsChangedEvent and siblings, :325-337,
 // :363-375, :401-413 at db021da0). A list that did not change emits
 // nothing, as a register of an active fault or a clear of an absent one
-// does not change matter.js's state.
+// does not change matter.js's state. It runs on the worker only, with no
+// lock held across the host's call.
 func (g *GeneralDiagnostics) faultsChanged(gen uint64) {
-	g.faultsMu.Lock()
-	defer g.faultsMu.Unlock()
 	g.mu.RLock()
-	src := g.faults
-	current := g.faultsGen == gen
+	src, current := g.faults, g.faultsGen == gen
 	g.mu.RUnlock()
 	if src == nil || !current {
 		return
 	}
-	next := faultListsOf(src.MatterActiveFaults())
+	next := g.faultListsOf(src.MatterActiveFaults())
 	g.mu.Lock()
 	if g.faultsGen != gen {
 		g.mu.Unlock()
@@ -1395,6 +1471,22 @@ func (g *GeneralDiagnostics) faultsChanged(gen uint64) {
 	}
 }
 
+// stopFaults detaches the host's notifier and ends the worker; the source
+// stays, so the lists keep being served from the last read.
+func (g *GeneralDiagnostics) stopFaults() {
+	g.mu.Lock()
+	unsub, worker := g.faultsUnsub, g.faultsWorker
+	g.faultsUnsub, g.faultsWorker = nil, nil
+	g.faultsGen++
+	g.mu.Unlock()
+	if unsub != nil {
+		unsub()
+	}
+	if worker != nil {
+		worker.stop()
+	}
+}
+
 // faultChangeEvent is the change event payload of fault list i.
 func faultChangeEvent(i int, current, previous []uint8) spec.Encodable {
 	switch i {
@@ -1415,6 +1507,11 @@ func enums[E ~uint8](in []uint8) []E {
 	return out
 }
 
+// interfacesChanged reports NetworkInterfaces after the interfaces
+// changed: the root's own DataVersion advances before the listeners mark
+// the attribute dirty (bridge wireAttributeNotifiersLocked), as matter.js
+// assigns the re-read list to the attribute state (#updateNetworkList,
+// GeneralDiagnosticsServer.ts:469-525 at db021da0).
 func (g *GeneralDiagnostics) interfacesChanged([]string) {
 	g.dataVersion.Bump()
 	g.changes.Notify(gendiagAttrNetworkInterfaces)

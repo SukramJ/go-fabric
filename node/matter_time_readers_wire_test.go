@@ -77,10 +77,22 @@ func TestRootReadersFollowTheNodesUTC(t *testing.T) {
 	}
 
 	// The event log's stamp.
+	// The server re-reads the faults on its own goroutine: read until the
+	// event is there.
 	faults.set(uint8(gendiagdef.HardwareFaultSensor))
-	events, err := fabrictest.Events(ctx, pair, im.ConcreteEventPath{Endpoint: 0, Cluster: gendiagdef.ClusterID, Event: gendiagdef.EventHardwareFaultChange, HasEndpoint: true, HasCluster: true, HasEvent: true})
-	if err != nil || len(events) == 0 {
-		t.Fatalf("HardwareFaultChange events %+v %v", events, err)
+	var events []fabrictest.EventData
+	for range 100 {
+		var err error
+		events, err = fabrictest.Events(ctx, pair, im.ConcreteEventPath{Endpoint: 0, Cluster: gendiagdef.ClusterID, Event: gendiagdef.EventHardwareFaultChange, HasEndpoint: true, HasCluster: true, HasEvent: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) > 0 {
+			break
+		}
+	}
+	if len(events) == 0 {
+		t.Fatal("no HardwareFaultChange event")
 	}
 	if ms := int64(events[len(events)-1].Timestamp); !nearSet(ms) { //nolint:gosec // milliseconds of this century
 		t.Errorf("event EpochTimestamp %d ms, want the node's UTC near %d, not the host clock's %d", ms, set.UnixMilli(), time.Now().UnixMilli())
