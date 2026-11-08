@@ -6,12 +6,15 @@ package controller_test
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
@@ -38,6 +41,8 @@ type otaRig struct {
 
 	mu       sync.Mutex
 	statuses []mattercore.OTAUpdateStatus
+	// logs are the messages the controller logged.
+	logs     []string
 	done     []softwareupdate.Peer
 	failed   []softwareupdate.Peer
 	applying []softwareupdate.Peer
@@ -87,6 +92,11 @@ func newOTARigHarness(t *testing.T, edit func(*controller.OTAConfig), devOTA *no
 		edit(ota)
 	}
 	cfg := r.site.ControllerConfig(fabrictest.ControllerOptions{OTA: ota})
+	next := slog.DiscardHandler
+	if cfg.Logger != nil {
+		next = cfg.Logger.Handler()
+	}
+	cfg.Logger = slog.New(&logCapture{next: next, r: r})
 	r.run(t, func(ctx context.Context) (err error) {
 		r.c, err = controller.New(ctx, cfg)
 		return err
@@ -102,6 +112,40 @@ func newOTARigHarness(t *testing.T, edit func(*controller.OTAConfig), devOTA *no
 	})
 	r.eventually(t, "the default subscription", r.n.SubscriptionActive)
 	return r
+}
+
+// logCapture records the message of every log record for the rig and
+// passes the record on.
+type logCapture struct {
+	next slog.Handler
+	r    *otaRig
+}
+
+func (h *logCapture) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *logCapture) Handle(ctx context.Context, rec slog.Record) error {
+	h.r.mu.Lock()
+	h.r.logs = append(h.r.logs, rec.Message)
+	h.r.mu.Unlock()
+	if !h.next.Enabled(ctx, rec.Level) {
+		return nil
+	}
+	return h.next.Handle(ctx, rec)
+}
+
+func (h *logCapture) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &logCapture{next: h.next.WithAttrs(attrs), r: h.r}
+}
+
+func (h *logCapture) WithGroup(name string) slog.Handler {
+	return &logCapture{next: h.next.WithGroup(name), r: h.r}
+}
+
+// logged reports whether the controller logged msg.
+func (r *otaRig) logged(msg string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Contains(r.logs, msg)
 }
 
 func (r *otaRig) run(t *testing.T, fn func(ctx context.Context) error) {
@@ -168,8 +212,12 @@ func (r *otaRig) snapshot() (statuses []mattercore.OTAUpdateStatus, done, failed
 // TestOTAPushFromTheController: the controller serves an image
 // the controller pushes to a device — consent, announcement, QueryImage,
 // a BDX download, the apply request and the applied notification — and the
-// device runs the new version (OtaTest.ts:91 "Successfully processes a
-// software update"). It is the end-to-end proof of brief CM §1.4.
+// device runs the new version (OtaTest.ts:91 at db021da0, "Successfully
+// processes a software update", the download followed by the
+// applyUpdateRequest at :102 and :171). It is the end-to-end proof of brief
+// CM §1.4. The provider reports the states in their order: the final
+// BlockAckEof marks the download finished — WaitForApply — before the
+// ApplyUpdateRequest that follows it is served (issue 462).
 func TestOTAPushFromTheController(t *testing.T) {
 	t.Parallel()
 	r := newOTARig(t, nil)
@@ -191,17 +239,71 @@ func TestOTAPushFromTheController(t *testing.T) {
 	if failed != 0 {
 		t.Fatalf("an update failed: %v", statuses)
 	}
-	want := []mattercore.OTAUpdateStatus{mattercore.OTAUpdateQuerying, mattercore.OTAUpdateDownloading, mattercore.OTAUpdateWaitForApply, mattercore.OTAUpdateApplying, mattercore.OTAUpdateDone}
-	for _, s := range want {
-		if !slices.Contains(statuses, s) {
-			t.Errorf("statuses %v lack %v", statuses, s)
-		}
+	if !slices.Equal(statuses, wantPushStatuses) {
+		t.Errorf("statuses %v, want %v in this order", statuses, wantPushStatuses)
 	}
 	if v, _ := r.dev.Node().Root().BasicInformation.MatterRead(0x0009); v != uint32(2) {
 		t.Errorf("device SoftwareVersion %v, want 2", v)
 	}
 	if q := mgr.QueuedUpdates(); len(q) != 0 {
 		t.Errorf("queue %v after the update", q)
+	}
+}
+
+// wantPushStatuses is the provider's status sequence of a pushed update.
+var wantPushStatuses = []mattercore.OTAUpdateStatus{mattercore.OTAUpdateQuerying, mattercore.OTAUpdateDownloading, mattercore.OTAUpdateWaitForApply, mattercore.OTAUpdateApplying, mattercore.OTAUpdateDone}
+
+// TestOTAPushApplyServedBeforeTheQueuedEOFAck: the flow's goroutine is held
+// on the queued BlockAckEof until the ApplyUpdateRequest that follows it
+// has been served, the interleaving that made the provider force-close a
+// completed transfer (issue 452). The ack finished the download at its
+// arrival, so the order still holds, the provider closes the transfer
+// without force — no ota.provider.bdx_close_failed, no failed transfer —
+// as matter.js's provider does once the transfer is known as completed
+// (OtaSoftwareUpdateProviderServer.ts:432-437 at db021da0).
+func TestOTAPushApplyServedBeforeTheQueuedEOFAck(t *testing.T) {
+	t.Parallel()
+	applying := make(chan struct{})
+	var once sync.Once
+	r := newOTARig(t, func(o *controller.OTAConfig) {
+		record := o.OnStatus
+		o.OnStatus = func(p softwareupdate.Peer, s softwareupdate.Status, v uint32) {
+			record(p, s, v)
+			if s == mattercore.OTAUpdateApplying {
+				once.Do(func() { close(applying) })
+			}
+		}
+	})
+	var held atomic.Bool
+	controller.HoldBDXReceive(r.c, func(ctx context.Context, m bdx.Message) {
+		if m.ProtocolID != bdx.ProtocolID || bdx.MessageType(m.Opcode) != bdx.MessageBlockAckEOF {
+			return
+		}
+		select {
+		case <-applying:
+			held.Store(true)
+		case <-ctx.Done():
+		case <-time.After(time.Minute):
+		}
+	})
+	r.storeImage(t, 2)
+	mgr := r.c.SoftwareUpdates()
+	r.run(t, func(ctx context.Context) error {
+		_, err := mgr.AddUpdateConsent(ctx, r.peer(t), softwareupdate.Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2})
+		return err
+	})
+	r.eventually(t, "the update done", func() bool { _, done, _ := r.snapshot(); return done > 0 })
+	statuses, _, failed := r.snapshot()
+	if !held.Load() {
+		t.Fatal("the ApplyUpdateRequest was not served while the flow held the queued BlockAckEof")
+	}
+	if failed != 0 || !slices.Equal(statuses, wantPushStatuses) {
+		t.Fatalf("statuses %v (%d failed), want %v in this order", statuses, failed, wantPushStatuses)
+	}
+	for _, msg := range []string{"ota.provider.bdx_close_failed", "bdx.transfer_failed"} {
+		if r.logged(msg) {
+			t.Errorf("logged %s", msg)
+		}
 	}
 }
 

@@ -163,7 +163,7 @@
   },
   {
     "file": "bridge/bdx_responder_test.go",
-    "line": 89,
+    "line": 91,
     "citation": "ExchangeManager.ts:407-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "onNewExchange",
@@ -424,7 +424,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 335,
+    "line": 353,
     "citation": "ExchangeManager.ts:561-585",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "peerLost",
@@ -433,7 +433,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 556,
+    "line": 575,
     "citation": "MessageExchange.ts:435-439",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "at": "db021da0",

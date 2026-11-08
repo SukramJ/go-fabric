@@ -263,6 +263,23 @@ type initiatedSecureExchange struct {
 	// peerMargin (nanoseconds) is the additional MRP delay of every
 	// message this exchange sends ([initiatedSecureExchange.SetPeerAdditionalMrpDelay]).
 	peerMargin atomic.Int64
+	// notify is the [bdx.ReceiveNotifier] callback the outbound flow
+	// installs; the receive path calls it before it queues a message.
+	notify atomic.Pointer[func(bdx.Message)]
+}
+
+// OnReceive implements [bdx.ReceiveNotifier]: fn is called with every
+// message the receive path hands the exchange, at its arrival, before the
+// message is queued for Receive ([initiatedSecureExchange.arrived]) — so a
+// transfer finished by its final BlockAckEof is finished before the
+// session's next datagram is dispatched.
+func (e *initiatedSecureExchange) OnReceive(fn func(bdx.Message)) { e.notify.Store(&fn) }
+
+// arrived calls the receive notifier with msg, on the receive goroutine.
+func (e *initiatedSecureExchange) arrived(msg bdx.Message) {
+	if fn := e.notify.Load(); fn != nil {
+		(*fn)(msg)
+	}
 }
 
 // SetPeerAdditionalMrpDelay sets the margin every later message of the
@@ -278,6 +295,7 @@ func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
 var (
 	_ bdx.Exchange         = (*initiatedSecureExchange)(nil)
 	_ bdx.MrpDelayExchange = (*initiatedSecureExchange)(nil)
+	_ bdx.ReceiveNotifier  = (*initiatedSecureExchange)(nil)
 )
 
 // fail ends the exchange because a message it sent was never
@@ -436,6 +454,7 @@ func (b *Bridge) deliverInitiatedSecure(hdr *message.Header, proto message.Proto
 		return false
 	}
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
+	ex.arrived(msg)
 	select {
 	case ex.in <- msg:
 	case <-ex.done:

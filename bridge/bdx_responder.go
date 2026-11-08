@@ -121,6 +121,7 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
 	if raw, ok := b.bdx.exchanges.Load(key); ok {
 		if ex, ok := raw.(*initiatedSecureExchange); ok {
+			ex.arrived(msg)
 			k := ex.turn.deliver()
 			select {
 			case ex.in <- msg:

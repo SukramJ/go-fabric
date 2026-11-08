@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -183,5 +185,85 @@ func TestBDXResponder_UnknownScope(t *testing.T) {
 	sr, err := bdx.DecodeStatusReport(m.Payload)
 	if err != nil || sr.GeneralStatus != bdx.GeneralFailure || sr.ProtocolStatus != bdx.StatusFileDesignatorUnknown || sr.ProtocolID != bdx.ProtocolID {
 		t.Fatalf("StatusReport %+v, %v", sr, err)
+	}
+}
+
+// notifyingResponder is a BDXResponder that installs a receive notifier on
+// the exchange and reads two messages, recording whether each reached the
+// notifier before Receive returned it.
+type notifyingResponder struct {
+	installed chan struct{}
+	result    chan notifyResult
+}
+
+type notifyResult struct {
+	notifier           bool
+	inOrder            bool
+	notified, received []uint8
+}
+
+func (r *notifyingResponder) HandleExchange(ctx context.Context, _ bdx.Peer, _ bdx.Message, ex bdx.Exchange) {
+	rn, ok := ex.(bdx.ReceiveNotifier)
+	if !ok {
+		r.result <- notifyResult{}
+		return
+	}
+	var mu sync.Mutex
+	var notified []uint8
+	rn.OnReceive(func(m bdx.Message) {
+		mu.Lock()
+		notified = append(notified, m.Opcode)
+		mu.Unlock()
+	})
+	close(r.installed)
+	res := notifyResult{notifier: true, inOrder: true}
+	for range 2 {
+		m, err := ex.Receive(ctx)
+		if err != nil {
+			break
+		}
+		res.received = append(res.received, m.Opcode)
+		mu.Lock()
+		if len(notified) < len(res.received) {
+			res.inOrder = false
+		}
+		mu.Unlock()
+	}
+	mu.Lock()
+	res.notified = slices.Clone(notified)
+	mu.Unlock()
+	r.result <- res
+}
+
+// TestBDXResponder_ExchangeNotifiesAtArrival: the exchange a peer opens is
+// a bdx.ReceiveNotifier, and the receive path tells it of each message
+// before the message is queued for Receive — the arrival at which the
+// outbound flow finishes a transfer on its final BlockAckEof (issue 462).
+func TestBDXResponder_ExchangeNotifiesAtArrival(t *testing.T) {
+	t.Parallel()
+	responder := &notifyingResponder{installed: make(chan struct{}), result: make(chan notifyResult, 1)}
+	peer, _ := newBDXSessionHarness(t, responder)
+	const exchangeID = 0x4343
+	init, err := bdx.Init{TransferControl: bdx.TransferControl{ReceiverDrive: true}, MaxBlockSize: 1024, FileDesignator: []byte("ota/image.bin")}.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendBDX(peer, exchangeID, bdx.MessageReceiveInit, init)
+	select {
+	case <-responder.installed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the responder did not get the exchange")
+	}
+	sendBDX(peer, exchangeID, bdx.MessageBlockQuery, bdx.CounterOnly{BlockCounter: 0}.Encode())
+	sendBDX(peer, exchangeID, bdx.MessageBlockAckEOF, bdx.CounterOnly{BlockCounter: 0}.Encode())
+	var res notifyResult
+	select {
+	case res = <-responder.result:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the responder did not finish")
+	}
+	want := []uint8{uint8(bdx.MessageBlockQuery), uint8(bdx.MessageBlockAckEOF)}
+	if !res.notifier || !res.inOrder || !slices.Equal(res.notified, want) || !slices.Equal(res.received, want) {
+		t.Fatalf("result %+v, want the notifier to see %v before Receive returned each", res, want)
 	}
 }
