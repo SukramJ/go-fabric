@@ -7405,14 +7405,14 @@
       "identifier": "TestPeerConnectionKickLocalAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 269
+      "line": 297
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionKickObserver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 331
+      "line": 363
     },
     {
       "package": "client/peer",
