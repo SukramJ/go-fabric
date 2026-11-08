@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 )
 
 // flowHooks are a flow's observables (flow/Flow.ts:21-23): progressInfo,
@@ -59,7 +60,28 @@ type outboundFlow struct {
 	bytesLeft *int64
 	// negotiatedLength is that negotiated length (transferParameters.dataLength).
 	negotiatedLength *uint64
+
+	// endMu serialises the flow's end, which two goroutines may reach: the
+	// flow's own (the final progress, the read of the final ack, a
+	// failure) and the receive goroutine, where a [ReceiveNotifier]
+	// reports the final BlockAckEof at its arrival. It guards the two
+	// fields below and is held while the end's hooks run, so finished and
+	// cancelled are exclusive and each runs at most once.
+	endMu sync.Mutex
+	// finalEmitted is set once the final progress went out (Flow.ts:135).
+	finalEmitted bool
+	// end is how the flow ended: endRunning until finished or cancelled.
+	end flowEnd
 }
+
+// flowEnd is how a flow ended.
+type flowEnd uint8
+
+const (
+	endRunning flowEnd = iota
+	endFinished
+	endCancelled
+)
 
 // nextCounter advances the block counter, wrapping at 2^32 (Flow.ts:97-100).
 func (f *outboundFlow) nextCounter() uint32 {
@@ -196,27 +218,114 @@ func (f *outboundFlow) followingNext(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// sendBlockEOF sends the last block. A scope disabled while the send still
-// waits for the block's acknowledgement is the same case as one disabled
-// while the BlockAckEof is read (process): the receiver has the block —
-// an OTA requestor asks to apply only after it — and has moved on; the
-// send counts as done and the final acknowledgement read reports the
-// transfer finished.
+// sendBlockEOF sends the last block, watching for its BlockAckEof first:
+// the receiver piggybacks the block's MRP acknowledgement on it, so it
+// arrives while the send still waits. When it arrived with the final
+// counter the transfer is finished, and a send that returns an error
+// after that — its wait ended by the context in the same instant — is
+// complete all the same.
 func (f *outboundFlow) sendBlockEOF(ctx context.Context, b Block) error {
-	if ctx.Err() != nil {
-		// Disabled before the block went out: nothing to count.
-		return context.Cause(ctx)
-	}
+	f.watchBlockAckEOF(b.BlockCounter, f.transferred+uint64(len(b.Data)))
 	err := f.m.SendBlockEOF(ctx, b)
-	if err != nil && errors.Is(context.Cause(ctx), ErrScopeDisabled) {
+	if err != nil && f.finished() {
 		return nil
 	}
 	return err
 }
 
+// watchBlockAckEOF installs the exchange's [ReceiveNotifier], when it has
+// one, for the final BlockAckEof: one for counter, the last block's,
+// finishes the transfer with total bytes at its arrival, on the receive
+// goroutine — the BDX state step on receive of chip's TransferFacilitator
+// (src/protocols/bdx/TransferFacilitator.cpp:61 at 6170af84, where
+// HandleMessageReceived runs in OnMessageReceived) and the end matter.js's
+// processTransfer reaches once finalizeTransfer read that ack
+// (flow/Flow.ts:139-141, flow/OutboundFlow.ts:115-118 at db021da0). The
+// transition needs no I/O, so it is complete before the receive path
+// decodes the peer's next datagram: an OTA requestor's ApplyUpdateRequest,
+// sent after its BlockAckEof, finds the update waiting for its apply. Any
+// other message, and one with another counter, is left to the read, which
+// refuses a wrong counter as it always has.
+func (f *outboundFlow) watchBlockAckEOF(counter uint32, total uint64) {
+	rn, ok := f.m.Exchange().(ReceiveNotifier)
+	if !ok {
+		return
+	}
+	rn.OnReceive(func(msg Message) {
+		if msg.ProtocolID != ProtocolID || MessageType(msg.Opcode) != MessageBlockAckEOF {
+			return
+		}
+		ack, err := DecodeCounterOnly(msg.Payload)
+		if err != nil || ack.BlockCounter != counter {
+			return
+		}
+		f.finish(total)
+	})
+}
+
+// emitFinal is the final progress (Flow.ts:135), once: finish emits it
+// when the BlockAckEof arrives first.
+func (f *outboundFlow) emitFinal() {
+	f.endMu.Lock()
+	defer f.endMu.Unlock()
+	if f.finalEmitted || f.end != endRunning {
+		return
+	}
+	f.finalEmitted = true
+	f.emit()
+}
+
+// finish ends the flow as finished with total bytes (Flow.ts:139-141):
+// the final progress if it has not gone out, then progressFinished. It
+// does nothing once the flow ended.
+func (f *outboundFlow) finish(total uint64) {
+	f.endMu.Lock()
+	defer f.endMu.Unlock()
+	if f.end != endRunning {
+		return
+	}
+	f.end = endFinished
+	if !f.finalEmitted {
+		f.finalEmitted = true
+		if f.hooks.progress != nil {
+			f.hooks.progress(total, f.dataLength)
+		}
+	}
+	if f.hooks.finished != nil {
+		f.hooks.finished(total)
+	}
+}
+
+// finished reports whether the flow ended as finished.
+func (f *outboundFlow) finished() bool {
+	f.endMu.Lock()
+	defer f.endMu.Unlock()
+	return f.end == endFinished
+}
+
+// cancel ends the flow as cancelled (Flow.ts:137-138, :143-145). It does
+// nothing once the flow ended: a transfer finished at its BlockAckEof's
+// arrival is never reported cancelled after.
+func (f *outboundFlow) cancel() {
+	f.endMu.Lock()
+	defer f.endMu.Unlock()
+	if f.end != endRunning {
+		return
+	}
+	f.end = endCancelled
+	if f.hooks.cancelled != nil {
+		f.hooks.cancelled()
+	}
+}
+
 // process is Flow.processTransfer (flow/Flow.ts:121-147) for an outbound
 // flow, finalized as OutboundFlow.finalizeTransfer (OutboundFlow.ts:115-119):
-// the peer's BlockAckEof, for the last block's counter.
+// the peer's BlockAckEof, for the last block's counter. On an exchange
+// with a [ReceiveNotifier] the ack finishes the transfer at its arrival
+// (watchBlockAckEOF), and process only takes the queued ack off the
+// exchange. A context that ends while the flow still waits — a scope
+// disabled under it included — fails the flow, which reports cancelled
+// (Flow.ts:137-138), never finished.
 func (f *outboundFlow) process(ctx context.Context, isDriver bool) error {
 	f.emit()
 	for {
@@ -235,23 +344,19 @@ func (f *outboundFlow) process(ctx context.Context, isDriver bool) error {
 		}
 		f.emit()
 	}
-	f.emit()
+	f.emitFinal()
+	if f.finished() {
+		// The BlockAckEof arrived and finished the transfer; its counter
+		// was checked there. Take it off the exchange — it is queued, and
+		// a context ended since leaves it to the exchange's close.
+		_, _ = f.m.ReadBlockAckEOF(ctx)
+		return nil
+	}
 	ack, err := f.m.ReadBlockAckEOF(ctx)
 	if err != nil {
-		if errors.Is(context.Cause(ctx), ErrScopeDisabled) {
-			// Every block went out and the scope was disabled while the
-			// final acknowledgement was still being read: the receiver
-			// has moved on — an OTA requestor asks to apply right after
-			// its BlockAckEOF, and a stack that serves the two exchanges
-			// concurrently (the controller's client stack) can take the
-			// ApplyUpdateRequest first. matter.js's provider force-closes
-			// a transfer "when not known as completed"
-			// (OtaSoftwareUpdateProviderServer.ts:437 at 862ad75f) and,
-			// single-threaded, always reads the ack first; here the
-			// transfer is complete, not cancelled.
-			if f.hooks.finished != nil {
-				f.hooks.finished(f.transferred)
-			}
+		if f.finished() {
+			// It arrived while the read waited and the context ended in
+			// the same instant.
 			return nil
 		}
 		return err
@@ -259,9 +364,7 @@ func (f *outboundFlow) process(ctx context.Context, isDriver bool) error {
 	if err := validateCounter(ack.BlockCounter, f.finalCounter); err != nil {
 		return err
 	}
-	if f.hooks.finished != nil {
-		f.hooks.finished(f.transferred)
-	}
+	f.finish(f.transferred)
 	return nil
 }
 
@@ -274,8 +377,6 @@ func (f *outboundFlow) fail(ctx context.Context, err error) error {
 		be.BytesTransferred = f.transferred
 		be.TotalBytesLength = f.dataLength
 	}
-	if f.hooks.cancelled != nil {
-		f.hooks.cancelled()
-	}
+	f.cancel()
 	return err
 }

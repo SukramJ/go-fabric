@@ -19,7 +19,7 @@
   },
   {
     "file": "bdx/outbound.go",
-    "line": 58,
+    "line": 59,
     "citation": "OutboundFlow.ts:93-110",
     "resolved": "packages/protocol/src/bdx/flow/OutboundFlow.ts",
     "identifier": "readDataChunk",
@@ -28,7 +28,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 141,
+    "line": 142,
     "citation": "MessageExchange.ts:1219-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",
@@ -37,7 +37,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 246,
+    "line": 248,
     "citation": "BdxProtocol.ts:204-211",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "SessionFor",
@@ -46,7 +46,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 373,
+    "line": 385,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",

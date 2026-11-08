@@ -48,6 +48,24 @@ type Exchange interface {
 	Close() error
 }
 
+// ReceiveNotifier is an [Exchange] that tells of a message of the peer when
+// it arrives, on the receive path, before [Exchange.Receive] can return it.
+// The outbound flow finds it by type assertion, as the responder finds a
+// [MrpDelayExchange], and uses it to mark a transfer finished when the
+// final BlockAckEof arrives rather than when its reader dequeues it; an
+// exchange without it finishes the transfer at the read.
+//
+// The notifier is matter.js MessageExchange.ReceiveNotifier
+// (MessageExchange.ts:1372 at db021da0, called at :499 for every message
+// the exchange takes) in BDX's terms: fn sees each message Receive would
+// return — not a duplicate, not a standalone acknowledgement. It runs on
+// the receive goroutine, so it must not block and must not call back into
+// the exchange. A later call replaces fn.
+type ReceiveNotifier interface {
+	Exchange
+	OnReceive(fn func(Message))
+}
+
 // ErrUnexpectedMessage is a well-formed message of a type the transfer did
 // not expect at this point. It is not a BDX [Error]: matter.js throws an
 // UnexpectedDataError here (BdxMessenger.ts:95-98), which sends no

@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -239,7 +240,8 @@ func (r *Responder) DisablePeerForScope(peer Peer, scope string, force bool) err
 // ErrScopeDisabled is the cause a session is closed with when its scope is
 // disabled while it runs ([Responder.DisablePeerForScope] with force) —
 // an OTA provider's ApplyUpdateRequest closing a transfer it does not know
-// as completed.
+// as completed. The transfer reports cancelled, as matter.js reports a
+// closed flow (flow/Flow.ts:137-138 at db021da0).
 var ErrScopeDisabled = errors.New("bdx: BDX protocol scope disabled")
 
 // SessionFor returns the running transfer of peer in scope, nil when none
@@ -250,8 +252,18 @@ func (r *Responder) SessionFor(peer Peer, scope string) *ServerSession {
 	return r.activeForLocked(scopeKey{peer: peer.key(), scope: scope})
 }
 
+// activeForLocked is the running transfer of key: a session whose transfer
+// ended — finished or cancelled — no longer counts, as matter.js's
+// BdxSession closes in processTransfer's finally right after its flow
+// emits the end (BdxSession.ts:185, :197-198 at db021da0) and the close
+// removes it from the active sessions (BdxProtocol.ts:187-189) before
+// anything else is dispatched. A transfer finished at its BlockAckEof's
+// arrival is thus not active for the ApplyUpdateRequest that follows.
 func (r *Responder) activeForLocked(key scopeKey) *ServerSession {
 	for s := range r.sessions {
+		if s.ended.Load() {
+			continue
+		}
 		if s.scope == key.scope && s.peer.key() == key.peer {
 			return s
 		}
@@ -412,6 +424,9 @@ type ServerSession struct {
 	initType MessageType
 	init     Init
 	cancel   context.CancelCauseFunc
+	// ended is set once the transfer finished or was cancelled; the
+	// session then no longer counts as running ([Responder.SessionFor]).
+	ended atomic.Bool
 
 	// mu guards the transfer's progress and its observers: every field
 	// below it. The observer lists are copied under it and called after it
@@ -478,6 +493,15 @@ func (o observedExchange) Send(ctx context.Context, protocolID uint16, opcode ui
 		o.s.message(MessageEvent{Sent: true, ProtocolID: protocolID, Opcode: opcode, Payload: slices.Clone(payload)})
 	}
 	return err
+}
+
+// OnReceive passes a [ReceiveNotifier] of the wrapped exchange through; on
+// an exchange without one it installs nothing, and the flow finishes the
+// transfer at the read.
+func (o observedExchange) OnReceive(fn func(Message)) {
+	if rn, ok := o.Exchange.(ReceiveNotifier); ok {
+		rn.OnReceive(fn)
+	}
 }
 
 func (o observedExchange) Receive(ctx context.Context) (Message, error) {
@@ -597,6 +621,7 @@ func (s *ServerSession) finished(total uint64) {
 	for _, fn := range fns {
 		fn(total)
 	}
+	s.ended.Store(true)
 }
 
 func (s *ServerSession) cancelled() {
@@ -606,6 +631,7 @@ func (s *ServerSession) cancelled() {
 	for _, fn := range fns {
 		fn()
 	}
+	s.ended.Store(true)
 }
 
 func (s *ServerSession) closed() {
