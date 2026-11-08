@@ -116,6 +116,9 @@ func TestWireNamesParityMatterjsServer(t *testing.T) {
 		if got, ok := camera.VideoCodecByName("9"); !ok || got != 9 {
 			t.Errorf("VideoCodecByName(9) = %d, %v", got, ok)
 		}
+		if got := camera.VideoCodecName(9); got != "9" {
+			t.Errorf("VideoCodecName(9) = %q, want the decimal spelling VideoCodecByName parses back", got)
+		}
 		if got, ok := camera.AudioCodecByName("1"); !ok || got != csdef.AudioCodecAacLc {
 			t.Errorf("AudioCodecByName(1) = %d, %v", got, ok)
 		}

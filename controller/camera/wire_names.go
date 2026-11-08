@@ -106,7 +106,12 @@ func byNameOrDecimal[E ~uint8](names map[E]string, name string) (E, bool) {
 func VideoCodecName(codec csdef.VideoCodecEnum) string { return wireName(videoCodecNames, codec) }
 
 // VideoCodecByName is the video codec name names, ignoring case, or the
-// codec its decimal spelling states.
+// codec its decimal spelling states — the spelling [VideoCodecName]
+// reports for a codec this build does not name, so every name parses
+// back. ok=true means the name parsed (a member name or a decimal), not
+// that the device or this module knows the codec. matterjs-server has no
+// video ByName (only imageCodecByName, wireNames.ts:68-73 at 0bd06f2);
+// this one extends its table by the same rule.
 func VideoCodecByName(name string) (csdef.VideoCodecEnum, bool) {
 	return byNameOrDecimal(videoCodecNames, name)
 }
@@ -116,7 +121,12 @@ func VideoCodecByName(name string) (csdef.VideoCodecEnum, bool) {
 func AudioCodecName(codec csdef.AudioCodecEnum) string { return wireName(audioCodecNames, codec) }
 
 // AudioCodecByName is the audio codec name names, ignoring case, or the
-// codec its decimal spelling states.
+// codec its decimal spelling states — the spelling [AudioCodecName]
+// reports for a codec this build does not name, so every name parses
+// back. ok=true means the name parsed (a member name or a decimal), not
+// that the device or this module knows the codec. matterjs-server has no
+// audio ByName (only imageCodecByName, wireNames.ts:68-73 at 0bd06f2);
+// this one extends its table by the same rule.
 func AudioCodecByName(name string) (csdef.AudioCodecEnum, bool) {
 	return byNameOrDecimal(audioCodecNames, name)
 }
@@ -126,7 +136,11 @@ func AudioCodecByName(name string) (csdef.AudioCodecEnum, bool) {
 func ImageCodecName(codec csdef.ImageCodecEnum) string { return wireName(imageCodecNames, codec) }
 
 // ImageCodecByName is the image codec name names, ignoring case, or the
-// codec its decimal spelling states.
+// codec its decimal spelling states — the spelling [ImageCodecName]
+// reports for a codec this build does not name, as matterjs-server's
+// imageCodecByName accepts it (wireNames.ts:68-73 at 0bd06f2). ok=true
+// means the name parsed (a member name or a decimal), not that the device
+// or this module knows the codec.
 func ImageCodecByName(name string) (csdef.ImageCodecEnum, bool) {
 	return byNameOrDecimal(imageCodecNames, name)
 }

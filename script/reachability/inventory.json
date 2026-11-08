@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7821,
+  "entry_points": 7822,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17817,
+    "total_exported": 17818,
     "reachable": 12388,
-    "whitelisted": 5429,
+    "whitelisted": 5430,
     "unreachable": 0
   },
   "by_package": [],
@@ -23129,7 +23129,7 @@
       "identifier": "TestCameraErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 49
+      "line": 69
     },
     {
       "package": "controller/camera",
@@ -23137,6 +23137,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
       "line": 33
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraHintRangesFloorAboveZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/camera_internal_test.go",
+      "line": 55
     },
     {
       "package": "controller/camera",
@@ -23332,7 +23339,7 @@
       "identifier": "TestOutcomeWaitEndsWithItsContext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 287
+      "line": 307
     },
     {
       "package": "controller/camera",
@@ -23395,7 +23402,7 @@
       "identifier": "TestProviderCommandNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 83
+      "line": 103
     },
     {
       "package": "controller/camera",
@@ -23486,7 +23493,7 @@
       "identifier": "TestSessionRegistryClaimAndForget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 254
+      "line": 274
     },
     {
       "package": "controller/camera",
@@ -23500,14 +23507,14 @@
       "identifier": "TestSessionRegistryEndSessionOfAnUnknownID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 213
+      "line": 233
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionRegistryEstablishingSessionEndedByEndSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 232
+      "line": 252
     },
     {
       "package": "controller/camera",
@@ -23535,35 +23542,35 @@
       "identifier": "TestSessionRegistryScopesByNodeAndKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 304
+      "line": 324
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionRegistryStopFailureKeepsTheSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 189
+      "line": 209
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionRegistryStopNotFoundAnnouncesTheCameraEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 169
+      "line": 189
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionRegistryStopSharesOneEndSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 123
+      "line": 143
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionRegistryVanishedAfterAReportDroppedIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
-      "line": 278
+      "line": 298
     },
     {
       "package": "controller/camera",

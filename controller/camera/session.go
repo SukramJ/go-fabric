@@ -477,7 +477,8 @@ func checkResolution(r *csdef.VideoResolutionStruct, field string) (resolution, 
 
 // checkRange refuses a stated value outside its field's range and is the
 // value, 0 for an unstated (nil) one — every range's floor is at least 1,
-// so 0 stays free to mean unstated inside the policy. Mirrors
+// so 0 stays free to mean unstated inside the policy (a package test
+// holds every hint range's floor at 1 or more). Mirrors
 // matterjs-server's toOptionalNumber (cameraCommands.ts:378-382 at
 // 0bd06f2): undefined is unstated, a stated value is held to the range
 // fieldRange takes from the constraint (cameraFieldRanges.ts:48-56).

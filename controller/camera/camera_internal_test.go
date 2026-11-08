@@ -46,6 +46,26 @@ func TestCameraFieldRangesFromModel(t *testing.T) {
 	}
 }
 
+// TestCameraHintRangesFloorAboveZero: every range the bounds' hints check
+// through checkRange has a floor of at least 1. checkRange is 0 for an
+// unstated value, and the policy below it reads 0 as unstated; a schema
+// lift that lowered one of these floors to 0 — or dropped the minimum,
+// which fieldRangeOf reads as 0 — would silently turn a stated 0 into
+// "unstated".
+func TestCameraHintRangesFloorAboveZero(t *testing.T) {
+	r := cameraFieldRanges
+	for name, fr := range map[string]fieldRange{
+		"video.min_frame_rate": r.minFrameRate, "video.max_frame_rate": r.maxFrameRate,
+		"video.min_bit_rate": r.minBitRate, "video.max_bit_rate": r.maxBitRate,
+		"audio.channel_count": r.channelCount, "audio.sample_rate": r.sampleRate,
+		"audio.bit_rate": r.audioBitRate,
+	} {
+		if fr.min < 1 {
+			t.Errorf("%s: floor %d, want at least 1 (0 is checkRange's unstated)", name, fr.min)
+		}
+	}
+}
+
 func TestCameraErrors(t *testing.T) {
 	status := im.StatusConstraintError
 	errs := []struct {
