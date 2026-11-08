@@ -247,6 +247,22 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.18.0: the BasicInformation restores
+
+`mattercore.BasicInformation.SetNodeLabel(string) error` and
+`SetLocation(string) error` were the boot-time restores of a persisted
+label and location; they are `RestoreNodeLabel` and `RestoreLocation` now,
+named as `RestoreConfigurationVersion` is, and neither persists nor reports.
+`SetNodeLabel(ctx, label) error` is the host's run-time write instead: a
+controller's write semantics (at most 32 bytes, `CONSTRAINT_ERROR`
+otherwise), persisted and reported with `contract.OriginHostSet`. A host
+that restored a value it stored itself renames the call; a host that meant a
+rename passes a context, or calls `Node.SetNodeLabel`, the facade's route
+([The node's own name](../getting-started/device.md#the-nodes-own-name)).
+`SetOnPersistentWrite` takes a hook that returns an error: return the
+store's, and the write fails with nothing served changed; return nil when
+the values are stored.
+
 ## Changed after v0.17.0: the attestation checks
 
 `attestation.CdSignerVerificationSkipped` is removed: the validator no

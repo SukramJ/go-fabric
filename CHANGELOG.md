@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `Node.SetNodeLabel(ctx, label)`: the node's own NodeLabel at run time, so a host's rename reaches controllers without a restart (issue 414). It has a controller's write semantics — at most 32 bytes, refused with `CONSTRAINT_ERROR` otherwise; persisted where a written label is; reported to subscribers and to `Observers.OnAttributeChanged` with `contract.OriginHostSet` once the node runs; before `Start` the label is configuration, served at start and persisted, and no observer is told. The root `BasicInformation` now implements `contract.AttributeChangeNotifier`, so a controller's NodeLabel or Location write reaches `Observers.OnAttributeChanged` with `contract.OriginControllerWrite` too; `BasicInformation.SetNodeLabel(ctx, label)` is the server's host write, `BasicInformation.RestoreNodeLabel` the silent boot-time restore (below).
+
+### Changed
+
+- **Break** — `cluster/core`: the root BasicInformation's boot-time restores are named as `RestoreConfigurationVersion` is: `BasicInformation.SetNodeLabel(string) error` → `BasicInformation.RestoreNodeLabel(string) error`, `BasicInformation.SetLocation(string) error` → `BasicInformation.RestoreLocation(string) error`; `BasicInformation.SetNodeLabel(ctx, label) error` is now the host's run-time write (validated, persisted, reported with `contract.OriginHostSet`), the server half of `Node.SetNodeLabel` (owner decision on #454, issue 414). `BasicInformation.SetOnPersistentWrite` takes `func(nodeLabel, location string) error` (was without the error): the hook stores the values before the cluster serves them, and its error fails the write with nothing served changed — no DataVersion advance, no report; the host's `SetNodeLabel` returns it, a controller's write answers FAILURE — as matter.js rolls a transaction back when its store write fails (review of #454). A host that restored a label itself calls `RestoreNodeLabel`; one that meant a rename calls `SetNodeLabel(ctx, label)` or `Node.SetNodeLabel`; a hook returns its store's error. [Migrating to the facade](docs/guides/migrating-to-the-facade.md) §"Changed after v0.18.0: the BasicInformation restores".
+
 ### Fixed
 
 - `cluster/core`: the OTA provider no longer races its own transfer listeners. `ApplyUpdateRequest` and the BDX session's close listener read the update in progress through a pointer held past the provider's lock while the other path wrote it; the race detector flagged it under `TestReferenceControllerOTA` (CI race leg, 2026-11-05 to 2026-11-07). Every reader now decides on a copy taken under the lock; the progress listener alone writes the entry, under the lock.
