@@ -839,7 +839,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 76,
+    "line": 77,
     "citation": "MessageExchange.ts:1289-1295",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "peerAdditionalMrpDelay",
@@ -848,7 +848,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 368,
+    "line": 369,
     "citation": "MessageExchange.ts:410-413",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "retransmissionCount",
@@ -857,7 +857,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 395,
+    "line": 396,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -866,7 +866,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 405,
+    "line": 406,
     "citation": "MessageExchange.ts:376-378",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "considerClosed",
@@ -875,7 +875,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 622,
+    "line": 623,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -884,7 +884,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 663,
+    "line": 664,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",

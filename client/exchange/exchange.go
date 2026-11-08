@@ -58,7 +58,8 @@ type Options struct {
 	// exchange with its retransmission number: 0 for a first
 	// transmission (a standalone ack included), n for the n-th
 	// retransmission — matter.js MessageExchange.Options.onSend
-	// (:1240-1243), called at :768 and :943. It runs on the sending
+	// (MessageExchange.ts:1321 at db021da0), a SendNotifier (:1367),
+	// called at :804 and :995. It runs on the sending
 	// goroutine, for a first transmission with the exchange locked, so it
 	// must not block for long or call back into the exchange.
 	OnSend func(retransmission int)
