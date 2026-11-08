@@ -42,7 +42,9 @@ func (d *lockoutACL) CheckACL(context.Context, uint8, uint64, []uint32, uint16, 
 // successful REPLACE-ALL of the same attribute in one WriteRequest are not
 // re-authorized, so an administrator rewriting the ACL in chunks keeps the
 // write its own empty replace would otherwise revoke (TC-ACL-2.6, 2.8). A
-// different attribute in between, or a later request, is authorized again.
+// different attribute in between, or a later request, is authorized again
+// — a write of the attribute itself there, as an append after another
+// attribute or alone is BUSY (InteractionServer.ts:511-531 at db021da0).
 func TestChunkedWriteIsAuthorizedOnce(t *testing.T) {
 	t.Parallel()
 	acl := ConcreteAttributePath{Endpoint: 0, Cluster: 0x001F, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true}
@@ -57,7 +59,7 @@ func TestChunkedWriteIsAuthorizedOnce(t *testing.T) {
 		{Path: appendPath, Value: AttributeValue{Value: 1}},
 		{Path: appendPath, Value: AttributeValue{Value: 2}},
 		{Path: other, Value: AttributeValue{Value: "x"}},
-		{Path: appendPath, Value: AttributeValue{Value: 3}},
+		{Path: acl, Value: AttributeValue{Value: []int{3}}},
 	}})
 	want := []StatusCode{StatusSuccess, StatusSuccess, StatusSuccess, StatusUnsupportedAccess, StatusUnsupportedAccess}
 	if len(resp.Responses) != len(want) {
@@ -71,9 +73,9 @@ func TestChunkedWriteIsAuthorizedOnce(t *testing.T) {
 	if d.writes != 3 {
 		t.Errorf("%d writes reached the dispatcher, want the replace and its two appends", d.writes)
 	}
-	next := HandleWriteRequest(ctx, d, WriteRequest{Writes: []AttributeWrite{{Path: appendPath, Value: AttributeValue{Value: 4}}}})
+	next := HandleWriteRequest(ctx, d, WriteRequest{Writes: []AttributeWrite{{Path: acl, Value: AttributeValue{Value: []int{4}}}}})
 	if got := next.Responses[0].Status.Status; got != StatusUnsupportedAccess {
-		t.Errorf("a later request's append: %v, want UnsupportedAccess (authorized afresh)", got)
+		t.Errorf("a later request's replace: %v, want UnsupportedAccess (authorized afresh)", got)
 	}
 }
 

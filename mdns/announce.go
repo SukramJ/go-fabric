@@ -181,32 +181,59 @@ func (r *Responder) stopLocked(e *entry) {
 	e.run = nil
 }
 
-// broadcastLocked announces e on every interface: one publication per
-// interface that carries e's records with the goodbyes of the records that
-// left, every record in the answer section (RFC 6762 §8.3; matter.js
-// MdnsServer.broadcast and InterfaceResponder.publish,
-// MdnsServer.ts:210-223 and InterfaceResponder.ts:271-302 at db021da0),
-// split where it outgrows a packet with every part in the answer section
-// (MdnsTest.ts:757-829 at db021da0). Caller holds r.mu.
-func (r *Responder) broadcastLocked(e *entry) {
-	if r.wire == nil {
-		return
+// broadcastLocked announces e's service on every listed interface
+// (MdnsServer.broadcast, MdnsServer.ts:208-219 at db021da0), with the
+// other announcements of the same turn. Caller holds r.mu.
+func (r *Responder) broadcastLocked(e *entry) { r.announceLocked([]string{e.key}, false) }
+
+// broadcastAllLocked announces every published service on every listed
+// interface. Caller holds r.mu.
+func (r *Responder) broadcastAllLocked() { r.announceLocked(nil, true) }
+
+// pendingAnnouncement collects the announcements requested before it goes
+// out (MdnsServer.ts PendingAnnouncement, #announce and
+// #startAnnouncement, :221-246 at db021da0).
+type pendingAnnouncement struct {
+	services map[string]bool
+	all      bool
+}
+
+// announceLocked joins the pending announcement, or starts one that goes
+// out once the requests of this turn are in: a timer of no delay on the
+// responder's clock, Go's form of matter.js's next macrotask. The
+// announcements of services published together — the commissionable and
+// the operational record of a starting node — share one message per
+// interface with each shared record once (MdnsServer.ts:209-214 at
+// db021da0). An announcement is never held by the one-second rule.
+// Caller holds r.mu.
+func (r *Responder) announceLocked(keys []string, all bool) {
+	p := r.pending
+	if p == nil {
+		p = &pendingAnnouncement{services: map[string]bool{}}
+		r.pending = p
+		r.clock.Load().AfterFunc(0, func() {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			r.sendAnnouncementLocked(p)
+		})
 	}
-	for _, ifIndex := range r.wire.links() {
-		r.publishLocked(ifIndex, map[string]bool{e.key: true}, false)
+	p.all = p.all || all
+	for _, k := range keys {
+		p.services[k] = true
 	}
 }
 
-// broadcastAllLocked announces every published service now: one message
-// per interface with each shared record once (MdnsServer.broadcast with no
-// service named, MdnsServer.ts:210-223 at db021da0; MdnsServerTest.ts
-// "announces all services in one packet with each shared record once").
-// Caller holds r.mu.
-func (r *Responder) broadcastAllLocked() {
-	if r.wire == nil {
+// sendAnnouncementLocked publishes the pending announcement on every
+// listed interface (#sendAnnouncement and #publishOnListedInterfaces,
+// :236-275 at db021da0); nothing after Close. Caller holds r.mu.
+func (r *Responder) sendAnnouncementLocked(p *pendingAnnouncement) {
+	if r.pending == p {
+		r.pending = nil
+	}
+	if r.closed || r.wire == nil {
 		return
 	}
-	for _, ifIndex := range r.wire.links() {
-		r.publishLocked(ifIndex, nil, true)
+	for _, l := range r.listLocked() {
+		r.publishLocked(l, p.services, p.all)
 	}
 }

@@ -33,7 +33,7 @@ import (
 	"math"
 	"slices"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
@@ -159,6 +159,11 @@ type Server struct {
 
 	srv *spec.Server
 	cfg Config
+
+	// matterTime is the node's Matter time LastChangedTime is stamped
+	// on, attached as the server joins a node's topology (AttachMatterTime);
+	// nil reads cfg.Clock.
+	matterTime atomic.Pointer[clock.MatterTime]
 
 	// mu guards last.
 	mu sync.Mutex
@@ -398,20 +403,43 @@ func (s *Server) resetCondition(ctx context.Context, _ any) (any, error) {
 	// the Matter epoch 2000-01-01 (chip stores its real-time clock's Unix
 	// seconds there). A clock before the epoch or past the range leaves it.
 	if s.Serves(hepa.AttrLastChangedTime) {
-		if t, ok := matterEpochSeconds(clock.Or(s.cfg.Clock).Now()); ok {
+		if t, ok := s.matterNow(); ok {
 			st.LastChangedTime = &t
 		}
 	}
 	return nil, s.setState(contract.OriginCommand, st, nil)
 }
 
-// matterEpochSeconds is t in seconds since the Matter epoch, 2000-01-01
-// 00:00:00 UTC; false before it or beyond the non-null uint32 range.
-func matterEpochSeconds(t time.Time) (uint32, bool) {
-	const matterEpochUnix = 946684800
-	secs := t.Unix() - matterEpochUnix
-	if secs < 0 || secs >= math.MaxUint32 {
-		return 0, false
+// matterNow is the Matter time LastChangedTime takes: the node's, or
+// cfg.Clock's outside a node (clock.MatterTimeOf); false before the epoch
+// or past the non-null range (MaxUint32 is the null value).
+func (s *Server) matterNow() (uint32, bool) {
+	mt := clock.MatterTimeOf(s.cfg.Clock)
+	if p := s.matterTime.Load(); p != nil {
+		mt = *p
 	}
-	return uint32(secs), true
+	t, ok := mt()
+	return t, ok && t != math.MaxUint32
 }
+
+// AttachMatterTime hands the server the node's Matter time, which
+// ResetCondition stamps LastChangedTime with; nil leaves it unchanged. A
+// node calls it as the server joins its topology, with its root
+// TimeSynchronization's UTC: connectedhomeip stamps it from the one system
+// clock SetUTCTime sets (ResourceMonitoringCluster.cpp:379 at 6170af84,
+// GetClock_RealTimeMS), so after SetUTCTime the stamp follows the node's
+// UTCTime (issue 445).
+func (s *Server) AttachMatterTime(matterTime clock.MatterTime) {
+	if matterTime != nil {
+		s.matterTime.Store(&matterTime)
+	}
+}
+
+// MatterTimeChanged does nothing: LastChangedTime is the time of the last
+// reset, read when it happens (ResourceMonitoringCluster.cpp:375-385).
+func (s *Server) MatterTimeChanged() {}
+
+// RequiresMatterTime is false: without a time ResetCondition leaves
+// LastChangedTime as it was, as connectedhomeip does when
+// GetClock_RealTimeMS fails (:379-384).
+func (s *Server) RequiresMatterTime() bool { return false }

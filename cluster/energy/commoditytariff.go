@@ -115,6 +115,9 @@ var (
 	// while a delayed update waits for its StartDate (DataMgmt.h:563-566,
 	// :612-615).
 	ErrTariffUpdatePending = errors.New("energy: CommodityTariff: a delayed update is pending")
+	// ErrNoTime: the node has no time, the update and the sync need one
+	// (commodity-tariff-server.cpp:928-934 at 6170af84, CHIP_ERROR_INVALID_TIME).
+	ErrNoTime = errors.New("energy: CommodityTariff: no valid time")
 )
 
 // Tariff is the tariff data a host hands to [CommodityTariffServer.UpdateTariff]:
@@ -210,6 +213,9 @@ type CommodityTariffConfig struct {
 // attributes and the two commands are chip's.
 type CommodityTariffServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	spec.SelfHeld
 
 	srv       *spec.Server
@@ -277,7 +283,9 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 	return s, nil
 }
 
-func (s *CommodityTariffServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *CommodityTariffServer) nowEpoch() (uint32, bool) { return s.epochS(s.clock) }
 
 // value reads a stored attribute.
 func (s *CommodityTariffServer) value(attrID uint32) any {
@@ -338,7 +346,10 @@ func (s *CommodityTariffServer) UpdateTariff(t Tariff) error {
 	if s.pending != nil {
 		return ErrTariffUpdatePending
 	}
-	now := s.nowEpoch()
+	now, ok := s.nowEpoch()
+	if !ok {
+		return ErrNoTime
+	}
 	ctx := &tariffUpdateCtx{
 		features: TariffFeature(s.FeatureMap()), blockMode: ct.BlockModeNoBlock,
 		tariffStart: t.StartDate, updateTS: now,
@@ -410,7 +421,9 @@ func (s *CommodityTariffServer) dataUpdatedLocked(erased bool) error {
 		return nil
 	}
 	s.active = true
-	_ = s.updateCurrentLocked(s.nowEpoch()) // InitCurrentAttrs logs a failure, :909-913
+	if now, ok := s.nowEpoch(); ok { // UpdateCurrentAttrs fails without a time, :928-934
+		_ = s.updateCurrentLocked(now) // InitCurrentAttrs logs a failure, :909-913
+	}
 	return nil
 }
 
@@ -448,7 +461,10 @@ func (s *CommodityTariffServer) ClearTariff() error {
 func (s *CommodityTariffServer) SyncTime() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := s.nowEpoch()
+	now, ok := s.nowEpoch()
+	if !ok { // UpdateCurrentAttrs, :928-934
+		return ErrNoTime
+	}
 	if s.pending != nil {
 		start, _ := s.pending[1].(uint32)
 		if now >= start {
@@ -907,10 +923,11 @@ func (s *CommodityTariffServer) componentByID(id uint32) *TariffComponent {
 }
 
 // dayOfWeek is GetDayOfWeek (Server.cpp:658-667): the UTC weekday of a
-// Matter epoch-s time as a DayPatternDayOfWeekBitmap bit.
+// Matter epoch-s time as a DayPatternDayOfWeekBitmap bit, Sunday bit 0.
+// The Matter epoch, 2000-01-01, is a Saturday.
 func dayOfWeek(epochS uint32) ct.DayPatternDayOfWeekBitmap {
-	wd := time.Unix(int64(epochS)+matterEpochOffset, 0).UTC().Weekday()
-	return ct.DayPatternDayOfWeekBitmap(1) << uint(wd)
+	wd := (epochS/86400 + uint32(time.Saturday)) % 7
+	return ct.DayPatternDayOfWeekBitmap(1) << wd
 }
 
 // findDay is FindDay (Server.cpp:669-730): the individual day whose date

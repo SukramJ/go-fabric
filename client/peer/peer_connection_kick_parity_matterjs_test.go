@@ -247,10 +247,38 @@ func kickableTry(t *testing.T, h *harness, p *Peer) (*connection, *attempt, *exc
 		x = att.exchange.Load()
 		return x != nil && x.RetransmissionCount() == 0
 	})
-	for !kickOpen(x) {
+	openKickGate(t, h, x, "the first try")
+	return c, att, x
+}
+
+// openKickGate retransmits the try's Sigma1 five fake seconds at a time
+// until the kick gate opens. It fails, naming the exchange's state, when
+// the exchange ended first — its schedule ran out, so the restart saving
+// stays 0 for good (exchange.go RetransmissionRestartSaving) — or the gate
+// stays shut for longer than any schedule lasts, instead of spinning
+// (issue 455).
+func openKickGate(t *testing.T, h *harness, x *exchange.Exchange, what string) {
+	t.Helper()
+	for range 120 { // ten fake minutes, beyond the refresh try's schedule
+		if kickOpen(x) {
+			return
+		}
+		select {
+		case <-x.Done():
+			t.Fatalf("%s: the exchange ended before the kick gate opened (retransmissions %d, restart saving %v)",
+				what, x.RetransmissionCount(), x.RetransmissionRestartSaving())
+		default:
+		}
 		h.clock.Advance(5 * time.Second)
 	}
-	return c, att, x
+	done := false
+	select {
+	case <-x.Done():
+		done = true
+	default:
+	}
+	t.Fatalf("%s: the kick gate stayed shut (retransmissions %d, restart saving %v, exchange done %v)",
+		what, x.RetransmissionCount(), x.RetransmissionRestartSaving(), done)
 }
 
 // ended waits for the exchange to end.
@@ -268,16 +296,16 @@ func ended(t *testing.T, x *exchange.Exchange, what string) {
 // context.
 func TestPeerConnectionKickLocalAbort(t *testing.T) {
 	t.Parallel()
-	start := func(t *testing.T) (*harness, *Peer) {
+	start := func(t *testing.T, edit func(*Context)) (*harness, *Peer) {
 		t.Helper()
-		h := newHarness(t, nil)
+		h := newHarness(t, edit)
 		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
 		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
 		return h, p
 	}
 	t.Run("firing localAbort causes AbortedError via Abort.attempt", func(t *testing.T) {
 		t.Parallel()
-		h, p := start(t)
+		h, p := start(t, nil)
 		_, att, x := kickableTry(t, h, p)
 		p.Kick()
 		ended(t, x, "a restarting kick")
@@ -288,14 +316,14 @@ func TestPeerConnectionKickLocalAbort(t *testing.T) {
 	})
 	t.Run("addressAbort propagates to localAbort", func(t *testing.T) {
 		t.Parallel()
-		h, p := start(t)
+		h, p := start(t, nil)
 		_, att, x := kickableTry(t, h, p)
 		att.cancel()
 		ended(t, x, "the attempt's abort")
 	})
 	t.Run("localAbort on already-aborted signal is harmless", func(t *testing.T) {
 		t.Parallel()
-		h, p := start(t)
+		h, p := start(t, nil)
 		_, att, x := kickableTry(t, h, p)
 		att.cancel()
 		p.Kick() // may reach the aborted try's restart; must not panic
@@ -303,22 +331,26 @@ func TestPeerConnectionKickLocalAbort(t *testing.T) {
 	})
 	t.Run("connect loop restarts after localAbort fires", func(t *testing.T) {
 		t.Parallel()
-		h, p := start(t)
+		// A restart cooldown of a nanosecond, through the set's timing: the
+		// next kick may restart once the gate's advances passed, with no
+		// ten-minute advance past the restarted try, whose goroutine may
+		// already have armed its Sigma1 schedule and would run it out in
+		// that one advance (issue 455).
+		h, p := start(t, func(c *Context) {
+			c.Timing = &Timing{KickRestartCooldown: KickRestartCooldown{Connect: time.Nanosecond}}
+		})
 		c, att, x := kickableTry(t, h, p)
 		ids := map[uint16]bool{x.ID(): true}
 		for range 2 { // :366, three tries, the first two restarted
 			p.Kick()
 			ended(t, x, "a restarting kick")
-			h.clock.Advance(DefaultTiming().KickRestartCooldown.Connect) // the next restart's cooldown
 			h.sigma1(t, addr1)
 			eventually(t, "the next try", func() bool {
 				x = att.exchange.Load()
 				return x != nil && !ids[x.ID()]
 			})
 			ids[x.ID()] = true
-			for !kickOpen(x) {
-				h.clock.Advance(5 * time.Second)
-			}
+			openKickGate(t, h, x, "the restarted try")
 		}
 		if len(ids) != 3 || att.ctx.Err() != nil || attemptAt(c, addr1) != att {
 			t.Fatalf("%d tries on the attempt (aborted %v), want 3 on one live attempt", len(ids), att.ctx.Err() != nil)

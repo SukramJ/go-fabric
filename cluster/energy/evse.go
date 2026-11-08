@@ -174,6 +174,9 @@ type evseSession struct {
 // EvseServer implements [contract.ClusterServer] for EnergyEvse.
 type EvseServer struct {
 	*spec.Instance
+	// nodeTime is the node's Matter time the server's epoch-s times
+	// are read from (mattertime.go).
+	nodeTime
 	// SelfHeld is the typed server's command handlers, event path and
 	// write veto over srv (evse_typed.go).
 	spec.SelfHeld
@@ -318,7 +321,9 @@ func (s *EvseServer) unlock() {
 
 func (s *EvseServer) notifyLocked(c EvseChange) { s.pending = append(s.pending, c) }
 
-func (s *EvseServer) nowEpoch() uint32 { return matterEpochS(s.now()) }
+// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
+// clock's outside a node.
+func (s *EvseServer) nowEpoch() (uint32, bool) { return s.epochS(s.clock) }
 
 // --- attribute access -----------------------------------------------------
 
@@ -999,7 +1004,11 @@ func (s *EvseServer) emitLocked(eventID uint32, data any) error {
 // startSessionLocked is EvseSession::StartSession (:1747-1783), which the
 // delegate calls with meter values 0 (:900).
 func (s *EvseServer) startSessionLocked() {
-	s.session = evseSession{startTime: s.nowEpoch()}
+	start, ok := s.nowEpoch()
+	if !ok { // :1752-1758: no time, no session
+		return
+	}
+	s.session = evseSession{startTime: start}
 	next := uint32(0)
 	if id := s.SessionID(); id != nil {
 		next = *id + 1
@@ -1021,7 +1030,11 @@ func (s *EvseServer) stopSessionLocked() {
 // recalculateSessionDurationLocked is RecalculateSessionDuration
 // (:1806-1821).
 func (s *EvseServer) recalculateSessionDurationLocked() {
-	s.forceLocked(evse.AttrSessionDuration, s.nowEpoch()-s.session.startTime)
+	now, ok := s.nowEpoch()
+	if !ok { // :1810-1817: no time, the duration stays
+		return
+	}
+	s.forceLocked(evse.AttrSessionDuration, now-s.session.startTime)
 }
 
 // --- the enabled-until timer (EvseDelegate.cpp:164-348) -------------------
@@ -1044,7 +1057,12 @@ func (s *EvseServer) scheduleEnabledCheckLocked() {
 	if until == nil {
 		return
 	}
-	now := s.nowEpoch()
+	now, ok := s.nowEpoch()
+	if !ok { // :293-300: no time, check again in 30 s
+		s.stopEnabledTimerLocked()
+		s.enabledTimer = s.clock.AfterFunc(evseNoTimeRecheck, s.enabledTimerExpired)
+		return
+	}
 	if *until > now { // :308-315
 		s.stopEnabledTimerLocked()
 		s.enabledTimer = s.clock.AfterFunc(time.Duration(*until-now)*time.Second, s.enabledTimerExpired)
@@ -1059,6 +1077,11 @@ func (s *EvseServer) scheduleEnabledCheckLocked() {
 	default:
 	}
 }
+
+// evseNoTimeRecheck is kPeriodicCheckIntervalRealTimeClockNotSynced_sec,
+// the wait before the enabled-until check runs again while the node has no
+// time (EnergyEvseDelegateImpl.cpp:296-300 at 6170af84).
+const evseNoTimeRecheck = 30 * time.Second
 
 // earliest is GetEarliestTime (:164-172).
 func earliest(a, b *uint32) *uint32 {

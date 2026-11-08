@@ -85,6 +85,18 @@ chip-tool send for a pairing code, and the address questions for the node's
 own host name. It joins the mDNS multicast groups beside the main responder
 on UDP 5353, which is how it shares the port.
 
+The responder answers a record by multicast at most once a second on an
+interface (RFC 6762 §6), as matter.js does: a query that asks again
+within the second is answered when the second has passed, in one deferred
+message, unless the querier already received the record. Services
+published together — the commissionable and the operational record of a
+starting node — share one announcement per interface. A multicast that an
+interface refuses, or that reaches only one of its address families, logs
+one `mdns.responder.multicast_not_sent` or
+`mdns.responder.multicast_some_families` line at Info per outage; the
+following misses log at Debug until a multicast reaches every family
+again.
+
 A host that already runs avahi-daemon keeps it: this project's own
 chip-tool harness runs the node on hosts with a running avahi-daemon. A
 host that must not answer mDNS sets `Network.MDNS.Off`; no controller
@@ -93,9 +105,34 @@ then discovers the node, and a controller reaches it by address alone.
 `Node.DiagnoseMDNS()` reports what would keep a controller from finding or
 commissioning it.
 
+The responder announces and answers on every multicast-capable interface,
+each with that interface's own addresses, and leaves container and
+virtualisation bridges out by name (`docker*`, `br-*`, `veth*`, `hassio*`,
+… — `mdns.DefaultInterfaceFilter`). `Network.MDNS.Interfaces` restricts it
+to the named interfaces: `[]string{"br30"}` announces and answers on `br30`
+alone. The default filter still applies to a named interface, so naming
+`docker0` or `hassio` does not publish its address. A name the host does
+not have is accepted — interfaces come and go, and the interface check
+picks it up when it appears — and `Node.DiagnoseMDNS()` reports it
+(`interface_not_found`), as it does a named bridge (`interface_filtered`)
+and a named interface without an advertised address
+(`interface_no_addresses`). The list does not scope the UDP listen socket;
+`Network.Listen` takes a host address for that.
+
+The case for it is a dual-homed host behind a gateway that relays mDNS
+between its networks (an mDNS reflector or proxy): the node answers each
+network with that network's address, the gateway relays the other
+network's answer as well, and the controllers cache two addresses for one
+host, one of them across the router. Advertising on the controllers'
+network alone keeps the second address out. matter.js publishes on every
+interface; the allow-list is this module's (*Ahead of matter.js*,
+`BD-matterjs-mdns-interface-allowlist`).
+
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
 [`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
 [`node/mdns.go`](https://github.com/SukramJ/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
+[`mdns/interface_filter.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/interface_filter.go) (`DefaultInterfaceFilter`),
+[`mdns/diagnose_interfaces.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/diagnose_interfaces.go) (`DiagnoseInterfaces`),
 [`internal/chiptool/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/internal/chiptool/doc.go) (the harness).*
 
 ## Logs

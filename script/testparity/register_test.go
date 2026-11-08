@@ -53,7 +53,8 @@ import (
 // Pin lift wave P4 (#433) ports CommissioningClosedSessionReArmTest.ts,
 // InitialContactScheduleTest.ts and VendorIdVerificationTest.ts, merged
 // with wave P3: 3.
-const testparityPlannedRatchet = 3
+// Issue 441 (wave W7) ports CommissionableMdnsScannerWindowChangeTest.ts: 2.
+const testparityPlannedRatchet = 2
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -132,10 +133,19 @@ const testparityPlannedRatchet = 3
 // Pin lift wave P4 (#433): InitialContactScheduleTest.ts ported, ClientConnectivityTest.ts's Sigma1 refresh: 152 ported, 997 missing.
 // Pin lift wave P4 (#433): VendorIdVerificationTest.ts ported, the VVSC rows of OperationalCertificateVerifyTest.ts: 153 ported, 988 missing.
 // Merged with wave P3: 158 ported, 985 missing.
-// Wave W8 (#461): BorderRouterRegistryTest.ts ported by thread/brdiscovery: 159 ported.
+// Issue 439 (wave W7): GeneralDiagnosticsServerTest.ts's five fault cases
+// ported over contract.FaultSource: 159 ported, 980 missing.
+// Issue 440 (wave W7): MdnsServerTransportTest.ts's ten remaining cases
+// ported, six MdnsServerTest.ts cases of the one-second rule and the
+// turn's announcement and MdnsTest.ts's announcement of devices that
+// start together: 160 ported, 963 missing.
+// Issue 441 (wave W7): CommissionableMdnsScannerWindowChangeTest.ts
+// ported, no scanner change: 161 ported.
+// Wave W8 (#461): BorderRouterRegistryTest.ts ported by thread/brdiscovery,
+// merged with wave W7: 162 ported.
 const (
-	testparityPortedRatchet  = 159
-	testparityMissingRatchet = 985
+	testparityPortedRatchet  = 162
+	testparityMissingRatchet = 963
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -182,11 +192,14 @@ const (
 // BD-Matter-MdnsFollowsAdvertisedAddresses), three state-field cases of
 // GeneralDiagnosticsServerTest.ts and the lone-ADD skip (findings T3-P3-1),
 // merged with waves P1 and P2: 619.
+// Issue 438 (wave W7) closes the lone-ADD skip: im/write.go answers it
+// BUSY as matter.js does (InteractionServer.ts:511-531 at db021da0): 618.
 // Wave W8 (#461) leaves twelve BorderRouterRegistryTest.ts cases — the
 // addresses, ports and MeshCoP version fields thread/brdiscovery does not
 // keep (device-ble-thread, ADR 0027 decision 5) and the JS start/stop,
-// target-observer and log-flag mechanics (js-runtime-only): 631.
-const testparityLeftRatchet = 631
+// target-observer and log-flag mechanics (js-runtime-only), merged with
+// wave W7: 630.
+const testparityLeftRatchet = 630
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

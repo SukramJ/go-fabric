@@ -309,6 +309,14 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	defer func() { tx.lastWritten = lastWritten }()
 	var wr WriteResponse
 	for _, w := range req.Writes {
+		// The interaction's BUSY checks come first (busyBefore).
+		if tx.busyBefore(w.Path) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusBusy},
+			})
+			continue
+		}
 		// A write path MUST name a concrete cluster and attribute. Matter
 		// reserves wildcards for Read/Subscribe; a wildcard-attribute write
 		// has no per-attribute privilege to gate on, so it would apply one
@@ -327,18 +335,12 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 			continue
 		}
-		// An attribute another interaction's chunked write holds is
-		// answered BUSY; a concrete path this interaction accepts is held
-		// before it is written when the write is chunked or holds already.
-		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:505-508 (#isHeldByOther → Status.Busy) and
-		// :536-543 (the hold, taken before any await).
-		if w.Path.HasEndpoint && !tx.holdUnlessBusy(w.Path, req.MoreChunkedMessages) {
-			wr.Responses = append(wr.Responses, AttributeStatus{
-				Path:   w.Path,
-				Status: StatusIB{Status: StatusBusy},
-			})
-			continue
+		// A concrete path this interaction accepts is held before it is
+		// written when the write is chunked or holds already, and becomes
+		// the marker a following ADD is checked against (matter.js
+		// InteractionServer.ts:533-543, the hold taken before any await).
+		if w.Path.HasEndpoint {
+			tx.accept(w.Path, req.MoreChunkedMessages)
 		}
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
@@ -539,17 +541,40 @@ func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint
 	return ok && holder != tx
 }
 
-// holdUnlessBusy reports false when another interaction holds the
-// attribute (the write is answered BUSY); otherwise it takes the hold
-// [WriteTransaction.hold] decides on and records the attribute as the
-// chunk's last accepted one.
-func (tx *WriteTransaction) holdUnlessBusy(p ConcreteAttributePath, more bool) bool {
-	if tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
-		return false
+// busyBefore reports whether the write element p is answered BUSY before
+// anything else is checked, the writability and the ACL included:
+//   - a concrete attribute another interaction's chunked write holds
+//     (matter.js packages/node/src/node/server/InteractionServer.ts:505-508
+//     at db021da0, #isHeldByOther → Status.Busy);
+//   - a list ADD (null list index) that does not follow a write path of
+//     the same attribute in this interaction — across its chunks —
+//     whatever that write's outcome, as chip answers it; a lone ADD to a
+//     read-only list is BUSY too, and a BUSY path leaves the marker where
+//     it was (:511-531, the marker previousProcessedAttributePath
+//     :456-458, not moved by a BUSY path, :529).
+func (tx *WriteTransaction) busyBefore(p ConcreteAttributePath) bool {
+	if p.HasEndpoint && p.HasCluster && p.HasAttribute && tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
+		return true
 	}
+	return p.ListAppend && !tx.followsLastQueued(p)
+}
+
+// accept takes the hold [WriteTransaction.hold] decides on and records
+// the attribute as the interaction's last accepted one — matter.js's
+// previousProcessedAttributePath (InteractionServer.ts:533-537 at
+// db021da0).
+func (tx *WriteTransaction) accept(p ConcreteAttributePath, more bool) {
 	tx.hold(p, more)
 	tx.lastQueued = &writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
-	return true
+}
+
+// followsLastQueued reports whether p names the attribute the
+// interaction accepted last, the condition of a list ADD
+// (InteractionServer.ts:513-517 at db021da0); a path without an endpoint
+// never does.
+func (tx *WriteTransaction) followsLastQueued(p ConcreteAttributePath) bool {
+	return tx.lastQueued != nil && p.HasEndpoint &&
+		*tx.lastQueued == writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
 }
 
 // hold takes the attribute for this interaction when the write is chunked

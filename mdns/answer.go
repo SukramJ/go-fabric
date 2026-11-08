@@ -4,6 +4,7 @@
 package mdns
 
 import (
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"net"
@@ -19,45 +20,35 @@ import (
 
 // The answer engine: one inbound query against the record sets of the
 // published services on the interface it arrived on. It mirrors matter.js
-// packages/protocol/src/mdns/MdnsServer.ts #handleMessage (:103-203 at
-// 862ad75f) rule for rule:
+// packages/protocol/src/mdns/InterfaceResponder.ts answer and #sendAnswer
+// (:247-396 at db021da0) and MdnsServer.ts #handleMessage and
+// #prepareMessage (:103-121, :463-503):
 //
 //   - a query for no name the responder owns is dropped before anything
-//     else (:120-122), and an interface without records is not answered on
-//     (:106-111);
-//   - each service's record set is matched on its own (#queryRecords,
-//     :377-387: the name case-insensitively, ANY or the exact type) and
-//     answered in its own response;
+//     else, and an interface without records is not answered on;
+//   - each service's record set is matched on its own (queryRecords: the
+//     name case-insensitively, ANY or the exact type) and answered in its
+//     own packet, 20–120 ms after the previous one, its content decided
+//     when it is sent;
 //   - the rest of the set except its PTRs goes along as additionals,
-//     unless every question asks for A or AAAA (:130-136);
+//     unless every question asks for A or AAAA (additionalRecordsFor,
+//     :910-916);
 //   - a record the querier lists as a known answer with more than half its
-//     TTL left is not sent (#suppressedByKnownAnswer, :366-375, :137-150);
+//     TTL left is not sent;
 //   - a query whose every question carries the unicast-response bit is
 //     answered by unicast, unless an answer has not gone out by multicast
-//     on the interface within a quarter of its TTL (:152-166);
-//   - a multicast answer repeats no record set sent on the interface within
-//     900 ms (:167-173), and a question answered on the interface within
-//     999 ms with every record already known to the link is not answered
-//     again (#shouldSuppressResponse, :394-444, QUESTION_SUPPRESSION_WINDOW
-//     :35);
+//     on the interface within a quarter of its TTL while peers cache it;
+//   - a multicast answer obeys the one-second rule with its deferral
+//     (hold.go);
 //   - a truncated query waits 400–500 ms for its continuation packets and
-//     is answered as one (#prepareMessage, :463-503;
-//     #processTruncatedQuery, :446-458);
+//     is answered as one;
 //   - the cache-flush bit is cleared where it would claim more than the
-//     response carries (sendable, :534-551);
+//     response carries (sendable, :934-962);
 //   - a response that outgrows 1232 bytes is split, answers first and the
 //     additionals spilled after them (packages/general/src/net/dns-sd/
 //     MdnsSocket.ts:131-201, MAX_MDNS_MESSAGE_SIZE DnsCodec.ts:26).
 
 const (
-	// questionSuppressionWindow is RFC 6762 §7.3's duplicate-question
-	// window, matter.js QUESTION_SUPPRESSION_WINDOW (MdnsServer.ts:35 at
-	// 862ad75f, after python-zeroconf).
-	questionSuppressionWindow = 999 * time.Millisecond
-	// multicastRateLimit is the minimum gap between two multicasts of one
-	// record set on one interface (RFC 6762 §6; matter.js
-	// MdnsServer.ts:167-173 at 862ad75f).
-	multicastRateLimit = 900 * time.Millisecond
 	// maxMessageSize is the largest message the responder sends,
 	// matter.js MAX_MDNS_MESSAGE_SIZE (packages/general/src/codec/
 	// DnsCodec.ts:26 at 862ad75f): the IPv6 minimum MTU less the IPv6 and
@@ -66,29 +57,18 @@ const (
 	// dnsHeaderSize is the fixed DNS header.
 	dnsHeaderSize = 12
 	// recordCacheLifetime is how long the per-interface record sets are
-	// reused before the interface's addresses are read again — matter.js's
-	// record cache (MdnsServer.ts:62-87 at 862ad75f, Minutes(15)).
+	// reused before the interface's addresses are read again, and how long
+	// an interface whose peers cache nothing stays unused before its state
+	// goes — matter.js INTERFACE_LIFETIME (InterfaceResponder.ts:37-40 at
+	// db021da0, Minutes(15)).
 	recordCacheLifetime = 15 * time.Minute
 )
 
-// answerState is the engine's memory between queries. The Responder's
-// mutex guards it.
+// answerState is the engine's memory between queries: the truncated
+// queries waiting for their continuation, by transaction id, interface and
+// source. The Responder's mutex guards it.
 type answerState struct {
-	// lastMulticast is when a record set (recordKey) last went out by
-	// multicast on an interface — matter.js
-	// #recordLastSentAsMulticastAnswer.
-	lastMulticast map[string]time.Time
-	// recentlyAnswered is matter.js #recentlyAnsweredQueries: per question
-	// signature and interface, the records known to the link.
-	recentlyAnswered map[string]recentAnswer
-	// truncated holds the truncated queries waiting for their
-	// continuation, by transaction id, interface and source.
 	truncated map[string]*truncatedQuery
-}
-
-type recentAnswer struct {
-	known map[string]bool
-	at    time.Time
 }
 
 type truncatedQuery struct {
@@ -97,19 +77,7 @@ type truncatedQuery struct {
 }
 
 func newAnswerState() answerState {
-	return answerState{
-		lastMulticast:    map[string]time.Time{},
-		recentlyAnswered: map[string]recentAnswer{},
-		truncated:        map[string]*truncatedQuery{},
-	}
-}
-
-// reset forgets the rate-limit and suppression state, as matter.js
-// #resetServices does whenever the records change (MdnsServer.ts:282-291
-// at 862ad75f). Pending truncated queries are kept.
-func (s *answerState) reset() {
-	clear(s.lastMulticast)
-	clear(s.recentlyAnswered)
+	return answerState{truncated: map[string]*truncatedQuery{}}
 }
 
 // linkRecords are the record sets of every published service on one
@@ -117,24 +85,28 @@ func (s *answerState) reset() {
 type linkRecords struct {
 	byService map[string][]dns.RR
 	owned     map[string]bool
-	// byKey holds the identity (recordIdentity) of every record, setKeys
+	// byKey holds every record by its identity (recordIdentity), setKeys
 	// the set (setKeyOf) of every record — matter.js's View.byKey and
-	// View.setKeys (InterfaceResponder.ts:880-892 at db021da0).
-	byKey   map[string]bool
-	setKeys map[string]bool
-	at      time.Time
+	// View.setKeys (InterfaceResponder.ts:880-892 at db021da0); complete
+	// is every record once, in order.
+	byKey    map[string]dns.RR
+	setKeys  map[string]bool
+	complete []dns.RR
+	at       time.Time
 }
 
 // recordsForLocked returns the record sets on ifIndex, from the cache while
-// it is fresh. Caller holds r.mu.
-func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
+// it is fresh, else built from the addresses addrs reads — the listing a
+// publication round took, or the one interface a query arrived on. Caller
+// holds r.mu.
+func (r *Responder) recordsForLocked(ifIndex int, addrs func() []net.IP) *linkRecords {
 	now := r.clock.Load().Now()
 	if lr, ok := r.links[ifIndex]; ok && now.Sub(lr.at) < recordCacheLifetime {
 		return lr
 	}
 	lr := &linkRecords{
 		byService: map[string][]dns.RR{}, owned: map[string]bool{},
-		byKey: map[string]bool{}, setKeys: map[string]bool{}, at: now,
+		byKey: map[string]dns.RR{}, setKeys: map[string]bool{}, at: now,
 	}
 	// An interface without advertised addresses carries no service records,
 	// listed or not. matter.js's generator yields PTR, SRV and TXT for
@@ -149,8 +121,7 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 	// 6170af84, CHIP_ERROR_TIMEOUT once no address arrived). A goodbye for
 	// an interface left without addresses therefore names the service
 	// records too (BD-Matter-MdnsFollowsAdvertisedAddresses).
-	addrs := r.wire.addrs(ifIndex)
-	if len(addrs) > 0 {
+	if addrs := addrs(); len(addrs) > 0 {
 		for _, key := range r.order {
 			e := r.services[key]
 			var hostAddrs []net.IP
@@ -166,7 +137,10 @@ func (r *Responder) recordsForLocked(ifIndex int) *linkRecords {
 			lr.byService[key] = rrs
 			for _, rr := range rrs {
 				lr.owned[strings.ToLower(rr.Header().Name)] = true
-				lr.byKey[recordIdentity(rr)] = true
+				if key := recordIdentity(rr); lr.byKey[key] == nil {
+					lr.byKey[key] = rr
+					lr.complete = append(lr.complete, rr)
+				}
 				lr.setKeys[setKeyOf(rr)] = true
 			}
 		}
@@ -180,8 +154,8 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 	if r.closed || len(r.order) == 0 || r.wire == nil {
 		return
 	}
-	// Ignore an interface without records (MdnsServer.ts:106-111).
-	if len(r.recordsForLocked(ifIndex).byService) == 0 {
+	// Ignore an interface without records.
+	if len(r.recordsForLocked(ifIndex, r.addrsOf(ifIndex)).byService) == 0 {
 		return
 	}
 	query := r.prepareLocked(msg, ifIndex, src)
@@ -249,103 +223,101 @@ func (r *Responder) processTruncated(key string, ifIndex int, src *net.UDPAddr) 
 		return
 	}
 	t.msg.Truncated = false
-	if len(r.recordsForLocked(ifIndex).byService) == 0 {
+	if len(r.recordsForLocked(ifIndex, r.addrsOf(ifIndex)).byService) == 0 {
 		return
 	}
 	r.answerLocked(t.msg, ifIndex, src)
 }
 
-// answerLocked answers a complete query (#handleMessage after
-// #prepareMessage, MdnsServer.ts:118-202 at 862ad75f). Caller holds r.mu.
+// addrsOf reads the addresses of the one interface ifIndex.
+func (r *Responder) addrsOf(ifIndex int) func() []net.IP {
+	return func() []net.IP { return r.wire.link(ifIndex).addrs }
+}
+
+// answerLocked answers a complete query — InterfaceResponder.answer
+// (:247-268 at db021da0): one packet per service with answers, in
+// registration order, 20–120 ms apart. Caller holds r.mu.
 func (r *Responder) answerLocked(query *dns.Msg, ifIndex int, src *net.UDPAddr) {
-	link := r.recordsForLocked(ifIndex)
-	// Skip unrelated LAN traffic (:120-122).
+	now := r.clock.Load().Now()
+	st := r.linkStateLocked(ifIndex)
+	st.usedAt = now
+	link := r.recordsForLocked(ifIndex, r.addrsOf(ifIndex))
+	// Skip unrelated LAN traffic.
 	if !slices.ContainsFunc(query.Question, func(q dns.Question) bool { return link.owned[strings.ToLower(q.Name)] }) {
 		return
 	}
+	r.answerNextLocked(query, ifIndex, src, map[string]bool{}, now)
+}
+
+// answerNextLocked is #sendAnswer (:323-396 at db021da0): the packet for
+// the first service in registration order not visited yet that has
+// answers, decided now; when services remain, the next packet follows
+// 20–120 ms later. Caller holds r.mu.
+func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAddr, visited map[string]bool, receivedAt time.Time) {
+	if r.closed || r.wire == nil {
+		return
+	}
+	link := r.recordsForLocked(ifIndex, r.addrsOf(ifIndex))
+	st := r.linkStateLocked(ifIndex)
 	onlyAddressQuestions := !slices.ContainsFunc(query.Question, func(q dns.Question) bool {
 		return q.Qtype != dns.TypeA && q.Qtype != dns.TypeAAAA
 	})
 	allUnicast := !slices.ContainsFunc(query.Question, func(q dns.Question) bool { return q.Qclass&classCacheFlush == 0 })
-
-	var delay time.Duration
-	sentPrevious := false
 	for _, key := range r.order {
+		if visited[key] {
+			continue
+		}
+		visited[key] = true
 		all := link.byService[key]
 		var answers []dns.RR
 		for _, q := range query.Question {
 			answers = append(answers, queryRecords(q, all)...)
 		}
+		answers = slices.DeleteFunc(uniqueRecords(answers), func(rr dns.RR) bool { return knownTo(query.Answer, rr) })
 		if len(answers) == 0 {
 			continue
 		}
 		var additional []dns.RR
 		if !onlyAddressQuestions {
 			for _, rr := range all {
-				if rr.Header().Rrtype != dns.TypePTR && !slices.Contains(answers, rr) {
+				if rr.Header().Rrtype != dns.TypePTR && !slices.Contains(answers, rr) && !knownTo(query.Answer, rr) {
 					additional = append(additional, rr)
 				}
 			}
 		}
-		if len(query.Answer) > 0 {
-			answers = slices.DeleteFunc(answers, func(rr dns.RR) bool { return knownTo(query.Answer, rr) })
-			if len(answers) == 0 {
-				continue
-			}
-			additional = slices.DeleteFunc(additional, func(rr dns.RR) bool { return knownTo(query.Answer, rr) })
-		}
 
 		now := r.clock.Load().Now()
-		sinceMulticast := func(rr dns.RR) time.Duration {
-			last, seen := r.answers.lastMulticast[recordKey(rr, ifIndex)]
-			if !seen {
-				return time.Duration(1<<63 - 1)
-			}
-			return now.Sub(last)
-		}
-		unicast := allUnicast && src != nil
-		if unicast && slices.ContainsFunc(answers, func(rr dns.RR) bool {
-			return sinceMulticast(rr) > time.Duration(rr.Header().Ttl)*time.Second/4
-		}) {
-			// Not multicast on this link within a quarter of the TTL: the
-			// link's caches need it, answer by multicast (:160-166).
-			unicast = false
-		}
+		unicast := allUnicast && src != nil && !slices.ContainsFunc(answers, func(rr dns.RR) bool {
+			return st.sinceCachedMulticast(rr, now) > time.Duration(rr.Header().Ttl)*time.Second/4
+		})
+		sentAnswers, sentAdditional := answers, additional
 		if !unicast {
-			answers = slices.DeleteFunc(answers, func(rr dns.RR) bool { return sinceMulticast(rr) < multicastRateLimit })
-			if len(answers) == 0 {
+			packet := append(slices.Clone(answers), additional...)
+			since := func(dns.RR) time.Time { return receivedAt }
+			sentAnswers = r.holdBackLocked(ifIndex, st, answers, now, since, true, func(dns.RR) []dns.RR { return additional }, packet)
+			sentAdditional = r.holdBackLocked(ifIndex, st, additional, now, since, false, func(dns.RR) []dns.RR { return nil }, packet)
+			if len(sentAnswers) == 0 {
 				continue
 			}
-			if r.suppressDuplicateLocked(query, ifIndex, answers, now) {
-				continue
-			}
-			for _, rr := range answers {
-				r.answers.lastMulticast[recordKey(rr, ifIndex)] = now
-			}
 		}
-
-		msgs := splitResponse(query.Id, sendable(answers, all, unicast), sendable(additional, all, unicast))
-		if sentPrevious {
-			// RFC 6762 §6: 20–120 ms between the responses of the
-			// services (:184-186).
-			delay += 20*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond //nolint:gosec // G404: a timing jitter
-		}
-		sentPrevious = true
 		var dst *net.UDPAddr
 		if unicast {
 			dst = src
 		}
-		if delay == 0 {
-			r.sendLocked(msgs, ifIndex, dst)
-			continue
+		l := r.wire.link(ifIndex)
+		r.sendLocked(splitResponse(query.Id, sendable(sentAnswers, all, unicast), sendable(sentAdditional, all, unicast)), l, dst, sentAnswers)
+		if !slices.ContainsFunc(r.order, func(k string) bool { return !visited[k] }) {
+			return
 		}
+		// RFC 6762 §6: 20–120 ms between the packets of one answer
+		// (packetDelay, InterfaceResponder.ts:920-922).
+		delay := 20*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond //nolint:gosec // G404: a timing jitter
 		r.clock.Load().AfterFunc(delay, func() {
 			r.mu.Lock()
 			defer r.mu.Unlock()
-			if !r.closed {
-				r.sendLocked(msgs, ifIndex, dst)
-			}
+			r.answerNextLocked(query, ifIndex, src, visited, receivedAt)
 		})
+		return
 	}
 }
 
@@ -362,48 +334,6 @@ func queryRecords(q dns.Question, all []dns.RR) []dns.RR {
 		}
 	}
 	return out
-}
-
-// suppressDuplicateLocked is matter.js #shouldSuppressResponse
-// (MdnsServer.ts:394-444 at 862ad75f, RFC 6762 §7.3): the same question
-// answered on the interface within the window, with every record we would
-// send already known to the link, is not answered again. Otherwise the
-// answer is recorded for the next duplicate. Caller holds r.mu.
-func (r *Responder) suppressDuplicateLocked(query *dns.Msg, ifIndex int, answers []dns.RR, now time.Time) bool {
-	for k, e := range r.answers.recentlyAnswered {
-		if now.Sub(e.at) >= questionSuppressionWindow {
-			delete(r.answers.recentlyAnswered, k)
-		}
-	}
-	sig := make([]string, 0, len(query.Question))
-	for _, q := range query.Question {
-		sig = append(sig, strings.ToLower(q.Name)+"-"+strconv.Itoa(int(q.Qtype)))
-	}
-	slices.Sort(sig)
-	key := strings.Join(sig, "|") + "-" + strconv.Itoa(ifIndex)
-	if e, ok := r.answers.recentlyAnswered[key]; ok && now.Sub(e.at) < questionSuppressionWindow {
-		if !slices.ContainsFunc(answers, func(rr dns.RR) bool { return !e.known[recordKey(rr, ifIndex)] }) {
-			return true
-		}
-	}
-	known := map[string]bool{}
-	for _, rr := range query.Answer {
-		known[recordKey(rr, ifIndex)] = true
-	}
-	for _, rr := range answers {
-		known[recordKey(rr, ifIndex)] = true
-	}
-	r.answers.recentlyAnswered[key] = recentAnswer{known: known, at: now}
-	return false
-}
-
-// recordKey identifies a record set on an interface as matter.js
-// buildDnsRecordKey does (MdnsServer.ts:99-101 at 862ad75f): name, class,
-// type and interface — not the value.
-func recordKey(rr dns.RR, ifIndex int) string {
-	hdr := rr.Header()
-	return strings.ToLower(hdr.Name) + "-" + strconv.Itoa(int(hdr.Class&^classCacheFlush)) + "-" +
-		strconv.Itoa(int(hdr.Rrtype)) + "-" + strconv.Itoa(ifIndex)
 }
 
 // knownTo reports whether a known answer of the query carries rr (RFC 6762
@@ -510,27 +440,32 @@ func splitResponse(id uint16, answers, additional []dns.RR) []*dns.Msg {
 	return out
 }
 
-// sendLocked packs and sends msgs on ifIndex: to dst by unicast when set,
-// to the mDNS groups otherwise. It notes what the peers may now cache
-// (noteSentLocked) and reports how far the message reached. Caller holds
-// r.mu.
-func (r *Responder) sendLocked(msgs []*dns.Msg, ifIndex int, dst *net.UDPAddr) reach {
+// sendLocked packs and sends msgs on the interface l: to dst by unicast
+// when set, to the mDNS groups otherwise. It notes what the peers may now
+// cache (noteSentLocked; answered are the answers to a query, which count
+// as the records' last multicast), logs a miss, and reports how far the
+// message reached (InterfaceResponder.ts #transmit, #sendFailed and
+// #multicastMissed, :694-789 at db021da0). Caller holds r.mu.
+func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answered []dns.RR) reach {
 	if len(msgs) == 0 {
 		return reachAll
 	}
 	now := r.clock.Load().Now()
 	rc, first := reachNone, true
+	var errs []error
 	for _, m := range msgs {
 		pkt, err := m.Pack()
 		var one reach
 		switch {
 		case err != nil:
-			r.logger().Debug("mdns.responder.pack_failed", slog.Any("err", err))
-			one = reachNone
+			one = reachFailed
 		case dst != nil:
-			one = r.wire.unicast(pkt, ifIndex, dst)
+			one, err = r.wire.unicast(pkt, l.index, dst)
 		default:
-			one = r.wire.multicast(pkt, ifIndex)
+			one, err = r.wire.multicast(pkt, l)
+		}
+		if err != nil {
+			errs = append(errs, err)
 		}
 		if first {
 			rc, first = one, false
@@ -538,6 +473,45 @@ func (r *Responder) sendLocked(msgs []*dns.Msg, ifIndex int, dst *net.UDPAddr) r
 			rc = rc.combine(one)
 		}
 	}
-	r.noteSentLocked(ifIndex, msgs, rc, now)
+	r.noteSentLocked(l.index, msgs, rc, now, dst == nil, answered)
+	err := errors.Join(errs...)
+	if dst != nil {
+		switch rc {
+		case reachFailed:
+			r.logger().Debug("mdns.responder.response_not_sent", slog.String("to", dst.String()), slog.Any("err", err))
+		case reachSome:
+			r.logger().Debug("mdns.responder.response_part_not_sent", slog.String("to", dst.String()), slog.Any("err", err))
+		case reachNone, reachAll:
+		}
+		return rc
+	}
+	st := r.linkStateLocked(l.index)
+	switch rc {
+	case reachAll:
+		st.outage = false
+	case reachSome:
+		r.multicastMissedLocked(st, l, "mdns.responder.multicast_some_families", err)
+	case reachFailed:
+		r.multicastMissedLocked(st, l, "mdns.responder.multicast_not_sent", err)
+	case reachNone:
+		// No usable family: nothing was tried, no outage (#transmit, :752-754).
+	}
 	return rc
+}
+
+// multicastMissedLocked logs a multicast that failed or reached only some
+// address families. Both are one outage of the interface, which only a
+// multicast that reached every family ends: the first miss logs at Info,
+// later ones — and every one while closing or on an interface the listing
+// no longer has — at Debug (#multicastMissed, :671-692 at db021da0). A
+// peer that makes the reach change between some and none cannot repeat
+// the line. Caller holds r.mu.
+func (r *Responder) multicastMissedLocked(st *linkState, l link, msg string, err error) {
+	attrs := []any{slog.String("iface", l.name), slog.Any("err", err)}
+	if st.outage || r.closed || !l.listed {
+		r.logger().Debug(msg, attrs...)
+		return
+	}
+	st.outage = true
+	r.logger().Info(msg, attrs...)
 }

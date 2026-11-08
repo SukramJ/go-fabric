@@ -15,6 +15,8 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -227,7 +229,7 @@ func TestMdnsServerHandleDuplicateMessages(t *testing.T) {
 		expectSent(t, got, 1)
 		expectResponse(t, got[0], 1, nil, []dns.RR{fooPTR(), fooSRV(), fooTXT()}, []dns.RR{fooA()})
 	}
-	t.Run("server suppress response to same ANY query when 0ms delay", func(t *testing.T) {
+	t.Run("server does not answer the same ANY query again when it arrives in the tick of the answer", func(t *testing.T) {
 		t.Parallel()
 		r, w, _ := newServerFixture()
 		deliver(t, r, anyQuery(), 1, dummySource)
@@ -240,11 +242,11 @@ func TestMdnsServerHandleDuplicateMessages(t *testing.T) {
 		r, w, clk := newServerFixture()
 		deliver(t, r, anyQuery(), 1, dummySource)
 		full(t, w.take())
-		clk.Advance(questionSuppressionWindow + 2*time.Millisecond)
+		clk.Advance(multicastInterval)
 		deliver(t, r, anyQuery(), 1, dummySource)
 		full(t, w.take())
 	})
-	t.Run("server also suppress response to different query with same records when 0ms delay", func(t *testing.T) {
+	t.Run("server does not answer a different query for the same records in the tick of the answer", func(t *testing.T) {
 		t.Parallel()
 		r, w, _ := newServerFixture()
 		deliver(t, r, anyQuery(), 1, dummySource)
@@ -252,15 +254,26 @@ func TestMdnsServerHandleDuplicateMessages(t *testing.T) {
 		deliver(t, r, queryMsg([]dns.Question{question(dummyQName, dns.TypeA, false)}), 1, dummySource)
 		expectSent(t, w.take(), 0)
 	})
-	t.Run("server do not suppress additional records to different query when 0ms delay", func(t *testing.T) {
+	// "server defers an additional record multicast less than a second
+	// ago" (MdnsServerTest.ts:841-922 at db021da0): the ANY answer leaves
+	// the A record out while its second runs and sends it alone, as the
+	// deferred answer, once the second has passed.
+	t.Run("server defers an additional record multicast less than a second ago", func(t *testing.T) {
 		t.Parallel()
-		r, w, _ := newServerFixture()
+		r, w, clk := newServerFixture()
 		deliver(t, r, queryMsg([]dns.Question{question("abcd.local", dns.TypeA, false)}), 1, dummySource)
 		got := w.take()
 		expectSent(t, got, 1)
 		expectResponse(t, got[0], 1, nil, []dns.RR{fooA()}, nil)
+		clk.Advance(time.Millisecond) // waitFor(Millis(1)): the query arrives after the answer left
 		deliver(t, r, anyQuery(), 1, dummySource)
-		full(t, w.take())
+		got = w.take()
+		expectSent(t, got, 1)
+		expectResponse(t, got[0], 1, nil, []dns.RR{fooPTR(), fooSRV(), fooTXT()}, nil)
+		clk.Advance(multicastInterval)
+		got = w.take()
+		expectSent(t, got, 1)
+		expectResponse(t, got[0], 1, nil, []dns.RR{fooA()}, nil)
 	})
 }
 
@@ -316,21 +329,27 @@ func TestMdnsServerRespondsAsUnicast(t *testing.T) {
 	})
 }
 
-// twelve or sixteen copies of the "foo" quadruple (:1059-1075,
-// :1135-1151).
+// twelve or sixteen distinct "foo" quadruples, as MdnsServerTest.ts at
+// db021da0 builds them (:1054-1071, :1110-1127): PTR to abcd<i+10>, SRV
+// on port 1234+i, TXT A=<i+10>, A 1.2.3.<i+10> — distinct records, since
+// an answer carries each record once.
 func quadruples(n int) (records, answers, additional []dns.RR) {
-	for range n {
-		records = append(records, fooPTR(), fooSRV(), fooTXT(), fooA())
-	}
-	for i := 0; i < len(records); i += 4 {
-		answers = append(answers, records[i], records[i+1], records[i+2])
-		additional = append(additional, records[i+3])
+	for i := range n {
+		ptr := &dns.PTR{Hdr: dns.RR_Header{Name: dns.Fqdn(dummyQName), Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: recordTTL}, Ptr: dns.Fqdn("abcd" + strconv.Itoa(i+10))}
+		srv := srvRec(dummyQName, uint16(1234+i), "abcd.local")
+		txt := txtRR(dummyQName, "A="+strconv.Itoa(i+10), "B=2")
+		a := addrRR("abcd.local", "1.2.3."+strconv.Itoa(i+10))
+		records = append(records, ptr, srv, txt, a)
+		answers = append(answers, ptr, srv, txt)
+		additional = append(additional, a)
 	}
 	return records, answers, additional
 }
 
 func TestMdnsServerSplitsResponse(t *testing.T) {
 	t.Parallel()
+	// :1048-1101: every answer in the first packet, the additional records
+	// spilled into the second.
 	t.Run("include as many answers as possible and spill remaining additionalRecords into a follow-up packet", func(t *testing.T) {
 		t.Parallel()
 		r, w, _ := newServerFixture()
@@ -339,9 +358,15 @@ func TestMdnsServerSplitsResponse(t *testing.T) {
 		deliver(t, r, anyQuery(), 1, dummySource)
 		got := w.take()
 		expectSent(t, got, 2)
-		expectResponse(t, got[0], 1, nil, answers, additional[:5])
-		expectResponse(t, got[1], 1, nil, nil, additional[5:])
+		expectRRs(t, "first answers", got[0].msg.Answer, answers...)
+		expectRRs(t, "second answers", got[1].msg.Answer)
+		expectRRs(t, "additionals", append(slices.Clone(got[0].msg.Extra), got[1].msg.Extra...), additional...)
+		if len(got[1].msg.Extra) == 0 {
+			t.Error("the second packet carries no additional record")
+		}
 	})
+	// :1103-1157: the answers across two packets, every additional record
+	// in the last.
 	t.Run("split answers into multiple responses and add additional records in last one", func(t *testing.T) {
 		t.Parallel()
 		r, w, _ := newServerFixture()
@@ -351,15 +376,16 @@ func TestMdnsServerSplitsResponse(t *testing.T) {
 		got := w.take()
 		expectSent(t, got, 2)
 		// No truncation bit: it is not relevant for responses.
-		expectResponse(t, got[0], 1, nil, answers[:len(answers)-7], nil)
-		expectResponse(t, got[1], 1, nil, answers[len(answers)-7:], additional)
+		expectRRs(t, "answers", append(slices.Clone(got[0].msg.Answer), got[1].msg.Answer...), answers...)
+		expectRRs(t, "first additionals", got[0].msg.Extra)
+		expectRRs(t, "last additionals", got[1].msg.Extra, additional...)
 	})
 }
 
 func TestMdnsServerDuplicateQuestionSuppression(t *testing.T) {
 	t.Parallel()
 	ptrQuery := func() *dns.Msg { return queryMsg([]dns.Question{question(dummyQName, dns.TypePTR, false)}) }
-	t.Run("suppresses response when same question was recently answered", func(t *testing.T) {
+	t.Run("does not answer a repeated question that arrives in the tick of the answer", func(t *testing.T) {
 		t.Parallel()
 		r, w, _ := newServerFixture()
 		deliver(t, r, ptrQuery(), 1, dummySource)
@@ -367,12 +393,12 @@ func TestMdnsServerDuplicateQuestionSuppression(t *testing.T) {
 		deliver(t, r, ptrQuery(), 1, dummySource)
 		expectSent(t, w.take(), 0) // Suppressed
 	})
-	t.Run("responds after suppression window expires", func(t *testing.T) {
+	t.Run("answers a repeated question at once a second after the answer", func(t *testing.T) {
 		t.Parallel()
 		r, w, clk := newServerFixture()
 		deliver(t, r, ptrQuery(), 1, dummySource)
 		expectSent(t, w.take(), 1)
-		clk.Advance(questionSuppressionWindow + 2*time.Millisecond)
+		clk.Advance(multicastInterval)
 		deliver(t, r, ptrQuery(), 1, dummySource)
 		expectSent(t, w.take(), 1) // Should respond after window expires
 	})

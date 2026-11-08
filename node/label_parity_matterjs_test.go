@@ -145,9 +145,15 @@ func (lp *labelPair) replaceAllThenAppend(t *testing.T, value []userlabeldef.Lab
 // of a rawLabels list or an ADD of one rawLabel.
 func (lp *labelPair) rawWrite(t *testing.T, writes ...spec.Encodable) []im.StatusCode {
 	t.Helper()
+	return lp.rawWriteTo(t, userlabeldef.ClusterID, writes...)
+}
+
+// rawWriteTo is rawWrite to the LabelList of cluster.
+func (lp *labelPair) rawWriteTo(t *testing.T, cluster uint32, writes ...spec.Encodable) []im.StatusCode {
+	t.Helper()
 	req := im.WriteRequest{}
 	for _, w := range writes {
-		p := lp.path(userlabeldef.ClusterID)
+		p := lp.path(cluster)
 		_, p.ListAppend = w.(rawLabel)
 		req.Writes = append(req.Writes, im.AttributeWrite{Path: p, Value: im.AttributeValue{Value: w}})
 	}
@@ -380,10 +386,9 @@ func TestUserLabelServerParity(t *testing.T) { //nolint:tparallel // each subtes
 	t.Run("answers a lone ADD to a non-empty list with BUSY and keeps the list", func(t *testing.T) {
 		// matter.js answers an ADD not preceded by a write path to the same
 		// attribute in the same interaction BUSY, as chip does
-		// (packages/node/src/node/server/InteractionServer.ts:510-530 at
-		// db021da0, previousProcessedAttributePath :458); im/write.go keeps
-		// no such marker and appends.
-		t.Skip("divergence: a lone list ADD is applied (Success), matter.js answers BUSY — InteractionServer.ts:510-530 at db021da0")
+		// (packages/node/src/node/server/InteractionServer.ts:511-531 at
+		// db021da0, previousProcessedAttributePath :456-458); im/write.go
+		// keeps the same marker (issue 438, findings T3-P3-1 closed).
 		lp := userLabelPair(t, 0)
 		lp.replaceAll(t, userLabels(2))
 		third := userLabels(3)[2]
@@ -483,6 +488,18 @@ func TestFixedLabelServerParity(t *testing.T) { //nolint:tparallel // each subte
 			}
 		})
 	}
+
+	// The lone-ADD rule comes before the writability check
+	// (InteractionServer.ts:511-531 at db021da0, ahead of
+	// AttributeWriteResponse.ts:231-233): an ADD to the read-only list
+	// that follows no write of it is BUSY, not UNSUPPORTED_WRITE.
+	t.Run("answers a lone ADD to the read-only list with BUSY and keeps the labels", func(t *testing.T) {
+		lp := fixedLabelPair(t)
+		expectStatuses(t, lp.rawWriteTo(t, fixedlabeldef.ClusterID, entry("room", "kitchen")), []im.StatusCode{im.StatusBusy})
+		if got := lp.fixedStored(); !slices.Equal(got, fixed) {
+			t.Fatalf("LabelList %v, want %v", got, fixed)
+		}
+	})
 
 	// Nothing writes the application's labels to storage, so a changed
 	// application value wins after a restart (:89-91).

@@ -201,12 +201,17 @@ func (r *exchangeRouting) dropSessionTimedDeadlines(sessionID uint16) {
 
 // writeTxTTL bounds how long an abandoned chunked write keeps its
 // transaction: far beyond any chunk round trip, short enough that an
-// abandoned one does not linger.
+// abandoned one does not linger. It is an idle time, counted from the
+// interaction's last chunk, so a chunked write that runs longer keeps its
+// holds and the list-ADD marker its later chunks depend on
+// (im.WriteTransaction.busyBefore).
 const writeTxTTL = time.Minute
 
 type writeTx struct {
-	tx      *im.WriteTransaction
-	started time.Time
+	tx *im.WriteTransaction
+	// lastChunk is when the interaction's last chunk arrived, Unix
+	// nanoseconds; the sweep of another exchange reads it concurrently.
+	lastChunk atomic.Int64
 }
 
 // writeTransaction returns the write transaction of the exchange key
@@ -215,7 +220,7 @@ type writeTx struct {
 // chunk (more=false) takes the transaction out of the table.
 func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now time.Time) *im.WriteTransaction {
 	r.writeTxs.Range(func(k, v any) bool {
-		if w, ok := v.(*writeTx); ok && now.Sub(w.started) > writeTxTTL {
+		if w, ok := v.(*writeTx); ok && now.Sub(time.Unix(0, w.lastChunk.Load())) > writeTxTTL {
 			r.writeTxs.Delete(k)
 			w.tx.Release()
 		}
@@ -229,8 +234,11 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 		}
 		return im.NewWriteTransaction(&r.writeHolds)
 	}
-	v, _ := r.writeTxs.LoadOrStore(key, &writeTx{tx: im.NewWriteTransaction(&r.writeHolds), started: now})
+	fresh := &writeTx{tx: im.NewWriteTransaction(&r.writeHolds)}
+	fresh.lastChunk.Store(now.UnixNano())
+	v, _ := r.writeTxs.LoadOrStore(key, fresh)
 	if w, isTx := v.(*writeTx); isTx {
+		w.lastChunk.Store(now.UnixNano())
 		return w.tx
 	}
 	return im.NewWriteTransaction(&r.writeHolds)

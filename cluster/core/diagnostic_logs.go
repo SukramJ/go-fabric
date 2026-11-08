@@ -43,7 +43,9 @@ type DiagnosticLogs struct {
 	exchanges BDXExchangeOpener
 	bootEpoch time.Time
 	clock     clock.Clock
-	logger    *slog.Logger
+	// utcClock is the node's UTC (SetUTCClock); nil stamps clock's time.
+	utcClock func() (time.Time, bool)
+	logger   *slog.Logger
 	// busy is set while a BDX transfer runs: chip has one
 	// BDXDiagnosticLogsProvider (DLC:62-64, :146-150).
 	busy bool
@@ -281,6 +283,22 @@ func (d *DiagnosticLogs) SetClock(c clock.Clock) {
 	d.bootEpoch = d.clock.Now()
 }
 
+// SetUTCClock couples the logs' UTCTimeStamp to the node's
+// TimeSynchronization: utc returns its UTC time, false while it is null,
+// and a collected log then carries no UTCTimeStamp — TimeSinceBoot
+// alone, which the specification allows. A server outside a node stamps
+// its clock's time. It takes the UTC as a time, not the participants'
+// clock.MatterTime: UTCTimeStamp is epoch-us, which Matter epoch seconds
+// cannot carry. Pass [TimeSynchronization.UTC] when both are mounted, as
+// the node does, so after SetUTCTime the stamp follows the
+// node's UTCTime as connectedhomeip's single system clock does
+// (TimeSynchronizationCluster.cpp:856-872 at 6170af84; issue 445).
+func (d *DiagnosticLogs) SetUTCClock(utc func() (time.Time, bool)) {
+	d.mu.Lock()
+	d.utcClock = utc
+	d.mu.Unlock()
+}
+
 // SetBootEpoch overrides the timestamp a [LogProvider]'s TimeSinceBoot is
 // computed against. Most operators won't need this; default is the
 // cluster construction time.
@@ -300,11 +318,19 @@ type sliceCollector struct {
 
 func (s *sliceCollector) stamps() LogTimestamps {
 	s.d.mu.RLock()
-	boot, clk := s.d.bootEpoch, s.d.clock
+	boot, clk, utcClock := s.d.bootEpoch, s.d.clock, s.d.utcClock
 	s.d.mu.RUnlock()
-	utc := matterEpochMicros(clk.Now())
 	since := uint64(max(clock.Since(clk, boot).Microseconds(), 0)) //nolint:gosec // non-negative, systime-us
-	return LogTimestamps{UTC: &utc, SinceBoot: &since}
+	stamps := LogTimestamps{SinceBoot: &since}
+	now, ok := clk.Now(), true
+	if utcClock != nil {
+		now, ok = utcClock()
+	}
+	if ok {
+		utc := matterEpochMicros(now)
+		stamps.UTC = &utc
+	}
+	return stamps
 }
 
 func (s *sliceCollector) GetSizeForIntent(ctx context.Context, intent uint8) (uint64, error) {

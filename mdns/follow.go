@@ -80,13 +80,12 @@ func (r *Responder) interfaceSnapshot() map[string]string {
 		return nil
 	}
 	out := map[string]string{}
-	for _, ifIndex := range w.links() {
-		addrs := w.addrs(ifIndex)
-		ips := make([]string, 0, len(addrs))
-		for _, ip := range addrs {
+	for _, l := range w.links() {
+		ips := make([]string, 0, len(l.addrs))
+		for _, ip := range l.addrs {
 			ips = append(ips, ip.String())
 		}
-		out[strconv.Itoa(ifIndex)] = netwatch.Describe("", ips)
+		out[strconv.Itoa(l.index)] = netwatch.Describe("", ips)
 	}
 	return out
 }
@@ -145,9 +144,9 @@ func (r *Responder) repeatChange(gen uint64) {
 // in only (MdnsServer.ts #publishOnListedInterfaces, :254-284 at
 // db021da0). Caller holds r.mu.
 func (r *Responder) publishOnListedLocked(only map[int]bool) {
-	for _, ifIndex := range r.wire.links() {
-		if only[ifIndex] {
-			r.publishLocked(ifIndex, nil, true)
+	for _, l := range r.listLocked() {
+		if only[l.index] {
+			r.publishLocked(l, nil, true)
 		}
 	}
 }

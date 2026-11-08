@@ -162,6 +162,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
 	r.GeneralDiagnostics.SetLogger(d.logger)
 	r.GeneralDiagnostics.SetInterfaceCheckInterval(cfg.Network.interfaceCheck())
+	r.GeneralDiagnostics.SetFaultSource(cfg.Faults) // nil serves no fault list
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)
@@ -268,6 +269,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.DiagnosticLogs.SetClock(cfg.Clock)
+	r.wireLogsUTC()
 	var netComm contract.ClusterServer
 	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once
@@ -641,6 +643,14 @@ func (d rootDeps) timeSynchronization(cfg *Config, gd *mattercore.GeneralDiagnos
 	ts.SetClock(cfg.Clock)
 	gd.SetUTCClock(ts.UTC)
 	return ts, nil
+}
+
+// wireLogsUTC stamps DiagnosticLogs' UTCTimeStamp with the node's UTC,
+// the root TimeSynchronization's, when it is mounted (issue 445).
+func (r *RootClusters) wireLogsUTC() {
+	if r.TimeSynchronization != nil {
+		r.DiagnosticLogs.SetUTCClock(r.TimeSynchronization.UTC)
+	}
 }
 
 // buildWiFiDiagnostics is the root's WiFiNetworkDiagnostics server of

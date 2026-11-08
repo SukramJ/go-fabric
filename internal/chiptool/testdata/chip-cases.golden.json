@@ -4073,6 +4073,12 @@
       "source": "the camera acceptance of issue 410: one WebRTC session against chip-camera-app at 6170af84, the SDP over TCP (gocert_camera_test.go)",
       "role": "dut"
     },
+    "CGENTC-GO/1.1": {
+      "steps": 3,
+      "stepsSkipped": 0,
+      "source": "the terms-and-conditions acceptance of issue 449: the commissioner reads the daemon's --tc-required requirement and fails early without the acknowledgement (gocert_tc_test.go)",
+      "role": "dut"
+    },
     "DD/1.8": {
       "steps": 7,
       "stepsSkipped": 0,

@@ -247,7 +247,7 @@ func TestResponder_TriggerReannounce(t *testing.T) {
 func TestResponder_HostQuestions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r, w, _ := newWiredResponder(map[int][]string{1: {"2001:db8::7", "fd00::1", "fe80::1", "192.168.1.10"}})
+	r, w, clk := newWiredResponder(map[int][]string{1: {"2001:db8::7", "fd00::1", "fe80::1", "192.168.1.10"}})
 	if err := r.Publish(ctx, operationalFixture(port1)); err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,11 @@ func TestResponder_HostQuestions(t *testing.T) {
 		flushed(addrRR(host, "fe80::1")), flushed(addrRR(host, "fd00::1")), flushed(addrRR(host, "2001:db8::7")),
 	}, nil)
 	// A mixed query carries the rest of the set (except the PTRs) as
-	// additionals.
+	// additionals — a second later, once the one-second rule no longer
+	// holds the address records back (InterfaceResponder.ts:59-75 at
+	// db021da0).
+	clk.Advance(multicastInterval)
+	w.take() // the schedule's second announcement
 	deliver(t, r, queryMsg([]dns.Question{question(host, dns.TypeA, false), question("other.local", dns.TypeSRV, false)}), 1, dummySource)
 	got = w.take()
 	expectSent(t, got, 1)

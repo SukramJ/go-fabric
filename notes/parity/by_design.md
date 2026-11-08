@@ -134,6 +134,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 | BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
+| BD-Matter-Commissioner-TermsRequirementRead | `ControllerCommissioningFlow.ts:570` at `db021da0` leaves the terms-and-conditions consent a TODO after step 8.2 and the flow reads no TC attribute (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"// TODO Step 9: If device and Controller supports T&C Feature then User consent is handled"` | this module: connectedhomeip sends the acknowledgement as a parameter and reads no TC attribute either (`src/controller/CHIPDeviceController.cpp:2592-2603`, `:3946-3957` at `6170af84`); the device side it reads is its own TC server (`BD-chip-GeneralCommissioning-TermsAndConditions`) | no |
+| BD-matterjs-mdns-interface-allowlist | `MdnsServer.ts:211` at `db021da0` announces "on every multicast interface", one `InterfaceResponder` per listed interface (`:36-38`), with no choice of interfaces (presence) | `packages/protocol/src/mdns/MdnsServer.ts` | `"Announce the named services, or all registered services if none are named, on every multicast interface."` | this module: an operator's allow-list by interface name within the default container filter (owner decision on issue 450); matter.js-based bridges offer the option at the host level | no |
 
 ---
 
@@ -6110,16 +6112,34 @@ tells of that adoption too because it moves the time the participants
 read —, and as chip's servers read the system clock
 SetUTCTime sets through `GetClock_MatterEpochS`
 (`src/system/SystemClock.cpp:284-306` at `6170af84`; the delegate call is
-`TimeSynchronizationCluster.cpp:865`). Difference,
-until issue 445: the other device-side readers of real time — the event
-log's EpochTimestamp, ResourceMonitoring's LastChangedTime, DiagnosticLogs,
-the energy servers — read the host clock without the offset, where chip
-reads the one system clock for them too. TimeSource and
+`TimeSynchronizationCluster.cpp:865`). Since issue 445 every device-side
+reader of real time reads the node's UTC, as chip's read the one system
+clock: the participants — Thermostat TSUGGEST, Valve TS, ResourceMonitoring's
+LastChangedTime (`cluster/filter`, chip `ResourceMonitoringCluster.cpp:379`,
+`GetClock_RealTimeMS`), DeviceEnergyManagement's forecast and pause times
+(`DeviceEnergyManagementCluster.cpp:449`, `:698`), CommodityTariff's
+current day and period (`commodity-tariff-server.cpp:928`) and EnergyEVSE's
+targets and session times — through `AttachMatterTime`; of these only the
+Valve re-evaluates on `MatterTimeChanged` (the others read the time per
+command or timer, as chip's) and only the Valve requires the time (chip's
+Startup refuses it, `ValveConfigurationAndControlCluster.cpp:46-50`); and
+the root's readers through `SetUTCClock(TimeSynchronization.UTC)` — the
+event log's EpochTimestamp (`im.EventLog`, chip `EventManagement.cpp:433-439`,
+which stamps a system time when the UTC is null; the Go record has no
+system-time form and takes the host clock then), GeneralDiagnostics'
+TimeSnapshot and DiagnosticLogs' UTCTimeStamp (omitted while the UTC is
+null). While the node's time is null a participant does what its chip line
+does on GetClock_MatterEpochS's error (DEM fails the request, EVSE skips the
+stamp and re-checks in 30 s, the tariff refuses); only a server outside a
+node reads its own clock (`clock.MatterTimeOf`),
+and the duplicated Matter-epoch offsets of the readers are gone onto it.
+TimeSource and
 TimeZoneDatabase go out as plain integers; a named enum type went out as
 TLV null through the bridge's reply writer. Pinned by `cluster/core`
 time-synchronization tests (3 chip cases, 9 rules, 6 client cases, 1 wire,
-1 epoch-seconds case), `node`'s client wire test and its
-`TestOneMatterTimePerNode`.
+1 epoch-seconds case), `node`'s client wire test, its
+`TestOneMatterTimePerNode` and `TestRootReadersFollowTheNodesUTC`,
+`cluster/filter:TestMatterNow` and `cluster/energy:TestNodeTime`.
 
 ### BD-chip-GeneralCommissioning-TermsAndConditions — the TC feature follows connectedhomeip when the node states its terms
 
@@ -6377,3 +6397,67 @@ verification still refuses a statement, as chip's does. Proof:
 `client/jcm:TestVendorIdVerificationParity`; Ahead row above. Retires when
 matter.js closes its TODOs — the statement message then follows matter.js
 or is recorded against it.
+
+### BD-Matter-Commissioner-TermsRequirementRead — the commissioner reads the device's terms-and-conditions requirement and fails early with it
+
+matter.js's commissioning flow has no terms-and-conditions step: it goes
+from `GeneralCommissioning.ConfigureRegulatoryInformation` (8.1) to
+`TimeSynchronization.SynchronizeTime` (8.2) and leaves the consent a TODO
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:556-570` at
+`db021da0`). connectedhomeip sends SetTCAcknowledgements when its
+parameters carry an acknowledgement and skips the stage otherwise
+(`src/controller/CHIPDeviceController.cpp:3946-3957` at `6170af84`;
+`AutoCommissioner.cpp:485-487` orders it after the regulatory
+configuration), and its `kReadCommissioningInfo` reads GeneralCommissioning's
+SupportsConcurrentConnection, Breadcrumb, BasicCommissioningInfo,
+RegulatoryConfig, LocationCapability and IsCommissioningWithoutPower — no TC
+attribute (`:2592-2603`). Neither learns that a device requires terms before
+the device refuses CommissioningComplete with TCAcknowledgementsNotReceived,
+after AddNOC. `controller/commissioner`'s step 0.1 (`getInitialData`) adds
+the root GeneralCommissioning's FeatureMap, TCMinRequiredVersion,
+TCAcknowledgementsRequired and TCUpdateDeadline to its second read (seven
+paths, within the nine a server has to accept, `:2581-2582`), and when the
+device has the TC feature, holds no satisfying acceptance and the options'
+acknowledgement is absent or below TCMinRequiredVersion, ends the
+commissioning right after that step with `*commissioner.TermsRequiredError`
+(`Version`, `Deadline` as Matter epoch seconds) — before ArmFailSafe, so the
+device is left as found. The error names no acknowledgement bits (owner
+decision 2026-11-08): a device serves no attribute naming the bits it
+requires (TCAcknowledgements is the accepted set; the required set is the
+vendor's DCL entry), so a missing bit stays the device's
+RequiredTCNotAccepted at SetTCAcknowledgements, typed as
+`*commissioner.GeneralCommissioningError` like every refused
+GeneralCommissioning command. `controller.PairOptions.TermsAndConditions`
+carries the acknowledgement. Owner decision 2026-11-07 (issue 449): read in
+the information step, no step of its own. Pinned by
+`TestTermsRequirementRead`, `TestTermsRequiredBeforeArmFailSafe`,
+`TestGeneralCommissioningErrorTyped` (`controller/commissioner/terms_test.go`)
+and `TestPairTermsRequired` (`controller/pair_terms_test.go`). Retire when
+matter.js's flow reads the requirement (the marker goes).
+
+### BD-matterjs-mdns-interface-allowlist — the mDNS responder can be restricted to named host interfaces
+
+matter.js's `MdnsServer` keeps one `InterfaceResponder` per network
+interface and announces "on every multicast interface", re-reading the
+interfaces on `Network.interfacesChanged`
+(`packages/protocol/src/mdns/MdnsServer.ts:36-43`, `:209-214` at
+`db021da0`); it has no allow-list. `node.MDNS.Interfaces` restricts the
+module's responder to the named host interfaces: `defaultAdvertiser`
+composes `mdns.Responder.InterfaceFilter` as the default container filter
+(`mdns.DefaultInterfaceFilter`) or "not named", so a named `docker0` or
+`hassio` stays filtered, and an interface outside the list is announced on
+and answered on as one the advertise policy excludes — listed, no
+addresses, no records (`BD-Matter-MdnsFollowsAdvertisedAddresses`). An
+unknown name is accepted (the interface check picks it up when it appears)
+and `Node.DiagnoseMDNS` names it (`mdns.DiagnoseInterfaces`:
+`interface_not_found`, `interface_filtered`, `interface_no_addresses`). It
+does not scope `Network.Listen`. The case is a dual-homed host whose
+gateway relays mDNS between its networks, so controllers cache the far
+network's address too (go-ha2fabric issue 40); matter.js-based bridges
+offer the same choice to operators at the host level. Owner decisions
+2026-11-07 (issue 450): by name, within the default filter, `Listen`
+untouched. Pinned by `TestMDNSInterfacesFilter`, `TestMDNSInterfacesValidate`,
+`TestDiagnoseMDNSNamesUnknownInterface` (`node/mdns_interfaces_test.go`),
+`TestDiagnoseInterfaces` and `TestAllowListAdvertisesOnNamedInterfaceOnly`
+(`mdns/diagnose_interfaces_test.go`). Retire when matter.js's server takes
+a choice of interfaces (the marker goes).

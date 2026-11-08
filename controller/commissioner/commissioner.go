@@ -155,11 +155,15 @@ type Options struct {
 	// with SetTCAcknowledgements after the regulatory configuration — a
 	// device that serves GeneralCommissioning's TC feature refuses
 	// CommissioningComplete without one. matter.js's flow has no such
-	// step (ControllerCommissioningFlow.ts:558-567 at 862ad75f goes from
-	// ConfigureRegulatoryInformation to SynchronizeTime); the step is
-	// connectedhomeip's kConfigureTCAcknowledgments, skipped without the
-	// parameter (register row
-	// BD-chip-GeneralCommissioning-TermsAndConditions).
+	// step (ControllerCommissioningFlow.ts:556-570 at db021da0 goes from
+	// ConfigureRegulatoryInformation to SynchronizeTime and leaves the
+	// consent a TODO); the step is connectedhomeip's
+	// kConfigureTCAcknowledgments, skipped without the parameter (register
+	// row BD-chip-GeneralCommissioning-TermsAndConditions). A device whose
+	// requirement this does not meet — nil, or a Version below its
+	// TCMinRequiredVersion, while it holds no satisfying acceptance — ends
+	// the commissioning after step 0.1 with a [*TermsRequiredError]
+	// (BD-Matter-Commissioner-TermsRequirementRead).
 	TermsAndConditions *TermsAndConditionsAcknowledgement
 	// OnAttestationFailure is the attestation policy (DAV:156). The zero
 	// value accepts every finding: a device whose attestation failed is
