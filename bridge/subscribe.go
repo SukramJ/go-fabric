@@ -910,6 +910,9 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 	counters = make([]uint32, 0, len(chunks))
 	ourRole := !target.peerInitiator
 	op := "subscribe.ongoing"
+	if target.flush {
+		op = "subscribe.flush"
+	}
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {

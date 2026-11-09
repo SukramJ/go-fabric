@@ -659,7 +659,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 974,
+    "line": 977,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -668,7 +668,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1345,
+    "line": 1348,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -677,7 +677,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1423,
+    "line": 1426,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -686,7 +686,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1510,
+    "line": 1513,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
