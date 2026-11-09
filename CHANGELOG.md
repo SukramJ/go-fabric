@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.19.2] — 2026-11-09
+
+Wave W11 (#474, issue 473 from go-fabric-server #54): the fabric-leaving flush — `Node.FactoryReset`, `Node.RemoveFabric` from the host — sends one report per subscription, the Leave event and the attributes owed together, once and without MRP retransmission, and waits at most 500 ms for its answer, as matter.js does. It sent two reports, each awaited up to the MRP-derived bound, and a controller that gives its sessions up on the Leave never answered the second: a reset waited about 14 s on a UDP session. With it: `subscription.FlushReporter`, `Manager.SetFlushReporter` and `Bridge.SubscriptionFlushReporter` for a host wiring its own manager. The roadmap's pause (owner decision 2026-11-09) continues after this release.
+
 ### Added
 
 - `im/subscription`, `bridge`: `subscription.FlushReporter` and `Manager.SetFlushReporter` — the hook `Manager.FlushFabric` hands each subscription's drained events and dirty attributes to, together, for one report — and `Bridge.SubscriptionFlushReporter`, the bridge's implementation, which a host wiring its own manager sets beside `SubscriptionReporter` and `SubscriptionEventReporter` (`node` wires it). Without a flush reporter `FlushFabric` neither drains nor sends (issue 473).
@@ -5603,7 +5607,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/SukramJ/go-fabric/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/SukramJ/go-fabric/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/SukramJ/go-fabric/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/SukramJ/go-fabric/compare/v0.17.0...v0.18.0
