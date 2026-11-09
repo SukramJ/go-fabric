@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-11-09
+
+The issue waves after 0.18.0 (owner decision 2026-11-08: one release for W7, W8 and W9): the flake pass FP2 (the OTA provider race, the camera fabrictest family); `Node.SetNodeLabel` (issue 414); wave W7 — the commissioner reads a device's terms-and-conditions requirement, the mDNS interface allow-list, the lone list ADD answered BUSY, GeneralDiagnostics fault lists and events, the rest of matter.js #4844 in the responder, the scanner window-change parity, every device-side reader of real time on the node's UTC (issues 438–441, 445, 449, 450); wave W8 — the host hand-overs: the factory reset restarts the endpoint numbering, the camera wire names and a test camera for hosts, a passive Thread border-router registry for the controller's topology (issues 457, 460, 461); wave W9 — the BlockAckEOF marks a BDX transfer finished at arrival and every client-stack socket serves a session's datagrams in arrival order (issue 462, from 452); the macOS host name is verified before its address records are left to the OS (issue 465); and the test flakes 455, 459, 467. Five breaks below the facade, each with a migration-guide section: the BasicInformation restores, `node.Network`/`node.MDNS` comparability, `endpoint.Store.EraseEndpoints`, the camera bounds as pointers, `topology.Build`'s registry input and the exchange receive notifier. The review of a wave is split since this release (Opus reviews the code, Fable reads the citations and the register text; `CLAUDE.md`).
+
 ### Added
 
 - `bdx`: `ReceiveNotifier`, the optional interface of an `Exchange` that tells of each message queued for `Receive` when it is queued, on the receive path — never one the exchange drops; the outbound flow finishes a transfer at its final `BlockAckEof` through it (issue 462).
@@ -5568,7 +5572,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/SukramJ/go-fabric/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/SukramJ/go-fabric/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/SukramJ/go-fabric/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/SukramJ/go-fabric/compare/v0.15.6...v0.16.0
