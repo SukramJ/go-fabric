@@ -133,7 +133,7 @@ type cameraRun struct {
 func caseCameraGo() goCertCase {
 	r := &cameraRun{}
 	return goCertCase{
-		tc: "CAMERA-GO-1.1", role: roleDUT, origin: cameraGoOrigin, noDaemon: true, finalize: r.finalize,
+		tc: "CAMERA-GO-1.1", role: roleDUT, origin: cameraGoOrigin, noDaemon: true, finalize: r.finalize, failureLog: r.failureLog,
 		steps: []goStep{
 			{n: "1", title: "TH_SERVER chip-camera-app starts on its test video source and serves Matter over TCP", run: r.start},
 			{n: "2", title: "DUT commissions the camera with outgoing TCP and starts the camera service", run: r.commission},
@@ -666,6 +666,18 @@ func (r *cameraRun) second(th *goTH) error {
 	}
 	th.note("session %d reuses video stream %d (%s); the camera answered it, and Stop ended it: the camera logged %q and its CurrentSessions reads []", s.ID, v.ID, v.Provenance, line)
 	return nil
+}
+
+// failureLog is the camera app's last lines, so a failed step shows the
+// camera's side ("Sending Answer command", "Answer command failed")
+// beside the controllers' (issue 464).
+func (r *cameraRun) failureLog(th *goTH) string {
+	if r.app == nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return "chip-camera-app's last log lines:\n" + tail(r.app.since(ctx, 0), 200)
 }
 
 func (r *cameraRun) finalize(th *goTH) {
