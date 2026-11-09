@@ -85,7 +85,12 @@
 //     but with HasSubscription=false and SubscriptionID=0, and no report
 //     ever follows; EmitEvent still appends to the event log and fans
 //     out to nobody. The controller sees a successful subscribe and a
-//     device that never changes.
+//     device that never changes. The manager's SetEventReporter and
+//     SetFlushReporter are the host's to wire too
+//     ([Bridge.SubscriptionEventReporter],
+//     [Bridge.SubscriptionFlushReporter]); without the flush reporter a
+//     fabric leave flushes nothing — no Leave event, no owed attribute —
+//     silently.
 //   - AttachSessionRegistry — silent. Inbound CloseSession stops closing
 //     anything, [Stop] tears sessions down without the CloseSession
 //     farewell (leaving controllers on stale sessions after a restart),
