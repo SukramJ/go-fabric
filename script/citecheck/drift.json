@@ -1235,7 +1235,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 117,
+    "line": 120,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1316,7 +1316,7 @@
   },
   {
     "file": "client/interaction/scripted_test.go",
-    "line": 87,
+    "line": 86,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1325,7 +1325,7 @@
   },
   {
     "file": "client/interaction/scripted_test.go",
-    "line": 88,
+    "line": 87,
     "citation": "ClientInteraction.ts:457-464",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "commandRef",
@@ -1334,7 +1334,7 @@
   },
   {
     "file": "client/interaction/scripted_test.go",
-    "line": 181,
+    "line": 180,
     "citation": "ClientInteraction.ts:438-440",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "TimedRequest",
@@ -1343,7 +1343,7 @@
   },
   {
     "file": "client/interaction/scripted_test.go",
-    "line": 306,
+    "line": 305,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "TlvReadRequest",

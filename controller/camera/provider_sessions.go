@@ -430,7 +430,7 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // matter.js packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:170-182
 // at db021da0). matterjs-server registers the session after the invoke
 // resolves, and the local requestor accepts the camera's signalling from
-// then on (packages/ws-controller/src/camera/sessionRegistry.ts:283-296 at
+// then on (packages/ws-controller/src/camera/sessionRegistry.ts:284-296 at
 // 0bd06f2); on Node the response's continuation runs to its end before the
 // Answer's datagram is decoded — a runtime property Go's scheduling does
 // not have, so the registration moves to the arrival (issue 464).
