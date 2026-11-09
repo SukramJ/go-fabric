@@ -887,32 +887,48 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
-	return b.sendReportChunksNotify(target, report, nil)
+	counters, _, err := b.sendReportChunksNotify(target, report, nil, false)
+	return counters, err
 }
 
 // sendReportChunksNotify is [Bridge.sendReportChunks] that hands the MRP
 // counter of the first chunk to firstSent (nil: no one) once it is sent
 // and tracked — before the wait for the peer's StatusResponse to it, so
 // the owner can register the counter while the exchange has heard nothing
-// from the peer yet.
-func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, firstSent func(counter uint32)) ([]uint32, error) {
+// from the peer yet. With armFinal it also arms the wait for the peer's
+// StatusResponse to the last chunk just before that chunk goes out and
+// returns it as finalWait — the waits for the chunks before it are this
+// loop's own, on the same key, so arming the final wait up front would
+// have the first of them replace and close it. A failed send disarms it.
+func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, firstSent func(counter uint32), armFinal bool) (counters []uint32, finalWait <-chan im.StatusCode, err error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_ongoing_report", target.src, err)
-		return nil, err
+		return nil, nil, err
 	}
-	counters := make([]uint32, 0, len(chunks))
+	counters = make([]uint32, 0, len(chunks))
 	ourRole := !target.peerInitiator
+	op := "subscribe.ongoing"
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
-			return nil, err
+			return nil, nil, err
 		}
 		var waitCh <-chan im.StatusCode
-		if chunk.MoreChunkedMessages {
+		switch {
+		case chunk.MoreChunkedMessages:
 			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+		case armFinal:
+			// The last chunk's answer is awaited too, by the caller:
+			// matter.js's sendDataReportMessage waits for the Success to
+			// every chunk it sends, the last included — Millis(500) for a
+			// closed subscription's report (packages/protocol/src/
+			// interaction/InteractionMessenger.ts:799-844, :844 at
+			// db021da0). Armed before the send, so the answer cannot land
+			// before the waiter exists.
+			finalWait = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
 		}
 		if i > 0 {
 			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
@@ -927,10 +943,10 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 		}
 		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
 		if err != nil {
-			if waitCh != nil {
+			if waitCh != nil || finalWait != nil {
 				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		if counter != 0 {
 			counters = append(counters, counter)
@@ -943,12 +959,12 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
-				return counters, err
+			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+				return counters, nil, err
 			}
 		}
 	}
-	return counters, nil
+	return counters, finalWait, nil
 }
 
 // sendInitiatedReport ships report on a **fresh bridge-initiated
@@ -978,16 +994,14 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 }
 
 // sendInitiatedReportArmed is [Bridge.sendInitiatedReport] that, with
-// arm, also arms the wait for the peer's StatusResponse on the fresh
-// exchange before the report goes out ([Bridge.armStatusResponseWait]),
-// so the answer cannot land before the waiter exists; the caller
-// receives on wait through [Bridge.awaitFlushedReport], which disarms
-// it. A failed send disarms it here.
+// arm, also arms the wait for the peer's StatusResponse to the report's
+// last chunk on the fresh exchange, just before that chunk goes out
+// ([Bridge.sendReportChunksNotify] armFinal), so the answer cannot land
+// before the waiter exists; the caller receives on wait through
+// [Bridge.awaitFlushedReport], which disarms it. A failed send disarms
+// it here.
 func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan im.StatusCode, err error) {
 	freshExchangeID := b.nextOutboundExchangeID()
-	if arm {
-		wait = b.armStatusResponseWait(target.sessionID, freshExchangeID, true)
-	}
 	freshTarget := target
 	freshTarget.exchangeID = freshExchangeID
 	// Set peerInitiator=false so sendUnsolicitedIM's
@@ -1008,13 +1022,13 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	// exchange yet, `#messageReceivedCounter === 0`). Later chunks are
 	// registered by the caller once the report is out, as before.
 	var firstCounter uint32
-	counters, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
+	counters, wait, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
 		firstCounter = counter
 		b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAtMono: createdAtMono, firstCounter: counter})
 		if report.SubscriptionID != 0 {
 			b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), report.SubscriptionID)
 		}
-	})
+	}, arm)
 	if err != nil {
 		if arm {
 			b.disarmStatusResponseWait(target.sessionID, freshExchangeID, true)
