@@ -238,7 +238,7 @@ func TestCameraAnswerAtArrival(t *testing.T) {
 			t.Errorf("steps %v", steps)
 		}
 	})
-	t.Run("a result naming another session than its arrival is refused, and the arrival's session ended", func(t *testing.T) {
+	t.Run("a result naming another session than its arrival is refused, and both sessions ended", func(t *testing.T) {
 		f, _, _, _ := raceFixture(t)
 		f.arrival = wpdef.ProvideOfferResponse{WebRtcSessionId: 7}
 		var local *StackError
@@ -251,8 +251,8 @@ func TestCameraAnswerAtArrival(t *testing.T) {
 		if _, ok := f.svc.ps.offerOf(f.svc.ps.key(at, 7)); ok {
 			t.Error("the arrival's offer was not withdrawn")
 		}
-		if !raceEnded(f, 7) {
-			t.Errorf("the arrival's session was not ended: %v", f.calls)
+		if !raceEnded(f, 7) || !raceEnded(f, 9) {
+			t.Errorf("the arrival's and the result's sessions were not both ended: %v", f.calls)
 		}
 	})
 	t.Run("an invoke that fails after the arrival ends the session and drops it from the requestor", func(t *testing.T) {

@@ -453,9 +453,14 @@ func (p *providerSessions) newSession(ctx context.Context, t target, fields spec
 	}
 	a.learn(resp) // registers the session unless its arrival did
 	if a.learnedID() != id {
+		// An internal invariant, not a camera's behaviour: the arrival and
+		// the result are the same message, and the clock retry follows
+		// only an INVALID_IN_STATE status, which carries no id. Should it
+		// break, neither session can be routed: both are ended.
 		if a.forget() {
 			p.endWithinBudget(ctx, p.cleanup, t, a.id)
 		}
+		p.endWithinBudget(ctx, p.cleanup, t, id)
 		return nil, stackError("the offer's response for node 0x%016X named WebRTC session %d, its arrival session %d", t.nodeID, id, a.id)
 	}
 	if !a.trackable {
