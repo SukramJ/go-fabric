@@ -29,8 +29,9 @@ pair it anew, and the bridged devices come back under endpoint numbers the
 controllers' automations do not know.
 
 A factory reset on purpose is `Node.FactoryReset`: it removes every fabric
-the way RemoveFabric does (each controller's Leave event, its sessions and
-subscriptions), stops the node and erases its store and endpoint records
+the way RemoveFabric does (each controller's Leave event, flushed with what
+its subscriptions owe in one report per subscription and awaited at most
+500 ms, its sessions and subscriptions), stops the node and erases its store and endpoint records
 (`endpoint.Store.EraseEndpoints`, which restarts the numbering); the host
 then builds a new node on the same store, which starts uncommissioned and
 numbers its bridged endpoints from 2, as a fresh install does. A controller's counterpart is `Controller.Erase`, which

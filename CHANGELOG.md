@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `im/subscription`, `bridge`: `subscription.FlushReporter` and `Manager.SetFlushReporter` — the hook `Manager.FlushFabric` hands each subscription's drained events and dirty attributes to, together, for one report — and `Bridge.SubscriptionFlushReporter`, the bridge's implementation, which a host wiring its own manager sets beside `SubscriptionReporter` and `SubscriptionEventReporter` (`node` wires it). Without a flush reporter `FlushFabric` drains and sends nothing (issue 473).
+
+### Fixed
+
+- `node`, `bridge`: the fabric-leaving flush (`Node.FactoryReset`, `Node.RemoveFabric` from the host) sends one report per subscription — the Leave event and the attributes owed together — once, without MRP retransmission, and waits at most 500 ms for its answer, as matter.js does (`ServerSubscription.ts:753-763`, `InteractionMessenger.ts:844` at db021da0). It sent the events and the attributes as two reports, each awaited up to the MRP-derived report bound: a controller that gives its sessions up on the Leave — as matter.js's and this module's controllers do — never answered the second, and the reset waited about 14 s on a UDP session (the S9 log, issue 473 from go-fabric-server #54).
+
 ## [0.19.1] — 2026-11-09
 
 Wave W10 (#471, issue 464 from 453): the camera's Answer to a new session is no longer refused `NOT_FOUND` — the controller's served WebRtcTransportRequestor learns the session when the ProvideOffer or SolicitOffer response arrives, on the receive path, before the camera's Answer can be handled (CAMERA-GO/1.1 went from 14/20 to 20/20 isolated runs). With it: `InvokeOptions.ResponseArrived`, the requestor's refusals logged and surfaced as `CameraSignalRefused`, the test camera's Answer right after the response (`cameratest`), and the harness printing the camera app's log on a failed step. One break below the facade, its migration inline: `InvokeOptions` is no longer comparable. After this release the roadmap pauses (owner decision 2026-11-09): milestone 7 and phase 40 wait for the owner's release or the 1.7 pin jump.
