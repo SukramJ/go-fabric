@@ -4,8 +4,11 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,6 +129,22 @@ func TestCameraPortFansOut(t *testing.T) {
 			if sig.Refused != camera.Signal("answer") || sig.Session.PeerNodeId != 0x55 || sig.Session.FabricIndex != 2 {
 				t.Fatalf("refusal %+v", sig)
 			}
+		}
+	}
+}
+
+// TestCameraPortRefusalLevels: a refused Offer or Answer logs a warning,
+// a refused ICECandidates or End logs at info.
+func TestCameraPortRefusalLevels(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	p := cameraPort{s: &served{listeners: map[uint64]func(CameraSignal){}}, log: slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))}
+	want := map[camera.Signal]string{wrdef.SignalOffer: "WARN", wrdef.SignalAnswer: "WARN", wrdef.SignalIceCandidates: "INFO", wrdef.SignalEnd: "INFO"}
+	for signal, level := range want {
+		buf.Reset()
+		p.Refused(context.Background(), signal, 7, 1, 0x55)
+		if line := buf.String(); !strings.Contains(line, "level="+level) || !strings.Contains(line, "camera.requestor.refused") || !strings.Contains(line, "kind="+string(signal)) {
+			t.Errorf("%s: %q", signal, line)
 		}
 	}
 }

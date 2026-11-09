@@ -274,10 +274,17 @@ func (p cameraPort) End(_ context.Context, session camera.WebRTCSession, reason 
 // refused event (packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:177-180
 // and :212-219 at db021da0). A refused Answer is otherwise invisible on
 // this side, and the camera only logs it (issue 464); the ws-controller
-// of the reference server leaves the event unobserved.
-func (p cameraPort) Refused(_ context.Context, signal camera.Signal, id uint16, fabricIndex uint8, node uint64) {
+// of the reference server leaves the event unobserved. A refused Offer or
+// Answer is a failed establishment and logs a warning; a refused
+// ICECandidates or End is routine after this side ended the session and
+// logs at info.
+func (p cameraPort) Refused(ctx context.Context, signal camera.Signal, id uint16, fabricIndex uint8, node uint64) {
 	if p.log != nil {
-		p.log.Warn("camera.requestor.refused", slog.String("kind", string(signal)), slog.Int("webrtc_session_id", int(id)), slog.Uint64("node_id", node))
+		level := slog.LevelInfo
+		if signal == wrdef.SignalOffer || signal == wrdef.SignalAnswer {
+			level = slog.LevelWarn
+		}
+		p.log.Log(ctx, level, "camera.requestor.refused", slog.String("kind", string(signal)), slog.Int("webrtc_session_id", int(id)), slog.Uint64("node_id", node))
 	}
 	p.s.emit(CameraSignal{Kind: CameraSignalRefused, Session: camera.WebRTCSession{Id: id, PeerNodeId: node, FabricIndex: fabricIndex}, Refused: signal})
 }
