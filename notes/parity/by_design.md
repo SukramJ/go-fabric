@@ -5537,7 +5537,7 @@ matter.js's server gains them.
 Phase 38 serves MotionLatching, Instantaneous, Speed and Calibration after
 the same file, behind the row (`closure.Ahead`, surface yes). A declared
 LT, SP or CL needs the `Mover`'s optional `closurecontrol.Latcher`,
-`SpeedMover` or `Calibrator` (`cluster/spec/closurecontrol/ports.go`),
+`SpeedMover` or `Calibrator` (`cluster/spec/closurecontrol/server_gen.go`),
 else `ErrFeatureMap` names the interface; IS is a declaration fact, and SP
 with IS is the definition's conformance refusal (chip's constructor dies
 on it, `:49-53`). LatchControlModes is the Latcher's, fixed (`:81`); Stop
