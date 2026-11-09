@@ -5,6 +5,8 @@ package topology
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -102,6 +104,19 @@ func (h *harness) want(n int, after string) {
 	h.t.Helper()
 	if got := h.count(); got != n {
 		h.t.Fatalf("%s: %d emitted, want %d", after, got, n)
+	}
+}
+
+// settle waits for wait while the fake clock moves deadline by deadline
+// (clocktest.Fake.Resolve), bounded by ten real seconds: a refresh that
+// stalls ends at its own deadline, and a wait that never ends fails the
+// test in seconds instead of hanging it to the package timeout (#476).
+func (h *harness) settle(what string, wait func() error) {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := h.fake.Resolve(ctx, wait); err != nil {
+		h.t.Fatalf("%s: %v", what, err)
 	}
 }
 
@@ -284,9 +299,7 @@ func TestServiceRefreshConcurrency(t *testing.T) {
 	for range 2 {
 		b.release <- struct{}{}
 	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	h.settle("the refresh", func() error { return <-done })
 	if got := b.max.Load(); got != 2 {
 		t.Errorf("most reads at once = %d, want 2", got)
 	}
@@ -304,11 +317,7 @@ func TestServiceRefreshDeadline(t *testing.T) {
 	if got := recv(t, b.started); got != 1 {
 		t.Fatalf("first read of node %d", got)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := h.fake.Resolve(ctx, func() error { return <-done }); err != nil {
-		t.Fatal(err)
-	}
+	h.settle("the refresh past its deadline", func() error { return <-done })
 	close(b.release)
 	h.fake.Yield()
 	select {
@@ -320,52 +329,63 @@ func TestServiceRefreshDeadline(t *testing.T) {
 
 // TestServiceRefreshShared ports "coalesces concurrent callers onto a
 // single read fan-out" (NetworkTopologyServiceTest.ts:721-746,
-// matterjs-server at 0bd06f22).
+// matterjs-server at 0bd06f22). The callers join synchronously through
+// joinRefresh, so the second joins while the first's reads still wait:
+// the ordering is the test's, not the scheduler's (#476), and a caller
+// that opened a refresh of its own fails here, before anything blocks.
 func TestServiceRefreshShared(t *testing.T) {
 	h := newHarness(t, Config{})
 	b := newBlocking()
 	h.setMembers(b.member(router(1, 1024)), b.member(router(2, 1025)))
-	type res struct {
-		t   Topology
-		err error
+	f := h.svc.joinRefresh()
+	if g := h.svc.joinRefresh(); g != f {
+		t.Fatal("a second caller started a refresh of its own")
 	}
-	out := make(chan res, 2)
-	go func() { t, err := h.svc.Refresh(context.Background()); out <- res{t, err} }()
 	recv(t, b.started)
-	go func() { t, err := h.svc.Refresh(context.Background()); out <- res{t, err} }()
 	recv(t, b.started)
-	b.release <- struct{}{}
-	b.release <- struct{}{}
-	r1, r2 := <-out, <-out
-	if r1.err != nil || r2.err != nil || len(r1.t.Nodes) != 2 || &r1.t.Nodes[0] != &r2.t.Nodes[0] {
-		t.Fatalf("callers got %+v and %+v", r1, r2)
+	close(b.release)
+	h.settle("the shared refresh", func() error { <-f.done; return nil })
+	if len(f.topo.Nodes) != 2 {
+		t.Fatalf("the shared snapshot: %+v", f.topo)
 	}
 	select {
 	case n := <-b.started:
 		t.Fatalf("a second read of node %d", n)
 	default:
 	}
-	go func() { _, err := h.svc.Refresh(context.Background()); out <- res{err: err} }()
-	recv(t, b.started)
-	recv(t, b.started)
-	b.release <- struct{}{}
-	b.release <- struct{}{}
-	if r := <-out; r.err != nil {
-		t.Fatal(r.err)
+
+	// Once the refresh landed, the next caller starts a new one — through
+	// the public path, which cannot block: the reads are released. Its
+	// bound is real time, not the fake clock: moving time could end the
+	// new refresh at its deadline before both reads started.
+	bounded, cancelBounded := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelBounded()
+	topo, err := h.svc.Refresh(bounded)
+	if err != nil || len(topo.Nodes) != 2 {
+		t.Fatalf("the next Refresh = %+v, %v", topo, err)
 	}
+	recv(t, b.started)
+	recv(t, b.started)
 
 	// A caller's context bounds its wait, not the shared refresh.
-	go func() { _, err := h.svc.Refresh(context.Background()); out <- res{err: err} }()
-	recv(t, b.started)
+	b = newBlocking()
+	h.setMembers(b.member(router(1, 1024)), b.member(router(2, 1025)))
+	f = h.svc.joinRefresh()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := h.svc.Refresh(ctx); err == nil {
-		t.Error("a cancelled caller waited")
+	if _, err := h.svc.Refresh(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("a cancelled caller waited: %v", err)
+	}
+	// This also guards Refresh's own join: a Refresh that opened a flight of its own would fail here.
+	if g := h.svc.joinRefresh(); g != f {
+		t.Fatal("the cancelled caller ended the shared refresh")
 	}
 	recv(t, b.started)
+	recv(t, b.started)
 	close(b.release)
-	if r := <-out; r.err != nil {
-		t.Fatal(r.err)
+	h.settle("the shared refresh", func() error { <-f.done; return nil })
+	if len(f.topo.Nodes) != 2 {
+		t.Fatalf("the shared snapshot after a cancelled caller: %+v", f.topo)
 	}
 }
 
@@ -402,9 +422,12 @@ func TestServiceClose(t *testing.T) {
 	recv(t, b.started)
 	h.svc.Close()
 	close(b.release)
-	if topo := <-done; len(topo.Nodes) != 2 {
-		t.Errorf("the caller's snapshot: %+v", topo)
-	}
+	h.settle("the refresh Close landed in", func() error {
+		if topo := <-done; len(topo.Nodes) != 2 {
+			return fmt.Errorf("the caller's snapshot: %+v", topo)
+		}
+		return nil
+	})
 	h.want(0, "a refresh Close landed in")
 }
 
