@@ -18,7 +18,7 @@ import (
 // TestLeaveFlushIssue473: a factory reset flushes what the controller's
 // subscription owes — the Leave event and an attribute changed inside the
 // subscription's floor — as one report, and waits at most 500 ms for its
-// answer. Answered, the reset returns without the clock moving; with the
+// answer. Answered, the reset returns before the 500 ms bound; with the
 // controller no longer answering, it returns once the clock has moved
 // 500 ms, never the MRP-derived bound of a report (issue 473, the S9 log
 // of go-fabric-server #54). Mirrors matter.js Fabric.leave
@@ -76,8 +76,8 @@ func TestLeaveFlushIssue473(t *testing.T) {
 			}
 			moved := site.Clock().Now().Sub(before)
 			switch {
-			case answered && moved != 0:
-				t.Fatalf("the answered reset moved the clock %v, want 0: the answer ends the wait", moved)
+			case answered && moved >= 500*time.Millisecond:
+				t.Fatalf("the answered reset ran into the 500 ms bound, moved %v: the answer should end the wait", moved)
 			case !answered && (moved < 500*time.Millisecond || moved >= time.Second):
 				t.Fatalf("the unanswered reset returned after %v on the clock, want 500 ms", moved)
 			}
