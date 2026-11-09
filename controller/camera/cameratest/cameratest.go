@@ -199,14 +199,14 @@ func (p *Port) AnswerAfterResponse(sdp string) {
 	p.afterSDP = sdp
 }
 
-// AnsweredAfterResponse is the outcome of the Answer AnswerAfterResponse
-// sent for the session — nil when the requestor took it — and false while
-// none came back.
-func (p *Port) AnsweredAfterResponse(sessionID uint16) (err error, sent bool) {
+// AnsweredAfterResponse reports whether the Answer AnswerAfterResponse
+// sent for the session came back, and its outcome — nil when the
+// requestor took it.
+func (p *Port) AnsweredAfterResponse(sessionID uint16) (sent bool, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	err, sent = p.afterErrs[sessionID]
-	return err, sent
+	return sent, err
 }
 
 // answerAfterResponse defers the Answer of AnswerAfterResponse until the
@@ -218,9 +218,12 @@ func (p *Port) answerAfterResponse(ctx context.Context, sessionID uint16) {
 	if sdp == "" || answer == nil {
 		return
 	}
+	// The Answer outlives the offer's interaction, as the camera's own
+	// signal does.
+	detached := context.WithoutCancel(ctx)
 	send := func() {
 		go func() {
-			actx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			actx, cancel := context.WithTimeout(detached, 30*time.Second)
 			defer cancel()
 			err := answer(actx, sessionID, sdp)
 			p.mu.Lock()

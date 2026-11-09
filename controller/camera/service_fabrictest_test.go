@@ -149,8 +149,8 @@ func TestServiceOnTheFabric(t *testing.T) {
 	if sig := next(t, first.Signals()); sig.Kind != camera.SignalAnswer || !strings.Contains(sig.SDP, "a=sendonly") {
 		t.Fatalf("answer %+v", sig)
 	}
-	eventually("the camera's Answer came back", func() bool { _, sent := port.AnsweredAfterResponse(first.ID); return sent })
-	if err, _ := port.AnsweredAfterResponse(first.ID); err != nil {
+	eventually("the camera's Answer came back", func() bool { sent, _ := port.AnsweredAfterResponse(first.ID); return sent })
+	if _, err := port.AnsweredAfterResponse(first.ID); err != nil {
 		t.Fatalf("the requestor refused the Answer sent right after the response: %v", err)
 	}
 	port.AnswerAfterResponse("")
