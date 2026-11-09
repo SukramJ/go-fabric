@@ -8338,7 +8338,19 @@
         "keeps the probe cooldown when the clock stepped back before the first probe",
         "a timer-fired address check is tracked exactly once"
       ],
-      "reason": "The session-suspect and address-change runs (current-only, channel-agnostic skip, migration, all-fail close), coalescing including a joining address-change, close awaiting the in-flight run, a joiner's own abort and the probe backoff (growth across address churn, the suspect reset, no debounce after a suspect run) are ported against a live session; the sleeping-LIT-ICD branch (PeerAddressMonitor.ts:143-172) is not in Go (no fabric ICD wakefulness model, ADR 0020 stage 4), the wall-clock steps need a second clock reading clocktest.Fake does not have, and the trackWork count has no Go counterpart (the peer tracks work in a WaitGroup with no observable count).",
+      "left": [
+        {
+          "it": "session-suspect alone: current fails → no alternate walk, session closed, false",
+          "class": "by-design",
+          "reason": "BD-Matter-SuspectProbeWalksAlternates: a session-suspect run walks the discovered alternates after the current address failed and migrates to one that answers (TestMonitorSessionSuspect, TestMonitorSuspectMigratesToAnAlternate)"
+        },
+        {
+          "it": "session-suspect stays current-only even when an address-change joins the run",
+          "class": "by-design",
+          "reason": "BD-Matter-SuspectProbeWalksAlternates: the joined run walks the alternates for both callers; there is no current-only run left to keep"
+        }
+      ],
+      "reason": "The session-suspect and address-change runs (a suspect run that answers on the current address, channel-agnostic skip, migration, all-fail close), coalescing including a joining address-change, close awaiting the in-flight run, a joiner's own abort and the probe backoff (growth across address churn, the suspect reset, no debounce after a suspect run) are ported against a live session; the sleeping-LIT-ICD branch (PeerAddressMonitor.ts:143-172) is not in Go (no fabric ICD wakefulness model, ADR 0020 stage 4), the wall-clock steps need a second clock reading clocktest.Fake does not have, and the trackWork count has no Go counterpart (the peer tracks work in a WaitGroup with no observable count).",
       "snapshotSha": "6e69549d9e68858d4b087b95eb3c32703ae77a4d"
     },
     {

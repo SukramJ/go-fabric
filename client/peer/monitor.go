@@ -24,8 +24,11 @@ const (
 	// discovered ones.
 	ReasonAddressChange ReachabilityReason = iota
 	// ReasonSessionSuspect is a check after the session itself looked dead
-	// (a subscription timed out, say): only the current address is probed,
-	// and the probe cooldown is reset first.
+	// (a subscription timed out, say): the probe cooldown is reset, the
+	// current address is probed, then the other discovered ones. matter.js
+	// probes the current address only (PeerAddressMonitor.ts:105-106 at
+	// db021da0); walking the alternates is this module's
+	// (BD-Matter-SuspectProbeWalksAlternates).
 	ReasonSessionSuspect
 )
 
@@ -39,7 +42,9 @@ func (r ReachabilityReason) String() string {
 // monitor follows a peer's discovered addresses and probes the session
 // when its address leaves them — matter.js PeerAddressMonitor
 // (packages/protocol/src/peer/PeerAddressMonitor.ts:43-293 at 0ceb202d),
-// the ICD branch (:143-172) included.
+// the ICD branch (:143-172) included. Unlike matter.js, a session-suspect
+// run walks the discovered alternates too (ReasonSessionSuspect), and both
+// runs walk them with the proven host's addresses first (orderForPeer).
 type monitor struct {
 	p     *Peer
 	delay time.Duration
@@ -224,29 +229,32 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		}
 		return true
 	}
-	if reason == ReasonAddressChange {
-		// The proven host's addresses first, as the connection tries them
-		// (orderForPeer).
-		for _, a := range orderForPeer(p, discovered) {
-			if ctx.Err() != nil {
-				return false
-			}
-			if a.AddrPort() == current {
-				continue
-			}
-			if probe(ctx, mgr, s, a.UDPAddr(), log, probeNetwork, &margin) {
-				log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
-				s.SetAddr(a.UDPAddr())
-				p.followAddress(s)
-				if migrated := p.set.ctx.SessionMigrated; migrated != nil {
-					migrated(p.address)
-				}
-				m.resetBackoff()
-				return true
-			}
+	// Both reasons walk the alternates, the proven host's addresses first,
+	// as the connection tries them (orderForPeer). matter.js walks them on
+	// an address change only; a session-suspect probe stays on the current
+	// address (PeerAddressMonitor.ts:219-221 at db021da0). Here a suspect
+	// session is migrated to an alternate that answers before it is given
+	// up: the reconnect that follows HandlePeerLoss costs a Thread node a
+	// minute or more (issue 478), a probe one small exchange per address.
+	for _, a := range orderForPeer(p, discovered) {
+		if ctx.Err() != nil {
+			return false
 		}
-		m.resetBackoff()
+		if a.AddrPort() == current {
+			continue
+		}
+		if probe(ctx, mgr, s, a.UDPAddr(), log, probeNetwork, &margin) {
+			log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
+			s.SetAddr(a.UDPAddr())
+			p.followAddress(s)
+			if migrated := p.set.ctx.SessionMigrated; migrated != nil {
+				migrated(p.address)
+			}
+			m.resetBackoff()
+			return true
+		}
 	}
+	m.resetBackoff()
 	if ctx.Err() != nil {
 		return false
 	}

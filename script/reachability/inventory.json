@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7856,
+  "entry_points": 7858,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17849,
+    "total_exported": 17851,
     "reachable": 12393,
-    "whitelisted": 5456,
+    "whitelisted": 5458,
     "unreachable": 0
   },
   "by_package": [],
@@ -7323,14 +7323,14 @@
       "identifier": "TestMonitorScheduledByAServiceChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 233
+      "line": 243
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorSessionSuspect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 200
+      "line": 202
     },
     {
       "package": "client/peer",
@@ -7338,6 +7338,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
       "line": 96
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSuspectJoinedWalksAlternates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/suspect_walk_test.go",
+      "line": 65
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSuspectMigratesToAnAlternate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/suspect_walk_test.go",
+      "line": 17
     },
     {
       "package": "client/peer",
@@ -7449,21 +7463,21 @@
       "identifier": "TestPeerAddressMonitorBackoff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 237
+      "line": 209
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorCoalescing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 200
+      "line": 192
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorVerifyReachability",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 111
+      "line": 117
     },
     {
       "package": "client/peer",
@@ -7638,7 +7652,7 @@
       "identifier": "TestSessionMoveCarriesOperationalAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 256
+      "line": 266
     },
     {
       "package": "client/peer",
