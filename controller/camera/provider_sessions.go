@@ -436,6 +436,9 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // not have, so the registration moves to the arrival (issue 464).
 func (p *providerSessions) newSession(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16)) (any, error) {
 	a := &arrivedSession{p: p, t: t, fields: fields, establishing: establishing}
+	// An arrival after newSession returned registers nothing: no one would
+	// own the session.
+	defer a.seal()
 	resp, err := p.send(ctx, t, fields, a.learn)
 	if err != nil {
 		// The camera holds a session only this scope knows the id of.
@@ -475,6 +478,9 @@ func (p *providerSessions) newSession(ctx context.Context, t target, fields spec
 // (packages/ws-controller/src/controller/webRtcSessionStreams.ts:284-308 at
 // 0bd06f2). learn runs at the response's arrival on the receive path and
 // again when send returned; the second call finds the session registered.
+// Once sealed — newSession returned, or forget ran — learn does nothing:
+// the queue notifier runs outside the exchange's lock and can still be
+// delivering a response after the invoke failed.
 type arrivedSession struct {
 	p            *providerSessions
 	t            target
@@ -483,6 +489,7 @@ type arrivedSession struct {
 
 	mu        sync.Mutex
 	learned   bool
+	sealed    bool
 	id        uint16
 	session   wrdef.WebRTCSessionStruct
 	trackable bool
@@ -498,7 +505,7 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.learned {
+	if a.learned || a.sealed {
 		return
 	}
 	a.learned, a.id = true, id
@@ -516,6 +523,13 @@ func (a *arrivedSession) learn(resp any) {
 	a.held = a.upsertErr == nil
 }
 
+// seal stops learn from registering a session from now on.
+func (a *arrivedSession) seal() {
+	a.mu.Lock()
+	a.sealed = true
+	a.mu.Unlock()
+}
+
 // learnedID is the id learn registered; reading it orders the caller
 // after learn.
 func (a *arrivedSession) learnedID() uint16 {
@@ -529,6 +543,7 @@ func (a *arrivedSession) learnedID() uint16 {
 func (a *arrivedSession) forget() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.sealed = true
 	if !a.learned {
 		return false
 	}

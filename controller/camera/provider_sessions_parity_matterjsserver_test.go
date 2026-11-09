@@ -66,6 +66,10 @@ type psFixture struct {
 	// returns — newSession held between the arrival and the result.
 	arrival any
 	held    func(resp any) error
+	// lateErr fails invokeEstablishing before the response's arrival is
+	// heard; late then delivers that arrival, after the invoke returned.
+	lateErr error
+	late    func()
 }
 
 func (f *psFixture) providerEndpoints(uint64) []uint16 {
@@ -131,8 +135,14 @@ func (f *psFixture) invokeEstablishing(ctx context.Context, t target, command st
 		return resp, err
 	}
 	f.mu.Lock()
-	arrival, held := f.arrival, f.held
+	arrival, held, lateErr := f.arrival, f.held, f.lateErr
+	if lateErr != nil {
+		f.late = func() { arrived(resp) }
+	}
 	f.mu.Unlock()
+	if lateErr != nil {
+		return nil, lateErr
+	}
 	if arrival == nil {
 		arrival = resp
 	}

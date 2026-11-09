@@ -224,6 +224,9 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 				queued(msg)
 			}
 		})
+		// Runs before m.close: no arrival is heard once Invoke returns,
+		// though one already being delivered may still finish.
+		defer m.x.SetQueueNotifier(nil)
 	}
 	// A timeout alone marks the invoke timed, as a write's does, and so
 	// does a command whose model carries the timed quality. Mirrors

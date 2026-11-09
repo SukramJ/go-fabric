@@ -271,6 +271,23 @@ func TestCameraAnswerAtArrival(t *testing.T) {
 			t.Errorf("the session was not ended: %v", f.calls)
 		}
 	})
+	t.Run("an arrival heard after the invoke failed registers nothing", func(t *testing.T) {
+		f, _, _, rr := raceFixture(t)
+		cut := errors.New("the context ended")
+		f.lateErr = cut
+		established, upserted := false, false
+		rr.afterUpsert = func(wrdef.WebRTCSessionStruct) { upserted = true }
+		if _, err := f.svc.ps.establish(context.Background(), at, psOfferRequest(nil), func(uint16) { established = true }); !errors.Is(err, cut) {
+			t.Fatalf("err %v", err)
+		}
+		f.late() // the receive path delivers the response now
+		if established || upserted || f.svc.ps.tracks(f.svc.ps.key(at, 9)) {
+			t.Errorf("the late arrival registered the session: establishing %v, upsert %v", established, upserted)
+		}
+		if _, ok := f.svc.ps.offerOf(f.svc.ps.key(at, 9)); ok {
+			t.Error("the late arrival recorded the offer")
+		}
+	})
 }
 
 // raceEnded reports whether the fixture's camera was sent EndSession for
