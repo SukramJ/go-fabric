@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/clock"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
@@ -21,7 +20,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
 )
 
 var _ = basicinformation.ClusterID
@@ -234,7 +232,7 @@ func (io *clientIO) invokeProvider(ctx context.Context, t target, command string
 }
 
 // invokeEstablishing hands arrived each InvokeResponse's establishing
-// response at its arrival (client.InvokeOptions.ResponseQueued), decoded
+// response at its arrival (client.InvokeOptions.ResponseArrived), decoded
 // as the call's result is.
 func (io *clientIO) invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(any)) (any, error) {
 	if io.send != nil || arrived == nil {
@@ -244,19 +242,12 @@ func (io *clientIO) invokeEstablishing(ctx context.Context, t target, command st
 	if n == nil {
 		return io.invokeProvider(ctx, t, command, fields)
 	}
-	opts := client.InvokeOptions{ResponseQueued: func(msg *exchange.Message) {
-		resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), func(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
-			return spec.ReadContainer(dec, el)
-		})
-		if err != nil {
+	opts := client.InvokeOptions{ResponseArrived: func(r client.Result) {
+		if !r.HasFields {
 			return
 		}
-		for _, e := range resp.Responses {
-			if fields, ok := e.Response.(spec.Node); ok && e.HasResponse {
-				if v, err := decodeResponse(e.Path.Cluster, e.Path.Command, fields); err == nil && v != nil {
-					arrived(v)
-				}
-			}
+		if v, err := decodeResponse(wpdef.ClusterID, r.Command, r.Fields); err == nil && v != nil {
+			arrived(v)
 		}
 	}}
 	return invokeDecodedWith(ctx, n, t.endpointID, wpdef.ClusterID, providerCommands[command], fields, opts)

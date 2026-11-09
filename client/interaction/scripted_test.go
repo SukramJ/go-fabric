@@ -4,7 +4,6 @@
 package interaction_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -464,36 +463,46 @@ func TestReadEvents(t *testing.T) {
 	})
 }
 
-// TestInvokeResponseQueued: ResponseQueued hears each InvokeResponse of
-// the invoke's exchange on the receive path, before Invoke returns, the
-// chunk acknowledgement's exchange included (issue 464).
-func TestInvokeResponseQueued(t *testing.T) {
+// TestInvokeResponseArrived: ResponseArrived hears each entry of each
+// InvokeResponse of the invoke's exchange, decoded as Invoke's Result, in
+// arrival order, on the receive path and before Invoke returns — the
+// entry of the chunk the client acknowledges included (issue 464).
+func TestInvokeResponseArrived(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		s := newScripted(t)
 		c := interaction.New(s.mgr, s.session, nil)
-		var queued [][]byte
+		var arrived []interaction.Result
 		var done <-chan invokeResult
 		returnedEarly := false
-		opts := interaction.InvokeOptions{ResponseQueued: func(msg *exchange.Message) {
+		opts := interaction.InvokeOptions{ResponseArrived: func(r interaction.Result) {
 			if len(done) != 0 {
 				returnedEarly = true
 			}
-			queued = append(queued, msg.Payload)
+			arrived = append(arrived, r)
 		}}
 		done = invokeAsync(c, armPath, gencomm.ArmFailSafeRequest{ExpiryLengthSeconds: 60, Breadcrumb: 1}, opts)
 		req := s.next(t)
 		path := im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true}
-		first := invokeResponse(t, true, im.InvokeResponseEntry{Path: path, HasResponse: true, Response: gencomm.ArmFailSafeResponse{DebugText: "first"}})
-		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, first)
+		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, invokeResponse(t, true,
+			im.InvokeResponseEntry{Path: path, HasResponse: true, Response: gencomm.ArmFailSafeResponse{DebugText: "first"}}))
 		status := s.next(t)
-		last := invokeResponse(t, false)
-		s.reply(t, status, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, last)
+		cs := uint8(4)
+		s.reply(t, status, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, invokeResponse(t, false,
+			im.InvokeResponseEntry{Path: armPath, IsStatus: true, Status: im.StatusIB{Status: im.StatusFailure, ClusterStatus: cs, HasClusterStatus: true}}))
 		if r := await(t, done); r.err != nil {
 			t.Fatal(r.err)
 		}
-		if returnedEarly || len(queued) != 2 || !bytes.Equal(queued[0], first) || !bytes.Equal(queued[1], last) {
-			t.Fatalf("queued %d InvokeResponses (Invoke returned first: %v)", len(queued), returnedEarly)
+		if returnedEarly || len(arrived) != 2 {
+			t.Fatalf("arrived %+v (Invoke returned first: %v)", arrived, returnedEarly)
+		}
+		var resp gencomm.ArmFailSafeResponse
+		if first := arrived[0]; !first.HasFields || first.Command != gencomm.CmdArmFailSafeResponse || first.Status != im.StatusSuccess ||
+			resp.DecodeTLV(first.Fields) != nil || resp.DebugText != "first" {
+			t.Errorf("first entry %+v (%+v)", first, resp)
+		}
+		if second := arrived[1]; second.HasFields || second.Status != im.StatusFailure || second.ClusterStatus == nil || *second.ClusterStatus != cs {
+			t.Errorf("second entry %+v", second)
 		}
 	})
 }

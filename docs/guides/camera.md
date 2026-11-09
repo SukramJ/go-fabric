@@ -471,7 +471,7 @@ the command, the session id and the node) and surfaces as
 `CameraSignal.Refused`; the service passes it to `Observer.Signal`. A new
 session is registered with the requestor when the ProvideOffer or
 SolicitOffer response arrives, on the receive path
-(`client.InvokeOptions.ResponseQueued`), so the camera's Answer, which it
+(`client.InvokeOptions.ResponseArrived`), so the camera's Answer, which it
 sends right after the response on the same session, finds it held.
 
 **The host's JSON.** A host that speaks matterjs-server's JSON to its own

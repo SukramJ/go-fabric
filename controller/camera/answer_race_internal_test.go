@@ -198,7 +198,7 @@ func TestCameraAnswerAtEstablishing(t *testing.T) {
 // TestCameraAnswerAtArrival: the session is registered when the response
 // arrives, on the receive path, before newSession reads the invoke's
 // result (issue 464, the queue notifier of client.InvokeOptions
-// .ResponseQueued).
+// .ResponseArrived).
 func TestCameraAnswerAtArrival(t *testing.T) {
 	at := target{psCamera, psEndpoint}
 	t.Run("an Answer served between the response's arrival and newSession's result reaches the session's signals", func(t *testing.T) {
