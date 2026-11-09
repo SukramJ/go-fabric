@@ -328,6 +328,8 @@ func TestInvokeBatcherParity(t *testing.T) {
 			{"batchDuration false", interaction.InvokeOptions{NoBatch: true, ExpectedProcessingTime: 90 * time.Second}},
 			{"interactionModelRevision", interaction.InvokeOptions{InteractionModelRevision: im.MatterInteractionModelRevision - 1}},
 			{"delayReportData", interaction.InvokeOptions{DelayReportData: &im.DelayReportData{}}},
+			// Go only: ResponseArrived has no matter.js counterpart (issue 464).
+			{"responseArrived", interaction.InvokeOptions{ResponseArrived: func(interaction.Result) {}}},
 		}
 		for _, row := range rows {
 			t.Run(row.name, func(t *testing.T) {
