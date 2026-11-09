@@ -210,6 +210,12 @@ type providerNodes interface {
 	// before it was read; an error when the endpoint has no provider.
 	providerRevision(t target) (revision uint16, known bool, err error)
 	invokeProvider(ctx context.Context, t target, command string, fields spec.Encodable) (any, error)
+	// invokeEstablishing is invokeProvider for ProvideOffer and
+	// SolicitOffer; arrived, when not nil, is called with the response at
+	// its arrival, decoded as the result is, on the receive path — before
+	// the handler of a message the camera sends after it runs. It must
+	// not block and must not call back into the node.
+	invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(resp any)) (any, error)
 	syncTime(ctx context.Context, nodeID uint64) error
 }
 
@@ -329,14 +335,17 @@ func (p *providerSessions) establish(ctx context.Context, t target, fields spec.
 	return establishingDo(p.watch, t, run)
 }
 
-// send invokes an establishing command with the clock retry.
-func (p *providerSessions) send(ctx context.Context, t target, fields spec.Encodable) (any, error) {
+// send invokes an establishing command with the clock retry; arrived hears
+// each response at its arrival (providerNodes.invokeEstablishing).
+func (p *providerSessions) send(ctx context.Context, t target, fields spec.Encodable, arrived func(resp any)) (any, error) {
 	command := callSolicitOffer
 	if _, ok := fields.(wpdef.ProvideOfferRequest); ok {
 		command = callProvideOffer
 	}
 	return offerWithClockRetry(ctx, fields,
-		func(ctx context.Context) (any, error) { return p.nodes.invokeProvider(ctx, t, command, fields) },
+		func(ctx context.Context) (any, error) {
+			return p.nodes.invokeEstablishing(ctx, t, command, fields, arrived)
+		},
 		func(ctx context.Context) error { return p.nodes.syncTime(ctx, t.nodeID) }, p.log)
 }
 
@@ -413,49 +422,124 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // packages/ws-controller/src/controller/webRtcSessionStreams.ts:270-317 at
 // 0bd06f2.
 //
-// The requestor entry is derived before establishing runs, so that
-// establishing, the recorded offer and the requestor's upsert follow one
-// another with nothing else on the response in between: from establishing
-// on, the camera's Answer may already be on its way, and the served
-// requestor answers NOT_FOUND to it until it holds the session
-// (cluster/camera Requestor.findSessionStrict; matter.js
-// packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:170-182
-// at db021da0). This is the contract matterjs-server's registry states —
-// "the local requestor accepts the camera's signalling from then on"
-// (packages/ws-controller/src/camera/sessionRegistry.ts:283-296 at 0bd06f2)
-// — held where Go's scheduling, unlike Node's, lets the Answer's handler
-// run while this goroutine still works on the response (issue 464). The
-// window before establishing — the response decoded — is
-// notes/parity/matter_behaviour_findings.md's WebRTC decode-window row.
+// The session is registered at the response's arrival, on the receive
+// path (arrivedSession), before the handler of the camera's Answer can
+// run: the camera sends it on the same CASE session right after the
+// response, and the served requestor answers NOT_FOUND to an Answer for a
+// session it does not hold (cluster/camera Requestor.findSessionStrict;
+// matter.js packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:170-182
+// at db021da0). matterjs-server registers the session after the invoke
+// resolves, and the local requestor accepts the camera's signalling from
+// then on (packages/ws-controller/src/camera/sessionRegistry.ts:283-296 at
+// 0bd06f2); on Node the response's continuation runs to its end before the
+// Answer's datagram is decoded — a runtime property Go's scheduling does
+// not have, so the registration moves to the arrival (issue 464).
 func (p *providerSessions) newSession(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16)) (any, error) {
-	resp, err := p.send(ctx, t, fields)
+	a := &arrivedSession{p: p, t: t, fields: fields, establishing: establishing}
+	resp, err := p.send(ctx, t, fields, a.learn)
 	if err != nil {
+		// The camera holds a session only this scope knows the id of.
+		if a.forget() {
+			p.endWithinBudget(ctx, p.cleanup, t, a.id)
+		}
 		return nil, err
 	}
 	id, _, _, ok := sessionIDOf(resp)
 	if !ok {
 		return nil, stackError("the offer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
 	}
-	session, trackable := p.trackableSession(t, fields, resp)
-	if establishing != nil {
-		establishing(id)
+	a.learn(resp) // registers the session unless its arrival did
+	if a.learnedID() != id {
+		if a.forget() {
+			p.endWithinBudget(ctx, p.cleanup, t, a.id)
+		}
+		return nil, stackError("the offer's response for node 0x%016X named WebRTC session %d, its arrival session %d", t.nodeID, id, a.id)
 	}
-	if !trackable {
+	if !a.trackable {
 		p.endWithinBudget(ctx, p.cleanup, t, id)
 		return nil, stackError("the offer for node 0x%016X produced a session with no stream usage or video/audio stream; deferred/auto-select streaming is not supported", t.nodeID)
 	}
-	var withdraw func()
-	if po, ok := fields.(wpdef.ProvideOfferRequest); ok {
-		withdraw = p.offerSent(p.key(t, id), po.Sdp)
-	}
-	if err := p.requestor.upsert(session); err != nil {
-		if withdraw != nil {
-			withdraw()
+	if a.upsertErr != nil {
+		if a.withdraw != nil {
+			a.withdraw()
 		}
 		p.endWithinBudget(ctx, p.cleanup, t, id)
-		return nil, err
+		return nil, a.upsertErr
 	}
 	return resp, nil
+}
+
+// arrivedSession registers the session a new offer's response names,
+// once: establishing, the recorded offer and the requestor's upsert, back
+// to back, in matterjs-server's order
+// (packages/ws-controller/src/controller/webRtcSessionStreams.ts:284-308 at
+// 0bd06f2). learn runs at the response's arrival on the receive path and
+// again when send returned; the second call finds the session registered.
+type arrivedSession struct {
+	p            *providerSessions
+	t            target
+	fields       spec.Encodable
+	establishing func(uint16)
+
+	mu        sync.Mutex
+	learned   bool
+	id        uint16
+	session   wrdef.WebRTCSessionStruct
+	trackable bool
+	held      bool
+	withdraw  func()
+	upsertErr error
+}
+
+func (a *arrivedSession) learn(resp any) {
+	id, _, _, ok := sessionIDOf(resp)
+	if !ok {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.learned {
+		return
+	}
+	a.learned, a.id = true, id
+	a.session, a.trackable = a.p.trackableSession(a.t, a.fields, resp)
+	if a.establishing != nil {
+		a.establishing(id)
+	}
+	if !a.trackable {
+		return
+	}
+	if po, ok := a.fields.(wpdef.ProvideOfferRequest); ok {
+		a.withdraw = a.p.offerSent(a.p.key(a.t, id), po.Sdp)
+	}
+	a.upsertErr = a.p.requestor.upsert(a.session)
+	a.held = a.upsertErr == nil
+}
+
+// learnedID is the id learn registered; reading it orders the caller
+// after learn.
+func (a *arrivedSession) learnedID() uint16 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.id
+}
+
+// forget undoes a registration: the requestor drops the session and the
+// offer is withdrawn. It reports whether learn had registered one.
+func (a *arrivedSession) forget() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.learned {
+		return false
+	}
+	if a.held {
+		a.p.requestor.remove(wrdef.KeyOf(a.session))
+		a.held = false
+	}
+	if a.withdraw != nil {
+		a.withdraw()
+	}
+	return true
 }
 
 // reOffer is a ProvideOffer naming a session the camera holds: it never
@@ -467,7 +551,7 @@ func (p *providerSessions) newSession(ctx context.Context, t target, fields spec
 func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.ProvideOfferRequest) (any, error) {
 	k := p.key(t, fields.WebRtcSessionId.Value)
 	withdraw := p.offerSent(k, fields.Sdp)
-	resp, err := p.send(ctx, t, fields)
+	resp, err := p.send(ctx, t, fields, nil)
 	if err != nil {
 		withdraw()
 		return nil, err

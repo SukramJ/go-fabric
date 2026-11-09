@@ -4,6 +4,7 @@
 package interaction_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -459,6 +460,40 @@ func TestReadEvents(t *testing.T) {
 		}
 		if e := r.r.Events[0]; e.Number != 7 || e.Priority != 2 || e.Timestamp != 1234 || e.EpochTimestamp == nil || !e.HasValue || len(e.Value.Children) != 1 {
 			t.Fatalf("event %+v", e)
+		}
+	})
+}
+
+// TestInvokeResponseQueued: ResponseQueued hears each InvokeResponse of
+// the invoke's exchange on the receive path, before Invoke returns, the
+// chunk acknowledgement's exchange included (issue 464).
+func TestInvokeResponseQueued(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		var queued [][]byte
+		var done <-chan invokeResult
+		returnedEarly := false
+		opts := interaction.InvokeOptions{ResponseQueued: func(msg *exchange.Message) {
+			if len(done) != 0 {
+				returnedEarly = true
+			}
+			queued = append(queued, msg.Payload)
+		}}
+		done = invokeAsync(c, armPath, gencomm.ArmFailSafeRequest{ExpiryLengthSeconds: 60, Breadcrumb: 1}, opts)
+		req := s.next(t)
+		path := im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true}
+		first := invokeResponse(t, true, im.InvokeResponseEntry{Path: path, HasResponse: true, Response: gencomm.ArmFailSafeResponse{DebugText: "first"}})
+		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, first)
+		status := s.next(t)
+		last := invokeResponse(t, false)
+		s.reply(t, status, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, last)
+		if r := await(t, done); r.err != nil {
+			t.Fatal(r.err)
+		}
+		if returnedEarly || len(queued) != 2 || !bytes.Equal(queued[0], first) || !bytes.Equal(queued[1], last) {
+			t.Fatalf("queued %d InvokeResponses (Invoke returned first: %v)", len(queued), returnedEarly)
 		}
 	})
 }

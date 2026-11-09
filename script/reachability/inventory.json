@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7839,
+  "entry_points": 7841,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17833,
+    "total_exported": 17834,
     "reachable": 12390,
-    "whitelisted": 5443,
+    "whitelisted": 5444,
     "unreachable": 0
   },
   "by_package": [],
@@ -23175,10 +23175,17 @@
     },
     {
       "package": "controller/camera",
+      "identifier": "TestCameraAnswerAtArrival",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 202
+    },
+    {
+      "package": "controller/camera",
       "identifier": "TestCameraAnswerAtEstablishing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/answer_race_internal_test.go",
-      "line": 128
+      "line": 131
     },
     {
       "package": "controller/camera",
@@ -23472,28 +23479,28 @@
       "identifier": "TestProviderSessionsAbandonParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 587
+      "line": 614
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsClockParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 504
+      "line": 531
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsEstablishParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 388
+      "line": 415
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsWatchParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 253
+      "line": 280
     },
     {
       "package": "controller/camera",
@@ -23633,14 +23640,14 @@
       "identifier": "TestSessionStreamsEstablishParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 295
+      "line": 305
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionStreamsRecordedOffersParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 528
+      "line": 538
     },
     {
       "package": "controller/camera",
@@ -23668,7 +23675,7 @@
       "identifier": "TestSessionStreamsTrackedSessionOfParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 591
+      "line": 601
     },
     {
       "package": "controller/camera",

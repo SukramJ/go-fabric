@@ -6,13 +6,16 @@ package camera
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	clustercamera "github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -189,5 +192,93 @@ func TestCameraAnswerAtEstablishing(t *testing.T) {
 		if got := port.refusals(); !slices.Equal(got, []uint16{9}) {
 			t.Errorf("refusals %v", got)
 		}
+	})
+}
+
+// TestCameraAnswerAtArrival: the session is registered when the response
+// arrives, on the receive path, before newSession reads the invoke's
+// result (issue 464, the queue notifier of client.InvokeOptions
+// .ResponseQueued).
+func TestCameraAnswerAtArrival(t *testing.T) {
+	at := target{psCamera, psEndpoint}
+	t.Run("an Answer served between the response's arrival and newSession's result reaches the session's signals", func(t *testing.T) {
+		f, port, r, _ := raceFixture(t)
+		sess := &Session{box: newMailbox(t.Context())}
+		var answerErr error
+		f.held = func(any) error {
+			// newSession is held here: the response arrived, the invoke
+			// has not returned it.
+			answerErr = cameraAnswers(r, 9)
+			return nil
+		}
+		if _, err := f.svc.ps.establish(context.Background(), at, psOfferRequest(nil), startEstablishing(f, sess)); err != nil {
+			t.Fatal(err)
+		}
+		if answerErr != nil {
+			t.Fatalf("the Answer after the arrival answered %v", answerErr)
+		}
+		if got := port.refusals(); len(got) != 0 {
+			t.Fatalf("the requestor refused %v", got)
+		}
+		if sig := awaitSessionSignal(t, sess); sig.Kind != SignalAnswer || sig.Session.Id != 9 || sig.SDP != psNarrowed {
+			t.Errorf("the session's signal %+v", sig)
+		}
+	})
+	t.Run("the session is registered once, at its arrival", func(t *testing.T) {
+		f, _, _, rr := raceFixture(t)
+		var steps []string
+		f.held = func(any) error { steps = append(steps, "result"); return nil }
+		rr.afterUpsert = func(wrdef.WebRTCSessionStruct) { steps = append(steps, "upsert") }
+		establishing := func(uint16) { steps = append(steps, "establishing") }
+		if _, err := f.svc.ps.establish(context.Background(), at, psOfferRequest(nil), establishing); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(steps, []string{"establishing", "upsert", "result"}) {
+			t.Errorf("steps %v", steps)
+		}
+	})
+	t.Run("a result naming another session than its arrival is refused, and the arrival's session ended", func(t *testing.T) {
+		f, _, _, _ := raceFixture(t)
+		f.arrival = wpdef.ProvideOfferResponse{WebRtcSessionId: 7}
+		var local *StackError
+		if _, err := f.svc.ps.establish(context.Background(), at, psOfferRequest(nil), nil); !errors.As(err, &local) {
+			t.Fatalf("err %v, want a stack error", err)
+		}
+		if f.svc.ps.tracks(f.svc.ps.key(at, 7)) || f.svc.ps.tracks(f.svc.ps.key(at, 9)) {
+			t.Error("the requestor kept a session")
+		}
+		if _, ok := f.svc.ps.offerOf(f.svc.ps.key(at, 7)); ok {
+			t.Error("the arrival's offer was not withdrawn")
+		}
+		if !raceEnded(f, 7) {
+			t.Errorf("the arrival's session was not ended: %v", f.calls)
+		}
+	})
+	t.Run("an invoke that fails after the arrival ends the session and drops it from the requestor", func(t *testing.T) {
+		f, _, _, _ := raceFixture(t)
+		cut := errors.New("the exchange closed")
+		f.held = func(any) error { return cut }
+		if _, err := f.svc.ps.establish(context.Background(), at, psOfferRequest(nil), nil); !errors.Is(err, cut) {
+			t.Fatalf("err %v", err)
+		}
+		if f.svc.ps.tracks(f.svc.ps.key(at, 9)) {
+			t.Error("the requestor kept the session")
+		}
+		if _, ok := f.svc.ps.offerOf(f.svc.ps.key(at, 9)); ok {
+			t.Error("the offer was not withdrawn")
+		}
+		if !raceEnded(f, 9) {
+			t.Errorf("the session was not ended: %v", f.calls)
+		}
+	})
+}
+
+// raceEnded reports whether the fixture's camera was sent EndSession for
+// id.
+func raceEnded(f *psFixture, id uint16) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.ContainsFunc(f.calls, func(c string) bool {
+		return strings.HasPrefix(c, callEndSession+":") && strings.Contains(c, fmt.Sprintf(`"webRtcSessionId":%d,`, id))
 	})
 }
