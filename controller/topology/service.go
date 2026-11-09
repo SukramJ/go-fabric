@@ -322,10 +322,27 @@ func (s *Service) OnChanged(fn func(Topology)) (unsubscribe func()) {
 // from (:196-198). ctx bounds the caller's wait only. After Close it
 // returns a snapshot without reading or telling anyone.
 func (s *Service) Refresh(ctx context.Context) (Topology, error) {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
+	f := s.joinRefresh()
+	if f == nil {
 		return s.Topology(), nil
+	}
+	select {
+	case <-f.done:
+		return f.topo, nil
+	case <-ctx.Done():
+		return Topology{}, ctx.Err()
+	}
+}
+
+// joinRefresh returns the refresh in flight, or starts one when none
+// runs — the join of [Service.Refresh], a call of its own so a test can
+// hold two callers on one flight without leaning on the scheduler
+// (#476). After Close it returns nil.
+func (s *Service) joinRefresh() *flight {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
 	}
 	f := s.inflight
 	if f == nil {
@@ -333,13 +350,7 @@ func (s *Service) Refresh(ctx context.Context) (Topology, error) {
 		s.inflight = f
 		go s.runRefresh(f)
 	}
-	s.mu.Unlock()
-	select {
-	case <-f.done:
-		return f.topo, nil
-	case <-ctx.Done():
-		return Topology{}, ctx.Err()
-	}
+	return f
 }
 
 func (s *Service) runRefresh(f *flight) {
