@@ -123,7 +123,11 @@ func TestServiceOnTheFabric(t *testing.T) {
 	// UnknownReason.
 	eventually("the sweep's EndSession", func() bool { return endedWith(port, leftover, 12) })
 
-	// A start with an offer allocates or reuses, as RootNodeID.
+	// A start with an offer allocates or reuses, as RootNodeID. The camera
+	// answers as soon as its response is out, on the same session, as
+	// chip's camera app does: the requestor holds the session by then
+	// (issue 464).
+	port.AnswerAfterResponse("v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendrecv\r\n")
 	var first *camera.Session
 	run(func(ctx context.Context) (err error) {
 		offer := acceptanceOffer
@@ -141,14 +145,15 @@ func TestServiceOnTheFabric(t *testing.T) {
 	}
 	video := first.Streams[0]
 
-	// The camera answers on the controller's session: the answer is
-	// narrowed to the offer's directions.
-	run(func(ctx context.Context) error {
-		return cam.Answer(ctx, first.ID, "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendrecv\r\n")
-	})
+	// The answer reached the session, narrowed to the offer's directions.
 	if sig := next(t, first.Signals()); sig.Kind != camera.SignalAnswer || !strings.Contains(sig.SDP, "a=sendonly") {
 		t.Fatalf("answer %+v", sig)
 	}
+	eventually("the camera's Answer came back", func() bool { _, sent := port.AnsweredAfterResponse(first.ID); return sent })
+	if err, _ := port.AnsweredAfterResponse(first.ID); err != nil {
+		t.Fatalf("the requestor refused the Answer sent right after the response: %v", err)
+	}
+	port.AnswerAfterResponse("")
 	run(func(ctx context.Context) error {
 		return cam.IceCandidates(ctx, first.ID, []wpdef.ICECandidateStruct{{Candidate: "candidate:1 1 UDP 1 192.0.2.1 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
 	})

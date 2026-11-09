@@ -497,7 +497,9 @@ device (H.264 video, audio and snapshots, one allocated live-view stream)
 on a scripted `cameratest.Port` that answers every offer with a session,
 numbers its allocations, records the host's answers, candidates and ends
 (`Offers`, `Answered`, `Candidates`, `Ended`) and refuses an operation on
-request (`Refuse`). Bridge `cam.Device()` into a `fabrictest` site, and send
+request (`Refuse`); `AnswerAfterResponse` makes it answer each ProvideOffer
+as soon as the offer's response is out, as chip's camera app does
+(`AnsweredAfterResponse` reports each such Answer). Bridge `cam.Device()` into a `fabrictest` site, and send
 the camera's own signals with `cam.Offer`, `cam.Answer`, `cam.IceCandidates`
 and `cam.End` inside `Site.Run` — no import of `cluster/camera`.
 

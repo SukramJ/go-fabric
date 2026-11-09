@@ -28,11 +28,13 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"time"
 
 	clustercamera "github.com/SukramJ/go-fabric/cluster/camera"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // AllocatedVideoStream is the id of the live-view video stream the camera
@@ -104,6 +106,9 @@ func New(opts Options) (*Camera, error) {
 	if !ok {
 		return nil, errors.New("cameratest: the camera serves no WebRTC provider")
 	}
+	port.mu.Lock()
+	port.answer = provider.Answer
+	port.mu.Unlock()
 	return &Camera{dev: dev, port: port, provider: provider}, nil
 }
 
@@ -167,13 +172,64 @@ type Port struct {
 	answers map[uint16]string
 	nextID  uint16
 	refuse  map[Op]error
+	// answer is the camera's Answer signal (the provider's); afterSDP the
+	// SDP AnswerAfterResponse sends, afterErrs each such Answer's outcome.
+	answer    func(ctx context.Context, sessionID uint16, sdp string) error
+	afterSDP  string
+	afterErrs map[uint16]error
 }
 
 // NewPort returns an empty port.
 func NewPort() *Port {
 	return &Port{
 		nextID: 10, ends: map[uint16]uint8{}, cands: map[uint16][]wpdef.ICECandidateStruct{},
-		answers: map[uint16]string{}, refuse: map[Op]error{},
+		answers: map[uint16]string{}, refuse: map[Op]error{}, afterErrs: map[uint16]error{},
+	}
+}
+
+// AnswerAfterResponse makes the camera answer each ProvideOffer with sdp
+// as soon as the offer's response is on the wire, as chip's camera app
+// schedules its Answer once the response is out
+// (examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:865-889
+// at 6170af84); "" stops it. AnsweredAfterResponse reports each such
+// Answer. A port without a [Camera] sends none.
+func (p *Port) AnswerAfterResponse(sdp string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.afterSDP = sdp
+}
+
+// AnsweredAfterResponse is the outcome of the Answer AnswerAfterResponse
+// sent for the session — nil when the requestor took it — and false while
+// none came back.
+func (p *Port) AnsweredAfterResponse(sessionID uint16) (err error, sent bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	err, sent = p.afterErrs[sessionID]
+	return err, sent
+}
+
+// answerAfterResponse defers the Answer of AnswerAfterResponse until the
+// response of the offer ctx carries is sent.
+func (p *Port) answerAfterResponse(ctx context.Context, sessionID uint16) {
+	p.mu.Lock()
+	sdp, answer := p.afterSDP, p.answer
+	p.mu.Unlock()
+	if sdp == "" || answer == nil {
+		return
+	}
+	send := func() {
+		go func() {
+			actx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			err := answer(actx, sessionID, sdp)
+			p.mu.Lock()
+			p.afterErrs[sessionID] = err
+			p.mu.Unlock()
+		}()
+	}
+	if !im.DeferAfterResponse(ctx, send) {
+		send()
 	}
 }
 
@@ -261,12 +317,15 @@ func (p *Port) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebR
 	return p.session(args), false, nil
 }
 
-// ProvideOffer implements the WebRTC provider port.
-func (p *Port) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
+// ProvideOffer implements the WebRTC provider port; with
+// [Port.AnswerAfterResponse] the camera answers once the response is out.
+func (p *Port) ProvideOffer(ctx context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
 	if err := p.refused(OpProvideOffer); err != nil {
 		return wpdef.WebRTCSessionStruct{}, err
 	}
-	return p.session(args), nil
+	session := p.session(args)
+	p.answerAfterResponse(ctx, session.Id)
+	return session, nil
 }
 
 // ProvideAnswer implements the WebRTC provider port.

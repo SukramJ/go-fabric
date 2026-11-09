@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -317,5 +318,71 @@ func TestCameraRefusalReachesTheObserver(t *testing.T) {
 	case sig := <-sess.Signals():
 		t.Fatalf("the session got %+v", sig)
 	default:
+	}
+}
+
+// arrivalProbe is the client stack's provider route with a probe on the
+// establishing call: whether the response was heard at its arrival, and
+// whether the requestor held the session when the invoke handed its
+// result back.
+type arrivalProbe struct {
+	clientProviderNodes
+	ps *providerSessions
+
+	mu               sync.Mutex
+	arrivals         int
+	heldBeforeResult bool
+}
+
+func (a *arrivalProbe) invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(any)) (any, error) {
+	resp, err := a.clientProviderNodes.invokeEstablishing(ctx, t, command, fields, func(v any) {
+		arrived(v)
+		a.mu.Lock()
+		a.arrivals++
+		a.mu.Unlock()
+	})
+	if id, _, _, ok := sessionIDOf(resp); err == nil && ok {
+		held := a.ps.tracks(a.ps.key(t, id))
+		a.mu.Lock()
+		a.heldBeforeResult = held
+		a.mu.Unlock()
+	}
+	return resp, err
+}
+
+// TestCameraArrivalOnTheFabric: over the TCP CASE session to a camera,
+// the client stack hands the ProvideOfferResponse to the session layer at
+// its arrival, decoded from the wire, and the requestor holds the session
+// before the invoke returns its result (issue 464). An in-process camera
+// answers too late to lose the race without this, so the order itself is
+// what the test holds.
+func TestCameraArrivalOnTheFabric(t *testing.T) {
+	t.Parallel()
+	d := newDevSite(t)
+	d.startService()
+	at, err := targetOf(d.n, d.ep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := &arrivalProbe{clientProviderNodes: clientProviderNodes{d.svc.io}}
+	ps := &providerSessions{
+		nodes: probe, requestor: requestor{d.c.CameraRequestor()}, fabricIndex: d.c.Fabric().FabricIndex,
+		log: slog.New(slog.DiscardHandler), cleanup: d.svc.m.cleanupContext, offers: map[providerKey]string{},
+	}
+	probe.ps = ps
+	usage := wpdef.StreamUsageLiveView
+	var id uint16
+	d.run(func(ctx context.Context) error {
+		resp, err := ps.establish(ctx, at, wpdef.ProvideOfferRequest{WebRtcSessionId: spec.Nullable[uint16]{Null: true}, Sdp: psOffer, StreamUsage: &usage, VideoStreams: &[]uint16{1}}, nil)
+		if err == nil {
+			id = resp.(wpdef.ProvideOfferResponse).WebRtcSessionId
+		}
+		return err
+	})
+	probe.mu.Lock()
+	arrivals, held := probe.arrivals, probe.heldBeforeResult
+	probe.mu.Unlock()
+	if arrivals != 1 || !held {
+		t.Fatalf("the response was heard at its arrival %d times; the requestor held session %d before the result: %v", arrivals, id, held)
 	}
 }
