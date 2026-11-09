@@ -37,7 +37,8 @@ func (l *recordedLog) messages(msg string) []map[string]string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	var out []map[string]string
-	for _, r := range l.records {
+	for i := range l.records {
+		r := &l.records[i]
 		if r.Message != msg {
 			continue
 		}
@@ -146,8 +147,9 @@ func TestService_TwoRespondersFlipTheSRVTarget(t *testing.T) {
 	check("router's SRV evicted", nodeAddrs)
 
 	type change struct{ from, to string }
-	var got []change
-	for _, a := range log.messages("matter.discovery.srv_target_changed") {
+	msgs := log.messages("matter.discovery.srv_target_changed")
+	got := make([]change, 0, len(msgs))
+	for _, a := range msgs {
 		if a["service"] != inst {
 			t.Fatalf("srv_target_changed service = %q, want %q", a["service"], inst)
 		}

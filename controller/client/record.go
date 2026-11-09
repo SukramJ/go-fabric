@@ -54,10 +54,8 @@ const (
 	recAdvertisedIntervals       uint32 = 20 // :1070-1071
 	recTCPSupport                uint32 = 21 // :1083-1084
 	recLongIdleTimeOperatingMode uint32 = 22 // :1089-1090
-	// recOperationalHost is this module's, matter.js has no such field:
-	// peer.Descriptor.OperationalHost, the proven host (issue 478).
-	recOperationalHost uint32 = 23
-	recordFields              = 24
+	recOperationalHost           uint32 = 23 // this module's (issue 478): peer.Descriptor.OperationalHost; matter.js has no such field
+	recordFields                        = 24
 )
 
 // Record is a node's commissioning record: who the node is on our fabric,

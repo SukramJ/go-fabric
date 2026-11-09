@@ -2366,7 +2366,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 140,
+    "line": 138,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2375,7 +2375,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 464,
+    "line": 462,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2384,7 +2384,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 488,
+    "line": 486,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2393,7 +2393,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 697,
+    "line": 695,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",

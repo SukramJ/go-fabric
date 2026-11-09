@@ -6203,7 +6203,7 @@
       "identifier": "TestService_AddressFromTwoTargetsKeepsTheFirstOwner",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/srv_target_test.go",
-      "line": 167
+      "line": 169
     },
     {
       "package": "client/discovery",
@@ -6245,7 +6245,7 @@
       "identifier": "TestService_TwoRespondersFlipTheSRVTarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/srv_target_test.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "client/discovery",
