@@ -59,6 +59,15 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // math alone).
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
+// FlushReporter receives everything a subscription owes when its fabric
+// leaves ([Manager.FlushFabric]): the drained events and the dirty
+// attribute paths together, for one report. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:534-556 at db021da0
+// (#sendUpdate takes the attribute filter and the events' minimum number
+// together) and :926-936 (#sendUpdateMessage sends both in one
+// DataReport). [Reporter] and [EventReporter] stay the ongoing paths.
+type FlushReporter func(ctx context.Context, sub *Subscription, events []im.EventReport, paths []im.ConcreteAttributePath)
+
 // EventSource is where the engine reads a subscription's events when its
 // report is due: the node's event log, which [im.EventLog] is. A
 // subscription keeps only the lowest event number it owes, never the
@@ -122,6 +131,7 @@ type Manager struct {
 	logger        *slog.Logger
 	reporter      Reporter
 	eventReporter EventReporter
+	flushReporter FlushReporter
 	eventSource   EventSource
 	// inflight counts a tick being walked and every report it started
 	// until the report returned (internal/inflight SubscriptionPending):
@@ -132,7 +142,7 @@ type Manager struct {
 	// seconds; zero for a node that is no such ICD.
 	icdIdleMax atomic.Uint32
 
-	// mu guards byID, eventReporter, eventSource, nextID, onClosed,
+	// mu guards byID, eventReporter, flushReporter, eventSource, nextID, onClosed,
 	// onTerminated and perFabric.
 	mu        sync.RWMutex
 	byID      map[uint32]*Subscription
@@ -169,6 +179,15 @@ func (m *Manager) SetICDIdleModeDuration(seconds uint16) { m.icdIdleMax.Store(ui
 func (m *Manager) SetEventReporter(r EventReporter) {
 	m.mu.Lock()
 	m.eventReporter = r
+	m.mu.Unlock()
+}
+
+// SetFlushReporter wires the hook [Manager.FlushFabric] reports through.
+// Pass nil to detach; without one a flush sends nothing and leaves what
+// the subscriptions owe in place. Safe to call before Start.
+func (m *Manager) SetFlushReporter(r FlushReporter) {
+	m.mu.Lock()
+	m.flushReporter = r
 	m.mu.Unlock()
 }
 
@@ -563,22 +582,34 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 }
 
 // FlushFabric reports what the fabric's subscriptions owe — the pending
-// events and the dirty attributes — now, the min interval and a deferral
-// notwithstanding, and returns once the reports are handed to the wire;
-// the subscriptions of exceptSessionID, the session carrying the command,
-// are left for after its response (0 excepts none). It is the flush of
-// matter.js's Fabric.leave before the fabric goes: every session of the
-// fabric runs `closeSubscriptions(true)` (packages/protocol/src/fabric/Fabric.ts:447-457
-// at 862ad75f), each subscription closing with a flush through the
-// session (NodeSession.ts:294-306), so the Leave event the node emitted
-// a moment before reaches the subscribers while the fabric still admits
-// them. A subscription whose report is in flight carries what it drained
-// and is skipped; a priming one owes nothing yet.
+// events and the dirty attributes, together in one report per
+// subscription — now, the min interval and a deferral notwithstanding,
+// and returns once the reports are handed to the wire and answered or
+// given up; the subscriptions of exceptSessionID, the session carrying
+// the command, are left for after its response (0 excepts none). It is
+// the flush of matter.js's Fabric.leave before the fabric goes
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0): every
+// session of the fabric runs `closeSubscriptions(true)`
+// (NodeSession.ts:312-323), each subscription closing with a flush through
+// the session (ServerSubscription.ts:753-763 #flush, one
+// #triggerSendUpdate), so the Leave event the node emitted a moment
+// before reaches the subscribers while the fabric still admits them. A
+// subscription whose report is in flight carries what it drained and is
+// skipped; a priming one owes nothing yet. Without a [FlushReporter]
+// nothing is drained or sent.
+//
+// Unlike matter.js, whose subscription is marked closed before its flush
+// (ServerSubscription.ts:776-788 #close, :800-809 #markClosed),
+// FlushFabric leaves the subscriptions open; they close with their
+// sessions right after, when the fabric is removed. In that window only
+// an ongoing report can go out, and none waits for its answer.
 func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSessionID uint16) {
 	m.mu.RLock()
-	eventReporter := m.eventReporter
-	reporter := m.reporter
+	flushReporter := m.flushReporter
 	m.mu.RUnlock()
+	if flushReporter == nil {
+		return
+	}
 	now := m.cfg.Clock.Now()
 	var wg sync.WaitGroup
 	for _, sub := range m.snapshot() {
@@ -590,7 +621,7 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 		}
 		events := sub.drainEvents(now, m.eventSourceOf(), true)
 		dirty := sub.drainDirty(now, true)
-		if (len(events) == 0 || eventReporter == nil) && (len(dirty) == 0 || reporter == nil) {
+		if len(events) == 0 && len(dirty) == 0 {
 			sub.reporting.Store(false)
 			continue
 		}
@@ -600,12 +631,7 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 			defer wg.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
 			defer sub.reporting.Store(false)
-			if len(events) > 0 && eventReporter != nil {
-				eventReporter(ctx, sub, events)
-			}
-			if len(dirty) > 0 && reporter != nil {
-				reporter(ctx, sub, dirty)
-			}
+			flushReporter(ctx, sub, events, dirty)
 		}()
 	}
 	wg.Wait()

@@ -283,8 +283,8 @@
   ],
   "summary": {
     "total_exported": 17839,
-    "reachable": 12392,
-    "whitelisted": 5447,
+    "reachable": 12393,
+    "whitelisted": 5446,
     "unreachable": 0
   },
   "by_package": [],
@@ -869,7 +869,7 @@
       "identifier": "TestAwaitFlushedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/flush_wait_test.go",
-      "line": 29
+      "line": 17
     },
     {
       "package": "bridge",
@@ -3369,13 +3369,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/filter_parity_matterjs_test.go",
       "line": 29
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestFlushWaitContext",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/flush_wait_test.go",
-      "line": 16
     },
     {
       "package": "bridge",

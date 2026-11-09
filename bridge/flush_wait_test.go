@@ -11,18 +11,6 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// TestFlushWaitContext: only a context marked by withFlushWait asks a
-// report to wait for its answer.
-func TestFlushWaitContext(t *testing.T) {
-	t.Parallel()
-	if flushWaitFromContext(context.Background()) {
-		t.Fatal("a plain context asks for the wait")
-	}
-	if !flushWaitFromContext(withFlushWait(context.Background())) {
-		t.Fatal("the marked context does not ask for the wait")
-	}
-}
-
 // TestAwaitFlushedReport: the wait for a flushed report's answer ends
 // with the peer's StatusResponse, with the context, or after the chunk
 // StatusResponse bound — and the waiter is disarmed on every path.

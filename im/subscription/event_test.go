@@ -69,6 +69,20 @@ func chanEventReporter(ch chan eventReporterCall) subscription.EventReporter {
 	}
 }
 
+// flushReporterCall is one [subscription.FlushReporter] call.
+type flushReporterCall struct {
+	sub    *subscription.Subscription
+	events []im.EventReport
+	paths  []im.ConcreteAttributePath
+}
+
+// chanFlushReporter returns a FlushReporter that sends to ch.
+func chanFlushReporter(ch chan flushReporterCall) subscription.FlushReporter {
+	return func(_ context.Context, sub *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) {
+		ch <- flushReporterCall{sub: sub, events: events, paths: paths}
+	}
+}
+
 // defaultEventArgs builds SubscribeArgs with a single event path covering
 // (endpoint=1, cluster=0x003B, event=0x01) and a 1s MinIntervalFloor.
 func defaultEventArgs() subscription.SubscribeArgs {
@@ -331,6 +345,8 @@ func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
 	ch := make(chan eventReporterCall, 8)
 	m, fire := newEventManager(subscription.Config{})
 	m.SetEventReporter(chanEventReporter(ch))
+	flushes := make(chan flushReporterCall, 8)
+	m.SetFlushReporter(chanFlushReporter(flushes))
 
 	args := defaultEventArgs()
 	flushed, err := m.Subscribe(args)
@@ -358,6 +374,11 @@ func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
 	m.FlushFabric(ctx, 1, 11)
 	select {
 	case call := <-ch:
+		t.Fatalf("the flush went out through the event reporter, subscription %d", call.sub.ID)
+	default:
+	}
+	select {
+	case call := <-flushes:
 		if call.sub.ID != flushed.ID || len(call.events) != 1 {
 			t.Fatalf("flushed subscription %d with %d events, want %d with 1", call.sub.ID, len(call.events), flushed.ID)
 		}
@@ -365,13 +386,13 @@ func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
 		t.Fatal("FlushFabric reported nothing")
 	}
 	select {
-	case call := <-ch:
+	case call := <-flushes:
 		t.Fatalf("a second report went out, subscription %d", call.sub.ID)
 	default:
 	}
 	m.FlushFabric(ctx, 1, 11) // nothing owed any more
 	select {
-	case call := <-ch:
+	case call := <-flushes:
 		t.Fatalf("a flush without pending data reported, subscription %d", call.sub.ID)
 	default:
 	}
@@ -383,9 +404,9 @@ func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
 // event arrived.
 func TestFlushFabricWaitsForTheReportInFlight(t *testing.T) {
 	t.Parallel()
-	ch := make(chan eventReporterCall, 8)
+	ch := make(chan flushReporterCall, 8)
 	m, fire := newEventManager(subscription.Config{})
-	m.SetEventReporter(chanEventReporter(ch))
+	m.SetFlushReporter(chanFlushReporter(ch))
 	sub, err := m.Subscribe(defaultEventArgs())
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
@@ -426,6 +447,51 @@ func TestFlushFabricWaitsForTheReportInFlight(t *testing.T) {
 	select {
 	case call := <-ch:
 		t.Fatalf("a flush with an ended context reported, subscription %d", call.sub.ID)
+	default:
+	}
+}
+
+// TestFlushFabricOneReportPerSubscription: the flush hands each
+// subscription's events and dirty attributes to one flush reporter call —
+// one report, as matter.js's #flush triggers one #sendUpdate carrying the
+// attribute filter and the events together (ServerSubscription.ts:753-763,
+// :534-556 at db021da0) — and the ongoing reporters see nothing. Without a
+// flush reporter nothing is drained: what is owed stays for the next
+// ongoing report (issue 473).
+func TestFlushFabricOneReportPerSubscription(t *testing.T) {
+	t.Parallel()
+	events := make(chan eventReporterCall, 8)
+	m, fire := newEventManager(subscription.Config{})
+	m.SetEventReporter(chanEventReporter(events))
+	attrPath := im.ConcreteAttributePath{Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
+	args := defaultEventArgs()
+	args.AttributePaths = []im.ConcreteAttributePath{attrPath}
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	ctx := context.Background()
+	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityInfo))
+	m.OnAttributeChanged(attrPath)
+
+	m.FlushFabric(ctx, 1, 0) // no flush reporter: nothing drained
+	flushes := make(chan flushReporterCall, 8)
+	m.SetFlushReporter(chanFlushReporter(flushes))
+	m.FlushFabric(ctx, 1, 0)
+	select {
+	case call := <-flushes:
+		if call.sub.ID != sub.ID || len(call.events) != 1 || len(call.paths) != 1 || call.paths[0] != attrPath {
+			t.Fatalf("flush of subscription %d carried %d events and paths %v, want %d with 1 event and [%v]",
+				call.sub.ID, len(call.events), call.paths, sub.ID, attrPath)
+		}
+	default:
+		t.Fatal("FlushFabric reported nothing")
+	}
+	select {
+	case call := <-flushes:
+		t.Fatalf("a second flush report went out, subscription %d", call.sub.ID)
+	case call := <-events:
+		t.Fatalf("the event reporter was called, subscription %d", call.sub.ID)
 	default:
 	}
 }
