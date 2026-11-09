@@ -272,9 +272,9 @@ func (p cameraPort) End(_ context.Context, session camera.WebRTCSession, reason 
 // Refused is the requestor's refusal observer: a command for a session it
 // does not hold is logged and fans out as [CameraSignalRefused] — matter.js's
 // refused event (packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:177-180
-// and :212-219 at db021da0), which matterjs-server does not observe; a
-// refused Answer is otherwise invisible on this side, and the camera only
-// logs it (issue 464).
+// and :212-219 at db021da0). A refused Answer is otherwise invisible on
+// this side, and the camera only logs it (issue 464); the ws-controller
+// of the reference server leaves the event unobserved.
 func (p cameraPort) Refused(_ context.Context, signal camera.Signal, id uint16, fabricIndex uint8, node uint64) {
 	if p.log != nil {
 		p.log.Warn("camera.requestor.refused", slog.String("kind", string(signal)), slog.Int("webrtc_session_id", int(id)), slog.Uint64("node_id", node))
