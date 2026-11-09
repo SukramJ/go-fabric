@@ -98,7 +98,8 @@ func TestCameraPortFansOut(t *testing.T) {
 	p.Answer(ctx, session, "answer")
 	p.IceCandidates(ctx, session, []camera.ICECandidate{{Candidate: "c"}})
 	p.End(ctx, session, 3)
-	want := []CameraSignalKind{CameraSignalOffer, CameraSignalAnswer, CameraSignalICECandidates, CameraSignalEnd}
+	p.Refused(ctx, camera.Signal("answer"), 7, 2, 0x55)
+	want := []CameraSignalKind{CameraSignalOffer, CameraSignalAnswer, CameraSignalICECandidates, CameraSignalEnd, CameraSignalRefused}
 	for _, kind := range want {
 		sig := <-got
 		if sig.Kind != kind || sig.Session.Id != 7 {
@@ -120,6 +121,10 @@ func TestCameraPortFansOut(t *testing.T) {
 		case CameraSignalEnd:
 			if sig.Reason != 3 {
 				t.Fatalf("reason %d", sig.Reason)
+			}
+		case CameraSignalRefused:
+			if sig.Refused != camera.Signal("answer") || sig.Session.PeerNodeId != 0x55 || sig.Session.FabricIndex != 2 {
+				t.Fatalf("refusal %+v", sig)
 			}
 		}
 	}

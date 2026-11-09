@@ -37,8 +37,9 @@ var (
 )
 
 // Signal is one command a camera invoked on the controller's requestor:
-// its Offer, Answer, ICECandidates or End. An Answer's SDP is narrowed to
-// the directions of the offer the controller sent.
+// its Offer, Answer, ICECandidates or End, or the requestor's refusal of
+// one for a session it does not hold (SignalRefused). An Answer's SDP is
+// narrowed to the directions of the offer the controller sent.
 type Signal = controller.CameraSignal
 
 // The signal kinds.
@@ -47,6 +48,7 @@ const (
 	SignalAnswer        = controller.CameraSignalAnswer
 	SignalICECandidates = controller.CameraSignalICECandidates
 	SignalEnd           = controller.CameraSignalEnd
+	SignalRefused       = controller.CameraSignalRefused
 )
 
 // Config configures a [Service].
@@ -74,7 +76,8 @@ type Observer struct {
 	// StreamEvicted is a stream a request deallocated to make room.
 	StreamEvicted func(StreamEvicted)
 	// Signal is a signal of a session no [Session] of this service holds:
-	// one the raw provider route ([Provider]) opened.
+	// one the raw provider route ([Provider]) opened, or a command the
+	// requestor refused ([SignalRefused]).
 	Signal func(Signal)
 }
 
@@ -347,8 +350,15 @@ func (s *Service) sessionEnded(e cameraSessionEnded) {
 
 // onSignal routes one requestor signal: an Answer narrowed to the offer
 // sent, an End recorded as the peer's, then to the session's Signals or
-// the observer.
+// the observer; a refusal goes to the observer alone.
 func (s *Service) onSignal(sig Signal) {
+	if sig.Kind == SignalRefused {
+		// No session holds it: the requestor knew none of that id.
+		if s.cfg.Observer.Signal != nil {
+			s.cfg.Observer.Signal(sig)
+		}
+		return
+	}
 	t := target{sig.Session.PeerNodeId, sig.Session.PeerEndpointId}
 	k := sessionKey{t.nodeID, t.endpointID, sig.Session.Id}
 	if sig.Kind == SignalAnswer && answerDirectionsNarrowed {

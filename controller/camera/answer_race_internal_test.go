@@ -282,3 +282,23 @@ func raceEnded(f *psFixture, id uint16) bool {
 		return strings.HasPrefix(c, callEndSession+":") && strings.Contains(c, fmt.Sprintf(`"webRtcSessionId":%d,`, id))
 	})
 }
+
+// TestCameraRefusalReachesTheObserver: a command the requestor refused
+// goes to Observer.Signal, never to a session, even one of that id.
+func TestCameraRefusalReachesTheObserver(t *testing.T) {
+	s := sigService()
+	sess := &Session{box: newMailbox(t.Context())}
+	s.sessions[sessionKey{psCamera, psEndpoint, 9}] = sess
+	var observed []Signal
+	s.cfg.Observer.Signal = func(sig Signal) { observed = append(observed, sig) }
+	refused := Signal{Kind: SignalRefused, Refused: clustercamera.Signal("answer"), Session: wrdef.WebRTCSessionStruct{Id: 9, PeerNodeId: psCamera, FabricIndex: psFabric}}
+	s.onSignal(refused)
+	if len(observed) != 1 || observed[0].Kind != SignalRefused || observed[0].Refused != "answer" || observed[0].Session.Id != 9 {
+		t.Fatalf("observed %+v", observed)
+	}
+	select {
+	case sig := <-sess.Signals():
+		t.Fatalf("the session got %+v", sig)
+	default:
+	}
+}

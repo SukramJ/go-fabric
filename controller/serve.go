@@ -66,12 +66,17 @@ const (
 type CameraSignalKind uint8
 
 // The requestor's signals (WebRtcTransportRequestor's commands: Offer,
-// Answer, ICECandidates, End).
+// Answer, ICECandidates, End), and the refusal of one.
 const (
 	CameraSignalOffer CameraSignalKind = iota + 1
 	CameraSignalAnswer
 	CameraSignalICECandidates
 	CameraSignalEnd
+	// CameraSignalRefused is a command the requestor answered NOT_FOUND,
+	// because it holds no session of that id for the camera's fabric and
+	// node; CameraSignal.Refused names the command, and the Session
+	// carries the id, the fabric and the node only.
+	CameraSignalRefused
 )
 
 // CameraSignal is one command a camera invoked on the controller's
@@ -87,6 +92,8 @@ type CameraSignal struct {
 	Candidates []camera.ICECandidate
 	// Reason is the End command's reason.
 	Reason uint8
+	// Refused is the command of a CameraSignalRefused.
+	Refused camera.Signal
 }
 
 // served is the controller's own endpoint tree and what it hangs on it.
@@ -123,7 +130,7 @@ func (c *Controller) composeTree(cfg Config, log *slog.Logger) error {
 	var endpoints []*endpoint.Endpoint
 	parts := []uint16{}
 	if cfg.Camera != nil {
-		requestor, err := camera.NewRequestor(camera.RequestorConfig{Port: cameraPort{s: s}})
+		requestor, err := camera.NewRequestor(camera.RequestorConfig{Port: cameraPort{s: s, log: log}})
 		if err != nil {
 			return err
 		}
@@ -239,9 +246,12 @@ func (servedQualities) AttributeFixed(cluster, attribute uint32) bool {
 	return a != nil && a.Quality.Fixed
 }
 
-// cameraPort is the requestor's port: every signal fans out to the
-// listeners of [Controller.OnCameraSignal].
-type cameraPort struct{ s *served }
+// cameraPort is the requestor's port: every signal, and every refusal,
+// fans out to the listeners of [Controller.OnCameraSignal].
+type cameraPort struct {
+	s   *served
+	log *slog.Logger
+}
 
 func (p cameraPort) Offer(_ context.Context, session camera.WebRTCSession, req wrdef.OfferRequest) {
 	p.s.emit(CameraSignal{Kind: CameraSignalOffer, Session: session, SDP: req.Sdp, Offer: req})
@@ -258,6 +268,21 @@ func (p cameraPort) IceCandidates(_ context.Context, session camera.WebRTCSessio
 func (p cameraPort) End(_ context.Context, session camera.WebRTCSession, reason uint8) {
 	p.s.emit(CameraSignal{Kind: CameraSignalEnd, Session: session, Reason: reason})
 }
+
+// Refused is the requestor's refusal observer: a command for a session it
+// does not hold is logged and fans out as [CameraSignalRefused] — matter.js's
+// refused event (packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:177-180
+// and :212-219 at db021da0), which matterjs-server does not observe; a
+// refused Answer is otherwise invisible on this side, and the camera only
+// logs it (issue 464).
+func (p cameraPort) Refused(_ context.Context, signal camera.Signal, id uint16, fabricIndex uint8, node uint64) {
+	if p.log != nil {
+		p.log.Warn("camera.requestor.refused", slog.String("kind", string(signal)), slog.Int("webrtc_session_id", int(id)), slog.Uint64("node_id", node))
+	}
+	p.s.emit(CameraSignal{Kind: CameraSignalRefused, Session: camera.WebRTCSession{Id: id, PeerNodeId: node, FabricIndex: fabricIndex}, Refused: signal})
+}
+
+var _ camera.RequestorRefusals = cameraPort{}
 
 func (s *served) emit(sig CameraSignal) {
 	s.mu.Lock()

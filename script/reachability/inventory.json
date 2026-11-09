@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7841,
+  "entry_points": 7842,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17834,
-    "reachable": 12390,
-    "whitelisted": 5444,
+    "total_exported": 17837,
+    "reachable": 12392,
+    "whitelisted": 5445,
     "unreachable": 0
   },
   "by_package": [],
@@ -22695,7 +22695,7 @@
       "identifier": "TestControllerAccessorsWithoutServices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 130
+      "line": 135
     },
     {
       "package": "controller",
@@ -23164,7 +23164,7 @@
       "identifier": "Signal",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/camera/service.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "controller/camera",
@@ -23214,6 +23214,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
       "line": 24
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraRefusalReachesTheObserver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 288
     },
     {
       "package": "controller/camera",

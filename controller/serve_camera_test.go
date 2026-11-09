@@ -113,6 +113,23 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 		t.Fatalf("originating endpoint %d", offered.OriginatingEndpointID)
 	}
 
+	// Before the requestor holds the session the camera's Answer is
+	// refused NOT_FOUND, and the refusal reaches the listeners (issue 464).
+	provider, ok := cam.WebRtcTransportProvider().Underlying().(*camera.Provider)
+	if !ok {
+		t.Fatal("the device serves no camera.Provider")
+	}
+	run(func(ctx context.Context) error {
+		if err := provider.Answer(ctx, session, "v=0 early"); err == nil {
+			return errors.New("the requestor took an Answer for a session it does not hold")
+		}
+		return nil
+	})
+	if sig := awaitSignal(t, signals, "the requestor's refusal did not reach the listeners"); sig.Kind != controller.CameraSignalRefused ||
+		sig.Refused != wrdef.SignalAnswer || sig.Session.Id != session || sig.Session.PeerNodeId != cameraNodeID {
+		t.Fatalf("signal %+v", sig)
+	}
+
 	// The camera service (wave C) keeps the requestor's table; here the
 	// test registers the session the camera will answer on.
 	if err := c.CameraRequestor().UpsertSession(camera.WebRTCSession{
@@ -123,10 +140,6 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 
 	// The camera answers: its provider invokes Answer on the controller's
 	// requestor over the existing session.
-	provider, ok := cam.WebRtcTransportProvider().Underlying().(*camera.Provider)
-	if !ok {
-		t.Fatal("the device serves no camera.Provider")
-	}
 	run(func(ctx context.Context) error { return provider.Answer(ctx, session, "v=0 answer") })
 	if sig := awaitSignal(t, signals, "the camera's Answer did not reach the controller's requestor"); sig.Kind != controller.CameraSignalAnswer || sig.SDP != "v=0 answer" || sig.Session.Id != session {
 		t.Fatalf("signal %+v", sig)

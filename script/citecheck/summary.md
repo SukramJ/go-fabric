@@ -6,14 +6,22 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 8426 |
+| Citations | 8427 |
 | Go files citing | 1435 |
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 1997 |
 | Resolved: unique suffix | 234 |
 | Resolved: unique basename | 6195 |
 | Checked at their own `at <sha>` | 1670 |
-| Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 672 |
+| Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 673 |
 | Drift-checked (the sentence names a name the file contains) | 3888 |
 | Hard-checked only | 4538 |
-| **Hard errors** | 0 |
+| **Hard errors** | 1 |
 | **Drift** | 416 |
+
+## Hard errors
+
+| Kind | Count |
+|---|---|
+| no matterjs-server commit | 1 |
+
+- `controller/serve.go:274: packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:177-180: no matterjs-server commit`
