@@ -6,6 +6,7 @@ package topology
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -375,6 +376,7 @@ func TestServiceRefreshShared(t *testing.T) {
 	if _, err := h.svc.Refresh(ctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("a cancelled caller waited: %v", err)
 	}
+	// This also guards Refresh's own join: a Refresh that opened a flight of its own would fail here.
 	if g := h.svc.joinRefresh(); g != f {
 		t.Fatal("the cancelled caller ended the shared refresh")
 	}
@@ -420,10 +422,12 @@ func TestServiceClose(t *testing.T) {
 	recv(t, b.started)
 	h.svc.Close()
 	close(b.release)
-	h.settle("the refresh Close landed in", func() error { topo = <-done; return nil })
-	if len(topo.Nodes) != 2 {
-		t.Errorf("the caller's snapshot: %+v", topo)
-	}
+	h.settle("the refresh Close landed in", func() error {
+		if topo := <-done; len(topo.Nodes) != 2 {
+			return fmt.Errorf("the caller's snapshot: %+v", topo)
+		}
+		return nil
+	})
 	h.want(0, "a refresh Close landed in")
 }
 
