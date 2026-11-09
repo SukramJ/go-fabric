@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7838,
+  "entry_points": 7839,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17832,
+    "total_exported": 17833,
     "reachable": 12390,
-    "whitelisted": 5442,
+    "whitelisted": 5443,
     "unreachable": 0
   },
   "by_package": [],
@@ -23172,6 +23172,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
       "line": 436
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraAnswerAtEstablishing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 128
     },
     {
       "package": "controller/camera",

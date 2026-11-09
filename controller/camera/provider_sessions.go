@@ -412,6 +412,21 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // that cannot be tracked or stored is ended. Mirrors matterjs-server
 // packages/ws-controller/src/controller/webRtcSessionStreams.ts:270-317 at
 // 0bd06f2.
+//
+// The requestor entry is derived before establishing runs, so that
+// establishing, the recorded offer and the requestor's upsert follow one
+// another with nothing else on the response in between: from establishing
+// on, the camera's Answer may already be on its way, and the served
+// requestor answers NOT_FOUND to it until it holds the session
+// (cluster/camera Requestor.findSessionStrict; matter.js
+// packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:170-182
+// at db021da0). This is the contract matterjs-server's registry states —
+// "the local requestor accepts the camera's signalling from then on"
+// (packages/ws-controller/src/camera/sessionRegistry.ts:283-296 at 0bd06f2)
+// — held where Go's scheduling, unlike Node's, lets the Answer's handler
+// run while this goroutine still works on the response (issue 464). The
+// window before establishing — the response decoded — is
+// notes/parity/matter_behaviour_findings.md's WebRTC decode-window row.
 func (p *providerSessions) newSession(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16)) (any, error) {
 	resp, err := p.send(ctx, t, fields)
 	if err != nil {
@@ -421,11 +436,11 @@ func (p *providerSessions) newSession(ctx context.Context, t target, fields spec
 	if !ok {
 		return nil, stackError("the offer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
 	}
+	session, trackable := p.trackableSession(t, fields, resp)
 	if establishing != nil {
 		establishing(id)
 	}
-	session, ok := p.trackableSession(t, fields, resp)
-	if !ok {
+	if !trackable {
 		p.endWithinBudget(ctx, p.cleanup, t, id)
 		return nil, stackError("the offer for node 0x%016X produced a session with no stream usage or video/audio stream; deferred/auto-select streaming is not supported", t.nodeID)
 	}
