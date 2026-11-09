@@ -533,7 +533,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 477,
+    "line": 482,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -542,7 +542,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 519,
+    "line": 524,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "InvokeResponse",
@@ -551,7 +551,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 596,
+    "line": 601,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -641,7 +641,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 754,
+    "line": 761,
     "citation": "ServerSubscription.ts:866-876",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidSubscription",
@@ -650,7 +650,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 865,
+    "line": 872,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -659,7 +659,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 945,
+    "line": 956,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdateMessage",
@@ -668,7 +668,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1298,
+    "line": 1321,
     "citation": "ServerSubscription.ts:610-614",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "InvalidAction",
@@ -677,7 +677,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1376,
+    "line": 1399,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -686,7 +686,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1463,
+    "line": 1486,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",

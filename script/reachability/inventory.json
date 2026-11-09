@@ -869,7 +869,7 @@
       "identifier": "TestAwaitFlushedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/flush_wait_test.go",
-      "line": 17
+      "line": 24
     },
     {
       "package": "bridge",

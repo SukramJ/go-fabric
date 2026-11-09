@@ -198,6 +198,12 @@ type subTarget struct {
 	// StatusResponse to the previous chunk on the same exchange.
 	hasAck     bool
 	ackCounter uint32
+
+	// flush marks the report a subscription sends as its fabric leaves
+	// ([Bridge.reportSubscriptionFlush]): the peer's answer to each of
+	// its chunks is awaited [flushStatusResponseTimeout], not the chunk
+	// StatusResponse bound.
+	flush bool
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -596,6 +602,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	if len(report.Reports) == 0 && len(report.EventReports) == 0 {
 		return
 	}
+	target.flush = true
 	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
@@ -930,7 +937,11 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			}
 		}
 		if waitCh != nil {
-			if err := b.awaitChunkStatusResponse(waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+			timeout := b.chunkStatusResponseTimeout(target.sessionID)
+			if target.flush {
+				timeout = flushStatusResponseTimeout
+			}
+			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
 				return counters, err
 			}
 		}
@@ -1015,21 +1026,33 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	return counters, freshExchangeID, wait, nil
 }
 
+// flushStatusResponseTimeout bounds the wait for the peer's answer to a
+// report flushed while its fabric leaves — each chunk and the report as a
+// whole. matter.js's flushing subscription is already closed
+// (ServerSubscription.ts:776-788 #close: :800-809 #markClosed sets
+// #isClosed, then :816-825 #cancel flushes), so its DataReport goes out
+// with `waitForAck: !this.#isClosed` = false (:919, :934 at db021da0),
+// and sendDataReportMessage then waits `Millis(500)` for the Success
+// instead of the MRP-derived bound (InteractionMessenger.ts:799-844, the
+// timeout at :844). The bound does not depend on the transport, as
+// matter.js's does not.
+const flushStatusResponseTimeout = 500 * time.Millisecond
+
 // awaitFlushedReport waits for the peer's StatusResponse to a flushed
 // report — one sent while its fabric leaves, before the fabric's
 // sessions close — so the peer has taken the report before the
 // CloseSession follows it: a CloseSession overtaking the report leaves
 // the report on a session the peer no longer knows, and the Leave in it
 // never arrives. matter.js's flush awaits the update it triggered
-// (ServerSubscription.ts:753-763 at 862ad75f, #flush awaits
+// (ServerSubscription.ts:753-763 at db021da0, #flush awaits
 // #currentUpdatePromise) and the update awaits the answer to each
 // DataReport (InteractionMessenger.ts:799-844, sendDataReportMessage
 // ends in waitForSuccess). The wait ends with the answer, with ctx, or
-// after the chunk StatusResponse bound ([Bridge.chunkStatusResponseTimeout]);
-// the answer's standalone ack goes out at once, as for a StatusResponse
-// no chunk loop waited for (receive_dispatch's absorbStatusResponse).
+// after [flushStatusResponseTimeout]; the answer's standalone ack goes
+// out at once, as for a StatusResponse no chunk loop waited for
+// (receive_dispatch's absorbStatusResponse).
 func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan im.StatusCode) {
-	timeout := b.chunkStatusResponseTimeout(sessionID)
+	timeout := flushStatusResponseTimeout
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
