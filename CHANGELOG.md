@@ -12,7 +12,11 @@ pseudo-version of `main`.
 
 ### Added
 
-- `im/subscription`, `bridge`: `subscription.FlushReporter` and `Manager.SetFlushReporter` — the hook `Manager.FlushFabric` hands each subscription's drained events and dirty attributes to, together, for one report — and `Bridge.SubscriptionFlushReporter`, the bridge's implementation, which a host wiring its own manager sets beside `SubscriptionReporter` and `SubscriptionEventReporter` (`node` wires it). Without a flush reporter `FlushFabric` drains and sends nothing (issue 473).
+- `im/subscription`, `bridge`: `subscription.FlushReporter` and `Manager.SetFlushReporter` — the hook `Manager.FlushFabric` hands each subscription's drained events and dirty attributes to, together, for one report — and `Bridge.SubscriptionFlushReporter`, the bridge's implementation, which a host wiring its own manager sets beside `SubscriptionReporter` and `SubscriptionEventReporter` (`node` wires it). Without a flush reporter `FlushFabric` neither drains nor sends (issue 473).
+
+### Changed
+
+- `im/subscription`, `bridge`: a host that wires its own `subscription.Manager` must call `SetFlushReporter(br.SubscriptionFlushReporter())`, or the fabric-leaving flush — the Leave event and the attributes owed — is no longer sent: `FlushFabric` used to hand it to the pair of `NewManager`'s reporter and `SetEventReporter`, and now hands it to the flush reporter alone (issue 473). A host on `node` needs no change.
 
 ### Fixed
 
