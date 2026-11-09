@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7838,
+  "entry_points": 7845,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17832,
-    "reachable": 12390,
-    "whitelisted": 5442,
+    "total_exported": 17839,
+    "reachable": 12392,
+    "whitelisted": 5447,
     "unreachable": 0
   },
   "by_package": [],
@@ -22688,21 +22688,28 @@
       "identifier": "TestCameraPortFansOut",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 90
+      "line": 93
+    },
+    {
+      "package": "controller",
+      "identifier": "TestCameraPortRefusalLevels",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/units_internal_test.go",
+      "line": 138
     },
     {
       "package": "controller",
       "identifier": "TestControllerAccessorsWithoutServices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 130
+      "line": 154
     },
     {
       "package": "controller",
       "identifier": "TestFieldsAs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 60
+      "line": 63
     },
     {
       "package": "controller",
@@ -22716,21 +22723,21 @@
       "identifier": "TestServedQualities",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 80
+      "line": 83
     },
     {
       "package": "controller",
       "identifier": "TestSessionIntervalsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 43
+      "line": 46
     },
     {
       "package": "controller",
       "identifier": "TestSessionIntervalsValidate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
-      "line": 21
+      "line": 24
     },
     {
       "package": "controller/attestation",
@@ -23164,7 +23171,7 @@
       "identifier": "Signal",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/camera/service.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "controller/camera",
@@ -23172,6 +23179,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
       "line": 436
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraAnswerAtArrival",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 203
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraAnswerAtEstablishing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 132
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraArrivalOnTheFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 359
     },
     {
       "package": "controller/camera",
@@ -23200,6 +23228,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
       "line": 24
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCameraRefusalReachesTheObserver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/answer_race_internal_test.go",
+      "line": 306
     },
     {
       "package": "controller/camera",
@@ -23465,28 +23500,28 @@
       "identifier": "TestProviderSessionsAbandonParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 587
+      "line": 624
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsClockParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 504
+      "line": 541
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsEstablishParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 388
+      "line": 425
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderSessionsWatchParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/provider_sessions_parity_matterjsserver_test.go",
-      "line": 253
+      "line": 290
     },
     {
       "package": "controller/camera",
@@ -23626,14 +23661,14 @@
       "identifier": "TestSessionStreamsEstablishParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 295
+      "line": 305
     },
     {
       "package": "controller/camera",
       "identifier": "TestSessionStreamsRecordedOffersParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 528
+      "line": 538
     },
     {
       "package": "controller/camera",
@@ -23661,7 +23696,7 @@
       "identifier": "TestSessionStreamsTrackedSessionOfParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_streams_parity_matterjsserver_test.go",
-      "line": 591
+      "line": 601
     },
     {
       "package": "controller/camera",

@@ -462,3 +462,47 @@ func TestReadEvents(t *testing.T) {
 		}
 	})
 }
+
+// TestInvokeResponseArrived: ResponseArrived hears each entry of each
+// InvokeResponse of the invoke's exchange, decoded as Invoke's Result, in
+// arrival order, on the receive path and before Invoke returns — the
+// entry of the chunk the client acknowledges included (issue 464).
+func TestInvokeResponseArrived(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		var arrived []interaction.Result
+		var done <-chan invokeResult
+		returnedEarly := false
+		opts := interaction.InvokeOptions{ResponseArrived: func(r interaction.Result) {
+			if len(done) != 0 {
+				returnedEarly = true
+			}
+			arrived = append(arrived, r)
+		}}
+		done = invokeAsync(c, armPath, gencomm.ArmFailSafeRequest{ExpiryLengthSeconds: 60, Breadcrumb: 1}, opts)
+		req := s.next(t)
+		path := im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true}
+		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, invokeResponse(t, true,
+			im.InvokeResponseEntry{Path: path, HasResponse: true, Response: gencomm.ArmFailSafeResponse{DebugText: "first"}}))
+		status := s.next(t)
+		cs := uint8(4)
+		s.reply(t, status, im.InteractionModelProtocolID, im.OpcodeInvokeResponse, invokeResponse(t, false,
+			im.InvokeResponseEntry{Path: armPath, IsStatus: true, Status: im.StatusIB{Status: im.StatusFailure, ClusterStatus: cs, HasClusterStatus: true}}))
+		if r := await(t, done); r.err != nil {
+			t.Fatal(r.err)
+		}
+		if returnedEarly || len(arrived) != 2 {
+			t.Fatalf("arrived %+v (Invoke returned first: %v)", arrived, returnedEarly)
+		}
+		var resp gencomm.ArmFailSafeResponse
+		if first := arrived[0]; !first.HasFields || first.Command != gencomm.CmdArmFailSafeResponse || first.Status != im.StatusSuccess ||
+			resp.DecodeTLV(first.Fields) != nil || resp.DebugText != "first" {
+			t.Errorf("first entry %+v (%+v)", first, resp)
+		}
+		if second := arrived[1]; second.HasFields || second.Status != im.StatusFailure || second.ClusterStatus == nil || *second.ClusterStatus != cs {
+			t.Errorf("second entry %+v", second)
+		}
+	})
+}

@@ -231,6 +231,28 @@ func (io *clientIO) invokeProvider(ctx context.Context, t target, command string
 	return io.call(ctx, t, wpdef.ClusterID, providerCommands[command], fields)
 }
 
+// invokeEstablishing hands arrived each InvokeResponse's establishing
+// response at its arrival (client.InvokeOptions.ResponseArrived), decoded
+// as the call's result is.
+func (io *clientIO) invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(any)) (any, error) {
+	if io.send != nil || arrived == nil {
+		return io.invokeProvider(ctx, t, command, fields)
+	}
+	n := io.node(t.nodeID)
+	if n == nil {
+		return io.invokeProvider(ctx, t, command, fields)
+	}
+	opts := client.InvokeOptions{ResponseArrived: func(r client.Result) {
+		if !r.HasFields {
+			return
+		}
+		if v, err := decodeResponse(wpdef.ClusterID, r.Command, r.Fields); err == nil && v != nil {
+			arrived(v)
+		}
+	}}
+	return invokeDecodedWith(ctx, n, t.endpointID, wpdef.ClusterID, providerCommands[command], fields, opts)
+}
+
 // syncTime pushes this controller's time to the node: the host's push
 // when Config.SyncTime is set, else SetUTCTime on the root endpoint.
 func (io *clientIO) syncTimeOf(ctx context.Context, nodeID uint64) error {
@@ -250,26 +272,36 @@ func (io *clientIO) syncTimeOf(ctx context.Context, nodeID uint64) error {
 // invokeDecoded invokes one command and decodes its response by the
 // command's generated response type.
 func invokeDecoded(ctx context.Context, n *client.Node, endpoint uint16, cluster, command uint32, fields spec.Encodable) (any, error) {
-	res, err := n.Invoke(ctx, client.CommandPath{Endpoint: endpoint, Cluster: cluster, Command: command}, fields, client.InvokeOptions{})
+	return invokeDecodedWith(ctx, n, endpoint, cluster, command, fields, client.InvokeOptions{})
+}
+
+func invokeDecodedWith(ctx context.Context, n *client.Node, endpoint uint16, cluster, command uint32, fields spec.Encodable, opts client.InvokeOptions) (any, error) {
+	res, err := n.Invoke(ctx, client.CommandPath{Endpoint: endpoint, Cluster: cluster, Command: command}, fields, opts)
 	if err != nil {
 		return nil, err
 	}
 	if !res.HasFields {
 		return nil, nil
 	}
+	return decodeResponse(cluster, res.Command, res.Fields)
+}
+
+// decodeResponse decodes a response command's fields by its generated
+// type; nil for a response this layer does not read.
+func decodeResponse(cluster, response uint32, fields spec.Node) (any, error) {
 	switch {
-	case cluster == csdef.ClusterID && res.Command == csdef.CmdVideoStreamAllocateResponse:
-		return decodeAs[csdef.VideoStreamAllocateResponse](res.Fields)
-	case cluster == csdef.ClusterID && res.Command == csdef.CmdAudioStreamAllocateResponse:
-		return decodeAs[csdef.AudioStreamAllocateResponse](res.Fields)
-	case cluster == csdef.ClusterID && res.Command == csdef.CmdSnapshotStreamAllocateResponse:
-		return decodeAs[csdef.SnapshotStreamAllocateResponse](res.Fields)
-	case cluster == csdef.ClusterID && res.Command == csdef.CmdCaptureSnapshotResponse:
-		return decodeAs[csdef.CaptureSnapshotResponse](res.Fields)
-	case cluster == wpdef.ClusterID && res.Command == wpdef.CmdProvideOfferResponse:
-		return decodeAs[wpdef.ProvideOfferResponse](res.Fields)
-	case cluster == wpdef.ClusterID && res.Command == wpdef.CmdSolicitOfferResponse:
-		return decodeAs[wpdef.SolicitOfferResponse](res.Fields)
+	case cluster == csdef.ClusterID && response == csdef.CmdVideoStreamAllocateResponse:
+		return decodeAs[csdef.VideoStreamAllocateResponse](fields)
+	case cluster == csdef.ClusterID && response == csdef.CmdAudioStreamAllocateResponse:
+		return decodeAs[csdef.AudioStreamAllocateResponse](fields)
+	case cluster == csdef.ClusterID && response == csdef.CmdSnapshotStreamAllocateResponse:
+		return decodeAs[csdef.SnapshotStreamAllocateResponse](fields)
+	case cluster == csdef.ClusterID && response == csdef.CmdCaptureSnapshotResponse:
+		return decodeAs[csdef.CaptureSnapshotResponse](fields)
+	case cluster == wpdef.ClusterID && response == wpdef.CmdProvideOfferResponse:
+		return decodeAs[wpdef.ProvideOfferResponse](fields)
+	case cluster == wpdef.ClusterID && response == wpdef.CmdSolicitOfferResponse:
+		return decodeAs[wpdef.SolicitOfferResponse](fields)
 	}
 	return nil, nil
 }

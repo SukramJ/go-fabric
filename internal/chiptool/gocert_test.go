@@ -120,6 +120,11 @@ type goCertCase struct {
 	// engine runs a case's finalizer in its finally block
 	// (packages/testing/src/chip/cert/cert-test.ts:498-502).
 	finalize func(th *goTH)
+	// failureLog is the last log lines of the case's own TH-side
+	// participants (a container the case runs), printed beside the Go
+	// controllers' when a step failed; read before finalize, which may
+	// remove them.
+	failureLog func(th *goTH) string
 	// native marks a case whose DUT is a device in matter.js too (the
 	// BDX receiver, SU requestor, BIND switch cases): its PICS are the
 	// device's as stated and are not mirrored onto the server side.
@@ -359,6 +364,10 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 			t.Errorf("%s: fail — %s", where, r.detail)
 		}
 	}
+	var participants string
+	if failed && c.failureLog != nil {
+		participants = c.failureLog(th)
+	}
 	if c.finalize != nil {
 		c.finalize(th)
 	}
@@ -367,6 +376,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 			th.dut.dump(t)
 		}
 		t.Logf("the Go controllers' last log lines:\n%s", th.logs.tail(200))
+		if participants != "" {
+			t.Logf("%s", participants)
+		}
 		return counts, false
 	}
 	return counts, true

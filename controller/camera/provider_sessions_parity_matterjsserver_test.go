@@ -61,6 +61,15 @@ type psFixture struct {
 	signals   []Signal
 	respond   func(command string) (any, error)
 	svc       *Service
+	// arrival is what the receive path hears of the response (nil: the
+	// response itself); held runs after it, before invokeEstablishing
+	// returns — newSession held between the arrival and the result.
+	arrival any
+	held    func(resp any) error
+	// lateErr fails invokeEstablishing before the response's arrival is
+	// heard; late then delivers that arrival, after the invoke returned.
+	lateErr error
+	late    func()
 }
 
 func (f *psFixture) providerEndpoints(uint64) []uint16 {
@@ -116,6 +125,34 @@ func (f *psFixture) invokeProvider(_ context.Context, t target, command string, 
 		return wpdef.SolicitOfferResponse{WebRtcSessionId: 9}, nil
 	}
 	return wpdef.ProvideOfferResponse{WebRtcSessionId: 9}, nil
+}
+
+// invokeEstablishing hands the response to arrived at its arrival, as the
+// client stack's queue notifier does, then returns it.
+func (f *psFixture) invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(any)) (any, error) {
+	resp, err := f.invokeProvider(ctx, t, command, fields)
+	if err != nil || arrived == nil {
+		return resp, err
+	}
+	f.mu.Lock()
+	arrival, held, lateErr := f.arrival, f.held, f.lateErr
+	if lateErr != nil {
+		f.late = func() { arrived(resp) }
+	}
+	f.mu.Unlock()
+	if lateErr != nil {
+		return nil, lateErr
+	}
+	if arrival == nil {
+		arrival = resp
+	}
+	arrived(arrival)
+	if held != nil {
+		if err := held(resp); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
 }
 
 func (f *psFixture) syncTime(_ context.Context, nodeID uint64) error {

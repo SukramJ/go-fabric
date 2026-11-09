@@ -67,7 +67,7 @@ func batchable(path im.ConcreteCommandPath, opts InvokeOptions) bool {
 		!opts.timedFor(im.CommandInvocation{Path: path}) && opts.ExpectedProcessingTime == 0 &&
 		!opts.ExtendedFailSafeTimeout && opts.AdditionalMrpDelay == nil && !opts.large() &&
 		(opts.InteractionModelRevision == 0 || opts.InteractionModelRevision == im.MatterInteractionModelRevision) &&
-		opts.DelayReportData == nil && opts.AddressOverride == nil
+		opts.DelayReportData == nil && opts.AddressOverride == nil && opts.ResponseArrived == nil
 }
 
 // batchLane is the commands queued for one network — matter.js BatchLane

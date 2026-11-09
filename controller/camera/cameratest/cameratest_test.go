@@ -7,11 +7,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/controller/camera/cameratest"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 func TestNewNamesTheCamera(t *testing.T) {
@@ -138,4 +140,59 @@ func TestPortRecordsAndRefuses(t *testing.T) {
 			t.Errorf("%s accepted again: %v", op, err)
 		}
 	}
+}
+
+// TestPortAnswersAfterResponse: with AnswerAfterResponse the camera sends
+// its Answer once the offer's response is out — at once without an
+// interaction to wait for — and records its outcome; "" stops it, and a
+// port without a camera sends none.
+func TestPortAnswersAfterResponse(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		cam, err := cameratest.New(cameratest.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := cam.Port()
+		p.AnswerAfterResponse("v=0")
+		after := &im.AfterResponse{}
+		if _, err := p.ProvideOffer(im.WithAfterResponse(context.Background(), after), wpdef.OfferArgs{SessionID: 4}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if sent, _ := p.AnsweredAfterResponse(4); sent {
+			t.Fatal("the Answer went before the response was out")
+		}
+		after.Run()
+		synctest.Wait()
+		// The provider runs outside a node: no route to a requestor, so
+		// the Answer comes back with an error.
+		if sent, err := p.AnsweredAfterResponse(4); !sent || err == nil {
+			t.Fatalf("after the response: sent %v, err %v", sent, err)
+		}
+		if _, err := p.ProvideOffer(context.Background(), wpdef.OfferArgs{SessionID: 5}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if sent, _ := p.AnsweredAfterResponse(5); !sent {
+			t.Fatal("without an interaction the Answer was not sent at once")
+		}
+		p.AnswerAfterResponse("")
+		if _, err := p.ProvideOffer(context.Background(), wpdef.OfferArgs{SessionID: 6}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if sent, _ := p.AnsweredAfterResponse(6); sent {
+			t.Fatal("an Answer went after AnswerAfterResponse was stopped")
+		}
+		bare := cameratest.NewPort()
+		bare.AnswerAfterResponse("v=0")
+		if _, err := bare.ProvideOffer(context.Background(), wpdef.OfferArgs{SessionID: 7}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if sent, _ := bare.AnsweredAfterResponse(7); sent {
+			t.Fatal("a port without a camera sent an Answer")
+		}
+	})
 }

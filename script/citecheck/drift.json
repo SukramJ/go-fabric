@@ -1235,7 +1235,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 106,
+    "line": 120,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",

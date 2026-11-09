@@ -68,6 +68,20 @@ type InvokeOptions struct {
 	// unless the delay-report-data forward feature is on (Invoke.ts:111-113);
 	// this module has no such switch (BD-Matter-DelayReportData).
 	DelayReportData *im.DelayReportData
+	// ResponseArrived is called with each entry of each InvokeResponse the
+	// invoke's exchange queues, in arrival order, as the [Result] Invoke
+	// returns, just before Invoke can read the message
+	// ([exchange.Exchange.SetQueueNotifier]): a caller that must act on the
+	// response at its arrival — before the handler of a message the peer
+	// sends after it runs — learns it here. A message that does not decode
+	// is skipped; Invoke reports it. It runs on the receive path: it must
+	// not block and must not call back into the node, the exchange or the
+	// manager synchronously. A command that sets it goes on its own, never
+	// in a batch; an InvokeBatch split over several exchanges calls it
+	// from each exchange's receive path, so concurrently. Go only:
+	// matter.js's runtime finishes a response's continuation before it
+	// decodes the next datagram, so it needs no such hook (issue 464).
+	ResponseArrived func(Result)
 	// ClientRequest names the invoke exchange's network profile and margin.
 	ClientRequest
 }
@@ -207,6 +221,23 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		return nil, err
 	}
 	defer m.close()
+	if arrived := opts.ResponseArrived; arrived != nil {
+		m.x.SetQueueNotifier(func(msg *exchange.Message) {
+			if msg.ProtocolID != im.InteractionModelProtocolID || msg.Opcode != im.OpcodeInvokeResponse {
+				return
+			}
+			resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), readFields)
+			if err != nil {
+				return // the read below reports it
+			}
+			for _, e := range resp.Responses {
+				arrived(resultOf(e))
+			}
+		})
+		// Runs before m.close: no arrival is heard once Invoke returns,
+		// though one already being delivered may still finish.
+		defer m.x.SetQueueNotifier(nil)
+	}
 	// A timeout alone marks the invoke timed, as a write's does, and so
 	// does a command whose model carries the timed quality. Mirrors
 	// matter.js packages/protocol/src/action/request/Invoke.ts:114

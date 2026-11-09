@@ -458,6 +458,22 @@ onto matterjs-server's `camera_*` error codes (`*IncompatibleError`,
 
 *Source: `controller/serve.go`, `controller/camera/service.go`, `session.go`, `manager*.go`, `provider_sessions.go`, `session_watch.go`, `errors.go`; `client/interaction/server.go`.*
 
+**The camera's signals on the controller.** The camera's commands reach
+the controller's requestor, and `Controller.OnCameraSignal` hands each to
+its listeners as a `CameraSignal`: Offer, Answer, ICECandidates and End
+with the session they name, which `camera.Service` routes to the
+session's `Signals` (or to `Observer.Signal` for a session no `Session`
+holds). The requestor answers `NOT_FOUND` to a command for a session it
+does not hold — chip's camera app only logs a refused Answer and sends
+nothing else — so the refusal is logged (`camera.requestor.refused`, with
+the command, the session id and the node) and surfaces as
+`CameraSignalRefused` (`camera.SignalRefused`), the refused command in
+`CameraSignal.Refused`; the service passes it to `Observer.Signal`. A new
+session is registered with the requestor when the ProvideOffer or
+SolicitOffer response arrives, on the receive path
+(`client.InvokeOptions.ResponseArrived`), so the camera's Answer, which it
+sends right after the response on the same session, finds it held.
+
 **The host's JSON.** A host that speaks matterjs-server's JSON to its own
 clients takes the names from the package rather than writing them out:
 `VideoCodecName` / `VideoCodecByName` (H264, H265, H266, AV1),
@@ -481,7 +497,9 @@ device (H.264 video, audio and snapshots, one allocated live-view stream)
 on a scripted `cameratest.Port` that answers every offer with a session,
 numbers its allocations, records the host's answers, candidates and ends
 (`Offers`, `Answered`, `Candidates`, `Ended`) and refuses an operation on
-request (`Refuse`). Bridge `cam.Device()` into a `fabrictest` site, and send
+request (`Refuse`); `AnswerAfterResponse` makes it answer each ProvideOffer
+as soon as the offer's response is out, as chip's camera app does
+(`AnsweredAfterResponse` reports each such Answer). Bridge `cam.Device()` into a `fabrictest` site, and send
 the camera's own signals with `cam.Offer`, `cam.Answer`, `cam.IceCandidates`
 and `cam.End` inside `Site.Run` — no import of `cluster/camera`.
 

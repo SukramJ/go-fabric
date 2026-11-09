@@ -218,6 +218,16 @@ func (f *ssFixture) invokeProvider(ctx context.Context, _ target, command string
 	return wpdef.ProvideOfferResponse{WebRtcSessionId: 9}, nil
 }
 
+// invokeEstablishing hands the response to arrived at its arrival, as the
+// client stack's queue notifier does.
+func (f *ssFixture) invokeEstablishing(ctx context.Context, t target, command string, fields spec.Encodable, arrived func(any)) (any, error) {
+	resp, err := f.invokeProvider(ctx, t, command, fields)
+	if err == nil && arrived != nil {
+		arrived(resp)
+	}
+	return resp, err
+}
+
 func (f *ssFixture) syncTime(context.Context, uint64) error { return nil }
 
 func (f *ssFixture) endpointID() uint16 { return 2 }
