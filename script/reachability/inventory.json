@@ -26419,7 +26419,7 @@
       "identifier": "TestChangesInstall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 438
+      "line": 457
     },
     {
       "package": "controller/topology",
@@ -26433,105 +26433,105 @@
       "identifier": "TestServiceBorderRouters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 667
+      "line": 686
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 375
+      "line": 393
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceDebounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 117
+      "line": 131
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 137
+      "line": 151
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceObservers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 413
+      "line": 432
     },
     {
       "package": "controller/topology",
       "identifier": "TestServicePeriodic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 175
+      "line": 189
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshConcurrency",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 268
+      "line": 282
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshDeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 298
+      "line": 310
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshFanOut",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 188
+      "line": 202
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshShared",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 324
+      "line": 335
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 535
+      "line": 554
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 597
+      "line": 616
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceMerges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 514
+      "line": 533
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceNotRead",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 553
+      "line": 572
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceRemove",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 581
+      "line": 600
     },
     {
       "package": "controller/topology",
