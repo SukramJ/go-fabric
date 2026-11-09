@@ -1185,7 +1185,8 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// (packages/protocol/src/protocol/MessageExchange.ts:785-798 at
 	// db021da0: no retransmission timer and no ack promise for it), which
 	// sendDataReportMessage sets for a closed subscription's report
-	// (InteractionMessenger.ts:829, :840). The peer's ack then finds no
+	// (InteractionMessenger.ts:799-844, `disableMrpLogic: !waitForAck`).
+	// The peer's ack then finds no
 	// entry, a no-op ([outboundReliableTracker.Ack]).
 	track := tracker != nil && respProto.NeedsAck && !target.flush
 	if track {
