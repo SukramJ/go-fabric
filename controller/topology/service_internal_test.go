@@ -106,6 +106,19 @@ func (h *harness) want(n int, after string) {
 	}
 }
 
+// settle waits for wait while the fake clock moves deadline by deadline
+// (clocktest.Fake.Resolve), bounded by ten real seconds: a refresh that
+// stalls ends at its own deadline, and a wait that never ends fails the
+// test in seconds instead of hanging it to the package timeout (#476).
+func (h *harness) settle(what string, wait func() error) {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := h.fake.Resolve(ctx, wait); err != nil {
+		h.t.Fatalf("%s: %v", what, err)
+	}
+}
+
 func router(id uint64, rloc uint16) Image {
 	return mkThread(id, threadOpts{role: role(5), rloc16: ptr(rloc)})
 }
@@ -285,9 +298,7 @@ func TestServiceRefreshConcurrency(t *testing.T) {
 	for range 2 {
 		b.release <- struct{}{}
 	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	h.settle("the refresh", func() error { return <-done })
 	if got := b.max.Load(); got != 2 {
 		t.Errorf("most reads at once = %d, want 2", got)
 	}
@@ -305,11 +316,7 @@ func TestServiceRefreshDeadline(t *testing.T) {
 	if got := recv(t, b.started); got != 1 {
 		t.Fatalf("first read of node %d", got)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := h.fake.Resolve(ctx, func() error { return <-done }); err != nil {
-		t.Fatal(err)
-	}
+	h.settle("the refresh past its deadline", func() error { return <-done })
 	close(b.release)
 	h.fake.Yield()
 	select {
@@ -336,7 +343,7 @@ func TestServiceRefreshShared(t *testing.T) {
 	recv(t, b.started)
 	recv(t, b.started)
 	close(b.release)
-	<-f.done
+	h.settle("the shared refresh", func() error { <-f.done; return nil })
 	if len(f.topo.Nodes) != 2 {
 		t.Fatalf("the shared snapshot: %+v", f.topo)
 	}
@@ -347,8 +354,12 @@ func TestServiceRefreshShared(t *testing.T) {
 	}
 
 	// Once the refresh landed, the next caller starts a new one — through
-	// the public path, which cannot block: the reads are released.
-	topo, err := h.svc.Refresh(context.Background())
+	// the public path, which cannot block: the reads are released. Its
+	// bound is real time, not the fake clock: moving time could end the
+	// new refresh at its deadline before both reads started.
+	bounded, cancelBounded := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelBounded()
+	topo, err := h.svc.Refresh(bounded)
 	if err != nil || len(topo.Nodes) != 2 {
 		t.Fatalf("the next Refresh = %+v, %v", topo, err)
 	}
@@ -370,7 +381,7 @@ func TestServiceRefreshShared(t *testing.T) {
 	recv(t, b.started)
 	recv(t, b.started)
 	close(b.release)
-	<-f.done
+	h.settle("the shared refresh", func() error { <-f.done; return nil })
 	if len(f.topo.Nodes) != 2 {
 		t.Fatalf("the shared snapshot after a cancelled caller: %+v", f.topo)
 	}
@@ -409,7 +420,8 @@ func TestServiceClose(t *testing.T) {
 	recv(t, b.started)
 	h.svc.Close()
 	close(b.release)
-	if topo := <-done; len(topo.Nodes) != 2 {
+	h.settle("the refresh Close landed in", func() error { topo = <-done; return nil })
+	if len(topo.Nodes) != 2 {
 		t.Errorf("the caller's snapshot: %+v", topo)
 	}
 	h.want(0, "a refresh Close landed in")
