@@ -19,6 +19,7 @@ pseudo-version of `main`.
 ### Changed
 
 - `client/interaction`, `controller/client`: `InvokeOptions` is no longer comparable — it carries `ResponseArrived`, a function (issue 464). A caller that compared two `InvokeOptions` with `==` compares the fields it needs instead.
+- `controller`, `controller/camera`: listeners of `Controller.OnCameraSignal` and `camera.Observer.Signal` now also receive `CameraSignalRefused` (`camera.SignalRefused`), whose `Session` carries the id, the fabric and the node only — `PeerEndpointId` is 0, the requestor knows no session to take it from (issue 464). A listener that switches on the kind ignores it or handles it.
 
 ### Fixed
 
