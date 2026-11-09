@@ -69,7 +69,12 @@ type Config struct {
 
 // Observer is the camera effects no caller's own result reports; a nil
 // field is not called. Each runs outside the service's locks, on the
-// goroutine that decided it; it must not block.
+// goroutine that decided it; it must not block. That goroutine can be the
+// client stack's receive path — a new session registered at its offer's
+// arrival ends a session the camera gave the same id before
+// (EndCameraRestarted) there — so a callback must not call the Service or
+// the node synchronously: a host that waits on the camera from
+// SessionEnded deadlocks that camera's connection.
 type Observer struct {
 	// SessionEnded is every end of a session this controller holds.
 	SessionEnded func(SessionEnd)
