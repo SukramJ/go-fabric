@@ -243,8 +243,9 @@ func (s *Server) EmitValveFault(endpoint uint16, data ValveFaultEvent) error {
 // false for null (quality X), and the command methods drive it
 // after the kit's checks (cluster/valve).
 //
-// The optional interfaces of a [StateSource] that unlock the Level (LVL)
-// feature and its optional DefaultOpenLevel attribute. The kit's server
+// Its optional interfaces [LevelSource] and [DefaultOpenLevelSource]
+// unlock the Level (LVL) feature and its optional DefaultOpenLevel
+// attribute. The kit's server
 // (cluster/valve) refuses a declared selection whose interface the
 // StateSource lacks, naming it; it resolves an Open's level — the
 // command's TargetLevel, else DefaultOpenLevel, else 100 — and hands it to

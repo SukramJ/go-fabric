@@ -222,13 +222,14 @@ func (s *Server) EmitSecureStateChanged(endpoint uint16, data SecureStateChanged
 // target position, Stop halts motion; an error answers FAILURE and
 // leaves the target state (cluster/closure).
 //
-// The optional interfaces of a [Mover] that unlock the features whose
-// commands and fields need more than a position: MotionLatching (LT),
+// Its optional interfaces [Latcher], [SpeedMover] and [Calibrator]
+// unlock the features whose commands and fields need more than a
+// position: MotionLatching (LT),
 // Speed (SP) and Calibration (CL). Instantaneous (IS) needs none — it
 // withdraws Stop, MovementCompleted and CountdownTime, a fact of the
 // declaration's Features. The kit's server (cluster/closure) refuses a
 // declared feature whose interface the Mover lacks, naming it.
-// These are the kit server's capability ports
+// Those interfaces are the kit server's capability ports
 // (connectedhomeip ClosureControlClusterDelegate.h HandleMoveToCommand's
 // latch and speed, HandleCalibrateCommand, at 6170af84).
 type Mover interface {
