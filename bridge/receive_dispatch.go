@@ -354,7 +354,12 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 // the exchange. op names the loop for the log line ("read" /
 // "subscribe").
 func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
-	timeout := b.chunkStatusResponseTimeout(sessionID)
+	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
+}
+
+// awaitChunkStatusResponseWithin is [Bridge.awaitChunkStatusResponse]
+// bounded by timeout instead of the chunk StatusResponse bound.
+func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {

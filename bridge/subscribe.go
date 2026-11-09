@@ -198,6 +198,14 @@ type subTarget struct {
 	// StatusResponse to the previous chunk on the same exchange.
 	hasAck     bool
 	ackCounter uint32
+
+	// flush marks the report a subscription sends as its fabric leaves
+	// ([Bridge.reportSubscriptionFlush]): the peer's answer to each of
+	// its chunks is awaited [flushStatusResponseTimeout], not the chunk
+	// StatusResponse bound, and each chunk is sent once — it asks for an
+	// ack but is not handed to the outbound reliable tracker
+	// ([Bridge.sendUnsolicitedIM]).
+	flush bool
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -230,6 +238,30 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // receives both report types interleaved.
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
+}
+
+// SubscriptionFlushReporter is the hook for the flush before a fabric
+// leaves. The daemon wires it via [subscription.Manager.SetFlushReporter]
+// beside the other two; [subscription.Manager.FlushFabric] hands it what
+// one subscription owes — events and attributes together — and it ships
+// them as one ReportData and waits for the peer's answer
+// ([Bridge.reportSubscriptionFlush]).
+func (b *Bridge) SubscriptionFlushReporter() subscription.FlushReporter {
+	return b.reportSubscriptionFlush
+}
+
+// subscriptionTargetOf returns the routing target captured for sub at
+// Subscribe time; false when sub has none (never routed, or reaped).
+func (b *Bridge) subscriptionTargetOf(sub *subscription.Subscription) (subTarget, bool) {
+	raw, ok := b.routing.subTargets.Load(sub.ID)
+	if !ok {
+		return subTarget{}, false
+	}
+	target, ok := raw.(subTarget)
+	if !ok || isNilRoute(target.src) {
+		return subTarget{}, false
+	}
+	return target, true
 }
 
 // eventReadAuthorizer builds the ACL + fabric-sensitive gate for event reads
@@ -275,12 +307,8 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if sub == nil || len(events) == 0 {
 		return
 	}
-	raw, ok := b.routing.subTargets.Load(sub.ID)
+	target, ok := b.subscriptionTargetOf(sub)
 	if !ok {
-		return
-	}
-	target, ok := raw.(subTarget)
-	if !ok || isNilRoute(target.src) {
 		return
 	}
 
@@ -310,7 +338,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// (ExchangeManager.ts:441-452), which the MRP layer here would then
 	// mistake for delivery. Ongoing server reports are always fresh
 	// server-initiated exchanges (ServerSubscription.ts:823).
-	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, flushWaitFromContext(ctx))
+	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Owe the same events again, so the next report retries them;
 		// the third consecutive failure reaps the subscription. Mirrors
@@ -330,9 +358,6 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
 		slog.Int("exchange_id", int(freshExch)))
-	if wait != nil {
-		b.awaitFlushedReport(ctx, "subscribe.event_report", target.sessionID, freshExch, wait)
-	}
 }
 
 // EmitEvent is the bridge-side [contract.EventEmitter]
@@ -465,41 +490,15 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	if dispatcher == nil || sub == nil {
 		return
 	}
-	raw, ok := b.routing.subTargets.Load(sub.ID)
+	target, ok := b.subscriptionTargetOf(sub)
 	if !ok {
 		return
-	}
-	target, ok := raw.(subTarget)
-	if !ok || isNilRoute(target.src) {
-		return
-	}
-
-	// Authorize + fabric-project every ongoing report against the
-	// identity captured at Subscribe time, so a CASE subject cannot
-	// keep receiving attributes it is not permitted to read (or another
-	// fabric's fabric-scoped rows). Mirrors the subCtx stamping the
-	// initial read applies in handleSubscribeRequest.
-	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
-	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
-	if target.pase {
-		readCtx = im.WithAuthModePASE(readCtx)
 	}
 
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
-	}
-	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
-		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
-			rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
-			if rr.Status != im.StatusSuccess {
-				rep.IsStatus = true
-				rep.Status = im.StatusIB{Status: rr.Status}
-			} else {
-				rep.Value = rr.Value
-			}
-			report.Reports = append(report.Reports, rep)
-		}
+		Reports:         b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths),
 	}
 
 	// An empty report is a max-interval keepalive (nothing changed, or every
@@ -510,7 +509,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		report.SuppressResponse = true
 	}
 
-	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, flushWaitFromContext(ctx))
+	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Mark the drained paths dirty again, so the next report
 		// retries them; the third consecutive failure reaps the
@@ -538,9 +537,96 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		slog.Int("paths", len(paths)),
 		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
-	if wait != nil {
-		b.awaitFlushedReport(ctx, "subscribe.report", target.sessionID, freshExch, wait)
+}
+
+// subscriptionAttributeReports reads paths for sub — the changed ones its
+// wildcard flags do not skip — and returns the attribute reports the
+// subscribing subject may read, under the identity captured on target.
+// Shared by the ongoing report and the flush.
+func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription, paths []im.ConcreteAttributePath) []im.AttributeReport {
+	// Authorize + fabric-project every ongoing report against the
+	// identity captured at Subscribe time, so a CASE subject cannot
+	// keep receiving attributes it is not permitted to read (or another
+	// fabric's fabric-scoped rows). Mirrors the subCtx stamping the
+	// initial read applies in handleSubscribeRequest.
+	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
+	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	if target.pase {
+		readCtx = im.WithAuthModePASE(readCtx)
 	}
+	var reports []im.AttributeReport
+	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
+		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
+			rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
+			if rr.Status != im.StatusSuccess {
+				rep.IsStatus = true
+				rep.Status = im.StatusIB{Status: rr.Status}
+			} else {
+				rep.Value = rr.Value
+			}
+			reports = append(reports, rep)
+		}
+	}
+	return reports
+}
+
+// reportSubscriptionFlush ships what sub owes as its fabric leaves — the
+// drained events and dirty attributes, authorized as the ongoing reports
+// are — in one ReportData on a fresh exchange, and waits for the peer's
+// answer ([Bridge.awaitFlushedReport]) so the CloseSession that follows
+// cannot overtake it. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:753-763 at db021da0
+// (#flush: one #triggerSendUpdate), :534-556 (#sendUpdate takes the
+// attribute filter and the events' minimum number together) and :926-936
+// (#sendUpdateMessage: one DataReport carrying both, suppressed when
+// empty, :935 suppressEmptyReport), reached from Fabric.ts:447-457
+// (leave) through NodeSession.ts:312-323 (closeSubscriptions(true)). A
+// failed send owes the events and attributes again, as the ongoing paths
+// do; the subscription closes with its session right after.
+func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) {
+	if sub == nil {
+		return
+	}
+	target, ok := b.subscriptionTargetOf(sub)
+	if !ok {
+		return
+	}
+	report := im.ReportData{
+		HasSubscription: true,
+		SubscriptionID:  sub.ID,
+	}
+	if dispatcher := b.Dispatcher(); dispatcher != nil && len(paths) > 0 {
+		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
+	}
+	if len(events) > 0 {
+		report.EventReports = b.authorizedEventReports(ctx, target, events)
+	}
+	if len(report.Reports) == 0 && len(report.EventReports) == 0 {
+		return
+	}
+	target.flush = true
+	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
+	if err != nil {
+		if len(events) > 0 {
+			sub.RequeueEvents(events[0].Number)
+		}
+		if len(paths) > 0 {
+			sub.RequeueAttributes(paths)
+		}
+		b.noteSubscriptionSendError(sub.ID, "flush", err)
+		return
+	}
+	// The flushed chunks are untracked, so no counter comes back and no
+	// counter→subscription entry is owed: nothing retransmits them, and
+	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
+	b.subSendErrorCount.Delete(sub.ID)
+	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.logger.Debug("matter.tx.subscribe.flush",
+		slog.Int("subscription_id", int(sub.ID)),
+		slog.Int("events", len(report.EventReports)),
+		slog.Int("reports", len(report.Reports)),
+		slog.Int("exchange_id", int(freshExch)))
+	b.awaitFlushedReport(ctx, "subscribe.flush", target.sessionID, freshExch, wait)
 }
 
 // sendErrorRetryLimit is how many consecutive send failures an ongoing
@@ -801,32 +887,51 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
-	return b.sendReportChunksNotify(target, report, nil)
+	counters, _, err := b.sendReportChunksNotify(target, report, nil, false)
+	return counters, err
 }
 
 // sendReportChunksNotify is [Bridge.sendReportChunks] that hands the MRP
 // counter of the first chunk to firstSent (nil: no one) once it is sent
 // and tracked — before the wait for the peer's StatusResponse to it, so
 // the owner can register the counter while the exchange has heard nothing
-// from the peer yet.
-func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, firstSent func(counter uint32)) ([]uint32, error) {
+// from the peer yet. With armFinal it also arms the wait for the peer's
+// StatusResponse to the last chunk just before that chunk goes out and
+// returns it as finalWait — the waits for the chunks before it are this
+// loop's own, on the same key, so arming the final wait up front would
+// have the first of them replace and close it. A failed send disarms it.
+func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, firstSent func(counter uint32), armFinal bool) (counters []uint32, finalWait <-chan im.StatusCode, err error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_ongoing_report", target.src, err)
-		return nil, err
+		return nil, nil, err
 	}
-	counters := make([]uint32, 0, len(chunks))
+	counters = make([]uint32, 0, len(chunks))
 	ourRole := !target.peerInitiator
+	op := "subscribe.ongoing"
+	if target.flush {
+		op = "subscribe.flush"
+	}
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
-			return nil, err
+			return nil, nil, err
 		}
 		var waitCh <-chan im.StatusCode
-		if chunk.MoreChunkedMessages {
+		switch {
+		case chunk.MoreChunkedMessages:
 			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+		case armFinal:
+			// The last chunk's answer is awaited too, by the caller:
+			// matter.js's sendDataReportMessage waits for the Success to
+			// every chunk it sends, the last included — Millis(500) for a
+			// closed subscription's report (packages/protocol/src/
+			// interaction/InteractionMessenger.ts:799-844, :844 at
+			// db021da0). Armed before the send, so the answer cannot land
+			// before the waiter exists.
+			finalWait = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
 		}
 		if i > 0 {
 			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
@@ -841,10 +946,10 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 		}
 		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
 		if err != nil {
-			if waitCh != nil {
+			if waitCh != nil || finalWait != nil {
 				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		if counter != 0 {
 			counters = append(counters, counter)
@@ -853,12 +958,16 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			}
 		}
 		if waitCh != nil {
-			if err := b.awaitChunkStatusResponse(waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
-				return counters, err
+			timeout := b.chunkStatusResponseTimeout(target.sessionID)
+			if target.flush {
+				timeout = flushStatusResponseTimeout
+			}
+			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+				return counters, nil, err
 			}
 		}
 	}
-	return counters, nil
+	return counters, finalWait, nil
 }
 
 // sendInitiatedReport ships report on a **fresh bridge-initiated
@@ -888,16 +997,14 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 }
 
 // sendInitiatedReportArmed is [Bridge.sendInitiatedReport] that, with
-// arm, also arms the wait for the peer's StatusResponse on the fresh
-// exchange before the report goes out ([Bridge.armStatusResponseWait]),
-// so the answer cannot land before the waiter exists; the caller
-// receives on wait through [Bridge.awaitFlushedReport], which disarms
-// it. A failed send disarms it here.
+// arm, also arms the wait for the peer's StatusResponse to the report's
+// last chunk on the fresh exchange, just before that chunk goes out
+// ([Bridge.sendReportChunksNotify] armFinal), so the answer cannot land
+// before the waiter exists; the caller receives on wait through
+// [Bridge.awaitFlushedReport], which disarms it. A failed send disarms
+// it here.
 func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan im.StatusCode, err error) {
 	freshExchangeID := b.nextOutboundExchangeID()
-	if arm {
-		wait = b.armStatusResponseWait(target.sessionID, freshExchangeID, true)
-	}
 	freshTarget := target
 	freshTarget.exchangeID = freshExchangeID
 	// Set peerInitiator=false so sendUnsolicitedIM's
@@ -918,13 +1025,13 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	// exchange yet, `#messageReceivedCounter === 0`). Later chunks are
 	// registered by the caller once the report is out, as before.
 	var firstCounter uint32
-	counters, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
+	counters, wait, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
 		firstCounter = counter
 		b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAtMono: createdAtMono, firstCounter: counter})
 		if report.SubscriptionID != 0 {
 			b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), report.SubscriptionID)
 		}
-	})
+	}, arm)
 	if err != nil {
 		if arm {
 			b.disarmStatusResponseWait(target.sessionID, freshExchangeID, true)
@@ -938,22 +1045,17 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	return counters, freshExchangeID, wait, nil
 }
 
-// flushWaitKey marks the context of a flush before the fabric's
-// sessions close: a report sent under it waits for the peer's
-// StatusResponse before the reporter returns.
-type flushWaitKey struct{}
-
-// withFlushWait returns ctx under which a report waits for its answer.
-func withFlushWait(ctx context.Context) context.Context {
-	return context.WithValue(ctx, flushWaitKey{}, true)
-}
-
-// flushWaitFromContext reports whether ctx asks a report to wait for its
-// answer.
-func flushWaitFromContext(ctx context.Context) bool {
-	v, _ := ctx.Value(flushWaitKey{}).(bool)
-	return v
-}
+// flushStatusResponseTimeout bounds the wait for the peer's answer to a
+// report flushed while its fabric leaves — each chunk and the report as a
+// whole. matter.js's flushing subscription is already closed
+// (ServerSubscription.ts:776-788 #close: :800-809 #markClosed sets
+// #isClosed, then :816-825 #cancel flushes), so its DataReport goes out
+// with `waitForAck: !this.#isClosed` = false (:919, :934 at db021da0),
+// and sendDataReportMessage then waits `Millis(500)` for the Success
+// instead of the MRP-derived bound (InteractionMessenger.ts:799-844, the
+// timeout at :844). The bound does not depend on the transport, as
+// matter.js's does not.
+const flushStatusResponseTimeout = 500 * time.Millisecond
 
 // awaitFlushedReport waits for the peer's StatusResponse to a flushed
 // report — one sent while its fabric leaves, before the fabric's
@@ -961,15 +1063,15 @@ func flushWaitFromContext(ctx context.Context) bool {
 // CloseSession follows it: a CloseSession overtaking the report leaves
 // the report on a session the peer no longer knows, and the Leave in it
 // never arrives. matter.js's flush awaits the update it triggered
-// (ServerSubscription.ts:753-763 at 862ad75f, #flush awaits
+// (ServerSubscription.ts:753-763 at db021da0, #flush awaits
 // #currentUpdatePromise) and the update awaits the answer to each
 // DataReport (InteractionMessenger.ts:799-844, sendDataReportMessage
 // ends in waitForSuccess). The wait ends with the answer, with ctx, or
-// after the chunk StatusResponse bound ([Bridge.chunkStatusResponseTimeout]);
-// the answer's standalone ack goes out at once, as for a StatusResponse
-// no chunk loop waited for (receive_dispatch's absorbStatusResponse).
+// after [flushStatusResponseTimeout]; the answer's standalone ack goes
+// out at once, as for a StatusResponse no chunk loop waited for
+// (receive_dispatch's absorbStatusResponse).
 func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan im.StatusCode) {
-	timeout := b.chunkStatusResponseTimeout(sessionID)
+	timeout := flushStatusResponseTimeout
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
@@ -1034,9 +1136,9 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
 	// sendReportChunks is the caller; both ongoing reporters (attributes
-	// and events) reach it through sendInitiatedReport, which forges a
-	// fresh bridge-opened exchange (target.peerInitiator=false →
-	// Initiator=true). A target with peerInitiator=true would answer on
+	// and events) and the flush reach it through sendInitiatedReport or
+	// sendInitiatedReportArmed, which forge a fresh bridge-opened exchange
+	// (target.peerInitiator=false → Initiator=true). A target with peerInitiator=true would answer on
 	// the peer-opened exchange instead — only meaningful while that
 	// exchange is still open on the peer's side.
 	respProto := message.ProtocolHeader{
@@ -1094,8 +1196,16 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	}
 
 	// Tracked before it is sent, so an ack handled before Send returns is
-	// not lost (bridge/reply.go sendReplyReliable).
-	track := tracker != nil && respProto.NeedsAck
+	// not lost (bridge/reply.go sendReplyReliable). A flushed report
+	// ([subTarget.flush]) still asks for the ack but is sent once: no
+	// retransmission, no ack wait — matter.js's `disableMrpLogic`
+	// (packages/protocol/src/protocol/MessageExchange.ts:785-798 at
+	// db021da0: no retransmission timer and no ack promise for it), which
+	// sendDataReportMessage sets for a closed subscription's report
+	// (InteractionMessenger.ts:799-844, `disableMrpLogic: !waitForAck`).
+	// The peer's ack then finds no
+	// entry, a no-op ([outboundReliableTracker.Ack]).
+	track := tracker != nil && respProto.NeedsAck && !target.flush
 	if track {
 		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
 	}

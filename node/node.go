@@ -531,7 +531,7 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 // fabricLeaving is the cluster's OnFabricLeaving hook: the Leave event,
 // then the flush of the fabric's subscriptions, both while the store
 // still holds the fabric. Mirrors matter.js Fabric.leave
-// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f, leave):
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0, leave):
 // the leaving event BasicInformationServer answers with Leave
 // (BasicInformationServer.ts:175, :186-188), then every session's
 // closeSubscriptions(true), then the delete. A fail-safe's revert

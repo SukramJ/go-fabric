@@ -446,6 +446,7 @@ func wireSecurity(
 
 	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
+	subs.SetFlushReporter(br.SubscriptionFlushReporter())
 	br.AttachSubscriptionManager(subs)
 	// One close hook, two observers: the session's subscriptions fall
 	// with it, and the bridge forgets its route — closing a TCP

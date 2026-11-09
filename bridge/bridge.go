@@ -85,7 +85,12 @@
 //     but with HasSubscription=false and SubscriptionID=0, and no report
 //     ever follows; EmitEvent still appends to the event log and fans
 //     out to nobody. The controller sees a successful subscribe and a
-//     device that never changes.
+//     device that never changes. The manager's SetEventReporter and
+//     SetFlushReporter are the host's to wire too
+//     ([Bridge.SubscriptionEventReporter],
+//     [Bridge.SubscriptionFlushReporter]); without the flush reporter a
+//     fabric leave flushes nothing — no Leave event, no owed attribute —
+//     silently.
 //   - AttachSessionRegistry — silent. Inbound CloseSession stops closing
 //     anything, [Stop] tears sessions down without the CloseSession
 //     farewell (leaving controllers on stale sessions after a restart),
@@ -1364,21 +1369,23 @@ type fabricSessionExceptCloser interface {
 // emits first still reaches its subscribers; a session carrying the
 // RemoveFabric command (ctx is the command's context) keeps its
 // subscriptions for after the response. Mirrors matter.js
-// packages/protocol/src/fabric/Fabric.ts:447-457 `leave`: the leaving
-// event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
+// packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0 `leave`: the
+// leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
 // :186-188), then every session of the fabric runs closeSubscriptions
-// with a flush (NodeSession.ts:294-306, closeSubscriptions). The fabric's
-// delete follows. Each flushed report waits for the peer's StatusResponse
-// before the flush returns, as the matter.js flush awaits its update
-// (ServerSubscription.ts:753-763, #flush), so the CloseSession that
-// follows cannot overtake the report. Needs the subscription manager;
-// without one there is nothing to flush.
+// with a flush (NodeSession.ts:312-323, closeSubscriptions). The fabric's
+// delete follows. Each subscription's flush is one report carrying its
+// events and attributes ([Bridge.SubscriptionFlushReporter]), and it
+// waits for the peer's StatusResponse before the flush returns, as the
+// matter.js flush awaits its update (ServerSubscription.ts:753-763,
+// #flush), so the CloseSession that follows cannot overtake the report.
+// Needs the subscription manager with the flush reporter wired; without
+// them there is nothing to flush.
 func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8) {
 	m := b.subscriptionManagerLocked()
 	if m == nil {
 		return
 	}
-	m.FlushFabric(withFlushWait(ctx), fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+	m.FlushFabric(ctx, fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
 }
 
 // EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal
