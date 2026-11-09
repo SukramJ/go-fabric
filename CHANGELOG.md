@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.19.1] — 2026-11-09
+
+Wave W10 (#471, issue 464 from 453): the camera's Answer to a new session is no longer refused `NOT_FOUND` — the controller's served WebRtcTransportRequestor learns the session when the ProvideOffer or SolicitOffer response arrives, on the receive path, before the camera's Answer can be handled (CAMERA-GO/1.1 went from 14/20 to 20/20 isolated runs). With it: `InvokeOptions.ResponseArrived`, the requestor's refusals logged and surfaced as `CameraSignalRefused`, the test camera's Answer right after the response (`cameratest`), and the harness printing the camera app's log on a failed step. One break below the facade, its migration inline: `InvokeOptions` is no longer comparable. After this release the roadmap pauses (owner decision 2026-11-09): milestone 7 and phase 40 wait for the owner's release or the 1.7 pin jump.
+
 ### Added
 
 - `client/interaction`, `controller/client`: `InvokeOptions.ResponseArrived func(Result)`, called with each entry of each InvokeResponse the invoke's exchange queues — decoded as the `Result` `Invoke` returns, in arrival order — on the receive path, before `Invoke` can read it (the exchange's queue notifier): a caller that must act on a response at its arrival, before the handler of a message the peer sends after it runs, learns it there. It must not block and must not call back into the node, the exchange or the manager synchronously; a command that sets it goes on its own, never in a batch, and an `InvokeBatch` split over several exchanges calls it concurrently. Go only: matter.js's runtime finishes a response's continuation before it decodes the next datagram (issue 464).
@@ -5587,7 +5591,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/SukramJ/go-fabric/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/SukramJ/go-fabric/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/SukramJ/go-fabric/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/SukramJ/go-fabric/compare/v0.16.0...v0.17.0
