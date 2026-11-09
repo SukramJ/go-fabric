@@ -10,6 +10,20 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `client/discovery`: `Address.Host` — the SRV target that owns a discovered address, lower-cased, without the trailing dot (issue 478). `matter.discovery.status.resolving` and `.resolved` carry a `targets` field (the service's current SRV targets), and a change of a service's SRV targets is logged as `matter.discovery.srv_target_changed` (`service`, `from`, `to`), so a target flipping between two responders is readable without a packet capture.
+- `client/peer`, `controller/client`: `peer.Descriptor.OperationalHost` — the discovered SRV target that owned the session's address when the peer was last reached — learned where the operational address follows the session, and persisted in `client.Record.OperationalHost` (a new record field; a record stored before loads with it empty) (issue 478).
+
+### Changed
+
+- `client/peer`: a connection attempt that ends in a timeout, another transient error or a send failure starts the next pending address at once; `DelayBeforeNextAddress` stays the stagger between attempts still in flight, and a status report from the node keeps it (connectedhomeip's behaviour; `notes/parity/by_design.md` `BD-Matter-PeerAttemptFailAdvance`, issue 478).
+- `client/peer`: a session-suspect reachability check (`VerifyReachability(ctx, ReasonSessionSuspect)`) probes the other discovered addresses after the current one failed and migrates the session to one that answers before the session is given up (`BD-Matter-SuspectProbeWalksAlternates`, issue 478).
+
+### Fixed
+
+- `client/peer`, `controller/client`: a controller reconnects to a Thread node whose operational instance a border router also answers with an SRV to its own host (issue 478, from a live Home Assistant setup with a tvOS border router): the host that proved itself in the last session ranks first while discovery still advertises it, so no reconnect spends 45 s on the router's link-local address first. The other hosts stay candidates after it (`BD-Matter-ProvenOperationalHost`, an *Ahead of matter.js* row).
+
 ## [0.19.2] — 2026-11-09
 
 Wave W11 (#474, issue 473 from go-fabric-server #54): the fabric-leaving flush — `Node.FactoryReset`, `Node.RemoveFabric` from the host — sends one report per subscription, the Leave event and the attributes owed together, once and without MRP retransmission, and waits at most 500 ms for its answer, as matter.js does. It sent two reports, each awaited up to the MRP-derived bound, and a controller that gives its sessions up on the Leave never answered the second: a reset waited about 14 s on a UDP session. With it: `subscription.FlushReporter`, `Manager.SetFlushReporter` and `Bridge.SubscriptionFlushReporter` for a host wiring its own manager. The roadmap's pause (owner decision 2026-11-09) continues after this release.
