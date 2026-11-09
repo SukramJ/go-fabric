@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7845,
+  "entry_points": 7846,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17839,
+    "total_exported": 17840,
     "reachable": 12393,
-    "whitelisted": 5446,
+    "whitelisted": 5447,
     "unreachable": 0
   },
   "by_package": [],
@@ -3369,6 +3369,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/filter_parity_matterjs_test.go",
       "line": 29
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFlushedReportSentOnceUntracked",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/flush_untracked_test.go",
+      "line": 25
     },
     {
       "package": "bridge",

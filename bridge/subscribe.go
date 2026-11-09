@@ -202,7 +202,9 @@ type subTarget struct {
 	// flush marks the report a subscription sends as its fabric leaves
 	// ([Bridge.reportSubscriptionFlush]): the peer's answer to each of
 	// its chunks is awaited [flushStatusResponseTimeout], not the chunk
-	// StatusResponse bound.
+	// StatusResponse bound, and each chunk is sent once — it asks for an
+	// ack but is not handed to the outbound reliable tracker
+	// ([Bridge.sendUnsolicitedIM]).
 	flush bool
 }
 
@@ -603,7 +605,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		return
 	}
 	target.flush = true
-	counters, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
+	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
 			sub.RequeueEvents(events[0].Number)
@@ -614,10 +616,10 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		b.noteSubscriptionSendError(sub.ID, "flush", err)
 		return
 	}
+	// The flushed chunks are untracked, so no counter comes back and no
+	// counter→subscription entry is owed: nothing retransmits them, and
+	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
 	b.subSendErrorCount.Delete(sub.ID)
-	for _, counter := range counters {
-		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
-	}
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.logger.Debug("matter.tx.subscribe.flush",
 		slog.Int("subscription_id", int(sub.ID)),
@@ -1117,9 +1119,9 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
 	// sendReportChunks is the caller; both ongoing reporters (attributes
-	// and events) reach it through sendInitiatedReport, which forges a
-	// fresh bridge-opened exchange (target.peerInitiator=false →
-	// Initiator=true). A target with peerInitiator=true would answer on
+	// and events) and the flush reach it through sendInitiatedReport or
+	// sendInitiatedReportArmed, which forge a fresh bridge-opened exchange
+	// (target.peerInitiator=false → Initiator=true). A target with peerInitiator=true would answer on
 	// the peer-opened exchange instead — only meaningful while that
 	// exchange is still open on the peer's side.
 	respProto := message.ProtocolHeader{
@@ -1177,8 +1179,15 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	}
 
 	// Tracked before it is sent, so an ack handled before Send returns is
-	// not lost (bridge/reply.go sendReplyReliable).
-	track := tracker != nil && respProto.NeedsAck
+	// not lost (bridge/reply.go sendReplyReliable). A flushed report
+	// ([subTarget.flush]) still asks for the ack but is sent once: no
+	// retransmission, no ack wait — matter.js's `disableMrpLogic`
+	// (packages/protocol/src/protocol/MessageExchange.ts:785-798 at
+	// db021da0: no retransmission timer and no ack promise for it), which
+	// sendDataReportMessage sets for a closed subscription's report
+	// (InteractionMessenger.ts:829, :840). The peer's ack then finds no
+	// entry, a no-op ([outboundReliableTracker.Ack]).
+	track := tracker != nil && respProto.NeedsAck && !target.flush
 	if track {
 		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
 	}
