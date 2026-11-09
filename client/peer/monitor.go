@@ -225,7 +225,9 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		return true
 	}
 	if reason == ReasonAddressChange {
-		for _, a := range discovered {
+		// The proven host's addresses first, as the connection tries them
+		// (orderForPeer).
+		for _, a := range orderForPeer(p, discovered) {
 			if ctx.Err() != nil {
 				return false
 			}

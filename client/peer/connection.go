@@ -12,6 +12,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -478,7 +479,16 @@ func (c *connection) sleep(ctx context.Context, d time.Duration, wake <-chan str
 // scheduleAttempts starts an attempt per pending address, the most
 // desirable first, each at least DelayBeforeNextAddress after the last
 // (PeerConnection.ts:217-262).
+//
+// Before an attempt it waits while the proven host is advertised but none
+// of its addresses has reached the queue yet (awaitingProvenLocked): the
+// service's addresses arrive one by one in the desirability order, and an
+// attempt started on the first of them would go to another target's
+// link-local address before the proven host's is queued — the race that
+// would undo the ranking. A service change wakes the wait as well, so an
+// address that leaves discovery before it was delivered ends it.
 func (c *connection) scheduleAttempts() {
+	changes := c.p.service.Changes(c.ctx)
 	for {
 		c.mu.Lock()
 		if c.ctx.Err() != nil {
@@ -503,15 +513,59 @@ func (c *connection) scheduleAttempts() {
 				continue
 			}
 		}
-		c.initiateAttemptLocked(c.shiftLocked())
+		discovered := c.p.service.Addresses()
+		if c.awaitingProvenLocked(discovered) {
+			c.mu.Unlock()
+			select {
+			case <-c.wake:
+			case _, ok := <-changes:
+				if !ok {
+					changes = nil
+				}
+			case <-c.ctx.Done():
+				return
+			}
+			continue
+		}
+		c.initiateAttemptLocked(c.shiftLocked(discovered))
 		c.mu.Unlock()
 	}
 }
 
+// awaitingProvenLocked reports whether the proven host is advertised
+// (provenHost) and none of its discovered addresses is queued or
+// attempted yet: its delivery is in flight.
+func (c *connection) awaitingProvenLocked(discovered []discovery.Address) bool {
+	host := provenHost(c.p.operationalHost(), discovered)
+	if host == "" {
+		return false
+	}
+	for _, a := range discovered {
+		if a.Host != host {
+			continue
+		}
+		ap := a.AddrPort()
+		for _, t := range c.pending {
+			if t.addr.AddrPort() == ap {
+				return false
+			}
+		}
+		for k := range c.attempts {
+			if k.ap == ap {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // shiftLocked takes the most desirable pending address — the heap of
 // :145-152 ordered by discovery.CompareDesirability, the variants of one
-// address by their index in the transport list, the first of equals.
-func (c *connection) shiftLocked() target {
+// address by their index in the transport list, the first of equals —
+// with the proven host's addresses ahead of every other (provenHost,
+// compareForHost) while discovered, the service's addresses, carries it.
+func (c *connection) shiftLocked(discovered []discovery.Address) target {
+	host := provenHost(c.p.operationalHost(), discovered)
 	transports := c.p.ResolveTransports(c.required, c.preferred)
 	index := func(t target) int {
 		for i, tr := range transports {
@@ -523,7 +577,7 @@ func (c *connection) shiftLocked() target {
 	}
 	best := 0
 	for i := 1; i < len(c.pending); i++ {
-		d := discovery.CompareDesirability(c.pending[i].addr, c.pending[best].addr)
+		d := compareForHost(host, c.pending[i].addr, c.pending[best].addr)
 		if d < 0 || (d == 0 && transports != nil && index(c.pending[i]) < index(c.pending[best])) {
 			best = i
 		}
@@ -531,6 +585,88 @@ func (c *connection) shiftLocked() target {
 	t := c.pending[best]
 	c.pending = append(c.pending[:best], c.pending[best+1:]...)
 	return t
+}
+
+// provenHost is the peer's operational host (Descriptor.OperationalHost)
+// while discovery advertises it — some discovered address carries it —
+// and empty otherwise: a host no longer advertised at all (a genuine
+// re-registration under a new one) gives the parity order back, and the
+// next session proves the new host.
+//
+// Ahead of matter.js and chip: compareDesirability ranks an address by
+// class, health and DNS priority and knows no host
+// (ServerAddressSet.ts:165-184 at db021da0); chip's lookup scores an
+// address by class alone, every IPv6 link-local first, and keeps the
+// DNS-SD interface only for link-local (src/lib/dnssd/IPAddressSorter.cpp:44-50,
+// src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:130-141 at
+// connectedhomeip 6170af84). Neither tells two SRV targets of one instance
+// apart. The session does: the node answered from an address one target
+// owns (issue 478: a border router answered a Thread node's instance with
+// an SRV to its own host, and its link-local address cost every reconnect
+// DelayBeforeNextAddress).
+func provenHost(host string, discovered []discovery.Address) string {
+	if host == "" {
+		return ""
+	}
+	for _, a := range discovered {
+		if a.Host == host {
+			return host
+		}
+	}
+	return ""
+}
+
+// compareForHost orders two addresses for an attempt, negative when a is
+// tried first: the proven host's before any other — a ranking, not a
+// filter: the other targets stay candidates after it — then
+// [discovery.CompareDesirability]. An empty host is the desirability
+// order alone.
+func compareForHost(host string, a, b discovery.Address) int {
+	if host != "" {
+		if ah, bh := a.Host == host, b.Host == host; ah != bh {
+			if ah {
+				return -1
+			}
+			return 1
+		}
+	}
+	return discovery.CompareDesirability(a, b)
+}
+
+// orderForPeer is addrs — discovered, most desirable first — with the
+// peer's proven host's addresses moved ahead of the others, each group in
+// the order given: the order the address monitor walks the alternates in,
+// the same as the connection's (shiftLocked).
+func orderForPeer(p *Peer, addrs []discovery.Address) []discovery.Address {
+	out := slices.Clone(addrs)
+	host := provenHost(p.operationalHost(), addrs)
+	if host == "" {
+		return out
+	}
+	slices.SortStableFunc(out, func(a, b discovery.Address) int {
+		switch ah, bh := a.Host == host, b.Host == host; {
+		case ah == bh:
+			return 0
+		case ah:
+			return -1
+		}
+		return 1
+	})
+	return out
+}
+
+// hostOwning is the SRV target of the discovered address a is — compared
+// without the zone, which the session and discovery may spell
+// differently — empty when none is.
+func hostOwning(discovered []discovery.Address, a *net.UDPAddr) string {
+	ap := addressOf(a).AddrPort()
+	ap = netip.AddrPortFrom(ap.Addr().WithZone(""), ap.Port())
+	for _, d := range discovered {
+		if d.Host != "" && netip.AddrPortFrom(d.IP.WithZone(""), d.Port) == ap {
+			return d.Host
+		}
+	}
+	return ""
 }
 
 // expand is one variant of a per transport to attempt, or its UDP one

@@ -54,7 +54,10 @@ const (
 	recAdvertisedIntervals       uint32 = 20 // :1070-1071
 	recTCPSupport                uint32 = 21 // :1083-1084
 	recLongIdleTimeOperatingMode uint32 = 22 // :1089-1090
-	recordFields                        = 23
+	// recOperationalHost is this module's, matter.js has no such field:
+	// peer.Descriptor.OperationalHost, the proven host (issue 478).
+	recOperationalHost uint32 = 23
+	recordFields              = 24
 )
 
 // Record is a node's commissioning record: who the node is on our fabric,
@@ -72,6 +75,13 @@ type Record struct {
 	// Hostname is the host the commissionable advertisement's SRV record
 	// named (:949-959).
 	Hostname string
+	// OperationalHost is the operational SRV target that owned the
+	// node's address (Addresses' first) when it was last reached —
+	// peer.Descriptor.OperationalHost, saved and restored with the peer;
+	// empty when unknown, and in a record stored before it existed. Not
+	// Hostname, the commissionable advertisement's host. This module's:
+	// matter.js keeps the operational address only.
+	OperationalHost string
 	// DiscoveredAt is when the node was discovered (:961-965); stored in
 	// milliseconds.
 	DiscoveredAt time.Time
@@ -242,6 +252,7 @@ func (r Record) encode() (map[uint32][]byte, error) {
 		add(!t.IsZero(), id, func(e *tlv.Encoder) { e.PutUint(anon, uint64(t.UnixMilli())) }) //nolint:gosec // a record time is after the epoch
 	}
 	str(recHostname, r.Hostname)
+	str(recOperationalHost, r.OperationalHost)
 	millis(recDiscoveredAt, r.DiscoveredAt)
 	millis(recCommissionedAt, r.CommissionedAt)
 	add(r.FabricIndexOnPeer != 0, recFabricIndexOnPeer, func(e *tlv.Encoder) { e.PutUint(anon, uint64(r.FabricIndexOnPeer)) })
@@ -322,6 +333,8 @@ func (r *Record) stringField(id uint32) *string {
 	switch id {
 	case recHostname:
 		return &r.Hostname
+	case recOperationalHost:
+		return &r.OperationalHost
 	case recDeviceIdentifier:
 		return &r.DeviceIdentifier
 	case recDeviceName:
@@ -604,6 +617,9 @@ func (r *Record) applyPeer(d peer.Descriptor) {
 	if a := d.OperationalAddress; a != nil {
 		ap := a.AddrPort()
 		r.Addresses = []NetworkAddress{{IP: ap.Addr(), Port: ap.Port()}}
+		// The proven host travels with the operational address; it is
+		// this module's (peer.Descriptor.OperationalHost).
+		r.OperationalHost = d.OperationalHost
 	}
 }
 
@@ -614,7 +630,7 @@ func (r *Record) applyPeer(d peer.Descriptor) {
 // are not kept: a session's CATs are the peer's NOC's (CaseClient.ts:396-404
 // at db021da0).
 func (r Record) knownDescriptor() peer.Descriptor {
-	d := peer.Descriptor{ReportedSessionParameters: clonePtr(r.ReportedSessionParameters), TCPUnsupported: r.TCPUnsupported}
+	d := peer.Descriptor{ReportedSessionParameters: clonePtr(r.ReportedSessionParameters), TCPUnsupported: r.TCPUnsupported, OperationalHost: r.OperationalHost}
 	if r.PeerAddress != nil {
 		d.Address = *r.PeerAddress
 	}

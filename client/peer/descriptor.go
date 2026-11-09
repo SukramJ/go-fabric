@@ -28,6 +28,15 @@ type Descriptor struct {
 	// TCP session's address is recorded with the discovered port, the
 	// transport not kept.
 	OperationalAddress *net.UDPAddr
+	// OperationalHost is the discovered SRV target that owned the
+	// session's address when the peer was last reached
+	// ([discovery.Address.Host]), empty when unknown. matter.js persists
+	// the operational address and not the host it belonged to
+	// (PeerDescriptor.ts:48 at db021da0); the host is this module's, ahead
+	// of matter.js: while discovery still advertises it, its addresses are
+	// tried first on reconnect (issue 478, a border router answering a
+	// node's instance with an SRV to its own host).
+	OperationalHost string
 	// DiscoveryData is what the peer's operational TXT record announced,
 	// nil when nothing is known (:55-58).
 	DiscoveryData *discovery.TXTData
