@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7855,
+  "entry_points": 7856,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17848,
+    "total_exported": 17849,
     "reachable": 12393,
-    "whitelisted": 5455,
+    "whitelisted": 5456,
     "unreachable": 0
   },
   "by_package": [],
@@ -7226,6 +7226,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
       "line": 461
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestFailedAttemptAdvances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/attempt_advance_test.go",
+      "line": 21
     },
     {
       "package": "client/peer",

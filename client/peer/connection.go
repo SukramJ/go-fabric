@@ -1158,6 +1158,9 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}
+	if advancesOnFailure(err, category) {
+		c.advanceAfterFailure()
+	}
 	log := p.log.With(slog.String("address", att.addr.String()))
 	if hasDelay && c.handleError != nil {
 		d, replace, fatal := c.handleError(err)
@@ -1185,6 +1188,39 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		return
 	}
 	c.sleep(att.ctx, delay, nil)
+}
+
+// advancesOnFailure reports whether a failed attempt starts the next
+// pending address at once: a timeout or another transient error (the
+// "network" category), or a failure of the socket to send — the node was
+// not reached. A status report means it was, and keeps the stagger.
+func advancesOnFailure(err error, category string) bool {
+	return category == "network" || errors.Is(err, exchange.ErrNetwork)
+}
+
+// advanceAfterFailure starts the next pending address at once: the delay
+// is reset and the scheduler woken. DelayBeforeNextAddress stays the
+// stagger between attempts still in flight.
+//
+// A deviation from matter.js, which starts the next address
+// delayBeforeNextAddress after the previous attempt started, whatever
+// became of it: its scheduler waits out the rest of the delay
+// (PeerConnection.ts:236-256 at db021da0), and lastAttemptAt is reset only
+// when the fallback is retired (:300-303). connectedhomeip moves to the
+// next resolved address at once when CASE fails with a timeout or busy
+// (OperationalSessionSetup::OnSessionEstablishmentError → TryNextResult,
+// src/app/OperationalSessionSetup.cpp:457-480 at connectedhomeip
+// 6170af84). Reason: a dead first candidate — issue 478, a border
+// router's address published for a Thread node — otherwise costs every
+// reconnect the full stagger.
+func (c *connection) advanceAfterFailure() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.pending) == 0 {
+		return
+	}
+	c.lastAttemptAt = time.Time{}
+	c.signal()
 }
 
 // flagsUnreachable is the rediscovery gate of handleConnectionError: a
