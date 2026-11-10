@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-11-10
+
+Wave W13 (#487, issue 483): the controller serves diagnostics — the new package `diag` holds the shapes both roles serve (`node` aliases them), and `Controller.SessionDiagnostics()`, `DiagnosticEvents()` and `OnDiagnosticEvent` give a snapshot of every peer's sessions and connection state and one bounded trace that includes reachability, ICD, OTA and camera events; `mdns` gains the browse-side finding `no_operational_names`. Wave W14 (#490, issue 488, the residual cases of issue 478 read from a live Home Assistant add-on log): a peer learns its proven operational host from discovery, not only at session establishment; while that host is known but another responder's cache-flush SRV removed it from the cache, a reconnect tries the last operational address first; a link-local address leaves the service on every interface it was heard on; the probe log names the probed address (`target`). Also in this release: issue 426 (#485, `ble/bluez` reports the ATT_MTU exchange), issue 481 (#484, the chip-tool Go-controller legs select the reference daemon by discriminator and port), issue 491 (#492, the CommodityTariff server reads its declared `TimeSource` inside a node again), and two test-stability fixes (issue 486 in #489, #493). The roadmap's pause (owner decision 2026-11-09) resumes after this release.
+
 ### Added
 
 - `diag`: a new package with the diagnostic shapes both roles serve — `SessionDiagnostics`, `SessionInfo`, `Occupancy`, `Diagnostics` (with `Effective()`), `DefaultDiagnosticsCapacity`, `Event` (an alias of `diagevent.Event`) and `PeerInfo` (issue 483). `diag.SessionInfo` gains `CreatedAt`, `Resumed`, `Transport` and `PeerLost` (zero on the node), `diag.SessionDiagnostics` gains `Peers` (nil on the node).
@@ -5648,7 +5652,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/SukramJ/go-fabric/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/SukramJ/go-fabric/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/SukramJ/go-fabric/compare/v0.19.0...v0.19.1
