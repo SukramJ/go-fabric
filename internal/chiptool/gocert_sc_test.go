@@ -56,22 +56,33 @@ func (th *goTH) names() (*discovery.Names, error) {
 }
 
 // commissionable finds the commissionable record of a long discriminator
-// (matter.js mdns-check.ts:141 discoverCommissionable) that a daemon on
-// port advertises; a record with the discriminator at no address on that
-// port is a foreign device on the LAN and is logged and passed over
-// (issue 481).
+// (matter.js mdns-check.ts:141 discoverCommissionable) that the daemon on
+// port of this host advertises: a record counts only with an address at
+// that port on one of the host's interface addresses ([isDaemon]). Any
+// other record with the discriminator is a foreign device on the LAN —
+// the default discriminator 3840 on the Matter port 5540 is the Go-TH
+// DUT's own identity too (issue 481) — and is logged and passed over.
 func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeout time.Duration) (*discovery.Device, error) {
+	if th.local == nil {
+		local, err := localHostAddrs()
+		if err != nil {
+			return nil, err
+		}
+		th.local = local
+	}
 	sc := discovery.NewScanner(names)
 	defer sc.Close()
 	ctx, cancel := context.WithTimeout(th.ctx, timeout)
 	defer cancel()
 	var found *discovery.Device
+	foreign := 0
 	_, err := sc.FindCommissionable(ctx, discovery.ByLongDiscriminator(d), func(dev discovery.Device) {
 		if found != nil {
 			return
 		}
-		if !isDaemon(dev, port) {
-			th.log.Info("ignoring a foreign commissionable device", "discriminator", dev.D, "instance", dev.InstanceID, "addresses", fmt.Sprint(dev.Addresses), "port", port)
+		if !isDaemon(dev, port, th.local) {
+			foreign++
+			th.log.Info("ignoring a foreign commissionable device", "discriminator", dev.D, "instance", dev.InstanceID, "addresses", fmt.Sprint(dev.Addresses), "want_port", port)
 			return
 		}
 		found = &dev
@@ -80,7 +91,11 @@ func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeo
 	if found != nil {
 		return found, nil
 	}
-	return nil, fmt.Errorf("no commissionable record for discriminator %d at port %d within %s: %w", d, port, timeout, err)
+	msg := fmt.Sprintf("no commissionable record for discriminator %d at port %d on this host within %s (%d foreign record(s) ignored)", d, port, timeout, foreign)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", msg, err)
+	}
+	return nil, errors.New(msg)
 }
 
 // browse collects the instances of a service type the host sees for d.
