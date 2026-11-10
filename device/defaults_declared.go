@@ -330,7 +330,8 @@ func newSmokeCoAlarmServer(b defaultBuild) (contract.ClusterServer, error) {
 // newCommodityTariffServer is the module's CommodityTariff server
 // ([energy.NewCommodityTariff]) on the device's clock, syncing itself
 // every [tariffSyncInterval]; the host sets the tariff through the typed
-// Set.
+// Set. A declared TimeSource is the server's time, inside a node ahead of
+// the node's Matter time (issue 491).
 func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
 	clk := b.clock
 	d, _ := b.ports.(ctdef.Declare)
@@ -338,7 +339,8 @@ func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
 		clk = sourceClock{Clock: b.clock, now: d.TimeSource.Now}
 	}
 	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
-		Features: energy.TariffFeature(b.opts.Features), Clock: clk, SyncInterval: tariffSyncInterval, DataVersion: b.cfg.DataVersion,
+		Features: energy.TariffFeature(b.opts.Features), Clock: clk, ClockDeclared: d.TimeSource != nil,
+		SyncInterval: tariffSyncInterval, DataVersion: b.cfg.DataVersion,
 	})
 	if err != nil {
 		return nil, notServed(err)

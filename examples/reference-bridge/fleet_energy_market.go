@@ -66,7 +66,8 @@ const (
 // enabled the clock stands still at a set time and moves only when a
 // trigger advances it, as chip's MockClock does. chip swaps the whole
 // app's system clock; here it is the CommodityTariff server's time alone,
-// its declared TimeSource. It notifies when it moved, and the server
+// its declared TimeSource, read ahead of the node's Matter time, which it
+// leaves untouched (issue 491). It notifies when it moved, and the server
 // derives the current attributes again (TariffTimeAttrsSync).
 type tariffTestClock struct {
 	notifier

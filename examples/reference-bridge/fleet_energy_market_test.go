@@ -8,7 +8,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -146,13 +148,23 @@ func fireMarket(t *testing.T, f *fleet, trigger uint64) {
 	}
 }
 
-// marketFleet is a fleet of the two energy-market devices, built.
+// marketFleet is a fleet of the two energy-market devices, built. The
+// tariff server is handed a Matter time as a node hands it as the device
+// joins its topology (node/matter_time.go attachMatterTime) — the host
+// clock.s here, standing in for the root's UTC — so the triggers run as
+// they do in the daemon (issue 491).
 func marketFleet(t *testing.T) *fleet {
 	t.Helper()
 	f := &fleet{energyTariff: newDemoEnergyTariff("test tariff"), electricalMeter: newDemoElectricalMeter("test meter")}
-	if _, err := f.energyTariff.device(bridged("tariff", f.energyTariff.name)); err != nil {
+	dev, err := f.energyTariff.device(bridged("tariff", f.energyTariff.name))
+	if err != nil {
 		t.Fatal(err)
 	}
+	p, ok := dev.Server(ct.ClusterID).(interface{ AttachMatterTime(clock.MatterTime) })
+	if !ok {
+		t.Fatal("the tariff server takes no Matter time")
+	}
+	p.AttachMatterTime(clock.MatterTimeOf(nil))
 	if _, err := f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)); err != nil {
 		t.Fatal(err)
 	}
@@ -188,8 +200,17 @@ func TestTariffTriggers(t *testing.T) { //nolint:funlen // two runs of one seque
 		if _, err := srv.MatterInvoke(context.Background(), ct.CmdGetDayEntry, ct.GetDayEntryRequest{DayEntryId: entries[0].DayEntryId}); err != nil {
 			t.Errorf("run %d: GetDayEntry %v", run, err)
 		}
-		// TC_SETRF_2_3.py steps 12-16: the day entry moves on, the day stays.
+		// The current day is the preset's, the declared test clock's — not
+		// the node's (issue 491).
 		currentDay, nextDay := read(ct.AttrCurrentDay), read(ct.AttrNextDay)
+		presetDay := uint32(time.Unix(tariffPresets[run].testTimestamp, 0).Sub(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) / time.Second) // Matter epoch-s
+		if day, ok := currentDay.(energy.TariffDay); !ok || day.Date != presetDay {
+			t.Errorf("run %d: CurrentDay %v, want the preset's day %d", run, currentDay, presetDay)
+		}
+		if date, ok := read(ct.AttrCurrentDayEntryDate).(uint32); !ok || date/86400 != presetDay/86400 {
+			t.Errorf("run %d: CurrentDayEntryDate %v, not on the preset's day %d", run, read(ct.AttrCurrentDayEntryDate), presetDay)
+		}
+		// TC_SETRF_2_3.py steps 12-16: the day entry moves on, the day stays.
 		nextDate := read(ct.AttrNextDayEntryDate)
 		if currentDay == nil || nextDate == nil {
 			t.Fatalf("run %d: CurrentDay %v NextDayEntryDate %v", run, currentDay, nextDate)
