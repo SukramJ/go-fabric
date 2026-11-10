@@ -7,8 +7,11 @@ package chiptool
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -97,11 +100,25 @@ func TestGoControllerCommissionsReferenceBridge(t *testing.T) {
 
 	findCtx, cancelFind := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFind()
+	local := mustHostAddrs(t)
 	var found *discovery.Device
+	foreign := 0
 	_, err = scanner.FindCommissionable(findCtx, discovery.ByLongDiscriminator(br.info.discriminator), func(d discovery.Device) {
+		if found != nil {
+			return
+		}
+		if !isDaemon(d, br.info.port, local) {
+			foreign++
+			t.Logf("ignoring a foreign commissionable device with discriminator %d: instance %s, addresses %v", d.D, d.InstanceID, d.Addresses)
+			return
+		}
 		found = &d
 		cancelFind()
 	})
+	if found == nil && foreign > 0 {
+		t.Fatalf("the daemon's commissionable record (port %d) was not seen, although %d foreign record(s) on discriminator %d were: multicast works, the daemon did not advertise (%v)",
+			br.info.port, foreign, br.info.discriminator, err)
+	}
 	if err != nil || found == nil {
 		t.Skipf("the daemon's commissionable record was not seen: multicast unavailable here (%v)", err)
 	}
@@ -154,6 +171,86 @@ func TestGoControllerCommissionsReferenceBridge(t *testing.T) {
 	}
 	if vid, err := spec.DecodeUint[uint16](16)(v); err != nil || int64(vid) != testVendorID {
 		t.Fatalf("VendorID = 0x%X (%v), want 0x%X", vid, err, testVendorID)
+	}
+}
+
+// isDaemon reports whether d is the reference daemon listening on port on
+// this host: at least one of its addresses names that port at one of the
+// host's own interface addresses (local). The discriminator alone does not
+// identify it — a LAN may hold another commissionable device on the
+// default discriminator 3840 (issue 481), and commissioning that one fails
+// with a wrong passcode — and the port alone does not either: the Go-TH
+// leg's daemon listens on the Matter port 5540 as such a device does.
+func isDaemon(d discovery.Device, port int, local hostAddrs) bool {
+	return slices.ContainsFunc(d.Addresses, func(a discovery.Address) bool { return int(a.Port) == port && local.has(a.IP) })
+}
+
+// hostAddrs is this host's interface addresses, without zone, IPv4 unmapped.
+type hostAddrs map[netip.Addr]bool
+
+// has reports whether ip is one of the host's addresses.
+func (h hostAddrs) has(ip netip.Addr) bool { return h[ip.WithZone("").Unmap()] }
+
+// localHostAddrs reads the host's interface addresses.
+func localHostAddrs() (hostAddrs, error) {
+	as, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("the host's interface addresses: %w", err)
+	}
+	h := hostAddrs{}
+	for _, a := range as {
+		var ip net.IP
+		switch v := a.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if addr, ok := netip.AddrFromSlice(ip); ok {
+			h[addr.Unmap()] = true
+		}
+	}
+	return h, nil
+}
+
+// mustHostAddrs is [localHostAddrs] for a leg; a failure fails the leg.
+func mustHostAddrs(t *testing.T) hostAddrs {
+	t.Helper()
+	h, err := localHostAddrs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// TestIsDaemon: the daemon is the record with an address at its port on
+// one of this host's addresses; a record on the same discriminator whose
+// addresses name other ports, or the same port on another host — the
+// foreign device of issue 481 — or none at all is not.
+func TestIsDaemon(t *testing.T) {
+	addr := func(ip string, port uint16) discovery.Address {
+		return discovery.Address{IP: netip.MustParseAddr(ip), Port: port}
+	}
+	local := hostAddrs{netip.MustParseAddr("192.168.1.2"): true, netip.MustParseAddr("fe80::1"): true}
+	const port = 5540
+	for _, tc := range []struct {
+		name  string
+		addrs []discovery.Address
+		want  bool
+	}{
+		{"a local address at the port", []discovery.Address{addr("192.168.1.2", port)}, true},
+		{"a zoned link-local address at the port", []discovery.Address{addr("fe80::1%eth0", port)}, true},
+		{"an IPv4-mapped local address at the port", []discovery.Address{addr("::ffff:192.168.1.2", port)}, true},
+		{"the local address after a foreign one", []discovery.Address{addr("172.18.4.29", port), addr("192.168.1.2", port)}, true},
+		{"a foreign address at the same port", []discovery.Address{addr("172.18.4.29", port)}, false},
+		{"a local address at another port", []discovery.Address{addr("192.168.1.2", 40123)}, false},
+		{"local IP and port on different addresses", []discovery.Address{addr("192.168.1.2", 40123), addr("172.18.4.29", port)}, false},
+		{"no address", nil, false},
+	} {
+		d := discovery.Device{InstanceID: "ABCDEF0123456789", D: 3840, Addresses: tc.addrs}
+		if got := isDaemon(d, port, local); got != tc.want {
+			t.Errorf("%s: isDaemon = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 
@@ -244,12 +341,26 @@ func TestGoControllerSubscribesReferenceBridge(t *testing.T) {
 	}
 
 	findCtx, cancelFind := context.WithTimeout(ctx, 30*time.Second)
+	local := mustHostAddrs(t)
 	var found *discovery.Device
+	foreign := 0
 	_, err = scanner.FindCommissionable(findCtx, discovery.ByLongDiscriminator(br.info.discriminator), func(d discovery.Device) {
+		if found != nil {
+			return
+		}
+		if !isDaemon(d, br.info.port, local) {
+			foreign++
+			t.Logf("ignoring a foreign commissionable device with discriminator %d: instance %s, addresses %v", d.D, d.InstanceID, d.Addresses)
+			return
+		}
 		found = &d
 		cancelFind()
 	})
 	cancelFind()
+	if found == nil && foreign > 0 {
+		t.Fatalf("the daemon's commissionable record (port %d) was not seen, although %d foreign record(s) on discriminator %d were: multicast works, the daemon did not advertise (%v)",
+			br.info.port, foreign, br.info.discriminator, err)
+	}
 	if err != nil || found == nil {
 		t.Skipf("the daemon's commissionable record was not seen: multicast unavailable here (%v)", err)
 	}

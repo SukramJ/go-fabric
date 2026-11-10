@@ -406,6 +406,9 @@ type goTH struct {
 	logs  syncBuffer
 	// extraEPs are the DUT's endpoints its daemonArgs add.
 	extraEPs []uint16
+	// local is the host's interface addresses, read once by the first
+	// commissionable search ([goTH.commissionable]).
+	local hostAddrs
 }
 
 // syncBuffer is a log sink the controllers write to concurrently.
