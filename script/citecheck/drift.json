@@ -3081,7 +3081,7 @@
   },
   {
     "file": "internal/chiptool/gocert_sc_test.go",
-    "line": 86,
+    "line": 109,
     "citation": "tc-dd-support.ts:513",
     "resolved": "support/chip-testing/test/cert/tc-dd-support.ts",
     "identifier": "qrPayloadWith",
@@ -3090,7 +3090,7 @@
   },
   {
     "file": "internal/chiptool/gocert_sc_test.go",
-    "line": 118,
+    "line": 141,
     "citation": "tc-dd-support.ts:895-905",
     "resolved": "support/chip-testing/test/cert/tc-dd-support.ts",
     "identifier": "absentDiscriminator",
@@ -3099,7 +3099,7 @@
   },
   {
     "file": "internal/chiptool/gocert_sc_test.go",
-    "line": 297,
+    "line": 320,
     "citation": "tc-dd-support.ts:1358",
     "resolved": "support/chip-testing/test/cert/tc-dd-support.ts",
     "identifier": "recordBackInCommissioningMode",
