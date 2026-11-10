@@ -354,7 +354,7 @@ type Entry struct {
 	// updated only on inbound decrypts — the peer-active determination
 	// for MRP interval selection needs the time the PEER last sent, not
 	// our own transmissions. Mirrors chip GetLastPeerActivityTime and
-	// matter.js NodeSession.ts:120.
+	// matter.js NodeSession.ts:121 at db021da0.
 	lastPeerActivity time.Time
 	// peerIdleIntervalMs / peerActiveIntervalMs / peerActiveThresholdMs
 	// carry the peer's advertised MRP session parameters (Sigma1 /

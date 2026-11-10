@@ -87,7 +87,7 @@ type SessionInfo struct {
 	// whose exchange sessions export no any-direction timestamp;
 	// LastPeerActivity when the peer last sent, counted from the
 	// session's creation (the peer is active then: matter.js
-	// NodeSession.ts:120, chip SecureSession.h:349).
+	// NodeSession.ts:121 at db021da0, chip SecureSession.h:349).
 	LastActivity, LastPeerActivity time.Time
 	// Idle and PeerIdle are AsOf minus LastActivity and LastPeerActivity;
 	// 0 when the timestamp is zero.

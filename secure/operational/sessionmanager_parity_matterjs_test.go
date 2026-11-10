@@ -166,7 +166,7 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		m.SetClock(clk)
 		e := sessionManagerOpen(t, m, 0x0100, 0x1234, 0x0100, false)
 		// A secure session counts its peer active from creation
-		// (NodeSession.ts:120); the matter.js case resets it to model a
+		// (NodeSession.ts:121 at db021da0); the matter.js case resets it to model a
 		// peer never heard from (`session.activeTimestamp = 0`).
 		e.mu.Lock()
 		e.lastPeerActivity = time.Time{}
