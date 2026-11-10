@@ -425,3 +425,17 @@ func TestConcurrent(t *testing.T) {
 		t.Fatal("the observer saw nothing")
 	}
 }
+
+// TestObserverStopWinsOverQueuedRecord holds unsubscribe's promise at the
+// pump: once stop is closed no queued record reaches fn — whether the
+// pump's select sees stop first or takes the record and then sees stop.
+// Both are ready here, so the select picks either; 64 rounds reach both.
+func TestObserverStopWinsOverQueuedRecord(t *testing.T) {
+	for range 64 {
+		o := &observer{queue: make(chan Record, 1), stop: make(chan struct{}), done: make(chan struct{})}
+		o.queue <- Record{Message: "queued"}
+		close(o.stop)
+		o.run(func(r Record) { t.Errorf("a record was delivered after stop: %q", r.Message) })
+		<-o.done
+	}
+}
