@@ -317,7 +317,12 @@ var floors = []packageFloor{
 		min: 84,
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/secure/channel", min: 85},
+	{
+		pkg:    "github.com/SukramJ/go-fabric/secure/channel",
+		min:    85,
+		spread: 1,
+		why:    "spread 1 (issue 486): TestConcurrentEncryptAndClose races Encrypt against Close, and whether an Encrypt passes the closed check and then finds its cipher already cleared (Session.Encrypt's ErrSessionInactive after encCipher.Load) depends on scheduling — one statement of 189, so the package measures 87.8 (166) or 88.4 (167); 88.4 read as a trailing floor under a loaded make ci",
+	},
 	// These three floors are deliberately set from the module WITHOUT its
 	// fuzz targets: secure/setup measured 84.0 without and 91.4 with,
 	// secure/mattercert 90.5 and 91.1, tlv 91.9 and 95.1. `go test` replays
