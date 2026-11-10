@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7865,
+  "entry_points": 7867,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17858,
+    "total_exported": 17860,
     "reachable": 12393,
-    "whitelisted": 5465,
+    "whitelisted": 5467,
     "unreachable": 0
   },
   "by_package": [],
@@ -7176,7 +7176,7 @@
       "identifier": "TestCompareForHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 112
+      "line": 115
     },
     {
       "package": "client/peer",
@@ -7421,14 +7421,14 @@
       "identifier": "TestOperationalHostLearned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 139
+      "line": 142
     },
     {
       "package": "client/peer",
       "identifier": "TestOrderForPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 170
+      "line": 173
     },
     {
       "package": "client/peer",
@@ -7610,7 +7610,7 @@
       "identifier": "TestPendingAddAdoptsTheHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 191
+      "line": 194
     },
     {
       "package": "client/peer",
@@ -7632,6 +7632,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
       "line": 89
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostAbsentFallbackNotRetired",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 141
     },
     {
       "package": "client/peer",
@@ -7659,7 +7666,7 @@
       "identifier": "TestProvenHostPreemptsTheStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 81
+      "line": 84
     },
     {
       "package": "client/peer",
@@ -7716,6 +7723,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
       "line": 47
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestShiftRanksTheFallbackFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 181
     },
     {
       "package": "client/peer",
