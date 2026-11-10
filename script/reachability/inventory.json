@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7859,
+  "entry_points": 7860,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17852,
+    "total_exported": 17853,
     "reachable": 12393,
-    "whitelisted": 5459,
+    "whitelisted": 5460,
     "unreachable": 0
   },
   "by_package": [],
@@ -7597,6 +7597,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_parity_matterjs_test.go",
       "line": 35
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPendingAddAdoptsTheHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 191
     },
     {
       "package": "client/peer",

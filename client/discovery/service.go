@@ -25,7 +25,9 @@ type Address struct {
 	// Host is the SRV target that owns the address — the host name whose A
 	// or AAAA record named it, lower-cased, without the trailing dot —
 	// empty when unknown (an address not from discovery). An address two
-	// targets name keeps the first owner. matter.js's ServerAddressIp
+	// targets name keeps the first owner until it leaves the set (a
+	// deletion drops the address whichever target named it, as matter.js
+	// does). matter.js's ServerAddressIp
 	// carries no host; it is this module's, so a peer can rank the host a
 	// session proved first (issue 478: a border router answering a node's
 	// instance with an SRV to its own host).

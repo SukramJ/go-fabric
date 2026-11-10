@@ -254,7 +254,10 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 			return true
 		}
 	}
-	m.resetBackoff()
+	if reason == ReasonAddressChange {
+		// A suspect run reset the backoff before its probes.
+		m.resetBackoff()
+	}
 	if ctx.Err() != nil {
 		return false
 	}

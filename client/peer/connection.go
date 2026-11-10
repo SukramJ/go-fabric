@@ -639,10 +639,17 @@ func (c *connection) expand(a discovery.Address) []target {
 }
 
 // pendingAddLocked queues t once (the heap holds an item once,
-// general/src/util/Heap.ts:119-138) and reports whether it did.
+// general/src/util/Heap.ts:119-138) and reports whether it did. A queued
+// entry without a host — the fallback, from the operational address —
+// takes the host discovery names for the same address, so the proven
+// host ranks it (compareForHost); that counts as queued.
 func (c *connection) pendingAddLocked(t target) bool {
-	for _, x := range c.pending {
+	for i, x := range c.pending {
 		if x.key() == t.key() {
+			if x.addr.Host == "" && t.addr.Host != "" {
+				c.pending[i].addr.Host = t.addr.Host
+				return true
+			}
 			return false
 		}
 	}

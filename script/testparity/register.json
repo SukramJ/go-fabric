@@ -8326,7 +8326,8 @@
         "client/peer:TestMonitorAllProbesFail",
         "client/peer:TestPeerAddressMonitorVerifyReachability",
         "client/peer:TestPeerAddressMonitorCoalescing",
-        "client/peer:TestPeerAddressMonitorBackoff"
+        "client/peer:TestPeerAddressMonitorBackoff",
+        "client/peer:TestMonitorSuspectJoinedWalksAlternates"
       ],
       "missing": [
         "sleeping LIT ICD whose address left mDNS: adopts a discovered address on trust, no probe",

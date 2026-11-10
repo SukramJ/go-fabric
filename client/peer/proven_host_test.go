@@ -184,3 +184,26 @@ func TestOrderForPeer(t *testing.T) {
 		}
 	})
 }
+
+// TestPendingAddAdoptsTheHost: the fallback queued from the operational
+// address carries no host; when discovery names the same address, the
+// queued entry takes its host, so the proven host ranks it.
+func TestPendingAddAdoptsTheHost(t *testing.T) {
+	t.Parallel()
+	c := &connection{wake: make(chan struct{}, 1)}
+	fallback := addressOf(udpAddr(addr1))
+	if !c.pendingAddLocked(target{addr: fallback}) {
+		t.Fatal("the fallback was not queued")
+	}
+	discovered := fallback
+	discovered.Host = "node1234.local"
+	if !c.pendingAddLocked(target{addr: discovered}) {
+		t.Fatal("adopting the host does not count")
+	}
+	if len(c.pending) != 1 || c.pending[0].addr.Host != "node1234.local" {
+		t.Fatalf("pending %+v", c.pending)
+	}
+	if c.pendingAddLocked(target{addr: discovered}) {
+		t.Fatal("a second add of the same entry counts")
+	}
+}
