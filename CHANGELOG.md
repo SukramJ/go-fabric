@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`: the nested modules require go-fabric `v0.21.0` (before `v0.12.1` and `v0.13.10`) and are tagged `ble/bluez/v0.21.0` and `ble/esphome/v0.21.0` at this commit, so the ATT_MTU report of issue 426 is reachable by a module version; no code change.
+
 ## [0.21.0] — 2026-11-10
 
 Wave W13 (#487, issue 483): the controller serves diagnostics — the new package `diag` holds the shapes both roles serve (`node` aliases them), and `Controller.SessionDiagnostics()`, `DiagnosticEvents()` and `OnDiagnosticEvent` give a snapshot of every peer's sessions and connection state and one bounded trace that includes reachability, ICD, OTA and camera events; `mdns` gains the browse-side finding `no_operational_names`. Wave W14 (#490, issue 488, the residual cases of issue 478 read from a live Home Assistant add-on log): a peer learns its proven operational host from discovery, not only at session establishment; while that host is known but another responder's cache-flush SRV removed it from the cache, a reconnect tries the last operational address first; a link-local address leaves the service on every interface it was heard on; the probe log names the probed address (`target`). Also in this release: issue 426 (#485, `ble/bluez` reports the ATT_MTU exchange), issue 481 (#484, the chip-tool Go-controller legs select the reference daemon by discriminator and port), issue 491 (#492, the CommodityTariff server reads its declared `TimeSource` inside a node again), and two test-stability fixes (issue 486 in #489, #493). The roadmap's pause (owner decision 2026-11-09) resumes after this release.
