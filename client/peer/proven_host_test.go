@@ -43,7 +43,10 @@ func TestProvenHostRanksFirst(t *testing.T) {
 	}{
 		{"proven host first", "node1234.local", true},
 		{"no proven host: parity order", "", false},
-		{"host no longer advertised: parity order", "gone.local", false},
+		// Parity only without an operational address: with one, the
+		// absent proven host queues it first (issue 488,
+		// TestProvenHostAbsentTriesTheOperationalAddressFirst).
+		{"host no longer advertised, no operational address: parity order", "gone.local", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

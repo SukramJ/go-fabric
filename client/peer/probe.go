@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log/slog"
@@ -45,9 +46,16 @@ const (
 // PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at 862ad75f)
 // and the medium margin PeerExchangeProvider.initiateExchange applies
 // (PeerExchangeProvider.ts:87-92, :136-141).
+//
+// Its log record matter.controller.peer.probe names the probed address in
+// target — override, else the session's — beside the caller's address, so
+// a walk of the alternates reads from the log (issue 488).
 func probe(ctx context.Context, mgr *exchange.Manager, s *exchange.Session, override *net.UDPAddr, log *slog.Logger, network *NetworkProfile, margin *time.Duration) bool {
 	if ctx.Err() != nil || s == nil || s.IsClosed() || s.IsPeerLost() {
 		return false
+	}
+	if dest := cmp.Or(override, s.Addr()); dest != nil {
+		log = log.With(slog.String("target", addressOf(dest).AddrPort().String()))
 	}
 	opts := exchange.Options{AddressOverride: override, PeerAdditionalMrpDelay: margin}
 	if network != nil {
