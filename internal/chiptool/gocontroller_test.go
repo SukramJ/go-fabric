@@ -9,6 +9,8 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -99,6 +101,13 @@ func TestGoControllerCommissionsReferenceBridge(t *testing.T) {
 	defer cancelFind()
 	var found *discovery.Device
 	_, err = scanner.FindCommissionable(findCtx, discovery.ByLongDiscriminator(br.info.discriminator), func(d discovery.Device) {
+		if found != nil {
+			return
+		}
+		if !isDaemon(d, br.info.port) {
+			t.Logf("ignoring a foreign commissionable device with discriminator %d: instance %s, addresses %v", d.D, d.InstanceID, d.Addresses)
+			return
+		}
 		found = &d
 		cancelFind()
 	})
@@ -154,6 +163,41 @@ func TestGoControllerCommissionsReferenceBridge(t *testing.T) {
 	}
 	if vid, err := spec.DecodeUint[uint16](16)(v); err != nil || int64(vid) != testVendorID {
 		t.Fatalf("VendorID = 0x%X (%v), want 0x%X", vid, err, testVendorID)
+	}
+}
+
+// isDaemon reports whether d is the reference daemon listening on port: at
+// least one of its addresses names that port. The discriminator alone does
+// not identify it — a LAN may hold another commissionable device on the
+// default discriminator 3840 (issue 481), and commissioning that one fails
+// with a wrong passcode; the daemon's bound port is known to the suite.
+func isDaemon(d discovery.Device, port int) bool {
+	return slices.ContainsFunc(d.Addresses, func(a discovery.Address) bool { return int(a.Port) == port })
+}
+
+// TestIsDaemon: the daemon is the record with an address at its port; a
+// record on the same discriminator whose addresses name other ports — the
+// foreign device of issue 481 — or none at all is not.
+func TestIsDaemon(t *testing.T) {
+	addr := func(ip string, port uint16) discovery.Address {
+		return discovery.Address{IP: netip.MustParseAddr(ip), Port: port}
+	}
+	const port = 40123
+	for _, tc := range []struct {
+		name  string
+		addrs []discovery.Address
+		want  bool
+	}{
+		{"the daemon's only address", []discovery.Address{addr("fe80::1", port)}, true},
+		{"the daemon's port on a later address", []discovery.Address{addr("172.18.4.29", 5540), addr("192.168.1.2", port)}, true},
+		{"a foreign device on the default port", []discovery.Address{addr("172.18.4.29", 5540)}, false},
+		{"a foreign device on several ports", []discovery.Address{addr("fe80::2", 5540), addr("10.0.0.2", 5541)}, false},
+		{"no address", nil, false},
+	} {
+		d := discovery.Device{InstanceID: "ABCDEF0123456789", D: 3840, Addresses: tc.addrs}
+		if got := isDaemon(d, port); got != tc.want {
+			t.Errorf("%s: isDaemon = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 
@@ -246,6 +290,13 @@ func TestGoControllerSubscribesReferenceBridge(t *testing.T) {
 	findCtx, cancelFind := context.WithTimeout(ctx, 30*time.Second)
 	var found *discovery.Device
 	_, err = scanner.FindCommissionable(findCtx, discovery.ByLongDiscriminator(br.info.discriminator), func(d discovery.Device) {
+		if found != nil {
+			return
+		}
+		if !isDaemon(d, br.info.port) {
+			t.Logf("ignoring a foreign commissionable device with discriminator %d: instance %s, addresses %v", d.D, d.InstanceID, d.Addresses)
+			return
+		}
 		found = &d
 		cancelFind()
 	})

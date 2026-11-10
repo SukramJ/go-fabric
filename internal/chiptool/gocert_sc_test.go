@@ -56,23 +56,31 @@ func (th *goTH) names() (*discovery.Names, error) {
 }
 
 // commissionable finds the commissionable record of a long discriminator
-// (matter.js mdns-check.ts:141 discoverCommissionable).
-func (th *goTH) commissionable(names *discovery.Names, d uint16, timeout time.Duration) (*discovery.Device, error) {
+// (matter.js mdns-check.ts:141 discoverCommissionable) that a daemon on
+// port advertises; a record with the discriminator at no address on that
+// port is a foreign device on the LAN and is logged and passed over
+// (issue 481).
+func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeout time.Duration) (*discovery.Device, error) {
 	sc := discovery.NewScanner(names)
 	defer sc.Close()
 	ctx, cancel := context.WithTimeout(th.ctx, timeout)
 	defer cancel()
 	var found *discovery.Device
 	_, err := sc.FindCommissionable(ctx, discovery.ByLongDiscriminator(d), func(dev discovery.Device) {
-		if found == nil {
-			found = &dev
-			cancel()
+		if found != nil {
+			return
 		}
+		if !isDaemon(dev, port) {
+			th.log.Info("ignoring a foreign commissionable device", "discriminator", dev.D, "instance", dev.InstanceID, "addresses", fmt.Sprint(dev.Addresses), "port", port)
+			return
+		}
+		found = &dev
+		cancel()
 	})
 	if found != nil {
 		return found, nil
 	}
-	return nil, fmt.Errorf("no commissionable record for discriminator %d within %s: %w", d, timeout, err)
+	return nil, fmt.Errorf("no commissionable record for discriminator %d at port %d within %s: %w", d, port, timeout, err)
 }
 
 // browse collects the instances of a service type the host sees for d.
@@ -112,7 +120,7 @@ func caseSC42() goCertCase {
 				if names, err = th.names(); err != nil {
 					return err
 				}
-				if own, err = th.commissionable(names, th.dut.info.discriminator, 30*time.Second); err != nil {
+				if own, err = th.commissionable(names, th.dut.info.discriminator, th.dut.info.port, 30*time.Second); err != nil {
 					return err
 				}
 				// absentDiscriminator (tc-dd-support.ts:895-905): no device
@@ -131,7 +139,7 @@ func caseSC42() goCertCase {
 				if _, err := ctrl.Pair(ctx, code, gocontroller.PairOptions{AutoSubscribe: &off}); !errors.Is(err, gocontroller.ErrNoDevice) {
 					return fmt.Errorf("a code naming discriminator %d, which nothing advertises, answered %w; want no device", absent, err)
 				}
-				if _, err := th.commissionable(names, th.dut.info.discriminator, 30*time.Second); err != nil {
+				if _, err := th.commissionable(names, th.dut.info.discriminator, th.dut.info.port, 30*time.Second); err != nil {
 					return fmt.Errorf("after the refused code: %w", err)
 				}
 				th.note("a code naming discriminator %d reached no device; the daemon still advertises %d", absent, th.dut.info.discriminator)
@@ -296,7 +304,7 @@ func caseSC48() goCertCase {
 			}
 			// recordBackInCommissioningMode (tc-dd-support.ts:1358): the
 			// device with no fabric left opens its window again.
-			if _, err := th.commissionable(names, d.b.info.discriminator, 30*time.Second); err != nil {
+			if _, err := th.commissionable(names, d.b.info.discriminator, d.b.info.port, 30*time.Second); err != nil {
 				return fmt.Errorf("after RemoveFabric: %w", err)
 			}
 			if err := commission(th, d); err != nil {
