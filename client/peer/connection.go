@@ -822,12 +822,13 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 
 // maybeAttemptFallbackLocked queues the descriptor's operational address
 // when nothing else is attempted, pending or discovered
-// (PeerConnection.ts:360-379).
+// (PeerConnection.ts:362-382 at db021da0).
 //
 // Ahead of matter.js (BD-Matter-ProvenOperationalHost), it is queued too
 // when the peer's proven host is known but no discovered address carries
 // it, and then ranks ahead of the other targets' addresses
-// (fallbackFirstLocked); they follow DelayBeforeNextAddress later. Another
+// (fallbackFirstLocked): they follow the operational address's transport
+// variants, each DelayBeforeNextAddress after the one before. Another
 // responder's cache-flush SRV removes the node's own SRV from the cache
 // until the node answers again (RFC 6762 §10.2); the session, not the
 // momentary cache, says which target is the node (issue 488).

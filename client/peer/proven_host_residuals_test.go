@@ -132,3 +132,78 @@ func TestProvenHostNewAddressFirst(t *testing.T) {
 		}
 	})
 }
+
+// TestProvenHostAbsentFallbackNotRetired: a change of the other target's
+// record while the proven host is absent does not retire the fallback —
+// after AddressChangeStabilizationDelay the attempt at the operational
+// address still runs (fallbackSuperseded; matter.js retires it,
+// PeerConnection.ts:264-303, issue 488).
+func TestProvenHostAbsentFallbackNotRetired(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, err := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1), OperationalHost: "node1234.local"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.mdns.announce(t, srvRR(h.qname, routerHostQ, 5540, 120), aaaaRR(routerHostQ, "fe80::1", 120))
+		eventually(t, "the router's address", func() bool { return len(p.Service().Addresses()) == 1 })
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		h.sigma1(t, addr1)
+		c := process(p)
+		key := attemptKey{ap: addressOf(udpAddr(addr1)).AddrPort()}
+		var first *attempt
+		eventually(t, "the operational address's attempt", func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			first = c.attempts[key]
+			return first != nil
+		})
+		h.clock.Advance(time.Second)
+		h.mdns.announce(t, aaaaRR(routerHostQ, "fe80::2", 120))
+		eventually(t, "the router's second address", func() bool { return len(p.Service().Addresses()) == 2 })
+		synctest.Wait()
+		h.clock.Advance(DefaultTiming().AddressChangeStabilizationDelay + time.Second)
+		synctest.Wait()
+		c.mu.Lock()
+		same, fb := c.attempts[key] == first, c.fallback != nil
+		c.mu.Unlock()
+		if !same || !fb {
+			t.Fatalf("the operational address's attempt kept %v, still the fallback %v: want both", same, fb)
+		}
+	})
+}
+
+// TestShiftRanksTheFallbackFirst: with the proven host absent, the
+// fallback ranks ahead of the other target's link-local address, which the
+// desirability order ranks first; without the fallback mark the
+// desirability order stands.
+func TestShiftRanksTheFallbackFirst(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, err := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1), OperationalHost: "node1234.local"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.mdns.announce(t, srvRR(h.qname, routerHostQ, 5540, 120), aaaaRR(routerHostQ, "fe80::1", 120))
+		eventually(t, "the router's address", func() bool { return len(p.Service().Addresses()) == 1 })
+		discovered := p.Service().Addresses()
+		fb := addressOf(udpAddr(addr1))
+		for _, marked := range []bool{true, false} {
+			c := &connection{p: p, wake: make(chan struct{}, 1)}
+			c.pending = []target{{addr: discovered[0]}, {addr: fb}}
+			want := routerLL
+			if marked {
+				c.fallback = &fb
+				want = addr1
+			}
+			c.mu.Lock()
+			got := c.shiftLocked(discovered)
+			c.mu.Unlock()
+			if got.addr.String() != want {
+				t.Fatalf("fallback marked %v: shifted %v, want %s", marked, got.addr, want)
+			}
+		}
+	})
+}
