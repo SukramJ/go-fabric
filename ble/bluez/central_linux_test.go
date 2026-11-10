@@ -18,6 +18,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/transport/btp"
@@ -301,6 +302,157 @@ func TestConnectionEndsOnConnectedFalse(t *testing.T) {
 	}
 	if err := conn.Disconnect(); err != nil {
 		t.Fatalf("Disconnect after the drop: %v", err)
+	}
+}
+
+// exchanged reports whether conn's ATT_MTU exchange is settled.
+func exchanged(t *testing.T, conn ble.Connection) bool {
+	t.Helper()
+	x, ok := conn.(ble.MTUExchange)
+	if !ok {
+		t.Fatal("the connection does not report the ATT_MTU exchange")
+	}
+	select {
+	case <-x.ATTMTUExchanged():
+		return true
+	default:
+		return false
+	}
+}
+
+// TestATTMTUExchange (issue 426): C1's MTU property above 23 is the
+// exchange's result, no property settles at once, and a 23 waits for
+// BlueZ's PropertiesChanged("MTU") (src/gatt-client.c att_exchange at
+// 5.88).
+func TestATTMTUExchange(t *testing.T) {
+	t.Run("negotiated at discovery", func(t *testing.T) {
+		_, _, _, conn, err := connectTo(t, 247, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !exchanged(t, conn) || conn.ATTMTU() != 247 {
+			t.Fatalf("exchanged %v, ATTMTU %d", exchanged(t, conn), conn.ATTMTU())
+		}
+	})
+	t.Run("no MTU property", func(t *testing.T) {
+		_, _, _, conn, err := connectTo(t, 0, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !exchanged(t, conn) || conn.ATTMTU() != 0 {
+			t.Fatalf("exchanged %v, ATTMTU %d", exchanged(t, conn), conn.ATTMTU())
+		}
+	})
+	t.Run("23, then the exchange signal", func(t *testing.T) {
+		b, d, _, conn, err := connectTo(t, defaultLEATTMTU, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exchanged(t, conn) || conn.ATTMTU() != 0 {
+			t.Fatalf("exchanged %v, ATTMTU %d before the signal", exchanged(t, conn), conn.ATTMTU())
+		}
+		// Another characteristic's signal is not C1's.
+		b.setProps(d.char(0x0d), ifaceGattChar, map[string]dbus.Variant{"MTU": dbus.MakeVariant(uint16(100))})
+		b.setProps(d.char(0x0b), ifaceGattChar, map[string]dbus.Variant{"MTU": dbus.MakeVariant(uint16(185))})
+		select {
+		case <-conn.(ble.MTUExchange).ATTMTUExchanged():
+		case <-time.After(5 * time.Second):
+			t.Fatal("the exchange signal did not settle the ATT_MTU")
+		}
+		if conn.ATTMTU() != 185 {
+			t.Fatalf("ATTMTU %d after the exchange", conn.ATTMTU())
+		}
+	})
+	t.Run("an exchange between the object read and the registration", func(t *testing.T) {
+		b := newFakeBus()
+		p := &bletest.Peripheral{Address: "AA:BB:CC:DD:EE:01", Discriminator: 3840}
+		d := b.addDevice(p, defaultLEATTMTU)
+		c := startCentral(t, b)
+		d.advertise(p.ServiceData())
+		b.mu.Lock()
+		b.afterManaged = func(objs managedObjects) {
+			if chr := objs[d.char(0x0b)][ifaceGattChar]; chr != nil {
+				chr["MTU"] = dbus.MakeVariant(uint16(185))
+			}
+		}
+		b.mu.Unlock()
+		conn, err := c.Connect(context.Background(), ble.Peripheral{Address: p.Address})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !exchanged(t, conn) || conn.ATTMTU() != 185 {
+			t.Fatalf("exchanged %v, ATTMTU %d", exchanged(t, conn), conn.ATTMTU())
+		}
+	})
+	t.Run("23 and no signal", func(t *testing.T) {
+		_, _, _, conn, err := connectTo(t, defaultLEATTMTU, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+		if exchanged(t, conn) || conn.ATTMTU() != 0 {
+			t.Fatalf("exchanged %v, ATTMTU %d without the signal", exchanged(t, conn), conn.ATTMTU())
+		}
+		// The connection gone settles the wait too.
+		if err := conn.Disconnect(); err != nil {
+			t.Fatal(err)
+		}
+		if !exchanged(t, conn) || conn.ATTMTU() != 0 {
+			t.Fatalf("exchanged %v, ATTMTU %d after the disconnect", exchanged(t, conn), conn.ATTMTU())
+		}
+	})
+}
+
+// TestDialAwaitsTheATTMTUExchange (issue 426) runs controller/ble's Dial
+// over the central: a 23 at discovery holds the segment size until the
+// exchange signal (no clock advance) or ATTMTUSettleTimeout (the minimum).
+func TestDialAwaitsTheATTMTUExchange(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		signal  bool
+		segment int
+	}{{"the exchange lands", true, btp.SegmentSizeFromATTMTU(185)}, {"the exchange never lands", false, btp.MinimumATTMTU}} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := newFakeBus()
+			p := &bletest.Peripheral{Address: "AA:BB:CC:DD:EE:01", Discriminator: 3840}
+			d := b.addDevice(p, defaultLEATTMTU)
+			c := startCentral(t, b)
+			d.advertise(p.ServiceData())
+			clock := clocktest.New(time.Unix(0, 0))
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			type dialed struct {
+				ch  *ble.Channel
+				err error
+			}
+			done := make(chan dialed, 1)
+			go func() {
+				ch, err := ble.Dial(ctx, c, ble.Peripheral{Address: p.Address}, ble.DialOptions{Clock: clock})
+				done <- dialed{ch, err}
+			}()
+			for !slices.Contains(clock.Armed(), ble.ATTMTUSettleTimeout) {
+				select {
+				case r := <-done:
+					t.Fatalf("Dial returned before the settle wait: %v", r.err)
+				case <-ctx.Done():
+					t.Fatal("no settle timer armed")
+				case <-time.After(5 * time.Millisecond):
+				}
+			}
+			if tc.signal {
+				b.setProps(d.char(0x0b), ifaceGattChar, map[string]dbus.Variant{"MTU": dbus.MakeVariant(uint16(185))})
+			} else {
+				clock.Advance(ble.ATTMTUSettleTimeout)
+			}
+			r := <-done
+			if r.err != nil {
+				t.Fatalf("Dial: %v", r.err)
+			}
+			defer func() { _ = r.ch.Close() }()
+			if got := p.Observed().HandshakeSegmentSizes; !slices.Equal(got, []int{tc.segment}) {
+				t.Fatalf("handshake segment sizes %v, want [%d]", got, tc.segment)
+			}
+		})
 	}
 }
 

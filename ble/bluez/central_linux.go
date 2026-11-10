@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -36,6 +37,10 @@ const (
 	// peripheral that may have vanished — BLE_DISCONNECT_TIMEOUT (:38).
 	disconnectTimeout = 5 * time.Second
 )
+
+// defaultLEATTMTU is the ATT_MTU of an LE link before an exchange,
+// BT_ATT_DEFAULT_LE_MTU (src/shared/att-types.h:28 at BlueZ 5.88).
+const defaultLEATTMTU = 23
 
 // matterServiceDataLength is the length of the Matter service data a
 // commissionable peripheral advertises; matter.js ignores any other
@@ -95,8 +100,9 @@ type central struct {
 }
 
 var (
-	_ ble.Central    = (*central)(nil)
-	_ ble.Connection = (*connection)(nil)
+	_ ble.Central     = (*central)(nil)
+	_ ble.Connection  = (*connection)(nil)
+	_ ble.MTUExchange = (*connection)(nil)
 )
 
 // newCentral is the central over b: the adapter must exist; the devices
@@ -328,6 +334,16 @@ func (c *central) handle(sig *dbus.Signal) {
 					conn.enqueue(v)
 				}
 			}
+			// The ATT_MTU exchange landed: BlueZ registers att_exchange
+			// for every characteristic it exports and emits
+			// PropertiesChanged("MTU") on its path when an exchange
+			// completes (src/gatt-client.c:1806-1812 and :1859-1862 at
+			// 5.88, commit 3a6b5f5ec, since 5.62).
+			if mtu, ok := variantAs[uint16](changed["MTU"], hasKey(changed, "MTU")); ok {
+				if conn := c.connectionOfC1(sig.Path); conn != nil {
+					conn.settleMTU(mtu)
+				}
+			}
 		}
 	}
 }
@@ -500,6 +516,15 @@ func (c *central) interview(ctx context.Context, path dbus.ObjectPath) (*connect
 	}
 	c.conns[path] = conn
 	c.mu.Unlock()
+	// An exchange that landed between the object read and the
+	// registration: its PropertiesChanged found no connection.
+	if !conn.mtuSettled() {
+		if v, err := getProperty(ictx, c.bus, conn.c1, ifaceGattChar, "MTU"); err == nil {
+			if mtu, ok := variantAs[uint16](v, true); ok && mtu > defaultLEATTMTU {
+				conn.settleMTU(mtu)
+			}
+		}
+	}
 	// A disconnect between the property read and the registration.
 	if v, err := getProperty(ictx, c.bus, path, ifaceDevice, "Connected"); err == nil {
 		if connected, _ := variantAs[bool](v, true); !connected {
@@ -507,6 +532,18 @@ func (c *central) interview(ctx context.Context, path dbus.ObjectPath) (*connect
 		}
 	}
 	return conn, nil
+}
+
+// connectionOfC1 is the connection whose C1 is at path; nil when none is.
+func (c *central) connectionOfC1(path dbus.ObjectPath) *connection {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, conn := range c.conns {
+		if conn.c1 == path {
+			return conn
+		}
+	}
+	return nil
 }
 
 // matterService is the connection over the first Matter service of the
@@ -522,7 +559,7 @@ func (c *central) matterService(dev dbus.ObjectPath, objs managedObjects) *conne
 		if owner != dev || !strings.EqualFold(uuid, btp.ServiceUUID) {
 			continue
 		}
-		conn := &connection{c: c, dev: dev, gone: make(chan struct{})}
+		conn := &connection{c: c, dev: dev, gone: make(chan struct{}), mtuExchanged: make(chan struct{})}
 		for ch, ifaces := range objs {
 			cp, ok := ifaces[ifaceGattChar]
 			if !ok {
@@ -535,11 +572,7 @@ func (c *central) matterService(dev dbus.ObjectPath, objs managedObjects) *conne
 			switch {
 			case strings.EqualFold(u, btp.C1CharacteristicUUID):
 				conn.c1 = ch
-				// org.bluez.GattCharacteristic.rst, Properties, "uint16 MTU":
-				// the link's ATT_MTU, where this BlueZ offers it.
-				if mtu, ok := variantAs[uint16](cp["MTU"], hasKey(cp, "MTU")); ok {
-					conn.mtu = int(mtu)
-				}
+				conn.takeMTU(cp)
 			case strings.EqualFold(u, btp.C2CharacteristicUUID):
 				conn.c2 = ch
 			case strings.EqualFold(u, btp.C3CharacteristicUUID):
@@ -558,9 +591,13 @@ type connection struct {
 	c          *central
 	dev        dbus.ObjectPath
 	c1, c2, c3 dbus.ObjectPath
-	mtu        int
 	gone       chan struct{}
 	goneOnce   sync.Once
+	// mtu is the ATT_MTU once known, 0 before; mtuExchanged closes (once,
+	// by mtuOnce) when it is settled.
+	mtu          atomic.Int32
+	mtuExchanged chan struct{}
+	mtuOnce      sync.Once
 	// mu guards delivering, on, queue and unsubscribe.
 	mu          sync.Mutex
 	on          func([]byte)
@@ -569,9 +606,62 @@ type connection struct {
 	unsubscribe bool
 }
 
-// ATTMTU implements ble.Connection: the MTU property of C1, 0 where BlueZ
-// has none, which selects the BTP minimum (NobleBleChannel.ts:679-681).
-func (k *connection) ATTMTU() int { return k.mtu }
+// takeMTU reads C1's MTU property at discovery
+// (org.bluez.GattCharacteristic.rst, Properties, "uint16 MTU
+// [read-only]", :399-403 at 5.88; since 5.62, commits 1abf1400f and
+// aaa0c4996). The property is the link's current ATT_MTU
+// (characteristic_get_mtu, bt_att_get_mtu, src/gatt-client.c:909-923 at
+// 5.88), so it reads 23, BT_ATT_DEFAULT_LE_MTU, until an exchange
+// completes. BlueZ exchanges before it discovers the services, and the
+// characteristic objects exist only after discovery (gatt_client_init,
+// src/shared/gatt-client.c:2154-2163, and exchange_mtu_cb, :1616-1655, at
+// 5.88), so a value above 23 is the exchange's result and settles at
+// once. A 23 is ambiguous — no exchange yet (BlueZ skips its own when its
+// configured MTU is the default, :2154-2157; a peripheral's may still
+// come) or the peer's true maximum — so it waits for the exchange signal
+// (handle) or the 2 s settle timeout, where the minimum is right anyway,
+// as matter.js waits for noble's "mtu" event (attMtuOf,
+// NobleBleChannel.ts:526-567 at db021da0). No property, a BlueZ before
+// 5.62, reports no exchange ever: settled at 0, the BTP minimum.
+func (k *connection) takeMTU(props map[string]dbus.Variant) {
+	mtu, ok := variantAs[uint16](props["MTU"], hasKey(props, "MTU"))
+	switch {
+	case !ok:
+		k.settleMTU(0)
+	case mtu > defaultLEATTMTU:
+		k.settleMTU(mtu)
+	}
+}
+
+// settleMTU records the ATT_MTU (0: none will come) and closes
+// ATTMTUExchanged; the first settlement wins.
+func (k *connection) settleMTU(mtu uint16) {
+	k.mtuOnce.Do(func() {
+		k.mtu.Store(int32(mtu))
+		close(k.mtuExchanged)
+	})
+}
+
+// mtuSettled reports whether the ATT_MTU is settled.
+func (k *connection) mtuSettled() bool {
+	select {
+	case <-k.mtuExchanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// ATTMTU implements ble.Connection: C1's MTU property once settled, 0
+// before and where BlueZ has none — 0 with the exchange pending makes
+// controller/ble wait for ATTMTUExchanged, 0 settled selects the BTP
+// minimum (NobleBleChannel.ts:679-681 at db021da0).
+func (k *connection) ATTMTU() int { return int(k.mtu.Load()) }
+
+// ATTMTUExchanged implements ble.MTUExchange: closed once the ATT_MTU is
+// settled — known at discovery, reported by BlueZ's exchange signal, no
+// property to wait on, or the connection gone.
+func (k *connection) ATTMTUExchanged() <-chan struct{} { return k.mtuExchanged }
 
 // WriteC1 implements ble.Connection: a write with response
 // (org.bluez.GattCharacteristic.rst, Methods, "void WriteValue(array{byte}
@@ -708,6 +798,7 @@ func (k *connection) markGone() {
 		}
 		k.c.mu.Unlock()
 		close(k.gone)
+		k.settleMTU(0) // no exchange will come; a settled MTU stays
 	})
 }
 

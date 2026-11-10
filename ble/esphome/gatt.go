@@ -232,7 +232,11 @@ func (k *connection) discover(ctx context.Context) error {
 
 // ATTMTU implements ble.Connection: the MTU of the connect's answer; the
 // firmware reports the negotiated value, or 23 when the exchange failed
-// (bluetooth_connection_bluedroid.cpp:715-733).
+// (bluetooth_connection_bluedroid.cpp:715-733). The value arrives with the
+// connect itself (BluetoothDeviceConnectionResponse.mtu, api.proto:1944,
+// taken in proxy.connect), so it is known before Connect returns: the
+// connection does not implement ble.MTUExchange and controller/ble never
+// waits on it (issue 426).
 func (k *connection) ATTMTU() int { return k.mtu }
 
 // WriteC1 implements ble.Connection: BluetoothGATTWriteRequest with

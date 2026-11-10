@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`: the connection reports the ATT_MTU exchange (`ble.MTUExchange`) from BlueZ's `PropertiesChanged("MTU")` on C1 (BlueZ 5.62 and later), so `controller/ble` waits up to `ATTMTUSettleTimeout` for a pending exchange instead of sizing the BTP segment from the pre-exchange 23 for the session's life; an MTU above 23 at discovery is taken at once, and a BlueZ without the property settles at once at the minimum (issue 426).
+
 ## [0.20.0] — 2026-11-10
 
 Wave W12 (#480, issue 478 from a live Home Assistant setup with Thread nodes behind an Apple TV border router): the controller reconnects to a node through the host that its last session proved — the SRV target that owned the session's address is recorded beside the operational address and its addresses are tried first while discovery still advertises it — so a border router answering a node's instance with its own host no longer costs every reconnect 45 s on the router's link-local address. With it: a failed connection attempt starts the next discovered address at once (connectedhomeip's behaviour, a `by_design` row), a session-suspect probe walks the discovered alternates before the session is given up (`by_design` row), and the SRV targets are visible in the discovery log. Also in this release: issue 420 (#479, the closure and valve capability ports generated from the clustergen port table) and issue 476 (#477, a deterministic join test in `controller/topology`). The roadmap's pause (owner decision 2026-11-09) continues after this release.
