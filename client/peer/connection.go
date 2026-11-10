@@ -1021,6 +1021,9 @@ func (c *connection) afterFailure(att *attempt, a *contactAttempt, err error) er
 	switch a.fail(err) {
 	case contactSwitched:
 		log.Info("matter.controller.peer.sigma1_refresh", slog.Any("err", err))
+		// The node never acknowledged: the next address starts at once
+		// (advanceAfterFailure; refreshes after this do not advance again).
+		c.advanceAfterFailure()
 		return nil
 	case contactRefreshed:
 		log.Debug("matter.controller.peer.sigma1_refresh_again")
@@ -1172,16 +1175,25 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 }
 
 // advancesOnFailure reports whether a failed attempt starts the next
-// pending address at once: a timeout or another transient error (the
+// address at once: a timeout or another transient error (the
 // "network" category), or a failure of the socket to send — the node was
 // not reached. A status report means it was, and keeps the stagger.
 func advancesOnFailure(err error, category string) bool {
 	return category == "network" || errors.Is(err, exchange.ErrNetwork)
 }
 
-// advanceAfterFailure starts the next pending address at once: the delay
-// is reset and the scheduler woken. DelayBeforeNextAddress stays the
-// stagger between attempts still in flight.
+// advanceAfterFailure starts the next address at once: the delay is
+// reset and the scheduler woken — also when nothing is pending yet, so an
+// address queued after the failure starts as soon as it arrives, as
+// connectedhomeip's ResolvingAddress state takes the next result the
+// resolver delivers. DelayBeforeNextAddress stays the stagger between
+// attempts still in flight. Besides the errors of advancesOnFailure, an
+// unacknowledged Sigma1 whose contact schedule switches to fresh ones
+// (afterFailure, contactSwitched) advances: in connectedhomeip that is
+// the CHIP_ERROR_TIMEOUT the exchange's response timer reports once the
+// retransmissions are exhausted (src/messaging/ReliableMessageMgr.cpp:186-205,
+// src/protocols/secure_channel/CASESession.cpp:575-584 at connectedhomeip
+// 6170af84).
 //
 // A deviation from matter.js, which starts the next address
 // delayBeforeNextAddress after the previous attempt started, whatever
@@ -1197,9 +1209,6 @@ func advancesOnFailure(err error, category string) bool {
 func (c *connection) advanceAfterFailure() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.pending) == 0 {
-		return
-	}
 	c.lastAttemptAt = time.Time{}
 	c.signal()
 }

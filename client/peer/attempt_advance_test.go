@@ -17,12 +17,17 @@ import (
 // DelayBeforeNextAddress after the first began — a send failure at once,
 // a CASE timeout (Sigma1 acknowledged, Sigma2 missing) when it expires;
 // a status report from the node keeps the stagger (issue 478, chip's
-// OperationalSessionSetup.cpp:457-480).
+// OperationalSessionSetup.cpp:457-480); a Sigma1 the node never
+// acknowledges advances when its contact schedule switches to fresh ones.
 func TestFailedAttemptAdvances(t *testing.T) {
 	t.Parallel()
-	start := func(t *testing.T) (*harness, *Peer) {
+	start := func(t *testing.T, edit ...func(*Context)) (*harness, *Peer) {
 		t.Helper()
-		h := newHarness(t, nil)
+		var e func(*Context)
+		if len(edit) > 0 {
+			e = edit[0]
+		}
+		h := newHarness(t, e)
 		p, _ := h.set.For(testAddr)
 		h.announceAddrs(t, "fd00::1", "fd00::2")
 		eventually(t, "the addresses", func() bool { return len(p.Service().Addresses()) == 2 })
@@ -57,6 +62,38 @@ func TestFailedAttemptAdvances(t *testing.T) {
 			h.sigma1(t, addr2)
 			if d := h.clock.Now().Sub(began); d >= 45*time.Second {
 				t.Fatalf("the second address began after %v", d)
+			}
+		})
+	})
+	t.Run("unacknowledged Sigma1", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			// A stagger of an hour: the second address can only start
+			// through the switch of the first's contact schedule.
+			h, p := start(t, func(c *Context) { c.Timing = &Timing{DelayBeforeNextAddress: time.Hour} })
+			began := h.clock.Now()
+			connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+			for {
+				synctest.Wait()
+				seen := false
+				for drained := false; !drained && !seen; {
+					select {
+					case d := <-h.udp.ch:
+						seen = d.to.String() == addr2 && decodeUnsecured(t, d.bytes).proto.Opcode == mrp.SCOpcodeSigma1
+					default:
+						drained = true
+					}
+				}
+				if seen {
+					break
+				}
+				if h.clock.Now().Sub(began) > 10*time.Minute {
+					t.Fatal("no attempt at the second address within 10 minutes")
+				}
+				h.clock.Advance(time.Second)
+			}
+			if d := h.clock.Now().Sub(began); d < DefaultTiming().MaxDelayBetweenInitialContactRetries {
+				t.Fatalf("the second address began after %v, before the first's Sigma1 could switch", d)
 			}
 		})
 	})

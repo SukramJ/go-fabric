@@ -7232,7 +7232,7 @@
       "identifier": "TestFailedAttemptAdvances",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/attempt_advance_test.go",
-      "line": 21
+      "line": 22
     },
     {
       "package": "client/peer",

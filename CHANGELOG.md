@@ -17,7 +17,7 @@ pseudo-version of `main`.
 
 ### Changed
 
-- `client/peer`: a connection attempt that ends in a timeout, another transient error or a send failure starts the next pending address at once; `DelayBeforeNextAddress` stays the stagger between attempts still in flight, and a status report from the node keeps it (connectedhomeip's behaviour; `notes/parity/by_design.md` `BD-Matter-PeerAttemptFailAdvance`, issue 478).
+- `client/peer`: a connection attempt that ends in a timeout (an unacknowledged Sigma1 included), another transient error or a send failure starts the next address at once; `DelayBeforeNextAddress` stays the stagger between attempts still in flight, and a status report from the node keeps it (connectedhomeip's behaviour; `notes/parity/by_design.md` `BD-Matter-PeerAttemptFailAdvance`, issue 478).
 - `client/peer`: a session-suspect reachability check (`VerifyReachability(ctx, ReasonSessionSuspect)`) probes the other discovered addresses after the current one failed and migrates the session to one that answers before the session is given up (`BD-Matter-SuspectProbeWalksAlternates`, issue 478).
 
 ### Fixed
