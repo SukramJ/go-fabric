@@ -480,15 +480,11 @@ func (c *connection) sleep(ctx context.Context, d time.Duration, wake <-chan str
 // desirable first, each at least DelayBeforeNextAddress after the last
 // (PeerConnection.ts:217-262).
 //
-// Before an attempt it waits while the proven host is advertised but none
-// of its addresses has reached the queue yet (awaitingProvenLocked): the
-// service's addresses arrive one by one in the desirability order, and an
-// attempt started on the first of them would go to another target's
-// link-local address before the proven host's is queued — the race that
-// would undo the ranking. A service change wakes the wait as well, so an
-// address that leaves discovery before it was delivered ends it.
+// The proven host's address may be queued after an attempt at another
+// target has started — the service delivers its addresses one at a time
+// in the desirability order; preemptForProvenLocked then starts it at
+// once, outside the stagger.
 func (c *connection) scheduleAttempts() {
-	changes := c.p.service.Changes(c.ctx)
 	for {
 		c.mu.Lock()
 		if c.ctx.Err() != nil {
@@ -513,50 +509,9 @@ func (c *connection) scheduleAttempts() {
 				continue
 			}
 		}
-		discovered := c.p.service.Addresses()
-		if c.awaitingProvenLocked(discovered) {
-			c.mu.Unlock()
-			select {
-			case <-c.wake:
-			case _, ok := <-changes:
-				if !ok {
-					changes = nil
-				}
-			case <-c.ctx.Done():
-				return
-			}
-			continue
-		}
-		c.initiateAttemptLocked(c.shiftLocked(discovered))
+		c.initiateAttemptLocked(c.shiftLocked(c.p.service.Addresses()))
 		c.mu.Unlock()
 	}
-}
-
-// awaitingProvenLocked reports whether the proven host is advertised
-// (provenHost) and none of its discovered addresses is queued or
-// attempted yet: its delivery is in flight.
-func (c *connection) awaitingProvenLocked(discovered []discovery.Address) bool {
-	host := provenHost(c.p.operationalHost(), discovered)
-	if host == "" {
-		return false
-	}
-	for _, a := range discovered {
-		if a.Host != host {
-			continue
-		}
-		ap := a.AddrPort()
-		for _, t := range c.pending {
-			if t.addr.AddrPort() == ap {
-				return false
-			}
-		}
-		for k := range c.attempts {
-			if k.ap == ap {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 // shiftLocked takes the most desirable pending address — the heap of
@@ -684,14 +639,38 @@ func (c *connection) expand(a discovery.Address) []target {
 }
 
 // pendingAddLocked queues t once (the heap holds an item once,
-// general/src/util/Heap.ts:119-138).
-func (c *connection) pendingAddLocked(t target) {
+// general/src/util/Heap.ts:119-138) and reports whether it did.
+func (c *connection) pendingAddLocked(t target) bool {
 	for _, x := range c.pending {
 		if x.key() == t.key() {
-			return
+			return false
 		}
 	}
 	c.pending = append(c.pending, t)
+	c.signal()
+	return true
+}
+
+// preemptForProvenLocked starts a newly queued address of the proven host
+// at once: when a carries the peer's operational host and no attempt at
+// that host is in flight, the stagger is reset and the scheduler woken;
+// shiftLocked ranks the address first, and its attempt sets the stagger
+// again for the addresses after it. An attempt already running at another
+// target continues. This module's (BD-Matter-ProvenOperationalHost): the
+// service delivers its addresses one at a time in the desirability order,
+// so the proven host's may arrive after another target's link-local
+// address was attempted — a preemption, not a wait.
+func (c *connection) preemptForProvenLocked(a discovery.Address) {
+	host := c.p.operationalHost()
+	if a.Host == "" || a.Host != host || c.lastAttemptAt.IsZero() {
+		return
+	}
+	for _, att := range c.attempts {
+		if att.addr.Host == host {
+			return
+		}
+	}
+	c.lastAttemptAt = time.Time{}
 	c.signal()
 }
 
@@ -777,7 +756,9 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 			}
 			continue
 		}
-		c.pendingAddLocked(v)
+		if c.pendingAddLocked(v) {
+			c.preemptForProvenLocked(v.addr)
+		}
 	}
 }
 

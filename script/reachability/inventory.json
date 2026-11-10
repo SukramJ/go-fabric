@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7858,
+  "entry_points": 7859,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17851,
+    "total_exported": 17852,
     "reachable": 12393,
-    "whitelisted": 5458,
+    "whitelisted": 5459,
     "unreachable": 0
   },
   "by_package": [],
@@ -7169,7 +7169,7 @@
       "identifier": "TestCompareForHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 68
+      "line": 112
     },
     {
       "package": "client/peer",
@@ -7414,14 +7414,14 @@
       "identifier": "TestOperationalHostLearned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 95
+      "line": 139
     },
     {
       "package": "client/peer",
       "identifier": "TestOrderForPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 126
+      "line": 170
     },
     {
       "package": "client/peer",
@@ -7614,10 +7614,17 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestProvenHostPreemptsTheStagger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 81
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestProvenHostRanksFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "client/peer",
