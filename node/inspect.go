@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/diag"
 	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
@@ -57,60 +58,17 @@ func (n *Node) SetupPayload() (SetupPayload, error) {
 
 // SessionDiagnostics is a read-only snapshot of the node's secure
 // sessions and of its session table — what [Node.SessionDiagnostics]
-// returns.
-type SessionDiagnostics struct {
-	// AsOf is when the snapshot was taken, on the node's clock
-	// ([Node.Clock]); every age in Sessions is measured against it.
-	AsOf time.Time
-	// Sessions are the open sessions, by session id.
-	Sessions []SessionInfo
-	// Occupancy is the session table's id usage.
-	Occupancy Occupancy
-}
+// returns ([diag.SessionDiagnostics], shared with the controller; Peers
+// is nil on the node).
+type SessionDiagnostics = diag.SessionDiagnostics
 
-// SessionInfo is one open PASE or CASE session.
-type SessionInfo struct {
-	// ID is the local session id.
-	ID uint16
-	// FabricIndex is the session's fabric; 0 for a PASE session before
-	// AddNOC.
-	FabricIndex uint8
-	// PeerNodeID and LocalNodeID are the session's two node ids.
-	PeerNodeID, LocalNodeID uint64
-	// PASE is true for a commissioning (PASE) session, false for CASE.
-	PASE bool
-	// Subscriptions counts the subscriptions riding on the session.
-	Subscriptions int
-	// SubscriptionIDs are their ids, ascending; nil for none. The
-	// subscriptions themselves are listed by Node.Subscriptions().Snapshot.
-	SubscriptionIDs []uint32
-	// LastActivity is when the session last carried traffic in either
-	// direction, zero when none yet; LastPeerActivity when the peer last
-	// sent, counted from the session's creation (the peer is active
-	// then: matter.js NodeSession.ts:120, chip SecureSession.h:349).
-	LastActivity, LastPeerActivity time.Time
-	// Idle and PeerIdle are AsOf minus LastActivity and LastPeerActivity;
-	// 0 when the timestamp is zero.
-	Idle, PeerIdle time.Duration
-	// PeerIdleInterval, PeerActiveInterval and PeerActiveThreshold are the
-	// session intervals the peer reported in its handshake (PASE
-	// PBKDFParamRequest or CASE Sigma1 SessionParameters, also on a resumed
-	// session); 0 when it reported none. The device's record of what the
-	// controller sent (matter.js NodeSession.reportedParameters).
-	PeerIdleInterval, PeerActiveInterval, PeerActiveThreshold time.Duration
-}
+// SessionInfo is one open PASE or CASE session ([diag.SessionInfo]).
+// The node leaves CreatedAt, Resumed, Transport and PeerLost zero.
+type SessionInfo = diag.SessionInfo
 
-// Occupancy is how much of the session-id space the node holds.
-type Occupancy struct {
-	// Live counts sessions with key material installed.
-	Live int
-	// Reserved counts ids a handshake staked that has not completed.
-	Reserved int
-	// Capacity is the size of the id space.
-	Capacity int
-	// Free is Capacity minus Live and Reserved, never negative.
-	Free int
-}
+// Occupancy is how much of the session-id space the node holds
+// ([diag.Occupancy]).
+type Occupancy = diag.Occupancy
 
 // SessionDiagnostics returns the node's sessions, each with its
 // subscription count and idle ages on the node's clock, and the session

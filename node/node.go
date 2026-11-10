@@ -298,7 +298,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.br.AttachAuxiliaryACL(n.groups)
 	// A bounded trace of the moments that explain a failed pairing
 	// (main.go:247-251 at b4ea1f96^).
-	n.diagRing = diagevent.NewRing(n.cfg.Diagnostics.capacity())
+	n.diagRing = diagevent.NewRing(n.cfg.Diagnostics.Effective())
 	n.diagRing.SetClock(n.cfg.Clock)
 	n.br.AttachDiagnosticEvents(n.diagRing)
 	// The named counters and gauges (metrics.go), before the bridge

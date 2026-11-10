@@ -61,6 +61,20 @@ const (
 	// datagram or connection path; the message that caused it was
 	// dropped.
 	MetricPanicsRecovered = "panics.recovered"
+	// MetricPairFailures is a counter: one failed pairing of a controller
+	// — a Pair that returned an error; a step that failed inside a pairing
+	// that went on (one discovery transport of a race) is not counted.
+	MetricPairFailures = "pair.failures"
+	// MetricCASEUnresponsive is a counter: one CASE establishment of a
+	// controller that retransmitted past its MRP budget unanswered, once
+	// per exhausted budget.
+	MetricCASEUnresponsive = "case.unresponsive"
+	// MetricReachabilityProbes is a counter: one reachability probe run of
+	// a controller that probed a peer, whatever its verdict.
+	MetricReachabilityProbes = "reachability.probes"
+	// MetricICDCheckInsMissed is a counter: one ICD Check-In a controller
+	// expected from a registered LIT peer and did not receive.
+	MetricICDCheckInsMissed = "icd.checkins_missed"
 )
 
 // MetricNames are the names of the named set, in the order the guide's
@@ -70,5 +84,6 @@ func MetricNames() []string {
 		MetricSessionsOpen, MetricSubscriptionsActive, MetricIMReceived, MetricIMSent,
 		MetricPASEFailures, MetricPASELockouts, MetricAggregatorReassemblies,
 		MetricMRPRetransmits, MetricPanicsRecovered,
+		MetricPairFailures, MetricCASEUnresponsive, MetricReachabilityProbes, MetricICDCheckInsMissed,
 	}
 }

@@ -39,8 +39,23 @@ const (
 	// completed CASE handshake, and a peer's CloseSession.
 	KindSession Kind = "session"
 	// KindDiscovery covers mDNS advertisement changes, such as the
-	// re-announce that follows a peer losing its last session.
+	// re-announce that follows a peer losing its last session, and on the
+	// controller the operational records and border routers its DNS-SD
+	// cache sees appear and disappear.
 	KindDiscovery Kind = "discovery"
+	// KindReachability covers the controller's reachability probes of a
+	// peer: a session that answered on its address or an alternate, and
+	// one given up because no probe answered.
+	KindReachability Kind = "reachability"
+	// KindICD covers an intermittently connected peer's Check-Ins: one
+	// accepted, and one the controller expected and did not receive.
+	KindICD Kind = "icd"
+	// KindOTA covers the software-update statuses a peer's update moves
+	// through, as the controller's OTA provider reports them.
+	KindOTA Kind = "ota"
+	// KindCamera covers the camera controller's WebRTC signalling a peer
+	// refused.
+	KindCamera Kind = "camera"
 )
 
 // Severity separates the entries that explain a failure from the ones

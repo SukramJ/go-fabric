@@ -118,6 +118,8 @@ Use `Observers` instead.
 | `TransportPreference` | the transport each peer prefers | UDP |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |
 | `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewResponder()` when `Advertise` is set |
+| `Diagnostics` (`diag.Diagnostics{Capacity}`) | the size of the diagnostic trace (`Controller.DiagnosticEvents`, `Controller.OnDiagnosticEvent`) | 256 events |
+| `Metrics` (`contract.Metrics`) | the named counters and gauges (`controller.Metric…`) | nothing recorded |
 
 `controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the
 scanners told to forget a device once it is commissioned; nil is none.

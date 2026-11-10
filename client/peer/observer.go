@@ -27,6 +27,17 @@ type Observer struct {
 	// 0ceb202d), which CommissioningClient observes per node
 	// (CommissioningClient.ts:711).
 	Updated func()
+	// ReachabilityVerified is called once at the end of an address
+	// monitor run that probed the peer ([Peer.VerifyReachability], the
+	// address check): ok when the session answered — on its address or,
+	// migrated, on an alternate — with address the session's address
+	// after the run; false with address "" when no probe answered and the
+	// session was given up. A run that needs no probe (no live session, a
+	// TCP session, a sleeping ICD, an address still discovered or probed
+	// within the cooldown) and a run the peer's closing cut short report
+	// nothing. This module's seam, for the controller's diagnostic trace:
+	// matter.js's PeerAddressMonitor logs the verdict and emits nothing.
+	ReachabilityVerified func(reason ReachabilityReason, ok bool, address string)
 }
 
 // observerEntry is a registered observer; its address identifies it for

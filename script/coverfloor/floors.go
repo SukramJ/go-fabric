@@ -159,6 +159,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/thread/brdiscovery", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/thread/otbr/otbrtest", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/diag", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/examples", min: 0, why: "test only, no statements to cover: the small examples' import guard (review 2026-11 W5-ex-02)"},

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -18,6 +19,7 @@ import (
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/schema"
@@ -130,7 +132,7 @@ func (c *Controller) composeTree(cfg Config, log *slog.Logger) error {
 	var endpoints []*endpoint.Endpoint
 	parts := []uint16{}
 	if cfg.Camera != nil {
-		requestor, err := camera.NewRequestor(camera.RequestorConfig{Port: cameraPort{s: s, log: log}})
+		requestor, err := camera.NewRequestor(camera.RequestorConfig{Port: cameraPort{s: s, log: log, ring: c.diagRing}})
 		if err != nil {
 			return err
 		}
@@ -251,6 +253,9 @@ func (servedQualities) AttributeFixed(cluster, attribute uint32) bool {
 type cameraPort struct {
 	s   *served
 	log *slog.Logger
+	// ring is the controller's diagnostic trace a refusal enters; nil
+	// records nothing.
+	ring *diagevent.Ring
 }
 
 func (p cameraPort) Offer(_ context.Context, session camera.WebRTCSession, req wrdef.OfferRequest) {
@@ -286,6 +291,15 @@ func (p cameraPort) Refused(ctx context.Context, signal camera.Signal, id uint16
 		}
 		p.log.Log(ctx, level, "camera.requestor.refused", slog.String("kind", string(signal)), slog.Int("webrtc_session_id", int(id)), slog.Uint64("node_id", node))
 	}
+	severity := diagevent.SeverityInfo
+	if signal == wrdef.SignalOffer || signal == wrdef.SignalAnswer {
+		severity = diagevent.SeverityWarning
+	}
+	p.ring.Record(diagevent.Event{
+		Kind: diagevent.KindCamera, Severity: severity,
+		Message: fmt.Sprintf("The controller refused node %s's WebRTC %s for session %d: no such session.", nodeHex(node), signal, id),
+		Detail:  map[string]string{"node_id": nodeHex(node), "fabric_index": strconv.Itoa(int(fabricIndex)), "webrtc_session_id": strconv.Itoa(int(id)), "kind": string(signal)},
+	})
 	p.s.emit(CameraSignal{Kind: CameraSignalRefused, Session: camera.WebRTCSession{Id: id, PeerNodeId: node, FabricIndex: fabricIndex}, Refused: signal})
 }
 
