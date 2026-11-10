@@ -169,3 +169,31 @@ func TestReachabilityVerifiedOncePerRun(t *testing.T) {
 		})
 	}
 }
+
+// TestContextPeerRemoved: a closed peer leaves the set and PeerRemoved
+// runs once, outside the set's lock (the hook reads the set); a second
+// Close removes nothing more.
+func TestContextPeerRemoved(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var removed []handshake.PeerAddress
+	var h *harness
+	h = newHarness(t, func(c *Context) {
+		c.PeerRemoved = func(p *Peer) {
+			if h.set.Has(p.Address()) { // takes the set's lock: deadlocks under it
+				t.Errorf("peer %v is still in the set", p.Address())
+			}
+			mu.Lock()
+			removed = append(removed, p.Address())
+			mu.Unlock()
+		}
+	})
+	p := h.set.Adopt(h.secureSession(t, 0x62, udpAddr(addr1)))
+	p.Close(context.Background())
+	p.Close(context.Background())
+	mu.Lock()
+	defer mu.Unlock()
+	if len(removed) != 1 || removed[0] != p.Address() {
+		t.Fatalf("PeerRemoved for %v, want the peer once", removed)
+	}
+}

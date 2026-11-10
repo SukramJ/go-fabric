@@ -74,14 +74,23 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
-	// PeerAdded is called once for every peer that joins the set, after
-	// it joined and outside the set's lock, before its connection
-	// process or a first session can reach it — so an [Observer]
-	// registered here sees every session the peer takes. nil ignores
-	// it. This module's seam: matter.js's PeerSet emits no per-peer
-	// addition (the controller's diagnostic trace registers its observer
-	// here).
+	// PeerAdded is called once for every peer that joins the set, right
+	// after it joined and outside the set's lock, before the peer's
+	// connection process starts and before the call that created it
+	// (AddKnownPeer, Adopt, For) gives it a session — so an [Observer]
+	// registered here sees the sessions the peer's own connection
+	// establishes. A session another goroutine hands the already
+	// published peer in between (an Adopt of the same address) may
+	// precede it. nil ignores it. This module's seam: matter.js's PeerSet
+	// emits no per-peer addition (the controller's diagnostic trace
+	// registers its observer here).
 	PeerAdded func(p *Peer)
+	// PeerRemoved is called once a closed peer left the set, outside its
+	// lock. Its sessions leave without a SessionDeleted (the peer's
+	// context ends first, Peer.Close), so a count of sessions over the set
+	// is taken again here. nil ignores it. This module's seam, as
+	// PeerAdded.
+	PeerRemoved func(p *Peer)
 	// SessionAdded is called when a peer takes a session — the
 	// SessionManager's sessions.added a controller's reboot armer watches
 	// (RebootResubscribeArmer.ts:117-150 at 862ad75f); nil ignores it.
@@ -318,8 +327,13 @@ func (s *Set) Close(ctx context.Context) {
 // remove drops p from the set — Peer.Context.closed (PeerSet.ts:91).
 func (s *Set) remove(p *Peer) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	n := len(s.peers)
 	s.peers = slices.DeleteFunc(s.peers, func(x *Peer) bool { return x == p })
+	removed := len(s.peers) < n
+	s.mu.Unlock()
+	if fn := s.ctx.PeerRemoved; removed && fn != nil {
+		fn(p)
+	}
 }
 
 // addressString formats a peer address as matter.js PeerAddress.toString
