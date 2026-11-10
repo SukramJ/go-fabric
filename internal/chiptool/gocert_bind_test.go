@@ -109,7 +109,7 @@ func (b *bindRun) factoryReset(th *goTH) error {
 	if err != nil {
 		return err
 	}
-	if _, err := th.commissionable(names, th.dut.info.discriminator, ddMDNSTimeout); err != nil {
+	if _, err := th.commissionable(names, th.dut.info.discriminator, th.dut.info.port, ddMDNSTimeout); err != nil {
 		return err
 	}
 	th.note("the DUT runs on a fresh database and advertises as commissionable; its switch is endpoint %d", b.sw)
