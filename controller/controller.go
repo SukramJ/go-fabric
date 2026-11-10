@@ -46,6 +46,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ca"
@@ -54,6 +55,8 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"github.com/SukramJ/go-fabric/diag"
+	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
@@ -206,6 +209,16 @@ type Config struct {
 	// DCL configures the controller's ledger services ([DCLConfig]); the
 	// zero value is the production ledger, online.
 	DCL DCLConfig
+	// Diagnostics sizes the controller's diagnostic trace
+	// ([Controller.DiagnosticEvents]); the zero value keeps
+	// diag.DefaultDiagnosticsCapacity events.
+	Diagnostics diag.Diagnostics
+	// Metrics receives the controller's named counters and gauges
+	// (controller/metrics.go: sessions.open, mrp.retransmits,
+	// pair.failures, case.unresponsive, reachability.probes,
+	// icd.checkins_missed); nil records nothing. node/metrics/expvar
+	// implements it.
+	Metrics contract.Metrics
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -258,6 +271,16 @@ type Controller struct {
 	// otaProvider is the OTA provider on the controller's identity
 	// (ota_provider.go), nil without Config.OTA.
 	otaProvider *otaProvider
+
+	// The diagnostics (diagnostics.go): the trace, the metrics port, the
+	// peer set the observers count sessions over (kept past Close, which
+	// clears peers), the nodes whose ICD Check-Ins are watched and the
+	// stop of the discovery watch.
+	diagRing     *diagevent.Ring
+	metrics      contract.Metrics
+	peerSet      atomic.Pointer[peer.Set]
+	icdWatched   sync.Map // *client.Node -> *icdWatch
+	stopDiscover func()
 }
 
 // New builds the controller over cfg.DB: the fabric is created on the
@@ -295,7 +318,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP}
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk)}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -330,7 +353,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
-		TransportPreference: cfg.TransportPreference, SessionAdded: c.sessionAdded,
+		TransportPreference: cfg.TransportPreference, SessionAdded: c.sessionAdded, PeerAdded: c.peerAdded,
 	}
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
@@ -374,9 +397,16 @@ func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, cl
 		nodeCfg.Clock = clk
 	}
 	hooksFor := cfg.HooksFor
-	if cfg.OTA != nil {
-		hooksFor = c.otaHooks(cfg.HooksFor) //nolint:contextcheck // node hooks carry no context; the manager's work runs on its own lifetime
+	if hooksFor == nil {
+		// The registry takes Node.Hooks without HooksFor; the chains below
+		// replace HooksFor, so they start from them.
+		node := nodeCfg.Hooks
+		hooksFor = func(string) client.Hooks { return node }
 	}
+	if cfg.OTA != nil {
+		hooksFor = c.otaHooks(hooksFor) //nolint:contextcheck // node hooks carry no context; the manager's work runs on its own lifetime
+	}
+	hooksFor = c.diagHooks(hooksFor)
 	var err error
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
@@ -386,6 +416,7 @@ func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, cl
 		return err
 	}
 	c.registry.Store(c.reg)
+	c.startTrace()
 	return nil
 }
 
@@ -429,6 +460,7 @@ func (c *Controller) openTransports(ctx context.Context, cfg Config, listen stri
 	}
 	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, exchange.Config{
 		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP, cfg.Sessions),
+		Retransmitted: c.retransmitted,
 	}); err != nil {
 		return nil, err
 	}
@@ -497,6 +529,10 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 // idempotent.
 func (c *Controller) Close(ctx context.Context) error {
 	var errs []error
+	if c.stopDiscover != nil {
+		c.stopDiscover()
+		c.stopDiscover = nil
+	}
 	c.closeVendorInfo()
 	if m := c.ota.Swap(nil); m != nil {
 		m.Close()
@@ -708,11 +744,26 @@ const (
 // (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
 // BLE when the options name a BLE capability (discoveryCapabilities,
 // :280-283).
+//
+// The pairing enters the diagnostic trace ([Controller.DiagnosticEvents]):
+// its start, every failed step and the paired node, recorded through the
+// Progress hook before opts.Progress runs (an opts.Edit that replaces the
+// commissioner's Progress replaces that recording too).
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
+	n, err := c.pair(ctx, code, opts)
+	if err == nil && n != nil {
+		c.recordPaired(n)
+	}
+	return n, err
+}
+
+// pair is [Controller.Pair] without the trace's final record.
+func (c *Controller) pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
 	pc, err := ParsePairingCode(code)
 	if err != nil {
 		return nil, err
 	}
+	opts.Progress = c.tracePairing(pc, opts.Progress)
 	if opts.BLE != nil && opts.Address != nil {
 		return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
 	}
