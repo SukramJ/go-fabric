@@ -1424,7 +1424,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1259,
+    "line": 1321,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -1443,7 +1443,7 @@
   },
   {
     "file": "client/peer/probe.go",
-    "line": 37,
+    "line": 38,
     "citation": "interaction/InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",

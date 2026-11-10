@@ -12,7 +12,14 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `client/peer`: `matter.controller.peer.probe` carries `target`, the probed address, beside `address` (the session's current address, unchanged), so the address monitor's walk of the alternates reads from the log (issue 488).
 - `ble/bluez`: the connection reports the ATT_MTU exchange (`ble.MTUExchange`) from BlueZ's `PropertiesChanged("MTU")` on C1 (BlueZ 5.62 and later), so `controller/ble` waits up to `ATTMTUSettleTimeout` for a pending exchange instead of sizing the BTP segment from the pre-exchange 23 for the session's life; an MTU above 23 at discovery is taken at once, and a BlueZ without the property settles at once at the minimum (issue 426).
+
+### Fixed
+
+- `client/peer`: a peer learns its proven operational host (`peer.Descriptor.OperationalHost`) whenever discovery names the SRV target that owns a live session's operational address — on a service change, before a reconnect ranks its addresses and before the address monitor walks the alternates — not only when a session is established; a session made from the stored address at start, before discovery resolved, no longer leaves the first reconnect in the parity order (issue 488).
+- `client/peer`: while the proven host is known but no discovered address carries it — another responder's cache-flush SRV removed the node's own from the cache — a reconnect tries the last operational address first and the other target's addresses `DelayBeforeNextAddress` later (or at once after a failed attempt); a proven host advertised with a new address is tried there first, the old address not at all (issue 488, `BD-Matter-ProvenOperationalHost`).
+- `client/discovery`: a link-local address leaves the service on every interface it was heard on when its AAAA record or its SRV target goes, instead of leaving the variant zoned to an earlier interface in `Service.Addresses()` until the service closes (issue 488, `BD-Matter-LinkLocalZoneVariants`).
 
 ## [0.20.0] — 2026-11-10
 

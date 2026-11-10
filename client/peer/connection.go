@@ -518,9 +518,25 @@ func (c *connection) scheduleAttempts() {
 // :145-152 ordered by discovery.CompareDesirability, the variants of one
 // address by their index in the transport list, the first of equals —
 // with the proven host's addresses ahead of every other (provenHost,
-// compareForHost) while discovered, the service's addresses, carries it.
+// compareForHost) while discovered, the service's addresses, carries it,
+// and the fallback ahead of every other while it does not
+// (fallbackFirstLocked). The proven host is learned first (learnHost).
 func (c *connection) shiftLocked(discovered []discovery.Address) target {
-	host := provenHost(c.p.operationalHost(), discovered)
+	c.p.learnHost(discovered)
+	known := c.p.operationalHost()
+	host := provenHost(known, discovered)
+	first := c.fallbackFirstLocked(known, discovered)
+	rank := func(a, b discovery.Address) int {
+		if first != nil {
+			if af, bf := a.AddrPort() == first.AddrPort(), b.AddrPort() == first.AddrPort(); af != bf {
+				if af {
+					return -1
+				}
+				return 1
+			}
+		}
+		return compareForHost(host, a, b)
+	}
 	transports := c.p.ResolveTransports(c.required, c.preferred)
 	index := func(t target) int {
 		for i, tr := range transports {
@@ -532,7 +548,7 @@ func (c *connection) shiftLocked(discovered []discovery.Address) target {
 	}
 	best := 0
 	for i := 1; i < len(c.pending); i++ {
-		d := compareForHost(host, c.pending[i].addr, c.pending[best].addr)
+		d := rank(c.pending[i].addr, c.pending[best].addr)
 		if d < 0 || (d == 0 && transports != nil && index(c.pending[i]) < index(c.pending[best])) {
 			best = i
 		}
@@ -591,9 +607,11 @@ func compareForHost(host string, a, b discovery.Address) int {
 // orderForPeer is addrs — discovered, most desirable first — with the
 // peer's proven host's addresses moved ahead of the others, each group in
 // the order given: the order the address monitor walks the alternates in,
-// the same as the connection's (shiftLocked).
+// the same as the connection's (shiftLocked). The proven host is learned
+// first (learnHost).
 func orderForPeer(p *Peer, addrs []discovery.Address) []discovery.Address {
 	out := slices.Clone(addrs)
+	p.learnHost(addrs)
 	host := provenHost(p.operationalHost(), addrs)
 	if host == "" {
 		return out
@@ -608,6 +626,22 @@ func orderForPeer(p *Peer, addrs []discovery.Address) []discovery.Address {
 		return 1
 	})
 	return out
+}
+
+// provenHostAbsent reports whether the peer has a proven host
+// (Descriptor.OperationalHost) that no discovered address carries.
+func provenHostAbsent(known string, discovered []discovery.Address) bool {
+	return known != "" && provenHost(known, discovered) == ""
+}
+
+// fallbackFirstLocked is the fallback when it ranks ahead of every other
+// pending address — the proven host is known and no discovered address
+// carries it (BD-Matter-ProvenOperationalHost, issue 488) — else nil.
+func (c *connection) fallbackFirstLocked(known string, discovered []discovery.Address) *discovery.Address {
+	if c.fallback == nil || !provenHostAbsent(known, discovered) {
+		return nil
+	}
+	return c.fallback
 }
 
 // hostOwning is the SRV target of the discovered address a is — compared
@@ -667,14 +701,27 @@ func (c *connection) pendingAddLocked(t target) bool {
 // service delivers its addresses one at a time in the desirability order,
 // so the proven host's may arrive after another target's link-local
 // address was attempted — a preemption, not a wait.
+//
+// An attempt queued without a host — the fallback, from the operational
+// address — is at the proven host once discovery names the host for its
+// address (hostOwning).
 func (c *connection) preemptForProvenLocked(a discovery.Address) {
 	host := c.p.operationalHost()
 	if a.Host == "" || a.Host != host || c.lastAttemptAt.IsZero() {
 		return
 	}
+	var discovered []discovery.Address
 	for _, att := range c.attempts {
 		if att.addr.Host == host {
 			return
+		}
+		if att.addr.Host == "" {
+			if discovered == nil {
+				discovered = c.p.service.Addresses()
+			}
+			if hostOwning(discovered, att.addr.UDPAddr()) == host {
+				return
+			}
 		}
 	}
 	c.lastAttemptAt = time.Time{}
@@ -731,7 +778,11 @@ func (c *connection) retireStaleFallback() {
 }
 
 // fallbackSuperseded: a fallback is attempted, addresses are known and
-// none is the fallback (PeerConnection.ts:305-320).
+// none is the fallback (PeerConnection.ts:305-320). Ahead of matter.js, a
+// fallback queued because the proven host is absent from the discovered
+// addresses is not superseded by another target's
+// (BD-Matter-ProvenOperationalHost): it stays until a discovered address
+// carries the host.
 func (c *connection) fallbackSuperseded() bool {
 	c.mu.Lock()
 	fb := c.fallback
@@ -740,7 +791,7 @@ func (c *connection) fallbackSuperseded() bool {
 		return false
 	}
 	addrs := c.p.service.Addresses()
-	if len(addrs) == 0 {
+	if len(addrs) == 0 || provenHostAbsent(c.p.operationalHost(), addrs) {
 		return false
 	}
 	for _, a := range addrs {
@@ -772,8 +823,19 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 // maybeAttemptFallbackLocked queues the descriptor's operational address
 // when nothing else is attempted, pending or discovered
 // (PeerConnection.ts:360-379).
+//
+// Ahead of matter.js (BD-Matter-ProvenOperationalHost), it is queued too
+// when the peer's proven host is known but no discovered address carries
+// it, and then ranks ahead of the other targets' addresses
+// (fallbackFirstLocked); they follow DelayBeforeNextAddress later. Another
+// responder's cache-flush SRV removes the node's own SRV from the cache
+// until the node answers again (RFC 6762 §10.2); the session, not the
+// momentary cache, says which target is the node (issue 488).
 func (c *connection) maybeAttemptFallbackLocked() {
-	if len(c.attempts) > 0 || len(c.pending) > 0 || len(c.p.service.Addresses()) > 0 {
+	if len(c.attempts) > 0 || len(c.pending) > 0 {
+		return
+	}
+	if discovered := c.p.service.Addresses(); len(discovered) > 0 && !provenHostAbsent(c.p.operationalHost(), discovered) {
 		return
 	}
 	op := c.p.Descriptor().OperationalAddress

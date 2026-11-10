@@ -178,16 +178,19 @@ func (p *Peer) goWork(fn func()) {
 // onServiceChanged: an operational TXT record states SII, SAI, SAT, T and
 // ICD as a group, so one it omits no longer applies; the record's keys
 // overlay the rest (Peer.ts:126-135). Then the address check is scheduled
-// (:137-138).
+// (:137-138). Ahead of matter.js, a peer with a session learns its proven
+// host from the changed addresses (learnHostLocked).
 func (p *Peer) onServiceChanged() {
 	hasTXT := p.service.HasTXTRecord()
 	parsed := p.service.TXTData()
+	discovered := p.service.Addresses()
 	p.mu.Lock()
 	merged := overlayTXT(cleared(p.desc.DiscoveryData, hasTXT), parsed)
 	if p.desc.DiscoveryData == nil || !sameTXT(*p.desc.DiscoveryData, merged) {
 		p.desc.DiscoveryData = &merged
 		p.changedLocked()
 	}
+	p.learnHostLocked(discovered)
 	p.mu.Unlock()
 	p.scheduleAddressCheck()
 }
@@ -392,11 +395,9 @@ func (p *Peer) addSession(s *exchange.Session) {
 // A TCP session's remote port may be ephemeral (an inbound connection):
 // the operational address takes the discovered port (Peer.ts:149-160).
 //
-// With the address it learns the proven host, ahead of matter.js: the
-// discovered SRV target that owns the session's address becomes the
-// descriptor's OperationalHost; an address no discovered target owns
-// leaves the host as it was. matter.js follows the address only, at the
-// same two sites (Peer.ts:142-144 and :161-163 at db021da0).
+// With the address it learns the proven host, ahead of matter.js
+// (learnHostLocked). matter.js follows the address only, at the same two
+// sites (Peer.ts:142-144 and :161-163 at db021da0).
 func (p *Peer) followAddressLocked(s *exchange.Session) {
 	a := s.Addr()
 	if a == nil {
@@ -413,10 +414,33 @@ func (p *Peer) followAddressLocked(s *exchange.Session) {
 		p.desc.OperationalAddress = cloneUDPAddr(a)
 		p.changedLocked()
 	}
-	if h := hostOwning(addrs, a); h != "" && h != p.desc.OperationalHost {
+	p.learnHostLocked(addrs)
+}
+
+// learnHostLocked learns the proven host, ahead of matter.js
+// (BD-Matter-ProvenOperationalHost): while the peer has a session, the
+// discovered SRV target that owns the operational address becomes the
+// descriptor's OperationalHost; an address no discovered target owns
+// leaves the host as it was. It runs when a session follows its address
+// (followAddressLocked), when the service changes (onServiceChanged) and
+// before addresses are ranked (shiftLocked, orderForPeer): a session made
+// from the stored address at start precedes discovery, which names the
+// target only later (issue 488).
+func (p *Peer) learnHostLocked(discovered []discovery.Address) {
+	if len(p.sessions) == 0 || p.desc.OperationalAddress == nil {
+		return
+	}
+	if h := hostOwning(discovered, p.desc.OperationalAddress); h != "" && h != p.desc.OperationalHost {
 		p.desc.OperationalHost = h
 		p.changedLocked()
 	}
+}
+
+// learnHost is learnHostLocked under the peer's lock.
+func (p *Peer) learnHost(discovered []discovery.Address) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.learnHostLocked(discovered)
 }
 
 // followAddress makes the session's address, after a migration, the

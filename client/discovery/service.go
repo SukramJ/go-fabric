@@ -571,10 +571,26 @@ func (s *Service) updateAddress(e *srvEntry, ip netip.Addr) {
 	s.notify()
 }
 
-// deleteAddress. Mirrors matter.js 0ceb202d IpService.ts:330-340.
+// deleteAddress. Mirrors matter.js 0ceb202d IpService.ts:330-340, and
+// goes beyond it for a link-local address (BD-Matter-LinkLocalZoneVariants):
+// every variant of the IP at the entry's port leaves, whatever its zone,
+// not only the one of the record's last interface. A cached AAAA record is
+// keyed by its address (DnssdName.ts:348 at db021da0) and keeps the
+// interface of its last arrival, which ipOf zones it to
+// (IpService.ts:392-408); an arrival on a second interface added a second
+// variant (:315-328), which matter.js keeps until the service closes
+// (issue 488).
 func (s *Service) deleteAddress(e *srvEntry, ip netip.Addr) {
-	k := netip.AddrPortFrom(ip, e.port)
-	if !s.addresses.del(k) {
+	deleted := s.addresses.del(netip.AddrPortFrom(ip, e.port))
+	if ip.IsLinkLocalUnicast() {
+		bare := ip.WithZone("")
+		for _, k := range s.addresses.snapshotKeys() {
+			if k.Port() == e.port && k.Addr().WithZone("") == bare && s.addresses.del(k) {
+				deleted = true
+			}
+		}
+	}
+	if !deleted {
 		return
 	}
 	s.notify()
