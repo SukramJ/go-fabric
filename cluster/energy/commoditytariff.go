@@ -194,8 +194,17 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 type CommodityTariffConfig struct {
 	Features TariffFeature
 	// Clock is the clock the tariff's current day and day entry are read
-	// from, and the time sync runs on. Nil is [clock.System].
+	// from, and the time sync runs on. Nil is [clock.System]. Inside a
+	// node the node's Matter time is read instead, unless ClockDeclared.
 	Clock clock.Clock
+	// ClockDeclared states that Clock is the server's declared time
+	// source (the device's TimeSource): its time is the server's time
+	// inside a node too, ahead of the node's Matter time, as the
+	// energy-gateway app's TestTimeManager is the time the tariff reads
+	// (commodity-tariff/src/CommodityTariffEventTriggers.cpp:42-195 at
+	// 6170af84). The node's time stays untouched; false reads the node's
+	// time once attached (issue 445).
+	ClockDeclared bool
 	// SyncInterval is the time sync's period: every interval the server
 	// runs [CommodityTariffServer.SyncTime] itself — chip's energy-gateway
 	// app polls every 30 s (CommodityTariffInstance.h:27
@@ -222,6 +231,9 @@ type CommodityTariffServer struct {
 	now       func() time.Time
 	clock     clock.Clock
 	syncEvery time.Duration
+	// declared is CommodityTariffConfig.ClockDeclared: clock is read
+	// ahead of the node's Matter time.
+	declared bool
 
 	// mu guards active, assigned, pending and syncTimer.
 	mu        sync.Mutex
@@ -266,7 +278,7 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		delete(initial, ct.AttrDefaultRandomizationType)
 	}
 	clk := clock.Or(cfg.Clock)
-	s := &CommodityTariffServer{now: clk.Now, clock: clk, syncEvery: cfg.SyncInterval}
+	s := &CommodityTariffServer{now: clk.Now, clock: clk, syncEvery: cfg.SyncInterval, declared: cfg.ClockDeclared}
 	handlers := map[uint32]spec.CommandHandler{
 		ct.CmdGetTariffComponent: s.getTariffComponent,
 		ct.CmdGetDayEntry:        s.getDayEntry,
@@ -283,9 +295,15 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 	return s, nil
 }
 
-// nowEpoch is the node's Matter time in epoch-s (nodeTime), its own
-// clock's outside a node.
-func (s *CommodityTariffServer) nowEpoch() (uint32, bool) { return s.epochS(s.clock) }
+// nowEpoch is the server's time in epoch-s: its declared clock's
+// (CommodityTariffConfig.ClockDeclared) wherever it runs; otherwise the
+// node's Matter time (nodeTime), its own clock's outside a node.
+func (s *CommodityTariffServer) nowEpoch() (uint32, bool) {
+	if s.declared {
+		return clock.MatterTimeOf(s.clock)()
+	}
+	return s.epochS(s.clock)
+}
 
 // value reads a stored attribute.
 func (s *CommodityTariffServer) value(attrID uint32) any {
