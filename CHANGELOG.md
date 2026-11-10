@@ -10,8 +10,19 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `diag`: a new package with the diagnostic shapes both roles serve — `SessionDiagnostics`, `SessionInfo`, `Occupancy`, `Diagnostics` (with `Effective()`), `DefaultDiagnosticsCapacity`, `Event` (an alias of `diagevent.Event`) and `PeerInfo` (issue 483). `diag.SessionInfo` gains `CreatedAt`, `Resumed`, `Transport` and `PeerLost` (zero on the node), `diag.SessionDiagnostics` gains `Peers` (nil on the node).
+- `controller`: `Controller.SessionDiagnostics()` (the sessions of every peer and one `diag.PeerInfo` per peer: connection state, address, DNS-SD names, ICD Check-Ins, session ids), `Controller.DiagnosticEvents()` and `Controller.OnDiagnosticEvent(fn)` (a bounded trace of pairing, session, discovery, reachability, icd, ota and camera events), `Controller.DiagnoseMDNS()`, `Config.Diagnostics` and `Config.Metrics` with `controller.MetricSessionsOpen`, `MetricMRPRetransmits`, `MetricPairFailures`, `MetricCASEUnresponsive`, `MetricReachabilityProbes`, `MetricICDCheckInsMissed` (issue 483; `BD-Matter-ControllerDiagnostics`).
+- `diagevent`: the kinds `KindReachability`, `KindICD`, `KindOTA` and `KindCamera`.
+- `client/peer`: `Context.PeerAdded`, called once for every peer that joins the set, `Context.PeerRemoved`, called once a closed peer left it, and `Observer.ReachabilityVerified`, the verdict of an address monitor run that probed.
+- `mdns`: the browse-side finding `no_operational_names` (`CodeNoOperationalNames`, `DiagnoseOperationalBrowse`).
+- `contract`: the metric names `pair.failures` (one `Pair` that returned an error), `case.unresponsive`, `reachability.probes` and `icd.checkins_missed` (`MetricPairFailures`, `MetricCASEUnresponsive`, `MetricReachabilityProbes`, `MetricICDCheckInsMissed`), in `MetricNames`, so `node/metrics/expvar` publishes them.
+
 ### Changed
 
+- `node`: `SessionDiagnostics`, `SessionInfo`, `Occupancy`, `Diagnostics` and `DefaultDiagnosticsCapacity` are aliases of `diag`'s, which the controller serves too, so `Node.SessionDiagnostics`, `Config.Diagnostics`, `Observers.OnSessionOpened`, `Observers.OnSessionClosed` and `Observers.OnSubscriptionsChanged` take and return `diag`'s types. apidiff reports the type identity as changed; no source change for a consumer (a keyed composite literal and every use by the `node` name compile unchanged).
+- `controller`: with `Config.OTA` set and `Config.HooksFor` nil, the nodes keep `Config.Node.Hooks`; before, the OTA hook chain started from empty hooks and dropped them.
 - `client/peer`: `matter.controller.peer.probe` carries `target`, the probed address, beside `address` (the session's current address, unchanged), so the address monitor's walk of the alternates reads from the log (issue 488).
 - `ble/bluez`: the connection reports the ATT_MTU exchange (`ble.MTUExchange`) from BlueZ's `PropertiesChanged("MTU")` on C1 (BlueZ 5.62 and later), so `controller/ble` waits up to `ATTMTUSettleTimeout` for a pending exchange instead of sizing the BTP segment from the pre-exchange 23 for the session's life; an MTU above 23 at discovery is taken at once, and a BlueZ without the property settles at once at the minimum (issue 426).
 

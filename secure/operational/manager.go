@@ -354,7 +354,7 @@ type Entry struct {
 	// updated only on inbound decrypts — the peer-active determination
 	// for MRP interval selection needs the time the PEER last sent, not
 	// our own transmissions. Mirrors chip GetLastPeerActivityTime and
-	// matter.js NodeSession.ts:120.
+	// matter.js NodeSession.ts:121 at db021da0.
 	lastPeerActivity time.Time
 	// peerIdleIntervalMs / peerActiveIntervalMs / peerActiveThresholdMs
 	// carry the peer's advertised MRP session parameters (Sigma1 /
@@ -662,7 +662,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
-		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// NodeSession.ts:121 at db021da0 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
 		lastPeerActivity:     m.clk().Now(),
 		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
@@ -778,7 +778,7 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		isInitiator:          initiator,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
-		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// NodeSession.ts:121 at db021da0 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
 		lastPeerActivity:     m.clk().Now(),
 		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
@@ -852,7 +852,7 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		isPase:               true,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
-		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// NodeSession.ts:121 at db021da0 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
 		lastPeerActivity:     m.clk().Now(),
 		lastPeerActivityMono: clock.MonotonicOf(m.clk()),
@@ -902,7 +902,7 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		isPase:               true,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
-		// NodeSession.ts:120 ("We always set the active timestamp for Secure
+		// NodeSession.ts:121 at db021da0 ("We always set the active timestamp for Secure
 		// sessions"), chip SecureSession.h:349 (mLastPeerActivityTime = now).
 		lastPeerActivity:     m.clk().Now(),
 		lastPeerActivityMono: clock.MonotonicOf(m.clk()),

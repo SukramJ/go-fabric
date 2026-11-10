@@ -815,7 +815,21 @@ operational dataset, as matter.js's `OperationalDataset.decode` does:
 line. The commissioner provisions the dataset as bytes
 (`commissioner.ThreadNetwork`).
 
-*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
+### Diagnostics
+
+`Controller.SessionDiagnostics()` is a snapshot of the controller's
+sessions and peers (each peer's connection state, address, DNS-SD names,
+ICD Check-Ins and session ids), `Controller.DiagnosticEvents()` and
+`Controller.OnDiagnosticEvent(fn)` its bounded trace (pairing, session,
+discovery, reachability, icd, ota, camera; `Config.Diagnostics` sizes it),
+and `Controller.DiagnoseMDNS()` its DNS-SD findings, among them
+`no_operational_names` when the browse gets no answer.
+`Config.Metrics` takes the `contract.Metrics` port. The shapes are package
+`diag`'s, the ones the node serves; the
+[observability guide](../guides/observability.md#the-controllers-diagnostics)
+describes each.
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`, `controller/diagnostics.go`, `controller/metrics.go`.*
 
 ## What is not here yet
 

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7867,
+  "entry_points": 7883,
   "entry_packages": [
     ".",
     "bdx",
@@ -206,6 +206,7 @@
     "controller/softwareupdate",
     "controller/topology",
     "device",
+    "diag",
     "diagevent",
     "eligibility",
     "endpoint",
@@ -282,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17860,
-    "reachable": 12393,
-    "whitelisted": 5467,
+    "total_exported": 17892,
+    "reachable": 12411,
+    "whitelisted": 5481,
     "unreachable": 0
   },
   "by_package": [],
@@ -7222,6 +7223,20 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestContextPeerAdded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/diag_seams_test.go",
+      "line": 21
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestContextPeerRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/diag_seams_test.go",
+      "line": 176
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestDiscoverKick",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
@@ -7674,6 +7689,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
       "line": 38
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestReachabilityVerifiedOncePerRun",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/diag_seams_test.go",
+      "line": 93
     },
     {
       "package": "client/peer",
@@ -22800,14 +22822,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 688
+      "line": 738
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 684
+      "line": 734
     },
     {
       "package": "controller",
@@ -22832,10 +22854,31 @@
     },
     {
       "package": "controller",
+      "identifier": "TestCameraPortRefusalTrace",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/diagnostics_internal_test.go",
+      "line": 196
+    },
+    {
+      "package": "controller",
       "identifier": "TestControllerAccessorsWithoutServices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
       "line": 154
+    },
+    {
+      "package": "controller",
+      "identifier": "TestControllerMetricsHooks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/diagnostics_internal_test.go",
+      "line": 217
+    },
+    {
+      "package": "controller",
+      "identifier": "TestDiagHooksChain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/diagnostics_internal_test.go",
+      "line": 126
     },
     {
       "package": "controller",
@@ -22871,6 +22914,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/units_internal_test.go",
       "line": 24
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTraceOTAStatus",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/diagnostics_internal_test.go",
+      "line": 173
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTracePairing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/diagnostics_internal_test.go",
+      "line": 73
+    },
+    {
+      "package": "controller",
+      "identifier": "WatchingICD",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/export_diag_test.go",
+      "line": 9
     },
     {
       "package": "controller/attestation",
@@ -27491,6 +27555,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 83
+    },
+    {
+      "package": "diag",
+      "identifier": "Event",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "diag/diag.go",
+      "line": 23
     },
     {
       "package": "diagevent",
@@ -32870,6 +32941,13 @@
     },
     {
       "package": "node",
+      "identifier": "Diagnostics",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/diagnostics.go",
+      "line": 13
+    },
+    {
+      "package": "node",
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
@@ -33052,6 +33130,13 @@
     },
     {
       "package": "node",
+      "identifier": "Occupancy",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/inspect.go",
+      "line": 71
+    },
+    {
+      "package": "node",
       "identifier": "PowerSourceConfigurationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
@@ -33084,6 +33169,20 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
       "line": 56
+    },
+    {
+      "package": "node",
+      "identifier": "SessionDiagnostics",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/inspect.go",
+      "line": 63
+    },
+    {
+      "package": "node",
+      "identifier": "SessionInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/inspect.go",
+      "line": 67
     },
     {
       "package": "node",

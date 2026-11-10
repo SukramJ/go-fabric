@@ -3,27 +3,18 @@
 
 package node
 
+import "github.com/SukramJ/go-fabric/diag"
+
 // Diagnostics is the type of [Config].Diagnostics: the node's diagnostic
 // trace, a bounded in-memory ring of the moments that explain a failed
 // pairing or a lost session ([DiagnosticEvent]). The ring is memory only;
-// the logs are the durable record.
-type Diagnostics struct {
-	// Capacity is the number of events kept, the oldest dropped first; 0
-	// keeps [DefaultDiagnosticsCapacity].
-	Capacity int
-}
+// the logs are the durable record. It is [diag.Diagnostics], shared with
+// the controller.
+type Diagnostics = diag.Diagnostics
 
 // DefaultDiagnosticsCapacity is the trace's capacity when
 // [Diagnostics].Capacity is 0.
-const DefaultDiagnosticsCapacity = 256
-
-// capacity is the ring's capacity: Capacity, or the default below one.
-func (d Diagnostics) capacity() int {
-	if d.Capacity < 1 {
-		return DefaultDiagnosticsCapacity
-	}
-	return d.Capacity
-}
+const DefaultDiagnosticsCapacity = diag.DefaultDiagnosticsCapacity
 
 // DiagnosticEvents returns the node's diagnostic trace, newest first: a
 // copy the caller may keep (the REST handler of a daemon serialises it).

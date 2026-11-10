@@ -227,32 +227,14 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		if reason == ReasonAddressChange {
 			m.advanceBackoff()
 		}
+		p.reachabilityVerified(reason, true, current.String())
 		return true
 	}
-	// Both reasons walk the alternates, the proven host's addresses first,
-	// as the connection tries them (orderForPeer). matter.js walks them on
-	// an address change only; a session-suspect probe stays on the current
-	// address (PeerAddressMonitor.ts:219-221 at db021da0). Here a suspect
-	// session is migrated to an alternate that answers before it is given
-	// up: the reconnect that follows HandlePeerLoss costs a Thread node a
-	// minute or more (issue 478), a probe one small exchange per address.
-	for _, a := range orderForPeer(p, discovered) {
-		if ctx.Err() != nil {
-			return false
+	if migrated, ended := m.walkAlternates(s, current, discovered, log, probeNetwork, &margin); ended || migrated {
+		if migrated {
+			p.reachabilityVerified(reason, true, s.Addr().String())
 		}
-		if a.AddrPort() == current {
-			continue
-		}
-		if probe(ctx, mgr, s, a.UDPAddr(), log, probeNetwork, &margin) {
-			log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
-			s.SetAddr(a.UDPAddr())
-			p.followAddress(s)
-			if migrated := p.set.ctx.SessionMigrated; migrated != nil {
-				migrated(p.address)
-			}
-			m.resetBackoff()
-			return true
-		}
+		return migrated
 	}
 	if reason == ReasonAddressChange {
 		// A suspect run reset the backoff before its probes.
@@ -263,7 +245,54 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	}
 	log.Info("matter.controller.peer.all_probes_failed")
 	s.HandlePeerLoss(&exchange.PeerUnresponsiveError{})
+	p.reachabilityVerified(reason, false, "")
 	return false
+}
+
+// walkAlternates probes the discovered addresses other than current and
+// migrates s to the first that answers: migrated then; ended when the
+// peer's context ended first.
+//
+// Both reasons walk the alternates, the proven host's addresses first,
+// as the connection tries them (orderForPeer). matter.js walks them on
+// an address change only; a session-suspect probe stays on the current
+// address (PeerAddressMonitor.ts:219-221 at db021da0). Here a suspect
+// session is migrated to an alternate that answers before it is given
+// up: the reconnect that follows HandlePeerLoss costs a Thread node a
+// minute or more (issue 478), a probe one small exchange per address.
+func (m *monitor) walkAlternates(s *exchange.Session, current netip.AddrPort, discovered []discovery.Address, log *slog.Logger, probeNetwork *NetworkProfile, margin *time.Duration) (migrated, ended bool) {
+	p := m.p
+	ctx := p.ctx
+	mgr := p.set.ctx.Exchanges
+	for _, a := range orderForPeer(p, discovered) {
+		if ctx.Err() != nil {
+			return false, true
+		}
+		if a.AddrPort() == current {
+			continue
+		}
+		if probe(ctx, mgr, s, a.UDPAddr(), log, probeNetwork, margin) {
+			log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
+			s.SetAddr(a.UDPAddr())
+			p.followAddress(s)
+			if migrated := p.set.ctx.SessionMigrated; migrated != nil {
+				migrated(p.address)
+			}
+			m.resetBackoff()
+			return true, false
+		}
+	}
+	return false, false
+}
+
+// reachabilityVerified tells the observers a run's verdict
+// ([Observer].ReachabilityVerified); the monitor holds no lock here.
+func (p *Peer) reachabilityVerified(reason ReachabilityReason, ok bool, address string) {
+	for _, o := range p.observing() {
+		if o.ReachabilityVerified != nil {
+			o.ReachabilityVerified(reason, ok, address)
+		}
+	}
 }
 
 // probeNetworkOf is the network a probe of p goes out on — the medium

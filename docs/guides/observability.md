@@ -179,6 +179,74 @@ trace answers GeneralDiagnostics' DiagnosticLogs RetrieveLogs.
 The two observers follow the callback rule the device kit's
 `OnChanged`/`OnChangedAsync` follow.
 
+## The controller's diagnostics
+
+A `controller.Controller` serves the same shapes as the node, from package
+`diag` (the node's `SessionDiagnostics`, `SessionInfo`, `Occupancy` and
+`Diagnostics` are aliases of them), so one page model renders either role.
+
+**Snapshot.** `Controller.SessionDiagnostics()` returns a
+`diag.SessionDiagnostics`: every session of every peer flat in `Sessions`
+(with `CreatedAt`, `Resumed`, `Transport` and `PeerLost`, which the node
+leaves zero), and one `diag.PeerInfo` per peer in `Peers` — whether a
+commissioned client node has its address, the node's connection state
+(`Connected`, `Disconnected`, `Reconnecting`, `WaitingForDeviceDiscovery`),
+how long its connection process has been trying, its operational address
+and the SRV host that owns it, whether its DNS-SD service is believed
+reachable and which of its operational names the cache holds, its last and
+next ICD Check-In, whether its default subscription is active, and the ids
+of its sessions. `Occupancy` stays zero with `Capacity` 0: the
+controller's exchange manager keeps no id-occupancy figure. A session's
+`Subscriptions` is 0 and `LastActivity` zero, because the controller keeps
+its subscriptions by peer and its sessions export no any-direction
+timestamp. The snapshot holds no lock across the peers.
+
+**Trace.** `Config.Diagnostics{Capacity}` sizes the controller's ring (0 is
+256). `Controller.DiagnosticEvents()` returns it newest first;
+`Controller.OnDiagnosticEvent(fn)` runs `fn` inline on the recording
+goroutine — the receive path, a peer's worker, the DNS-SD cache's
+goroutine — so `fn` must not block and must not call `SessionDiagnostics`
+or `DiagnoseMDNS`, which wait for that cache. There is no async variant:
+the controller keeps no ordered callback queue. The kinds and an example
+of each:
+
+| Kind | What it records | Example |
+| --- | --- | --- |
+| `pairing` | a `Pair`'s start, each failed step (a warning: one discovery transport of a race may fail while another wins), the paired node, or the failed pairing (error) when `Pair` returns an error | "Pairing failed at step OperationalCredentials.DeviceAttestation: …" |
+| `session` | a session established, closed or lost (warning), a CASE establishment unanswered within the MRP budget (warning), a client node's connection-state transition (`Reconnecting` and `WaitingForDeviceDiscovery` as warnings) | "The secure session with node 5C50D14E724B52F1 was lost; the controller reconnects." |
+| `discovery` | a node of our fabric whose operational record appears in or disappears from the DNS-SD cache; a Thread border router added to or removed from the registry | "Node 5C50D14E724B52F1's operational record appeared." |
+| `reachability` | a reachability probe run's verdict: answered on its address or an alternate, or given up (warning) | "Node 5C50D14E724B52F1 answered no session-suspect probe; the session is given up." |
+| `icd` | an accepted ICD Check-In, a missed one (warning) | "Node 5C50D14E724B52F1 checked in (counter 12)." |
+| `ota` | a status of a node's software update; `Cancelled` as a warning | "Node 5C50D14E724B52F1's software update is Downloading (version 2)." |
+| `camera` | a WebRTC signal the controller's requestor refused (a node's command for a session it does not hold, answered NOT_FOUND); Offer and Answer as warnings | "The controller refused node 5C50D14E724B52F1's WebRTC answer for session 3: no such session." |
+
+The host's own hooks — `PairOptions.Progress`, `Config.HooksFor`,
+`OTAConfig.OnStatus`, `Controller.OnCameraSignal` — still run, after the
+trace recorded the event.
+
+**Findings.** `Controller.DiagnoseMDNS()` returns `[]mdns.Finding`:
+`mdns.Diagnose` of the records the controller advertises (without the
+node's `no_commissionable_service`), and `no_operational_names` (warning)
+when a commissioned node waits for device discovery and the DNS-SD cache
+holds none of the commissioned nodes' operational records — the browse
+gets no answer on this network. The controller has no interface
+allow-list, so `mdns.DiagnoseInterfaces` is not called. Errors come first.
+
+**Metrics.** `Config.Metrics` takes the same `contract.Metrics` port; nil
+records nothing.
+
+| Name (`controller.Metric…`) | Kind | One unit | Fed from |
+| --- | --- | --- | --- |
+| `sessions.open` (`MetricSessionsOpen`) | gauge | a secure session of one of the controller's peers | taken from the peers' sessions when one is established or leaves its peer and when a closed peer leaves the set (its sessions go without a deletion event), and set to 0 at the end of `Controller.Close` (`controller/diagnostics.go`, `controller/metrics.go`) |
+| `mrp.retransmits` (`MetricMRPRetransmits`) | counter | a reliable message the controller's exchanges sent again | `client/exchange.Config.Retransmitted` |
+| `pair.failures` (`MetricPairFailures`) | counter | a failed pairing: a `Pair` that returned an error; a step that failed inside a pairing that went on is not counted | `Controller.Pair` |
+| `case.unresponsive` (`MetricCASEUnresponsive`) | counter | a CASE establishment unanswered past its MRP budget | the peer observer's `EstablishmentUnresponsive` |
+| `reachability.probes` (`MetricReachabilityProbes`) | counter | a reachability probe run, whatever its verdict | the peer observer's `ReachabilityVerified` |
+| `icd.checkins_missed` (`MetricICDCheckInsMissed`) | counter | an ICD Check-In expected from a registered LIT peer and not received | `client.ICDClient.OnCheckInMissed` |
+
+`subscriptions.active` is not fed by the controller: its subscription
+registry signals no change a gauge could follow.
+
 ## Attribute changes
 
 `node.Observers.OnAttributeChanged` hears every attribute change a cluster
