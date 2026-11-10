@@ -113,7 +113,7 @@ var areaKeys = []string{
 	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
 	"subscriptions_reaped", "subsystem", "supported", "suppress_response",
-	"sw_version", "system_mode", "target", "tcp", "test", "timed", "timeout",
+	"sw_version", "system_mode", "target", "targets", "tcp", "test", "timed", "timeout",
 	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "uri_node", "url", "valid",
 	// controller/camera (phase 37): a camera's WebRTC session and stream ids

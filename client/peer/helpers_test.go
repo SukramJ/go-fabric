@@ -61,6 +61,14 @@ type fakeUDP struct {
 	ch  chan datagram
 	// fail, when set, is the error of every Send, which then sends nothing.
 	fail atomic.Pointer[error]
+	// failFor, when set, is the error of every Send to its one address.
+	failFor atomic.Pointer[sendFailure]
+}
+
+// sendFailure is a send error for one destination.
+type sendFailure struct {
+	to  string
+	err error
 }
 
 func newFakeUDP() *fakeUDP { return &fakeUDP{ch: make(chan datagram, 4096)} }
@@ -68,6 +76,9 @@ func newFakeUDP() *fakeUDP { return &fakeUDP{ch: make(chan datagram, 4096)} }
 func (c *fakeUDP) Send(dst *net.UDPAddr, payload []byte) error {
 	if err := c.fail.Load(); err != nil {
 		return *err
+	}
+	if f := c.failFor.Load(); f != nil && dst.String() == f.to {
+		return f.err
 	}
 	d := datagram{to: dst, bytes: append([]byte(nil), payload...)}
 	c.mu.Lock()

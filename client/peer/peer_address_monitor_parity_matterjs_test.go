@@ -108,22 +108,14 @@ func waitVerifyCallers(t *testing.T, n int) {
 // "PeerAddressMonitor.verifyReachability" (the other cases are
 // TestMonitorSessionSuspect, TestMonitorMigratesToAnAlternate,
 // TestMonitorStillDiscoveredAndCooldown and TestMonitorAllProbesFail).
+// "session-suspect alone: current fails → no alternate walk" is not
+// ported, and neither is the describe "coalescing"'s "session-suspect
+// stays current-only even when an address-change joins the run": a
+// suspect run walks the alternates here
+// (BD-Matter-SuspectProbeWalksAlternates; TestMonitorSessionSuspect and
+// TestMonitorSuspectMigratesToAnAlternate hold this module's behaviour).
 func TestPeerAddressMonitorVerifyReachability(t *testing.T) {
 	t.Parallel()
-	t.Run("session-suspect alone: current fails → no alternate walk, session closed, false", func(t *testing.T) {
-		t.Parallel()
-		h, p, n := verifyFixture(t, "fd00::1", "fd00::2")
-		rs, to := failRuns(t, h, verifyAsync(context.Background(), p, ReasonSessionSuspect))
-		if rs[0].ok || !n.s.IsPeerLost() {
-			t.Fatalf("ok %v lost %v, want false and the session closed", rs[0].ok, n.s.IsPeerLost())
-		}
-		for _, a := range to {
-			if a != addr1 {
-				t.Fatalf("a session-suspect run probed %s", a)
-			}
-		}
-	})
-
 	t.Run("address-change: current matches a channel-agnostic discovered address → skip, no probe", func(t *testing.T) {
 		t.Parallel()
 		// Discovered addresses carry no transport; the session's UDP address
@@ -209,26 +201,6 @@ func TestPeerAddressMonitorCoalescing(t *testing.T) {
 			t.Fatalf("results %v %v, want true true", ra.ok, rb.ok)
 		}
 		h.udp.none(t) // a single shared run, a single probe
-	})
-
-	t.Run("session-suspect stays current-only even when an address-change joins the run", func(t *testing.T) {
-		h, p, n := verifyFixture(t, "fd00::2")
-		suspect := verifyAsync(context.Background(), p, ReasonSessionSuspect)
-		first := h.udp.next(t)
-		change := verifyAsync(context.Background(), p, ReasonAddressChange)
-		waitVerifyCallers(t, 2)
-		rs, to := failRuns(t, h, suspect, change)
-		if rs[0].ok || rs[1].ok {
-			t.Fatalf("results %v %v, want false false", rs[0].ok, rs[1].ok)
-		}
-		for _, a := range append(to, first.to.String()) {
-			if a != addr1 {
-				t.Fatalf("the joined run probed %s", a)
-			}
-		}
-		if n.s.Addr().String() != addr1 || !n.s.IsPeerLost() {
-			t.Fatalf("session at %v lost %v, want %s and closed", n.s.Addr(), n.s.IsPeerLost(), addr1)
-		}
 	})
 }
 

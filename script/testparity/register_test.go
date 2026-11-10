@@ -199,7 +199,9 @@ const (
 // keep (device-ble-thread, ADR 0027 decision 5) and the JS start/stop,
 // target-observer and log-flag mechanics (js-runtime-only), merged with
 // wave W7: 630.
-const testparityLeftRatchet = 630
+// Wave W12 (#478) leaves two PeerAddressMonitorTest.ts session-suspect
+// cases by design (BD-Matter-SuspectProbeWalksAlternates): 632.
+const testparityLeftRatchet = 632
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

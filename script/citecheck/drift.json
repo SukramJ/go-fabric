@@ -1415,7 +1415,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 52,
+    "line": 53,
     "citation": "types/src/protocol/definitions/general.ts:33",
     "resolved": "packages/types/src/protocol/definitions/general.ts",
     "identifier": "GeneralStatusCode",
@@ -1424,7 +1424,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1090,
+    "line": 1259,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -2366,7 +2366,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 130,
+    "line": 138,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2375,7 +2375,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 451,
+    "line": 462,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2384,7 +2384,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 475,
+    "line": 486,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2393,7 +2393,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 681,
+    "line": 695,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",

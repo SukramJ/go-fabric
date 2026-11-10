@@ -265,6 +265,12 @@ func (p *Peer) mergeKnown(d Descriptor) {
 		p.desc.OperationalAddress = cloneUDPAddr(d.OperationalAddress)
 		p.changedLocked()
 	}
+	// The proven host is this module's (Descriptor.OperationalHost): a
+	// known one is taken, an unknown one leaves the peer's as it was.
+	if d.OperationalHost != "" && d.OperationalHost != p.desc.OperationalHost {
+		p.desc.OperationalHost = d.OperationalHost
+		p.changedLocked()
+	}
 	if d.DiscoveryData != nil {
 		merged := *d.DiscoveryData
 		if p.desc.DiscoveryData != nil {
@@ -385,17 +391,30 @@ func (p *Peer) addSession(s *exchange.Session) {
 //
 // A TCP session's remote port may be ephemeral (an inbound connection):
 // the operational address takes the discovered port (Peer.ts:149-160).
+//
+// With the address it learns the proven host, ahead of matter.js: the
+// discovered SRV target that owns the session's address becomes the
+// descriptor's OperationalHost; an address no discovered target owns
+// leaves the host as it was. matter.js follows the address only, at the
+// same two sites (Peer.ts:142-144 and :161-163 at db021da0).
 func (p *Peer) followAddressLocked(s *exchange.Session) {
 	a := s.Addr()
-	if a != nil && s.Transport() == exchange.TransportTCP {
-		addrs := p.service.Addresses()
+	if a == nil {
+		return
+	}
+	addrs := p.service.Addresses()
+	if s.Transport() == exchange.TransportTCP {
 		if len(addrs) == 0 {
 			return
 		}
 		a = &net.UDPAddr{IP: a.IP, Port: int(addrs[0].Port), Zone: a.Zone}
 	}
-	if a != nil && !sameUDPAddr(p.desc.OperationalAddress, a) {
+	if !sameUDPAddr(p.desc.OperationalAddress, a) {
 		p.desc.OperationalAddress = cloneUDPAddr(a)
+		p.changedLocked()
+	}
+	if h := hostOwning(addrs, a); h != "" && h != p.desc.OperationalHost {
+		p.desc.OperationalHost = h
 		p.changedLocked()
 	}
 }
@@ -444,6 +463,13 @@ func (p *Peer) Descriptor() Descriptor {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.desc.clone()
+}
+
+// operationalHost is the descriptor's OperationalHost.
+func (p *Peer) operationalHost() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.desc.OperationalHost
 }
 
 // Sessions returns the peer's sessions.

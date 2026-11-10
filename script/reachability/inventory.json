@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7848,
+  "entry_points": 7860,
   "entry_packages": [
     ".",
     "bdx",
@@ -282,9 +282,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17841,
+    "total_exported": 17853,
     "reachable": 12393,
-    "whitelisted": 5448,
+    "whitelisted": 5460,
     "unreachable": 0
   },
   "by_package": [],
@@ -6200,6 +6200,13 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestService_AddressFromTwoTargetsKeepsTheFirstOwner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/srv_target_test.go",
+      "line": 169
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestService_AddressesFollowTheSRVTarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/service_test.go",
@@ -6232,6 +6239,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/txt_data_test.go",
       "line": 13
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_TwoRespondersFlipTheSRVTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/srv_target_test.go",
+      "line": 63
     },
     {
       "package": "client/discovery",
@@ -7152,6 +7166,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestCompareForHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 112
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestConnectDiscoveredAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
@@ -7205,6 +7226,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
       "line": 461
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestFailedAttemptAdvances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/attempt_advance_test.go",
+      "line": 22
     },
     {
       "package": "client/peer",
@@ -7295,14 +7323,14 @@
       "identifier": "TestMonitorScheduledByAServiceChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 233
+      "line": 243
     },
     {
       "package": "client/peer",
       "identifier": "TestMonitorSessionSuspect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 200
+      "line": 202
     },
     {
       "package": "client/peer",
@@ -7310,6 +7338,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
       "line": 96
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSuspectJoinedWalksAlternates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/suspect_walk_test.go",
+      "line": 65
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSuspectMigratesToAnAlternate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/suspect_walk_test.go",
+      "line": 17
     },
     {
       "package": "client/peer",
@@ -7369,6 +7411,20 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestOperationalHostLearned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 139
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestOrderForPeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 170
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestParityErrorDelays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
@@ -7407,21 +7463,21 @@
       "identifier": "TestPeerAddressMonitorBackoff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 237
+      "line": 209
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorCoalescing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 200
+      "line": 192
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorVerifyReachability",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 111
+      "line": 117
     },
     {
       "package": "client/peer",
@@ -7544,6 +7600,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestPendingAddAdoptsTheHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 191
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestProbeFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
@@ -7555,6 +7618,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
       "line": 89
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostPreemptsTheStagger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 81
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostRanksFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_test.go",
+      "line": 38
     },
     {
       "package": "client/peer",
@@ -7589,7 +7666,7 @@
       "identifier": "TestSessionMoveCarriesOperationalAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
-      "line": 256
+      "line": 266
     },
     {
       "package": "client/peer",
@@ -24634,7 +24711,7 @@
       "identifier": "TestNodeRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 192
+      "line": 241
     },
     {
       "package": "controller/client",
@@ -24739,14 +24816,21 @@
       "identifier": "TestRecordDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 149
+      "line": 198
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordIgnoresRetiredCATs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 238
+      "line": 287
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordOperationalHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 151
     },
     {
       "package": "controller/client",

@@ -28,7 +28,7 @@ func fullRecord() Record {
 			{IP: netip.MustParseAddr("fe80::1%eth0"), Port: 5540, TTL: 120 * time.Second, DiscoveredAt: at},
 			{IP: netip.MustParseAddr("192.0.2.7"), Port: 5541},
 		},
-		Hostname: "host", DiscoveredAt: at, CommissionedAt: at.Add(time.Second), FabricIndexOnPeer: 3, TTL: 90 * time.Second,
+		Hostname: "host", OperationalHost: "b25f4dcb247973d5.local", DiscoveredAt: at, CommissionedAt: at.Add(time.Second), FabricIndexOnPeer: 3, TTL: 90 * time.Second,
 		DeviceIdentifier: "ABCD", Discriminator: ptr(uint16(3840)), CommissioningMode: 2,
 		VendorID: ptr(uint16(0xFFF1)), ProductID: ptr(uint16(0x8001)), DeviceType: ptr(uint32(0x10A)), DeviceName: "plug",
 		RotatingIdentifier: "RI", PairingHint: ptr(uint32(33)), PairingInstructions: "press",
@@ -98,7 +98,7 @@ func TestRecordDecodeErrors(t *testing.T) {
 			continue // read and ignored (TestRecordIgnoresRetiredCATs)
 		}
 		values := map[uint32][]byte{id: good[recDeviceIdentifier]}
-		if id == recDeviceIdentifier || id == recHostname || id == recDeviceName || id == recRotatingIdentifier || id == recPairingInstructions {
+		if id == recDeviceIdentifier || id == recHostname || id == recOperationalHost || id == recDeviceName || id == recRotatingIdentifier || id == recPairingInstructions {
 			values[id] = good[recFabricIndexOnPeer]
 		}
 		if _, err := decodeRecord(values); err == nil {
@@ -142,6 +142,55 @@ func TestRecordApplyPeer(t *testing.T) {
 	r.applyPeer(peer.Descriptor{})
 	if len(r.Addresses) != 1 || r.DeviceName != "renamed" || r.ReportedSessionParameters == nil {
 		t.Fatalf("after an empty descriptor %+v", r)
+	}
+}
+
+// TestRecordOperationalHost: the peer's proven host is saved with its
+// operational address and restored into the known descriptor; a record
+// stored before the field existed loads with it empty (issue 478).
+func TestRecordOperationalHost(t *testing.T) {
+	t.Parallel()
+	var r Record
+	r.applyPeer(peer.Descriptor{
+		OperationalAddress: &net.UDPAddr{IP: net.ParseIP("fd75:c2d:62d3:0:c20:86a3:cb92:55ba"), Port: 5540},
+		OperationalHost:    "b25f4dcb247973d5.local",
+	})
+	if r.OperationalHost != "b25f4dcb247973d5.local" {
+		t.Fatalf("applyPeer: host %q", r.OperationalHost)
+	}
+	// A descriptor without an operational address leaves address and host.
+	r.applyPeer(peer.Descriptor{})
+	if r.OperationalHost != "b25f4dcb247973d5.local" || len(r.Addresses) != 1 {
+		t.Fatalf("after an empty descriptor %+v", r)
+	}
+	values, err := r.encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values[recOperationalHost] == nil {
+		t.Fatalf("field %d not stored", recOperationalHost)
+	}
+	back, err := decodeRecord(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := back.knownDescriptor(); d.OperationalHost != "b25f4dcb247973d5.local" || d.OperationalAddress.String() != "[fd75:c2d:62d3:0:c20:86a3:cb92:55ba]:5540" {
+		t.Fatalf("knownDescriptor %+v", d)
+	}
+	// Old bytes: the stored form of a record without the tag.
+	old, err := fullRecord().encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(old, recOperationalHost)
+	legacy, err := decodeRecord(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fullRecord()
+	want.OperationalHost = ""
+	if !reflect.DeepEqual(legacy, want) || legacy.knownDescriptor().OperationalHost != "" {
+		t.Fatalf("legacy record\n got %+v\nwant %+v", legacy, want)
 	}
 }
 

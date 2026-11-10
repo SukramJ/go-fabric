@@ -5,6 +5,7 @@ package discovery
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/netip"
 	"slices"
@@ -21,6 +22,16 @@ import (
 type Address struct {
 	IP   netip.Addr
 	Port uint16
+	// Host is the SRV target that owns the address — the host name whose A
+	// or AAAA record named it, lower-cased, without the trailing dot —
+	// empty when unknown (an address not from discovery). An address two
+	// targets name keeps the first owner until it leaves the set (a
+	// deletion drops the address whichever target named it, as matter.js
+	// does). matter.js's ServerAddressIp
+	// carries no host; it is this module's, so a peer can rank the host a
+	// session proved first (issue 478: a border router answering a node's
+	// instance with an SRV to its own host).
+	Host string
 	// HealthyAt is the last successful use, zero when unknown.
 	HealthyAt time.Time
 	// UnhealthyAt is the last failed use, zero when unknown.
@@ -150,6 +161,7 @@ type changeObserver struct{ fn func() }
 
 type srvEntry struct {
 	name         *Name
+	host         string
 	discoveredAt time.Time
 	ttl          time.Duration
 	port         uint16
@@ -406,6 +418,7 @@ func (s *Service) onServiceChanged(c Changes) {
 	if s.closed {
 		return
 	}
+	before := s.targets()
 	txtUpdated, txtSuperseded := false, false
 	for _, r := range c.Updated {
 		switch r.Type {
@@ -424,6 +437,13 @@ func (s *Service) onServiceChanged(c Changes) {
 			txtSuperseded = txtSuperseded || s.isSuperseded(r)
 		default:
 		}
+	}
+	// Two responders answering one instance with different SRV targets,
+	// each with cache-flush, make the target flip with the last answer
+	// (issue 478); the flip is logged so it is readable without a capture.
+	if after := s.targets(); after != before {
+		s.names.logger.Info("matter.discovery.srv_target_changed",
+			slog.String("service", s.name.qname), slog.String("from", before), slog.String("to", after))
 	}
 	// When the newest TXT expires, the last known parameters stay the best
 	// assumption; only a superseded one may change them.
@@ -449,6 +469,26 @@ func hostKey(target string, port uint16) string {
 	return target + ":" + strconv.Itoa(int(port))
 }
 
+// hostName is an SRV target as [Address.Host] names it: lower-cased,
+// without the trailing dot.
+func hostName(target string) string {
+	return strings.ToLower(strings.TrimSuffix(target, "."))
+}
+
+// targets is the service's current SRV targets, sorted and comma-joined:
+// the log value of matter.discovery.status.resolving/resolved and of
+// matter.discovery.srv_target_changed.
+func (s *Service) targets() string {
+	var hosts []string
+	for _, e := range s.services.values() {
+		if !slices.Contains(hosts, e.host) {
+			hosts = append(hosts, e.host)
+		}
+	}
+	slices.Sort(hosts)
+	return strings.Join(hosts, ",")
+}
+
 // updateService tracks one SRV target. Mirrors matter.js 0ceb202d
 // IpService.ts:249-277.
 func (s *Service) updateService(ttl time.Duration, target string, port, priority, weight uint16) {
@@ -460,6 +500,7 @@ func (s *Service) updateService(ttl time.Duration, target string, port, priority
 	}
 	e := &srvEntry{
 		name:         s.names.get(target),
+		host:         hostName(target),
 		discoveredAt: s.names.clock.Now(),
 		ttl:          ttl,
 		port:         port,
@@ -520,7 +561,7 @@ func ipOf(r *Record) (netip.Addr, bool) {
 // updateAddress adds {ip, port}; a new address marks the service
 // reachable. Mirrors matter.js 0ceb202d IpService.ts:315-328.
 func (s *Service) updateAddress(e *srvEntry, ip netip.Addr) {
-	a := Address{IP: ip, Port: e.port}
+	a := Address{IP: ip, Port: e.port, Host: e.host}
 	k := a.AddrPort()
 	if s.addresses.has(k) {
 		return

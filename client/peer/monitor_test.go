@@ -195,8 +195,10 @@ func TestMonitorAllProbesFail(t *testing.T) {
 }
 
 // TestMonitorSessionSuspect: a session-suspect run probes the current
-// address only, cooldown or not (PeerAddressMonitor.ts:177-180, :219);
-// a joiner whose context ends returns without cancelling the run (:121-126).
+// address first, cooldown or not (PeerAddressMonitor.ts:177-180), then —
+// this module's, BD-Matter-SuspectProbeWalksAlternates — the other
+// discovered addresses before the session is lost; a joiner whose context
+// ends returns without cancelling the run (:121-126).
 func TestMonitorSessionSuspect(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -217,12 +219,20 @@ func TestMonitorSessionSuspect(t *testing.T) {
 		}
 		r, to := failProbes(t, h, res)
 		if r.ok || !n.s.IsPeerLost() {
-			t.Fatal("a failed suspect probe kept the session")
+			t.Fatal("failed suspect probes kept the session")
 		}
+		walked := false
 		for _, a := range to {
-			if a != addr1 {
+			switch a {
+			case addr1:
+			case addr2:
+				walked = true
+			default:
 				t.Fatalf("a session-suspect run probed %s", a)
 			}
+		}
+		if !walked {
+			t.Fatalf("probed %v: the suspect run did not walk the alternate", to)
 		}
 	})
 }

@@ -12,6 +12,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -478,6 +479,11 @@ func (c *connection) sleep(ctx context.Context, d time.Duration, wake <-chan str
 // scheduleAttempts starts an attempt per pending address, the most
 // desirable first, each at least DelayBeforeNextAddress after the last
 // (PeerConnection.ts:217-262).
+//
+// The proven host's address may be queued after an attempt at another
+// target has started — the service delivers its addresses one at a time
+// in the desirability order; preemptForProvenLocked then starts it at
+// once, outside the stagger.
 func (c *connection) scheduleAttempts() {
 	for {
 		c.mu.Lock()
@@ -503,15 +509,18 @@ func (c *connection) scheduleAttempts() {
 				continue
 			}
 		}
-		c.initiateAttemptLocked(c.shiftLocked())
+		c.initiateAttemptLocked(c.shiftLocked(c.p.service.Addresses()))
 		c.mu.Unlock()
 	}
 }
 
 // shiftLocked takes the most desirable pending address — the heap of
 // :145-152 ordered by discovery.CompareDesirability, the variants of one
-// address by their index in the transport list, the first of equals.
-func (c *connection) shiftLocked() target {
+// address by their index in the transport list, the first of equals —
+// with the proven host's addresses ahead of every other (provenHost,
+// compareForHost) while discovered, the service's addresses, carries it.
+func (c *connection) shiftLocked(discovered []discovery.Address) target {
+	host := provenHost(c.p.operationalHost(), discovered)
 	transports := c.p.ResolveTransports(c.required, c.preferred)
 	index := func(t target) int {
 		for i, tr := range transports {
@@ -523,7 +532,7 @@ func (c *connection) shiftLocked() target {
 	}
 	best := 0
 	for i := 1; i < len(c.pending); i++ {
-		d := discovery.CompareDesirability(c.pending[i].addr, c.pending[best].addr)
+		d := compareForHost(host, c.pending[i].addr, c.pending[best].addr)
 		if d < 0 || (d == 0 && transports != nil && index(c.pending[i]) < index(c.pending[best])) {
 			best = i
 		}
@@ -531,6 +540,88 @@ func (c *connection) shiftLocked() target {
 	t := c.pending[best]
 	c.pending = append(c.pending[:best], c.pending[best+1:]...)
 	return t
+}
+
+// provenHost is the peer's operational host (Descriptor.OperationalHost)
+// while discovery advertises it — some discovered address carries it —
+// and empty otherwise: a host no longer advertised at all (a genuine
+// re-registration under a new one) gives the parity order back, and the
+// next session proves the new host.
+//
+// Ahead of matter.js and chip: compareDesirability ranks an address by
+// class, health and DNS priority and knows no host
+// (ServerAddressSet.ts:165-184 at db021da0); chip's lookup scores an
+// address by class alone, every IPv6 link-local first, and keeps the
+// DNS-SD interface only for link-local (src/lib/dnssd/IPAddressSorter.cpp:44-50,
+// src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:130-141 at
+// connectedhomeip 6170af84). Neither tells two SRV targets of one instance
+// apart. The session does: the node answered from an address one target
+// owns (issue 478: a border router answered a Thread node's instance with
+// an SRV to its own host, and its link-local address cost every reconnect
+// DelayBeforeNextAddress).
+func provenHost(host string, discovered []discovery.Address) string {
+	if host == "" {
+		return ""
+	}
+	for _, a := range discovered {
+		if a.Host == host {
+			return host
+		}
+	}
+	return ""
+}
+
+// compareForHost orders two addresses for an attempt, negative when a is
+// tried first: the proven host's before any other — a ranking, not a
+// filter: the other targets stay candidates after it — then
+// [discovery.CompareDesirability]. An empty host is the desirability
+// order alone.
+func compareForHost(host string, a, b discovery.Address) int {
+	if host != "" {
+		if ah, bh := a.Host == host, b.Host == host; ah != bh {
+			if ah {
+				return -1
+			}
+			return 1
+		}
+	}
+	return discovery.CompareDesirability(a, b)
+}
+
+// orderForPeer is addrs — discovered, most desirable first — with the
+// peer's proven host's addresses moved ahead of the others, each group in
+// the order given: the order the address monitor walks the alternates in,
+// the same as the connection's (shiftLocked).
+func orderForPeer(p *Peer, addrs []discovery.Address) []discovery.Address {
+	out := slices.Clone(addrs)
+	host := provenHost(p.operationalHost(), addrs)
+	if host == "" {
+		return out
+	}
+	slices.SortStableFunc(out, func(a, b discovery.Address) int {
+		switch ah, bh := a.Host == host, b.Host == host; {
+		case ah == bh:
+			return 0
+		case ah:
+			return -1
+		}
+		return 1
+	})
+	return out
+}
+
+// hostOwning is the SRV target of the discovered address a is — compared
+// without the zone, which the session and discovery may spell
+// differently — empty when none is.
+func hostOwning(discovered []discovery.Address, a *net.UDPAddr) string {
+	ap := addressOf(a).AddrPort()
+	ap = netip.AddrPortFrom(ap.Addr().WithZone(""), ap.Port())
+	for _, d := range discovered {
+		if d.Host != "" && netip.AddrPortFrom(d.IP.WithZone(""), d.Port) == ap {
+			return d.Host
+		}
+	}
+	return ""
 }
 
 // expand is one variant of a per transport to attempt, or its UDP one
@@ -548,14 +639,45 @@ func (c *connection) expand(a discovery.Address) []target {
 }
 
 // pendingAddLocked queues t once (the heap holds an item once,
-// general/src/util/Heap.ts:119-138).
-func (c *connection) pendingAddLocked(t target) {
-	for _, x := range c.pending {
+// general/src/util/Heap.ts:119-138) and reports whether it did. A queued
+// entry without a host — the fallback, from the operational address —
+// takes the host discovery names for the same address, so the proven
+// host ranks it (compareForHost); that counts as queued.
+func (c *connection) pendingAddLocked(t target) bool {
+	for i, x := range c.pending {
 		if x.key() == t.key() {
-			return
+			if x.addr.Host == "" && t.addr.Host != "" {
+				c.pending[i].addr.Host = t.addr.Host
+				return true
+			}
+			return false
 		}
 	}
 	c.pending = append(c.pending, t)
+	c.signal()
+	return true
+}
+
+// preemptForProvenLocked starts a newly queued address of the proven host
+// at once: when a carries the peer's operational host and no attempt at
+// that host is in flight, the stagger is reset and the scheduler woken;
+// shiftLocked ranks the address first, and its attempt sets the stagger
+// again for the addresses after it. An attempt already running at another
+// target continues. This module's (BD-Matter-ProvenOperationalHost): the
+// service delivers its addresses one at a time in the desirability order,
+// so the proven host's may arrive after another target's link-local
+// address was attempted — a preemption, not a wait.
+func (c *connection) preemptForProvenLocked(a discovery.Address) {
+	host := c.p.operationalHost()
+	if a.Host == "" || a.Host != host || c.lastAttemptAt.IsZero() {
+		return
+	}
+	for _, att := range c.attempts {
+		if att.addr.Host == host {
+			return
+		}
+	}
+	c.lastAttemptAt = time.Time{}
 	c.signal()
 }
 
@@ -641,7 +763,9 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 			}
 			continue
 		}
-		c.pendingAddLocked(v)
+		if c.pendingAddLocked(v) {
+			c.preemptForProvenLocked(v.addr)
+		}
 	}
 }
 
@@ -904,6 +1028,9 @@ func (c *connection) afterFailure(att *attempt, a *contactAttempt, err error) er
 	switch a.fail(err) {
 	case contactSwitched:
 		log.Info("matter.controller.peer.sigma1_refresh", slog.Any("err", err))
+		// The node never acknowledged: the next address starts at once
+		// (advanceAfterFailure; refreshes after this do not advance again).
+		c.advanceAfterFailure()
 		return nil
 	case contactRefreshed:
 		log.Debug("matter.controller.peer.sigma1_refresh_again")
@@ -1022,6 +1149,9 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}
+	if advancesOnFailure(err, category) {
+		c.advanceAfterFailure()
+	}
 	log := p.log.With(slog.String("address", att.addr.String()))
 	if hasDelay && c.handleError != nil {
 		d, replace, fatal := c.handleError(err)
@@ -1049,6 +1179,45 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		return
 	}
 	c.sleep(att.ctx, delay, nil)
+}
+
+// advancesOnFailure reports whether a failed attempt starts the next
+// address at once: a timeout or another transient error (the
+// "network" category), or a failure of the socket to send — the node was
+// not reached. A status report means it was, and keeps the stagger.
+func advancesOnFailure(err error, category string) bool {
+	return category == "network" || errors.Is(err, exchange.ErrNetwork)
+}
+
+// advanceAfterFailure starts the next address at once: the delay is
+// reset and the scheduler woken — also when nothing is pending yet, so an
+// address queued after the failure starts as soon as it arrives, as
+// connectedhomeip's ResolvingAddress state takes the next result the
+// resolver delivers. DelayBeforeNextAddress stays the stagger between
+// attempts still in flight. Besides the errors of advancesOnFailure, an
+// unacknowledged Sigma1 whose contact schedule switches to fresh ones
+// (afterFailure, contactSwitched) advances: in connectedhomeip that is
+// the CHIP_ERROR_TIMEOUT the exchange's response timer reports once the
+// retransmissions are exhausted (src/messaging/ReliableMessageMgr.cpp:186-205,
+// src/protocols/secure_channel/CASESession.cpp:575-584 at connectedhomeip
+// 6170af84).
+//
+// A deviation from matter.js, which starts the next address
+// delayBeforeNextAddress after the previous attempt started, whatever
+// became of it: its scheduler waits out the rest of the delay
+// (PeerConnection.ts:236-256 at db021da0), and lastAttemptAt is reset only
+// when the fallback is retired (:300-303). connectedhomeip moves to the
+// next resolved address at once when CASE fails with a timeout or busy
+// (OperationalSessionSetup::OnSessionEstablishmentError → TryNextResult,
+// src/app/OperationalSessionSetup.cpp:457-480 at connectedhomeip
+// 6170af84). Reason: a dead first candidate — issue 478, a border
+// router's address published for a Thread node — otherwise costs every
+// reconnect the full stagger.
+func (c *connection) advanceAfterFailure() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastAttemptAt = time.Time{}
+	c.signal()
 }
 
 // flagsUnreachable is the rediscovery gate of handleConnectionError: a
