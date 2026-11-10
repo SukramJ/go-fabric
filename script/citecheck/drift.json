@@ -145,7 +145,7 @@
   },
   {
     "file": "ble/bluez/central_linux.go",
-    "line": 424,
+    "line": 440,
     "citation": "NobleBleChannel.ts:299-440",
     "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
     "identifier": "openChannel",

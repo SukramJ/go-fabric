@@ -154,6 +154,11 @@ func TestConnectAndGATT(t *testing.T) {
 		if conn.ATTMTU() != 100 || btp.SegmentSizeFromATTMTU(conn.ATTMTU()) != 97 {
 			t.Fatalf("ATT_MTU %d", conn.ATTMTU())
 		}
+		// The MTU comes with the connect's answer: nothing to wait for
+		// (issue 426).
+		if _, ok := conn.(ble.MTUExchange); ok {
+			t.Fatal("the connection reports an ATT_MTU exchange; its MTU is known at connect")
+		}
 		c3, err := conn.ReadC3(ctx)
 		if err != nil || !bytes.Equal(c3, []byte{0x15, 0x30}) {
 			t.Fatalf("C3 %x %v", c3, err)

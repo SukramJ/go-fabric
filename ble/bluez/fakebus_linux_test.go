@@ -32,6 +32,10 @@ type fakeBus struct {
 	devices map[dbus.ObjectPath]*fakeDevice
 	sigs    chan *dbus.Signal
 	closed  bool
+	// afterManaged, when set, changes the objects (under mu, without a
+	// signal) once a GetManagedObjects answer is taken: a change BlueZ
+	// made between that read and the next.
+	afterManaged func(managedObjects)
 }
 
 const testAdapter = dbus.ObjectPath("/org/bluez/hci0")
@@ -151,6 +155,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 					out[p][i][k] = v
 				}
 			}
+		}
+		if b.afterManaged != nil {
+			b.afterManaged(b.objs)
 		}
 		return []any{out}, nil
 	case methodGetProperty:

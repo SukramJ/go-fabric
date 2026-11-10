@@ -43,7 +43,7 @@ The sequence is matter.js's (`packages/nodejs-ble/src/NobleBleClient.ts`,
 | advertisements | `InterfacesAdded` and `PropertiesChanged` of `org.bluez.Device1`, `ServiceData[0000fff6-…]` (8 bytes) |
 | connect | `org.bluez.Device1.Connect`, then `ServicesResolved` (bounded by 2 min and 1 min, as matter.js bounds noble) |
 | GATT | the `org.bluez.GattService1` with the Matter UUID; its `GattCharacteristic1` C1 (`WriteValue`, type `request`), C2 (`StartNotify`, values as `PropertiesChanged` of `Value`), C3 (`ReadValue`, optional) |
-| ATT_MTU | C1's `MTU` property where BlueZ offers it, else the BTP minimum |
+| ATT_MTU | C1's `MTU` property (BlueZ 5.62 and later): above 23 at discovery it is the exchange's result; 23 waits up to 2 s for its `PropertiesChanged` (the exchange landing, reported as `ble.MTUExchange`), then the BTP minimum; no property is the BTP minimum at once |
 | disconnect | `StopNotify` on C2, `org.bluez.Device1.Disconnect` (each bounded by 5 s); `Connected=false` or the device's removal ends the connection |
 
 ## Rights
