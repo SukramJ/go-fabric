@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7877,
+  "entry_points": 7884,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17885,
+    "total_exported": 17892,
     "reachable": 12411,
-    "whitelisted": 5474,
+    "whitelisted": 5481,
     "unreachable": 0
   },
   "by_package": [],
@@ -6222,6 +6222,13 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestService_LinkLocalLeavesOnEveryInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/link_local_zones_test.go",
+      "line": 44
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/service_test.go",
@@ -7170,7 +7177,7 @@
       "identifier": "TestCompareForHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 112
+      "line": 115
     },
     {
       "package": "client/peer",
@@ -7429,14 +7436,14 @@
       "identifier": "TestOperationalHostLearned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 139
+      "line": 142
     },
     {
       "package": "client/peer",
       "identifier": "TestOrderForPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 170
+      "line": 173
     },
     {
       "package": "client/peer",
@@ -7618,7 +7625,7 @@
       "identifier": "TestPendingAddAdoptsTheHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 191
+      "line": 194
     },
     {
       "package": "client/peer",
@@ -7629,6 +7636,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestProbeLogNamesTheTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/probe_target_test.go",
+      "line": 63
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestProbeReadsTheReports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
@@ -7636,10 +7650,38 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestProvenHostAbsentFallbackNotRetired",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 141
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostAbsentTriesTheOperationalAddressFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 58
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostLearnedFromDiscovery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProvenHostNewAddressFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 110
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestProvenHostPreemptsTheStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/proven_host_test.go",
-      "line": 81
+      "line": 84
     },
     {
       "package": "client/peer",
@@ -7703,6 +7745,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
       "line": 47
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestShiftRanksTheFallbackFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/proven_host_residuals_test.go",
+      "line": 181
     },
     {
       "package": "client/peer",
