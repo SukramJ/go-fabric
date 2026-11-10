@@ -100,7 +100,7 @@ func (d *ddRun) discriminatorHonored(devices ...*bridgeProcess) func(th *goTH) e
 			return fmt.Errorf("a code naming discriminator %d commissioned a device", absent)
 		}
 		for _, b := range append([]*bridgeProcess{dev}, devices...) {
-			if _, err := th.commissionable(d.names, b.info.discriminator, ddMDNSTimeout); err != nil {
+			if _, err := th.commissionable(d.names, b.info.discriminator, b.info.port, ddMDNSTimeout); err != nil {
 				return fmt.Errorf("after the refused code: %w", err)
 			}
 		}
@@ -116,7 +116,7 @@ func (d *ddRun) commissionableStep(b func(th *goTH) *bridgeProcess) func(th *goT
 			return err
 		}
 		dev := b(th)
-		found, err := th.commissionable(d.names, dev.info.discriminator, ddMDNSTimeout)
+		found, err := th.commissionable(d.names, dev.info.discriminator, dev.info.port, ddMDNSTimeout)
 		if err != nil {
 			return err
 		}

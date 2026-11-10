@@ -162,7 +162,7 @@ func (d *dutRun) refuseEach(th *goTH, codes, whats []string) error {
 // commissionable record, so a give-up is about the code, not about a TH
 // that is not there.
 func (d *dutRun) advertising(th *goTH) error {
-	if _, err := th.commissionable(d.names, th.dut.info.discriminator, ddMDNSTimeout); err != nil {
+	if _, err := th.commissionable(d.names, th.dut.info.discriminator, th.dut.info.port, ddMDNSTimeout); err != nil {
 		return fmt.Errorf("the TH is not advertising before the attempt: %w", err)
 	}
 	return nil
