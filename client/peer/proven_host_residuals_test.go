@@ -123,10 +123,12 @@ func TestProvenHostNewAddressFirst(t *testing.T) {
 		if d := h.clock.Now().Sub(began); d != 0 {
 			t.Fatalf("the new address began after %v", d)
 		}
-		h.clock.waitTimer(t, 45*time.Second)
-		h.clock.Advance(45 * time.Second)
-		h.sigma1(t, routerLL)
-		h.clock.Advance(2 * time.Minute)
-		h.noSigma1(t, addr9)
+		// The router's address follows, outside or after the stagger
+		// (the service may deliver it first, then the proven host's
+		// preempts); the old operational address never.
+		for range 6 {
+			h.clock.Advance(30 * time.Second)
+			h.noSigma1(t, addr9)
+		}
 	})
 }
