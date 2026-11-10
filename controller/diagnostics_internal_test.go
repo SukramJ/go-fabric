@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -66,23 +67,24 @@ func only(t *testing.T, c *Controller) diag.Event {
 }
 
 // TestTracePairing: the first started step records the start once, a
-// failed step an error naming it with its error and one pair.failures;
-// the host's hook runs after each report, with the trace already holding
-// it.
+// failed step a warning naming it and its error without a count; the
+// host's hook runs after each report, with the trace already holding it.
+// The failed Pair records the error and one pair.failures.
 func TestTracePairing(t *testing.T) {
 	t.Parallel()
 	c, m := traced()
+	tr := &pairTrace{}
 	var host []PairingStep
-	progress := c.tracePairing(PairingCode{Manual: true, Discriminator: 15}, func(st PairingStep) {
-		if st.Phase == PairingFailed && c.DiagnosticEvents()[0].Severity != diagevent.SeverityError {
-			t.Error("the host ran before the failure was recorded")
+	progress := c.tracePairing(PairingCode{Manual: true, Discriminator: 15}, tr, func(st PairingStep) {
+		if st.Phase == PairingFailed && c.DiagnosticEvents()[0].Severity != diagevent.SeverityWarning {
+			t.Error("the host ran before the failed step was recorded")
 		}
 		host = append(host, st)
 	})
 	progress(PairingStep{Name: "Discovery", Phase: PairingStarted})
 	progress(PairingStep{Name: "Discovery", Phase: PairingSucceeded})
 	progress(PairingStep{Name: "PASE", Phase: PairingStarted})
-	progress(PairingStep{Name: "PASE", Phase: PairingFailed, Err: errors.New("boom")})
+	progress(PairingStep{Name: "PASE", Phase: PairingFailed, Err: fmt.Errorf("boom%s", ".")})
 	events := c.DiagnosticEvents()
 	if len(events) != 2 || len(host) != 4 {
 		t.Fatalf("events %+v, host %d reports", events, len(host))
@@ -90,15 +92,30 @@ func TestTracePairing(t *testing.T) {
 	if e := events[1]; e.Kind != diagevent.KindPairing || e.Message != "Pairing started." || e.Detail["code_kind"] != "manual" || e.Detail["discriminator"] != "15" {
 		t.Fatalf("start %+v", e)
 	}
-	if e := events[0]; e.Severity != diagevent.SeverityError || e.Message != "Pairing failed at step PASE: boom." || e.Detail["step"] != "PASE" || e.Detail["err"] != "boom" {
-		t.Fatalf("failure %+v", e)
+	if e := events[0]; e.Severity != diagevent.SeverityWarning || e.Message != "Pairing step PASE failed: boom." || e.Detail["step"] != "PASE" || e.Detail["err"] != "boom." {
+		t.Fatalf("failed step %+v", e)
+	}
+	if got := m.counter(MetricPairFailures); got != 0 {
+		t.Fatalf("pair.failures %d after a failed step", got)
+	}
+	c.recordPairFailed(tr, errors.New("boom"))
+	if e := c.DiagnosticEvents()[0]; e.Severity != diagevent.SeverityError || e.Message != "Pairing failed at step PASE: boom." || e.Detail["step"] != "PASE" {
+		t.Fatalf("failed pairing %+v", e)
 	}
 	if got := m.counter(MetricPairFailures); got != 1 {
 		t.Fatalf("pair.failures %d", got)
 	}
-	qr := c.tracePairing(PairingCode{}, nil)
+	c.recordPairFailed(&pairTrace{}, nil)
+	if e := c.DiagnosticEvents()[0]; e.Message != "Pairing failed." || e.Detail["step"] != "" {
+		t.Fatalf("a failure without a step %+v", e)
+	}
+	qr := c.tracePairing(PairingCode{}, &pairTrace{}, nil)
 	qr(PairingStep{Name: "PASE", Phase: PairingStarted})
-	if e := c.DiagnosticEvents()[0]; e.Detail["code_kind"] != "qr" {
+	qr(PairingStep{Name: "PASE", Phase: PairingFailed})
+	if e := c.DiagnosticEvents()[0]; e.Message != "Pairing step PASE failed." {
+		t.Fatalf("a failed step without an error %+v", e)
+	}
+	if e := c.DiagnosticEvents()[1]; e.Detail["code_kind"] != "qr" {
 		t.Fatalf("a QR code's start %+v", e)
 	}
 }
@@ -187,7 +204,7 @@ func TestCameraPortRefusalTrace(t *testing.T) {
 		t.Fatalf("events %+v", events)
 	}
 	if e := events[1]; e.Kind != diagevent.KindCamera || e.Severity != diagevent.SeverityWarning ||
-		e.Message != "Node 0000000000000055 refused a WebRTC offer for session 7." || e.Detail["webrtc_session_id"] != "7" || e.Detail["kind"] != "offer" {
+		e.Message != "The controller refused node 0000000000000055's WebRTC offer for session 7: no such session." || e.Detail["webrtc_session_id"] != "7" || e.Detail["kind"] != "offer" {
 		t.Fatalf("offer %+v", e)
 	}
 	if e := events[0]; e.Severity != diagevent.SeverityInfo {

@@ -15,9 +15,9 @@ pseudo-version of `main`.
 - `diag`: a new package with the diagnostic shapes both roles serve — `SessionDiagnostics`, `SessionInfo`, `Occupancy`, `Diagnostics` (with `Effective()`), `DefaultDiagnosticsCapacity`, `Event` (an alias of `diagevent.Event`) and `PeerInfo` (issue 483). `diag.SessionInfo` gains `CreatedAt`, `Resumed`, `Transport` and `PeerLost` (zero on the node), `diag.SessionDiagnostics` gains `Peers` (nil on the node).
 - `controller`: `Controller.SessionDiagnostics()` (the sessions of every peer and one `diag.PeerInfo` per peer: connection state, address, DNS-SD names, ICD Check-Ins, session ids), `Controller.DiagnosticEvents()` and `Controller.OnDiagnosticEvent(fn)` (a bounded trace of pairing, session, discovery, reachability, icd, ota and camera events), `Controller.DiagnoseMDNS()`, `Config.Diagnostics` and `Config.Metrics` with `controller.MetricSessionsOpen`, `MetricMRPRetransmits`, `MetricPairFailures`, `MetricCASEUnresponsive`, `MetricReachabilityProbes`, `MetricICDCheckInsMissed` (issue 483; `BD-Matter-ControllerDiagnostics`).
 - `diagevent`: the kinds `KindReachability`, `KindICD`, `KindOTA` and `KindCamera`.
-- `client/peer`: `Context.PeerAdded`, called once for every peer that joins the set, and `Observer.ReachabilityVerified`, the verdict of an address monitor run that probed.
+- `client/peer`: `Context.PeerAdded`, called once for every peer that joins the set, `Context.PeerRemoved`, called once a closed peer left it, and `Observer.ReachabilityVerified`, the verdict of an address monitor run that probed.
 - `mdns`: the browse-side finding `no_operational_names` (`CodeNoOperationalNames`, `DiagnoseOperationalBrowse`).
-- `contract`: the metric names `pair.failures`, `case.unresponsive`, `reachability.probes` and `icd.checkins_missed` (`MetricPairFailures`, `MetricCASEUnresponsive`, `MetricReachabilityProbes`, `MetricICDCheckInsMissed`), in `MetricNames`, so `node/metrics/expvar` publishes them.
+- `contract`: the metric names `pair.failures` (one `Pair` that returned an error), `case.unresponsive`, `reachability.probes` and `icd.checkins_missed` (`MetricPairFailures`, `MetricCASEUnresponsive`, `MetricReachabilityProbes`, `MetricICDCheckInsMissed`), in `MetricNames`, so `node/metrics/expvar` publishes them.
 
 ### Changed
 

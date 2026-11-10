@@ -297,7 +297,7 @@ func (p cameraPort) Refused(ctx context.Context, signal camera.Signal, id uint16
 	}
 	p.ring.Record(diagevent.Event{
 		Kind: diagevent.KindCamera, Severity: severity,
-		Message: fmt.Sprintf("Node %s refused a WebRTC %s for session %d.", nodeHex(node), signal, id),
+		Message: fmt.Sprintf("The controller refused node %s's WebRTC %s for session %d: no such session.", nodeHex(node), signal, id),
 		Detail:  map[string]string{"node_id": nodeHex(node), "fabric_index": strconv.Itoa(int(fabricIndex)), "webrtc_session_id": strconv.Itoa(int(id)), "kind": string(signal)},
 	})
 	p.s.emit(CameraSignal{Kind: CameraSignalRefused, Session: camera.WebRTCSession{Id: id, PeerNodeId: node, FabricIndex: fabricIndex}, Refused: signal})

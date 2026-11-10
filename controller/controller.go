@@ -276,10 +276,16 @@ type Controller struct {
 	// peer set the observers count sessions over (kept past Close, which
 	// clears peers), the nodes whose ICD Check-Ins are watched and the
 	// stop of the discovery watch.
-	diagRing     *diagevent.Ring
-	metrics      contract.Metrics
-	peerSet      atomic.Pointer[peer.Set]
-	icdWatched   sync.Map // *client.Node -> *icdWatch
+	diagRing *diagevent.Ring
+	metrics  contract.Metrics
+	peerSet  atomic.Pointer[peer.Set]
+	// closeMu orders DiagnoseMDNS against Close, which clears adv and
+	// names: Close sets closed under it first.
+	closeMu      sync.RWMutex
+	closed       bool
+	icdMu        sync.Mutex
+	icdWatched   map[*client.Node][]func() // guarded by icdMu
+	icdClosed    bool                      // guarded by icdMu: Close stopped every watch
 	stopDiscover func()
 }
 
@@ -354,6 +360,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
 		TransportPreference: cfg.TransportPreference, SessionAdded: c.sessionAdded, PeerAdded: c.peerAdded,
+		PeerRemoved: c.peerRemoved,
 	}
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
@@ -529,6 +536,10 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 // idempotent.
 func (c *Controller) Close(ctx context.Context) error {
 	var errs []error
+	c.closeMu.Lock()
+	c.closed = true
+	c.closeMu.Unlock()
+	c.unwatchAllICD()
 	if c.stopDiscover != nil {
 		c.stopDiscover()
 		c.stopDiscover = nil
@@ -597,6 +608,9 @@ func (c *Controller) Close(ctx context.Context) error {
 		errs = append(errs, c.names.Close())
 		c.names = nil
 	}
+	// A closed peer's sessions leave without SessionDeleted (its context
+	// ends first): the gauge reads none once the stack is down.
+	c.gauge(MetricSessionsOpen, 0)
 	return errors.Join(errs...)
 }
 
@@ -746,24 +760,31 @@ const (
 // :280-283).
 //
 // The pairing enters the diagnostic trace ([Controller.DiagnosticEvents]):
-// its start, every failed step and the paired node, recorded through the
-// Progress hook before opts.Progress runs (an opts.Edit that replaces the
-// commissioner's Progress replaces that recording too).
+// its start and each failed step (a warning: one discovery transport of a
+// race may fail while another wins), recorded through the Progress hook
+// before opts.Progress runs (an opts.Edit that replaces the commissioner's
+// Progress replaces that recording too), then the paired node, or — when
+// Pair returns an error — the failed pairing as an error, counted once as
+// pair.failures ([Config].Metrics).
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
-	n, err := c.pair(ctx, code, opts)
-	if err == nil && n != nil {
+	tr := &pairTrace{}
+	n, err := c.pair(ctx, code, opts, tr)
+	switch {
+	case err != nil:
+		c.recordPairFailed(tr, err)
+	case n != nil:
 		c.recordPaired(n)
 	}
 	return n, err
 }
 
 // pair is [Controller.Pair] without the trace's final record.
-func (c *Controller) pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
+func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr *pairTrace) (*client.Node, error) {
 	pc, err := ParsePairingCode(code)
 	if err != nil {
 		return nil, err
 	}
-	opts.Progress = c.tracePairing(pc, opts.Progress)
+	opts.Progress = c.tracePairing(pc, tr, opts.Progress)
 	if opts.BLE != nil && opts.Address != nil {
 		return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
 	}

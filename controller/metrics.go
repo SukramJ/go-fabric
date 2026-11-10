@@ -16,8 +16,8 @@ const (
 	// MetricMRPRetransmits is a counter: one reliable message the
 	// controller's exchanges sent again.
 	MetricMRPRetransmits = contract.MetricMRPRetransmits
-	// MetricPairFailures is a counter: one failed pairing step, the last
-	// report of a failed [Controller.Pair].
+	// MetricPairFailures is a counter: one failed pairing, a
+	// [Controller.Pair] that returned an error.
 	MetricPairFailures = contract.MetricPairFailures
 	// MetricCASEUnresponsive is a counter: one CASE establishment that
 	// retransmitted past its MRP budget unanswered.

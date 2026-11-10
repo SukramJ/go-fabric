@@ -186,10 +186,53 @@ func (c *Controller) record(kind diagevent.Kind, severity diagevent.Severity, me
 // the operational instance name's form.
 func nodeHex(id uint64) string { return fmt.Sprintf("%016X", id) }
 
+// pairTrace is one Pair's state in the trace: the step that failed
+// last, which names the pairing's failure.
+type pairTrace struct {
+	mu         sync.Mutex
+	failedStep string
+}
+
+func (t *pairTrace) failed(step string) {
+	t.mu.Lock()
+	t.failedStep = step
+	t.mu.Unlock()
+}
+
+func (t *pairTrace) lastFailed() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.failedStep
+}
+
+// sentence is prefix as one sentence, with err's text after a colon when
+// there is one: "Pairing failed: no device." — a full stop of err's own is
+// not doubled.
+func sentence(prefix string, err error) string {
+	if err == nil {
+		return prefix + "."
+	}
+	text := strings.TrimRight(strings.TrimSpace(err.Error()), ".")
+	if text == "" {
+		return prefix + "."
+	}
+	return prefix + ": " + text + "."
+}
+
+// errText is err's text, "" for nil.
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 // tracePairing wraps a Pair's progress hook: the first started step
-// records "Pairing started.", every failed step a pairing error, and then
+// records "Pairing started.", a failed step a warning — one discovery
+// transport of a race may fail while another wins, so a failed step is
+// not yet a failed pairing ([Controller.Pair] records that) — and then
 // host runs.
-func (c *Controller) tracePairing(pc PairingCode, host func(PairingStep)) func(PairingStep) {
+func (c *Controller) tracePairing(pc PairingCode, tr *pairTrace, host func(PairingStep)) func(PairingStep) {
 	var started sync.Once
 	kind := "qr"
 	if pc.Manual {
@@ -203,13 +246,9 @@ func (c *Controller) tracePairing(pc PairingCode, host func(PairingStep)) func(P
 					map[string]string{"code_kind": kind, "discriminator": strconv.Itoa(int(pc.Discriminator))})
 			})
 		case PairingFailed:
-			c.count(MetricPairFailures)
-			errText := ""
-			if st.Err != nil {
-				errText = st.Err.Error()
-			}
-			c.record(diagevent.KindPairing, diagevent.SeverityError, fmt.Sprintf("Pairing failed at step %s: %s.", st.Name, errText),
-				map[string]string{"step": st.Name, "err": errText})
+			tr.failed(st.Name)
+			c.record(diagevent.KindPairing, diagevent.SeverityWarning, sentence("Pairing step "+st.Name+" failed", st.Err),
+				map[string]string{"step": st.Name, "err": errText(st.Err)})
 		case PairingSucceeded, PairingSkipped:
 		}
 		if host != nil {
@@ -218,14 +257,22 @@ func (c *Controller) tracePairing(pc PairingCode, host func(PairingStep)) func(P
 	}
 }
 
+// recordPairFailed records a Pair that returned err: one pair.failures and
+// an error naming the step that failed last, when one did.
+func (c *Controller) recordPairFailed(tr *pairTrace, err error) {
+	c.count(MetricPairFailures)
+	detail := map[string]string{"err": errText(err)}
+	prefix := "Pairing failed"
+	if step := tr.lastFailed(); step != "" {
+		detail["step"] = step
+		prefix += " at step " + step
+	}
+	c.record(diagevent.KindPairing, diagevent.SeverityError, sentence(prefix, err), detail)
+}
+
 // recordPaired records a node Pair commissioned.
 func (c *Controller) recordPaired(n *client.Node) {
-	detail := map[string]string{"node": n.ID()}
-	who := fmt.Sprintf("Node %q", n.ID())
-	if a, ok := n.PeerAddress(); ok {
-		detail["node_id"], detail["fabric_index"] = nodeHex(a.NodeID), strconv.Itoa(int(a.FabricIndex))
-		who = "Node " + nodeHex(a.NodeID)
-	}
+	who, detail := nodeDetail(n, n.ID())
 	c.record(diagevent.KindPairing, diagevent.SeverityInfo, who+" was paired.", detail)
 }
 
@@ -270,9 +317,13 @@ func (c *Controller) peerAdded(p *peer.Peer) {
 	})
 }
 
+// peerRemoved is the peer set's PeerRemoved hook: a closed peer's
+// sessions left without SessionDeleted, so the gauge is taken again.
+func (c *Controller) peerRemoved(*peer.Peer) { c.gaugeSessions() }
+
 // diagHooks chains the trace in front of inner's hooks: a connection-state
-// transition is recorded, and a node's ICD Check-Ins are watched from its
-// commissioning or its first transition on; inner's hooks run after.
+// transition is recorded, a commissioned node's ICD Check-Ins are watched
+// and a decommissioned node's no longer; inner's hooks run after.
 func (c *Controller) diagHooks(inner func(id string) client.Hooks) func(id string) client.Hooks {
 	return func(id string) client.Hooks {
 		h := inner(id)
@@ -332,11 +383,7 @@ func nodeDetail(n *client.Node, id string) (who string, detail map[string]string
 // connectionStateChanged records a client node's transition: a lost or
 // waiting connection as a warning, connected and disconnected as info.
 func (c *Controller) connectionStateChanged(id string, s client.ConnectionState) {
-	n := c.nodeByID(id)
-	if n != nil {
-		c.watchICD(n)
-	}
-	who, detail := nodeDetail(n, id)
+	who, detail := nodeDetail(c.nodeByID(id), id)
 	detail["state"] = s.String()
 	severity, message := diagevent.SeverityInfo, who+" is "+s.String()+"."
 	switch s {
@@ -352,18 +399,22 @@ func (c *Controller) connectionStateChanged(id string, s client.ConnectionState)
 	c.record(diagevent.KindSession, severity, message, detail)
 }
 
-// watchICD records n's ICD Check-Ins and missed Check-Ins, once per node.
+// watchICD records n's ICD Check-Ins and missed Check-Ins, once per node:
+// for the nodes the registry loaded and for each node commissioned since.
+// The observers are registered before the watch is published, so an
+// unwatchICD that follows stops them.
 func (c *Controller) watchICD(n *client.Node) {
 	icd := n.ICD()
 	if icd == nil {
 		return
 	}
-	stops := &icdWatch{}
-	if _, loaded := c.icdWatched.LoadOrStore(n, stops); loaded {
+	c.icdMu.Lock()
+	defer c.icdMu.Unlock()
+	if _, ok := c.icdWatched[n]; ok || c.icdClosed {
 		return
 	}
 	id := n.ID()
-	stops.set(
+	stops := []func(){
 		icd.OnCheckIn(func(in client.ICDCheckIn) {
 			who, detail := nodeDetail(n, id)
 			detail["counter"] = strconv.FormatUint(uint64(in.Counter), 10)
@@ -374,38 +425,43 @@ func (c *Controller) watchICD(n *client.Node) {
 			who, detail := nodeDetail(n, id)
 			c.record(diagevent.KindICD, diagevent.SeverityWarning, who+" missed its expected check-in.", detail)
 		}),
-	)
+	}
+	if c.icdWatched == nil {
+		c.icdWatched = map[*client.Node][]func(){}
+	}
+	c.icdWatched[n] = stops
 }
 
 // unwatchICD stops watching n's Check-Ins (its node was decommissioned).
 func (c *Controller) unwatchICD(n *client.Node) {
-	if v, ok := c.icdWatched.LoadAndDelete(n); ok {
-		if w, ok := v.(*icdWatch); ok {
-			w.stop()
+	c.icdMu.Lock()
+	stops := c.icdWatched[n]
+	delete(c.icdWatched, n)
+	c.icdMu.Unlock()
+	for _, stop := range stops {
+		stop()
+	}
+}
+
+// unwatchAllICD stops every ICD watch and refuses new ones (Close).
+func (c *Controller) unwatchAllICD() {
+	c.icdMu.Lock()
+	watched := c.icdWatched
+	c.icdWatched, c.icdClosed = nil, true
+	c.icdMu.Unlock()
+	for _, stops := range watched {
+		for _, stop := range stops {
+			stop()
 		}
 	}
 }
 
-// icdWatch holds the unsubscribe functions of one node's ICD observers.
-type icdWatch struct {
-	mu    sync.Mutex
-	stops []func()
-}
-
-func (w *icdWatch) set(stops ...func()) {
-	w.mu.Lock()
-	w.stops = stops
-	w.mu.Unlock()
-}
-
-func (w *icdWatch) stop() {
-	w.mu.Lock()
-	stops := w.stops
-	w.stops = nil
-	w.mu.Unlock()
-	for _, s := range stops {
-		s()
-	}
+// watchingICD reports whether n's Check-Ins are watched (a test seam).
+func (c *Controller) watchingICD(n *client.Node) bool {
+	c.icdMu.Lock()
+	defer c.icdMu.Unlock()
+	_, ok := c.icdWatched[n]
+	return ok
 }
 
 // operationalSuffix is the DNS-SD suffix of the operational instances the
@@ -489,6 +545,11 @@ func (c *Controller) traceOTAStatus(host func(softwareupdate.Peer, softwareupdat
 // node.Node.DiagnoseMDNS. It asks the DNS-SD cache: it must not be called
 // from a callback the cache runs.
 func (c *Controller) DiagnoseMDNS() []mdns.Finding {
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		return nil
+	}
 	var out []mdns.Finding
 	if c.adv != nil {
 		for _, f := range mdns.Diagnose(c.adv.Active()) {

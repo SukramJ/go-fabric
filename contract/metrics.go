@@ -61,8 +61,9 @@ const (
 	// datagram or connection path; the message that caused it was
 	// dropped.
 	MetricPanicsRecovered = "panics.recovered"
-	// MetricPairFailures is a counter: one failed step of a controller's
-	// pairing — the last report of a failed Pair.
+	// MetricPairFailures is a counter: one failed pairing of a controller
+	// — a Pair that returned an error; a step that failed inside a pairing
+	// that went on (one discovery transport of a race) is not counted.
 	MetricPairFailures = "pair.failures"
 	// MetricCASEUnresponsive is a counter: one CASE establishment of a
 	// controller that retransmitted past its MRP budget unanswered, once

@@ -212,13 +212,13 @@ of each:
 
 | Kind | What it records | Example |
 | --- | --- | --- |
-| `pairing` | a `Pair`'s start, each failed step (error), the paired node | "Pairing failed at step OperationalCredentials.DeviceAttestation: …" |
+| `pairing` | a `Pair`'s start, each failed step (a warning: one discovery transport of a race may fail while another wins), the paired node, or the failed pairing (error) when `Pair` returns an error | "Pairing failed at step OperationalCredentials.DeviceAttestation: …" |
 | `session` | a session established, closed or lost (warning), a CASE establishment unanswered within the MRP budget (warning), a client node's connection-state transition (`Reconnecting` and `WaitingForDeviceDiscovery` as warnings) | "The secure session with node 5C50D14E724B52F1 was lost; the controller reconnects." |
 | `discovery` | a node of our fabric whose operational record appears in or disappears from the DNS-SD cache; a Thread border router added to or removed from the registry | "Node 5C50D14E724B52F1's operational record appeared." |
 | `reachability` | a reachability probe run's verdict: answered on its address or an alternate, or given up (warning) | "Node 5C50D14E724B52F1 answered no session-suspect probe; the session is given up." |
 | `icd` | an accepted ICD Check-In, a missed one (warning) | "Node 5C50D14E724B52F1 checked in (counter 12)." |
 | `ota` | a status of a node's software update; `Cancelled` as a warning | "Node 5C50D14E724B52F1's software update is Downloading (version 2)." |
-| `camera` | a WebRTC signal a camera refused; Offer and Answer as warnings | "Node 5C50D14E724B52F1 refused a WebRTC answer for session 3." |
+| `camera` | a WebRTC signal the controller's requestor refused (a node's command for a session it does not hold, answered NOT_FOUND); Offer and Answer as warnings | "The controller refused node 5C50D14E724B52F1's WebRTC answer for session 3: no such session." |
 
 The host's own hooks — `PairOptions.Progress`, `Config.HooksFor`,
 `OTAConfig.OnStatus`, `Controller.OnCameraSignal` — still run, after the
@@ -237,9 +237,9 @@ records nothing.
 
 | Name (`controller.Metric…`) | Kind | One unit | Fed from |
 | --- | --- | --- | --- |
-| `sessions.open` (`MetricSessionsOpen`) | gauge | a secure session of one of the controller's peers | set from the peers' sessions when one is established or leaves its peer (`controller/diagnostics.go`, the peer observers) |
+| `sessions.open` (`MetricSessionsOpen`) | gauge | a secure session of one of the controller's peers | taken from the peers' sessions when one is established or leaves its peer and when a closed peer leaves the set (its sessions go without a deletion event), and set to 0 at the end of `Controller.Close` (`controller/diagnostics.go`, `controller/metrics.go`) |
 | `mrp.retransmits` (`MetricMRPRetransmits`) | counter | a reliable message the controller's exchanges sent again | `client/exchange.Config.Retransmitted` |
-| `pair.failures` (`MetricPairFailures`) | counter | a failed pairing step, the last report of a failed `Pair` | the `Pair` progress hook |
+| `pair.failures` (`MetricPairFailures`) | counter | a failed pairing: a `Pair` that returned an error; a step that failed inside a pairing that went on is not counted | `Controller.Pair` |
 | `case.unresponsive` (`MetricCASEUnresponsive`) | counter | a CASE establishment unanswered past its MRP budget | the peer observer's `EstablishmentUnresponsive` |
 | `reachability.probes` (`MetricReachabilityProbes`) | counter | a reachability probe run, whatever its verdict | the peer observer's `ReachabilityVerified` |
 | `icd.checkins_missed` (`MetricICDCheckInsMissed`) | counter | an ICD Check-In expected from a registered LIT peer and not received | `client.ICDClient.OnCheckInMissed` |

@@ -158,9 +158,10 @@ type PeerInfo struct {
 	// DiscoveredNames are the operational instance names of the peer the
 	// DNS-SD cache holds records for; empty when none.
 	DiscoveredNames []string
-	// LastCheckInAt is the last ICD Check-In the peer sent and
-	// NextExpectedCheckIn when the next is due; zero when the peer is no
-	// registered LIT ICD or none arrived.
+	// LastCheckInAt is the last ICD Check-In the peer sent, zero when none
+	// arrived (it is kept after the registration ends);
+	// NextExpectedCheckIn is when the next is due, zero when the peer is
+	// no registered LIT ICD.
 	LastCheckInAt, NextExpectedCheckIn time.Time
 	// SubscriptionActive is true while the client node's default
 	// subscription is established.

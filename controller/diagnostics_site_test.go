@@ -5,6 +5,7 @@ package controller_test
 
 import (
 	"context"
+	"errors"
 	"net"
 	"slices"
 	"strings"
@@ -15,12 +16,15 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/diag"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/internal/udpseam"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -30,6 +34,17 @@ func hasEvent(events []diag.Event, kind diagevent.Kind, severity diagevent.Sever
 	return slices.ContainsFunc(events, func(e diag.Event) bool {
 		return e.Kind == kind && e.Severity == severity && strings.Contains(e.Message, part)
 	})
+}
+
+// connectedEvents counts the session events of a transition to Connected.
+func connectedEvents(events []diag.Event) int {
+	n := 0
+	for _, e := range events {
+		if e.Kind == diagevent.KindSession && e.Detail["state"] == "Connected" {
+			n++
+		}
+	}
+	return n
 }
 
 // TestControllerDiagnosticsOnASite: a paired node is one registered peer
@@ -43,7 +58,9 @@ func TestControllerDiagnosticsOnASite(t *testing.T) {
 	site, dev, c, n := sitePair(t, fabrictest.Topology{}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := site.Eventually(ctx, "the node is connected", func() bool { return n.ConnectionState() == client.Connected }); err != nil {
+	if err := site.Eventually(ctx, "the node is connected, in the trace", func() bool {
+		return n.ConnectionState() == client.Connected && connectedEvents(c.DiagnosticEvents()) > 0
+	}); err != nil {
 		t.Fatal(err)
 	}
 	addr, _ := n.PeerAddress()
@@ -82,6 +99,7 @@ func TestControllerDiagnosticsOnASite(t *testing.T) {
 		t.Fatal("the trace is not newest first")
 	}
 
+	before := connectedEvents(c.DiagnosticEvents())
 	if err := dev.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -95,12 +113,10 @@ func TestControllerDiagnosticsOnASite(t *testing.T) {
 	if err := dev.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := site.Eventually(ctx, "the node is connected again", func() bool { return n.ConnectionState() == client.Connected }); err != nil {
-		t.Fatal(err)
-	}
-	events = c.DiagnosticEvents()
-	if events[0].Kind != diagevent.KindSession || !hasEvent(events[:3], diagevent.KindSession, diagevent.SeverityInfo, " is connected.") {
-		t.Fatalf("the newest events %+v, want the reconnection", events[:3])
+	if err := site.Eventually(ctx, "the node is connected again, in the trace", func() bool {
+		return n.ConnectionState() == client.Connected && connectedEvents(c.DiagnosticEvents()) > before
+	}); err != nil {
+		t.Fatalf("%v: %+v", err, c.DiagnosticEvents())
 	}
 	if f := c.DiagnoseMDNS(); slices.ContainsFunc(f, func(f mdns.Finding) bool { return f.Code == mdns.CodeNoOperationalNames }) {
 		t.Fatalf("a connected node: findings %+v", f)
@@ -225,5 +241,127 @@ func TestControllerDiagnoseMDNSNoOperationalNames(t *testing.T) {
 	d := c.SessionDiagnostics()
 	if len(d.Peers) != 1 || !d.Peers[0].Registered || d.Peers[0].State != "WaitingForDeviceDiscovery" || len(d.Peers[0].DiscoveredNames) != 0 || len(d.Sessions) != 0 {
 		t.Fatalf("snapshot %+v", d)
+	}
+}
+
+// TestControllerPairingRaceStepFailure: in a race over DNS-SD and a BLE
+// central that cannot scan, the BLE transport's failed discovery step is
+// a warning in the trace and no pair.failures: the IP transport wins and
+// the pairing succeeds (pair_race.go reports the failed transport).
+func TestControllerPairingRaceStepFailure(t *testing.T) {
+	t.Parallel()
+	drv := &wifiDriver{}
+	m := &countingMetrics{}
+	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
+		fabrictest.UseWiFiCommissioning(cfg, drv)
+	}}, func(cfg *controller.Config) { cfg.Metrics = m })
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		_, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{
+			BLE: unscannable{bletest.NewCentral()}, WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
+			OnAttestationFailure: attestation.Accept(),
+		})
+		return err
+	}); err != nil {
+		t.Fatalf("Pair: %v", err)
+	}
+	events := c.DiagnosticEvents()
+	warnings := 0
+	for _, e := range events {
+		if e.Kind == diagevent.KindPairing && e.Severity == diagevent.SeverityWarning {
+			warnings++
+			if e.Detail["step"] != "Discovery.BLE" {
+				t.Fatalf("failed step %+v, want Discovery.BLE", e)
+			}
+		}
+		if e.Kind == diagevent.KindPairing && e.Severity == diagevent.SeverityError {
+			t.Fatalf("an error in a pairing that succeeded: %+v", e)
+		}
+	}
+	if warnings != 1 || !hasEvent(events, diagevent.KindPairing, diagevent.SeverityInfo, " was paired.") {
+		t.Fatalf("%d warnings, events %+v", warnings, events)
+	}
+	if got := m.counter(controller.MetricPairFailures); got != 0 {
+		t.Fatalf("pair.failures %d for a pairing that succeeded", got)
+	}
+}
+
+// unscannable is a BLE central whose scan fails at once.
+type unscannable struct{ *bletest.Central }
+
+func (unscannable) StartScanning(context.Context) error { return errors.New("bletest: adapter off") }
+
+// countingMetrics counts the counters it is given.
+type countingMetrics struct {
+	mu       sync.Mutex
+	counters map[string]int64
+	gauges   map[string]int64
+}
+
+func (m *countingMetrics) Counter(name string, delta int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.counters == nil {
+		m.counters = map[string]int64{}
+	}
+	m.counters[name] += delta
+}
+
+func (m *countingMetrics) Gauge(name string, value int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.gauges == nil {
+		m.gauges = map[string]int64{}
+	}
+	m.gauges[name] = value
+}
+
+func (m *countingMetrics) counter(name string) int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.counters[name]
+}
+
+func (m *countingMetrics) gauge(name string) (int64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v, ok := m.gauges[name]
+	return v, ok
+}
+
+// TestControllerICDWatchAndGaugeLifecycle: a paired node's ICD Check-Ins
+// are watched; decommissioned, the watch goes and the disconnect that
+// follows does not bring it back. sessions.open counts the peer's session
+// while it runs and reads 0 once the controller closed.
+func TestControllerICDWatchAndGaugeLifecycle(t *testing.T) {
+	t.Parallel()
+	m := &countingMetrics{}
+	site, _, c, n := sitePair(t, fabrictest.Topology{}, func(cfg *controller.Config) { cfg.Metrics = m })
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if !controller.WatchingICD(c, n) {
+		t.Fatal("a commissioned node's ICD Check-Ins are not watched")
+	}
+	if v, ok := m.gauge(controller.MetricSessionsOpen); !ok || v < 1 {
+		t.Fatalf("sessions.open %d (%v) with a paired node", v, ok)
+	}
+	if err := site.Run(ctx, func(ctx context.Context) error { return c.Registry().Decommission(ctx, n) }); err != nil {
+		t.Fatalf("Decommission: %v", err)
+	}
+	if err := site.Settle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if controller.WatchingICD(c, n) {
+		t.Fatal("a decommissioned node is still watched")
+	}
+	if err := site.Run(ctx, c.Close); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := m.gauge(controller.MetricSessionsOpen); v != 0 {
+		t.Fatalf("sessions.open %d after Close", v)
+	}
+	if controller.WatchingICD(c, n) || c.DiagnoseMDNS() != nil {
+		t.Fatal("a closed controller watches or diagnoses")
 	}
 }
