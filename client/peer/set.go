@@ -74,6 +74,14 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
+	// PeerAdded is called once for every peer that joins the set, after
+	// it joined and outside the set's lock, before its connection
+	// process or a first session can reach it — so an [Observer]
+	// registered here sees every session the peer takes. nil ignores
+	// it. This module's seam: matter.js's PeerSet emits no per-peer
+	// addition (the controller's diagnostic trace registers its observer
+	// here).
+	PeerAdded func(p *Peer)
 	// SessionAdded is called when a peer takes a session — the
 	// SessionManager's sessions.added a controller's reboot armer watches
 	// (RebootResubscribeArmer.ts:117-150 at 862ad75f); nil ignores it.
@@ -258,6 +266,9 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 	p.preferTCP = s.ctx.TransportPreference == exchange.TransportTCP
 	s.peers = append(s.peers, p)
 	s.mu.Unlock()
+	if fn := s.ctx.PeerAdded; fn != nil {
+		fn(p)
+	}
 	p.start()
 	return p, nil
 }
