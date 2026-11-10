@@ -22,7 +22,11 @@
 //   - org.bluez.GattService.rst — the UUID and Device properties;
 //   - org.bluez.GattCharacteristic.rst — ReadValue, WriteValue (option
 //     type "request"), StartNotify, StopNotify, the UUID, Service, Value
-//     and MTU properties.
+//     and MTU properties. The MTU property exists since BlueZ 5.62 and is
+//     the link's current ATT_MTU, 23 before an exchange; its
+//     PropertiesChanged on C1 is the exchange landing, which the
+//     connection reports as [ble.MTUExchange], so controller/ble waits for
+//     a pending exchange as matter.js waits for noble's "mtu" event.
 //
 // The UUIDs are transport/btp's (ServiceUUID, C1/C2/C3CharacteristicUUID).
 // Every D-Bus failure is an [*Error] naming the D-Bus error
