@@ -347,13 +347,17 @@ type WiFi struct {
 	// of the Ethernet one — the network list of one, the 10 s scan and
 	// 20 s connect maxima of connectedhomeip's Linux driver
 	// (NetworkCommissioningDriver.h:85-87 at 6170af84). The cluster keeps
-	// the committed network in the node's store and rejoins it at
-	// [Node.Start]. After every successful join — the ConnectNetwork
-	// command's and the rejoin at start — the node re-announces its DNS-SD
-	// records at once ([Node.TriggerReannounce]), as matter.js's example
-	// does after its connect (DummyWifiNetworkCommissioningServer.ts:132-133
-	// at db021da0). wifi/wpasupplicant is the Linux driver; nil mounts the
-	// Ethernet server.
+	// the committed network in the node's store and rejoins it inside
+	// [Node.Start], before the fabrics' operational records are published:
+	// a network out of range holds Start for up to the connect timeout.
+	// After a successful ConnectNetwork command the node re-announces its
+	// DNS-SD records at once ([Node.TriggerReannounce]), as matter.js's
+	// example does after its connect
+	// (DummyWifiNetworkCommissioningServer.ts:132-133 at db021da0); after
+	// the rejoin at Start the trigger finds nothing published yet, and the
+	// start sequence publishes the records right after it.
+	// wifi/wpasupplicant is the Linux driver; nil mounts the Ethernet
+	// server.
 	Driver contract.WiFiDriver
 	// Reporter answers WiFiNetworkDiagnostics' reads and ResetCounts
 	// (WiFiReporter); nil mounts no cluster.

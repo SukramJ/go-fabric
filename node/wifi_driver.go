@@ -11,10 +11,12 @@ import (
 )
 
 // reannouncingDriver is the host's Wi-Fi driver as the node hands it to
-// the Wi-Fi NetworkCommissioning server: a successful join — the
-// ConnectNetwork command's and the rejoin at [Node.Start] — re-announces
-// the node's DNS-SD records at once instead of waiting for the responder's
-// interface check. Mirrors matter.js
+// the Wi-Fi NetworkCommissioning server: a successful ConnectNetwork
+// command re-announces the node's DNS-SD records at once instead of
+// waiting for the responder's interface check. The rejoin at [Node.Start]
+// goes through it too; it runs before the start sequence publishes the
+// fabrics' operational records (startLocked), so there the trigger finds
+// nothing published yet and the records go out right after it. Mirrors matter.js
 // examples/device-onoff-advanced/src/cluster/DummyWifiNetworkCommissioningServer.ts:132-133
 // at db021da0 ("Announce operational in IP network",
 // `this.env.get(DeviceAdvertiser).restartAdvertisement()` after its connect). The

@@ -14,6 +14,8 @@ import (
 	"database/sql"
 	"net"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -139,9 +141,37 @@ func TestLiveCommissioningOverIPWithWiFi(t *testing.T) {
 	checkWiFiCommissioned(ctx, t, f, res, drv)
 }
 
+// joinReannouncer counts the re-announcements the node triggers from the
+// Wi-Fi driver's return (the node's driver wrapper on its call stack) apart
+// from every other: the bridge also re-announces on session events during
+// commissioning (triggerSessionReannounce), which a plain count would
+// include.
+type joinReannouncer struct {
+	*mdns.Noop
+	mu       sync.Mutex
+	fromJoin int
+}
+
+func (a *joinReannouncer) Enabled() bool { return true }
+
+func (a *joinReannouncer) TriggerReannounce(context.Context) {
+	if !strings.Contains(string(debug.Stack()), "reannouncingDriver.ConnectNetwork") {
+		return
+	}
+	a.mu.Lock()
+	a.fromJoin++
+	a.mu.Unlock()
+}
+
+func (a *joinReannouncer) joins() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.fromJoin
+}
+
 // TestLiveWiFiJoinReannounces: a successful join announces the node's
-// DNS-SD records at once — the ConnectNetwork command's (commissioning
-// over IP) and the rejoin of the committed network at the next Start —
+// DNS-SD records — the ConnectNetwork command's (commissioning over IP)
+// once, and the rejoin of the committed network at the next Start once —
 // and a failed join does not (matter.js
 // DummyWifiNetworkCommissioningServer.ts:132-133 at db021da0).
 func TestLiveWiFiJoinReannounces(t *testing.T) {
@@ -152,19 +182,15 @@ func TestLiveWiFiJoinReannounces(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	start := func(name string, drv *liveWiFi) (*node.Node, *reannouncer) {
-		adv := &reannouncer{Noop: mdns.NewNoop()}
+	start := func(name string, drv *liveWiFi) (*node.Node, *joinReannouncer) {
+		adv := &joinReannouncer{Noop: mdns.NewNoop()}
 		return liveNode(t, name, func(c *node.Config) {
 			c.Store = node.Store{DB: db}
 			c.Advertiser = adv
 			c.Network.WiFi = &node.WiFi{Driver: drv}
 		}), adv
 	}
-	triggers := func(a *reannouncer) int {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		return a.triggers
-	}
+	triggers := (*joinReannouncer).joins
 
 	f := newCCFabric(t, bleFabricID+3, bleAdmin, "rejoin")
 	n, adv := start("node-rejoin", &liveWiFi{})
@@ -177,8 +203,8 @@ func TestLiveWiFiJoinReannounces(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Commission over IP with Wi-Fi: %v", err)
 	}
-	if got := triggers(adv); got < 1 {
-		t.Errorf("ConnectNetwork re-announced %d times, want at least 1", got)
+	if got := triggers(adv); got != 1 {
+		t.Errorf("ConnectNetwork re-announced %d times, want 1", got)
 	}
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
@@ -211,7 +237,7 @@ func TestLiveWiFiFailedConnectDoesNotReannounce(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	f := newCCFabric(t, bleFabricID+4, bleAdmin, "connect fails")
-	adv := &reannouncer{Noop: mdns.NewNoop()}
+	adv := &joinReannouncer{Noop: mdns.NewNoop()}
 	drv := &liveWiFi{fail: true}
 	n := liveNode(t, "node-connect-fails", func(c *node.Config) {
 		c.Advertiser = adv
@@ -228,9 +254,7 @@ func TestLiveWiFiFailedConnectDoesNotReannounce(t *testing.T) {
 	drv.mu.Lock()
 	connects := len(drv.connects)
 	drv.mu.Unlock()
-	adv.mu.Lock()
-	triggers := adv.triggers
-	adv.mu.Unlock()
+	triggers := adv.joins()
 	if connects != 1 || triggers != 0 {
 		t.Errorf("%d connects, %d re-announcements; want 1 and 0", connects, triggers)
 	}
