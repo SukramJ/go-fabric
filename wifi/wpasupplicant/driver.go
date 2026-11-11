@@ -147,7 +147,7 @@ func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 		err = dbus.Store(body, &path)
 	}
 	if err != nil {
-		d.log.Info("wpasupplicant: interface not found, creating it", slog.String("interface", ifname), slog.String("error", errText(err)))
+		d.log.Info("wpasupplicant: interface not found, creating it", slog.String("iface", ifname), slog.Any("err", err))
 		body, err = b.Call(ctx, rootPath, ifaceRoot+".CreateInterface", map[string]dbus.Variant{"Ifname": dbus.MakeVariant(ifname)})
 		if err == nil {
 			err = dbus.Store(body, &path)
@@ -158,9 +158,9 @@ func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 	}
 	d.iface = path
 	if _, err := b.Call(ctx, path, ifaceInterface+".AutoScan", ""); err != nil {
-		d.log.Warn("wpasupplicant: failed to stop auto scan", slog.String("error", errText(err)))
+		d.log.Warn("wpasupplicant: failed to stop auto scan", slog.Any("err", err))
 	}
-	d.log.Info("wpasupplicant: interface ready", slog.String("interface", ifname), slog.String("path", string(path)))
+	d.log.Info("wpasupplicant: interface ready", slog.String("iface", ifname), slog.String("path", string(path)))
 	go d.run()
 	return d, nil
 }
@@ -263,7 +263,7 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	defer cancel()
 
 	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
-		d.log.Info("wpasupplicant: failed to start network scan", slog.String("error", errText(err)))
+		d.log.Info("wpasupplicant: failed to start network scan", slog.Any("err", err))
 		return statusUnknown, "scan: " + errName(err), nil
 	}
 	select {
@@ -278,7 +278,7 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	if v, err := d.property(ctx, "BSSs"); err == nil {
 		paths, _ = v.Value().([]dbus.ObjectPath)
 	} else {
-		d.log.Debug("wpasupplicant: no network found", slog.String("error", errText(err)))
+		d.log.Debug("wpasupplicant: no network found", slog.Any("err", err))
 	}
 	for _, p := range paths {
 		props, err := d.getAll(ctx, p, ifaceBSS)
@@ -370,7 +370,7 @@ func (d *Driver) addAndSelect(ctx context.Context, ssid, credentials []byte, ssi
 	if v, err := d.property(ctx, "CurrentNetwork"); err == nil {
 		if cur, _ := v.Value().(dbus.ObjectPath); cur != "" && cur != "/" {
 			if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", cur); err != nil {
-				d.log.Warn("wpasupplicant: failed to remove the current network", slog.String("error", errText(err)))
+				d.log.Warn("wpasupplicant: failed to remove the current network", slog.Any("err", err))
 				return "", "remove network: " + errName(err)
 			}
 			d.log.Debug("wpasupplicant: removed network", slog.String("path", string(cur)))
@@ -384,7 +384,7 @@ func (d *Driver) addAndSelect(ctx context.Context, ssid, credentials []byte, ssi
 		err = dbus.Store(body, &network)
 	}
 	if err != nil {
-		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("error", errName(err)))
+		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("reason", errName(err)))
 		return "", "add network: " + errName(err)
 	}
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
@@ -424,15 +424,15 @@ func (d *Driver) await(ctx context.Context, a *attempt, network dbus.ObjectPath,
 			started = false
 			reason := d.int32Property(ctx, "DisconnectReason")
 			assoc := d.int32Property(ctx, "AssocStatusCode")
-			d.log.Debug("wpasupplicant: disconnected", slog.Int("reason", int(reason)), slog.Int("assocStatus", int(assoc)))
+			d.log.Debug("wpasupplicant: disconnected", slog.Int("code", int(reason)), slog.Int("status_code", int(assoc)))
 			if assoc == wlanStatusAuthTimeout && retries > 0 {
 				retries--
-				d.log.Debug("wpasupplicant: association timeout, retrying", slog.Int("retriesLeft", retries))
+				d.log.Debug("wpasupplicant: association timeout, retrying", slog.Int("left", retries))
 				if err := d.selectNetwork(ctx, network); err == nil {
 					continue
 				}
 			}
-			d.log.Info("wpasupplicant: connect failed", ssidAttr, slog.Int("reason", int(reason)))
+			d.log.Info("wpasupplicant: connect failed", ssidAttr, slog.Int("code", int(reason)))
 			return statusUnknown, fmt.Sprintf("disconnected, reason %d", reason), reason
 		}
 	}
@@ -442,7 +442,7 @@ func (d *Driver) await(ctx context.Context, a *attempt, network dbus.ObjectPath,
 func (d *Driver) selectNetwork(ctx context.Context, network dbus.ObjectPath) error {
 	_, err := d.bus.Call(ctx, d.iface, ifaceInterface+".SelectNetwork", network)
 	if err != nil {
-		d.log.Warn("wpasupplicant: failed to select network", slog.String("error", errText(err)))
+		d.log.Warn("wpasupplicant: failed to select network", slog.Any("err", err))
 	}
 	return err
 }
@@ -541,13 +541,4 @@ func errName(err error) string {
 		return err.Error()
 	}
 	return "failed"
-}
-
-// errText is err's text for a log line of a call that carries no
-// credential.
-func errText(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }
