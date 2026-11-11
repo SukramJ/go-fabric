@@ -720,7 +720,7 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
-	n.leaveRadioWhenCommissioned()
+	n.leaveRadioWhenCommissioned() //nolint:contextcheck // the stop outlives the CommissioningComplete request on purpose (its response must not wait for the radio); it is bounded by the node's lifetime, n.life
 	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
 	// response and a grace, since the command itself arrives over the
 	// fabric-adopted PASE session. Mirrors matter.js
