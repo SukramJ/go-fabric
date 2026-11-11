@@ -22,8 +22,9 @@ import (
 // central's BTP session is one more connection of the transport-neutral
 // receive path, its replies sent back on it without MRP — and advertises
 // the commissionable payload on matter.js's schedule. Whoever announces the
-// commissioning window decides when ([Bridge.StartBLE], [Bridge.StopBLE]);
-// the node facade does so for an uncommissioned node only.
+// commissioning window decides when ([Bridge.StartBLE]; [Bridge.WithdrawBLE]
+// at the window's end; [Bridge.StopBLE] once the node is commissioned); the
+// node facade does so for an uncommissioned node only.
 
 // The BLE advertisement's schedule — matter.js BleAdvertisement.run
 // (packages/protocol/src/advertisement/ble/BleAdvertisement.ts:13-20,
@@ -56,12 +57,17 @@ var errNoBLE = errors.New("bridge: no BLE peripheral configured (Config.BLE)")
 type bleRuntime struct {
 	// mu guards every field below.
 	mu sync.Mutex
-	// serveCancel ends the GATT service's Serve; serveDone closes when
-	// it returned. Nil while the service is not served.
+	// running is set between Start and Stop: StartBLE refuses outside
+	// it, so nothing StartBLE begins outlives Stop.
+	running bool
+	// serveCancel ends the GATT service's Serve, nil once asked to end;
+	// serveDone closes when Serve returned and stays set until then, so
+	// the next StartBLE waits for the old Serve rather than racing it.
 	serveCancel context.CancelFunc
 	serveDone   chan struct{}
-	// advCancel ends the advertisement's schedule; advDone closes when it
-	// stopped advertising. adv is what it advertises.
+	// advCancel ends the advertisement's schedule, nil once asked to end;
+	// advDone closes when it stopped advertising and stays set until
+	// then. adv is what it advertises.
 	advCancel context.CancelFunc
 	advDone   chan struct{}
 	adv       bleAdvert
@@ -73,6 +79,14 @@ type bleRuntime struct {
 // [CommissioningAdvertisement].
 type bleAdvert struct {
 	discriminator, vendorID, productID uint16
+}
+
+// setBLERunning marks the bridge started (true) or stopping (false) for
+// StartBLE.
+func (b *Bridge) setBLERunning(on bool) {
+	b.ble.mu.Lock()
+	b.ble.running = on
+	b.ble.mu.Unlock()
 }
 
 // StartBLE puts the node on the Bluetooth radio of [Config].BLE for the
@@ -92,11 +106,14 @@ type bleAdvert struct {
 // flag — at 1285 ms, for 2 days; BleAdvertisement.ts:13-85). A second call
 // with the same discriminator, vendor and product id keeps the running
 // schedule, as matter.js does not restart a broadcasting advertisement
-// (Advertisement.ts:83-87); a different one restarts it with the new
-// payload. BLE announces a basic window only: adv.CommissioningMode must
-// be 1 (matter.js BleAdvertiser.getAdvertisement, BleAdvertiser.ts:37-45).
+// (Advertisement.ts:83-87); a different one, or a call after
+// [Bridge.WithdrawBLE], starts it anew with the service left registered.
+// BLE announces a basic window only: adv.CommissioningMode must be 1
+// (matter.js BleAdvertiser.getAdvertisement, BleAdvertiser.ts:37-45).
 //
-// The bridge must be started; [Bridge.Stop] ends what StartBLE started.
+// A service or advertisement still ending after a [Bridge.StopBLE] that
+// gave up waiting is waited for first, until ctx ends. The bridge must be
+// started; [Bridge.Stop] ends what StartBLE started.
 func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) error {
 	p := b.cfg.BLE
 	if p == nil {
@@ -105,15 +122,25 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 	if adv.CommissioningMode != 1 {
 		return fmt.Errorf("bridge: BLE advertises a basic commissioning window (CM=1), not CM=%d", adv.CommissioningMode)
 	}
-	b.mu.RLock()
-	started := b.started
-	b.mu.RUnlock()
-	if !started {
-		return ErrNotStarted
-	}
 	want := bleAdvert{discriminator: adv.Discriminator, vendorID: adv.VendorID, productID: adv.ProductID}
 
-	b.ble.mu.Lock()
+	for {
+		b.ble.mu.Lock()
+		if !b.ble.running {
+			b.ble.mu.Unlock()
+			return ErrNotStarted
+		}
+		ending := b.ble.serveDone
+		if b.ble.serveCancel != nil || ending == nil {
+			break // locked
+		}
+		b.ble.mu.Unlock()
+		select {
+		case <-ending:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if b.ble.serveCancel == nil {
 		serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 		done := make(chan struct{})
@@ -123,8 +150,8 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 			if err := p.Serve(serveCtx, nil, b.acceptBLE); err != nil {
 				b.logger.Warn("matter.ble.serve", slog.Any("err", err))
 			}
-			// A service that ended on its own (refused, withdrawn) is
-			// registered again by the next StartBLE.
+			// The service ended — asked to, or on its own (refused,
+			// withdrawn): the next StartBLE registers it again.
 			b.ble.mu.Lock()
 			if b.ble.serveDone == done {
 				b.ble.serveCancel, b.ble.serveDone = nil, nil
@@ -146,13 +173,45 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 
 	if prevCancel != nil {
 		prevCancel()
-		<-prevDone
 	}
 	go func() {
 		defer close(done)
+		defer func() {
+			b.ble.mu.Lock()
+			if b.ble.advDone == done {
+				b.ble.advCancel, b.ble.advDone, b.ble.adv = nil, nil, bleAdvert{}
+			}
+			b.ble.mu.Unlock()
+		}()
+		if prevDone != nil {
+			// The advertisement it replaces stops first, so its stop
+			// cannot end this one.
+			select {
+			case <-prevDone:
+			case <-advCtx.Done():
+				return
+			}
+		}
 		b.advertiseBLE(advCtx, p, want)
 	}()
 	return nil
+}
+
+// WithdrawBLE ends the BLE advertisement and leaves the GATT service and a
+// connected central alone — matter.js's end of a commissioning window,
+// which stops the BLE advertisement (BleAdvertisement.ts:69-71) while the
+// BLE transport stays until the node is commissioned
+// (ServerNetworkRuntime.ts:294-308). It waits for the advertisement to
+// stop until ctx ends; without one it does nothing.
+func (b *Bridge) WithdrawBLE(ctx context.Context) error {
+	b.ble.mu.Lock()
+	cancel, done := b.ble.advCancel, b.ble.advDone
+	b.ble.advCancel = nil
+	b.ble.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	return waitBLE(ctx, done)
 }
 
 // StopBLE takes the node off the radio: the advertisement stops, the
@@ -165,10 +224,9 @@ func (b *Bridge) StopBLE(ctx context.Context) error {
 	b.ble.mu.Lock()
 	advCancel, advDone := b.ble.advCancel, b.ble.advDone
 	serveCancel, serveDone := b.ble.serveCancel, b.ble.serveDone
-	b.ble.advCancel, b.ble.advDone, b.ble.adv = nil, nil, bleAdvert{}
-	b.ble.serveCancel, b.ble.serveDone = nil, nil
+	b.ble.advCancel, b.ble.serveCancel = nil, nil
 	b.ble.mu.Unlock()
-	if advCancel == nil && serveCancel == nil {
+	if advDone == nil && serveDone == nil {
 		return nil
 	}
 	if advCancel != nil {
@@ -177,18 +235,27 @@ func (b *Bridge) StopBLE(ctx context.Context) error {
 	if serveCancel != nil {
 		serveCancel()
 	}
-	for _, done := range []chan struct{}{advDone, serveDone} {
-		if done == nil {
-			continue
-		}
-		select {
-		case <-done:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	if err := waitBLE(ctx, advDone); err != nil {
+		return err
+	}
+	if err := waitBLE(ctx, serveDone); err != nil {
+		return err
 	}
 	b.logger.Info("matter.ble.stopped")
 	return nil
+}
+
+// waitBLE waits for done (nil: nothing to wait for) until ctx ends.
+func waitBLE(ctx context.Context, done chan struct{}) error {
+	if done == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // advertiseBLE runs the advertisement's schedule until ctx ends or the
@@ -245,8 +312,10 @@ func (b *Bridge) stopAdvertisingBLE(p contract.BLEPeripheral) {
 	}
 }
 
-// stopBLEForShutdown is [Bridge.Stop]'s StopBLE.
+// stopBLEForShutdown is [Bridge.Stop]'s StopBLE: StartBLE refuses from
+// here on, so nothing it would begin outlives Stop.
 func (b *Bridge) stopBLEForShutdown(ctx context.Context) {
+	b.setBLERunning(false)
 	if err := b.StopBLE(ctx); err != nil {
 		b.logger.Warn("matter.ble.stop", slog.Any("err", err))
 	}

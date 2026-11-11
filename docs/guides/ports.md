@@ -187,7 +187,7 @@ the next `Reassemble`.
 | `SetSubscriptionPersistence` | on by default; off, no subscription is recorded or re-established after a restart |
 | `SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity` | an ICD only, silent: the ICD's record and MRP padding stay those of a non-ICD node, and inbound traffic does not extend its active window |
 | `SetOnReassembled`, `SetOnFabricRemoved` | nil-safe observer hooks. A fabric's installation is observed on the node (`node.Observers.OnFabricAdded`) |
-| `Config.BLE`, then `StartBLE` / `StopBLE` | no BLE: StartBLE refuses and the bridge never touches a radio. The facade starts BLE with the own window of a node without a fabric and stops it when the window closes |
+| `Config.BLE`, then `StartBLE` / `WithdrawBLE` / `StopBLE` | no BLE: StartBLE refuses and the bridge never touches a radio. The facade starts BLE with the own window of a node without a fabric, withdraws the advertisement when the window closes and stops BLE when the node is commissioned |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
 
 Strict refuses only what an addition causes. Each `Start` and `Reassemble`

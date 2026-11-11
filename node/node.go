@@ -720,6 +720,7 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
+	n.leaveRadioWhenCommissioned()
 	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
 	// response and a grace, since the command itself arrives over the
 	// fabric-adopted PASE session. Mirrors matter.js
@@ -733,6 +734,30 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 			observe(n.logger, "commissioning_complete", func() { fn(fabricIndex) })
 		}
 	}
+}
+
+// leaveRadioWhenCommissioned takes a node with a BLE radio off it once its
+// commissioning is committed — matter.js endUncommissionedMode on the
+// commissioned event (ServerNetworkRuntime.ts:294-308, wired at :386, at
+// db021da0), which a fabric added under a fail-safe raises only once the
+// fail-safe ended in its commit (CommissioningServer.ts:118-127, :148-158).
+// matter.js hands the deletion of the advertiser and the transport to the
+// runtime (:300-307); here it runs on a goroutine of its own, so the
+// CommissioningComplete response does not wait for the radio, and Stop
+// waits for it.
+func (n *Node) leaveRadioWhenCommissioned() {
+	if n.cfg.Network.BLE == nil {
+		return
+	}
+	n.keeperWG.Add(1)
+	go func() {
+		defer n.keeperWG.Done()
+		ctx, cancel := clock.WithTimeout(n.life, clock.Or(n.cfg.Clock), bleStopTimeout)
+		defer cancel()
+		if err := n.br.StopBLE(ctx); err != nil {
+			n.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
+		}
+	}()
 }
 
 // notifyFabricUpdated runs every OnFabricUpdated with the fabric as the

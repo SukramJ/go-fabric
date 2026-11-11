@@ -651,3 +651,16 @@ func TestDeviceTypeValidatorModes(t *testing.T) {
 		t.Errorf("rendering = %q / %q", v.String(), v.Key())
 	}
 }
+
+// TestTopologyCommissionsOverBLE: an assembled topology states
+// CustomNetworkConfig unless it commissions over BLE (matter.js
+// ServerEndpointFacts.ts:131-145 at db021da0).
+func TestTopologyCommissionsOverBLE(t *testing.T) {
+	t.Parallel()
+	if got := topologyTree(&Topology{}).NodeConditions(0); !slices.Equal(got, []string{condCustomNetworkConfig}) {
+		t.Fatalf("without BLE: %v", got)
+	}
+	if got := topologyTree(&Topology{CommissionsOverBLE: true}).NodeConditions(0); len(got) != 0 {
+		t.Fatalf("over BLE: %v", got)
+	}
+}

@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // The peripheral's GATT server, Accept, follows matter.js
@@ -392,5 +394,47 @@ func TestAcceptIndicationWaitsForConfirmationParityMatterJS(t *testing.T) {
 	}
 	if o2.count() != 0 {
 		t.Fatal("an unconfirmed response opened a session")
+	}
+}
+
+// heldClock is a fake clock whose AfterFunc callbacks the test runs by
+// hand, in the order it chooses.
+type heldClock struct {
+	*fakeClock
+	mu  sync.Mutex
+	fns []func()
+}
+
+func (c *heldClock) AfterFunc(d time.Duration, f func()) clock.Timer {
+	c.mu.Lock()
+	c.fns = append(c.fns, f)
+	c.mu.Unlock()
+	return c.fakeClock.AfterFunc(d, func() {})
+}
+
+func (c *heldClock) fn(i int) func() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fns[i]
+}
+
+// TestAcceptStaleTimerKeepsTheNewOne: the callback of a handshake timer
+// that fired while a repeated request restarted the timer (it waited on
+// the lock) leaves the new timer armed, which then drops the connection.
+func TestAcceptStaleTimerKeepsTheNewOne(t *testing.T) {
+	clk := &heldClock{fakeClock: newFakeClock()}
+	g := newFakeGATT()
+	if err := Accept(g, (&opened{}).open, Options{TimeSource: clk}); err != nil {
+		t.Fatal(err)
+	}
+	g.write(handshakeRequest(100)) // timer A
+	g.write(handshakeRequest(100)) // timer B replaces A
+	clk.fn(0)()                    // A's callback, stale
+	if g.isGone() {
+		t.Fatal("the stale timer dropped the connection")
+	}
+	clk.fn(1)() // B fires
+	if !g.isGone() {
+		t.Fatal("the new timer did not drop the connection after the stale one ran")
 	}
 }

@@ -97,7 +97,8 @@ cfg.Network.BLE = radio
 | When | On the radio |
 | --- | --- |
 | uncommissioned, its own window open (at start, after the last fabric is removed, or `Node.OpenBasicWindow`) | the GATT service is registered and the window advertised — 20 ms for 30 s, 150 ms until 15 minutes, then the extended announcement (no vendor and product id) at 1285 ms; one central at a time |
-| the window closes: CommissioningComplete, its timeout, `Node.CloseWindow` | the advertisement stops, the central is disconnected, the service unregistered |
+| the window closes: its timeout, `Node.CloseWindow` | only the advertisement stops; the service and a connected central stay, so a commissioning over BLE in progress completes over the same link, and a new own window advertises again on the same service |
+| commissioned: CommissioningComplete commits the fail-safe | the advertisement stops, the central is disconnected, the service unregistered — after the response, not before it |
 | commissioned | nothing: no advertisement, no service, also for a window an administrator opens |
 | `Node.Stop` | off the radio |
 
@@ -112,7 +113,7 @@ bluetoothd. It needs the system-bus rights its central needs (the
 The reference daemon has no BLE flag yet.
 
 *Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `leaveBLE`),
-[`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `StopBLE`, `advertiseBLE`),
+[`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
 [`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
 [`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
 

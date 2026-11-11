@@ -201,7 +201,7 @@ const (
 // wave W7: 630.
 // Wave W12 (#478) leaves two PeerAddressMonitorTest.ts session-suspect
 // cases by design (BD-Matter-SuspectProbeWalksAlternates): 632.
-const testparityLeftRatchet = 632
+const testparityLeftRatchet = 630
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -4351,7 +4351,8 @@
         "endpoint:TestBaseMandatesBinding",
         "endpoint:TestDeviceTypeConformanceNodeParityMatterJS",
         "endpoint:TestBindingMountParityMatterJS",
-        "endpoint:TestDeclaredClientMountsBinding"
+        "endpoint:TestDeclaredClientMountsBinding",
+        "endpoint:TestTopologyCommissionsOverBLE"
       ],
       "left": [
         {
@@ -4360,22 +4361,12 @@
           "reason": "asserts a TypeScript behavior subclass whose schema.classification is undefined (OnOffServer.with(...).enable(...)); a Go server is identified by its cluster id, so there is no extended server apart from the cluster"
         },
         {
-          "it": "requires NetworkCommissioning of a node that commissions over BLE",
-          "class": "device-ble-thread",
-          "reason": "the node commissions over BLE (createBleNode); no Bluetooth on the device side (CLAUDE.md scope boundaries), so CustomNetworkConfig always holds for a Go node"
-        },
-        {
-          "it": "accepts a node that commissions over BLE with NetworkCommissioning",
-          "class": "device-ble-thread",
-          "reason": "the node commissions over BLE (createBleNode, RootWithWiFi); no Bluetooth on the device side (CLAUDE.md scope boundaries)"
-        },
-        {
           "it": "keeps the refused endpoint out of a violation error's own enumerable properties",
           "class": "js-runtime-only",
           "reason": "asserts Object.keys of a JavaScript Error subclass; a Go error has no enumerable properties"
         }
       ],
-      "reason": "Ported by meaning over fake endpoints in the snapshot's model and the TS stand-in models, and over the assembler's Binding mount; the left cases are TypeScript class shapes and device-side BLE.",
+      "reason": "Ported by meaning over fake endpoints in the snapshot's model and the TS stand-in models, and over the assembler's Binding mount; the left cases are TypeScript class shapes.",
       "snapshotSha": "cd9c595fabd1b048e21e658a75011f90ed116332"
     },
     {

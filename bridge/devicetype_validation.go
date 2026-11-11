@@ -62,6 +62,12 @@ func (b *Bridge) deviceTypeValidator() *endpoint.DeviceTypeValidator {
 // requirements" — the Root-asserted violations at debug; a refusal is
 // returned unlogged.
 func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
+	// The node commissions over BLE when the bridge has a radio
+	// (ServerEndpointFacts.ts:140-145 at db021da0 asks the node's
+	// NetworkServer the same).
+	if topology != nil {
+		topology.CommissionsOverBLE = b.cfg.BLE != nil
+	}
 	verdict, err := b.deviceTypeValidator().Validate(topology)
 	if err != nil {
 		return err

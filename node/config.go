@@ -259,12 +259,16 @@ type Network struct {
 	// matter.js `network.ble` and `discoveryCapabilities.ble`
 	// (NetworkServer.ts:28-51 at db021da0). While the node has no fabric,
 	// its own window (and a [Node.OpenBasicWindow] window) advertises over
-	// BLE as well as over DNS-SD and serves PASE over BTP; the node leaves
-	// the radio when the window closes — at CommissioningComplete, at its
-	// timeout — and at [Node.Stop]. A commissioned node never touches the
-	// radio, not even for a window an administrator opens
-	// (ServerNetworkRuntime.ts:255-275, :294-308); when its last fabric is
-	// removed, the own window that reopens is on BLE again. nil is no BLE.
+	// BLE as well as over DNS-SD and serves PASE over BTP. The window's end
+	// (its timeout, [Node.CloseWindow]) stops only the BLE advertisement
+	// (BleAdvertisement.ts:69-71): the GATT service and a central stay, so a
+	// commissioning over BLE completes over the same link. The node leaves
+	// the radio once it is commissioned — the fail-safe committed at
+	// CommissioningComplete (ServerNetworkRuntime.ts:294-308) — and at
+	// [Node.Stop]. A commissioned node never touches the radio, not even
+	// for a window an administrator opens (:255-275); when its last fabric
+	// is removed, the own window that reopens is on BLE again. nil is no
+	// BLE.
 	BLE contract.BLEPeripheral
 	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
 	// Wi-Fi. NetworkCommissioning

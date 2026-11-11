@@ -174,7 +174,7 @@ func TestBLEDisconnectEvictsSessions(t *testing.T) {
 // served is disconnected (matter.js's peripheral serves a single
 // connection, BlenoBleServer.ts:129-133); the first stays.
 func TestBLEOneCentralAtATime(t *testing.T) {
-	_, p := newBLEHarness(t, nil)
+	h, p := newBLEHarness(t, nil)
 	first := dialRadio(t, p)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -189,6 +189,13 @@ func TestBLEOneCentralAtATime(t *testing.T) {
 	}
 	if first.disconnected() {
 		t.Fatal("the first central was disconnected")
+	}
+	// The first central's session still carries a request and its reply.
+	if err := first.s.Send(h.sealedInvoke(0x312)); err != nil {
+		t.Fatal(err)
+	}
+	if proto := h.open(waitReply(t, first.replies)); proto.ExchangeID != 0x312 {
+		t.Fatalf("reply on exchange 0x%X", proto.ExchangeID)
 	}
 }
 
@@ -331,4 +338,166 @@ func TestStartBLENewWindowRestartsSchedule(t *testing.T) {
 	if !bytes.Equal(ads[1].Data, btp.EncodeAdvertisementData(1234, 0xFFF1, 0x8001, false, false)) || ads[1].Interval != 20*time.Millisecond {
 		t.Fatalf("restarted: %x at %v", ads[1].Data, ads[1].Interval)
 	}
+}
+
+// TestWithdrawBLE: the window's end stops only the advertisement
+// (BleAdvertisement.ts:69-71); the service and the central stay, and the
+// next StartBLE advertises again on the same service.
+func TestWithdrawBLE(t *testing.T) {
+	h, p := newBLEHarness(t, nil)
+	c := dialRadio(t, p)
+	if err := h.bridge.WithdrawBLE(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, advertising := p.Radio().Advertising(); advertising {
+		t.Fatal("still advertising after WithdrawBLE")
+	}
+	if serving, n := p.Radio().Serving(); !serving || n != 1 || c.disconnected() {
+		t.Fatalf("serving %v with %d centrals after WithdrawBLE", serving, n)
+	}
+	if err := h.bridge.WithdrawBLE(context.Background()); err != nil {
+		t.Fatalf("a second WithdrawBLE: %v", err)
+	}
+	if err := h.bridge.StartBLE(context.Background(), bleWindow); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "advertised again", func() bool { _, a := p.Radio().Advertising(); return a })
+	if c.disconnected() {
+		t.Fatal("the central was dropped by the second StartBLE")
+	}
+	if err := c.s.Send(h.sealedInvoke(0x313)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, c.replies)
+}
+
+// hookedRadio is a radio whose Serve, once its own returned, waits for
+// release and then runs after.
+type hookedRadio struct {
+	*bletest.Radio
+	release chan struct{}
+	after   func()
+}
+
+func (r *hookedRadio) Serve(ctx context.Context, c3 []byte, accept func(contract.BLEConnection)) error {
+	err := r.Radio.Serve(ctx, c3, accept)
+	if r.release != nil {
+		<-r.release
+	}
+	if r.after != nil {
+		r.after()
+	}
+	return err
+}
+
+// TestStartBLERefusedOnceStopping: a StartBLE that runs while Stop takes
+// the bridge off the radio is refused, so nothing it would start outlives
+// Stop.
+func TestStartBLERefusedOnceStopping(t *testing.T) {
+	p := &bletest.Peripheral{Address: "C0:FF:EE:00:00:03"}
+	hr := &hookedRadio{Radio: p.Radio()}
+	h := newConnHarness(t, Config{Listen: "127.0.0.1:0", BLE: hr})
+	var during error
+	hr.after = func() { during = h.bridge.StartBLE(context.Background(), bleWindow) }
+	if err := h.bridge.StartBLE(context.Background(), bleWindow); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "served", func() bool { s, _ := p.Radio().Serving(); return s })
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := h.bridge.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(during, ErrNotStarted) {
+		t.Fatalf("StartBLE during Stop: %v, want ErrNotStarted", during)
+	}
+	if serving, _ := p.Radio().Serving(); serving {
+		t.Fatal("serving after Stop")
+	}
+	if _, advertising := p.Radio().Advertising(); advertising {
+		t.Fatal("advertising after Stop")
+	}
+}
+
+// TestStartBLEWaitsForALateServe: a StopBLE that gave up waiting leaves the
+// old Serve running; the next StartBLE waits for it and registers the
+// service again instead of running into the old one.
+func TestStartBLEWaitsForALateServe(t *testing.T) {
+	p := &bletest.Peripheral{Address: "C0:FF:EE:00:00:04"}
+	hr := &hookedRadio{Radio: p.Radio(), release: make(chan struct{})}
+	h := newConnHarness(t, Config{Listen: "127.0.0.1:0", BLE: hr})
+	if err := h.bridge.StartBLE(context.Background(), bleWindow); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "served", func() bool { s, _ := p.Radio().Serving(); return s })
+	short, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := h.bridge.StopBLE(short); !errors.Is(err, context.Canceled) {
+		t.Fatalf("StopBLE with an ended context: %v", err)
+	}
+	started := make(chan error, 1)
+	go func() { started <- h.bridge.StartBLE(context.Background(), bleWindow) }()
+	select {
+	case err := <-started:
+		t.Fatalf("StartBLE returned (%v) while the old Serve still ran", err)
+	default:
+	}
+	close(hr.release)
+	if err := <-started; err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "served again", func() bool { s, _ := p.Radio().Serving(); return s })
+	waitFor(t, "advertised again", func() bool { _, a := p.Radio().Advertising(); return a })
+}
+
+// TestStopBLEBeforeSubscription: StopBLE between the central's handshake
+// request and its subscription drops the central and unregisters the
+// service; the subscription that follows fails.
+func TestStopBLEBeforeSubscription(t *testing.T) {
+	h, p := newBLEHarness(t, nil)
+	conn, err := bletest.NewCentral(p).Connect(context.Background(), ble.Peripheral{Address: p.Address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.WriteC1(context.Background(), btp.EncodeHandshakeRequest(btp.HandshakeRequest{Versions: btp.SupportedVersions, ATTMTU: 244, ClientWindowSize: 255})); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.bridge.StopBLE(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	<-conn.Disconnected()
+	if err := conn.SubscribeC2(context.Background(), func([]byte) {}); err == nil {
+		t.Fatal("a subscription after StopBLE succeeded")
+	}
+	if serving, _ := p.Radio().Serving(); serving {
+		t.Fatal("serving after StopBLE")
+	}
+}
+
+// TestStopBLEWithIndicationPending: StopBLE returns while an indication
+// waits for a central that does not confirm it, and the central is gone.
+func TestStopBLEWithIndicationPending(t *testing.T) {
+	h, p := newBLEHarness(t, nil)
+	conn, err := bletest.NewCentral(p).Connect(context.Background(), ble.Peripheral{Address: p.Address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stuck := make(chan struct{})
+	got := make(chan struct{}, 1)
+	if err := conn.WriteC1(context.Background(), btp.EncodeHandshakeRequest(btp.HandshakeRequest{Versions: btp.SupportedVersions, ATTMTU: 244, ClientWindowSize: 255})); err != nil {
+		t.Fatal(err)
+	}
+	// The central receives the handshake response and does not return:
+	// the indication stays unconfirmed.
+	if err := conn.SubscribeC2(context.Background(), func([]byte) { got <- struct{}{}; <-stuck }); err != nil {
+		t.Fatal(err)
+	}
+	<-got
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := h.bridge.StopBLE(ctx); err != nil {
+		t.Fatalf("StopBLE with an indication pending: %v", err)
+	}
+	<-conn.Disconnected()
+	close(stuck)
 }

@@ -175,7 +175,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (matter.js BleAdvertiser announces basic windows only,
 		// BleAdvertiser.ts:40-42, and only while uncommissioned,
 		// ServerNetworkRuntime.ts:271-274).
-		h.leaveBLE(ctx)
+		h.withdrawBLE(ctx)
 		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
@@ -189,7 +189,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (:236-256), the status BasicWindowOpen.
 		h.attachPase(h.baseline)
 		h.announce(ctx, h.advert, "commissioning.basic_window.announce")
-		h.leaveBLE(ctx)
+		h.withdrawBLE(ctx)
 		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
 		return false
 	}
@@ -199,7 +199,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// exitCommissioningMode).
 		h.attachPase(nil)
 		h.br.WithdrawCommissioning(ctx)
-		h.leaveBLE(ctx)
+		h.withdrawBLE(ctx)
 		h.setAnnounced(0, 0)
 		h.logger.Info("commissioning.window.closed")
 		return endedBasic && !window.IsOpen()
@@ -283,25 +283,25 @@ func (h *commissioningHost) announce(ctx context.Context, adv bridge.Commissioni
 	h.setAnnounced(adv.CommissioningMode, adv.Discriminator)
 }
 
-// bleStopTimeout bounds how long a window transition waits for the radio
-// to stop.
+// bleStopTimeout bounds how long a window transition waits for the BLE
+// advertisement to stop, and the node for the radio when it is
+// commissioned.
 const bleStopTimeout = 5 * time.Second
 
-// followOnBLE puts the node on its BLE radio for the own window adv
-// announces, while the node has no fabric — matter.js adds the BLE
-// advertiser only to an uncommissioned node (ServerNetworkRuntime.ts:255-275
-// at db021da0), and its peripheral registers the GATT service only once it
-// advertises (BlenoBleServer.ts:224-231). A node with a fabric leaves the
-// radio instead.
+// followOnBLE advertises the own window adv announces over BLE while the
+// node has no fabric — matter.js adds the BLE advertiser only to an
+// uncommissioned node (ServerNetworkRuntime.ts:255-275 at db021da0), and
+// its peripheral registers the GATT service only once it advertises
+// (BlenoBleServer.ts:224-231). A node with a fabric — committed or still
+// under the fail-safe — advertises nothing over BLE; the GATT service and
+// a central stay until the node is commissioned ([Node]'s
+// leaveRadioWhenCommissioned).
 func (h *commissioningHost) followOnBLE(ctx context.Context, adv bridge.CommissioningAdvertisement) {
-	if !h.ble {
-		return
-	}
-	if h.fabricCount == nil {
+	if !h.ble || h.fabricCount == nil {
 		return
 	}
 	if n, err := h.fabricCount(ctx); err != nil || n > 0 {
-		h.leaveBLE(ctx)
+		h.withdrawBLE(ctx)
 		return
 	}
 	if err := h.br.StartBLE(ctx, adv); err != nil {
@@ -309,18 +309,19 @@ func (h *commissioningHost) followOnBLE(ctx context.Context, adv bridge.Commissi
 	}
 }
 
-// leaveBLE takes the node off its BLE radio — matter.js
-// endUncommissionedMode (ServerNetworkRuntime.ts:294-308) on commissioning,
-// and the window's end, whose advertisement stops (BleAdvertisement.ts:69-71).
-// Without a radio, or off it already, it does nothing.
-func (h *commissioningHost) leaveBLE(ctx context.Context) {
+// withdrawBLE ends the BLE advertisement and leaves the GATT service and a
+// connected central alone: a window's end stops only the advertisement
+// (BleAdvertisement.ts:69-71), so a commissioning that runs over BLE when
+// the window closes — the own window's timer runs whatever the fail-safe
+// does — completes over the same link. Without a radio it does nothing.
+func (h *commissioningHost) withdrawBLE(ctx context.Context) {
 	if !h.ble {
 		return
 	}
 	stopCtx, cancel := clock.WithTimeout(ctx, h.clk, bleStopTimeout)
 	defer cancel()
-	if err := h.br.StopBLE(stopCtx); err != nil {
-		h.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
+	if err := h.br.WithdrawBLE(stopCtx); err != nil {
+		h.logger.Warn("commissioning.ble.withdraw", slog.Any("err", err))
 	}
 }
 

@@ -29,7 +29,8 @@
 //
 // BLE: with [Config].BLE (the host's contract.BLEPeripheral) the bridge
 // serves the Matter GATT service between [Bridge.StartBLE] and
-// [Bridge.StopBLE], one central at a time, each central's BTP session
+// [Bridge.StopBLE] ([Bridge.WithdrawBLE] ends only the advertisement),
+// one central at a time, each central's BTP session
 // (transport/btp.Accept) one more connection of the same receive path —
 // MRP off, the sessions evicted when the central goes, the connection
 // kept when its last session goes (matter.js closes only a TCP channel
@@ -945,6 +946,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// retransmits instead of timely standalone ACKs.
 	pumpTracker := b.ackTracker
 	b.mu.Unlock()
+	b.setBLERunning(true)
 	if pumpTracker != nil {
 		pumpCtx, pumpCancel := context.WithCancel(context.Background())
 		pumpDone := make(chan struct{})

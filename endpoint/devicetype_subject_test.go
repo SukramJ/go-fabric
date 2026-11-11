@@ -99,7 +99,7 @@ func TestDeviceTypeSubjectSameVerdicts(t *testing.T) {
 		t.Fatal("the fixture conforms; it should not")
 	}
 	plain := copySubjects(topologyTree(topo))
-	got := treeOf(plain, assembledNodeConditions).Validate()
+	got := treeOf(plain, assembledNodeConditions(false)).Validate()
 	if len(got) != len(want) {
 		t.Fatalf("plain %d violations, assembled %d", len(got), len(want))
 	}
@@ -109,7 +109,7 @@ func TestDeviceTypeSubjectSameVerdicts(t *testing.T) {
 		}
 	}
 	// Check judges one endpoint in the whole tree's context.
-	if lamp := treeOf(plain, assembledNodeConditions).Check(2); !slices.Equal(keysOf(lamp, 2), keysOf(want, 2)) || len(lamp) != len(keysOf(want, 2)) {
+	if lamp := treeOf(plain, assembledNodeConditions(false)).Check(2); !slices.Equal(keysOf(lamp, 2), keysOf(want, 2)) || len(lamp) != len(keysOf(want, 2)) {
 		t.Errorf("Check(2) = %v, want %v", keysOf(lamp, 2), keysOf(want, 2))
 	}
 	if treeOf(plain, nil).Check(99) != nil {

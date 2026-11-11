@@ -273,8 +273,12 @@ func (s *gattServer) startTimerLocked() {
 	gen := s.timerGen
 	s.timer = s.clock.AfterFunc(ConnRspTimeout, func() {
 		s.mu.Lock()
-		fired := s.timer != nil && s.timerGen == gen
-		s.timer = nil
+		// A callback of a timer replaced meanwhile (it fired while a
+		// repeated request restarted the timer) leaves the new one alone.
+		fired := s.timerGen == gen
+		if fired {
+			s.timer = nil
+		}
 		s.mu.Unlock()
 		if !fired {
 			return

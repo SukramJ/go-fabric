@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 725,
+    "line": 726,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -181,7 +181,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1430,
+    "line": 1432,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -190,7 +190,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1432,
+    "line": 1434,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -199,7 +199,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1469,
+    "line": 1471,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -208,7 +208,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1492,
+    "line": 1494,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -217,7 +217,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1817,
+    "line": 1819,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1818,
+    "line": 1820,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -2637,7 +2637,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 765,
+    "line": 771,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -3171,7 +3171,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 323,
+    "line": 327,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
