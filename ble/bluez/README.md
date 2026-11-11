@@ -1,15 +1,31 @@
-# `ble/bluez` — BlueZ for the commissioner's BLE seam
+# `ble/bluez` — BlueZ for both BLE roles
 
-`github.com/SukramJ/go-fabric/ble/bluez` implements `controller/ble.Central`
-and `controller/ble.Connection` over BlueZ on the D-Bus system bus, in pure Go
-(no cgo). With it, `controller/ble.NewScanner`, `controller/ble.Dial` and
-`commissioner.Options.Channel` commission a Wi-Fi or Thread device over BLE
-([ADR 0024](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0024-ble-commissioning-in-the-controller.md)).
-The device role of go-fabric never uses Bluetooth.
+`github.com/SukramJ/go-fabric/ble/bluez` speaks BlueZ on the D-Bus system bus,
+in pure Go (no cgo), for both roles of go-fabric:
+
+- **The commissioner's central**: `NewCentral` implements
+  `controller/ble.Central` and `controller/ble.Connection`. With it,
+  `controller/ble.NewScanner`, `controller/ble.Dial` and
+  `commissioner.Options.Channel` commission a Wi-Fi or Thread device over BLE
+  ([ADR 0024](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0024-ble-commissioning-in-the-controller.md)).
+- **The node's peripheral**: `NewPeripheral` implements
+  `contract.BLEPeripheral`, the radio a device-side host hands its node
+  (`node.Config.Network.BLE`), so an uncommissioned node is commissionable
+  over BLE. The node decides when it is on the radio and what it advertises;
+  BTP runs in the main module (`transport/btp.Accept`).
 
 It is a Go module of its own, so the main module keeps its dependencies and a
 host without BLE never pulls `github.com/godbus/dbus/v5`. The main module
 never imports it.
+
+```go
+radio, err := bluez.NewPeripheral("hci0") // "" is hci0
+if err != nil {
+	return err
+}
+defer radio.(io.Closer).Close()
+cfg.Network.BLE = radio // node.Config
+```
 
 ```go
 central, err := bluez.NewCentral("hci0") // "" is hci0
@@ -46,6 +62,22 @@ The sequence is matter.js's (`packages/nodejs-ble/src/NobleBleClient.ts`,
 | ATT_MTU | C1's `MTU` property (BlueZ 5.62 and later): above 23 at discovery it is the exchange's result; 23 waits up to 2 s for its `PropertiesChanged` (the exchange landing, reported as `ble.MTUExchange`), then the BTP minimum; no property is the BTP minimum at once |
 | disconnect | `StopNotify` on C2, `org.bluez.Device1.Disconnect` (each bounded by 5 s); `Connected=false` or the device's removal ends the connection |
 
+The peripheral's plumbing follows connectedhomeip's Linux platform
+(`src/platform/Linux/bluez/` at the harness pin), since matter.js's
+peripheral is bleno on a raw HCI socket; matter.js remains the authority
+for what goes on the air (`BlenoBleServer.ts`, `BleAdvertisement.ts`):
+
+| Step | BlueZ |
+| --- | --- |
+| the GATT application | objects under an `org.freedesktop.DBus.ObjectManager` root (`/gofabric/<adapter>`): the primary service `fff6`, C1 (`write`, `WriteAcquired`), C2 (`indicate`, `NotifyAcquired`), C3 (`read`, the additional data); `org.bluez.GattManager1.RegisterApplication`, `UnregisterApplication` when `Serve` returns |
+| a central's writes | `AcquireWrite` on C1 (options `device`, `mtu`): a socket pair, each packet one C1 write; the first acquire of a device accepts its connection |
+| the subscription and indications | `AcquireNotify` on C2: a socket pair, each indication one packet; the confirmation a byte 1 on the socket (BlueZ 5.80 and later) or C2's `Confirm` (up to 5.73); the socket's end is the unsubscription |
+| the advertisement | an `org.bluez.LEAdvertisement1` (`Type` peripheral, `ServiceUUIDs` `fff6`, `ServiceData`, `Discoverable`, `LocalName` `MATTER-<discriminator>`, `MinInterval` = `MaxInterval`); `LEAdvertisingManager1.RegisterAdvertisement`, later changes as `PropertiesChanged`, `UnregisterAdvertisement` |
+| disconnect | `org.bluez.Device1.Disconnect`; `Connected=false` or the device's removal ends the connection |
+
+bluetoothd keeps the adapter: unlike bleno's HCI user channel, the
+peripheral shares it with every other BlueZ client.
+
 ## Rights
 
 BlueZ answers only callers its D-Bus policy admits. On most distributions
@@ -63,7 +95,8 @@ An adapter that is off answers `org.bluez.Error.NotReady`
 
 ## Platforms
 
-Linux only. Elsewhere `NewCentral` returns `bluez.ErrUnsupported`: macOS
+Linux only. Elsewhere `NewCentral` and `NewPeripheral` return
+`bluez.ErrUnsupported`: macOS
 and Windows need cgo or COM for their Bluetooth stacks (ADR 0024 decision 6).
 
 ## Licences
