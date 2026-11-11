@@ -141,7 +141,7 @@ cfg.Network.WiFi = &node.WiFi{Driver: wifi}
 | AddOrUpdateWiFiNetwork | the cluster stages the network (one) and its credential, nothing reaches the radio |
 | ConnectNetwork | the driver hands the network to wpa_supplicant and waits for the interface's `completed` state, at most 20 s; on success the node re-announces its DNS-SD records at once |
 | CommissioningComplete | the cluster commits the network into the node's store |
-| `Node.Start` | the committed network is rejoined before the fabrics' records go out |
+| `Node.Start` | the committed network is rejoined before the fabrics' records go out, which the start sequence then publishes |
 
 The host's part:
 
@@ -159,9 +159,14 @@ The host's part:
   place, and the node rejoins it at start.
 
 The credential is never logged, nor part of a debug text or an error. An
-SSID that is not valid UTF-8 or holds a NUL byte is refused
-(UnknownError): wpa_supplicant's D-Bus `AddNetwork` takes the SSID as a
-string. Empty credentials join an open network.
+SSID that is valid UTF-8 goes to wpa_supplicant as a string, any other as
+its bytes; a credential of exactly 64 hex digits is the raw PSK, any other
+a passphrase. Empty credentials join an open network. A join that does not
+succeed removes the network it added, so wpa_supplicant does not keep
+trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
+timeout when the network is out of range. The driver resolves the
+interface once, at `New`: after a wpa_supplicant restart the host builds a
+new driver.
 
 *Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),

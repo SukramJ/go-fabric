@@ -21,6 +21,8 @@ type fakeCall struct {
 	path   dbus.ObjectPath
 	method string
 	args   []any
+	// afterClose: the bus was closed when the call came.
+	afterClose bool
 }
 
 // fakeBus plays wpa_supplicant over the bus seam: one interface, its
@@ -39,6 +41,10 @@ type fakeBus struct {
 	fail map[string]error
 	// noScanDone: a scan never ends.
 	noScanDone bool
+	// scanFailed: ScanDone reports success false.
+	scanFailed bool
+	// onDisconnect runs on Disconnect before its own state change.
+	onDisconnect func(b *fakeBus)
 	// onSelect runs on SelectNetwork; nil walks associating, associated,
 	// completed.
 	onSelect func(b *fakeBus, n int)
@@ -79,6 +85,20 @@ func (b *fakeBus) setState(s string) {
 	b.setStateLocked(s)
 }
 
+// removed is the RemoveNetwork calls of the added network, and whether
+// one came after the bus closed.
+func (b *fakeBus) removed() (n int, afterClose bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, c := range b.calls {
+		if c.method == ifaceInterface+".RemoveNetwork" && c.args[0] == fakeNetwork {
+			n++
+			afterClose = afterClose || c.afterClose
+		}
+	}
+	return n, afterClose
+}
+
 // called is the methods called, in order, without the property reads.
 func (b *fakeBus) called() []string {
 	b.mu.Lock()
@@ -101,7 +121,7 @@ func (b *fakeBus) callsCopy() []fakeCall {
 func (b *fakeBus) Call(_ context.Context, path dbus.ObjectPath, method string, args ...any) ([]any, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.calls = append(b.calls, fakeCall{path: path, method: method, args: args})
+	b.calls = append(b.calls, fakeCall{path: path, method: method, args: args, afterClose: b.closed})
 	if b.closed {
 		return nil, dbus.ErrClosed
 	}
@@ -128,13 +148,16 @@ func (b *fakeBus) Call(_ context.Context, path dbus.ObjectPath, method string, a
 		return []any{props}, nil
 	case ifaceInterface + ".Scan":
 		if !b.noScanDone {
-			b.sigs <- &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{true}}
+			b.sigs <- &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{!b.scanFailed}}
 		}
 	case ifaceInterface + ".AddNetwork":
 		return []any{fakeNetwork}, nil
 	case ifaceInterface + ".RemoveNetwork":
 		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
 	case ifaceInterface + ".Disconnect":
+		if b.onDisconnect != nil {
+			b.onDisconnect(b)
+		}
 		if s, _ := b.props["State"].Value().(string); s != stateDisconnected {
 			b.setStateLocked(stateDisconnected)
 		}

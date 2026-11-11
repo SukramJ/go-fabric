@@ -31,7 +31,10 @@ The host runs wpa_supplicant with its D-Bus interface, keeps the interface out
 of NetworkManager's hands, grants the process the system bus's permission for
 `fi.w1.wpa_supplicant1`, and does the addressing: the driver saves nothing into
 wpa_supplicant's configuration (the node's store keeps the committed network)
-and runs no DHCP client. The Wi-Fi credential is never logged.
+and runs no DHCP client. The Wi-Fi credential is never logged. The
+interface's D-Bus path is resolved once, at `New`: after a wpa_supplicant
+restart the driver's calls fail, and the host builds a new `Driver` — that
+supervision is the host's.
 
 `make wpasupplicant-check` builds (Linux and the `!linux` stub), vets, tests
 (over an in-process bus that plays wpa_supplicant) and lints the module; the

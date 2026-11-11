@@ -6,6 +6,7 @@ package wpasupplicant
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -72,7 +73,9 @@ const (
 )
 
 // Options configures [New]. The zero value is wlan0 with connectedhomeip's
-// maxima.
+// maxima. The interface's D-Bus path is resolved once, at New: when
+// wpa_supplicant restarts, the Driver's calls fail and the host builds a
+// new Driver (its process supervision).
 type Options struct {
 	// Interface is the Wi-Fi interface wpa_supplicant manages ("" is
 	// wlan0).
@@ -98,9 +101,17 @@ type Driver struct {
 	connectTimeout time.Duration
 	log            *slog.Logger
 
-	mu      sync.Mutex
-	scan    chan struct{} // non-nil while a scan waits for ScanDone
-	connect *attempt      // non-nil while a join follows State
+	mu         sync.Mutex
+	scan       chan struct{} // non-nil while a scan waits for ScanDone
+	connecting bool          // a join runs
+	connect    *attempt      // non-nil while a join follows State
+
+	// register hands the run loop a join's attempt once the join has
+	// selected nothing yet (listen).
+	register chan *attempt
+	// calls counts the scans and joins in flight: Close lets them finish
+	// (a failed join removes its network) before it releases the bus.
+	calls sync.WaitGroup
 
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -113,8 +124,14 @@ var _ contract.WiFiDriver = (*Driver)(nil)
 // attempt is one join's view of the interface's State changes.
 type attempt struct {
 	states chan string
-	done   chan struct{}
+	// ready is closed once the run loop installed the attempt.
+	ready chan struct{}
+	done  chan struct{}
 }
+
+// removeTimeout bounds the RemoveNetwork of a failed join's network, which
+// runs after the join's own context may have ended.
+const removeTimeout = 2 * time.Second
 
 // newDriver brings the interface up over b and starts following its
 // signals. Mirrors connectedhomeip
@@ -126,7 +143,8 @@ type attempt struct {
 func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 	d := &Driver{
 		bus: b, scanTimeout: opts.ScanTimeout, connectTimeout: opts.ConnectTimeout, log: opts.Logger,
-		closed: make(chan struct{}), loopDone: make(chan struct{}),
+		register: make(chan *attempt),
+		closed:   make(chan struct{}), loopDone: make(chan struct{}),
 	}
 	ifname := opts.Interface
 	if ifname == "" {
@@ -184,6 +202,25 @@ func (d *Driver) run() {
 				return
 			}
 			d.handle(s)
+		case a := <-d.register:
+			// The signals already queued were sent before the reply of the
+			// join's last call before SelectNetwork (godbus delivers a
+			// signal into the channel before it reads the next message):
+			// they belong to the network that was current, to its removal
+			// and to the driver's own Disconnect, not to this attempt.
+			// They are handled without it — a scan still sees its
+			// ScanDone — and the attempt follows only what comes after.
+			for n := len(sigs); n > 0; n-- {
+				s, ok := <-sigs
+				if !ok {
+					return
+				}
+				d.handle(s)
+			}
+			d.mu.Lock()
+			d.connect = a
+			d.mu.Unlock()
+			close(a.ready)
 		}
 	}
 }
@@ -194,6 +231,11 @@ func (d *Driver) handle(s *dbus.Signal) {
 	}
 	switch s.Name {
 	case sigScanDone:
+		// The signal's success argument is not read: connectedhomeip's
+		// _OnWpaInterfaceScanDone reads the interface's BSSs whatever it
+		// says (ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:1545-1595
+		// at 6170af84; success is unused). A ScanDone of a scan another
+		// client started ends a waiting scan as well, as there.
 		d.mu.Lock()
 		ch := d.scan
 		d.mu.Unlock()
@@ -253,11 +295,13 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 		return statusUnknown, "a scan is in progress", nil
 	}
 	d.scan = done
+	d.calls.Add(1)
 	d.mu.Unlock()
 	defer func() {
 		d.mu.Lock()
 		d.scan = nil
 		d.mu.Unlock()
+		d.calls.Done()
 	}()
 	ctx, cancel := context.WithTimeout(ctx, d.scanTimeout)
 	defer cancel()
@@ -314,48 +358,101 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 // network again (:324-348). The timeout, the call's context and Close end
 // it with UnknownError and errorValue 0.
 //
-// Empty credentials join an open network: key_mgmt "NONE" without a psk
-// (connectedhomeip sends psk "" with "SAE WPA-PSK"). An SSID that is not
-// valid UTF-8 or holds a NUL is refused: chip hands the SSID as a D-Bus
-// string, and wpa_supplicant's D-Bus documentation (doc/dbus.doxygen,
-// fi.w1.wpa_supplicant1.Interface AddNetwork) names no other form for a
-// network-block entry than its "appropriate type". The committed network
-// is not saved into wpa_supplicant's configuration (no SaveConfig): the
-// node's store keeps it and the cluster rejoins it at start.
+// The attempt follows the State changes from SelectNetwork on only
+// ([Driver.listen]). A join that does not end in Success removes the
+// network it added ([Driver.removeAdded]); connectedhomeip keeps it. The
+// network's arguments are [networkArgs]'s. The committed network is not
+// saved into wpa_supplicant's configuration (no SaveConfig): the node's
+// store keeps it and the cluster rejoins it at start.
 func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (status uint8, debugText string, errorValue int32) {
-	a := &attempt{states: make(chan string, 16), done: make(chan struct{})}
 	d.mu.Lock()
 	switch {
 	case d.isClosed():
 		d.mu.Unlock()
 		return statusUnknown, "the driver is closed", 0
-	case d.connect != nil:
+	case d.connecting:
 		d.mu.Unlock()
 		return statusUnknown, "a connect is in progress", 0
 	}
-	d.connect = a
+	d.connecting = true
+	d.calls.Add(1)
 	d.mu.Unlock()
 	defer func() {
 		d.mu.Lock()
+		d.connecting = false
 		d.connect = nil
 		d.mu.Unlock()
-		close(a.done)
+		d.calls.Done()
 	}()
 	ctx, cancel := context.WithTimeout(ctx, d.connectTimeout)
 	defer cancel()
 
 	ssidAttr := slog.String("ssid", fmt.Sprintf("%q", ssid))
-	network, debugText := d.addAndSelect(ctx, ssid, credentials, ssidAttr)
+	network, debugText := d.addNetwork(ctx, ssid, credentials, ssidAttr)
 	if debugText != "" {
 		return statusUnknown, debugText, 0
 	}
-	return d.await(ctx, a, network, ssidAttr)
+	_, _ = d.bus.Call(ctx, d.iface, ifaceInterface+".Disconnect")
+	a, ok := d.listen()
+	if !ok {
+		d.removeAdded(ctx, network)
+		return statusUnknown, "the driver is closed", 0
+	}
+	defer close(a.done)
+	if err := d.selectNetwork(ctx, network); err != nil {
+		d.removeAdded(ctx, network)
+		return statusUnknown, "select network: " + errName(err), 0
+	}
+	status, debugText, errorValue = d.await(ctx, a, network, ssidAttr)
+	if status != statusSuccess {
+		d.removeAdded(ctx, network)
+	}
+	return status, debugText, errorValue
 }
 
-// addAndSelect hands the network to wpa_supplicant and selects it: the
-// part of ConnectNetwork before the State walk. A non-empty debugText is
-// the failure.
-func (d *Driver) addAndSelect(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network dbus.ObjectPath, debugText string) {
+// listen starts the join's attempt: from here on the interface's State
+// changes are its own. It runs after the driver's Disconnect has returned
+// and right before SelectNetwork, so a change caused by the network that
+// was current, its removal or the Disconnect does not decide the join
+// (the run loop drains them first). False when the driver closed.
+func (d *Driver) listen() (*attempt, bool) {
+	a := &attempt{states: make(chan string, 16), ready: make(chan struct{}), done: make(chan struct{})}
+	select {
+	case d.register <- a:
+	case <-d.closed:
+		return nil, false
+	}
+	select {
+	case <-a.ready:
+		return a, true
+	case <-d.closed:
+		return nil, false
+	}
+}
+
+// removeAdded removes the network a join added once the join did not end
+// in Success — its select failed, the interface disconnected, the timeout,
+// the call's context or Close ended it. The credential lives in the node's
+// store only, and wpa_supplicant must not keep trying a network whose
+// join the node already reported as failed. connectedhomeip keeps the
+// network (_ConnectWiFiNetworkAsync, :852-911 at 6170af84, removes only
+// the current network at the next join). The call runs on a context of
+// its own, since the join's may have ended; a failure is logged by its
+// D-Bus error name.
+func (d *Driver) removeAdded(ctx context.Context, network dbus.ObjectPath) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", network); err != nil {
+		d.log.Warn("wpasupplicant: failed to remove the network of a failed join", slog.String("path", string(network)), slog.String("reason", errName(err)))
+		return
+	}
+	d.log.Debug("wpasupplicant: removed the network of a failed join", slog.String("path", string(network)))
+}
+
+// addNetwork hands the network to wpa_supplicant: the part of
+// ConnectNetwork before the State walk. A non-empty debugText is the
+// failure; then nothing was added.
+func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network dbus.ObjectPath, debugText string) {
 	args, refusal := networkArgs(ssid, credentials)
 	if refusal != "" {
 		d.log.Warn("wpasupplicant: network refused", slog.String("reason", refusal))
@@ -388,10 +485,6 @@ func (d *Driver) addAndSelect(ctx context.Context, ssid, credentials []byte, ssi
 		return "", "add network: " + errName(err)
 	}
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
-	_, _ = d.bus.Call(ctx, d.iface, ifaceInterface+".Disconnect")
-	if err := d.selectNetwork(ctx, network); err != nil {
-		return "", "select network: " + errName(err)
-	}
 	return network, ""
 }
 
@@ -447,19 +540,56 @@ func (d *Driver) selectNetwork(ctx context.Context, network dbus.ObjectPath) err
 	return err
 }
 
+// rawPSKHexLength is the length of a raw WPA PSK written as hex digits:
+// 32 bytes.
+const rawPSKHexLength = 64
+
 // networkArgs is AddNetwork's argument for the network, or why it is
 // refused. The refusal names no byte of the credential.
+//
+// wpa_supplicant turns a D-Bus string entry into a quoted configuration
+// value unless its key is in dont_quote ("ssid" and "psk" are not), and a
+// byte array into an unquoted hex string (hostap
+// wpa_supplicant/dbus/dbus_new_handlers.c:141-170, dont_quote and
+// should_quote_opt, and :225-257 in set_network_properties, at 6d3d778).
+// A quoted psk is a passphrase of 8 to 63 characters, an unquoted one
+// 64 hex digits, the raw PSK (wpa_supplicant/config.c:620-695,
+// wpa_config_parse_psk; wpa_supplicant/wpa_supplicant.conf:1171-1175); an
+// ssid is a quoted string or a hex string of its octets
+// (wpa_supplicant.conf:971-974). So:
+//
+//   - the SSID goes as a string when it is valid UTF-8 without NUL —
+//     connectedhomeip's form (:936-940 at 6170af84) and what its test mock
+//     sees — and as a byte array otherwise, which reaches wpa_supplicant as
+//     the hex form of its octets;
+//   - a credential of exactly 64 hex digits is the raw PSK and goes as a
+//     byte array of its 32 bytes: as a string (connectedhomeip's form)
+//     wpa_supplicant would quote it and refuse it as an over-long
+//     passphrase. Every other credential goes as a string; one that is not
+//     valid UTF-8 or holds a NUL cannot be a D-Bus string and is refused.
+//
+// Empty credentials join an open network: key_mgmt "NONE" without a psk
+// (connectedhomeip sends psk "" with "SAE WPA-PSK").
 func networkArgs(ssid, credentials []byte) (args map[string]dbus.Variant, refusal string) {
-	if !utf8.Valid(ssid) || bytes.IndexByte(ssid, 0) >= 0 {
-		return nil, "the SSID is not valid UTF-8 or holds a NUL; wpa_supplicant's D-Bus AddNetwork takes it as a string"
+	args = map[string]dbus.Variant{}
+	if utf8.Valid(ssid) && bytes.IndexByte(ssid, 0) < 0 {
+		args["ssid"] = dbus.MakeVariant(string(ssid))
+	} else {
+		args["ssid"] = dbus.MakeVariant(bytes.Clone(ssid))
 	}
-	args = map[string]dbus.Variant{"ssid": dbus.MakeVariant(string(ssid))}
-	if len(credentials) == 0 {
+	switch {
+	case len(credentials) == 0:
 		args["key_mgmt"] = dbus.MakeVariant("NONE")
 		return args, ""
+	case len(credentials) == rawPSKHexLength:
+		if psk, err := hex.DecodeString(string(credentials)); err == nil {
+			args["psk"] = dbus.MakeVariant(psk)
+			args["key_mgmt"] = dbus.MakeVariant("SAE WPA-PSK")
+			return args, ""
+		}
 	}
 	if !utf8.Valid(credentials) || bytes.IndexByte(credentials, 0) >= 0 {
-		return nil, "the credential is not valid UTF-8 or holds a NUL; wpa_supplicant's D-Bus AddNetwork takes it as a string"
+		return nil, "the credential is not valid UTF-8 or holds a NUL; wpa_supplicant's D-Bus AddNetwork takes a passphrase as a string"
 	}
 	args["psk"] = dbus.MakeVariant(string(credentials))
 	args["key_mgmt"] = dbus.MakeVariant("SAE WPA-PSK")
@@ -520,7 +650,11 @@ func (d *Driver) isClosed() bool {
 // It is idempotent.
 func (d *Driver) Close() error {
 	d.closeOnce.Do(func() {
+		d.mu.Lock()
 		close(d.closed)
+		d.mu.Unlock()
+		// A join ended by Close removes its network over the bus first.
+		d.calls.Wait()
 		d.closeErr = d.bus.Close()
 		<-d.loopDone
 	})

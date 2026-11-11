@@ -6,6 +6,7 @@ package wpasupplicant
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"slices"
@@ -452,20 +453,178 @@ func TestConnectOpenNetwork(t *testing.T) {
 	}
 }
 
-// TestConnectNonUTF8SSID: an SSID wpa_supplicant's D-Bus AddNetwork
-// cannot take as a string is refused before any call.
+// TestConnectNonUTF8SSID: an SSID that is not valid UTF-8 or holds a NUL
+// goes as a byte array (wpa_supplicant writes it as the hex form of its
+// octets); one that is valid UTF-8 stays a string.
 func TestConnectNonUTF8SSID(t *testing.T) {
 	t.Parallel()
 	for _, ssid := range [][]byte{{0xff, 0xfe, 'a'}, []byte("la\x00b")} {
 		b := newFakeBus()
 		d, logs := startDriver(t, b, Options{})
 		status, debug, _ := d.ConnectNetwork(t.Context(), ssid, []byte(testCredential))
-		if status != statusUnknown || !strings.Contains(debug, "SSID") || len(b.called()) != 2 {
-			t.Errorf("ConnectNetwork(%q) = %d %q, calls %v", ssid, status, debug, b.called())
+		if status != statusSuccess {
+			t.Errorf("ConnectNetwork(%q) = %d %q", ssid, status, debug)
+		}
+		if got, ok := addNetworkArgs(t, b)["ssid"].Value().([]byte); !ok || !bytes.Equal(got, ssid) {
+			t.Errorf("AddNetwork ssid %v, want the bytes %q", addNetworkArgs(t, b)["ssid"], ssid)
 		}
 		if strings.Contains(logs.String(), testCredential) {
 			t.Error("the credential leaked")
 		}
+	}
+}
+
+// TestConnectRawPSK: a credential of exactly 64 hex digits is the raw PSK
+// and goes as its 32 bytes; a 63-character passphrase and a 64-character
+// credential that is not hex stay strings.
+func TestConnectRawPSK(t *testing.T) {
+	t.Parallel()
+	raw := strings.Repeat("0123456789abcdEF", 4)
+	for _, tc := range []struct {
+		cred  string
+		bytes bool
+	}{
+		{raw, true},
+		{strings.Repeat("p", 63), false},
+		{strings.Repeat("g", 64), false},
+		{raw[:62] + "zz", false},
+	} {
+		b := newFakeBus()
+		d, logs := startDriver(t, b, Options{})
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(tc.cred)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q", status, debug)
+		}
+		psk := addNetworkArgs(t, b)["psk"].Value()
+		if tc.bytes {
+			want, _ := hex.DecodeString(raw)
+			if got, ok := psk.([]byte); !ok || !bytes.Equal(got, want) || len(got) != 32 {
+				t.Errorf("psk %T, want the 32 raw bytes", psk)
+			}
+		} else if got, ok := psk.(string); !ok || got != tc.cred {
+			t.Errorf("psk %T, want the string", psk)
+		}
+		if strings.Contains(strings.ToLower(logs.String()), strings.ToLower(tc.cred)) {
+			t.Error("the credential leaked")
+		}
+	}
+}
+
+// TestConnectIgnoresStatesBeforeSelect: State changes from before the
+// join's SelectNetwork — the network that was current, its removal, the
+// driver's own Disconnect — do not decide the join.
+func TestConnectIgnoresStatesBeforeSelect(t *testing.T) {
+	t.Parallel()
+	// A stale "associating" before Disconnect's "disconnected": the new
+	// network then walks to completed.
+	b := newFakeBus()
+	b.props["State"] = dbus.MakeVariant(stateCompleted)
+	b.onDisconnect = func(b *fakeBus) { b.setStateLocked("associating") }
+	d, _ := startDriver(t, b, Options{})
+	if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+		t.Errorf("ConnectNetwork = %d %q, want Success from the new network's walk", status, debug)
+	}
+
+	// A stale "associating, completed" pair while the new network never
+	// associates: no Success.
+	b = newFakeBus()
+	b.props["State"] = dbus.MakeVariant(stateDisconnected)
+	b.onDisconnect = func(b *fakeBus) {
+		b.setStateLocked("associating")
+		b.setStateLocked(stateCompleted)
+		b.setStateLocked(stateDisconnected)
+	}
+	b.onSelect = func(*fakeBus, int) {}
+	d, _ = startDriver(t, b, Options{ConnectTimeout: 50 * time.Millisecond})
+	if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown || !strings.Contains(debug, "in time") {
+		t.Errorf("ConnectNetwork = %d %q, want the timeout", status, debug)
+	}
+}
+
+// TestConnectFailureRemovesNetwork: every join that does not end in
+// Success removes the network it added — a failed select, a
+// "disconnected" verdict, the timeout, the call's context, Close (over the
+// bus, before Close releases it); a Success keeps it.
+func TestConnectFailureRemovesNetwork(t *testing.T) {
+	t.Parallel()
+	disconnects := func(b *fakeBus, _ int) {
+		b.setStateLocked("associating")
+		b.setStateLocked(stateDisconnected)
+	}
+	stalls := func(*fakeBus, int) {}
+	for _, tc := range []struct {
+		name    string
+		setup   func(b *fakeBus)
+		opts    Options
+		ctx     func(t *testing.T) context.Context
+		status  uint8
+		removes int
+	}{
+		{"success", func(*fakeBus) {}, Options{}, nil, statusSuccess, 0},
+		{"select fails", func(b *fakeBus) {
+			b.fail[ifaceInterface+".SelectNetwork"] = dbus.NewError("fi.w1.wpa_supplicant1.UnknownError", nil)
+		}, Options{}, nil, statusUnknown, 1},
+		{"disconnected", func(b *fakeBus) { b.onSelect = disconnects }, Options{}, nil, statusUnknown, 1},
+		{"timeout", func(b *fakeBus) { b.onSelect = stalls }, Options{ConnectTimeout: 20 * time.Millisecond}, nil, statusUnknown, 1},
+		{"context", func(b *fakeBus) { b.onSelect = stalls }, Options{ConnectTimeout: time.Hour}, func(t *testing.T) context.Context {
+			t.Helper()
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+			t.Cleanup(cancel)
+			return ctx
+		}, statusUnknown, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := newFakeBus()
+			tc.setup(b)
+			d, _ := startDriver(t, b, tc.opts)
+			ctx := t.Context()
+			if tc.ctx != nil {
+				ctx = tc.ctx(t)
+			}
+			if status, debug, _ := d.ConnectNetwork(ctx, []byte("lab"), []byte(testCredential)); status != tc.status {
+				t.Fatalf("ConnectNetwork = %d %q", status, debug)
+			}
+			if n, _ := b.removed(); n != tc.removes {
+				t.Errorf("%d removals of the added network, want %d", n, tc.removes)
+			}
+		})
+	}
+
+	t.Run("close", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		b.onSelect = stalls
+		d, _ := startDriver(t, b, Options{ConnectTimeout: time.Hour})
+		result := make(chan uint8, 1)
+		go func() {
+			status, _, _ := d.ConnectNetwork(context.Background(), []byte("lab"), []byte(testCredential))
+			result <- status
+		}()
+		<-b.selected
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if s := <-result; s != statusUnknown {
+			t.Errorf("status %d", s)
+		}
+		if n, afterClose := b.removed(); n != 1 || afterClose {
+			t.Errorf("%d removals, after the bus closed: %v", n, afterClose)
+		}
+	})
+}
+
+// TestScanDoneFailure: a ScanDone that reports success false ends the
+// scan as one that reports true — connectedhomeip reads the BSSs either
+// way.
+func TestScanDoneFailure(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.scanFailed = true
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{"/b/1"})
+	b.bss["/b/1"] = bssProps("lab", bssid1, -50, 2437, nil, nil)
+	d, _ := startDriver(t, b, Options{})
+	if status, _, results := d.ScanNetworks(t.Context(), nil); status != statusSuccess || len(results) != 1 {
+		t.Errorf("ScanNetworks = %d, %v", status, results)
 	}
 }
 
