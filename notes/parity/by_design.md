@@ -6355,7 +6355,7 @@ reaches the same controller through bluetoothd, as connectedhomeip's Linux
 platform does (`src/platform/Linux/bluez/BluezEndpoint.cpp:448-534`,
 `BluezAdvertisement.cpp:43-101`, `BluezConnection.cpp:172-238` at `6170af84`):
 a GATT application with C1 through `AcquireWrite` and C2 through
-`AcquireNotify`, and an `LEAdvertisement1` object. Five things follow from
+`AcquireNotify`, and an `LEAdvertisement1` object. Six things follow from
 the platform. (1) BlueZ composes the advertisement from properties: the
 service data is taken out of the payload matter.js would hand bleno, the
 flags are BlueZ's, and the local name is connectedhomeip's
@@ -6373,7 +6373,12 @@ does not report it on this path at the pin (`BLEManagerImpl.cpp:699-712`).
 held until it was: the two travel on different sockets, so their order of
 arrival is the platform's, not the central's, and matter.js's refusal of a
 subscription before the handshake request (`BlenoBleServer.ts:288-291`)
-would refuse a correct central. Everything above the platform is
+would refuse a correct central. (6) Where bluetoothd reports an
+indication's confirmation through C2's `Confirm` call, the call names no
+device: connectedhomeip completes the connection of the device seen last
+(`BluezEndpoint.cpp:207-217`), the peripheral the live connection that
+waits for one, so a refused second central cannot take the first one's
+confirmations (`TestPeripheralConfirmAfterRefusedCentral`). Everything above the platform is
 matter.js's and shared by every platform — the handshake held until the
 subscription, the 15 s timer, the single session, the advertisement's
 schedule, BLE only without a fabric (`transport/btp/accept.go`,
