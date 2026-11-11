@@ -66,7 +66,19 @@ these interfaces does not drag the host's dependencies into the module.
 | `SwitchEventEmitter` | the module (`cluster/switch.Server`) | the press gestures a host narrates (InitialPress, ShortRelease, LongPress, LongRelease); handed to a source with `WireMatterSwitchHandler` | — |
 | `SwitchPositionSink` | the module (`cluster/switch.Server`) | the positions a host reports (`SetRawPosition` debounced, `SetCurrentPosition`); the server derives every Switch event, multi press included, as matter.js `SwitchServer.ts` does; handed to a source with `WireMatterSwitchPositions` | a source without either method reports no press |
 
-*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
+### Radios
+
+A device-side host that commissions over Bluetooth LE and joins Wi-Fi
+supplies its radios; what goes on the air — the BTP session, the
+advertisement's bytes and schedule, when the node is on the radio — stays
+in the module.
+
+| Interface | Implemented by | What it does | When absent |
+| --- | --- | --- | --- |
+| `BLEPeripheral` (`BLEAdvertisement`, `BLEConnection`) | the host's BLE stack: `ble/bluez.NewPeripheral` on Linux, `bletest.Peripheral.Radio` in tests | advertises the payload the node gives, serves the Matter GATT service (C1, C2, C3) and hands each central's connection to the node | no BLE: the node is commissionable over IP only and its QR code says so |
+| `WiFiDriver` | the host's Wi-Fi stack | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
+
+*Source: `contract/doc.go:4-18`, `contract/ble.go`, `contract/wifi.go`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
 ## `node.Config`: the facade's ports
 
@@ -79,6 +91,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update; `TransferProtocols` adds the HTTPS download, whose GET goes through `HTTPClient` | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied`. Empty `TransferProtocols` announces BDX alone, and a list without `OTADownloadBDXSynchronous` fails the build; a nil `HTTPClient` is the module's client, which follows a redirect only to an `https://` target; a host's client keeps its own redirect policy |
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
+| `Network.BLE` | the node's Bluetooth LE radio (`contract.BLEPeripheral`): while the node has no fabric its own window is advertised over BLE and PASE is served over BTP; the QR code carries the BLE discovery bit ([Operations](operations.md#ble-commissioning)) | no BLE; the node never touches a radio |
 | `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null |
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
@@ -174,6 +187,7 @@ the next `Reassemble`.
 | `SetSubscriptionPersistence` | on by default; off, no subscription is recorded or re-established after a restart |
 | `SetICDAdvertisement`, `SetLocalFixedMRPBackoff`, `SetOnInboundActivity` | an ICD only, silent: the ICD's record and MRP padding stay those of a non-ICD node, and inbound traffic does not extend its active window |
 | `SetOnReassembled`, `SetOnFabricRemoved` | nil-safe observer hooks. A fabric's installation is observed on the node (`node.Observers.OnFabricAdded`) |
+| `Config.BLE`, then `StartBLE` / `StopBLE` | no BLE: StartBLE refuses and the bridge never touches a radio. The facade starts BLE with the own window of a node without a fabric and stops it when the window closes |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
 
 Strict refuses only what an addition causes. Each `Start` and `Reassemble`

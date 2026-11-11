@@ -28,9 +28,11 @@ Alliance, and nothing built on it may be described as certified.
   and embedded; all 135 clusters of the snapshot served and all 91 device
   types generated.
 - **Transports:** IPv6 (and IPv4) UDP with MRP, TCP for large payloads,
-  DNS-SD. No Thread radio, no Bluetooth on the device side; the
-  commissioner commissions over BLE
-  ([ADR 0024](adr/0024-ble-commissioning-in-the-controller.md)).
+  DNS-SD; an uncommissioned node is commissionable over Bluetooth LE
+  through a host's radio (`node.Network.BLE`), and the commissioner
+  commissions over BLE
+  ([ADR 0024](adr/0024-ble-commissioning-in-the-controller.md)). No Thread
+  radio.
 - **Proof:** connectedhomeip's own certification cases run against the
   reference daemon in CI, and the module's controller commissions the
   module's node in-repo. The [certifiability report](certifiability.md)

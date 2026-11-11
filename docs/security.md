@@ -52,7 +52,9 @@ rather than fall back silently.
 - **Certification.** Nothing here is CSA-certified, and a product built on
   it is not certified by virtue of it ([ADR 0011](adr/0011-certifiability-is-a-goal.md)).
 - **Encryption at rest, OS hardening, network segmentation** — the host's.
-- **Thread and BLE on the device side** — out of scope.
+- **Thread on the device side** — out of scope. BLE on the device side is
+  the host's radio (`node.Network.BLE`): its pairing and link security are
+  the platform's, and the node is on it only while it has no fabric.
 
 ## Reporting a vulnerability
 
