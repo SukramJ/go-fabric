@@ -148,6 +148,13 @@ type Node struct {
 	// reopenPending is set while a reopen after the last fabric waits for
 	// the node to become idle (reopenWhenIdle).
 	reopenPending atomic.Bool
+	// commissioned is matter.js's CommissioningServer state.commissioned
+	// (CommissioningServer.ts:148-165 at db021da0): true from a start
+	// with stored fabrics and from a committed CommissioningComplete, false
+	// once the last fabric of a commissioned node is removed. A fabric
+	// that only a fail-safe added leaves it false, so the fail-safe's
+	// rollback of that fabric decommissions nothing.
+	commissioned atomic.Bool
 	cancel        context.CancelFunc
 	keeperWG      sync.WaitGroup
 
@@ -592,6 +599,24 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if srv := n.root.TLSCertificateManagement; srv != nil {
 		srv.FabricRemoved(ctx, fabricIndex)
 	}
+	n.reopenIfDecommissionedWhenIdle(ctx)
+}
+
+// reopenIfDecommissionedWhenIdle reopens the own window after the removal
+// of a commissioned node's last fabric (reopenWhenIdle). A fabric that
+// only the fail-safe added — a first commissioning rolled back — does not
+// decommission the node: matter.js's #syncCommissioned sees no change
+// for it (commissioned was never set, CommissioningServer.ts:148-152 at
+// db021da0; a deletion is synced at once, :118-134) and starts no reset
+// (:136-140), so the window stays as the commissioning left it.
+func (n *Node) reopenIfDecommissionedWhenIdle(ctx context.Context) {
+	if !n.commissioned.Load() {
+		return
+	}
+	if fabrics, err := n.st.ListFabrics(ctx); err != nil || len(fabrics) > 0 {
+		return
+	}
+	n.commissioned.Store(false)
 	n.reopenWhenIdle()
 }
 
@@ -720,6 +745,7 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
+	n.commissioned.Store(true)
 	n.leaveRadioWhenCommissioned() //nolint:contextcheck // the stop outlives the CommissioningComplete request on purpose (its response must not wait for the radio); it is bounded by the node's lifetime, n.life
 	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
 	// response and a grace, since the command itself arrives over the
@@ -924,6 +950,8 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// commissioned node, not a new one: advertising it as commissionable
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
+	// A node with stored fabrics starts commissioned.
+	n.commissioned.Store(err == nil && stored > 0)
 	switch {
 	case err != nil:
 	case stored == 0:

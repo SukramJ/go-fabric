@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
@@ -171,26 +170,39 @@ func (w joinWiFi) ConnectNetwork(context.Context, []byte, []byte) (status uint8,
 
 // bleSite is a site with one BLE device on Wi-Fi commissioning and a
 // controller.
-func bleSite(t *testing.T, drv joinWiFi) (*fabrictest.Site, *fabrictest.Device, *controller.Controller) {
+func bleSite(t *testing.T, drv joinWiFi) (*fabrictest.Site, *fabrictest.Device, *fabrictest.Controller) {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
+	c := site.AddController(fabrictest.ControllerOptions{})
 	dev := site.AddDevice(fabrictest.Topology{BLE: true, Configure: func(cfg *node.Config) {
 		fabrictest.UseWiFiCommissioning(cfg, drv)
 	}})
-	var c *controller.Controller
-	if err := site.Run(bleCtx(t), func(ctx context.Context) (err error) {
-		c, err = controller.New(ctx, site.ControllerConfig(fabrictest.ControllerOptions{}))
-		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = site.Run(context.Background(), c.Close) })
 	return site, dev, c
 }
 
-// closeWindowAfterPASE is a pairing progress hook that closes the device's
-// window once PASE over BLE succeeded — the transition the own window's
-// timer runs (Node.CloseWindow and the timer both end it through
+// commissionOverBLE commissions dev over a BTP channel to its radio — BLE
+// only, no race with the IP network — calling progress on every step.
+func commissionOverBLE(t *testing.T, site *fabrictest.Site, dev *fabrictest.Device, c *fabrictest.Controller, progress func(commissioner.Step)) error {
+	t.Helper()
+	var ch *ble.Channel
+	if err := site.Run(bleCtx(t), func(ctx context.Context) (err error) {
+		ch, err = ble.Dial(ctx, bletest.NewCentral(dev.BLE()), ble.Peripheral{Address: dev.BLE().Address}, ble.DialOptions{})
+		return err
+	}); err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	_, err := c.Commission(bleCtx(t), dev, fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
+		o.Addresses, o.Channel = nil, ch
+		o.WiFiNetwork = &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"}
+		o.OnAttestationFailure = attestation.Accept()
+		o.Progress = progress
+	}})
+	return err
+}
+
+// closeWindowAfterPASE is a commissioning progress hook that closes the
+// device's window once PASE over BLE succeeded — the transition the own
+// window's timer runs (Node.CloseWindow and the timer both end it through
 // CommissioningWindow.closeLocked, without touching the fail-safe) — and
 // records the radio right after.
 type closeWindowAfterPASE struct {
@@ -202,8 +214,8 @@ type closeWindowAfterPASE struct {
 	connections int
 }
 
-func (h *closeWindowAfterPASE) progress(s controller.PairingStep) {
-	if s.Name != "PASE" || s.Phase != controller.PairingSucceeded {
+func (h *closeWindowAfterPASE) progress(s commissioner.Step) {
+	if s.Name != commissioner.StepPASE || s.Phase != commissioner.StepSucceeded {
 		return
 	}
 	_ = h.dev.Node().CloseWindow(context.Background())
@@ -226,18 +238,8 @@ func TestNodeBLEWindowCloseKeepsTheLink(t *testing.T) {
 	r := dev.BLE().Radio()
 	radioState(t, site, r, true, "the uncommissioned node on BLE")
 	h := &closeWindowAfterPASE{dev: dev}
-	code, err := setup.ManualCode(dev.Discriminator(), dev.Passcode())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := site.Run(bleCtx(t), func(ctx context.Context) error {
-		_, err := c.Pair(ctx, code, controller.PairOptions{
-			BLE: bletest.NewCentral(dev.BLE()), WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
-			OnAttestationFailure: attestation.Accept(), Progress: h.progress,
-		})
-		return err
-	}); err != nil {
-		t.Fatalf("Pair over BLE with the window closed after PASE: %v", err)
+	if err := commissionOverBLE(t, site, dev, c, h.progress); err != nil {
+		t.Fatalf("commission over BLE with the window closed after PASE: %v", err)
 	}
 	h.mu.Lock()
 	closed, serving, advertising, conns := h.closed, h.serving, h.advertising, h.connections
@@ -283,33 +285,45 @@ func TestNodeBLEReopenedWindowAdvertisesAgain(t *testing.T) {
 
 // TestNodeBLEFailSafeExpiryAfterWindowClose: a commissioning over BLE that
 // fails after the window closed rolls its fabric back; the node stays
-// uncommissioned with the service registered and nothing advertised over
-// BLE until a window opens.
+// uncommissioned with the window closed, the service registered and
+// nothing advertised over BLE — matter.js reopens nothing for a fabric only
+// the fail-safe added (CommissioningServer.ts:118-165 at db021da0) — until
+// a window opens.
 func TestNodeBLEFailSafeExpiryAfterWindowClose(t *testing.T) {
 	site, dev, c := bleSite(t, joinWiFi{fail: true})
 	r := dev.BLE().Radio()
 	radioState(t, site, r, true, "the uncommissioned node on BLE")
 	h := &closeWindowAfterPASE{dev: dev}
-	code, err := setup.ManualCode(dev.Discriminator(), dev.Passcode())
-	if err != nil {
-		t.Fatal(err)
+	if err := commissionOverBLE(t, site, dev, c, h.progress); err == nil {
+		t.Fatal("a commissioning whose network does not join succeeded")
 	}
-	if err := site.Run(bleCtx(t), func(ctx context.Context) error {
-		_, err := c.Pair(ctx, code, controller.PairOptions{
-			BLE: bletest.NewCentral(dev.BLE()), WiFi: &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
-			OnAttestationFailure: attestation.Accept(), Progress: h.progress,
-		})
-		return err
-	}); err == nil {
-		t.Fatal("a pairing whose network does not join succeeded")
+	h.mu.Lock()
+	closed, conns := h.closed, h.connections
+	h.mu.Unlock()
+	if !closed || conns != 1 {
+		t.Fatalf("the window was not closed over the BLE link: closed %v, connections %d", closed, conns)
 	}
 	if err := site.Eventually(bleCtx(t), "the fail-safe ended", func() bool {
 		return !dev.Node().Root().GeneralCommissioning.FailSafeArmed()
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if infos, err := dev.Node().FabricInfos(context.Background()); err != nil || len(infos) != 0 {
-		t.Fatalf("fabrics %v, %v: want the commissioning rolled back", infos, err)
+	if err := site.Eventually(bleCtx(t), "the fabric rolled back", func() bool {
+		infos, err := dev.Node().FabricInfos(context.Background())
+		return err == nil && len(infos) == 0
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The rollback decommissions nothing (CommissioningServer.ts:148-152 at
+	// db021da0): no reopen follows once the node is idle. Time moves well
+	// past the node's idle poll before the state is read.
+	if err := site.Eventually(bleCtx(t), "no session left", func() bool {
+		return len(dev.Node().SessionDiagnostics().Sessions) == 0
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := site.Step(bleCtx(t), 5*time.Second); err != nil {
+		t.Fatal(err)
 	}
 	serving, _ := r.Serving()
 	_, advertising := r.Advertising()
