@@ -17,6 +17,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -68,6 +69,11 @@ type Topology struct {
 	// acting on a MockServerNode created with `online: false` before
 	// node.start().
 	Prepare func(n *node.Node)
+	// BLE gives the device a Bluetooth radio of the in-memory BLE model
+	// (node.Network.BLE): while uncommissioned it is commissionable over
+	// BLE through its own bridge, as a device with a radio is, and its QR
+	// code says so. [Device.BLE] is the radio as a central reaches it.
+	BLE bool
 }
 
 // Device is an in-process Matter node of a site — a node.Node with its
@@ -106,6 +112,9 @@ type Device struct {
 	// group counts the work in hand of every node the device runs
 	// (internal/inflight), kept across restarts.
 	group *inflight.Group
+	// ble is the device's BLE peripheral with Topology.BLE, built at the
+	// first start and kept across restarts; nil without.
+	ble *bletest.Peripheral
 }
 
 // clientPort is the port of a device's client socket on its host address
@@ -304,6 +313,9 @@ func (d *Device) config() node.Config {
 	}
 	if cfg.Client != nil {
 		d.siteClient(&cfg)
+	}
+	if d.topo.BLE {
+		cfg.Network.BLE = d.blePeripheral(cfg).Radio()
 	}
 	return cfg
 }

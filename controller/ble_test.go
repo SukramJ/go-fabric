@@ -44,7 +44,7 @@ func (w *wifiDriver) ConnectNetwork(_ context.Context, ssid, credentials []byte)
 func TestPairOverBLE(t *testing.T) {
 	t.Parallel()
 	drv := &wifiDriver{}
-	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
+	site, dev, c := siteController(t, fabrictest.Topology{BLE: true, Configure: func(cfg *node.Config) {
 		fabrictest.UseWiFiCommissioning(cfg, drv)
 	}}, nil)
 	p := dev.BLE()

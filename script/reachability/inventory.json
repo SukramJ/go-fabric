@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7885,
+  "entry_points": 7905,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17893,
-    "reachable": 12411,
-    "whitelisted": 5482,
+    "total_exported": 17918,
+    "reachable": 12419,
+    "whitelisted": 5499,
     "unreachable": 0
   },
   "by_package": [],
@@ -902,10 +902,38 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBLEAdvertisementScheduleParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 273
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBLEDisconnectEvictsSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 149
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBLEOneCentralAtATime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 175
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBLERequestRepliedWithoutMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 112
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 410
+      "line": 417
     },
     {
       "package": "bridge",
@@ -4734,7 +4762,7 @@
       "identifier": "TestReceiveOverReliableServesUnsecuredDropsGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 383
+      "line": 390
     },
     {
       "package": "bridge",
@@ -5070,7 +5098,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 482
+      "line": 489
     },
     {
       "package": "bridge",
@@ -5333,6 +5361,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestStartBLENewWindowRestartsSchedule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 318
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStartBLERefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 225
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStartHealthProbe_BoundReportsHealthy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
@@ -5365,6 +5407,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/status_response_decode_test.go",
       "line": 33
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStopBLE",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_test.go",
+      "line": 197
     },
     {
       "package": "bridge",
@@ -5553,14 +5602,14 @@
       "identifier": "TestTCPConnClosedWhenLastSessionGoes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 244
+      "line": 251
     },
     {
       "package": "bridge",
       "identifier": "TestTCPConnectionDropEvictsBoundSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 215
+      "line": 222
     },
     {
       "package": "bridge",
@@ -5574,21 +5623,21 @@
       "identifier": "TestTCPInboundCloseSessionClosesConn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 301
+      "line": 308
     },
     {
       "package": "bridge",
       "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 339
+      "line": 346
     },
     {
       "package": "bridge",
       "identifier": "TestTCPRequestRepliedOnSameConnWithoutMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 184
+      "line": 191
     },
     {
       "package": "bridge",
@@ -5707,7 +5756,7 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 457
+      "line": 464
     },
     {
       "package": "bridge",
@@ -29612,14 +29661,14 @@
       "identifier": "TestPairBLEWithoutBLEOrNetwork",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 43
+      "line": 41
     },
     {
       "package": "examples/reference-controller/cli",
       "identifier": "TestPairBluetoothProxyFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 69
+      "line": 67
     },
     {
       "package": "examples/reference-controller/cli",
@@ -29633,7 +29682,7 @@
       "identifier": "TestPairOverBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 103
+      "line": 102
     },
     {
       "package": "examples/reference-controller/cli",
@@ -37411,6 +37460,76 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/fuzz_codec_test.go",
       "line": 64
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptDisconnectClosesParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 295
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptHandshakeThenSubscribeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 172
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptHandshakeTimeoutParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 254
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptIndicationWaitsForConfirmationParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 340
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptRefusesDataWithoutSessionParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 328
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptRefusesNil",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 159
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptRefusesSecondSessionParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 231
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptRefusesSubscribeBeforeHandshakeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 216
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptSessionCloseDisconnectsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 314
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestAcceptUnsubscribeClosesParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/accept_parity_matterjs_test.go",
+      "line": 277
     },
     {
       "package": "transport/btp",

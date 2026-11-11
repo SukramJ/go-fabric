@@ -12,14 +12,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
 // testWiFi is the harness's Wi-Fi driver: every scan finds the SSID, every
@@ -97,24 +95,18 @@ func TestPairBluetoothProxyFlag(t *testing.T) {
 	}
 }
 
-// TestPairOverBLE pairs the harness over an in-memory BTP pair: found by
-// its advertisement, PASE over BTP, the Wi-Fi network steps, then CASE
-// over IP found by DNS-SD, and a read over it.
+// TestPairOverBLE pairs the harness over its BLE radio (node.Network.BLE,
+// an in-memory bletest radio): found by its advertisement, PASE over BTP,
+// the Wi-Fi network steps, then CASE over IP found by DNS-SD, and a read
+// over it.
 func TestPairOverBLE(t *testing.T) {
 	drv := &testWiFi{}
-	h := startHarness(t, func(c *node.Config) { nodeseam.UseWiFiCommissioning(c, drv) })
+	p := &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: harnessDiscriminator, VendorID: 0xFFF1, ProductID: 0x8001}
+	h := startHarness(t, func(c *node.Config) {
+		nodeseam.UseWiFiCommissioning(c, drv)
+		c.Network.BLE = p.Radio()
+	})
 	tl := newTool(t, h)
-	p := &bletest.Peripheral{
-		Address: "C0:FF:EE:00:0B:1E", Discriminator: harnessDiscriminator, VendorID: 0xFFF1, ProductID: 0x8001,
-		Serve: func(conn *btp.Conn) (func([]byte), func()) {
-			srv, err := bridgetest.ServeConn(h.n.Bridge(), conn)
-			if err != nil {
-				t.Error(err)
-				return nil, nil
-			}
-			return srv.Deliver, srv.Close
-		},
-	}
 	opts := Options{Central: func(string) (ble.Central, error) { return bletest.NewCentral(p), nil }}
 	manual, err := setup.ManualCode(harnessDiscriminator, harnessPasscode)
 	if err != nil {

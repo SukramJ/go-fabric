@@ -404,8 +404,16 @@ func (b *Bridge) bindEstablishedSession(src net.Addr, h any) {
 // a no-op. The connection's own close then runs the drop path
 // (handleTCPClose → evictConn), which finds nothing bound any more and
 // forgets the route.
+//
+// Only a TCP connection is closed: matter.js schedules the check for a
+// session whose transport channel is TCP (ExchangeManager.ts:770-775 at
+// db021da0), so a BLE connection stays when its PASE session goes — it
+// ends with the central or with the node leaving the radio.
 func (b *Bridge) closeConnRoute(r *connRoute) {
 	if r == nil || r.conn == nil {
+		return
+	}
+	if _, isTCP := r.conn.(*tcp.Conn); !isTCP {
 		return
 	}
 	c, ok := r.conn.(interface{ Close() error })

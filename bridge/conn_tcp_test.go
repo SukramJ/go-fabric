@@ -35,13 +35,20 @@ type tcpHarness struct {
 
 func newTCPHarness(t *testing.T) *tcpHarness {
 	t.Helper()
+	return newConnHarness(t, Config{
+		Listen: "127.0.0.1:0",
+		TCP:    TCPConfig{Incoming: true, Outgoing: true},
+	})
+}
+
+// newConnHarness is the harness's bridge built from cfg: TCP for the TCP
+// tests, a BLE peripheral for the BLE ones.
+func newConnHarness(t *testing.T, cfg Config) *tcpHarness {
+	t.Helper()
 	st := openHarnessStore(t)
 	fabric := addHarnessFabric(t, st, harnessFabricID, harnessCompressedID)
 	adv := newFakeAdvertiser()
-	b, err := New(wbEmptySnapshotter, adv, Config{
-		Listen: "127.0.0.1:0",
-		TCP:    TCPConfig{Incoming: true, Outgoing: true},
-	}, nil)
+	b, err := New(wbEmptySnapshotter, adv, cfg, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

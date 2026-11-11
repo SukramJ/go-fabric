@@ -253,6 +253,19 @@ type Network struct {
 	// handshake and may open TCP to us — matter.js
 	// ServerNetworkRuntime.ts:355-363.
 	TCP TCPConfig
+	// BLE is the host's Bluetooth LE radio in the peripheral role: with
+	// it an uncommissioned node is commissionable over BLE, and the
+	// onboarding payload says so (the QR code's BLE discovery bit) —
+	// matter.js `network.ble` and `discoveryCapabilities.ble`
+	// (NetworkServer.ts:28-51 at db021da0). While the node has no fabric,
+	// its own window (and a [Node.OpenBasicWindow] window) advertises over
+	// BLE as well as over DNS-SD and serves PASE over BTP; the node leaves
+	// the radio when the window closes — at CommissioningComplete, at its
+	// timeout — and at [Node.Stop]. A commissioned node never touches the
+	// radio, not even for a window an administrator opens
+	// (ServerNetworkRuntime.ts:255-275, :294-308); when its last fabric is
+	// removed, the own window that reopens is on BLE again. nil is no BLE.
+	BLE contract.BLEPeripheral
 	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
 	// Wi-Fi. NetworkCommissioning
 	// stays Ethernet-only either way (concept v2 §B.4): the node states the

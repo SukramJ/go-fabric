@@ -5,11 +5,12 @@ package node_test
 
 // The proof of brief BA item 2, after commissioner_control_live_test.go:
 // the module's commissioner finds the module's node by its BLE
-// advertisement, dials it over an in-memory BTP pair, runs PASE and the
+// advertisement, dials it over the in-memory BLE model, runs PASE and the
 // commissioning flow over that channel without MRP, and reaches the node
-// over IP (CASE) afterwards. The node's side of the BTP pair is served
-// through bridgetest.ServeConn — a node never advertises over BLE (ADR
-// 0024, decision 1).
+// over IP (CASE) afterwards. The node's side is its own BLE radio
+// (Network.BLE, an in-memory bletest radio): the node advertises, serves
+// BTP through its bridge and leaves the radio once commissioned (brief
+// 28a).
 
 import (
 	"context"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -30,7 +30,6 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/transport/btp"
 )
 
 const (
@@ -61,20 +60,26 @@ func (f *ccFabric) announceOperational(t *testing.T, addr *net.UDPAddr, nodeID u
 	f.dns.out <- mdns.QueryResponse{Msg: b}
 }
 
-// blePeripheralOf is the node's BLE side: its advertisement, and every
-// BTP session served by the node's bridge.
-func blePeripheralOf(t *testing.T, n *node.Node) *bletest.Peripheral {
+// nodePeripheral is a node's BLE radio as the central reaches it; the
+// node is built with its Radio (Network.BLE).
+func nodePeripheral() *bletest.Peripheral {
+	return &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
+}
+
+// offTheRadio waits until the node no longer serves or advertises on r.
+func offTheRadio(t *testing.T, r *bletest.Radio) {
 	t.Helper()
-	return &bletest.Peripheral{
-		Address: "C0:FF:EE:00:0B:1E", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001,
-		Serve: func(conn *btp.Conn) (func([]byte), func()) {
-			srv, err := bridgetest.ServeConn(n.Bridge(), conn)
-			if err != nil {
-				t.Error(err)
-				return nil, nil
-			}
-			return srv.Deliver, srv.Close
-		},
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		serving, _ := r.Serving()
+		_, advertising := r.Advertising()
+		if !serving && !advertising {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the commissioned node is still on the radio: serving %v, advertising %v", serving, advertising)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -105,8 +110,9 @@ func TestLiveCommissioningOverBLE(t *testing.T) {
 	defer cancel()
 
 	f := newCCFabric(t, bleFabricID, bleAdmin, "ble")
-	n := liveNode(t, "node-ble", nil)
-	central := bletest.NewCentral(blePeripheralOf(t, n))
+	p := nodePeripheral()
+	n := liveNode(t, "node-ble", func(c *node.Config) { c.Network.BLE = p.Radio() })
+	central := bletest.NewCentral(p)
 	ch := dialBLE(ctx, t, central)
 
 	f.announceOperational(t, udpAddrOf(t, n), bleNodeID, "node-ble")
@@ -122,6 +128,7 @@ func TestLiveCommissioningOverBLE(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the BLE channel outlived the commissioning")
 	}
+	offTheRadio(t, p.Radio())
 
 	// Over IP now: CASE to the node, a read.
 	ia := f.com.Interaction(f.set.Get(res.Address))

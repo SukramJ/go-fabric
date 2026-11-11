@@ -132,8 +132,8 @@ func (v DeviceTypeViolation) String() string {
 // Conditions are decided as matter.js decides them: structurally from the
 // tree (Node, App, Simple, Dynamic, Composed, Client, Server, Duplicate),
 // from condition requirements the device types assert (Root, Self,
-// Descendant), from the node's configuration — CustomNetworkConfig always,
-// because this module never commissions over BLE, and Ethernet / WiFi /
+// Descendant), from the node's configuration — CustomNetworkConfig always
+// (assembledNodeConditions), and Ethernet / WiFi /
 // Thread from the features of a NetworkCommissioning server in the node
 // scope — and from [Endpoint.DeviceConditions], what the host states. Every
 // other condition is not true, and a condition that is not true never
@@ -306,9 +306,13 @@ func featureMapOf(srv contract.ClusterServer) uint32 {
 	return uintOf(v)
 }
 
-// assembledNodeConditions: CustomNetworkConfig, always — matter.js answers
+// assembledNodeConditions: CustomNetworkConfig, always. matter.js answers
 // it for a node that does not commission over BLE (ServerEndpointFacts
-// nodeConditionsOf), and this module has no BLE.
+// nodeConditionsOf, ServerEndpointFacts.ts:131-145 at db021da0); the
+// topology does not know whether the host gave the node a BLE radio
+// (node.Network.BLE), so a BLE node is judged as one without. Every root
+// this module assembles mounts NetworkCommissioning, the requirement the
+// condition would add, either way.
 func assembledNodeConditions(uint16) []string {
 	return []string{condCustomNetworkConfig}
 }

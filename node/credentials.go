@@ -85,21 +85,31 @@ func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredential
 // PairingCodesFor returns the QR code payload and the manual pairing code
 // of a window the host opens with its own credentials
 // ([Node.OpenBasicWindow]): creds' passcode and discriminator under the
-// node's vendor and product, on-network discovery — what
-// [Node.SetupPayload] returns for the configured secret.
+// node's vendor and product, on-network discovery and, with a BLE radio
+// (Network.BLE), BLE discovery — what [Node.SetupPayload] returns for the
+// configured secret.
 func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err error) {
-	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode)
+	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode, n.cfg.Network.BLE != nil)
 }
 
 // pairingCodes encodes one passcode and discriminator as the QR payload
-// and the manual code.
-func pairingCodes(pd ProductDescription, discriminator uint16, passcode uint32) (qr, manual string, err error) {
+// and the manual code. The QR code's discovery capabilities are on-network
+// and, for a node with a BLE radio, BLE — matter.js's
+// discoveryCapabilities, whose `ble` follows `network.ble` and whose
+// `onIpNetwork` defaults to true (NetworkServer.ts:36-51 at db021da0),
+// encoded into every QR code (CommissioningServer.ts:430-443). The manual
+// code carries none.
+func pairingCodes(pd ProductDescription, discriminator uint16, passcode uint32, ble bool) (qr, manual string, err error) {
+	caps := setup.DiscoveryOnIP
+	if ble {
+		caps |= setup.DiscoveryBLE
+	}
 	qr, err = setup.QRCode(setup.Payload{
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
 		Discriminator: discriminator,
 		Passcode:      passcode,
-		DiscoveryCaps: setup.DiscoveryOnIP,
+		DiscoveryCaps: caps,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("node: qr payload: %w", err)

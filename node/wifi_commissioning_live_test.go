@@ -49,10 +49,13 @@ func (w *liveWiFi) ConnectNetwork(_ context.Context, ssid, credentials []byte) (
 	return 0, "", 0
 }
 
-func wifiNode(t *testing.T, name string, drv *liveWiFi) *node.Node {
+func wifiNode(t *testing.T, name string, drv *liveWiFi, radio *bletest.Radio) *node.Node {
 	t.Helper()
 	return liveNode(t, name, func(c *node.Config) {
 		nodeseam.UseWiFiCommissioning(c, drv)
+		if radio != nil {
+			c.Network.BLE = radio
+		}
 	})
 }
 
@@ -91,11 +94,12 @@ func TestLiveCommissioningOverBLEWithWiFi(t *testing.T) {
 	defer cancel()
 	f := newCCFabric(t, bleFabricID+1, bleAdmin, "ble wifi")
 	drv := &liveWiFi{}
-	n := wifiNode(t, "node-ble-wifi", drv)
+	p := nodePeripheral()
+	n := wifiNode(t, "node-ble-wifi", drv, p.Radio())
 	if n.Root().WiFiNetworkCommissioning == nil || n.Root().NetworkCommissioning != nil {
 		t.Fatal("the Wi-Fi NetworkCommissioning is not mounted")
 	}
-	central := bletest.NewCentral(blePeripheralOf(t, n))
+	central := bletest.NewCentral(p)
 	ch := dialBLE(ctx, t, central)
 	f.announceOperational(t, udpAddrOf(t, n), bleNodeID, "node-ble-wifi")
 	res, err := f.com.Commission(ctx, commissioner.Options{
@@ -114,7 +118,7 @@ func TestLiveCommissioningOverIPWithWiFi(t *testing.T) {
 	defer cancel()
 	f := newCCFabric(t, bleFabricID+2, bleAdmin, "ip wifi")
 	drv := &liveWiFi{}
-	n := wifiNode(t, "node-ip-wifi", drv)
+	n := wifiNode(t, "node-ip-wifi", drv, nil)
 	addr := udpAddrOf(t, n)
 	f.announceOperational(t, addr, bleNodeID, "node-ip-wifi")
 	res, err := f.com.Commission(ctx, commissioner.Options{

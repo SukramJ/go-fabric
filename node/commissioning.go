@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -64,6 +65,13 @@ type commissioningHost struct {
 	basicMu sync.Mutex
 	basic   *basicWindow // the open OpenBasicWindow window, nil without one
 
+	// ble is whether the node has a BLE radio (Network.BLE); clk paces
+	// the bound of leaving it. fabricCount counts the node's fabrics
+	// (set by wireCommissioningWindow).
+	ble         bool
+	clk         clock.Clock
+	fabricCount func(context.Context) (int, error)
+
 	// announcedMu guards announcedDiscriminator and announcedMode.
 	announcedMu            sync.Mutex
 	announcedMode          uint8  // CM of the published commissionable record; 0 none
@@ -92,6 +100,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	}
 	admin.SetFabricCounter(fabrics)
 	window.SetFabricCounter(fabrics)
+	h.fabricCount = fabrics
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)
 	window.SetFailSafeArmer(h.root.GeneralCommissioning)
@@ -148,6 +157,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 			adv.Discriminator = basic.discriminator
 		}
 		h.announce(ctx, adv, "commissioning.own_window.announce")
+		h.followOnBLE(ctx, adv)
 		h.logger.Info("commissioning.own_window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
@@ -161,6 +171,11 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 			adv.CommissioningMode = 3
 		}
 		h.announce(ctx, adv, "commissioning.window.announce")
+		// An administrator's window is never on BLE: the node has a fabric
+		// (matter.js BleAdvertiser announces basic windows only,
+		// BleAdvertiser.ts:40-42, and only while uncommissioned,
+		// ServerNetworkRuntime.ts:271-274).
+		h.leaveBLE(ctx)
 		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
@@ -174,6 +189,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (:236-256), the status BasicWindowOpen.
 		h.attachPase(h.baseline)
 		h.announce(ctx, h.advert, "commissioning.basic_window.announce")
+		h.leaveBLE(ctx)
 		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
 		return false
 	}
@@ -183,6 +199,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// exitCommissioningMode).
 		h.attachPase(nil)
 		h.br.WithdrawCommissioning(ctx)
+		h.leaveBLE(ctx)
 		h.setAnnounced(0, 0)
 		h.logger.Info("commissioning.window.closed")
 		return endedBasic && !window.IsOpen()
@@ -264,6 +281,47 @@ func (h *commissioningHost) announce(ctx context.Context, adv bridge.Commissioni
 		return
 	}
 	h.setAnnounced(adv.CommissioningMode, adv.Discriminator)
+}
+
+// bleStopTimeout bounds how long a window transition waits for the radio
+// to stop.
+const bleStopTimeout = 5 * time.Second
+
+// followOnBLE puts the node on its BLE radio for the own window adv
+// announces, while the node has no fabric — matter.js adds the BLE
+// advertiser only to an uncommissioned node (ServerNetworkRuntime.ts:255-275
+// at db021da0), and its peripheral registers the GATT service only once it
+// advertises (BlenoBleServer.ts:224-231). A node with a fabric leaves the
+// radio instead.
+func (h *commissioningHost) followOnBLE(ctx context.Context, adv bridge.CommissioningAdvertisement) {
+	if !h.ble {
+		return
+	}
+	if h.fabricCount == nil {
+		return
+	}
+	if n, err := h.fabricCount(ctx); err != nil || n > 0 {
+		h.leaveBLE(ctx)
+		return
+	}
+	if err := h.br.StartBLE(ctx, adv); err != nil {
+		h.logger.Warn("commissioning.ble.start", slog.Any("err", err))
+	}
+}
+
+// leaveBLE takes the node off its BLE radio — matter.js
+// endUncommissionedMode (ServerNetworkRuntime.ts:294-308) on commissioning,
+// and the window's end, whose advertisement stops (BleAdvertisement.ts:69-71).
+// Without a radio, or off it already, it does nothing.
+func (h *commissioningHost) leaveBLE(ctx context.Context) {
+	if !h.ble {
+		return
+	}
+	stopCtx, cancel := clock.WithTimeout(ctx, h.clk, bleStopTimeout)
+	defer cancel()
+	if err := h.br.StopBLE(stopCtx); err != nil {
+		h.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
+	}
 }
 
 // setAnnounced records the commissioning mode and discriminator of the

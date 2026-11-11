@@ -21,10 +21,22 @@
 // ServerNetworkRuntime.ts:203-214). Every message enters through one
 // transport-neutral receive path and every reply leaves on the
 // connection the request arrived on (conn.go). Over TCP, MRP is off,
-// session establishment is not served yet (an unsecured message is
-// dropped), and a dropped connection closes every session bound to it.
-// Config.TCP is configuration, not a port: the zero value is TCP off
-// and the bridge behaves exactly as without it.
+// PASE and CASE are served on the connection like any other message,
+// a dropped connection closes every session bound to it, and the
+// connection closes when its last session goes. Config.TCP is
+// configuration, not a port: the zero value is TCP off and the bridge
+// behaves exactly as without it.
+//
+// BLE: with [Config].BLE (the host's contract.BLEPeripheral) the bridge
+// serves the Matter GATT service between [Bridge.StartBLE] and
+// [Bridge.StopBLE], one central at a time, each central's BTP session
+// (transport/btp.Accept) one more connection of the same receive path —
+// MRP off, the sessions evicted when the central goes, the connection
+// kept when its last session goes (matter.js closes only a TCP channel
+// then) — and advertises the commissioning window on matter.js's
+// schedule (ble.go). Whoever announces the window drives it; the node
+// facade does so for an uncommissioned node only. A nil Config.BLE never
+// touches a radio, and StartBLE refuses.
 //
 // # Bring-up sequence
 //
@@ -295,6 +307,13 @@ type Config struct {
 	// socket's port for Incoming, and the T key of the operational
 	// record for both roles. The zero value is TCP off. See [TCPConfig].
 	TCP TCPConfig
+
+	// BLE is the host's Bluetooth LE peripheral, on which the bridge
+	// serves BTP and advertises a commissioning window between
+	// [Bridge.StartBLE] and [Bridge.StopBLE] — matter.js `network.ble`
+	// (NetworkServer.ts:28-34 at db021da0) with the platform's peripheral
+	// installed. nil is no BLE: the bridge never touches a radio.
+	BLE contract.BLEPeripheral
 
 	// AdvertiseTimeout caps the per-call timeout for mDNS publish /
 	// withdraw operations. Defaults to 5 seconds when zero. Each
@@ -735,6 +754,10 @@ type Bridge struct {
 	// when its accept loop returned.
 	tcpListener  *tcp.Listener
 	tcpServeDone chan struct{}
+
+	// ble is the BLE side while the bridge is on the radio of Config.BLE
+	// (ble.go).
+	ble bleRuntime
 
 	// reportExchangeOwner maps the bridge-initiated exchange an ongoing
 	// subscription report currently rides ([mrp.ExchangeKey] with
@@ -1795,6 +1818,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// ExchangeManager.ts:716-726 #sendCloseSession) before the transport
 	// is torn down (ServerNetworkRuntime.ts:410-447 stop()).
 	b.closeSecureSessionsForShutdown()
+	// Off the radio before the transports go: the advertisement stops,
+	// the central is disconnected and the GATT service unregistered.
+	b.stopBLEForShutdown(ctx)
 	b.mu.Lock()
 	if !b.started {
 		b.mu.Unlock()
@@ -1847,23 +1873,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		_ = tcpListener.Close()
 	}
 	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
-	if pumpDone != nil {
-		// Give the pump its own bounded budget. If `ctx` already
-		// expired waiting for the serve loop, the pump still gets a
-		// fresh window — pumpCancel fired above so the goroutine
-		// should already be unwinding. Without this, a slow serve-
-		// loop teardown burns the entire ctx and the pump select
-		// falls through immediately while the goroutine is still
-		// alive — that's the leak the original "Same context" branch
-		// was hiding.
-		pumpStopCtx, pumpStopCancel := clock.WithTimeout(context.Background(), b.clk(), pumpStopGrace)
-		select {
-		case <-pumpDone:
-		case <-pumpStopCtx.Done():
-			b.logger.Warn("matter.bridge.stop.pump_timeout", slog.Duration("grace", pumpStopGrace))
-		}
-		pumpStopCancel()
-	}
+	b.waitPumpStopped(pumpDone)
 
 	// A session re-announce still running publishes on the advertiser;
 	// the serve context's cancel above ends it, and it is gone before the
@@ -2076,6 +2086,26 @@ func (b *Bridge) udpConn(src *net.UDPAddr) *udp.Conn {
 	listener := b.listener
 	b.mu.RUnlock()
 	return listener.Conn(src)
+}
+
+// waitPumpStopped waits for the ACK pump's goroutine (pumpDone; nil
+// without one) on its own bounded budget. If Stop's ctx already expired
+// waiting for the serve loop, the pump still gets a fresh window —
+// pumpCancel fired before, so the goroutine should already be unwinding.
+// Without this, a slow serve-loop teardown burns the entire ctx and the
+// pump select falls through immediately while the goroutine is still
+// alive — that's the leak the original "Same context" branch was hiding.
+func (b *Bridge) waitPumpStopped(pumpDone chan struct{}) {
+	if pumpDone == nil {
+		return
+	}
+	pumpStopCtx, pumpStopCancel := clock.WithTimeout(context.Background(), b.clk(), pumpStopGrace)
+	defer pumpStopCancel()
+	select {
+	case <-pumpDone:
+	case <-pumpStopCtx.Done():
+		b.logger.Warn("matter.bridge.stop.pump_timeout", slog.Duration("grace", pumpStopGrace))
+	}
 }
 
 // handlerContext returns the context every IM/SC handler call runs

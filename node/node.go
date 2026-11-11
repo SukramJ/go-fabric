@@ -273,6 +273,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		Listen:     cfg.Network.Listen,
 		PreferIPv4: cfg.Network.PreferIPv4,
 		TCP:        cfg.Network.TCP,
+		BLE:        cfg.Network.BLE,
 		Clock:      n.cfg.Clock,
 		// The invoke path refuses what BasicInformation does not advertise.
 		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
@@ -372,6 +373,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
 		responderParams: n.sec.responderParams, life: n.life,
+		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
 	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
 

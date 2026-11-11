@@ -37,7 +37,7 @@ func (joinAll) ConnectNetwork(context.Context, []byte, []byte) (status uint8, de
 func TestDeviceBLE(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	dev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
+	dev := site.AddDevice(fabrictest.Topology{BLE: true, Configure: func(cfg *node.Config) {
 		fabrictest.UseWiFiCommissioning(cfg, joinAll{})
 	}})
 	p := dev.BLE()
