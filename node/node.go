@@ -155,8 +155,8 @@ type Node struct {
 	// that only a fail-safe added leaves it false, so the fail-safe's
 	// rollback of that fabric decommissions nothing.
 	commissioned atomic.Bool
-	cancel        context.CancelFunc
-	keeperWG      sync.WaitGroup
+	cancel       context.CancelFunc
+	keeperWG     sync.WaitGroup
 
 	// mu serialises Start and Stop, the lifecycle; it is held across
 	// them, host callbacks included (the host's Snapshotter), and
