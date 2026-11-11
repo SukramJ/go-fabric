@@ -94,7 +94,8 @@ func TestNodeBLEFollowsCommissioning(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(50 * time.Millisecond)
+	// The window's transition hook runs inside OpenOwnWindow: nothing
+	// that would start BLE is still pending.
 	if serving, _ := r.Serving(); serving {
 		t.Fatal("the commissioned node serves on the radio")
 	}

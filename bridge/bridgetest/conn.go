@@ -22,6 +22,11 @@ var ErrNoConn = errors.New("bridgetest: nil connection")
 // handed to a test that holds a connection of its own — a
 // controller/ble/bletest peripheral's session, a fault model's.
 type ConnServer struct {
+	fns *connFns
+}
+
+// connFns are the bridge's receiver of the connection.
+type connFns struct {
 	deliver     func([]byte)
 	close, wait func()
 }
@@ -38,7 +43,7 @@ func ServeConn(b *bridge.Bridge, conn transport.Conn) (*ConnServer, error) {
 	if !ok {
 		return nil, ErrNoBridge
 	}
-	return &ConnServer{deliver: deliver, close: closeConn, wait: wait}, nil
+	return &ConnServer{fns: &connFns{deliver: deliver, close: closeConn, wait: wait}}, nil
 }
 
 // Deliver hands one complete Matter message to the bridge. Messages are
@@ -46,11 +51,11 @@ func ServeConn(b *bridge.Bridge, conn transport.Conn) (*ConnServer, error) {
 // released its turn — the contract of transport/tcp's ordered handler, so
 // a handler that waits for the peer's answer on the same connection lets
 // that answer through. Deliver does not wait for the handler.
-func (s *ConnServer) Deliver(msg []byte) { s.deliver(msg) }
+func (s *ConnServer) Deliver(msg []byte) { s.fns.deliver(msg) }
 
 // Close stops delivering and evicts every session bound to the
 // connection, as a dropped TCP connection does.
-func (s *ConnServer) Close() { s.close() }
+func (s *ConnServer) Close() { s.fns.close() }
 
 // Wait waits for every delivered message's handler to return.
-func (s *ConnServer) Wait() { s.wait() }
+func (s *ConnServer) Wait() { s.fns.wait() }

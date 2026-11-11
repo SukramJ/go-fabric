@@ -142,6 +142,14 @@ func (o *opened) conn(t *testing.T) *Conn {
 	return o.conns[0]
 }
 
+// deadline is the test's 5-second bound on a wait.
+func deadline(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func handshakeRequest(attMTU uint16) []byte {
 	return EncodeHandshakeRequest(HandshakeRequest{Versions: []int{4}, ATTMTU: attMTU, ClientWindowSize: 5})
 }
@@ -285,7 +293,7 @@ func TestAcceptUnsubscribeClosesParityMatterJS(t *testing.T) {
 	}
 	select {
 	case <-conn.Closed():
-	case <-time.After(5 * time.Second):
+	case <-deadline(t).Done():
 		t.Fatal("the unsubscription left the session open")
 	}
 }
@@ -300,7 +308,7 @@ func TestAcceptDisconnectClosesParityMatterJS(t *testing.T) {
 	f.goneOnce.Do(func() { close(f.gone) })
 	select {
 	case <-conn.Closed():
-	case <-time.After(5 * time.Second):
+	case <-deadline(t).Done():
 		t.Fatal("the disconnect left the session open")
 	}
 	if err := conn.Send([]byte{1}); err == nil {
@@ -353,7 +361,7 @@ func TestAcceptIndicationWaitsForConfirmationParityMatterJS(t *testing.T) {
 	select {
 	case <-done:
 		t.Fatal("the subscription completed before the response was confirmed")
-	case <-time.After(50 * time.Millisecond):
+	default:
 	}
 	if o.count() != 0 {
 		t.Fatal("the session opened before its response was confirmed")
@@ -379,7 +387,7 @@ func TestAcceptIndicationWaitsForConfirmationParityMatterJS(t *testing.T) {
 	f2.goneOnce.Do(func() { close(f2.gone) })
 	select {
 	case <-done2:
-	case <-time.After(5 * time.Second):
+	case <-deadline(t).Done():
 		t.Fatal("the indication kept waiting after the connection dropped")
 	}
 	if o2.count() != 0 {

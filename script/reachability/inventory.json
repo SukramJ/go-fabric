@@ -905,21 +905,21 @@
       "identifier": "TestBLEAdvertisementScheduleParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 273
+      "line": 274
     },
     {
       "package": "bridge",
       "identifier": "TestBLEDisconnectEvictsSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 149
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestBLEOneCentralAtATime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 175
+      "line": 176
     },
     {
       "package": "bridge",
@@ -5364,14 +5364,14 @@
       "identifier": "TestStartBLENewWindowRestartsSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 318
+      "line": 319
     },
     {
       "package": "bridge",
       "identifier": "TestStartBLERefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 225
+      "line": 226
     },
     {
       "package": "bridge",
@@ -5413,7 +5413,7 @@
       "identifier": "TestStopBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
-      "line": 197
+      "line": 198
     },
     {
       "package": "bridge",
@@ -37466,70 +37466,70 @@
       "identifier": "TestAcceptDisconnectClosesParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 295
+      "line": 303
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptHandshakeThenSubscribeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 172
+      "line": 180
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptHandshakeTimeoutParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 254
+      "line": 262
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptIndicationWaitsForConfirmationParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 340
+      "line": 348
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptRefusesDataWithoutSessionParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 328
+      "line": 336
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptRefusesNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 159
+      "line": 167
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptRefusesSecondSessionParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 231
+      "line": 239
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptRefusesSubscribeBeforeHandshakeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 216
+      "line": 224
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptSessionCloseDisconnectsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 314
+      "line": 322
     },
     {
       "package": "transport/btp",
       "identifier": "TestAcceptUnsubscribeClosesParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/accept_parity_matterjs_test.go",
-      "line": 277
+      "line": 285
     },
     {
       "package": "transport/btp",

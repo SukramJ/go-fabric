@@ -223,8 +223,7 @@ func (b *Bridge) advertiseBLE(ctx context.Context, p contract.BLEPeripheral, adv
 		}
 		b.logger.Debug("matter.ble.advertising",
 			slog.Int("discriminator", int(adv.discriminator)),
-			slog.Duration("interval", step.interval),
-			slog.Bool("extended", extended))
+			slog.Duration("interval", step.interval))
 		if !clock.Sleep(clk, min(timeout, step.sleep), ctx.Done()) {
 			return
 		}
@@ -259,13 +258,13 @@ func (b *Bridge) acceptBLE(c contract.BLEConnection) {
 	b.ble.mu.Lock()
 	if b.ble.central != nil {
 		b.ble.mu.Unlock()
-		b.logger.Info("matter.ble.central_refused", slog.String("central", c.Remote()))
+		b.logger.Info("matter.ble.central_refused", slog.String("peer", c.Remote()))
 		_ = c.Disconnect()
 		return
 	}
 	b.ble.central = c
 	b.ble.mu.Unlock()
-	b.logger.Info("matter.ble.central_connected", slog.String("central", c.Remote()))
+	b.logger.Info("matter.ble.central_connected", slog.String("peer", c.Remote()))
 	go func() {
 		<-c.Disconnected()
 		b.ble.mu.Lock()
@@ -273,7 +272,7 @@ func (b *Bridge) acceptBLE(c contract.BLEConnection) {
 			b.ble.central = nil
 		}
 		b.ble.mu.Unlock()
-		b.logger.Info("matter.ble.central_disconnected", slog.String("central", c.Remote()))
+		b.logger.Info("matter.ble.central_disconnected", slog.String("peer", c.Remote()))
 	}()
 	err := btp.Accept(c, func(conn *btp.Conn) func([]byte) {
 		r := b.newConnReceiver(conn)

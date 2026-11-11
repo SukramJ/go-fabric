@@ -132,18 +132,18 @@ func (s *gattServer) handleC1Write(data []byte) {
 		s.startTimerLocked()
 		s.handshake = data
 		s.mu.Unlock()
-		s.log.Debug("matter.btp.handshake_request", slog.String("central", s.c.Remote()))
+		s.log.Debug("matter.btp.handshake_request", slog.String("peer", s.c.Remote()))
 		return
 	}
 	session := s.session
 	s.mu.Unlock()
 	if session == nil {
-		s.log.Warn("matter.btp.c1_refused", slog.String("central", s.c.Remote()),
+		s.log.Warn("matter.btp.c1_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Received Matter data but no BTP session was initialized"}))
 		return
 	}
 	if err := session.HandleIncoming(data); err != nil {
-		s.log.Info("matter.btp.rx_failed", slog.String("central", s.c.Remote()), slog.Any("err", err))
+		s.log.Info("matter.btp.rx_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
 	}
 }
 
@@ -155,12 +155,12 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 		return
 	}
 	if s.handshake == nil {
-		s.log.Warn("matter.btp.c2_refused", slog.String("central", s.c.Remote()),
+		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received before handshake Request"}))
 		return
 	}
 	if s.session != nil {
-		s.log.Warn("matter.btp.c2_refused", slog.String("central", s.c.Remote()),
+		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received but BTP session already initialized. Cannot handle two sessions!"}))
 		return
 	}
@@ -173,7 +173,7 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 		Message:    s.deliver,
 	}, s.opts)
 	if err != nil {
-		s.log.Warn("matter.btp.session_failed", slog.String("central", s.c.Remote()), slog.Any("err", err))
+		s.log.Warn("matter.btp.session_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
 		return
 	}
 	s.handshake = nil
@@ -187,7 +187,7 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 
 // handleC2Unsubscribe is the C2 unsubscribe: the server closes (:81-84).
 func (s *gattServer) handleC2Unsubscribe() {
-	s.log.Debug("matter.btp.c2_unsubscribe", slog.String("central", s.c.Remote()))
+	s.log.Debug("matter.btp.c2_unsubscribe", slog.String("peer", s.c.Remote()))
 	s.close()
 }
 
@@ -244,7 +244,7 @@ func (s *gattServer) close() {
 	session := s.session
 	s.mu.Unlock()
 	if err := s.c.Disconnect(); err != nil {
-		s.log.Debug("matter.btp.disconnect_failed", slog.String("central", s.c.Remote()), slog.Any("err", err))
+		s.log.Debug("matter.btp.disconnect_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
 	}
 	if session != nil {
 		_ = session.Close()
@@ -279,7 +279,7 @@ func (s *gattServer) startTimerLocked() {
 		if !fired {
 			return
 		}
-		s.log.Warn("matter.btp.handshake_timeout", slog.String("central", s.c.Remote()))
+		s.log.Warn("matter.btp.handshake_timeout", slog.String("peer", s.c.Remote()))
 		s.close()
 	})
 }

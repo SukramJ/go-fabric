@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -52,6 +53,8 @@ func TestRadio(t *testing.T) {
 	if _, err := c.Connect(context.Background(), ble.Peripheral{Address: "aa"}); !errors.Is(err, bletest.ErrNoService) {
 		t.Fatalf("connect without a service: %v", err)
 	}
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer waitCancel()
 	ctx, cancel := context.WithCancel(context.Background())
 	events := make(chan string, 8)
 	var peer contract.BLEConnection
@@ -69,15 +72,16 @@ func TestRadio(t *testing.T) {
 			bc.OnUnsubscribe(func() { events <- "unsubscribe" })
 		})
 	}()
-	deadline := time.Now().Add(5 * time.Second)
 	for {
 		if s, _ := r.Serving(); s {
 			break
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-waitCtx.Done():
 			t.Fatal("not serving")
+		default:
+			runtime.Gosched()
 		}
-		time.Sleep(time.Millisecond)
 	}
 	if err := r.Serve(context.Background(), nil, func(contract.BLEConnection) {}); !errors.Is(err, bletest.ErrServing) {
 		t.Fatalf("second Serve: %v", err)
@@ -116,7 +120,7 @@ func TestRadio(t *testing.T) {
 	}
 	select {
 	case <-conn.Disconnected():
-	case <-time.After(5 * time.Second):
+	case <-waitCtx.Done():
 		t.Fatal("the connection outlived Serve")
 	}
 	if err := peer.Indicate(context.Background(), []byte("x")); !errors.Is(err, btp.ErrDisconnected) {

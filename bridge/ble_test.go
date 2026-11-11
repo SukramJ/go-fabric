@@ -136,8 +136,9 @@ func TestBLERequestRepliedWithoutMRP(t *testing.T) {
 
 	// The last session's close leaves a BLE connection standing: matter.js
 	// closes only a TCP channel then (ExchangeManager.ts:770-775).
+	// The close of the last session's route is synchronous
+	// (unbindSessionRoute → closeConnRoute).
 	h.bridge.SessionClosed(harnessLocalSessionID)
-	time.Sleep(50 * time.Millisecond)
 	if c.disconnected() {
 		t.Fatal("the BLE connection closed with its last session")
 	}
