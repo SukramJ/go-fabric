@@ -76,6 +76,47 @@ only with host networking or an equivalent.
 *Source: [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Network`),
 [`bridge/tcp_listen.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/tcp_listen.go) (`TCPConfig`, `openTransports`).*
 
+## BLE commissioning
+
+A device without a network at first boot is commissioned over Bluetooth LE:
+the commissioner finds it by its BLE advertisement, runs PASE over BTP,
+provisions the network (Wi-Fi credentials through NetworkCommissioning) and
+completes over CASE on the IP network. The node gets the radio as a host
+port, `node.Config.Network.BLE` (a `contract.BLEPeripheral`); on Linux that
+is `ble/bluez`, a nested module a host without BLE never pulls:
+
+```go
+radio, err := bluez.NewPeripheral("hci0") // "" is hci0
+if err != nil {
+	return err // an *bluez.Error names the D-Bus error
+}
+defer radio.(io.Closer).Close()
+cfg.Network.BLE = radio
+```
+
+| When | On the radio |
+| --- | --- |
+| uncommissioned, its own window open (at start, after the last fabric is removed, or `Node.OpenBasicWindow`) | the GATT service is registered and the window advertised — 20 ms for 30 s, 150 ms until 15 minutes, then the extended announcement (no vendor and product id) at 1285 ms; one central at a time |
+| the window closes: its timeout, `Node.CloseWindow` | only the advertisement stops; the service and a connected central stay, so a commissioning over BLE in progress completes over the same link, and a new own window advertises again on the same service |
+| commissioned: CommissioningComplete commits the fail-safe | the advertisement stops, the central is disconnected, the service unregistered — after the response, not before it |
+| commissioned | nothing: no advertisement, no service, also for a window an administrator opens |
+| `Node.Stop` | off the radio |
+
+The QR code of `Node.SetupPayload` names BLE discovery beside the IP
+network only with `Network.BLE` set; the manual code carries no discovery
+bits. BTP is reliable, so MRP does not run over it; a lost BLE connection
+closes the sessions it carried.
+
+`ble/bluez` speaks BlueZ's D-Bus API and shares the adapter with
+bluetoothd. It needs the system-bus rights its central needs (the
+`bluetooth` group on most distributions) and an adapter that is powered on.
+The reference daemon has no BLE flag yet.
+
+*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `leaveBLE`),
+[`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
+[`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
+[`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
+
 ## mDNS
 
 With `node.Config.Advertiser` unset the node runs its own DNS-SD responder:

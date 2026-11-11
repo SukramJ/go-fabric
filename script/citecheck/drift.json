@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 706,
+    "line": 726,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -181,7 +181,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1407,
+    "line": 1432,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -190,7 +190,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1409,
+    "line": 1434,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -199,7 +199,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1446,
+    "line": 1471,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -208,7 +208,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1469,
+    "line": 1494,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -217,7 +217,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1794,
+    "line": 1819,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1795,
+    "line": 1820,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -271,7 +271,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 446,
+    "line": 454,
     "citation": "ExchangeManager.ts:242-265",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createUnsecuredSession",
@@ -280,7 +280,7 @@
   },
   {
     "file": "bridge/conn_tcp_test.go",
-    "line": 242,
+    "line": 249,
     "citation": "ExchangeManager.ts:674-681",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#closeTcpChannelIfLastSession",
@@ -2637,7 +2637,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 765,
+    "line": 771,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -3171,7 +3171,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 310,
+    "line": 327,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
@@ -3189,7 +3189,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 640,
+    "line": 667,
     "citation": "SessionManager.ts:491",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecordsForFabric",

@@ -376,12 +376,33 @@ func TestDeviceTypeConformanceNodeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// validation/DeviceTypeConformanceTest.ts:785-791: this module never commissions
-	// over BLE, so CustomNetworkConfig holds and RootNode's
-	// NetworkCommissioning ("!CustomNetworkConfig") is not required.
+	// validation/DeviceTypeConformanceTest.ts:785-791: a node without a BLE
+	// radio has CustomNetworkConfig, so RootNode's NetworkCommissioning
+	// ("!CustomNetworkConfig") is not required.
 	t.Run("does not require NetworkCommissioning of a node that does not commission over BLE", func(t *testing.T) {
 		t.Parallel()
 		f, root := nodeTree()
+		wantKinds(t, f.check(std, root))
+	})
+
+	// validation/DeviceTypeConformanceTest.ts:793-801 (createBleNode): a node
+	// that commissions over BLE has no CustomNetworkConfig
+	// (ServerEndpointFacts.ts:140-145), so RootNode requires
+	// NetworkCommissioning.
+	t.Run("requires NetworkCommissioning of a node that commissions over BLE", func(t *testing.T) {
+		t.Parallel()
+		f, root := nodeTree()
+		f.node = assembledNodeConditions(true)(0)
+		wantKinds(t, f.check(std, root), "missing NetworkCommissioning")
+	})
+
+	// validation/DeviceTypeConformanceTest.ts:803-809 (createBleNode with
+	// RootWithWiFi): with a Wi-Fi NetworkCommissioning nothing is missing.
+	t.Run("accepts a node that commissions over BLE with NetworkCommissioning", func(t *testing.T) {
+		t.Parallel()
+		f, root := nodeTree()
+		root.server(clNetworkComm, "WI")
+		f.node = append(assembledNodeConditions(true)(0), condWiFi)
 		wantKinds(t, f.check(std, root))
 	})
 

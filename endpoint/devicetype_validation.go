@@ -132,8 +132,9 @@ func (v DeviceTypeViolation) String() string {
 // Conditions are decided as matter.js decides them: structurally from the
 // tree (Node, App, Simple, Dynamic, Composed, Client, Server, Duplicate),
 // from condition requirements the device types assert (Root, Self,
-// Descendant), from the node's configuration — CustomNetworkConfig always,
-// because this module never commissions over BLE, and Ethernet / WiFi /
+// Descendant), from the node's configuration — CustomNetworkConfig unless
+// the node commissions over BLE ([Topology].CommissionsOverBLE), and
+// Ethernet / WiFi /
 // Thread from the features of a NetworkCommissioning server in the node
 // scope — and from [Endpoint.DeviceConditions], what the host states. Every
 // other condition is not true, and a condition that is not true never
@@ -178,7 +179,7 @@ func topologyTree(t *Topology) DeviceTypeTree {
 			byNumber[parent].parts = append(byNumber[parent].parts, s.ep.ID)
 		}
 	}
-	tree := DeviceTypeTree{Endpoints: make([]DeviceTypeSubject, 0, len(subjects)), NodeConditions: assembledNodeConditions}
+	tree := DeviceTypeTree{Endpoints: make([]DeviceTypeSubject, 0, len(subjects)), NodeConditions: assembledNodeConditions(t.CommissionsOverBLE)}
 	for _, s := range subjects {
 		tree.Endpoints = append(tree.Endpoints, s)
 	}
@@ -306,11 +307,16 @@ func featureMapOf(srv contract.ClusterServer) uint32 {
 	return uintOf(v)
 }
 
-// assembledNodeConditions: CustomNetworkConfig, always — matter.js answers
-// it for a node that does not commission over BLE (ServerEndpointFacts
-// nodeConditionsOf), and this module has no BLE.
-func assembledNodeConditions(uint16) []string {
-	return []string{condCustomNetworkConfig}
+// assembledNodeConditions: CustomNetworkConfig for a node that does not
+// commission over BLE, none for one that does — matter.js
+// ServerEndpointFacts.nodeConditionsOf (ServerEndpointFacts.ts:131-145 at
+// db021da0): "a node that does not commission over BLE only supports
+// out-of-band-configured networking".
+func assembledNodeConditions(overBLE bool) func(uint16) []string {
+	if overBLE {
+		return func(uint16) []string { return nil }
+	}
+	return func(uint16) []string { return []string{condCustomNetworkConfig} }
 }
 
 // DeviceTypeValidationMode selects what [DeviceTypeValidator] does with a

@@ -15,9 +15,11 @@
 // the BLE advertisement's service data) and
 // packages/protocol/src/ble/BtpSessionHandler.ts (the session, both
 // roles). The central role is what the commissioner uses
-// (controller/ble); the peripheral role serves the tests and a later
-// device-side BLE transport — a node of this module never advertises
-// over BLE (ADR 0024, decision 1).
+// (controller/ble); the peripheral role is the node's, served on a GATT
+// connection by [Accept] — matter.js's BlenoBleServer
+// (packages/nodejs-ble/src/BlenoBleServer.ts at db021da0) without its
+// platform, so every BLE platform and the tests' in-memory radio share
+// it.
 //
 // A BTP session is a reliable channel: Matter's MRP does not run over
 // it. matter.js's BleChannel declares `isReliable = true`

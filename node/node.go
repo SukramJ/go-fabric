@@ -148,8 +148,15 @@ type Node struct {
 	// reopenPending is set while a reopen after the last fabric waits for
 	// the node to become idle (reopenWhenIdle).
 	reopenPending atomic.Bool
-	cancel        context.CancelFunc
-	keeperWG      sync.WaitGroup
+	// commissioned is matter.js's CommissioningServer state.commissioned
+	// (CommissioningServer.ts:148-165 at db021da0): true from a start
+	// with stored fabrics and from a committed CommissioningComplete, false
+	// once the last fabric of a commissioned node is removed. A fabric
+	// that only a fail-safe added leaves it false, so the fail-safe's
+	// rollback of that fabric decommissions nothing.
+	commissioned atomic.Bool
+	cancel       context.CancelFunc
+	keeperWG     sync.WaitGroup
 
 	// mu serialises Start and Stop, the lifecycle; it is held across
 	// them, host callbacks included (the host's Snapshotter), and
@@ -273,6 +280,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		Listen:     cfg.Network.Listen,
 		PreferIPv4: cfg.Network.PreferIPv4,
 		TCP:        cfg.Network.TCP,
+		BLE:        cfg.Network.BLE,
 		Clock:      n.cfg.Clock,
 		// The invoke path refuses what BasicInformation does not advertise.
 		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
@@ -372,6 +380,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
 		responderParams: n.sec.responderParams, life: n.life,
+		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
 	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
 
@@ -590,6 +599,24 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if srv := n.root.TLSCertificateManagement; srv != nil {
 		srv.FabricRemoved(ctx, fabricIndex)
 	}
+	n.reopenIfDecommissionedWhenIdle(ctx)
+}
+
+// reopenIfDecommissionedWhenIdle reopens the own window after the removal
+// of a commissioned node's last fabric (reopenWhenIdle). A fabric that
+// only the fail-safe added — a first commissioning rolled back — does not
+// decommission the node: matter.js's #syncCommissioned sees no change
+// for it (commissioned was never set, CommissioningServer.ts:148-152 at
+// db021da0; a deletion is synced at once, :118-134) and starts no reset
+// (:136-140), so the window stays as the commissioning left it.
+func (n *Node) reopenIfDecommissionedWhenIdle(ctx context.Context) {
+	if !n.commissioned.Load() {
+		return
+	}
+	if fabrics, err := n.st.ListFabrics(ctx); err != nil || len(fabrics) > 0 {
+		return
+	}
+	n.commissioned.Store(false)
 	n.reopenWhenIdle()
 }
 
@@ -718,6 +745,8 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
+	n.commissioned.Store(true)
+	n.leaveRadioWhenCommissioned() //nolint:contextcheck // the stop outlives the CommissioningComplete request on purpose (its response must not wait for the radio); it is bounded by the node's lifetime, n.life
 	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
 	// response and a grace, since the command itself arrives over the
 	// fabric-adopted PASE session. Mirrors matter.js
@@ -731,6 +760,30 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 			observe(n.logger, "commissioning_complete", func() { fn(fabricIndex) })
 		}
 	}
+}
+
+// leaveRadioWhenCommissioned takes a node with a BLE radio off it once its
+// commissioning is committed — matter.js endUncommissionedMode on the
+// commissioned event (ServerNetworkRuntime.ts:294-308, wired at :386, at
+// db021da0), which a fabric added under a fail-safe raises only once the
+// fail-safe ended in its commit (CommissioningServer.ts:118-127, :148-158).
+// matter.js hands the deletion of the advertiser and the transport to the
+// runtime (:300-307); here it runs on a goroutine of its own, so the
+// CommissioningComplete response does not wait for the radio, and Stop
+// waits for it.
+func (n *Node) leaveRadioWhenCommissioned() {
+	if n.cfg.Network.BLE == nil {
+		return
+	}
+	n.keeperWG.Add(1)
+	go func() {
+		defer n.keeperWG.Done()
+		ctx, cancel := clock.WithTimeout(n.life, clock.Or(n.cfg.Clock), bleStopTimeout)
+		defer cancel()
+		if err := n.br.StopBLE(ctx); err != nil {
+			n.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
+		}
+	}()
 }
 
 // notifyFabricUpdated runs every OnFabricUpdated with the fabric as the
@@ -897,6 +950,8 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// commissioned node, not a new one: advertising it as commissionable
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
+	// A node with stored fabrics starts commissioned.
+	n.commissioned.Store(err == nil && stored > 0)
 	switch {
 	case err != nil:
 	case stored == 0:

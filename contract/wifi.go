@@ -12,8 +12,10 @@ import "context"
 // harness pin). The network list, its rules and the failsafe revert stay
 // in the cluster (cluster/core.WiFiNetworkCommissioning).
 //
-// The module's own nodes are Ethernet-attached; the reference daemon
-// implements this as a simulation (TESTING ONLY, --wifi-sim).
+// With [BLEPeripheral] it is one of the two radios a device-side host
+// supplies: a node commissioned over BLE joins its Wi-Fi network through
+// it. The reference daemon implements it as a simulation (TESTING ONLY,
+// --wifi-sim).
 type WiFiDriver interface {
 	// ScanNetworks scans for the network named ssid, every network when
 	// ssid is empty. status is a NetworkCommissioningStatusEnum value

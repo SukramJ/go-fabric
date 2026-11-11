@@ -13,10 +13,25 @@ pseudo-version of `main`.
 ### Added
 
 - `docs/reference/glossary.md`: a glossary of the Matter terms and the family's own terms the documentation uses, each with the package or page that owns it; linked from the Reference navigation and the home page's "Where to start".
+- BLE on the device side (milestone 7, phase 28, wave 28a): an uncommissioned node is commissionable over Bluetooth LE.
+  - `contract`: the host port `BLEPeripheral` (`Advertise`, `StopAdvertising`, `Serve`), its `BLEAdvertisement` (the complete advertising payload and the interval) and `BLEConnection` (one central's GATT connection: `Remote`, `OnWrite`, `OnSubscribe`, `OnUnsubscribe`, `Indicate`, `Disconnect`, `Disconnected`) — matter.js `BlePeripheralInterface` with the GATT server of its `BlenoBleServer`.
+  - `transport/btp`: `Accept` serves the peripheral's BTP side on a GATT connection after matter.js `BlenoBleServer.ts` — the handshake request kept from C1, the 15 s wait for the C2 subscription, the session at the ATT_MTU less 3, a subscription before a handshake and a second session refused, indications complete with their confirmation, an unsubscription or a disconnect closes; `GATTConnection` is the method set it takes (that of `contract.BLEConnection`), `ErrNoConnection` its refusal.
+  - `bridge`: `Config.BLE`, `Bridge.StartBLE`, `Bridge.WithdrawBLE` (the advertisement only) and `Bridge.StopBLE` — the Matter GATT service on the host's radio, one central at a time, each BTP session served through the receive path without MRP and its sessions evicted when the central goes, and the advertisement on matter.js's schedule (20 ms for 30 s, 150 ms until 15 minutes, then the extended announcement at 1285 ms, for 2 days). `Bridge.Stop` takes the bridge off the radio.
+  - `node`: `Network.BLE` — while the node has no fabric its own window (and an `OpenBasicWindow` window) is advertised over BLE and served over BTP; the window's end stops only the advertisement (a commissioning over BLE completes over the same link), the node leaves the radio once CommissioningComplete committed its fail-safe and at `Stop`, a commissioned node never touches the radio, and the own window that reopens after the last fabric is removed is on BLE again. `SetupPayload` and `PairingCodesFor` set the QR code's BLE discovery bit for a node with a radio.
+  - `controller/ble/bletest`: `Peripheral.Radio` returns the peripheral as a node's in-memory `contract.BLEPeripheral` (`Radio` with `Advertising`, `Advertisements`, `Serving`; `ErrNoService`, `ErrServing`), so a test's central reaches the node's production BLE path.
+  - `fabrictest`: `Topology.BLE` builds the device with that radio; `Device.BLE` returns the same peripheral for every call and fails the test for a device without `Topology.BLE`.
+  - `ble/bluez`: `NewPeripheral(adapter)` implements `contract.BLEPeripheral` over BlueZ's D-Bus API after connectedhomeip's Linux platform — a GATT application (service `fff6`, C1 through `AcquireWrite`, C2 through `AcquireNotify` with the confirmation on the socket or through `Confirm`, C3 read) registered with `GattManager1`, the advertisement an `LEAdvertisement1` (`MATTER-<discriminator>`) updated in place; pure Go, no cgo, the adapter shared with bluetoothd.
 
 ### Changed
 
+- `bridge`: a connection that is not TCP is no longer closed when its last session goes; matter.js closes only a TCP channel then (`ExchangeManager.ts:770-775`), so a central's BLE connection outlives its PASE session.
+- `endpoint`: `Topology.CommissionsOverBLE` — a node that commissions over BLE (the bridge sets it from `Config.BLE`) no longer states the node condition CustomNetworkConfig, so RootNode requires NetworkCommissioning, as matter.js's `nodeConditionsOf` decides (`ServerEndpointFacts.ts:131-145`); a node without BLE is judged as before.
+- `bridge/bridgetest`: `ServeConn` delivers through the bridge's own receiver of a BLE connection (same ordering contract); `fabrictest.Device.BLE()` no longer serves through it.
 - `ble/bluez`, `ble/esphome`: the nested modules require go-fabric `v0.21.0` (before `v0.12.1` and `v0.13.10`) and are tagged `ble/bluez/v0.21.0` and `ble/esphome/v0.21.0` at this commit, so the ATT_MTU report of issue 426 is reachable by a module version; no code change.
+
+### Fixed
+
+- `node`: a fail-safe's rollback of a fabric that only the fail-safe added (a first commissioning that failed) no longer reopens the node's own window once the node is idle; only the removal of a commissioned node's last fabric does, as matter.js's `CommissioningServer` decommissions only a node whose commissioning was committed (`CommissioningServer.ts:118-165`). The window stays as the commissioning left it.
 
 ## [0.21.0] — 2026-11-10
 

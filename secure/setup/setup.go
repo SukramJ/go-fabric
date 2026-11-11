@@ -27,8 +27,9 @@ import (
 )
 
 // DiscoveryCaps is the bitmap exposed in the QR onboarding payload
-// (Matter §5.7.4 RendezvousInformation). Bridge advertises ON_NETWORK
-// (bit 2) only; BLE / Soft-AP are not v1.1 transports.
+// (Matter §5.7.4 RendezvousInformation). A node advertises ON_NETWORK
+// (bit 2), and BLE (bit 1) beside it when it has a BLE radio
+// (node.Network.BLE, ADR 0031); Soft-AP is not served.
 type DiscoveryCaps uint8
 
 const (

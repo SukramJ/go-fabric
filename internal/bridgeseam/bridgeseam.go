@@ -75,17 +75,16 @@ var AnchorPeerCounter func(b any, sessionID uint16, peerNodeID uint64, counter u
 // The second result is false when b is not a bridge.
 var AckPumpTick func(b any, now time.Time) (int, bool)
 
-// ReceiveOnConn hands one complete Matter message that arrived on c — a
-// connection of a transport the bridge does not listen on itself, such as
-// the BTP peripheral of controller/ble/bletest — to the bridge's
-// transport-neutral receive path, exactly as the TCP listener's handler
-// does: replies go back on c, and release hands c's turn to its next
-// message. Reports false when b is not a bridge.
-var ReceiveOnConn func(b any, c transport.Conn, msg []byte, release func()) bool
-
-// ConnClosed evicts every session bound to c, as a dropped TCP connection
-// does. Reports false when b is not a bridge.
-var ConnClosed func(b any, c transport.Conn) bool
+// ServeConn returns the bridge's own receiver of the Matter messages of c
+// — a connection of a transport the bridge does not listen on itself, such
+// as the BTP peripheral of controller/ble/bletest — the one its BLE
+// transport serves each central's session with: deliver hands one
+// complete message to the transport-neutral receive path, in delivery
+// order, each once its predecessor returned or released its turn, replies
+// going back on c; closeConn stops delivering and evicts every session
+// bound to c, as a dropped TCP connection does; wait waits for the
+// delivered messages' handlers. ok is false when b is not a bridge.
+var ServeConn func(b any, c transport.Conn) (deliver func(msg []byte), closeConn, wait func(), ok bool)
 
 // UseListener makes b's Start serve the listener open returns instead of
 // binding a UDP socket of its own: fabrictest's in-memory network hands a

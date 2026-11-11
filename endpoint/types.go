@@ -670,6 +670,12 @@ type Topology struct {
 	// VendorName is the node's BasicInformation VendorName
 	// ([Config.VendorName]).
 	VendorName string
+	// CommissionsOverBLE states that the node commissions over Bluetooth
+	// LE (a node with a BLE radio, node.Network.BLE): the node condition
+	// CustomNetworkConfig does not hold for it, so RootNode requires
+	// NetworkCommissioning ([ValidateDeviceTypes]). The bridge sets it from
+	// its Config.BLE before it validates a topology.
+	CommissionsOverBLE bool
 }
 
 // FindByID returns the endpoint with id ID, or nil when no such

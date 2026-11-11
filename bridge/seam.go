@@ -14,7 +14,6 @@ package bridge
 // it is.
 
 import (
-	"context"
 	"net"
 	"time"
 
@@ -82,16 +81,13 @@ func init() {
 		return anchor != nil && anchor(sess, counter)
 	}
 
-	bridgeseam.ReceiveOnConn = func(b any, c transport.Conn, msg []byte, release func()) bool {
+	bridgeseam.ServeConn = func(b any, c transport.Conn) (func([]byte), func(), func(), bool) {
 		br, ok := b.(*Bridge)
 		if !ok || br == nil || c == nil {
-			return false
+			return nil, nil, nil, false
 		}
-		// As handleTCPMessage: the dispatch context carries the release of
-		// the connection's turn.
-		ctx := context.WithValue(br.handlerContext(), sessionTurnKey{}, release)
-		_ = br.receive(ctx, msg, c)
-		return true
+		r := br.newConnReceiver(c)
+		return r.deliver, r.close, r.wait, true
 	}
 
 	bridgeseam.UseListener = func(b any, open func() (*udp.Listener, error)) bool {
@@ -100,15 +96,6 @@ func init() {
 			return false
 		}
 		br.openUDP.Store(&open)
-		return true
-	}
-
-	bridgeseam.ConnClosed = func(b any, c transport.Conn) bool {
-		br, ok := b.(*Bridge)
-		if !ok || br == nil || c == nil {
-			return false
-		}
-		br.evictConn(c)
 		return true
 	}
 

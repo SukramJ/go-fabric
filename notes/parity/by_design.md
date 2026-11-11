@@ -6345,6 +6345,52 @@ the register leaves that case. Supersedes `BD-Matter-BTP-NoStallRenegotiation`
 `controller/ble/channel_parity_matterjs_test.go` over the `bletest`
 peripheral's `Stall` and `Faults`; no chip-tool leg exists (no BTP family).
 
+### BD-Matter-BLEPeripheralOverBlueZ — the BLE peripheral on Linux speaks BlueZ's D-Bus API after connectedhomeip, where matter.js drives the controller through bleno
+
+matter.js's peripheral is `BlenoBleServer` on bleno
+(`packages/nodejs-ble/src/BlenoBleServer.ts` at `db021da0`): raw HCI through
+a native binding, the advertising payload handed over as EIR bytes (`:384`),
+the GATT service set once advertising started (`:224-231`). `ble/bluez`
+reaches the same controller through bluetoothd, as connectedhomeip's Linux
+platform does (`src/platform/Linux/bluez/BluezEndpoint.cpp:448-534`,
+`BluezAdvertisement.cpp:43-101`, `BluezConnection.cpp:172-238` at `6170af84`):
+a GATT application with C1 through `AcquireWrite` and C2 through
+`AcquireNotify`, and an `LEAdvertisement1` object. Six things follow from
+the platform. (1) BlueZ composes the advertisement from properties: the
+service data is taken out of the payload matter.js would hand bleno, the
+flags are BlueZ's, and the local name is connectedhomeip's
+`MATTER-<discriminator>` (`BLEManagerImpl.cpp:377`) where matter.js sends
+none. (2) A refused C1 write or C2 subscription is logged and not answered
+with an ATT error (`BlenoBleServer.ts:51-57`): bluetoothd has answered the
+central before the socket delivers the write. (3) A central counts from its
+first use of the Matter service, where connectedhomeip counts every device
+that connects to the adapter (`BluezEndpoint.cpp:296-350`), so another use
+of the adapter does not take the node's one slot. (4) The end of the C2
+subscription is the end of the notify socket; it is reported and closes the
+session as in matter.js (`BlenoBleServer.ts:81-84`), where connectedhomeip
+does not report it on this path at the pin (`BLEManagerImpl.cpp:699-712`).
+(5) A C2 subscription that arrives before the first C1 write was read is
+held until it was: the two travel on different sockets, so their order of
+arrival is the platform's, not the central's, and matter.js's refusal of a
+subscription before the handshake request (`BlenoBleServer.ts:288-291`)
+would refuse a correct central. (6) Where bluetoothd reports an
+indication's confirmation through C2's `Confirm` call, the call names no
+device: connectedhomeip completes the connection of the device seen last
+(`BluezEndpoint.cpp:207-217`), the peripheral the live connection that
+waits for one, so a refused second central cannot take the first one's
+confirmations (`TestPeripheralConfirmAfterRefusedCentral`). Everything above the platform is
+matter.js's and shared by every platform — the handshake held until the
+subscription, the 15 s timer, the single session, the advertisement's
+schedule, BLE only without a fabric (`transport/btp/accept.go`,
+`bridge/ble.go`, `node/commissioning.go`); the single connection, bleno's
+limit in matter.js (`BlenoBleServer.ts:130-133`), is the bridge's rule
+here: a second central is disconnected. Reasoning: bleno needs a native
+build and takes the HCI device away from bluetoothd; this module is pure Go
+and shares the adapter (ADR 0031, decision 5). Pinned by
+`TestPeripheralAdvertisement`, `TestPeripheralConnectionEvents` and
+`TestPeripheralServesBTP` (`ble/bluez/peripheral_linux_test.go`) over an
+in-process bluetoothd, and `TestBLEOneCentralAtATime` (`bridge/ble_test.go`).
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map

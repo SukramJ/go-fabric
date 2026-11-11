@@ -5,7 +5,10 @@
 // implements ble.Central and the [Peripheral]s it reaches, each a GATT
 // server of the Matter service whose BTP side is a transport/btp
 // peripheral session. Writes and indications travel asynchronously, in
-// order, on goroutines of their own, as a radio delivers them.
+// order, on goroutines of their own, as a radio delivers them. A
+// peripheral's [Peripheral.Radio] is the same peripheral as a node's
+// contract.BLEPeripheral: the centrals then reach the node's own BTP
+// server (bridge.Config.BLE), its production path.
 //
 // The peripheral's GATT behaviour follows matter.js's BLE server
 // (packages/nodejs-ble/src/BlenoBleServer.ts at 0ceb202d): the handshake
@@ -21,6 +24,7 @@ package bletest
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/controller/ble"
@@ -62,6 +66,11 @@ func (c *Central) Add(p *Peripheral) {
 	c.peripherals[p.Address] = p
 	scanning := c.scanning
 	c.mu.Unlock()
+	p.mu.Lock()
+	if !slices.Contains(p.centrals, c) {
+		p.centrals = append(p.centrals, c)
+	}
+	p.mu.Unlock()
 	if scanning {
 		c.Advertise(p.Address)
 	}
@@ -105,7 +114,8 @@ func (c *Central) Scanning() (scanning bool, starts, stops int) {
 }
 
 // Advertise reports the peripheral's advertisement to the discovery
-// callback.
+// callback. A peripheral that is a node's [Radio] advertises only while
+// the node does.
 func (c *Central) Advertise(address string) {
 	c.mu.Lock()
 	p := c.peripherals[address]
@@ -114,7 +124,18 @@ func (c *Central) Advertise(address string) {
 	if p == nil || cb == nil {
 		return
 	}
-	cb(ble.Peripheral{Address: p.Address}, p.ServiceData())
+	data := p.ServiceData()
+	if data == nil {
+		return
+	}
+	cb(ble.Peripheral{Address: p.Address}, data)
+}
+
+// isScanning reports whether the central scans.
+func (c *Central) isScanning() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.scanning
 }
 
 // Connect implements ble.Central.
@@ -124,6 +145,9 @@ func (c *Central) Connect(_ context.Context, p ble.Peripheral) (ble.Connection, 
 	c.mu.Unlock()
 	if per == nil {
 		return nil, ErrUnknownPeripheral
+	}
+	if r := per.currentRadio(); r != nil {
+		return r.connect()
 	}
 	return per.accept(), nil
 }
@@ -159,11 +183,17 @@ type Peripheral struct {
 	// Faults are the GATT failures every connection shows.
 	Faults Faults
 
-	// mu guards conns, handshakes and unsubscribes.
+	// mu guards conns, handshakes, unsubscribes, centrals and radio.
 	mu           sync.Mutex
 	conns        []*connection
 	handshakes   []int
 	unsubscribes int
+	// centrals are the centrals the peripheral was added to; its radio
+	// reports a new advertisement to the ones that scan.
+	centrals []*Central
+	// radio is the node's radio this peripheral is ([Peripheral.Radio]);
+	// nil serves Serve.
+	radio *Radio
 }
 
 // Faults are GATT failures a peripheral or its platform shows, after the
@@ -225,9 +255,21 @@ func (p *Peripheral) DropConnections() {
 }
 
 // ServiceData is the Matter service data the peripheral advertises
-// (btp.EncodeAdvertisementData without the AD structure headers).
+// (btp.EncodeAdvertisementData without the AD structure headers). A
+// node's [Radio] advertises the node's payload, and nothing (nil) while
+// the node does not advertise.
 func (p *Peripheral) ServiceData() []byte {
+	if r := p.currentRadio(); r != nil {
+		return r.serviceData()
+	}
 	return btp.EncodeAdvertisementData(p.Discriminator, p.VendorID, p.ProductID, false, false)[7:]
+}
+
+// currentRadio is the peripheral's radio, nil without one.
+func (p *Peripheral) currentRadio() *Radio {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.radio
 }
 
 func (p *Peripheral) attMTU() int {

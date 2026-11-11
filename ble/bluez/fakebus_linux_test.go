@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,17 @@ type fakeBus struct {
 	// signal) once a GetManagedObjects answer is taken: a change BlueZ
 	// made between that read and the next.
 	afterManaged func(managedObjects)
+	// exports are the methods this process exported (path → interface →
+	// member → func); emitted are the signals it sent.
+	exports map[dbus.ObjectPath]map[string]map[string]any
+	emitted []*dbus.Signal
+	// app and adv are what bluetoothd holds registered: the application's
+	// objects as it read them, the advertisement's properties.
+	app managedObjects
+	adv map[string]dbus.Variant
+	// onDisconnect, when set, runs once inside the next Device1.Disconnect
+	// bluetoothd answers.
+	onDisconnect func()
 }
 
 const testAdapter = dbus.ObjectPath("/org/bluez/hci0")
@@ -47,8 +59,56 @@ func newFakeBus() *fakeBus {
 		errs:    map[string]error{},
 		devices: map[dbus.ObjectPath]*fakeDevice{},
 		sigs:    make(chan *dbus.Signal, 4096),
+		exports: map[dbus.ObjectPath]map[string]map[string]any{},
 	}
 	return b
+}
+
+// Export implements bus: what this process exports, recorded.
+func (b *fakeBus) Export(path dbus.ObjectPath, iface string, methods map[string]any) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if methods == nil {
+		delete(b.exports[path], iface)
+		if len(b.exports[path]) == 0 {
+			delete(b.exports, path)
+		}
+		return nil
+	}
+	if b.exports[path] == nil {
+		b.exports[path] = map[string]map[string]any{}
+	}
+	b.exports[path][iface] = methods
+	return nil
+}
+
+// Emit implements bus: a signal this process sends, recorded; a
+// PropertiesChanged of the registered advertisement updates what
+// bluetoothd holds, as BlueZ's property watch does.
+func (b *fakeBus) Emit(path dbus.ObjectPath, name string, values ...any) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.emitted = append(b.emitted, &dbus.Signal{Path: path, Name: name, Body: copyBody(values)})
+	if name == sigPropsChanged && len(values) >= 2 && values[0] == ifaceAdvertise && b.adv != nil {
+		if changed, ok := values[1].(map[string]dbus.Variant); ok {
+			maps.Copy(b.adv, changed)
+		}
+	}
+	return nil
+}
+
+// method is an exported method, nil when it is not exported.
+func (b *fakeBus) method(path dbus.ObjectPath, iface, member string) any {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.exports[path][iface][member]
+}
+
+// exported reports whether anything is exported at path.
+func (b *fakeBus) exported(path dbus.ObjectPath) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.exports[path]) > 0
 }
 
 func (b *fakeBus) Signals() <-chan *dbus.Signal { return b.sigs }
@@ -173,7 +233,165 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	if dev != nil {
 		return dev.call(ctx, path, method, args)
 	}
+	return b.bluetoothd(path, method, args)
+}
+
+// bluetoothd answers the peripheral's calls as bluetoothd does: the
+// application's registration reads its objects through the exported
+// ObjectManager, the advertisement's through the exported Properties.
+func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([]any, error) {
+	switch method {
+	case ifaceGattManager + ".RegisterApplication":
+		root, _ := args[0].(dbus.ObjectPath)
+		get, ok := b.method(root, ifaceObjectMgr, "GetManagedObjects").(func() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
+		if !ok {
+			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no ObjectManager at " + string(root)}}
+		}
+		objs, derr := get()
+		if derr != nil {
+			return nil, derr
+		}
+		b.mu.Lock()
+		b.app = objs
+		b.mu.Unlock()
+	case ifaceGattManager + ".UnregisterApplication":
+		b.mu.Lock()
+		b.app = nil
+		b.mu.Unlock()
+	case ifaceAdvertising + ".RegisterAdvertisement":
+		adv, _ := args[0].(dbus.ObjectPath)
+		getAll, ok := b.method(adv, ifaceProperties, "GetAll").(func(string) (map[string]dbus.Variant, *dbus.Error))
+		if !ok {
+			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no Properties at " + string(adv)}}
+		}
+		props, derr := getAll(ifaceAdvertise)
+		if derr != nil {
+			return nil, derr
+		}
+		b.mu.Lock()
+		b.adv = maps.Clone(props)
+		b.mu.Unlock()
+	case ifaceAdvertising + ".UnregisterAdvertisement":
+		b.mu.Lock()
+		b.adv = nil
+		b.mu.Unlock()
+	case ifaceDevice + ".Disconnect":
+		b.mu.Lock()
+		hook := b.onDisconnect
+		b.onDisconnect = nil
+		b.mu.Unlock()
+		if hook != nil {
+			hook()
+		}
+		b.setProps(path, ifaceDevice, map[string]dbus.Variant{"Connected": dbus.MakeVariant(false)})
+	}
 	return nil, nil
+}
+
+// registered is what bluetoothd holds: the application's objects and the
+// advertisement's properties (nil when not registered).
+func (b *fakeBus) registered() (app managedObjects, adv map[string]dbus.Variant) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.app, maps.Clone(b.adv)
+}
+
+// fakeCentral is a central connected to the peripheral, as bluetoothd
+// serves it: the C1 socket it writes to, the C2 socket it reads
+// indications from and confirms on.
+type fakeCentral struct {
+	b      *fakeBus
+	device dbus.ObjectPath
+	write  *os.File
+	notify *os.File
+}
+
+// connectCentral adds a connected central's Device1 under the adapter.
+func (b *fakeBus) connectCentral(addr string) *fakeCentral {
+	path := devPath(addr)
+	b.addObject(path, map[string]map[string]dbus.Variant{ifaceDevice: {
+		"Address": dbus.MakeVariant(addr), "Connected": dbus.MakeVariant(true),
+	}})
+	return &fakeCentral{b: b, device: path}
+}
+
+func (fc *fakeCentral) options(mtu uint16) map[string]dbus.Variant {
+	return map[string]dbus.Variant{"device": dbus.MakeVariant(fc.device), "mtu": dbus.MakeVariant(mtu), "link": dbus.MakeVariant("LE")}
+}
+
+type acquireFunc = func(map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error)
+
+// acquire calls the exported AcquireWrite (C1) or AcquireNotify (C2), as
+// bluetoothd does at the central's first write and at its subscription.
+func (fc *fakeCentral) acquire(char dbus.ObjectPath, member string, mtu uint16) (*os.File, error) {
+	f, ok := fc.b.method(char, ifaceGattChar, member).(acquireFunc)
+	if !ok {
+		return nil, fmt.Errorf("%s not exported at %s", member, char)
+	}
+	fd, gotMTU, derr := f(fc.options(mtu))
+	if derr != nil {
+		return nil, derr
+	}
+	if gotMTU != mtu {
+		return nil, fmt.Errorf("%s answered MTU %d, want %d", member, gotMTU, mtu)
+	}
+	return os.NewFile(uintptr(fd), member), nil
+}
+
+func (fc *fakeCentral) acquireWrite(char dbus.ObjectPath, mtu uint16) error {
+	f, err := fc.acquire(char, "AcquireWrite", mtu)
+	if err == nil {
+		fc.write = f
+	}
+	return err
+}
+
+func (fc *fakeCentral) acquireNotify(char dbus.ObjectPath, mtu uint16) error {
+	f, err := fc.acquire(char, "AcquireNotify", mtu)
+	if err == nil {
+		fc.notify = f
+	}
+	return err
+}
+
+// writeC1 is one C1 write over the acquired socket.
+func (fc *fakeCentral) writeC1(v []byte) error {
+	_, err := fc.write.Write(v)
+	return err
+}
+
+// indication reads the next indication from the C2 socket.
+func (fc *fakeCentral) indication() ([]byte, error) {
+	if err := fc.notify.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 512)
+	n, err := fc.notify.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n], nil
+}
+
+// confirm is BlueZ 5.80's confirmation: a byte 1 on the C2 socket.
+func (fc *fakeCentral) confirm() error {
+	_, err := fc.notify.Write([]byte{1})
+	return err
+}
+
+// unsubscribe is the central's CCC write of 0: bluetoothd closes its C2
+// socket.
+func (fc *fakeCentral) unsubscribe() error { return fc.notify.Close() }
+
+// disconnect is the link lost: Connected false, the sockets closed.
+func (fc *fakeCentral) disconnect() {
+	fc.b.setProps(fc.device, ifaceDevice, map[string]dbus.Variant{"Connected": dbus.MakeVariant(false)})
+	if fc.write != nil {
+		_ = fc.write.Close()
+	}
+	if fc.notify != nil {
+		_ = fc.notify.Close()
+	}
 }
 
 // setProps sets properties of an object and sends their PropertiesChanged.

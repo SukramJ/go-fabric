@@ -5,7 +5,6 @@ package bridgetest
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
@@ -16,20 +15,20 @@ import (
 var ErrNoConn = errors.New("bridgetest: nil connection")
 
 // ConnServer serves the Matter messages of one connection of a transport
-// the bridge does not listen on itself — the BTP peripheral of
-// controller/ble/bletest — through the bridge's transport-neutral receive
-// path: replies go back on the connection, without MRP when it is
-// reliable. A node of this module never advertises over BLE (ADR 0024,
-// decision 1); this is how a test commissions one over BTP anyway.
+// the bridge does not listen on itself through the bridge's
+// transport-neutral receive path: replies go back on the connection,
+// without MRP when it is reliable. It is the receiver the bridge's own BLE
+// transport serves each central's BTP session with (bridge.Config.BLE),
+// handed to a test that holds a connection of its own — a
+// controller/ble/bletest peripheral's session, a fault model's.
 type ConnServer struct {
-	b    *bridge.Bridge
-	conn transport.Conn
+	fns *connFns
+}
 
-	// mu guards done, prev and wg.
-	mu   sync.Mutex
-	prev chan struct{}
-	done bool
-	wg   sync.WaitGroup
+// connFns are the bridge's receiver of the connection.
+type connFns struct {
+	deliver     func([]byte)
+	close, wait func()
 }
 
 // ServeConn returns the server of conn's messages on b.
@@ -40,9 +39,11 @@ func ServeConn(b *bridge.Bridge, conn transport.Conn) (*ConnServer, error) {
 	if conn == nil {
 		return nil, ErrNoConn
 	}
-	first := make(chan struct{})
-	close(first)
-	return &ConnServer{b: b, conn: conn, prev: first}, nil
+	deliver, closeConn, wait, ok := bridgeseam.ServeConn(b, conn)
+	if !ok {
+		return nil, ErrNoBridge
+	}
+	return &ConnServer{fns: &connFns{deliver: deliver, close: closeConn, wait: wait}}, nil
 }
 
 // Deliver hands one complete Matter message to the bridge. Messages are
@@ -50,36 +51,11 @@ func ServeConn(b *bridge.Bridge, conn transport.Conn) (*ConnServer, error) {
 // released its turn — the contract of transport/tcp's ordered handler, so
 // a handler that waits for the peer's answer on the same connection lets
 // that answer through. Deliver does not wait for the handler.
-func (s *ConnServer) Deliver(msg []byte) {
-	s.mu.Lock()
-	if s.done {
-		s.mu.Unlock()
-		return
-	}
-	prev := s.prev
-	turn := make(chan struct{})
-	s.prev = turn
-	s.wg.Add(1)
-	s.mu.Unlock()
-	msg = append([]byte(nil), msg...)
-	go func() {
-		defer s.wg.Done()
-		var once sync.Once
-		release := func() { once.Do(func() { close(turn) }) }
-		defer release()
-		<-prev
-		bridgeseam.ReceiveOnConn(s.b, s.conn, msg, release)
-	}()
-}
+func (s *ConnServer) Deliver(msg []byte) { s.fns.deliver(msg) }
 
 // Close stops delivering and evicts every session bound to the
 // connection, as a dropped TCP connection does.
-func (s *ConnServer) Close() {
-	s.mu.Lock()
-	s.done = true
-	s.mu.Unlock()
-	bridgeseam.ConnClosed(s.b, s.conn)
-}
+func (s *ConnServer) Close() { s.fns.close() }
 
 // Wait waits for every delivered message's handler to return.
-func (s *ConnServer) Wait() { s.wg.Wait() }
+func (s *ConnServer) Wait() { s.fns.wait() }

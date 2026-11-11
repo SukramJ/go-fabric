@@ -1,6 +1,9 @@
 # ADR 0024 — BLE commissioning in the controller role
 
-- **Status**: Accepted (2026-10-16; concept v3, decision 0.1)
+- **Status**: Accepted (2026-10-16; concept v3, decision 0.1); the second
+  half of decision 1 ("the device role stays without Bluetooth") is
+  superseded by [ADR 0031](./0031-ble-and-wifi-provisioning-on-the-device-side.md)
+  (2026-11-11)
 - **Date**: 2026-10-16
 - **Related**: [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md),
   [concept v3](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) §A.1,
@@ -31,6 +34,9 @@ BSD-2-Clause); CoreBluetooth and WinRT need cgo or COM.
 
 1. **The controller role commissions over BLE; the device role stays
    without Bluetooth.** A node of this module never advertises over BLE.
+   *(Superseded for the device role by ADR 0031: a node without a fabric
+   is commissionable over BLE. The sentence stays as the history of the
+   decision.)*
 2. **BTP is pure Go in the main module** (`transport/btp`), a port of
    `BtpSessionHandler.ts` proved against matter.js's test vectors; the
    seam `controller/ble` (`Central`, the advertisement parser, the PASE

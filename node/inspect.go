@@ -42,7 +42,7 @@ type SetupPayload struct {
 // 405-414, :417-450 at 862ad75f).
 func (n *Node) SetupPayload() (SetupPayload, error) {
 	cm, pd := n.cfg.Commissioning, n.cfg.ProductDescription
-	qr, manual, err := pairingCodes(pd, cm.Discriminator, cm.Passcode)
+	qr, manual, err := pairingCodes(pd, cm.Discriminator, cm.Passcode, n.cfg.Network.BLE != nil)
 	if err != nil {
 		return SetupPayload{}, err
 	}
