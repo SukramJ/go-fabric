@@ -129,9 +129,13 @@ one-way test seams (`bridgeseam`, `channelseam`), the shared parity-test
 support (`paritytest`) and the chip-tool suite.
 
 Scope boundaries that are decisions, not backlog — do not "fix" them:
-no Bluetooth on the device side (the commissioner speaks BLE since
-[ADR 0024](./docs/adr/0024-ble-commissioning-in-the-controller.md), concept v3),
-no Thread radio. The controller/commissioner role was a third
+no Thread radio. Bluetooth on the device side was a second until
+[ADR 0031](./docs/adr/0031-ble-and-wifi-provisioning-on-the-device-side.md)
+(accepted 2026-11-11, roadmap milestone 7): a node without a fabric is
+commissioned over BLE through a `contract.BLEPeripheral`, and a node with
+one is never on the radio (the commissioner speaks BLE since
+[ADR 0024](./docs/adr/0024-ble-commissioning-in-the-controller.md), concept v3).
+The controller/commissioner role was a third
 until [ADR 0020](./docs/adr/0020-commissioner-and-controller-role.md)
 (accepted 2026-10-13, concept v2): it enters as `controller/` in stages;
 until a stage lands nothing outside that package changes for it.
@@ -389,8 +393,9 @@ its family (go-fabric-ui, go-fabric-server, the hosts) is held to:
   why; when the owner's choice is not the best architecture in the
   assistant's judgement, the assistant says so with its reasons before
   implementing — the owner decides, the reasons are on record. A scope
-  boundary that is a decision (no Thread radio on the device side, no
-  device-side BLE) is kept unless the owner reopens it.
+  boundary that is a decision (no Thread radio on the device side) is
+  kept unless the owner reopens it, as the owner reopened device-side BLE
+  (ADR 0031).
 - **Questions to the owner are a wizard, never a list.** Set 2026-11-06.
   Every open decision is put one step at a time (`AskUserQuestion`, one
   decision per step, the independent ones in one call): the options, the
