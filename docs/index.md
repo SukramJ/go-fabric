@@ -17,6 +17,7 @@ Alliance, and nothing built on it may be described as certified.
 | Pair and control Matter devices from Go | [Getting started: controller](getting-started/controller.md) |
 | Decide whether the module fits your product | [Architecture](architecture.md), [Security model](security.md), [matter.js comparison](matterjs-comparison.md), [Certifiability](certifiability.md), [Roadmap](roadmap.md) |
 | Run it in production | [Concurrency](guides/concurrency.md), [Persistence](guides/persistence.md), the [API stability policy](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability) |
+| Look a term up | [Glossary](reference/glossary.md) |
 | Change it | [CONTRIBUTING](https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md), the [parity contract](matter-parity-contract.md), the [decision records](adr/README.md) |
 
 ## At a glance

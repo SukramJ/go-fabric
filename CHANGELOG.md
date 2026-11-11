@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/reference/glossary.md`: a glossary of the Matter terms and the family's own terms the documentation uses, each with the package or page that owns it; linked from the Reference navigation and the home page's "Where to start".
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`: the nested modules require go-fabric `v0.21.0` (before `v0.12.1` and `v0.13.10`) and are tagged `ble/bluez/v0.21.0` and `ble/esphome/v0.21.0` at this commit, so the ATT_MTU report of issue 426 is reachable by a module version; no code change.
