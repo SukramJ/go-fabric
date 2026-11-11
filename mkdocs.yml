@@ -133,6 +133,7 @@ nav:
           - "ADR 0028 — The test site paces by counted in-flight work": adr/0028-site-paces-by-counted-work.md
           - "ADR 0029 — ICD state split by role, no transaction model": adr/0029-icd-split-by-role.md
           - "ADR 0030 — The served surface is a value under policies": adr/0030-the-served-surface-is-a-value-under-policies.md
+      - Glossary: reference/glossary.md
       - Device types: reference/device-types.md
       - Specification levels: reference/spec-levels.md
       - matter.js comparison: matterjs-comparison.md
