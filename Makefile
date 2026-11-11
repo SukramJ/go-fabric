@@ -533,5 +533,37 @@ esphome-check: ## the ble/esphome sub-module: build (Linux, darwin, windows), ve
 	cd $(ESPHOME_DIR) && $(GO) mod tidy -diff
 	cd $(ESPHOME_DIR) && $(GO) mod verify
 
+# wifi/wpasupplicant is a Go module of its own (brief 28b decision 3): the
+# node's Wi-Fi driver over wpa_supplicant's D-Bus interface, with godbus.
+# The main module's ./... does not reach it. The !linux stub is built for
+# darwin as well; its tests run over an in-process bus.
+WPASUPPLICANT_DIR ?= wifi/wpasupplicant
+
+.PHONY: wpasupplicant-check
+wpasupplicant-check: ## the wifi/wpasupplicant sub-module: build (Linux and the stub), vet, test with -race, golangci-lint, go mod tidy -diff
+	cd $(WPASUPPLICANT_DIR) && $(GO) build ./...
+	cd $(WPASUPPLICANT_DIR) && GOOS=darwin $(GO) build ./...
+	cd $(WPASUPPLICANT_DIR) && $(GO) vet ./...
+	cd $(WPASUPPLICANT_DIR) && CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+	cd $(WPASUPPLICANT_DIR) && $(GOLANGCI_LINT) run --timeout=$(GOLANGCI_TIMEOUT) ./...
+	cd $(WPASUPPLICANT_DIR) && $(GO) mod tidy -diff
+	cd $(WPASUPPLICANT_DIR) && $(GO) mod verify
+
+# examples/ble-wifi-light is a module of its own (brief 28b decision 4): it
+# composes ble/bluez and wifi/wpasupplicant, which neither the main module
+# nor either library module imports. Built for the Linux targets a Pi runs.
+BLEWIFI_DIR ?= examples/ble-wifi-light
+
+.PHONY: ble-wifi-light-check
+ble-wifi-light-check: ## the examples/ble-wifi-light module: build (linux amd64, arm64, arm), vet, test, golangci-lint, go mod tidy -diff
+	cd $(BLEWIFI_DIR) && GOOS=linux GOARCH=amd64 $(GO) build -o /dev/null .
+	cd $(BLEWIFI_DIR) && GOOS=linux GOARCH=arm64 $(GO) build -o /dev/null .
+	cd $(BLEWIFI_DIR) && GOOS=linux GOARCH=arm GOARM=7 $(GO) build -o /dev/null .
+	cd $(BLEWIFI_DIR) && $(GO) vet ./...
+	cd $(BLEWIFI_DIR) && $(GO) test -count=1 ./...
+	cd $(BLEWIFI_DIR) && $(GOLANGCI_LINT) run --timeout=$(GOLANGCI_TIMEOUT) ./...
+	cd $(BLEWIFI_DIR) && $(GO) mod tidy -diff
+	cd $(BLEWIFI_DIR) && $(GO) mod verify
+
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check test lint cover-check surface-check bluez-check esphome-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck apidiff-check test lint cover-check surface-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs

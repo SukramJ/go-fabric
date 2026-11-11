@@ -21,14 +21,15 @@ updates:
       go-minor-patch:
         update-types: ["minor", "patch"]
 
-  # The nested modules (ble/bluez, ble/esphome): their own third-party
+  # The nested modules (ble/bluez, ble/esphome, wifi/wpasupplicant, and the
+  # example module examples/ble-wifi-light): their own third-party
   # requires (godbus, flynn/noise, miekg/dns). Their require of go-fabric
   # itself is set by the release (the nested module is tagged with the
   # release that ships it), so Dependabot leaves it alone. Their indirect
   # requires of the root module's dependencies (modernc.org/sqlite and its
   # transitive set) follow the root through the replace directive, which
   # Dependabot does not see: a root-module bump runs `go mod tidy` in both
-  # nested modules on the same PR, or ble/bluez and ble/esphome fail on
+  # nested modules on the same PR, or they fail on
   # `go mod tidy -diff` (#350).
   - package-ecosystem: gomod
     directory: "/ble/bluez"
@@ -40,6 +41,36 @@ updates:
       prefix: "chore(deps)"
     ignore:
       - dependency-name: "github.com/SukramJ/go-fabric"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: gomod
+    directory: "/wifi/wpasupplicant"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "github.com/SukramJ/go-fabric"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+  # The example composes the in-repo modules through replace directives;
+  # its third-party requires follow them.
+  - package-ecosystem: gomod
+    directory: "/examples/ble-wifi-light"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "github.com/SukramJ/go-fabric"
+      - dependency-name: "github.com/SukramJ/go-fabric/ble/bluez"
+      - dependency-name: "github.com/SukramJ/go-fabric/wifi/wpasupplicant"
     groups:
       go-minor-patch:
         update-types: ["minor", "patch"]
