@@ -52,8 +52,10 @@ talks to*; a **subscription** is another node asking *to be told* about
 this one. In go-fabric: [`binding`](https://github.com/SukramJ/go-fabric/tree/main/binding)
 resolves the entries into peers.
 
-**Border Router** — The device through which a controller forms or joins a
-Thread network; its device type is ThreadBorderRouter (`0x0091`). In
+**Border Router** — A router that connects a Thread network to another IP
+network (Wi-Fi, Ethernet), so nodes off Thread reach Thread nodes; a
+commissioner hands a device the dataset of the Thread network the border
+router serves. Its device type is ThreadBorderRouter (`0x0091`). In
 go-fabric: an existing OpenThread Border Router is managed over its REST
 API (`thread/otbr`, `cluster/threadbr`;
 [Thread Border Router](../guides/thread-border-router.md)).
@@ -203,8 +205,8 @@ policies ([`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)).
 
 **Groups and groupcast** — A group is a set of endpoints, on one or more
 nodes, addressed by one group id with one message; the Groups cluster
-manages an endpoint's membership, and the newer Groupcast cluster
-supersedes it once certifiable. In go-fabric:
+manages an endpoint's membership; the newer Groupcast cluster is its
+designated successor. In go-fabric:
 [`groups`](https://github.com/SukramJ/go-fabric/tree/main/groups)
 ([ADR 0009](../adr/0009-groups-and-group-messaging.md),
 [ADR 0010](../adr/0010-groupcast-and-auxiliary-acl.md)).
