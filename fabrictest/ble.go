@@ -6,9 +6,7 @@ package fabrictest
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -50,14 +48,4 @@ func (d *Device) blePeripheral(cfg node.Config) *bletest.Peripheral {
 		}
 	}
 	return d.ble
-}
-
-// UseWiFiCommissioning makes the device built from cfg serve
-// NetworkCommissioning with the Wi-Fi feature instead of Ethernet, its
-// scan and connect done by driver — what a commissioner's network steps
-// configure when it pairs the device over BLE. A test's Topology.Configure
-// calls it; the knob is not part of node.Config, whose nodes are
-// Ethernet-attached (review 2026-11 W5-api-11).
-func UseWiFiCommissioning(cfg *node.Config, driver contract.WiFiDriver) {
-	nodeseam.UseWiFiCommissioning(cfg, driver)
 }

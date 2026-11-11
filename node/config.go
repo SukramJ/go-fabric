@@ -270,22 +270,17 @@ type Network struct {
 	// is removed, the own window that reopens is on BLE again. nil is no
 	// BLE.
 	BLE contract.BLEPeripheral
-	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
-	// Wi-Fi. NetworkCommissioning
-	// stays Ethernet-only either way (concept v2 §B.4): the node states the
-	// RootNode device-type condition WiFi, under which RootNode lists the
-	// cluster ("[WiFi]", device/root_node_gen.go), through the assembler's
-	// RootDeviceConditions — with [Config].Snapshotter the host's own
-	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
-	// it. nil mounts none; a non-nil WiFi needs its Reporter.
+	// WiFi is the node's Wi-Fi interface: its Driver joins the network a
+	// commissioner hands it (NetworkCommissioning with the Wi-Fi feature),
+	// its Reporter answers WiFiNetworkDiagnostics (0x0036). Either or both;
+	// a non-nil WiFi with neither is a configuration error. The node states
+	// the RootNode device-type condition WiFi, under which RootNode lists
+	// WiFiNetworkDiagnostics ("[WiFi]", device/root_node_gen.go), through
+	// the assembler's RootDeviceConditions — with [Config].Snapshotter the
+	// host's own assembler states it. EthernetNetworkDiagnostics stays
+	// mounted beside it. nil is an Ethernet-attached node:
+	// NetworkCommissioning with the Ethernet feature, no Wi-Fi cluster.
 	WiFi *WiFi
-	// wifiCommissioning mounts NetworkCommissioning with the Wi-Fi
-	// feature instead of Ethernet, its scan and connect done by its
-	// Driver — what the commissioner's network steps configure. TESTING
-	// ONLY, set through internal/nodeseam.UseWiFiCommissioning: the
-	// module's nodes are Ethernet-attached; the reference daemon's
-	// --wifi-sim and the module's tests are its users.
-	wifiCommissioning wifiCommissioning
 	// MDNS configures the advertiser the node builds when
 	// [Config].Advertiser is nil; the zero value advertises (the module's
 	// mDNS responder, which announces on matter.js's broadcast schedule).
@@ -344,17 +339,23 @@ type TimeSynchronization struct {
 	Config *TimeSynchronizationConfig
 }
 
-// wifiCommissioning is the Wi-Fi NetworkCommissioning configuration
-// (mattercore.WiFiNetworkCommissioningConfig): the network list of one,
-// the 10 s scan and 20 s connect maxima.
-type wifiCommissioning struct {
-	// Driver scans and connects; nil mounts the Ethernet-only server.
-	Driver contract.WiFiDriver
-}
-
-// WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
+// WiFi is a Wi-Fi node's interface: its commissioning driver and its
+// WiFiNetworkDiagnostics.
 type WiFi struct {
-	// Reporter answers the cluster's reads and ResetCounts
+	// Driver scans and joins the Wi-Fi networks a commissioner configures:
+	// non-nil mounts NetworkCommissioning with the Wi-Fi feature in place
+	// of the Ethernet one — the network list of one, the 10 s scan and
+	// 20 s connect maxima of connectedhomeip's Linux driver
+	// (NetworkCommissioningDriver.h:85-87 at 6170af84). The cluster keeps
+	// the committed network in the node's store and rejoins it at
+	// [Node.Start]. After every successful join — the ConnectNetwork
+	// command's and the rejoin at start — the node re-announces its DNS-SD
+	// records at once ([Node.TriggerReannounce]), as matter.js's example
+	// does after its connect (DummyWifiNetworkCommissioningServer.ts:132-133
+	// at db021da0). wifi/wpasupplicant is the Linux driver; nil mounts the
+	// Ethernet server.
+	Driver contract.WiFiDriver
+	// Reporter answers WiFiNetworkDiagnostics' reads and ResetCounts
 	// (WiFiReporter); nil mounts no cluster.
 	Reporter WiFiReporter
 	// Features is the cluster's FeatureMap: wifidiagdef.FeaturePacketCounts
@@ -374,13 +375,13 @@ const (
 )
 
 // rootDeviceConditions are the device-type conditions the node states for
-// its root endpoint: WiFi when it serves WiFiNetworkDiagnostics.
+// its root endpoint: WiFi when it has a Wi-Fi interface.
 func (c *Config) rootDeviceConditions() []string {
 	// The root always carries EthernetNetworkDiagnostics (buildRootOptional,
 	// unknownEthernet), so it states the Base condition "Ethernet" its
-	// `[Ethernet]` requirement names; a Wi-Fi reporter adds "WiFi".
+	// `[Ethernet]` requirement names; a Wi-Fi interface adds "WiFi".
 	out := []string{conditionEthernet}
-	if c.Network.WiFi != nil && c.Network.WiFi.Reporter != nil {
+	if c.Network.WiFi != nil {
 		out = append(out, conditionWiFi)
 	}
 	// An ICD states the condition RootNode's IcdManagement requirement
@@ -704,8 +705,8 @@ func (c *Config) optionalErrors() []error {
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
-	if c.Network.WiFi != nil && c.Network.WiFi.Reporter == nil {
-		errs = append(errs, errors.New("node: Network.WiFi needs its Reporter"))
+	if w := c.Network.WiFi; w != nil && w.Driver == nil && w.Reporter == nil {
+		errs = append(errs, errors.New("node: Network.WiFi needs its Driver, its Reporter or both"))
 	}
 	for i, name := range c.Network.MDNS.Interfaces {
 		switch {

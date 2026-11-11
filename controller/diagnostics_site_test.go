@@ -253,7 +253,7 @@ func TestControllerPairingRaceStepFailure(t *testing.T) {
 	drv := &wifiDriver{}
 	m := &countingMetrics{}
 	site, dev, c := siteController(t, fabrictest.Topology{Configure: func(cfg *node.Config) {
-		fabrictest.UseWiFiCommissioning(cfg, drv)
+		cfg.Network.WiFi = &node.WiFi{Driver: drv}
 	}}, func(cfg *controller.Config) { cfg.Metrics = m })
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

@@ -18,7 +18,6 @@
 package nodeseam
 
 import (
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -35,13 +34,6 @@ var UseClientListener func(cfg any, open func() (*udp.Listener, error)) bool
 // harness gives. TESTING ONLY. Reports false when cfg is not a
 // *node.Config or has no OTA.
 var UseOTAHarness func(cfg any) bool
-
-// UseWiFiCommissioning mounts NetworkCommissioning with the Wi-Fi feature
-// instead of Ethernet on the node built from cfg (a *node.Config), its
-// scan and connect done by driver — what a commissioner's network steps
-// configure. TESTING ONLY: the module's nodes are Ethernet-attached.
-// Reports false when cfg is not a *node.Config or driver is nil.
-var UseWiFiCommissioning func(cfg any, driver contract.WiFiDriver) bool
 
 // UseSpecificationVersion makes the node built from cfg (a *node.Config)
 // report version as its BasicInformation SpecificationVersion instead of

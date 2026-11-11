@@ -14,8 +14,10 @@ import "context"
 //
 // With [BLEPeripheral] it is one of the two radios a device-side host
 // supplies: a node commissioned over BLE joins its Wi-Fi network through
-// it. The reference daemon implements it as a simulation (TESTING ONLY,
-// --wifi-sim).
+// it. It is set as node.Network.WiFi's Driver; the module
+// github.com/SukramJ/go-fabric/wifi/wpasupplicant implements it over
+// wpa_supplicant's D-Bus interface on Linux, and the reference daemon's
+// --wifi-sim implements it as a simulation.
 type WiFiDriver interface {
 	// ScanNetworks scans for the network named ssid, every network when
 	// ssid is empty. status is a NetworkCommissioningStatusEnum value

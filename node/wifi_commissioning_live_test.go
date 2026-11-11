@@ -11,7 +11,9 @@ package node_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"net"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -32,6 +34,8 @@ type liveWiFi struct {
 	mu       sync.Mutex
 	scans    [][]byte
 	connects [][2][]byte
+	// fail answers every connect with AuthFailure.
+	fail bool
 }
 
 func (w *liveWiFi) ScanNetworks(_ context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
@@ -46,13 +50,16 @@ func (w *liveWiFi) ConnectNetwork(_ context.Context, ssid, credentials []byte) (
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.connects = append(w.connects, [2][]byte{bytes.Clone(ssid), bytes.Clone(credentials)})
+	if w.fail {
+		return 7, "refused", 15 // AuthFailure
+	}
 	return 0, "", 0
 }
 
 func wifiNode(t *testing.T, name string, drv *liveWiFi, radio *bletest.Radio) *node.Node {
 	t.Helper()
 	return liveNode(t, name, func(c *node.Config) {
-		nodeseam.UseWiFiCommissioning(c, drv)
+		c.Network.WiFi = &node.WiFi{Driver: drv}
 		if radio != nil {
 			c.Network.BLE = radio
 		}
@@ -130,4 +137,101 @@ func TestLiveCommissioningOverIPWithWiFi(t *testing.T) {
 		t.Fatalf("Commission over IP with Wi-Fi: %v", err)
 	}
 	checkWiFiCommissioned(ctx, t, f, res, drv)
+}
+
+// TestLiveWiFiJoinReannounces: a successful join announces the node's
+// DNS-SD records at once — the ConnectNetwork command's (commissioning
+// over IP) and the rejoin of the committed network at the next Start —
+// and a failed join does not (matter.js
+// DummyWifiNetworkCommissioningServer.ts:132-133 at db021da0).
+func TestLiveWiFiJoinReannounces(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "rejoin.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	start := func(name string, drv *liveWiFi) (*node.Node, *reannouncer) {
+		adv := &reannouncer{Noop: mdns.NewNoop()}
+		return liveNode(t, name, func(c *node.Config) {
+			c.Store = node.Store{DB: db}
+			c.Advertiser = adv
+			c.Network.WiFi = &node.WiFi{Driver: drv}
+		}), adv
+	}
+	triggers := func(a *reannouncer) int {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.triggers
+	}
+
+	f := newCCFabric(t, bleFabricID+3, bleAdmin, "rejoin")
+	n, adv := start("node-rejoin", &liveWiFi{})
+	addr := udpAddrOf(t, n)
+	f.announceOperational(t, addr, bleNodeID, "node-rejoin")
+	if _, err := f.com.Commission(ctx, commissioner.Options{
+		Fabric: f.fab, Passcode: otaLivePasscode, NodeID: bleNodeID, Addresses: []*net.UDPAddr{addr},
+		WiFiNetwork:          &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
+		OnAttestationFailure: attestation.Accept(), Timeout: 30 * time.Second,
+	}); err != nil {
+		t.Fatalf("Commission over IP with Wi-Fi: %v", err)
+	}
+	if got := triggers(adv); got < 1 {
+		t.Errorf("ConnectNetwork re-announced %d times, want at least 1", got)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// The rejoin at Start: liveNode starts the node.
+	n, adv = start("node-rejoin", &liveWiFi{})
+	if got := triggers(adv); got != 1 {
+		t.Errorf("the rejoin re-announced %d times, want 1", got)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	drv := &liveWiFi{fail: true}
+	_, adv = start("node-rejoin", drv)
+	drv.mu.Lock()
+	connects := len(drv.connects)
+	drv.mu.Unlock()
+	if connects != 1 {
+		t.Fatalf("the failing driver saw %d connects at Start, want 1", connects)
+	}
+	if got := triggers(adv); got != 0 {
+		t.Errorf("a failed rejoin re-announced %d times, want 0", got)
+	}
+}
+
+// TestLiveWiFiFailedConnectDoesNotReannounce: a ConnectNetwork command the
+// driver fails announces nothing.
+func TestLiveWiFiFailedConnectDoesNotReannounce(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	f := newCCFabric(t, bleFabricID+4, bleAdmin, "connect fails")
+	adv := &reannouncer{Noop: mdns.NewNoop()}
+	drv := &liveWiFi{fail: true}
+	n := liveNode(t, "node-connect-fails", func(c *node.Config) {
+		c.Advertiser = adv
+		c.Network.WiFi = &node.WiFi{Driver: drv}
+	})
+	addr := udpAddrOf(t, n)
+	if _, err := f.com.Commission(ctx, commissioner.Options{
+		Fabric: f.fab, Passcode: otaLivePasscode, NodeID: bleNodeID, Addresses: []*net.UDPAddr{addr},
+		WiFiNetwork:          &commissioner.WiFiNetwork{SSID: "lab", Credentials: "secret12"},
+		OnAttestationFailure: attestation.Accept(), Timeout: 30 * time.Second,
+	}); err == nil {
+		t.Fatal("Commission succeeded with a failing ConnectNetwork")
+	}
+	drv.mu.Lock()
+	connects := len(drv.connects)
+	drv.mu.Unlock()
+	adv.mu.Lock()
+	triggers := adv.triggers
+	adv.mu.Unlock()
+	if connects != 1 || triggers != 0 {
+		t.Errorf("%d connects, %d re-announcements; want 1 and 0", connects, triggers)
+	}
 }

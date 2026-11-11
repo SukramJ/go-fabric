@@ -15,7 +15,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
@@ -103,7 +102,7 @@ func TestPairOverBLE(t *testing.T) {
 	drv := &testWiFi{}
 	p := &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: harnessDiscriminator, VendorID: 0xFFF1, ProductID: 0x8001}
 	h := startHarness(t, func(c *node.Config) {
-		nodeseam.UseWiFiCommissioning(c, drv)
+		c.Network.WiFi = &node.WiFi{Driver: drv}
 		c.Network.BLE = p.Radio()
 	})
 	tl := newTool(t, h)

@@ -3171,7 +3171,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 327,
+    "line": 322,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
@@ -3189,7 +3189,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 667,
+    "line": 668,
     "citation": "SessionManager.ts:491",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecordsForFabric",

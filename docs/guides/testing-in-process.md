@@ -184,7 +184,7 @@ the site's network — with no BTP peripheral built by hand:
 ```go
 site := fabrictest.NewSite(t, fabrictest.Options{})
 dev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-	fabrictest.UseWiFiCommissioning(cfg, wifi)
+	cfg.Network.WiFi = &node.WiFi{Driver: wifi}
 }})
 err := site.Run(ctx, func(ctx context.Context) error {
 	_, err := ctl.Pair(ctx, code, controller.PairOptions{

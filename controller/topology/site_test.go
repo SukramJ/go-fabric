@@ -72,8 +72,7 @@ func TestServiceOnASite(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	wifiDev := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.Network.WiFi = &node.WiFi{Reporter: link{}}
-		fabrictest.UseWiFiCommissioning(cfg, joinAll{})
+		cfg.Network.WiFi = &node.WiFi{Reporter: link{}, Driver: joinAll{}}
 	}})
 	ethDev := site.AddDevice(fabrictest.Topology{})
 

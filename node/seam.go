@@ -4,7 +4,6 @@
 package node
 
 import (
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -37,14 +36,6 @@ func init() {
 			return false
 		}
 		c.specificationVersion = version
-		return true
-	}
-	nodeseam.UseWiFiCommissioning = func(cfg any, driver contract.WiFiDriver) bool {
-		c, ok := cfg.(*Config)
-		if !ok || c == nil || driver == nil {
-			return false
-		}
-		c.Network.wifiCommissioning = wifiCommissioning{Driver: driver}
 		return true
 	}
 }

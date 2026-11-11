@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -77,7 +76,10 @@ func applyTestWiFi(cfg *node.Config, f flags, devices *fleet) {
 		cfg.Network.WiFi = devices.wifi.nodeConfig()
 	}
 	if f.wifiSim {
-		nodeseam.UseWiFiCommissioning(cfg, wifiSim{delay: wifiSimConnectDelay, networks: parseWiFiSimSSIDs(f.wifiSimSSIDs)})
+		if cfg.Network.WiFi == nil {
+			cfg.Network.WiFi = &node.WiFi{}
+		}
+		cfg.Network.WiFi.Driver = wifiSim{delay: wifiSimConnectDelay, networks: parseWiFiSimSSIDs(f.wifiSimSSIDs)}
 	}
 }
 

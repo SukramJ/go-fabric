@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7915,
+  "entry_points": 7920,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17925,
-    "reachable": 12419,
-    "whitelisted": 5506,
+    "total_exported": 17924,
+    "reachable": 12417,
+    "whitelisted": 5507,
     "unreachable": 0
   },
   "by_package": [],
@@ -29703,14 +29703,14 @@
       "identifier": "TestPairBLEWithoutBLEOrNetwork",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 41
+      "line": 40
     },
     {
       "package": "examples/reference-controller/cli",
       "identifier": "TestPairBluetoothProxyFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 67
+      "line": 66
     },
     {
       "package": "examples/reference-controller/cli",
@@ -29724,7 +29724,7 @@
       "identifier": "TestPairOverBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
-      "line": 102
+      "line": 101
     },
     {
       "package": "examples/reference-controller/cli",
@@ -33456,6 +33456,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 105
+    },
+    {
+      "package": "node",
+      "identifier": "TestReannouncingDriver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wifi_driver_internal_test.go",
+      "line": 40
     },
     {
       "package": "node",
