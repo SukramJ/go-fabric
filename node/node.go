@@ -333,6 +333,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
 	if err := n.buildLevelledRoot(ctx, rootDeps{
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
+		wifiDriver:              n.wifiDriver(),
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
 		onFailSafeExpired:       n.failSafeExpired,
@@ -896,7 +897,7 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.ensureOTAProviderACL(ctx)
 	n.camerasOnline(ctx)
 	// The committed Wi-Fi network is rejoined before the fabrics'
-	// subscriptions and records go out (TESTING ONLY, --wifi-sim): chip's
+	// subscriptions and records go out ([Network].WiFi's Driver): chip's
 	// link comes back with the device (WiFiNetworkCommissioning.Start).
 	if wifi := n.root.WiFiNetworkCommissioning; wifi != nil {
 		work.pause()

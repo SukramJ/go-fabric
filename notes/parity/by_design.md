@@ -3398,7 +3398,13 @@ NetworkCommissioning stays `ET`. Report AM.
 
 By design. A bridge host does not scan or join networks through Matter;
 the diagnostics tell the truth about the link, the commissioning cluster
-says what the host can do. Since review 2026-11 W5-api-11 the Wi-Fi feature is mounted only through the module-internal test seam (`internal/nodeseam.UseWiFiCommissioning`, the reference daemon's `--wifi-sim`, TESTING ONLY); a host has no Wi-Fi commissioning port, so the default stays Ethernet (review 2026-11 W6-reg-04).
+says what the host can do. Since wave 28b (2026-11-11) the entry holds for
+a host without a Wi-Fi driver only: `Network.WiFi.Driver` is the host's
+Wi-Fi commissioning port, and a node that sets it serves
+NetworkCommissioning with the `WI` feature in place of `ET`
+(BD-chip-WiFiNetworkCommissioningServer, BD-chip-WpaSupplicantDriver); the
+test seam of review 2026-11 W5-api-11 (`internal/nodeseam.UseWiFiCommissioning`)
+is gone. A reporter alone leaves the cluster on Ethernet, as before.
 
 ---
 
@@ -3986,9 +3992,12 @@ taken from chip's
 `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp`
 (harness pin `6170af84`), as the parity contract allows where matter.js has
 no behaviour. `core.WiFiNetworkCommissioning` sits behind
-`contract.WiFiDriver` and `node.Network.WiFiCommissioning`; the reference
-daemon mounts it only with `--wifi-sim`, so the FeatureMap and the
-composition the harness certifies do not move. Report BA §4. The
+`contract.WiFiDriver` and — since wave 28b (2026-11-11) — the public
+`node.Network.WiFi.Driver`, no longer a test seam (the heading keeps its
+words for the links to it); `wifi/wpasupplicant` is the Linux driver
+(BD-chip-WpaSupplicantDriver). The reference daemon mounts it only with
+`--wifi-sim`, so the FeatureMap and the composition the harness certifies
+do not move. Report BA §4. The
 committed networks — SSID and credentials — are kept in the node's
 `store.Settings` (`WiFiNetworkCommissioningConfig.Store`), as the Linux
 driver keeps its network in the KVS (`NetworkCommissioningWiFiDriver.cpp`
@@ -6529,3 +6538,53 @@ untouched. Pinned by `TestMDNSInterfacesFilter`, `TestMDNSInterfacesValidate`,
 `TestDiagnoseInterfaces` and `TestAllowListAdvertisesOnNamedInterfaceOnly`
 (`mdns/diagnose_interfaces_test.go`). Retire when matter.js's server takes
 a choice of interfaces (the marker goes).
+
+### BD-chip-WpaSupplicantDriver — the Linux Wi-Fi driver speaks wpa_supplicant's D-Bus API after connectedhomeip, with six departures
+
+matter.js ships no Wi-Fi driver: its `NetworkCommissioningServer` is the
+empty class (`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+at `db021da0`) and its example fakes the join
+(`examples/device-onoff-advanced/src/cluster/DummyWifiNetworkCommissioningServer.ts:110-139`).
+`wifi/wpasupplicant` (a nested module, the driver behind
+`node.Network.WiFi.Driver`) therefore follows connectedhomeip's Linux
+platform (`src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp`
+at `6170af84`: bring-up `:464-520`, scan `:1251-1280` and `:1545-1595`, the
+BSS mapping `:1385-1543`, connect `:852-943`, the verdict from the
+interface's `State` `:287-418` with eight retries after an authentication
+timeout `:56-61`), under the Ahead row of
+BD-chip-WiFiNetworkCommissioningServer. Six things differ. (1) A join that
+does not end in Success removes the network it added; connectedhomeip
+keeps it until the next join removes the current network (`:861-877`).
+Owner decision 2026-11-11: the credential lives in the node's store only,
+and wpa_supplicant must not go on trying a network whose join the node
+reported as failed. (2) The committed network is not written into
+wpa_supplicant's configuration: no `SaveConfig` (`CommitConfig`,
+`:1118-1135`); the cluster keeps it in the node's store and rejoins at
+start, so there is one copy. (3) No DHCP client is started
+(`CHIP_DEVICE_CONFIG_LINUX_DHCPC_CMD`, `:1098-1115`): addressing is the
+host's network stack's, and Matter needs the IPv6 link-local address the
+kernel configures. (4) A credential of exactly 64 hex digits is handed
+over as the 32 bytes of the raw PSK and an SSID that is not valid UTF-8 or
+holds a NUL as its octets, both as D-Bus byte arrays; connectedhomeip
+hands both as C strings (`:936-940`), which wpa_supplicant quotes — a
+64-digit string is then refused as a passphrase over 63 characters, and a
+C string ends at the first NUL (hostap `wpa_supplicant/dbus/dbus_new_handlers.c:141-170`
+and `:225-257`, `wpa_supplicant/config.c:620-695` at `6d3d778`). A raw PSK
+joins a WPA2 network; SAE needs the passphrase. (5) Empty credentials are
+an open network, `key_mgmt` `NONE` without `psk`, where connectedhomeip
+sends `psk ""` with `SAE WPA-PSK`. (6) A scan that does not end within its
+timeout is UnknownError; connectedhomeip's StartWiFiScan (`:1251-1280`)
+starts no timer of its own. As there, a `ScanDone` of another client's
+scan ends a waiting scan and its `success` argument is not read
+(`:1545-1595`), and the attempt reads the interface's `State` only from
+its own `SelectNetwork` on, where connectedhomeip's one flag
+(`mAssociationStarted`, `:297-300`) also sees an association that was
+under way before. The credential reaches `AddNetwork` and nothing else:
+no log line, no error text, no debug text (the D-Bus error's name only).
+Not carried over: PDC, AP mode and Wi-Fi PAF. Pinned by `TestConnect`,
+`TestConnectFailureRemovesNetwork`, `TestConnectRawPSK`,
+`TestConnectNonUTF8SSID`, `TestConnectOpenNetwork`,
+`TestConnectIgnoresStatesBeforeSelect`, `TestScanOneAtATime`,
+`TestScanDoneFailure` and `TestCredentialNeverLeaves`
+(`wifi/wpasupplicant/driver_test.go`). Retire a point when connectedhomeip's
+driver takes it; reconcile onto matter.js when it ships a driver.

@@ -180,7 +180,7 @@ func bleSite(t *testing.T, drv joinWiFi) (*fabrictest.Site, *fabrictest.Device, 
 	site := fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 	c := site.AddController(fabrictest.ControllerOptions{})
 	dev := site.AddDevice(fabrictest.Topology{BLE: true, Configure: func(cfg *node.Config) {
-		fabrictest.UseWiFiCommissioning(cfg, drv)
+		cfg.Network.WiFi = &node.WiFi{Driver: drv}
 	}})
 	return site, dev, c
 }

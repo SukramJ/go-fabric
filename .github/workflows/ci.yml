@@ -348,6 +348,31 @@ jobs:
       - name: ble/bluez
         run: make bluez-check
 
+  wpasupplicant:
+    name: wifi/wpasupplicant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            wifi/wpasupplicant/go.sum
+            examples/ble-wifi-light/go.sum
+      - name: golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+      # wifi/wpasupplicant and examples/ble-wifi-light are modules of their
+      # own (brief 28b), so no other job's ./... reaches them: build, vet,
+      # test (the driver over an in-process bus, -race), lint and module
+      # hygiene inside each; the example is built for linux amd64, arm64
+      # and arm.
+      - name: wifi/wpasupplicant
+        run: make wpasupplicant-check
+      - name: examples/ble-wifi-light
+        run: make ble-wifi-light-check
+
   esphome:
     name: ble/esphome
     runs-on: ubuntu-latest

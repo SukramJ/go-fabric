@@ -9,12 +9,15 @@ package node_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 )
@@ -108,5 +111,71 @@ func TestWiFiDiagnostics(t *testing.T) {
 				t.Error("CurrentMaxRate served without opting in")
 			}
 		})
+	}
+}
+
+// joinLab is a Wi-Fi driver that finds and joins every network.
+type joinLab struct{}
+
+func (joinLab) ScanNetworks(_ context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
+	return 0, "", []contract.WiFiScanResult{{SSID: bytes.Clone(ssid), BSSID: make([]byte, 6), Channel: 6}}
+}
+
+func (joinLab) ConnectNetwork(context.Context, []byte, []byte) (status uint8, debugText string, errorValue int32) {
+	return 0, "", 0
+}
+
+// TestWiFiDriver: Network.WiFi's Driver mounts NetworkCommissioning with
+// the Wi-Fi feature in place of the Ethernet one, without
+// WiFiNetworkDiagnostics; the root states the condition WiFi, and a node
+// that commissions over BLE (CustomNetworkConfig does not hold) passes the
+// RootNode judgement with it. Driver and Reporter together mount both.
+func TestWiFiDriver(t *testing.T) {
+	t.Parallel()
+	for name, reporter := range map[string]bool{"driver": false, "driver and reporter": true} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+			cfg.Network.WiFi = &node.WiFi{Driver: joinLab{}}
+			if reporter {
+				cfg.Network.WiFi.Reporter = wifiLink{}
+			}
+			radio := &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1F", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
+			cfg.Network.BLE = radio.Radio()
+			n := newNode(t, cfg)
+			if n.Root().WiFiNetworkCommissioning == nil || n.Root().NetworkCommissioning != nil {
+				t.Fatalf("Wi-Fi NetworkCommissioning %v, Ethernet %v", n.Root().WiFiNetworkCommissioning, n.Root().NetworkCommissioning)
+			}
+			if (n.Root().WiFiNetworkDiagnostics != nil) != reporter {
+				t.Errorf("WiFiNetworkDiagnostics %v with a reporter %v", n.Root().WiFiNetworkDiagnostics, reporter)
+			}
+			if err := n.Start(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			root := n.Bridge().Topology().FindByID(0)
+			if !slices.Contains(root.DeviceConditions, "WiFi") {
+				t.Errorf("root conditions %v do not state WiFi", root.DeviceConditions)
+			}
+			for _, v := range n.Bridge().DeviceTypeViolations() {
+				if v.Endpoint == 0 {
+					t.Errorf("root violation %+v", v)
+				}
+			}
+		})
+	}
+}
+
+// TestWiFiNeedsDriverOrReporter: a Network.WiFi with neither is the
+// configuration error.
+func TestWiFiNeedsDriverOrReporter(t *testing.T) {
+	t.Parallel()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.Network.WiFi = &node.WiFi{}
+	if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) || !strings.Contains(err.Error(), "Network.WiFi") {
+		t.Fatalf("Validate = %v, want ErrInvalidConfig naming Network.WiFi", err)
+	}
+	cfg.Network.WiFi = &node.WiFi{Driver: joinLab{}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate with a Driver: %v", err)
 	}
 }

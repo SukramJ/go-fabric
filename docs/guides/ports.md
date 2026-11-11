@@ -76,7 +76,7 @@ in the module.
 | Interface | Implemented by | What it does | When absent |
 | --- | --- | --- | --- |
 | `BLEPeripheral` (`BLEAdvertisement`, `BLEConnection`) | the host's BLE stack: `ble/bluez.NewPeripheral` on Linux, `bletest.Peripheral.Radio` in tests | advertises the payload the node gives, serves the Matter GATT service (C1, C2, C3) and hands each central's connection to the node | no BLE: the node is commissionable over IP only and its QR code says so |
-| `WiFiDriver` | the host's Wi-Fi stack | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
+| `WiFiDriver` | the host's Wi-Fi stack: `wifi/wpasupplicant.New` on Linux, the reference daemon's `--wifi-sim` in tests | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
 
 *Source: `contract/doc.go:4-18`, `contract/ble.go`, `contract/wifi.go`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
@@ -92,7 +92,8 @@ in the module.
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
 | `Network.BLE` | the node's Bluetooth LE radio (`contract.BLEPeripheral`): while the node has no fabric its own window is advertised over BLE and PASE is served over BTP; the QR code carries the BLE discovery bit ([Operations](operations.md#ble-commissioning)) | no BLE; the node never touches a radio |
-| `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null |
+| `Network.WiFi.Driver` | the node's Wi-Fi radio (`contract.WiFiDriver`): mounts NetworkCommissioning with the Wi-Fi feature in place of the Ethernet one; the committed network is kept in the node's store and rejoined at `Start`, and a successful join re-announces the node's DNS-SD records at once ([Operations](operations.md#wi-fi-provisioning)) | NetworkCommissioning serves the Ethernet feature |
+| `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null. A `Network.WiFi` with neither `Driver` nor `Reporter` is refused |
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
 | `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |

@@ -84,7 +84,7 @@ func rootFeatures(cfg *Config) map[uint32]uint32 {
 	if cfg.Commissioning.TermsAndConditions != nil {
 		out[gencommdef.ClusterID] = uint32(gencommdef.FeatureTermsAndConditions)
 	}
-	if cfg.Network.wifiCommissioning.Driver != nil {
+	if cfg.Network.WiFi != nil && cfg.Network.WiFi.Driver != nil {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureWiFi
 	} else {
 		out[netcommdef.ClusterID] = mattercore.NetworkCommFeatureEthernet

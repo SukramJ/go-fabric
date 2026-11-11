@@ -110,12 +110,67 @@ closes the sessions it carried.
 `ble/bluez` speaks BlueZ's D-Bus API and shares the adapter with
 bluetoothd. It needs the system-bus rights its central needs (the
 `bluetooth` group on most distributions) and an adapter that is powered on.
-The reference daemon has no BLE flag yet.
+The reference daemon has no BLE flag: `examples/ble-wifi-light` is the
+example node with BLE and Wi-Fi.
 
 *Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `leaveBLE`),
 [`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
 [`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
 [`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
+
+## Wi-Fi provisioning
+
+The network a commissioner provisions over BLE is joined through the
+node's Wi-Fi port, `node.Config.Network.WiFi.Driver` (a
+`contract.WiFiDriver`): with it the node serves NetworkCommissioning with
+the Wi-Fi feature in place of the Ethernet one. On Linux the driver is
+`wifi/wpasupplicant`, a nested module a wired host never pulls:
+
+```go
+wifi, err := wpasupplicant.New(ctx, wpasupplicant.Options{Interface: "wlan0"}) // "" is wlan0
+if err != nil {
+	return err
+}
+defer wifi.Close()
+cfg.Network.WiFi = &node.WiFi{Driver: wifi}
+```
+
+| When | What happens |
+| --- | --- |
+| ScanNetworks | an active scan; the results carry SSID, BSSID, channel, band, RSSI and the security bitmap; at most 10 s |
+| AddOrUpdateWiFiNetwork | the cluster stages the network (one) and its credential, nothing reaches the radio |
+| ConnectNetwork | the driver hands the network to wpa_supplicant and waits for the interface's `completed` state, at most 20 s; on success the node re-announces its DNS-SD records at once |
+| CommissioningComplete | the cluster commits the network into the node's store |
+| `Node.Start` | the committed network is rejoined before the fabrics' records go out, which the start sequence then publishes |
+
+The host's part:
+
+- wpa_supplicant runs with its D-Bus interface (`wpa_supplicant -u`, or the
+  distribution's `wpa_supplicant.service`), and the Wi-Fi interface is not
+  managed by NetworkManager at the same time (`nmcli device set wlan0
+  managed no`, or an `unmanaged-devices` entry);
+- the process may talk to `fi.w1.wpa_supplicant1` on the system bus (root,
+  or a D-Bus policy that allows its user or group);
+- addressing is the host's network stack's: the driver runs no DHCP
+  client. Matter needs the IPv6 link-local address the kernel configures
+  on the interface; an IPv4 or global address is the host's affair;
+- wpa_supplicant's configuration file stays untouched: the committed
+  network lives in the node's store, so the credential is kept in one
+  place, and the node rejoins it at start.
+
+The credential is never logged, nor part of a debug text or an error. An
+SSID that is valid UTF-8 goes to wpa_supplicant as a string, any other as
+its bytes; a credential of exactly 64 hex digits is the raw PSK, any other
+a passphrase. Empty credentials join an open network. A join that does not
+succeed removes the network it added, so wpa_supplicant does not keep
+trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
+timeout when the network is out of range. The driver resolves the
+interface once, at `New`: after a wpa_supplicant restart the host builds a
+new driver.
+
+*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
+[`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
+[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`).*
 
 ## mDNS
 

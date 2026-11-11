@@ -65,10 +65,10 @@ type RootClusters struct {
 	GeneralCommissioning       *mattercore.GeneralCommissioning
 	AdministratorCommissioning *wire.AdministratorCommissioning
 	// NetworkCommissioning is the Ethernet server; nil when
-	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver.
+	// [Network].WiFi has a Driver.
 	NetworkCommissioning *mattercore.NetworkCommissioning
 	// WiFiNetworkCommissioning is the Wi-Fi server, nil unless
-	// the Wi-Fi commissioning seam (internal/nodeseam.UseWiFiCommissioning) set a Driver (TESTING ONLY).
+	// [Network].WiFi has a Driver.
 	WiFiNetworkCommissioning *mattercore.WiFiNetworkCommissioning
 	GeneralDiagnostics       *mattercore.GeneralDiagnostics
 	DiagnosticLogs           *mattercore.DiagnosticLogs
@@ -103,12 +103,16 @@ func (r *RootClusters) Servers() []contract.ClusterServer { return slices.Clone(
 
 // rootDeps is what buildRoot needs from the node under construction.
 type rootDeps struct {
-	cfg               *Config
-	logger            *slog.Logger
-	bootReason        uint8
-	st                store.Port
-	groups            *groups.Manager
-	connector         mattercore.OtaProviderConnector
+	cfg        *Config
+	logger     *slog.Logger
+	bootReason uint8
+	st         store.Port
+	groups     *groups.Manager
+	connector  mattercore.OtaProviderConnector
+	// wifiDriver is [Network].WiFi's Driver as the node hands it to the
+	// Wi-Fi NetworkCommissioning server (reannouncingDriver); nil mounts
+	// the Ethernet server.
+	wifiDriver        contract.WiFiDriver
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// onCommissioningComplete runs after the root's own
 	// CommissioningComplete handling (the host's observer).
@@ -271,9 +275,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs.SetClock(cfg.Clock)
 	r.wireLogsUTC()
 	var netComm contract.ClusterServer
-	if wc := cfg.Network.wifiCommissioning; wc.Driver != nil {
+	if drv := d.wifiDriver; drv != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once
-			Driver: wc.Driver, FailSafe: generalCom.FailSafeFabric,
+			Driver: drv, FailSafe: generalCom.FailSafeFabric,
 			// The committed network survives a restart, as chip's driver
 			// keeps it (NetworkCommissioningWiFiDriver.cpp:135-167);
 			// Node.Start reconnects to it.

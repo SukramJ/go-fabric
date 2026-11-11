@@ -28,7 +28,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -50,7 +49,7 @@ func TestRegulatoryConfigCommissioningParity(t *testing.T) {
 		t.Helper()
 		site := quietSite(t)
 		u := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
-			nodeseam.UseWiFiCommissioning(cfg, acceptingWiFi{})
+			cfg.Network.WiFi = &node.WiFi{Driver: acceptingWiFi{}}
 		}}})
 		ctx := parityCtx(t)
 		p, err := u.Controller.Commission(ctx, u.Device, fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
