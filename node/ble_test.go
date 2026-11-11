@@ -109,12 +109,17 @@ func TestNodeBLEFollowsCommissioning(t *testing.T) {
 		t.Fatalf("the commissioned node advertised: %d advertisements, %d stops (was %d, %d)", len(ads), s, len(adsAfter), stops)
 	}
 
-	// Removing the last fabric brings the own window back on BLE.
-	if err := dev.Act(func(n *node.Node) error {
-		if err := n.CloseWindow(context.Background()); err != nil {
-			return err
-		}
-		return n.RemoveFabric(context.Background(), 1)
+	// Removing the last fabric brings the own window back on BLE. The
+	// removal flushes the fabric's subscription and waits for the
+	// controller's StatusResponse on the site's clock, so it runs under
+	// site.Run, which moves that clock.
+	if err := site.Run(bleCtx(t), func(ctx context.Context) error {
+		return dev.Act(func(n *node.Node) error {
+			if err := n.CloseWindow(ctx); err != nil {
+				return err
+			}
+			return n.RemoveFabric(ctx, 1)
+		})
 	}); err != nil {
 		t.Fatal(err)
 	}
