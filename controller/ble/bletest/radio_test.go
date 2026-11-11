@@ -126,6 +126,27 @@ func TestRadio(t *testing.T) {
 	if err := peer.Indicate(context.Background(), []byte("x")); !errors.Is(err, btp.ErrDisconnected) {
 		t.Fatalf("indicate on a dropped connection: %v", err)
 	}
+	// Every GATT operation of a dropped connection fails as a lost link.
+	if err := conn.WriteC1(context.Background(), []byte("x")); !errors.Is(err, btp.ErrDisconnected) {
+		t.Fatalf("write on a dropped connection: %v", err)
+	}
+	if err := conn.SubscribeC2(context.Background(), func([]byte) {}); !errors.Is(err, btp.ErrDisconnected) {
+		t.Fatalf("subscribe on a dropped connection: %v", err)
+	}
+	if err := conn.UnsubscribeC2(context.Background()); !errors.Is(err, btp.ErrDisconnected) {
+		t.Fatalf("unsubscribe on a dropped connection: %v", err)
+	}
+	if conn.ATTMTU() != 100 {
+		t.Fatalf("ATT_MTU %d", conn.ATTMTU())
+	}
+	if ex, ok := conn.(ble.MTUExchange); !ok {
+		t.Fatal("no ble.MTUExchange")
+	} else {
+		<-ex.ATTMTUExchanged()
+	}
+	_ = peer.Disconnect()
+	_ = conn.Disconnect()
+	<-peer.Disconnected()
 	if err := r.StopAdvertising(context.Background()); err != nil {
 		t.Fatal(err)
 	}
