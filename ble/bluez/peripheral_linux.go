@@ -105,11 +105,8 @@ type peripheral struct {
 	accept  func(contract.BLEConnection)
 	c3      []byte
 	// conns are the centrals that use the Matter service, by device
-	// path; last is the one accepted last, whose indication a Confirm
-	// without a device confirms (chip GetBluezConnectionViaDevice,
-	// BluezEndpoint.cpp:398-401).
+	// path.
 	conns map[dbus.ObjectPath]*pconn
-	last  *pconn
 }
 
 var _ contract.BLEPeripheral = (*peripheral)(nil)
@@ -222,9 +219,6 @@ func (p *peripheral) forget(c *pconn) {
 	defer p.mu.Unlock()
 	if p.conns[c.device] == c {
 		delete(p.conns, c.device)
-	}
-	if p.last == c {
-		p.last = nil
 	}
 }
 
@@ -411,6 +405,10 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 	case <-ctx.Done():
 	case <-p.done:
 	}
+	// No central is accepted from here on, so none outlives the drop.
+	p.mu.Lock()
+	p.serving = false
+	p.mu.Unlock()
 	p.dropAll(true) //nolint:contextcheck // Serve's context has ended; each disconnect runs on a fresh bounded one
 	unregCtx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
 	defer cancel()
@@ -577,7 +575,6 @@ func (p *peripheral) connFor(device dbus.ObjectPath) (*pconn, *dbus.Error) {
 	}
 	c := newPConn(p, device)
 	p.conns[device] = c
-	p.last = c
 	accept := p.accept
 	p.mu.Unlock()
 	accept(c)
@@ -650,14 +647,23 @@ func (p *peripheral) acquireNotify(options map[string]dbus.Variant) (dbus.UnixFD
 }
 
 // confirm is C2's Confirm, the indication confirmation of BlueZ up to
-// 5.73, for the connection accepted last (chip BluezCharacteristicConfirm,
-// BluezEndpoint.cpp:207-217).
+// 5.73, which names no device (chip BluezCharacteristicConfirm,
+// BluezEndpoint.cpp:207-217, takes the connection of the device seen last,
+// :398-401). It completes the indication of the live connection that waits
+// for one: the bridge serves one central at a time, so a refused second
+// central, gone already, cannot take the served one's confirmation.
 func (p *peripheral) confirm() *dbus.Error {
 	p.mu.Lock()
-	c := p.last
+	conns := make([]*pconn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
 	p.mu.Unlock()
-	if c != nil {
-		c.confirmed()
+	for _, c := range conns {
+		if !c.isGone() && c.waiting() {
+			c.confirmed()
+			return nil
+		}
 	}
 	return nil
 }
@@ -689,6 +695,10 @@ type pconn struct {
 	queued   []func()
 	started  bool
 	indicate sync.Mutex
+	// order makes counting a C1 write and posting it one step, so a
+	// subscription bluetoothd reports meanwhile is posted after it, never
+	// between the count and the post. Taken before mu.
+	order sync.Mutex
 }
 
 var _ contract.BLEConnection = (*pconn)(nil)
@@ -777,6 +787,7 @@ func (c *pconn) setWrite(f *os.File) bool {
 				return
 			}
 			v := bytes.Clone(buf[:n])
+			c.order.Lock()
 			c.mu.Lock()
 			c.writes++
 			held, mtu := c.heldSub, c.heldMTU
@@ -786,6 +797,7 @@ func (c *pconn) setWrite(f *os.File) bool {
 			if held {
 				c.post(func() { c.deliverSubscribe(mtu) })
 			}
+			c.order.Unlock()
 		}
 	}()
 	return true
@@ -803,19 +815,23 @@ func (c *pconn) setWrite(f *os.File) bool {
 // the pin produces — but matter.js closes on the unsubscription
 // (BlenoBleServer.ts:81-84 at db021da0), so the port reports it.
 func (c *pconn) setNotify(f *os.File, mtu uint16) bool {
+	c.order.Lock()
 	c.mu.Lock()
 	if c.isGone() || c.notify != nil {
 		c.mu.Unlock()
+		c.order.Unlock()
 		return false
 	}
 	c.notify = f
-	if c.writes == 0 {
+	held := c.writes == 0
+	if held {
 		c.heldSub, c.heldMTU = true, int(mtu)
-		c.mu.Unlock()
-	} else {
-		c.mu.Unlock()
+	}
+	c.mu.Unlock()
+	if !held {
 		c.post(func() { c.deliverSubscribe(int(mtu)) })
 	}
+	c.order.Unlock()
 	go func() {
 		var b [1]byte
 		for {
@@ -873,6 +889,13 @@ func (c *pconn) deliverUnsubscribe() {
 	if h != nil {
 		h()
 	}
+}
+
+// waiting reports whether an indication waits for its confirmation.
+func (c *pconn) waiting() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.pending != nil
 }
 
 // confirmed completes the indication that waits for its confirmation.

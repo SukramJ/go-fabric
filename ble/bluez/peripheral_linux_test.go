@@ -251,10 +251,8 @@ func TestPeripheralConnectionEvents(t *testing.T) {
 	if c.Remote() != "AA:BB:CC:DD:EE:01" {
 		t.Fatalf("remote %q", c.Remote())
 	}
-	time.Sleep(20 * time.Millisecond)
-	if len(a.seen()) != 0 {
-		t.Fatalf("events before the first write: %q", a.seen())
-	}
+	// No event before the first write: the ordered events below start
+	// with it.
 	if err := fc.writeC1([]byte("hs")); err != nil {
 		t.Fatal(err)
 	}
@@ -482,4 +480,82 @@ func TestPeripheralServesBTP(t *testing.T) {
 	waitUntil(t, "Device1.Disconnect", func() bool {
 		return slices.Contains(b.called(), string(fc.device)+" "+ifaceDevice+".Disconnect")
 	})
+}
+
+// TestPeripheralConfirmAfterRefusedCentral: Confirm names no device (BlueZ
+// up to 5.73); after a second central was refused and dropped, it still
+// completes the served central's indication.
+func TestPeripheralConfirmAfterRefusedCentral(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:06")
+	if err := fc.acquireWrite(p.charPath(1), 50); err != nil {
+		t.Fatal(err)
+	}
+	if err := fc.writeC1([]byte("hs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := fc.acquireNotify(p.charPath(2), 50); err != nil {
+		t.Fatal(err)
+	}
+	served := a.conn(t)
+	second := b.connectCentral("AA:BB:CC:DD:EE:07")
+	if err := second.acquireWrite(p.charPath(1), 50); err != nil {
+		t.Fatal(err)
+	}
+	a.mu.Lock()
+	refused := a.conns[1]
+	a.mu.Unlock()
+	if err := refused.Disconnect(); err != nil { // as the bridge refuses it
+		t.Fatal(err)
+	}
+	errc := make(chan error, 1)
+	ictx, icancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer icancel()
+	go func() { errc <- served.Indicate(ictx, []byte("ind")) }()
+	if _, err := fc.indication(); err != nil {
+		t.Fatal(err)
+	}
+	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func() *dbus.Error)
+	if !ok {
+		t.Fatal("Confirm not exported")
+	}
+	if derr := confirm(); derr != nil {
+		t.Fatal(derr)
+	}
+	if err := <-errc; err != nil {
+		t.Fatalf("the served central's indication: %v", err)
+	}
+}
+
+// TestPeripheralRefusesCentralWhileDropping: a central that acquires C1
+// while Serve drops the connected ones (its context ended) is refused, not
+// accepted after the drop.
+func TestPeripheralRefusesCentralWhileDropping(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	s := serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:08")
+	if err := fc.acquireWrite(p.charPath(1), 50); err != nil {
+		t.Fatal(err)
+	}
+	late := b.connectCentral("AA:BB:CC:DD:EE:09")
+	var lateErr error
+	b.mu.Lock()
+	b.onDisconnect = func() { lateErr = late.acquireWrite(p.charPath(1), 50) }
+	b.mu.Unlock()
+	s.cancel()
+	<-s.done
+	if lateErr == nil {
+		t.Fatal("a central was accepted while Serve dropped the connected ones")
+	}
+	a.mu.Lock()
+	n := len(a.conns)
+	a.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("%d connections accepted, want 1", n)
+	}
 }

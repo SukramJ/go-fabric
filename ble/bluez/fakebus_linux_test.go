@@ -45,6 +45,9 @@ type fakeBus struct {
 	// objects as it read them, the advertisement's properties.
 	app managedObjects
 	adv map[string]dbus.Variant
+	// onDisconnect, when set, runs once inside the next Device1.Disconnect
+	// bluetoothd answers.
+	onDisconnect func()
 }
 
 const testAdapter = dbus.ObjectPath("/org/bluez/hci0")
@@ -273,6 +276,13 @@ func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([
 		b.adv = nil
 		b.mu.Unlock()
 	case ifaceDevice + ".Disconnect":
+		b.mu.Lock()
+		hook := b.onDisconnect
+		b.onDisconnect = nil
+		b.mu.Unlock()
+		if hook != nil {
+			hook()
+		}
 		b.setProps(path, ifaceDevice, map[string]dbus.Variant{"Connected": dbus.MakeVariant(false)})
 	}
 	return nil, nil
