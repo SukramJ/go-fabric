@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.22.1] — 2026-11-12
+
+Wave W15 (#509, issue 507): a Thread node whose operational instance a border router also answers with its own host is no longer locked out between the flips of its SRV set — the proven host's last addresses and the attempts on them outlive the foreign SRV (`Timing.ProvenAddressRetention`), the stored operational address anchors a peer whose host was never learned, and a Busy answer's delay is held for the peer. With it: Go 1.27.4 (`GO-2026-6859`, #508) and the nested modules at `v0.22.0` (#506). Not verified on the live Thread network yet; why the node answers Busy is open.
+
 ### Added
 
 - `client/peer`: `Timing.ProvenAddressRetention` (default 10 minutes; a negative value retains nothing) — how long a connection attempt goes on trying a peer's addresses after DNS-SD stopped advertising them (issue 507). The two new Info log lines `matter.controller.peer.address_retained` and `matter.controller.peer.address_retention_expired` name the address, its host and the reason; `matter.controller.peer.connecting` carries `retained`.
@@ -5718,7 +5722,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/SukramJ/go-fabric/compare/v0.19.2...v0.20.0
