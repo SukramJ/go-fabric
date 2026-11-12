@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- Built with Go 1.27.4: `GO-2026-6859` (`net/http`, fixed in 1.27.4) is reachable through the HTTP paths of the controller and its consumers; `go.mod`, the nested modules and the workflows move together.
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.22.0` (before `v0.21.0`) and are tagged `ble/bluez/v0.22.0`, `ble/esphome/v0.22.0` and `wifi/wpasupplicant/v0.22.0` at this commit — the first tag of `wifi/wpasupplicant`; `examples/ble-wifi-light` requires the three at `v0.22.0`. No code change.
 
 ## [0.22.0] — 2026-11-12
