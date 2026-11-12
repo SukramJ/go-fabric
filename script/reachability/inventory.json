@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7926,
+  "entry_points": 7927,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17928,
+    "total_exported": 17929,
     "reachable": 12417,
-    "whitelisted": 5511,
+    "whitelisted": 5512,
     "unreachable": 0
   },
   "by_package": [],
@@ -7184,7 +7184,7 @@
       "identifier": "TestRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/sustained_internal_test.go",
-      "line": 14
+      "line": 18
     },
     {
       "package": "client/interaction",
@@ -7192,6 +7192,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/report_internal_test.go",
       "line": 218
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestSustainedHoldsWakefulnessFedAfterEstablishment",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_internal_test.go",
+      "line": 75
     },
     {
       "package": "client/interaction",

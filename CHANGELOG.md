@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `client/interaction`: a sustained subscription to an ICD peer whose registration arrived just as the subscription established no longer stays unheld for good — the peer's next Check-In was reported due beside an active subscription until the subscription was next lost; the registration now recreates the subscription, which holds the peer's wakefulness.
+
 ## [0.22.0] — 2026-11-12
 
 Milestone 7, phase 28 (ADR 0031) in three waves: a node without a network at first boot is commissioned over Bluetooth LE onto Wi-Fi on a Linux host. Wave 28a (#498): the peripheral port `contract.BLEPeripheral`, BTP's peripheral side `btp.Accept`, `node.Network.BLE` and the BlueZ GATT peripheral of `ble/bluez`; a node is on the radio only while it has no fabric. Wave 28b (#499): `node.Network.WiFi.Driver`, the new nested module `wifi/wpasupplicant` (wpa_supplicant over D-Bus) and `examples/ble-wifi-light`. Wave 28c (#502): the proof — chip-tool's `pairing ble-wifi` against the example under connectedhomeip's Bluetooth and wpa_supplicant mocks with connectedhomeip's own app as the control (`make chiptool-ble-wifi`, harness image with BLE-capable binaries), the weekly `ble-virtual` job in both directions on real `bluetoothd` with Wi-Fi on a simulated radio against a real wpa_supplicant, and the mDNS responder joining interfaces that come up after it started. **Breaking:** `fabrictest.UseWiFiCommissioning` is removed (see Removed). Not yet proven on real radios: the owner's hardware test (`notes/manual-test-plan-m7-ble-wifi.md`) follows this release; no certification case runs over BLE (the harness's Python controller has none).
