@@ -66,14 +66,19 @@ type sockets struct {
 // at db021da0), and UdpMulticastServer.create fails only when the IPv6
 // socket cannot be created (UdpMulticastServer.ts:70-83).
 func openSockets(exclude func(string) bool, log *slog.Logger, clk *clockvar.Var, handle func([]byte, int, *net.UDPAddr)) (*sockets, error) {
+	return openSocketsOn(listMulticastInterfaces(), exclude, log, clk, handle)
+}
+
+// openSocketsOn is openSockets joining ifaces at open.
+func openSocketsOn(ifaces []net.Interface, exclude func(string) bool, log *slog.Logger, clk *clockvar.Var, handle func([]byte, int, *net.UDPAddr)) (*sockets, error) {
 	s := &sockets{log: log, clk: clk, exclude: exclude, handle: handle}
-	pc4, joined4, err4 := bindMcast4()
+	pc4, joined4, err4 := bindMcast4(ifaces)
 	if err4 != nil {
 		log.Debug("mdns.responder.udp4_join_failed", slog.Any("err", err4))
 	} else {
 		s.pc4, s.joined4 = pc4, joined4
 	}
-	pc6, joined6, err6 := bindMcast6()
+	pc6, joined6, err6 := bindMcast6(ifaces)
 	if err6 != nil {
 		log.Debug("mdns.responder.udp6_join_failed", slog.Any("err", err6))
 	} else {
@@ -238,21 +243,37 @@ func (s *sockets) joinNew(ifaces []net.Interface) {
 			continue
 		}
 		var v4, v6 bool
-		if s.pc4 != nil && !s.joined4[ifi.Index] && s.pc4.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup4.IP}) == nil {
-			s.joined4[ifi.Index], v4 = true, true
+		if s.pc4 != nil && !s.joined4[ifi.Index] {
+			if err := s.pc4.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup4.IP}); err == nil {
+				s.joined4[ifi.Index], v4 = true, true
+			} else {
+				s.log.Debug("mdns.responder.join_failed", slog.String("iface", ifi.Name), slog.Bool("ipv4", true), slog.Any("err", err))
+			}
 		}
-		if s.pc6 != nil && !s.joined6[ifi.Index] && s.pc6.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup6.IP}) == nil {
-			s.joined6[ifi.Index], v6 = true, true
+		if s.pc6 != nil && !s.joined6[ifi.Index] {
+			if err := s.pc6.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup6.IP}); err == nil {
+				s.joined6[ifi.Index], v6 = true, true
+			} else {
+				s.log.Debug("mdns.responder.join_failed", slog.String("iface", ifi.Name), slog.Bool("ipv6", true), slog.Any("err", err))
+			}
 		}
 		if v4 || v6 {
 			s.log.Info("mdns.responder.joined", slog.String("iface", ifi.Name), slog.Bool("ipv4", v4), slog.Bool("ipv6", v6))
 		}
 	}
-	for _, joined := range []map[int]bool{s.joined4, s.joined6} {
-		for index := range joined {
-			if !present[index] {
-				delete(joined, index)
-			}
+	// A vanished interface's membership is left before it is forgotten:
+	// a device created again under the same index would otherwise find
+	// the socket still a member there and refuse the join (EADDRINUSE).
+	for index := range s.joined4 {
+		if !present[index] {
+			_ = s.pc4.LeaveGroup(&net.Interface{Index: index}, &net.UDPAddr{IP: mdnsGroup4.IP})
+			delete(s.joined4, index)
+		}
+	}
+	for index := range s.joined6 {
+		if !present[index] {
+			_ = s.pc6.LeaveGroup(&net.Interface{Index: index}, &net.UDPAddr{IP: mdnsGroup6.IP})
+			delete(s.joined6, index)
 		}
 	}
 }
@@ -531,8 +552,11 @@ func hostAddrsFor(exclude func(string) bool) func(ifIndex int) []net.IP {
 // bind (SO_REUSEADDR) coexists with the OS responder and with the
 // module's querier; bind + JoinGroup is the approach both Linux and macOS
 // support.
-func joinMcast4() (*ipv4.PacketConn, error) {
-	pc, joined, err := bindMcast4()
+func joinMcast4() (*ipv4.PacketConn, error) { return joinMcast4On(listMulticastInterfaces()) }
+
+// joinMcast4On is joinMcast4 on ifaces.
+func joinMcast4On(ifaces []net.Interface) (*ipv4.PacketConn, error) {
+	pc, joined, err := bindMcast4(ifaces)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +570,7 @@ func joinMcast4() (*ipv4.PacketConn, error) {
 // bindMcast4 / bindMcast6 are joinMcast4 / joinMcast6 without the demand
 // that an interface accepted the join: the socket and the interfaces
 // (by index) that joined.
-func bindMcast4() (*ipv4.PacketConn, map[int]bool, error) {
+func bindMcast4(ifaces []net.Interface) (*ipv4.PacketConn, map[int]bool, error) {
 	addr := &net.UDPAddr{IP: net.IPv4(224, 0, 0, 0), Port: 5353}
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil {
@@ -566,7 +590,6 @@ func bindMcast4() (*ipv4.PacketConn, map[int]bool, error) {
 	// down (container churn on the host) or a transient net.Interfaces()
 	// error between the two syscalls then panics with index out of range
 	// on the daemon's boot goroutine, where nothing recovers.
-	ifaces := listMulticastInterfaces()
 	for i := range ifaces {
 		ifi := ifaces[i]
 		if jerr := pc.JoinGroup(&ifi, group); jerr == nil {
@@ -588,8 +611,11 @@ func bindMcast4() (*ipv4.PacketConn, map[int]bool, error) {
 	return pc, joined, nil
 }
 
-func joinMcast6() (*ipv6.PacketConn, error) {
-	pc, joined, err := bindMcast6()
+func joinMcast6() (*ipv6.PacketConn, error) { return joinMcast6On(listMulticastInterfaces()) }
+
+// joinMcast6On is joinMcast6 on ifaces.
+func joinMcast6On(ifaces []net.Interface) (*ipv6.PacketConn, error) {
+	pc, joined, err := bindMcast6(ifaces)
 	if err != nil {
 		return nil, err
 	}
@@ -600,7 +626,7 @@ func joinMcast6() (*ipv6.PacketConn, error) {
 	return pc, nil
 }
 
-func bindMcast6() (*ipv6.PacketConn, map[int]bool, error) {
+func bindMcast6(ifaces []net.Interface) (*ipv6.PacketConn, map[int]bool, error) {
 	addr := &net.UDPAddr{IP: net.ParseIP("ff02::"), Port: 5353}
 	conn, err := net.ListenUDP("udp6", addr)
 	if err != nil {
@@ -616,7 +642,6 @@ func bindMcast6() (*ipv6.PacketConn, map[int]bool, error) {
 	var primaryIface *net.Interface
 	// One snapshot — see joinMcast4 for why the list must not be
 	// re-enumerated inside the loop.
-	ifaces := listMulticastInterfaces()
 	for i := range ifaces {
 		ifi := ifaces[i]
 		if jerr := pc.JoinGroup(&ifi, group); jerr == nil {
