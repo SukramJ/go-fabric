@@ -51,7 +51,7 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   | (a) defect | go-fabric misbehaves or lacks mandatory behaviour | fixed per matter.js, or an open finding carrying the TC id |
   | (b) not supported | optional per spec for the device types exposed, and declared so in PICS | the PICS line is the record |
   | (c) harness | the test case or the environment is at fault | the evidence is cited |
-  | (d) out of scope | Bluetooth and Thread on the device side, Wi-Fi commissioning of the node itself | the scope decision is named (the controller role entered with ADR 0020; BLE commissioning in the controller with ADR 0024) |
+  | (d) out of scope | Thread on the device side (no Thread radio) | the scope decision is named (the controller role entered with ADR 0020; BLE commissioning in the controller with ADR 0024; BLE and Wi-Fi commissioning of the node with ADR 0031) |
 
   A case matter.js passes and this module fails is class (a) by definition.
 - **Out-of-band controls** are the ones CHIP's CI drives its sample apps
@@ -170,7 +170,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CADMIN | 21 | 13 | 0 | 0 | 0 | 8 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
 | CGENTC | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
-| CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
+| CNET | 23 | 2 | 0 | 0 | 17 | 4 | 0 |
 | CNETWIFI | 23 | 6 | 0 | 0 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
 | DD | 30 | 13 | 0 | 0 | 0 | 17 | 0 |
@@ -300,7 +300,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **839** | **564** | **0** | **2** | **130** | **138** | **5** |
+| **all** | **839** | **564** | **0** | **2** | **135** | **138** | **0** |
 
 ### Cases not run
 
@@ -368,7 +368,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CLDIM/6.2 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F00 & CLDIM.S.C03.Rsp` is false for the reference DUT |
 | CNET/4.1 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
-| CNET/4.11 | (d) out of scope | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; Wi-Fi commissioning is out of scope (ADR 0011 (d), docs/matterjs-comparison.md), and the case has no PICS gate (CNET.S.F00=0) |
+| CNET/4.11 | (b) not supported | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition's row is CNETWIFI/4.11, (c) harness (two real access points) |
 | CNET/4.12 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNET/4.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -379,10 +379,10 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CNET/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNET/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.23 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
-| CNET/4.25 | (d) out of scope | TC-CNET-4.25 verifies Wi-Fi per-device credentials; Wi-Fi commissioning is out of scope and the case skips itself on a node without the Wi-Fi feature (runs, and skips itself) |
-| CNET/4.26 | (d) out of scope | TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); out of scope with Wi-Fi commissioning, and the case skips itself (runs, and skips itself) |
-| CNET/4.27 | (d) out of scope | TC-CNET-4.27 verifies Wi-Fi network client identities; out of scope with Wi-Fi commissioning, and the case skips itself (runs, and skips itself) |
-| CNET/4.29 | (d) out of scope | TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; out of scope with Wi-Fi commissioning, and the case skips itself once given the endpoint its matcher needs (runs, and skips itself) |
+| CNET/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.26 | (b) not supported | TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.29 | (b) not supported | TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29, where it skips itself (no per-device credentials) (runs, and skips itself) |
 | CNET/4.4 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.5 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
@@ -701,7 +701,8 @@ whose family is not in that list is "not yet run", not "not supported".
 | ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | CONCON | the module serves ContentControl (`cluster/media`), but chip has no case of the family at the harness pin | (c) no case |
 | ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node. The daemon's `--icd-lit` (TESTING ONLY) is such a node for the ICD client cases the Go controller runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3, under "Controller role" above) | (b) not supported |
-| SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
+| SC_TC (PASE over Thread MeshCoP, `TC_SC_TC_*.py`), the Thread cases of DD and SC | the device side has no Thread radio | (d) out of scope |
+| commissioning the node over BLE in the certification cases (the BLE discovery cases of DD and SC, and the Python cases whose TH commissions over BLE-Wi-Fi in the test, as TC-CNET-4.23 step 16) | the node is commissioned over BLE onto Wi-Fi since milestone 7 (ADR 0031). Since wave 28c the harness image carries `chip-tool-ble` and `all-clusters-app-ble` (BLE and Wi-Fi on; the base image builds every binary `no-ble-no-wifi`, matter.js `support/chip/support/build-one`:23, :60-63 at `db021da0`), and `make chiptool-ble-wifi` passes: chip-tool commissions `examples/ble-wifi-light` over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, then reads NetworkCommissioning and toggles OnOff, with chip's all-clusters app as the control. The cases themselves stay unrun: the DD BLE cases are manual rows above, and the Python cases' controller in the image is still built without BLE (its `_ChipDeviceCtrl.so` carries no BlueZ code), so a case that commissions over BLE inside the test cannot. The weekly ble-virtual job proves the same path on real BlueZ over btvirt | (c) harness |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
 | TSTAT 4.5 (MatterScheduleConfiguration) | the module serves MSCH behind `surface.Policies.Extensions("BD-chip-Thermostat-Schedules")` and the reference daemon enables it with `--thermostat-schedules`, but `TC_TSTAT_4_5.py` is absent at the harness commit `6170af84` (present in connectedhomeip from 2026-10-23); lifting `CHIP_TEST_IMAGE` is a separate owner decision | (c) not yet run |
 | ACS, WIFINM | the module serves AmbientContextSensing (`cluster/sensing`, wave 26-C, a host server only: no device type at the pin lists it, `BD-chip-AmbientContextSensing-RulesInServer`) and WiFiNetworkManagement (`cluster/netinfra`, wave 26-B), but the reference daemon composes neither and the harness does not run their families | (c) not yet run |

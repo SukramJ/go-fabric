@@ -1,6 +1,8 @@
 # go-fabric's certification harness image (internal/chiptool/image): the
 # pinned matter.js CHIP image (the Makefile's CHIP_BASE_IMAGE) with chip's
-# jf-admin-app, jf-control-app and Push AV server added, built from the
+# jf-admin-app, jf-control-app and Push AV server added, and BLE + Wi-Fi
+# builds of chip-tool and the all-clusters app (chip-tool-ble,
+# all-clusters-app-ble) with bluezoo for the BLE-Wi-Fi leg, built from the
 # Makefile's CHIP_TEST_IMAGE_COMMIT and pushed as
 # ghcr.io/sukramj/go-fabric-chip:<that commit>.
 #
@@ -20,10 +22,11 @@ jobs:
   build:
     name: build and push the harness image
     runs-on: ubuntu-24.04
-    timeout-minutes: 300
+    # Four CHIP builds since wave 28c; 360 is a hosted runner's limit.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The CHIP source, its bootstrap and two app builds need more than
+      # The CHIP source, its bootstrap and four app builds need more than
       # the runner's free disk: drop the toolchains this job does not use.
       - name: free disk
         run: |

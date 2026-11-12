@@ -137,7 +137,7 @@ cfg.Network.WiFi = &node.WiFi{Driver: wifi}
 
 | When | What happens |
 | --- | --- |
-| ScanNetworks | an active scan; the results carry SSID, BSSID, channel, band, RSSI and the security bitmap; at most 10 s |
+| ScanNetworks | an active scan; the results carry SSID, BSSID, channel, band, RSSI and the security bitmap. The node advertises ScanMaxTimeSeconds 10, as connectedhomeip; the driver waits for wpa_supplicant's end of the scan up to 30 s (`DefaultScanTimeout`), since a scan while the interface is associated can take about 10 s |
 | AddOrUpdateWiFiNetwork | the cluster stages the network (one) and its credential, nothing reaches the radio |
 | ConnectNetwork | the driver hands the network to wpa_supplicant and waits for the interface's `completed` state, at most 20 s; on success the node re-announces its DNS-SD records at once |
 | CommissioningComplete | the cluster commits the network into the node's store |
@@ -216,6 +216,13 @@ picks it up when it appears — and `Node.DiagnoseMDNS()` reports it
 and a named interface without an advertised address
 (`interface_no_addresses`). The list does not scope the UDP listen socket;
 `Network.Listen` takes a host address for that.
+
+A node may start with no multicast interface up at all — a node
+commissioned over BLE onto Wi-Fi has none before it joins the network. The
+responder's sockets stay open then, and every interface that comes up later
+is joined to the mDNS groups at the next publication or interface check
+(the node re-announces after a successful Wi-Fi join, which is the next
+publication).
 
 The case for it is a dual-homed host behind a gateway that relays mDNS
 between its networks (an mDNS reflector or proxy): the node answers each

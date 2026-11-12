@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func (joinAll) ConnectNetwork(context.Context, []byte, []byte) (status uint8, de
 // in-memory BLE peripheral and a Wi-Fi driver that joins every network —
 // on loopback: it mounts the Wi-Fi NetworkCommissioning, advertises its
 // own window on the radio, and its QR code names BLE. The binary on real
-// radios is driven by the chip-harness leg of wave 28c.
+// radios is driven by the ble-virtual job (script/ble-virtual-test.sh).
 func TestNode(t *testing.T) {
 	ctx := context.Background()
 	o, err := parseFlags([]string{"--storage", filepath.Join(t.TempDir(), "light.db"), "--discriminator", "3001", "--passcode", "20202024"})
@@ -79,13 +80,37 @@ func TestNode(t *testing.T) {
 
 // TestFlags: the passcode and the discriminator are bounded.
 func TestFlags(t *testing.T) {
-	for _, args := range [][]string{{"--passcode", "100000000"}, {"--discriminator", "4096"}} {
+	for _, args := range [][]string{{"--passcode", "100000000"}, {"--discriminator", "4096"}, {"--log-level", "loud"}} {
 		if _, err := parseFlags(args); err == nil {
 			t.Errorf("parseFlags(%v) accepted", args)
 		}
 	}
 	o, err := parseFlags(nil)
-	if err != nil || o.adapter != "hci0" || o.wifiInterface != "wlan0" || o.passcode != 20202021 || o.discriminator != 3840 {
+	if err != nil || o.adapter != "hci0" || o.wifiInterface != "wlan0" || o.passcode != 20202021 || o.discriminator != 3840 || o.logLevel != slog.LevelInfo {
 		t.Errorf("defaults %+v, %v", o, err)
+	}
+}
+
+// TestNodeWithoutWiFi: --no-wifi builds the node without a Wi-Fi driver —
+// the Ethernet NetworkCommissioning in its place — still on the BLE radio,
+// the variant the ble-virtual job runs where the runner has no Wi-Fi radio.
+func TestNodeWithoutWiFi(t *testing.T) {
+	ctx := context.Background()
+	o, err := parseFlags([]string{"--storage", filepath.Join(t.TempDir(), "light.db"), "--no-wifi"})
+	if err != nil || !o.noWiFi {
+		t.Fatalf("parseFlags: %+v, %v", o, err)
+	}
+	p := &bletest.Peripheral{Address: "C0:FF:EE:00:00:02", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
+	loopback := node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}}
+	n, err := newNode(ctx, o, loopback, p.Radio(), nil)
+	if err != nil {
+		t.Fatalf("newNode: %v", err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = n.Stop(context.Background()) })
+	if n.Root().WiFiNetworkCommissioning != nil || n.Root().NetworkCommissioning == nil {
+		t.Error("without a Wi-Fi driver the Ethernet NetworkCommissioning is not mounted in place of the Wi-Fi one")
 	}
 }

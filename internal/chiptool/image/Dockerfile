@@ -12,7 +12,15 @@
 #     (with_pw_rpc.gni);
 #   - /src/tools/push_av_server, chip's Push AV TH server (the PAVST and
 #     PAVSTI cases' ${PUSH_AV_SERVER}, tests.yaml:1199), with its Python
-#     requirements and the hypercorn patch its README.md:19-25 applies.
+#     requirements and the hypercorn patch its README.md:19-25 applies;
+#   - /bin/chip-tool-ble and /bin/all-clusters-app-ble, chip-tool and
+#     the all-clusters app with BLE and Wi-Fi (milestone 7, wave 28c): the
+#     base image builds every binary without them (matter.js
+#     support/chip/support/build-one:23, :60-63), so the BLE-Wi-Fi
+#     commissioning leg and its control get their own builds, the base
+#     image's binaries unchanged; with them bluezoo==1.0.2, chip's BlueZ
+#     mock (connectedhomeip scripts/setup/constraints.txt:25 at the pin),
+#     which chip's matter.testing.linux.BluetoothMock starts.
 #
 # The CHIP source and build stages are matter.js's own (support/chip/
 # Dockerfile at matter.js 862ad75f, stages base, build and source; its
@@ -81,13 +89,38 @@ RUN set -e; \
 # -Wthread-safety-analysis. The code is upstream's.
 RUN build-one jf-admin-app/linux jfa-app jfa-app treat_warnings_as_errors=false
 RUN build-one jf-control-app jfc-app jfc-app treat_warnings_as_errors=false
+# chip-tool and the all-clusters app with BLE and Wi-Fi, as chip's CI builds
+# them for its ble-wifi run (.github/workflows/tests.yaml:301-302, :486-488
+# at the pin: linux-x64-chip-tool and linux-x64-all-clusters with no
+# "no-ble", "no-wifi" or "platform-mdns" modifier). build-one fixes BLE,
+# Wi-Fi, IPv4 and the platform mDNS off in GN_ARGS and appends the caller's
+# arguments after them (build-one:58-71); whether gn accepts a second
+# assignment of the same argument was not established, so these two are
+# generated here with build-one's steps (:56-97: gn gen with its flags,
+# ninja, the executable by name, strip, /dist/bin) and its arguments less
+# the five network ones (chip_inet_config_enable_ipv4, the two BLE
+# switches, chip_enable_wifi, chip_mdns), which keep chip's defaults.
+# Thread stays off as in build-one. Warnings are not errors, as above.
+RUN set -e; \
+    ble_one() { \
+      root=$1; target=$2; out_name=$3; \
+      rm -rf out; mkdir out; \
+      gn gen out --fail-on-unused-args --add-export-compile-commands=* --root="examples/$root" \
+        --args='chip_enable_thread=false chip_build_libshell=false is_clang=true matter_enable_tracing_support=false matter_trace_config="///src/tracing/none" matter_commandline_enable_perfetto_tracing=false treat_warnings_as_errors=false'; \
+      ninja -C out "$target"; \
+      bin="$(find out -type f -executable -name "$target")"; \
+      [ -x "$bin" ] || { echo "no executable $target" >&2; exit 1; }; \
+      strip "$bin"; mkdir -p /dist/bin; mv "$bin" "/dist/bin/$out_name"; rm -rf out; \
+    }; \
+    ble_one chip-tool chip-tool chip-tool-ble; \
+    ble_one all-clusters-app/linux chip-all-clusters-app all-clusters-app-ble
 
 FROM ${CHIP_TEST_IMAGE} AS chip
 ARG CHIP_COMMIT=6170af8461b10b1766044122ac83332c6d00ab20
 LABEL org.opencontainers.image.title="go-fabric CHIP certification harness"
 LABEL org.opencontainers.image.source=https://github.com/SukramJ/go-fabric/tree/main/internal/chiptool/image
 LABEL org.opencontainers.image.revision=${CHIP_COMMIT}
-COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /bin/
+COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /dist/bin/chip-tool-ble /dist/bin/all-clusters-app-ble /bin/
 COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_server
 # The base image installs libcurl4 for chip-camera-app (matter.js
 # support/chip/Dockerfile:28-33 at 862ad75f); its apt state does not survive
@@ -97,7 +130,14 @@ COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_
 # ("libcurl.so.4 => not found"); since 482f8caf it loads (issue 415).
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
-    apt-get -qq update && apt-get -qq -y install --no-install-recommends python3-pip patch && \
+    apt-get -qq update && apt-get -qq -y install --no-install-recommends python3-pip patch libglib2.0-0t64 && \
     pip install --break-system-packages --no-cache-dir -r /src/tools/push_av_server/requirements.txt && \
     patch -d "$(python3 -c 'import hypercorn, os; print(os.path.dirname(os.path.dirname(hypercorn.__file__)))')" -p0 < /src/tools/push_av_server/hypercorn.patch && \
-    apt-mark manual libcurl4t64 && apt-get -qq -y purge python3-pip && apt-get -qq -y autoremove
+    pip install --break-system-packages --no-cache-dir bluezoo==1.0.2 && \
+    apt-mark manual libcurl4t64 libglib2.0-0t64 && apt-get -qq -y purge python3-pip && apt-get -qq -y autoremove && \
+    bluezoo --help >/dev/null && \
+    for b in /bin/chip-tool-ble /bin/all-clusters-app-ble; do \
+      ! ldd "$b" | grep 'not found' || { echo "$b misses a library" >&2; exit 1; }; \
+      grep -q org.bluez "$b" || { echo "$b has no BlueZ support" >&2; exit 1; }; \
+      grep -q fi.w1.wpa_supplicant1 "$b" || { echo "$b has no wpa_supplicant support" >&2; exit 1; }; \
+    done

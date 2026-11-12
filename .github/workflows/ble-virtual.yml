@@ -4,7 +4,10 @@
 # (ble/bluez/cmd/reference-controller), a matter.js node with
 # @matter/nodejs-ble (script/ble-virtual/peripheral.mjs, bleno over the HCI
 # user channel) advertises on the second; `pair --ble` commissions it with
-# Wi-Fi credentials, then a read runs over the operational session.
+# Wi-Fi credentials, then a read runs over the operational session. The
+# second direction (wave 28c): examples/ble-wifi-light as the peripheral
+# through BlueZ, commissioned by pair --ble and by matter.js's controller,
+# its Wi-Fi a real wpa_supplicant on mac80211_hwsim when the kernel has it.
 #
 # Manual and weekly (owner decision 2026-10-18; the weekly run since
 # W6-test-12, so a regression does not wait for someone to dispatch):
@@ -33,7 +36,7 @@ env:
 
 jobs:
   ble-virtual:
-    name: BLE over btvirt (matter.js peripheral, pair --ble)
+    name: BLE over btvirt (both directions, pair --ble and matter.js)
     # The arm64 image: the x86-64 ubuntu-24.04 runner's 6.17 Azure kernel is
     # built with "# CONFIG_BT is not set" (no Bluetooth stack, no hci_vhci;
     # run 39099608818), the arm64 one with CONFIG_BT=m and
@@ -49,6 +52,8 @@ jobs:
           cache-dependency-path: |
             go.sum
             ble/bluez/go.sum
+            wifi/wpasupplicant/go.sum
+            examples/ble-wifi-light/go.sum
       # @matter/nodejs-ble's engines: >=20.19 <21 or >=22.13.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -60,10 +65,15 @@ jobs:
           sudo apt-get update
           # make and g++: packages/nodejs-ble/README.md (node-gyp builds bleno and noble).
           sudo apt-get install -y --no-install-recommends bluez bluez-test-tools make g++
-          # The Azure kernel's Bluetooth modules may sit in its extra modules.
-          # Without hci_vhci the script ends "environment".
-          grep -E '^(# )?CONFIG_BT(_HCIVHCI)?[= ]' "/boot/config-$(uname -r)" || true
-          if ! find "/lib/modules/$(uname -r)" -name 'hci_vhci.ko*' | grep -q .; then
+          # The second direction's Wi-Fi variant: hostapd's access points and
+          # wpa_supplicant on mac80211_hwsim radios; without the module the
+          # example runs --no-wifi and the summary says so.
+          sudo apt-get install -y --no-install-recommends hostapd wpasupplicant || true
+          # The Azure kernel's Bluetooth and hwsim modules may sit in its
+          # extra modules. Without hci_vhci the script ends "environment".
+          grep -E '^(# )?CONFIG_(BT(_HCIVHCI)?|MAC80211_HWSIM)[= ]' "/boot/config-$(uname -r)" || true
+          if ! find "/lib/modules/$(uname -r)" -name 'hci_vhci.ko*' | grep -q . ||
+            ! find "/lib/modules/$(uname -r)" -name 'mac80211_hwsim.ko*' | grep -q .; then
             sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
           fi
           bluetoothctl --version
@@ -72,6 +82,9 @@ jobs:
       - name: pair over btvirt
         env:
           BLE_LOG_DIR: ${{ runner.temp }}/ble-virtual
+          # The runner has mac80211_hwsim (run 43137917486): a run without
+          # the Wi-Fi variant is an environment failure, not a pass.
+          BLE_VIRTUAL_REQUIRE_WIFI: "1"
         run: make ble-virtual-test
       - name: upload logs
         if: always()

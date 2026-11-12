@@ -20,7 +20,7 @@
 // family table by TestCertifiabilityDocument — is the status.
 //
 // The `chiptool` build tag keeps the harness-driven tests out of
-// `make test`, `make race` and the default `go test ./...`. Four entry
+// `make test`, `make race` and the default `go test ./...`. Five entry
 // points:
 //
 //   - TestChipToolCommissionsReferenceBridge — commission, read, invoke,
@@ -33,7 +33,11 @@
 //     cases with GOFABRIC_CHIP_CASES=FAN/3.1,… and repeated with
 //     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases);
 //   - TestGoCertificationCases — the Go-TH leg below (`make chiptool-gocert`,
-//     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2).
+//     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2);
+//   - TestChipToolBLEWiFi — chip-tool-ble commissions examples/ble-wifi-light
+//     over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, with
+//     all-clusters-app-ble as the control (`make chiptool-ble-wifi`,
+//     blewifi_test.go; not part of `make chiptool-test`).
 //
 // # The harness
 //

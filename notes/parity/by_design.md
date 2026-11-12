@@ -6400,6 +6400,22 @@ and shares the adapter (ADR 0031, decision 5). Pinned by
 `TestPeripheralServesBTP` (`ble/bluez/peripheral_linux_test.go`) over an
 in-process bluetoothd, and `TestBLEOneCentralAtATime` (`bridge/ble_test.go`).
 
+One further point since wave 28c: after a successful `AcquireWrite` or
+`AcquireNotify` the characteristic reports `WriteAcquired` /
+`NotifyAcquired` true before the call completes, as connectedhomeip does
+(`src/platform/Linux/bluez/BluezEndpoint.cpp:129`, `:186` at `6170af84`),
+so a GATT server that decides by the property writes into the socket it
+holds instead of acquiring one per write. connectedhomeip never sets the
+properties back; here each follows whether any connection still holds that
+socket and returns to false when the last one ends, state and signal
+changed under one lock. Reasoning: the peripheral serves one central after
+another for the life of the process, and a property left true would tell
+the platform that the next central's socket already exists. Pinned by
+`TestPeripheralAcquiredFlags`, `TestPeripheralAcquiredFlagsAcrossCentrals`,
+`TestPeripheralAcquiredFlagsWhenTheLinkDrops` and
+`TestPeripheralAcquiredSignalsInOrder`
+(`ble/bluez/peripheral_linux_test.go`).
+
 ### BD-Matter-GeneratedServerSuffices — clusters whose generated server is complete: no source carries behaviour beyond the model
 
 Audit of 2026-10-27 (owner question at the milestone 6 concept; read map
@@ -6539,6 +6555,32 @@ untouched. Pinned by `TestMDNSInterfacesFilter`, `TestMDNSInterfacesValidate`,
 (`mdns/diagnose_interfaces_test.go`). Retire when matter.js's server takes
 a choice of interfaces (the marker goes).
 
+### BD-matterjs-mdns-JoinsLateInterfaces — the mDNS responder joins the group on interfaces that come up after it started
+
+matter.js joins the mDNS groups once, when `UdpMulticastServer.create`
+opens its sockets (`packages/general/src/net/udp/UdpMulticastServer.ts:61`,
+`:78` at `db021da0`); a membership that fails is logged per interface and
+the socket stays (`packages/nodejs/src/net/NodeJsUdpSocket.ts:189-205`),
+and only a missing IPv6 socket fails the server (`UdpMulticastServer.ts:70-83`).
+On `Network.interfacesChanged` its `MdnsServer` reads the interfaces again
+and publishes on them (`packages/protocol/src/mdns/MdnsServer.ts:40-43`),
+without a further `addMembership`: an interface that came up after the
+sockets were opened is announced on, and queries multicast on it are not
+received. The module's responder keeps matter.js's rule for the open —
+`openSockets` succeeds with no interface up — and goes one step further:
+at every listing of the interfaces, which it takes before each publication
+and at each interface check, `joinNew` joins the groups on every up,
+multicast-capable interface it holds no membership on, and leaves the group
+of an interface that is gone (`mdns/socket.go`). Reasoning: a node
+commissioned over BLE onto Wi-Fi (ADR 0031) starts with no network at all
+and must answer the commissioner's operational query on the interface that
+appears during commissioning; without the join it was announced once and
+never found again — the defect wave 28c's proof showed. The resolver's
+`joinMcast4`/`joinMcast6` keep refusing a join on no interface. Pinned by
+`TestOpenSocketsWithoutInterface`, `TestSockets_JoinNewInterfaces` and
+`TestSockets_ReceiveAfterJoinNew` (`mdns/socket_live_test.go`). Reconcile
+when matter.js joins on an interface change.
+
 ### BD-chip-WpaSupplicantDriver — the Linux Wi-Fi driver speaks wpa_supplicant's D-Bus API after connectedhomeip, with six departures
 
 matter.js ships no Wi-Fi driver: its `NetworkCommissioningServer` is the
@@ -6574,8 +6616,16 @@ joins a WPA2 network; SAE needs the passphrase. (5) Empty credentials are
 an open network, `key_mgmt` `NONE` without `psk`, where connectedhomeip
 sends `psk ""` with `SAE WPA-PSK`. (6) A scan that does not end within its
 timeout is UnknownError; connectedhomeip's StartWiFiScan (`:1251-1280`)
-starts no timer of its own. As there, a `ScanDone` of another client's
-scan ends a waiting scan and its `success` argument is not read
+starts no timer of its own. The bound is a safety net of 30 s
+(`DefaultScanTimeout`), above the 10 s the node advertises as
+ScanMaxTimeSeconds as connectedhomeip does
+(`src/platform/Linux/NetworkCommissioningDriver.h:86`): a scan of an
+associated station measured 10.0 s against wpa_supplicant on a simulated
+radio (3.7 s unassociated), and the bound covers the wait for `ScanDone`
+only, not the reads of the results (`TestScanReadsAfterTheBound`). A
+`ScanDone` that arrives before the driver's own `Scan` call has returned
+is not read as its scan's (`TestScanIgnoresAStaleScanDone`). As there, a
+`ScanDone` of another client's scan ends a waiting scan and its `success` argument is not read
 (`:1545-1595`), and the attempt reads the interface's `State` only from
 its own `SelectNetwork` on, where connectedhomeip's one flag
 (`mAssociationStarted`, `:297-300`) also sees an association that was

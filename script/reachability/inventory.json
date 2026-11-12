@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7920,
+  "entry_points": 7923,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17924,
+    "total_exported": 17927,
     "reachable": 12417,
-    "whitelisted": 5507,
+    "whitelisted": 5510,
     "unreachable": 0
   },
   "by_package": [],
@@ -32552,14 +32552,14 @@
       "identifier": "TestJoinMcast4_Success",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 48
+      "line": 51
     },
     {
       "package": "mdns",
       "identifier": "TestJoinMcast6_ProbeAndClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 61
+      "line": 64
     },
     {
       "package": "mdns",
@@ -32738,6 +32738,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestOpenSocketsWithoutInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_live_test.go",
+      "line": 385
+    },
+    {
+      "package": "mdns",
       "identifier": "TestOperationalResolver_AsksForHostAddressesAfterBareSRV",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/operational_resolver_test.go",
@@ -32839,21 +32846,21 @@
       "identifier": "TestResponder_LiveHostAnswerV4",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 165
+      "line": 168
     },
     {
       "package": "mdns",
       "identifier": "TestResponder_LiveHostAnswerV6",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 206
+      "line": 209
     },
     {
       "package": "mdns",
       "identifier": "TestResponder_LiveOperationalRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 252
+      "line": 255
     },
     {
       "package": "mdns",
@@ -32892,10 +32899,24 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestSockets_JoinNewInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_live_test.go",
+      "line": 332
+    },
+    {
+      "package": "mdns",
       "identifier": "TestSockets_Lifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/socket_live_test.go",
-      "line": 80
+      "line": 83
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestSockets_ReceiveAfterJoinNew",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/socket_live_test.go",
+      "line": 415
     },
     {
       "package": "mdns",

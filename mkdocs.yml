@@ -87,6 +87,7 @@ nav:
       - Camera: guides/camera.md
       - Ambient context sensing: guides/sensing.md
       - Joint Fabric: guides/joint-fabric.md
+      - A node without a network at first boot: guides/first-boot-without-network.md
       - BLE through ESPHome proxies: guides/ble-proxies.md
       - Network infrastructure: guides/network-infrastructure.md
       - Thread Border Router: guides/thread-border-router.md

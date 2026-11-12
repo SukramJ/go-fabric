@@ -9,9 +9,12 @@
 package mdns
 
 import (
+	"bytes"
 	"context"
 	"net"
+	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -317,6 +320,153 @@ func TestResponder_LiveOperationalRoundTrip(t *testing.T) {
 	for _, rec := range []DNSRecord{ptr, srv, txt, addr} {
 		if rec.TTL != recordTTL {
 			t.Errorf("%v %s TTL %d, want %d", rec.Type, rec.Name, rec.TTL, recordTTL)
+		}
+	}
+}
+
+// TestSockets_JoinNewInterfaces: sockets opened while no interface was up
+// — a node that joins its Wi-Fi network during commissioning — join every
+// interface at the next listing of the interfaces; an interface that
+// vanishes is left and forgotten, and joined again when it is listed
+// once more.
+func TestSockets_JoinNewInterfaces(t *testing.T) {
+	skipUnlessMulticastV4(t)
+	ifaces := listMulticastInterfaces()
+	if len(ifaces) == 0 {
+		t.Skip("no multicast interface")
+	}
+	r := &Responder{}
+	s, err := openSocketsOn(nil, DefaultInterfaceFilter, r.logger(), &r.clock, func([]byte, int, *net.UDPAddr) {})
+	if err != nil {
+		t.Skipf("no UDP 5353 socket on this host: %v", err)
+	}
+	t.Cleanup(func() { _ = s.close() })
+	if len(s.joined4) != 0 || len(s.joined6) != 0 {
+		t.Fatalf("sockets opened on no interface joined %v / %v", s.joined4, s.joined6)
+	}
+	s.joinNew(ifaces)
+	if len(s.joined4) == 0 {
+		t.Fatal("joinNew joined no interface")
+	}
+	gone := -1
+	for _, ifi := range ifaces {
+		if s.joined4[ifi.Index] {
+			gone = ifi.Index
+			break
+		}
+	}
+	rest := slices.DeleteFunc(slices.Clone(ifaces), func(ifi net.Interface) bool { return ifi.Index == gone })
+	s.joinNew(rest)
+	if s.joined4[gone] {
+		t.Fatalf("interface %d left the listing but is still recorded as joined", gone)
+	}
+	// Listed again: joined again — the membership was left with it, so the
+	// join is not refused.
+	s.joinNew(ifaces)
+	if !s.joined4[gone] {
+		t.Errorf("interface %d, listed again, was not joined again", gone)
+	}
+	// A down interface keeps its record: its membership outlives the down.
+	down := slices.Clone(ifaces)
+	for i := range down {
+		down[i].Flags &^= net.FlagUp
+	}
+	before := len(s.joined4)
+	s.joinNew(down)
+	if len(s.joined4) != before {
+		t.Errorf("a down interface was forgotten: %d joined, want %d", len(s.joined4), before)
+	}
+}
+
+// TestOpenSocketsWithoutInterface: with no interface to join, the sockets
+// open (a responder of a node without a network at start can publish and
+// join later), while joinMcast4 and joinMcast6 keep refusing such a socket
+// for the operational resolver.
+func TestOpenSocketsWithoutInterface(t *testing.T) {
+	if testing.Short() {
+		t.Skip("live multicast test: skipped under -short")
+	}
+	r := &Responder{}
+	s, err := openSocketsOn(nil, DefaultInterfaceFilter, r.logger(), &r.clock, func([]byte, int, *net.UDPAddr) {})
+	if err != nil {
+		t.Skipf("no UDP 5353 socket on this host: %v", err)
+	}
+	if s.pc4 == nil && s.pc6 == nil {
+		t.Error("openSocketsOn(nil) returned no socket")
+	}
+	if len(s.joined4) != 0 || len(s.joined6) != 0 {
+		t.Errorf("openSocketsOn(nil) joined %v / %v", s.joined4, s.joined6)
+	}
+	_ = s.close()
+	if pc, err := joinMcast4On(nil); err == nil {
+		_ = pc.Close()
+		t.Error("joinMcast4On(nil) accepted a socket joined on no interface")
+	}
+	if pc, err := joinMcast6On(nil); err == nil {
+		_ = pc.Close()
+		t.Error("joinMcast6On(nil) accepted a socket joined on no interface")
+	}
+}
+
+// TestSockets_ReceiveAfterJoinNew: sockets opened on no interface receive
+// a multicast to 224.0.0.251:5353 on an interface once joinNew joined it
+// (the sender's own copy, IP_MULTICAST_LOOP); skipped where the host
+// sends no multicast.
+func TestSockets_ReceiveAfterJoinNew(t *testing.T) {
+	skipUnlessMulticastV4(t)
+	var out *net.Interface
+	for _, ifi := range listMulticastInterfaces() {
+		if isPrimaryV4(&ifi) {
+			out = &ifi
+			break
+		}
+	}
+	if out == nil {
+		t.Skip("no multicast interface with an IPv4 address")
+	}
+	payload := []byte("gofabric-joinnew-" + strconv.Itoa(os.Getpid()))
+	got := make(chan struct{}, 1)
+	r := &Responder{}
+	s, err := openSocketsOn(nil, DefaultInterfaceFilter, r.logger(), &r.clock, func(b []byte, _ int, _ *net.UDPAddr) {
+		if bytes.Equal(b, payload) {
+			select {
+			case got <- struct{}{}:
+			default:
+			}
+		}
+	})
+	if err != nil || s.pc4 == nil {
+		t.Skipf("no IPv4 UDP 5353 socket on this host: %v", err)
+	}
+	t.Cleanup(func() { _ = s.close() })
+	s.joinNew([]net.Interface{*out})
+	if !s.joined4[out.Index] {
+		t.Skipf("%s refused the join", out.Name)
+	}
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero})
+	if err != nil {
+		t.Skip(err)
+	}
+	defer func() { _ = conn.Close() }()
+	pc := ipv4.NewPacketConn(conn)
+	if err := pc.SetMulticastInterface(out); err != nil {
+		t.Skipf("send on %s: %v", out.Name, err)
+	}
+	_ = pc.SetMulticastLoopback(true)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if _, err := conn.WriteTo(payload, mdnsGroup4); err != nil {
+			t.Skipf("multicast send on %s: %v", out.Name, err)
+		}
+		select {
+		case <-got:
+			return
+		case <-ctx.Done():
+			t.Fatalf("no multicast received on %s after joinNew", out.Name)
+		case <-tick.C:
 		}
 	}
 }
