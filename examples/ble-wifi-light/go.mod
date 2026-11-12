@@ -3,9 +3,9 @@ module github.com/SukramJ/go-fabric/examples/ble-wifi-light
 go 1.27.3
 
 require (
-	github.com/SukramJ/go-fabric v0.21.0
-	github.com/SukramJ/go-fabric/ble/bluez v0.21.0
-	github.com/SukramJ/go-fabric/wifi/wpasupplicant v0.0.0-00010101000000-000000000000
+	github.com/SukramJ/go-fabric v0.22.0
+	github.com/SukramJ/go-fabric/ble/bluez v0.22.0
+	github.com/SukramJ/go-fabric/wifi/wpasupplicant v0.22.0
 )
 
 require (

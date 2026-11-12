@@ -3,7 +3,7 @@ module github.com/SukramJ/go-fabric/wifi/wpasupplicant
 go 1.27.3
 
 require (
-	github.com/SukramJ/go-fabric v0.21.0
+	github.com/SukramJ/go-fabric v0.22.0
 	github.com/godbus/dbus/v5 v5.2.4
 )
 
