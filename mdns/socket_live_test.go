@@ -320,3 +320,80 @@ func TestResponder_LiveOperationalRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// TestSockets_JoinNewInterfaces: an interface that was not up when the
+// sockets opened — none at all on a node that joins its Wi-Fi network
+// during commissioning — is joined at the next listing of the
+// interfaces, and an interface that is gone is forgotten, so it is joined
+// again should its index come back.
+func TestSockets_JoinNewInterfaces(t *testing.T) {
+	skipUnlessMulticastV4(t)
+	pc4, joined4, err := bindMcast4()
+	if err != nil {
+		t.Skipf("no IPv4 socket on UDP 5353: %v", err)
+	}
+	ifaces := listMulticastInterfaces()
+	if len(ifaces) == 0 || len(joined4) == 0 {
+		_ = pc4.Close()
+		t.Skip("no multicast interface joined")
+	}
+	r := &Responder{}
+	// The state of sockets opened while no interface was up: the socket
+	// without a membership.
+	for index := range joined4 {
+		ifi, err := net.InterfaceByIndex(index)
+		if err == nil {
+			_ = pc4.LeaveGroup(ifi, &net.UDPAddr{IP: mdnsGroup4.IP})
+		}
+	}
+	s := &sockets{log: r.logger(), pc4: pc4, joined4: map[int]bool{}, joined6: map[int]bool{}}
+	t.Cleanup(func() { _ = pc4.Close() })
+
+	s.joinNew(ifaces)
+	for _, ifi := range ifaces {
+		if joined4[ifi.Index] && !s.joined4[ifi.Index] {
+			t.Errorf("%s accepted the join at open but joinNew did not join it", ifi.Name)
+		}
+	}
+	if len(s.joined4) == 0 {
+		t.Fatal("joinNew joined no interface")
+	}
+
+	// Gone: the interface leaves the listing and its membership record.
+	gone := ifaces[0]
+	s.joinNew(ifaces[1:])
+	if s.joined4[gone.Index] {
+		t.Errorf("%s left the listing but is still recorded as joined", gone.Name)
+	}
+	// A down interface stays recorded: its membership outlives the down.
+	down := slices.Clone(ifaces)
+	for i := range down {
+		down[i].Flags &^= net.FlagUp
+	}
+	before := len(s.joined4)
+	s.joinNew(down)
+	if len(s.joined4) != before {
+		t.Errorf("a down interface was forgotten: %d joined, want %d", len(s.joined4), before)
+	}
+}
+
+// TestOpenSocketsWithoutInterface: sockets whose join found no interface
+// stay open (bindMcast4 and bindMcast6 report no error for it), so a
+// responder of a node without a network at start can publish and join
+// later; joinMcast4 and joinMcast6 keep refusing such a socket for the
+// operational resolver.
+func TestOpenSocketsWithoutInterface(t *testing.T) {
+	if testing.Short() {
+		t.Skip("live multicast test: skipped under -short")
+	}
+	pc6, joined6, err := bindMcast6()
+	if err != nil {
+		t.Skipf("no IPv6 socket on UDP 5353: %v", err)
+	}
+	defer func() { _ = pc6.Close() }()
+	s := &sockets{log: (&Responder{}).logger(), pc6: pc6, joined4: map[int]bool{}, joined6: joined6}
+	s.joinNew(nil)
+	if len(s.joined6) != 0 {
+		t.Errorf("an empty listing left %d interfaces recorded as joined", len(s.joined6))
+	}
+}

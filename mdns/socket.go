@@ -50,23 +50,37 @@ type sockets struct {
 	pc4    *ipv4.PacketConn
 	pc6    *ipv6.PacketConn
 	closed bool
+	// joined4 and joined6 are the interfaces (by index) whose group
+	// membership each socket holds; links joins the ones that came up
+	// since (joinNew).
+	joined4, joined6 map[int]bool
 }
 
 // openSockets binds both families and starts their receive loops. Either
-// family alone suffices; the error says why neither bound.
+// family alone suffices; the error says why neither bound. A socket that
+// joined the group on no interface stays open: a host without a network
+// at start — a node commissioned over BLE onto Wi-Fi — has none up yet,
+// and links joins each interface as it comes (joinNew). matter.js keeps
+// its sockets when a membership fails too: NodeJsUdpSocket.addMembership
+// logs the failure per interface and goes on (NodeJsUdpSocket.ts:189-205
+// at db021da0), and UdpMulticastServer.create fails only when the IPv6
+// socket cannot be created (UdpMulticastServer.ts:70-83).
 func openSockets(exclude func(string) bool, log *slog.Logger, clk *clockvar.Var, handle func([]byte, int, *net.UDPAddr)) (*sockets, error) {
 	s := &sockets{log: log, clk: clk, exclude: exclude, handle: handle}
-	pc4, err4 := joinMcast4()
+	pc4, joined4, err4 := bindMcast4()
 	if err4 != nil {
 		log.Debug("mdns.responder.udp4_join_failed", slog.Any("err", err4))
 	} else {
-		s.pc4 = pc4
+		s.pc4, s.joined4 = pc4, joined4
 	}
-	pc6, err6 := joinMcast6()
+	pc6, joined6, err6 := bindMcast6()
 	if err6 != nil {
 		log.Debug("mdns.responder.udp6_join_failed", slog.Any("err", err6))
 	} else {
-		s.pc6 = pc6
+		s.pc6, s.joined6 = pc6, joined6
+	}
+	if (s.pc4 != nil || s.pc6 != nil) && len(joined4) == 0 && len(joined6) == 0 {
+		log.Info("mdns.responder.no_interface", slog.String("hint", "no multicast interface is up; the responder joins each one as it comes"))
 	}
 	if s.pc4 == nil && s.pc6 == nil {
 		return nil, fmt.Errorf("bind udp4 and udp6 port 5353: %w / %w", err4, err6)
@@ -191,6 +205,7 @@ func (s *sockets) links() []link {
 	if err != nil {
 		return nil
 	}
+	s.joinNew(ifaces)
 	out := make([]link, 0, len(ifaces))
 	for _, ifi := range ifaces {
 		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 {
@@ -199,6 +214,47 @@ func (s *sockets) links() []link {
 		out = append(out, s.linkOf(ifi))
 	}
 	return out
+}
+
+// joinNew joins the mDNS groups on every up, multicast-capable interface
+// of ifaces whose membership a socket does not hold yet, and forgets the
+// interfaces that are gone (the kernel drops their memberships). The
+// sockets join at open only the interfaces up then; an interface that
+// comes up later — the Wi-Fi interface of a node that joins its network
+// during commissioning — would otherwise never receive a query. It runs on
+// every listing of the interfaces, which the responder takes before each
+// publication and at each interface check.
+func (s *sockets) joinNew(ifaces []net.Interface) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	present := make(map[int]bool, len(ifaces))
+	for i := range ifaces {
+		ifi := ifaces[i]
+		present[ifi.Index] = true
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 {
+			continue
+		}
+		var v4, v6 bool
+		if s.pc4 != nil && !s.joined4[ifi.Index] && s.pc4.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup4.IP}) == nil {
+			s.joined4[ifi.Index], v4 = true, true
+		}
+		if s.pc6 != nil && !s.joined6[ifi.Index] && s.pc6.JoinGroup(&ifi, &net.UDPAddr{IP: mdnsGroup6.IP}) == nil {
+			s.joined6[ifi.Index], v6 = true, true
+		}
+		if v4 || v6 {
+			s.log.Info("mdns.responder.joined", slog.String("iface", ifi.Name), slog.Bool("ipv4", v4), slog.Bool("ipv6", v6))
+		}
+	}
+	for _, joined := range []map[int]bool{s.joined4, s.joined6} {
+		for index := range joined {
+			if !present[index] {
+				delete(joined, index)
+			}
+		}
+	}
 }
 
 // link implements [wire].
@@ -476,18 +532,33 @@ func hostAddrsFor(exclude func(string) bool) func(ifIndex int) []net.IP {
 // module's querier; bind + JoinGroup is the approach both Linux and macOS
 // support.
 func joinMcast4() (*ipv4.PacketConn, error) {
+	pc, joined, err := bindMcast4()
+	if err != nil {
+		return nil, err
+	}
+	if len(joined) == 0 {
+		_ = pc.Close()
+		return nil, errors.New("mdns: no multicast interface accepted IPv4 join")
+	}
+	return pc, nil
+}
+
+// bindMcast4 / bindMcast6 are joinMcast4 / joinMcast6 without the demand
+// that an interface accepted the join: the socket and the interfaces
+// (by index) that joined.
+func bindMcast4() (*ipv4.PacketConn, map[int]bool, error) {
 	addr := &net.UDPAddr{IP: net.IPv4(224, 0, 0, 0), Port: 5353}
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pc := ipv4.NewPacketConn(conn)
 	if err := pc.SetControlMessage(ipv4.FlagInterface, true); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	group := &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251)}
-	joined := 0
+	joined := map[int]bool{}
 	var primaryIface *net.Interface
 	// One snapshot: the loop bound and the indexed slice must come from
 	// the same enumeration. Re-reading the interface list per iteration
@@ -499,7 +570,7 @@ func joinMcast4() (*ipv4.PacketConn, error) {
 	for i := range ifaces {
 		ifi := ifaces[i]
 		if jerr := pc.JoinGroup(&ifi, group); jerr == nil {
-			joined++
+			joined[ifi.Index] = true
 			// First non-loopback, non-tunnel interface with an IPv4
 			// address wins. Used as the default outgoing interface
 			// for multicast sends — without this, macOS rejects
@@ -511,29 +582,37 @@ func joinMcast4() (*ipv4.PacketConn, error) {
 			}
 		}
 	}
-	if joined == 0 {
-		_ = pc.Close()
-		return nil, errors.New("mdns: no multicast interface accepted IPv4 join")
-	}
 	if primaryIface != nil {
 		_ = pc.SetMulticastInterface(primaryIface)
+	}
+	return pc, joined, nil
+}
+
+func joinMcast6() (*ipv6.PacketConn, error) {
+	pc, joined, err := bindMcast6()
+	if err != nil {
+		return nil, err
+	}
+	if len(joined) == 0 {
+		_ = pc.Close()
+		return nil, errors.New("mdns: no multicast interface accepted IPv6 join")
 	}
 	return pc, nil
 }
 
-func joinMcast6() (*ipv6.PacketConn, error) {
+func bindMcast6() (*ipv6.PacketConn, map[int]bool, error) {
 	addr := &net.UDPAddr{IP: net.ParseIP("ff02::"), Port: 5353}
 	conn, err := net.ListenUDP("udp6", addr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pc := ipv6.NewPacketConn(conn)
 	if err := pc.SetControlMessage(ipv6.FlagInterface, true); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	group := &net.UDPAddr{IP: net.ParseIP("ff02::fb")}
-	joined := 0
+	joined := map[int]bool{}
 	var primaryIface *net.Interface
 	// One snapshot — see joinMcast4 for why the list must not be
 	// re-enumerated inside the loop.
@@ -541,20 +620,16 @@ func joinMcast6() (*ipv6.PacketConn, error) {
 	for i := range ifaces {
 		ifi := ifaces[i]
 		if jerr := pc.JoinGroup(&ifi, group); jerr == nil {
-			joined++
+			joined[ifi.Index] = true
 			if primaryIface == nil && isPrimaryV6(&ifi) {
 				primaryIface = &ifi
 			}
 		}
 	}
-	if joined == 0 {
-		_ = pc.Close()
-		return nil, errors.New("mdns: no multicast interface accepted IPv6 join")
-	}
 	if primaryIface != nil {
 		_ = pc.SetMulticastInterface(primaryIface)
 	}
-	return pc, nil
+	return pc, joined, nil
 }
 
 // isPrimaryV4 reports whether the interface looks like the host's
