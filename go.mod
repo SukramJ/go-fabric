@@ -7,7 +7,7 @@ require (
 	github.com/miekg/dns v1.1.73
 	golang.org/x/net v0.62.0
 	golang.org/x/tools v0.52.0
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 )
 
 require (
