@@ -5,6 +5,7 @@ package wpasupplicant
 
 import (
 	"context"
+	"runtime"
 	"slices"
 	"sync"
 
@@ -43,6 +44,15 @@ type fakeBus struct {
 	noScanDone bool
 	// scanFailed: ScanDone reports success false.
 	scanFailed bool
+	// staleScanDone: Scan sends a ScanDone before its reply (an earlier
+	// scan's), and no other.
+	staleScanDone bool
+	// scanArmed reports whether the driver waits for ScanDone; the
+	// ScanDone of a scan follows it, as wpa_supplicant's follows the Scan
+	// reply (startDriver sets it).
+	scanArmed func() bool
+	// beforeRead runs before a Get or GetAll answers (outside mu).
+	beforeRead func()
 	// onDisconnect runs on Disconnect before its own state change.
 	onDisconnect func(b *fakeBus)
 	// onSelect runs on SelectNetwork; nil walks associating, associated,
@@ -118,7 +128,19 @@ func (b *fakeBus) callsCopy() []fakeCall {
 	return slices.Clone(b.calls)
 }
 
-func (b *fakeBus) Call(_ context.Context, path dbus.ObjectPath, method string, args ...any) ([]any, error) {
+func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string, args ...any) ([]any, error) {
+	if method == methodGet || method == methodGetAll {
+		b.mu.Lock()
+		hook := b.beforeRead
+		b.mu.Unlock()
+		if hook != nil {
+			hook()
+		}
+	}
+	// A call on an ended context fails, as godbus's CallWithContext does.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.calls = append(b.calls, fakeCall{path: path, method: method, args: args, afterClose: b.closed})
@@ -147,8 +169,24 @@ func (b *fakeBus) Call(_ context.Context, path dbus.ObjectPath, method string, a
 		}
 		return []any{props}, nil
 	case ifaceInterface + ".Scan":
-		if !b.noScanDone {
-			b.sigs <- &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{!b.scanFailed}}
+		done := &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{!b.scanFailed}}
+		switch {
+		case b.staleScanDone:
+			b.sigs <- done
+		case !b.noScanDone:
+			armed := b.scanArmed
+			go func() {
+				for armed != nil && !armed() {
+					b.mu.Lock()
+					closed := b.closed
+					b.mu.Unlock()
+					if closed {
+						return
+					}
+					runtime.Gosched()
+				}
+				b.sigs <- done
+			}()
 		}
 	case ifaceInterface + ".AddNetwork":
 		return []any{fakeNetwork}, nil

@@ -47,15 +47,28 @@ const (
 	stateInterfaceDisabled = "interface_disabled"
 )
 
-// Defaults of [Options]: connectedhomeip's Linux driver's — the interface
-// CHIP_DEVICE_CONFIG_WIFI_STATION_IF_NAME and the maxima the cluster
-// advertises (src/platform/Linux/NetworkCommissioningDriver.h:85-87 at
-// 6170af84).
+// Defaults of [Options]. DefaultInterface is connectedhomeip's
+// CHIP_DEVICE_CONFIG_WIFI_STATION_IF_NAME, DefaultConnectTimeout the
+// connect maximum its Linux driver advertises
+// (src/platform/Linux/NetworkCommissioningDriver.h:85-87 at 6170af84).
+//
+// DefaultScanTimeout is a safety net, not the advertised value: the
+// cluster keeps advertising ScanMaxTimeSeconds 10 (chip's
+// GetScanNetworkTimeoutSeconds, :86), but chip's driver sets no timer of
+// its own — it answers at wpa_supplicant's ScanDone — and a scan while the
+// station is associated took 10.008 s and 9.990 s on the ble-virtual job's
+// mac80211_hwsim radio (run 43137917486; 3.72 s unassociated). 30 s ends
+// only a scan that never reports.
 const (
 	DefaultInterface      = "wlan0"
-	DefaultScanTimeout    = 10 * time.Second
+	DefaultScanTimeout    = 30 * time.Second
 	DefaultConnectTimeout = 20 * time.Second
 )
+
+// scanReadTimeout bounds reading a finished scan's BSSs: their own
+// context derived from the caller's, so a ScanDone close to the scan's
+// bound still yields every result.
+const scanReadTimeout = 5 * time.Second
 
 // assocMaxRetries and wlanStatusAuthTimeout: an association that ends in
 // the IEEE 802.11 status AUTH_TIMEOUT is retried up to eight times
@@ -80,7 +93,8 @@ type Options struct {
 	// Interface is the Wi-Fi interface wpa_supplicant manages ("" is
 	// wlan0).
 	Interface string
-	// ScanTimeout bounds a scan (0 is 10 s); ConnectTimeout bounds a join
+	// ScanTimeout bounds the wait for a scan's end (0 is 30 s, see
+	// DefaultScanTimeout); ConnectTimeout bounds a join
 	// (0 is 20 s). The cluster's own bounds apply as well, through the
 	// call's context.
 	ScanTimeout, ConnectTimeout time.Duration
@@ -102,13 +116,17 @@ type Driver struct {
 	log            *slog.Logger
 
 	mu         sync.Mutex
-	scan       chan struct{} // non-nil while a scan waits for ScanDone
+	scanning   bool          // a scan runs
+	scan       chan struct{} // non-nil once the running scan's Scan call returned: it waits for ScanDone
 	connecting bool          // a join runs
 	connect    *attempt      // non-nil while a join follows State
 
 	// register hands the run loop a join's attempt once the join has
 	// selected nothing yet (listen).
 	register chan *attempt
+	// armScan hands the run loop a scan's waiter once its Scan call has
+	// returned (armWaiter).
+	armScan chan *scanWaiter
 	// calls counts the scans and joins in flight: Close lets them finish
 	// (a failed join removes its network) before it releases the bus.
 	calls sync.WaitGroup
@@ -120,6 +138,13 @@ type Driver struct {
 }
 
 var _ contract.WiFiDriver = (*Driver)(nil)
+
+// scanWaiter is one scan's wait for ScanDone; ready closes once the run
+// loop installed it.
+type scanWaiter struct {
+	done  chan struct{}
+	ready chan struct{}
+}
 
 // attempt is one join's view of the interface's State changes.
 type attempt struct {
@@ -143,8 +168,8 @@ const removeTimeout = 2 * time.Second
 func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 	d := &Driver{
 		bus: b, scanTimeout: opts.ScanTimeout, connectTimeout: opts.ConnectTimeout, log: opts.Logger,
-		register: make(chan *attempt),
-		closed:   make(chan struct{}), loopDone: make(chan struct{}),
+		register: make(chan *attempt), armScan: make(chan *scanWaiter),
+		closed: make(chan struct{}), loopDone: make(chan struct{}),
 	}
 	ifname := opts.Interface
 	if ifname == "" {
@@ -202,6 +227,22 @@ func (d *Driver) run() {
 				return
 			}
 			d.handle(s)
+		case w := <-d.armScan:
+			// The signals already queued were sent before the Scan call's
+			// reply (godbus delivers a signal into the channel before it
+			// reads the next message): a ScanDone among them ended an
+			// earlier scan, not this one, and is dropped.
+			for n := len(sigs); n > 0; n-- {
+				s, ok := <-sigs
+				if !ok {
+					return
+				}
+				d.handle(s)
+			}
+			d.mu.Lock()
+			d.scan = w.done
+			d.mu.Unlock()
+			close(w.ready)
 		case a := <-d.register:
 			// The signals already queued were sent before the reply of the
 			// join's last call before SelectNetwork (godbus delivers a
@@ -284,39 +325,53 @@ func (d *Driver) handle(s *dbus.Signal) {
 // :1568-1573) at 6170af84. A scan that does not end within the timeout or
 // the call's context is UnknownError.
 func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
-	done := make(chan struct{}, 1)
 	d.mu.Lock()
 	switch {
 	case d.isClosed():
 		d.mu.Unlock()
 		return statusUnknown, "the driver is closed", nil
-	case d.scan != nil:
+	case d.scanning:
 		d.mu.Unlock()
 		return statusUnknown, "a scan is in progress", nil
 	}
-	d.scan = done
+	d.scanning = true
 	d.calls.Add(1)
 	d.mu.Unlock()
 	defer func() {
 		d.mu.Lock()
-		d.scan = nil
+		d.scanning, d.scan = false, nil
 		d.mu.Unlock()
 		d.calls.Done()
 	}()
-	ctx, cancel := context.WithTimeout(ctx, d.scanTimeout)
+	// The bound covers the Scan call and the wait for ScanDone only; the
+	// reads after it get their own context (scanReadTimeout).
+	waitCtx, cancel := context.WithTimeout(ctx, d.scanTimeout)
 	defer cancel()
 
-	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
+	if _, err := d.bus.Call(waitCtx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
 		d.log.Info("wpasupplicant: failed to start network scan", slog.Any("err", err))
 		return statusUnknown, "scan: " + errName(err), nil
 	}
+	w := &scanWaiter{done: make(chan struct{}, 1), ready: make(chan struct{})}
 	select {
-	case <-done:
-	case <-ctx.Done():
+	case d.armScan <- w:
+	case <-d.closed:
+		return statusUnknown, "the driver is closed", nil
+	}
+	select {
+	case <-w.ready:
+	case <-d.closed:
+		return statusUnknown, "the driver is closed", nil
+	}
+	select {
+	case <-w.done:
+	case <-waitCtx.Done():
 		return statusUnknown, "the scan did not end in time", nil
 	case <-d.closed:
 		return statusUnknown, "the driver is closed", nil
 	}
+	ctx, cancelRead := context.WithTimeout(ctx, scanReadTimeout)
+	defer cancelRead()
 
 	var paths []dbus.ObjectPath
 	if v, err := d.property(ctx, "BSSs"); err == nil {

@@ -137,7 +137,7 @@ cfg.Network.WiFi = &node.WiFi{Driver: wifi}
 
 | When | What happens |
 | --- | --- |
-| ScanNetworks | an active scan; the results carry SSID, BSSID, channel, band, RSSI and the security bitmap; at most 10 s |
+| ScanNetworks | an active scan; the results carry SSID, BSSID, channel, band, RSSI and the security bitmap. The node advertises ScanMaxTimeSeconds 10, as connectedhomeip; the driver waits for wpa_supplicant's end of the scan up to 30 s (`DefaultScanTimeout`), since a scan while the interface is associated can take about 10 s |
 | AddOrUpdateWiFiNetwork | the cluster stages the network (one) and its credential, nothing reaches the radio |
 | ConnectNetwork | the driver hands the network to wpa_supplicant and waits for the interface's `completed` state, at most 20 s; on success the node re-announces its DNS-SD records at once |
 | CommissioningComplete | the cluster commits the network into the node's store |

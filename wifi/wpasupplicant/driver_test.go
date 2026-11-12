@@ -50,6 +50,13 @@ func startDriver(t *testing.T, b *fakeBus, opts Options) (*Driver, *syncBuffer) 
 	if err != nil {
 		t.Fatalf("newDriver: %v", err)
 	}
+	b.mu.Lock()
+	b.scanArmed = func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return d.scan != nil
+	}
+	b.mu.Unlock()
 	t.Cleanup(func() { _ = d.Close() })
 	return d, logs
 }
@@ -711,5 +718,42 @@ func TestErrName(t *testing.T) {
 	t.Parallel()
 	if got := errName(errors.New("secret")); got != "failed" {
 		t.Errorf("errName = %q", got)
+	}
+}
+
+// TestScanReadsAfterTheBound: the scan's bound covers the wait for
+// ScanDone, not the reads after it — a ScanDone close to the bound still
+// yields every BSS (run 43137917486: a scan while associated ended at
+// 9.99 s of a 10 s bound).
+func TestScanReadsAfterTheBound(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{"/b/1", "/b/2"})
+	b.bss["/b/1"] = bssProps("lab", bssid1, -40, 2437, nil, []string{"wpa-psk"})
+	b.bss["/b/2"] = bssProps("lab5", bssid1, -50, 5180, nil, []string{"wpa-psk"})
+	const bound = 30 * time.Millisecond
+	// Each read starts after the scan's bound has passed.
+	b.beforeRead = func() { time.Sleep(2 * bound) }
+	d, _ := startDriver(t, b, Options{ScanTimeout: bound})
+	status, debug, results := d.ScanNetworks(t.Context(), nil)
+	if status != statusSuccess || len(results) != 2 {
+		t.Fatalf("ScanNetworks = %d %q, %d results; want Success with 2", status, debug, len(results))
+	}
+}
+
+// TestScanIgnoresAStaleScanDone: a ScanDone that arrives before this
+// scan's Scan call returned ended an earlier scan; the scan keeps waiting
+// (here until its bound).
+func TestScanIgnoresAStaleScanDone(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.staleScanDone = true
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
+	d, _ := startDriver(t, b, Options{ScanTimeout: 50 * time.Millisecond})
+	if status, debug, _ := d.ScanNetworks(t.Context(), nil); status != statusUnknown || !strings.Contains(debug, "in time") {
+		t.Fatalf("ScanNetworks after a stale ScanDone = %d %q, want the bound's UnknownError", status, debug)
+	}
+	if slices.Contains(b.called(), methodGet) {
+		t.Error("the BSSs were read on the stale ScanDone")
 	}
 }
