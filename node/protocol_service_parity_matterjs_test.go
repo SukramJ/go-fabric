@@ -285,7 +285,9 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 				t.Errorf("reported %v; NOCs reported", seen)
 			}
 
-			if err := p1.Device.Act(func(n *node.Node) error { return n.RemoveFabric(context.Background(), f2) }); err != nil {
+			if err := site.Run(parityCtx(t), func(ctx context.Context) error {
+				return p1.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, f2) })
+			}); err != nil {
 				t.Fatal(err)
 			}
 			var leave *interaction.EventData

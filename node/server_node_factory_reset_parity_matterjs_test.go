@@ -4,6 +4,7 @@
 package node_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -209,7 +210,9 @@ func TestServerNodeFactoryResetParityMatterJS(t *testing.T) {
 		if err != nil || len(infos) != 1 {
 			t.Fatalf("fabrics after the second commissioning %v (%v), want one", infos, err)
 		}
-		if err := again.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, infos[0].FabricIndex) }); err != nil {
+		if err := site.Run(ctx, func(ctx context.Context) error {
+			return again.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, infos[0].FabricIndex) })
+		}); err != nil {
 			t.Fatal(err)
 		}
 		if err := site.Eventually(ctx, "the fabric removal", func() bool { return removed.Load() >= 1 }); err != nil {

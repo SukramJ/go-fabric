@@ -4,6 +4,7 @@
 package node_test
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -92,7 +93,9 @@ func TestSessionEventsParity(t *testing.T) {
 	}
 
 	idx := fabricIndexOf(t, p)
-	if err := p.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, idx) }); err != nil {
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		return p.Device.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, idx) })
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := site.Eventually(ctx, "the session closed", func() bool { return log.count("closed") > 0 }); err != nil {
