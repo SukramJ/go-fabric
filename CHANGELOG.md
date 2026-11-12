@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.22.1` (before `v0.22.0`) and are tagged `ble/bluez/v0.22.1`, `ble/esphome/v0.22.1` and `wifi/wpasupplicant/v0.22.1` at this commit; `examples/ble-wifi-light` requires the three at `v0.22.1`. No code change.
+
 ## [0.22.1] — 2026-11-12
 
 Wave W15 (#509, issue 507): a Thread node whose operational instance a border router also answers with its own host is no longer locked out between the flips of its SRV set — the proven host's last addresses and the attempts on them outlive the foreign SRV (`Timing.ProvenAddressRetention`), the stored operational address anchors a peer whose host was never learned, and a Busy answer's delay is held for the peer. With it: Go 1.27.4 (`GO-2026-6859`, #508) and the nested modules at `v0.22.0` (#506). Not verified on the live Thread network yet; why the node answers Busy is open.
