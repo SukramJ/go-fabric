@@ -260,9 +260,11 @@ file controls every node paired to it.
 
 `Controller.Pair(ctx, code, controller.PairOptions{})` runs the four steps
 below. Its `OnAttestationFailure` defaults to `attestation.Reject()`, and
-`AutoSubscribe` overrides the registry's default subscription. A context
-without a deadline is bounded by `controller.DefaultPairTimeout` (one
-minute).
+`AutoSubscribe` overrides the registry's default subscription. With a
+context without a deadline the search for the device ends after
+`controller.DefaultPairTimeout` (one minute) with `ErrNoDevice`; the
+commissioning of a device that was found is not bounded by it, only by
+the commissioner's own budgets and the context.
 
 1. **Decode the code.** `setup.DecodeQRCode` reads an `MT:` payload and
    gives the long discriminator. `setup.DecodeManualCode` reads 11 or 21

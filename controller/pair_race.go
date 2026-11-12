@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller/ble"
@@ -37,7 +38,7 @@ const (
 // The transports are matter.js's selection (Discovery.ts:272-273): the IP
 // network always, BLE where a QR code's capabilities name it or the code
 // names none (a manual code).
-func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identity discovery.Identity, opts PairOptions) (*client.Node, error) {
+func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identity discovery.Identity, opts PairOptions, searchTimeout time.Duration) (*client.Node, error) {
 	r := &pairRace{progress: opts.Progress}
 	var transports []discovery.Transport
 	if c.names != nil {
@@ -59,7 +60,7 @@ func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identit
 	r.multi = len(discovery.SelectTransports(transports, caps)) > 1
 	commissioner.ReportDiscovery(opts.Progress, PairingStarted, nil)
 	s := discovery.CommissioningRace(ctx, transports, discovery.SessionOptions{
-		Identifier: pc.Identifier(), Capabilities: caps, Clock: c.clock, Logger: c.log,
+		Identifier: pc.Identifier(), Capabilities: caps, Timeout: searchTimeout, Clock: c.clock, Logger: c.log,
 	}, identity, func(actx context.Context, cand discovery.Candidate, win func() bool) (*client.Node, error) {
 		return c.pairAttempt(actx, ctx, cand, win, bsc, pc.Passcode, opts, r)
 	})

@@ -269,7 +269,12 @@ func (f *flow) execute(ctx context.Context) error {
 		}
 		if isCommissioningError(err) || isStatusError(err) {
 			f.log.Error("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.Any("err", err))
-			f.resetFailsafeTimer(ctx)
+			// The reset outlives ctx: matter.js's has no abort signal
+			// (#resetFailsafeTimer, #invokeCommand), and a step that
+			// failed because ctx ended would otherwise leave the device
+			// holding its fail-safe until it expires. The exchange's own
+			// response timeout bounds it.
+			f.resetFailsafeTimer(context.WithoutCancel(ctx))
 			// StatusResponseError.accept rethrows anything else as is
 			// (:459, general/src/MatterError.ts:87-92); a status error
 			// itself is repacked (:462, util/Error.ts:88-104).
