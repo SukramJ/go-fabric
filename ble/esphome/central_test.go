@@ -246,6 +246,32 @@ func TestCancelledWriteEndsTheConnection(t *testing.T) {
 	t.Skip("every reply beat the cancel")
 }
 
+// A C1 write the proxy answers with BluetoothGATTErrorResponse is the
+// peripheral's disconnect — matter.js isNobleDisconnectError
+// (NobleBleChannel.ts:50-59): the error wraps btp.ErrDisconnected, which is
+// how the commissioner knows a device that left BLE on ConnectNetwork, and
+// still carries the proxy's code.
+func TestFailedWriteIsADisconnect(t *testing.T) {
+	p := peripheral("C0:FF:EE:00:0B:1F")
+	p.Faults.FailDataWrite = 1
+	f := fake(t, esphometest.Options{}, p)
+	c := central(t, esphome.Options{}, esphome.Proxy{Addr: f.Addr(), Name: "lab"})
+	scanFor(t, c, p.Address)
+	conn, err := c.Connect(context.Background(), ble.Peripheral{Address: p.Address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Disconnect() }()
+	err = conn.WriteC1(context.Background(), []byte{0x05, 0x01, 0x01, 0x00, 0x00})
+	if !errors.Is(err, btp.ErrDisconnected) {
+		t.Fatalf("WriteC1 = %v, want it to wrap btp.ErrDisconnected", err)
+	}
+	var ge *esphome.GATTError
+	if !errors.As(err, &ge) || ge.Op != "write" || ge.Code != 0x85 {
+		t.Fatalf("WriteC1 = %v, want the proxy's GATT error 0x85 of the write", err)
+	}
+}
+
 func TestConnectErrors(t *testing.T) {
 	p := peripheral("C0:FF:EE:00:0B:1E")
 	f := fake(t, esphometest.Options{Slots: 1}, p)
