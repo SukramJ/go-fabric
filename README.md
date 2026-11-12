@@ -255,6 +255,11 @@ The rule behind all of the above: **a break that appears only in a commit
 message, a doc comment or a diff has not been announced.** If it is not in
 the changelog, it does not ship.
 
+A release pull request (head branch `release/*`) is also the gate of the
+certification run: it runs every chip-tool job and certification family the
+nightly run does, and cannot merge with one of them red
+([Certifiability](https://github.com/SukramJ/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
+
 A guard holds the rule: `make apidiff` compares every public package with
 the last release tag (`golang.org/x/exp/cmd/apidiff`, a tool dependency of
 the module) and prints the incompatible changes, and `make apidiff-check`,
