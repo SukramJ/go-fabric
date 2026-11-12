@@ -243,9 +243,30 @@ func (k *connection) ATTMTU() int { return k.mtu }
 // response=true (api.proto:2030-2040), answered by BluetoothGATTWriteResponse
 // or BluetoothGATTErrorResponse (client.py:1673-1728). A peripheral that is
 // gone wraps btp.ErrDisconnected (NobleBleChannel.ts:770-781).
+//
+// So does a write the proxy answers with BluetoothGATTErrorResponse: the
+// error wraps btp.ErrDisconnected and the [*GATTError]. Mirrors matter.js
+// isNobleDisconnectError (packages/nodejs-ble/src/NobleBleChannel.ts:50-59
+// at db021da0), which takes a failed C1 write of any status from 2 for the
+// peripheral's disconnect. A proxy has three such answers, none of them
+// told apart from a lost link by its code alone: the stack's status of a
+// write it had sent (bluetooth_connection_bluedroid.cpp:776-781), the
+// error of the call that never sent it (:290-299) and its own
+// GATT_NOT_CONNECTED (bluetooth_proxy.cpp:152-158) — and the error
+// reaches the client before the proxy's BluetoothDeviceConnectionResponse
+// does. A device that leaves BLE on ConnectNetwork ends the write this
+// way, and the commissioner's channel-drop fallback knows it by
+// btp.ErrDisconnected alone (controller/commissioner/network.go
+// isChannelDrop). The connection is not marked gone: the session's close
+// still asks the proxy to disconnect, which frees the slot of a peripheral
+// that is in fact still there.
 func (k *connection) WriteC1(ctx context.Context, data []byte) error {
 	_, err := k.do(ctx, &op{name: "write", want: wire.TypeBluetoothGATTWriteResponse, handle: k.c1},
 		&wire.AddressHandle{MessageType: wire.TypeBluetoothGATTWriteRequest, Address: k.addr, Handle: k.c1, Flag: true, Data: data}, bleTimeout)
+	var ge *GATTError
+	if errors.As(err, &ge) && !errors.Is(err, btp.ErrDisconnected) {
+		return fmt.Errorf("%w: %w", btp.ErrDisconnected, err)
+	}
 	return err
 }
 

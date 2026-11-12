@@ -10,6 +10,32 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.22.2] — 2026-11-12
+
+A fix in the nested module `ble/esphome` (#512): a device that leaves BLE the moment it is told to join its network no longer fails its commissioning through an ESPHome Bluetooth proxy. The root module has no code change since `v0.22.1`; the release is tagged `v0.22.2` and `ble/esphome/v0.22.2` at one commit, and `ble/esphome` still requires go-fabric `v0.22.1`.
+
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.22.1` (before `v0.22.0`) and are tagged `ble/bluez/v0.22.1`, `ble/esphome/v0.22.1` and `wifi/wpasupplicant/v0.22.1` at this commit; `examples/ble-wifi-light` requires the three at `v0.22.1`. No code change.
+
+### Fixed
+
+- `ble/esphome`: a C1 write the proxy answers with `BluetoothGATTErrorResponse` wraps `btp.ErrDisconnected` beside the `*GATTError` (matter.js `isNobleDisconnectError`, `NobleBleChannel.ts:50-59`). A device that leaves BLE the moment it is told to join its network (`ConnectNetwork`) ended the write this way — `GATT write on handle … failed (error 0x85)` or `0x103` through a proxy — and the commissioner, which knows a dropped commissioning channel by `btp.ErrDisconnected`, failed the commissioning instead of going on to find the node on its operational network.
+
+## [0.22.1] — 2026-11-12
+
+Wave W15 (#509, issue 507): a Thread node whose operational instance a border router also answers with its own host is no longer locked out between the flips of its SRV set — the proven host's last addresses and the attempts on them outlive the foreign SRV (`Timing.ProvenAddressRetention`), the stored operational address anchors a peer whose host was never learned, and a Busy answer's delay is held for the peer. With it: Go 1.27.4 (`GO-2026-6859`, #508) and the nested modules at `v0.22.0` (#506). Not verified on the live Thread network yet; why the node answers Busy is open.
+
+### Added
+
+- `client/peer`: `Timing.ProvenAddressRetention` (default 10 minutes; a negative value retains nothing) — how long a connection attempt goes on trying a peer's addresses after DNS-SD stopped advertising them (issue 507). The two new Info log lines `matter.controller.peer.address_retained` and `matter.controller.peer.address_retention_expired` name the address, its host and the reason; `matter.controller.peer.connecting` carries `retained`.
+
+### Fixed
+
+- `client/peer`: a node whose operational instance another responder also answers (a Thread border router publishing its own host for the node, the SRV target flipping back and forth) is no longer locked out between flips (issue 507). When DNS-SD stops advertising the node's proven host, the connection keeps that host's last addresses — all of them, not only the stored one — as candidates ahead of every other target, and an attempt in flight on them goes on instead of being aborted; a peer without a learned host keeps its stored operational address the same way, also while other targets are discovered and attempted — and the first newly discovered address starts beside it at once, without the 45 s stagger. The addresses go when the host is advertised again (an address its fresh set no longer carries is then dropped), when a session is established, or after `Timing.ProvenAddressRetention`. Before, every flip to the other responder aborted the attempts at the node's addresses, and the node was tried again only when its host reappeared.
+- `client/peer`: a Busy answer now holds every CASE attempt to that peer until the delay the node asked for has passed — across an aborted or restarted attempt and at the peer's other addresses — and a session clears it. Before, an attempt restarted after an address flip sent a fresh Sigma1 inside the node's Busy window (issue 507).
+- `client/peer`: the retirement of a superseded fallback address no longer depends on whether the retirement worker saw the address change before or after the connection marked the fallback.
+
 ### Changed
 
 - Built with Go 1.27.4: `GO-2026-6859` (`net/http`, fixed in 1.27.4) is reachable through the HTTP paths of the controller and its consumers; `go.mod`, the nested modules and the workflows move together.
@@ -5708,7 +5734,9 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.2...HEAD
+[0.22.2]: https://github.com/SukramJ/go-fabric/compare/v0.22.1...v0.22.2
+[0.22.1]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/SukramJ/go-fabric/compare/v0.19.2...v0.20.0

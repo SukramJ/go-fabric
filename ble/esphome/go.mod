@@ -3,7 +3,7 @@ module github.com/SukramJ/go-fabric/ble/esphome
 go 1.27.4
 
 require (
-	github.com/SukramJ/go-fabric v0.22.0
+	github.com/SukramJ/go-fabric v0.22.1
 	github.com/flynn/noise v1.1.0
 	github.com/miekg/dns v1.1.73
 	golang.org/x/crypto v0.58.0
