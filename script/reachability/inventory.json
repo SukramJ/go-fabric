@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7927,
+  "entry_points": 7939,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17929,
+    "total_exported": 17941,
     "reachable": 12417,
-    "whitelisted": 5512,
+    "whitelisted": 5524,
     "unreachable": 0
   },
   "by_package": [],
@@ -7282,14 +7282,14 @@
       "identifier": "TestConnectReuseSharedProcessAndTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 331
+      "line": 334
     },
     {
       "package": "client/peer",
       "identifier": "TestConnectionErrorDelays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 200
+      "line": 203
     },
     {
       "package": "client/peer",
@@ -7331,14 +7331,14 @@
       "identifier": "TestDiscoverKick",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 426
+      "line": 429
     },
     {
       "package": "client/peer",
       "identifier": "TestEstablishmentUnresponsive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 461
+      "line": 464
     },
     {
       "package": "client/peer",
@@ -7352,21 +7352,21 @@
       "identifier": "TestFallbackOnlyAndNotFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 94
+      "line": 96
     },
     {
       "package": "client/peer",
       "identifier": "TestFallbackRetiredAfterStabilization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 126
+      "line": 129
     },
     {
       "package": "client/peer",
       "identifier": "TestHandleErrorOverrideAndFatal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 274
+      "line": 277
     },
     {
       "package": "client/peer",
@@ -7398,10 +7398,87 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestIssue507_BusyDeadline",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 244
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_BusyNodeAcrossFlips",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/issue507_test.go",
+      "line": 423
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_FallbackRetiredWithoutRetention",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 342
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_LinkLocalAttemptOutlivesTwoMinutes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/issue507_test.go",
+      "line": 459
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_OnlyAttemptSurvivesTheFlip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/issue507_test.go",
+      "line": 380
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_ProvenHostReturnsWithAnotherSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 131
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_ProvenHostWithdrawnWhileAttempting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/issue507_test.go",
+      "line": 321
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_RetentionExpires",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 86
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_RouterOnlyAtStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/issue507_test.go",
+      "line": 284
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_SessionEndsRetention",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 164
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_StaleOperationalAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 195
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestKickRestartsTheExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 376
+      "line": 379
     },
     {
       "package": "client/peer",
@@ -7499,7 +7576,7 @@
       "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 256
+      "line": 259
     },
     {
       "package": "client/peer",
@@ -7520,7 +7597,7 @@
       "identifier": "TestOperationalAddressStaysAsFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 173
+      "line": 176
     },
     {
       "package": "client/peer",
@@ -7541,21 +7618,21 @@
       "identifier": "TestParityErrorDelays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "client/peer",
       "identifier": "TestParityKnownPeerMerge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 157
+      "line": 158
     },
     {
       "package": "client/peer",
       "identifier": "TestParityProbeCooldownFibonacci",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/parity_matterjs_test.go",
-      "line": 134
+      "line": 135
     },
     {
       "package": "client/peer",
@@ -7625,28 +7702,28 @@
       "identifier": "TestPeerConnectionFallbackRetirementAfterStabilization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementKeepAlive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 125
+      "line": 127
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 167
+      "line": 169
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementSuperseded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 96
+      "line": 98
     },
     {
       "package": "client/peer",
@@ -7797,6 +7874,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestRetainedFallbackNotRetired",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 374
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestSemaphoreGrantedAndClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_test.go",
@@ -7856,14 +7940,14 @@
       "identifier": "TestTwoAddressesStaggered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 152
+      "line": 155
     },
     {
       "package": "client/peer",
       "identifier": "TestUnhandledErrorAndDisconnectedSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
-      "line": 309
+      "line": 312
     },
     {
       "package": "clock/clocktest",

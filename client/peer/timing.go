@@ -46,6 +46,16 @@ type Timing struct {
 	// AddressChangeProbeCooldown bounds the growing interval between
 	// address-change probes (:116-132).
 	AddressChangeProbeCooldown ProbeCooldown
+	// ProvenAddressRetention is how long a connection process goes on
+	// attempting an address discovery stopped advertising, from the
+	// moment it stopped: the last addresses of the peer's proven host
+	// (Descriptor.OperationalHost) or — no host learned — the stored
+	// operational address. They rank ahead of the other targets until then,
+	// unless the address, or the proven host with a fresh set, is
+	// advertised again first. A negative value retains nothing: matter.js's
+	// behaviour, which deletes such an address with discovery. This
+	// module's; matter.js has no such parameter (issue 507).
+	ProvenAddressRetention time.Duration
 }
 
 // KickRestartCooldown is the per-trigger restart cooldown of [Timing].
@@ -69,7 +79,8 @@ type ProbeCooldown struct {
 const maxInitialContactRetryInterval = 2 * time.Minute
 
 // DefaultTiming is matter.js PeerTimingParameters.defaults
-// (PeerTimingParameters.ts:184-209).
+// (PeerTimingParameters.ts:184-209), with this module's
+// ProvenAddressRetention of 10 minutes.
 func DefaultTiming() Timing {
 	return Timing{
 		DefaultConnectionTimeout:             90 * time.Second,
@@ -84,6 +95,7 @@ func DefaultTiming() Timing {
 		KickRestartCooldown:                  KickRestartCooldown{AddressChange: 30 * time.Minute, Connect: 10 * time.Minute},
 		AddressChangeStabilizationDelay:      10 * time.Second,
 		AddressChangeProbeCooldown:           ProbeCooldown{Min: 10 * time.Minute, Max: 24 * time.Hour},
+		ProvenAddressRetention:               10 * time.Minute,
 	}
 }
 
@@ -112,5 +124,6 @@ func Merge(base, over Timing) Timing {
 	set(&base.AddressChangeStabilizationDelay, over.AddressChangeStabilizationDelay)
 	set(&base.AddressChangeProbeCooldown.Min, over.AddressChangeProbeCooldown.Min)
 	set(&base.AddressChangeProbeCooldown.Max, over.AddressChangeProbeCooldown.Max)
+	set(&base.ProvenAddressRetention, over.ProvenAddressRetention)
 	return base
 }

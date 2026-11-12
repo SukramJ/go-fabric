@@ -181,6 +181,31 @@ type connection struct {
 	lastRestartAt  time.Time
 	lastKickAt     time.Time
 	kickHandlers   map[*attempt]func(kickOrigin)
+	// retained are the addresses discovery stopped advertising that the
+	// process goes on attempting for Timing.ProvenAddressRetention: the
+	// proven host's last addresses, or — no host learned — the stored
+	// operational address (retainLocked, issue 507).
+	retained map[netip.AddrPort]*retention
+	// spent are the operational addresses whose retention expired: not
+	// anchored again until discovery advertises them (anchorLocked).
+	spent map[netip.AddrPort]bool
+	// hosts are the SRV targets of the discovered addresses: a deletion
+	// the service reports carries none (discovery.AddressChanges).
+	hosts map[netip.AddrPort]string
+	// refall wakes retireStaleFallback when the fallback was marked or a
+	// retention ended — a change the service's own notification does not
+	// carry (rewakeLocked).
+	refall chan struct{}
+}
+
+// retention is one retained address: the address with the host discovery
+// named for it, since when it is no longer advertised, why it is kept and
+// the timer of its bound.
+type retention struct {
+	addr   discovery.Address
+	since  time.Time
+	reason string
+	timer  exchange.Timer
 }
 
 // initiateConnection starts the peer's connection process unless one
@@ -239,6 +264,10 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 		wake:         make(chan struct{}, 1),
 		attempts:     make(map[attemptKey]*attempt),
 		kickHandlers: make(map[*attempt]func(kickOrigin)),
+		retained:     make(map[netip.AddrPort]*retention),
+		spent:        make(map[netip.AddrPort]bool),
+		hosts:        make(map[netip.AddrPort]string),
+		refall:       make(chan struct{}, 1),
 	}
 	p.connecting = c
 	p.workers.Add(1)
@@ -427,8 +456,9 @@ func (c *connection) run() {
 		switch change.Kind {
 		case discovery.AddressAdded:
 			c.addAddressLocked(change.Address)
+			c.anchorLocked()
 		case discovery.AddressDeleted:
-			c.deleteAddressLocked(change.Address, "aborting attempt because address is expired", false)
+			c.withdrawnLocked(change.Address)
 			c.maybeAttemptFallbackLocked()
 		}
 		c.mu.Unlock()
@@ -436,6 +466,11 @@ func (c *connection) run() {
 
 	c.mu.Lock()
 	connected := c.session != nil
+	// A session, or the end of the process, ends every retention.
+	for ap, r := range c.retained {
+		r.timer.Stop()
+		delete(c.retained, ap)
+	}
 	c.mu.Unlock()
 	if connected {
 		p.status.SetReachable(true)
@@ -520,7 +555,8 @@ func (c *connection) scheduleAttempts() {
 // with the proven host's addresses ahead of every other (provenHost,
 // compareForHost) while discovered, the service's addresses, carries it,
 // and the fallback ahead of every other while it does not
-// (fallbackFirstLocked). The proven host is learned first (learnHost).
+// (fallbackFirstLocked), then the retained addresses ahead of the rest
+// (retainLocked). The proven host is learned first (learnHost).
 func (c *connection) shiftLocked(discovered []discovery.Address) target {
 	c.p.learnHost(discovered)
 	known := c.p.operationalHost()
@@ -534,6 +570,12 @@ func (c *connection) shiftLocked(discovered []discovery.Address) target {
 				}
 				return 1
 			}
+		}
+		if ar, br := c.retained[a.AddrPort()] != nil, c.retained[b.AddrPort()] != nil; ar != br {
+			if ar {
+				return -1
+			}
+			return 1
 		}
 		return compareForHost(host, a, b)
 	}
@@ -745,6 +787,14 @@ func (c *connection) pendingDeleteLocked(a discovery.Address) {
 // retireStaleFallback drops the speculative fallback once discovery
 // settled on addresses without it, so the discovered address starts
 // without the stagger (PeerConnection.ts:264-303).
+//
+// It looks again when the service changes and when the process marks the
+// fallback or ends a retention (refall): the process marks the fallback on
+// its own goroutine after the service's change, so a look at the change
+// alone could come before the mark and miss it — the retirement then
+// depended on which goroutine ran first (issue 507's reproduction). The
+// decision after the stabilization delay is taken under the process's lock
+// with the retirement.
 func (c *connection) retireStaleFallback() {
 	changes := c.p.service.Changes(c.ctx)
 	for c.ctx.Err() == nil {
@@ -754,6 +804,7 @@ func (c *connection) retireStaleFallback() {
 				if !ok {
 					return
 				}
+			case <-c.refall:
 			case <-c.ctx.Done():
 				return
 			}
@@ -762,11 +813,8 @@ func (c *connection) retireStaleFallback() {
 		if !c.sleep(c.ctx, c.timing.AddressChangeStabilizationDelay, nil) {
 			return
 		}
-		if !c.fallbackSuperseded() {
-			continue
-		}
 		c.mu.Lock()
-		if c.fallback != nil {
+		if c.fallbackSupersededLocked() {
 			stale := *c.fallback
 			c.fallback = nil
 			c.lastAttemptAt = time.Time{}
@@ -777,17 +825,38 @@ func (c *connection) retireStaleFallback() {
 	}
 }
 
-// fallbackSuperseded: a fallback is attempted, addresses are known and
-// none is the fallback (PeerConnection.ts:305-320). Ahead of matter.js, a
-// fallback queued because the proven host is absent from the discovered
-// addresses is not superseded by another target's
-// (BD-Matter-ProvenOperationalHost): it stays until a discovered address
-// carries the host.
+// rewakeLocked wakes retireStaleFallback to look again.
+func (c *connection) rewakeLocked() {
+	select {
+	case c.refall <- struct{}{}:
+	default:
+	}
+}
+
+// fallbackSuperseded is fallbackSupersededLocked under the process's lock.
 func (c *connection) fallbackSuperseded() bool {
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fallbackSupersededLocked()
+}
+
+// fallbackSupersededLocked: a fallback is attempted, addresses are known
+// and none is the fallback (PeerConnection.ts:305-320). Ahead of
+// matter.js, a fallback queued because the proven host is absent from the
+// discovered addresses is not superseded by another target's
+// (BD-Matter-ProvenOperationalHost): it stays until a discovered address
+// carries the host.
+//
+// Nor is a retained fallback (retainLocked) before its bound. matter.js
+// retires a superseded fallback after addressChangeStabilizationDelay
+// (PeerConnection.ts:277-322 at db021da0); this module keeps it: another
+// target's SRV answering for the node's instance is not evidence that the
+// node's address is stale (issue 507: a border router's SRV to its own
+// host), and the stagger still starts the discovered targets beside it,
+// so nothing is stranded.
+func (c *connection) fallbackSupersededLocked() bool {
 	fb := c.fallback
-	c.mu.Unlock()
-	if fb == nil {
+	if fb == nil || c.retained[fb.AddrPort()] != nil {
 		return false
 	}
 	addrs := c.p.service.Addresses()
@@ -805,7 +874,19 @@ func (c *connection) fallbackSuperseded() bool {
 // addAddressLocked queues a discovered address unless it is attempted; a
 // fallback that discovery now names is a real address and kicks the
 // process (PeerConnection.ts:338-358).
+//
+// The address advertised again ends its retention; an address of the
+// proven host ends the retention of the host's others too: its fresh set
+// replaces them, and a retained address it no longer carries is deleted as
+// discovery's deletion would have deleted it (provenHostReturnedLocked).
 func (c *connection) addAddressLocked(a discovery.Address) {
+	ap := a.AddrPort()
+	if a.Host != "" {
+		c.hosts[ap] = a.Host
+	}
+	delete(c.spent, ap)
+	c.unretainLocked(ap)
+	c.provenHostReturnedLocked(a)
 	for _, v := range c.expand(a) {
 		if _, ok := c.attempts[v.key()]; ok {
 			if c.fallback != nil && c.fallback.AddrPort() == a.AddrPort() {
@@ -832,8 +913,11 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 // responder's cache-flush SRV removes the node's own SRV from the cache
 // until the node answers again (RFC 6762 §10.2); the session, not the
 // momentary cache, says which target is the node (issue 488).
+//
+// Without a proven host the operational address is queued, too, while
+// discovery advertises other addresses and not it (anchorLocked).
 func (c *connection) maybeAttemptFallbackLocked() {
-	if len(c.attempts) > 0 || len(c.pending) > 0 {
+	if c.anchorLocked() || len(c.attempts) > 0 || len(c.pending) > 0 {
 		return
 	}
 	if discovered := c.p.service.Addresses(); len(discovered) > 0 && !provenHostAbsent(c.p.operationalHost(), discovered) {
@@ -846,9 +930,205 @@ func (c *connection) maybeAttemptFallbackLocked() {
 	}
 	a := addressOf(op)
 	c.fallback = &a
+	c.rewakeLocked()
 	for _, v := range c.expand(a) {
 		c.pendingAddLocked(v)
 	}
+}
+
+// retentionOn reports whether the process retains addresses
+// (Timing.ProvenAddressRetention positive).
+func (c *connection) retentionOn() bool { return c.timing.ProvenAddressRetention > 0 }
+
+// queuedLocked reports whether a variant of a is attempted or pending.
+func (c *connection) queuedLocked(a discovery.Address) bool {
+	ap := a.AddrPort()
+	for k := range c.attempts {
+		if k.ap == ap {
+			return true
+		}
+	}
+	for _, x := range c.pending {
+		if x.addr.AddrPort() == ap {
+			return true
+		}
+	}
+	return false
+}
+
+// withdrawnLocked handles discovery's deletion of a: the address is
+// retained when retainLocked keeps it — marked as fallback where
+// matter.js's deleteAddress would have kept it as one — and deleted
+// otherwise (PeerConnection.ts:412-440).
+func (c *connection) withdrawnLocked(a discovery.Address) {
+	ap := a.AddrPort()
+	a.Host = c.hosts[ap]
+	delete(c.hosts, ap)
+	if c.retainLocked(a, "no longer advertised") {
+		if c.keptAsFallbackLocked(a, false) {
+			c.fallback = &a
+			c.rewakeLocked()
+		}
+		return
+	}
+	c.deleteAddressLocked(a, "aborting attempt because address is expired", false)
+}
+
+// retainLocked keeps an address discovery stopped advertising as a
+// candidate for Timing.ProvenAddressRetention, measured on the set's
+// clock from now, and reports whether it does. It keeps an attempted or
+// pending address of the proven host (Descriptor.OperationalHost) while no
+// discovered address carries the host, and — no host learned — the stored
+// operational address while discovery does not carry it. A retained
+// address ranks ahead of the other targets (shiftLocked), its attempt in
+// flight goes on, and the fallback retirement passes it by
+// (fallbackSupersededLocked). Its retention ends when the address is
+// advertised again (addAddressLocked), when the proven host is advertised
+// again without it — it is then deleted (provenHostReturnedLocked) — when
+// the process ends (run), and at the bound, when it is deleted as
+// discovery's deletion would have deleted it (expireLocked).
+//
+// Ahead of matter.js, whose deleteAddress keeps the operational address
+// only while no other attempt remains (PeerConnection.ts:419-441 at
+// db021da0), and of BD-Matter-ProvenOperationalHost, which ranks the
+// proven host first only while discovery carries it: another responder's
+// cache-flush SRV for the node's instance removes the node's own records
+// for as long as it answers (issue 507: a border router answering a Thread
+// node's instance with its own host, the SRV set flipping thousands of
+// times a day), and with them the addresses the node answers at. The
+// node's last addresses — all of them: in issue 507's log the stored
+// address was stale and the node answered at another address of its host —
+// stay candidates until the bound.
+func (c *connection) retainLocked(a discovery.Address, reason string) bool {
+	if !c.retentionOn() || !c.queuedLocked(a) {
+		return false
+	}
+	ap := a.AddrPort()
+	if c.retained[ap] != nil {
+		return true
+	}
+	discovered := c.p.service.Addresses()
+	for _, d := range discovered {
+		if d.AddrPort() == ap {
+			return false // advertised again already: the next addition follows
+		}
+	}
+	switch host := c.p.operationalHost(); {
+	case host != "":
+		if a.Host != host || provenHost(host, discovered) != "" {
+			return false
+		}
+	case c.spent[ap]:
+		return false
+	default:
+		op := c.p.Descriptor().OperationalAddress
+		if op == nil || addressOf(op).AddrPort() != ap {
+			return false
+		}
+	}
+	r := &retention{addr: a, since: c.p.set.clock.Now(), reason: reason}
+	r.timer = c.p.set.clock.AfterFunc(c.timing.ProvenAddressRetention, func() { c.expire(ap, r) })
+	c.retained[ap] = r
+	c.p.log.Info("matter.controller.peer.address_retained", slog.String("address", a.String()), slog.String("host", a.Host), slog.String("reason", reason))
+	return true
+}
+
+// unretainLocked ends the retention of the address at ap, if any, without
+// deleting it.
+func (c *connection) unretainLocked(ap netip.AddrPort) {
+	r := c.retained[ap]
+	if r == nil {
+		return
+	}
+	r.timer.Stop()
+	delete(c.retained, ap)
+	c.rewakeLocked()
+}
+
+// provenHostReturnedLocked: the proven host is advertised again — a
+// carries it and discovery carries it now — so its fresh set replaces its
+// retained addresses: one the host still carries stays as it is, one it
+// no longer carries is deleted as discovery's deletion would have deleted
+// it.
+func (c *connection) provenHostReturnedLocked(a discovery.Address) {
+	host := c.p.operationalHost()
+	if host == "" || a.Host != host || len(c.retained) == 0 {
+		return
+	}
+	discovered := c.p.service.Addresses()
+	if provenHost(host, discovered) == "" {
+		return // gone again already: the next deletion follows
+	}
+	fresh := map[netip.AddrPort]bool{a.AddrPort(): true}
+	for _, d := range discovered {
+		if d.Host == host {
+			fresh[d.AddrPort()] = true
+		}
+	}
+	for ap, r := range c.retained {
+		if r.addr.Host != host || fresh[ap] {
+			continue
+		}
+		c.unretainLocked(ap)
+		c.deleteAddressLocked(r.addr, "aborting attempt because the proven host is advertised without its address", false)
+	}
+}
+
+// anchorLocked queues and retains the stored operational address of a peer
+// without a proven host while discovery advertises other addresses and not
+// it (retainLocked), and reports whether it did. With nothing discovered
+// the operational address is matter.js's fallback instead
+// (maybeAttemptFallbackLocked); once its retention expired it is not
+// anchored again until discovery advertises it (spent).
+func (c *connection) anchorLocked() bool {
+	if !c.retentionOn() || c.p.operationalHost() != "" {
+		return false
+	}
+	op := c.p.Descriptor().OperationalAddress
+	if op == nil {
+		return false
+	}
+	a := addressOf(op)
+	ap := a.AddrPort()
+	if c.spent[ap] {
+		return false
+	}
+	if c.retained[ap] != nil {
+		return true
+	}
+	discovered := c.p.service.Addresses()
+	if len(discovered) == 0 {
+		return false
+	}
+	for _, d := range discovered {
+		if d.AddrPort() == ap {
+			return false
+		}
+	}
+	if !c.queuedLocked(a) {
+		for _, v := range c.expand(a) {
+			c.pendingAddLocked(v)
+		}
+	}
+	return c.retainLocked(a, "operational address not advertised")
+}
+
+// expire ends the retention r of the address at ap at its bound: the
+// address is deleted as discovery's deletion would have deleted it
+// (deleteAddressLocked), and the fallback looked at again.
+func (c *connection) expire(ap netip.AddrPort, r *retention) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ctx.Err() != nil || c.retained[ap] != r {
+		return
+	}
+	c.unretainLocked(ap)
+	c.spent[ap] = true
+	c.p.log.Info("matter.controller.peer.address_retention_expired",
+		slog.String("address", r.addr.String()), slog.String("host", r.addr.Host),
+		slog.String("reason", r.reason), slog.Duration("after", c.p.set.clock.Now().Sub(r.since)))
+	c.deleteAddressLocked(r.addr, "aborting attempt because the retention of its address expired", false)
+	c.maybeAttemptFallbackLocked()
 }
 
 // addressOf is an operational address as a discovered one.
@@ -873,7 +1153,11 @@ func (c *connection) initiateAttemptLocked(t target) {
 	c.addrsAttempted++
 	att := &attempt{addr: t.addr, tcp: t.tcp, addrNo: c.addrsAttempted, ctx: ctx, cancel: cancel}
 	if c.fallback != nil && c.fallback.AddrPort() != key.ap {
-		c.deleteAddressLocked(*c.fallback, "aborting attempt to last known address because device reports address change", false)
+		// A retained fallback is not deleted: its attempt goes on beside
+		// this one (retainLocked).
+		if c.retained[c.fallback.AddrPort()] == nil {
+			c.deleteAddressLocked(*c.fallback, "aborting attempt to last known address because device reports address change", false)
+		}
 		c.fallback = nil
 	}
 	c.attempts[key] = att
@@ -894,18 +1178,12 @@ func (c *connection) initiateAttemptLocked(t target) {
 // the deletion is not forced (PeerConnection.ts:412-440).
 func (c *connection) deleteAddressLocked(a discovery.Address, why string, force bool) {
 	ap := a.AddrPort()
-	op := c.p.Descriptor().OperationalAddress
-	isOperational := op != nil && addressOf(op).AddrPort() == ap
-	remaining := 0
-	for k := range c.attempts {
-		if k.ap != ap {
-			remaining++
-		}
-	}
-	if !force && isOperational && remaining == 0 {
+	if c.keptAsFallbackLocked(a, force) {
 		c.fallback = &a
+		c.rewakeLocked()
 		return
 	}
+	c.unretainLocked(ap)
 	for k, att := range c.attempts {
 		if k.ap != ap {
 			continue
@@ -915,6 +1193,23 @@ func (c *connection) deleteAddressLocked(a discovery.Address, why string, force 
 		delete(c.attempts, k)
 	}
 	c.pendingDeleteLocked(a)
+}
+
+// keptAsFallbackLocked is the keep-alive guard of deleteAddressLocked: an
+// unforced deletion of the operational address while no attempt at another
+// address remains keeps it as fallback (PeerConnection.ts:419-441).
+func (c *connection) keptAsFallbackLocked(a discovery.Address, force bool) bool {
+	ap := a.AddrPort()
+	op := c.p.Descriptor().OperationalAddress
+	if force || op == nil || addressOf(op).AddrPort() != ap {
+		return false
+	}
+	for k := range c.attempts {
+		if k.ap != ap {
+			return false
+		}
+	}
+	return true
 }
 
 // kick emits a kick through the throttle (Peer.ts:641-648: at most one
@@ -984,8 +1279,12 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 	if !ok {
 		return fmt.Errorf("%w with index %d", ErrNoFabric, p.address.FabricIndex)
 	}
+	if !c.waitOutBusy(att) {
+		return nil
+	}
 	c.mu.Lock()
 	markedFallback := c.fallback != nil && c.fallback.AddrPort() == att.addr.AddrPort()
+	retained := c.retained[att.addr.AddrPort()] != nil
 	c.mu.Unlock()
 
 	a, err := schedule.begin(c.isDelayedFallback(att))
@@ -1026,7 +1325,7 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 	}
 	logConnecting("matter.controller.peer.connecting",
 		slog.String("address", att.addr.String()), slog.Int("address_index", att.addrNo), slog.Int("attempt", attemptNo),
-		slog.Bool("fallback", markedFallback))
+		slog.Bool("fallback", markedFallback), slog.Bool("retained", retained))
 	params := p.SessionParameters()
 	opts := handshake.CASEOptions{
 		PeerParameters:                 &params,
@@ -1068,6 +1367,23 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 		return nil
 	}
 	return c.afterFailure(att, a, err)
+}
+
+// waitOutBusy holds the attempt's next Sigma1 until the peer's Busy
+// deadline passed (Peer.busyRemaining); false when the attempt ended
+// first. The deadline may move while it waits — another address of the
+// peer answered Busy again — so it looks again after each wait.
+func (c *connection) waitOutBusy(att *attempt) bool {
+	for {
+		d := c.p.busyRemaining()
+		if d <= 0 {
+			return true
+		}
+		c.p.log.Debug("matter.controller.peer.busy_wait", slog.String("address", att.addr.String()), slog.Duration("delay", d))
+		if !c.sleep(att.ctx, d, nil) {
+			return false
+		}
+	}
 }
 
 // adopt takes the session the attempt established and ends the process.
@@ -1185,7 +1501,8 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
 // it (PeerConnection.ts:653-752): a Busy status
-// waits the peer's delay plus up to DelayAfterNetworkError of jitter; a
+// waits the peer's delay plus up to DelayAfterNetworkError of jitter — and
+// holds every attempt of the peer for as long (Peer.holdBusy); a
 // NoSharedTrustRoots status whose resumption record could be deleted
 // retries at once; any other status waits DelayAfterPeerError; a transient
 // error DelayAfterNetworkError; anything else DelayAfterUnhandledError. A
@@ -1209,6 +1526,9 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		return
 	}
 	delay, hasDelay, category := classifyError(err, c.timing, p.set.rand, c.deleteResumptionRecord)
+	if category == "busy" {
+		p.holdBusy(delay)
+	}
 	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}

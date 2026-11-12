@@ -60,6 +60,43 @@ type Peer struct {
 	// preferTCP is the TCP transport preference (SetTransportPreference),
 	// guarded by mu.
 	preferTCP bool
+	// busyUntil is the deadline the peer's last Busy answer set
+	// (holdBusy), guarded by mu; zero when none holds.
+	busyUntil time.Time
+}
+
+// holdBusy holds every Sigma1 to the peer for d from now: the peer
+// answered an attempt with Busy, d the delay classifyError computed for
+// it. A later deadline replaces an earlier one, never the other way
+// round; a session clears it (addSession).
+//
+// Ahead of matter.js, which waits the Busy delay inside the attempt that
+// received it (PeerConnection.ts:700-701 at db021da0): an abort of that
+// attempt ends the wait with it, and an attempt at another address — or
+// the same address again, once discovery advertised it anew — sends a
+// fresh Sigma1 inside the window the node asked for (issue 507: a border
+// router's SRV flipping a Thread node's addresses in and out of discovery
+// while the node answered Busy). The node's Busy is the node's, not the
+// address's.
+func (p *Peer) holdBusy(d time.Duration) {
+	until := p.set.clock.Now().Add(d)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if until.After(p.busyUntil) {
+		p.busyUntil = until
+	}
+}
+
+// busyRemaining is how long the peer's Busy deadline still holds, zero or
+// negative when none does.
+func (p *Peer) busyRemaining() time.Duration {
+	p.mu.Lock()
+	until := p.busyUntil
+	p.mu.Unlock()
+	if until.IsZero() {
+		return 0
+	}
+	return until.Sub(p.set.clock.Now())
 }
 
 // SetMedium sets the report of the peer's network medium, the physical
@@ -344,6 +381,7 @@ func (p *Peer) addSession(s *exchange.Session) {
 		return
 	}
 	p.sessions = append(p.sessions, s)
+	p.busyUntil = time.Time{}
 	p.followAddressLocked(s)
 	// A later move of the session — a migration, or a new exchange the
 	// node opened from another address — carries the operational address

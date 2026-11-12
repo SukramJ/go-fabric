@@ -58,11 +58,15 @@ type rig507 struct {
 
 // newRig507 is a harness with the default network profiles: a peer
 // without a medium is "unknown", the conservative profile with its 1.5 s
-// MRP margin — the profile a Thread peer gets as well.
-func newRig507(t *testing.T) *rig507 {
+// MRP margin — the profile a Thread peer gets as well. edits change the
+// set's context after that.
+func newRig507(t *testing.T, edits ...func(*Context)) *rig507 {
 	t.Helper()
 	h := newHarness(t, func(c *Context) {
 		c.Networks = NewNetworkProfiles(c.Clock, nil, slog.New(slog.DiscardHandler))
+		for _, e := range edits {
+			e(c)
+		}
 	})
 	return &rig507{harness: h, t: t, start: h.clock.Now(), seen: map[uint32]bool{}, nodeIPs: []string{"fd00::1"}}
 }
@@ -282,9 +286,6 @@ func TestIssue507_RouterOnlyAtStart(t *testing.T) {
 	for _, c := range []struct{ name, host string }{{"proven host", i507Host}, {"host never learned", ""}} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			if c.host == "" {
-				t.Skip("issue 507: without a proven host the ULA is never attempted while the router's link-local attempt runs (maybeAttemptFallbackLocked returns at its discovered-address gate)")
-			}
 			synctest.Test(t, func(t *testing.T) {
 				r := newRig507(t)
 				p := r.peer(c.host)
@@ -347,7 +348,6 @@ func TestIssue507_ProvenHostWithdrawnWhileAttempting(t *testing.T) {
 	for _, v := range variants {
 		t.Run(v.name, func(t *testing.T) {
 			t.Parallel()
-			t.Skip("issue 507: the flip aborts the ULA's attempt and nothing attempts it again until the node's host is advertised (deleteAddressLocked keeps it only as the last attempt; maybeAttemptFallbackLocked returns while another address is pending or attempted)")
 			synctest.Test(t, func(t *testing.T) {
 				r := newRig507(t)
 				if v.second {
@@ -372,13 +372,14 @@ func TestIssue507_ProvenHostWithdrawnWhileAttempting(t *testing.T) {
 // target before DelayBeforeNextAddress passed: it is kept as fallback and
 // goes on (fallbackSuperseded is false while the proven host is absent);
 // the router's link-local address starts beside it when the stagger has
-// passed. Without a proven host the same fallback is superseded by the
-// router's address, and whether retireStaleFallback aborts it depends on
-// the order its goroutine and the process's loop see the change in — no
-// case pins that.
+// passed. Without a proven host the operational address is retained the
+// same way (retainLocked), so the fallback retirement passes it by. Before
+// the fix whether retireStaleFallback aborted it there depended on the
+// order its goroutine and the process's loop saw the change in;
+// TestIssue507_FallbackRetiredWithoutRetention pins matter.js's retirement.
 func TestIssue507_OnlyAttemptSurvivesTheFlip(t *testing.T) {
 	t.Parallel()
-	for _, c := range []struct{ name, host string }{{"proven host", i507Host}} {
+	for _, c := range []struct{ name, host string }{{"proven host", i507Host}, {"host never learned", ""}} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			synctest.Test(t, func(t *testing.T) {
@@ -421,7 +422,6 @@ func TestIssue507_OnlyAttemptSurvivesTheFlip(t *testing.T) {
 // asks for: no fresh Sigma1 to the node before its Busy delay passed.
 func TestIssue507_BusyNodeAcrossFlips(t *testing.T) {
 	t.Parallel()
-	t.Skip("issue 507: the flip aborts the attempt waiting out Busy, and the node's return starts a fresh Sigma1 inside the 73.035 s wait")
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig507(t)
 		r.respond = func(u unsecured, to string) {
@@ -452,7 +452,10 @@ func TestIssue507_BusyNodeAcrossFlips(t *testing.T) {
 // fresh one only after the budget of the identical phase, at least
 // MaxDelayBetweenInitialContactRetries (2 min) after the first, plus the
 // final wait: 151.5 s. Then the attempt goes on at the same address — it
-// never ends by itself, so its end never queues the fallback.
+// never ends by itself, so its end never queues the fallback. Without a
+// proven host the operational address is anchored (anchorLocked): the ULA
+// is attempted first, the link-local address DelayBeforeNextAddress later,
+// and both stay in flight.
 func TestIssue507_LinkLocalAttemptOutlivesTwoMinutes(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -461,25 +464,32 @@ func TestIssue507_LinkLocalAttemptOutlivesTwoMinutes(t *testing.T) {
 		r.routerOnly()
 		r.connect(p)
 		r.advance(4 * time.Minute)
-		if len(r.sent) == 0 {
-			t.Fatal("no Sigma1")
+		fresh := r.fresh(routerLL, 0, time.Hour)
+		if len(fresh) == 0 || fresh[0] != 45*time.Second {
+			t.Fatalf("the router's first Sigma1 at %v, want 45s; order: %s", fresh, r.order())
+		}
+		if got := r.fresh(addr1, 0, time.Hour); len(got) == 0 || got[0] != 0 {
+			t.Fatalf("the ULA's first Sigma1 at %v, want 0s; order: %s", got, r.order())
 		}
 		var all []time.Duration
+		var first uint32
 		for _, s := range r.sent {
-			if s.to == routerLL && s.counter == r.sent[0].counter {
-				all = append(all, s.at)
+			if s.to == routerLL && s.first && first == 0 {
+				first = s.counter
+			}
+			if s.to == routerLL && s.counter == first {
+				all = append(all, s.at-fresh[0])
 			}
 		}
 		want := []time.Duration{0, 13750 * time.Millisecond, 27250 * time.Millisecond, 49250 * time.Millisecond, 84 * time.Second}
 		if fmt.Sprint(all) != fmt.Sprint(want) {
-			t.Fatalf("the first Sigma1's transmissions at %v, want %v (rounded up to %v)", all, want, i507Step)
+			t.Fatalf("the first Sigma1's transmissions at %v after its start, want %v (rounded up to %v)", all, want, i507Step)
 		}
-		fresh := r.fresh(routerLL, 0, time.Hour)
-		if len(fresh) < 2 || fresh[1] != 151750*time.Millisecond {
-			t.Fatalf("fresh Sigma1 at %v, want the second at 151.75s", fresh)
+		if len(fresh) < 2 || fresh[1]-fresh[0] != 151750*time.Millisecond {
+			t.Fatalf("fresh Sigma1 at %v, want the second 151.75s after the first", fresh)
 		}
-		if !r.attempting(p, routerLL) || len(r.fresh(addr1, 0, time.Hour)) != 0 {
-			t.Fatalf("want the link-local attempt alone in flight; %s; order: %s", r.state(p), r.order())
+		if !r.attempting(p, routerLL) || !r.attempting(p, addr1) {
+			t.Fatalf("want the link-local and the ULA's attempts in flight; %s; order: %s", r.state(p), r.order())
 		}
 	})
 }

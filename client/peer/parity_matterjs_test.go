@@ -80,6 +80,7 @@ func TestParityTimingMerge(t *testing.T) {
 		DelayAfterNetworkError: 4, DelayAfterPeerError: 5, DelayAfterUnhandledError: 6, KickThrottleInterval: 7,
 		KickMinRetransmissions: 8, KickMinRestartSaving: 9, KickRestartCooldown: KickRestartCooldown{10, 11},
 		AddressChangeStabilizationDelay: 12, AddressChangeProbeCooldown: ProbeCooldown{13, 14},
+		ProvenAddressRetention: 15,
 	}
 	if Merge(base, all) != all {
 		t.Fatal("a full override did not replace every field")
