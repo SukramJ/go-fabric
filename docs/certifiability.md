@@ -21,6 +21,15 @@ make chiptool-families                                  # every family, hours
 GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
 ```
 
+In CI (`.github/workflows/chiptool.yml`) the nightly run covers every family.
+A release pull request (head branch `release/*`) runs that same full set —
+every family group, the chip-tool suite, the control leg and the BLE-Wi-Fi
+leg — and its required check `chip certification cases against the
+reference daemon` stays red until all of them have passed, so no release is
+tagged over a family only the nightly run would have shown; the virtual
+Bluetooth and OTBR legs (`ble-virtual.yml`, `otbr-virtual.yml`) need runner
+kernel modules and stay weekly, outside that gate.
+
 - **The device under test** is the reference daemon in
   `examples/reference-bridge`: a root node, an aggregator and one bridged
   endpoint per device surface the module serves (lights, sensors, closures,

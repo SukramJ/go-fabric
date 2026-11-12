@@ -34,7 +34,8 @@
 #     request runs the core groups (core-su, core-idm, core-ace, core-rest)
 #     and the commissioning group, in parallel; the `needs-chiptool` label
 #     adds the application groups;
-#     the nightly run and a manual dispatch run all of them, including
+#     the nightly run, a manual dispatch and a release pull request run all
+#     of them, including
 #     `long`, the families whose one case waits for hours by design
 #     (TC-DGGEN-2.1 sits through 3 h 10 min of literal waits for
 #     TotalOperationalHours). The split keeps every job under the runner
@@ -43,6 +44,21 @@
 # Not a blanket per-PR gate — the runs are slow and the image is large. It
 # runs nightly, on manual dispatch, on the `needs-chiptool` label, and
 # automatically whenever a pull request touches Go code.
+#
+# A RELEASE PULL REQUEST (head branch `release/*`, issue 495) runs the full
+# set: every job above, and every family group the nightly run covers,
+# `long` included — the full run is the gate of a release, not of every
+# pull request (owner, 2026-11-10; v0.20.0 was tagged with an app-energy
+# failure only the nightly run showed). The `changes` job computes it once:
+# `full` (a labelled or release pull request) replaces the label test at
+# every condition, `release` widens the family selection to `long`. The
+# required check `chip certification cases against the reference daemon`
+# (chip-families-gate) is the gate: on a release pull request it is red
+# unless the suite, the control leg, the BLE-Wi-Fi leg and every family
+# group ran and passed; on any other event it judges the families alone,
+# as before. No new check name. ble-virtual.yml and otbr-virtual.yml stay
+# outside the gate: they need kernel modules a hosted runner may lack and
+# run weekly.
 #
 # That last trigger is wider here than in a consuming daemon, and deliberately
 # so: this module IS the Matter stack, so almost any change to it can move
@@ -100,10 +116,33 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       families: ${{ steps.groups.outputs.matrix }}
+      full: ${{ steps.scope.outputs.full }}
+      release: ${{ steps.scope.outputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Whether this pull request runs the full set (issue 495). `release`: a
+      # release pull request, head branch `release/*`. `full`: labelled
+      # `needs-chiptool` or a release pull request — the one value every
+      # job condition below reads in place of the label test. Both false on
+      # every other event, whose own condition already runs everything.
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'needs-chiptool') }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          release=false
+          full=false
+          if [ "$EVENT" = "pull_request" ]; then
+            if [[ "$HEAD_REF" == release/* ]]; then release=true; fi
+            if [ "$LABELLED" = "true" ] || [ "$release" = "true" ]; then full=true; fi
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "head branch: ${HEAD_REF:-<none>}; release pull request: $release; full set: $full"
       - id: filter
         env:
           EVENT: ${{ github.event_name }}
@@ -139,8 +178,8 @@ jobs:
       # the core-* groups and `commissioning` (TC-SC, TC-DA, TC-CADMIN and the
       # rest: a change under secure/, commissioning/, bridge/ or transport/
       # must not merge before they ran, W6-test-04); the `needs-chiptool`
-      # label adds every group but `long`; the nightly run and a manual
-      # dispatch run every group.
+      # label adds every group but `long`; the nightly run, a manual
+      # dispatch and a release pull request (issue 495) run every group.
       # `long` holds the families whose case budget is hours (the family
       # table's timeout: TC-DGGEN-2.1 waits 3 h 10 min by design,
       # connectedhomeip#29580), so a pull request's chip run ends in under
@@ -150,7 +189,8 @@ jobs:
       - id: groups
         env:
           EVENT: ${{ github.event_name }}
-          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'needs-chiptool') }}
+          FULL: ${{ steps.scope.outputs.full }}
+          RELEASE: ${{ steps.scope.outputs.release }}
           FAMILIES_INPUT: ${{ github.event.inputs.families }}
         run: |
           set -euo pipefail
@@ -178,10 +218,10 @@ jobs:
             "thread=TBRM,DGTHREAD,THNETDIR"
           )
           # core-* and commissioning: every event. long: never a pull
-          # request. thread: never here — it needs the virtual OTBR agent
-          # and runs in otbr-virtual.yml (dispatch and weekly), after the
-          # agent's own live test. The rest: every event but an unlabelled
-          # pull request.
+          # request but a release one. thread: never here — it needs the
+          # virtual OTBR agent and runs in otbr-virtual.yml (dispatch and
+          # weekly), after the agent's own live test. The rest: every event
+          # but a pull request that is neither labelled nor a release one.
           include="[]"
           for entry in "${groups[@]}"; do
             group="${entry%%=*}"; families="${entry#*=}"
@@ -191,8 +231,8 @@ jobs:
             elif [[ "$group" == core-* ]] || [ "$group" = commissioning ]; then
               runs=true
             elif [ "$group" = long ]; then
-              if [ "$EVENT" != "pull_request" ]; then runs=true; fi
-            elif [ "$EVENT" != "pull_request" ] || [ "$LABELLED" = "true" ]; then
+              if [ "$EVENT" != "pull_request" ] || [ "$RELEASE" = "true" ]; then runs=true; fi
+            elif [ "$EVENT" != "pull_request" ] || [ "$FULL" = "true" ]; then
               runs=true
             fi
             if [ "$runs" = true ]; then
@@ -208,7 +248,7 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 55
@@ -312,7 +352,7 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -379,7 +419,7 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -403,7 +443,7 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 350
@@ -472,9 +512,16 @@ jobs:
   # reports under its unexpanded name. This job always reports, under one
   # fixed name: green when every family group that ran passed (or the suite
   # was not due at all), red when one failed or was cancelled.
+  #
+  # On a release pull request (issue 495) it is the release gate and fails
+  # closed: every job of the full run — the suite, the control leg, the
+  # BLE-Wi-Fi leg and the family groups — must have run and passed; a
+  # skipped, failed or cancelled one is red. That is why it needs the three
+  # legs too; on every other event their results are not read, and the
+  # verdict is the families' alone, as before.
   chip-families-gate:
     name: chip certification cases against the reference daemon
-    needs: [changes, chip-families]
+    needs: [changes, chiptool, chiptool-control, chiptool-ble-wifi, chip-families]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -482,8 +529,23 @@ jobs:
       - env:
           FAMILIES: ${{ needs.chip-families.result }}
           CHANGES: ${{ needs.changes.result }}
+          RELEASE: ${{ needs.changes.outputs.release }}
+          SUITE: ${{ needs.chiptool.result }}
+          CONTROL: ${{ needs.chiptool-control.result }}
+          BLE_WIFI: ${{ needs.chiptool-ble-wifi.result }}
         run: |
           echo "code touched: $CHANGES; certification families: $FAMILIES"
+          if [ "$RELEASE" = "true" ]; then
+            echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI"
+            failed=0
+            for leg in "chip-tool suite=$SUITE" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "certification families=$FAMILIES"; do
+              if [ "${leg#*=}" != "success" ]; then
+                echo "::error::release gate: the ${leg%%=*} did not pass (${leg#*=})"
+                failed=1
+              fi
+            done
+            if [ "$failed" -ne 0 ]; then exit 1; fi
+          fi
           case "$CHANGES/$FAMILIES" in
             success/success|success/skipped) exit 0 ;;
             *) echo "::error::a certification family group did not pass ($FAMILIES)"; exit 1 ;;
