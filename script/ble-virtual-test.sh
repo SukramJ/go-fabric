@@ -343,8 +343,10 @@ setup_hwsim() {
 	sudo hostapd "$LOG_DIR/hostapd-wpa2.conf" "$LOG_DIR/hostapd-open.conf" >"$LOG_DIR/hostapd.log" 2>&1 &
 	hostapd_pid=$!
 	# -u: the D-Bus interface the driver speaks; no interface named, the
-	# driver creates it (CreateInterface).
-	sudo wpa_supplicant -u -s -O /run/wpa_supplicant >"$LOG_DIR/wpa_supplicant.log" 2>&1 &
+	# driver creates it (CreateInterface). -d -t -f: a timestamped debug
+	# log in the artifact (a scan's channels and its end; keys stay out of
+	# it without -K, wpa_supplicant/config.c dumps them at MSGDUMP).
+	sudo wpa_supplicant -u -d -t -f "$LOG_DIR/wpa_supplicant.log" -O /run/wpa_supplicant >"$LOG_DIR/wpa_supplicant.out" 2>&1 &
 	wpa_pid=$!
 	for _ in $(seq 1 50); do
 		grep -q AP-ENABLED "$LOG_DIR/hostapd.log" 2>/dev/null &&
@@ -484,11 +486,19 @@ fi
 
 # --- the verdict -------------------------------------------------------------
 
+# Every leg ran whatever an earlier one did; each result is printed before
+# the verdict, so one run reports all of them (the summary lists them too).
+for n in "${notes[@]}"; do echo "ble-virtual: $n"; done
+
 # The second direction's verdict comes first: a failure of the example
 # under both controllers, while matter.js <-> matter.js passed over the
 # same virtual stack, is ours; with that control failing too it is the
-# stack's.
-second="${example_ours:+pair --ble -> example: $example_ours; }${example_control:+matter.js -> example: $example_control; }${wifi_live:+wpa_supplicant: $wifi_live}"
+# stack's. The Wi-Fi driver's live test is a verdict of its own: its
+# failure says nothing about BLE.
+second="${example_ours:+pair --ble -> example: $example_ours; }${example_control:+matter.js -> example: $example_control}"
+if [ -z "$second" ] && [ -n "$wifi_live" ]; then
+	verdict defect "every BLE leg passed; the Wi-Fi driver's live test failed against the real wpa_supplicant: $wifi_live"
+fi
 if [ -n "$second" ]; then
 	if [ -z "$control" ]; then
 		verdict defect "the second direction failed — $second — while matter.js's controller commissioned matter.js's peripheral over the same virtual stack"

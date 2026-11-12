@@ -36,6 +36,9 @@ const (
 	envLiveSSID       = "GOFABRIC_WPA_LIVE_SSID"
 	envLivePassphrase = "GOFABRIC_WPA_LIVE_PASSPHRASE" //nolint:gosec // G101: the variable's name, not a credential
 	envLiveOpenSSID   = "GOFABRIC_WPA_LIVE_OPEN_SSID"
+
+	// liveScanTimeout bounds the live test's scan (see New below).
+	liveScanTimeout = 45 * time.Second
 )
 
 // TestLiveWPASupplicant: a scan finds the WPA2 network; a WPA2 passphrase
@@ -51,7 +54,16 @@ func TestLiveWPASupplicant(t *testing.T) {
 	var logs bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	d, err := New(ctx, Options{Interface: iface, Logger: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))})
+	// A full scan of the job's mac80211_hwsim station ran past the 10 s
+	// default (ble-virtual run 43135990719: "the scan did not end in
+	// time" after 10.01 s, while every join passed). The radio offers
+	// every channel of its bands, so the scan's length is the radio's,
+	// not the driver's; the live test allows liveScanTimeout and logs
+	// how long the scan took.
+	d, err := New(ctx, Options{
+		Interface: iface, ScanTimeout: liveScanTimeout,
+		Logger: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	})
 	if err != nil {
 		t.Fatalf("New(%s): %v", iface, err)
 	}
@@ -63,15 +75,24 @@ func TestLiveWPASupplicant(t *testing.T) {
 	}
 	rawPSK := hex.EncodeToString(psk)
 	defer func() {
+		leaked := false
 		for _, secret := range []string{pass, rawPSK} {
 			if strings.Contains(logs.String(), secret) {
+				leaked = true
 				t.Error("a credential reached the driver's log")
 			}
+		}
+		// The driver's log explains a failure; it is shown only when it
+		// holds no credential.
+		if t.Failed() && !leaked {
+			t.Logf("the driver's log:\n%s", logs.String())
 		}
 	}()
 
 	t.Run("scan", func(t *testing.T) {
+		start := time.Now()
 		status, debug, results := d.ScanNetworks(ctx, nil)
+		t.Logf("ScanNetworks: status %d after %v, %d results", status, time.Since(start).Round(time.Millisecond), len(results))
 		if status != statusSuccess {
 			t.Fatalf("ScanNetworks: status %d (%s)", status, debug)
 		}
