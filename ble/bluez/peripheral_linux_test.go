@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -557,5 +558,104 @@ func TestPeripheralRefusesCentralWhileDropping(t *testing.T) {
 	a.mu.Unlock()
 	if n != 1 {
 		t.Fatalf("%d connections accepted, want 1", n)
+	}
+}
+
+// acquiredFlag reads C1's WriteAcquired or C2's NotifyAcquired as BlueZ
+// reads it, through the characteristic's Properties.Get.
+func acquiredFlag(t *testing.T, b *fakeBus, p *peripheral, n int, name string) bool {
+	t.Helper()
+	get, ok := b.method(p.charPath(n), methodProps, "Get").(func(string, string) (dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("Properties.Get not exported")
+	}
+	v, derr := get(ifaceGattChar, name)
+	if derr != nil {
+		t.Fatalf("%s: %v", name, derr)
+	}
+	on, _ := v.Value().(bool)
+	return on
+}
+
+// acquiredSignals are the PropertiesChanged signals of the
+// characteristics' acquired flags, as "<prop>=<value>" in order.
+func acquiredSignals(b *fakeBus) []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []string
+	for _, s := range b.emitted {
+		if s.Name != sigPropsChanged || len(s.Body) < 2 || s.Body[0] != ifaceGattChar {
+			continue
+		}
+		changed, _ := s.Body[1].(map[string]dbus.Variant)
+		for _, k := range []string{"WriteAcquired", "NotifyAcquired"} {
+			if v, ok := changed[k]; ok {
+				out = append(out, fmt.Sprintf("%s=%v", k, v.Value()))
+			}
+		}
+	}
+	return out
+}
+
+// TestPeripheralAcquiredFlags: a granted AcquireWrite and AcquireNotify
+// set WriteAcquired and NotifyAcquired true, announced as
+// PropertiesChanged, as connectedhomeip's peripheral sets them
+// (BluezEndpoint.cpp:129, :186 at 6170af84); the end of a socket sets its
+// flag back, so the next central acquires its own; a second AcquireWrite
+// that replaces the socket keeps C1 acquired.
+func TestPeripheralAcquiredFlags(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	if acquiredFlag(t, b, p, 1, "WriteAcquired") || acquiredFlag(t, b, p, 2, "NotifyAcquired") {
+		t.Fatal("a characteristic is acquired before any central")
+	}
+
+	fc := b.connectCentral("AA:BB:CC:DD:EE:07")
+	if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := fc.acquireNotify(p.charPath(2), 100); err != nil {
+		t.Fatal(err)
+	}
+	if !acquiredFlag(t, b, p, 1, "WriteAcquired") || !acquiredFlag(t, b, p, 2, "NotifyAcquired") {
+		t.Fatal("the flags are not set after the acquires")
+	}
+	// A second AcquireWrite replaces the socket; C1 stays acquired.
+	first := fc.write
+	if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close()
+	if err := fc.writeC1([]byte("hs")); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the write", func() bool { return slices.Contains(a.seen(), "write hs") })
+	if !acquiredFlag(t, b, p, 1, "WriteAcquired") {
+		t.Fatal("a replaced C1 socket cleared WriteAcquired")
+	}
+
+	// The link goes: both sockets end, both flags return to false.
+	fc.disconnect()
+	// The flag is set before its PropertiesChanged goes out: wait for
+	// both signals, then read the flags.
+	waitUntil(t, "the flags cleared", func() bool { return len(acquiredSignals(b)) == 4 })
+	if acquiredFlag(t, b, p, 1, "WriteAcquired") || acquiredFlag(t, b, p, 2, "NotifyAcquired") {
+		t.Fatal("a flag is still set after the link went")
+	}
+	got := acquiredSignals(b)
+	want := []string{"WriteAcquired=true", "NotifyAcquired=true"}
+	if len(got) != 4 || !slices.Equal(got[:2], want) || !slices.Contains(got[2:], "WriteAcquired=false") || !slices.Contains(got[2:], "NotifyAcquired=false") {
+		t.Fatalf("PropertiesChanged of the flags: %q", got)
+	}
+
+	// The next central acquires afresh.
+	fc2 := b.connectCentral("AA:BB:CC:DD:EE:08")
+	if err := fc2.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	if !acquiredFlag(t, b, p, 1, "WriteAcquired") {
+		t.Fatal("the next central's AcquireWrite did not set WriteAcquired")
 	}
 }

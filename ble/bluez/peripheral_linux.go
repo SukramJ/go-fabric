@@ -107,6 +107,10 @@ type peripheral struct {
 	// conns are the centrals that use the Matter service, by device
 	// path.
 	conns map[dbus.ObjectPath]*pconn
+	// writeAcquired and notifyAcquired are C1's WriteAcquired and C2's
+	// NotifyAcquired: true while a socket of the characteristic is held
+	// (setAcquired).
+	writeAcquired, notifyAcquired bool
 }
 
 var _ contract.BLEPeripheral = (*peripheral)(nil)
@@ -384,6 +388,7 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 		return ErrServing
 	}
 	p.serving, p.accept, p.c3 = true, accept, bytes.Clone(c3)
+	p.writeAcquired, p.notifyAcquired = false, false
 	p.mu.Unlock()
 	defer func() {
 		p.mu.Lock()
@@ -435,6 +440,7 @@ func (p *peripheral) objects() map[dbus.ObjectPath]map[string]map[string]dbus.Va
 	c3 := bytes.Clone(p.c3)
 	adv := p.adv
 	registered := p.registered
+	writeAcquired, notifyAcquired := p.writeAcquired, p.notifyAcquired
 	p.mu.Unlock()
 	svc := p.servicePath()
 	objs := map[dbus.ObjectPath]map[string]map[string]dbus.Variant{
@@ -446,13 +452,13 @@ func (p *peripheral) objects() map[dbus.ObjectPath]map[string]map[string]dbus.Va
 			"UUID":          dbus.MakeVariant(strings.ToLower(btp.C1CharacteristicUUID)),
 			"Service":       dbus.MakeVariant(svc),
 			"Flags":         dbus.MakeVariant([]string{"write"}),
-			"WriteAcquired": dbus.MakeVariant(false),
+			"WriteAcquired": dbus.MakeVariant(writeAcquired),
 		}},
 		p.charPath(2): {ifaceGattChar: {
 			"UUID":           dbus.MakeVariant(strings.ToLower(btp.C2CharacteristicUUID)),
 			"Service":        dbus.MakeVariant(svc),
 			"Flags":          dbus.MakeVariant([]string{"indicate"}),
-			"NotifyAcquired": dbus.MakeVariant(false),
+			"NotifyAcquired": dbus.MakeVariant(notifyAcquired),
 		}},
 		p.charPath(3): {ifaceGattChar: {
 			"UUID":    dbus.MakeVariant(strings.ToLower(btp.C3CharacteristicUUID)),
@@ -593,6 +599,32 @@ func socketPair() (*os.File, int, error) {
 	return os.NewFile(uintptr(fds[0]), "btp"), fds[1], nil
 }
 
+// setAcquired sets C1's WriteAcquired (n 1) or C2's NotifyAcquired (n 2)
+// and announces a change as PropertiesChanged on the characteristic.
+// connectedhomeip sets the property true once it handed out the socket
+// (bluez_gatt_characteristic1_set_write_acquired, BluezEndpoint.cpp:129;
+// set_notify_acquired, :186 at 6170af84), before it completes the call; a
+// GATT server that decides by the property (bluezoo's
+// GattCharacteristicClientLink.WriteValue) then writes into the socket it
+// holds instead of acquiring a new one for each write. connectedhomeip
+// never sets it back; here it returns to false when the characteristic's
+// socket ends, so the next central acquires its own.
+func (p *peripheral) setAcquired(n int, on bool) {
+	name := "WriteAcquired"
+	p.mu.Lock()
+	field := &p.writeAcquired
+	if n == 2 {
+		name, field = "NotifyAcquired", &p.notifyAcquired
+	}
+	if *field == on {
+		p.mu.Unlock()
+		return
+	}
+	*field = on
+	p.mu.Unlock()
+	_ = p.bus.Emit(p.charPath(n), sigPropsChanged, ifaceGattChar, map[string]dbus.Variant{name: dbus.MakeVariant(on)}, []string{})
+}
+
 // acquireWrite is C1's AcquireWrite: a socket pair whose writes are C1's
 // (chip BluezCharacteristicAcquireWrite, BluezEndpoint.cpp:97-136).
 func (p *peripheral) acquireWrite(options map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error) {
@@ -614,6 +646,7 @@ func (p *peripheral) acquireWrite(options map[string]dbus.Variant) (dbus.UnixFD,
 		_ = syscall.Close(remote)
 		return 0, 0, dbus.NewError(errFailed, []any{"the connection is gone"})
 	}
+	p.setAcquired(1, true)
 	return dbus.UnixFD(remote), mtu, nil //nolint:gosec // a file descriptor, small and non-negative
 }
 
@@ -643,6 +676,7 @@ func (p *peripheral) acquireNotify(options map[string]dbus.Variant) (dbus.UnixFD
 		_ = syscall.Close(remote)
 		return 0, 0, dbus.NewError(errFailed, []any{"the connection is gone"})
 	}
+	p.setAcquired(2, true)
 	return dbus.UnixFD(remote), mtu, nil //nolint:gosec // a file descriptor, small and non-negative
 }
 
@@ -781,6 +815,20 @@ func (c *pconn) setWrite(f *os.File) bool {
 	}
 	go func() {
 		buf := make([]byte, 512) // the characteristic's maximum size (:179)
+		defer func() {
+			// The socket ended — the central closed it, the link went, or
+			// the connection was dropped — unless a newer AcquireWrite
+			// replaced it: C1 is no longer acquired.
+			c.mu.Lock()
+			current := c.write == f || c.write == nil
+			if c.write == f {
+				c.write = nil
+			}
+			c.mu.Unlock()
+			if current {
+				c.p.setAcquired(1, false)
+			}
+		}()
 		for {
 			n, err := f.Read(buf)
 			if err != nil || n <= 0 {
@@ -844,12 +892,16 @@ func (c *pconn) setNotify(f *os.File, mtu uint16) bool {
 			}
 		}
 		c.mu.Lock()
+		current := c.notify == f || c.notify == nil
 		if c.notify == f {
 			c.notify = nil
 			c.heldSub = false
 		}
 		c.mu.Unlock()
 		_ = f.Close()
+		if current {
+			c.p.setAcquired(2, false)
+		}
 		c.confirmed() // an indication waiting on the closed socket
 		if !c.isGone() {
 			c.post(c.deliverUnsubscribe)
