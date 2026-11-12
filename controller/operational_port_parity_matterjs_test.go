@@ -4,13 +4,33 @@
 package controller
 
 import (
+	"log/slog"
 	"net"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/mdns"
 )
+
+// offlineConn is a DNS-SD connection that sends nowhere and hears
+// nothing: the port cases need no discovery, and the default opener
+// (discovery.Open) would join the host's multicast group, where a Thread
+// border router announcing itself on the LAN reaches the controller's
+// border-router registry — a local run then covers the diagnostics
+// watch's border-router arm (diagnostics.go watchDiscovery) and CI never
+// does, which moved the package's coverage by half a point.
+type offlineConn struct{ out chan mdns.QueryResponse }
+
+func (c offlineConn) Send([]byte) error                    { return nil }
+func (c offlineConn) Responses() <-chan mdns.QueryResponse { return c.out }
+func (c offlineConn) Close() error                         { return nil }
+
+func offlineNames(log *slog.Logger) (*discovery.Names, error) {
+	return discovery.NewNames(offlineConn{out: make(chan mdns.QueryResponse)}, log), nil
+}
 
 // TestOperationalPortParityMatterJS ports the controller-node cases of
 // matter.js packages/node/test/node/ServerNodeTest.ts:339-376 at 862ad75f:
@@ -26,7 +46,7 @@ func TestOperationalPortParityMatterJS(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = db.Close() })
-		c, err := New(t.Context(), Config{DB: db, Attestation: attestation.TestStore(), Listen: listen, ManualStart: true})
+		c, err := New(t.Context(), Config{DB: db, Attestation: attestation.TestStore(), Listen: listen, ManualStart: true, Names: offlineNames})
 		if err != nil {
 			t.Fatal(err)
 		}
