@@ -78,8 +78,14 @@ var (
 // 0xFFF1, one of the test vendor IDs (0xFFF1–0xFFF4).
 const DefaultVendorID uint16 = 0xFFF1
 
-// DefaultPairTimeout bounds [Controller.Pair] when its context has no
-// deadline.
+// DefaultPairTimeout bounds the search of [Controller.Pair] for the
+// device when its context has no deadline: a code no device answers
+// within it is [ErrNoDevice]. It does not bound the commissioning of a
+// device that was found — that has the commissioner's own budgets
+// (commissioner.DefaultPASETimeout, commissioner.DefaultCASEConnectionTimeout
+// and the fail-safe), as matter.js's has: its commissionNode sets no
+// overall deadline (CommissioningController.ts:462-500 at 862ad75f), only
+// the discovery's timeout (CommissioningDiscovery.ts:40-45).
 const DefaultPairTimeout = time.Minute
 
 // Config configures a [Controller].
@@ -750,9 +756,11 @@ const (
 // it into our fabric with the code's passcode: PASE, attestation against
 // [Config].Attestation, the operational certificate,
 // CommissioningComplete. A code [ParsePairingCode] refuses is
-// [ErrPairingCode]; a ctx without a deadline is bounded by
-// [DefaultPairTimeout]; a code no device answers before it is
-// [ErrNoDevice]. With [PairOptions].BLE the device is found over BLE and
+// [ErrPairingCode]; with a ctx without a deadline the search for the
+// device ends after [DefaultPairTimeout], and a code no device answers
+// before it is [ErrNoDevice]; the commissioning of a found device is
+// bounded by ctx and the commissioner's own budgets, not by that
+// timeout. With [PairOptions].BLE the device is found over BLE and
 // commissioned over BTP; with [PairOptions].Address it is dialled at that
 // address without discovery. Mirrors CommissioningController.commissionNode
 // (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
@@ -801,13 +809,16 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 	}
 	passcode := pc.Passcode
 	identity := discovery.Identity{VendorID: pc.VendorID, ProductID: pc.ProductID}
-	if _, ok := ctx.Deadline(); !ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
-		defer cancel()
-	}
 	if known == nil {
-		return c.pairDiscovered(ctx, pc, identity, opts)
+		// Without a deadline of the caller's the search alone is bounded:
+		// a deadline around the whole pairing would cut the commissioning
+		// of a device that was found — over BLE onto Thread the step-18
+		// reconnect alone may take minutes.
+		var searchTimeout time.Duration
+		if _, ok := ctx.Deadline(); !ok {
+			searchTimeout = DefaultPairTimeout
+		}
+		return c.pairDiscovered(ctx, pc, identity, opts, searchTimeout)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
 	n, err := c.reg.ForDevice(ctx, *known, "")

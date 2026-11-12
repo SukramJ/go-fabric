@@ -255,6 +255,31 @@ func TestFlowErrorClasses(t *testing.T) {
 	}
 }
 
+// TestFlowResetsFailsafeAfterContextEnded: a step that fails because the
+// caller's context ended still expires the fail-safe on the device —
+// matter.js's #resetFailsafeTimer carries no abort signal
+// (ControllerCommissioningFlow.ts:1092-1108 at db021da0, called at :457).
+// Found on a BLE-to-Thread pairing whose deadline passed in step 18: the
+// reset failed with "context canceled" and the device kept its fail-safe.
+func TestFlowResetsFailsafeAfterContextEnded(t *testing.T) {
+	t.Parallel()
+	dev := &failsafeDevice{info: gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}}
+	f, _ := newTestFlow(t, dev.handle)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.steps = []step{
+		{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }},
+		{18, 1, "reconnect", func(ctx context.Context) (stepResult, error) {
+			cancel()
+			return 0, newError(ErrOperativeConnectionFailed, "Operative reconnection with device failed", ctx.Err())
+		}},
+	}
+	err := f.execute(ctx)
+	if !errors.Is(err, ErrOperativeConnectionFailed) || !slices.Equal(dev.armed(), []uint16{60, 0}) {
+		t.Fatalf("error %v, arms %v, want the reset (0) after the ended context", err, dev.armed())
+	}
+}
+
 // TestEnsureFailsafeTimerFor: the failsafe must outlive the response wait
 // plus the margin; with less left it re-arms for at least the default
 // (:895-951).
