@@ -66,9 +66,11 @@ type Peer struct {
 }
 
 // holdBusy holds every Sigma1 to the peer for d from now: the peer
-// answered an attempt with Busy, d the delay classifyError computed for
-// it. A later deadline replaces an earlier one, never the other way
-// round; a session clears it (addSession).
+// answered an attempt with Busy, d the attempt's final delay — the one
+// classifyError computed, or the error handler's replacement. A later
+// deadline replaces an earlier one, never the other way round; a session
+// clears it (addSession), and a Busy handled while the peer has a session
+// holds nothing. It does not depend on Timing.ProvenAddressRetention.
 //
 // Ahead of matter.js, which waits the Busy delay inside the attempt that
 // received it (PeerConnection.ts:700-701 at db021da0): an abort of that
@@ -79,9 +81,16 @@ type Peer struct {
 // while the node answered Busy). The node's Busy is the node's, not the
 // address's.
 func (p *Peer) holdBusy(d time.Duration) {
+	if d <= 0 {
+		return
+	}
 	until := p.set.clock.Now().Add(d)
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// A Busy a parallel attempt handled after a session came up is stale.
+	if len(p.sessions) > 0 {
+		return
+	}
 	if until.After(p.busyUntil) {
 		p.busyUntil = until
 	}

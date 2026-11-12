@@ -47,14 +47,22 @@ type Timing struct {
 	// address-change probes (:116-132).
 	AddressChangeProbeCooldown ProbeCooldown
 	// ProvenAddressRetention is how long a connection process goes on
-	// attempting an address discovery stopped advertising, from the
-	// moment it stopped: the last addresses of the peer's proven host
-	// (Descriptor.OperationalHost) or — no host learned — the stored
-	// operational address. They rank ahead of the other targets until then,
-	// unless the address, or the proven host with a fresh set, is
-	// advertised again first. A negative value retains nothing: matter.js's
-	// behaviour, which deletes such an address with discovery. This
-	// module's; matter.js has no such parameter (issue 507).
+	// attempting an address discovery stopped advertising: the last
+	// addresses of the peer's proven host (Descriptor.OperationalHost) or
+	// — no host learned — the stored operational address, which is
+	// anchored while discovery advertises other addresses and not it. The
+	// bound runs from the moment the address stopped being advertised —
+	// for an anchored address, from when it was anchored. Until then the
+	// retained addresses rank ahead of the other targets and their
+	// attempts in flight go on. Each return ends the retention — the
+	// address advertised again, or the proven host advertised with a fresh
+	// set, which deletes a retained address it no longer carries — and a
+	// later withdrawal starts a new one. At the bound the address is
+	// handled as a deletion by discovery, which still keeps the operational
+	// address as fallback while it is the only attempt. A negative value
+	// retains nothing; the per-peer Busy hold and the fallback
+	// retirement's ordering fix do not depend on it. This module's;
+	// matter.js has no such parameter (issue 507).
 	ProvenAddressRetention time.Duration
 }
 

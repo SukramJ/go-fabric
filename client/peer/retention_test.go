@@ -6,11 +6,18 @@ package peer
 import (
 	"context"
 	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/miekg/dns"
+
+	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // withoutRetention is the harness edit for matter.js's behaviour: no
@@ -367,8 +374,8 @@ func TestIssue507_FallbackRetiredWithoutRetention(t *testing.T) {
 // TestRetainedFallbackNotRetired: without a proven host, the operational
 // address — attempted as matter.js's fallback while nothing was
 // discovered — is retained once discovery names another address: the
-// retirement passes it by, the discovered address starts beside it when
-// the stagger passed, and at the bound it is deleted, its attempt aborted
+// retirement passes it by, the discovered address starts beside it at
+// once (anchorBesideLocked), and at the bound it is deleted, its attempt aborted
 // while the other goes on (TestFallbackRetiredAfterStabilization is
 // matter.js's behaviour).
 func TestRetainedFallbackNotRetired(t *testing.T) {
@@ -383,14 +390,12 @@ func TestRetainedFallbackNotRetired(t *testing.T) {
 		fb := attemptAt(c, addr9)
 		h.announceAddrs(t, "fd00::1")
 		eventually(t, "the retention", func() bool { return len(retainedOf(c)) == 1 })
-		h.clock.waitTimer(t, 45*time.Second)
-		h.clock.Advance(45*time.Second - time.Millisecond)
-		h.noSigma1(t, addr1)
+		h.sigma1(t, addr1)
+		h.clock.Advance(45 * time.Second)
+		h.clock.Yield()
 		if attemptAt(c, addr9) != fb || fb.ctx.Err() != nil {
 			t.Fatal("the retained fallback was retired")
 		}
-		h.clock.Advance(time.Millisecond)
-		h.sigma1(t, addr1)
 		h.clock.Advance(bound - 45*time.Second - time.Millisecond)
 		h.clock.Yield()
 		if fb.ctx.Err() != nil {
@@ -401,5 +406,205 @@ func TestRetainedFallbackNotRetired(t *testing.T) {
 		if attemptAt(c, addr1) == nil {
 			t.Fatal("the discovered address's attempt ended with the retention")
 		}
+	})
+}
+
+// TestIssue507_SessionEndsAnchor: without a proven host the anchored
+// operational address is retained while the router's target is the only
+// one; a session from it, or the process stopped, ends the process and no
+// retention is created afterwards — not even when the attempts' goroutines
+// look at the fallback once more on their way out.
+func TestIssue507_SessionEndsAnchor(t *testing.T) {
+	t.Parallel()
+	const bound = 7 * time.Minute
+	for _, end := range []struct {
+		name string
+		do   func(r *rig507, p *Peer)
+	}{
+		{"session", func(r *rig507, p *Peer) { r.set.Adopt(r.secureSession(r.t, 0x54, udpAddr(addr1))) }},
+		{"stopConnecting", func(_ *rig507, p *Peer) { p.stopConnecting(context.Background()) }},
+	} {
+		t.Run(end.name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				r := newRig507(t, retainFor(bound))
+				p := r.peer("")
+				r.routerOnly()
+				r.connect(p)
+				r.advance(50 * time.Second)
+				c := process(p)
+				if got := retainedOf(c); len(got) != 1 {
+					t.Fatalf("retained %v, want the anchor", got)
+				}
+				end.do(r, p)
+				<-c.done
+				synctest.Wait()
+				// After stopConnecting the waiting Connect starts a new
+				// process, whose own anchor is due in the full bound.
+				fresh := process(p) == nil && r.clock.hasTimer(bound)
+				if got := retainedOf(c); len(got) != 0 || fresh || r.clock.hasTimer(bound-50*time.Second) {
+					t.Fatalf("after the end: retained %v, timers %v", got, r.clock.pending())
+				}
+			})
+		})
+	}
+}
+
+// TestIssue507_BusyHoldsTheHandlersDelay: the error handler's replacement
+// of the Busy delay is the delay the peer's deadline holds.
+func TestIssue507_BusyHoldsTheHandlersDelay(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig507(t, func(c *Context) {
+			c.HandleError = func(error) (time.Duration, bool, error) { return 2 * time.Second, true, nil }
+		})
+		r.respond = func(u unsecured, to string) {
+			r.status(u, to, generalStatusBusy, secureChannelStatusBusy, busyData(65535))
+		}
+		p := r.peer(i507Host)
+		r.nodeOnly()
+		r.connect(p)
+		if d := p.busyRemaining(); d != 2*time.Second {
+			t.Fatalf("the Busy deadline in %v, want the handler's 2s", d)
+		}
+	})
+}
+
+// TestIssue507_BusyAfterSessionHoldsNothing: a Busy handled while the peer
+// has a session — a parallel attempt's, after another established the
+// session — sets no deadline.
+func TestIssue507_BusyAfterSessionHoldsNothing(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.For(testAddr)
+		h.set.Adopt(h.secureSession(t, 0x55, udpAddr(addr1)))
+		eventually(t, "the session", p.HasSession)
+		p.holdBusy(time.Minute)
+		if d := p.busyRemaining(); d > 0 {
+			t.Fatalf("the Busy deadline holds %v with a session", d)
+		}
+	})
+}
+
+// TestIssue507_DeletionAfterTheFlipBack: discovery's deletion of the
+// node's address is handled after the address was advertised again (the
+// stream runs behind the cache): the attempt in flight goes on — the
+// addition follows and finds it running.
+func TestIssue507_DeletionAfterTheFlipBack(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig507(t)
+		p := r.peer(i507Host)
+		r.nodeOnly()
+		r.connect(p)
+		first := attemptOf(p, addr1)
+		c := process(p)
+		c.mu.Lock()
+		c.withdrawnLocked(addressOf(udpAddr(addr1)))
+		c.mu.Unlock()
+		if first == nil || first.ctx.Err() != nil || attemptOf(p, addr1) != first || len(retainedOf(c)) != 0 {
+			t.Fatalf("the attempt at the advertised address was aborted or retained; %s", r.state(p))
+		}
+	})
+}
+
+// announceOn injects one response received on the interface ifIndex.
+func (f *fakeMDNS) announceOn(t *testing.T, ifIndex int, rrs ...dns.RR) {
+	t.Helper()
+	m := new(dns.Msg)
+	m.Response = true
+	m.Answer = rrs
+	b, err := m.Pack()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.out <- mdns.QueryResponse{Msg: b, IfIndex: ifIndex}
+}
+
+// TestIssue507_ZoneSpelledTwoWays: the stored operational address carries
+// its zone as the interface index (the session's spelling), discovery
+// spells it with the interface's name. The anchor treats them as one
+// address: it is not anchored beside its own discovered spelling, and its
+// retention ends when the other spelling is advertised.
+func TestIssue507_ZoneSpelledTwoWays(t *testing.T) {
+	t.Parallel()
+	ifi, err := net.InterfaceByIndex(1)
+	if err != nil {
+		t.Skip("no interface with index 1")
+	}
+	op := "[fe80::1%" + strconv.Itoa(ifi.Index) + "]:5540"
+	t.Run("not anchored beside its discovered spelling", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			h := newHarness(t, nil)
+			p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(op)})
+			h.mdns.announceOn(t, ifi.Index, srvRR(h.qname, h.hostQ, 5540, 120), aaaaRR(h.hostQ, "fe80::1", 120))
+			eventually(t, "the discovered address", func() bool {
+				as := p.Service().Addresses()
+				return len(as) == 1 && as[0].IP.Zone() == ifi.Name
+			})
+			connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+			eventually(t, "the process", func() bool { return process(p) != nil })
+			synctest.Wait()
+			c := process(p)
+			if got := retainedOf(c); len(got) != 0 {
+				t.Fatalf("anchored beside its discovered spelling: %v", got)
+			}
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if n := len(c.attempts) + len(c.pending); n != 1 {
+				t.Fatalf("%d attempts and pending addresses, want the discovered one alone", n)
+			}
+		})
+	})
+	t.Run("the other spelling ends the retention", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			h := newHarness(t, nil)
+			p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(op)})
+			h.announceAddrs(t, "fd00::5")
+			eventually(t, "the other address", func() bool { return len(p.Service().Addresses()) == 1 })
+			connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+			eventually(t, "the process", func() bool { return process(p) != nil })
+			c := process(p)
+			eventually(t, "the anchor", func() bool { return len(retainedOf(c)) == 1 })
+			h.mdns.announceOn(t, ifi.Index, aaaaRR(h.hostQ, "fe80::1", 120))
+			eventually(t, "the retention to end", func() bool { return len(retainedOf(c)) == 0 })
+		})
+	})
+}
+
+// TestIssue507_NewAddressBesideTheAnchor: no proven host, the stored
+// address is stale and discovery offers a new one: the anchor's Sigma1
+// and the new address's go out at once; a second discovered address
+// follows the stagger.
+func TestIssue507_NewAddressBesideTheAnchor(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
+		h.announceAddrs(t, "fd00::1")
+		eventually(t, "the new address", func() bool { return len(p.Service().Addresses()) == 1 })
+		began := h.clock.Now()
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		seen := map[string]bool{}
+		for !seen[addr9] || !seen[addr1] {
+			d := h.udp.next(t)
+			if decodeUnsecured(t, d.bytes).proto.Opcode == mrp.SCOpcodeSigma1 {
+				seen[d.to.String()] = true
+			}
+		}
+		if d := h.clock.Now().Sub(began); d != 0 {
+			t.Fatalf("the new address began after %v", d)
+		}
+		h.clock.Advance(time.Second)
+		h.announceAddrs(t, "fd00::1", "fd00::2")
+		eventually(t, "the second address", func() bool { return len(p.Service().Addresses()) == 2 })
+		h.clock.waitTimer(t, 44*time.Second)
+		h.clock.Advance(44*time.Second - time.Millisecond)
+		h.noSigma1(t, addr2)
+		h.clock.Advance(time.Millisecond)
+		h.sigma1(t, addr2)
 	})
 }

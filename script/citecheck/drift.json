@@ -1424,7 +1424,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1642,
+    "line": 1714,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",

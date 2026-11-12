@@ -196,6 +196,9 @@ type connection struct {
 	// retention ended — a change the service's own notification does not
 	// carry (rewakeLocked).
 	refall chan struct{}
+	// besideUsed records that the one discovered address the anchor lets
+	// start beside it without the stagger has started (anchorBesideLocked).
+	besideUsed bool
 }
 
 // retention is one retained address: the address with the host discovery
@@ -518,7 +521,8 @@ func (c *connection) sleep(ctx context.Context, d time.Duration, wake <-chan str
 // The proven host's address may be queued after an attempt at another
 // target has started — the service delivers its addresses one at a time
 // in the desirability order; preemptForProvenLocked then starts it at
-// once, outside the stagger.
+// once, outside the stagger. So does the first discovered address beside
+// an anchored operational address in flight (anchorBesideLocked).
 func (c *connection) scheduleAttempts() {
 	for {
 		c.mu.Lock()
@@ -535,7 +539,9 @@ func (c *connection) scheduleAttempts() {
 			}
 			continue
 		}
-		if !c.lastAttemptAt.IsZero() {
+		if !c.lastAttemptAt.IsZero() && c.anchorBesideLocked() {
+			c.besideUsed = true
+		} else if !c.lastAttemptAt.IsZero() {
 			if delay := c.timing.DelayBeforeNextAddress - c.p.set.clock.Now().Sub(c.lastAttemptAt); delay > 0 {
 				c.mu.Unlock()
 				if !c.sleep(c.ctx, delay, c.wake) {
@@ -884,8 +890,16 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 	if a.Host != "" {
 		c.hosts[ap] = a.Host
 	}
-	delete(c.spent, ap)
-	c.unretainLocked(ap)
+	for k := range c.spent {
+		if sameEndpoint(k, ap) {
+			delete(c.spent, k)
+		}
+	}
+	for k := range c.retained {
+		if sameEndpoint(k, ap) {
+			c.unretainLocked(k)
+		}
+	}
 	c.provenHostReturnedLocked(a)
 	for _, v := range c.expand(a) {
 		if _, ok := c.attempts[v.key()]; ok {
@@ -964,6 +978,11 @@ func (c *connection) withdrawnLocked(a discovery.Address) {
 	ap := a.AddrPort()
 	a.Host = c.hosts[ap]
 	delete(c.hosts, ap)
+	if c.retentionOn() && advertised(c.p.service.Addresses(), ap) {
+		// Advertised again before this deletion was handled: the addition
+		// follows, and finds the attempt running (addAddressLocked).
+		return
+	}
 	if c.retainLocked(a, "no longer advertised") {
 		if c.keptAsFallbackLocked(a, false) {
 			c.fallback = &a
@@ -1000,7 +1019,9 @@ func (c *connection) withdrawnLocked(a discovery.Address) {
 // address was stale and the node answered at another address of its host —
 // stay candidates until the bound.
 func (c *connection) retainLocked(a discovery.Address, reason string) bool {
-	if !c.retentionOn() || !c.queuedLocked(a) {
+	// The process ended: nothing is retained for it any more (run's
+	// cleanup ran, or runs, before the attempts' goroutines return).
+	if c.ctx.Err() != nil || !c.retentionOn() || !c.queuedLocked(a) {
 		return false
 	}
 	ap := a.AddrPort()
@@ -1008,10 +1029,8 @@ func (c *connection) retainLocked(a discovery.Address, reason string) bool {
 		return true
 	}
 	discovered := c.p.service.Addresses()
-	for _, d := range discovered {
-		if d.AddrPort() == ap {
-			return false // advertised again already: the next addition follows
-		}
+	if advertised(discovered, ap) {
+		return false // advertised again already: the next addition follows
 	}
 	switch host := c.p.operationalHost(); {
 	case host != "":
@@ -1022,13 +1041,14 @@ func (c *connection) retainLocked(a discovery.Address, reason string) bool {
 		return false
 	default:
 		op := c.p.Descriptor().OperationalAddress
-		if op == nil || addressOf(op).AddrPort() != ap {
+		if op == nil || !sameEndpoint(addressOf(op).AddrPort(), ap) {
 			return false
 		}
 	}
 	r := &retention{addr: a, since: c.p.set.clock.Now(), reason: reason}
 	r.timer = c.p.set.clock.AfterFunc(c.timing.ProvenAddressRetention, func() { c.expire(ap, r) })
 	c.retained[ap] = r
+	c.signal() // the order, and the anchor's start beside it, may change
 	c.p.log.Info("matter.controller.peer.address_retained", slog.String("address", a.String()), slog.String("host", a.Host), slog.String("reason", reason))
 	return true
 }
@@ -1081,7 +1101,7 @@ func (c *connection) provenHostReturnedLocked(a discovery.Address) {
 // (maybeAttemptFallbackLocked); once its retention expired it is not
 // anchored again until discovery advertises it (spent).
 func (c *connection) anchorLocked() bool {
-	if !c.retentionOn() || c.p.operationalHost() != "" {
+	if c.ctx.Err() != nil || !c.retentionOn() || c.p.operationalHost() != "" {
 		return false
 	}
 	op := c.p.Descriptor().OperationalAddress
@@ -1097,13 +1117,8 @@ func (c *connection) anchorLocked() bool {
 		return true
 	}
 	discovered := c.p.service.Addresses()
-	if len(discovered) == 0 {
+	if len(discovered) == 0 || advertised(discovered, ap) {
 		return false
-	}
-	for _, d := range discovered {
-		if d.AddrPort() == ap {
-			return false
-		}
 	}
 	if !c.queuedLocked(a) {
 		for _, v := range c.expand(a) {
@@ -1111,6 +1126,62 @@ func (c *connection) anchorLocked() bool {
 		}
 	}
 	return c.retainLocked(a, "operational address not advertised")
+}
+
+// anchorBesideLocked reports whether the next pending address starts
+// without the stagger: no proven host, the anchored operational address
+// is in flight, another address is pending, and no address has started
+// beside the anchor this way yet. The anchor is a guess from the last
+// session, as matter.js treats its fallback — it resets the stagger when
+// it retires the fallback (lastAttemptAt = undefined,
+// PeerConnection.ts:300-303 at db021da0) — so a genuinely new address the
+// discovery offers does not wait DelayBeforeNextAddress behind it; the
+// addresses after it do. With a proven host the stagger stays: the other
+// targets are foreign ones.
+func (c *connection) anchorBesideLocked() bool {
+	if c.besideUsed || len(c.retained) == 0 || c.p.operationalHost() != "" {
+		return false
+	}
+	op := c.p.Descriptor().OperationalAddress
+	if op == nil {
+		return false
+	}
+	ap := addressOf(op).AddrPort()
+	if c.retained[ap] == nil {
+		return false
+	}
+	inFlight := false
+	for k := range c.attempts {
+		if sameEndpoint(k.ap, ap) {
+			inFlight = true
+		}
+	}
+	if !inFlight {
+		return false
+	}
+	for _, x := range c.pending {
+		if !sameEndpoint(x.addr.AddrPort(), ap) {
+			return true
+		}
+	}
+	return false
+}
+
+// sameEndpoint compares two addresses without their zones, which the
+// session and discovery may spell differently (fe80::x%2 against
+// fe80::x%eth0), as hostOwning does.
+func sameEndpoint(a, b netip.AddrPort) bool {
+	return a.Port() == b.Port() && a.Addr().WithZone("") == b.Addr().WithZone("")
+}
+
+// advertised reports whether discovered carries ap, without the zone.
+func advertised(discovered []discovery.Address, ap netip.AddrPort) bool {
+	for _, d := range discovered {
+		if sameEndpoint(d.AddrPort(), ap) {
+			return true
+		}
+	}
+	return false
 }
 
 // expire ends the retention r of the address at ap at its bound: the
@@ -1201,7 +1272,7 @@ func (c *connection) deleteAddressLocked(a discovery.Address, why string, force 
 func (c *connection) keptAsFallbackLocked(a discovery.Address, force bool) bool {
 	ap := a.AddrPort()
 	op := c.p.Descriptor().OperationalAddress
-	if force || op == nil || addressOf(op).AddrPort() != ap {
+	if force || op == nil || !sameEndpoint(addressOf(op).AddrPort(), ap) {
 		return false
 	}
 	for k := range c.attempts {
@@ -1526,9 +1597,6 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		return
 	}
 	delay, hasDelay, category := classifyError(err, c.timing, p.set.rand, c.deleteResumptionRecord)
-	if category == "busy" {
-		p.holdBusy(delay)
-	}
 	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}
@@ -1549,6 +1617,10 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		if replace {
 			delay = d
 		}
+	}
+	if category == "busy" {
+		// The final delay, the error handler's replacement included.
+		p.holdBusy(delay)
 	}
 	switch category {
 	case "busy":

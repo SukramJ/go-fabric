@@ -373,7 +373,9 @@ func TestIssue507_ProvenHostWithdrawnWhileAttempting(t *testing.T) {
 // goes on (fallbackSuperseded is false while the proven host is absent);
 // the router's link-local address starts beside it when the stagger has
 // passed. Without a proven host the operational address is retained the
-// same way (retainLocked), so the fallback retirement passes it by. Before
+// same way (retainLocked), so the fallback retirement passes it by, and the
+// router's address — the first discovered beside the anchor — starts at
+// the flip, without the stagger (anchorBesideLocked). Before
 // the fix whether retireStaleFallback aborted it there depended on the
 // order its goroutine and the process's loop saw the change in;
 // TestIssue507_FallbackRetiredWithoutRetention pins matter.js's retirement.
@@ -397,6 +399,7 @@ func TestIssue507_OnlyAttemptSurvivesTheFlip(t *testing.T) {
 				}
 				r.advance(20 * time.Second)
 				r.routerOnly()
+				flip := r.now()
 				r.advance(30 * time.Second)
 				pc.mu.Lock()
 				same := pc.attempts[key] == first
@@ -404,8 +407,12 @@ func TestIssue507_OnlyAttemptSurvivesTheFlip(t *testing.T) {
 				if !same {
 					t.Fatalf("the ULA's attempt did not go on; %s", r.state(p))
 				}
-				if got := r.fresh(routerLL, 0, time.Hour); len(got) != 1 || got[0] != 45*time.Second {
-					t.Fatalf("the router's Sigma1 at %v, want 45s; order: %s", got, r.order())
+				want := 45 * time.Second
+				if c.host == "" {
+					want = flip
+				}
+				if got := r.fresh(routerLL, 0, time.Hour); len(got) != 1 || got[0] != want {
+					t.Fatalf("the router's Sigma1 at %v, want %v; order: %s", got, want, r.order())
 				}
 			})
 		})
@@ -454,8 +461,9 @@ func TestIssue507_BusyNodeAcrossFlips(t *testing.T) {
 // final wait: 151.5 s. Then the attempt goes on at the same address — it
 // never ends by itself, so its end never queues the fallback. Without a
 // proven host the operational address is anchored (anchorLocked): the ULA
-// is attempted first, the link-local address DelayBeforeNextAddress later,
-// and both stay in flight.
+// is attempted at once, the link-local address — the first discovered
+// beside the anchor — at once too (anchorBesideLocked), and both stay in
+// flight.
 func TestIssue507_LinkLocalAttemptOutlivesTwoMinutes(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -465,8 +473,8 @@ func TestIssue507_LinkLocalAttemptOutlivesTwoMinutes(t *testing.T) {
 		r.connect(p)
 		r.advance(4 * time.Minute)
 		fresh := r.fresh(routerLL, 0, time.Hour)
-		if len(fresh) == 0 || fresh[0] != 45*time.Second {
-			t.Fatalf("the router's first Sigma1 at %v, want 45s; order: %s", fresh, r.order())
+		if len(fresh) == 0 || fresh[0] != 0 {
+			t.Fatalf("the router's first Sigma1 at %v, want 0s; order: %s", fresh, r.order())
 		}
 		if got := r.fresh(addr1, 0, time.Hour); len(got) == 0 || got[0] != 0 {
 			t.Fatalf("the ULA's first Sigma1 at %v, want 0s; order: %s", got, r.order())

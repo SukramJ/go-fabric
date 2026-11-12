@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7939,
+  "entry_points": 7945,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17941,
+    "total_exported": 17947,
     "reachable": 12417,
-    "whitelisted": 5524,
+    "whitelisted": 5530,
     "unreachable": 0
   },
   "by_package": [],
@@ -7398,45 +7398,73 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestIssue507_BusyAfterSessionHoldsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 476
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestIssue507_BusyDeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 244
+      "line": 251
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_BusyHoldsTheHandlersDelay",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 455
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_BusyNodeAcrossFlips",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/issue507_test.go",
-      "line": 423
+      "line": 430
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_DeletionAfterTheFlipBack",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 494
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_FallbackRetiredWithoutRetention",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 342
+      "line": 349
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_LinkLocalAttemptOutlivesTwoMinutes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/issue507_test.go",
-      "line": 459
+      "line": 467
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_NewAddressBesideTheAnchor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 582
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_OnlyAttemptSurvivesTheFlip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/issue507_test.go",
-      "line": 380
+      "line": 382
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_ProvenHostReturnsWithAnotherSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 131
+      "line": 138
     },
     {
       "package": "client/peer",
@@ -7450,7 +7478,7 @@
       "identifier": "TestIssue507_RetentionExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 86
+      "line": 93
     },
     {
       "package": "client/peer",
@@ -7461,17 +7489,31 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestIssue507_SessionEndsAnchor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 417
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestIssue507_SessionEndsRetention",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 164
+      "line": 171
     },
     {
       "package": "client/peer",
       "identifier": "TestIssue507_StaleOperationalAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 195
+      "line": 202
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestIssue507_ZoneSpelledTwoWays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/retention_test.go",
+      "line": 530
     },
     {
       "package": "client/peer",
@@ -7877,7 +7919,7 @@
       "identifier": "TestRetainedFallbackNotRetired",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/retention_test.go",
-      "line": 374
+      "line": 381
     },
     {
       "package": "client/peer",
