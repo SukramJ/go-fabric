@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7923,
+  "entry_points": 7926,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17927,
+    "total_exported": 17928,
     "reachable": 12417,
-    "whitelisted": 5510,
+    "whitelisted": 5511,
     "unreachable": 0
   },
   "by_package": [],
@@ -22906,14 +22906,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 738
+      "line": 744
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 734
+      "line": 740
     },
     {
       "package": "controller",
@@ -25447,7 +25447,7 @@
       "identifier": "TestEnsureFailsafeTimerFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 261
+      "line": 286
     },
     {
       "package": "controller/commissioner",
@@ -25546,6 +25546,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
       "line": 146
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFlowResetsFailsafeAfterContextEnded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/flow_test.go",
+      "line": 264
     },
     {
       "package": "controller/commissioner",

@@ -56,6 +56,8 @@ Milestone 7, phase 28 (ADR 0031) in three waves: a node without a network at fir
 
 ### Fixed
 
+- `controller`: `Controller.Pair` with a context without a deadline no longer ends the whole pairing after `DefaultPairTimeout` (one minute). The timeout now bounds the search for the device only — a code no device answers within it is still `ErrNoDevice`, timed on the controller's clock — and the commissioning of a found device runs on the commissioner's own budgets (PASE, the step-18 CASE reconnect, the fail-safe), as matter.js's `commissionNode` does, which sets no overall deadline. A BLE commissioning onto Thread, whose reconnect alone can take minutes, ended exactly 60 s after its start with `Operative reconnection with device failed: context canceled`. A caller that wants an overall bound passes a context with a deadline, as before.
+- `controller/commissioner`: a step that fails because the caller's context ended still expires the fail-safe on the device (`ArmFailSafe` with 0). The reset ran on the ended context and failed with `reset_failsafe_failed err="context canceled"`, leaving the device to wait out its fail-safe; matter.js's `#resetFailsafeTimer` carries no abort signal.
 - `node`: a fail-safe's rollback of a fabric that only the fail-safe added (a first commissioning that failed) no longer reopens the node's own window once the node is idle; only the removal of a commissioned node's last fabric does, as matter.js's `CommissioningServer` decommissions only a node whose commissioning was committed (`CommissioningServer.ts:118-165`). The window stays as the commissioning left it.
 
 ## [0.21.0] — 2026-11-10
