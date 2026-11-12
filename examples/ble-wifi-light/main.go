@@ -41,9 +41,11 @@ import (
 type options struct {
 	adapter       string
 	wifiInterface string
+	noWiFi        bool
 	storage       string
 	passcode      uint
 	discriminator uint
+	logLevel      slog.Level
 }
 
 func parseFlags(args []string) (options, error) {
@@ -51,11 +53,16 @@ func parseFlags(args []string) (options, error) {
 	fs := flag.NewFlagSet("ble-wifi-light", flag.ContinueOnError)
 	fs.StringVar(&o.adapter, "adapter", "hci0", "the Bluetooth adapter (BlueZ)")
 	fs.StringVar(&o.wifiInterface, "wifi-interface", wpasupplicant.DefaultInterface, "the Wi-Fi interface wpa_supplicant manages")
+	fs.BoolVar(&o.noWiFi, "no-wifi", false, "no Wi-Fi: the node serves the Ethernet NetworkCommissioning and is reached over the host's present network (a test without a Wi-Fi radio)")
 	fs.StringVar(&o.storage, "storage", "ble-wifi-light.db", "the SQLite file of the node's state")
 	fs.UintVar(&o.passcode, "passcode", 20202021, "the setup passcode")
 	fs.UintVar(&o.discriminator, "discriminator", 3840, "the 12-bit discriminator")
+	level := fs.String("log-level", "info", "debug, info, warn or error")
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
+	}
+	if err := o.logLevel.UnmarshalText([]byte(*level)); err != nil {
+		return options{}, fmt.Errorf("--log-level: %w", err)
 	}
 	if o.passcode > 99999998 {
 		return options{}, fmt.Errorf("--passcode %d is not an 8-digit passcode", o.passcode)
@@ -75,6 +82,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: o.logLevel})))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	err = run(ctx, o, os.Stdout)
 	stop()
@@ -94,11 +102,15 @@ func run(ctx context.Context, o options, out io.Writer) error {
 	if c, ok := radio.(io.Closer); ok {
 		defer func() { _ = c.Close() }()
 	}
-	wifi, err := wpasupplicant.New(ctx, wpasupplicant.Options{Interface: o.wifiInterface})
-	if err != nil {
-		return fmt.Errorf("wi-fi interface %s: %w", o.wifiInterface, err)
+	var wifi contract.WiFiDriver
+	if !o.noWiFi {
+		d, err := wpasupplicant.New(ctx, wpasupplicant.Options{Interface: o.wifiInterface})
+		if err != nil {
+			return fmt.Errorf("wi-fi interface %s: %w", o.wifiInterface, err)
+		}
+		defer func() { _ = d.Close() }()
+		wifi = d
 	}
-	defer func() { _ = wifi.Close() }()
 
 	// The zero Network listens on :5540 on every interface and advertises
 	// over DNS-SD on the interfaces as they come; the Wi-Fi interface's
@@ -117,10 +129,13 @@ func run(ctx context.Context, o options, out io.Writer) error {
 }
 
 // newNode builds the node on o's storage with the BLE radio and the Wi-Fi
-// driver, and adds the light, unstarted.
+// driver (none: the Ethernet NetworkCommissioning), and adds the light,
+// unstarted.
 func newNode(ctx context.Context, o options, network node.Network, radio contract.BLEPeripheral, wifi contract.WiFiDriver) (*node.Node, error) {
 	network.BLE = radio
-	network.WiFi = &node.WiFi{Driver: wifi}
+	if wifi != nil {
+		network.WiFi = &node.WiFi{Driver: wifi}
+	}
 	n, err := node.New(ctx, node.Config{
 		Network: network,
 		Commissioning: node.Commissioning{
