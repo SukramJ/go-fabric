@@ -297,14 +297,15 @@ CHIPTOOL_BIN_DIR     ?= bin
 # (CHIP_BASE_IMAGE, ../matter.js/support/chip: chip-tool, the YAML and Python
 # certification cases and the CHIP reference apps at one CHIP commit) plus
 # chip's jf-admin-app, jf-control-app and Push AV server at that commit
-# (phase 34). Both pinned by digest, never a floating tag; the CHIP commit
+# (phase 34), and since wave 28c chip-tool-ble and all-clusters-app-ble
+# (BLE and Wi-Fi on) with bluezoo for the BLE-Wi-Fi leg. Both pinned by digest, never a floating tag; the CHIP commit
 # is in the images' org.opencontainers.image.revision label and
 # /etc/chip-version, recorded below; `make chiptool-setup` checks the CHIP
 # source out at that commit. Bump the three together, deliberately: a new
 # digest is a new commissioner and a new case set — lift CHIP_BASE_IMAGE and
 # the commit, dispatch chip-image.yml, then pin the digest it prints here.
 CHIP_BASE_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
-CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea4fb4f2afc6d04fb831e7b69b44b2d6de0234e4
+CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@sha256:8fc06f22ddfd717470f739dd0b3bdeafaf56186201b46289b23209c23339f59c
 CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 
 # The CHIP data model directory the snapshot is cross-checked against
@@ -381,7 +382,13 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 	@# chip-tool; fails loudly on a missing daemon binary, which
 	@# chiptool-build has just produced.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
-		-skip '^TestChipCertificationFamilies$$' ./internal/chiptool/...
+		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi)$$' ./internal/chiptool/...
+
+.PHONY: chiptool-ble-wifi
+chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)
+	@# Skips, naming why, on an image without the -ble binaries or bluezoo.
+	GOFABRIC_CHIP_BLEWIFI=1 $(GO) test -tags=chiptool -count=1 -timeout=40m -v \
+		-run '^TestChipToolBLEWiFi$$' ./internal/chiptool/...
 
 .PHONY: chiptool-gocert
 chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's cert cases with the Go controller as TH (read mirrored) and as DUT (GOFABRIC_GOCERT=DD,ICDM narrows)

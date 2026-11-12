@@ -365,13 +365,14 @@ on mac80211_hwsim where the kernel has it), the mDNS responder that joins
 an interface coming up after start (a node without a network at first boot
 was not found on the network it joined), the certifiability rows moved, the
 [guide](./guides/first-boot-without-network.md) and the owner's manual test
-plan. Not run: the DD and SC BLE cases — the CHIP harness image's
-controllers are built without BLE (matter.js `support/chip/support/build-one`
-at `db021da0`), so the chip-tool `pairing ble-wifi` leg under chip's
-BlueZ and wpa_supplicant mocks waits for an owner decision on the image;
-the module's own controller commissioned the example under those mocks in
-wave 28c's spike. The hardware test (Raspberry Pi, Apple Home) follows the
-tag.
+plan; then (owner decision 2026-11-12) the harness image's own BLE builds
+`chip-tool-ble` and `all-clusters-app-ble` with bluezoo, the
+`make chiptool-ble-wifi` leg — chip-tool commissions the example over BLE
+onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, chip's
+all-clusters app as its control — and `ble/bluez`'s acquired flags. Not
+run: the DD BLE cases (manual) and the Python cases that commission over
+BLE inside the test (the image's Python controller has no BLE). The
+hardware test (Raspberry Pi, Apple Home) follows the tag.
 
 ### Milestone 8: Proof
 

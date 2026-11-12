@@ -10,7 +10,7 @@
 # commit. The image is amd64, as the runners are. The
 # container shares the host network and the runner's avahi over /run/dbus.
 #
-# Three jobs, and the second is the point:
+# Four jobs, and the second is the point:
 #
 #   - chiptool: `make chiptool-test` — commission the daemon for real, then
 #     the chip-tool suite over one interactive session.
@@ -20,6 +20,11 @@
 #     + red suite is a go-fabric defect; both red is the environment (an
 #     image bump, a runner change, avahi/dbus, network). Without it every red
 #     run starts with an hour of ruling the environment out.
+#   - chiptool-ble-wifi: `make chiptool-ble-wifi` (wave 28c) — the image's
+#     chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi
+#     under chip's BlueZ and wpa_supplicant mocks in a privileged
+#     container, with all-clusters-app-ble under the same mocks as its own
+#     control in the same test. Not a required check.
 #   - chip-families: the CSA certification families (`make
 #     chiptool-families`), the way matter.js runs them. Certification is not
 #     pursued by this project, but certifiability is a goal
@@ -366,6 +371,31 @@ jobs:
             /tmp/pair.log
             /tmp/read.log
           if-no-files-found: ignore
+
+  chiptool-ble-wifi:
+    # Not a required status check (brief 28c): it runs beside the others.
+    name: chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
+    needs: changes
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: pull the pinned CHIP image
+        run: make chiptool-image
+      # The test's container is privileged (network namespaces, bluezoo,
+      # the wpa_supplicant mock); nothing runs on the runner's own network
+      # or Bluetooth.
+      - name: BLE-Wi-Fi leg and its control
+        run: make chiptool-ble-wifi
 
   chip-families:
     name: certification families (${{ matrix.group }})

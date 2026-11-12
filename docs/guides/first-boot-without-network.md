@@ -87,6 +87,10 @@ operations guide.
 
 - the in-process tests: the example's node on the in-memory BLE radio, the
   node's BLE and Wi-Fi tests, and the fake-bus tests of both modules;
+- `make chiptool-ble-wifi` (and its CI job): the CSA's chip-tool commissions
+  the example over BLE onto Wi-Fi under connectedhomeip's own BlueZ and
+  wpa_supplicant mocks, then reads NetworkCommissioning and switches the
+  light, with chip's all-clusters app under the same mocks as the control;
 - the weekly `ble-virtual` job: the example on real bluetoothd over virtual
   HCI controllers, commissioned by the module's controller and by
   matter.js's, its Wi-Fi a real wpa_supplicant with hostapd on
@@ -94,8 +98,9 @@ operations guide.
 - the owner's hardware test on a Raspberry Pi with chip-tool, the reference
   controller and Apple Home.
 
-The CHIP certification harness does not run the BLE cases: its controllers
-are built without BLE ([certifiability](../certifiability.md)).
+The certification cases that commission over BLE inside the test do not
+run: the harness's Python controller is built without BLE
+([certifiability](../certifiability.md)).
 
 *Source: [`examples/ble-wifi-light/main.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/ble-wifi-light/main.go),
 [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Network.BLE`, `WiFi.Driver`),
