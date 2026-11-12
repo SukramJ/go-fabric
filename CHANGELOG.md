@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.22.0` (before `v0.21.0`) and are tagged `ble/bluez/v0.22.0`, `ble/esphome/v0.22.0` and `wifi/wpasupplicant/v0.22.0` at this commit — the first tag of `wifi/wpasupplicant`; `examples/ble-wifi-light` requires the three at `v0.22.0`. No code change.
+
 ## [0.22.0] — 2026-11-12
 
 Milestone 7, phase 28 (ADR 0031) in three waves: a node without a network at first boot is commissioned over Bluetooth LE onto Wi-Fi on a Linux host. Wave 28a (#498): the peripheral port `contract.BLEPeripheral`, BTP's peripheral side `btp.Accept`, `node.Network.BLE` and the BlueZ GATT peripheral of `ble/bluez`; a node is on the radio only while it has no fabric. Wave 28b (#499): `node.Network.WiFi.Driver`, the new nested module `wifi/wpasupplicant` (wpa_supplicant over D-Bus) and `examples/ble-wifi-light`. Wave 28c (#502): the proof — chip-tool's `pairing ble-wifi` against the example under connectedhomeip's Bluetooth and wpa_supplicant mocks with connectedhomeip's own app as the control (`make chiptool-ble-wifi`, harness image with BLE-capable binaries), the weekly `ble-virtual` job in both directions on real `bluetoothd` with Wi-Fi on a simulated radio against a real wpa_supplicant, and the mDNS responder joining interfaces that come up after it started. **Breaking:** `fabrictest.UseWiFiCommissioning` is removed (see Removed). Not yet proven on real radios: the owner's hardware test (`notes/manual-test-plan-m7-ble-wifi.md`) follows this release; no certification case runs over BLE (the harness's Python controller has none).
