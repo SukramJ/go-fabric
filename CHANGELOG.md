@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-11-12
+
+Milestone 7, phase 28 (ADR 0031) in three waves: a node without a network at first boot is commissioned over Bluetooth LE onto Wi-Fi on a Linux host. Wave 28a (#498): the peripheral port `contract.BLEPeripheral`, BTP's peripheral side `btp.Accept`, `node.Network.BLE` and the BlueZ GATT peripheral of `ble/bluez`; a node is on the radio only while it has no fabric. Wave 28b (#499): `node.Network.WiFi.Driver`, the new nested module `wifi/wpasupplicant` (wpa_supplicant over D-Bus) and `examples/ble-wifi-light`. Wave 28c (#502): the proof — chip-tool's `pairing ble-wifi` against the example under connectedhomeip's Bluetooth and wpa_supplicant mocks with connectedhomeip's own app as the control (`make chiptool-ble-wifi`, harness image with BLE-capable binaries), the weekly `ble-virtual` job in both directions on real `bluetoothd` with Wi-Fi on a simulated radio against a real wpa_supplicant, and the mDNS responder joining interfaces that come up after it started. **Breaking:** `fabrictest.UseWiFiCommissioning` is removed (see Removed). Not yet proven on real radios: the owner's hardware test (`notes/manual-test-plan-m7-ble-wifi.md`) follows this release; no certification case runs over BLE (the harness's Python controller has none).
+
 ### Added
 
 - `docs/reference/glossary.md`: a glossary of the Matter terms and the family's own terms the documentation uses, each with the package or page that owns it; linked from the Reference navigation and the home page's "Where to start".
@@ -5698,7 +5702,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/SukramJ/go-fabric/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/SukramJ/go-fabric/compare/v0.19.1...v0.19.2
