@@ -100,7 +100,7 @@ one none uses, and both come before completeness for its own sake.
 | 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.11.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
 | 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` (23–24), `v0.13.0` (25) | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
 | 6 | [Completeness](#milestone-6-completeness) | `v0.14.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
-| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | not yet assigned | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.22.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 | 8 | [Proof](#milestone-8-proof) | `v0.17.0` | 29–35 | what is automatable runs: the 68 certification cases matter.js automated, the four defects, 644 more matter.js cases, the families without a run, no sleep-driven test |
 | 9 | [View](#milestone-9-view) | go-fabric-ui `0.4.0`, contract `0.3.0`/`0.3.1` (U3a/U3b); go-fabric-ui `0.5.0`, contract `0.4.0` (U4) | U3–U5 | topology, live device details and an operator's diagnostics in the UI, from data the module already has |
 | 10 | [The rest of the standard](#milestone-10-the-rest-of-the-standard) | `v0.18.0` | 36–40 | the features matter.js serves and we refuse; the consumer features after chip; the 1.7 pin when matter.js moves |
@@ -352,6 +352,26 @@ without a network at first boot — none of the current bridges.
 
 **Done when.** The comparison's BLE row is ✅ for both roles; the DD and
 SC BLE cases run.
+
+**Status 2026-11-12.** Phase 28 in three waves for `v0.22.0` (ADR 0031,
+owner decisions 2026-11-11). Wave 28a (pull request 498): the peripheral
+port `contract.BLEPeripheral`, BTP's peripheral side `btp.Accept`, the
+advertisement on matter.js's schedule, `node.Network.BLE` and `ble/bluez`'s
+GATT peripheral. Wave 28b (pull request 499): `node.Network.WiFi.Driver`,
+the nested module `wifi/wpasupplicant` and `examples/ble-wifi-light`. Wave
+28c: the second direction of the weekly btvirt job (the example on real
+BlueZ, commissioned by `pair --ble` and by matter.js's controller, its Wi-Fi
+on mac80211_hwsim where the kernel has it), the mDNS responder that joins
+an interface coming up after start (a node without a network at first boot
+was not found on the network it joined), the certifiability rows moved, the
+[guide](./guides/first-boot-without-network.md) and the owner's manual test
+plan. Not run: the DD and SC BLE cases — the CHIP harness image's
+controllers are built without BLE (matter.js `support/chip/support/build-one`
+at `db021da0`), so the chip-tool `pairing ble-wifi` leg under chip's
+BlueZ and wpa_supplicant mocks waits for an owner decision on the image;
+the module's own controller commissioned the example under those mocks in
+wave 28c's spike. The hardware test (Raspberry Pi, Apple Home) follows the
+tag.
 
 ### Milestone 8: Proof
 

@@ -27,8 +27,9 @@ const (
 	// classHarness: the test case or the environment is at fault; the
 	// reason cites the evidence.
 	classHarness gapClass = "(c) harness"
-	// classOutOfScope: Bluetooth, Thread, Wi-Fi commissioning, controller
-	// role; the reason names the scope decision.
+	// classOutOfScope: Thread on the device side (no Thread radio); the
+	// reason names the scope decision. Bluetooth and Wi-Fi commissioning
+	// of the node left it with ADR 0031 (milestone 7).
 	classOutOfScope gapClass = "(d) out of scope"
 )
 
@@ -461,13 +462,15 @@ var chipFamilies = []family{
 		name: "CNET",
 		// The Wi-Fi cases the descriptor gates on CNET.S.F00 are not
 		// applicable through the PICS; these carry no gate at all
-		// (matter.js test/core/CNET.test.ts excludes the same set).
+		// (matter.js test/core/CNET.test.ts excludes the same set). This
+		// run is the Ethernet composition, which declares no Wi-Fi feature;
+		// the Wi-Fi composition runs them as CNETWIFI below.
 		exclude: map[string]gap{
-			"4.11": {classOutOfScope, "TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; Wi-Fi commissioning is out of scope (ADR 0011 (d), docs/matterjs-comparison.md), and the case has no PICS gate (CNET.S.F00=0)", false},
-			"4.25": {classOutOfScope, "TC-CNET-4.25 verifies Wi-Fi per-device credentials; Wi-Fi commissioning is out of scope and the case skips itself on a node without the Wi-Fi feature", true},
-			"4.26": {classOutOfScope, "TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); out of scope with Wi-Fi commissioning, and the case skips itself", true},
-			"4.27": {classOutOfScope, "TC-CNET-4.27 verifies Wi-Fi network client identities; out of scope with Wi-Fi commissioning, and the case skips itself", true},
-			"4.29": {classOutOfScope, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; out of scope with Wi-Fi commissioning, and the case skips itself once given the endpoint its matcher needs", true},
+			"4.11": {classNotSupported, "TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition runs it as CNETWIFI/4.11", false},
+			"4.25": {classNotSupported, "TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25", true},
+			"4.26": {classNotSupported, "TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26", true},
+			"4.27": {classNotSupported, "TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27", true},
+			"4.29": {classNotSupported, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29", true},
 		},
 		args: map[string][]string{
 			// These cases' endpoint matchers need --endpoint before they

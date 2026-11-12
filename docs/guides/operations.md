@@ -217,6 +217,13 @@ and a named interface without an advertised address
 (`interface_no_addresses`). The list does not scope the UDP listen socket;
 `Network.Listen` takes a host address for that.
 
+A node may start with no multicast interface up at all — a node
+commissioned over BLE onto Wi-Fi has none before it joins the network. The
+responder's sockets stay open then, and every interface that comes up later
+is joined to the mDNS groups at the next publication or interface check
+(the node re-announces after a successful Wi-Fi join, which is the next
+publication).
+
 The case for it is a dual-homed host behind a gateway that relays mDNS
 between its networks (an mDNS reflector or proxy): the node answers each
 network with that network's address, the gateway relays the other
