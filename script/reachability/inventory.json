@@ -23109,7 +23109,7 @@
       "identifier": "TestOperationalPortParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
-      "line": 20
+      "line": 40
     },
     {
       "package": "controller",
