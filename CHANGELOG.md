@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.22.2] — 2026-11-12
+
+A fix in the nested module `ble/esphome` (#512): a device that leaves BLE the moment it is told to join its network no longer fails its commissioning through an ESPHome Bluetooth proxy. The root module has no code change since `v0.22.1`; the release is tagged `v0.22.2` and `ble/esphome/v0.22.2` at one commit, and `ble/esphome` still requires go-fabric `v0.22.1`.
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.22.1` (before `v0.22.0`) and are tagged `ble/bluez/v0.22.1`, `ble/esphome/v0.22.1` and `wifi/wpasupplicant/v0.22.1` at this commit; `examples/ble-wifi-light` requires the three at `v0.22.1`. No code change.
@@ -5730,7 +5734,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.22.2...HEAD
+[0.22.2]: https://github.com/SukramJ/go-fabric/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/SukramJ/go-fabric/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/SukramJ/go-fabric/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/SukramJ/go-fabric/compare/v0.20.0...v0.21.0
