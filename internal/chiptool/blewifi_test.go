@@ -8,11 +8,13 @@ package chiptool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -31,9 +33,11 @@ import (
 // or the environment's by inspection: the control red too is the
 // environment.
 //
-// `make chiptool-ble-wifi` runs it (GOFABRIC_CHIP_BLEWIFI=1); without the
-// variable, or on an image without the -ble binaries or bluezoo, it skips
-// naming why.
+// GOFABRIC_CHIP_BLEWIFI=1 runs it and lets it skip, naming why, without
+// Docker or on an image without the -ble binaries or bluezoo;
+// GOFABRIC_CHIP_BLEWIFI=require — what `make chiptool-ble-wifi` and the CI
+// job set — turns every such skip into a failure, so the leg cannot go
+// green without running. Without the variable it skips.
 
 const (
 	bleWiFiEnv        = "GOFABRIC_CHIP_BLEWIFI"
@@ -49,12 +53,25 @@ type bleWiFiStep struct {
 	Seconds float64 `json:"seconds"`
 }
 
+// bleWiFiProbeMissing is the probe's exit when the image lacks a binary
+// or bluezoo; any other failure is Docker's and fails the test.
+const bleWiFiProbeMissing = 3
+
 func TestChipToolBLEWiFi(t *testing.T) {
-	if os.Getenv(bleWiFiEnv) != "1" {
-		t.Skipf("the BLE-Wi-Fi leg runs with %s=1: make chiptool-ble-wifi", bleWiFiEnv)
+	mode := os.Getenv(bleWiFiEnv)
+	if mode != "1" && mode != "require" {
+		t.Skipf("the BLE-Wi-Fi leg runs with %s=1 or =require: make chiptool-ble-wifi", bleWiFiEnv)
+	}
+	// skip is a skip under =1 and a failure under =require.
+	skip := func(format string, args ...any) {
+		t.Helper()
+		if mode == "require" {
+			t.Fatalf("required leg cannot run: "+format, args...)
+		}
+		t.Skipf(format, args...)
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skipf("docker not on PATH: %v", err)
+		skip("docker not on PATH: %v", err)
 	}
 	image, err := pinnedChipImage()
 	if err != nil {
@@ -67,9 +84,13 @@ func TestChipToolBLEWiFi(t *testing.T) {
 			t.Fatalf("docker pull %s: %v\n%s", image, err, out)
 		}
 	}
-	probe := "test -x /bin/chip-tool-ble && test -x /bin/all-clusters-app-ble && command -v bluezoo >/dev/null"
+	probe := fmt.Sprintf("test -x /bin/chip-tool-ble && test -x /bin/all-clusters-app-ble && command -v bluezoo >/dev/null || exit %d", bleWiFiProbeMissing)
 	if out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "--entrypoint", "sh", image, "-c", probe).CombinedOutput(); err != nil { //nolint:gosec // fixed argv
-		t.Skipf("the harness image %s has no /bin/chip-tool-ble, /bin/all-clusters-app-ble or bluezoo (built since wave 28c): %v %s", image, err, out)
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == bleWiFiProbeMissing {
+			skip("the harness image %s has no /bin/chip-tool-ble, /bin/all-clusters-app-ble or bluezoo (built since wave 28c)", image)
+		}
+		t.Fatalf("probing %s: %v\n%s", image, err, out)
 	}
 
 	// Under the module's bin/, as launchHarness: a snap Docker sees no host /tmp.
@@ -104,19 +125,22 @@ func TestChipToolBLEWiFi(t *testing.T) {
 		t.Fatalf("build examples/ble-wifi-light: %v\n%s", err, out)
 	}
 
-	run := func(t *testing.T, mode, app, ready, endpoint string) (string, map[string]int) {
+	run := func(t *testing.T, leg string, app []string, ready, endpoint string) (string, map[string]int) {
 		t.Helper()
-		out := filepath.Join(shared, mode)
-		name := fmt.Sprintf("gofabric-blewifi-%s-%d", mode, os.Getpid())
-		args := []string{
+		out := filepath.Join(shared, leg)
+		name := fmt.Sprintf("gofabric-blewifi-%s-%d", leg, os.Getpid())
+		// The container goes with the test, also when it fails or is
+		// interrupted mid-run.
+		t.Cleanup(func() {
+			_ = exec.Command("docker", "stop", "-t", "5", name).Run() //nolint:gosec,noctx // our own container
+			_ = exec.Command("docker", "rm", "-f", name).Run()        //nolint:gosec,noctx // our own container
+		})
+		args := slices.Concat([]string{
 			"run", "--rm", "--privileged", "--name", name,
 			"-v", shared + ":" + shared, "--entrypoint", "python3", image,
-			filepath.Join(shared, "driver.py"), "--out", out, "--app", app, "--ready", ready, "--endpoint", endpoint,
-		}
+			filepath.Join(shared, "driver.py"), "--out", out, "--ready", ready, "--endpoint", endpoint, "--",
+		}, app)
 		cmdOut, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput() //nolint:gosec // fixed argv
-		if ctx.Err() != nil {
-			_ = exec.Command("docker", "rm", "-f", name).Run() //nolint:gosec,noctx // our own container
-		}
 		if err != nil {
 			t.Fatalf("the driver: %v\n%s", err, tail(string(cmdOut), 40))
 		}
@@ -157,11 +181,22 @@ func TestChipToolBLEWiFi(t *testing.T) {
 	// mock, not the leg.
 	proof := func(t *testing.T, dir string, exits map[string]int, connected bool) {
 		t.Helper()
-		if exits["app-ready"] != 0 {
+		// exit is a step's exit code; a step absent from results.json —
+		// the driver never ran it — fails the leg.
+		exit := func(step string) int {
+			t.Helper()
+			e, ok := exits[step]
+			if !ok {
+				t.Errorf("%s: the driver did not run it", step)
+				return -1
+			}
+			return e
+		}
+		if exit("app-ready") != 0 {
 			t.Fatalf("the app did not come up on the BLE adapter:\n%s", tail(readLog(t, dir, "app"), 30))
 		}
-		if exits["pairing"] != 0 {
-			t.Fatalf("chip-tool-ble pairing ble-wifi failed (exit %d):\n%s", exits["pairing"], tail(readLog(t, dir, "pairing"), 40))
+		if e := exit("pairing"); e != 0 {
+			t.Fatalf("chip-tool-ble pairing ble-wifi failed (exit %d):\n%s", e, tail(readLog(t, dir, "pairing"), 40))
 		}
 		for line := range strings.SplitSeq(readLog(t, dir, "pairing"), "\n") {
 			if strings.Contains(line, "commissioning completed with success") || strings.Contains(line, "Commissioning complete for node ID") {
@@ -175,8 +210,10 @@ func TestChipToolBLEWiFi(t *testing.T) {
 			{"on-off", `OnOff: TRUE`, "the toggle switched the light on"},
 		}
 		for _, c := range checks {
-			if exits[c.step] != 0 {
-				t.Errorf("%s: exit %d:\n%s", c.step, exits[c.step], tail(readLog(t, dir, c.step), 20))
+			if e := exit(c.step); e != 0 {
+				if e > 0 {
+					t.Errorf("%s: exit %d:\n%s", c.step, e, tail(readLog(t, dir, c.step), 20))
+				}
 				continue
 			}
 			log := readLog(t, dir, c.step)
@@ -187,13 +224,13 @@ func TestChipToolBLEWiFi(t *testing.T) {
 			}
 			t.Logf("%s: %q", c.step, strings.Join(strings.Fields(m), " "))
 		}
-		if exits["toggle"] != 0 {
-			t.Errorf("toggle: exit %d", exits["toggle"])
+		if e := exit("toggle"); e > 0 {
+			t.Errorf("toggle: exit %d:\n%s", e, tail(readLog(t, dir, "toggle"), 20))
 		}
 	}
 
 	t.Run("ble-wifi-light", func(t *testing.T) {
-		app := "/" + strings.TrimPrefix(example, "/") + " --adapter hci0 --wifi-interface wlx-app-0 --storage " + filepath.Join(shared, "light.db") + " --log-level debug"
+		app := []string{example, "--adapter", "hci0", "--wifi-interface", "wlx-app-0", "--storage", filepath.Join(shared, "light.db"), "--log-level", "debug"}
 		dir, exits := run(t, "dut", app, "matter.ble.serving", "2")
 		proof(t, dir, exits, true)
 		log := readLog(t, dir, "app")
@@ -215,7 +252,7 @@ func TestChipToolBLEWiFi(t *testing.T) {
 		}
 	})
 	t.Run("control: all-clusters-app-ble", func(t *testing.T) {
-		app := "/bin/all-clusters-app-ble --ble-controller 0 --wifi --KVS " + filepath.Join(shared, "acl.kvs")
+		app := []string{"/bin/all-clusters-app-ble", "--ble-controller", "0", "--wifi", "--KVS", filepath.Join(shared, "acl.kvs")}
 		dir, exits := run(t, "control", app, "APP STATUS: Starting event loop", "1")
 		proof(t, dir, exits, false)
 	})

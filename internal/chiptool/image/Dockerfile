@@ -139,4 +139,5 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     for b in /bin/chip-tool-ble /bin/all-clusters-app-ble; do \
       ! ldd "$b" | grep 'not found' || { echo "$b misses a library" >&2; exit 1; }; \
       grep -q org.bluez "$b" || { echo "$b has no BlueZ support" >&2; exit 1; }; \
+      grep -q fi.w1.wpa_supplicant1 "$b" || { echo "$b has no wpa_supplicant support" >&2; exit 1; }; \
     done

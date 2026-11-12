@@ -466,11 +466,11 @@ var chipFamilies = []family{
 		// run is the Ethernet composition, which declares no Wi-Fi feature;
 		// the Wi-Fi composition runs them as CNETWIFI below.
 		exclude: map[string]gap{
-			"4.11": {classNotSupported, "TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition runs it as CNETWIFI/4.11", false},
-			"4.25": {classNotSupported, "TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25", true},
-			"4.26": {classNotSupported, "TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26", true},
-			"4.27": {classNotSupported, "TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27", true},
-			"4.29": {classNotSupported, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29", true},
+			"4.11": {classNotSupported, "TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition's row is CNETWIFI/4.11, (c) harness (two real access points)", false},
+			"4.25": {classNotSupported, "TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25, where it skips itself (no per-device credentials)", true},
+			"4.26": {classNotSupported, "TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26, where it skips itself (no per-device credentials)", true},
+			"4.27": {classNotSupported, "TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27, where it skips itself (no per-device credentials)", true},
+			"4.29": {classNotSupported, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29, where it skips itself (no per-device credentials)", true},
 		},
 		args: map[string][]string{
 			// These cases' endpoint matchers need --endpoint before they

@@ -386,8 +386,9 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 
 .PHONY: chiptool-ble-wifi
 chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)
-	@# Skips, naming why, on an image without the -ble binaries or bluezoo.
-	GOFABRIC_CHIP_BLEWIFI=1 $(GO) test -tags=chiptool -count=1 -timeout=40m -v \
+	@# Required: an image without the -ble binaries or bluezoo, or no Docker,
+	@# fails (GOFABRIC_CHIP_BLEWIFI=require); =1 by hand lets it skip.
+	GOFABRIC_CHIP_BLEWIFI=require $(GO) test -tags=chiptool -count=1 -timeout=40m -v \
 		-run '^TestChipToolBLEWiFi$$' ./internal/chiptool/...
 
 .PHONY: chiptool-gocert

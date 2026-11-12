@@ -368,7 +368,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CLDIM/6.2 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F00 & CLDIM.S.C03.Rsp` is false for the reference DUT |
 | CNET/4.1 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
-| CNET/4.11 | (b) not supported | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition runs it as CNETWIFI/4.11 |
+| CNET/4.11 | (b) not supported | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case has no PICS gate; the Wi-Fi composition's row is CNETWIFI/4.11, (c) harness (two real access points) |
 | CNET/4.12 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNET/4.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -379,10 +379,10 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CNET/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNET/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.23 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
-| CNET/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25 (runs, and skips itself) |
-| CNET/4.26 | (b) not supported | TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26 (runs, and skips itself) |
-| CNET/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27 (runs, and skips itself) |
-| CNET/4.29 | (b) not supported | TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29 (runs, and skips itself) |
+| CNET/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.26 | (b) not supported | TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.26, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.27, where it skips itself (no per-device credentials) (runs, and skips itself) |
+| CNET/4.29 | (b) not supported | TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself once given the endpoint its matcher needs; the Wi-Fi composition runs it as CNETWIFI/4.29, where it skips itself (no per-device credentials) (runs, and skips itself) |
 | CNET/4.4 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.5 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |

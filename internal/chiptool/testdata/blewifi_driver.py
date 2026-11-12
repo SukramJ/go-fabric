@@ -41,11 +41,15 @@ NODE_ID = "1"
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--app", required=True, help="the app's argv, one string, split on spaces")
+    ap.add_argument("app", nargs=argparse.REMAINDER, help="after --: the app's argv")
     ap.add_argument("--ready", required=True, help="the app's log line that says it serves BLE")
     ap.add_argument("--endpoint", required=True, help="the OnOff endpoint")
     ap.add_argument("--chip-tool", default="/bin/chip-tool-ble")
     args = ap.parse_args()
+    if args.app and args.app[0] == "--":
+        args.app = args.app[1:]
+    if not args.app:
+        ap.error("the app's argv follows --")
     os.makedirs(args.out, exist_ok=True)
     results = []
 
@@ -62,7 +66,7 @@ def main() -> int:
         stack.enter_context(WpaSupplicantMock(["wlx-app"], SSID, PASSPHRASE, ns))
 
         app_log = open(os.path.join(args.out, "app.log"), "w")
-        app = subprocess.Popen(ns.app_ns.wrap_cmd(args.app.split()), stdout=app_log, stderr=subprocess.STDOUT)
+        app = subprocess.Popen(ns.app_ns.wrap_cmd(args.app), stdout=app_log, stderr=subprocess.STDOUT)
         stack.callback(app_log.close)
 
         def stop_app():
