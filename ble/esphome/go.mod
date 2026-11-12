@@ -1,6 +1,6 @@
 module github.com/SukramJ/go-fabric/ble/esphome
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/SukramJ/go-fabric v0.22.0
