@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- Dependencies: `modernc.org/sqlite` 1.61.0 → 1.61.1, which raises it in every consumer's build list (#500); the nested modules and `examples/ble-wifi-light` follow in their `go.mod`.
+
 ## [0.22.2] — 2026-11-12
 
 A fix in the nested module `ble/esphome` (#512): a device that leaves BLE the moment it is told to join its network no longer fails its commissioning through an ESPHome Bluetooth proxy. The root module has no code change since `v0.22.1`; the release is tagged `v0.22.2` and `ble/esphome/v0.22.2` at one commit, and `ble/esphome` still requires go-fabric `v0.22.1`.
