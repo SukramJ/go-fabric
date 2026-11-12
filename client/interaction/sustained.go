@@ -326,10 +326,21 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		}
 
 		schedule := newRetries(DefaultSustainRetries, c.rand)
+		var held *icd.PeerWakefulness
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
-				established(outer, inner, wakefulness())
+				// One read decides both the hold and what the wait watches. matter.js
+				// takes the hold on the wakefulness present at establishment
+				// (SustainedSubscription.ts:228 at db021da0) and reads it again for the
+				// wait (:460) one `await` later (:282); here the two reads were apart by
+				// whatever another goroutine did in between, and a registration fed
+				// between them left the subscription waiting for a mode flip of a
+				// wakefulness it never held — a due Check-In reported for ever beside an
+				// active subscription. With the value read once, a feed after it is the
+				// nil branch's "a wakefulness present now is the feed", and the recreate
+				// takes the hold.
+				held = established(outer, inner, wakefulness())
 				break
 			}
 			if ctx.Err() != nil {
@@ -358,7 +369,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			continue
 		}
 		outer.setActive(true)
-		flipped := c.awaitClosedOrModeFlip(ctx, outer, wakefulness(), closed)
+		flipped := c.awaitClosedOrModeFlip(ctx, outer, held, closed)
 		if ctx.Err() != nil {
 			return
 		}
@@ -472,8 +483,9 @@ func (c *Interaction) sustainGate(ctx context.Context, outer *Subscription, w *i
 
 // established records the inner subscription an attempt established and,
 // for an ICD peer, holds the peer's wakefulness for it
-// (SustainedSubscription.ts:224-229).
-func established(outer, inner *Subscription, w *icd.PeerWakefulness) {
+// (SustainedSubscription.ts:224-229). It returns w: the wakefulness the
+// hold was decided on is the one the wait watches.
+func established(outer, inner *Subscription, w *icd.PeerWakefulness) *icd.PeerWakefulness {
 	st := outer.sustained
 	st.mu.Lock()
 	st.inner = inner
@@ -486,6 +498,7 @@ func established(outer, inner *Subscription, w *icd.PeerWakefulness) {
 	if w != nil {
 		st.setHold(w.HoldSubscription())
 	}
+	return w
 }
 
 // tearDownForRecreate closes the inner subscription for a mode-flip
