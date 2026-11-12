@@ -659,3 +659,108 @@ func TestPeripheralAcquiredFlags(t *testing.T) {
 		t.Fatal("the next central's AcquireWrite did not set WriteAcquired")
 	}
 }
+
+// lastAcquiredSignal is the value the last PropertiesChanged of name
+// carried ("" before any).
+func lastAcquiredSignal(b *fakeBus, name string) string {
+	last := ""
+	for _, s := range acquiredSignals(b) {
+		if v, ok := strings.CutPrefix(s, name+"="); ok {
+			last = v
+		}
+	}
+	return last
+}
+
+// settledAcquired waits until both flags read as want and the last signal
+// of each says the same: the published state and its announcement agree.
+func settledAcquired(t *testing.T, b *fakeBus, p *peripheral, want bool) {
+	t.Helper()
+	w := strconv.FormatBool(want)
+	// No signal yet is false: the flags start false.
+	agrees := func(name string) bool {
+		last := lastAcquiredSignal(b, name)
+		return last == w || (last == "" && !want)
+	}
+	waitUntil(t, "the flags settled at "+w, func() bool {
+		return acquiredFlag(t, b, p, 1, "WriteAcquired") == want && acquiredFlag(t, b, p, 2, "NotifyAcquired") == want &&
+			agrees("WriteAcquired") && agrees("NotifyAcquired")
+	})
+}
+
+// TestPeripheralAcquiredFlagsAcrossCentrals: the flags follow every
+// connection's sockets. A central that goes while another holds its
+// sockets does not clear them — its sockets' end comes after the other's
+// acquire — and they clear once no central holds one.
+func TestPeripheralAcquiredFlagsAcrossCentrals(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	serve(t, p, nil, (&acceptedConn{}).accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+
+	first := b.connectCentral("AA:BB:CC:DD:EE:21")
+	second := b.connectCentral("AA:BB:CC:DD:EE:22")
+	for _, fc := range []*fakeCentral{first, second} {
+		if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+			t.Fatal(err)
+		}
+		if err := fc.acquireNotify(p.charPath(2), 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	settledAcquired(t, b, p, true)
+	first.disconnect()
+	waitUntil(t, "the first central gone", func() bool {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return len(p.conns) == 1
+	})
+	// The first central's readers end after its sockets close; the
+	// second's sockets keep both flags.
+	time.Sleep(20 * time.Millisecond)
+	settledAcquired(t, b, p, true)
+	second.disconnect()
+	settledAcquired(t, b, p, false)
+}
+
+// TestPeripheralAcquiredFlagsWhenTheLinkDrops: a link that drops while its
+// AcquireWrite and AcquireNotify are being granted leaves no flag set —
+// the publication reads the connections, not the acquire's intent.
+func TestPeripheralAcquiredFlagsWhenTheLinkDrops(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	serve(t, p, nil, (&acceptedConn{}).accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	for i := range 10 {
+		fc := b.connectCentral(fmt.Sprintf("AA:BB:CC:DD:EF:%02X", i))
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			_ = fc.acquireWrite(p.charPath(1), 100)
+			_ = fc.acquireNotify(p.charPath(2), 100)
+		})
+		wg.Go(func() { p.gone(fc.device) })
+		wg.Wait()
+		fc.disconnect()
+		settledAcquired(t, b, p, false)
+	}
+}
+
+// TestPeripheralAcquiredSignalsInOrder: concurrent acquires and drops of
+// several centrals announce the flags in the order of the states they
+// report — the last signal of each matches the published value.
+func TestPeripheralAcquiredSignalsInOrder(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	serve(t, p, nil, (&acceptedConn{}).accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	var wg sync.WaitGroup
+	for i := range 8 {
+		fc := b.connectCentral(fmt.Sprintf("AA:BB:CC:DD:F0:%02X", i))
+		wg.Go(func() {
+			_ = fc.acquireWrite(p.charPath(1), 100)
+			_ = fc.acquireNotify(p.charPath(2), 100)
+			if i%2 == 0 {
+				fc.disconnect()
+			}
+		})
+	}
+	wg.Wait()
+	settledAcquired(t, b, p, true)
+}
