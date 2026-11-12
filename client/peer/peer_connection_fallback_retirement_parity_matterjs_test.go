@@ -24,10 +24,12 @@ import (
 const addrAlt = "[fd00::5]:5540" // the discovered alternative, :116
 
 // fallbackPeer is a peer whose operational address addr9 is the fallback,
-// with the given addresses discovered.
+// with the given addresses discovered, on matter.js's timing: without the
+// retention, which keeps a fallback no discovered address carries
+// (withoutRetention, issue 507).
 func fallbackPeer(t *testing.T, discovered ...string) (*harness, *Peer) {
 	t.Helper()
-	h := newHarness(t, nil)
+	h := newHarness(t, withoutRetention)
 	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
 	if len(discovered) > 0 {
 		h.announceAddrs(t, discovered...)

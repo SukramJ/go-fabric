@@ -90,7 +90,9 @@ func TestConnectDiscoveredAddress(t *testing.T) {
 // when nothing is discovered; a fallback attempted as the first address
 // uses the normal backoff, one attempted after another address adds
 // MaxDelayBetweenInitialContactRetries to each backoff (PeerConnection.ts:360-379,
-// :519-520, :597-603).
+// :519-520, :597-603). The second half runs without the retention
+// (withoutRetention): with it, the operational address no discovered
+// address carries is anchored and tried first (anchorLocked, issue 507).
 func TestFallbackOnlyAndNotFirst(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -103,7 +105,7 @@ func TestFallbackOnlyAndNotFirst(t *testing.T) {
 		}
 		p.Close(context.Background())
 
-		h2 := newHarness(t, nil)
+		h2 := newHarness(t, withoutRetention)
 		q, _ := h2.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
 		h2.announceAddrs(t, "fd00::1")
 		eventually(t, "the address", func() bool { return len(q.Service().Addresses()) == 1 })
@@ -122,11 +124,12 @@ func TestFallbackOnlyAndNotFirst(t *testing.T) {
 // TestFallbackRetiredAfterStabilization: discovery that names other
 // addresses retires the fallback after AddressChangeStabilizationDelay and
 // the discovered address starts at once, without the stagger
-// (PeerConnection.ts:264-303).
+// (PeerConnection.ts:264-303) — matter.js's behaviour, without the
+// retention (withoutRetention; with it, TestRetainedFallbackNotRetired).
 func TestFallbackRetiredAfterStabilization(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		h := newHarness(t, nil)
+		h := newHarness(t, withoutRetention)
 		p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr9)})
 		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
 		h.sigma1(t, addr9)

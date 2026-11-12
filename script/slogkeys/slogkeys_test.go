@@ -103,7 +103,7 @@ var areaKeys = []string{
 	"queued", "reachable", "rearm_for", "recovered_total",
 	"reestablished", "registered", "reports", "req_paths", "request_id",
 	"requested", "requirement", "resp", "response_type", "responses",
-	"result", "resumed", "retransmission", "retry", "retry_in", "retry_limit",
+	"result", "resumed", "retained", "retransmission", "retry", "retry_in", "retry_limit",
 	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "service",
 	"sessions", "since_last_restart", "skid", "source", "source_endpoint",
 	"source_node_id", "ssid", "stack", "stage", "state", "status_code",
