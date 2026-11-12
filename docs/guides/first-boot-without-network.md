@@ -25,7 +25,9 @@ radio, err := bluez.NewPeripheral("hci0")
 if err != nil {
 	return err
 }
-defer radio.(io.Closer).Close()
+if c, ok := radio.(io.Closer); ok {
+	defer func() { _ = c.Close() }()
+}
 wifi, err := wpasupplicant.New(ctx, wpasupplicant.Options{Interface: "wlan0"})
 if err != nil {
 	return err

@@ -21,7 +21,9 @@
 # network, and wifi/wpasupplicant's live test runs the driver's joins —
 # passphrase, raw PSK, wrong passphrase, open network); otherwise the
 # example runs with --no-wifi (the Ethernet NetworkCommissioning, reached
-# over the runner's network) and the summary says so. The example's log
+# over the runner's network) and the summary says so; with
+# BLE_VIRTUAL_REQUIRE_WIFI=1 (the workflow) that fallback ends the run as
+# "environment". The example's log
 # must name no Wi-Fi passphrase and must show it left the radio after
 # commissioning.
 #
@@ -63,6 +65,12 @@ example_pid=
 hostapd_pid=
 wpa_pid=
 hwsim=
+# wpa_service_was_active: the host's wpa_supplicant.service ran before the
+# Wi-Fi variant stopped it; cleanup starts it again.
+wpa_service_was_active=
+# wifi_missing: why the Wi-Fi variant did not run; with
+# BLE_VIRTUAL_REQUIRE_WIFI=1 (the workflow) that is an environment verdict.
+wifi_missing=
 notes=()
 # alive PID — sudo's pid is root's, so kill -0 from the runner's user
 # answers EPERM; /proc answers for every user.
@@ -92,7 +100,10 @@ cleanup() {
 	stop_example
 	if [ -n "$hostapd_pid" ]; then sudo kill "$hostapd_pid" 2>/dev/null || true; fi
 	if [ -n "$wpa_pid" ]; then sudo kill "$wpa_pid" 2>/dev/null || true; fi
+	# Only a module this script loaded is unloaded, and only a service it
+	# stopped is started again.
 	if [ -n "$hwsim" ]; then sudo modprobe -r mac80211_hwsim 2>/dev/null || true; fi
+	if [ -n "$wpa_service_was_active" ]; then sudo systemctl start wpa_supplicant 2>/dev/null || true; fi
 	if [ -n "$btmon_pid" ]; then sudo kill "$btmon_pid" 2>/dev/null || true; fi
 	if [ -n "$btvirt_pid" ]; then sudo kill "$btvirt_pid" 2>/dev/null || true; fi
 	sudo chown -R "$(id -u):$(id -g)" "$LOG_DIR" 2>/dev/null || true
@@ -312,6 +323,17 @@ setup_hwsim() {
 		return 1
 	}
 	local before after radios
+	# A module loaded already has its own radios, and a second modprobe
+	# does not add three: the variant needs a module of its own.
+	if [ -d /sys/module/mac80211_hwsim ]; then
+		notes+=("Wi-Fi: mac80211_hwsim is loaded already (not by this script); left as it is")
+		return 1
+	fi
+	# A wpa_supplicant outside systemd is the host's: it is not killed.
+	if pgrep -x wpa_supplicant >/dev/null && ! systemctl is-active --quiet wpa_supplicant 2>/dev/null; then
+		notes+=("Wi-Fi: a wpa_supplicant outside wpa_supplicant.service runs; left as it is")
+		return 1
+	fi
 	before=$(ls -d /sys/class/net/*/wireless 2>/dev/null | sort)
 	sudo modprobe mac80211_hwsim radios=3 >>"$LOG_DIR/modprobe.log" 2>&1 || {
 		notes+=("Wi-Fi: no mac80211_hwsim module in kernel $(uname -r)")
@@ -335,8 +357,10 @@ setup_hwsim() {
 	if command -v nmcli >/dev/null; then
 		for i in $sta $ap $open; do sudo nmcli device set "$i" managed no >/dev/null 2>&1 || true; done
 	fi
-	sudo systemctl stop wpa_supplicant >/dev/null 2>&1 || true
-	sudo pkill -x wpa_supplicant 2>/dev/null || true
+	if systemctl is-active --quiet wpa_supplicant 2>/dev/null; then
+		wpa_service_was_active=1
+		sudo systemctl stop wpa_supplicant >/dev/null 2>&1 || true
+	fi
 	printf 'interface=%s\ndriver=nl80211\nssid=%s\nhw_mode=g\nchannel=1\nwpa=2\nwpa_key_mgmt=WPA-PSK\nrsn_pairwise=CCMP\nwpa_passphrase=%s\n' \
 		"$ap" "$WIFI_SSID" "$WIFI_PASS" >"$LOG_DIR/hostapd-wpa2.conf"
 	printf 'interface=%s\ndriver=nl80211\nssid=%s\nhw_mode=g\nchannel=6\n' "$open" "$WIFI_OPEN_SSID" >"$LOG_DIR/hostapd-open.conf"
@@ -369,6 +393,7 @@ if setup_hwsim; then
 else
 	WIFI_VARIANT="--no-wifi (no mac80211_hwsim radio: the Ethernet NetworkCommissioning over the runner's network)"
 	EXAMPLE_WIFI=(--no-wifi)
+	wifi_missing="the Wi-Fi variant did not run (see the Wi-Fi note)"
 fi
 notes+=("second direction, Wi-Fi: $WIFI_VARIANT")
 
@@ -475,8 +500,9 @@ if [ -n "$WIFI_IFACE" ]; then
 			wifi_live="the driver's live test failed against wpa_supplicant (see wpasupplicant-live.log)"
 		grep -q -- '--- SKIP: TestLiveWPASupplicant ' "$LOG_DIR/wpasupplicant-live.log" &&
 			wifi_live="the driver's live test skipped (see wpasupplicant-live.log)"
-		if [ -z "$wifi_live" ] && grep -q -- "$WIFI_PASS" "$LOG_DIR/wpasupplicant-live.log"; then
-			wifi_live="the driver's live test output names the passphrase"
+		# Also on a failed run: the log is uploaded as an artifact.
+		if grep -q -- "$WIFI_PASS" "$LOG_DIR/wpasupplicant-live.log"; then
+			wifi_live="${wifi_live:+$wifi_live; }the driver's live test output names the passphrase"
 		fi
 	else
 		wifi_live="wifi/wpasupplicant's tests do not compile (see build-wpasupplicant.log)"
@@ -496,8 +522,8 @@ for n in "${notes[@]}"; do echo "ble-virtual: $n"; done
 # stack's. The Wi-Fi driver's live test is a verdict of its own: its
 # failure says nothing about BLE.
 second="${example_ours:+pair --ble -> example: $example_ours; }${example_control:+matter.js -> example: $example_control}"
-if [ -z "$second" ] && [ -n "$wifi_live" ]; then
-	verdict defect "every BLE leg passed; the Wi-Fi driver's live test failed against the real wpa_supplicant: $wifi_live"
+if [ -z "$second" ] && [ -z "$ours" ] && [ -n "$wifi_live" ]; then
+	verdict defect "every go-fabric BLE leg passed; the Wi-Fi driver's live test failed against the real wpa_supplicant: $wifi_live"
 fi
 if [ -n "$second" ]; then
 	if [ -z "$control" ]; then
@@ -506,6 +532,10 @@ if [ -n "$second" ]; then
 		verdict defect "the second direction failed — $second — while the example was commissioned by the other controller"
 	fi
 	verdict environment "the second direction failed — $second — and so did the control leg ($control): the virtual stack"
+fi
+
+if [ -z "$ours" ] && [ "${BLE_VIRTUAL_REQUIRE_WIFI:-}" = 1 ] && [ -n "$wifi_missing" ]; then
+	verdict environment "the BLE legs passed, but the required Wi-Fi variant did not run (BLE_VIRTUAL_REQUIRE_WIFI=1): $wifi_missing"
 fi
 
 what="pair --ble over $CENTRAL commissioned the matter.js peripheral on $PERIPHERAL with Wi-Fi credentials; read over the operational session; examples/ble-wifi-light on $PERIPHERAL through BlueZ was commissioned by pair --ble and by matter.js's controller (Wi-Fi: $WIFI_VARIANT)"

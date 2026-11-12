@@ -39,13 +39,15 @@ Ethernet cable** for parts B and C.
 
 ## Part B — commissioning with chip-tool
 
-chip-tool with BLE (the snap on amd64, or a build with BLE; the harness
-image's chip-tool has no BLE). The access point's SSID and passphrase are
-`<ssid>` and `<pass>`.
+chip-tool with BLE on the host that talks to the real radio: the snap on
+amd64, or a build with BLE. The harness image's `/bin/chip-tool-ble` has
+BLE, but its leg runs it against chip's BlueZ and wpa_supplicant mocks in
+network namespaces; that setup does not drive a real adapter. The access
+point's SSID and passphrase are `<ssid>` and `<pass>`.
 
 | # | Step | Expected |
 | --- | --- | --- |
-| B1 | `chip-tool pairing ble-wifi 1 <ssid> <pass> 20202021 3840` | Pairing succeeds within 60 s. `light.log`: PASE over BTP, `AddOrUpdateWiFiNetwork`, `wpasupplicant: added network`, `wpasupplicant: connected`, `mdns.responder.joined iface=wlan0`, CASE, then `matter.ble.stopped`. `bluetoothctl scan on` on another host no longer lists `MATTER-3840`. |
+| B1 | `chip-tool pairing ble-wifi 1 <ssid> <pass> 20202021 3840` | Pairing succeeds within 60 s. `light.log`: PASE over BTP, `AddOrUpdateWiFiNetwork`, `wpasupplicant: added network`, `wpasupplicant: connected`, `mdns.responder.joined iface=wlan0` (only when wlan0 was not up and multicast-capable at the example's start; an interface that was up then is joined at the start and not logged again), CASE, then `matter.ble.stopped`. `bluetoothctl scan on` on another host no longer lists `MATTER-3840`. |
 | B2 | `chip-tool networkcommissioning read networks 1 0`, `read last-networking-status 1 0`, `read feature-map 1 0` | `Networks` lists `<ssid>` with `Connected: TRUE`; `LastNetworkingStatus` 0 (Success); FeatureMap 1 (Wi-Fi). |
 | B3 | `chip-tool onoff toggle 1 2`, then `onoff read on-off 1 2` | `light.log` shows `msg=light on=true`; the read returns TRUE. |
 | B4 | `grep -c '<pass>' light.log` | 0. |

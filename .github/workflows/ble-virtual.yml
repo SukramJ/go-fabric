@@ -82,6 +82,9 @@ jobs:
       - name: pair over btvirt
         env:
           BLE_LOG_DIR: ${{ runner.temp }}/ble-virtual
+          # The runner has mac80211_hwsim (run 43137917486): a run without
+          # the Wi-Fi variant is an environment failure, not a pass.
+          BLE_VIRTUAL_REQUIRE_WIFI: "1"
         run: make ble-virtual-test
       - name: upload logs
         if: always()
