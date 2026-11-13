@@ -475,13 +475,14 @@ func TestAcceptStaleTimerKeepsTheNewOne(t *testing.T) {
 	if err := Accept(g, (&opened{}).open, Options{TimeSource: clk}); err != nil {
 		t.Fatal(err)
 	}
+	// fn(0) is the accept timer's callback (accept.go acceptTimeout).
 	g.write(handshakeRequest(100)) // timer A
 	g.write(handshakeRequest(100)) // timer B replaces A
-	clk.fn(0)()                    // A's callback, stale
+	clk.fn(1)()                    // A's callback, stale
 	if g.isGone() {
 		t.Fatal("the stale timer dropped the connection")
 	}
-	clk.fn(1)() // B fires
+	clk.fn(2)() // B fires
 	if !g.isGone() {
 		t.Fatal("the new timer did not drop the connection after the stale one ran")
 	}

@@ -45,6 +45,13 @@ var ErrNoConnection = errors.New("btp: nil GATT connection or open function")
 // db021da0), with the platform cut away. It registers its handlers on c
 // and returns at once:
 //
+//   - The accept starts the handshake timer of [ConnRspTimeout]: a central
+//     that has not completed the handshake — its C2 subscription has not
+//     started the session — when it ends is disconnected, a silent one
+//     included. Ahead of matter.js, whose accept handler starts no timer
+//     (BlenoBleServer.ts:189-193 at db021da0; its timer starts at the
+//     handshake request, :258), so a central that never writes holds the
+//     connection; review II, R2-P1-req-07, owner decision 31.
 //   - A C1 write of a handshake request (a 9-byte value starting 0x65 0x6C)
 //     is kept, and [ConnRspTimeout] starts: the central must subscribe C2
 //     before it ends, or the connection is dropped (:251-264, :148-150,
@@ -81,6 +88,12 @@ func Accept(c GATTConnection, open func(conn *Conn) (handle func(msg []byte)), o
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &gattServer{c: c, open: open, opts: opts, clock: clock.Or(opts.TimeSource), log: opts.Logger, ctx: ctx, cancel: cancel}
+	// The handshake timer runs from the accept; the subscription that
+	// starts the session stops it, and its generation keeps a callback
+	// that raced the stop out of the session (startTimerLocked).
+	s.mu.Lock()
+	s.startTimerLocked()
+	s.mu.Unlock()
 	c.OnWrite(s.handleC1Write)
 	c.OnSubscribe(s.handleC2Subscribe)
 	c.OnUnsubscribe(s.handleC2Unsubscribe)
@@ -269,8 +282,9 @@ func (s *gattServer) watch() {
 	}
 }
 
-// startTimerLocked (re)starts the handshake timer (:258): when it fires
-// before the subscription, the connection is dropped (:413-416).
+// startTimerLocked (re)starts the handshake timer (:258; and at the
+// accept, [Accept]): when it fires before the subscription, the
+// connection is dropped (:413-416).
 func (s *gattServer) startTimerLocked() {
 	s.stopTimerLocked()
 	gen := s.timerGen
