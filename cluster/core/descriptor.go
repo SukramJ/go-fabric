@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -44,8 +45,8 @@ type Descriptor struct {
 	tagList   []SemanticTag
 
 	// version is the cluster's DataVersion, bumped whenever an observed
-	// ServerList / PartsList differs from the last one; lastLists is that
-	// last observation. See MatterDataVersion.
+	// DeviceTypeList / ServerList / PartsList / TagList differs from the
+	// last one; lastLists is that last observation. See MatterDataVersion.
 	versionMu sync.Mutex
 	version   cluster.DataVersionTracker
 	lastLists string
@@ -56,7 +57,9 @@ type Descriptor struct {
 // Descriptor's content changes only through its providers (the mounted set
 // and the topology), never through a write, so there is no write path to
 // bump on. The version is therefore derived from the content: each call
-// renders the two dynamic lists and bumps when they differ from the last
+// renders the lists that can move — DeviceTypeList, ServerList, PartsList
+// and, with the feature, TagList ([Descriptor.EnableTagList],
+// [Descriptor.AddTags]) — and bumps when they differ from the last
 // rendering. A Descriptor without a version answered every read with the
 // sentinel DataVersion, which the read path will not filter on — a
 // controller's DataVersionFilter for it never matched, and the CHIP read
@@ -64,9 +67,10 @@ type Descriptor struct {
 // every cluster's Datasource carries a version that advances when its
 // state changes (Datasource.ts).
 func (d *Descriptor) MatterDataVersion() uint32 {
+	deviceTypes, _ := d.MatterRead(descriptorAttrDeviceTypeList)
 	server, _ := d.MatterRead(descriptorAttrServerList)
 	parts, _ := d.MatterRead(descriptorAttrPartsList)
-	lists := fmt.Sprint(server, parts)
+	lists := fmt.Sprint(deviceTypes, server, parts, d.tagListDigest())
 	d.versionMu.Lock()
 	defer d.versionMu.Unlock()
 	if d.lastLists != "" && d.lastLists != lists {
@@ -74,6 +78,33 @@ func (d *Descriptor) MatterDataVersion() uint32 {
 	}
 	d.lastLists = lists
 	return d.version.Current()
+}
+
+// tagListDigest renders the TagList state for the version digest: whether
+// the feature is selected, and every tag with its label by value — a label
+// is a pointer, which fmt would render as an address that differs on every
+// read.
+func (d *Descriptor) tagListDigest() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if !d.tagListOn {
+		return "-"
+	}
+	var b strings.Builder
+	b.WriteByte('+')
+	for _, t := range d.tagList {
+		fmt.Fprintf(&b, "%v/%d/%d/", t.MfgCode, t.NamespaceId, t.Tag)
+		switch {
+		case t.Label == nil:
+			b.WriteByte('-')
+		case t.Label.Null:
+			b.WriteByte('0')
+		default:
+			fmt.Fprintf(&b, "%q", t.Label.Value)
+		}
+		b.WriteByte(';')
+	}
+	return b.String()
 }
 
 // DeviceTypeStruct is the Descriptor.DeviceTypeList entry, the generated
@@ -312,10 +343,20 @@ func (d *Descriptor) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, 
 	return nil, im.UnsupportedCommandf("core: Descriptor has no commands (got 0x%02X)", cmdID)
 }
 
-// MatterReportable returns the attributes that subscribe-able. PartsList
-// changes when the bridge adds or removes a bridged endpoint.
+// MatterReportable returns the lists MatterDataVersion digests: PartsList
+// moves when the bridge adds or removes a bridged endpoint, ServerList with
+// the mounted cluster set, and TagList — listed only with the feature,
+// since an unserved attribute cannot be read back — with
+// [Descriptor.AddTags]. DeviceTypeList is fixed at construction and listed
+// with them.
 func (d *Descriptor) MatterReportable() []uint32 {
-	return []uint32{descriptorAttrPartsList}
+	out := []uint32{descriptorAttrDeviceTypeList, descriptorAttrServerList, descriptorAttrPartsList}
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if d.tagListOn {
+		out = append(out, descriptorAttrTagList)
+	}
+	return out
 }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]

@@ -474,3 +474,55 @@ func TestDescriptorDataVersionFollowsItsLists(t *testing.T) {
 		t.Error("a changed PartsList kept the version")
 	}
 }
+
+// TestDescriptorDataVersionFollowsTagList pins the TagList half of the
+// content-derived DataVersion (review II, W3-clucore-12): stable across
+// reads of an unchanged TagList, advancing when the feature is selected,
+// when a tag is added and when a listed tag's label is replaced — and not
+// when AddTags changes nothing. Every list the server serves is reportable;
+// TagList only with the feature, since an attribute the server does not
+// answer counts as changed on every notification.
+func TestDescriptorDataVersionFollowsTagList(t *testing.T) {
+	t.Parallel()
+	d := defaultDescriptor(t)
+	if got, want := d.MatterReportable(), []uint32{0x0000, 0x0001, 0x0003}; !slices.Equal(got, want) {
+		t.Errorf("MatterReportable without TagList = %#x, want %#x", got, want)
+	}
+	v0 := d.MatterDataVersion()
+
+	label := func(s string) *spec.Nullable[string] { return &spec.Nullable[string]{Value: s} }
+	d.EnableTagList(core.SemanticTag{NamespaceId: 7, Tag: 1, Label: label("left")})
+	v1 := d.MatterDataVersion()
+	if v1 == v0 {
+		t.Error("selecting the TagList feature kept the version")
+	}
+	if got, want := d.MatterReportable(), []uint32{0x0000, 0x0001, 0x0003, 0x0004}; !slices.Equal(got, want) {
+		t.Errorf("MatterReportable with TagList = %#x, want %#x", got, want)
+	}
+	if v := d.MatterDataVersion(); v != v1 {
+		t.Fatalf("an unchanged TagList moved the version %d → %d", v1, v)
+	}
+
+	if err := d.AddTags(core.SemanticTag{NamespaceId: 7, Tag: 2}); err != nil {
+		t.Fatal(err)
+	}
+	v2 := d.MatterDataVersion()
+	if v2 == v1 {
+		t.Error("AddTags after the first read kept the version")
+	}
+
+	if err := d.AddTags(core.SemanticTag{NamespaceId: 7, Tag: 1, Label: label("right")}); err != nil {
+		t.Fatal(err)
+	}
+	v3 := d.MatterDataVersion()
+	if v3 == v2 {
+		t.Error("a replaced label kept the version")
+	}
+
+	if err := d.AddTags(core.SemanticTag{NamespaceId: 7, Tag: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if v := d.MatterDataVersion(); v != v3 {
+		t.Errorf("AddTags that changed nothing moved the version %d → %d", v3, v)
+	}
+}
