@@ -3,10 +3,7 @@
 
 package btp
 
-import (
-	"testing"
-	"time"
-)
+import "testing"
 
 // A handshake that states a receive window of 0 is refused on both roles,
 // as connectedhomeip does (src/ble/BLEEndPoint.cpp:1014 for the request,
@@ -90,7 +87,7 @@ func TestAcceptRefusesZeroWindow(t *testing.T) {
 	f.subscribe(100)
 	select {
 	case <-f.Disconnected():
-	case <-time.After(5 * time.Second):
+	case <-deadline(t).Done():
 		t.Fatal("the connection stayed after a handshake request with window 0")
 	}
 	if n := o.count(); n != 0 {
