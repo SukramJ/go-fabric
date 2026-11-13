@@ -130,6 +130,7 @@ Use `Observers` instead.
 | `GroupTransport` (`groups.MulticastTransport`) | the transport group messages leave on (`Controller.Groups`, `Controller.SetGroupKey`) | the controller's own UDP socket |
 | `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
 | `TransportPreference` | the transport each peer prefers | UDP |
+| `PeerTiming` (`*client.Timing`) | the peer set's connection timing, overriding the defaults field-wise (a zero field keeps its default; a negative `ProvenAddressRetention` retains nothing) | `client/peer.DefaultTiming` |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |
 | `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewResponder()` when `Advertise` is set |
 | `Diagnostics` (`diag.Diagnostics{Capacity}`) | the size of the diagnostic trace (`Controller.DiagnosticEvents`, `Controller.OnDiagnosticEvent`) | 256 events |

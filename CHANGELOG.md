@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `controller.Config.PeerTiming` (`*client.Timing`): a host sets the controller's peer timing — `ProvenAddressRetention` (issue 507) and the other `client/peer.Timing` parameters — overriding `DefaultTiming` field-wise; nil keeps the defaults.
+
 ### Changed
 
 - Dependencies: `modernc.org/sqlite` 1.61.0 → 1.61.1, which raises it in every consumer's build list (#500); the nested modules and `examples/ble-wifi-light` follow in their `go.mod`.
