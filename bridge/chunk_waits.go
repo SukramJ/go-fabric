@@ -25,8 +25,12 @@ import (
 //     subscription ([Bridge.releaseSubscriptionRouting] closes its
 //     priming abort).
 //   - One session holds at most [maxChunkWaitsPerSession] interactions
-//     that wait so at once; the request beyond is answered Busy before
-//     anything is read, run or registered.
+//     that wait so at once; the request beyond is answered Busy — a
+//     SubscribeRequest before anything is registered, a batch
+//     InvokeRequest before any command runs, a ReadRequest after it was
+//     read and chunked, instead of its first chunk: whether a read waits
+//     at all depends on its chunk count, and a read that fits one chunk
+//     is not refused (review II, R2-P1-dr-req-10).
 //
 // The cut is the bound per session, not releasing the dispatch slot for
 // the wait: a released slot would leave the waiting goroutines without
