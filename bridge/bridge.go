@@ -64,11 +64,12 @@
 // next [Reassemble] (or, for the ACK tracker, not at all on a bridge
 // that is already running):
 //
-//   - AttachACLLister — FAILS CLOSED. The lister reaches the dispatcher
-//     only in reassembleLocked, which Start runs. Without one,
-//     TopologyDispatcher.CheckACL denies every fabric-scoped request
-//     with UnsupportedAccess (endpoint/dispatcher.go:790-802): a bridge
-//     that pairs normally and then answers nothing. A deployment that
+//   - AttachACLLister — FAILS CLOSED. Attached before Start so the
+//     first dispatcher carries it; a later call replaces the lister on
+//     the running dispatcher at once (the one port of this group that
+//     does). Without one, TopologyDispatcher.CheckACL denies every
+//     fabric-scoped request with UnsupportedAccess: a bridge that pairs
+//     normally and then answers nothing. A deployment that
 //     means to run unguarded passes [endpoint.UnenforcedACL] — the
 //     explicit spelling of the same effect.
 //   - AttachSessionLookup — silent. The default noopSessionLookup misses
@@ -1146,6 +1147,11 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	b.mu.Lock()
 	prevTopology := b.topology
 	b.topology = topology
+	// The sources once more, under the lock of the swap: an Attach… that
+	// ran since they were read above applied to the dispatcher this one
+	// replaces.
+	dispatcher.SetACLLister(b.aclLister)
+	dispatcher.SetAuxiliaryACL(b.auxACL)
 	b.dispatcher = dispatcher
 	staleSwitchUnsubs := b.switchUnsubscribers
 	b.switchUnsubscribers = switchUnsubs
@@ -1634,8 +1640,9 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 // invokes are gated by the AccessControl cluster's stored entries; without
 // one the dispatcher's CheckACL denies every operational request, so a
 // bridge left unwired answers nothing rather than answering everything. The
-// lister is applied to the dispatcher on the next [Reassemble] and on every
-// subsequent rebuild.
+// lister is applied at once to the dispatcher of a running bridge — the
+// next access check reads it — and to every dispatcher a [Reassemble]
+// builds.
 //
 // A setup that means to run without stored entries passes
 // [endpoint.UnenforcedACL].
@@ -1645,6 +1652,10 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	}
 	b.mu.Lock()
 	b.aclLister = l
+	// The live dispatcher too (nil before the first assembly): before, a
+	// lister replaced on a running bridge waited for a Reassemble that a
+	// node with a fixed set of devices never runs (review II, W2-api-10).
+	b.dispatcher.SetACLLister(l)
 	b.mu.Unlock()
 }
 
@@ -1654,8 +1665,9 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 // the auxiliary ones, and a Group entry without targets no longer reaches
 // endpoint 0. Pass the *groups.Manager the Groupcast server was built
 // with — the server turns the feature on in AccessControl, this port makes
-// the dispatcher enforce what that cluster reports. Applied on the next
-// [Reassemble]. nil (the default) keeps the feature off in the
+// the dispatcher enforce what that cluster reports. Applied at once to
+// the dispatcher of a running bridge and to every one a [Reassemble]
+// builds. nil (the default) keeps the feature off in the
 // dispatcher: a Groupcast auxiliary grant is then not honoured, so group
 // commands relying on it are dropped — fails closed, silently, since a
 // group message is never answered. Mirrors matter.js AccessControlServer
@@ -1667,6 +1679,7 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 	}
 	b.mu.Lock()
 	b.auxACL = src
+	b.dispatcher.SetAuxiliaryACL(src)
 	b.mu.Unlock()
 }
 

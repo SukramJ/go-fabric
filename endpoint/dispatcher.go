@@ -8,6 +8,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
@@ -55,8 +56,13 @@ func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
 // and swaps the dispatcher's reference.
 type TopologyDispatcher struct {
 	topology *Topology
-	acl      ACLLister
-	aux      AuxiliaryACLLister
+	// acl and aux are the access-control sources [TopologyDispatcher.CheckACL]
+	// reads, nil for none. A running bridge replaces them on the live
+	// dispatcher (Bridge.AttachACLLister, Bridge.AttachAuxiliaryACL) while
+	// requests are checked, hence the atomics; the boxes keep an
+	// interface value behind one pointer.
+	acl atomic.Pointer[ACLLister]
+	aux atomic.Pointer[AuxiliaryACLLister]
 	// timedWrite reports an attribute with the timed access quality; nil
 	// is [schema.IsTimedWrite]. A test sets it: no attribute of the
 	// snapshot at the pin carries the quality. A pointer keeps the
@@ -130,11 +136,39 @@ func NewTopologyDispatcher(t *Topology) *TopologyDispatcher {
 //
 // Passing nil leaves the gate closed rather than open: every operational
 // (CASE) request is denied until a source is wired. Pass [UnenforcedACL] to
-// run without stored entries on purpose.
+// run without stored entries on purpose. Safe while requests are being
+// checked: the next CheckACL reads l.
 func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
-	if d != nil {
-		d.acl = l
+	if d == nil {
+		return
 	}
+	if l == nil {
+		d.acl.Store(nil)
+		return
+	}
+	d.acl.Store(&l)
+}
+
+// aclLister is the ACL source, nil when none is wired.
+func (d *TopologyDispatcher) aclLister() ACLLister {
+	if d == nil {
+		return nil
+	}
+	if p := d.acl.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
+
+// auxLister is the auxiliary ACL source, nil when none is wired.
+func (d *TopologyDispatcher) auxLister() AuxiliaryACLLister {
+	if d == nil {
+		return nil
+	}
+	if p := d.aux.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // SetAuxiliaryACL wires the auxiliary access control entries
@@ -143,11 +177,17 @@ func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
 // that a Group entry without targets no longer reaches endpoint 0. nil
 // turns the feature off. Mirrors matter.js AccessControlServer
 // #applyFabricAcl, which installs `[...realAcl, ...#auxiliaryAclFor(fabric)]`
-// and sets FabricAccessControl.auxiliaryFeatureEnabled.
+// and sets FabricAccessControl.auxiliaryFeatureEnabled. Safe while
+// requests are being checked, as [TopologyDispatcher.SetACLLister].
 func (d *TopologyDispatcher) SetAuxiliaryACL(l AuxiliaryACLLister) {
-	if d != nil {
-		d.aux = l
+	if d == nil {
+		return
 	}
+	if l == nil {
+		d.aux.Store(nil)
+		return
+	}
+	d.aux.Store(&l)
 }
 
 // Compile-time assertion: TopologyDispatcher satisfies im.Dispatcher
@@ -1070,7 +1110,8 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// W2-sec-03.
 		return im.StatusUnsupportedAccess
 	}
-	if d == nil || d.acl == nil {
+	acl := d.aclLister()
+	if acl == nil {
 		// Fail closed. A dispatcher without an ACL source cannot tell an
 		// authorised controller from any other node that completed CASE, so
 		// answering the request would serve exactly what the AccessControl
@@ -1079,7 +1120,7 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// without stored entries wires [UnenforcedACL].
 		return im.StatusUnsupportedAccess
 	}
-	entries, err := d.acl.ListACL(ctx, fabricIndex)
+	entries, err := acl.ListACL(ctx, fabricIndex)
 	if err != nil {
 		// Fail closed: an ACL that cannot be evaluated must not grant access.
 		return im.StatusUnsupportedAccess
@@ -1099,12 +1140,13 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// host that mounts Groupcast (which turns AUX on) without
 		// AttachAuxiliaryACL now gets the endpoint 0 restriction and no
 		// auxiliary grants — closed, not open.
-		auxEnabled := d.aux != nil || d.auxiliaryAdvertised()
-		if d.aux != nil {
+		auxSource := d.auxLister()
+		auxEnabled := auxSource != nil || d.auxiliaryAdvertised()
+		if auxSource != nil {
 			// Auxiliary entries are all Group entries, so only a group
 			// subject can match one. An auxiliary source that cannot be
 			// read fails closed like the stored ACL.
-			aux, err := d.aux.AuxiliaryACL(ctx, fabricIndex)
+			aux, err := auxSource.AuxiliaryACL(ctx, fabricIndex)
 			if err != nil {
 				return im.StatusUnsupportedAccess
 			}

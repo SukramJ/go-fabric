@@ -208,7 +208,8 @@ func TestTopologyDispatcher_CheckACL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			d := &TopologyDispatcher{acl: tt.lister}
+			d := &TopologyDispatcher{}
+			d.SetACLLister(tt.lister)
 			got := d.CheckACL(ctx, tt.fabric, tt.subjNodeID, tt.subjCATs, ep, tt.cluster, tt.required)
 			if got != tt.want {
 				t.Fatalf("CheckACL = 0x%02X, want 0x%02X", got, tt.want)
