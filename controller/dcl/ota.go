@@ -317,7 +317,16 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	// copy of nothing (review II, R2-P0-rv-C04).
 	limit := bound
 	if u.OTAFileSize != 0 {
-		limit = int64(u.OTAFileSize) //nolint:gosec // at most bound, checked above
+		// At most bound, checked above; said again against the type's own
+		// limit, where the conversion stands, so that it is bounded in the
+		// place it is made.
+		if u.OTAFileSize > math.MaxInt64 {
+			return &OTAError{
+				Message: fmt.Sprintf("OTA image from %s announces %d bytes, more than the bound of %d bytes (MaxImageSize)", u.OTAURL, u.OTAFileSize, bound),
+				Err:     ErrOTAImageTooLarge,
+			}
+		}
+		limit = int64(u.OTAFileSize)
 	}
 	probe := limit
 	if probe < math.MaxInt64 {

@@ -64,7 +64,7 @@ Findings of review II, phase 0 (`notes/review/2026-11-13/`).
 
 ### Removed
 
-- **Breaking:** `cluster/core`: `(*core.OperationalCredentials).SetAttestationChallenge`. The server holds no challenge of its own any more; AttestationRequest, CSRRequest and SignVIDVerificationRequest sign over the invoking session's (see Security). Migration: nothing to call when the bridge dispatches — it stamps the invoking session's challenge from a session table with `AttestationChallengeFor(sessionID uint16) ([]byte, bool)`, as `operational.Manager` has; a host's own direct `MatterInvoke` of the three commands stamps `core.WithInvokeAttestationChallenge(ctx, challenge)`, without which they answer FAILURE ([migration guide](docs/guides/migrating-to-the-facade.md#removed-in-the-next-release-setattestationchallenge)) (review II, W3-clusec-10, owner decision 19).
+- **Breaking:** `cluster/core`: `OperationalCredentials.SetAttestationChallenge` (the method of `*core.OperationalCredentials`). The server holds no challenge of its own any more; AttestationRequest, CSRRequest and SignVIDVerificationRequest sign over the invoking session's (see Security). Migration: nothing to call when the bridge dispatches — it stamps the invoking session's challenge from a session table with `AttestationChallengeFor(sessionID uint16) ([]byte, bool)`, as `operational.Manager` has; a host's own direct `MatterInvoke` of the three commands stamps `core.WithInvokeAttestationChallenge(ctx, challenge)`, without which they answer FAILURE ([migration guide](docs/guides/migrating-to-the-facade.md#removed-in-the-next-release-setattestationchallenge)) (review II, W3-clusec-10, owner decision 19).
 
 ### Fixed
 
