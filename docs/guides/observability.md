@@ -157,8 +157,17 @@ cfg.Metrics = expvarmetrics.New("fabric.")
 ```
 
 `New` publishes the whole set at zero, so a dashboard sees every name
-before the first event. The reference bridge serves it with
-`--metrics-expvar 127.0.0.1:9090`.
+before the first event.
+
+The standard library's `/debug/vars` handler has no authentication and
+publishes more than these names: its built-in `cmdline` variable is
+`os.Args`. A daemon that takes a secret as a flag — a setup passcode, a
+Wi-Fi passphrase — hands it to every client of that handler. Serve the
+variables you mean to serve instead. The reference bridge does: its
+`--metrics-expvar 127.0.0.1:9090` serves the `fabric.` variables only, in
+the same JSON shape
+([`metrics.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/reference-bridge/metrics.go)),
+and belongs on a loopback address.
 
 ## The diagnostic trace
 

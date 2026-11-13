@@ -136,7 +136,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that knows the --wifi-sim-ssid networks, connects to one after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
-	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
+	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as /debug/vars, in expvar's JSON shape and without authentication — keep it on loopback; off when empty; see metrics.go")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
@@ -171,7 +171,7 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	// below is safe exactly because of this check.
 	const setupPasscodeMax = 99999998
 	if f.passcode > setupPasscodeMax {
-		return 0, 0, fmt.Errorf("--passcode %d exceeds the Matter maximum %d", f.passcode, setupPasscodeMax)
+		return 0, 0, fmt.Errorf("--passcode exceeds the Matter maximum %d", setupPasscodeMax)
 	}
 	passcode = uint32(f.passcode)
 	if err := node.ValidateSetupPIN(passcode); err != nil {
