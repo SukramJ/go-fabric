@@ -562,8 +562,11 @@ func (a *Aggregator) detachAll() {
 // IncreaseConfigurationVersions raises, as one change of the node, the
 // ConfigurationVersion of the bridged endpoints with keys — each physical
 // device once — and the node's own once, after them, and persists every
-// version raised in one pass under ctx, so a version never decreases
-// across a restart. With no key it raises the node's alone. Before the
+// version raised in one pass, so a version never decreases across a
+// restart. The write runs on ctx's values without its cancellation — a
+// version served is stored even when ctx ends first — and a write the
+// store refuses is returned, after the versions were raised and served.
+// With no key it raises the node's alone. Before the
 // node assembled its topology ([Node.Start]) it fails with
 // [ErrNotStarted]; an unknown key fails with [ErrUnknownKey] before
 // anything is raised. Mirrors
@@ -601,8 +604,10 @@ func (a *Aggregator) IncreaseConfigurationVersions(ctx context.Context, keys ...
 			c.IncreaseConfigurationVersion(d.scope, d.address)
 		}
 	})
-	a.n.persisted.storeConfigVersions(ctx, topo, versions)
-	return nil
+	// The versions are served already: their write must not depend on
+	// the caller's context staying alive, or a version served now would
+	// go back down after a restart.
+	return a.n.persisted.storeConfigVersions(context.WithoutCancel(ctx), topo, versions)
 }
 
 func (a *Aggregator) setStarted() {
