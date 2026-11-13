@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -857,24 +858,38 @@ func TestCallsEndWhenTheBusConnectionDrops(t *testing.T) {
 }
 
 // TestScanEndsWithItsContextWhileTheLoopIsBusy: a scan whose hand-over to
-// the run loop cannot complete — the loop is held handling a join's State
-// changes — ends with its context, and the driver scans again once the
-// loop is free (review II, R2-P1-drv-02).
+// the run loop cannot complete — the loop is held handling a signal — ends
+// with its context, and the driver scans again once the loop is free
+// (review II, R2-P1-drv-02). The loop waits on nothing of the driver's
+// since core2 item 4, so a logger that blocks on the loop's "interface
+// state" record holds it.
 func TestScanEndsWithItsContextWhileTheLoopIsBusy(t *testing.T) {
 	t.Parallel()
 	b := newFakeBus()
 	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
 	release, held := make(chan struct{}), make(chan struct{})
-	b.onSelect = func(b *fakeBus, _ int) {
-		// One State change more than the join's buffer holds, while the
-		// join is still in SelectNetwork: the loop blocks handing it over.
-		for range 17 {
-			b.setStateLocked("scanning")
-		}
-		close(held)
-		<-release
+	logs := &syncBuffer{}
+	var once sync.Once
+	logger := slog.New(&holdingHandler{
+		Handler: slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		hold: func(r slog.Record) {
+			if r.Message == "wpasupplicant: interface state" {
+				once.Do(func() { close(held); <-release })
+			}
+		},
+	})
+	d, err := newDriver(t.Context(), b, Options{ScanTimeout: 50 * time.Millisecond, ConnectTimeout: 50 * time.Millisecond, Logger: logger})
+	if err != nil {
+		t.Fatalf("newDriver: %v", err)
 	}
-	d, _ := startDriver(t, b, Options{ScanTimeout: 50 * time.Millisecond, ConnectTimeout: 50 * time.Millisecond})
+	b.mu.Lock()
+	b.scanArmed = func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return d.scan != nil
+	}
+	b.mu.Unlock()
+	t.Cleanup(func() { _ = d.Close() })
 	joined := make(chan struct{})
 	go func() {
 		defer close(joined)
@@ -908,6 +923,68 @@ func TestScanEndsWithItsContextWhileTheLoopIsBusy(t *testing.T) {
 	if armed || scanning {
 		t.Fatalf("after the scans: armed %v, scanning %v", armed, scanning)
 	}
+}
+
+// TestTheRunLoopKeepsReadingWhileAJoinIsInACall pins core2 item 4
+// (R2-P1-drv-06): a join's State changes are queued for it without the
+// run loop waiting on the join. Before, the loop handed each change over a
+// 16-slot channel and blocked on the 17th while the join was in a bus call
+// of its own (here the DisconnectReason read), so it read no signal and
+// took no scan until the call returned — and on the system bus godbus
+// handed every signal that found its channel full to a goroutine of its
+// own, losing the order the join's "drain by length" relies on
+// (default_handler.go:316-333 at v5.2.4).
+func TestTheRunLoopKeepsReadingWhileAJoinIsInACall(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
+	b.props["DisconnectReason"] = dbus.MakeVariant(int32(3))
+	b.props["AssocStatusCode"] = dbus.MakeVariant(int32(0))
+	inCall, release := make(chan struct{}), make(chan struct{})
+	var first atomic.Bool
+	b.onSelect = func(b *fakeBus, _ int) {
+		b.setStateLocked("associating")
+		b.setStateLocked(stateDisconnected)
+		// The join's next property read is its DisconnectReason: it stays
+		// in that call until release. Later reads (the scan's) pass.
+		b.beforeRead = func() {
+			if first.CompareAndSwap(false, true) {
+				close(inCall)
+				<-release
+			}
+		}
+	}
+	d, _ := startDriver(t, b, Options{})
+	joined := make(chan uint8, 1)
+	go func() {
+		status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+		joined <- status
+	}()
+	<-inCall
+	for range 40 {
+		b.setState("scanning")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	status, debug, _ := d.ScanNetworks(ctx, nil)
+	close(release)
+	if status != statusSuccess {
+		t.Errorf("a scan while the join is in a call = %d %q, want Success: the run loop waited on the join", status, debug)
+	}
+	if status := <-joined; status != statusUnknown {
+		t.Errorf("the join = %d, want UnknownError (disconnected)", status)
+	}
+}
+
+// holdingHandler runs hold on every record before its handler writes it.
+type holdingHandler struct {
+	slog.Handler
+	hold func(slog.Record)
+}
+
+func (h *holdingHandler) Handle(ctx context.Context, r slog.Record) error {
+	h.hold(r)
+	return h.Handler.Handle(ctx, r)
 }
 
 // TestAHandedOverWaitIsNotInstalledAfterItsCallerGaveUp: the run loop takes

@@ -151,15 +151,48 @@ type scanWaiter struct {
 	abandoned bool
 }
 
-// attempt is one join's view of the interface's State changes.
+// attempt is one join's view of the interface's State changes. The run
+// loop appends to states and never waits on the join: a join in a bus call
+// of its own (a property read, a re-select) does not hold the loop, so the
+// loop keeps reading the bus — its signal channel stays short, which the
+// hand-over's drain by length relies on ([Driver.run]; core2 item 4,
+// R2-P1-drv-06). The queue lives as long as one join, which its timeout
+// bounds.
 type attempt struct {
-	states chan string
+	mu     sync.Mutex
+	states []string
+	// more is signalled (one slot) when states grew.
+	more chan struct{}
 	// ready is closed once the run loop installed the attempt.
 	ready chan struct{}
 	done  chan struct{}
 	// abandoned (d.mu) is set when listen gave up on the hand-over: the
 	// run loop does not install the attempt.
 	abandoned bool
+}
+
+// push queues a State change for the join; it never blocks.
+func (a *attempt) push(state string) {
+	a.mu.Lock()
+	a.states = append(a.states, state)
+	a.mu.Unlock()
+	select {
+	case a.more <- struct{}{}:
+	default:
+	}
+}
+
+// next takes the oldest queued State change, if any.
+func (a *attempt) next() (string, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.states) == 0 {
+		return "", false
+	}
+	state := a.states[0]
+	a.states[0] = ""
+	a.states = a.states[1:]
+	return state, true
 }
 
 // debugBusGone is the debug text of a call made after the run loop ended
@@ -268,8 +301,9 @@ func (d *Driver) run() {
 			// while the channel has room: a full channel hands each signal
 			// to a goroutine of its own, default_handler.go:316-333 at
 			// v5.2.4, so after an overflow len undercounts and order is
-			// lost; the run loop keeps the channel short unless a join's
-			// State hand-over holds it): they belong to the network that
+			// lost; the run loop keeps the channel short, as nothing it
+			// does waits — a join's State changes are queued for it,
+			// [attempt]): they belong to the network that
 			// was current, to its removal and to the driver's own
 			// Disconnect, not to this attempt.
 			// They are handled without it — a scan still sees its
@@ -383,13 +417,8 @@ func (d *Driver) handle(s *dbus.Signal) {
 		d.mu.Lock()
 		a := d.connect
 		d.mu.Unlock()
-		if a == nil {
-			return
-		}
-		select {
-		case a.states <- state:
-		case <-a.done:
-		case <-d.closed:
+		if a != nil {
+			a.push(state)
 		}
 	}
 }
@@ -572,7 +601,7 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 // is marked abandoned, so the loop does not install it
 // ([Driver.installAttempt]).
 func (d *Driver) listen(ctx context.Context) (a *attempt, debugText string) {
-	a = &attempt{states: make(chan string, 16), ready: make(chan struct{}), done: make(chan struct{})}
+	a = &attempt{more: make(chan struct{}, 1), ready: make(chan struct{}), done: make(chan struct{})}
 	select {
 	case d.register <- a:
 		select {
@@ -662,14 +691,17 @@ func (d *Driver) await(ctx context.Context, a *attempt, network dbus.ObjectPath,
 	retries := assocMaxRetries
 	started := false
 	for {
-		var state string
-		select {
-		case <-ctx.Done():
-			d.log.Info("wpasupplicant: connect did not complete in time", ssidAttr)
-			return statusUnknown, "the connect did not complete in time", 0
-		case <-d.closed:
-			return statusUnknown, "the driver is closed", 0
-		case state = <-a.states:
+		state, ok := a.next()
+		if !ok {
+			select {
+			case <-ctx.Done():
+				d.log.Info("wpasupplicant: connect did not complete in time", ssidAttr)
+				return statusUnknown, "the connect did not complete in time", 0
+			case <-d.closed:
+				return statusUnknown, "the driver is closed", 0
+			case <-a.more:
+			}
+			continue
 		}
 		switch state {
 		case stateAssociating:
