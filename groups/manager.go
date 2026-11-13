@@ -17,7 +17,6 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/aesccm"
 	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // Errors.
@@ -129,10 +128,11 @@ type Manager struct {
 	allLoaded bool
 
 	// reception is matter.js MessagingState: the replay-protection
-	// window per operational key and source node. In memory only, as
-	// in matter.js.
+	// window per operational key and source node — per key at most
+	// maxReceptionPeers of them, most recently used first
+	// ([Manager.acceptCounter]). In memory only, as in matter.js.
 	receptionMu sync.Mutex
-	reception   map[string]map[uint64]*mrp.Window
+	reception   map[string][]receptionPeer
 
 	// observersMu guards observers and tableObservers.
 	observersMu        sync.Mutex
@@ -184,7 +184,7 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		logger:    logger,
 		maxGroups: DefaultMaxGroupsPerFabric,
 		fabrics:   make(map[uint8]*fabricGroups),
-		reception: make(map[string]map[uint64]*mrp.Window),
+		reception: make(map[string][]receptionPeer),
 
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
