@@ -40,7 +40,11 @@ func TestOpCredsWithoutFailSafePortFailsClosed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewOperationalCredentials: %v", err)
 			}
-			_, err = oc.MatterInvoke(context.Background(), tc.command, tc.fields)
+			// The request arrives on a session: the commands that sign refuse
+			// one without its attestation challenge before they look at the
+			// fail-safe (matter.js asserts the session first,
+			// OperationalCredentialsServer.ts:126 at db021da0).
+			_, err = oc.MatterInvoke(sessionChallengeCtx(context.Background()), tc.command, tc.fields)
 			var sc statusCoder
 			if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusFailsafeRequired {
 				t.Fatalf("%s without a fail-safe port = %v, want FailsafeRequired (0xCA)", tc.name, err)
