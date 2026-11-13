@@ -52,7 +52,7 @@ func (d *probedDevice) readCount() int {
 	return d.reads
 }
 
-func (d *probedDevice) handle(req imRequest) (uint8, []byte, bool) {
+func (d *probedDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bool) {
 	if req.opcode != im.OpcodeReadRequest {
 		return 0, nil, false
 	}

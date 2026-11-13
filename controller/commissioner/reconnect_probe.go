@@ -151,7 +151,6 @@ type reconnectProbe struct {
 	f      *flow
 	ia     *interaction.Interaction
 	hint   func([]netip.AddrPort) int
-	ctx    context.Context
 	cancel context.CancelFunc
 	done   chan struct{}
 
@@ -165,8 +164,8 @@ type reconnectProbe struct {
 // open, and a probe that fails ends it: it never fails the step.
 func (f *flow) startReconnectProbe(ctx context.Context, ia *interaction.Interaction) *reconnectProbe {
 	pctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	p := &reconnectProbe{f: f, ia: ia, hint: f.hint, ctx: pctx, cancel: cancel, done: make(chan struct{})}
-	go p.run()
+	p := &reconnectProbe{f: f, ia: ia, hint: f.hint, cancel: cancel, done: make(chan struct{})}
+	go p.run(pctx)
 	return p
 }
 
@@ -183,40 +182,40 @@ func (p *reconnectProbe) stop() *deviceNetworkReport {
 	return p.last
 }
 
-func (p *reconnectProbe) run() {
+func (p *reconnectProbe) run(ctx context.Context) {
 	defer close(p.done)
 	wait := reconnectProbeFirst
-	for p.sleep(wait) && p.once() {
+	for p.sleep(ctx, wait) && p.once(ctx) {
 		wait = reconnectProbeInterval
 	}
 }
 
 // sleep waits d on the flow's clock; false when the probing ended first.
-func (p *reconnectProbe) sleep(d time.Duration) bool {
+func (p *reconnectProbe) sleep(ctx context.Context, d time.Duration) bool {
 	fired := make(chan struct{})
 	t := p.f.c.ctx.Clock.AfterFunc(d, func() { close(fired) })
 	defer t.Stop()
 	select {
 	case <-fired:
 		return true
-	case <-p.ctx.Done():
+	case <-ctx.Done():
 		return false
 	}
 }
 
 // once is one probe; false ends the probing.
-func (p *reconnectProbe) once() bool {
+func (p *reconnectProbe) once(probing context.Context) bool {
 	if s := p.ia.Session(); s == nil || s.IsClosed() {
 		p.f.log.Debug("matter.controller.commissioning.reconnect_probe_ended", slog.String("reason", "session closed"))
 		return false
 	}
-	ctx, cancel := context.WithCancel(p.ctx)
+	ctx, cancel := context.WithCancel(probing)
 	defer cancel()
 	t := p.f.c.ctx.Clock.AfterFunc(reconnectProbeTimeout, cancel)
 	defer t.Stop()
 	report, err := p.ia.Read(ctx, p.f.probePaths()...)
 	if err != nil {
-		if p.ctx.Err() == nil {
+		if probing.Err() == nil {
 			p.f.log.Debug("matter.controller.commissioning.reconnect_probe_ended", slog.Any("err", err))
 		}
 		return false
@@ -301,6 +300,31 @@ func (f *flow) probePaths() []im.ConcreteAttributePath {
 	return paths
 }
 
+// addInterfaces takes the addresses of the operational interfaces, each
+// once, the routable ones marked.
+func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
+	r.interfacesKnown = true
+	for _, iface := range ifaces {
+		if !iface.IsOperational {
+			continue
+		}
+		for _, raw := range slices.Concat(iface.IPv6Addresses, iface.IPv4Addresses) {
+			a, ok := netip.AddrFromSlice(raw)
+			if !ok {
+				continue
+			}
+			a = a.Unmap()
+			if slices.Contains(r.addresses, a) {
+				continue
+			}
+			r.addresses = append(r.addresses, a)
+			if routableAddr(a) {
+				r.routable = append(r.routable, a)
+			}
+		}
+	}
+}
+
 // parseNetworkReport reads a probe's report. A value that does not decode
 // is left out, as one the device did not report: the probe informs, it
 // does not validate.
@@ -328,26 +352,7 @@ func parseNetworkReport(report *interaction.Report) *deviceNetworkReport {
 	}
 	if n, ok := value(gendiag.ClusterID, gendiag.AttrNetworkInterfaces); ok {
 		if ifaces, err := spec.DecodeList(spec.DecodeStruct[gendiag.NetworkInterface])(n); err == nil {
-			r.interfacesKnown = true
-			for _, iface := range ifaces {
-				if !iface.IsOperational {
-					continue
-				}
-				for _, raw := range slices.Concat(iface.IPv6Addresses, iface.IPv4Addresses) {
-					a, ok := netip.AddrFromSlice(raw)
-					if !ok {
-						continue
-					}
-					a = a.Unmap()
-					if slices.Contains(r.addresses, a) {
-						continue
-					}
-					r.addresses = append(r.addresses, a)
-					if routableAddr(a) {
-						r.routable = append(r.routable, a)
-					}
-				}
-			}
+			r.addInterfaces(ifaces)
 		}
 	}
 	if n, ok := value(threaddiag.ClusterID, threaddiag.AttrRoutingRole); ok {
