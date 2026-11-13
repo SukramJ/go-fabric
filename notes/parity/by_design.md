@@ -3574,7 +3574,16 @@ RESOURCE_EXHAUSTED (the list's `max 8`, `messages.element.ts:32`), a
 cancel touches only the accessing fabric's messages (the list is `R F V`),
 the presentation lifecycle is the host's (`Presented`, `Complete` with
 a `MessageOutcome`), and MessageComplete's ResponseId/Reply are null
-with RESP/RPLY and absent without. Report AR.
+with RESP/RPLY and absent without. chip's per-option rules — at most 4
+options, a MessageResponseID from 1, a label of at most 32 — are held by
+the generated request decoder (`cluster/spec/messages/definition_gen.go:150-151`,
+`:250`; chip `messages-server.cpp:365-367`, `:379-385`,
+`messages-delegate.h:33-35` at `6170af84`), an option without id or label
+is INVALID_COMMAND as there (`:375-377`), and chip's SpokenMessage and
+AudioMessage checks (from `:293`) have no counterpart: the snapshot's
+MessageControlBitmap has neither bit (`definition_gen.go:92-96`). Pinned by
+`cluster/core:TestMessagesResponseOptionRules` (review II, W3-clucore-09).
+Report AR.
 
 By design (ADR 0022). The list bound and the fabric scope come from the
 model; the lifecycle has no reference and is the host's.
@@ -5568,7 +5577,15 @@ INVALID_COMMAND (`:558`), a Position outside the advertised set
 CONSTRAINT_ERROR, and in any MainState other than Moving, WaitingForMotion
 or Stopped INVALID_IN_STATE before the mover is called (`:599-605`;
 W3-club1-01, `TestClosureControlMoveToMainStateChip`); the server starts in
-SetupRequired until the host reports a state. chip's null-OverallCurrentState
+SetupRequired until the host reports a state. The CONSTRAINT_ERROR for a
+Position whose feature is not advertised is this server's, from the enum
+value's conformance and before the mover (`cluster/closure/closurecontrol_server.go:431`,
+`:620-630`, ahead of the mover call at `:518`;
+`TestMoveToTakesTheGeneratedRequest`): connectedhomeip answers
+CONSTRAINT_ERROR for a value outside the enum only (`:574`) and, for a
+defined position whose feature it lacks, FAILURE after the delegate ran and
+MainState moved, because `SetOverallTargetState` refuses it (`:222-238`,
+`:435-436`, `:622-637`; review II, W3-club1-10). chip's null-OverallCurrentState
 gate (`:560-562`) has no counterpart: this server reads OverallCurrentState
 as a struct whose fields are null until observed. Stop (`HandleStop`
 `:531-551`): only Moving, WaitingForMotion and Calibrating stop, SUCCESS
@@ -5829,7 +5846,17 @@ ProvisionedClientCertificates serve the full certificates, as matter.js's
 generated behaviour does (rule 1) — chip's id-only encoding outside a
 large-payload transport (:136-166) is not mirrored (owner decision
 2026-10-28); and `ClientCSR` publishes a change notification for the new
-entry. The node mounts both TLS servers on endpoint 0 through
+entry. The consequence over a UDP-sized message: a list entry that does
+not fit a report chunk on its own turns the whole attribute into an
+AttributeStatusIB(RESOURCE_EXHAUSTED) (`bridge/reply.go:441-446`,
+`chunkReportData`; the cap is `udp.MaxDatagramSize - 200` = 1848 bytes,
+`bridge/reply.go:357`, `transport/udp/listener.go:39`), and a certificate
+may be 3000 bytes (`cluster/tls/certificates.go:39`) — the case chip's
+id-only encoding avoids (`TLSCertificateManagementCluster.cpp:139-150`,
+`:158-169` at `6170af84`: "Drop the certificate payload if transport
+doesn't support large payload"). The findings register holds it as
+TC-TLSCERT-2.2 / TC-TLSCERT-2.9 (review II, W3-club1-09). The node mounts
+both TLS servers on endpoint 0 through
 `node.Config.TLS`, as chip serves them on the root endpoint only. Pinned
 by `tls/*_chip_test.go` (17 + 16 of chip's cases) and the fuzz target
 `FuzzCertificateUpserts` (chip's three `FUZZ_TEST`).
@@ -6656,3 +6683,114 @@ Not carried over: PDC, AP mode and Wi-Fi PAF. Pinned by `TestConnect`,
 `TestScanDoneFailure` and `TestCredentialNeverLeaves`
 (`wifi/wpasupplicant/driver_test.go`). Retire a point when connectedhomeip's
 driver takes it; reconcile onto matter.js when it ships a driver.
+
+### BD-Matter-CertValidityNotEnforced — a NOC or ICAC outside its validity period verifies; the verifier's clock is not read
+
+matter.js checks neither bound of an operational certificate's validity
+period against the clock: its verification ends with "notBefore date
+should be already reached, notAfter is not checked right now", logs a
+warning for a notBefore in the future and has the throw commented out
+(`packages/protocol/src/certificate/kinds/OperationalBase.ts:99-106` at
+`db021da0`). `mattercert.Verifier.checkValidity`
+(`secure/mattercert/verify.go:602-612`) does the same without the warning:
+it refuses a NotBefore or NotAfter that names no representable time and
+compares neither with a clock; the `TimeSource` a verifier is built with
+(`verify.go:48`, `:197`) is stored and never read. Mirrored: a node
+without a trusted clock cannot judge expiry, and matter.js leaves the
+check to its Last-Known-Good-Time TODO (`:100`). connectedhomeip's
+validity policy was not read for this entry (unverified). The
+representable-time half is pinned by
+`secure/mattercert:TestCheckValidityRejectsAWrappingNotBefore`,
+`TestCheckValidityRejectsAWrappingNotAfter` and
+`TestCheckValidityAcceptsOrdinaryBounds`; no test holds that a NotAfter in
+the past verifies (review II, W1-sec-04). Retire when matter.js enforces
+the period.
+
+### BD-Matter-BTP-ATTMTUFieldIsSegmentSize — the BLE central writes the BTP segment size into the handshake request's ATT_MTU field
+
+matter.js's central derives the segment size from the connection's
+ATT_MTU (`packages/nodejs-ble/src/NobleBleChannel.ts:679-681` at
+`db021da0`; `btpSegmentSizeFromAttMtu` is the ATT_MTU less 3, clamped,
+`packages/protocol/src/ble/BleConsts.ts:37-42`) and sends it as the
+request's `attMtu` (`NobleBleChannel.ts:624`, `attMtu: segmentSize`); its
+peripheral reads the field as a "Number excluding 3 header bytes" and
+takes it as the fragment size
+(`packages/protocol/src/ble/BtpSessionHandler.ts:99`, `:111-122`).
+`controller/ble` does the same (`channel.go:275`
+`btp.SegmentSizeFromATTMTU`, `:301` `ATTMTU: uint16(segment)`).
+connectedhomeip's peripheral reads the field as the ATT_MTU and subtracts
+3 itself (`src/ble/BLEEndPoint.cpp:991-994`, `:1001-1004` at `6170af84`),
+so against a chip device the fragment size comes out 3 bytes below what
+the link carries (inferred from the two reads; not measured against a
+chip device). Mirrored: matter.js decides the wire shape (order of
+authority 1), and the cost is throughput only. Pinned by
+`controller/ble:TestNobleBleChannelAttMtuSettle` (an ATT_MTU of 247
+offers 244, `channel_parity_matterjs_test.go:131`; review II, W1-wire-10).
+Retire when matter.js's central sends the ATT_MTU.
+
+### BD-Matter-Read-RepeatedPathsDropped — a repeated AttributePathIB of a Read or Subscribe is read once
+
+matter.js's server registers one data producer per requested path, in
+request order and with no check for a repeat
+(`packages/protocol/src/action/server/AttributeReadResponse.ts:88-94`,
+`:442-448` at `db021da0`), so a path sent twice is answered twice
+(inferred from those lines; not run); only its client-side request
+builder dedupes (`packages/protocol/src/action/request/Read.ts:338-352`).
+`im.DedupAttributePaths` (`im/read.go:967-985`) drops every repeat of an
+earlier path, first occurrence first, before the read handler
+(`im/read.go:508`) and the subscribe priming
+(`bridge/subscribe_dispatch.go:48`) expand it. Deliberate: a repeat
+expands to the results the first occurrence gave, and dropping it bounds
+the materialised report by the node's attribute count instead of by how
+many copies of a path fit one request (`im.MaxReadPaths`).
+connectedhomeip prunes its path list too, by another rule: a concrete
+path that a wildcard of the same request covers is removed
+(`src/app/ReadHandler.cpp:530`,
+`src/app/InteractionModelEngine.cpp:1669-1716` at `6170af84`); that
+function leaves identical repeats alone. Pinned by
+`im:TestHandleReadRequest_IdenticalPathsAreReadOnce` and
+`im:TestDedupAttributePaths_KeepsOrderAndDistinctPaths` (review II,
+W2-wire-15). Retire when the report is bounded without it and matter.js
+still answers each occurrence.
+
+### BD-Matter-Peer-ConnectAfterDisconnectRetries — a connection process started after `Set.Disconnect` retries an attempt that cannot succeed
+
+matter.js's `PeerSet.disconnect` clears its exchange manager "to prevent
+future connections" (`packages/protocol/src/peer/PeerSet.ts:248-256` at
+`db021da0`), after which the peer context's `exchanges` accessor throws
+`ImplementationError("Client networking is not initialized")` (`:83-86`).
+A connection attempt reads the accessor when it creates its exchange
+(`packages/protocol/src/peer/PeerConnection.ts:544`), and the error
+handling gives an error that is neither a status response nor a
+`TransientPeerCommunicationError` the delay
+`timing.delayAfterUnhandledError` and the category "general"
+(`:715-717`), a warning (`:762-764`) and another attempt. `client/peer`
+mirrors it: after `Set.Disconnect` an attempt returns `ErrNotConnectable`
+(`client/peer/connection.go:1368-1370`), which the classifier answers
+with `DelayAfterUnhandledError` and "general" (`:1730-1731`; the error
+handler may replace the delay or end the process, `:1596-1603`).
+Mirrored, not improved: a refusal in `initiateConnection` would be an
+*Ahead of matter.js* row with `PeerSet.ts:85` as its marker (review II,
+W4-ctlnet-07). Pinned for the attempt's error by
+`client/peer:TestInitialContactRefreshKickBeforeSend`
+(`initial_contact_schedule_parity_matterjs_test.go:507`); no test holds
+the retry cadence after a disconnect. Retire when matter.js refuses the
+connect.
+
+### BD-Matter-Attestation-ValidityAtDacNotBefore — the attestation chain is judged at the DAC's notBefore; a DAC past its notAfter is accepted
+
+matter.js's validator checks "Certificate validity at DAC's notBefore
+timestamp": the DAC's notBefore must lie inside the PAI's and the PAA's
+validity (a notAfter of 0 is none), and the current time is not consulted
+(`packages/protocol/src/certificate/DeviceAttestationValidator.ts:393-419`
+at `db021da0`). `controller/attestation` does the same
+(`validate.go:229-241`; the file reads no clock), so a DAC past its own
+notAfter, or a PAI that has expired since the DAC was issued, passes.
+connectedhomeip refuses an expired DAC where it has a clock
+(`src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:638-641`
+at `6170af84`: `IsCertificateValidAtCurrentTime(info.dacDerBuffer)` →
+`kDacExpired`, compiled out under `CURRENT_TIME_NOT_IMPLEMENTED`).
+Mirrored: matter.js decides where it models something (order of authority
+1; review 2026-11 W4-ctlsec-03, verdict "stay with matter.js", no Ahead
+row). No test holds that an expired DAC is accepted (review II,
+W4-ctlsec-03). Retire when matter.js consults the clock.
