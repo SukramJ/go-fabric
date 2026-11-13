@@ -6,6 +6,7 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,4 +132,63 @@ func filesHolding(t *testing.T, dir, needle string) []string {
 		}
 	}
 	return hits
+}
+
+// TestStoreEraseWhoseCheckpointAReaderBlocks (review II, R2-P1-dr-rest-02):
+// another connection holds a read transaction on the WAL database, so the
+// scrub's checkpoint cannot truncate the -wal. Erase still empties the
+// store — its deletes committed — and says only the scrub is missing
+// (ErrScrubIncomplete); a Scrub once the reader is gone finishes it.
+func TestStoreEraseWhoseCheckpointAReaderBlocks(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "matter.db")
+	db, err := store.OpenSQLite(path, walMode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	// One connection whose blocked checkpoint answers at once (the
+	// opener's 5 s busy timeout would only make the test wait).
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(ctx, `PRAGMA busy_timeout = 0`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(db)
+	if err := s.SetSetting(ctx, "erased.secret", "value"); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := store.OpenSQLite(path, walMode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close() }()
+	tx, err := reader.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var rows int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM matter_settings`).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Erase(ctx); !errors.Is(err, store.ErrScrubIncomplete) {
+		t.Fatalf("Erase = %v while a reader held the -wal; want ErrScrubIncomplete", err)
+	}
+	if v, ok, err := s.GetSetting(ctx, "erased.secret"); err != nil || ok {
+		t.Fatalf("setting after Erase: %q %v %v; want erased — the deletes committed", v, ok, err)
+	}
+	if err := store.Scrub(ctx, db); !errors.Is(err, store.ErrScrubIncomplete) {
+		t.Fatalf("Scrub with the reader still there = %v; want ErrScrubIncomplete", err)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Scrub(ctx, db); err != nil {
+		t.Fatalf("Scrub after the reader left: %v", err)
+	}
 }

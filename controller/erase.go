@@ -27,6 +27,12 @@ import (
 // the database untouched; an Erase called again once the hook returned
 // completes the reset.
 //
+// An error that wraps [store.ErrScrubIncomplete] is a completed reset whose
+// scrub of the file did not finish (another connection's reader holds its
+// -wal, a full disk fails the VACUUM): every row is gone, and the erased
+// bytes may remain in the file until a later [store.Scrub] of [Config].DB
+// succeeds.
+//
 // A Go controller is single-use, as the node is: the host comes back by
 // building a new controller on the same DB, which mints a new CA and
 // fabric and holds no peer (BD-Matter-FactoryResetEndsTheNode). Mirrors

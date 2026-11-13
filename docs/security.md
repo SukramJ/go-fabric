@@ -74,7 +74,12 @@ when the node keeps them in the same file — and then rewrites the SQLite file
 (`VACUUM`) and empties its write-ahead log (`wal_checkpoint(TRUNCATE)`):
 afterwards none of the erased bytes — nor those of rows deleted before the
 reset — are in the database file, its `-wal` or its `-shm`, measured in both
-the rollback-journal and the WAL mode. Copies the module does not see — the
+the rollback-journal and the WAL mode. When that scrub cannot finish —
+another connection's reader holds the `-wal`, a full disk fails the
+`VACUUM` — the reset still completes (the rows are gone; a node pins its
+fresh UniqueID) and its error wraps `store.ErrScrubIncomplete`: the erased
+bytes may remain in the file until `store.Scrub` of it succeeds, which the
+host can run again once the reader is gone. Copies the module does not see — the
 flash controller's wear-levelled blocks, file-system snapshots, the free
 blocks of a deleted journal, backups — are outside what it can promise.
 
@@ -83,7 +88,7 @@ key that is not beside the data, is an open architecture question of the
 2026-11 review. Nothing on this page promises it; protect the file as the
 keys it holds.
 
-*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`; `TestStoreEraseLeavesNoResidue`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
+*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side
 

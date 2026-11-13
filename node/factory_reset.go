@@ -30,7 +30,12 @@ import (
 // [Store].Endpoints override as it is, and the store New built on the file
 // for the other. A SQLite file the node's stores are on is scrubbed after
 // every delete ([store.Scrub]), so none of the erased bytes — endpoint
-// records included — remain in it.
+// records included — remain in it. A scrub that does not finish (another
+// connection's reader blocks the checkpoint, a full disk fails the VACUUM)
+// does not undo the reset: every other step completes, the fresh UniqueID
+// included, and the error wraps [store.ErrScrubIncomplete] — the rows are
+// gone, their bytes may remain in the file until a later [store.Scrub] of
+// it succeeds.
 //
 // A Go node is single-use — [Node.Stop] ends it, as [ErrStopped] says —
 // so the reset does not bring the node back: the host comes back by
@@ -102,10 +107,18 @@ func (n *Node) eraseStores(ctx context.Context) error {
 	if endpoints != nil {
 		errs = append(errs, eraseEndpointRecords(ctx, endpoints))
 	}
-	if err := st.Erase(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("node: factory reset: erase the store: %w", err))
-	} else if err := n.pinFreshUniqueID(ctx, st); err != nil {
-		errs = append(errs, fmt.Errorf("node: factory reset: pin a fresh UniqueID: %w", err))
+	// A scrub that did not finish (store.ErrScrubIncomplete) follows a
+	// committed erase: the rows are gone, so the fresh UniqueID is pinned
+	// as after a complete one, and the error says only the bytes may
+	// remain (review II, R2-P1-dr-rest-02).
+	eraseErr := st.Erase(ctx)
+	if eraseErr != nil {
+		errs = append(errs, fmt.Errorf("node: factory reset: erase the store: %w", eraseErr))
+	}
+	if eraseErr == nil || errors.Is(eraseErr, store.ErrScrubIncomplete) {
+		if err := n.pinFreshUniqueID(ctx, st); err != nil {
+			errs = append(errs, fmt.Errorf("node: factory reset: pin a fresh UniqueID: %w", err))
+		}
 	}
 	if n.builtEndpoints && !n.builtCredentials && db != nil {
 		if err := store.Scrub(ctx, db); err != nil {
