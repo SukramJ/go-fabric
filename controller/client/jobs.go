@@ -34,7 +34,13 @@ func newJobQueue() *jobQueue { return &jobQueue{} }
 
 // enqueue appends job; past maxPendingJobs it waits until the queue has
 // drained — the back-pressure of ClientStructure.ts:469-471 (`if
-// (pendingJobs > MAX_PENDING_JOBS) await queue`).
+// (pendingJobs > MAX_PENDING_JOBS) await queue`). That wait takes no
+// context, because the callers that reach it have none to give: a job is
+// queued from a subscription's callbacks (Updated, KeepaliveReceived,
+// ActiveChanged), and the context of the request that established the
+// subscription ended with that request.
+//
+//nolint:contextcheck // the back-pressure runs in subscription callbacks, which outlive the request context their closures were built under
 func (q *jobQueue) enqueue(job func()) {
 	q.mu.Lock()
 	q.jobs = append(q.jobs, job)

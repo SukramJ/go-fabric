@@ -205,6 +205,14 @@ func (n *Node) adoptDefaultFabricFilter() {
 // the old record stays — written last, so the next attempt forgets the
 // versions again. Mirrors matter.js ClientStructure.adoptFabricFilter
 // (packages/node/src/node/client/ClientStructure.ts:343-390 at 862ad75f).
+//
+// The drain it starts with does not end with the context of the call that
+// asked for the adoption (Start, SetDefaultSubscription): an adoption has
+// no state for a drain cut short — the caller has stored the default
+// subscription the filter belongs to and takes no error for a filter left
+// behind it.
+//
+//nolint:contextcheck // the adoption outlasts its caller's context: it has no cut-short state, see above
 func (n *Node) adoptFabricFilter(filtered bool) error {
 	n.adoptMu.Lock()
 	defer n.adoptMu.Unlock()
