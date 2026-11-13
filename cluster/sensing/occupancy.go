@@ -111,6 +111,14 @@ type Occupancy struct {
 	// and be overwritten (review II, R2-P1-clu-03). Taken before mu.
 	occMu sync.Mutex
 
+	// holdMu makes a change of the hold time and its store one step, for
+	// a controller's write (the Sink changes holdTime, spec.Server stores
+	// after it) as for the host's Set: two at once otherwise leave the
+	// HoldTime attribute and holdTime, which the timer and the deprecated
+	// delay attributes use, at different values (review II,
+	// R2-P1-clu-04). Taken before occMu.
+	holdMu sync.Mutex
+
 	// mu guards endpoint, hold, limits, holdTime, timer, started and gen.
 	mu       sync.Mutex
 	endpoint uint16
@@ -444,10 +452,15 @@ func (o *Occupancy) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	if hold != nil {
-		if err := o.setHoldTime(*hold); err != nil {
+		o.holdMu.Lock()
+		err := o.setHoldTime(*hold)
+		if err == nil {
+			_ = o.srv.SetAttributes(map[uint32]any{occdef.AttrHoldTime: *hold})
+		}
+		o.holdMu.Unlock()
+		if err != nil {
 			return fmt.Errorf("%w: %w", spec.ErrInvalidValue, err)
 		}
-		_ = o.srv.SetAttributes(map[uint32]any{occdef.AttrHoldTime: *hold})
 	}
 	if occ != nil {
 		o.setOccupancy(*occ)
@@ -499,7 +512,12 @@ func (o *Occupancy) MatterRead(attrID uint32) (any, bool) { return o.srv.MatterR
 // delay attribute as HoldTime (OccupancySensingCluster.cpp:170-181).
 func (o *Occupancy) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if slices.Contains(holdTimeAliases, attrID) && o.Serves(attrID) {
-		return o.srv.MatterWrite(ctx, occdef.AttrHoldTime, value)
+		attrID = occdef.AttrHoldTime
+	}
+	if attrID == occdef.AttrHoldTime {
+		// The Sink's setHoldTime and the server's store, one step (holdMu).
+		o.holdMu.Lock()
+		defer o.holdMu.Unlock()
 	}
 	return o.srv.MatterWrite(ctx, attrID, value)
 }
