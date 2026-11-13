@@ -23,6 +23,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `ble/bluez`: the driver's D-Bus exports are serialised. godbus's export reads its object map without the lock its writers take (`export.go:396`, `:406` at v5.2.4), so the GATT application's export from `Serve` and the advertisement's from `Advertise` — two goroutines in the bridge — could end the process with `fatal error: concurrent map read and map write` at the start of a BLE commissioning window (seen once in the BLE certification leg, TC-CNET-4.15). In the nested module `ble/bluez`.
 - `wifi/wpasupplicant`: `ScanNetworks` arms its wait for `ScanDone` before the `Scan` call, as connectedhomeip sets its scan callback first. A `ScanDone` sent right behind the call's reply — chip's wpa_supplicant mock, a fast scan — was dropped as an earlier scan's, and the scan ended only at the 30 s scan timeout (TC-CNET-4.4 over BLE timed out at its ScanNetworks). A `Scan` call that fails disarms the wait.
 
 ## [0.22.2] — 2026-11-12
