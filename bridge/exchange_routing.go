@@ -58,6 +58,12 @@ type exchangeRouting struct {
 	//
 	// map[mrp.ExchangeKey]exchangeReplyTarget
 	exchangeSrcs sync.Map
+	// ackRouteMu orders the arrival of an obligation with its route
+	// ([Bridge.owedInboundAck]) against the release of that route (a
+	// piggyback, the pump's pass): without it a route could be released
+	// between an arrival's store and its Owe, or while an obligation a
+	// newer one displaced still waited for the pump.
+	ackRouteMu sync.Mutex
 
 	// writeTxs holds the [im.WriteTransaction] of every chunked write in
 	// progress, keyed by its exchange, so the chunks of one Write
