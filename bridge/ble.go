@@ -370,6 +370,13 @@ type connReceiver struct {
 	b    *Bridge
 	conn transport.Conn
 
+	// inFlight holds one slot per message that is delivered and not yet
+	// finished ([connReceiverMaxInFlight]).
+	inFlight chan struct{}
+	// stopped closes with the receiver, ending a delivery that waits for
+	// a slot.
+	stopped chan struct{}
+
 	// mu guards prev and done.
 	mu   sync.Mutex
 	prev chan struct{}
@@ -377,18 +384,39 @@ type connReceiver struct {
 	wg   sync.WaitGroup
 }
 
+// connReceiverMaxInFlight bounds the messages of one connection that are
+// delivered but not yet finished: beyond it deliver waits, so the
+// transport takes no further message from the peer — for BTP the central's
+// next write is not consumed — until a handler returns or the connection
+// closes. It is transport/tcp's bound on the same queue, by the same means
+// (maxInFlightPerConn: the reader stops reading). Without it every message
+// a peer sent while a handler held the connection's turn was one more
+// goroutine and one more copy.
+const connReceiverMaxInFlight = 64
+
 func (b *Bridge) newConnReceiver(conn transport.Conn) *connReceiver {
 	first := make(chan struct{})
 	close(first)
-	return &connReceiver{b: b, conn: conn, prev: first}
+	return &connReceiver{
+		b: b, conn: conn, prev: first,
+		inFlight: make(chan struct{}, connReceiverMaxInFlight),
+		stopped:  make(chan struct{}),
+	}
 }
 
 // deliver hands one complete Matter message to the bridge; it does not
-// wait for the handler.
+// wait for the handler, only — with [connReceiverMaxInFlight] messages in
+// flight — for one of them to finish.
 func (r *connReceiver) deliver(msg []byte) {
+	select {
+	case r.inFlight <- struct{}{}:
+	case <-r.stopped:
+		return
+	}
 	r.mu.Lock()
 	if r.done {
 		r.mu.Unlock()
+		<-r.inFlight
 		return
 	}
 	prev := r.prev
@@ -399,6 +427,7 @@ func (r *connReceiver) deliver(msg []byte) {
 	msg = append([]byte(nil), msg...)
 	go func() {
 		defer r.wg.Done()
+		defer func() { <-r.inFlight }()
 		var once sync.Once
 		release := func() { once.Do(func() { close(turn) }) }
 		defer release()
@@ -414,7 +443,10 @@ func (r *connReceiver) deliver(msg []byte) {
 // connection, as a dropped TCP connection does.
 func (r *connReceiver) close() {
 	r.mu.Lock()
-	r.done = true
+	if !r.done {
+		r.done = true
+		close(r.stopped)
+	}
 	r.mu.Unlock()
 	r.b.evictConn(r.conn)
 }
