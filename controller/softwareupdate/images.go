@@ -182,7 +182,10 @@ type ImagesConfig struct {
 	Blobs Blobs
 	// Ledger asks the production and test-net ledgers; nil asks none, as
 	// the service's offline option (:1283-1296): only stored images are
-	// found, and nothing is downloaded.
+	// found, and nothing is downloaded. Its MaxImageSize bounds every
+	// download of the store ([Images.DownloadUpdate],
+	// [Images.UpdateInfoFromURL]) — each is held in memory until it is
+	// verified — at [dcl.DefaultMaxImageSize] when it sets none.
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger

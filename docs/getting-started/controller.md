@@ -812,6 +812,31 @@ _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
 })
 ```
 
+A store without a ledger offers stored images only. `ImagesConfig.Ledger`
+(a `dcl.OTAVersions` with a `dcl.Client` for the production ledger, the
+test-net ledger or both) turns the ledger lookups and the downloads on:
+`DownloadUpdate` fetches the image a ledger record names and
+`UpdateInfoFromURL` one a URL names, each into memory, verified before it
+is stored. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
+`dcl.DefaultMaxImageSize`, 256 MiB. The size a ledger record announces is
+the vendor's statement and does not raise the bound: a record that
+announces more is refused before the request, an answer longer than its
+announcement is cut there, and an answer without an announced size is cut
+at the bound. The refusals are a `*dcl.OTAError` that names the bound and
+matches `dcl.ErrOTAImageTooLarge` (and `softwareupdate.ErrOTA` from the
+store). matter.js has no such bound; it streams the answer to storage.
+
+```go
+images := softwareupdate.NewImages(softwareupdate.ImagesConfig{
+	Ledger: &dcl.OTAVersions{
+		Client:       dcl.NewClient(dcl.ProductionURL),
+		MaxImageSize: 64 << 20, // this host's products ship smaller images
+	},
+})
+```
+
+*Source: `controller/dcl/ota.go` (`OTAVersions.Download`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`).*
+
 ### TCP
 
 `controller.Config.TCP` turns the TCP initiator on (`Outgoing`) and a TCP

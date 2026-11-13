@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -40,6 +39,16 @@ func (e *OTAError) Error() string {
 }
 
 func (e *OTAError) Unwrap() error { return e.Err }
+
+// DefaultMaxImageSize bounds an image download when
+// [OTAVersions.MaxImageSize] sets none: 256 MiB. The number is this
+// module's (owner decision, review II, R2-P0-bound-C01) — a judgement, not
+// a measured image size; matter.js has no bound (see [OTAVersions.Download]).
+const DefaultMaxImageSize = 256 << 20
+
+// ErrOTAImageTooLarge is the cause of the [OTAError] of a download the
+// size bound refused or cut ([OTAVersions.MaxImageSize]).
+var ErrOTAImageTooLarge = errors.New("dcl: OTA image exceeds the size bound")
 
 // Update sources — OtaUpdateSource (DclOtaUpdateService.ts:39).
 const (
@@ -70,6 +79,10 @@ type OTAVersions struct {
 	TestClient *Client
 	// Logger receives the lookups' log; nil discards it.
 	Logger *slog.Logger
+	// MaxImageSize bounds [OTAVersions.Download] in bytes; 0 (or less) is
+	// [DefaultMaxImageSize]. A host that knows its products' images sets
+	// it lower; one that serves larger images sets it higher.
+	MaxImageSize int64
 }
 
 func (o *OTAVersions) log() *slog.Logger {
@@ -243,6 +256,18 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 // the size on verification (:408, OtaImageReader.file with otaFileSize);
 // the bound keeps that verdict without
 // buffering what an OTA host sends past the announced size.
+//
+// The announced size is the vendor's statement and does not raise the
+// bound: no download passes [OTAVersions.MaxImageSize]
+// ([DefaultMaxImageSize] when unset). A record that announces more is
+// refused before the request; an answer without an announced size is cut
+// at the bound. Both are an OTAError that names the bound and wraps
+// [ErrOTAImageTooLarge]. The bound is this module's, as the CRL
+// download's is (maxCRLSize): matter.js at db021da0 has none —
+// packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693 fetches with a
+// timeout only, :703 hands the body to store, :571 writes the stream to
+// storage — where this module's callers hold the image in memory
+// (controller/softwareupdate, Images.DownloadUpdate and UpdateInfoFromURL).
 func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writer) error {
 	if strings.TrimSpace(u.OTAURL) == "" {
 		return &OTAError{Message: "No OTA URL provided in update info"}
@@ -253,6 +278,13 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	}
 	if scheme := strings.ToLower(parsed.Scheme); scheme != "https" && scheme != "http" {
 		return &OTAError{Message: fmt.Sprintf(`Unsupported protocol "%s:" in OTA URL. Only "https:", "http:" are supported`, scheme)}
+	}
+	bound := o.maxImageSize()
+	if u.OTAFileSize > uint64(bound) { //nolint:gosec // bound is positive
+		return &OTAError{
+			Message: fmt.Sprintf("OTA image from %s announces %d bytes, more than the bound of %d bytes (MaxImageSize)", u.OTAURL, u.OTAFileSize, bound),
+			Err:     ErrOTAImageTooLarge,
+		}
 	}
 	o.log().Info("dcl.ota.download", slog.String("url", u.OTAURL), slog.Int("vendor_id", int(u.VID)), slog.Int("product_id", int(u.PID)),
 		slog.String("version", fmt.Sprintf("%d (%s)", u.SoftwareVersion, u.SoftwareVersionString)))
@@ -277,24 +309,34 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return &OTAError{Message: fmt.Sprintf("Failed to download OTA image: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))}
 	}
-	if u.OTAFileSize == 0 {
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			return fail(err)
-		}
-		return nil
+	// One byte past the limit tells an answer of exactly the limit from a
+	// longer one.
+	limit := bound
+	if u.OTAFileSize != 0 {
+		limit = int64(u.OTAFileSize) //nolint:gosec // at most bound, checked above
 	}
-	if u.OTAFileSize > math.MaxInt64-1 {
-		return &OTAError{Message: fmt.Sprintf("OTA image from %s announces an impossible size of %d bytes", u.OTAURL, u.OTAFileSize)}
-	}
-	limit := int64(u.OTAFileSize) //nolint:gosec // bounded above
 	n, err := io.Copy(w, io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return fail(err)
 	}
 	if n > limit {
+		if u.OTAFileSize == 0 {
+			return &OTAError{
+				Message: fmt.Sprintf("OTA image from %s announces no size and exceeds the bound of %d bytes (MaxImageSize)", u.OTAURL, bound),
+				Err:     ErrOTAImageTooLarge,
+			}
+		}
 		return &OTAError{Message: fmt.Sprintf("OTA image from %s exceeds its announced size of %d bytes", u.OTAURL, u.OTAFileSize)}
 	}
 	return nil
+}
+
+// maxImageSize is MaxImageSize, or the default.
+func (o *OTAVersions) maxImageSize() int64 {
+	if o.MaxImageSize > 0 {
+		return o.MaxImageSize
+	}
+	return DefaultMaxImageSize
 }
 
 // prefixCapture keeps the first 16 bytes of an image, its fixed prefix.

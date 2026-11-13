@@ -243,6 +243,68 @@ func TestOTADownloadBoundedByTheAnnouncedSize(t *testing.T) {
 	}
 }
 
+// TestOTADownloadBoundedByMaxImageSize (R2-P0-bound-C01): the announced
+// size is the vendor's statement and does not raise the bound. A record
+// that announces more than MaxImageSize is refused before the request; an
+// answer without an announced size is cut at the bound; an image of exactly
+// the bound passes; and the default holds when the host sets none.
+func TestOTADownloadBoundedByMaxImageSize(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	f.bytes("/image.ota", bytes.Repeat([]byte{0xAA}, 4096))
+	ctx := context.Background()
+	var oe *OTAError
+
+	// The host's own, smaller bound.
+	o := &OTAVersions{Client: f.client(), MaxImageSize: 2048}
+	var buf bytes.Buffer
+	err := o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: 2049}, &buf)
+	if !errors.As(err, &oe) || !errors.Is(err, ErrOTAImageTooLarge) || !strings.Contains(err.Error(), "bound of 2048 bytes") {
+		t.Errorf("a record announcing 2049 bytes under a bound of 2048: %v, want ErrOTAImageTooLarge naming the bound", err)
+	}
+	if f.hit("/image.ota") != 0 || buf.Len() != 0 {
+		t.Errorf("the image was requested %d times and %d bytes copied, want the refusal before any download", f.hit("/image.ota"), buf.Len())
+	}
+
+	err = o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota")}, &buf)
+	if !errors.As(err, &oe) || !errors.Is(err, ErrOTAImageTooLarge) || !strings.Contains(err.Error(), "bound of 2048 bytes") {
+		t.Errorf("an unannounced answer of 4096 bytes under a bound of 2048: %v, want ErrOTAImageTooLarge naming the bound", err)
+	}
+	if buf.Len() > 2049 {
+		t.Errorf("copied %d bytes, want the stream cut at the bound (at most 2049)", buf.Len())
+	}
+
+	// Exactly the bound: with and without an announcement.
+	o = &OTAVersions{Client: f.client(), MaxImageSize: 4096}
+	for _, size := range []uint64{0, 4096} {
+		buf.Reset()
+		if err := o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: size}, &buf); err != nil || buf.Len() != 4096 {
+			t.Errorf("an image of exactly the bound, announced %d: %d bytes, %v", size, buf.Len(), err)
+		}
+	}
+
+	// No bound set: the default, 256 MiB.
+	if DefaultMaxImageSize != 256<<20 {
+		t.Fatalf("DefaultMaxImageSize %d, want 256 MiB", DefaultMaxImageSize)
+	}
+	o = &OTAVersions{Client: f.client()}
+	hits := f.hit("/image.ota")
+	err = o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: DefaultMaxImageSize + 1}, &buf)
+	if !errors.Is(err, ErrOTAImageTooLarge) || !strings.Contains(err.Error(), "bound of 268435456 bytes") || f.hit("/image.ota") != hits {
+		t.Errorf("a record announcing more than the default bound: %v, %d requests; want ErrOTAImageTooLarge before the request", err, f.hit("/image.ota")-hits)
+	}
+	// An impossible announcement is refused by the same bound.
+	if err := o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: math.MaxUint64}, &buf); !errors.Is(err, ErrOTAImageTooLarge) {
+		t.Errorf("a record announcing MaxUint64 bytes: %v", err)
+	}
+	// A record announcing exactly the default bound is downloaded; that
+	// the host then sends fewer bytes is VerifyImage's business.
+	buf.Reset()
+	if err := o.Download(ctx, SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: DefaultMaxImageSize}, &buf); err != nil || buf.Len() != 4096 {
+		t.Errorf("a record announcing exactly the default bound: %d bytes, %v", buf.Len(), err)
+	}
+}
+
 // TestOTAVersionWithoutMaximum (W4-ctlint-06): a ledger record without
 // maxApplicableSoftwareVersion has no upper bound — matter.js checks the
 // maximum only when it is defined (DclOtaUpdateService.ts:811-816); a
