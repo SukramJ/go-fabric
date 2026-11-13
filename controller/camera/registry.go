@@ -252,6 +252,9 @@ type sessionRegistry struct {
 	pendingOrder []*pendingSession
 	queue        []func()
 	delivering   bool
+	// closed: the Service's Close claimed every session; a start that
+	// registers later is refused (review II, R2-P1-cam-b-04).
+	closed bool
 }
 
 // newSessionRegistry is a registry calling announce for every end and
@@ -324,16 +327,28 @@ func (r *sessionRegistry) begin(nodeID uint64, endpointID uint16, connectionID, 
 }
 
 // beginKeyed is the key check and begin as one step under the lock, so two
-// concurrent starts of a connection cannot both register one key; false
-// when clientSessionKey (non-empty) already names a session of the
-// connection (review II, R2-P1-cam-a-01, R2-P1-cam-b-03).
-func (r *sessionRegistry) beginKeyed(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) (*pendingSession, bool) {
+// concurrent starts of a connection cannot both register one key
+// (review II, R2-P1-cam-a-01, R2-P1-cam-b-03). It refuses a key
+// (non-empty) that already names a session of the connection, and every
+// start once the registry is closed.
+func (r *sessionRegistry) beginKeyed(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) (*pendingSession, error) {
 	r.mu.Lock()
 	defer r.unlock()
-	if clientSessionKey != "" && r.clientSessionKeyInUseLocked(connectionID, clientSessionKey) {
-		return nil, false
+	if r.closed {
+		return nil, ErrClosed
 	}
-	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey), true
+	if clientSessionKey != "" && r.clientSessionKeyInUseLocked(connectionID, clientSessionKey) {
+		return nil, invalidArguments("client_session_key %q already names a session of this connection that is starting or open", clientSessionKey)
+	}
+	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey), nil
+}
+
+// closeStarts refuses every start from now on; the claim that follows sees
+// every start registered before.
+func (r *sessionRegistry) closeStarts() {
+	r.mu.Lock()
+	r.closed = true
+	r.unlock()
 }
 
 // beginLocked is begin; the caller holds mu.

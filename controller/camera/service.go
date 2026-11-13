@@ -225,7 +225,7 @@ func (s *Service) Close(ctx context.Context) error {
 	}
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
-	s.m.stopAll(ctx)
+	s.m.shutdown(ctx)
 	if s.unsub != nil {
 		s.unsub()
 	}
