@@ -62,7 +62,10 @@ type Exchange interface {
 // acknowledgement, a message the exchange's acknowledgement checks drop or
 // one a full queue drops. A transfer finished at its arrival can then
 // always read the ack from the queue. fn runs on the receive goroutine, so
-// it must not block and must not call back into the exchange. A later
+// it must not block and must not call back into the exchange — and neither
+// may what it reaches: the outbound flow's fn runs the transfer's final
+// progress and finished hooks, so the [ServerSession.OnProgress] and
+// [ServerSession.OnFinished] observers are bound by the same rule. A later
 // call replaces fn.
 type ReceiveNotifier interface {
 	Exchange
