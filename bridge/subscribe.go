@@ -505,11 +505,15 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 	if !hasACL {
 		return results
 	}
-	if fabricIndex == 0 {
+	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
 		// anything to (matter.js FabricAccessControl.ts:189-191 keys the
 		// implicit grant on the PASE auth mode only; review 2026-11
-		// W2-sec-03).
+		// W2-sec-03). An index the bridge could not resolve
+		// (endpoint.FabricIndexUnresolvable) is no accessing fabric
+		// either, as at every gate of im: the filter does not rest on the
+		// access-control source knowing that index (review II,
+		// R2-P0-rv-A08).
 		return nil
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)

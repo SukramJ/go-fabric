@@ -781,12 +781,12 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
 	// session without one — PASE before AddNOC, or a session whose fabric
-	// the caller could not resolve ([hasAccessingFabric]) — it answers
+	// the caller could not resolve ([HasAccessingFabric]) — it answers
 	// UnsupportedAccess. Mirrors matter.js
 	// packages/protocol/src/action/server/CommandInvokeResponse.ts:287-290
 	// at db021da0 (`limits.fabricScoped && !this.session.fabric`). Found by
 	// the CHIP Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
-	if !hasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
+	if !HasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
 		return StatusUnsupportedAccess
 	}
 	// A timed-required command ("T") outside a timed interaction answers
@@ -824,7 +824,7 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 	}
 	// CommandInvokeResponse.ts:388 at db021da0, the same check at a
 	// wildcard path's endpoint.
-	if !hasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(clusterID, commandID) {
+	if !HasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(clusterID, commandID) {
 		return StatusUnsupportedAccess
 	}
 	if g.timedKnown && !g.timed && g.isTimed(at) {

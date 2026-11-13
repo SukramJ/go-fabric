@@ -23,6 +23,7 @@ import (
 
 	core "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -199,5 +200,55 @@ func TestReadAuthorizedResults_NoACLChecker_Passthrough(t *testing.T) {
 	}
 	if got[0] != fd.results[0] {
 		t.Errorf("readAuthorizedResults: result = %+v, want unchanged %+v", got[0], fd.results[0])
+	}
+}
+
+// grantingDispatcher is a dispatcher whose access-control source grants
+// whatever it is asked — one that does not know the index of a session
+// whose fabric could not be resolved — and records the fabric indexes it
+// was asked about.
+type grantingDispatcher struct {
+	fakeReadOnlyDispatcher
+	asked []uint8
+}
+
+func (d *grantingDispatcher) CheckACL(_ context.Context, fabricIndex uint8, _ uint64, _ []uint32, _ uint16, _ uint32, _ uint8) im.StatusCode {
+	d.asked = append(d.asked, fabricIndex)
+	return im.StatusSuccess
+}
+
+var _ im.ACLChecker = (*grantingDispatcher)(nil)
+
+// TestReadAuthorizedResults_UnresolvableFabricIsNoAccessingFabric: the
+// subscription's report filter reads a fabric index it cannot resolve
+// (endpoint.FabricIndexUnresolvable, 255) as no accessing fabric, as every
+// gate of im does ([im.HasAccessingFabric]) — before the access-control
+// source is asked, so the answer does not rest on that source refusing the
+// index. Before, the filter tested index 0 only and handed 255 to the
+// checker (review II, R2-P0-rv-A08; the module's own checker refuses it,
+// another may not).
+func TestReadAuthorizedResults_UnresolvableFabricIsNoAccessingFabric(t *testing.T) {
+	t.Parallel()
+	path := accessControlACLPath()
+	for _, tc := range []struct {
+		fabricIndex uint8
+		want        int
+		wantAsked   bool
+	}{
+		{fabricIndex: 0, want: 0},
+		{fabricIndex: endpointpkg.FabricIndexUnresolvable, want: 0},
+		{fabricIndex: 1, want: 1, wantAsked: true},
+		{fabricIndex: 254, want: 1, wantAsked: true},
+	} {
+		d := &grantingDispatcher{fakeReadOnlyDispatcher: fakeReadOnlyDispatcher{results: []im.ReadResult{{Path: path, Status: im.StatusSuccess}}}}
+		ctx := im.WithFabricFilter(context.Background(), true, tc.fabricIndex)
+		ctx = im.WithSubject(ctx, 0x0000000000001111, nil)
+		got := (&Bridge{}).readAuthorizedResults(ctx, d, path)
+		if len(got) != tc.want {
+			t.Errorf("fabric index %d: %d results, want %d", tc.fabricIndex, len(got), tc.want)
+		}
+		if asked := len(d.asked) > 0; asked != tc.wantAsked {
+			t.Errorf("fabric index %d: the access-control source was asked about %v, want asked = %v", tc.fabricIndex, d.asked, tc.wantAsked)
+		}
 	}
 }

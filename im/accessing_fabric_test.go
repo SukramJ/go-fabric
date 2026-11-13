@@ -82,8 +82,8 @@ var (
 func TestHasAccessingFabric(t *testing.T) {
 	t.Parallel()
 	for index, want := range map[uint8]bool{0: false, 1: true, 7: true, 254: true, 255: false} {
-		if got := hasAccessingFabric(index); got != want {
-			t.Errorf("hasAccessingFabric(%d) = %v, want %v", index, got, want)
+		if got := HasAccessingFabric(index); got != want {
+			t.Errorf("HasAccessingFabric(%d) = %v, want %v", index, got, want)
 		}
 	}
 }

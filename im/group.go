@@ -231,7 +231,7 @@ func groupAuthorizer(ctx context.Context, d Dispatcher, subject GroupSubject) fu
 		if !slices.Contains(subject.Endpoints, endpoint) {
 			return StatusUnsupportedEndpoint
 		}
-		if !hasACL || !hasAccessingFabric(fabricIndex) {
+		if !hasACL || !HasAccessingFabric(fabricIndex) {
 			return StatusUnsupportedAccess
 		}
 		return aclChecker.CheckACL(ctx, fabricIndex, 0, nil, endpoint, clusterID, privilege)

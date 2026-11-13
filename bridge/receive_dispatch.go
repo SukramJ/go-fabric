@@ -418,7 +418,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// same way reads do via [im.FabricFilterFromContext]. Without
 	// this stamp the write has no accessing fabric and is refused
 	// with UNSUPPORTED_ACCESS — by the write handler's gate for a
-	// fabric-scoped attribute (im/write.go, hasAccessingFabric) and
+	// fabric-scoped attribute (im/write.go, HasAccessingFabric) and
 	// by AccessControl's own writeFabric — so Apple's
 	// post-CommissioningComplete ACL update — which carries the new
 	// Resident NodeID + CAT subjects — never reaches the requesting

@@ -380,7 +380,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// leaves the write to its behaviours; here the attribute is skipped,
 		// as that path skips whatever its other gates refuse — the cluster
 		// servers' own refusals remain behind both.
-		if !hasAccessingFabric(fabricIndex) && schema.IsFabricScopedWrite(w.Path.Cluster, w.Path.Attribute) {
+		if !HasAccessingFabric(fabricIndex) && schema.IsFabricScopedWrite(w.Path.Cluster, w.Path.Attribute) {
 			if !w.Path.HasEndpoint {
 				continue
 			}

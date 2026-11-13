@@ -164,15 +164,15 @@ func IsPASEFromContext(ctx context.Context) bool {
 // An index the caller could not resolve (endpoint.FabricIndexUnresolvable)
 // is no accessing fabric either and is refused here, before the
 // access-control source is asked: the gate does not rest on every
-// [ACLChecker] knowing that index ([hasAccessingFabric]).
+// [ACLChecker] knowing that index ([HasAccessingFabric]).
 func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32, endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
-	if !hasAccessingFabric(fabricIndex) {
+	if !HasAccessingFabric(fabricIndex) {
 		return StatusUnsupportedAccess
 	}
 	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
 }
 
-// hasAccessingFabric reports whether fabricIndex names a fabric — the one
+// HasAccessingFabric reports whether fabricIndex names a fabric — the one
 // reading of "no accessing fabric" every gate of this package uses: the
 // subject's access check, the fabric-scoped write and invoke gates, the
 // group authorizer. Matter constrains a fabric index to "1 to 254" (matter.js
@@ -183,7 +183,11 @@ func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subje
 // resolve (endpoint.FabricIndexUnresolvable). Neither is an accessing
 // fabric. No reference models an index it cannot resolve; reading it as no
 // fabric is this module's fail-closed rule.
-func hasAccessingFabric(fabricIndex uint8) bool {
+//
+// Exported for the gate that runs outside this package on the same
+// question: the bridge's filter of a subscription's attribute reports
+// (bridge.readAuthorizedResults).
+func HasAccessingFabric(fabricIndex uint8) bool {
 	return fabricIndex >= 1 && fabricIndex <= 254
 }
 
