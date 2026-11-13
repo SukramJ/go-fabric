@@ -5,6 +5,8 @@ package schema
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -49,30 +51,72 @@ func loadWritableSnapshot(t *testing.T) *snapshotSchema {
 	return &s
 }
 
-// snapshotWritable mirrors matter.js Access.writable
-// (../matter.js/packages/model/src/aspects/Access.ts:44-46): writability is
-// decided by the leading read/write token of the access string. rw == "R"
-// (or no rw token, e.g. a bare "A" privilege) is read-only; "W", "RW", and
-// the optional-write "R[W]" are writable.
-func snapshotWritable(access string) bool {
-	fields := strings.Fields(access)
-	if len(fields) == 0 {
-		return false // no rw token → read-only
+// effectiveWritable mirrors matter.js Access.writable
+// (packages/model/src/aspects/Access.ts:44-46 at db021da0,
+// `!!this.rw && this.rw !== Access.Rw.Read`) on an attribute's effective
+// rw: "R" or none is read-only; "RW" and the optional-write "R[W]" are
+// writable.
+func effectiveWritable(a snapshotAttribute) bool {
+	return a.Effective != nil && a.Effective.Access.RW != "" && a.Effective.Access.RW != "R"
+}
+
+// globalAttribute reports an id in the global attribute range
+// (GeneratedCommandList 0xFFF8 … ClusterRevision 0xFFFD). The snapshot lists
+// FeatureMap and ClusterRevision as attributes of a cluster; the write gate
+// answers the range itself (endpoint/dispatcher.go isGlobalAttribute), so
+// readOnlyAttributes leaves it out.
+func globalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
+
+// readOnlyDrift compares table, cluster by cluster, with the read-only
+// attributes of the snapshot clusters — every attribute whose effective
+// access is not writable, the global range excepted — and returns one line
+// per difference: a table cluster the snapshot does not have, a read-only
+// attribute the table lacks, a table entry the snapshot marks writable or
+// does not list. The effective access is each attribute's own (review II,
+// W3-clugen-05): an attribute a derived cluster inherits states no access
+// string, and a comparison by that string skipped it, so a read-only
+// inherited attribute could be missing from the table unnoticed.
+func readOnlyDrift(clusters []snapshotCluster, table map[uint32]map[uint32]struct{}) []string {
+	byID := make(map[uint32]snapshotCluster, len(clusters))
+	for _, c := range clusters {
+		byID[c.ID] = c
 	}
-	switch fields[0] {
-	case "R":
-		return false
-	case "W", "RW", "R[W]":
-		return true
-	default:
-		return false // e.g. "A" — privilege only, no read/write token
+	var drift []string
+	for clusterID, tableSet := range table {
+		sc, ok := byID[clusterID]
+		if !ok {
+			drift = append(drift, fmt.Sprintf("readOnlyAttributes has cluster 0x%04X but the snapshot does not — stale table entry", clusterID))
+			continue
+		}
+		want := make(map[uint32]struct{})
+		for _, a := range sc.Attributes {
+			if a.Effective == nil {
+				drift = append(drift, fmt.Sprintf("cluster 0x%04X (%s): attr 0x%04X has no effective layer in the snapshot", clusterID, sc.Name, a.ID))
+				continue
+			}
+			if !globalAttribute(a.ID) && !effectiveWritable(a) {
+				want[a.ID] = struct{}{}
+			}
+		}
+		for id := range want {
+			if _, present := tableSet[id]; !present {
+				drift = append(drift, fmt.Sprintf("cluster 0x%04X (%s): attr 0x%04X is read-only in matter.js but missing from the table", clusterID, sc.Name, id))
+			}
+		}
+		for id := range tableSet {
+			if _, present := want[id]; !present {
+				drift = append(drift, fmt.Sprintf("cluster 0x%04X (%s): attr 0x%04X is in the read-only table but matter.js marks it writable/unknown", clusterID, sc.Name, id))
+			}
+		}
 	}
+	slices.Sort(drift)
+	return drift
 }
 
 // TestReadOnlyAttributeParity pins readOnlyAttributes (via AttributeWritable)
 // against the committed matter.js HEAD schema snapshot. For every cluster in
 // the table it derives the read-only attribute set straight from the
-// snapshot's per-attribute access strings and asserts an EXACT match — no
+// snapshot's per-attribute effective access and asserts an EXACT match — no
 // missing read-only attribute, no stray/writable attribute — so the
 // hand-maintained table cannot drift from matter.js when the snapshot is
 // regenerated.
@@ -80,69 +124,70 @@ func TestReadOnlyAttributeParity(t *testing.T) {
 	t.Parallel()
 
 	snap := loadWritableSnapshot(t)
-	byID := make(map[uint32]snapshotCluster, len(snap.Clusters))
-	for _, c := range snap.Clusters {
-		byID[c.ID] = c
+	for _, d := range readOnlyDrift(snap.Clusters, readOnlyAttributes) {
+		t.Error(d)
 	}
 
-	for clusterID, tableSet := range readOnlyAttributes {
-		sc, ok := byID[clusterID]
-		if !ok {
-			t.Errorf("readOnlyAttributes has cluster 0x%04X but the snapshot does not — stale table entry", clusterID)
+	// Cross-check the public AttributeWritable verdict for every attribute
+	// of the table's clusters.
+	for _, sc := range snap.Clusters {
+		if _, ok := readOnlyAttributes[sc.ID]; !ok {
 			continue
 		}
-
-		// Derive the snapshot's read-only set for this cluster. Attributes
-		// with no access string (globals) carry no writability verdict and
-		// are excluded on both sides.
-		want := make(map[uint32]struct{})
 		for _, a := range sc.Attributes {
-			if a.Access == "" {
+			if globalAttribute(a.ID) {
 				continue
 			}
-			if !snapshotWritable(a.Access) {
-				want[a.ID] = struct{}{}
-			}
-		}
-
-		// Exact set comparison catches both a missing read-only attribute
-		// and a stray entry that matter.js actually marks writable.
-		if len(want) != len(tableSet) {
-			t.Errorf("cluster 0x%04X (%s): table has %d read-only attrs, snapshot has %d",
-				clusterID, sc.Name, len(tableSet), len(want))
-		}
-		for id := range want {
-			if _, present := tableSet[id]; !present {
-				t.Errorf("cluster 0x%04X (%s): attr 0x%04X is read-only in matter.js but missing from the table",
-					clusterID, sc.Name, id)
-			}
-		}
-		for id := range tableSet {
-			if _, present := want[id]; !present {
-				t.Errorf("cluster 0x%04X (%s): attr 0x%04X is in the read-only table but matter.js marks it writable/unknown",
-					clusterID, sc.Name, id)
-			}
-		}
-
-		// Cross-check the public AttributeWritable verdict for every
-		// access-bearing attribute of the cluster.
-		for _, a := range sc.Attributes {
-			if a.Access == "" {
-				continue
-			}
-			writable, known := AttributeWritable(clusterID, a.ID)
-			if snapshotWritable(a.Access) {
+			writable, known := AttributeWritable(sc.ID, a.ID)
+			if effectiveWritable(a) {
 				if !writable {
 					t.Errorf("AttributeWritable(0x%04X, 0x%04X) writable=false, want true (access %q)",
-						clusterID, a.ID, a.Access)
+						sc.ID, a.ID, a.Access)
 				}
-			} else {
-				if !known || writable {
-					t.Errorf("AttributeWritable(0x%04X, 0x%04X) = (writable %v, known %v), want (false, true) (access %q)",
-						clusterID, a.ID, writable, known, a.Access)
-				}
+			} else if !known || writable {
+				t.Errorf("AttributeWritable(0x%04X, 0x%04X) = (writable %v, known %v), want (false, true) (access %q)",
+					sc.ID, a.ID, writable, known, a.Access)
 			}
 		}
+	}
+}
+
+// TestReadOnlyDriftSeesAnInheritedAttribute holds the comparison itself: a
+// read-only attribute the snapshot lists without an access string — as a
+// derived cluster lists what it inherits — is one the table must carry, a
+// global one is not, and a writable or unlisted table entry is reported.
+func TestReadOnlyDriftSeesAnInheritedAttribute(t *testing.T) {
+	t.Parallel()
+	attr := func(id uint32, access, rw string) snapshotAttribute {
+		a := snapshotAttribute{ID: id, Access: access}
+		a.Effective = &struct {
+			Access struct {
+				RW        string `json:"rw"`
+				WritePriv string `json:"writePriv"`
+			} `json:"access"`
+		}{}
+		a.Effective.Access.RW = rw
+		return a
+	}
+	clusters := []snapshotCluster{{ID: 0x1234, Name: "Derived", Attributes: []snapshotAttribute{
+		attr(0x0000, "R V", "R"),
+		attr(0x0001, "", "R"), // inherited, read-only
+		attr(0x0002, "", "RW"),
+		attr(0xFFFD, "", "R"), // ClusterRevision: the gate's own
+	}}}
+	set := func(ids ...uint32) map[uint32]map[uint32]struct{} {
+		return map[uint32]map[uint32]struct{}{0x1234: newReadOnlySet(ids...)}
+	}
+	if d := readOnlyDrift(clusters, set(0x0000, 0x0001)); len(d) != 0 {
+		t.Errorf("the exact table drifts: %q", d)
+	}
+	d := readOnlyDrift(clusters, set(0x0000))
+	if len(d) != 1 || !strings.Contains(d[0], "attr 0x0001 is read-only in matter.js but missing") {
+		t.Errorf("a table without the inherited read-only attribute: %q, want the one missing entry", d)
+	}
+	d = readOnlyDrift(clusters, set(0x0000, 0x0001, 0x0002, 0x0003))
+	if len(d) != 2 || !strings.Contains(d[0], "attr 0x0002 is in the read-only table") || !strings.Contains(d[1], "attr 0x0003 is in the read-only table") {
+		t.Errorf("a table with a writable and an unlisted attribute: %q, want both", d)
 	}
 }
 

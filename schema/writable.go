@@ -28,11 +28,13 @@ package schema
 // clusters the bridge exposes (core clusters plus OnOff/LevelControl/
 // ColorControl/Groups, WindowCovering, DoorLock, Thermostat, GenericSwitch,
 // SmokeCoAlarm, OperationalState, RvcOperationalState, FanControl,
-// PumpConfigurationAndControl, and the measurement clusters) so it stays bounded. Every entry is derived
-// from the per-attribute `access` strings in
-// parity/schema.json (the matter.js HEAD pin);
-// TestReadOnlyAttributeParity reloads that snapshot and fails if any entry
-// drifts from matter.js, so the table cannot silently diverge.
+// PumpConfigurationAndControl, and the measurement clusters) so it stays bounded. Every entry is an
+// attribute whose effective access in parity/schema.json (the matter.js
+// HEAD pin) is not writable — the attribute's own access, an inherited one
+// included; TestReadOnlyAttributeParity reloads that snapshot and fails if
+// any entry drifts from matter.js, so the table cannot silently diverge.
+// A read-only attribute of a cluster outside the table is not judged here:
+// its write reaches the access-control gate and then the cluster server.
 //
 // Matter global attributes (FeatureMap, ClusterRevision, AttributeList,
 // AcceptedCommandList, GeneratedCommandList, EventList) carry no explicit
