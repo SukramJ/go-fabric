@@ -1314,7 +1314,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	}
 
 	// Notify active subscribers that Descriptor.PartsList has changed
-	// on both the Root (EP 0) and Aggregator (EP 1) endpoints. Mirrors
+	// on the endpoints that list the parts that moved. Mirrors
 	// matter.js packages/node/src/behaviors/descriptor/
 	// DescriptorServer.ts:27 — `this.reactTo(this.agent.get(IndexBehavior)
 	// .events.change, this.#updatePartsList)` which writes
@@ -1332,8 +1332,12 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// chip equivalent: src/app/clusters/descriptor/descriptor.cpp +
 	// emberAfSetDynamicEndpoint which calls
 	// MatterReportingAttributeChangeCallback for Descriptor.PartsList.
+	//
+	// The endpoints marked are the root, the Aggregator by its role — not
+	// endpoint 1 — and every endpoint whose own parts changed, with its
+	// ancestors (review II, R2-P1-req2-13).
 	if m := b.subscriptionManagerLocked(); m != nil {
-		for _, epID := range []uint16{0, 1} {
+		for _, epID := range partsListOwnersChanged(prevTopology, topology) {
 			m.OnAttributeChanged(im.ConcreteAttributePath{
 				Endpoint:     epID,
 				Cluster:      0x001D, // Descriptor
@@ -1371,6 +1375,69 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 		hook(count)
 	}
 	return nil
+}
+
+// partsListOwnersChanged names the endpoints whose Descriptor.PartsList a
+// reassembly from prev to next may have moved: the root and the
+// Aggregator always, and every endpoint whose direct parts — the
+// endpoints that name it as their parent — differ, with its ancestors in
+// next, whose PartsList lists descendants. prev may be nil.
+func partsListOwnersChanged(prev, next *endpoint.Topology) []uint16 {
+	out := []uint16{0}
+	if agg := next.Aggregator(); agg != nil && agg.ID != 0 {
+		out = append(out, agg.ID)
+	}
+	directParts := func(t *endpoint.Topology) map[uint16][]uint16 {
+		parts := map[uint16][]uint16{}
+		if t == nil {
+			return parts
+		}
+		for _, ep := range t.Endpoints {
+			if ep != nil && ep.HasParentEndpointID && ep.ParentEndpointID != ep.ID {
+				parts[ep.ParentEndpointID] = append(parts[ep.ParentEndpointID], ep.ID)
+			}
+		}
+		for id := range parts {
+			slices.Sort(parts[id])
+		}
+		return parts
+	}
+	before, after := directParts(prev), directParts(next)
+	parentOf := map[uint16]uint16{}
+	for _, ep := range next.Endpoints {
+		if ep != nil && ep.HasParentEndpointID {
+			parentOf[ep.ID] = ep.ParentEndpointID
+		}
+	}
+	seen := map[uint16]bool{}
+	for _, id := range out {
+		seen[id] = true
+	}
+	mark := func(id uint16) {
+		for !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+			parent, ok := parentOf[id]
+			if !ok {
+				return
+			}
+			id = parent
+		}
+	}
+	owners := make([]uint16, 0, len(before)+len(after))
+	for id := range before {
+		owners = append(owners, id)
+	}
+	for id := range after {
+		owners = append(owners, id)
+	}
+	slices.Sort(owners)
+	for _, id := range slices.Compact(owners) {
+		if !slices.Equal(before[id], after[id]) && next.FindByID(id) != nil {
+			mark(id)
+		}
+	}
+	return out
 }
 
 // announceAddedEndpoints marks every attribute of each endpoint in next
