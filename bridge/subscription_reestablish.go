@@ -286,7 +286,13 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		_ = m.Release(sub.ID)
 		return err
 	}
-	sub.TouchLastReport(b.clk().Now())
+	// The priming ends as a SubscribeRequest's does (sendSubscribeResponse):
+	// the events the report carried are not owed again, and the engine
+	// reports from now on (review II, R2-P1-dr-req-06).
+	if latest, ok := latestEventNumber(report.EventReports); ok {
+		sub.PrimedEvents(latest)
+	}
+	sub.EndPriming(b.clk().Now())
 	b.logger.Info("matter.subscription.reestablished_one",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("session_id", int(link.sessionID)),
