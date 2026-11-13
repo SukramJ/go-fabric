@@ -84,18 +84,9 @@ const (
 	attrOccupancySensorBmp  = occdef.AttrOccupancySensorTypeBitmap
 )
 
-// Cluster revisions, each the generated definition's (matter.js HEAD).
-const (
-	tempMeasClusterRevision      = tmpdef.Revision
-	humidityClusterRevision      = rhdef.Revision
-	illuminanceClusterRevision   = illdef.Revision
-	pressureClusterRevision      = prsdef.Revision
-	booleanStateClusterRevision  = booldef.Revision
-	occupancyClusterRevision     = occdef.Revision
-	concentrationClusterRevision = co2def.Revision // CO2 / PM2.5 / PM10 share the base cluster's revision
-	airQualityClusterRevision    = aqdef.Revision
-	powerSourceClusterRevision   = psdef.Revision
-)
+// concentrationClusterRevision is the revision the concentration clusters
+// share, the generated CO2 definition's (matter.js HEAD).
+const concentrationClusterRevision = co2def.Revision
 
 // AirQuality (0x005B) attribute ID per Matter §2.9.6.1.
 const attrAirQualityLevel = aqdef.AttrAirQuality
@@ -179,13 +170,6 @@ const (
 const (
 	attrElEnAccuracy           = eemdef.AttrAccuracy
 	attrElEnCumulativeImported = eemdef.AttrCumulativeEnergyImported // int64 mWh, struct EnergyMeasurementStruct.energy
-)
-
-// ElectricalPower / ElectricalEnergy ClusterRevisions, the generated
-// definitions'.
-const (
-	electricalPowerClusterRevision  = epmdef.Revision
-	electricalEnergyClusterRevision = eemdef.Revision
 )
 
 // elPwrFeatureAltC is the ElectricalPower FeatureMap: only the ALTC
