@@ -1426,9 +1426,12 @@ type fabricSessionExceptCloser interface {
 // EmitFabricLeavingContext flushes the subscriptions of a fabric that is
 // about to be removed — what they owe goes to the wire now, before the
 // fabric's rows and with them its ACL go — so the Leave event the node
-// emits first still reaches its subscribers; a session carrying the
-// RemoveFabric command (ctx is the command's context) keeps its
-// subscriptions for after the response. Mirrors matter.js
+// emits first still reaches its subscribers, those of the session
+// carrying the RemoveFabric command (ctx is the command's context)
+// included: the command hands that session's turn on first, so the
+// peer's answer to the flushed report is not queued behind it (review
+// II, R2-P1-req2-04; matter.js's Session.ts:312 awaits the shutdown logic
+// of every session at once, the invoking one included). Mirrors matter.js
 // packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0 `leave`: the
 // leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
 // :186-188), then every session of the fabric runs closeSubscriptions
@@ -1445,7 +1448,10 @@ func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8
 	if m == nil {
 		return
 	}
-	m.FlushFabric(ctx, fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+	if invoking := mattercore.InvokeSessionIDFromContext(ctx); invoking != 0 && m.CountBySession()[invoking] > 0 {
+		leaveSessionOrder(ctx)
+	}
+	m.FlushFabric(ctx, fabricIndex, 0)
 }
 
 // EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal

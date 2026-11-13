@@ -602,8 +602,9 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // events and the dirty attributes, together in one report per
 // subscription — now, the min interval and a deferral notwithstanding,
 // and returns once the reports are handed to the wire and answered or
-// given up; the subscriptions of exceptSessionID, the session carrying
-// the command, are left for after its response (0 excepts none). It is
+// given up; the subscriptions of exceptSessionID are left out (0 excepts
+// none — what the bridge passes, the session carrying RemoveFabric
+// included, R2-P1-req2-04). It is
 // the flush of matter.js's Fabric.leave before the fabric goes
 // (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0): every
 // session of the fabric runs `closeSubscriptions(true)`
