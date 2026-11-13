@@ -54,8 +54,13 @@ type Conn struct {
 	closeErr  error
 
 	// served is closed once serve returned, after every message it handed
-	// to the handler: what [Conn.Wait] waits for.
-	served chan struct{}
+	// to the handler: what [Conn.Wait] waits for. A connection closed
+	// before serve started has nothing to wait for, so close closes it
+	// then; serveMu guards serveStarted and servedOnce the one close.
+	served       chan struct{}
+	servedOnce   sync.Once
+	serveMu      sync.Mutex
+	serveStarted bool
 
 	// received is set by the first complete message; the listener's
 	// idle timer reads it (TcpTransport.ts:89-104 receivedData).
@@ -152,7 +157,8 @@ func (c *Conn) Close() error {
 
 // Wait blocks until the connection's reader returned and every handler
 // call it started has returned, or ctx ends (its error is returned then).
-// It returns at once for a connection whose reader never ran.
+// It returns at once for a connection that was closed before its reader
+// ran.
 func (c *Conn) Wait(ctx context.Context) error {
 	select {
 	case <-c.served:
@@ -167,7 +173,19 @@ func (c *Conn) close(reason error) {
 		c.closeErr = reason
 		close(c.closed)
 		_ = c.nc.Close()
+		c.serveMu.Lock()
+		started := c.serveStarted
+		c.serveMu.Unlock()
+		if !started {
+			c.markServed()
+		}
 	})
+}
+
+// markServed closes served, once: by serve when it returned, or by close
+// for a connection whose reader never started.
+func (c *Conn) markServed() {
+	c.servedOnce.Do(func() { close(c.served) })
 }
 
 func (c *Conn) isClosed() bool {
@@ -194,11 +212,14 @@ func (c *Conn) String() string {
 // message and returns once the connection is closed and every one of
 // them returned; then served closes.
 func (c *Conn) serve(handler Handler) {
+	c.serveMu.Lock()
+	c.serveStarted = true
+	c.serveMu.Unlock()
 	var handlers sync.WaitGroup
 	defer func() {
 		c.close(nil)
 		handlers.Wait()
-		close(c.served)
+		c.markServed()
 	}()
 
 	asm := newAssembler(c.maxPayloadSize)
