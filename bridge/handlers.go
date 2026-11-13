@@ -139,6 +139,12 @@ type PaseAdapter struct {
 // A non-nil error from the callback is wrapped and returned from
 // ProcessPake3 (the SecureChannel router logs it and the
 // commissioner falls back).
+//
+// The slice is the callback's own: the adapter holds no other reference to
+// it and does not read it after the call. An implementation that has
+// derived its keys overwrites it, as the node facade does (review II,
+// W1-sec-05); the adapter does not do so itself, because an implementation
+// may keep the slice.
 type PaseSessionEstablished func(sharedSecret []byte, peerSessionID uint16) error
 
 // NewPaseAdapter wraps v as a single-shot adapter — the verifier is

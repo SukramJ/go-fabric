@@ -247,6 +247,34 @@ func TestPaseAdapter_HappyPathPake3_StillEstablishes(t *testing.T) {
 	}
 }
 
+// TestPaseAdapter_TheCallbackOwnsKe: the shared secret the adapter hands
+// its callback is the callback's to overwrite — the adapter does not read
+// it again, and a later handshake on the same adapter is not built on the
+// overwritten bytes (review II, W1-sec-05: the node facade overwrites Ke
+// once the session's keys are derived).
+func TestPaseAdapter_TheCallbackOwnsKe(t *testing.T) {
+	t.Parallel()
+	a := NewPaseAdapterWithFactory(newVerifierFactory(t, nil))
+	var seen [][]byte
+	a.SetOnSessionEstablished(func(ke []byte, _ uint16) error {
+		if len(ke) != 16 || bytes.Equal(ke, make([]byte, 16)) {
+			t.Errorf("the callback was handed Ke = %x, want 16 bytes that are not all zero", ke)
+		}
+		seen = append(seen, bytes.Clone(ke))
+		clear(ke)
+		return nil
+	})
+	for round := range 2 {
+		opcode, _, err := paseRoundTrip(t, a)
+		if err != nil || opcode != mrp.SCOpcodeStatusReport {
+			t.Fatalf("round %d after the callback overwrote Ke: opcode 0x%02X, %v", round, opcode, err)
+		}
+	}
+	if len(seen) != 2 {
+		t.Fatalf("the callback ran %d times, want 2", len(seen))
+	}
+}
+
 // decodeStatusReportCodes strips the message + protocol headers off a
 // captured Secure-Channel datagram and returns the StatusReport general
 // + protocol codes (little-endian uint16s at body offsets 0 and 6 per

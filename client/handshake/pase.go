@@ -174,10 +174,21 @@ func pairPASE(ctx context.Context, mgr *exchange.Manager, us *exchange.Session, 
 		return nil, err
 	}
 
-	keys, err := hkdf.Key(sha256.New, prover.SharedSecret(), nil, sessionKeysInfo, 48)
+	// Ke has served once the session keys are derived, and the 48 derived
+	// bytes once the session holds its own copies of them: channel.New
+	// copies both keys and the manager the attestation challenge
+	// (TestNewKeepsItsOwnKeys in secure/channel holds the first). Both
+	// buffers are overwritten on every way out — best effort, within Go's
+	// limits (secure/sigma/zero.go); connectedhomeip clears the same
+	// (src/crypto/CHIPCryptoPALOpenSSL.cpp:1150-1151 at 6170af84,
+	// `ClearSecretData(Kae)`; review II, W1-sec-05, owner decision 6).
+	ke := prover.SharedSecret()
+	keys, err := hkdf.Key(sha256.New, ke, nil, sessionKeysInfo, 48)
+	clear(ke)
 	if err != nil {
 		return nil, fmt.Errorf("handshake: session keys: %w", err)
 	}
+	defer clear(keys)
 	return mgr.NewSecureSession(exchange.SecureSessionConfig{
 		ID:   sessionID,
 		Addr: us.Addr(),
