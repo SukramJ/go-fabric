@@ -397,6 +397,10 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 # certification families and the BLE legs need the harness image and stay
 # in CI. CHIPTOOL_CONTAINER_RUN narrows the run, e.g.
 # CHIPTOOL_CONTAINER_RUN='^TestChipToolCommissionsReferenceBridge$$'.
+# The target leaves behind what makes the next run fast: the image
+# $(CHIPTOOL_CONTAINER_IMAGE), the network $(CHIPTOOL_CONTAINER_NETWORK) and
+# the Docker volumes gofabric-chiptool-gomod and gofabric-chiptool-gocache
+# (Go's module and build caches).
 CHIPTOOL_CONTAINER_IMAGE   ?= gofabric-chiptool-container:local
 CHIPTOOL_CONTAINER_NETWORK ?= gofabric-chiptool
 CHIPTOOL_CONTAINER_SUBNET  ?= fd00:6f66:6162:c7::/64
@@ -410,8 +414,14 @@ chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 co
 		echo "chiptool-container: $(CHIP_CERT_BINS_IMAGE) publishes linux/arm64 only; this host is $$arch."; \
 		echo "  On amd64 Linux use 'make chiptool-test' (the harness image)."; \
 		exit 1;; esac
+	@case "$(CHIPTOOL_CONTAINER_NETWORK)" in host|none|bridge|"") \
+		echo "chiptool-container: CHIPTOOL_CONTAINER_NETWORK must be a user-defined bridge network, not '$(CHIPTOOL_CONTAINER_NETWORK)': this target never runs on the host network."; \
+		exit 1;; esac
 	@docker network inspect $(CHIPTOOL_CONTAINER_NETWORK) >/dev/null 2>&1 || \
 		docker network create --ipv6 --subnet $(CHIPTOOL_CONTAINER_SUBNET) $(CHIPTOOL_CONTAINER_NETWORK) >/dev/null
+	@[ "$$(docker network inspect -f '{{.EnableIPv6}}' $(CHIPTOOL_CONTAINER_NETWORK))" = "true" ] || { \
+		echo "chiptool-container: the network $(CHIPTOOL_CONTAINER_NETWORK) exists without IPv6, which Matter needs; name another with CHIPTOOL_CONTAINER_NETWORK."; \
+		exit 1; }
 	docker build --platform linux/arm64 \
 		--build-arg CHIP_CERT_BINS_IMAGE=$(CHIP_CERT_BINS_IMAGE) \
 		--build-arg GO_IMAGE=golang:$(GO_MOD_VERSION) \
