@@ -50,27 +50,6 @@ func TestClassifyInterface_AllBranches(t *testing.T) {
 	}
 }
 
-// TestSyntheticEthernetIface verifies the fallback struct has the expected
-// 6-byte zero MAC and "eth0" name.
-func TestSyntheticEthernetIface(t *testing.T) {
-	t.Parallel()
-	s := syntheticEthernetIface()
-	if s.Name != "eth0" {
-		t.Errorf("Name=%q, want eth0", s.Name)
-	}
-	if len(s.HardwareAddress) != 6 {
-		t.Errorf("HardwareAddress len=%d, want 6", len(s.HardwareAddress))
-	}
-	for i, b := range s.HardwareAddress {
-		if b != 0 {
-			t.Errorf("HardwareAddress[%d]=%d, want 0", i, b)
-		}
-	}
-	if s.InterfaceType != InterfaceTypeEthernet {
-		t.Errorf("InterfaceType=%d, want %d (Ethernet)", s.InterfaceType, InterfaceTypeEthernet)
-	}
-}
-
 // ─── basicInfoSerialFromUniqueID ─────────────────────────────────────────────
 
 // TestBasicInfoSerialFromUniqueID_Short verifies that a uid ≤ 16 chars is

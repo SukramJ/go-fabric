@@ -29,13 +29,9 @@ import (
 
 // NetworkInterfaceStruct mirrors Matter §11.12.4.1 (NetworkInterface
 // struct) — the per-interface entry the GeneralDiagnostics
-// `NetworkInterfaces` (0x0000) attribute exposes. Apple Home's
-// `HMMTRAccessoryServerBrowser` reads this list to build its internal
-// "topology dictionary"; without at least one entry it logs
-// "No enumeration/topology dictionary found" + "Nil supported link
-// layer types" and aborts the pair via RemoveFabric ~5 s after
-// Subscribe-Initial. matter.js HEAD shape:
-// packages/types/src/clusters/general-diagnostics.ts:NetworkInterface.
+// `NetworkInterfaces` (0x0000) attribute exposes. matter.js shape:
+// packages/model/src/standard/elements/general-diagnostics.element.ts
+// :178-198 at db021da0.
 type NetworkInterfaceStruct struct {
 	// Name is a non-empty UTF-8 label (max 32 chars). Matches the OS
 	// interface name ("en0", "eth0", …).
@@ -177,8 +173,8 @@ type GeneralDiagnostics struct {
 	// without mu).
 	obsMu     sync.Mutex
 	observers int
-	// interfaces lists NetworkInterfaces; nil is the host's
-	// (enumerateNetworkInterfaces). A test seam.
+	// interfaces lists the interfaces NetworkInterfaces is selected
+	// from; nil is the host's (enumerateNetworkInterfaces). A test seam.
 	interfaces func() []NetworkInterfaceStruct
 }
 
@@ -521,18 +517,10 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	defer g.mu.RUnlock()
 	switch attrID {
 	case gendiagAttrNetworkInterfaces:
-		// Apple Home's HMMTRAccessoryServerBrowser reads this list to
-		// build its "topology dictionary". An empty list (the prior
-		// stub value) makes Apple log "No enumeration/topology dictionary
-		// found" + "Nil supported link layer types" and tear the
-		// fabric down via RemoveFabric ~5 s after Subscribe-Initial.
-		// Enumerate every operational non-loopback interface and emit
-		// at least one entry so HAP-ServiceMapper can resolve the link
-		// layer type. Mirrors matter.js
-		// packages/node/src/behaviors/general-diagnostics/
-		// GeneralDiagnosticsServer.ts:networkInterfaces. Read on every
-		// read; a change is reported to subscribers by the interface
-		// watcher (interfacesChanged).
+		// The host's interfaces as matter.js lists them
+		// (selectNetworkInterfaces): at most 8, an empty list when none
+		// qualifies. Read on every read; a change is reported to
+		// subscribers by the interface watcher (interfacesChanged).
 		return g.listInterfaces(), true
 	case gendiagAttrRebootCount:
 		// Seeded by the daemon via [SetPersistedCounters]; 0 when
@@ -1055,58 +1043,46 @@ func (g *GeneralDiagnostics) EmitBootReason() {
 		g.def().EventPriority(gendiagEventBootReason))
 }
 
-// enumerateNetworkInterfaces walks net.Interfaces() and projects every
-// non-loopback interface that has at least one assigned address into a
-// [NetworkInterfaceStruct]. The returned slice is what
-// `NetworkInterfaces` reports on the wire — guaranteed non-empty in
-// practice (any host that can talk Matter has at least one routable
-// interface). Loopback interfaces are excluded so they cannot
-// accidentally satisfy the HAP-ServiceMapper's "at least one
-// non-loopback layer" check.
+// The list bounds of NetworkInterfaces and of an entry's address lists,
+// from the model: "max 8" interfaces, "max 4" IPv4 and "max 8" IPv6
+// addresses (matter.js packages/model/src/standard/elements/
+// general-diagnostics.element.ts:27, :191, :195 at db021da0). matter.js
+// cuts each list to its bound (GeneralDiagnosticsServer.ts:518, :525,
+// :526 at db021da0).
+const (
+	maxNetworkInterfaces = 8
+	maxIPv4PerIface      = 4
+	maxIPv6PerIface      = 8
+)
+
+// enumerateNetworkInterfaces lists the host's own interfaces, the
+// candidates [selectNetworkInterfaces] chooses from: every non-loopback
+// interface with at least one address (matter.js NodeJsNetwork.ts:193-194
+// at db021da0 skips an interface without addresses and an internal one),
+// projected into a [NetworkInterfaceStruct]. A failed listing is nil.
 //
-// Heuristics:
+// What this server decides without matter.js:
 //
 //   - InterfaceType is Ethernet for any name starting with "en" or
 //     "eth"; WiFi for "wl" prefixes; Thread for "tr"; Unspecified
-//     otherwise. The bridge does not probe link technology so a
-//     macOS "en0" (which can be either WiFi or Ethernet) defaults to
-//     Ethernet — Apple's mapper treats both equivalently for a
-//     non-Thread / non-Cellular accessory.
-//   - HardwareAddress is canonicalised to 6 or 8 bytes. Synthetic
-//     interfaces with empty MACs return an empty slice, which Matter
-//     allows.
-//   - IPv4 addresses are emitted as the raw 4-byte form. IPv6
-//     addresses are emitted as the raw 16-byte form. Link-local
-//     (fe80::/10) addresses are kept — Apple's commissioner uses
-//     them to route inside the home subnet.
-//
-// Apple HAP-mapper hard limits — picked empirically from observed
-// Apple Home iOS 17+ behaviour. Exceeding either makes Apple log
-// "No known schema for decoding attribute value" + HAPErrorDomain
-// Code=14 and tear the pair down.
-const (
-	maxIfacesForApple = 4 // matter.js spec has no overall cap; Apple's mapper does
-	maxIPv4PerIface   = 4 // matter.js: list constraint "max 4"
-	maxIPv6PerIface   = 8 // matter.js: list constraint "max 8"
-)
-
+//     otherwise. The server does not probe link technology, so a macOS
+//     "en0" (which can be either WiFi or Ethernet) is Ethernet.
+//   - IsOperational is the interface's up flag.
+//   - An interface whose hardware address is not 6 or 8 bytes long is
+//     skipped: the field is a hwadr, and Go reports no address at all
+//     for an interface without one.
+//   - IPv4 addresses are emitted as the raw 4-byte form, IPv6 addresses
+//     as the raw 16-byte form; link-local (fe80::/10) addresses are kept.
 func enumerateNetworkInterfaces() []NetworkInterfaceStruct {
 	ifaces, err := net.Interfaces()
-	if err != nil || len(ifaces) == 0 {
-		return []NetworkInterfaceStruct{syntheticEthernetIface()}
+	if err != nil {
+		return nil
 	}
 	out := make([]NetworkInterfaceStruct, 0, len(ifaces))
 	for _, iface := range ifaces {
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		// matter.js NetworkInterface struct field 4 (HardwareAddress)
-		// is `type: "hwadr"` with exact constraint 6 or 8 bytes.
-		// Apple's IM-decoder rejects the whole struct (and on cascade
-		// the entire Subscribe-Initial) with "No known schema for
-		// decoding attribute value" when HardwareAddress is empty or
-		// odd length. Synthetic / virtual interfaces (utun, awdl, ...)
-		// often have either no MAC or a 0-byte MAC — skip them.
 		if len(iface.HardwareAddr) != 6 && len(iface.HardwareAddr) != 8 {
 			continue
 		}
@@ -1136,40 +1112,47 @@ func enumerateNetworkInterfaces() []NetworkInterfaceStruct {
 			}
 		}
 		out = append(out, entry)
-		if len(out) >= maxIfacesForApple {
-			break
-		}
-	}
-	if len(out) == 0 {
-		// No real interface qualifies (loopback-only host, no MACs,
-		// no addresses). Fall back to one synthetic Ethernet entry —
-		// matter.js spec accepts hardware-address fixed at zeros for
-		// synthetic accessories, and Apple's HAP mapper just needs ONE
-		// entry to build the topology dictionary.
-		return []NetworkInterfaceStruct{syntheticEthernetIface()}
 	}
 	return out
 }
 
-// syntheticEthernetIface returns a fallback NetworkInterface struct
-// when host enumeration produces nothing valid. All-zero MAC keeps
-// the matter.js `hwadr` constraint (exact 6 bytes); zero address
-// lists keep the spec's max-4 / max-8 constraints trivially.
-func syntheticEthernetIface() NetworkInterfaceStruct {
-	return NetworkInterfaceStruct{
-		Name:            "eth0",
-		IsOperational:   true,
-		HardwareAddress: make([]byte, 6),
-		InterfaceType:   InterfaceTypeEthernet,
+// unassignedMAC is the hardware address matter.js reads as "no address
+// assigned" (GeneralDiagnosticsServer.ts:507 at db021da0).
+var unassignedMAC = make([]byte, 6)
+
+// selectNetworkInterfaces is matter.js's selection over the host's
+// interfaces (GeneralDiagnosticsServer.ts:505-518 at db021da0): the
+// entries with the unassigned MAC are dropped, the operational ones come
+// first in their listed order, and the list ends after 8 entries. It adds
+// no entry of its own: a host without a qualifying interface serves an
+// empty list.
+func selectNetworkInterfaces(candidates []NetworkInterfaceStruct) []NetworkInterfaceStruct {
+	out := make([]NetworkInterfaceStruct, 0, len(candidates))
+	for _, c := range candidates {
+		if bytes.Equal(c.HardwareAddress, unassignedMAC) {
+			continue
+		}
+		out = append(out, c)
 	}
+	slices.SortStableFunc(out, func(a, b NetworkInterfaceStruct) int {
+		switch {
+		case a.IsOperational && !b.IsOperational:
+			return -1
+		case !a.IsOperational && b.IsOperational:
+			return 1
+		}
+		return 0
+	})
+	if len(out) > maxNetworkInterfaces {
+		out = out[:maxNetworkInterfaces]
+	}
+	return out
 }
 
 // classifyInterface maps an OS interface name to a Matter
-// InterfaceType enum. Defaults to Ethernet for the common Linux/macOS
-// prefixes (en0, eth0) — Apple's HAP mapper treats Ethernet + WiFi
-// identically for non-Thread accessories, so the heuristic miss is
-// harmless. A loopback name should never reach this function (the
-// caller filters it out), but guard with Unspecified just in case.
+// InterfaceType enum: Ethernet for the common Linux/macOS prefixes (en0,
+// eth0). A loopback name should never reach this function (the caller
+// filters it out), but guard with Unspecified just in case.
 func classifyInterface(name string) uint8 {
 	n := strings.ToLower(name)
 	switch {
@@ -1250,9 +1233,9 @@ func (g *GeneralDiagnostics) currentClock() clock.Clock {
 // listInterfaces is the NetworkInterfaces value.
 func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
 	if g.interfaces != nil {
-		return g.interfaces()
+		return selectNetworkInterfaces(g.interfaces())
 	}
-	return enumerateNetworkInterfaces()
+	return selectNetworkInterfaces(enumerateNetworkInterfaces())
 }
 
 // interfaceSnapshot describes each listed interface by its hardware
@@ -1261,8 +1244,8 @@ func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
 func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
 	// A failed listing keeps the previous snapshot (nil, the Watcher's
 	// contract), as matter.js keeps its state (Network.ts:174-177 at
-	// db021da0); enumerateNetworkInterfaces would turn it into the
-	// synthetic Ethernet entry and report a change twice.
+	// db021da0); listInterfaces would turn it into an empty list and
+	// report a change twice.
 	if _, err := net.Interfaces(); err != nil {
 		return nil
 	}
