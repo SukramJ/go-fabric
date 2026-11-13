@@ -891,8 +891,8 @@ const (
 	EventPriorityDebug EventPriority = 0
 	// EventPriorityInfo — informational.
 	EventPriorityInfo EventPriority = 1
-	// EventPriorityCritical — must be delivered;
-	// bypasses MinIntervalFloor when subscribed.
+	// EventPriorityCritical — must be delivered. The priority does not
+	// decide when a subscriber is told: see [EventEmitter].
 	EventPriorityCritical EventPriority = 2
 )
 
@@ -904,7 +904,13 @@ const (
 // event) triple.
 //
 // `data` is the cluster-native event payload (struct, scalar, …).
-// `priority` drives the urgency gate per Matter §10.6.6.
+// `priority` is the priority the event is recorded and reported with. It
+// does not decide when a subscriber is told: an event is reported with
+// the subscription's next report, and it asks for one itself only when
+// the subscriber marked a path that covers it urgent (isUrgent in the
+// SubscribeRequest) — and then no sooner than the subscription's
+// MinIntervalFloor after the last report, as an attribute change. An
+// emitter cannot make an event jump that floor.
 type EventEmitter interface {
 	MatterEmitEvent(endpoint uint16, cluster, event uint32, data any, priority EventPriority)
 }

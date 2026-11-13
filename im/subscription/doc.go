@@ -15,6 +15,10 @@
 //     containing the current values for every requested path.
 //   - Subsequent reports fire when an attribute changes (gated by
 //     MinInterval) or after MaxInterval expires (keep-alive).
+//   - An event is reported with the subscription's next report. It asks
+//     for one itself — gated by MinInterval like an attribute change —
+//     only when a path of the subscriber that covers it is marked urgent;
+//     its priority does not matter.
 //   - Each subscription is fabric-scoped and counts against the
 //     per-fabric MaxSubscriptions quota.
 //

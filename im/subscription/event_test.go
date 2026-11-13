@@ -83,8 +83,18 @@ func chanFlushReporter(ch chan flushReporterCall) subscription.FlushReporter {
 	}
 }
 
-// defaultEventArgs builds SubscribeArgs with a single event path covering
-// (endpoint=1, cluster=0x003B, event=0x01) and a 1s MinIntervalFloor.
+// urgentEventPath is mkEventPath with the subscriber's isUrgent flag: an
+// event the path covers asks for a report (matter.js
+// ServerSubscription.ts:401-409 at db021da0).
+func urgentEventPath(endpoint uint16, cluster, event uint32) im.ConcreteEventPath {
+	p := mkEventPath(endpoint, cluster, event)
+	p.IsUrgent = true
+	return p
+}
+
+// defaultEventArgs builds SubscribeArgs with a single urgent event path
+// covering (endpoint=1, cluster=0x003B, event=0x01) and a 1s
+// MinIntervalFloor.
 func defaultEventArgs() subscription.SubscribeArgs {
 	return subscription.SubscribeArgs{
 		FabricIndex:        1,
@@ -94,7 +104,7 @@ func defaultEventArgs() subscription.SubscribeArgs {
 		MaxIntervalCeiling: 60,
 		AttributePaths:     []im.ConcreteAttributePath{}, // no attribute paths
 		EventPaths: []im.ConcreteEventPath{
-			mkEventPath(1, 0x003B, 0x01),
+			urgentEventPath(1, 0x003B, 0x01),
 		},
 	}
 }
@@ -116,8 +126,9 @@ func TestOnEventFired_MatchingPath_ReporterReceivesOne(t *testing.T) {
 	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 
 	ctx := context.Background()
-	// Critical priority → bypasses MinIntervalFloor; Tick with t0+0 is enough.
-	m.Tick(ctx, time.Now())
+	// An urgent path's event is reported once MinIntervalFloor (1 s) has
+	// elapsed since the subscription was admitted.
+	m.Tick(ctx, time.Now().Add(2*time.Second))
 
 	select {
 	case call := <-ch:
@@ -174,7 +185,7 @@ func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 		MaxIntervalCeiling: 60,
 		AttributePaths:     []im.ConcreteAttributePath{},
 		EventPaths: []im.ConcreteEventPath{
-			{Cluster: 0x003B, HasCluster: true, Event: 0x01, HasEvent: true},
+			{Cluster: 0x003B, HasCluster: true, Event: 0x01, HasEvent: true, IsUrgent: true},
 		},
 	}
 	// Subscription B: concrete endpoint+cluster, wildcard event.
@@ -186,7 +197,7 @@ func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 		MaxIntervalCeiling: 60,
 		AttributePaths:     []im.ConcreteAttributePath{},
 		EventPaths: []im.ConcreteEventPath{
-			{Endpoint: 1, HasEndpoint: true, Cluster: 0x003B, HasCluster: true},
+			{Endpoint: 1, HasEndpoint: true, Cluster: 0x003B, HasCluster: true, IsUrgent: true},
 		},
 	}
 
@@ -201,7 +212,7 @@ func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 
 	ctx := context.Background()
-	m.Tick(ctx, time.Now())
+	m.Tick(ctx, time.Now().Add(2*time.Second))
 
 	// Drain up to 2 calls.
 	var calls []eventReporterCall
@@ -217,12 +228,16 @@ func TestOnEventFired_TwoSubscriptions_BothReceive(t *testing.T) {
 	}
 }
 
-// ---- Test: Critical priority bypasses MinIntervalFloor ----
+// ---- Test: Critical priority does not bypass MinIntervalFloor ----
 
-func TestOnEventFired_CriticalPriority_BypassesMinIntervalFloor(t *testing.T) {
+// A Critical event is reported no sooner than any other: matter.js reads
+// urgency from the subscriber's path (ServerSubscription.ts:401-409 at
+// db021da0), never from the event's priority, and the report an urgent
+// event asks for waits for the floor (:464-473). Until review II
+// (W2-conc-05) a Critical event went out past the floor here.
+func TestOnEventFired_CriticalPriority_HonoursMinIntervalFloor(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 4)
-	// Use a large MinIntervalFloor (10 s) that would normally block.
 	cfg := subscription.Config{MinIntervalFloorSeconds: 10}
 	m, fire := newEventManager(cfg)
 	m.SetEventReporter(chanEventReporter(ch))
@@ -234,30 +249,30 @@ func TestOnEventFired_CriticalPriority_BypassesMinIntervalFloor(t *testing.T) {
 		MinIntervalFloor:   10, // large floor
 		MaxIntervalCeiling: 60,
 		AttributePaths:     []im.ConcreteAttributePath{},
-		EventPaths:         []im.ConcreteEventPath{mkEventPath(1, 0x003B, 0x01)},
+		EventPaths:         []im.ConcreteEventPath{urgentEventPath(1, 0x003B, 0x01)},
 	}
-	if _, err := m.Subscribe(args); err != nil {
+	sub, err := m.Subscribe(args)
+	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
 
 	ctx := context.Background()
 	t0 := time.Now()
-	// Establish lastReport via a Tick (keepalive because MaxInterval elapsed).
-	m.Tick(ctx, t0)
-	for len(ch) > 0 {
-		<-ch
-	}
+	sub.TouchLastReport(t0)
 
 	// Fire Critical event just 1s after last report (well within the 10s floor).
 	fire(mkEventFiring(1, 0x003B, 0x01, im.EventPriorityCritical))
 	m.Tick(ctx, t0.Add(1*time.Second))
-
-	if len(ch) == 0 {
-		t.Fatal("EventReporter not called for Critical event within MinIntervalFloor window")
+	if len(ch) != 0 {
+		t.Fatal("EventReporter called for a Critical event inside the MinIntervalFloor window")
+	}
+	m.Tick(ctx, t0.Add(10*time.Second))
+	if len(ch) != 1 {
+		t.Fatalf("EventReporter calls when the floor ends = %d, want 1", len(ch))
 	}
 }
 
-// ---- Test: non-Critical events wait for MinIntervalFloor ----
+// ---- Test: an urgent path's Info event waits for MinIntervalFloor ----
 
 func TestOnEventFired_InfoPriority_WaitsForMinIntervalFloor(t *testing.T) {
 	t.Parallel()
@@ -273,7 +288,7 @@ func TestOnEventFired_InfoPriority_WaitsForMinIntervalFloor(t *testing.T) {
 		MinIntervalFloor:   5,
 		MaxIntervalCeiling: 60,
 		AttributePaths:     []im.ConcreteAttributePath{},
-		EventPaths:         []im.ConcreteEventPath{mkEventPath(1, 0x003B, 0x01)},
+		EventPaths:         []im.ConcreteEventPath{urgentEventPath(1, 0x003B, 0x01)},
 	}
 	if _, err := m.Subscribe(args); err != nil {
 		t.Fatalf("Subscribe: %v", err)

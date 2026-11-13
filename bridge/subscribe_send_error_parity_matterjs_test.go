@@ -22,7 +22,8 @@ import (
 func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 	t.Parallel()
 	attrPath := im.ConcreteAttributePath{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
-	eventPath := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 1, Cluster: 0x003B, Event: 0x01}
+	// The subscriber's isUrgent flag: its events ask for a report.
+	eventPath := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 1, Cluster: 0x003B, Event: 0x01, IsUrgent: true}
 
 	type rig struct {
 		b      *Bridge

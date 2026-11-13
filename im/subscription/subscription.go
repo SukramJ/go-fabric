@@ -72,13 +72,17 @@ type Subscription struct {
 	// the engine reports nothing for it until [Subscription.EndPriming].
 	priming    bool
 	lastReport time.Time
-	// deferredUntil holds every report but a critical event until then
-	// (DelayReportData, [Subscription.DeferReports]).
+	// deferredUntil holds every report that carries data until then
+	// (DelayReportData, [Subscription.DeferReports]); a keep-alive is not
+	// held.
 	deferredUntil time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
 	// The events the subscription owes are one number, not a queue: the
 	// lowest unreported event number (eventsMin, valid while
-	// eventsPending) and whether one of them is urgent. The report reads
+	// eventsPending) and whether one of them asks for a report
+	// (eventsUrgent: an urgent path of the subscriber covers it, it was
+	// owed when the priming report ended, or the report that carried it
+	// could not be sent). The report reads
 	// the occurrences from the event log at drain time, so an event storm
 	// under a long MinIntervalFloor costs a subscription nothing and the
 	// log's own bound bounds it. Mirrors matter.js
@@ -94,7 +98,32 @@ type Subscription struct {
 	// event before it fans it out — and is not owed again.
 	eventsReported     uint64
 	eventsHaveReported bool
-	closed             bool
+	// duePaths are the dirty attribute paths the engine drained together
+	// with the events it is handing to the [EventReporter], until the
+	// reporter takes them ([Subscription.TakeDuePaths]).
+	duePaths []im.ConcreteAttributePath
+	closed   bool
+}
+
+// TakeDuePaths returns the changed attribute paths that are due in the
+// same report as the events the engine is handing to the [EventReporter],
+// and hands them over: the reporter that takes them sends them with the
+// events in one ReportData, and marks them dirty again
+// ([Subscription.RequeueAttributes]) when that report cannot be sent. Nil
+// outside an [EventReporter] call and when no attribute change is due.
+//
+// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
+// :539-555 at db021da0: #sendUpdate takes #outstandingAttributeUpdates and
+// #outstandingEventsMinNumber together and calls #sendUpdateMessage once.
+// An [EventReporter] that does not call it sends its events alone; the
+// engine then marks the paths dirty again, and they follow in an attribute
+// report of their own once MinIntervalFloor has elapsed.
+func (s *Subscription) TakeDuePaths() []im.ConcreteAttributePath {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	paths := s.duePaths
+	s.duePaths = nil
+	return paths
 }
 
 // markDirty records that an attribute path has a pending change. The
@@ -109,20 +138,6 @@ func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 		s.pendingDirty = make(map[im.ConcreteAttributePath]struct{})
 	}
 	s.pendingDirty[path] = struct{}{}
-}
-
-// heartbeatIntervalElapsed reports whether the publisher-initiated
-// heartbeat deadline has fired. Without a periodic keep-alive both
-// commissioners drop the subscription with `CHIP Error 0x32 Timeout`
-// / `MTRErrorDomain Code=9 Transaction timed out` — the chip-tool-
-// reproducible Subscribe-pump bug from Session 14 §19.4.
-func (s *Subscription) heartbeatIntervalElapsed(now time.Time) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.lastReport.IsZero() {
-		return true
-	}
-	return now.Sub(s.lastReport) >= s.sendIntervalLocked()
 }
 
 // sendIntervalLocked computes the publisher-side heartbeat cadence.
@@ -232,8 +247,8 @@ func (s *Subscription) IsClosed() bool {
 	return s.closed
 }
 
-// touchLastReport stamps the report time without consuming dirty
-// paths — used for keep-alives that emit zero-attribute reports.
+// touchLastReport stamps the report time without consuming what the
+// subscription owes.
 func (s *Subscription) touchLastReport(now time.Time) {
 	s.mu.Lock()
 	s.lastReport = now
@@ -247,10 +262,17 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // initial report afterwards (ServerSubscription.ts: the subscription is
 // activated only once the initial report completed — activate() sets
 // #sendUpdatesActivated, packages/node/src/node/server/ServerSubscription.ts:412).
+// The events fired in that window go with them, urgent or not: matter.js
+// sends whatever is outstanding at activation, attribute changes and
+// events alike (ServerSubscription.ts:443-445 at db021da0) — at once
+// there, after MinIntervalFloor here.
 func (s *Subscription) EndPriming(now time.Time) {
 	s.mu.Lock()
 	s.priming = false
 	s.lastReport = now
+	if s.eventsPending {
+		s.eventsUrgent = true
+	}
 	s.mu.Unlock()
 }
 
@@ -264,25 +286,81 @@ func (s *Subscription) isPriming() bool {
 // TouchLastReport is the exported counterpart of [touchLastReport].
 // The bridge calls it right after the initial-report flush so the
 // engine doesn't fire an immediate keep-alive on the next 250 ms tick
-// (lastReport.IsZero() makes maxIntervalElapsed return true on the
-// first sweep — see [Subscription.maxIntervalElapsed]).
+// (a subscription that never reported owes its keep-alive at once — see
+// [Subscription.drainDue]).
 func (s *Subscription) TouchLastReport(now time.Time) {
 	s.touchLastReport(now)
 }
 
-// drainDirty returns the dirty paths *only* when (force: whatever the interval, a flush)
-// MinIntervalFloor has elapsed since the last report; otherwise
-// returns nil and leaves the dirty bucket alone.
-func (s *Subscription) drainDirty(now time.Time, force bool) []im.ConcreteAttributePath {
+// dueWork is what one report of a subscription carries.
+type dueWork struct {
+	// events are the owed events the subscription selects, in number
+	// order; paths the changed attribute paths.
+	events []im.EventReport
+	paths  []im.ConcreteAttributePath
+	// keepAlive: the send interval has elapsed since the last report, so
+	// a report goes out even when it carries nothing.
+	keepAlive bool
+}
+
+// drainDue decides whether a report of the subscription is due at now and
+// takes what that report carries: the changed attribute paths and the
+// owed events together, for one report. due is false when nothing is
+// sent, and then nothing was taken but an event watermark that yielded no
+// event.
+//
+// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts at
+// db021da0:
+//
+//   - A report is asked for by an attribute change (:380-382) or by an
+//     event an urgent path of the subscriber covers (:396-398); an event
+//     no urgent path covers is owed and asks for nothing.
+//   - What was asked for waits for max(lastUpdateTime + minIntervalFloor,
+//     deferredUntil) (#prepareDataUpdate, :464-473) — an urgent event as
+//     an attribute change, whatever the event's priority.
+//   - The send interval's pass (#startSendInterval, :480-485) sends
+//     without being asked: what is owed, or a keep-alive when nothing is.
+//   - One pass takes the attribute changes and the events' minimum number
+//     together and stamps the time of the last report once (#sendUpdate,
+//     :539-551).
+//
+// flush takes everything whatever the intervals, for the report of a
+// fabric that leaves (#flush, :753-763); it sends no keep-alive.
+//
+// A pass that was asked for by an urgent event alone and finds no event
+// to send — no source, the event gone from the log, none of the
+// subscription's paths — is not a report: the time of the last report
+// stays, so a dirty attribute past its floor and the keep-alive are not
+// held back by a report that was never sent.
+func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (work dueWork, due bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || len(s.pendingDirty) == 0 {
-		return nil
+	if s.closed {
+		return dueWork{}, false
 	}
-	if !force && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
-		return nil
+	takeData := flush
+	if !flush {
+		work.keepAlive = s.lastReport.IsZero() || now.Sub(s.lastReport) >= s.sendIntervalLocked()
+		asked := len(s.pendingDirty) > 0 || (s.eventsPending && s.eventsUrgent)
+		floorOver := s.lastReport.IsZero() || now.Sub(s.lastReport) >= time.Duration(s.MinIntervalFloor)*time.Second
+		held := now.Before(s.deferredUntil)
+		takeData = !held && (work.keepAlive || (asked && floorOver))
 	}
-	if !force && now.Before(s.deferredUntil) {
+	if takeData {
+		work.events = s.takeEventsLocked(src)
+		work.paths = s.takeDirtyLocked()
+	}
+	if len(work.events) == 0 && len(work.paths) == 0 && !work.keepAlive {
+		return dueWork{}, false
+	}
+	s.lastReport = now
+	return work, true
+}
+
+// takeDirtyLocked hands out the dirty attribute paths. Caller must hold
+// s.mu.
+func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
+	if len(s.pendingDirty) == 0 {
 		return nil
 	}
 	out := make([]im.ConcreteAttributePath, 0, len(s.pendingDirty))
@@ -290,18 +368,27 @@ func (s *Subscription) drainDirty(now time.Time, force bool) []im.ConcreteAttrib
 		out = append(out, p)
 	}
 	s.pendingDirty = nil
-	s.lastReport = now
 	return out
 }
 
+// offerDuePaths holds paths for the [EventReporter] the engine is about
+// to call ([Subscription.TakeDuePaths]).
+func (s *Subscription) offerDuePaths(paths []im.ConcreteAttributePath) {
+	s.mu.Lock()
+	s.duePaths = paths
+	s.mu.Unlock()
+}
+
 // queueEvent records that the event numbered number is owed to the
-// subscriber: it lowers the watermark to number and marks the
-// subscription urgent for a Critical event. Returns true on the first
-// owed event (so callers can wake the engine). Mirrors matter.js
-// ServerSubscription.ts:391-394 #handleAddedEvents; the minimum rather
-// than the first number keeps a firing that lost a race to a later one
-// in the report.
-func (s *Subscription) queueEvent(number uint64, priority im.EventPriority) (firstQueued bool) {
+// subscriber: it lowers the watermark to number and, when urgent — an
+// urgent path of the subscriber covers the event — asks for a report.
+// Returns true on the first owed event (so callers can wake the engine).
+// Mirrors matter.js ServerSubscription.ts:385-399 at db021da0
+// (#handleAddedEvents: the number is kept for every event, :392-394, and
+// #prepareDataUpdate runs only for an urgent one, :396-398); the minimum
+// rather than the first number keeps a firing that lost a race to a later
+// one in the report.
+func (s *Subscription) queueEvent(number uint64, urgent bool) (firstQueued bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -315,17 +402,40 @@ func (s *Subscription) queueEvent(number uint64, priority im.EventPriority) (fir
 		s.eventsMin = number
 	}
 	s.eventsPending = true
-	if priority == im.EventPriorityCritical {
+	if urgent {
 		s.eventsUrgent = true
 	}
 	return first
 }
 
+// eventUrgency reports whether one of the subscription's event paths
+// covers path, and whether one that does is urgent. Mirrors matter.js
+// ServerSubscription.ts:401-409 at db021da0 (#sendEventUrgently: some
+// request path with isUrgent whose endpoint, cluster and event are each
+// absent or equal to the event's); the event's priority is not read.
+func (s *Subscription) eventUrgency(path im.ConcreteEventPath) (selected, urgent bool) {
+	for _, p := range s.EventPaths {
+		if !p.Matches(path) {
+			continue
+		}
+		selected = true
+		if p.IsUrgent {
+			return true, true
+		}
+	}
+	return selected, false
+}
+
 // RequeueEvents owes the subscriber every selected event from number
 // fromNumber on again: the reporter calls it when a report carrying
-// them could not be sent, so the next report retries them. Mirrors
-// matter.js ServerSubscription.ts:578-580 ("newer number are always
-// higher, so we can just set it").
+// them could not be sent. Mirrors matter.js ServerSubscription.ts:582-584
+// at db021da0 ("newer number are always higher, so we can just set it").
+// The events ask for a report again, urgent or not, so the retry goes out
+// once MinIntervalFloor has elapsed since the failed report — as the
+// paths of [Subscription.RequeueAttributes] do, and as both did before
+// events were reported by urgency. matter.js schedules nothing there
+// (:569-584 never calls #prepareDataUpdate): its retry waits for the next
+// change, urgent event or send interval.
 func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -336,6 +446,7 @@ func (s *Subscription) RequeueEvents(fromNumber uint64) {
 		s.eventsMin = fromNumber
 	}
 	s.eventsPending = true
+	s.eventsUrgent = true
 	if s.eventsHaveReported && s.eventsReported >= fromNumber {
 		if fromNumber == 0 {
 			s.eventsHaveReported = false
@@ -355,25 +466,13 @@ func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
 	}
 }
 
-// drainEvents mirrors drainDirty for events: when the
-// owed events are due it takes the watermark and reads the subscription's
-// events from src, and counts as the subscription's last report when it
-// returns any. Critical-priority events bypass the MinIntervalFloor
-// gate per Matter §10.6.6 — controllers expect immediate delivery.
-// Number order and timestamps are the log's, the same as a Read answers
-// (matter.js ServerSubscription.ts:537-555 reads the occurrences for
-// both).
-func (s *Subscription) drainEvents(now time.Time, src EventSource, force bool) []im.EventReport {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed || !s.eventsPending {
-		return nil
-	}
-	urgent := s.eventsUrgent || force
-	if !urgent && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
-		return nil
-	}
-	if !urgent && now.Before(s.deferredUntil) {
+// takeEventsLocked hands out the events the subscription owes: it takes
+// the watermark and reads the subscription's events from src. Number
+// order and timestamps are the log's, the same as a Read answers
+// (matter.js ServerSubscription.ts:874-887 at db021da0 reads the
+// occurrences from the events' minimum number on). Caller must hold s.mu.
+func (s *Subscription) takeEventsLocked(src EventSource) []im.EventReport {
+	if !s.eventsPending {
 		return nil
 	}
 	minNumber := s.eventsMin
@@ -404,14 +503,6 @@ func (s *Subscription) drainEvents(now time.Time, src EventSource, force bool) [
 			Timestamp: rec.EpochMS,
 			Data:      im.AttributeValue{Value: rec.Payload},
 		})
-	}
-	// Only a drain that hands out an event is a report. One that yields
-	// none — no source, the event gone from the log, none of the
-	// subscription's paths — leaves the time of the last report alone, so
-	// a dirty attribute past its floor and the keep-alive are not held
-	// back by a report that was never sent.
-	if len(out) > 0 {
-		s.lastReport = now
 	}
 	return out
 }

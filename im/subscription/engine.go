@@ -14,8 +14,11 @@ import (
 // run is the engine's tick loop. Iterates the live subscription set
 // every Config.TickInterval, emitting:
 //
-//   - dirty-paths reports when MinIntervalFloor has elapsed,
-//   - keep-alive reports when MaxIntervalCeiling has elapsed.
+//   - a report of the changed attributes, and of the events owed with
+//     them, when MinIntervalFloor has elapsed — asked for by an attribute
+//     change or by an event an urgent path of the subscriber covers,
+//   - a report of what is owed, or an empty keep-alive, when the send
+//     interval has elapsed.
 //
 // Closed subscriptions are skipped. The reporter callback is invoked
 // outside the manager's lock so it can safely block on the wire.
@@ -107,55 +110,47 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 
 // dueReport drains what sub has due at now and returns the report to send
 // for it, or nil when nothing is due.
+//
+// One pass, one report: the attribute changes and the events that are due
+// together leave in one ReportData, as matter.js ServerSubscription.ts
+// :539-555 at db021da0 (#sendUpdate takes both and calls
+// #sendUpdateMessage once). When to send is [Subscription.drainDue]'s.
+//
+// Which hook gets the report follows from what it carries:
+//
+//   - Events, with or without attribute paths, go to the [EventReporter];
+//     the paths due with them wait on the subscription for it to take
+//     ([Subscription.TakeDuePaths]). A reporter that does not take them
+//     sends the events alone, and the paths are marked dirty again: they
+//     follow in an attribute report of their own once MinIntervalFloor has
+//     elapsed, never as a second report in the same tick.
+//   - Attribute paths alone, and the keep-alive when the send interval
+//     has elapsed with nothing owed, go to the [Reporter]. The send
+//     interval is the matter.js-style cadence of
+//     [Subscription.sendIntervalLocked], not MaxIntervalCeiling: Apple
+//     Home's MTRDevice and chip-tool's ReadClient both drop a subscription
+//     on a timer that fires well before the ceiling.
+//
+// Without an [EventReporter] the events drained are not sent.
 func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Time, eventReporter EventReporter) func() {
-	// Pending events drain whenever MinInterval has elapsed —
-	// Critical priority bypasses the gate inside the subscription.
-	// Drains BEFORE attribute dirty so urgent events do not wait
-	// behind a value sweep.
-	//
-	// After an event drain the same-tick dirty drain is explicitly
-	// skipped. A drainEvents that returns events stamps lastReport=now,
-	// which makes drainDirty return nil (0 < MinIntervalFloor)
-	// for floor>0, but the skip-flag makes the intent unambiguous and
-	// prevents a double-report when floor=0 (degenerate subscription
-	// created outside the manager). Apple Home's duplicate-suppression
-	// heuristic rejects two consecutive ReportData frames in the same
-	// 250 ms window regardless of which path produced them.
-	// matter.js ref: ServerSubscription.ts — events and dirty attrs
-	// are merged into a single ReportData per send cycle.
-	if events := sub.drainEvents(now, m.eventSourceOf(), false); len(events) > 0 {
-		if eventReporter == nil {
-			return nil
-		}
-		return func() { eventReporter(ctx, sub, events) }
+	work, due := sub.drainDue(now, m.eventSourceOf(), false)
+	if !due {
+		return nil
 	}
-	// Dirty-path report fires when MinInterval has elapsed, but only
-	// when no event report fired in the same tick (returned above).
-	if dirty := sub.drainDirty(now, false); len(dirty) > 0 {
-		if m.reporter == nil {
-			return nil
+	if len(work.events) > 0 && eventReporter != nil {
+		return func() {
+			sub.offerDuePaths(work.paths)
+			eventReporter(ctx, sub, work.events)
+			if left := sub.TakeDuePaths(); len(left) > 0 {
+				sub.RequeueAttributes(left)
+			}
 		}
-		reporter := m.reporter
-		return func() { reporter(ctx, sub, dirty) }
 	}
-	// Keep-alive: nothing dirty, but the publisher-side heartbeat
-	// cadence (≈ matter.js sendInterval; see
-	// [Subscription.heartbeatIntervalElapsed]) has elapsed. Apple
-	// Home's MTRDevice and chip-tool's ReadClient both drop the
-	// subscription after an internal timer that fires *well before*
-	// `MaxIntervalCeiling` would — so heartbeats must ride at the
-	// faster matter.js-style cadence computed by
-	// [Subscription.sendIntervalLocked], not at the spec-only
-	// `MaxIntervalCeiling`.
-	if sub.heartbeatIntervalElapsed(now) {
-		sub.touchLastReport(now)
-		if m.reporter == nil {
-			return nil
-		}
-		reporter := m.reporter
-		return func() { reporter(ctx, sub, nil) }
+	if m.reporter == nil || (len(work.paths) == 0 && !work.keepAlive) {
+		return nil
 	}
-	return nil
+	reporter := m.reporter
+	return func() { reporter(ctx, sub, work.paths) }
 }
 
 // Tick is the test surface for [Manager.tick]: it waits for the reports

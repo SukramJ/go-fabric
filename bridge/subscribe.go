@@ -378,8 +378,13 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 // implementation. Cluster servers (or model-side cluster servers
 // that implement [contract.EventReceiver]) call this when
 // the underlying DP fires an event that should surface to
-// subscribers. Non-blocking — fan-out into per-subscription queues
-// happens in the manager; the engine tick later drains them.
+// subscribers. Non-blocking — the manager records what each subscription
+// owes; the engine sends it with the subscription's next report. The
+// priority does not decide when: an event that an urgent path (isUrgent)
+// of the subscriber covers asks for a report, which honours the
+// subscription's MinIntervalFloor; any other event leaves with the next
+// report — an attribute change's, an urgent event's or the keep-alive's
+// ([subscription.Manager.OnEventFired]).
 //
 // In addition to the live subscription fan-out, EmitEvent appends
 // the event to the bridge's persistent [im.EventLog] so controllers

@@ -19,6 +19,10 @@ import (
 func TestEventWatermarkParity(t *testing.T) {
 	t.Parallel()
 	path := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 1, Cluster: 0x003B, Event: 0x01}
+	// The subscriber asks for its events urgently, so each asks for a
+	// report (ServerSubscription.ts:396-409).
+	urgentPath := path
+	urgentPath.IsUrgent = true
 	subscribe := func(t *testing.T, floor uint16) (*Manager, *im.EventLog, *Subscription) {
 		t.Helper()
 		m := NewManager(Config{}, nil, nil)
@@ -27,7 +31,7 @@ func TestEventWatermarkParity(t *testing.T) {
 		sub, err := m.Subscribe(SubscribeArgs{
 			FabricIndex: 1, PeerNodeID: 1, SessionID: 1,
 			MinIntervalFloor: floor, MaxIntervalCeiling: 3600,
-			EventPaths: []im.ConcreteEventPath{path},
+			EventPaths: []im.ConcreteEventPath{urgentPath},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -55,10 +59,11 @@ func TestEventWatermarkParity(t *testing.T) {
 		if !pending || minNumber != first {
 			t.Fatalf("watermark = (%v, %d), want (true, %d)", pending, minNumber, first)
 		}
-		if got := sub.drainEvents(t0.Add(time.Minute), log, false); got != nil {
-			t.Fatalf("drained %d events inside the floor", len(got))
+		if work, due := sub.drainDue(t0.Add(time.Minute), log, false); due {
+			t.Fatalf("drained %d events inside the floor", len(work.events))
 		}
-		got := sub.drainEvents(t0.Add(time.Hour), log, false)
+		work, _ := sub.drainDue(t0.Add(time.Hour), log, false)
+		got := work.events
 		inLog := log.Query(0xFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0)
 		if len(got) == 0 || len(got) != len(inLog) || len(inLog) >= 10000 {
 			t.Fatalf("report carries %d events, the log %d: the log's bound must bound the report", len(got), len(inLog))
@@ -72,7 +77,8 @@ func TestEventWatermarkParity(t *testing.T) {
 		n2 := log.Append(im.EventRecord{Priority: im.EventPriorityInfo, Endpoint: 1, Cluster: 0x003B, EventID: 0x01, EpochMS: 2_000})
 		m.OnEventFired(EventFiring{Path: path, Number: n2, Priority: im.EventPriorityInfo})
 		m.OnEventFired(EventFiring{Path: path, Number: n1, Priority: im.EventPriorityInfo})
-		got := sub.drainEvents(time.Now(), log, false)
+		work, _ := sub.drainDue(time.Now(), log, false)
+		got := work.events
 		if len(got) != 2 || got[0].Number != n1 || got[1].Number != n2 {
 			t.Fatalf("report = %+v, want events %d then %d", got, n1, n2)
 		}
@@ -81,8 +87,8 @@ func TestEventWatermarkParity(t *testing.T) {
 		}
 		// Fanned out after a drain already read it from the log: not owed again.
 		m.OnEventFired(EventFiring{Path: path, Number: n2, Priority: im.EventPriorityInfo})
-		if again := sub.drainEvents(time.Now().Add(time.Second), log, false); again != nil {
-			t.Errorf("event %d reported twice: %+v", n2, again)
+		if again, due := sub.drainDue(time.Now().Add(time.Second), log, false); due {
+			t.Errorf("event %d reported twice: %+v", n2, again.events)
 		}
 	})
 }
