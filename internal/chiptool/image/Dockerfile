@@ -21,6 +21,13 @@
 #     image's binaries unchanged; with them bluezoo==1.0.2, chip's BlueZ
 #     mock (connectedhomeip scripts/setup/constraints.txt:25 at the pin),
 #     which chip's matter.testing.linux.BluetoothMock starts.
+#   - /opt/matter-ble, a second Python controller built with BLE (a venv
+#     of the CHIP wheels over the base image's site-packages): the base
+#     image's controller is built without BLE (matter.js
+#     support/chip/support/install-chip-python at 862ad75f), so the cases
+#     whose TH commissions over BLE onto Wi-Fi (`make chiptool-ble-cases`)
+#     run with /opt/matter-ble/bin/python3, every other family with the
+#     base image's python3, unchanged.
 #
 # The CHIP source and build stages are matter.js's own (support/chip/
 # Dockerfile at matter.js 862ad75f, stages base, build and source; its
@@ -115,12 +122,42 @@ RUN set -e; \
     ble_one chip-tool chip-tool chip-tool-ble; \
     ble_one all-clusters-app/linux chip-all-clusters-app all-clusters-app-ble
 
+# The Python controller with BLE, for the certification cases whose TH
+# commissions over BLE onto Wi-Fi in the test (`make chiptool-ble-cases`).
+# The base image's controller is matter.js's install-chip-python (862ad75f),
+# which builds it with chip_config_network_layer_ble=false and
+# chip_enable_ble=false (its _ChipDeviceCtrl.so has no BlueZ code and no
+# pychip_ble_adapter_list_new, src/controller/python/BUILD.gn:147-150 at
+# the pin). This one is install-chip-python's gn arguments and BUILD.gn
+# edits less those two switches, so BLE and Wi-Fi keep chip's defaults, as
+# chip's scripts/build_python.sh builds it (enable_ble=true, :39, :300-301),
+# and with chip's own mDNS, build_python.sh's default chip_mdns=minimal
+# (:44): the cases run in chip's network namespaces on a private system
+# bus, where no avahi-daemon answers. Only the CHIP wheels go into the venv
+# /opt/matter-ble, --no-deps over the system site-packages: their
+# dependencies are the base image's, and the base image's controller in
+# /usr/local stays the one every other family runs.
+FROM source AS pyble
+RUN set -e; \
+    gn gen out --fail-on-unused-args \
+      --args='matter_log_json_payload_hex=true matter_log_json_payload_decode_full=true chip_detail_logging=true chip_project_config_include_dirs=["//config/python"] chip_mdns="minimal" matter_enable_tracing_support=false matter_trace_config="///src/tracing/none" matter_commandline_enable_perfetto_tracing=false'; \
+    gn args out --list --short | grep -qx 'chip_enable_ble = true' || { echo "the controller build has no BLE" >&2; exit 1; }; \
+    sed -i -e /ipython/d -e /ipykernel/d -e /ipdb/d -e /pygobject/d -e s/dbus-python==1.2.18/dbus-python==1.4.0/ src/controller/python/BUILD.gn; \
+    ninja -C out python_wheels; \
+    find out -name '*.whl' | grep -v matter_yamltests-0.0.1 | grep -v matter-controller-wheels > /tmp/wheels; \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin python3 -m venv --system-site-packages /opt/matter-ble; \
+    /opt/matter-ble/bin/pip install --no-deps --no-cache-dir $(cat /tmp/wheels); \
+    /opt/matter-ble/bin/pip uninstall -q -y pip; \
+    find /opt/matter-ble -name '*.so' | xargs strip; \
+    rm -rf out
+
 FROM ${CHIP_TEST_IMAGE} AS chip
 ARG CHIP_COMMIT=6170af8461b10b1766044122ac83332c6d00ab20
 LABEL org.opencontainers.image.title="go-fabric CHIP certification harness"
 LABEL org.opencontainers.image.source=https://github.com/SukramJ/go-fabric/tree/main/internal/chiptool/image
 LABEL org.opencontainers.image.revision=${CHIP_COMMIT}
 COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /dist/bin/chip-tool-ble /dist/bin/all-clusters-app-ble /bin/
+COPY --from=pyble /opt/matter-ble /opt/matter-ble
 COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_server
 # The base image installs libcurl4 for chip-camera-app (matter.js
 # support/chip/Dockerfile:28-33 at 862ad75f); its apt state does not survive
@@ -140,4 +177,8 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
       ! ldd "$b" | grep 'not found' || { echo "$b misses a library" >&2; exit 1; }; \
       grep -q org.bluez "$b" || { echo "$b has no BlueZ support" >&2; exit 1; }; \
       grep -q fi.w1.wpa_supplicant1 "$b" || { echo "$b has no wpa_supplicant support" >&2; exit 1; }; \
-    done
+    done && \
+    lib=/opt/matter-ble/lib/python3.12/site-packages/matter/_ChipDeviceCtrl.so && \
+    grep -q org.bluez "$lib" || { echo "/opt/matter-ble's controller has no BlueZ support" >&2; exit 1; }; \
+    /opt/matter-ble/bin/python3 -c 'import ctypes, os, matter, matter.testing.linux; d = os.path.dirname(matter.__file__); assert d.startswith("/opt/matter-ble/"), d; ctypes.CDLL(d + "/_ChipDeviceCtrl.so").pychip_ble_adapter_list_new' && \
+    python3 -c 'import matter; assert matter.__file__.startswith("/usr/local/"), matter.__file__'

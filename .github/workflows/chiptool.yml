@@ -25,6 +25,13 @@
 #     under chip's BlueZ and wpa_supplicant mocks in a privileged
 #     container, with all-clusters-app-ble under the same mocks as its own
 #     control in the same test. A required check since 2026-11-13.
+#   - chiptool-ble-cases: `make chiptool-ble-cases` — chip's Python
+#     certification cases whose TH commissions over BLE onto Wi-Fi in the
+#     test, against examples/ble-wifi-light under the same mocks, with the
+#     image's BLE-capable Python controller (/opt/matter-ble). Not a
+#     required check; cheap (about seven minutes for eleven cases), so it
+#     runs where the BLE-Wi-Fi leg runs and a release pull request gates on
+#     it. An image without /opt/matter-ble skips it, naming why.
 #   - chip-families: the CSA certification families (`make
 #     chiptool-families`), the way matter.js runs them. Certification is not
 #     pursued by this project, but certifiability is a goal
@@ -438,6 +445,30 @@ jobs:
       - name: BLE-Wi-Fi leg and its control
         run: make chiptool-ble-wifi
 
+  chiptool-ble-cases:
+    name: certification cases commissioning over BLE onto Wi-Fi (chip's mocks)
+    needs: changes
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.full == 'true' ||
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: pull the pinned CHIP image
+        run: make chiptool-image
+      # Privileged containers, one per case (network namespaces, bluezoo,
+      # the wpa_supplicant mock); nothing runs on the runner's own network
+      # or Bluetooth.
+      - name: BLE cases and their control
+        run: make chiptool-ble-cases
+
   chip-families:
     name: certification families (${{ matrix.group }})
     needs: changes
@@ -516,13 +547,13 @@ jobs:
   #
   # On a release pull request (issue 495) it is the release gate and fails
   # closed: every job of the full run — the suite, the control leg, the
-  # BLE-Wi-Fi leg and the family groups — must have run and passed; a
-  # skipped, failed or cancelled one is red. That is why it needs the three
-  # legs too; on every other event their results are not read, and the
-  # verdict is the families' alone, as before.
+  # BLE-Wi-Fi leg, the BLE cases leg and the family groups — must have run
+  # and passed; a skipped, failed or cancelled one is red. That is why it
+  # needs the four legs too; on every other event their results are not
+  # read, and the verdict is the families' alone, as before.
   chip-families-gate:
     name: chip certification cases against the reference daemon
-    needs: [changes, chiptool, chiptool-control, chiptool-ble-wifi, chip-families]
+    needs: [changes, chiptool, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -534,12 +565,13 @@ jobs:
           SUITE: ${{ needs.chiptool.result }}
           CONTROL: ${{ needs.chiptool-control.result }}
           BLE_WIFI: ${{ needs.chiptool-ble-wifi.result }}
+          BLE_CASES: ${{ needs.chiptool-ble-cases.result }}
         run: |
           echo "code touched: $CHANGES; certification families: $FAMILIES"
           if [ "$RELEASE" = "true" ]; then
-            echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI"
+            echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI, BLE cases leg $BLE_CASES"
             failed=0
-            for leg in "chip-tool suite=$SUITE" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "certification families=$FAMILIES"; do
+            for leg in "chip-tool suite=$SUITE" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "certification families=$FAMILIES"; do
               if [ "${leg#*=}" != "success" ]; then
                 echo "::error::release gate: the ${leg%%=*} did not pass (${leg#*=})"
                 failed=1

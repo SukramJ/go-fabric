@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - `controller.Config.PeerTiming` (`*client.Timing`): a host sets the controller's peer timing — `ProvenAddressRetention` (issue 507) and the other `client/peer.Timing` parameters — overriding `DefaultTiming` field-wise; nil keeps the defaults.
+- Certification harness: `make chiptool-ble-cases` runs connectedhomeip's Python cases whose TH commissions over BLE onto Wi-Fi in the test (the Wi-Fi TC-CNET cases) against `examples/ble-wifi-light` under chip's BlueZ and wpa_supplicant mocks, case by case, with `all-clusters-app-ble` as the control. The harness image gains a second Python controller built with BLE, `/opt/matter-ble` (a venv of the CHIP wheels over the image's site-packages, 48 MB; the base image's controller stays as it is for every other family); until the image is rebuilt from this Dockerfile the leg skips, naming why. CI job `chiptool-ble-cases`, not a required check, part of the release gate. TC-CNET-1.4, 4.1, 4.9 and 4.15 pass over BLE; TC-CNET-4.4 is an open finding (the wpa_supplicant driver's ScanNetworks under chip's mock).
 
 ### Changed
 

@@ -23,8 +23,8 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
 
 In CI (`.github/workflows/chiptool.yml`) the nightly run covers every family.
 A release pull request (head branch `release/*`) runs that same full set —
-every family group, the chip-tool suite, the control leg and the BLE-Wi-Fi
-leg — and its required check `chip certification cases against the
+every family group, the chip-tool suite, the control leg, the BLE-Wi-Fi
+leg and the BLE cases leg — and its required check `chip certification cases against the
 reference daemon` stays red until all of them have passed, so no release is
 tagged over a family only the nightly run would have shown; the virtual
 Bluetooth and OTBR legs (`ble-virtual.yml`, `otbr-virtual.yml`) need runner
@@ -406,7 +406,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CNETWIFI/4.20 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNETWIFI/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CNETWIFI/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
-| CNETWIFI/4.23 | (c) harness | TC-CNET-4.23 steps 0-15 pass on the simulated driver (a wrong SSID is NetworkNotFound, a wrong passphrase AuthFailure, examples/reference-bridge/wifisim.go); step 16 calls the TH's CloseBLEConnection (TC_CNET_4_23.py:498) before its CASE CommissioningComplete, which the harness image's controller, built without BLE, refuses (CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE without CONFIG_NETWORK_LAYER_BLE, src/controller/python/ChipDeviceController-ScriptBinding.cpp:1520-1528): the case assumes a BLE-commissioned DUT |
+| CNETWIFI/4.23 | (c) harness | TC-CNET-4.23 steps 0-15 pass on the simulated driver (a wrong SSID is NetworkNotFound, a wrong passphrase AuthFailure, examples/reference-bridge/wifisim.go); step 16 calls the TH's CloseBLEConnection (TC_CNET_4_23.py:498) before its CASE CommissioningComplete, which the harness image's controller, built without BLE, refuses (CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE without CONFIG_NETWORK_LAYER_BLE, src/controller/python/ChipDeviceController-ScriptBinding.cpp:1520-1528): the case assumes a BLE-commissioned DUT. Commissioned over BLE onto Wi-Fi (make chiptool-ble-cases, the image's BLE controller, examples/ble-wifi-light) it stops at step 3 instead: chip's wpa_supplicant mock associates a wrong SSID (matter/testing/linux/wifi.py:415-440), and all-clusters-app-ble fails there too |
 | CNETWIFI/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials (NetworkCommissioning PDC); the module serves no PDC, and the case skips itself on an endpoint without it (runs, and skips itself) |
 | CNETWIFI/4.26 | (b) not supported | TC-CNET-4.26 verifies QueryIdentity (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
 | CNETWIFI/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
@@ -711,7 +711,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | CONCON | the module serves ContentControl (`cluster/media`), but chip has no case of the family at the harness pin | (c) no case |
 | ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node. The daemon's `--icd-lit` (TESTING ONLY) is such a node for the ICD client cases the Go controller runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3, under "Controller role" above) | (b) not supported |
 | SC_TC (PASE over Thread MeshCoP, `TC_SC_TC_*.py`), the Thread cases of DD and SC | the device side has no Thread radio | (d) out of scope |
-| commissioning the node over BLE in the certification cases (the BLE discovery cases of DD and SC, and the Python cases whose TH commissions over BLE-Wi-Fi in the test, as TC-CNET-4.23 step 16) | the node is commissioned over BLE onto Wi-Fi since milestone 7 (ADR 0031). Since wave 28c the harness image carries `chip-tool-ble` and `all-clusters-app-ble` (BLE and Wi-Fi on; the base image builds every binary `no-ble-no-wifi`, matter.js `support/chip/support/build-one`:23, :60-63 at `db021da0`), and `make chiptool-ble-wifi` passes: chip-tool commissions `examples/ble-wifi-light` over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, then reads NetworkCommissioning and toggles OnOff, with chip's all-clusters app as the control. The cases themselves stay unrun: the DD BLE cases are manual rows above, and the Python cases' controller in the image is still built without BLE (its `_ChipDeviceCtrl.so` carries no BlueZ code), so a case that commissions over BLE inside the test cannot. The weekly ble-virtual job proves the same path on real BlueZ over btvirt | (c) harness |
+| commissioning the node over BLE in the certification cases: the BLE discovery cases of DD and SC | the node is commissioned over BLE onto Wi-Fi since milestone 7 (ADR 0031): `make chiptool-ble-wifi` has chip-tool commission `examples/ble-wifi-light` over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, with chip's all-clusters app as the control, and `make chiptool-ble-cases` runs the Python cases whose TH commissions over BLE in the test (below, "Cases that commission over BLE"). The DD and SC cases that discover the node over BLE are manual YAML cases at the harness pin (the rows above); no automated case of either family commissions over BLE | (c) harness |
 | CNET Thread cases | the device side has no Thread radio; the Thread NetworkCommissioning variant over a border router (`core.ThreadNetworkCommissioning`, ADR 0027) is not on the reference daemon | (c) not yet run |
 | TSTAT 4.5 (MatterScheduleConfiguration) | the module serves MSCH behind `surface.Policies.Extensions("BD-chip-Thermostat-Schedules")` and the reference daemon enables it with `--thermostat-schedules`, but `TC_TSTAT_4_5.py` is absent at the harness commit `6170af84` (present in connectedhomeip from 2026-10-23); lifting `CHIP_TEST_IMAGE` is a separate owner decision | (c) not yet run |
 | ACS, WIFINM | the module serves AmbientContextSensing (`cluster/sensing`, wave 26-C, a host server only: no device type at the pin lists it, `BD-chip-AmbientContextSensing-RulesInServer`) and WiFiNetworkManagement (`cluster/netinfra`, wave 26-B), but the reference daemon composes neither and the harness does not run their families | (c) not yet run |
@@ -814,6 +814,37 @@ does not define (MediaPlayback's AvailableCommands and ContentInfo,
 ContentLauncher's ContentReplication and Presets features, AccountLogin's
 OAuth feature) and are not applicable. Nothing here plays media: a
 product's host implements the ports over its own player.
+
+## Cases that commission over BLE
+
+`make chiptool-ble-cases` (`internal/chiptool/blecases_test.go`) runs
+connectedhomeip's Python cases whose TH commissions the DUT over BLE onto
+Wi-Fi inside the case (`--commissioning-method ble-wifi`) against
+`examples/ble-wifi-light`, one fresh environment per case: chip's network
+namespaces, BlueZ mock (bluezoo) and wpa_supplicant mock, as for
+`make chiptool-ble-wifi`. The TH is the harness image's second Python
+controller, `/opt/matter-ble`, built with BLE: the image's own controller is
+built without it (matter.js `support/chip/support/install-chip-python` sets
+`chip_config_network_layer_ble=false` and `chip_enable_ble=false`; its
+`_ChipDeviceCtrl.so` has no BlueZ code and no `pychip_ble_adapter_list_new`).
+The PICS are the light's own, generated over BLE first (`gen_pics.py`). A
+case that does not pass runs once more against chip's `all-clusters-app-ble`
+under the same mocks, the control. At the harness pin the Wi-Fi CNET cases
+are the only Python cases that commission over BLE:
+
+| Case | Over BLE onto Wi-Fi | Evidence |
+| --- | --- | --- |
+| TC-CNET-1.4 | passes | |
+| TC-CNET-4.1 | passes | |
+| TC-CNET-4.4 | (a) defect | step 4's ScanNetworks is answered only after the wpa_supplicant driver's 30 s scan timeout (`wifi/wpasupplicant` `DefaultScanTimeout`), past the TH's command timeout; chip's mock ends a scan at once (`matter/testing/linux/wifi.py`:403-412 at `6170af84`); open finding |
+| TC-CNET-4.9 | passes | |
+| TC-CNET-4.11 | (c) harness | a second access point (`PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID`) the mock does not serve (one network, `wifi.py`:735-736) and a TH host Wi-Fi to switch; the control fails the same assertion |
+| TC-CNET-4.15 | passes | |
+| TC-CNET-4.23 | (c) harness | step 3 expects a join to a wrong SSID to fail; the mock ignores the network's arguments and associates whatever is selected (`wifi.py`:415-440); the control fails at the same step |
+| TC-CNET-4.25, 4.26, 4.27, 4.29 | (b) not supported | the cases run and skip themselves: no per-device credentials |
+
+The leg is not a required check; the release gate includes it. Until the
+pinned image carries `/opt/matter-ble` it skips, naming why.
 
 ## What a product owner must supply
 
