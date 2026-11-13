@@ -5,6 +5,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -33,7 +34,19 @@ var erasedTables = []string{
 }
 
 // Erase empties every matter_* table in one transaction and seeds the
-// next fabric index as the schema does ([Eraser]).
+// next fabric index as the schema does ([Eraser]), then scrubs the file:
+// a DELETE only unlinks rows, and their bytes — and those of every row a
+// plain delete removed earlier, RemoveFabric's among them — stay in the
+// database's free pages and in the write-ahead log. VACUUM rebuilds the
+// database without its free pages, and wal_checkpoint(TRUNCATE) copies the
+// rebuilt pages into the file and truncates the -wal to zero bytes, so
+// none of the erased bytes remain in the database file, its -wal or its
+// -shm (TestStoreEraseLeavesNoResidue). It runs on the store's own handle,
+// whoever opened it. secure_delete is not used: it zeroes only the rows
+// its own connection deletes, so it misses the earlier deletes, and in WAL
+// mode the log keeps them until a checkpoint anyway. Going beyond matter.js,
+// whose SQLite driver erases with plain DELETE
+// (packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts:201,207,305).
 func (s *Store) Erase(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -50,6 +63,24 @@ func (s *Store) Erase(ctx context.Context) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store: erase: %w", err)
+	}
+	return s.scrub(ctx)
+}
+
+// scrub rewrites the database without its free pages and empties the
+// write-ahead log. In rollback-journal mode the checkpoint is a no-op that
+// reports busy 0. A checkpoint a reader blocks reports busy 1: the -wal
+// may then still hold erased bytes, and Erase says so.
+func (s *Store) scrub(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `VACUUM`); err != nil {
+		return fmt.Errorf("store: erase: vacuum: %w", err)
+	}
+	var busy, logFrames, checkpointed int
+	if err := s.db.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &checkpointed); err != nil {
+		return fmt.Errorf("store: erase: wal checkpoint: %w", err)
+	}
+	if busy != 0 {
+		return errors.New("store: erase: wal checkpoint blocked by a reader: the -wal may still hold erased data")
 	}
 	return nil
 }

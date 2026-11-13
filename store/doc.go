@@ -49,4 +49,11 @@
 // same database. Whether the store should seal every secret uniformly is
 // an open architecture question of the 2026-11 review; this list is what
 // holds today.
+//
+// The factory reset ([Store.Erase]) deletes every matter_* row and then
+// rewrites the file (VACUUM) and empties the write-ahead log
+// (wal_checkpoint(TRUNCATE)), so the erased bytes, and those of rows
+// deleted before it, remain in none of the database file, its -wal and its
+// -shm. Copies outside those files — flash wear-levelling, file-system
+// snapshots, backups — are beyond what the store can promise.
 package store

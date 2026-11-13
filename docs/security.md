@@ -67,12 +67,21 @@ The node keeps both sealing keys as settings of the same database
 those secrets out of a read of one table, not from a reader of the whole
 file.
 
+The factory reset (`node.Node.FactoryReset`, `controller.Controller.Erase`)
+empties every `matter_*` table and then rewrites the SQLite file
+(`VACUUM`) and empties its write-ahead log (`wal_checkpoint(TRUNCATE)`):
+afterwards none of the erased bytes — nor those of rows deleted before the
+reset — are in the database file, its `-wal` or its `-shm`, measured in both
+the rollback-journal and the WAL mode. Copies the module does not see — the
+flash controller's wear-levelled blocks, file-system snapshots, the free
+blocks of a deleted journal, backups — are outside what it can promise.
+
 Whether the module should seal every secret at rest, uniformly and under a
 key that is not beside the data, is an open architecture question of the
 2026-11 review. Nothing on this page promises it; protect the file as the
 keys it holds.
 
-*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
+*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `scrub`; `TestStoreEraseLeavesNoResidue`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side
 
