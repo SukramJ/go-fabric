@@ -230,8 +230,8 @@ func (b *Bridge) registerSubscription(
 		if !req.KeepSubscriptions {
 			if fabricIndex != 0 && peerNodeID != 0 {
 				// CASE session — tear down by (fabric, peer) tuple. The
-				// peer is the session's subject: a secure unicast header
-				// carries no source node id (Matter §4.4.1.4), and
+				// peer is the session's subject, whatever source node id
+				// the frame's header claims (subscriptionPeerNodeID), as
 				// matter.js matches on session.peerAddress.
 				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
 					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
@@ -274,10 +274,10 @@ func (b *Bridge) registerSubscription(
 			// SubscribeRequests on the same session can only arise when
 			// the peer's first attempt is racing a reconnect; keeping
 			// the older entry drains quota and causes duplicate reports.
-			// Applied only for CASE sessions (fabricIndex != 0 and a
-			// real SourceNodeID) because PASE re-subscribe cleanup is
-			// handled by the KeepSubscriptions=false / CloseSession
-			// path above.
+			// Applied only for CASE sessions (fabricIndex != 0) because
+			// PASE re-subscribe cleanup is handled by the
+			// KeepSubscriptions=false / CloseSession path above; the
+			// header's source node id has no say (R2-P1-req2-02).
 			//
 			// Gated on !req.KeepSubscriptions: a peer that sets
 			// KeepSubscriptions=true is explicitly asking for its existing
@@ -290,7 +290,7 @@ func (b *Bridge) registerSubscription(
 			// the KeepSubscriptions=false teardown matter.js performs at
 			// packages/node/src/node/server/InteractionServer.ts:611
 			// (`if (fabric !== undefined && !keepSubscriptions)`).
-			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0 && requestHdr.HasSourceNodeID,
+			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0,
 		})
 		if err != nil {
 			b.logger.Warn("matter.rx.im.subscribe.manager",
@@ -306,11 +306,17 @@ func (b *Bridge) registerSubscription(
 	return subID, nil
 }
 
-// subscriptionPeerNodeID names the peer a subscribe came from: the source
-// node id of the request header when it carries one (unsecured / PASE
-// traffic), else the subject node id of the secure session it rode on.
+// subscriptionPeerNodeID names the peer a subscribe came from: the
+// subject node id of the secure session it rode on. The source node id a
+// secure frame's header may carry is chosen by the sender and not bound to
+// the session (the nonce is built from the session's peer), so it never
+// names the peer there; only a frame of the unsecured session, which has
+// no subject, is attributed to its header's source node id. matter.js
+// takes the session's identity, never the header: InteractionServer.ts:647,
+// :651 (PeerAddress.is(sess.peerAddress, session.peerAddress)) and :723 at
+// db021da0. Review II, R2-P1-req2-02.
 func subscriptionPeerNodeID(requestHdr *message.Header, subjectNodeID uint64) uint64 {
-	if requestHdr.HasSourceNodeID && requestHdr.SourceNodeID != 0 {
+	if requestHdr.SessionID == 0 && requestHdr.HasSourceNodeID {
 		return requestHdr.SourceNodeID
 	}
 	return subjectNodeID
