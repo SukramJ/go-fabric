@@ -580,6 +580,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
 	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
+	b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
 	b.reportInvokeChanges(invokeCtx, dispatcher, before)
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])

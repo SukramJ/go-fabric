@@ -157,7 +157,7 @@ These are read once at `Start`, or feed a component `Start` builds.
 | `AttachCaseHandlerProvider` (or `AttachCaseHandler`) | fails closed | no CASE. A singleton rejects the parallel CASE sessions Apple Home opens |
 | `AttachAckTracker` | silent | no standalone ACKs and no retransmission of the bridge's own messages; every reply is best-effort. It wraps the lower-level `AttachAckHandler` |
 | `AttachSubscriptionManager` | silent | a Subscribe returns its initial report with no subscription id, and no report follows |
-| `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, and the re-announce trigger is not installed |
+| `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, the re-announce trigger is not installed, and the PASE sessions are not cleared when a commissioning ends. The bridge clears them itself after a CommissioningComplete that `core.GeneralCommissioning` answered OK; for the fail-safe's expiry the host calls `Bridge.FailSafeExpired(ctx)` from the root's `SetOnFailSafeExpired` hook (the node facade does) — skipped, a PASE session with the commissioning channel's implicit Administer outlives an abandoned commissioning until it is reaped |
 | a session table without `AttestationChallengeFor(sessionID uint16) ([]byte, bool)` | fails closed | AttestationRequest, CSRRequest and SignVIDVerificationRequest answer FAILURE: the bridge reads the invoking session's attestation challenge from the registry or, failing that, the session lookup, and the server signs over nothing else. `operational.Manager` has the method |
 | `AttachSubscriptionStore` | silent | nothing survives a restart; controllers wait out their liveness timeout. `SetSubscriptionPersistence(false)` switches persistence off on purpose |
 
@@ -223,6 +223,7 @@ method with exactly this signature, or the bridge silently does without.
 | the registry | `SetOnPaseSessionClose(fn func(sessionID uint16))` | the commissionable record is not announced again when a PASE session closes |
 | the registry | `Active() int` | the `sessions.open` gauge of `AttachMetrics` is not recorded |
 | the registry | `SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint16` | the bridge finds no live session to a peer it wants to reach and establishes a new one each time |
+| the registry | `Sessions() []operational.SessionInfo` | the bridge cannot tell which sessions are PASE: none is cleared after CommissioningComplete or by `Bridge.FailSafeExpired` |
 | the registry | `CloseFabric(fabricIndex uint8)` | a removed fabric's sessions are not closed by the bridge |
 | the registry | `CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16)` | a fabric's other sessions are not closed while the session that carries the command stays open to answer it |
 | a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
@@ -230,7 +231,7 @@ method with exactly this signature, or the bridge silently does without.
 | an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
 | an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
 
-*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 
 ## `<cluster>def.Host`: the kit server's host methods
 

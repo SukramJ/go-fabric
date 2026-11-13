@@ -6,16 +6,17 @@ package node
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
-// paseCloseNode is a node with only the session table wired, holding one
-// PASE session that AddNOC adopted onto fabric 1.
-func paseCloseNode(t *testing.T) (*Node, *operational.Manager, *clocktest.Fake) {
+// paseCloseNode is a node with only the bridge and its session table
+// wired, holding one PASE session that AddNOC adopted onto fabric 1.
+func paseCloseNode(t *testing.T) (*Node, *operational.Manager) {
 	t.Helper()
 	mgr := operational.NewManager(nil)
 	e, err := mgr.OpenFromPase(1, 2, 7, []byte("pase-shared-secret"))
@@ -25,10 +26,12 @@ func paseCloseNode(t *testing.T) (*Node, *operational.Manager, *clocktest.Fake) 
 	if err := mgr.AdoptFabricIndex(e.SessionID, 1); err != nil {
 		t.Fatalf("AdoptFabricIndex: %v", err)
 	}
-	clk := clocktest.New(time.Unix(0, 0))
-	n := &Node{sec: &security{sessions: mgr}}
-	n.cfg.Clock = clk
-	return n, mgr, clk
+	br, err := bridge.New(endpointtest.NewEmptySnapshotter(), mdns.NewNoop(), bridge.Config{Listen: ":0"}, nil)
+	if err != nil {
+		t.Fatalf("bridge.New: %v", err)
+	}
+	br.AttachSessionRegistry(mgr)
+	return &Node{sec: &security{sessions: mgr}, br: br}, mgr
 }
 
 func paseCount(mgr *operational.Manager) int {
@@ -41,48 +44,20 @@ func paseCount(mgr *operational.Manager) int {
 	return count
 }
 
-// TestPASEClosedOnCommissioningCompleteParity pins Matter §11.10.6.6 step
-// 4 as matter.js packages/protocol/src/common/FailsafeContext.ts:150-153
-// performs it (completeCommission → closePaseSession): the PASE session —
-// the one AddNOC adopted onto the fabric included — is cleared after the
-// CommissioningComplete response has gone out and the grace has elapsed,
-// not before. (The hook's wiring into commissioningCompleted is pinned
-// end to end by TestPASEClosedAfterCommissioningParity.)
-func TestPASEClosedOnCommissioningCompleteParity(t *testing.T) {
-	t.Parallel()
-	n, mgr, clk := paseCloseNode(t)
-	after := &im.AfterResponse{}
-	ctx := im.WithAfterResponse(context.Background(), after)
-
-	n.closePASESessions(ctx, paseCloseGrace)
-	if got := paseCount(mgr); got != 1 {
-		t.Fatalf("PASE sessions before the response = %d, want 1 (the response travels on it)", got)
-	}
-	after.Run()
-	if got := paseCount(mgr); got != 1 {
-		t.Fatalf("PASE sessions right after the response = %d, want 1 until the grace elapses", got)
-	}
-	// A new commissioning's PASE session established within the grace is
-	// not this fail-safe context's and survives it.
-	if _, err := mgr.OpenFromPase(1, 3, 8, []byte("next-pase-secret")); err != nil {
-		t.Fatalf("OpenFromPase: %v", err)
-	}
-	clk.Advance(paseCloseGrace)
-	if got := paseCount(mgr); got != 1 {
-		t.Errorf("PASE sessions after CommissioningComplete = %d, want 1 (only the new commissioning's)", got)
-	}
-}
-
 // TestPASEClosedOnFailSafeExpiryParity pins the fail-safe rollback's step
 // 1, matter.js packages/protocol/src/common/FailsafeContext.ts:277-279
-// (closePaseSession): a timer expiry clears the PASE sessions at once,
-// an expiry inside an interaction (ArmFailSafe with expiry 0) after its
-// response.
+// (closePaseSession), on the facade's hook: it hands the close to the
+// bridge, which owns the sessions (bridge.Bridge.FailSafeExpired) — a
+// timer expiry clears the PASE sessions at once, an expiry inside an
+// interaction (ArmFailSafe with expiry 0) after its response. The close
+// after CommissioningComplete is the bridge's own
+// (bridge/pase_close_test.go); TestPASEClosedAfterCommissioningParity pins
+// it end to end through the facade.
 func TestPASEClosedOnFailSafeExpiryParity(t *testing.T) {
 	t.Parallel()
 	t.Run("timer", func(t *testing.T) {
 		t.Parallel()
-		n, mgr, _ := paseCloseNode(t)
+		n, mgr := paseCloseNode(t)
 		n.failSafeExpired(context.Background(), 1)
 		if got := paseCount(mgr); got != 0 {
 			t.Errorf("PASE sessions after the fail-safe expired = %d, want 0", got)
@@ -90,7 +65,7 @@ func TestPASEClosedOnFailSafeExpiryParity(t *testing.T) {
 	})
 	t.Run("in an interaction", func(t *testing.T) {
 		t.Parallel()
-		n, mgr, _ := paseCloseNode(t)
+		n, mgr := paseCloseNode(t)
 		after := &im.AfterResponse{}
 		n.failSafeExpired(im.WithAfterResponse(context.Background(), after), 1)
 		if got := paseCount(mgr); got != 1 {

@@ -1101,7 +1101,8 @@ var (
 // window must not admit another one until an administrator opens a new
 // one. Unlike [CommissioningWindow.RevokeWindow] it neither evicts PASE
 // sessions nor touches the fail-safe — CommissioningComplete has already
-// disarmed it. No-op when no window is open. Mirrors matter.js
+// disarmed it, and the bridge clears the PASE sessions once the command's
+// response is out (pase_close.go). No-op when no window is open. Mirrors matter.js
 // DeviceCommissioner.endCommissioning, which failsafeContext.commissioned
 // triggers (DeviceCommissioner.ts:160). Without it a second
 // OpenCommissioningWindow right after a commissioning answered BUSY

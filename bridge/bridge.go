@@ -120,6 +120,16 @@
 //     operational.Manager does. Without it AttestationRequest, CSRRequest
 //     and SignVIDVerificationRequest answer FAILURE, so commissioning
 //     stops at the attestation step.
+//     Another is silent: the registry lists its sessions (Sessions, as
+//     operational.Manager does), which is how the bridge clears the PASE
+//     sessions when a commissioning ends — by itself after a
+//     CommissioningComplete core.GeneralCommissioning answered OK, and in
+//     [Bridge.FailSafeExpired], which the host calls from the root's
+//     fail-safe-expiry hook (GeneralCommissioning.SetOnFailSafeExpired,
+//     after its own rollback; the node facade does). Without the
+//     capability, or without that call, a PASE session keeps the
+//     commissioning channel's implicit Administer after the commissioning
+//     it served is over, until it is reaped.
 //   - AttachSubscriptionStore — silent. Start loads the previous run's
 //     subscriptions from it and clears it; each subscription of a CASE
 //     session is written when it becomes active and deleted when it is

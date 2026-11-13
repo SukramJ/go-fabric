@@ -748,12 +748,10 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.failSafeCommitted(ctx)
 	n.commissioned.Store(true)
 	n.leaveRadioWhenCommissioned() //nolint:contextcheck // the stop outlives the CommissioningComplete request on purpose (its response must not wait for the radio); it is bounded by the node's lifetime, n.life
-	// Matter §11.10.6.6 step 4: the PASE sessions are cleared — after the
-	// response and a grace, since the command itself arrives over the
-	// fabric-adopted PASE session. Mirrors matter.js
-	// packages/protocol/src/common/FailsafeContext.ts:150-153
-	// (completeCommission → closePaseSession).
-	n.closePASESessions(ctx, paseCloseGrace)
+	// Matter §11.10.6.6 step 4, the PASE sessions cleared after the
+	// response, is the bridge's: it reads the command's response on its
+	// invoke path (bridge/pase_close.go), for a host without this facade
+	// too.
 	n.ensureOTAProviderACL(ctx)
 	n.ensureRequestorACL(ctx)
 	for _, o := range n.observerList() {
