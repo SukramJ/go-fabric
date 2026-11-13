@@ -1356,3 +1356,51 @@ func TestGeneralCommissioningReportsTheBreadcrumbResetOnExpiry(t *testing.T) {
 		})
 	}
 }
+
+// TestGeneralCommissioningBumpsDataVersionWithTheBreadcrumb pins
+// R2-P1-core-02: a Breadcrumb that changes — written, or reset by the
+// fail-safe timer's expiry — advances the cluster's DataVersion, so a
+// DataVersionFilter of the version a controller holds does not hide it.
+// Mirrors matter.js Datasource.ts:1456-1457 (`if (changes) {
+// this.#internals.advanceVersion();`) and chip DefaultServerCluster.cpp:100-102
+// (NotifyAttributeChanged → IncreaseDataVersion). An unchanged write
+// keeps the version.
+func TestGeneralCommissioningBumpsDataVersionWithTheBreadcrumb(t *testing.T) {
+	t.Run("write", func(t *testing.T) {
+		gc := newGencomm(t, core.GeneralCommissioningConfig{})
+		ctx := context.Background()
+		v0 := gc.MatterDataVersion()
+		if err := gc.MatterWrite(ctx, 0x0000, uint64(6)); err != nil {
+			t.Fatal(err)
+		}
+		v1 := gc.MatterDataVersion()
+		if v1 == v0 {
+			t.Fatalf("DataVersion %d unchanged after the Breadcrumb moved 0 -> 6", v1)
+		}
+		if err := gc.MatterWrite(ctx, 0x0000, uint64(6)); err != nil {
+			t.Fatal(err)
+		}
+		if v2 := gc.MatterDataVersion(); v2 != v1 {
+			t.Fatalf("DataVersion %d -> %d on an unchanged Breadcrumb write", v1, v2)
+		}
+	})
+	t.Run("expiry", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			fired := make(chan uint8, 1)
+			gc := newGencomm(t, core.GeneralCommissioningConfig{
+				LocationCapability: core.RegulatoryIndoor,
+				FailSafeMaxSeconds: 600,
+				OnFailSafeExpired:  func(_ context.Context, idx uint8) { fired <- idx },
+			})
+			ctx := im.WithFabricFilter(context.Background(), false, 1)
+			if _, err := gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 1, Breadcrumb: 7}); err != nil {
+				t.Fatalf("ArmFailSafe: %v", err)
+			}
+			armed := gc.MatterDataVersion()
+			awaitFailSafeExpiryHook(t, time.Second, fired)
+			if v := gc.MatterDataVersion(); v == armed {
+				t.Fatalf("DataVersion %d unchanged after the expiry reset the Breadcrumb 7 -> 0", v)
+			}
+		})
+	})
+}

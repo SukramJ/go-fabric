@@ -479,6 +479,11 @@ func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, v
 	g.mu.Lock()
 	changed := g.breadcrumb != v
 	g.breadcrumb = v
+	if changed {
+		// A changed attribute advances the cluster's DataVersion
+		// (matter.js Datasource.ts:1456-1457; review II, R2-P1-core-02).
+		g.dataVersion.Bump()
+	}
 	g.mu.Unlock()
 	if changed {
 		g.changes.NotifyFrom(contract.OriginFrom(ctx), gencommAttrBreadcrumb)
@@ -864,6 +869,9 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 		// which stops when the fail-safe expires.
 		g.failSafeCumulativeStarted = false
 		termsReverted = g.revertTermsLocked()
+		// As the disarm, ExpireFailSafe and ArmFailSafeFor(0) paths do:
+		// the expiry changed the cluster (review II, R2-P1-core-02).
+		g.dataVersion.Bump()
 	}
 	hook := g.failSafeExpiryHooksLocked()
 	g.mu.Unlock()
