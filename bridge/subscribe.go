@@ -2001,7 +2001,7 @@ func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 type booleanStateEvents struct {
 	b  *Bridge
 	ep *endpointpkg.Endpoint
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu   sync.Mutex
 	last *bool
 }
@@ -2039,18 +2039,21 @@ func (e *booleanStateEvents) read() (value, ok bool) {
 	return false, false
 }
 
+// check reads, compares, remembers and emits under e.mu: two
+// notifications that overlap store the latest reading last and emit in
+// the order they read (review II, R2-P1-req2-10).
 func (e *booleanStateEvents) check() {
 	if e == nil {
 		return
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	v, ok := e.read()
 	if !ok {
 		return
 	}
-	e.mu.Lock()
 	changed := e.last == nil || *e.last != v
 	e.last = &v
-	e.mu.Unlock()
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
 			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
@@ -2070,7 +2073,7 @@ func (e *booleanStateEvents) check() {
 type occupancyEvents struct {
 	b  *Bridge
 	ep *endpointpkg.Endpoint
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu   sync.Mutex
 	last *uint8
 }
@@ -2116,18 +2119,20 @@ func (e *occupancyEvents) read() (uint8, bool) {
 	return bitmap, ok && isU8
 }
 
+// check is [booleanStateEvents.check] for Occupancy: read, compare,
+// remember and emit under e.mu (review II, R2-P1-req2-10).
 func (e *occupancyEvents) check() {
 	if e == nil {
 		return
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	v, ok := e.read()
 	if !ok {
 		return
 	}
-	e.mu.Lock()
 	changed := e.last == nil || *e.last != v
 	e.last = &v
-	e.mu.Unlock()
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterOccupancySensing, measurement.OccupancyEventChanged,
 			measurement.OccupancyChangedEvent{Occupancy: occdef.OccupancyBitmap(v)}, contract.EventPriorityInfo)
@@ -2137,7 +2142,7 @@ func (e *occupancyEvents) check() {
 // pathValues remembers the last value of each path a change notifier
 // covers, so a notification reports only the paths that moved.
 type pathValues struct {
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu    sync.Mutex
 	ep    *endpointpkg.Endpoint
 	paths []im.ConcreteAttributePath
@@ -2176,11 +2181,13 @@ func (v *pathValues) read() map[im.ConcreteAttributePath]attributeReading {
 
 // changed returns the paths whose value differs from the last
 // notification's, compared by value ([attributeReading]), and remembers
-// the new values.
+// the new values. The values are read under v.mu, so of two
+// notifications that overlap the later reading is remembered last
+// (review II, R2-P1-req2-10).
 func (v *pathValues) changed() []im.ConcreteAttributePath {
-	now := v.read()
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	now := v.read()
 	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
 	for _, p := range v.paths {
 		cur, ok := now[p]
