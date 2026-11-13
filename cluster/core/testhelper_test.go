@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 
@@ -711,7 +712,10 @@ func mintUpdateNOC(fabCtx context.Context, t *testing.T, oc *core.OperationalCre
 	// Without that reset, the CSRRequest lands in the same window as the
 	// initial AddNOC and is rejected with ConstraintError — matter.js
 	// OperationalCredentialsServer.ts:132-138 (failsafeContext.fabricIndex !==
-	// undefined). Simulate the re-arm here so the helper reflects the real flow.
+	// undefined). Simulate the re-arm here so the helper reflects the real flow:
+	// the new window is armed by the fabric that updates its NOC.
+	_, updating := im.FabricFilterFromContext(fabCtx)
+	oc.SetFailSafe(armedFailSafe(updating))
 	oc.ClearPendingState()
 	pendingPub := issueCSRPendingPubKey(fabCtx, t, oc, true)
 	return buildCoreSignedCertForPubKey(t, pendingPub, false, signerPriv, fabricID, nodeID)

@@ -74,7 +74,7 @@ func TestAddNOC_SameFabricIDAndRootTwiceRejectedAsFabricConflict(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestUpdateNOC_SignedByDifferentRootRejectedAsInvalidNOC(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -169,7 +169,9 @@ func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	// A real UpdateNOC opens a fresh FailSafe window (ArmFailSafe →
 	// ClearPendingState) before its CSRRequest; without the reset the CSR
 	// lands in the AddNOC window and is rejected with ConstraintError
-	// (matter.js OperationalCredentialsServer.ts:132-138).
+	// (matter.js OperationalCredentialsServer.ts:132-138). The fabric
+	// that updates its NOC armed the new window.
+	oc.SetFailSafe(armedFailSafe(fabricIndex))
 	oc.ClearPendingState()
 	// Issue the update CSR (sets a pending key) but mint the NOC over an
 	// unrelated throwaway key instead of the one the CSR carried.
@@ -206,7 +208,7 @@ func TestUpdateNOC_DifferentFabricIDRejectedAsInvalidNOC(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -246,6 +248,7 @@ func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 
 	fs := newFakeStore()
 	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		OnFabricWithdraw: func(_ context.Context, compressedID [8]byte, nodeID uint64) {
 			withdrawFired = true
@@ -321,6 +324,7 @@ func TestRemoveFabric_WithdrawsTheRemovedFabricOnly(t *testing.T) {
 
 	fs := newFakeStore()
 	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		OnFabricWithdraw: func(_ context.Context, compressedID [8]byte, nodeID uint64) {
 			order = append(order, "withdraw")
@@ -368,11 +372,14 @@ func TestAddNOC_SecondInSameFailSafeIsConstraintError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
 	_, _, fabricIndex := commissionTestFabric(ctx, t, oc)
+	// The AddNOC re-stamped the window onto its fabric
+	// (OpcredsConfig.RearmFailSafeForFabric in a wired node).
+	oc.SetFailSafe(armedFailSafe(fabricIndex))
 
 	assertConstraint := func(name string, cmd uint32, req any) {
 		t.Helper()
@@ -396,7 +403,7 @@ func TestUpdateNOC_RevertedOnFailSafeExpiry(t *testing.T) {
 	ctx := context.Background()
 	fs := newFakeStore()
 	updated := 0
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,7 +56,7 @@ func makeP256Fixture(seed byte) []byte {
 func opcredsWithFakeStore(t *testing.T) (*core.OperationalCredentials, *fakeStore) {
 	t.Helper()
 	s := newFakeStore()
-	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 10})
+	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 10, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -390,7 +390,8 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	s := newFakeStore()
-	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 5})
+	// The window fabric 1 armed over CASE.
+	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(1)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -632,7 +633,7 @@ func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
 	setup := func(t *testing.T) (*core.OperationalCredentials, context.Context, *uint8, *ecdsa.PrivateKey) {
 		t.Helper()
 		ctx := context.Background()
-		oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+		oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 		if err != nil {
 			t.Fatalf("NewOperationalCredentials: %v", err)
 		}

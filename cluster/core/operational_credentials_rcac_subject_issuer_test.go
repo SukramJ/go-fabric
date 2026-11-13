@@ -82,7 +82,7 @@ func TestPin_ValidateRCAC_SubjectVsIssuer(t *testing.T) {
 	}
 
 	// Step 2 — the handler must accept the self-signed root ...
-	ocOK, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	ocOK, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestPin_ValidateRCAC_SubjectVsIssuer(t *testing.T) {
 	// ... and reject the one whose Subject does not match its Issuer,
 	// surfacing mattercert.ErrInvalidRCAC so the rejection is provably the
 	// RCAC validation and not some other guard on the path.
-	ocBad, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	ocBad, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}

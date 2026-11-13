@@ -133,8 +133,9 @@ type OperationalCredentials struct {
 
 	// failSafe is the runtime accessor to [GeneralCommissioning]'s
 	// fail-safe — armed, and for which fabric — wired via
-	// [OpcredsConfig.FailSafe]. When nil, the FailsafeRequired guard is
-	// skipped (test setups).
+	// [OpcredsConfig.FailSafe]. When nil, no fail-safe can be armed: the
+	// commands that need one answer FailsafeRequired (fail closed, review
+	// II W2-sec-06).
 	failSafe func() (fabricIndex uint8, armed bool)
 
 	// onFabricUpdated fires after a successful UpdateNOC. The daemon
@@ -425,7 +426,11 @@ type OpcredsConfig struct {
 	// `IsFailSafeArmed(commandObj->GetAccessingFabricIndex())`); UpdateNOC
 	// answers FailsafeRequired when none is armed and ConstraintError for
 	// another fabric's window (matter.js OperationalCredentialsServer.ts:355-360).
-	// When nil, the guard is skipped (test setups).
+	// When nil, no fail-safe is armed: the four commands answer
+	// FailsafeRequired, so a node without this port cannot be
+	// commissioned (fail closed — chip's guard is unconditional, :341,
+	// :472, :640, :760). A test rig passes a port that is armed for the
+	// fabric it invokes as.
 	FailSafe func() (fabricIndex uint8, armed bool)
 	// RearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
 	// AddNOC just installed. Bound to
@@ -505,7 +510,9 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 // after construction. Mirrors [SetOnFabricRemoved]'s post-construction
 // wiring pattern — [GeneralCommissioning] is built alongside
 // [OperationalCredentials] in the bridge and the back-reference is wired
-// once both are constructed. Idempotent. Pass nil to detach.
+// once both are constructed. Idempotent. Pass nil to detach: without a
+// port no fail-safe is armed and the commands that need one answer
+// FailsafeRequired.
 func (o *OperationalCredentials) SetFailSafe(fn func() (fabricIndex uint8, armed bool)) {
 	o.mu.Lock()
 	o.failSafe = fn
@@ -520,14 +527,14 @@ func (o *OperationalCredentials) SetFailSafe(fn func() (fabricIndex uint8, armed
 // `IsFailSafeArmed(commandObj->GetAccessingFabricIndex())`, FailSafeContext.h:76-79.
 // matter.js checks the armed state only (OperationalCredentialsServer.ts:602-604,
 // the DeviceCommissioner's one failsafeContext; Ahead-of-matter.js row
-// in notes/parity/by_design.md). Nil port: never (test setups).
+// in notes/parity/by_design.md). Nil port: always — chip's guard is
+// unconditional, and a host that left the port out must not run the
+// credential commands outside every fail-safe (review II, W2-sec-06;
+// [FailSafeArmedFor] reads a nil port as disarmed).
 func (o *OperationalCredentials) failSafeRequired(ctx context.Context) bool {
 	o.mu.RLock()
 	failSafe := o.failSafe
 	o.mu.RUnlock()
-	if failSafe == nil {
-		return false
-	}
 	_, accessing := im.FabricFilterFromContext(ctx)
 	return !FailSafeArmedFor(failSafe, accessing)
 }
@@ -1524,10 +1531,9 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// OperationalCredentialsServer.ts:118-119 (the `commissioner.failsafeContext`
 	// getter calls assertFailsafeArmed → Status::FailsafeRequired, 0xCA) and
 	// chip operational-credentials-server.cpp CSRRequest failsafe assertion.
-	// When the accessor is nil (test setups + legacy callers) the guard is
-	// skipped, matching handleAddNOC / handleAddTrustedRootCertificate. A
-	// window armed for another fabric is not armed for this one (chip
-	// :341, failSafeRequired).
+	// A nil accessor is a disarmed fail-safe, as in handleAddNOC /
+	// handleAddTrustedRootCertificate. A window armed for another fabric
+	// is not armed for this one (chip :341, failSafeRequired).
 	o.mu.RLock()
 	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
@@ -2066,10 +2072,14 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	nocInvoked := o.nocWasInvoked
 	rootSet := o.pendingTrustRoot != nil
 	o.mu.RUnlock()
-	if failSafe != nil {
-		if _, armed := failSafe(); !armed {
-			return nil, errOpcredsFailsafeRequired
-		}
+	// A nil port is a disarmed fail-safe (chip
+	// OperationalCredentialsCluster.cpp:640 at 6170af84 is unconditional;
+	// review II, W2-sec-06).
+	if failSafe == nil {
+		return nil, errOpcredsFailsafeRequired
+	}
+	if _, armed := failSafe(); !armed {
+		return nil, errOpcredsFailsafeRequired
 	}
 	// matter.js updateNoc: `timedOp.fabricIndex !== undefined` →
 	// ConstraintError, ahead of every other check.

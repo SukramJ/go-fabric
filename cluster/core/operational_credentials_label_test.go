@@ -63,10 +63,10 @@ func addNOCLabel(t *testing.T, cfg core.OpcredsConfig) string {
 // a host-configured InitialFabricLabel replaces it.
 func TestAddNOC_FabricLabelStartsEmpty(t *testing.T) {
 	t.Parallel()
-	if got := addNOCLabel(t, core.OpcredsConfig{}); got != "" {
+	if got := addNOCLabel(t, core.OpcredsConfig{FailSafe: armedFailSafe(0)}); got != "" {
 		t.Errorf("Label after AddNOC = %q, want \"\"", got)
 	}
-	if got := addNOCLabel(t, core.OpcredsConfig{InitialFabricLabel: "home"}); got != "home" {
+	if got := addNOCLabel(t, core.OpcredsConfig{InitialFabricLabel: "home", FailSafe: armedFailSafe(0)}); got != "home" {
 		t.Errorf("Label after AddNOC with InitialFabricLabel = %q, want \"home\"", got)
 	}
 }

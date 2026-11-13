@@ -302,7 +302,7 @@ func TestAddNOC_VersionedCASEAuthTagSubjectIsAccepted(t *testing.T) {
 	const catSubject uint64 = 0xFFFF_FFFD_0001_0001 // CAT id 0x0001, version 1
 
 	store := newFakeStore()
-	oc, err := core.NewOperationalCredentials(store, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(store, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}

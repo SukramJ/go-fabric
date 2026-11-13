@@ -53,7 +53,7 @@ func newFabricManagerReplaceable(t *testing.T) *fabricManagerReplaceable {
 	t.Helper()
 	ctx := context.Background()
 	r := &fabricManagerReplaceable{fs: newFakeStore()}
-	oc, err := core.NewOperationalCredentials(r.fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(r.fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatal(err)
 	}

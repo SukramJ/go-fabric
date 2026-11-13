@@ -35,6 +35,7 @@ func newOpcredsWithDAC(t *testing.T) (*core.OperationalCredentials, *ecdsa.Priva
 		t.Fatalf("GenerateKey DAC: %v", err)
 	}
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		DACPrivateKey:    dacKey,
 	})
@@ -122,7 +123,7 @@ func TestCSRRequest_AttestationChallenge_NilDACKey(t *testing.T) {
 	t.Parallel()
 
 	// Construct without DAC key — production stub mode.
-	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}

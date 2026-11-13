@@ -22,7 +22,7 @@ import (
 
 func newOpcreds(t *testing.T) *core.OperationalCredentials {
 	t.Helper()
-	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -494,7 +494,7 @@ func TestAddNOC_InstallsIPKInGroupKeyManagement(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -565,7 +565,7 @@ func TestAddNOC_RejectsMismatchedCSRSession(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -636,6 +636,7 @@ func TestRemoveFabric_FiresCleanupCallbacks(t *testing.T) {
 
 	fs := newFakeStore()
 	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		OnFabricRemoved: func(_ context.Context, fi uint8) {
 			hookFired = true
@@ -722,7 +723,7 @@ func TestAddTrustedRoot_AfterNOCCommandRejected(t *testing.T) {
 	ctx := context.Background()
 
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
@@ -856,6 +857,7 @@ func TestUpdateNOC_FiresOnFabricUpdatedHook(t *testing.T) {
 
 	fs := newFakeStore()
 	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		OnFabricUpdated: func(_ context.Context, fi uint8) {
 			hookFired = true
@@ -1276,6 +1278,7 @@ func TestOpcreds_MalformedArgsReturnInvalidCommand(t *testing.T) {
 func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
+	oc.SetFailSafe(armedFailSafe(1)) // the window fabric 1 armed over CASE
 	// CASE session (fabricIndex=1) with a stamped session ID.
 	caseCtx := core.WithInvokeSessionID(im.WithFabricFilter(context.Background(), true, 1), 100)
 	// Issue an AddNOC-targeted CSR (IsForUpdateNOC=false).
@@ -1361,7 +1364,7 @@ func TestAddNOC_ReportsTheAdminEntryToAccessControl(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatal(err)
 	}
