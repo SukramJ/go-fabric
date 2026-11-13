@@ -1000,7 +1000,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 		return 0, fmt.Errorf("%w: NOCSRElements: %w", errUnexpectedResponse, err)
 	}
 	// Ahead of matter.js: the echoed nonce must be the one sent. matter.js
-	// draws the nonce (ControllerCommissioningFlow.ts:1395 at 862ad75f)
+	// draws the nonce (ControllerCommissioningFlow.ts:1412 at db021da0)
 	// and never reads it back; connectedhomeip refuses a mismatch
 	// (DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84,
 	// VerifyNodeOperationalCSRInformation). See notes/parity/by_design.md
