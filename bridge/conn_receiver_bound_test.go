@@ -6,6 +6,9 @@ package bridge
 import (
 	"testing"
 	"testing/synctest"
+
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // TestConnReceiverBoundsTheMessagesInFlight: a connection of a transport
@@ -97,5 +100,38 @@ func TestConnReceiverCloseEndsAWaitingDelivery(t *testing.T) {
 		}
 		close(held)
 		r.wait()
+	})
+}
+
+// panickyConn is a BTP-like connection whose name panics: a group message
+// delivered on it makes the receive path panic while it logs the drop.
+type panickyConn struct{ fakeConn }
+
+func (*panickyConn) String() string { panic("test: a handler panic over BLE") }
+
+// TestConnReceiverRecoversAHandlerPanic (review II, R2-P1-dr-req-08): a
+// handler of a message delivered over BLE that panics is recovered, logged
+// and counted, as the UDP listener's safeDispatch and the TCP connection's
+// safeHandle do — it does not end the process — and the receiver goes on:
+// its turn and its place in flight are given back, so the next message is
+// handled and wait returns.
+func TestConnReceiverRecoversAHandlerPanic(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		b := newUnstartedBridge(t)
+		m := &recordingMetrics{}
+		b.AttachMetrics(m)
+		r := b.newConnReceiver(&panickyConn{})
+		group := []byte{0x00, 0x00, 0x00, byte(message.SessionGroup)}
+		r.deliver(group)
+		r.deliver(group)
+		synctest.Wait()
+		r.wait()
+		if got := m.counter(contract.MetricPanicsRecovered); got != 2 {
+			t.Errorf("panics.recovered = %d after two panicking handlers, want 2", got)
+		}
+		if n := len(r.inFlight); n != 0 {
+			t.Errorf("%d places in flight still taken after the handlers panicked", n)
+		}
 	})
 }

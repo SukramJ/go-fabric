@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -507,12 +508,31 @@ func (r *connReceiver) deliver(msg []byte) {
 		var once sync.Once
 		release := func() { once.Do(func() { close(turn) }) }
 		defer release()
+		defer r.recoverHandler(len(msg))
 		<-prev
 		// As handleTCPMessage: the dispatch context carries the release of
 		// the connection's turn.
 		ctx := context.WithValue(r.b.handlerContext(), sessionTurnKey{}, release)
 		_ = r.b.receive(ctx, msg, r.conn)
 	}()
+}
+
+// recoverHandler recovers a panic of a delivered message's handler, so a
+// message over BLE cannot end the process: logged and counted as the UDP
+// listener's safeDispatch and the TCP connection's safeHandle do (review
+// II, R2-P1-dr-req-08). deliver's other defers give back the turn and the
+// place in flight.
+func (r *connReceiver) recoverHandler(msgLen int) {
+	p := recover()
+	if p == nil {
+		return
+	}
+	r.b.panicRecovered()
+	r.b.logger.Error("matter.ble.dispatch_panic",
+		slog.Any("panic", p),
+		slog.String("peer", r.conn.Remote().String()),
+		slog.Int("message_bytes", msgLen),
+		slog.String("stack", string(debug.Stack())))
 }
 
 // close stops delivering and evicts every session bound to the
