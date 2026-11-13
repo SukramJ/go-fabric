@@ -7292,3 +7292,68 @@ ignored", `src/lib/support/Pool.h:619-626`; Linux and Darwin set it,
 Pinned by `bridge:TestTimedRequestsOfOneSessionAreBounded`. Register row
 above; the row closes when matter.js bounds the timed interactions a
 session may leave waiting.
+
+### BD-Matter-ClientNode-StartAdoptsFilterBeforeOnline — a client node adopts the default subscription's fabric filter before it goes online, within the caller's context
+
+matter.js's `NetworkClient.startup` binds the peer's signals first — four
+`reactTo` calls on the peer
+(`packages/node/src/behavior/system/network/NetworkClient.ts:85-88` at
+`db021da0`) — and then awaits, as one reaction on its `subscriptionChanges`
+mutex, `#adoptFabricFilter()` followed by `#syncAutoSubscribe()`
+(`:93-98`). `#adoptFabricFilter` awaits
+`structure.adoptFabricFilter(fabricFiltered)` and hands it no abort signal
+and no timeout (`:280-298`, the call at `:284`); what
+`ClientStructure.adoptFabricFilter` waits for inside was not read
+(unverified). `controller/client`'s `Node.start`
+(`controller/client/node.go`) turns the order around: under `subSync` it
+first calls `adoptDefaultFabricFilter(ctx)`, which waits within `ctx` for
+the node's queued report jobs — their store writes and hooks — and only
+then marks the node started, restarts the persister, observes the peer and
+syncs the default subscription. When `ctx` ends while jobs are still
+queued — a hook that blocks, the queue a `Stop` that timed out left
+behind — `Start` returns `ctx`'s error and has started nothing: the node is
+not started, no signal of the peer is bound, the cache keeps its fabric
+filter, and a later `Start` starts it. Reason: a Go caller bounds `Start`
+by its context, and in matter.js's order a `Start` that gave up in the
+adoption would leave bound signals behind to be taken back; with the
+adoption first there is nothing to take back. Unchanged from matter.js: a
+storage failure of the adoption is logged and is not `Start`'s error
+(`:285-297`; `adoptDefaultFabricFilter`, `controller/client/network.go`).
+Review II, R2-P0-rv-C03 (`f467ea98`). Pinned by
+`controller/client:TestStartReturnsWithItsContextWhileAHookBlocks`. Retire
+when matter.js's start takes an abort signal, or adopts before it binds.
+
+### BD-Matter-Bridge-StartDuringStopRefused — a `Start` that arrives while `Stop` is still running is refused with `ErrAlreadyStarted`
+
+matter.js's `Node.start()` returns at once, without an error and without
+starting, while `lifecycle.isOnline` holds
+(`packages/node/src/node/Node.ts:114-117` at `db021da0`), and `isOnline`
+holds until the `offline` event has cleared it
+(`packages/node/src/node/NodeLifecycle.ts:35-37`, `:52-54`), which the
+network runtime emits at the end of its own stop
+(`packages/node/src/behavior/system/network/NetworkRuntime.ts:69-77`).
+Otherwise `start` and `stop` run one after the other on the lifecycle's
+mutex (`Node.ts:123`, `:195`), and "Once the node is offline you may use
+{@link start} to bring the node online again" (`:191`). So, by these
+lines, a `start()` during a `stop()` that has not yet emitted `offline`
+resolves as if the node were online and the node ends offline; one that
+arrives after it waits for the stop and starts the node. Read, not run:
+the pinned export has no build, and which awaits of `cancelWithMutex`
+(`:215-235`) that window spans was not traced (unverified).
+`bridge.Bridge.Stop` keeps the start claim until it has finished
+(`bridge/bridge.go`), so `Bridge.Start` returns `ErrAlreadyStarted` for as
+long as a `Stop` of the run before has not returned — "the bridge has not
+stopped until then" — and `node.Node.Start` wraps what `Bridge.Start`
+returns (`node/node.go`). Reason:
+the caller is told that nothing was started, where matter.js's early
+return tells it nothing; and before `517ce6ed` a `Start` let in at that
+moment had the run it had just wired taken apart by the rest of `Stop` —
+it served without its value and switch listeners (review II,
+R2-P0-rv-A06). A `Start` after `Stop` has returned is not refused; whether
+such a restart is supported is open: the package doc states the lifecycle
+as "[New] → [Start] → (optional) [Reassemble] → [Stop]" and says nothing
+of a second run, and the rework of R2-P0-rv-A06 found no test that starts
+a bridge a second time (not re-checked here) — phase 5 of review II.
+Pinned by
+`bridge:TestStartDuringStopIsRefused`. Retire with the answer to the
+restart question.
