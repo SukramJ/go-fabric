@@ -33,6 +33,12 @@ import "context"
 // it runs, the countdown does not tick and no other request for this
 // server's IdentifyTime is served. MatterTriggerEffect is called without
 // the queue.
+//
+// Removing the endpoint does not wait for the handler: the server's Close
+// returns while a MatterIdentify is still running — a request's, or the
+// stop of a countdown that just ended, which is called from a goroutine of
+// its own — so a handler may take a lock that is held across the removal,
+// and may return into a server that is closed.
 type IdentifyHandler interface {
 	// MatterIdentify is the Identify command or an IdentifyTime write:
 	// identify for identifyTime seconds, 0 stops. It runs with the

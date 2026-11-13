@@ -97,7 +97,15 @@ type Identify struct {
 	// :108-114, :121-127 at db021da0). The host's MatterIdentify runs
 	// with op held: it must not set IdentifyTime on this server (a write
 	// or the Identify command) from inside the call.
-	op sync.Mutex
+	//
+	// It is a queue of one slot and not a mutex, created on first use
+	// ([Identify.opQueue]), because the countdown must be able to give up
+	// its place: its goroutine is the one [Identify.Close] waits for, and
+	// it never waits for the host — not behind a request whose handler is
+	// in flight ([Identify.tick] leaves when the server closes), and not
+	// in the stop it reports, which runs on a goroutine of its own that
+	// takes the slot with it (review II, R2-P0-rv-B04).
+	op atomic.Pointer[chan struct{}]
 	// timerMu guards timerActive and closed.
 	timerMu     sync.Mutex
 	timerActive bool
@@ -176,6 +184,13 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // Close releases the cluster: a running countdown terminates at once —
 // Close returns after its goroutine did — and no later write / command
 // starts a new one. Idempotent and safe for concurrent use.
+//
+// Close does not wait for the host: a [contract.IdentifyHandler] call in
+// flight — a request's, or the stop the countdown reported — is still
+// running when Close returns, and returns into a server that is closed.
+// The countdown's goroutine is never inside the host's code, so a handler
+// that is slow, or that waits for a lock the closing goroutine holds,
+// cannot hold Close.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/identify/IdentifyServer.ts
@@ -282,8 +297,9 @@ func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) er
 // countdown (op), which therefore sees the value before the request or
 // after it and never the handler's call without its store.
 func (i *Identify) setIdentifyTime(ctx context.Context, t uint16) error {
-	i.op.Lock()
-	defer i.op.Unlock()
+	op := i.opQueue()
+	op <- struct{}{}
+	defer func() { <-op }()
 	if h := i.hostHandler(); h != nil {
 		if err := h.MatterIdentify(ctx, t); err != nil {
 			return err
@@ -378,7 +394,7 @@ func (i *Identify) maybeStartCountdown() {
 			case <-done:
 				return
 			case <-ticker.C():
-				over, zero := i.tick()
+				over, zero := i.tick(done)
 				if zero {
 					// Reported outside op, so a listener may call
 					// back into this server.
@@ -392,23 +408,47 @@ func (i *Identify) maybeStartCountdown() {
 	}()
 }
 
+// opQueue is the one-slot queue [Identify.op] describes, created on first
+// use: sending takes the slot, receiving gives it back.
+func (i *Identify) opQueue() chan struct{} {
+	if q := i.op.Load(); q != nil {
+		return *q
+	}
+	q := make(chan struct{}, 1)
+	i.op.CompareAndSwap(nil, &q)
+	return *i.op.Load()
+}
+
 // tick is one second of the countdown; over reports that the countdown
 // ended, zero that this tick took IdentifyTime to zero. The decrement and
 // — at zero — the host's stop are one step for a request (op), so a new
 // IdentifyTime arrives before the tick, which then counts it down, or
 // after the stop.
-func (i *Identify) tick() (over, zero bool) {
-	i.op.Lock()
-	defer i.op.Unlock()
+//
+// The tick runs on the goroutine [Identify.Close] waits for, so it does
+// not wait for the host. Behind a request whose handler is in flight it
+// waits for the slot only until done closes, and then leaves without
+// having counted. And the stop at zero is called from a goroutine of its
+// own, which keeps the slot until the host's handler returns — the order
+// a request sees is the same — while the tick returns at once.
+func (i *Identify) tick(done <-chan struct{}) (over, zero bool) {
+	op := i.opQueue()
+	select {
+	case op <- struct{}{}:
+	case <-done:
+		return true, false
+	}
 	v := i.identifyTime.Load()
 	if v == 0 {
 		i.timerMu.Lock()
 		i.timerActive = false
 		i.timerMu.Unlock()
+		<-op
 		return true, false
 	}
 	i.identifyTime.Store(v - 1)
 	if v != 1 {
+		<-op
 		return false, false
 	}
 	// The countdown reached zero: the edge advances the DataVersion and
@@ -417,9 +457,17 @@ func (i *Identify) tick() (over, zero bool) {
 	// (IdentifyServer.ts:100-114, :121-127 at 862ad75f); 0 is the
 	// contract's "stops".
 	i.dataVersion.Bump()
-	if h := i.hostHandler(); h != nil {
-		_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
+	h := i.hostHandler()
+	if h == nil {
+		<-op
+		return false, true
 	}
+	// Not counted in i.countdown: Close does not wait for the host. The
+	// goroutine ends when the host's handler returns.
+	go func() {
+		defer func() { <-op }()
+		_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
+	}()
 	return false, true
 }
 
