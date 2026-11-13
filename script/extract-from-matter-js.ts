@@ -33,6 +33,9 @@ import {
     ValueModel,
 } from "@matter/model";
 import { execSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ReqOut is one cluster requirement of a device type: which cluster the
 // Device Library specifies for the type, on which side (server/client), and
@@ -110,16 +113,56 @@ out.matter.specificationVersion = Specification.SPECIFICATION_VERSION;
 out.matter.interactionModelRevision = Specification.INTERACTION_MODEL_REVISION;
 out.matter.dataModelRevision = Specification.DATA_MODEL_REVISION;
 
-try {
-    // Record the matter.js HEAD commit the snapshot was extracted from, so the
-    // pinned reference is traceable. This script runs inside the matter.js
-    // checkout, so HEAD is matter.js's. Deterministic: changes only when the
-    // matter.js source does.
-    out.matter.sourceCommit = execSync("git rev-parse HEAD", {
-        encoding: "utf8",
-    }).trim();
-} catch (e) {
-    console.error("source commit:", (e as Error).message);
+// Record the matter.js HEAD commit the snapshot was extracted from: the pin
+// every citation, parity test and pin lift is read against. This script runs
+// inside the matter.js checkout, so HEAD is matter.js's. Deterministic:
+// changes only when the matter.js source does.
+out.matter.sourceCommit = sourceCommit();
+
+// sourceCommit returns the checkout's HEAD, and ends the run without a
+// snapshot when there is none to name or the tree is not that commit: a
+// snapshot with no sourceCommit has no pin, and one extracted from a tree
+// with local changes names a commit it does not describe. The one expected
+// difference is this script's own copy in the tree (and the form esbuild
+// transpiles it to, beside it). What git ignores — the build output the
+// model is imported from — is not seen here: building the checkout at its
+// HEAD stays the caller's step.
+function sourceCommit(): string {
+    const git = (args: string) => execSync(`git ${args}`, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    let commit: string;
+    let top: string;
+    let status: string;
+    try {
+        commit = git("rev-parse --verify HEAD").trim();
+        top = git("rev-parse --show-toplevel").trim();
+        // -z: one NUL-terminated "XY <path>" record per entry, the path
+        // verbatim and relative to the top level (git-status(1), porcelain
+        // format version 1); a rename is followed by its source path.
+        status = git("status --porcelain=v1 -z --untracked-files=all");
+    } catch (e) {
+        console.error("source commit: no matter.js commit to record —", (e as Error).message.trim());
+        process.exit(1);
+    }
+    const self = relative(realpathSync(top), realpathSync(fileURLToPath(import.meta.url))).replace(/\.m[tj]s$/, "");
+    const changed: string[] = [];
+    const records = status.split("\0");
+    for (let i = 0; i < records.length; i++) {
+        const rec = records[i];
+        if (rec === "") continue;
+        const xy = rec.slice(0, 2);
+        const path = rec.slice(3);
+        if (xy[0] === "R" || xy[0] === "C") i++; // the source path of a rename or copy
+        if (xy === "??" && (path === self + ".mts" || path === self + ".mjs")) continue;
+        changed.push(`${xy} ${path}`);
+    }
+    if (changed.length) {
+        console.error(
+            `source commit: the checkout differs from HEAD ${commit}; the snapshot would name a commit it was not extracted from. ` +
+                "Commit, stash or remove:\n  " + changed.join("\n  "),
+        );
+        process.exit(1);
+    }
+    return commit;
 }
 
 function jsonable(v: any): any {
@@ -758,14 +801,15 @@ console.log(JSON.stringify(out, null, 2));
 // it from inside the matter.js checkout — copy this file in rather than running
 // it in place, and build packages/model first (`npm run build`). Writing stdout
 // straight over parity/schema.json would truncate the embed if the extractor
-// throws, so land it in a temporary file and move it into place only on a
-// zero exit status:
+// throws — or refuses: it exits 1 without a snapshot when the checkout has no
+// HEAD to record or differs from it (sourceCommit above) — so land it in a
+// temporary file and move it into place only on a zero exit status:
 //
 //   cd ../matter.js
-//   cp <go-fabric>/script/extract-from-matter-js.ts .occu-extract.mts
-//   node .occu-extract.mts > /tmp/schema.json && \
+//   cp <go-fabric>/script/extract-from-matter-js.ts .gofabric-extract.mts
+//   node .gofabric-extract.mts > /tmp/schema.json && \
 //       mv /tmp/schema.json <go-fabric>/parity/schema.json
-//   rm .occu-extract.mts
+//   rm .gofabric-extract.mts
 //
 // Then regenerate the typed Go maps that read it:
 //
