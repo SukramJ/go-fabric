@@ -240,7 +240,9 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 // onLink reports whether a query's source is on the link of the interface
 // it arrived on, whose prefixes are nets: an IPv6 link-local address, or an
 // address inside one of the prefixes (RFC 6762 §11, the source address
-// check). The sockets bind the wildcard address, so a datagram sent by
+// check). An IPv4 link-local source (169.254/16) is one of the prefixes'
+// like any other: refused unless the interface holds a 169.254 address, as
+// matter.js finds it no interface (below; review II, R2-P1-dr-rest-07). The sockets bind the wildcard address, so a datagram sent by
 // unicast to the host's port 5353 from anywhere reaches the engine; a query
 // from off the link is not answered, by multicast or unicast, and not held
 // as a truncated query (review II, R2-P1-net-02).
