@@ -123,16 +123,16 @@ already draws that line for itself: `internal/` holds three kinds of
 package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
-`channelseam`, `deviceseam`, `fabrictestseam`, `nodeseam`, `surfaceseam`,
-`udpseam`, `inflight`, `clockvar`); shared internals behind them
-(`serialqueue`, `forward`); and test support (`paritytest`, `chipdm`, the
-chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
+`channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `fabrictestseam`,
+`nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
+internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`);
+and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
 Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `clock/`, `cluster/…`,
-`commissioning/`, `contract/`, `controller/…`, `device/`, `diagevent/`,
+`commissioning/`, `contract/`, `controller/…`, `device/`, `diag/`, `diagevent/`,
 `eligibility/`, `endpoint/` (including `endpoint/sqlitestore`), `groups/`,
-`icd/`, `im/`, `im/subscription`, `mdns/`, `node/`,
+`icd/`, `im/`, `im/subscription`, `logring/`, `mdns/`, `node/`,
 `parity/`, `schema/`, `secure/…`, `store/`, `surface/`, `thread/`, `tlv/` and `transport/…`. The
 device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
@@ -149,9 +149,10 @@ Three things outside `internal/` are still not API. `conformance/` is this
 module's own suite, shaped for the tests in this repository rather than for a
 consumer -- one of its three exported identifiers takes a `*testing.T`, and the
 other two exist to serve it. `examples/reference-bridge`,
-`examples/reference-controller` and everything under `script/` are
-`package main` — runnable, not importable. Copy from them; do not build
-against them.
+`examples/reference-controller` and everything under `script/` are programs
+and the packages that serve them (`examples/reference-controller/cli`, the
+guards and generators' own packages under `script/`) — runnable, not a
+library. Copy from them; do not build against them.
 
 One value-level caveat on `parity/` and `schema/`: their Go surface is
 covered by everything below, but the data behind it is a matter.js HEAD

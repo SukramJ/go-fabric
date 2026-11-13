@@ -186,12 +186,16 @@ facade's own state.
 | `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
-| `matter.fabric.<fabric>.vid.statement`, `.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
+| `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
 | `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion |
 | `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
 | `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names; the offset of the node's UTC over its clock is not stored |
 | `general_commissioning.tc_acceptance` (`store.SettingTermsAcceptance`) | `cluster/core` | the committed terms-and-conditions acceptance (`<version>:<bits>`) of GeneralCommissioning's TC feature (`node.Commissioning.TermsAndConditions`); written at CommissioningComplete or by a SetTCAcknowledgements outside a fail-safe window, deleted with the last fabric, erased by the factory reset |
+| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`) |
+| `thermostat_user_interface_configuration.keypad_lockout` (`thermo.DefaultKeypadLockoutSetting`) | `cluster/thermo` | ThermostatUserInterfaceConfiguration's KeypadLockout, when the server is given `Settings`; `ThermostatUIConfig.SettingKey` names another key, which a second endpoint with the cluster needs |
+| `tls.certificates:<key>`, `tls.endpoints:<key>` | `cluster/tls` | the certificate tables of TlsCertificateManagement and the provisioned endpoints of TlsClientManagement, when the servers are given a `Store`; `<key>` is the server's `Key` |
+| `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key` |
 
 `<key>` is the endpoint's stable key in `String()` form, the same identity
 endpoint numbers are kept under. A host that keeps scenes and labels
@@ -202,7 +206,11 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
+
+`script/docscheck` (`TestSettingsKeysDocumented`) holds the table to the
+code: a `SetSetting` call that states its key as a constant fails the
+build while the key is not in a table of this page.
 
 ## What survives a restart
 
