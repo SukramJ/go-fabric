@@ -333,15 +333,25 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 // the exchange. op names the loop for the log line ("read" /
 // "subscribe").
 func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
-	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
+	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), nil, waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
 }
 
+// errChunkWaitAborted ends a chunk wait whose sender stopped: the
+// subscription engine, for an ongoing report ([subTarget.abort]). It is
+// no verdict on the peer.
+var errChunkWaitAborted = errors.New("bridge: chunk wait aborted")
+
 // awaitChunkStatusResponseWithin is [Bridge.awaitChunkStatusResponse]
-// bounded by timeout instead of the chunk StatusResponse bound.
-func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+// bounded by timeout instead of the chunk StatusResponse bound, and by
+// abort (nil: never) — the wait ends with [errChunkWaitAborted] when it
+// closes.
+func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {
+	case <-abort:
+		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
+		return fmt.Errorf("%w: exchange %d chunk %d", errChunkWaitAborted, exchangeID, chunkIdx)
 	case status := <-waitCh:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		if status.IsSuccess() {

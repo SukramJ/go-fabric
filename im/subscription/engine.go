@@ -34,8 +34,15 @@ import (
 // O(N_subscriptions) timers and goroutines for a problem that is trivially
 // solved by a single shared poller. Documented in
 // `notes/parity/by_design.md` §"Systematic Parity Run #02".
+//
+// The context a reporter receives ends when the engine does — with ctx or
+// with [Manager.Stop] — so a report that waits on its peer can end its
+// wait instead of holding Stop for the length of it (review II,
+// W2-conc-06).
 func (m *Manager) run(ctx context.Context) {
 	defer m.wg.Done()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	ticker := m.cfg.Clock.NewTicker(m.cfg.TickInterval)
 	defer ticker.Stop()
 

@@ -206,6 +206,12 @@ type subTarget struct {
 	// ack but is not handed to the outbound reliable tracker
 	// ([Bridge.sendUnsolicitedIM]).
 	flush bool
+	// abort, when it closes, ends the wait for the peer's answer to a
+	// chunk of the report being sent ([errChunkWaitAborted]). The ongoing
+	// reporters set it to their context's Done on the copy they send
+	// with — the subscription engine's stop — and it is never stored in
+	// the routing table. Nil: the wait ends with its answer or its timer.
+	abort <-chan struct{}
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -324,6 +330,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		return
 	}
 
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
+	target.abort = ctx.Done()
+
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
@@ -346,6 +355,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		// :566-581 (restores #outstandingEventsMinNumber while
 		// #sendUpdateErrorCounter <= 2).
 		sub.RequeueEvents(events[0].Number)
+		if errors.Is(err, errChunkWaitAborted) {
+			return // the engine stopped; the peer did nothing wrong
+		}
 		b.noteSubscriptionSendError(sub.ID, "event_report", err)
 		return
 	}
@@ -495,6 +507,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		return
 	}
 
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
+	target.abort = ctx.Done()
+
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
@@ -517,6 +532,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		// packages/node/src/node/server/ServerSubscription.ts:566-577
 		// (#addOutstandingAttributes while #sendUpdateErrorCounter <= 2).
 		sub.RequeueAttributes(paths)
+		if errors.Is(err, errChunkWaitAborted) {
+			return // the engine stopped; the peer did nothing wrong
+		}
 		b.noteSubscriptionSendError(sub.ID, "report", err)
 		return
 	}
@@ -962,7 +980,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+			if err := b.awaitChunkStatusResponseWithin(timeout, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
 				return counters, nil, err
 			}
 		}

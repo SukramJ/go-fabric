@@ -48,7 +48,9 @@ var (
 
 // Reporter receives ReportData payloads the engine produces. The
 // caller wires this into the bridge's IM dispatcher to encode +
-// transmit the report on the right secure-channel session.
+// transmit the report on the right secure-channel session. ctx ends
+// when the engine stops ([Manager.Stop]); a reporter that waits on its
+// peer ends the wait with it.
 type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAttributePath)
 
 // EventReporter is the symmetrical hook for event drains. The engine
@@ -352,7 +354,10 @@ func (m *Manager) Start(ctx context.Context) {
 	})
 }
 
-// Stop terminates the engine and waits for it to drain. Idempotent.
+// Stop terminates the engine and waits for it to drain: the tick loop and
+// every report it started. The context those reports' reporters hold is
+// cancelled first, so a reporter that honours it does not hold Stop.
+// Idempotent.
 func (m *Manager) Stop() {
 	m.stopOnce.Do(func() {
 		close(m.stopCh)
