@@ -115,14 +115,20 @@ func TestParityMatterJS_IdentifyTimeReachesTheHost(t *testing.T) {
 
 // tickingIdentify is a host IdentifyHandler whose handling of one
 // IdentifyTime takes as long as the countdown's next tick: while it handles
-// during, it advances the clock by a second and gives the countdown time to
-// act on the tick before it returns.
+// during, it advances the clock by a second and lets the countdown act on
+// the tick before it returns — the fake clock's Yield, until the countdown
+// stopped the host or tickYields of them passed. A countdown that waits
+// for the request behind the server's lock shows nothing a test could
+// wait for, so the window is the fake's, not a signal.
 type tickingIdentify struct {
 	recordingIdentify
 	clk     *clocktest.Fake
 	during  uint16
 	stopped chan struct{}
 }
+
+// tickYields is how often tickingIdentify yields to a tick it fired.
+const tickYields = 50
 
 func (h *tickingIdentify) MatterIdentify(ctx context.Context, t uint16) error {
 	if err := h.recordingIdentify.MatterIdentify(ctx, t); err != nil {
@@ -131,9 +137,13 @@ func (h *tickingIdentify) MatterIdentify(ctx context.Context, t uint16) error {
 	switch t {
 	case h.during:
 		h.clk.Advance(time.Second)
-		select {
-		case <-h.stopped:
-		case <-time.After(300 * time.Millisecond):
+		for range tickYields {
+			select {
+			case <-h.stopped:
+				return nil
+			default:
+				h.clk.Yield()
+			}
 		}
 	case 0:
 		close(h.stopped)
@@ -183,12 +193,11 @@ func TestIdentifyCountdownStopDoesNotOvertakeAWrite(t *testing.T) {
 				t.Fatal(err)
 			}
 			// The tick that fired is the new countdown's first: 10 → 9.
-			deadline := time.Now().Add(2 * time.Second)
-			for time.Now().Before(deadline) {
+			for range 2_000 {
 				if v, _ := id.MatterRead(0x0000); v == uint16(9) {
 					break
 				}
-				time.Sleep(time.Millisecond)
+				clk.Yield()
 			}
 			v, _ := id.MatterRead(0x0000)
 			if got := h.seen(); len(got) != 2 || got[0] != 1 || got[1] != 10 || v != uint16(9) {
