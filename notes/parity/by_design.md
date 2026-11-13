@@ -7319,7 +7319,8 @@ adoption would leave bound signals behind to be taken back; with the
 adoption first there is nothing to take back. Unchanged from matter.js: a
 storage failure of the adoption is logged and is not `Start`'s error
 (`:285-297`; `adoptDefaultFabricFilter`, `controller/client/network.go`).
-Review II, R2-P0-rv-C03 (`f467ea98`). Pinned by
+Review II, the follow-up of R2-P0-conc-C03 (`f467ea98`); the citation of
+matter.js's order in the code is R2-P0-rv-C03's (`ecc76f50`). Pinned by
 `controller/client:TestStartReturnsWithItsContextWhileAHookBlocks`. Retire
 when matter.js's start takes an abort signal, or adopts before it binds.
 
