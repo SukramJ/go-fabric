@@ -173,6 +173,15 @@ type Node struct {
 	// began, and no window opens after br.Stop stopped the window's timer.
 	keeperMu sync.Mutex
 	stopping bool
+	// windowLife bounds the commissioning window's transitions — the
+	// announce and the BLE advertisement of the transition hook — and a
+	// reopen's (wireCommissioningWindow, reopenUnlessStopping). Stop
+	// cancels it first, before it takes keeperMu, which a reopen holds
+	// across the window's open: a reopen waiting on its context ends, and
+	// Stop does not wait on the lock for a lifetime only it ends (review
+	// II, R2-P1-dr-req-04). No transition is announced once Stop began.
+	windowLife   context.Context //nolint:containedctx // a child of life that Stop cancels first
+	cancelWindow context.CancelFunc
 
 	// mu serialises Start and Stop, the lifecycle; it is held across
 	// them, host callbacks included (the host's Snapshotter), and
@@ -229,6 +238,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		attestationErr: attestationErr,
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	n.windowLife, n.cancelWindow = context.WithCancel(n.life)
 	n.surfaceDigest = cfg.Surface.Digest()
 	n.rootDecisions, n.rootCandidates = rootDecisions, rootCandidates
 	ok := false
@@ -403,7 +413,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
-	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
+	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
@@ -684,14 +694,15 @@ func (n *Node) reopenWhenIdle() {
 // reopenUnlessStopping is reopenWhenIdle's reopen, which a Stop that began
 // cancels: under keeperMu, so it either opens the window before stopLocked
 // set stopping — and br.Stop then stops the window's timer — or not at all
-// (TestReopenPendingAtStopArmsNoWindow).
+// (TestReopenPendingAtStopArmsNoWindow). It runs on windowLife, which Stop
+// cancels before it waits for keeperMu (TestStopEndsAReopenWaitingOnTheLifetime).
 func (n *Node) reopenUnlessStopping() {
 	n.keeperMu.Lock()
 	defer n.keeperMu.Unlock()
 	if n.stopping {
 		return
 	}
-	n.window.reopenIfDecommissioned(n.life, n.st)
+	n.window.reopenIfDecommissioned(n.windowLife, n.st)
 }
 
 // goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
@@ -1079,7 +1090,9 @@ func (n *Node) stopLocked(ctx context.Context) error {
 // stopLocked's count.
 func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	// No keeper starts and no reopen opens the window from here on
-	// (keeperMu).
+	// (keeperMu); a reopen in progress, which holds it, has its waits
+	// ended first (windowLife).
+	n.cancelWindow()
 	n.keeperMu.Lock()
 	n.stopping = true
 	n.keeperMu.Unlock()

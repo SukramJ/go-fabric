@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -151,5 +152,64 @@ func TestLateHandlerKeeperDoesNotRaceStop(t *testing.T) {
 	<-hammered
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// publishUntilDoneAdvertiser blocks its next Publish once armed until the
+// publish's context ends, after closing entered: an announce that only the
+// node's lifetime bounds.
+type publishUntilDoneAdvertiser struct {
+	*mdns.Noop
+	armed   atomic.Bool
+	entered chan struct{}
+}
+
+func (a *publishUntilDoneAdvertiser) Publish(ctx context.Context, svc mdns.Service) error {
+	if a.armed.CompareAndSwap(true, false) {
+		close(a.entered)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return a.Noop.Publish(ctx, svc)
+}
+
+// TestStopEndsAReopenWaitingOnTheLifetime (review II, R2-P1-dr-req-04): a
+// reopen after the last fabric's removal that waits inside the window's
+// transition on something only the node's lifetime ends — here the
+// announce's publish — does not hold Stop: Stop ends the reopen's wait
+// before it waits for the reopen, so it neither opens the window after the
+// bridge stopped nor blocks on the keeper lock until a lifetime only Stop
+// itself ends.
+func TestStopEndsAReopenWaitingOnTheLifetime(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	adv := &publishUntilDoneAdvertiser{Noop: mdns.NewNoop(), entered: make(chan struct{})}
+	n, fake, idx := commissionedKeeperNode(t, adv)
+	adv.armed.Store(true)
+	if err := n.RemoveFabric(ctx, idx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-adv.entered:
+	case <-ctx.Done():
+		t.Fatal("the reopen never announced the window")
+	}
+	stopped := make(chan error, 1)
+	go func() { stopped <- n.Stop(ctx) }()
+	bound, boundCancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer boundCancel()
+	select {
+	case err := <-stopped:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-bound.Done():
+		t.Error("Stop waited for a reopen whose wait only the node's lifetime ends")
+		n.cancel() // what Stop never reached: the reopen and Stop return
+		<-stopped
+	}
+	if armed := fake.Armed(); len(armed) != 0 {
+		t.Errorf("armed after Stop: %v", armed)
 	}
 }
