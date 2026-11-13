@@ -184,3 +184,26 @@ func TestObserve(t *testing.T) {
 	nilRing.Observe(func(Event) { t.Error("a nil ring called its observer") })()
 	r.Observe(nil)()
 }
+
+// TestRecordKeepsItsOwnDetail: the ring's entry does not share the
+// caller's Detail map (review II, W2-conc-13). Before, Record stored the
+// map by reference, so a caller that reused or changed it after the call
+// rewrote the recorded event — and raced a reader of Snapshot.
+func TestRecordKeepsItsOwnDetail(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	detail := map[string]string{"peer": "fd11::1", "session_id": "7"}
+	r.Record(Event{At: at(1), Kind: KindSession, Message: "opened", Detail: detail})
+	detail["peer"] = "changed after Record"
+	delete(detail, "session_id")
+	detail["added"] = "after Record"
+
+	got := r.Snapshot()
+	if len(got) != 1 {
+		t.Fatalf("Snapshot holds %d events, want 1", len(got))
+	}
+	want := map[string]string{"peer": "fd11::1", "session_id": "7"}
+	if len(got[0].Detail) != len(want) || got[0].Detail["peer"] != want["peer"] || got[0].Detail["session_id"] != want["session_id"] {
+		t.Errorf("recorded Detail = %v after the caller changed its map, want %v", got[0].Detail, want)
+	}
+}
