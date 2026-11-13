@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // newOpcredsWithDAC builds an OperationalCredentials cluster wired with a
@@ -224,8 +226,9 @@ func TestAttestationProvider_IncompleteMaterialIsRetried(t *testing.T) {
 	}
 	ctx := sessionChallengeCtx(context.Background())
 	req := core.AttestationRequest{AttestationNonce: make([]byte, 32)}
-	if _, err := oc.MatterInvoke(ctx, 0x00, req); err == nil {
-		t.Fatal("an AttestationRequest over empty attestation material succeeded")
+	// resolveAttestation's plain error: the IM layer's Failure.
+	if _, err := oc.MatterInvoke(ctx, 0x00, req); spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("an AttestationRequest over empty attestation material: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 	resp, err := oc.MatterInvoke(ctx, 0x00, req)
 	if err != nil {

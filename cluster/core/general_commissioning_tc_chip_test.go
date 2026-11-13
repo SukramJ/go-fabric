@@ -542,8 +542,9 @@ func TestGencommTerms_FailedImmediateCommitLeavesNoAcceptance(t *testing.T) {
 	st.fail = errors.New("disk")
 	st.mu.Unlock()
 	req := gencommdef.SetTcAcknowledgementsRequest{TcVersion: 1, TcUserResponse: 1}
-	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, req); err == nil {
-		t.Fatal("a failing store did not fail the command")
+	// commitTermsLocked's store error: the IM layer's Failure.
+	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, req); spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("a failing store: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
 	}
 	if !readBool(t, gc, gencommdef.AttrTcAcknowledgementsRequired) {
 		t.Fatal("TCAcknowledgementsRequired = false after the failed commit, want true")
