@@ -430,3 +430,23 @@ func TestCloseOverwritesAnAbandonedHandshake(t *testing.T) {
 		t.Errorf("SharedSecret of a verifier closed before Pake3: % x", got)
 	}
 }
+
+// TestScalarTo32Bytes: the scalar comes out as 32 big-endian bytes, padded
+// on the left. It is written straight into the buffer the caller
+// overwrites (big.Int.FillBytes); that the copy big.Int.Bytes made on the
+// way is gone is not something a test can see — the compiler kept it on
+// the stack, so the allocation count was 1 before and after (review II,
+// R2-P0-rv-B08).
+func TestScalarTo32Bytes(t *testing.T) {
+	if got := scalarTo32Bytes(someScalar(0x5A)); !bytes.Equal(got, bytes.Repeat([]byte{0x5A}, ScalarSize)) {
+		t.Errorf("scalarTo32Bytes = % x", got)
+	}
+	want := make([]byte, ScalarSize)
+	want[ScalarSize-2], want[ScalarSize-1] = 0x01, 0x02
+	if got := scalarTo32Bytes(big.NewInt(0x0102)); !bytes.Equal(got, want) {
+		t.Errorf("scalarTo32Bytes(0x0102) = % x, want % x", got, want)
+	}
+	if got := scalarTo32Bytes(new(big.Int)); !bytes.Equal(got, make([]byte, ScalarSize)) {
+		t.Errorf("scalarTo32Bytes(0) = % x", got)
+	}
+}

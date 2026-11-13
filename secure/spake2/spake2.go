@@ -173,6 +173,10 @@ func PBKDF(passcode uint32, salt []byte, iterations int) (w0, w1 *big.Int, err e
 	}
 	pwd := make([]byte, 4)
 	binary.LittleEndian.PutUint32(pwd, passcode)
+	// crypto/pbkdf2 takes the password as a string and has no []byte
+	// form, so the four passcode bytes are copied into a string here and
+	// again inside it, for its HMAC key; neither copy can be reached to be
+	// overwritten. pwd and the output are, below.
 	out, err := pbkdf2.Key(sha256.New, string(pwd), salt, iterations, PBKDF2OutputSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("spake2: pbkdf2: %w", err)
@@ -723,8 +727,9 @@ func (p *Prover) Close() {
 // are copied when a goroutine's stack grows and when they are passed by
 // value; math/big, crypto/hmac, crypto/hkdf, crypto/pbkdf2 and the nistec
 // points keep working state of their own that nothing outside them can
-// reach; and a slice the caller was handed ([Verifier.SharedSecret]) is
-// the caller's.
+// reach — [PBKDF] names the one this package feeds itself, the passcode
+// as a string; and a slice the caller was handed ([Verifier.SharedSecret])
+// is the caller's.
 //
 // Not every buffer this package holds is overwritten by itself. Three
 // outlive a handshake step, each for a use that is still to come: the
@@ -857,12 +862,12 @@ func buildTranscript(context, idA, idB, x, y, z, v []byte, w0 *big.Int) []byte {
 }
 
 // scalarTo32Bytes returns a left-zero-padded 32-byte big-endian
-// representation of n.
+// representation of n. The scalar is written straight into the returned
+// buffer, which the caller overwrites: big.Int.Bytes would make a second
+// copy on the way that nothing could reach afterwards. n must fit — every
+// scalar here is below the group order or a 32-byte wire value.
 func scalarTo32Bytes(n *big.Int) []byte {
-	out := make([]byte, ScalarSize)
-	b := n.Bytes()
-	copy(out[ScalarSize-len(b):], b)
-	return out
+	return n.FillBytes(make([]byte, ScalarSize))
 }
 
 // --- helpers ---
