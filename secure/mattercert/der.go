@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -498,17 +499,45 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 
 // derECDSASignature reads the certificate's signature BIT STRING, a DER
 // ECDSA-Sig-Value, as the 64-byte r‖s the TLV carries.
+//
+// Mirrors matter.js EcdsaSignature (EcdsaSignature.ts:28-29 at db021da0):
+// r and s each through DerCodec.decodeBigUint(…, 32) (DerCodec.ts:288-318),
+// which takes the INTEGER's content bytes as they are — 32 of them, 33 with
+// a leading zero, fewer padded to 32 — and refuses anything wider ("Encoded
+// integer contains too many bytes"). The certificate arrives before it is
+// trusted, so a wide value is ErrMalformed, never a panic.
 func derECDSASignature(v asn1.RawValue) ([]byte, error) {
 	var bits asn1.BitString
 	if _, err := asn1.Unmarshal(v.FullBytes, &bits); err != nil {
 		return nil, fmt.Errorf("%w: signature: %w", ErrMalformed, err)
 	}
-	var sig ecdsaSignature
+	var sig struct{ R, S asn1.RawValue }
 	if _, err := asn1.Unmarshal(bits.Bytes, &sig); err != nil {
 		return nil, fmt.Errorf("%w: signature is not an ECDSA-Sig-Value: %w", ErrMalformed, err)
 	}
-	out := make([]byte, 64)
-	sig.R.FillBytes(out[:32])
-	sig.S.FillBytes(out[32:])
-	return out, nil
+	r, err := derSignatureInteger(sig.R, "r")
+	if err != nil {
+		return nil, err
+	}
+	s, err := derSignatureInteger(sig.S, "s")
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(r, s), nil
+}
+
+// derSignatureInteger is DerCodec.decodeBigUint(value, 32) (DerCodec.ts:
+// 288-318 at db021da0) for one ECDSA-Sig-Value component.
+func derSignatureInteger(v asn1.RawValue, name string) ([]byte, error) {
+	if v.Class != asn1.ClassUniversal || v.Tag != asn1.TagInteger || v.IsCompound {
+		return nil, fmt.Errorf("%w: signature is not an ECDSA-Sig-Value: %s is not an INTEGER", ErrMalformed, name)
+	}
+	b := v.Bytes
+	switch {
+	case len(b) == 33 && b[0] == 0:
+		b = b[1:]
+	case len(b) > 32:
+		return nil, fmt.Errorf("%w: signature %s: encoded integer contains too many bytes", ErrMalformed, name)
+	}
+	return append(make([]byte, 32-len(b), 32), b...), nil
 }

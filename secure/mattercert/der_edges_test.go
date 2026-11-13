@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"errors"
+	"math/big"
 	"slices"
 	"strings"
 	"testing"
@@ -151,6 +152,7 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 	validity := func(a, b string) []byte { return derSeq(t, derUTC(t, a), derUTC(t, b)) }
 	keyAlg := func(key, curve []byte) []byte { return derSeq(t, derSeq(t, key, curve), spki[1]) }
 	exts := func(entries ...[]byte) []byte { return derCtx3(t, derSeq(t, entries...)) }
+	one, wide := big.NewInt(1), new(big.Int).Lsh(big.NewInt(1), 256)
 
 	cases := []struct {
 		name string
@@ -189,6 +191,13 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 		{"a required extension missing", p.with(6, exts(p.extensionsByOID(t)[oidExtBasicConstraints.String()])).cert(t), "missing required extensions", ErrMalformed},
 		{"signature not a bit string", derSeq(t, p.tbs(t), p.alg, derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1})), "signature: ", ErrMalformed},
 		{"signature not an ECDSA-Sig-Value", derSeq(t, p.tbs(t), p.alg, derMust(t, asn1.BitString{Bytes: []byte{0xff}, BitLength: 8})), "not an ECDSA-Sig-Value", ErrMalformed},
+		// r or s wider than 32 bytes: a certificate arrives before it is
+		// trusted, so this is an error and never a panic (review II,
+		// R2-P1-sec-01).
+		{"signature r wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, wide, one)), "too many bytes", ErrMalformed},
+		{"signature s wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, one, wide)), "too many bytes", ErrMalformed},
+		{"signature r of 300 bits", derSeq(t, p.tbs(t), p.alg, derSigValue(t, new(big.Int).Lsh(big.NewInt(1), 300), one)), "too many bytes", ErrMalformed},
+		{"signature r not an INTEGER", derSeq(t, p.tbs(t), p.alg, derSigBits(t, derSeq(t, derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1}), derMust(t, one)))), "not an ECDSA-Sig-Value", ErrMalformed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -196,6 +205,52 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 			_, err := DecodeDER(tc.der)
 			if err == nil || !errors.Is(err, tc.is) || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("DecodeDER = %v, want %v containing %q", err, tc.is, tc.want)
+			}
+		})
+	}
+}
+
+// derSigBits wraps a DER ECDSA-Sig-Value in the certificate's signature
+// BIT STRING.
+func derSigBits(t *testing.T, sigValue []byte) []byte {
+	t.Helper()
+	return derMust(t, asn1.BitString{Bytes: sigValue, BitLength: 8 * len(sigValue)})
+}
+
+// derSigValue is the signature BIT STRING of SEQUENCE { r, s }.
+func derSigValue(t *testing.T, r, s *big.Int) []byte {
+	t.Helper()
+	return derSigBits(t, derMust(t, ecdsaSignature{R: r, S: s}))
+}
+
+// The signature's r and s are read as matter.js reads them: the
+// INTEGER's content bytes, 32 of them, 33 with a leading zero, fewer
+// padded to 32 (EcdsaSignature.ts:28-29, DerCodec.ts:303-318 at
+// db021da0) — so a negative INTEGER is its two's-complement bytes, not
+// its magnitude (review II, R2-P1-sec-01).
+func TestDecodeDERReadsSignatureIntegersAsTheirBytes(t *testing.T) {
+	t.Parallel()
+	p := derPartsOf(t, certificatesExternalDER(t, "RCAC"))
+	max256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	pad := func(b ...byte) []byte { return append(make([]byte, 32-len(b)), b...) }
+	cases := []struct {
+		name string
+		r, s *big.Int
+		want []byte
+	}{
+		{"short values padded", big.NewInt(1), big.NewInt(0x0203), slices.Concat(pad(1), pad(2, 3))},
+		{"33 bytes with a leading zero", max256, big.NewInt(0), slices.Concat(bytes.Repeat([]byte{0xff}, 32), pad(0))},
+		{"negative as its bytes", big.NewInt(-5), big.NewInt(1), slices.Concat(pad(0xfb), pad(1))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := DecodeDER(derSeq(t, p.tbs(t), p.alg, derSigValue(t, tc.r, tc.s)))
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if !bytes.Equal(c.Signature, tc.want) {
+				t.Fatalf("Signature = %x, want %x", c.Signature, tc.want)
 			}
 		})
 	}

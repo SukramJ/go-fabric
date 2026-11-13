@@ -5,6 +5,7 @@ package mattercert
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"reflect"
@@ -90,6 +91,46 @@ func FuzzDecode(f *testing.F) {
 
 		// Everything reachable from an accepted certificate has to be
 		// total as well — these run on attacker-supplied field values.
+		_, _ = cert.PublicKeyECDSA()
+		_, _ = TBSToDER(cert)
+		_ = cert.IsRoot()
+		_ = cert.IsICA()
+		_ = cert.IsNOC()
+	})
+}
+
+// FuzzDecodeDER drives [DecodeDER] with arbitrary bytes.
+//
+// DecodeDER is the entry point for a certificate of a PKI outside Matter
+// (an operator's RCAC/ICAC/NOC in X.509 DER), read before anything about
+// it is trusted. The asserted property is the one [FuzzDecode] asserts:
+// DecodeDER terminates and does not panic, and on an accepted input the
+// accessors reachable from the certificate are total too. Seeds are the
+// three external DER fixtures; testdata/fuzz/FuzzDecodeDER holds the
+// inputs that once crashed it (signature-r-of-300-bits: an ECDSA-Sig-Value
+// whose r is wider than 32 bytes, review II R2-P1-sec-01).
+func FuzzDecodeDER(f *testing.F) {
+	f.Add([]byte{})
+	f.Add([]byte{0x30, 0x00})
+	for _, kind := range []string{"RCAC", "ICAC", "NOC"} {
+		der, err := base64.StdEncoding.DecodeString(certificatesExternal[kind])
+		if err != nil {
+			f.Fatalf("%s: %v", kind, err)
+		}
+		f.Add(der)
+	}
+
+	f.Fuzz(func(t *testing.T, der []byte) {
+		cert, err := DecodeDER(der)
+		if err != nil {
+			return
+		}
+		if cert == nil {
+			t.Fatal("DecodeDER returned nil cert with nil error")
+		}
+		if len(cert.Signature) != 64 {
+			t.Fatalf("Signature is %d bytes, want 64", len(cert.Signature))
+		}
 		_, _ = cert.PublicKeyECDSA()
 		_, _ = TBSToDER(cert)
 		_ = cert.IsRoot()
