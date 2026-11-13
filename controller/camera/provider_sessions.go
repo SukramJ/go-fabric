@@ -246,6 +246,13 @@ type providerSessions struct {
 
 	mu     sync.Mutex
 	offers map[providerKey]string
+	// owners is the identity of the session each key's offer and
+	// requestor entry were recorded for, guarded by mu; recordMu orders
+	// that recording against an end applied by identity, so a late end
+	// of an older session under the id cannot remove a newer one's
+	// (review II, R2-P1-cam-b-02).
+	owners   map[providerKey]*lifecycle
+	recordMu sync.Mutex
 }
 
 func (p *providerSessions) key(t target, id uint16) providerKey {
@@ -279,7 +286,43 @@ func (p *providerSessions) offerOf(k providerKey) (string, bool) {
 func (p *providerSessions) sessionEnded(k providerKey) {
 	p.mu.Lock()
 	delete(p.offers, k)
+	delete(p.owners, k)
 	p.mu.Unlock()
+}
+
+// own records whose session the key's offer and requestor entry are; nil
+// is a session no registration names. The caller holds recordMu.
+func (p *providerSessions) own(k providerKey, life *lifecycle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if life == nil {
+		delete(p.owners, k)
+		return
+	}
+	if p.owners == nil {
+		p.owners = map[providerKey]*lifecycle{}
+	}
+	p.owners[k] = life
+}
+
+// ownedByOther reports whether the key's records belong to another
+// session than life. The caller holds recordMu.
+func (p *providerSessions) ownedByOther(k providerKey, life *lifecycle) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	o := p.owners[k]
+	return o != nil && o != life
+}
+
+// sessionEndedOf is sessionEnded for the session life names: the records
+// of a newer session under the id stay.
+func (p *providerSessions) sessionEndedOf(k providerKey, life *lifecycle) {
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
+	if p.ownedByOther(k, life) {
+		return
+	}
+	p.sessionEnded(k)
 }
 
 // trackedSessionOf is the requestor's entry for the session on the
@@ -307,6 +350,18 @@ func (p *providerSessions) tracks(k providerKey) bool {
 // packages/ws-controller/src/controller/WebRtcProviderSessions.ts:181-233
 // at 0bd06f2.
 func (p *providerSessions) establish(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16)) (any, error) {
+	return p.establishOwned(ctx, t, fields, func(id uint16) *lifecycle {
+		if establishing != nil {
+			establishing(id)
+		}
+		return nil
+	})
+}
+
+// establishOwned is establish whose establishing returns the identity of
+// the session it registered under the id, recorded with the session's
+// offer and requestor entry.
+func (p *providerSessions) establishOwned(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16) *lifecycle) (any, error) {
 	revision, known, err := p.nodes.providerRevision(t)
 	if err != nil {
 		return nil, err
@@ -434,7 +489,7 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // 0bd06f2); on Node the response's continuation runs to its end before the
 // Answer's datagram is decoded — a runtime property Go's scheduling does
 // not have, so the registration moves to the arrival (issue 464).
-func (p *providerSessions) newSession(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16)) (any, error) {
+func (p *providerSessions) newSession(ctx context.Context, t target, fields spec.Encodable, establishing func(uint16) *lifecycle) (any, error) {
 	a := &arrivedSession{p: p, t: t, fields: fields, establishing: establishing}
 	// An arrival after newSession returned registers nothing: no one would
 	// own the session.
@@ -490,7 +545,7 @@ type arrivedSession struct {
 	p            *providerSessions
 	t            target
 	fields       spec.Encodable
-	establishing func(uint16)
+	establishing func(uint16) *lifecycle
 
 	mu        sync.Mutex
 	learned   bool
@@ -515,14 +570,19 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	a.learned, a.id = true, id
 	a.session, a.trackable = a.p.trackableSession(a.t, a.fields, resp)
+	var life *lifecycle
 	if a.establishing != nil {
-		a.establishing(id)
+		life = a.establishing(id)
 	}
 	if !a.trackable {
 		return
 	}
+	a.p.recordMu.Lock()
+	defer a.p.recordMu.Unlock()
+	k := a.p.key(a.t, id)
+	a.p.own(k, life)
 	if po, ok := a.fields.(wpdef.ProvideOfferRequest); ok {
-		a.withdraw = a.p.offerSent(a.p.key(a.t, id), po.Sdp)
+		a.withdraw = a.p.offerSent(k, po.Sdp)
 	}
 	a.upsertErr = a.p.requestor.upsert(a.session)
 	a.held = a.upsertErr == nil
@@ -601,6 +661,18 @@ func (p *providerSessions) removeTracked(t target, id uint16) {
 		p.requestor.remove(wrdef.KeyOf(s))
 	}
 	p.sessionEnded(k)
+}
+
+// removeTrackedOf is removeTracked for the session life names, applied
+// when a report dropped it — possibly after the camera handed its id to a
+// newer session, whose requestor entry and offer stay.
+func (p *providerSessions) removeTrackedOf(t target, id uint16, life *lifecycle) {
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
+	if p.ownedByOther(p.key(t, id), life) {
+		return
+	}
+	p.removeTracked(t, id)
 }
 
 // abandon stops tracking a session this controller gave up and could not

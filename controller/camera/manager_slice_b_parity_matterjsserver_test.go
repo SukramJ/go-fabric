@@ -1530,7 +1530,7 @@ func TestSliceBSessionsRegistryParityMatterjsServer(t *testing.T) {
 		})
 		if _, err := m.startStream(sliceBCtx, sliceBArgs(videoOffer, func(a *startArgs) {
 			sliceBVideoOnly(a)
-			a.establishing = func(id uint16) { seen = append(seen, fmt.Sprintf("establishing %d", id)) }
+			a.establishing = func(id uint16, _ *lifecycle) { seen = append(seen, fmt.Sprintf("establishing %d", id)) }
 		})); err != nil {
 			t.Fatal(err)
 		}

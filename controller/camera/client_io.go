@@ -170,7 +170,7 @@ func (io *clientIO) invoke(ctx context.Context, call deviceCall) (any, error) {
 	case callProvideOffer, callSolicitOffer:
 		// The local requestor must hold the session: it answers NotFound
 		// to the Answer and ICECandidates of a session it never stored.
-		return io.svc.ps.establish(ctx, call.target, call.fields, call.establishing)
+		return io.svc.ps.establishOwned(ctx, call.target, call.fields, call.establishing)
 	case callEndSession:
 		req, _ := call.fields.(wpdef.EndSessionRequest)
 		id := req.WebRtcSessionId

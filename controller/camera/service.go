@@ -206,7 +206,7 @@ func (s *Service) wire() {
 		}
 	}
 	s.m.onVanished = func(ms managedSession, _ sessionEndCause) {
-		s.ps.removeTracked(target{ms.nodeID, ms.endpointID}, ms.webRTCSessionID)
+		s.ps.removeTrackedOf(target{ms.nodeID, ms.endpointID}, ms.webRTCSessionID, ms.life)
 	}
 }
 
@@ -331,13 +331,21 @@ func (s *Service) Release(ctx context.Context, owner string) {
 }
 
 // sessionEnded announces an end: to the session's Signals, closed after
-// the signals before it, and to the observer.
+// the signals before it, and to the observer. The registry can deliver an
+// end late, after the camera handed the id to a newer session: the end
+// acts on the session it names (e.life) and leaves a newer session under
+// the id — its Signals, its recorded offer — alone (review II,
+// R2-P1-cam-b-02).
 func (s *Service) sessionEnded(e cameraSessionEnded) {
 	k := sessionKey{e.nodeID, e.endpointID, e.webRTCSessionID}
-	s.ps.sessionEnded(s.ps.key(target{e.nodeID, e.endpointID}, e.webRTCSessionID))
+	s.ps.sessionEndedOf(s.ps.key(target{e.nodeID, e.endpointID}, e.webRTCSessionID), e.life)
 	s.mu.Lock()
 	sess := s.sessions[k]
-	delete(s.sessions, k)
+	if sess != nil && sess.life == e.life {
+		delete(s.sessions, k)
+	} else {
+		sess = nil
+	}
 	s.mu.Unlock()
 	if sess != nil {
 		sess.box.close()

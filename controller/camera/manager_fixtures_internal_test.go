@@ -87,7 +87,7 @@ type recordedInvoke struct {
 	command      string
 	fields       spec.Encodable
 	t            target
-	establishing func(uint16)
+	establishing func(uint16) *lifecycle
 }
 
 // fakeIO is the managerWith camera (CameraStreamManagerTest.ts:192-269,
@@ -190,7 +190,12 @@ func managerWith(state *cameraState, respond func(*recordedInvoke) (any, error))
 func endingsOf(m *manager) func() []cameraSessionEnded {
 	var mu sync.Mutex
 	var seen []cameraSessionEnded
-	m.onEnded = func(e cameraSessionEnded) { mu.Lock(); seen = append(seen, e); mu.Unlock() }
+	m.onEnded = func(e cameraSessionEnded) {
+		e.life = nil // the identity is compared by the cases that name it
+		mu.Lock()
+		seen = append(seen, e)
+		mu.Unlock()
+	}
 	return func() []cameraSessionEnded {
 		mu.Lock()
 		defer mu.Unlock()

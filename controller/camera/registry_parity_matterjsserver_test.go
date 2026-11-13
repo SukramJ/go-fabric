@@ -5,7 +5,6 @@ package camera
 
 import (
 	"context"
-	"reflect"
 	"slices"
 	"testing"
 )
@@ -40,6 +39,13 @@ func ids(set ...uint16) map[uint16]bool {
 	return m
 }
 
+// sameSession compares two sessions apart from their identity, which the
+// registry sets when it tracks one.
+func sameSession(a, b managedSession) bool {
+	a.life, b.life = nil, nil
+	return a == b
+}
+
 // TestSessionRegistryClientKeysParityMatterjsServer is the top-level cases of
 // describe("CameraSessionRegistry client session keys")
 // (SessionRegistryClientKeyTest.ts:35-147, matterjs-server at 0bd06f2).
@@ -55,7 +61,7 @@ func TestSessionRegistryClientKeysParityMatterjsServer(t *testing.T) {
 		}
 		for _, when := range []string{"before finish", "after finish"} {
 			got, ok := r.byClientKey(regNode, regEndpoint, "conn-1", "key-a")
-			if !ok || got.pending != nil || got.session == nil || !reflect.DeepEqual(*got.session, session) {
+			if !ok || got.pending != nil || got.session == nil || !sameSession(*got.session, session) {
 				t.Errorf("%s: byClientKey = %+v, %v; want the tracked session", when, got, ok)
 			}
 			r.finish(p)
@@ -140,7 +146,7 @@ func TestSessionRegistryClientKeysParityMatterjsServer(t *testing.T) {
 		r.establishing(p, 42)
 		session := sessionOf(42, "conn-1", "key-a", regNode, regEndpoint)
 		r.track(p, session)
-		if got, ok := r.byClientKey(regNode, regEndpoint, "conn-1", "key-a"); !ok || got.session == nil || !reflect.DeepEqual(*got.session, session) {
+		if got, ok := r.byClientKey(regNode, regEndpoint, "conn-1", "key-a"); !ok || got.session == nil || !sameSession(*got.session, session) {
 			t.Errorf("byClientKey = %+v, %v; want the session", got, ok)
 		}
 		checkOtherScopes()

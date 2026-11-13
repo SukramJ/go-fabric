@@ -50,10 +50,12 @@ const (
 // 0bd06f2.
 type deviceCall struct {
 	target
-	cluster      callCluster
-	command      string
-	fields       spec.Encodable
-	establishing func(sessionID uint16)
+	cluster callCluster
+	command string
+	fields  spec.Encodable
+	// establishing hears the id at its arrival and returns the identity of
+	// the session it registered under it.
+	establishing func(sessionID uint16) *lifecycle
 }
 
 // DeviceSession is one entry of a camera's CurrentSessions (§11.5.5.1),

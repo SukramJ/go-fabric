@@ -44,9 +44,11 @@ type startArgs struct {
 	icePolicy    *string
 	metadata     bool
 	// allowEviction defaults to true in the request; here it is stated.
-	allowEviction    bool
-	talkback         bool
-	establishing     func(sessionID uint16)
+	allowEviction bool
+	talkback      bool
+	// establishing hears the id and the identity of the session the
+	// registry knows under it.
+	establishing     func(sessionID uint16, life *lifecycle)
 	clientSessionKey string
 }
 
@@ -312,11 +314,12 @@ func (m *manager) invokeEstablishingOffer(ctx context.Context, pending *pendingS
 	if audio != nil {
 		audioStreams = &[]uint16{audio.streamID}
 	}
-	call := deviceCall{target: args.t, cluster: clusterProvider, establishing: func(id uint16) {
-		m.sessions.establishing(pending, id)
+	call := deviceCall{target: args.t, cluster: clusterProvider, establishing: func(id uint16) *lifecycle {
+		life := m.sessions.establishing(pending, id)
 		if args.establishing != nil {
-			args.establishing(id)
+			args.establishing(id, life)
 		}
+		return life
 	}}
 	if offer == nil {
 		call.command = callSolicitOffer

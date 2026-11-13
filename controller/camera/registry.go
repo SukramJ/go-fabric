@@ -469,13 +469,15 @@ func (r *sessionRegistry) claimRefusalLocked(p *pendingSession) trackRefusal {
 // camera lost (it numbers sessions from 0 again after a reboot), handled as
 // issued does. Mirrors matterjs-server
 // packages/ws-controller/src/camera/sessionRegistry.ts:203-212 at 0bd06f2.
-func (r *sessionRegistry) establishing(p *pendingSession, sessionID uint16) {
+func (r *sessionRegistry) establishing(p *pendingSession, sessionID uint16) *lifecycle {
 	r.mu.Lock()
 	defer r.unlock()
 	r.issuedLocked(p.scope.nodeID, p.scope.endpointID, sessionID, p)
 	if record, ok := r.pending[p]; ok {
 		record.life.sessionID, record.life.hasID = sessionID, true
+		return record.life
 	}
+	return nil
 }
 
 // issued records that the camera handed the id to a session another route
@@ -552,6 +554,7 @@ func (r *sessionRegistry) track(p *pendingSession, session managedSession) track
 		return refusalAlreadyEnded
 	}
 	life.sessionID, life.hasID = session.webRTCSessionID, true
+	session.life = life
 	life.session = &session
 	r.setTracked(sessionKey{session.nodeID, session.endpointID, session.webRTCSessionID}, life)
 	return trackAccepted
@@ -655,7 +658,7 @@ func (r *sessionRegistry) end(ctx context.Context, life *lifecycle, k sessionKey
 		return invokeEndSession(ctx, send, func(deviceHeldSession bool) {
 			if deviceHeldSession {
 				r.mu.Lock()
-				r.announceEnd(k, end, nil)
+				r.announceEnd(k, end, nil, nil)
 				r.unlock()
 			}
 		})
@@ -695,7 +698,7 @@ func (r *sessionRegistry) endSessionAnswered(life *lifecycle, k sessionKey, end 
 	}
 	life.over = true
 	if deviceHeldSession && end.cause != endReleased {
-		r.announceEnd(k, end, nil)
+		r.announceEnd(k, end, nil, life)
 	}
 }
 
@@ -827,14 +830,14 @@ func (r *sessionRegistry) close(life *lifecycle, end sessionEnd) {
 	if r.tracked[k] == life {
 		r.deleteTracked(k)
 	}
-	r.announceEnd(k, end, session)
+	r.announceEnd(k, end, session, life)
 }
 
 // announceEnd queues the announcement of an end; without an owner the
 // route tells every camera-aware connection. Mirrors matterjs-server
 // packages/ws-controller/src/camera/sessionRegistry.ts:480-496 at 0bd06f2.
-func (r *sessionRegistry) announceEnd(k sessionKey, end sessionEnd, owner *managedSession) {
-	ended := cameraSessionEnded{sessionEnd: end, nodeID: k.nodeID, endpointID: k.endpointID, webRTCSessionID: k.sessionID}
+func (r *sessionRegistry) announceEnd(k sessionKey, end sessionEnd, owner *managedSession, life *lifecycle) {
+	ended := cameraSessionEnded{sessionEnd: end, life: life, nodeID: k.nodeID, endpointID: k.endpointID, webRTCSessionID: k.sessionID}
 	if owner != nil {
 		ended.ownerID, ended.clientSessionKey = owner.connectionID, owner.clientSessionKey
 	}

@@ -198,6 +198,11 @@ type managedSession struct {
 	// and audio stream ids, which the stream manager (phase 37 wave C)
 	// keeps.
 	clientSessionKey string
+	// life is the session's identity: the registration that tracks it.
+	// The camera can hand its id to a newer session, so a callback
+	// delivered late acts on the session it names, not on the id (review
+	// II, R2-P1-cam-b-02).
+	life *lifecycle
 }
 
 // sessionEndCause says why a tracked session ended. Mirrors matterjs-server
@@ -243,6 +248,9 @@ type sessionEnd struct {
 // at 0bd06f2.
 type cameraSessionEnded struct {
 	sessionEnd
+	// life is the ended session's identity (managedSession.life); nil for
+	// an id no registration named.
+	life            *lifecycle
 	nodeID          uint64
 	endpointID      uint16
 	webRTCSessionID uint16

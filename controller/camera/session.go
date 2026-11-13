@@ -177,6 +177,10 @@ type Session struct {
 	svc *Service
 	t   target
 	box *mailbox
+	// life is the session's identity in the manager's registry: an end
+	// announced for another session that had the same id leaves this one
+	// alone (review II, R2-P1-cam-b-02).
+	life *lifecycle
 }
 
 // Signals is the camera's signalling of the session.
@@ -380,11 +384,12 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 	}
 	sess := &Session{Node: req.Node, Endpoint: req.Endpoint, Owner: req.Owner, Key: req.Key, svc: s, t: args.t, box: newMailbox(s.life)} //nolint:contextcheck // the mailbox lives as long as the service, not the call
 	var registered *sessionKey
-	args.establishing = func(id uint16) {
+	args.establishing = func(id uint16, life *lifecycle) {
 		k := sessionKey{args.t.nodeID, args.t.endpointID, id}
 		registered = &k
 		sess.ID = id
 		s.mu.Lock()
+		sess.life = life
 		s.sessions[k] = sess
 		s.mu.Unlock()
 	}
