@@ -1129,6 +1129,11 @@ func (s *EvseServer) enabledStateExpirationLocked(now uint32) {
 func (s *EvseServer) enabledTimerExpired() {
 	s.lock()
 	defer s.unlock()
+	if s.enabledTimer == nil {
+		// Stopped after it fired, before it got the lock (MatterQuiesce,
+		// Close): it neither checks nor arms again.
+		return
+	}
 	s.enabledTimer = nil
 	s.scheduleEnabledCheckLocked()
 }
@@ -1380,6 +1385,14 @@ func (s *EvseServer) Close() {
 	defer s.unlock()
 	s.stopEnabledTimerLocked()
 }
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. It stops the enabled-until
+// timer — the deadline and the 30-s re-check of a node without a time —
+// so the server neither disables the supply nor tells its host or emits
+// an event afterwards. The server stays usable: the next EnableCharging or
+// EnableDischarging arms the timer again.
+func (s *EvseServer) MatterQuiesce() { s.Close() }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *EvseServer) SetMatterEventEmitter(emitter contract.EventEmitter) {

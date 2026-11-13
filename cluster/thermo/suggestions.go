@@ -527,6 +527,14 @@ func (s *ThermostatServer) armSuggestionTimerLocked(now, wake uint32) {
 func (s *ThermostatServer) suggestionTimerFired() {
 	s.op.Lock()
 	defer s.op.Unlock()
+	s.mu.Lock()
+	stopped := s.suggest.timer == nil && !s.suggest.pending
+	s.mu.Unlock()
+	if stopped {
+		// Stopped after it fired, before it got the queue: MatterQuiesce, or
+		// a re-evaluation that found nothing due.
+		return
+	}
 	s.reevaluateSuggestions(contract.WithOrigin(context.Background(), contract.OriginCommand))
 }
 

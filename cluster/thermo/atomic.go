@@ -208,6 +208,18 @@ func (w *atomicWrites) closeFabric(fabricIndex uint8, log *slog.Logger) {
 	}
 }
 
+// closeAll closes every state — matter.js AtomicWriteHandler.close
+// (AtomicWriteHandler.ts:84-89), which ThermostatServer's
+// [Symbol.asyncDispose] runs (ThermostatServer.ts:1582-1585).
+func (w *atomicWrites) closeAll() {
+	w.mu.Lock()
+	all := slices.Clone(w.states)
+	w.mu.Unlock()
+	for _, s := range all {
+		s.close()
+	}
+}
+
 // isOperationalNodeID reports whether id is an operational node id
 // (0x0000_0000_0000_0001 to 0xFFFF_FFEF_FFFF_FFFF, Matter Core §2.5.5.1;
 // matter.js NodeId.isOperationalNodeId).

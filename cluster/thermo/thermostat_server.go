@@ -1845,6 +1845,26 @@ func (s *ThermostatServer) MatterAttributes() []uint32 { return s.inst.MatterAtt
 // the selection emits (servedEvents), none without TEVT.
 func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. It stops the
+// ThermostatSuggestions timer and drops a scheduled re-evaluation, so no
+// suggestion activates a preset on the host's Sink or reports a change
+// afterwards, and it closes every atomic write in progress with its
+// timeout, as matter.js's [Symbol.asyncDispose] closes the
+// AtomicWriteHandler (ThermostatServer.ts:1582-1585,
+// AtomicWriteHandler.ts:84-89). The server stays usable: the next
+// command or MatterTimeChanged arms the suggestion timer again.
+func (s *ThermostatServer) MatterQuiesce() {
+	s.mu.Lock()
+	if s.suggest.timer != nil {
+		s.suggest.timer.Stop()
+		s.suggest.timer = nil
+	}
+	s.suggest.pending = false
+	s.mu.Unlock()
+	s.atomic.closeAll()
+}
+
 // thermoConstraintErr is a typed [im.StatusCodeError] returned when a
 // setpoint or SystemMode write violates limit constraints.
 // Mirrors matter.js ThermostatServer.ts:#assertSetpointWithinLimits and
