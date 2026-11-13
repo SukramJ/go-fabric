@@ -205,6 +205,19 @@ func (s StatusIB) MarshalTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	_ = enc.EndContainer()
 }
 
+// statusIBField returns a StatusIB's Status or ClusterStatus: an unsigned
+// integer of at most 8 bits. A wider value is refused, never masked — a
+// masked 0x100 would read as Success. chip refuses it the same way
+// (src/app/MessageDef/StatusIB.cpp:55-60 with
+// src/lib/core/TLVReader.cpp:204-214 at 6170af84,
+// CHIP_ERROR_INVALID_INTEGER_VALUE); matter.js reads both as a 32-bit enum
+// (packages/types/src/protocol/types/TlvStatus.ts:15-16,
+// packages/types/src/tlv/TlvNumber.ts:303 at db021da0) and keeps the
+// number, which the 8-bit [StatusCode] cannot.
+func statusIBField(el tlv.Element) (uint8, error) {
+	return uint8Field(el)
+}
+
 // UnmarshalStatusIBTLV decodes a StatusIB from the next element in
 // the decoder.
 func UnmarshalStatusIBTLV(dec *tlv.Decoder) (StatusIB, error) {
@@ -233,10 +246,16 @@ func UnmarshalStatusIBTLV(dec *tlv.Decoder) (StatusIB, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagStatusIBStatus:
-			sib.Status = StatusCode(el.Uint & 0xFF)
+			status, err := statusIBField(el)
+			if err != nil {
+				return StatusIB{}, fmt.Errorf("%w: %w", ErrInvalidStatusIB, err)
+			}
+			sib.Status = StatusCode(status)
 			sawStatus = true
 		case tagStatusIBClusterStatus:
-			sib.ClusterStatus = uint8(el.Uint & 0xFF)
+			if sib.ClusterStatus, err = statusIBField(el); err != nil {
+				return StatusIB{}, fmt.Errorf("%w: %w", ErrInvalidStatusIB, err)
+			}
 			sib.HasClusterStatus = true
 		}
 	}

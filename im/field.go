@@ -90,6 +90,15 @@ func uintField(el tlv.Element, maxValue uint64) (uint64, error) {
 	return el.Uint, nil
 }
 
+// uint8Field is [uintField] bounded by the uint8 range.
+func uint8Field(el tlv.Element) (uint8, error) {
+	v, err := uintField(el, math.MaxUint8)
+	if err != nil || v > math.MaxUint8 {
+		return 0, err
+	}
+	return uint8(v), nil
+}
+
 // uint16Field is [uintField] bounded by the uint16 range.
 func uint16Field(el tlv.Element) (uint16, error) {
 	v, err := uintField(el, math.MaxUint16)
