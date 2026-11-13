@@ -126,6 +126,15 @@ type OperationalCredentials struct {
 	// fabric; TC-OPCREDS-3.5 step 10).
 	pendingUpdateRevert *nocUpdateRevert
 
+	// nocMu serialises AddNOC and UpdateNOC with the fail-safe's rollback
+	// (OnFailSafeExpiry) and commit (ClearPendingState): an expiry that
+	// fires while a NOC command is between its fail-safe check and
+	// recording what it wrote waits for the command and then reverts it,
+	// instead of finding nothing to revert and leaving the command to
+	// install outside any fail-safe (review II, R2-P1-core-03). matter.js
+	// runs both on one thread. Taken before mu, never under it.
+	nocMu sync.Mutex
+
 	// pendingNOCMarkerOut records that this server wrote the durable
 	// marker of the two fields above ([pendingNOCSettingKey]) and has not
 	// cleared it yet.
@@ -632,6 +641,8 @@ type nocUpdateRevert struct {
 // that hook): the durable marker of a pending AddNOC / UpdateNOC goes
 // with the memory state, so a later restart keeps what was committed.
 func (o *OperationalCredentials) ClearPendingState() {
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	o.mu.Lock()
 	o.clearPendingState()
 	o.mu.Unlock()
@@ -655,6 +666,8 @@ func (o *OperationalCredentials) ClearPendingState() {
 // It is also safe to call from any other expiry path — it is idempotent
 // and acquires its own lock.
 func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) {
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	o.mu.Lock()
 	fabricToRevert := o.pendingInstallFabricIndex
 	updateRevert := o.pendingUpdateRevert
@@ -1714,6 +1727,10 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if !isOperationalAdminVendorID(req.AdminVendorID) {
 		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("core: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
 	}
+	// From the fail-safe check to the pending record, one with the
+	// rollback (nocMu).
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
@@ -2116,6 +2133,10 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	if !ok {
 		return nil, fmt.Errorf("%w: UpdateNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
+	// From the fail-safe check to the pending record, one with the
+	// rollback (nocMu).
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	// Matter §11.18.6.9 requires Status::FailsafeRequired when UpdateNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:HandleUpdateNOC FailSafe check.

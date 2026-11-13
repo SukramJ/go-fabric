@@ -207,6 +207,13 @@ func testRestartRevertsAddNOC(t *testing.T, open func(*testing.T) restartStore) 
 // accepts any AddNOC answer: a crash inside AddNOC fails it.
 func commissionTestFabricTolerant(ctx context.Context, t *testing.T, oc *core.OperationalCredentials) {
 	t.Helper()
+	_, _ = oc.MatterInvoke(ctx, 0x06, prepareAddNOC(ctx, t, oc))
+}
+
+// prepareAddNOC runs AddTrustedRootCertificate and CSRRequest on oc and
+// returns the AddNOC request for a NOC minted over the pending key.
+func prepareAddNOC(ctx context.Context, t *testing.T, oc *core.OperationalCredentials) core.AddNOCRequest {
+	t.Helper()
 	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -216,13 +223,12 @@ func commissionTestFabricTolerant(ctx context.Context, t *testing.T, oc *core.Op
 		t.Fatalf("AddTrustedRootCertificate: %v", err)
 	}
 	pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
-	nocRaw := buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID)
-	_, _ = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue:         nocRaw,
+	return core.AddNOCRequest{
+		NOCValue:         buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID),
 		IPKValue:         make([]byte, 16),
 		CaseAdminSubject: 0xABCD,
 		AdminVendorID:    0x1234,
-	})
+	}
 }
 
 // TestOpcreds_RestartAfterCommissioningComplete_KeepsFabric is the
