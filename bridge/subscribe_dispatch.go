@@ -306,6 +306,19 @@ func (b *Bridge) registerSubscription(
 	return subID, nil
 }
 
+// latestEventNumber is the highest number of the events reports carries
+// with their data; false when it carries none.
+func latestEventNumber(reports []im.EventReport) (uint64, bool) {
+	var latest uint64
+	found := false
+	for _, r := range reports {
+		if !r.IsStatus && (!found || r.Number > latest) {
+			latest, found = r.Number, true
+		}
+	}
+	return latest, found
+}
+
 // subscriptionPeerNodeID names the peer a subscribe came from: the
 // subject node id of the secure session it rode on. The source node id a
 // secure frame's header may carry is chosen by the sender and not bound to
@@ -577,6 +590,11 @@ func (b *Bridge) sendSubscribeResponse(
 	// primer above.
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
 		if sub, err := m.Get(subID); err == nil {
+			// The events the priming report carried are not owed again
+			// (review II, R2-P1-req2-03).
+			if latest, ok := latestEventNumber(initialReport.EventReports); ok {
+				sub.PrimedEvents(latest)
+			}
 			sub.EndPriming(b.clk().Now())
 		}
 	}
