@@ -211,13 +211,16 @@ func (r *probeRig) probe(t *testing.T, wait time.Duration) {
 func (r *probeRig) finish(t *testing.T, err error) error {
 	t.Helper()
 	r.release <- err
-	select {
-	case got := <-r.result:
-		return got
-	case <-time.After(10 * time.Second):
-		t.Fatal("the Reconnect step did not return")
-		return nil
-	}
+	var got error
+	eventually(t, "the Reconnect step to return", func() bool {
+		select {
+		case got = <-r.result:
+			return true
+		default:
+			return false
+		}
+	})
+	return got
 }
 
 func ptr[T any](v T) *T { return &v }

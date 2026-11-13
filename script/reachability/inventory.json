@@ -25881,49 +25881,49 @@
       "identifier": "TestReconnectProbeFailureNamesAddresses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 337
+      "line": 340
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbeFailureNamesReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 313
+      "line": 316
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbeHintsRoutableAddresses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 251
+      "line": 254
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbeNotConcurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 403
+      "line": 406
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbePathsFollowServerList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 418
+      "line": 421
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbeSessionClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 385
+      "line": 388
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestReconnectProbeSilentDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
-      "line": 356
+      "line": 359
     },
     {
       "package": "controller/commissioner",
