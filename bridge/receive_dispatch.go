@@ -416,14 +416,17 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
 	// same way reads do via [im.FabricFilterFromContext]. Without
-	// this stamp AccessControl.MatterWrite falls back to fabric=1
-	// (last resort) and Apple's post-CommissioningComplete ACL
-	// update — which carries the new Resident NodeID + CAT subjects
-	// — never reaches the requesting fabric. Apple then reads the
-	// ACL from its own fabric on the Subscribe-Initial, sees only
-	// the pre-existing case_admin_subject entry, classifies the
-	// bridge as missing Administer privilege, and tears the pair
-	// down with the iOS "accessory could not be added" dialog.
+	// this stamp the write has no accessing fabric and is refused
+	// with UNSUPPORTED_ACCESS — by the write handler's gate for a
+	// fabric-scoped attribute (im/write.go, hasAccessingFabric) and
+	// by AccessControl's own writeFabric — so Apple's
+	// post-CommissioningComplete ACL update — which carries the new
+	// Resident NodeID + CAT subjects — never reaches the requesting
+	// fabric. Apple then reads the ACL from its own fabric on the
+	// Subscribe-Initial, sees only the pre-existing case_admin_subject
+	// entry, classifies the bridge as missing Administer privilege, and
+	// tears the pair down with the iOS "accessory could not be added"
+	// dialog.
 	// Mirrors the Invoke pathway below.
 	writeFabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
 	writeSubjectNodeID, writeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)

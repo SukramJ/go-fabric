@@ -659,14 +659,17 @@ func (a *AccessControl) writeFabric(ctx context.Context, attr string, entryFabri
 	return fabric, nil
 }
 
-// MatterWrite handles writes to the cluster's writable attributes.
-// The only writable attribute today is ACL (0x0000) — Apple Home
-// rewrites the entire list ~10 ms after CommissioningComplete to
-// install HomePod / AppleTV edge controllers as additional Administer
-// subjects on the freshly-paired bridge. Without a working write path
-// Apple times out after 10 s and tears the fabric down via
-// RemoveFabric. Extension (0x0001) is not implemented — matter.js does
-// the same and Apple does not write it.
+// MatterWrite handles writes to the cluster's writable attributes: ACL
+// (0x0000) and Extension (0x0001), each a fabric-scoped list the write
+// replaces for the accessing fabric (writeFabric); any other attribute
+// is refused. Apple Home rewrites the entire ACL ~10 ms after
+// CommissioningComplete to install HomePod / AppleTV edge controllers
+// as additional Administer subjects on the freshly-paired bridge.
+// Without a working write path Apple times out after 10 s and tears the
+// fabric down via RemoveFabric. An Extension write is held to matter.js's
+// checks — at most one entry for the fabric, its Data a well-formed TLV
+// list (AccessControlServer.ts:344-362, :416-434 at db021da0) — and to
+// the model's 128 bytes of Data (access-control.element.ts:206).
 func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value any) error { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)

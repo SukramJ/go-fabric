@@ -63,10 +63,13 @@ builds on `controller.New`: it composes its trust set
 (`attestation.Trust` over the DCL snapshot and the online ledger) into
 `Attestation`, opens its CA key file into `CAKey` and its socket into
 `Listener`, and pairs through `Controller.Pair`, over BLE with
-`PairOptions.BLE`; its own node is reached through `Peers` and
-`Commissioner().Interaction`.
+`PairOptions.BLE`. It runs no second node: its `group` commands send as
+the controller's own identity (`Controller.Groups`) and `ota serve` serves
+images from the controller's own tree (`Config.OTA`), both under
+`Fabric().RootNodeID` — the "own node" of earlier releases was retired
+in v0.18.0.
 
-*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:114-190`, `examples/reference-controller/cli/pair.go` (`cmdPair`), `examples/quickstart-controller/main.go`.*
+*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go` (`openStack`), `examples/reference-controller/cli/self.go`, `examples/reference-controller/cli/group.go` (`Controller.Groups`), `examples/reference-controller/cli/pair.go` (`cmdPair`), `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -972,4 +975,4 @@ stages. Group messages and OTA images come from the controller's own
 identity (`Controller.Groups`, `Controller.SetGroupKey`, `Config.OTA`); the
 reference controller's `group` and `ota` commands use them.
 
-*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `controller/ota_provider.go`, `controller/groups.go`, `controller/serve.go`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*
+*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `controller/ota_provider.go`, `controller/groups.go`, `controller/serve.go`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own identity).*
