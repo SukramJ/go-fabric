@@ -442,10 +442,12 @@ func (s *Service) signalsOverflowed(sess *Session, t target, id uint16) {
 	}()
 }
 
-// nodeRemoved forgets a node that left the fabric.
+// nodeRemoved forgets a node that left the fabric: its sessions, provider
+// records, leases and last reports.
 func (s *Service) nodeRemoved(nodeID uint64) {
 	s.ps.nodeRemoved(nodeID)
 	s.m.sessions.forgetNode(nodeID)
+	s.m.forgetNode(nodeID)
 	s.mu.Lock()
 	for k := range s.lastSeen {
 		if k.nodeID == nodeID {
