@@ -15,6 +15,29 @@ import (
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
 
+// TestNodeListenFlagIsDeprecatedNotRemoved (review II, the class of
+// R2-P0-doc-C04; phase-0-fix-w4w5 "Noticed" 1):
+// --node-listen has had no effect since the second node was retired
+// (v0.18.0); until its removal it is still accepted, so a script that
+// passes it runs, and its help says what it is.
+func TestNodeListenFlagIsDeprecatedNotRemoved(t *testing.T) {
+	t.Parallel()
+	fs := flag.NewFlagSet("reference-controller", flag.ContinueOnError)
+	defaultOptions().register(fs)
+	f := fs.Lookup("node-listen")
+	if f == nil {
+		t.Fatal("--node-listen is gone: removing it is a CLI break")
+	}
+	for _, want := range []string{"deprecated", "no effect since v0.18.0", "will be removed"} {
+		if !strings.Contains(f.Usage, want) {
+			t.Errorf("--node-listen help %q lacks %q", f.Usage, want)
+		}
+	}
+	if err := fs.Parse([]string{"--node-listen", "127.0.0.1:0", "nodes"}); err != nil {
+		t.Fatalf("--node-listen is no longer accepted: %v", err)
+	}
+}
+
 // TestArguments: the argument errors every command reports before it
 // opens anything, and the parsers behind them.
 func TestArguments(t *testing.T) {

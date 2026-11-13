@@ -34,7 +34,7 @@ They go before or after the command.
 | `--attestation accept\|reject\|ask` | `ask` on a terminal, `reject` otherwise | What an attestation finding does to a pairing. |
 | `--log-level debug\|info\|warn\|error` | `warn` | The log, as `slog` text on stderr. |
 | `--listen <addr>` | `[::]:0` | The controller's UDP socket. |
-| `--node-listen <addr>` | `[::]:0` | The UDP socket of the controller's own node (group sender, OTA provider). |
+| `--node-listen <addr>` | `[::]:0` | Deprecated: accepted, without effect since v0.18.0, which retired the controller's second node — the group sender and the OTA provider use the controller's socket (`--listen`). The flag will be removed. |
 | `--timeout <duration>` | `60s` | How long a command waits for the network (a bare number is seconds). |
 | `--ca-key file:<path>` | unset | The CA root key in a passphrase-encrypted key file instead of the database; the passphrase comes from `GOFABRIC_KEY_PASSPHRASE`. A missing file is created: with the root key the database holds (which then leaves the database), or a new key for a new database. Every later run needs the flag. |
 
@@ -146,8 +146,8 @@ its error on stderr.
 - `group create <id> --key <hex|random> --nodes <n,n…> --endpoints <e,e…> [--keyset N]`
   — writes the key set (GroupKeyManagement KeySetWrite) on each node and
   joins the group on its endpoints with Groupcast JoinGroup and the
-  auxiliary ACL entry; the controller's own node gets the key set as a
-  sender-only member. The key set id defaults to the group id. A node whose
+  auxiliary ACL entry; the controller keeps the key set in its own
+  database, as the sender. The key set id defaults to the group id. A node whose
   root ServerList lacks Groupcast (before Matter 1.5) is provisioned the
   pre-1.5 way instead: GroupKeyMap entry, Groups AddGroup on each endpoint
   and a Group ACL entry granting the group Operate on them.
@@ -157,7 +157,7 @@ its error on stderr.
   ```
 
 - `group send <id> <Cluster>/<Command> [<json>]` — a group command from the
-  controller's own node.
+  controller, sent as the fabric's root node id.
 
   ```sh
   reference-controller group send 257 OnOff/Toggle
@@ -261,16 +261,25 @@ plaintext. The host needs no adapter. A proxy serves one API subscriber, so the 
 Assistant while it runs
 ([guide](../../docs/guides/ble-proxies.md)).
 
-## The controller's own node
+## The controller's own identity
 
 A group message is sealed and sent by a node of the fabric, and an OTA
-image is served by one; the controller role has neither. `group` and `ota`
-therefore open the controller with its OTA push, whose own node
-(`Controller.OwnNode`, started by `node/controllernode`) the controller
-commissions into the tool's fabric on first use and keeps in the same
-database. It serves no device; it advertises on DNS-SD like any node while it
-runs. `pair`, `read`, `write`, `invoke`, `subscribe`, `events`, `bind` and
-`unpair` do not start it.
+image is served by one. The controller is that node: it sends group
+messages and serves the OTA provider under its one operational identity,
+the fabric's root node id, over its own socket (`--listen`) — matter.js's
+one controller node. `group` and `ota` therefore open the controller with
+its OTA push (`controller.Config.OTA`): the provider sits at
+`controller.OTAProviderEndpoint` of the controller's own endpoint tree, the
+controller advertises its operational record on DNS-SD while the command
+runs, and `group send` goes through `Controller.Groups()`. `pair`, `read`,
+`write`, `invoke`, `subscribe`, `events`, `bind` and `unpair` open the
+controller without the OTA push.
+
+Until v0.18.0 the tool ran a second node for both, commissioned into its
+own fabric (`--node-listen` was its socket; the flag is still accepted and
+does nothing). A database of that time is migrated by the first `group` or
+`ota` command: the node's record is removed and the registry forgets the
+node.
 
 ## The database
 
@@ -281,9 +290,11 @@ One SQLite file holds:
 | `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). With `--ca-key` the root key is not here; `rootKeyRef` names the key file. |
 | `matter_settings` `controller.ca.fabric` | The fabric: fabric id, root node id, vendor id, IPK, fabric index, label, the controller's operational key and NOC (matter.js `Fabric.Config` names). |
 | `matter_settings` `controller.dcl.trust` | The DCL trust store, with `--dcl prod` or `testnet`. |
-| `matter_settings` `controller.ownnode`, `controller.group.<id>` | The own node's passcode, discriminator, salt and node id (moved from `controller.self` on the first start of v0.13.0); each group `group create` made (key set, epoch key, members). |
+| `matter_settings` `controller.group.<id>` | Each group `group create` made (key set, epoch key, members). |
+| `matter_settings` `controller.self`, `controller.ownnode` | Only in a database from before v0.18.0: the record of the second node the tool ran then (passcode, discriminator, salt, node id). The first `group` or `ota` command removes it. |
 | `matter_client_values`, `matter_client_versions` | The client registry: every paired node's record and cached image (`controller/client/sqlstore`). |
-| the other `matter_*` tables | The own node's store (its fabric, keys, ACL). |
+| `matter_group_keys`, `matter_group_key_map` | The key sets of the groups the controller sends to (`Controller.SetGroupKey`). |
+| the other `matter_*` tables | In a database from before v0.18.0: the store of the second node the tool ran then (its fabric, keys, ACL). The migration removes that node's record and the registry's node, not these rows. |
 
 The file holds private keys: keep it as private as the devices it controls.
 CASE resumption records are kept in memory only, so the first command of a
@@ -304,4 +315,5 @@ CD signer and the revocation points by their subject key identifiers. The
 ledger learns which manufacturers' devices the controller commissions; no
 device identity, passcode or fabric key is sent. The store is kept in the
 database between runs. GitHub's development certificates are not fetched.
-The other commands, and the own node, never contact the ledger.
+The other commands never contact the ledger: `ota serve`'s image store has
+none, so it offers the given image only.

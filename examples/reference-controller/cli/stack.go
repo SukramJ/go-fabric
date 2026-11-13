@@ -49,14 +49,15 @@ const (
 )
 
 // hooks are the seams a test replaces: the DNS-SD socket of the
-// controller and the own node's advertiser and group transport.
+// controller here, its advertiser and group transport in selfHooks.
 var hooks struct {
 	names func(log *slog.Logger) (*discovery.Names, error)
 }
 
 // stack is the controller (controller.New over the database: CA, fabric,
-// socket, DNS-SD, peers, commissioner, registry), the trust store this
-// tool composes for it, and the own node.
+// socket, DNS-SD, peers, commissioner, registry — and, for group and ota,
+// its OTA push and group sender) and the trust store this tool composes
+// for it.
 type stack struct {
 	e        *env
 	db       *sql.DB
@@ -183,8 +184,8 @@ func openStack(e *env) (_ *stack, err error) {
 	return s, nil
 }
 
-// close tears the stack down: the controller (with its own node), the
-// trust store, the database.
+// close tears the stack down: the controller (with the tree it serves),
+// the trust store, the database.
 func (s *stack) close() {
 	ctx := context.Background()
 	if s.ctl != nil {
