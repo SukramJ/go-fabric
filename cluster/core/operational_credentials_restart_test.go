@@ -10,7 +10,9 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"log/slog"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -326,5 +328,62 @@ func testRestartRevertsUpdateNOC(t *testing.T, open func(*testing.T) restartStor
 				t.Errorf("crash after write %d of %d: node id 0x%X after the restart, want 0x%X", crashAfter, total, fab.NodeID, beforeNode)
 			}
 		})
+	}
+}
+
+// failingRemoveStore is a store whose fabric removal fails.
+type failingRemoveStore struct{ restartStore }
+
+func (failingRemoveStore) RemoveFabric(context.Context, uint8) error { return errCrashed }
+
+// syncBuffer is a bytes.Buffer safe for a logger's concurrent writes.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// TestOpcreds_RemoveFabricStoreFailureAfterLeaving pins R2-P1-core-11: a
+// RemoveFabric whose store removal fails after the fabric-leaving hook ran
+// — the Leave event is out, the fabric's subscriptions are flushed, and
+// the fabric stays — says so at error level, and the fabric is still served.
+func TestOpcreds_RemoveFabricStoreFailureAfterLeaving(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var logs syncBuffer
+	st := failingRemoveStore{memstore.New()}
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{
+		SupportedFabrics: 5, FailSafe: armedFailSafe(0),
+		Logger: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, idx := commissionTestFabric(ctx, t, oc)
+	oc.ClearPendingState()
+	left := 0
+	oc.SetOnFabricLeaving(func(context.Context, uint8) { left++ })
+	if err := oc.RemoveFabric(ctx, idx); err == nil {
+		t.Fatal("RemoveFabric succeeded over a failing store")
+	}
+	if left != 1 {
+		t.Fatalf("the leaving hook ran %d times, want 1", left)
+	}
+	if !strings.Contains(logs.String(), "level=ERROR msg=matter.opcreds.remove_fabric.store_failed") {
+		t.Fatalf("the failed removal after the Leave was not logged at error level:\n%s", logs.String())
+	}
+	if _, err := st.GetFabric(ctx, idx); err != nil {
+		t.Fatalf("the fabric is gone although its removal failed: %v", err)
 	}
 }

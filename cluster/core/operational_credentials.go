@@ -2424,6 +2424,16 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 		}
 	}
 	if err := o.store.RemoveFabric(ctx, fabricIndex); err != nil {
+		if gerr == nil {
+			// The leaving hook ran: the Leave event is out and the fabric's
+			// subscriptions are flushed, yet the fabric, its sessions and its
+			// ACL stay. That cannot be taken back; it is said, and the caller
+			// (the host, or the controller through the command's answer) may
+			// retry (review II, R2-P1-core-11).
+			o.logger().Error("matter.opcreds.remove_fabric.store_failed",
+				slog.Int("fabric_index", int(fabricIndex)),
+				slog.Any("err", err))
+		}
 		return err
 	}
 
