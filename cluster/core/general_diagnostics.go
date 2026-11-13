@@ -1336,9 +1336,12 @@ func (g *GeneralDiagnostics) SetFaultSource(src contract.FaultSource) {
 	if src == nil {
 		return
 	}
-	lists := g.faultListsOf(src.MatterActiveFaults())
+	// Subscribe, then read: a change before the read is in the read, one
+	// after it signals the worker — read first, a change between the two
+	// would be neither (review II, R2-P1-core-09).
 	w := &faultsWorker{signal: make(chan struct{}, 1), done: make(chan struct{}), exited: make(chan struct{})}
 	off := src.OnMatterValueChanged(w.notify)
+	lists := g.faultListsOf(src.MatterActiveFaults())
 	g.mu.Lock()
 	if g.faultsGen != gen {
 		g.mu.Unlock()
