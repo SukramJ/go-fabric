@@ -277,3 +277,23 @@ var changesOmittedAttributes = map[uint32]map[uint32]struct{}{
 		0x0004: {}, // IcdCounter "N C"
 	},
 }
+
+// fabricScopedWritePaths lists every writable attribute whose effective
+// access in parity/schema.json is fabric-scoped ("F") or
+// fabric-sensitive ("S"): a write to it needs an accessing fabric.
+var fabricScopedWritePaths = map[uint32]map[uint32]struct{}{
+	0x001E: { // Binding
+		0x0000: {}, // Binding "RW F VM"
+	},
+	0x001F: { // AccessControl
+		0x0000: {}, // Acl "RW F A"
+		0x0001: {}, // Extension "RW F A"
+	},
+	0x002A: { // OtaSoftwareUpdateRequestor
+		0x0000: {}, // DefaultOtaProviders "RW F VA"
+	},
+	0x003F: { // GroupKeyManagement
+		0x0000: {}, // GroupKeyMap "RW F VM"
+		0x0004: {}, // GroupcastAdoption "RW F A"
+	},
+}

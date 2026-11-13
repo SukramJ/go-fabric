@@ -9,7 +9,9 @@
 //   - clusters.go  — ClusterRevisions, ClusterNames (map[uint32]uint16/string)
 //   - devicetypes.go — DeviceTypeRevisions, DeviceTypeNames, DeviceTypeServerClusters
 //   - attribute_access_gen.go — attributeWritePrivileges (writable attributes
-//     whose effective write privilege is above Operate)
+//     whose effective write privilege is above Operate), changesOmittedAttributes
+//     and fabricScopedWritePaths (writable attributes whose effective access
+//     is fabric-scoped or fabric-sensitive)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
 //     type's requirement tree, conditions and composition: the device-type
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
@@ -619,6 +621,47 @@ func writeAccessFile(clusters []snapshotCluster) error {
 			if hasQuality(a.Quality, "C") {
 				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Quality))
 			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	// fabricScopedWritePaths: matter.js's limits.fabricScoped
+	// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0,
+	// fabric "F" or "S") on an attribute that is writable — the attributes
+	// AttributeWriteResponse.ts:248-251 refuses without an accessing fabric.
+	buf.WriteString("// fabricScopedWritePaths lists every writable attribute whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or\n")
+	buf.WriteString("// fabric-sensitive (\"S\"): a write to it needs an accessing fabric.\n")
+	buf.WriteString("var fabricScopedWritePaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			switch acc.Fabric {
+			case "":
+				continue
+			case "F", "S":
+			default:
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			p, err := writePrivilege(acc)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			if p == 0 {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
 		}
 		if len(rows) == 0 {
 			continue

@@ -21,10 +21,10 @@ func (d *statusDispatcher) Read(_ context.Context, p ConcreteAttributePath) []Re
 	return []ReadResult{{Path: p, Status: d.status}}
 }
 
-// TestVersionCheckApplies: a write's DataVersion is judged on an attribute
+// TestReachesWriteGates: a write's DataVersion is judged on an attribute
 // the node serves and writes, and left to the dispatcher's own answer
 // otherwise (matter.js AttributeWriteResponse.ts:221-257 at 862ad75f).
-func TestVersionCheckApplies(t *testing.T) {
+func TestReachesWriteGates(t *testing.T) {
 	t.Parallel()
 	const basicInformation = 0x0028
 	path := func(attr uint32) ConcreteAttributePath {
@@ -45,8 +45,8 @@ func TestVersionCheckApplies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			d := &statusDispatcher{labelDispatcher: labelDispatcher{values: map[uint32]string{}}, status: tc.status}
-			if got := versionCheckApplies(context.Background(), d, path(tc.attr)); got != tc.want {
-				t.Fatalf("versionCheckApplies = %v, want %v", got, tc.want)
+			if got := reachesWriteGates(context.Background(), d, path(tc.attr)); got != tc.want {
+				t.Fatalf("reachesWriteGates = %v, want %v", got, tc.want)
 			}
 		})
 	}

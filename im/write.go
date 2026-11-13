@@ -363,6 +363,35 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				continue
 			}
 		}
+		// A fabric-scoped attribute needs an accessing fabric: without one
+		// the write is refused here, before a cluster server sees it — after
+		// the existence, writability, privilege and timed answers, before
+		// the DataVersion. Mirrors matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:248-251
+		// at db021da0 (`limits.fabricScoped && !this.session.fabric` →
+		// Status.UnsupportedAccess); chip src/app/WriteHandler.cpp:804-812
+		// at 6170af84 answers the same status, for a fabric-scoped list.
+		// A PASE session has no fabric until AddNOC gives it one
+		// (OperationalCredentialsServer.ts:280-282 at db021da0, `session.fabric
+		// = fabric`; chip OperationalCredentialsCluster.cpp:543-546
+		// AdoptFabricIndex), so the implicit Administer of the commissioning
+		// channel does not pass this gate. matter.js's wildcard path
+		// (AttributeWriteResponse.ts:326-361) carries no such check and
+		// leaves the write to its behaviours; here the attribute is skipped,
+		// as that path skips whatever its other gates refuse — the cluster
+		// servers' own refusals remain behind both.
+		if !hasAccessingFabric(fabricIndex) && schema.IsFabricScopedWrite(w.Path.Cluster, w.Path.Attribute) {
+			if !w.Path.HasEndpoint {
+				continue
+			}
+			if reachesWriteGates(ctx, d, w.Path) {
+				wr.Responses = append(wr.Responses, AttributeStatus{
+					Path:   w.Path,
+					Status: StatusIB{Status: StatusUnsupportedAccess},
+				})
+				continue
+			}
+		}
 		// A DataVersion on a wildcard-endpoint path is ignored: Matter
 		// §8.9.2.8.1 forbids a client to send one (the controller refuses
 		// to, client/interaction/write.go formulateWrite), and the
@@ -379,7 +408,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// request means "caller does not constrain the version" — skip.
 		if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
 			if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
-				if current != w.DataVersion && versionCheckApplies(ctx, d, w.Path) {
+				if current != w.DataVersion && reachesWriteGates(ctx, d, w.Path) {
 					wr.Responses = append(wr.Responses, AttributeStatus{
 						Path:   w.Path,
 						Status: StatusIB{Status: StatusDataVersionMismatch},
@@ -448,16 +477,16 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	return wr
 }
 
-// versionCheckApplies reports whether a write's DataVersion is judged at
-// all: matter.js answers a path that does not exist, an attribute that is
-// not writable and a timed attribute outside a timed interaction with their
-// own statuses before it compares the version
+// reachesWriteGates reports whether a write's accessing fabric and
+// DataVersion are judged at all: matter.js answers a path that does not
+// exist, an attribute that is not writable and a timed attribute outside a
+// timed interaction with their own statuses before it looks at either
 // (packages/protocol/src/action/server/AttributeWriteResponse.ts:221-257 —
-// existence, writable, write privilege, timed, then the version), so the
-// dispatcher's answer is left to those. InteractionProtocolTest.ts:557-627
-// (WRITE_REQUEST: the read-only ProductName with a version is
-// UNSUPPORTED_WRITE).
-func versionCheckApplies(ctx context.Context, d Dispatcher, p ConcreteAttributePath) bool {
+// existence, writable, write privilege, timed, then the accessing fabric and
+// the version), so the dispatcher's answer is left to those.
+// InteractionProtocolTest.ts:557-627 (WRITE_REQUEST: the read-only
+// ProductName with a version is UNSUPPORTED_WRITE).
+func reachesWriteGates(ctx context.Context, d Dispatcher, p ConcreteAttributePath) bool {
 	if writable, known := schema.AttributeWritable(p.Cluster, p.Attribute); known && !writable {
 		return false
 	}
@@ -472,6 +501,17 @@ func versionCheckApplies(ctx context.Context, d Dispatcher, p ConcreteAttributeP
 		}
 	}
 	return true
+}
+
+// hasAccessingFabric reports whether fabricIndex names a fabric. Matter
+// constrains a fabric index to "1 to 254" (matter.js
+// packages/model/src/standard/elements/operational-credentials.element.ts:129
+// at db021da0); 0 is a session without a fabric — PASE before AddNOC,
+// matter.js FabricIndex.NO_FABRIC — and anything above 254 an index the
+// caller could not resolve (endpoint.FabricIndexUnresolvable). Neither is an
+// accessing fabric.
+func hasAccessingFabric(fabricIndex uint8) bool {
+	return fabricIndex >= 1 && fabricIndex <= 254
 }
 
 // allSucceeded reports whether every result of a write is Success.
