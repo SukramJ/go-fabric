@@ -26,16 +26,17 @@ const (
 //
 // Group-session reject guard. Matter §8.5.7: only Write- and
 // Invoke-Requests are valid over Secure Group sessions; Read,
-// Subscribe, and Timed requests are unicast-only and must be
-// rejected with StatusResponse(InvalidAction).
+// Subscribe, and Timed requests are unicast-only and are dropped
+// without a reply.
 //
 // Mirrors matter.js packages/protocol/src/interaction/
-// InteractionMessenger.ts:240,269,287 — ReadRequest /
-// SubscribeRequest / TimedRequest each throw a
+// InteractionMessenger.ts:354-358, :383-387, :401-405 at db021da0 —
+// ReadRequest / SubscribeRequest / TimedRequest each throw a
 // StatusResponseError(InvalidAction, "<op> is not supported in
-// group sessions"). Without this guard, a malicious group sender
-// could enumerate the bridge's attribute tree via a single
-// multicast Read.
+// group sessions"), and the status is sent only
+// `if (!isGroupSession)` (:458-460). Without this guard, a malicious
+// group sender could enumerate the bridge's attribute tree via a
+// single multicast Read.
 //
 // Secure-session guard. The Interaction Model runs on secure sessions
 // only: an IM message on the unsecured session (unicast session type,

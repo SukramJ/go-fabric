@@ -129,8 +129,8 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 // rejectUnsupportedOpcode handles any opcode that is not a request opcode,
 // and a StatusResponse that opens an exchange. As the first message of an
 // exchange on a unicast session it is answered StatusResponse(InvalidAction)
-// and the owed ack discharged (the shape of [Bridge.rejectGroupSession]),
-// so the peer's exchange closes at once instead of timing out. Mirrors
+// and the owed ack discharged, so the peer's exchange closes at once
+// instead of timing out. Mirrors
 // matter.js packages/protocol/src/interaction/InteractionMessenger.ts
 // :415-419 (the default arm throws StatusResponseError InvalidAction) and
 // :431-461 (sendStatus unless the session is a group session); chip
@@ -156,27 +156,6 @@ func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, requestHdr *message.Heade
 	if sendErr := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); sendErr != nil {
 		debugReplyError(b.logger, "send_unsupported_reject", src, sendErr)
 		return sendErr
-	}
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-	return nil
-}
-
-// rejectGroupSession handles Read/Subscribe/Timed request opcodes that
-// arrived over a Secure Group session, which is forbidden by Matter §8.5.7.
-// Sends StatusResponse(InvalidAction) and discharges the owed ACK.
-// The matter.js citation for the group-session rule is on classifyIMOpcode.
-func (b *Bridge) rejectGroupSession(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
-	b.logger.Warn("matter.rx.im.group_reject",
-		slog.String("src", srcString(src)),
-		slog.Int("opcode", int(proto.Opcode)))
-	body, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusInvalidAction})
-	if err != nil {
-		debugReplyError(b.logger, "encode_group_reject", src, err)
-		return err
-	}
-	if err := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); err != nil {
-		debugReplyError(b.logger, "send_group_reject", src, err)
-		return err
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	return nil
