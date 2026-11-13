@@ -636,7 +636,7 @@ with a port of the named case.
   Sigma3 that does not verify); they differ when the handshake fails while
   its last reply is still unacknowledged. Which peers and failures reach
   that state was not exercised (unverified). Not decided: the report was
-  made reliable by `99149871` (before, it left without the R flag, which
+  made reliable by `e98028e4` (before, it left without the R flag, which
   neither reference does either), and whether to skip it as the references
   do or to keep it under a `by_design` entry is an open question of that
   rework. Fix: skip the report while an entry of the exchange is still
@@ -666,7 +666,7 @@ with a port of the named case.
   `bridge/subscribe.go`), and the engine then sends the keep-alive when the
   pass was the send interval's and otherwise puts the time of the last
   report back (`dueReport`, `im/subscription/engine.go`); an event drain
-  that yields no event is no report either (`e506836f`). Since `ab039217`
+  that yields no event is no report either (`758fb3ec`). Since `16495f81`
   the keep-alive due in such a pass is sent — before, the pass counted and
   a subscriber heard nothing for two send intervals (review II,
   R2-P0-rv-A03) — so what still differs is the empty DataReport itself and

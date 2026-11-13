@@ -315,7 +315,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   reply to Sigma3 stays tracked; it changes what a successful CASE sends
   and wants a test with a lost StatusReport. Found in review II, phase 0
   (R2-P0-bound-A06).
-  Closed 2026-11-13 (review II, R2-P0-rv-A01 and -A04, `99149871`):
+  Closed 2026-11-13 (review II, R2-P0-rv-A01 and -A04, `e98028e4`):
   confirmed by test first — the rework's run on the unchanged code reported
   "pending after Sigma3's success StatusReport = 0, want 1" — and fixed as
   the entry proposes: the Sigma3 case drops what the exchange left
@@ -334,7 +334,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 - **F-db021da0-6: the subscribe path's ACL filter tests fabric index 0 only.**
   `Bridge.readAuthorizedResults` returns nothing for `fabricIndex == 0`
   (`bridge/subscribe.go:498-504`) and hands every other index to the ACL
-  checker. Since `6301a66b` every gate of `im` reads an index it cannot
+  checker. Since `36941966` every gate of `im` reads an index it cannot
   resolve (255, `endpoint.FabricIndexUnresolvable`) as no accessing fabric
   before the access-control source is asked (`im/fabric_context.go`,
   `hasAccessingFabric`); this filter does not. What it lets through is not
@@ -343,9 +343,9 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   not exercised (unverified). No reference models an unresolvable index;
   the rule is this module's fail-closed reading, and the gap is that one
   site does not apply it. Fix: the same test as the other gates, with a
-  subscription case beside the write, invoke and group cases of `6301a66b`.
+  subscription case beside the write, invoke and group cases of `36941966`.
   Found in review II, phase 0.
-  Closed 2026-11-13 (review II, R2-P0-rv-A08, `16b716d4`):
+  Closed 2026-11-13 (review II, R2-P0-rv-A08, `cd642683`):
   `Bridge.readAuthorizedResults` returns nothing unless
   `im.HasAccessingFabric(fabricIndex)` — the helper of every other gate,
   exported for it — before the access-control source is asked. Pinned by

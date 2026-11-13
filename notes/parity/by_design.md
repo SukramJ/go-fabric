@@ -976,7 +976,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-SetReachable-LockReleased | matter.js BridgedDeviceBasicInformationServer emits ReachableChanged through its async `events.reachableChanged.emit` EventEmitter pattern | `cluster/core/bridged_device_basic_information.go::SetReachable` releases the internal `b.mu` **before** calling `emitter.MatterEmitEvent` (lines 438-455) so the emit path cannot deadlock against a Subscribe-Manager mutex acquired downstream | Audit drift L10-D06 ("ReachableChanged-Event synchron emittiert; Deadlock-Risiko wenn unter Lock") is a **false positive**: the emit runs after the unlock; there is no nesting of `b.mu` and any downstream lock. The synchronous-vs-asynchronous distinction is purely an internal-dispatch shape; observable behaviour is identical. |
 | BD-Matter-DN-TXT-Set | matter.js emits the `DN` TXT key (the commissionable advertisement, `packages/protocol/src/advertisement/mdns/`; `MdnsBroadcaster.ts` is gone at `862ad75f`) when a device name is supplied | `mdns/service.go::BuildCommissionableService` emits `DN` when `cfg.DeviceName != ""`; `bridge/bridge.go:1156` sets `DeviceName: params.NodeLabel` so the bridge's NodeLabel surfaces as the DN value | Audit drift L7-D03 ("DN TXT-Key fehlt im commissionable Record") is a **false positive**: the DN key is already wired through the bridge's parameter pipe; an empty DeviceName (and therefore an omitted DN) only happens when the bridge is started without a NodeLabel, which is rejected by `Config.Validate()`. |
 | BD-Matter-PBKDF2-Documented | matter.js `PasePairing.ts` makes the PBKDF2 iteration count configurable; spec default is 1000 (Matter §3.10) | `example.config.yaml:240` documents `iterations: 1000` with the spec-mandated 1000..100000 range comment | Audit drift L5-D02 ("PBKDF2-Iterationsanzahl nicht in example.config.yaml dokumentiert") is a **false positive**: the annotated value is already present. `cluster/wire/admincommissioning.go:403-404` enforces the spec floor/ceiling at runtime. |
-| BD-Matter-CriticalEventBypassMin | matter.js takes an event's urgency from the subscriber's request, not from the event's priority: `#sendEventUrgently` reads `isUrgent` of the matching event path, and only an urgent event schedules a report (`packages/node/src/node/server/ServerSubscription.ts:396-398`, `:401-409` at `db021da0`); the scheduled report still waits for `lastUpdateTime + minIntervalFloor` and for a running deferral (`#prepareDataUpdate`, `:454-478`); every event is owed, urgent or not (`:392-394`), and leaves in the one report that takes the attribute changes (`:539-555`) | `im/subscription/subscription.go` — `eventUrgency` reads the subscriber's event paths, and `drainDue` holds an urgent event to MinIntervalFloor and a deferral as it holds a dirty path; a non-urgent event asks for no report and leaves with the next one, in the same ReportData as the attribute changes | **Status (2026-11): RESOLVED — no longer a divergence.** Mirrored since review II (W2-conc-05 and W2-conc-04, owner decision 2; `dda33a05`, `9e1d2b26`). Until then any event of `im.EventPriorityCritical` skipped both the floor and the deferral, and events left in a report of their own. Pinned by `im/subscription:TestEventReportParityMatterJS`. Two gaps on the same path are not deliberate and stand in [`matter_behaviour_findings.md`](./matter_behaviour_findings.md): the retry after a failed report and the send at activation (F-db021da0-3, F-db021da0-4). |
+| BD-Matter-CriticalEventBypassMin | matter.js takes an event's urgency from the subscriber's request, not from the event's priority: `#sendEventUrgently` reads `isUrgent` of the matching event path, and only an urgent event schedules a report (`packages/node/src/node/server/ServerSubscription.ts:396-398`, `:401-409` at `db021da0`); the scheduled report still waits for `lastUpdateTime + minIntervalFloor` and for a running deferral (`#prepareDataUpdate`, `:454-478`); every event is owed, urgent or not (`:392-394`), and leaves in the one report that takes the attribute changes (`:539-555`) | `im/subscription/subscription.go` — `eventUrgency` reads the subscriber's event paths, and `drainDue` holds an urgent event to MinIntervalFloor and a deferral as it holds a dirty path; a non-urgent event asks for no report and leaves with the next one, in the same ReportData as the attribute changes | **Status (2026-11): RESOLVED — no longer a divergence.** Mirrored since review II (W2-conc-05 and W2-conc-04, owner decision 2; `11405570`, `e81a115e`). Until then any event of `im.EventPriorityCritical` skipped both the floor and the deferral, and events left in a report of their own. Pinned by `im/subscription:TestEventReportParityMatterJS`. Two gaps on the same path are not deliberate and stand in [`matter_behaviour_findings.md`](./matter_behaviour_findings.md): the retry after a failed report and the send at activation (F-db021da0-3, F-db021da0-4). |
 | BD-Matter-RemainingAuditTestGaps | matter.js carries its own cluster-revision regression suite via `@matter/model` and per-behaviour parity tests | go-fabric has parity tests for the actively-pair-tested cluster surface (OnOff, LevelControl on Switch/Light/Siren projections, the BridgedDeviceBasicInformation surface, the Aggregator + Root composition) but not for every device-type-projection cluster | Audit drifts L1-D08 (DoorLock), L1-D09 (WindowCovering), L2-D04 (OnOffPlug→OnOffLight upgrade), L2-D05 (LevelControl OO feature-bit), L7-D06 (commissionable TXT golden test) are **PARITY-TEST-GAPs**, not code drifts. L2-D03 (Switch power-source-attachment) is closed rather than open: the cross-channel attachment it described no longer exists — the Device Library specifies neither electrical measurement cluster for OnOffPlugInUnit (0x010A), so the metering channel now projects its own ElectricalSensor (0x0510) endpoint and the Switch projection carries no measurement clusters at all. The corresponding production paths have been Apple-pair-verified end-to-end; adding parity tests is desirable but does not block release. Tracked as an open behavioural-parity-test gap; new cases are added per `docs/matter-parity-contract.md`. L1-D07 (Thermostat) is superseded: the formerly Apple-pair-verified SystemMode read path surfaced Auto(1) whenever the HM device sat in its factory-default CONTROL_MODE=AUTO, violating SystemModeEnum conformance — Auto has conformance "AUTO" (matter.js `packages/model/src/standard/elements/thermostat-cluster.element.ts:558`) while the projection advertises a HEAT-only FeatureMap. Pair-success never exercised the state-sync echo: a controller writing the read value back received ConstraintError from the projection's own write gate, and RunningMode could yield Auto(1), which is not a ThermostatRunningModeEnum member at all (`element.ts:568-573`). Fixed in `internal/model/custom/climate/matter.go` (`systemModeFromHmMode` / `runningModeFromHmMode` clamp reads to the FeatureMap); pinned by `TestParityMatterJS_SystemModeAutoRequiresAutoFeature` and `TestThermostatSystemModeReadClampsHmAutoToFeatureMap`. See `BD-Matter-Thermostat-NoAutoFeature` (next row). |
 | BD-Matter-Thermostat-NoAutoFeature | matter.js Thermostat composition may include the AUTO (AutoMode) feature, which mandates independent dual setpoints plus MinSetpointDeadBand (0x0019, conformance "AUTO" — `packages/model/src/standard/elements/thermostat-cluster.element.ts:100-104`) and requires HEAT+COOL (FeatureMap conformance "AUTO, O.a+", `element.ts:24-25,28`) | `internal/model/custom/climate/matter.go::featureMap` advertises HEAT always and COOL for SupportsCool profiles, but never AUTO — even on cooling-capable hybrids | HM climates are single-setpoint devices: the Matter Cool setpoint aliases the one HM setpoint and the projection implements no MinSetpointDeadBand, so advertising AUTO would be a conformance violation. HM's AUTO (week-program) mode is a single-setpoint schedule, not Matter AutoMode; SystemMode reads surface it as Heat(4), or Cool(3) when HEATING_COOLING==COOLING. ThermostatRunningMode stays feature-gated on AUTO ("TEVT & AUTO, [AUTO]", `element.ts:117-120`) and its value space is ThermostatRunningModeEnum (Off/Cool/Heat — no Auto member, `element.ts:568-573`). Precondition for lighting AUTO up: a true dual-setpoint surface plus MinSetpointDeadBand. Aligned with thermo.ThermostatServer's AUTO-clearing constructor; pinned by `TestParityMatterJS_SystemModeAutoRequiresAutoFeature`. |
 | BD-Matter-TouchLastReport-Timing | matter.js sets the subscription's `lastReport` timestamp in the SubscribeResponse handler after the final Initial-Chunk has been pushed | `im/subscription/subscription.go:192-197` calls `TouchLastReport()` immediately after the Initial-Report flush sequence completes from the bridge's perspective | Audit drift L10-D04 is a timing-shape difference, not a correctness drift: the chunked Initial-Report sequence is owned by the bridge, which only signals "done" to the subscription after every chunk has been ack'd. The two stacks therefore land on the same effective `lastReport` instant; the only observable difference would be if a peer raced a Report into the gap before the final ack, which the bridge's ack-walk prevents. |
@@ -6706,7 +6706,7 @@ compares neither with a clock; the `TimeSource` a verifier is built with
 without a trusted clock cannot judge expiry, and matter.js leaves the
 check to its Last-Known-Good-Time TODO (`:100`). connectedhomeip's
 validity policy was not read for this entry (unverified). Pinned by
-`secure/mattercert:TestCertValidityNotEnforced` (`87dba851`): a NOC and
+`secure/mattercert:TestCertValidityNotEnforced` (`cb2377a9`): a NOC and
 an ICAC, expired and not yet valid, verify through
 `Verifier.VerifyAndExtractPubKey`, and a `TimeSource` that counts its
 reads is read zero times. Three older tests already held that a
@@ -6791,7 +6791,7 @@ W4-ctlnet-07). Pinned for the attempt's error by
 (`initial_contact_schedule_parity_matterjs_test.go:507`), for the first
 pause and the timeout by `TestUnhandledErrorAndDisconnectedSet`, and for
 the repetition by `client/peer:TestConnectAfterDisconnectRetries`
-(`87dba851`): four rounds, each failing with `ErrNotConnectable`, each
+(`cb2377a9`): four rounds, each failing with `ErrNotConnectable`, each
 pausing `DelayAfterUnhandledError`, nothing sent and the process still
 running. Retire when matter.js refuses the connect.
 
@@ -6812,7 +6812,7 @@ Mirrored: matter.js decides where it models something (order of authority
 1; review 2026-11 W4-ctlsec-03, verdict "stay with matter.js", no Ahead
 row). Pinned by
 `controller/attestation:TestAttestationValidityAtDacNotBefore`
-(`87dba851`): an expired DAC, a PAI that expired after the DAC was
+(`cb2377a9`): an expired DAC, a PAI that expired after the DAC was
 issued and both are accepted, and a DAC issued after the PAI's notAfter
 is refused (review II, W4-ctlsec-03). Retire when matter.js consults the
 clock.
@@ -6901,7 +6901,7 @@ resumption keys, the bytes the session keys are cut from — and the shared
 secret when the handshake fails or the responder is reset; in the callers
 the initiator's Ke copy and derived key bytes (`client/handshake/pase.go`)
 and the Ke the node facade's PASE callback receives (`node/security.go`).
-On the device side too since `f4f88166` (review II, R2-P0-rv-B03): the 48
+On the device side too since `065e2207` (review II, R2-P0-rv-B03): the 48
 derived bytes of `operational.Manager.OpenFromPase` and `OpenFromPaseWithID`
 (`paseSession`, `secure/operational/manager.go`), on every way out, once the
 session holds its own copies of the two keys and the challenge is copied
@@ -6969,8 +6969,8 @@ secrets.
 
 Not a departure from matter.js: its behaviour, kept against
 connectedhomeip's bound and recorded because this module carried that
-bound for one commit (`c87940e2`, with an Ahead row of this register;
-both went with `a41ebc3e`, owner decision 22 of review II). matter.js keeps the reception
+bound for one commit (`5ca8da6a`, with an Ahead row of this register;
+both went with `48e53ec5`, owner decision 22 of review II). matter.js keeps the reception
 state of group data messages "per Operational key and source node"
 (`packages/protocol/src/groups/MessagingState.ts:18-19` at `db021da0`):
 `receptionStateFor` creates a state for every source node id it is asked
@@ -7004,12 +7004,12 @@ against a build). **What was run** is this module's own table while it
 was bounded the same way — 15 senders per operational key, the least
 recently accepted evicted, a new sender's first counter trusted:
 `groups:TestRecordedGroupMessageStaysADuplicate` against an export of
-`c87940e2` (one recorded datagram per sender, presented again round-robin,
+`5ca8da6a` (one recorded datagram per sender, presented again round-robin,
 oldest first, three rounds) fails with "48 of 48 byte-identical replays
 were accepted as new messages" for 16 senders, 300 of 300 for 100 and
 3000 of 3000 for 1000 (re-run for this entry; the diff review's own run
 found 80 of 80 over five rounds, R2-P0-rv-B01). On the code since
-`a41ebc3e` the test passes: every such replay is a duplicate for as long
+`48e53ec5` the test passes: every such replay is a duplicate for as long
 as the key is held. **What the missing bound costs:** memory, under a
 holder of the group key. An entry is 48 to 67 bytes of retained heap —
 measured for this entry as the `runtime.MemStats.HeapAlloc` difference,
@@ -7043,7 +7043,7 @@ one cap on exchanges, `MAXIMUM_CONCURRENT_OUTGOING_EXCHANGES_PER_SESSION` =
 30 (`packages/protocol/src/protocol/ExchangeManager.ts:63`), leaves a
 session that is not secure out — "PASE/CASE exchanges are not relevant for
 this limit" (`:578-582`); a search of `packages/protocol/src` for another
-constant that names a maximum of exchanges found none. Before `c97d47f7` any peer could park one entry per Sigma1 on
+constant that names a maximum of exchanges found none. Before `834eb5ac` any peer could park one entry per Sigma1 on
 this module's unsecured session, paced by the intervals it stated. The
 bridge holds at most `unsecuredEntryLimit` = 16 reliable messages on the
 unsecured session (`bridge/outbound_reliable.go`) — a responder's replies
@@ -7087,11 +7087,11 @@ bound holds only where its pools are static: with
 ignored" (`src/lib/support/Pool.h:619-626`), and Linux and Darwin set it
 (`src/platform/Linux/SystemPlatformConfig.h:41`,
 `src/platform/Darwin/SystemPlatformConfig.h:39`). This module refused the
-message that did not fit first (`c97d47f7`, under another Ahead row of
+message that did not fit first (`834eb5ac`, under another Ahead row of
 this register): sixteen entries for all peers, the
 newest refused, each for up to 60 s, let any node on the link keep every
 handshake from being answered with sixteen Sigma1 a minute (the diff
-review's trace, R2-P0-rv-A01); `99149871` replaced the refusal with the
+review's trace, R2-P0-rv-A01); `e98028e4` replaced the refusal with the
 eviction. **Why 16:** under eviction the size has to cover the handshakes
 of honest peers that wait for an acknowledgement at the same moment — one
 PASE, the single-active slot, and the CASE handshakes of controllers that
@@ -7201,7 +7201,7 @@ through `TLVReader::Get` (`src/app/MessageDef/StatusIB.cpp:54-60`,
 (`src/lib/core/TLVReader.cpp:204-214`). `im.statusIBField` (`im/status.go`),
 which both StatusIB readers of the client side use, refuses the wider value
 as connectedhomeip does. Deliberate: this module's `StatusCode` is 8 bits
-wide, and before `ee681996` the wider value was masked — a status 0x100
+wide, and before `30abc8f6` the wider value was masked — a status 0x100
 read as Success. The event priority of an EventDataIB is held to 8 bits
 the same way (`im/client.go`), where matter.js again declares a `TlvEnum`
 (`packages/types/src/protocol/types/TlvEventData.ts:21`); connectedhomeip's
@@ -7319,8 +7319,8 @@ adoption would leave bound signals behind to be taken back; with the
 adoption first there is nothing to take back. Unchanged from matter.js: a
 storage failure of the adoption is logged and is not `Start`'s error
 (`:285-297`; `adoptDefaultFabricFilter`, `controller/client/network.go`).
-Review II, the follow-up of R2-P0-conc-C03 (`f467ea98`); the citation of
-matter.js's order in the code is R2-P0-rv-C03's (`ecc76f50`). Pinned by
+Review II, the follow-up of R2-P0-conc-C03 (`5efceca2`); the citation of
+matter.js's order in the code is R2-P0-rv-C03's (`a0a0d818`). Pinned by
 `controller/client:TestStartReturnsWithItsContextWhileAHookBlocks`. Retire
 when matter.js's start takes an abort signal, or adopts before it binds.
 
@@ -7347,7 +7347,7 @@ long as a `Stop` of the run before has not returned — "the bridge has not
 stopped until then" — and `node.Node.Start` wraps what `Bridge.Start`
 returns (`node/node.go`). Reason:
 the caller is told that nothing was started, where matter.js's early
-return tells it nothing; and before `517ce6ed` a `Start` let in at that
+return tells it nothing; and before `e11c5552` a `Start` let in at that
 moment had the run it had just wired taken apart by the rest of `Stop` —
 it served without its value and switch listeners (review II,
 R2-P0-rv-A06). A `Start` after `Stop` has returned is not refused; whether
