@@ -134,9 +134,8 @@ type flow struct {
 	challenge  []byte
 	transition transitionFunc
 	// hint hands addresses the reconnect probe learned to the running
-	// operational connection (peer.Peer.HintAddresses) and returns how
-	// many it queued; nil hands none.
-	hint    func([]netip.AddrPort) int
+	// operational connection (peer.Peer.HintAddresses); nil hands none.
+	hint    func([]netip.AddrPort)
 	steps   []step
 	results map[[2]int]stepResult
 	// reArmBefore are the steps with reArmFailsafe (:196-198).
@@ -1096,6 +1095,8 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 	var probe *reconnectProbe
 	if concurrent {
 		probe = f.startReconnectProbe(ctx, f.interaction())
+		// A transition that panics does not leave the probe reading.
+		defer probe.stop()
 	}
 	next, err := f.transition(ctx, f.address, concurrent)
 	// The re-arm timer ends with the transition (:2031-2033).

@@ -202,7 +202,11 @@ type connection struct {
 	// hinted are the addresses queued by HintAddresses that discovery has
 	// not advertised: ranked after the discovered ones, and no stagger for
 	// a discovered address while only they are in flight (hintBesideLocked).
-	hinted map[netip.AddrPort]bool
+	// An entry stays for the process: a hint is queued once.
+	hinted map[netip.AddrPort]hintState
+	// hintBesideUsed records that the one discovered address a hinted
+	// attempt lets start without the stagger has started.
+	hintBesideUsed bool
 }
 
 // retention is one retained address: the address with the host discovery
@@ -275,7 +279,7 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 		spent:        make(map[netip.AddrPort]bool),
 		hosts:        make(map[netip.AddrPort]string),
 		refall:       make(chan struct{}, 1),
-		hinted:       make(map[netip.AddrPort]bool),
+		hinted:       make(map[netip.AddrPort]hintState),
 	}
 	p.connecting = c
 	p.workers.Add(1)
@@ -547,7 +551,9 @@ func (c *connection) scheduleAttempts() {
 		}
 		if !c.lastAttemptAt.IsZero() && c.anchorBesideLocked() {
 			c.besideUsed = true
-		} else if !c.lastAttemptAt.IsZero() && !c.hintBesideLocked() {
+		} else if !c.lastAttemptAt.IsZero() && c.hintBesideLocked() {
+			c.hintBesideUsed = true
+		} else if !c.lastAttemptAt.IsZero() {
 			if delay := c.timing.DelayBeforeNextAddress - c.p.set.clock.Now().Sub(c.lastAttemptAt); delay > 0 {
 				c.mu.Unlock()
 				if !c.sleep(c.ctx, delay, c.wake) {
@@ -903,7 +909,9 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 	if a.Host != "" {
 		c.hosts[ap] = a.Host
 	}
-	delete(c.hinted, ap)
+	if _, ok := c.hinted[ap]; ok {
+		c.hinted[ap] = hintDiscovered
+	}
 	for k := range c.spent {
 		if sameEndpoint(k, ap) {
 			delete(c.spent, k)

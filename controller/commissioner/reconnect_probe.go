@@ -54,12 +54,16 @@ type deviceNetworkReport struct {
 	networkName      *string
 	channel          *uint16
 	partitionID      *uint32
+	// meshLocal is ThreadNetworkDiagnostics MeshLocalPrefix, invalid when
+	// absent, null or malformed.
+	meshLocal netip.Prefix
 	// addresses are the addresses of the operational interfaces
-	// (GeneralDiagnostics NetworkInterfaces with IsOperational), routable
-	// marks those a connection can use: not link-local, not loopback,
-	// not unspecified, not multicast.
-	addresses []netip.Addr
-	routable  []netip.Addr
+	// (GeneralDiagnostics NetworkInterfaces with IsOperational); routable
+	// are those the operational connection can use (hintable), meshLocal
+	// counts the Thread mesh-local ones left out of it.
+	addresses      []netip.Addr
+	routable       []netip.Addr
+	meshLocalCount int
 	// interfacesKnown is NetworkInterfaces read at all.
 	interfacesKnown bool
 }
@@ -80,6 +84,7 @@ func (r *deviceNetworkReport) key() string {
 	opt("name", r.networkName != nil, deref(r.networkName))
 	opt("channel", r.channel != nil, deref(r.channel))
 	opt("partition", r.partitionID != nil, deref(r.partitionID))
+	opt("mesh", r.meshLocal.IsValid(), r.meshLocal)
 	opt("addresses", r.interfacesKnown, r.addresses)
 	return b.String()
 }
@@ -124,6 +129,13 @@ func (r *deviceNetworkReport) summary() string {
 		} else {
 			parts = append(parts, "addresses "+addrList(r.routable)+"; not reachable at them")
 		}
+		switch r.meshLocalCount {
+		case 0:
+		case 1:
+			parts = append(parts, "1 mesh-local address omitted")
+		default:
+			parts = append(parts, fmt.Sprintf("%d mesh-local addresses omitted", r.meshLocalCount))
+		}
 	}
 	if len(parts) == 0 {
 		return "the device reports no network state"
@@ -141,16 +153,52 @@ func addrList(addrs []netip.Addr) string {
 
 // routableAddr reports whether a probed address can carry the operational
 // connection: a link-local address has no zone the controller could use
-// across the border router, and the others name no peer.
+// across the border router, and the others name no peer. A Thread
+// mesh-local address is routable by this test but not from off the mesh
+// (meshLocalAddr).
 func routableAddr(a netip.Addr) bool {
 	return a.IsValid() && !a.IsLinkLocalUnicast() && !a.IsLoopback() && !a.IsUnspecified() && !a.IsMulticast()
+}
+
+// meshLocalAddr reports whether a is a Thread mesh-local address, which
+// only the mesh reaches: inside the device's mesh-local prefix (the ML-EID,
+// RLOC and ALOC; prefix invalid when the device did not report it), or —
+// whatever the prefix — with the interface identifier 0000:00ff:fe00:xxxx
+// Thread gives its routing and anycast locators (RLOC, ALOC).
+func meshLocalAddr(a netip.Addr, prefix netip.Prefix) bool {
+	if !a.Is6() || a.Is4In6() {
+		return false
+	}
+	if prefix.IsValid() && prefix.Contains(a) {
+		return true
+	}
+	b := a.As16()
+	return b[8] == 0 && b[9] == 0 && b[10] == 0 && b[11] == 0xff && b[12] == 0xfe && b[13] == 0
+}
+
+// decodeIPv6Prefix decodes an ipv6pre: the prefix length in bits, then the
+// prefix's bytes — as connectedhomeip encodes MeshLocalPrefix (one length
+// byte, then the eight bytes of the prefix,
+// src/app/clusters/thread-network-diagnostics-server/DirectThreadNetworkDiagnosticsProvider.cpp:167-174
+// at connectedhomeip 6170af84). Invalid when malformed.
+func decodeIPv6Prefix(b []byte) netip.Prefix {
+	if len(b) < 1 || int(b[0]) > 128 || len(b)-1 < (int(b[0])+7)/8 || len(b)-1 > 16 {
+		return netip.Prefix{}
+	}
+	var a [16]byte
+	copy(a[:], b[1:])
+	p, err := netip.AddrFrom16(a).Prefix(int(b[0]))
+	if err != nil {
+		return netip.Prefix{}
+	}
+	return p
 }
 
 // reconnectProbe is one Reconnect step's probing: run reads until stop.
 type reconnectProbe struct {
 	f      *flow
 	ia     *interaction.Interaction
-	hint   func([]netip.AddrPort) int
+	hint   func([]netip.AddrPort)
 	cancel context.CancelFunc
 	done   chan struct{}
 
@@ -165,12 +213,15 @@ type reconnectProbe struct {
 func (f *flow) startReconnectProbe(ctx context.Context, ia *interaction.Interaction) *reconnectProbe {
 	pctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	p := &reconnectProbe{f: f, ia: ia, hint: f.hint, cancel: cancel, done: make(chan struct{})}
-	go p.run(pctx)
+	// The first wait is armed before the transition starts.
+	fired := make(chan struct{})
+	first := f.c.ctx.Clock.AfterFunc(reconnectProbeFirst, func() { close(fired) })
+	go p.run(pctx, fired, first)
 	return p
 }
 
 // stop ends the probing, waits for it and returns the last report, nil
-// when no probe succeeded (or p is nil).
+// when no probe succeeded (or p is nil). It may be called again.
 func (p *reconnectProbe) stop() *deviceNetworkReport {
 	if p == nil {
 		return nil
@@ -182,11 +233,18 @@ func (p *reconnectProbe) stop() *deviceNetworkReport {
 	return p.last
 }
 
-func (p *reconnectProbe) run(ctx context.Context) {
+func (p *reconnectProbe) run(ctx context.Context, first <-chan struct{}, firstTimer interface{ Stop() bool }) {
 	defer close(p.done)
-	wait := reconnectProbeFirst
-	for p.sleep(ctx, wait) && p.once(ctx) {
-		wait = reconnectProbeInterval
+	select {
+	case <-first:
+	case <-ctx.Done():
+		firstTimer.Stop()
+		return
+	}
+	for p.once(ctx) {
+		if !p.sleep(ctx, reconnectProbeInterval) {
+			return
+		}
 	}
 }
 
@@ -264,7 +322,10 @@ func (r *deviceNetworkReport) logAttrs() []any {
 		out = append(out, slog.Uint64("partition_id", uint64(*r.partitionID)))
 	}
 	if r.interfacesKnown {
-		out = append(out, slog.String("addresses", addrList(r.addresses)))
+		out = append(out, slog.String("addresses", addrList(r.routable)))
+		if n := len(r.addresses) - len(r.routable); n > 0 {
+			out = append(out, slog.Int("ignored", n))
+		}
 	}
 	return out
 }
@@ -273,7 +334,7 @@ func (r *deviceNetworkReport) logAttrs() []any {
 // NetworkCommissioning's state (the endpoint the NetworkCommissioning
 // steps use), GeneralDiagnostics' NetworkInterfaces and the Thread
 // diagnostics, each cluster only when the root's ServerList (step 0.1)
-// names it or the list is unknown. Eight paths: a server has to accept
+// names it or the list is unknown. Nine paths: a server has to accept
 // nine per read (readTerms). A cluster or attribute the device lacks is
 // a status in the report, not an error.
 func (f *flow) probePaths() []im.ConcreteAttributePath {
@@ -295,7 +356,8 @@ func (f *flow) probePaths() []im.ConcreteAttributePath {
 			rootAttr(threaddiag.ClusterID, threaddiag.AttrRoutingRole),
 			rootAttr(threaddiag.ClusterID, threaddiag.AttrNetworkName),
 			rootAttr(threaddiag.ClusterID, threaddiag.AttrChannel),
-			rootAttr(threaddiag.ClusterID, threaddiag.AttrPartitionId))
+			rootAttr(threaddiag.ClusterID, threaddiag.AttrPartitionId),
+			rootAttr(threaddiag.ClusterID, threaddiag.AttrMeshLocalPrefix))
 	}
 	return paths
 }
@@ -318,7 +380,11 @@ func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
 				continue
 			}
 			r.addresses = append(r.addresses, a)
-			if routableAddr(a) {
+			switch {
+			case !routableAddr(a):
+			case meshLocalAddr(a, r.meshLocal):
+				r.meshLocalCount++
+			default:
 				r.routable = append(r.routable, a)
 			}
 		}
@@ -348,6 +414,11 @@ func parseNetworkReport(report *interaction.Report) *deviceNetworkReport {
 		if nets, err := decodeNetworks(n); err == nil {
 			connected := slices.ContainsFunc(nets, func(n netcomm.NetworkInfoStruct) bool { return n.Connected })
 			r.connected = &connected
+		}
+	}
+	if n, ok := value(threaddiag.ClusterID, threaddiag.AttrMeshLocalPrefix); ok {
+		if v, err := spec.DecodeNullable(spec.DecodeBytes)(n); err == nil && !v.Null {
+			r.meshLocal = decodeIPv6Prefix(v.Value)
 		}
 	}
 	if n, ok := value(gendiag.ClusterID, gendiag.AttrNetworkInterfaces); ok {

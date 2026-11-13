@@ -33,6 +33,10 @@ type probeState struct {
 	name       string
 	channel    uint16
 	interfaces []gendiag.NetworkInterface
+	// meshPrefix is MeshLocalPrefix's ipv6pre bytes, nil for null.
+	meshPrefix []byte
+	// unsupported are attributes answered with UNSUPPORTED_ATTRIBUTE.
+	unsupported []uint32
 }
 
 // probedDevice answers the reconnect probe's reads with its states in
@@ -84,6 +88,13 @@ func (d *probedDevice) handle(req imRequest) (opcode uint8, payload []byte, ok b
 	if st.role != nil {
 		values = append(values, value{threaddiag.ClusterID, threaddiag.AttrRoutingRole, uintValue(*st.role)})
 	}
+	values = append(values, value{threaddiag.ClusterID, threaddiag.AttrMeshLocalPrefix, termsValue(func(e *tlv.Encoder, tag tlv.Tag) {
+		if st.meshPrefix == nil {
+			e.PutNull(tag)
+			return
+		}
+		e.PutOctets(tag, st.meshPrefix)
+	})})
 	return im.OpcodeReportData, encodeTLV(func(e *tlv.Encoder) {
 		e.StartStruct(tlv.AnonymousTag())
 		e.StartArray(tlv.ContextTag(1))
@@ -93,6 +104,14 @@ func (d *probedDevice) handle(req imRequest) (opcode uint8, payload []byte, ok b
 			e.PutUint(tlv.ContextTag(0), 1)
 			im.ConcreteAttributePath{Cluster: v.cluster, Attribute: v.attribute, HasEndpoint: true, HasCluster: true, HasAttribute: true}.MarshalTLV(e, tlv.ContextTag(1))
 			v.v.EncodeTLV(e, tlv.ContextTag(2))
+			_ = e.EndContainer()
+			_ = e.EndContainer()
+		}
+		for _, a := range st.unsupported {
+			e.StartStruct(tlv.AnonymousTag())
+			e.StartStruct(tlv.ContextTag(0))
+			im.ConcreteAttributePath{Cluster: threaddiag.ClusterID, Attribute: a, HasEndpoint: true, HasCluster: true, HasAttribute: true}.MarshalTLV(e, tlv.ContextTag(0))
+			im.StatusIB{Status: im.StatusUnsupportedAttribute}.MarshalTLV(e, tlv.ContextTag(1))
 			_ = e.EndContainer()
 			_ = e.EndContainer()
 		}
@@ -155,6 +174,7 @@ type probeRig struct {
 
 	release chan error
 	result  chan error
+	entered chan struct{}
 
 	mu    sync.Mutex
 	hints [][]netip.AddrPort
@@ -162,23 +182,23 @@ type probeRig struct {
 
 func newProbeRig(t *testing.T, dev *probedDevice, concurrent bool) *probeRig {
 	t.Helper()
-	r := &probeRig{dev: dev, log: &probeLog{}, release: make(chan error, 1), result: make(chan error, 1)}
+	r := &probeRig{dev: dev, log: &probeLog{}, release: make(chan error, 1), result: make(chan error, 1), entered: make(chan struct{})}
 	r.f, r.clock = newTestFlow(t, dev.handle)
 	r.f.log = slog.New(r.log)
 	r.f.data.supportsConcurrentConnection = &concurrent
 	// A failsafe long enough: the step arms nothing.
 	r.f.setFailSafeEnd(r.clock.Now().Add(time.Hour))
 	r.f.transition = func(context.Context, handshake.PeerAddress, bool) (*interaction.Interaction, error) {
+		close(r.entered)
 		if err := <-r.release; err != nil {
 			return nil, err
 		}
 		return r.f.interaction(), nil
 	}
-	r.f.hint = func(addrs []netip.AddrPort) int {
+	r.f.hint = func(addrs []netip.AddrPort) {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		r.hints = append(r.hints, slices.Clone(addrs))
-		return len(addrs)
 	}
 	go func() {
 		_, err := r.f.reconnectWithDevice(context.Background())
@@ -246,7 +266,7 @@ func iface(typ gendiag.InterfaceTypeEnum, operational bool, addrs ...string) gen
 // TestReconnectProbeHintsRoutableAddresses: a concurrent device is probed
 // over the commissioning session once the transition ran
 // reconnectProbeFirst, then every reconnectProbeInterval, in one read of
-// eight root paths. The probe logs at Info when the report changed, not on
+// nine root paths. The probe logs at Info when the report changed, not on
 // every probe; the operational interfaces' routable addresses — not the
 // link-local one, not a non-operational interface's — are handed to the
 // connection at port 5540 on every probe. The step succeeds with the
@@ -281,10 +301,10 @@ func TestReconnectProbeHintsRoutableAddresses(t *testing.T) {
 	}
 	first, second := logs[0], logs[1]
 	if first["level"] != "INFO" || first["role"] != "Unassigned" || first["networking_status"] != "Success" || first["connected"] != "false" ||
-		first["network_name"] != "lab" || first["channel"] != "15" || first["addresses"] != "[fe80::1]" {
+		first["network_name"] != "lab" || first["channel"] != "15" || first["addresses"] != "[]" || first["ignored"] != "1" {
 		t.Fatalf("first line %v", first)
 	}
-	if second["role"] != "EndDevice" || second["connected"] != "true" || second["addresses"] != "[fe80::1, fd11::5, 2001:db8::5]" {
+	if second["role"] != "EndDevice" || second["connected"] != "true" || second["addresses"] != "[fd11::5, 2001:db8::5]" || second["ignored"] != "1" {
 		t.Fatalf("second line %v", second)
 	}
 	want := []netip.AddrPort{netip.MustParseAddrPort("[fd11::5]:5540"), netip.MustParseAddrPort("[2001:db8::5]:5540")}
@@ -301,7 +321,7 @@ func TestReconnectProbeHintsRoutableAddresses(t *testing.T) {
 		t.Fatalf("reads %d then %d: the probing outlived the transition", reads, dev.readCount())
 	}
 	dev.mu.Lock()
-	paths := slices.Clone(dev.paths[:8])
+	paths := slices.Clone(dev.paths[:9])
 	dev.mu.Unlock()
 	for _, p := range paths {
 		if !p.HasEndpoint || p.Endpoint != rootEndpoint || !p.HasCluster || !p.HasAttribute {
@@ -407,6 +427,10 @@ func TestReconnectProbeNotConcurrent(t *testing.T) {
 	t.Parallel()
 	dev := &probedDevice{states: []probeState{{}}}
 	r := newProbeRig(t, dev, false)
+	<-r.entered
+	if slices.Contains(r.clock.Armed(), reconnectProbeFirst) {
+		t.Fatal("a probe is armed for a non-concurrent device")
+	}
 	r.clock.Advance(reconnectProbeFirst + 3*reconnectProbeInterval)
 	if err := r.finish(t, nil); err != nil {
 		t.Fatal(err)
@@ -421,12 +445,142 @@ func TestReconnectProbeNotConcurrent(t *testing.T) {
 func TestReconnectProbePathsFollowServerList(t *testing.T) {
 	t.Parallel()
 	f, _ := newTestFlow(t, nil)
-	if n := len(f.probePaths()); n != 8 {
-		t.Fatalf("%d paths without a ServerList, want 8", n)
+	if n := len(f.probePaths()); n != 9 {
+		t.Fatalf("%d paths without a ServerList, want 9", n)
 	}
 	f.data.rootServerList = []uint32{netcomm.ClusterID, gendiag.ClusterID}
 	paths := f.probePaths()
 	if len(paths) != 4 || slices.ContainsFunc(paths, func(p im.ConcreteAttributePath) bool { return p.Cluster == threaddiag.ClusterID }) {
 		t.Fatalf("paths %v", paths)
+	}
+}
+
+// TestReconnectProbeArmedWithTransition: a concurrent device's first probe
+// is armed by the time the transition runs.
+func TestReconnectProbeArmedWithTransition(t *testing.T) {
+	t.Parallel()
+	r := newProbeRig(t, &probedDevice{states: []probeState{{}}}, true)
+	<-r.entered
+	if !slices.Contains(r.clock.Armed(), reconnectProbeFirst) {
+		t.Fatal("no probe armed when the transition started")
+	}
+	if err := r.finish(t, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestReconnectProbeMeshLocalOmitted: the mesh-local addresses — inside
+// the reported MeshLocalPrefix (the ML-EID) or, whatever the prefix, with
+// the RLOC/ALOC interface identifier 0000:00ff:fe00:xxxx — are not hinted,
+// not logged as addresses and not named as unreachable; the failure counts
+// them.
+func TestReconnectProbeMeshLocalOmitted(t *testing.T) {
+	t.Parallel()
+	dev := &probedDevice{states: []probeState{{
+		status: ptr(netcomm.NetworkCommissioningStatusSuccess), connected: true, role: ptr(threaddiag.RoutingRoleEndDevice), name: "lab", channel: 15,
+		meshPrefix: []byte{64, 0xfd, 0xde, 0xad, 0x00, 0xbe, 0xef, 0x00, 0x00},
+		interfaces: []gendiag.NetworkInterface{iface(gendiag.InterfaceTypeThread, true,
+			"fe80::1", "fdde:ad00:beef:0:1234:5678:9abc:def0", "fdde:ad00:beef:0:0:ff:fe00:4c01", "fd11::5")},
+	}}}
+	r := newProbeRig(t, dev, true)
+	r.probe(t, reconnectProbeFirst)
+	want := []netip.AddrPort{netip.MustParseAddrPort("[fd11::5]:5540")}
+	if h := r.hinted(); len(h) != 1 || !slices.Equal(h[0], want) {
+		t.Fatalf("hints %v, want %v", h, want)
+	}
+	if l := r.log.all(); len(l) != 1 || l[0]["addresses"] != "[fd11::5]" || l[0]["ignored"] != "3" {
+		t.Fatalf("log %v", l)
+	}
+	err := r.finish(t, errors.New("peer: unreachable"))
+	if !strings.Contains(err.Error(), "addresses [fd11::5]; not reachable at them, 2 mesh-local addresses omitted)") {
+		t.Fatalf("error %v", err)
+	}
+}
+
+// TestReconnectProbeRLOCWithoutPrefix: without a MeshLocalPrefix (null)
+// only the RLOC/ALOC rule applies — the ML-EID passes as a routable ULA.
+func TestReconnectProbeRLOCWithoutPrefix(t *testing.T) {
+	t.Parallel()
+	dev := &probedDevice{states: []probeState{{
+		role: ptr(threaddiag.RoutingRoleEndDevice),
+		interfaces: []gendiag.NetworkInterface{iface(gendiag.InterfaceTypeThread, true,
+			"fdde:ad00:beef:0:1234:5678:9abc:def0", "fdde:ad00:beef:0:0:ff:fe00:fc00")},
+	}}}
+	r := newProbeRig(t, dev, true)
+	r.probe(t, reconnectProbeFirst)
+	want := []netip.AddrPort{netip.MustParseAddrPort("[fdde:ad00:beef:0:1234:5678:9abc:def0]:5540")}
+	if h := r.hinted(); len(h) != 1 || !slices.Equal(h[0], want) {
+		t.Fatalf("hints %v, want %v", h, want)
+	}
+	if err := r.finish(t, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDecodeIPv6Prefix: an ipv6pre is the length in bits, then the
+// prefix's bytes; a malformed one is invalid.
+func TestDecodeIPv6Prefix(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		in   []byte
+		want string
+	}{
+		{[]byte{64, 0xfd, 0xde, 0xad, 0, 0xbe, 0xef, 0, 0}, "fdde:ad00:beef::/64"},
+		{[]byte{48, 0xfd, 0xde, 0xad, 0, 0xbe, 0xef}, "fdde:ad00:beef::/48"},
+		{[]byte{64, 0xfd}, "invalid Prefix"},
+		{[]byte{129}, "invalid Prefix"},
+		{nil, "invalid Prefix"},
+	} {
+		if got := decodeIPv6Prefix(c.in).String(); got != c.want {
+			t.Errorf("decodeIPv6Prefix(%x) = %s, want %s", c.in, got, c.want)
+		}
+	}
+}
+
+// TestReconnectProbeUnsupportedAttribute: an attribute answered with a
+// status (UNSUPPORTED_ATTRIBUTE) is not reported, and the rest of the
+// probe stands.
+func TestReconnectProbeUnsupportedAttribute(t *testing.T) {
+	t.Parallel()
+	dev := &probedDevice{states: []probeState{{
+		status: ptr(netcomm.NetworkCommissioningStatusNetworkNotFound), name: "lab", channel: 15,
+		interfaces: []gendiag.NetworkInterface{}, unsupported: []uint32{threaddiag.AttrRoutingRole},
+	}}}
+	r := newProbeRig(t, dev, true)
+	r.probe(t, reconnectProbeFirst)
+	l := r.log.all()
+	if len(l) != 1 || l[0]["network_name"] != "lab" || l[0]["networking_status"] != "NetworkNotFound" {
+		t.Fatalf("log %v", l)
+	}
+	dev.mu.Lock()
+	n := dev.reads
+	dev.mu.Unlock()
+	if _, ok := l[0]["role"]; ok || n != 1 {
+		t.Fatalf("an unsupported attribute was reported: %v", l[0])
+	}
+	if err := r.finish(t, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestReconnectProbeReadInFlightAtSuccess: a transition that succeeds
+// while a probe read is in flight returns at once — no clock advance — and
+// the read is cancelled: its timeout timer is gone and no end is logged.
+func TestReconnectProbeReadInFlightAtSuccess(t *testing.T) {
+	t.Parallel()
+	dev := &probedDevice{silent: true}
+	r := newProbeRig(t, dev, true)
+	r.armed(t, reconnectProbeFirst)
+	r.clock.Advance(reconnectProbeFirst)
+	r.armed(t, reconnectProbeTimeout)
+	eventually(t, "the read", func() bool { return dev.readCount() > 0 })
+	if err := r.finish(t, nil); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(r.clock.Armed(), reconnectProbeTimeout) || slices.Contains(r.clock.Armed(), reconnectProbeInterval) {
+		t.Fatalf("probe timers left armed: %v", r.clock.Armed())
+	}
+	if n := len(r.log.named("matter.controller.commissioning.reconnect_probe_ended")); n != 0 {
+		t.Fatalf("%d end lines for a cancelled read", n)
 	}
 }

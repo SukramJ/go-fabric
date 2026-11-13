@@ -345,8 +345,10 @@ networking status, whether its network is connected, its Thread role,
 network name and channel, the addresses of its operational interfaces —
 first two seconds into the step, then every ten seconds. A change is
 logged at Info (`matter.controller.commissioning.reconnect_probe`); the
-routable addresses it reports (not link-local) are attempted over CASE
-at port 5540 beside what discovery delivers
+routable addresses it reports (not link-local, not Thread mesh-local:
+inside its mesh-local prefix or a routing or anycast locator) are
+attempted over CASE at port 5540, each once, beside what discovery
+delivers
 (`matter.controller.peer.address_hinted`), so a Thread node whose border
 router never publishes its operational record is still reached; and a
 `Reconnect` that fails names the device's last report, for example

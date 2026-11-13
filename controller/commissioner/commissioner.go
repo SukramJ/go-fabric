@@ -562,11 +562,10 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 	// The reconnect probe's addresses go to the peer's running connection
 	// process; before the transition added the peer, or once it ended,
 	// they go nowhere.
-	f.hint = func(addrs []netip.AddrPort) int {
+	f.hint = func(addrs []netip.AddrPort) {
 		if p := c.ctx.Peers.Get(address); p != nil {
-			return p.HintAddresses(addrs...)
+			p.HintAddresses(addrs...)
 		}
-		return 0
 	}
 	if err := f.execute(ctx); err != nil {
 		if p := c.ctx.Peers.Get(address); p != nil {

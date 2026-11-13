@@ -119,7 +119,7 @@ var areaKeys = []string{
 	// controller/camera (phase 37): a camera's WebRTC session and stream ids
 	// and the track of a session start.
 	"stream_id", "track", "webrtc_session_id",
-	// controller/commissioner (W16): the reconnect probe's report of the
+	// controller/commissioner (W17): the reconnect probe's report of the
 	// device's network state.
 	"connect_error", "connected", "network_name", "networking_status", "partition_id",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
