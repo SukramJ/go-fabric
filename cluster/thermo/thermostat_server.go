@@ -1853,7 +1853,9 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
 // AtomicWriteHandler (ThermostatServer.ts:1582-1585,
 // AtomicWriteHandler.ts:84-89). The server stays usable: the next
-// command or MatterTimeChanged arms the suggestion timer again.
+// command or MatterTimeChanged arms the suggestion timer again, and so
+// does the [ThermostatServer.SetEndpoint] of a reassembly that puts the
+// server back.
 func (s *ThermostatServer) MatterQuiesce() {
 	s.mu.Lock()
 	if s.suggest.timer != nil {
@@ -1861,6 +1863,7 @@ func (s *ThermostatServer) MatterQuiesce() {
 		s.suggest.timer = nil
 	}
 	s.suggest.pending = false
+	s.suggest.quiesced = true
 	s.mu.Unlock()
 	s.atomic.closeAll()
 }

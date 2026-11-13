@@ -69,3 +69,26 @@ func TestThermostatMatterQuiesceStopsItsTimers(t *testing.T) {
 		t.Errorf("ActivePresetHandle %q after a re-evaluation following MatterQuiesce, want %q", got, handleB)
 	}
 }
+
+// TestThermostatReAddedAfterMatterQuiesceArmsItsSuggestion (review II,
+// R2-P1-dr-rest-03): a reassembly drops the server (MatterQuiesce) and a
+// later one puts the same object back, stamping its endpoint
+// (bridge.Reassemble → SetEndpoint). The suggestion it held becomes current
+// at its EffectiveTime without waiting for a command or a moved time.
+func TestThermostatReAddedAfterMatterQuiesceArmsItsSuggestion(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	at := clk.epoch() + 600
+	if _, err := addSuggestion(srv, handleB, &at, 30); err != nil {
+		t.Fatal(err)
+	}
+	srv.MatterQuiesce()
+	clk.Advance(10 * time.Second)
+	srv.SetEndpoint(1) // the later reassembly
+	clk.Advance(0)
+	clk.Advance(600 * time.Second)
+	if got := srv.ActivePresetHandle(); !bytes.Equal(got, handleB) {
+		t.Errorf("ActivePresetHandle %q past the EffectiveTime after the re-add, want %q", got, handleB)
+	}
+}

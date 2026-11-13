@@ -90,6 +90,9 @@ type suggestions struct {
 	// time before it was scheduled, so it leaves the scheduled timer armed
 	// instead of replacing it (armSuggestionTimerLocked).
 	pending bool
+	// quiesced marks the timer MatterQuiesce stopped: the SetEndpoint of
+	// a reassembly that puts the server back re-evaluates and arms it.
+	quiesced bool
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions

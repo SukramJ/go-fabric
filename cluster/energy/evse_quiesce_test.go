@@ -86,3 +86,54 @@ func TestEvseMatterQuiesceStopsTheEnabledTimer(t *testing.T) {
 		})
 	}
 }
+
+// TestEvseReAddedAfterMatterQuiesceEnforcesTheDeadline (review II,
+// R2-P1-dr-rest-03): a reassembly drops the server (MatterQuiesce) and a
+// later one puts the same object back, stamping its endpoint
+// (bridge.Reassemble → SetEndpoint) as node.Aggregator's Remove and Add of
+// the same Endpoint do. The enabled-until deadline the controller set
+// before is enforced again: a deadline still ahead re-arms the timer, one
+// that passed while the server was out disables at once.
+func TestEvseReAddedAfterMatterQuiesceEnforcesTheDeadline(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		out  time.Duration // how long the server is out of the topology
+	}{
+		{"deadline ahead", 10 * time.Second},
+		{"deadline passed while out", 2 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			clk := clocktest.New(time.Unix(1700000000, 0))
+			host := &evseHost{}
+			srv, err := energy.NewEnergyEvse(energy.EvseConfig{
+				Features: energy.EvseFeatureChargingPreferences, UserMaximumChargeCurrent: true,
+				RandomizationDelayWindow: true, ApproximateEvEfficiency: true, StartDiagnostics: true,
+				Host: host, Clock: clk,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			host.srv = srv
+			ev := &energyEvents{}
+			srv.SetMatterEventEmitter(ev)
+			srv.SetEndpoint(2)
+			t.Cleanup(srv.Close)
+			basicFunctionality(t, srv)
+			pluggedIn(t, srv)
+			until := demEpoch(clk.Now()) + 60
+			enableCharging(t, srv, &until, 6000, 60000)
+
+			srv.MatterQuiesce()
+			clk.Advance(tc.out)
+			if got := srv.SupplyState(); got != energy.SupplyChargingEnabled {
+				t.Fatalf("SupplyState %v while out of the topology; want it untouched", got)
+			}
+			srv.SetMatterEventEmitter(ev) // the later reassembly
+			srv.SetEndpoint(2)
+			clk.Advance(5 * time.Minute)
+			wantEvse(t, "past the deadline after the re-add", srv, energy.EvsePluggedInNoDemand, energy.SupplyDisabled)
+		})
+	}
+}

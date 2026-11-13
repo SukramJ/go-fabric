@@ -194,8 +194,21 @@ func (s *ThermostatServer) emit(ctx context.Context, eventID uint32, data any) {
 }
 
 // SetEndpoint stamps the endpoint the events of a host change are
-// addressed to; the bridge calls it at reassembly.
-func (s *ThermostatServer) SetEndpoint(endpoint uint16) { s.endpoint.Store(uint32(endpoint)) }
+// addressed to; the bridge calls it at reassembly, for every server of the
+// new topology. A server [ThermostatServer.MatterQuiesce] stopped comes
+// back here — a reassembly that puts the same object back — and its
+// suggestions are re-evaluated and the timer armed from the state, as a
+// moved Matter time does (review II, R2-P1-dr-rest-03).
+func (s *ThermostatServer) SetEndpoint(endpoint uint16) {
+	s.endpoint.Store(uint32(endpoint))
+	s.mu.Lock()
+	back := s.suggest.quiesced
+	s.suggest.quiesced = false
+	s.mu.Unlock()
+	if back {
+		s.scheduleSuggestionReevaluation()
+	}
+}
 
 // SetThermostatRunningMode records the mode the thermostat runs in right
 // now (ThermostatRunningModeEnum: Off, Cool, Heat), the attribute TEVT and
