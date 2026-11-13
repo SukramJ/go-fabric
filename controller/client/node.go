@@ -478,9 +478,9 @@ func (n *Node) start(ctx context.Context) (started bool, err error) {
 	}
 	// The cache adopts the default subscription's fabric filter before
 	// the default subscription syncs, one reaction at a time
-	// (NetworkClient.ts:88-97 at 862ad75f). matter.js binds the peer's
+	// (NetworkClient.ts:93-98 at db021da0). matter.js binds the peer's
 	// signals before that reaction and awaits it without a deadline
-	// (NetworkClient.ts:85-87, :92-97 at 862ad75f); here the adoption,
+	// (NetworkClient.ts:85-88, :93-98 at db021da0); here the adoption,
 	// whose drain ends with ctx, comes before the node goes online, so a
 	// Start that returns ctx's error has started nothing it would have to
 	// take back.
