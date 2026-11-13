@@ -147,10 +147,10 @@ func matterTime(t time.Time) int64 {
 	return t.Unix() - matterEpochOffset
 }
 
-// MatterIDs reads the vendor and product id of the subject DN —
-// Certificate.ts:345-352 (the OID attributes, hex strings parsed with
-// parseInt(_, 16)) and :379-392 (the Mvid:/Mpid: commonName fallback,
-// only when the DN carries neither OID).
+// MatterIDs reads the vendor and product id of the subject DN: the OID
+// attributes as [parseHexID] reads them (the rule of matter.js 862ad75f,
+// not of the db021da0 pin — see there) and Certificate.ts:379-392 (the
+// Mvid:/Mpid: commonName fallback, only when the DN carries neither OID).
 func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	return matterIDsOf(c.Subject)
 }
@@ -190,11 +190,15 @@ func matterIDsOf(name pkix.Name) (vid, pid *uint16, err error) {
 	return vid, pid, nil
 }
 
-// parseHexID is parseInt(hexString, 16) as matter.js applies it to a
-// vendor or product id attribute (Certificate.ts:345-352): the leading
-// hex digits; a value without one is absent. A value above 16 bits is
-// absent here too — matter.js keeps the number, which then matches no
-// 16-bit id either.
+// parseHexID reads a vendor or product id attribute leniently: the
+// leading hex digits, either case; a value without one, or above 16 bits,
+// is absent. That is parseInt(hexString, 16) as matter.js applied it at
+// 862ad75f (Certificate.ts:346-352). At the db021da0 pin matter.js reads
+// the attribute with parseMatterRdnHex(field, text, 2,
+// CertificateProfileError) (Certificate.ts:341-353; :242-249 accepts
+// exactly 4 uppercase hex digits and nothing else) and rethrows the error
+// unless acceptMalformedVidPid, which leaves the field out. This reader
+// has not followed that lift (review II, R2-P1-sec-02).
 func parseHexID(s string) *uint16 {
 	end := 0
 	for end < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[end])) {
