@@ -68,6 +68,10 @@ type WiFiNetworkCommissioning struct {
 	// is derived from it, as chip's Linux driver reports the network the
 	// link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
 	link []byte
+	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
+	// ConnectNetwork whose driver call outlives the window that admitted it
+	// sees it moved and drops its result.
+	expiries uint64
 
 	lastStatus     *uint8
 	lastNetworkID  []byte // empty reads as null (ReadAttribute :1087-1092)
@@ -684,6 +688,7 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
+	window := w.expiries
 	i := w.indexLocked(req.NetworkId)
 	var target wifiNetwork
 	if i >= 0 {
@@ -700,8 +705,22 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
 	}
 	w.mu.Lock()
-	w.busy = false
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, DebugText: debugText(text), ErrorValue: spec.Nullable[int32]{Null: true}}
+	if w.expiries != window {
+		// The fail-safe that admitted the command expired while the driver
+		// ran, and OnFailSafeExpired reverted the networks: the result
+		// touches neither the reverted state nor the Breadcrumb.
+		// connectedhomeip releases the pending command on the expiry
+		// (NetworkCommissioningCluster.cpp:1002 at 6170af84) and its
+		// OnResult returns on the released handle (:850-857) (review II,
+		// R2-P1-core-06).
+		w.mu.Unlock()
+		if !statusOK(status) {
+			resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
+		}
+		return resp, nil
+	}
+	w.busy = false
 	if statusOK(status) {
 		w.lastConnectErr = nil
 		w.link = bytes.Clone(req.NetworkId)
@@ -740,6 +759,7 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 // reported ([WiFiNetworkCommissioning.OnAttributeChange]).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
+	w.expiries++
 	w.networks = slices.Clone(w.committed)
 	for j := range w.networks {
 		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)
