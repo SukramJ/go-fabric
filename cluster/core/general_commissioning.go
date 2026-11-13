@@ -804,17 +804,17 @@ type failSafeWatch struct {
 }
 
 // startFailSafeWatchLocked replaces the expiry watcher by one for a
-// window that ends at expiresAt; without an expiry hook — the host's or
-// the session owner's — none runs. One
+// window that ends at expiresAt. It runs with or without an expiry hook:
+// the expiry has effects of the cluster's own — the window ends, the
+// Breadcrumb resets, a tentative terms acceptance reverts — which the
+// command paths judge by the armed flag the watcher clears (review II,
+// R2-P1-core-05). One
 // watcher serves the window: before, every arm and re-arm started a
 // goroutine that slept to its own deadline, so a commissioner that
 // re-armed every few seconds left one parked per re-arm until that
 // deadline (review II, W2-conc-15). Caller holds g.mu.
 func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
 	g.stopFailSafeWatchLocked()
-	if g.onFailSafeExpired == nil && g.onFailSafeRolledBack == nil {
-		return
-	}
 	w := &failSafeWatch{
 		timer: g.clock.NewTimer(clock.Until(g.clock, expiresAt)),
 		stop:  make(chan struct{}),

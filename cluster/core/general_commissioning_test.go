@@ -1404,3 +1404,63 @@ func TestGeneralCommissioningBumpsDataVersionWithTheBreadcrumb(t *testing.T) {
 		})
 	})
 }
+
+// TestGeneralCommissioningExpiresWithoutHooks pins R2-P1-core-05: a
+// fail-safe armed on a server with no expiry hook wired still ends at its
+// deadline — the Breadcrumb is reset and reported, another fabric may arm,
+// and CommissioningComplete answers NoFailSafe — instead of the command
+// paths seeing it armed for good.
+func TestGeneralCommissioningExpiresWithoutHooks(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC))
+	gc := newGencomm(t, core.GeneralCommissioningConfig{
+		LocationCapability: core.RegulatoryIndoor,
+		FailSafeMaxSeconds: 600,
+		Clock:              clk,
+	})
+	reset := make(chan struct{}, 1)
+	defer gc.OnAttributeChange(func(c contract.Change) {
+		if slices.Contains(c.Attributes, 0x0000) {
+			reset <- struct{}{}
+		}
+	})()
+	fab1 := im.WithFabricFilter(context.Background(), false, 1)
+	if _, err := gc.MatterInvoke(fab1, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 1, Breadcrumb: 7}); err != nil {
+		t.Fatalf("ArmFailSafe: %v", err)
+	}
+	for range 1000 {
+		if clk.Pending() >= 1 {
+			break
+		}
+		clk.Yield()
+	}
+	if clk.Pending() < 1 {
+		t.Fatal("no expiry watcher runs for a fail-safe armed without hooks")
+	}
+	clk.Advance(2 * time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second) // a bound on a missing reset, not a wait for time
+	defer cancel()
+	select {
+	case <-reset:
+	case <-ctx.Done():
+		t.Fatal("the expiry did not reset the Breadcrumb")
+	}
+	if v, _ := gc.MatterRead(0x0000); v != uint64(0) {
+		t.Fatalf("Breadcrumb after expiry = %v, want 0", v)
+	}
+	resp, err := gc.MatterInvoke(fab1, 0x04, nil)
+	if err != nil {
+		t.Fatalf("CommissioningComplete: %v", err)
+	}
+	if code := resp.(core.CommissioningCompleteResponse).ErrorCode; code != core.CommissioningErrorNoFailSafe {
+		t.Fatalf("CommissioningComplete after expiry ErrorCode = %d, want NoFailSafe", code)
+	}
+	fab2 := im.WithFabricFilter(context.Background(), false, 2)
+	resp, err = gc.MatterInvoke(fab2, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60})
+	if err != nil {
+		t.Fatalf("ArmFailSafe(fabric 2): %v", err)
+	}
+	if code := resp.(core.ArmFailSafeResponse).ErrorCode; code != core.CommissioningErrorOK {
+		t.Fatalf("ArmFailSafe from another fabric after expiry ErrorCode = %d, want OK", code)
+	}
+}
