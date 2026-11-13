@@ -302,6 +302,10 @@ func (p *reconnectProbe) once(probing context.Context) bool {
 	p.mu.Unlock()
 	if changed {
 		p.f.log.Info("matter.controller.commissioning.reconnect_probe", r.logAttrs()...)
+		if r.interfacesOver > 0 {
+			p.f.log.Warn("matter.controller.commissioning.reconnect_probe_interfaces_dropped",
+				slog.Int("max", maxProbedInterfaces()), slog.Int("dropped", r.interfacesOver))
+		}
 	}
 	if p.hint != nil && len(r.routable) > 0 {
 		targets := make([]netip.AddrPort, len(r.routable))
@@ -341,9 +345,6 @@ func (r *deviceNetworkReport) logAttrs() []any {
 		out = append(out, slog.String("addresses", addrList(r.routable)))
 		if n := len(r.addresses) - len(r.routable); n > 0 {
 			out = append(out, slog.Int("ignored", n))
-		}
-		if r.interfacesOver > 0 {
-			out = append(out, slog.Int("interfaces_ignored", r.interfacesOver))
 		}
 	}
 	return out
@@ -413,10 +414,11 @@ func (r *deviceNetworkReport) addInterfaceList(n spec.Node) {
 // addInterfaces takes the addresses of the operational interfaces, each
 // once, the routable ones marked — of the first maxProbedInterfaces
 // operational interfaces, in the device's order; the ones after them are
-// counted (interfacesOver) and not taken. With the generated entry's own
-// bounds that is at most peer.MaxHintedAddresses addresses per report: the
-// report is the device's statement, and what the probe takes from it is
-// logged, named in the step's failure and attempted.
+// counted (interfacesOver, which the probe logs) and not taken. With the
+// generated entry's own bounds that is at most peer.MaxHintedAddresses
+// addresses per report: the report is the device's statement, and what
+// the probe takes from it is logged, named in the step's failure and
+// attempted.
 func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
 	r.interfacesKnown = true
 	limit, taken := maxProbedInterfaces(), 0

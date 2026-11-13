@@ -73,7 +73,7 @@ func (p *Peer) HintAddresses(addrs ...netip.AddrPort) int {
 	}
 	if over > 0 && !c.hintLimitLogged {
 		c.hintLimitLogged = true
-		p.log.Warn("matter.controller.peer.address_hint_limit", slog.Int("limit", MaxHintedAddresses), slog.Int("passed_over", over))
+		p.log.Warn("matter.controller.peer.address_hint_limit", slog.Int("max", MaxHintedAddresses), slog.Int("dropped", over))
 	}
 	return n
 }
