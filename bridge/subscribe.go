@@ -1446,6 +1446,20 @@ func (b *Bridge) handleSubscribeRequest(
 		// reports the bridge never sends.
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
+	// No path leaves the subscription priming: unless its
+	// SubscribeResponse went out, it is closed on the way out — a panic
+	// the transport recovers above this handler included; the returns
+	// below close it before they answer, a second close is a no-op. A priming
+	// subscription is skipped by the KeepSubscriptions=false teardown and
+	// the session replacement, so one left behind would hold its place in
+	// the fabric's quota until its session closed (review II,
+	// R2-P1-dr-req-07).
+	established := false
+	defer func() {
+		if !established {
+			b.abandonPrimingSubscription(subID)
+		}
+	}()
 	// One EventFilterIB applies to the priming report: the first for this
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
@@ -1478,6 +1492,7 @@ func (b *Bridge) handleSubscribeRequest(
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
+	established = true
 	// The subscription is active: record it for re-establishment after a
 	// restart (matter.js SubscriptionsServer.#addSubscription, fired when
 	// InteractionServer activates the subscription after its
