@@ -444,12 +444,19 @@ func (r *Registry) add(n *Node) {
 	r.manageExpiration()
 }
 
-// remove drops n and manages the expiry timer (Peers.ts:107).
+// remove drops n and manages the expiry timer (Peers.ts:107), then runs
+// n's Deleted hook — once, for a node the registry held (review II,
+// R2-P1-ctl-05).
 func (r *Registry) remove(n *Node) {
 	r.mu.Lock()
+	held := len(r.nodes)
 	r.nodes = slices.DeleteFunc(r.nodes, func(x *Node) bool { return x == n })
+	removed := len(r.nodes) < held
 	r.mu.Unlock()
 	r.manageExpiration()
+	if h := n.cfg.Hooks.Deleted; removed && h != nil {
+		h()
+	}
 }
 
 // Forget drops n from the registry and the database without reaching it:

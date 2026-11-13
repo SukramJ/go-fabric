@@ -365,3 +365,48 @@ func TestControllerICDWatchAndGaugeLifecycle(t *testing.T) {
 		t.Fatal("a closed controller watches or diagnoses")
 	}
 }
+
+// TestControllerICDWatchEndsWithTheNodesDeletion (review II, R2-P1-ctl-05):
+// a commissioned node deleted through the registry without a
+// decommission — Forget, or Erase — is no longer watched. The watch is
+// the controller's only per-node state of the trace: two observers on the
+// node's ICD client, no timer and no goroutine; it goes with the node.
+// Before, only the Decommissioned hook ended it, which neither path fires,
+// so the controller kept the node and its observers until Close.
+func TestControllerICDWatchEndsWithTheNodesDeletion(t *testing.T) {
+	t.Parallel()
+	for name, remove := range map[string]func(context.Context, *controller.Controller, *client.Node) error{
+		"Forget": func(ctx context.Context, c *controller.Controller, n *client.Node) error {
+			return c.Registry().Forget(ctx, n)
+		},
+		"Erase": func(ctx context.Context, c *controller.Controller, _ *client.Node) error {
+			c.Registry().Erase(ctx)
+			return nil
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			site, _, c, n := sitePair(t, fabrictest.Topology{}, nil)
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+			defer cancel()
+			if !controller.WatchingICD(c, n) {
+				t.Fatal("a commissioned node's ICD Check-Ins are not watched")
+			}
+			if err := site.Run(ctx, func(ctx context.Context) error { return remove(ctx, c, n) }); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if err := site.Settle(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if len(c.Registry().Nodes()) != 0 {
+				t.Fatalf("the registry still holds %d nodes", len(c.Registry().Nodes()))
+			}
+			if controller.WatchingICD(c, n) {
+				t.Fatal("a deleted node is still watched")
+			}
+			if err := site.Run(ctx, c.Close); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

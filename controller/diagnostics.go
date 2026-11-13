@@ -352,6 +352,13 @@ func (c *Controller) diagHooks(inner func(id string) client.Hooks) func(id strin
 				decommissioned()
 			}
 		}
+		deleted := h.Deleted
+		h.Deleted = func() {
+			c.unwatchDeletedICD(id)
+			if deleted != nil {
+				deleted()
+			}
+		}
 		return h
 	}
 }
@@ -440,6 +447,26 @@ func (c *Controller) unwatchICD(n *client.Node) {
 	c.icdMu.Unlock()
 	for _, stop := range stops {
 		stop()
+	}
+}
+
+// unwatchDeletedICD stops watching the node with local id that left the
+// registry: a node Forget or Erase deleted fires no Decommissioned (review
+// II, R2-P1-ctl-05). The registry no longer holds it when its Deleted hook
+// runs, and a node created since may hold the id, so the watch is found by
+// its id among the watched nodes the registry does not hold under it.
+func (c *Controller) unwatchDeletedICD(id string) {
+	current := c.nodeByID(id)
+	c.icdMu.Lock()
+	var gone []*client.Node
+	for n := range c.icdWatched {
+		if n.ID() == id && n != current {
+			gone = append(gone, n)
+		}
+	}
+	c.icdMu.Unlock()
+	for _, n := range gone {
+		c.unwatchICD(n)
 	}
 }
 
