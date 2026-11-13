@@ -7018,3 +7018,111 @@ real central. Review II, R2-P0-bound-E05. Pinned by
 `TestConnReceiverCloseEndsAWaitingDelivery`. Register row above; the row
 closes when matter.js bounds the messages of a BTP session it has not
 finished.
+
+### BD-Matter-BTP-WindowZeroRefused — a BTP handshake that states a window size of 0 is refused on both roles
+
+matter.js accepts the value: its peripheral answers with
+`Math.min(MatterBle.BTP_MAXIMUM_WINDOW_SIZE, clientWindowSize)`
+(`packages/protocol/src/ble/BtpSessionHandler.ts:123` at `db021da0`), which
+is 0 for a request that states 0, and its central hands the response's
+`windowSize` to the session unchecked (`:180-191`). What a matter.js session
+with a window of 0 then does was not traced (unverified). connectedhomeip
+refuses on both roles — `VerifyOrReturnError(req.mWindowSize > 0,
+CHIP_ERROR_INVALID_ARGUMENT)` for the request (`src/ble/BLEEndPoint.cpp:1014`
+at `6170af84`) and the same for the response (`:1081`) — and the error
+closes the end point (`:1151-1152`, `:1160-1169`, `:1294-1297`).
+`transport/btp` follows connectedhomeip: `NewPeripheral` writes no response,
+calls the disconnect callback and returns a `*ProtocolError`; `NewCentral`
+returns a `*ProtocolError` and its callers drop the connection
+(`transport/btp/session.go`). Deliberate: a peer whose window is 0 can never
+be sent a packet, and the device is a BLE peripheral since ADR 0031 (owner
+decision 1 of review II, W1-wire-07). One difference from connectedhomeip in
+*when*: it refuses on the write of the request ("a peripheral receiving a
+capabilities request write", `:1154-1160`), where this module parses the
+kept request at the subscription, as matter.js does
+(`packages/nodejs-ble/src/BlenoBleServer.ts:258-263`, `:299`). Pinned by
+`transport/btp:TestBtpSessionRefusesZeroWindowRequest`,
+`TestBtpSessionRefusesZeroWindowResponse`, `TestAcceptRefusesZeroWindow`
+and, for a window of 1 on both roles, `TestBtpSessionAcceptsSmallestWindow`.
+Retire when matter.js refuses a window of 0.
+
+### BD-chip-StatusIB-EightBitStatus — the client-side decoders refuse a StatusIB status that does not fit 8 bits
+
+matter.js declares both StatusIB fields as `TlvEnum<Status>()`
+(`packages/types/src/protocol/types/TlvStatus.ts:15-16` at `db021da0`; the
+first carries the comment "8Bit"), and `TlvEnum` is `TlvUInt32`
+(`packages/types/src/tlv/TlvNumber.ts:303`, "We use internally 32bit
+here"), so a status above 255 decodes to its number (inferred from the two
+schemas; not run). connectedhomeip reads `Status` into an
+`enum class Status : uint8_t`
+(`src/protocols/interaction_model/StatusCode.h:43` at `6170af84`) and
+`ClusterStatus` into a `uint8_t` (`src/lib/core/DataModelTypes.h:33`), both
+through `TLVReader::Get` (`src/app/MessageDef/StatusIB.cpp:54-60`,
+`src/lib/core/TLVReader.h:531-538`), which answers
+`CHIP_ERROR_INVALID_INTEGER_VALUE` for a value that does not fit
+(`src/lib/core/TLVReader.cpp:204-214`). `im.statusIBField` (`im/status.go`),
+which both StatusIB readers of the client side use, refuses the wider value
+as connectedhomeip does. Deliberate: this module's `StatusCode` is 8 bits
+wide, and before `ee681996` the wider value was masked — a status 0x100
+read as Success. The event priority of an EventDataIB is held to 8 bits
+the same way (`im/client.go`), where matter.js again declares a `TlvEnum`
+(`packages/types/src/protocol/types/TlvEventData.ts:21`); connectedhomeip's
+width for it was not read (unverified). Review II, R2-P0-wire-A05. Pinned
+by `im:TestClientDecodersRefuseOutOfRangeIntegers` and
+`TestClientDecodersKeepTheWholeRange`. Retire when matter.js refuses a
+status above 8 bits, or when this module's status type holds 32.
+
+### BD-Matter-SetupCode-ErrorOmitsPasscode — an error for a refused passcode names the rule, not the value
+
+matter.js prints the value: `assertValidPasscode` throws
+``Invalid passcode ${passcode}``
+(`packages/types/src/schema/PairingCodeSchema.ts:181-185` at `db021da0`),
+and four of its tests expect "Invalid passcode 12345678"
+(`packages/types/test/schema/PairingCodeSchemaTest.ts:163-165`, `:170`,
+`:420-422`, `:427`). The errors of `secure/setup` for a passcode that is
+zero, above 99999998 or one of the disallowed values name the rule
+(`secure/setup/setup.go`, `passcodeRule`), and the ported assertions expect
+the text without the value
+(`secure/setup/pairing_code_schema_parity_matterjs_test.go`). Deliberate: an
+error text reaches logs and a controller's diagnostics, and a disallowed
+passcode is still the passcode of the device that ships with it. The same
+rule holds for this module's own checks, which have no matter.js text to
+depart from: `node`'s configuration and window checks, the PASE responder
+(`commissioning.ErrPASEInvalidPasscode`) and the example commands. Review
+II, R2-P0-sec-E04. Pinned by `secure/setup:TestErrorsDoNotRenderThePasscode`
+and `commissioning/pase_error_text_test.go`. Retire when matter.js's text
+drops the value.
+
+### BD-Matter-WildcardFabricScopedWriteWithoutFabric — a wildcard-endpoint write of a fabric-scoped attribute without an accessing fabric is skipped without a status
+
+On a concrete path both references answer UNSUPPORTED_ACCESS, and this
+module mirrors matter.js: `if (limits.fabricScoped && !this.session.fabric)`
+(`packages/protocol/src/action/server/AttributeWriteResponse.ts:248-251` at
+`db021da0`; connectedhomeip `src/app/WriteHandler.cpp:804-812` at
+`6170af84`, for a fabric-scoped list). On a wildcard-endpoint path
+matter.js has no accessing-fabric check: `#writeAttributeForWildcard`
+tests writable (`:331-333`), the write privilege (`:335-341`), timed
+(`:343-345`) and a write in progress (`:355-358`) and then calls
+`writeValue` (`:360`), which assigns the decoded value to the behaviour's
+state (`:434`) and turns a thrown status error into a status entry for the
+resolved path (`:452-458`). The enforcer's "No accessing fabric" refusal
+covers a fabric-sensitive attribute only
+(`packages/protocol/src/action/server/AccessControl.ts:314`, `:358-365`),
+and the assignment runs the fabric-scoped list merge
+(`packages/node/src/behavior/state/managed/values/StructManager.ts:243-265`)
+through a proxy that treats an entry without a fabric index as visible and
+fills in the session's (`ListManager.ts:480-481`, `:533`). **What matter.js
+answers there per attribute and per value is not established (unverified):**
+the path was read, not run — the pinned export has no build — and the
+behaviours' own reactions were not traced to the end. connectedhomeip does
+not model the case: a unicast write needs a concrete path
+(`src/app/WriteHandler.cpp:353-354`), and a path without an endpoint exists
+for group writes only (`ProcessGroupAttributeDataIBs`, `:434`); which status
+the failure at `:353-354` maps to was not read (unverified). `im`'s write
+gate (`im/write.go`) skips the attribute without a status, like every other
+gate of the wildcard path, and no cluster server sees the write. Deliberate:
+following matter.js would hand a fabric-less write to the cluster servers
+again, the class owner decision 14 of review II closed (R2-P0-test-B09).
+Pinned by `im:TestWriteFabricScopedGateOrder`. Retire when what matter.js
+answers is established and mirrored, or when matter.js gates the wildcard
+path.
