@@ -149,7 +149,7 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 		}
 
 		// Block a waiter on counter=2 (target exchange) to verify it gets
-		// unblocked when AbandonExchange runs.
+		// unblocked when AbandonUnsecuredExchange runs.
 		waitErrCh := make(chan error, 1)
 		go func() {
 			waitErrCh <- tr.WaitForAck(t.Context(), 0, 2)
@@ -158,9 +158,9 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 		// settles.
 		synctest.Wait()
 
-		cleared := tr.AbandonExchange(targetExchange)
+		cleared := tr.AbandonUnsecuredExchange(targetExchange)
 		if cleared != 3 {
-			t.Errorf("AbandonExchange: cleared %d, want 3", cleared)
+			t.Errorf("AbandonUnsecuredExchange: cleared %d, want 3", cleared)
 		}
 		if tr.Pending() != 2 {
 			t.Errorf("Pending after abandon: got %d, want 2", tr.Pending())
@@ -185,12 +185,12 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 				t.Errorf("waiter resolved with unexpected err: %v", err)
 			}
 		case <-time.After(time.Second):
-			t.Fatal("AbandonExchange did not release the WaitForAck waiter within 1s")
+			t.Fatal("AbandonUnsecuredExchange did not release the WaitForAck waiter within 1s")
 		}
 
 		// Abandoning an unknown exchange is a no-op.
-		if got := tr.AbandonExchange(0xBEEF); got != 0 {
-			t.Errorf("AbandonExchange on unknown exchange: cleared %d, want 0", got)
+		if got := tr.AbandonUnsecuredExchange(0xBEEF); got != 0 {
+			t.Errorf("AbandonUnsecuredExchange on unknown exchange: cleared %d, want 0", got)
 		}
 	})
 }

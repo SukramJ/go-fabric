@@ -248,12 +248,26 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	ex := &initiatedExchange{ch: make(chan initiatedMessage, 4)}
 	b.resumption.initiated.Store(exchangeID, ex)
 	defer b.resumption.initiated.Delete(exchangeID)
-	defer func() {
+	// A handshake that ends takes what it sent and the peer has not
+	// acknowledged with it — a Sigma1 or Sigma3 nobody answers any more.
+	// The StatusReport that ends it is the exception, as on the responder
+	// side ([Bridge.sendHandshakeFailureReport]): it is sent after the
+	// handshake dropped the rest and stays tracked until it is
+	// acknowledged, its retries are spent or [unsecuredEntryLifetime] is
+	// over. The unsecured session's entries only: exchange ids are per
+	// initiator, and a secure session's peer may have picked the same one.
+	reported := false
+	abandon := func() {
 		b.mu.RLock()
 		tracker := b.outboundReliable
 		b.mu.RUnlock()
 		if tracker != nil {
-			tracker.AbandonExchange(exchangeID)
+			tracker.AbandonUnsecuredExchange(exchangeID)
+		}
+	}
+	defer func() {
+		if !reported {
+			abandon()
 		}
 	}()
 
@@ -280,6 +294,8 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	case mrp.SCOpcodeSigma2:
 		sigma3, perr := init.Initiator.ProcessSigma2Bytes(reply.payload)
 		if perr != nil {
+			abandon()
+			reported = true
 			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
 			return 0, perr
 		}
@@ -301,6 +317,8 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		// budget ran out (seen against matter.js's controller).
 		b.sendInitiatedAck(addr, exchangeID, ephemeral, status.counter)
 	case mrp.SCOpcodeSigma2Resume:
+		abandon()
+		reported = true
 		if perr := init.Initiator.ProcessSigma2Resume(reply.payload); perr != nil {
 			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
 			return 0, perr
@@ -372,7 +390,8 @@ func statusReportSuccessOr(payload []byte, failure error) error {
 
 // sendCASEError reports a failed handshake to the peer, best effort —
 // matter.js CaseClient.pair sends StatusReport(InvalidParam) unless the
-// failure was a transport one.
+// failure was a transport one. The caller has dropped the handshake's
+// unacknowledged messages before, so the report stays tracked.
 func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32) {
 	report := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
 	if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeStatusReport, report, &ackCounter); err != nil {
@@ -381,7 +400,10 @@ func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral u
 }
 
 // sendInitiatedUnsecured ships one unsecured Secure-Channel message on an
-// exchange this node initiated, reliably when the MRP tracker is wired.
+// exchange this node initiated, reliably when the MRP tracker is wired —
+// and then always tracked: it shares the unsecured session's table with
+// the replies to peers' handshakes, where a full table gives up its oldest
+// entry and never leaves a new message untracked ([unsecuredEntryLimit]).
 // ackCounter, when non-nil, piggybacks the acknowledgement of the peer's
 // last message and discharges the pump's standalone-ack obligation for it.
 func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, opcode uint8, payload []byte, ackCounter *uint32) error {
@@ -414,7 +436,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 	// Tracked before it is sent, so an ack handled before Send returns is
 	// not lost (bridge/reply.go sendReplyReliable).
 	if tracker != nil {
-		tracker.Track(hdr.MessageCounter, 0, exchangeID, datagram, addr, b.clk().Now())
+		tracker.trackUnsecured(hdr.MessageCounter, exchangeID, datagram, addr, b.clk().Now(), nil)
 	}
 	if err := listener.Send(addr, datagram); err != nil {
 		if tracker != nil {

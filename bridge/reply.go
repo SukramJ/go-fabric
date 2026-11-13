@@ -138,7 +138,8 @@ func (b *Bridge) sendReplyOpts(
 // responder's reply on the unsecured session: peer carries the
 // initiator's stated intervals and activity, which the retransmit
 // schedule uses instead of the idle default
-// ([outboundReliableTracker.trackUnsecured]).
+// ([outboundReliableTracker.trackUnsecured]). The reply is always sent: the
+// unsecured session's table never refuses one ([unsecuredEntryLimit]).
 func (b *Bridge) sendHandshakeReplyReliable(
 	src net.Addr,
 	requestHdr *message.Header,
@@ -216,17 +217,10 @@ func (b *Bridge) sendReplyTimed(
 		// handled on another goroutine) before Send returns, and an ack
 		// for an untracked message is lost — the message then goes out
 		// again as a spurious retransmission.
-		if needsAck && !tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer) {
-			// The unsecured session's retransmission table is full: the
-			// reply is not sent, as connectedhomeip does not send a
-			// message it cannot add to its table
-			// (src/messaging/ExchangeMessageDispatch.cpp:63-64 at 6170af84).
-			b.logger.Warn("matter.tx.reliable.unsecured_table_full",
-				slog.String("peer", srcString(src)),
-				slog.Int("exchange_id", int(requestProto.ExchangeID)),
-				slog.Int("opcode", int(responseOpcode)),
-				slog.Int("max", unsecuredEntryLimit))
-			return fmt.Errorf("%w: %w", ErrReplySend, errRetransmitTableFull)
+		// Always: a full table gives up its oldest entry, never this reply
+		// ([unsecuredEntryLimit]).
+		if needsAck {
+			tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {

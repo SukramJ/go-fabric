@@ -60,9 +60,23 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 	if b.outboundReliable == nil {
 		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
 		b.outboundReliable.wake = b.wakeAckPump
+		b.outboundReliable.evicted = b.unsecuredEntryEvicted
 		b.outboundReliable.fixedBackoff.Store(b.icd.fixedBackoff.Load())
 	}
 	b.mu.Unlock()
+}
+
+// unsecuredEntryEvicted is the outbound tracker's report of an
+// unsecured-session message that lost its place — and with it its
+// retransmissions, nothing else — to a newer one ([unsecuredEntryLimit]).
+// Sixteen handshake messages waiting for an acknowledgement at once is not
+// what a home's controllers produce; a line of this kind per datagram is
+// what a flood of handshake openers looks like.
+func (b *Bridge) unsecuredEntryEvicted(exchangeID uint16, counter uint32) {
+	b.logger.Warn("matter.tx.reliable.unsecured_evicted",
+		slog.Int("exchange_id", int(exchangeID)),
+		slog.Uint64("counter", uint64(counter)),
+		slog.Int("max", unsecuredEntryLimit))
 }
 
 // outboundBaseInterval resolves the peer-appropriate MRP base
@@ -544,11 +558,11 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue
 		}
-		if errors.Is(r.Err, errUnsecuredEntryExpired) {
-			// A handshake this node opened whose Sigma1 was never
-			// acknowledged ends like one whose retries are spent.
-			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
-		}
+		// What is left is a failed send or an unsecured-session entry
+		// dropped after [unsecuredEntryLifetime]. Neither is told to
+		// anybody: the entry's handshake ends on its own clock — the PASE
+		// slot's timeout, the CASE responder's reaper, the context of a
+		// handshake this node opened.
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))

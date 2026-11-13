@@ -373,16 +373,28 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// session on the channel).
 		b.holdHandshake(src, proto.ExchangeID, false)
 		ch := b.resolveCaseHandler(proto.ExchangeID)
-		err := b.handleCase(src, requestHdr, proto, payload, "sigma1",
+		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
 			ch.ProcessSigma1, ch)
-		if errors.Is(err, errRetransmitTableFull) {
-			// The reply was not sent ([unsecuredEntryLimit]): the peer's
-			// retransmission of this Sigma1 is no replay of an answered
-			// one, and is answered once the table has room.
-			b.forgetSigma1Replied(proto.ExchangeID)
-		}
-		return err
 	case mrp.SCOpcodeSigma3:
+		// The initiator has moved past Sigma2: a Sigma2 still waiting for
+		// its acknowledgement is done — its retransmissions are wasted
+		// bandwidth at best and confuse Apple iOS's MRP layer at worst (it
+		// drops a late Sigma2 with `Dropping message without piggyback ack
+		// when we are waiting for an ack`, then aborts the handshake).
+		// Before the handler runs, as the Pake3 case does, so the reply to
+		// Sigma3 itself — the StatusReport that ends the handshake — stays
+		// tracked and is retransmitted until the initiator acknowledges it:
+		// matter.js sends it as an ordinary reliable message and waits for
+		// its acknowledgement (packages/protocol/src/session/case/CaseServer.ts:332,
+		// packages/protocol/src/securechannel/SecureChannelMessenger.ts:209-232,
+		// packages/protocol/src/protocol/MessageExchange.ts:692, :785-790
+		// and :821-828 at db021da0), connectedhomeip likewise
+		// (src/protocols/secure_channel/PairingSession.h:157-190,
+		// src/messaging/ExchangeMessageDispatch.cpp:54-75 at 6170af84).
+		// Dropped after the handler, the report went out once: lost, it
+		// left the initiator waiting out its timeout for a session this
+		// node had already installed.
+		b.abandonHandshakeReplies(proto.ExchangeID)
 		ch := b.resolveCaseHandler(proto.ExchangeID)
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
 			ch.ProcessSigma3, ch); err != nil {
@@ -402,26 +414,6 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			Message:  "A controller completed a secure-session handshake with the bridge.",
 			Detail:   map[string]string{"peer": srcString(src)},
 		})
-		// Sigma3 receive implicitly acks every prior Sigma2 on the same
-		// exchange — the commissioner has progressed past Sigma2, so any
-		// still-pending Sigma2 retransmits in our outbound-reliable
-		// tracker are wasted bandwidth at best and confuse Apple iOS's
-		// MRP layer at worst (it drops the late Sigma2 retransmits with
-		// `Dropping message without piggyback ack when we are waiting
-		// for an ack`, then aborts the CASE handshake). Mirrors
-		// matter.js's `MessageExchange.ts::close` which discards every
-		// retx-pending message of the exchange when the receiver
-		// advances state.
-		b.mu.RLock()
-		tracker := b.outboundReliable
-		b.mu.RUnlock()
-		if tracker != nil {
-			if cleared := tracker.AbandonUnsecuredExchange(proto.ExchangeID); cleared > 0 {
-				b.logger.Debug("matter.sc.sigma3.abandon_prior",
-					slog.Int("exchange_id", int(proto.ExchangeID)),
-					slog.Int("cleared", cleared))
-			}
-		}
 		return nil
 	case mrp.SCOpcodeSigma2Resume:
 		ch := b.resolveCaseHandler(proto.ExchangeID)
@@ -585,7 +577,9 @@ func (b *Bridge) claimPaseInFlight(exchangeID uint16) bool {
 // abandonHandshakeReplies drops the replies of the handshake on exchangeID
 // that still wait for their acknowledgement on the unsecured session: the
 // handshake ended, or moved past them
-// ([outboundReliableTracker.AbandonUnsecuredExchange]).
+// ([outboundReliableTracker.AbandonUnsecuredExchange]). A caller that goes
+// on to send the StatusReport ending the handshake calls it first — the
+// report is the one message that has to outlive the handshake.
 func (b *Bridge) abandonHandshakeReplies(exchangeID uint16) {
 	b.mu.RLock()
 	tracker := b.outboundReliable
@@ -808,7 +802,7 @@ func (b *Bridge) handlePase(
 				mrp.SCStatusProtocolInvalidParameter,
 				nil,
 			)
-			if sendErr := b.sendReply(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body); sendErr != nil {
+			if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.pase_err.status_report_send_failed",
 					slog.String("stage", stage),
 					slog.Any("err", sendErr))
@@ -829,8 +823,13 @@ func (b *Bridge) handlePase(
 		// termination, not only on success.
 		if !isStateReplay {
 			b.releasePaseInFlight(proto.ExchangeID)
-			// And its replies stop waiting for an acknowledgement.
-			b.abandonHandshakeReplies(proto.ExchangeID)
+			// And its replies stop waiting for an acknowledgement — all
+			// but the StatusReport above, which was sent after them
+			// ([Bridge.sendHandshakeFailureReport]); a failure that sent
+			// none (no handler wired) drops them here.
+			if isMissing {
+				b.abandonHandshakeReplies(proto.ExchangeID)
+			}
 		}
 		return err
 	}
@@ -907,15 +906,14 @@ func (b *Bridge) handleCase(
 				caseFailureProtocolCode(err),
 				nil,
 			)
-			if sendErr := b.sendReply(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body); sendErr != nil {
+			// The handshake is over: a Sigma2 still waiting for its
+			// acknowledgement is not retransmitted to a peer whose
+			// Sigma3 was refused; the report that tells it so is.
+			if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.case_err.status_report_send_failed",
 					slog.String("stage", stage),
 					slog.Any("err", sendErr))
 			}
-			// The handshake is over: a Sigma2 still waiting for its
-			// acknowledgement is not retransmitted to a peer whose
-			// Sigma3 was refused.
-			b.abandonHandshakeReplies(proto.ExchangeID)
 		}
 		return err
 	}
@@ -932,6 +930,41 @@ func (b *Bridge) handleCase(
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	return nil
+}
+
+// sendHandshakeFailureReport ends the handshake on the request's exchange
+// with the failure StatusReport body: what the handshake sent and the peer
+// has not acknowledged is dropped first, then the report goes out as a
+// reliable message, so it is the one entry the exchange keeps and is
+// retransmitted until the peer acknowledges it. Both references send the
+// report that way: matter.js `sendError` is `exchange.send` without
+// `suppressAck`, which sets the R flag, starts the retransmission timer and
+// waits for the acknowledgement
+// (packages/protocol/src/securechannel/SecureChannelMessenger.ts:170-172
+// and :209-232, packages/protocol/src/protocol/MessageExchange.ts:692,
+// :785-790 and :821-828 at db021da0; an exchange that is then closed keeps
+// retransmitting, :1165-1190); connectedhomeip's `SendStatusReport` is a
+// plain `SendMessage`, reliable on a session that uses MRP
+// (src/protocols/secure_channel/PairingSession.h:157-190,
+// src/messaging/ExchangeContext.cpp:111-114 at 6170af84), and releasing
+// the pairing session afterwards aborts the exchange only while it still
+// waits on a response (src/protocols/secure_channel/PairingSession.cpp:285-290,
+// src/messaging/ExchangeHolder.h:122-139). Before review II the report was
+// sent without the R flag, once (R2-P0-rv-A04).
+func (b *Bridge) sendHandshakeFailureReport(
+	src net.Addr,
+	requestHdr *message.Header,
+	proto message.ProtocolHeader,
+	body []byte,
+	peer *handshakePeerTiming,
+) error {
+	b.abandonHandshakeReplies(proto.ExchangeID)
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer); err != nil {
+		return err
+	}
+	// The report carried the acknowledgement of the request.
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	return nil
 }
