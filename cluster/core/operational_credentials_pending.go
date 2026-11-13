@@ -22,6 +22,18 @@ import (
 // R2-P1-core-01). Empty means no marker.
 const pendingNOCSettingKey = "operational_credentials.pending_noc"
 
+// pendingNOCUpdateSettingKey holds the "update" marker, apart from the
+// "add" one at [pendingNOCSettingKey]: an UpdateNOC that fails after its
+// identity write leaves its revert pending without counting as the
+// fail-safe's NOC command, so an AddNOC in the same fail-safe is admitted
+// and both are pending at once — in memory (pendingUpdateRevert and
+// pendingInstallFabricIndex) and so on disk (review II, R2-P1-dr-sec-04).
+const pendingNOCUpdateSettingKey = "operational_credentials.pending_noc_update"
+
+// pendingNOCKeys are the marker's keys, in the order a start rolls them
+// back. Each holds one marker, which says by its op what it names.
+var pendingNOCKeys = [...]string{pendingNOCSettingKey, pendingNOCUpdateSettingKey}
+
 // pendingNOC* name the marker's op.
 const (
 	pendingNOCAdd    = "add"
@@ -51,6 +63,14 @@ type pendingNOCMarker struct {
 	VVSC          []byte `json:"vvsc,omitempty"`
 }
 
+// key is the settings key the marker is written to.
+func (m pendingNOCMarker) key() string {
+	if m.Op == pendingNOCUpdate {
+		return pendingNOCUpdateSettingKey
+	}
+	return pendingNOCSettingKey
+}
+
 // updateRevert is the marker's update as the in-memory revert record.
 func (m pendingNOCMarker) updateRevert() nocUpdateRevert {
 	return nocUpdateRevert{
@@ -75,8 +95,9 @@ func updateMarker(fab store.FabricRecord, r *nocUpdateRevert) pendingNOCMarker {
 	}
 }
 
-// writePendingNOC persists m before the command's first store write. A
-// store without settings keeps the pending state in memory only, as before.
+// writePendingNOC persists m, at its key, before the command's first
+// store write. A store without settings keeps the pending state in memory
+// only, as before.
 func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingNOCMarker) error {
 	st, ok := o.store.(vidVerificationSettings)
 	if !ok {
@@ -86,23 +107,33 @@ func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingN
 	if err != nil {
 		return fmt.Errorf("core: OperationalCredentials: encode the pending NOC marker: %w", err)
 	}
-	if err := st.SetSetting(ctx, pendingNOCSettingKey, string(b)); err != nil {
+	if err := st.SetSetting(ctx, m.key(), string(b)); err != nil {
 		return fmt.Errorf("core: OperationalCredentials: persist the pending NOC marker: %w", err)
 	}
 	o.mu.Lock()
-	o.pendingNOCMarkerOut = true
+	if o.pendingNOCMarkersOut == nil {
+		o.pendingNOCMarkersOut = map[string]bool{}
+	}
+	o.pendingNOCMarkersOut[m.key()] = true
 	o.mu.Unlock()
 	return nil
 }
 
-// clearPendingNOC removes the marker once what it names is committed or
-// rolled back. It touches the store only when this server wrote one, and
-// writes only when the marker still stands: CommissioningComplete clears
-// it before it answers (GeneralCommissioning.commitPendingNOCLocked). A
-// failed clear is logged: the next start would roll back what it names.
+// clearPendingNOC removes every marker once what it names is committed or
+// rolled back; clearPendingNOCKey removes the one at key.
 func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
+	for _, key := range pendingNOCKeys {
+		o.clearPendingNOCKey(ctx, key)
+	}
+}
+
+// clearPendingNOCKey touches the store only when this server wrote the
+// marker at key, and writes only when it still stands: CommissioningComplete
+// clears it before it answers (GeneralCommissioning.commitPendingNOCLocked).
+// A failed clear is logged: the next start would roll back what it names.
+func (o *OperationalCredentials) clearPendingNOCKey(ctx context.Context, key string) {
 	o.mu.Lock()
-	out := o.pendingNOCMarkerOut
+	out := o.pendingNOCMarkersOut[key]
 	o.mu.Unlock()
 	if !out {
 		return
@@ -112,18 +143,18 @@ func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
 		return
 	}
 	ctx = context.WithoutCancel(ctx)
-	if v, found, err := st.GetSetting(ctx, pendingNOCSettingKey); err == nil && (!found || v == "") {
+	if v, found, err := st.GetSetting(ctx, key); err == nil && (!found || v == "") {
 		o.mu.Lock()
-		o.pendingNOCMarkerOut = false
+		delete(o.pendingNOCMarkersOut, key)
 		o.mu.Unlock()
 		return
 	}
-	if err := st.SetSetting(ctx, pendingNOCSettingKey, ""); err != nil {
-		o.logger().Error("matter.opcreds.pending_noc.clear_failed", slog.Any("err", err))
+	if err := st.SetSetting(ctx, key, ""); err != nil {
+		o.logger().Error("matter.opcreds.pending_noc.clear_failed", slog.String("key", key), slog.Any("err", err))
 		return
 	}
 	o.mu.Lock()
-	o.pendingNOCMarkerOut = false
+	delete(o.pendingNOCMarkersOut, key)
 	o.mu.Unlock()
 }
 
@@ -141,7 +172,17 @@ func (o *OperationalCredentials) recoverPendingNOC(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	raw, found, err := st.GetSetting(ctx, pendingNOCSettingKey)
+	for _, key := range pendingNOCKeys {
+		if err := o.recoverPendingNOCKey(ctx, st, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// recoverPendingNOCKey rolls back what the marker at key names and clears it.
+func (o *OperationalCredentials) recoverPendingNOCKey(ctx context.Context, st vidVerificationSettings, key string) error {
+	raw, found, err := st.GetSetting(ctx, key)
 	if err != nil {
 		return fmt.Errorf("core: OperationalCredentials: read the pending NOC marker: %w", err)
 	}
@@ -181,7 +222,7 @@ func (o *OperationalCredentials) recoverPendingNOC(ctx context.Context) error {
 	default:
 		return fmt.Errorf("core: OperationalCredentials: pending NOC marker with op %q", m.Op)
 	}
-	if err := st.SetSetting(ctx, pendingNOCSettingKey, ""); err != nil {
+	if err := st.SetSetting(ctx, key, ""); err != nil {
 		return fmt.Errorf("core: OperationalCredentials: clear the pending NOC marker: %w", err)
 	}
 	return nil

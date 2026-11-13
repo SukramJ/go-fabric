@@ -140,10 +140,11 @@ type OperationalCredentials struct {
 	// rather than on a timeout (review II, R2-P1-dr-sec-05).
 	nocContended func()
 
-	// pendingNOCMarkerOut records that this server wrote the durable
-	// marker of the two fields above ([pendingNOCSettingKey]) and has not
-	// cleared it yet.
-	pendingNOCMarkerOut bool
+	// pendingNOCMarkersOut records, by settings key, the durable markers of
+	// the two fields above ([pendingNOCSettingKey] for the AddNOC,
+	// [pendingNOCUpdateSettingKey] for the UpdateNOC) this server wrote and
+	// has not cleared yet.
+	pendingNOCMarkersOut map[string]bool
 
 	// changeListeners receive [OperationalCredentials.OnMatterValueChanged]
 	// notifications.
@@ -681,9 +682,8 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	o.mu.Unlock()
 	// The durable marker goes once every revert it names has landed; a
 	// failed one leaves it for the next start (review II, R2-P1-core-01).
-	reverted := true
-	if updateRevert != nil {
-		reverted = o.revertUpdateNOC(ctx, *updateRevert)
+	if updateRevert == nil || o.revertUpdateNOC(ctx, *updateRevert) {
+		o.clearPendingNOCKey(ctx, pendingNOCUpdateSettingKey)
 	}
 	// Roll back the half-paired fabric when AddNOC completed but
 	// CommissioningComplete was never received. Without the rollback the
@@ -692,11 +692,8 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	// CommissioningWindowManager::OnFailSafeTimerExpired which calls
 	// RevertPendingOpCertsExceptRoot to evict the pending fabric record.
 	if fabricToRevert != 0 {
-		if err := o.revertAddNOC(ctx, fabricToRevert); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
-			reverted = false
-		}
-		if reverted {
-			o.clearPendingNOC(ctx)
+		if err := o.revertAddNOC(ctx, fabricToRevert); err == nil || errors.Is(err, store.ErrFabricNotFound) {
+			o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
 		}
 		// The revert is a fabric removal: core§11.9.7.2 step 6 asks for
 		// "the equivalent effect of invoking the RemoveFabric command",
@@ -719,9 +716,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 		}
 		return
 	}
-	if reverted {
-		o.clearPendingNOC(ctx)
-	}
+	o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
 }
 
 // lockNOCForRollback takes nocMu for the fail-safe's rollback, running
@@ -1970,7 +1965,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	}
 	idx, err := o.store.AddFabric(ctx, rec)
 	if err != nil {
-		o.clearPendingNOC(ctx)
+		o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
 		return NOCResponse{StatusCode: NOCStatusFabricConflict, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	// Record the fabric slot so FailSafe expiry can revert it when
@@ -2680,7 +2675,7 @@ func (o *OperationalCredentials) revertAddNOC(ctx context.Context, fabricIndex u
 // AddFabric: the pending marker goes once the fabric is gone.
 func (o *OperationalCredentials) revertFailedAddNOC(ctx context.Context, fabricIndex uint8) {
 	if err := o.revertAddNOC(ctx, fabricIndex); err == nil || errors.Is(err, store.ErrFabricNotFound) {
-		o.clearPendingNOC(ctx)
+		o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
 	}
 }
 

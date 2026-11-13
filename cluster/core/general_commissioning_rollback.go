@@ -87,7 +87,7 @@ func (g *GeneralCommissioning) settleExpiryLocked(ctx context.Context) error {
 }
 
 // commitPendingNOCLocked clears OperationalCredentials' durable pending-NOC
-// marker ([pendingNOCSettingKey]) as part of CommissioningComplete, before
+// markers ([pendingNOCKeys]) as part of CommissioningComplete, before
 // the fail-safe is disarmed: while the marker stands, a restart rolls the
 // fabric back, so CommissioningComplete must not answer success over it
 // (core2 item 1a). The marker is the fail-safe context's durable half;
@@ -101,15 +101,17 @@ func (g *GeneralCommissioning) commitPendingNOCLocked(ctx context.Context) error
 	if g.tcSettings == nil {
 		return nil
 	}
-	v, ok, err := g.tcSettings.GetSetting(ctx, pendingNOCSettingKey)
-	if err != nil {
-		return fmt.Errorf("core: GeneralCommissioning: read the pending NOC marker: %w", err)
-	}
-	if !ok || v == "" {
-		return nil
-	}
-	if err := g.tcSettings.SetSetting(ctx, pendingNOCSettingKey, ""); err != nil {
-		return fmt.Errorf("core: GeneralCommissioning: commit the pending NOC: %w", err)
+	for _, key := range pendingNOCKeys {
+		v, ok, err := g.tcSettings.GetSetting(ctx, key)
+		if err != nil {
+			return fmt.Errorf("core: GeneralCommissioning: read the pending NOC marker: %w", err)
+		}
+		if !ok || v == "" {
+			continue
+		}
+		if err := g.tcSettings.SetSetting(ctx, key, ""); err != nil {
+			return fmt.Errorf("core: GeneralCommissioning: commit the pending NOC: %w", err)
+		}
 	}
 	return nil
 }
