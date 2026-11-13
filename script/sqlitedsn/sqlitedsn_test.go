@@ -180,7 +180,7 @@ type names map[string][]string
 
 // bind records the string literals rhs binds to the identifiers of lhs,
 // position by position.
-func (n names) bind(lhs []ast.Expr, rhs []ast.Expr) {
+func (n names) bind(lhs, rhs []ast.Expr) {
 	if len(lhs) != len(rhs) {
 		return
 	}
