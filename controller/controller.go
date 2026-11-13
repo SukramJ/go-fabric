@@ -264,8 +264,13 @@ type Controller struct {
 	subs      *interaction.Subscriptions
 	com       *commissioner.Commissioner
 	reg       *client.Registry
-	udp       *udp.Listener
-	stop      func()
+	// stopping is the registry a Close left with nodes still stopping —
+	// report jobs and the store's final flush queued behind a hook that
+	// outlasted Close's ctx ([client.Node.Stop]). Erase waits for it
+	// before it deletes a row (review II, R2-P1-ctl-02).
+	stopping *client.Registry
+	udp      *udp.Listener
+	stop     func()
 	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address;
 	// tcp is the configuration they follow.
 	stopTCP func()
@@ -590,7 +595,10 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.armer.Close()
 	}
 	if c.reg != nil {
-		errs = append(errs, c.reg.Close(ctx))
+		if err := c.reg.Close(ctx); err != nil {
+			errs = append(errs, err)
+			c.stopping = c.reg
+		}
 		c.reg = nil
 	}
 	if c.subs != nil {

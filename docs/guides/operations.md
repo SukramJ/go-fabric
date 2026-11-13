@@ -36,7 +36,10 @@ store and endpoint records (`endpoint.Store.EraseEndpoints`, which restarts
 the numbering); the host then builds a new node on the same store, which
 starts uncommissioned and numbers its bridged endpoints from 2, as a
 fresh install does. A controller's counterpart is `Controller.Erase`,
-which drops its paired nodes, its fabric and its CA key material.
+which drops its paired nodes, its fabric and its CA key material. While
+a host hook still holds a node's report queue past the context, it erases
+nothing and returns the context's error; called again once the hook
+returned, it completes the reset.
 
 So the operator's rules are the persistence guide's
 [backup rules](persistence.md#backup):

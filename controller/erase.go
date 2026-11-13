@@ -19,6 +19,14 @@ import (
 // the controller keeps there. A [Config].CAKey held outside the database
 // (an HSM) is the host's to retire.
 //
+// Erase deletes nothing while a node is still stopping: a node whose
+// report queue a hook holds past ctx ([client.Node.Stop]) still writes its
+// queued values and the store's final flush, and a row deleted before
+// them would come back. Erase waits for those stops within ctx — a node's
+// second Close does — and when ctx ends first it returns ctx's error with
+// the database untouched; an Erase called again once the hook returned
+// completes the reset.
+//
 // A Go controller is single-use, as the node is: the host comes back by
 // building a new controller on the same DB, which mints a new CA and
 // fabric and holds no peer (BD-Matter-FactoryResetEndsTheNode). Mirrors
@@ -29,6 +37,16 @@ import (
 // the node store).
 func (c *Controller) Erase(ctx context.Context) error {
 	errs := []error{c.Close(ctx)}
+	// Node.Stop's rule: Erase does nothing after a Stop that failed
+	// (controller/client/node.go, Node.Stop). A second Registry.Close waits
+	// within ctx for the stops the first could not wait for.
+	if reg := c.stopping; reg != nil {
+		if err := reg.Close(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("controller: erase: nodes still stopping, nothing erased: %w", err))
+			return errors.Join(errs...)
+		}
+		c.stopping = nil
+	}
 	nodes := sqlstore.New(c.db)
 	ids, err := nodes.NodeIDs() //nolint:contextcheck // sqlstore's node API carries no context
 	if err != nil {
