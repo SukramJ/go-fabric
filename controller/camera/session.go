@@ -730,9 +730,14 @@ type Snapshot struct {
 
 // Snapshot captures one still frame from a snapshot stream the camera
 // keeps, adopting one within the request's bounds or allocating one.
-// Mirrors matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:2389-2649
-// at 0bd06f2.
+// After Close it is [ErrClosed] and allocates nothing (review II,
+// R2-P1-cam-b-04). Mirrors matterjs-server
+// packages/ws-controller/src/camera/CameraStreamManager.ts:2389-2649 at
+// 0bd06f2.
 func (s *Service) Snapshot(ctx context.Context, req SnapshotRequest) (*Snapshot, error) {
+	if s.isClosed() {
+		return nil, ErrClosed
+	}
 	t, err := targetOf(req.Node, req.Endpoint)
 	if err != nil {
 		return nil, err
