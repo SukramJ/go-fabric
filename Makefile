@@ -382,7 +382,7 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 	@# chip-tool; fails loudly on a missing daemon binary, which
 	@# chiptool-build has just produced.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
-		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi)$$' ./internal/chiptool/...
+		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$' ./internal/chiptool/...
 
 .PHONY: chiptool-ble-wifi
 chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)
