@@ -164,6 +164,15 @@ type Node struct {
 	commissioned atomic.Bool
 	cancel       context.CancelFunc
 	keeperWG     sync.WaitGroup
+	// keeperMu orders the keepers a handler starts (goKeeper:
+	// reopenWhenIdle's, leaveRadioWhenCommissioned's) against Stop:
+	// stopLocked sets stopping under it before the teardown, and a keeper
+	// is added to keeperWG — and a reopen opens the window — only under
+	// it while stopping is clear. So no Add races keeperWG.Wait (a handler
+	// can outlive br.Stop's bounded wait), no keeper starts once Stop
+	// began, and no window opens after br.Stop stopped the window's timer.
+	keeperMu sync.Mutex
+	stopping bool
 
 	// mu serialises Start and Stop, the lifecycle; it is held across
 	// them, host callbacks included (the host's Snapshotter), and
@@ -646,16 +655,14 @@ func (n *Node) reopenWhenIdle() {
 	if !n.reopenPending.CompareAndSwap(false, true) {
 		return
 	}
-	n.keeperWG.Add(1)
-	go func() {
-		defer n.keeperWG.Done()
+	started := n.goKeeper(func() {
 		defer n.reopenPending.Store(false)
 		tick := n.cfg.Clock.NewTicker(reopenPollInterval)
 		defer tick.Stop()
 		for {
 			armed := n.root.GeneralCommissioning != nil && n.root.GeneralCommissioning.FailSafeArmed()
 			if !armed && n.sec.sessions.Active() == 0 {
-				n.window.reopenIfDecommissioned(n.life, n.st)
+				n.reopenUnlessStopping()
 				return
 			}
 			select {
@@ -664,7 +671,40 @@ func (n *Node) reopenWhenIdle() {
 			case <-tick.C():
 			}
 		}
+	})
+	if !started {
+		n.reopenPending.Store(false)
+	}
+}
+
+// reopenUnlessStopping is reopenWhenIdle's reopen, which a Stop that began
+// cancels: under keeperMu, so it either opens the window before stopLocked
+// set stopping — and br.Stop then stops the window's timer — or not at all
+// (TestReopenPendingAtStopArmsNoWindow).
+func (n *Node) reopenUnlessStopping() {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	if n.stopping {
+		return
+	}
+	n.window.reopenIfDecommissioned(n.life, n.st)
+}
+
+// goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
+// began; it reports whether it started one. A handler that outlives
+// br.Stop's bounded wait starts nothing (TestLateHandlerKeeperDoesNotRaceStop).
+func (n *Node) goKeeper(fn func()) bool {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	if n.stopping {
+		return false
+	}
+	n.keeperWG.Add(1)
+	go func() {
+		defer n.keeperWG.Done()
+		fn()
 	}()
+	return true
 }
 
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
@@ -783,15 +823,13 @@ func (n *Node) leaveRadioWhenCommissioned() {
 	if n.cfg.Network.BLE == nil {
 		return
 	}
-	n.keeperWG.Add(1)
-	go func() {
-		defer n.keeperWG.Done()
+	n.goKeeper(func() {
 		ctx, cancel := clock.WithTimeout(n.life, clock.Or(n.cfg.Clock), bleStopTimeout)
 		defer cancel()
 		if err := n.br.StopBLE(ctx); err != nil {
 			n.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
 		}
-	}()
+	})
 }
 
 // notifyFabricUpdated runs every OnFabricUpdated with the fabric as the
@@ -999,6 +1037,11 @@ func (n *Node) stopLocked(ctx context.Context) error {
 		return nil
 	}
 	n.stopped = true
+	// No keeper starts and no reopen opens the window from here on
+	// (keeperMu).
+	n.keeperMu.Lock()
+	n.stopping = true
+	n.keeperMu.Unlock()
 	// The stop is work in hand of the node's in-flight group but for the
 	// client stack's close, which waits on its peers (see Start).
 	work := countWork(n.cfg.Clock, inflight.NodeStop)
