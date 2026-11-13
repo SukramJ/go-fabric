@@ -232,7 +232,7 @@ func (s *Service) Close(ctx context.Context) error {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	s.w.wait()
+	s.w.stop()
 	s.mu.Lock()
 	open := s.sessions
 	s.sessions = map[sessionKey]*Session{}
