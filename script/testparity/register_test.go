@@ -201,6 +201,9 @@ const (
 // wave W7: 630.
 // Wave W12 (#478) leaves two PeerAddressMonitorTest.ts session-suspect
 // cases by design (BD-Matter-SuspectProbeWalksAlternates): 632.
+// Wave 28a (#498) ports the two DeviceTypeConformanceTest.ts cases of a
+// node that commissions over BLE, left as device-ble-thread until the
+// device side had Bluetooth (endpoint:TestTopologyCommissionsOverBLE): 630.
 const testparityLeftRatchet = 630
 
 // The matterjs-server register's four ratchets, exact in both directions as

@@ -38,7 +38,7 @@ import (
 // number was measured, not tuned: no citation was edited to leave the list
 // other than by the brief's rules, and five derived moves the review found
 // wrong were left in place (and on the list) rather than applied. The goal
-// is 0 by the end of milestone 2; each owner correction lowers it.
+// is 0; each correction lowers it.
 //
 // 265 after brief BH-1: the report assembler's InteractionMessenger.ts
 // citation moved to the lines that name what it mirrors.
@@ -60,6 +60,12 @@ import (
 //
 // 253 after phase 33's TLV root: the TlvStringTest.ts citation of
 // tlv/codec_parity_test.go re-cited at the pin.
+//
+// 419 after the pin lift to db021da0 (#434, f24d83f1), up from 253: the
+// bare citations resolve at the new pin and 166 of them drifted with it —
+// a citation whose line moved without changing what it says drifts, and a
+// lift moves many at once (notes/parity/pin-lifts.md). They are worked
+// off as the files are touched.
 //
 // 418 after pin lift wave P2 (#431): the testSignerInfo citation of
 // controller/attestation/store.go left with the built-in test CD signer.
