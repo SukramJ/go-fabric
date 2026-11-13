@@ -995,19 +995,19 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 		if !ok || math.IsNaN(v) { // a NaN reading is no reading (W3-club1-07)
 			return nil, true
 		}
-		return wattsToMilliWatts(v), true
+		return boundedInt64(v*1000, -elPwrReadingBound, elPwrReadingBound), true
 	case attrElPwrVoltage:
 		// Null rather than UnsupportedAttribute when the device does not
 		// report the parameter: the attribute is specified for the cluster,
 		// the reading is what is missing. See TemperatureServer.MatterRead.
-		return s.scaled(func() (float64, bool) { return s.readings.Voltage() }, 1000), true
+		return s.scaled(func() (float64, bool) { return s.readings.Voltage() }, 1000, -elPwrReadingBound, elPwrReadingBound), true
 	case attrElPwrActiveCurrnt:
 		// CURRENT is reported in milliamperes and the attribute is
 		// milliamperes (spec §2.13.6.5), so no scaling. Verified against the
 		// reference stack, which types it UnitOfElectricCurrent.MILLIAMPERE.
-		return s.scaled(func() (float64, bool) { return s.readings.Current() }, 1), true
+		return s.scaled(func() (float64, bool) { return s.readings.Current() }, 1, -elPwrReadingBound, elPwrReadingBound), true
 	case attrElPwrFrequency:
-		return s.scaled(func() (float64, bool) { return s.readings.Frequency() }, 1000), true
+		return s.scaled(func() (float64, bool) { return s.readings.Frequency() }, 1000, 0, elPwrFrequencyMax), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return electricalPowerInst.ReadGlobal(attrID)
 	}
@@ -1035,39 +1035,43 @@ func (s *ElectricalPowerServer) MatterAttributes() []uint32 {
 	return electricalPowerInst.MatterAttributes()
 }
 
+// The constraints of the readings ElectricalPowerMeasurement serves:
+// "-2^62 to 2^62" for Voltage, ActiveCurrent and ActivePower, "0 to
+// 1000000" for Frequency (matter.js packages/model/src/standard/elements/
+// electrical-power-measurement.element.ts:54-55, :58-59, :70-71, :94-95 at
+// db021da0).
+const (
+	elPwrReadingBound int64 = 1 << 62
+	elPwrFrequencyMax int64 = 1_000_000
+)
+
 // scaled reads one optional attribute from the readings surface and converts
-// it to the attribute's wire unit. Returns nil — a Matter null — when there is
-// no readings surface or the device does not report the parameter.
-func (s *ElectricalPowerServer) scaled(read func() (float64, bool), factor float64) any {
+// it to the attribute's wire unit, held inside the attribute's constraint
+// [lo, hi]. Returns nil — a Matter null — when there is no readings surface,
+// the device does not report the parameter, or the reading is NaN (a NaN
+// reading is no reading, W3-club1-07).
+func (s *ElectricalPowerServer) scaled(read func() (float64, bool), factor float64, lo, hi int64) any {
 	if s.readings == nil {
 		return nil
 	}
 	v, ok := read()
-	if !ok {
+	if !ok || math.IsNaN(v) {
 		return nil
 	}
-	return clampToInt64(math.Round(v * factor))
+	return boundedInt64(v*factor, lo, hi)
 }
 
-// clampToInt64 saturates instead of wrapping, so an implausible reading
-// cannot flip sign on the wire.
-func clampToInt64(v float64) int64 {
-	if v > math.MaxInt64 {
-		return math.MaxInt64
+// boundedInt64 rounds v and holds it inside [lo, hi], so an implausible or
+// infinite reading reads as the attribute's bound and never reaches a
+// float-to-integer conversion outside int64's range. lo and hi must be
+// exact as float64 (a power of two, or below 2^53); v must not be NaN.
+func boundedInt64(v float64, lo, hi int64) int64 {
+	v = math.Round(v)
+	if v >= float64(hi) {
+		return hi
 	}
-	if v < math.MinInt64 {
-		return math.MinInt64
-	}
-	return int64(v)
-}
-
-func wattsToMilliWatts(w float64) int64 {
-	v := math.Round(w * 1000)
-	if v > math.MaxInt64 {
-		return math.MaxInt64
-	}
-	if v < math.MinInt64 {
-		return math.MinInt64
+	if v <= float64(lo) {
+		return lo
 	}
 	return int64(v)
 }
