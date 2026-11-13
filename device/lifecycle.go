@@ -110,8 +110,12 @@ func (d *Device) EndpointNumber() (uint16, bool) {
 // does (BridgedDeviceBasicInformationServer.ts:129-132). It is the one
 // reachability input: a host whose source goes away calls it, as a
 // matter.js host sets the one reachable state (ADR 0025 principle 2).
-// Before the device is added only the value changes.
+// Before the device is added only the value changes. Concurrent calls tell
+// the host in the order they change the state, so the last value the host
+// hears is the device's.
 func (d *Device) SetReachable(ctx context.Context, reachable bool) {
+	d.reachMu.Lock()
+	defer d.reachMu.Unlock()
 	if d.reachable.Swap(reachable) == reachable {
 		return
 	}
