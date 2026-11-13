@@ -34,6 +34,10 @@ type chainSpec struct {
 	paiNoVID               bool
 	paiNotBefore           time.Time
 	dacNotBefore           time.Time
+	// paiNotAfter and dacNotAfter end the certificate's validity; the
+	// zero value is 9999-12-31T23:59:59Z, the date without a well-defined
+	// expiration.
+	paiNotAfter, dacNotAfter time.Time
 	// dacSigner signs the DAC in place of the PAI key.
 	dacSigner *ecdsa.PrivateKey
 	// paiSigner signs the PAI in place of the PAA key.
@@ -48,6 +52,15 @@ func defaultSpec() chainSpec {
 		paiNotBefore: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		dacNotBefore: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
+}
+
+// notAfterOr is t, or the date without a well-defined expiration when t is
+// the zero value.
+func notAfterOr(t time.Time) time.Time {
+	if t.IsZero() {
+		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	}
+	return t
 }
 
 func skid(pub *ecdsa.PublicKey) []byte {
@@ -88,7 +101,7 @@ func buildChain(t *testing.T, s chainSpec) (dac, pai []byte, dacKey *ecdsa.Priva
 		SerialNumber:          big.NewInt(0x1234),
 		Subject:               name("Test PAI", s.paiVID, !s.paiNoVID, 0, false),
 		NotBefore:             s.paiNotBefore,
-		NotAfter:              time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
+		NotAfter:              notAfterOr(s.paiNotAfter),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -115,7 +128,7 @@ func buildChain(t *testing.T, s chainSpec) (dac, pai []byte, dacKey *ecdsa.Priva
 		SerialNumber:          big.NewInt(0x5678),
 		Subject:               name("Test DAC", s.dacVID, true, s.dacPID, true),
 		NotBefore:             s.dacNotBefore,
-		NotAfter:              time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
+		NotAfter:              notAfterOr(s.dacNotAfter),
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 		SubjectKeyId:          skid(&dacKey.PublicKey),
