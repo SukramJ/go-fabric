@@ -22,7 +22,8 @@
 //	gh api repos/SukramJ/go-fabric/branches/main/protection \
 //	    --jq '.required_status_checks.contexts[]' > script/requiredchecks/required.txt
 //
-// Last refreshed 2026-11-13: 19 contexts, strict, and no ruleset
+// Last refreshed 2026-11-13: 20 contexts (wifi/wpasupplicant added that
+// day, owner decision 12 of review II), strict, and no ruleset
 // (`gh api repos/SukramJ/go-fabric/rulesets` answers []). Refresh it in the
 // commit that follows a change of the protection; a context is never added
 // to the file by hand ahead of the protection.
@@ -102,12 +103,6 @@ type decision struct {
 // notRequired lists every job of a pull-request workflow that is not a
 // required check.
 var notRequired = []decision{
-	{
-		"ci.yml", "wifi/wpasupplicant", pending,
-		"to be made required — owner action (review II, R2-P0-test-D01). The job builds, vets, tests and lints " +
-			"wifi/wpasupplicant and examples/ble-wifi-light, modules of their own that \"no other job's ./... reaches\" " +
-			"(the comment over its steps in ci.yml); it was added on 2026-11-12 (517e10e8) without an entry in the branch protection.",
-	},
 	{
 		"chiptool.yml", "code touched", advisory,
 		"not a guard: it decides which of the workflow's jobs an event runs (the comment over the job in chiptool.yml); " +

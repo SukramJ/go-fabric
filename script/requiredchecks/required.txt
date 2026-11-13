@@ -17,3 +17,4 @@ chip data model cross-check
 ble/bluez
 ble/esphome
 chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
+wifi/wpasupplicant
