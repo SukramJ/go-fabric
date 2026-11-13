@@ -24,7 +24,7 @@
 #     chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi
 #     under chip's BlueZ and wpa_supplicant mocks in a privileged
 #     container, with all-clusters-app-ble under the same mocks as its own
-#     control in the same test. Not a required check.
+#     control in the same test. A required check since 2026-11-13.
 #   - chip-families: the CSA certification families (`make
 #     chiptool-families`), the way matter.js runs them. Certification is not
 #     pursued by this project, but certifiability is a goal
@@ -413,7 +413,8 @@ jobs:
           if-no-files-found: ignore
 
   chiptool-ble-wifi:
-    # Not a required status check (brief 28c): it runs beside the others.
+    # The name is a required status check on main (branch protection, since
+    # 2026-11-13); keep it when the job moves.
     name: chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
     needs: changes
     if: |
