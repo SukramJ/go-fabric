@@ -61,6 +61,10 @@ type GeneralCommissioning struct {
 	failSafeArmed       bool
 	failSafeExpiresAt   time.Time
 	failSafeFabricIndex uint8
+	// failSafeWatch is the expiry watcher of the armed window, nil when
+	// none runs: one at a time, replaced on a re-arm and stopped on a
+	// disarm ([GeneralCommissioning.startFailSafeWatchLocked]).
+	failSafeWatch *failSafeWatch
 
 	// Cumulative FailSafe tracking: once the cumulative cap is hit the
 	// bridge must refuse further ArmFailSafe calls with BusyWithOtherAdmin.
@@ -628,6 +632,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		wasArmed := g.failSafeArmed
 		expiredFabric := g.failSafeFabricIndex
 		g.failSafeArmed = false
+		g.stopFailSafeWatchLocked()
 		g.failSafeFabricIndex = 0
 		g.failSafeCumulativeStarted = false
 		// The request's Breadcrumb is not taken: an armed fail-safe expires,
@@ -720,9 +725,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// general-commissioning-server.cpp MarkAttributeDirty.
 	g.dataVersion.Bump()
 
-	if g.onFailSafeExpired != nil {
-		go g.watchFailSafeExpiry(ctx, g.failSafeFabricIndex, g.failSafeExpiresAt)
-	}
+	g.startFailSafeWatchLocked(ctx, g.failSafeFabricIndex, g.failSafeExpiresAt)
 	// Capture the hook + fabric before releasing the cluster lock so the
 	// callback runs without holding our mutex (OpCreds.ClearPendingState
 	// acquires its own lock).
@@ -748,19 +751,61 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	return ArmFailSafeResponse{ErrorCode: CommissioningErrorOK}, nil
 }
 
-// watchFailSafeExpiry blocks until expiresAt (or ctx is cancelled) and
-// fires onFailSafeExpired iff the fail-safe is still armed at that
-// moment. Runs in a fresh goroutine off ArmFailSafe; harmless if the
-// commissioner calls CommissioningComplete or re-arms before timeout.
-func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
-	timer := g.clock.NewTimer(clock.Until(g.clock, expiresAt))
-	defer timer.Stop()
+// failSafeWatch is one expiry watcher: its timer and the channel that
+// ends it early.
+type failSafeWatch struct {
+	timer clock.Timer
+	stop  chan struct{}
+}
+
+// startFailSafeWatchLocked replaces the expiry watcher by one for a
+// window that ends at expiresAt; without an expiry hook none runs. One
+// watcher serves the window: before, every arm and re-arm started a
+// goroutine that slept to its own deadline, so a commissioner that
+// re-armed every few seconds left one parked per re-arm until that
+// deadline (review II, W2-conc-15). Caller holds g.mu.
+func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
+	g.stopFailSafeWatchLocked()
+	if g.onFailSafeExpired == nil {
+		return
+	}
+	w := &failSafeWatch{
+		timer: g.clock.NewTimer(clock.Until(g.clock, expiresAt)),
+		stop:  make(chan struct{}),
+	}
+	g.failSafeWatch = w
+	go g.watchFailSafeExpiry(ctx, fabricIndex, w)
+}
+
+// stopFailSafeWatchLocked ends the expiry watcher, if one runs: the
+// window it watched was re-armed or disarmed. Caller holds g.mu.
+func (g *GeneralCommissioning) stopFailSafeWatchLocked() {
+	w := g.failSafeWatch
+	if w == nil {
+		return
+	}
+	g.failSafeWatch = nil
+	w.timer.Stop()
+	close(w.stop)
+}
+
+// watchFailSafeExpiry blocks until w's timer fires (or w is stopped, or
+// ctx is cancelled) and fires onFailSafeExpired iff the fail-safe is
+// still armed and due at that moment. Runs in the one goroutine
+// [GeneralCommissioning.startFailSafeWatchLocked] starts per window.
+func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIndex uint8, w *failSafeWatch) {
+	defer w.timer.Stop()
 	select {
 	case <-ctx.Done():
 		return
-	case <-timer.C():
+	case <-w.stop:
+		return
+	case <-w.timer.C():
 	}
 	g.mu.Lock()
+	if g.failSafeWatch == w {
+		g.failSafeWatch = nil
+	}
 	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(g.clock.Now())
 	hadBreadcrumb := stillArmed && g.breadcrumb != 0
 	termsReverted := false
@@ -909,6 +954,7 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 		}
 	}
 	g.failSafeArmed = false
+	g.stopFailSafeWatchLocked()
 	g.failSafeFabricIndex = 0
 	g.breadcrumb = 0
 	// Reset the cumulative cap on successful CommissioningComplete so the
@@ -973,6 +1019,7 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 		// is never reached from inside the hook, so it cannot recurse.
 		g.mu.Lock()
 		g.failSafeArmed = false
+		g.stopFailSafeWatchLocked()
 		g.failSafeFabricIndex = 0
 		g.failSafeCumulativeStarted = false
 		// Matter §11.10.6.1: Breadcrumb SHALL be 0 once the fail-safe is no
@@ -1001,13 +1048,9 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 	g.breadcrumb = req.Breadcrumb
 	g.failSafeFabricIndex = fabricIndex
 	g.dataVersion.Bump()
-	expiresAt := g.failSafeExpiresAt
-	hasCB := g.onFailSafeExpired != nil
+	g.startFailSafeWatchLocked(ctx, fabricIndex, g.failSafeExpiresAt)
 	armedHook := g.onFailSafeArmed
 	g.mu.Unlock()
-	if hasCB {
-		go g.watchFailSafeExpiry(ctx, fabricIndex, expiresAt)
-	}
 	// An arm from the disarmed state starts a new fail-safe context — the
 	// PASE auto-arm included, as matter.js arms a new
 	// ServerNodeFailsafeContext when the PASE session is established — so
@@ -1037,6 +1080,7 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 	}
 	fabric := g.failSafeFabricIndex
 	g.failSafeArmed = false
+	g.stopFailSafeWatchLocked()
 	g.failSafeFabricIndex = 0
 	g.failSafeCumulativeStarted = false
 	g.breadcrumb = 0

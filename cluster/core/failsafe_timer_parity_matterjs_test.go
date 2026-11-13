@@ -124,7 +124,7 @@ func TestFailsafeTimerVerifyExpiryHandling(t *testing.T) {
 		f.arm(ctx, t, 900, 1)
 		f.clk.Advance(675 * time.Second)
 		f.wantNotExpired(t)
-		f.arm(ctx, t, 450, 2)
+		f.arm(ctx, t, 450, 1) // the re-arm replaces the watcher, it does not add one
 		f.wantNotExpired(t)
 		f.clk.Advance(225*time.Second - time.Nanosecond)
 		f.wantNotExpired(t)
