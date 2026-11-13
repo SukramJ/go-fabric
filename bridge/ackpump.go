@@ -188,15 +188,36 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 // the tracker is not wired (test paths) or when no obligation exists
 // (e.g. before the peer has acked any chunk yet).
 func (b *Bridge) refreshAckCounter(requestHdr *message.Header, exchangeID uint16, initiator bool) {
+	if counter, ok := b.takeOwedAck(requestHdr.SessionID, exchangeID, initiator); ok {
+		requestHdr.MessageCounter = counter
+	}
+}
+
+// takeOwedAck returns the ack counter the bridge owes on the (session,
+// exchange, role) triple and discharges the obligation, for a message
+// that is about to piggyback it ([mrp.AckTracker.LookupAndDischarge]).
+// The exchange's reply route goes with the obligation — it exists for
+// the pump's standalone ack and nothing is owed any more — unless a
+// newer obligation arrived in between, which the pump still has to
+// route. A later reliable message on the exchange stores the route
+// again ([Bridge.owedInboundAck]). (0, false) when nothing is owed or
+// no tracker is wired.
+//
+// Before, only [Bridge.dischargeOwedAck] and the pump released the
+// route: every path that took the ack here left it behind until its
+// session was evicted (review II, W1-conc-08).
+func (b *Bridge) takeOwedAck(sessionID, exchangeID uint16, initiator bool) (uint32, bool) {
 	b.mu.RLock()
 	tracker := b.ackTracker
 	b.mu.RUnlock()
 	if tracker == nil {
-		return
+		return 0, false
 	}
-	if counter, ok := tracker.LookupAndDischarge(requestHdr.SessionID, exchangeID, initiator); ok {
-		requestHdr.MessageCounter = counter
+	counter, ok := tracker.LookupAndDischarge(sessionID, exchangeID, initiator)
+	if !tracker.Owes(sessionID, exchangeID, initiator) {
+		b.routing.exchangeSrcs.Delete(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator})
 	}
+	return counter, ok
 }
 
 // dischargeOwedAck cancels an obligation because the bridge just

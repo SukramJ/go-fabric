@@ -1098,13 +1098,7 @@ func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, e
 // does not also send it standalone. target is returned unchanged when
 // nothing is owed or no tracker is wired.
 func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
-	b.mu.RLock()
-	tracker := b.ackTracker
-	b.mu.RUnlock()
-	if tracker == nil {
-		return target
-	}
-	if counter, ok := tracker.LookupAndDischarge(target.sessionID, target.exchangeID, ourRole); ok {
+	if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, ourRole); ok {
 		target.hasAck = true
 		target.ackCounter = counter
 	}
