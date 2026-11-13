@@ -27,6 +27,9 @@ type groupFakeDispatcher struct {
 	deny     map[uint16]bool // endpoint → ACL denies
 	acl      []uint8         // privileges requested
 	readOnly bool
+	// timedStamp records the timed-interaction stamp of the last
+	// WriteAuthorized context.
+	timedStamp struct{ timed, known bool }
 }
 
 func (d *groupFakeDispatcher) Read(context.Context, ConcreteAttributePath) []ReadResult { return nil }
@@ -56,7 +59,10 @@ func (d *groupFakeDispatcher) InvokeAuthorized(_ context.Context, p ConcreteComm
 	return out
 }
 
-func (d *groupFakeDispatcher) WriteAuthorized(_ context.Context, p ConcreteAttributePath, _ AttributeValue, authorize WriteAuthorizer) []WriteResult {
+func (d *groupFakeDispatcher) WriteAuthorized(ctx context.Context, p ConcreteAttributePath, _ AttributeValue, authorize WriteAuthorizer) []WriteResult {
+	d.mu.Lock()
+	d.timedStamp.timed, d.timedStamp.known = TimedInteractionFromContext(ctx)
+	d.mu.Unlock()
 	if d.readOnly {
 		return nil
 	}
@@ -208,6 +214,8 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 	concrete.Path.Endpoint, concrete.Path.HasEndpoint = 2, true
 	noAttr := attr
 	noAttr.Path.HasAttribute = false
+	flagged := attr
+	flagged.Path.WildcardPathFlags = 0x01
 
 	cases := []struct {
 		name    string
@@ -222,6 +230,8 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 		{"handleWriteRequest: a group write needs SuppressResponse", WriteRequest{Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"process: group writes can not be concrete paths", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{concrete}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"process: writes before a concrete path have run", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr, concrete}}, []uint16{2}, nil, StatusInvalidAction, []uint16{2}},
+		{"process: WildcardPathFlags are not allowed in write interactions", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{flagged}}, []uint16{2}, nil, StatusInvalidAction, nil},
+		{"process: writes before a path with WildcardPathFlags have run", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr, flagged}}, []uint16{2}, nil, StatusInvalidAction, []uint16{2}},
 		{"#writeEndpointForWildcard: clusterId and attributeId are required", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{noAttr}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"#processWildcard: no member endpoints, nothing written", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr}}, nil, nil, StatusSuccess, nil},
 		{"#writeAttributeForWildcard: members only, denied skipped", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr}}, []uint16{2, 3, 4}, map[uint16]bool{4: true}, StatusSuccess, []uint16{2, 3}},
@@ -242,5 +252,24 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 	}
 	if got := HandleGroupWriteRequest(WithFabricFilter(context.Background(), true, 7), &groupFakeDispatcher{}, WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr}}); got != StatusSuccess {
 		t.Errorf("write without a Group subject: %v", got)
+	}
+}
+
+// TestGroupWriteIsNeverTimed: a group session is never timed, so the
+// dispatcher's timed-attribute gate skips an attribute with the timed
+// quality on a group write — matter.js
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:343-345
+// (`if (attribute.limits.timed && !this.session.timed) return;`) on the
+// wildcard path a group write takes. Without the stamp the gate does not
+// know and lets the write through.
+func TestGroupWriteIsNeverTimed(t *testing.T) {
+	t.Parallel()
+	attr := AttributeWrite{Path: ConcreteAttributePath{Cluster: 6, Attribute: 0x4001, HasCluster: true, HasAttribute: true}}
+	d := &groupFakeDispatcher{}
+	if got := HandleGroupWriteRequest(groupCtx(2), d, WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr}}); got != StatusSuccess {
+		t.Fatalf("group write: status %v, want Success", got)
+	}
+	if !d.timedStamp.known || d.timedStamp.timed {
+		t.Errorf("group write context: timed=%v known=%v, want timed=false known=true", d.timedStamp.timed, d.timedStamp.known)
 	}
 }
