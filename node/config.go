@@ -611,10 +611,11 @@ const maxUniqueIDBytes = 32
 // the trivially-guessable list.
 func validSetupPIN(pin uint32) bool { return pin <= setupPasscodeMax && setup.IsValidSetupPIN(pin) }
 
-// errSetupPIN is the failure every passcode check reports.
-func errSetupPIN(pin uint32) error {
-	return fmt.Errorf("node: passcode %d is invalid or on the trivially-guessable list", pin)
-}
+// errSetupPIN is the failure every passcode check reports. It names the
+// rule and not the value: the text reaches the host's log, and a refused
+// passcode is still the passcode of the device it was configured for —
+// the rule secure/setup's errors follow (review II, R2-P0-sec-E04).
+var errSetupPIN = errors.New("node: the setup passcode is invalid: zero, above 99999998 or on the trivially-guessable list")
 
 // The checks [Config.Validate] and [Node.OpenBasicWindow] share, against
 // the bounds above.
@@ -652,7 +653,7 @@ func (c *Config) Validate() error {
 		errs = append(errs, err)
 	}
 	if !validSetupPIN(cm.Passcode) {
-		errs = append(errs, errSetupPIN(cm.Passcode))
+		errs = append(errs, errSetupPIN)
 	}
 	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {

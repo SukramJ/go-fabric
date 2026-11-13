@@ -601,7 +601,7 @@ type paseParams struct {
 // OperationalCredentials.
 func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseParams, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	if !setup.IsValidSetupPIN(p.passcode) {
-		return nil, fmt.Errorf("node: passcode %d is invalid or trivially guessable", p.passcode)
+		return nil, errSetupPIN
 	}
 	vc, err := spake2.NewVerifierContext(p.passcode, p.salt, p.iterations)
 	if err != nil {

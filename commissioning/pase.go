@@ -68,7 +68,9 @@ type PASEResponder struct {
 // fast.
 func NewPASEResponder(cfg PASEConfig) (*PASEResponder, error) {
 	if cfg.Passcode < 1 || cfg.Passcode > 99999998 {
-		return nil, fmt.Errorf("%w: %d", ErrPASEInvalidPasscode, cfg.Passcode)
+		// The value is not rendered: the text reaches a log, and a
+		// passcode that fails the range is most often a real one mistyped.
+		return nil, fmt.Errorf("%w: outside 1..99999998", ErrPASEInvalidPasscode)
 	}
 	if cfg.Iterations < 1000 || cfg.Iterations > 100000 {
 		return nil, fmt.Errorf("%w: %d", ErrPASEInvalidIterations, cfg.Iterations)

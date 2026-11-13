@@ -106,6 +106,15 @@ func TestArguments(t *testing.T) {
 		}
 	}
 
+	// A refused --passcode is not echoed (review II, R2-P0-sec-E04): it is
+	// the passcode of the device being paired, and the text reaches a log.
+	for _, passcode := range []string{"12345678", "87654321", "99999999"} {
+		err := run([]string{"--db", db, "pair", "--passcode", passcode, "--discriminator", "1"}, strings.NewReader(""), &bytes.Buffer{})
+		if err == nil || strings.Contains(err.Error(), passcode) {
+			t.Errorf("pair --passcode %s: err %v, want a refusal without the value", passcode, err)
+		}
+	}
+
 	// The stack's own refusals.
 	for _, tc := range []struct {
 		args []string

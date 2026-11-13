@@ -123,7 +123,7 @@ func SoftwareVersionFromString(version string) uint32 {
 // [Commissioning].Passcode. The error wraps [ErrInvalidConfig].
 func ValidateSetupPIN(pin uint32) error {
 	if !validSetupPIN(pin) {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, errSetupPIN(pin))
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, errSetupPIN)
 	}
 	return nil
 }
