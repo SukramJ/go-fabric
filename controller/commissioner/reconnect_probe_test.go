@@ -428,6 +428,50 @@ func TestReconnectProbeRoutableIsUnicast(t *testing.T) {
 	}
 }
 
+// TestRoutableAddr holds routableAddr's classes one by one (review II,
+// item 5): net/netip's where it has them, RFC 1122 §3.2.1.3 for 0.0.0.0/8
+// and RFC 1112 §4 for 240.0.0.0/4.
+func TestRoutableAddr(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		addr string
+		want bool
+		by   string
+	}{
+		{"0.0.0.0", false, "netip: unspecified"},
+		{"::", false, "netip: unspecified"},
+		{"224.0.0.251", false, "netip: multicast"},
+		{"ff02::1", false, "netip: multicast"},
+		{"255.255.255.255", false, "netip: limited broadcast"},
+		{"127.0.0.1", false, "netip: loopback"},
+		{"::1", false, "netip: loopback"},
+		{"169.254.1.2", false, "netip: link-local"},
+		{"fe80::1", false, "netip: link-local"},
+		{"fe80::1%eth0", false, "netip: link-local"},
+		{"0.1.2.3", false, "RFC 1122 §3.2.1.3 (b)"},
+		{"0.255.255.255", false, "RFC 1122 §3.2.1.3 (b)"},
+		{"240.0.0.1", false, "RFC 1112 §4"},
+		{"255.255.255.254", false, "RFC 1112 §4"},
+		{"::ffff:0.1.2.3", false, "RFC 1122 §3.2.1.3 (b), IPv4-mapped"},
+		{"::ffff:240.0.0.1", false, "RFC 1112 §4, IPv4-mapped"},
+		{"::ffff:127.0.0.1", false, "netip: loopback, IPv4-mapped"},
+		{"1.0.0.0", true, "above 0.0.0.0/8"},
+		{"223.255.255.255", true, "below 224.0.0.0/4"},
+		{"192.0.2.7", true, "unicast"},
+		{"10.1.2.3", true, "unicast (private)"},
+		{"fd11::5", true, "unicast (unique local)"},
+		{"2001:db8::1", true, "unicast"},
+		{"::ffff:192.0.2.7", true, "unicast (IPv4-mapped)"},
+	} {
+		if got := routableAddr(netip.MustParseAddr(tc.addr)); got != tc.want {
+			t.Errorf("routableAddr(%s) = %v, want %v (%s)", tc.addr, got, tc.want, tc.by)
+		}
+	}
+	if routableAddr(netip.Addr{}) {
+		t.Error("the zero Addr is routable")
+	}
+}
+
 // TestReconnectProbeFailureNamesReport: a device that reports it is not
 // attached and never becomes reachable fails the step with
 // ErrOperativeConnectionFailed, its message naming the last report.

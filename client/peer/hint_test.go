@@ -141,7 +141,7 @@ func TestHintAddressesUnicastOnly(t *testing.T) {
 		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
 		eventually(t, "the process", func() bool { return process(p) != nil && p.status.IsResolving() })
 		for _, a := range []string{
-			"[::]:5540", "[ff02::1]:5540", "[ff05::fb]:5540",
+			"[::]:5540", "[::%eth0]:5540", "[ff02::1]:5540", "[ff05::fb]:5540",
 			"0.0.0.0:5540", "0.1.2.3:5540", "224.0.0.251:5540", "239.1.1.1:5540", "240.0.0.1:5540", "255.255.255.255:5540",
 			"[::ffff:255.255.255.255]:5540", "[::ffff:224.0.0.251]:5540",
 		} {

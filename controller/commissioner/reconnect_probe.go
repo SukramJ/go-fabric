@@ -158,22 +158,28 @@ func addrList(addrs []netip.Addr) string {
 	return "[" + strings.Join(s, ", ") + "]"
 }
 
+// The two IPv4 blocks net/netip does not classify and no datagram to a
+// host is addressed to: 0.0.0.0/8 (RFC 1122 §3.2.1.3, "this network") and
+// 240.0.0.0/4 (RFC 1112 §4, reserved) — the blocks, with the quoted text
+// and their RFC 6890 registry entries, of client/peer's hint filter
+// (hint.go, ipv4ThisNetwork and ipv4Reserved).
+var (
+	ipv4ThisNetwork = netip.MustParsePrefix("0.0.0.0/8")
+	ipv4Reserved    = netip.MustParsePrefix("240.0.0.0/4")
+)
+
 // routableAddr reports whether a probed address can carry the operational
-// connection: a link-local address has no zone the controller could use
-// across the border router, and the others name no peer — loopback, the
-// unspecified address, multicast, and in IPv4 "this network" (0.0.0.0/8)
-// and the reserved 240.0.0.0/4 with the limited broadcast, which
-// peer.Peer.HintAddresses passes over as well. A Thread mesh-local address
-// is routable by this test but not from off the mesh (meshLocalAddr).
+// connection. [netip.Addr.IsGlobalUnicast] refuses what names no peer —
+// the zero Addr, the unspecified address, multicast, the IPv4 limited
+// broadcast — and loopback and link-local unicast with them: a link-local
+// address has no zone the controller could use across the border router.
+// In IPv4 the two blocks the package does not classify are refused beside
+// them, as peer.Peer.HintAddresses passes them over. An IPv4-mapped
+// address is judged as its IPv4 address. A Thread mesh-local address is
+// routable by this test but not from off the mesh (meshLocalAddr).
 func routableAddr(a netip.Addr) bool {
-	if !a.IsValid() || a.IsLinkLocalUnicast() || a.IsLoopback() || a.IsUnspecified() || a.IsMulticast() {
-		return false
-	}
-	if a.Is4() {
-		first := a.As4()[0]
-		return first != 0 && first < 240
-	}
-	return true
+	a = a.Unmap().WithZone("")
+	return a.IsGlobalUnicast() && !ipv4ThisNetwork.Contains(a) && !ipv4Reserved.Contains(a)
 }
 
 // meshLocalAddr reports whether a is a Thread mesh-local address, which
