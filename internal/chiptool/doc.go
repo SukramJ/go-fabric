@@ -37,7 +37,14 @@
 //   - TestChipToolBLEWiFi — chip-tool-ble commissions examples/ble-wifi-light
 //     over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, with
 //     all-clusters-app-ble as the control (`make chiptool-ble-wifi`,
-//     blewifi_test.go; not part of `make chiptool-test`).
+//     blewifi_test.go; not part of `make chiptool-test`);
+//   - TestChipToolBLECases — chip's Python certification cases whose TH
+//     commissions over BLE onto Wi-Fi in the test, run case by case against
+//     examples/ble-wifi-light under the same mocks with the image's
+//     BLE-capable Python controller (/opt/matter-ble; the base image's
+//     controller is built without BLE), all-clusters-app-ble as the
+//     control of a case that fails (`make chiptool-ble-cases`,
+//     blecases_test.go; an image without /opt/matter-ble skips it).
 //
 // # The harness
 //

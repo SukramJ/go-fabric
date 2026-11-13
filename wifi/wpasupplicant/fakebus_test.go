@@ -44,9 +44,12 @@ type fakeBus struct {
 	noScanDone bool
 	// scanFailed: ScanDone reports success false.
 	scanFailed bool
-	// staleScanDone: Scan sends a ScanDone before its reply (an earlier
-	// scan's), and no other.
-	staleScanDone bool
+	// immediateScanDone: Scan's ScanDone is queued with its reply, without
+	// waiting for the driver's arming — as chip's wpa_supplicant mock emits
+	// it from a task scheduled right behind the reply
+	// (matter/testing/linux/wifi.py:403-412 at 6170af84), and a fast real
+	// scan can.
+	immediateScanDone bool
 	// scanArmed reports whether the driver waits for ScanDone; the
 	// ScanDone of a scan follows it, as wpa_supplicant's follows the Scan
 	// reply (startDriver sets it).
@@ -171,7 +174,7 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	case ifaceInterface + ".Scan":
 		done := &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{!b.scanFailed}}
 		switch {
-		case b.staleScanDone:
+		case b.immediateScanDone:
 			b.sigs <- done
 		case !b.noScanDone:
 			armed := b.scanArmed

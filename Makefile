@@ -382,7 +382,7 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 	@# chip-tool; fails loudly on a missing daemon binary, which
 	@# chiptool-build has just produced.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
-		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi)$$' ./internal/chiptool/...
+		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$' ./internal/chiptool/...
 
 .PHONY: chiptool-ble-wifi
 chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)
@@ -390,6 +390,13 @@ chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE
 	@# fails (GOFABRIC_CHIP_BLEWIFI=require); =1 by hand lets it skip.
 	GOFABRIC_CHIP_BLEWIFI=require $(GO) test -tags=chiptool -count=1 -timeout=40m -v \
 		-run '^TestChipToolBLEWiFi$$' ./internal/chiptool/...
+
+.PHONY: chiptool-ble-cases
+chiptool-ble-cases: ## chip's Python certification cases that commission over BLE onto Wi-Fi, against examples/ble-wifi-light under chip's mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)
+	@# Required (GOFABRIC_CHIP_BLECASES=require): no Docker fails; an image
+	@# without the BLE Python controller (/opt/matter-ble) skips, naming why.
+	GOFABRIC_CHIP_BLECASES=require $(GO) test -tags=chiptool -count=1 -timeout=40m -v \
+		-run '^TestChipToolBLECases$$' ./internal/chiptool/...
 
 .PHONY: chiptool-gocert
 chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's cert cases with the Go controller as TH (read mirrored) and as DUT (GOFABRIC_GOCERT=DD,ICDM narrows)

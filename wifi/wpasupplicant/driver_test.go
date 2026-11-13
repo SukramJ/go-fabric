@@ -741,19 +741,66 @@ func TestScanReadsAfterTheBound(t *testing.T) {
 	}
 }
 
-// TestScanIgnoresAStaleScanDone: a ScanDone that arrives before this
-// scan's Scan call returned ended an earlier scan; the scan keeps waiting
-// (here until its bound).
+// TestScanIgnoresAStaleScanDone: a ScanDone sent before ScanNetworks was
+// called ended an earlier scan; the scan keeps waiting (here until its
+// bound) and reads no BSSs.
 func TestScanIgnoresAStaleScanDone(t *testing.T) {
 	t.Parallel()
 	b := newFakeBus()
-	b.staleScanDone = true
+	b.noScanDone = true
 	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
 	d, _ := startDriver(t, b, Options{ScanTimeout: 50 * time.Millisecond})
+	b.sigs <- &dbus.Signal{Path: fakeIface, Name: sigScanDone, Body: []any{true}}
 	if status, debug, _ := d.ScanNetworks(t.Context(), nil); status != statusUnknown || !strings.Contains(debug, "in time") {
 		t.Fatalf("ScanNetworks after a stale ScanDone = %d %q, want the bound's UnknownError", status, debug)
 	}
 	if slices.Contains(b.called(), methodGet) {
 		t.Error("the BSSs were read on the stale ScanDone")
+	}
+}
+
+// TestScanEndsAtAnImmediateScanDone: a ScanDone queued right behind the
+// Scan call's reply — before the driver could have armed a wait after the
+// call — ends the scan at once, as chip's mock and a fast scan send it.
+// The bound is an hour: a lost ScanDone fails the test at its deadline.
+func TestScanEndsAtAnImmediateScanDone(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.immediateScanDone = true
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{"/b/1"})
+	b.bss["/b/1"] = bssProps("lab", bssid1, -50, 2437, nil, nil)
+	d, _ := startDriver(t, b, Options{ScanTimeout: time.Hour})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	status, debug, results := d.ScanNetworks(ctx, nil)
+	if status != statusSuccess || len(results) != 1 {
+		t.Fatalf("ScanNetworks with an immediate ScanDone = %d %q, %d results; want Success with 1", status, debug, len(results))
+	}
+}
+
+// TestScanFailureLeavesNoWaiter: a Scan call that fails is UnknownError
+// and disarms its wait; the next scan waits for its own ScanDone and
+// succeeds.
+func TestScanFailureLeavesNoWaiter(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.fail[ifaceInterface+".Scan"] = dbus.NewError("fi.w1.wpa_supplicant1.Interface.ScanError", []any{"busy"})
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{"/b/1"})
+	b.bss["/b/1"] = bssProps("lab", bssid1, -50, 2437, nil, nil)
+	d, _ := startDriver(t, b, Options{})
+	if status, debug, _ := d.ScanNetworks(t.Context(), nil); status != statusUnknown || !strings.Contains(debug, "scan:") {
+		t.Fatalf("failed Scan = %d %q", status, debug)
+	}
+	d.mu.Lock()
+	armed, scanning := d.scan != nil, d.scanning
+	d.mu.Unlock()
+	if armed || scanning {
+		t.Fatalf("after a failed Scan: armed %v, scanning %v", armed, scanning)
+	}
+	b.mu.Lock()
+	delete(b.fail, ifaceInterface+".Scan")
+	b.mu.Unlock()
+	if status, debug, results := d.ScanNetworks(t.Context(), nil); status != statusSuccess || len(results) != 1 {
+		t.Fatalf("scan after a failed one = %d %q, %v", status, debug, results)
 	}
 }
