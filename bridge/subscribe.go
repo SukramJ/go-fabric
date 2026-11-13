@@ -1671,18 +1671,19 @@ func (l *listenerSet) add(unsub func()) {
 // Before, both ran under b.mu held for writing and such a notifier
 // stopped the bridge (review II, W2-conc-07). b.mu guards the list and
 // the generation only: a wiring a later one overtook while it registered
-// is detached again instead of installed, so the last one wins.
-func (b *Bridge) rewireMeasurementListeners() {
+// is detached again instead of installed, so the last one wins. It
+// returns the generation it wired under.
+func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	b.mu.Lock()
 	stale := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
 	b.listenerGeneration++
-	generation := b.listenerGeneration
+	generation = b.listenerGeneration
 	mgr, topology := b.subManager, b.topology
 	b.mu.Unlock()
 	runUnsubscribers(stale)
 	if mgr == nil || topology == nil {
-		return
+		return generation
 	}
 	unsubs := b.wireMeasurementListeners(mgr, topology)
 	b.mu.Lock()
@@ -1694,6 +1695,24 @@ func (b *Bridge) rewireMeasurementListeners() {
 	if overtaken {
 		runUnsubscribers(unsubs)
 	}
+	return generation
+}
+
+// detachListenersOfGeneration detaches the value listeners while they are
+// still the ones [Bridge.rewireMeasurementListeners] installed under
+// generation: a later wiring or detach moved the generation on and owns
+// what is installed now.
+func (b *Bridge) detachListenersOfGeneration(generation uint64) {
+	b.mu.Lock()
+	if b.listenerGeneration != generation {
+		b.mu.Unlock()
+		return
+	}
+	unsubs := b.measurementUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.listenerGeneration++
+	b.mu.Unlock()
+	runUnsubscribers(unsubs)
 }
 
 // detachHostListeners unregisters the bridge from every host notifier —

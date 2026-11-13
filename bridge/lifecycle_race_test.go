@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -201,4 +202,74 @@ func TestStopWithDoneContextTearsDown(t *testing.T) {
 		t.Fatalf("the port after the last Stop: %v", err)
 	}
 	_ = free.Close()
+}
+
+// gatedContact is a contact source that counts its live value listeners;
+// once armed, its next registration closes entered and waits for release
+// — a host notifier that blocks while the bridge registers with it.
+type gatedContact struct {
+	countingContact
+	armed            atomic.Bool
+	entered, release chan struct{}
+}
+
+func (s *gatedContact) OnMatterValueChanged(fn func()) func() {
+	if s.armed.CompareAndSwap(true, false) {
+		close(s.entered)
+		<-s.release
+	}
+	return s.countingContact.OnMatterValueChanged(fn)
+}
+
+// TestReassembleStraddlingARestartKeepsTheNewRunsListeners (review II,
+// R2-P1-dr-req-05): a Reassemble that blocks in a host notifier's
+// registration while the bridge is stopped and started again does not,
+// when it resumes and finds its run over, detach the listeners the new
+// run wired — it removes only what it wired itself. Before, it detached
+// whatever the bridge held, and the new run served without its value
+// listeners until the next Reassemble (the state R2-P0-rv-A06 was fixed
+// for).
+func TestReassembleStraddlingARestartKeepsTheNewRunsListeners(t *testing.T) {
+	t.Parallel()
+	src := &gatedContact{entered: make(chan struct{}), release: make(chan struct{})}
+	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := func(ctx context.Context) (*endpoint.Topology, error) {
+		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
+			StableKey: endpoint.StringKey("contact"), DeviceAddress: "C", DeviceType: 0x0015,
+			FriendlyName: "Contact", ChannelAddress: "C:1", Measurement: src,
+		}}}})
+	}
+	b := newStartedBridgeWithSnapshotter(t, snap)
+	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+	if got := src.live.Load(); got != 1 {
+		t.Fatalf("%d listeners on the started bridge, want 1", got)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	src.armed.Store(true)
+	reassembled := make(chan error, 1)
+	go func() { reassembled <- b.Reassemble(ctx) }()
+	select {
+	case <-src.entered:
+	case <-ctx.Done():
+		t.Fatal("the Reassemble never registered with the host's notifier")
+	}
+	if err := b.Stop(ctx); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if err := b.Start(ctx); err != nil {
+		t.Fatalf("the second Start: %v", err)
+	}
+	if got := src.live.Load(); got != 1 {
+		t.Fatalf("%d listeners after the second Start, want 1 (the new run's)", got)
+	}
+	close(src.release)
+	<-reassembled
+	if got := src.live.Load(); got != 1 {
+		t.Fatalf("%d listeners once the Reassemble of the former run returned, want 1: the new run's were detached", got)
+	}
 }

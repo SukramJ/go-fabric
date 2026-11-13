@@ -1262,15 +1262,19 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// The value listeners follow the swap, outside the lock: the host's
 	// notifiers are called to unregister and to register, and their
 	// callbacks re-enter the bridge (review II, W2-conc-07).
-	b.rewireMeasurementListeners()
+	generation := b.rewireMeasurementListeners()
 	// A Stop that set in after the swap detaches what it finds; one that
 	// set in before this wiring was installed missed it, so the wiring
-	// goes again here.
+	// goes again here — this wiring only: a Stop and the next Start that
+	// ran meanwhile wired the new run's listeners, which stay (review II,
+	// R2-P1-dr-req-05). The switch hooks need nothing here: the swap
+	// installed them under the lock, so a Stop after it finds them and one
+	// before it was refused above.
 	b.mu.RLock()
 	ended := b.runEndedLocked(run)
 	b.mu.RUnlock()
 	if ended {
-		b.detachHostListeners()
+		b.detachListenersOfGeneration(generation)
 	}
 
 	// Drain the swapped-out press-DP hooks now that the new topology
