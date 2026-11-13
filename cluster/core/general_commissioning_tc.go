@@ -174,18 +174,22 @@ func (g *GeneralCommissioning) handleSetTCAcknowledgements(ctx context.Context, 
 		g.mu.Unlock()
 		return gencommdef.SetTcAcknowledgementsResponse{ErrorCode: gencommdef.CommissioningErrorOk}, nil
 	}
+	prev := g.tcTemporal
 	g.tcTemporal = &accepted
-	var err error
 	if g.failSafeArmed {
 		g.tcTouched = true
-	} else {
-		err = g.commitTermsLocked(ctx)
+	} else if err := g.commitTermsLocked(ctx); err != nil {
+		// Outside a fail-safe nothing would revert an acceptance the store
+		// refused: it would stay in force unpersisted, pass
+		// CommissioningComplete's gate and make a retry a no-op. The
+		// command fails with the acceptance as it was (review II,
+		// R2-P1-core-04).
+		g.tcTemporal = prev
+		g.mu.Unlock()
+		return nil, err
 	}
 	g.dataVersion.Bump()
 	g.mu.Unlock()
-	if err != nil {
-		return nil, err
-	}
 	g.changes.Notify(gencommdef.AttrTcAcceptedVersion, gencommdef.AttrTcAcknowledgements, gencommdef.AttrTcAcknowledgementsRequired)
 	return gencommdef.SetTcAcknowledgementsResponse{ErrorCode: gencommdef.CommissioningErrorOk}, nil
 }
