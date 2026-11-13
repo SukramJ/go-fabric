@@ -471,7 +471,16 @@ func (n *Node) Start(ctx context.Context) error {
 // (NetworkClient.ts:309-313), the peer's signals are released, the
 // properties freeze, the store is flushed (ClientCacheBuffer.ts:94-101)
 // and the connection state is recomputed. It waits, within ctx, for the
-// subscription to end, so a hook must not call it.
+// subscription to end and for the node's queued report jobs — their store
+// writes and hooks ([Hooks]) — to drain, so a hook must not call it.
+//
+// When ctx ends while jobs are still queued — a hook that blocks, on the
+// host's own I/O or on a lock the caller of Stop holds — Stop returns
+// ctx's error and the stop is not complete: the queue runs its jobs to
+// their end, hooks included, and the store's final flush has not run (it
+// follows the drain, so no queued write lands behind it). The node is
+// offline all the same; a second Stop completes it. Erase and the
+// registry's delete stop first and do nothing after a Stop that failed.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false
@@ -498,7 +507,12 @@ func (n *Node) Stop(ctx context.Context) error {
 	// The deferred report jobs drain before the store's final flush, so
 	// none lands after a stop (or the erase that follows a delete) —
 	// ClientStructure.ts:482-486 drains its queue on every exit path.
-	n.jobs.wait()
+	// matter.js has no deadline there; this drain ends with ctx, and the
+	// flush then waits for the Stop that sees the queue empty.
+	if werr := n.jobs.waitContext(ctx); werr != nil {
+		n.recompute()
+		return werr
+	}
 	n.persist.stop()
 	n.recompute()
 	return err

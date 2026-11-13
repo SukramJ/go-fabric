@@ -561,6 +561,18 @@ Each names its matter.js counterpart in its doc comment.
 instead, so a host attributes a report, an event or a subscription signal
 to its node, as matter.js gives each paired node its own events.
 
+The hooks of a subscription report run on the node's ordered job queue,
+after the report's StatusResponse, so a hook may block without holding the
+peer's exchange. `Node.Stop` and `Node.Close` (and with them
+`Registry.Decommission`, `Forget` and `Close`) drain that queue within
+their context, so a hook must not call them. A hook still blocked when the
+context ends makes them return the context's error: the node is offline,
+the queue runs its jobs to their end, and the store's final flush waits
+for a second `Stop` — a node whose stop failed is not erased and stays in
+the registry.
+
+*Source: `controller/client/config.go` (`Hooks`), `controller/client/node.go` (`Node.Stop`), `controller/client/jobs.go`.*
+
 ### JSON values
 
 A host that speaks JSON to its own clients reads and builds values
