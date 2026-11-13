@@ -216,6 +216,12 @@ func TestDEMPowerAdjustLifecycle(t *testing.T) {
 
 		host.fail = errors.New("refused")
 		demWantStatus(t, "host refusal", demInvoke(srv, dem.CmdPowerAdjustRequest, req), im.StatusFailure)
+		// A refusal that names its status — a host's contract.StatusError
+		// — answers it (docs/guides/ports.md; review II R2-P0-err-D01).
+		host.fail = contract.StatusError{Status: uint8(im.StatusBusy), Message: "defrosting"}
+		if err := demInvoke(srv, dem.CmdPowerAdjustRequest, req); spec.StatusOf(err) != im.StatusBusy {
+			t.Errorf("PowerAdjustRequest refused with a host status answered %v, want BUSY", err)
+		}
 		if srv.EsaState() != energy.EsaStateOnline {
 			t.Errorf("after refusal: ESAState %d", srv.EsaState())
 		}

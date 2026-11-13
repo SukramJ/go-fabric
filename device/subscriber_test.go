@@ -5,7 +5,6 @@ package device_test
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -23,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // reportSpy records the paths each report carries.
@@ -95,7 +95,7 @@ var _ contract.ChangeNotifier = (*dial)(nil)
 // behavior's change through its own Datasource (Datasource.ts:776-796).
 func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	t.Parallel()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "node.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

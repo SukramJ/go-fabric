@@ -446,6 +446,31 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 	return []uint8{fabric}, nil
 }
 
+// writeFabric is the fabric a GroupKeyMap write lands on: the accessing
+// fabric of the request. An Interaction Model write without one — a PASE
+// session before AddNOC — is refused with UnsupportedAccess, as
+// [AccessControl] refuses its lists. A local write — MatterWrite without a
+// request context — uses the [GroupKeyManagement.SetCurrentFabric] value
+// and is refused without one; the entries' own FabricIndex is raw input
+// and never a scope. Mirrors chip src/app/WriteHandler.cpp:805-811 at
+// 6170af84 ("a fabric-scoped list and there is no accessing fabric →
+// UNSUPPORTED_ACCESS") and matter.js
+// packages/protocol/src/action/server/AccessControl.ts:358-365 at db021da0
+// (authorizeWrite: "Permission denied: No accessing fabric",
+// Status.UnsupportedAccess).
+func (g *GroupKeyManagement) writeFabric(ctx context.Context) (uint8, error) {
+	_, fabric, request := im.LookupFabricFilter(ctx)
+	if !request {
+		g.mu.RLock()
+		fabric = g.currentFabric
+		g.mu.RUnlock()
+	}
+	if fabric == 0 {
+		return 0, gkmStatusError{im.StatusUnsupportedAccess, "GroupKeyMap is fabric-scoped; the write has no accessing fabric"}
+	}
+	return fabric, nil
+}
+
 // MatterWrite handles GroupKeyMap as a writable attribute (Matter
 // §11.2.10.4.1). The IM layer pre-filters the list to the requesting
 // fabric.
@@ -457,19 +482,9 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	if !ok {
 		return fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidArg, value)
 	}
-	// Resolve fabric from the IM dispatcher's filter context:
-	// g.currentFabric is set by SetCurrentFabric which has no production
-	// caller, so every inbound write would see fabric=0 and reject as
-	// cross-fabric. FabricFilterFromContext returns the session's fabric
-	// on CASE (after AddNOC) — the correct value for a fabric-scoped write.
-	_, fabric := im.FabricFilterFromContext(ctx)
-	if fabric == 0 {
-		// Fall back to the legacy SetCurrentFabric path so test
-		// harnesses that haven't migrated to FabricFilterFromContext
-		// still work.
-		g.mu.RLock()
-		fabric = g.currentFabric
-		g.mu.RUnlock()
+	fabric, err := g.writeFabric(ctx)
+	if err != nil {
+		return err
 	}
 
 	// Matter §11.2.10.4.1 semantics: writing GroupKeyMap REPLACES the

@@ -23,7 +23,7 @@ import (
 
 func openStore(t *testing.T) (*store.Store, *sql.DB) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "matter.db"))
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "matter.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

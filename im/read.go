@@ -381,11 +381,24 @@ func (r ReportData) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWrite
 		// explicit-width helper to lock the wire type.
 		enc.PutUint32(tlv.ContextTag(tagReportSubscriptionID), r.SubscriptionID)
 	}
-	enc.StartArray(tlv.ContextTag(tagReportAttributeReports))
-	for _, rep := range r.Reports {
-		rep.marshal(enc, valueWriter)
+	// Each report array is written only when it has an entry: a
+	// keep-alive, an event-only report and an empty read response carry no
+	// attributeReports field. Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:490-491 at
+	// db021da0 (`attributeReports: undefined, eventReports: undefined`),
+	// :764-767 and :782-785 (an array is created with its first entry) and
+	// :512-513 (both deleted once a chunk went out) — for every message
+	// sendDataReport sends, the read response, the priming report and the
+	// subscription's reports alike. A receiver takes an absent array and
+	// an empty one alike ([UnmarshalReportDataTLV]; chip
+	// src/app/ReadClient.cpp:688-712 at 6170af84).
+	if len(r.Reports) > 0 {
+		enc.StartArray(tlv.ContextTag(tagReportAttributeReports))
+		for _, rep := range r.Reports {
+			rep.marshal(enc, valueWriter)
+		}
+		_ = enc.EndContainer()
 	}
-	_ = enc.EndContainer()
 	if len(r.EventReports) > 0 {
 		enc.StartArray(tlv.ContextTag(tagReportEventReports))
 		for _, ev := range r.EventReports {
@@ -429,11 +442,13 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 		// DataVersion is mandatory in AttributeDataIB per Matter
 		// §10.6.1.4. chip-tool's ClusterStateCache expects to find
 		// it at context tag 0 — without it the controller surfaces
-		// CHIP_ERROR_KEY_NOT_FOUND on every read. v1.1 emits a
-		// constant 1 because the bridge does not yet implement the
-		// per-cluster version-tracking required for cache-coherent
-		// subscribe responses; controllers tolerate stale data
-		// versions on first read.
+		// CHIP_ERROR_KEY_NOT_FOUND on every read. A report without a
+		// version (0: the dispatcher reported none — in
+		// endpoint.TopologyDispatcher a root or Aggregator server
+		// without contract.ClusterDataVersion; a bridged endpoint
+		// always has the endpoint-held one) goes out as 1. Such a
+		// cluster is never left out for a DataVersionFilter:
+		// HandleReadRequest honours a filter only above 1.
 		dataVersion := rep.DataVersion
 		if dataVersion == 0 {
 			dataVersion = 1
@@ -480,7 +495,8 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 // AddNOC adopted the session onto the new fabric (matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191 keys the
 // implicit Administer grant on the auth mode, not on the fabric), so the
-// bypass fires on fabricIndex==0 OR [IsPASEFromContext]. Mirrors matter.js
+// bypass is keyed on [IsPASEFromContext] alone: a request without a fabric
+// that is not PASE is refused (checkSubjectACL). Mirrors matter.js
 // packages/protocol/src/action/server/AttributeReadResponse.ts:238-274
 // (addConcrete → error status) and readAttributeForWildcard (bare return).
 func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) ReportData {
@@ -488,7 +504,8 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	// A PASE session keeps its implicit Administer grant after AddNOC
 	// adopted it onto the new fabric, so the gate is keyed on the auth
-	// mode as well as on the fabric.
+	// mode, not on the fabric: fabric 0 without PASE is checked, and
+	// refused.
 	pase := IsPASEFromContext(ctx)
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(AttributeReadPrivilegeProvider)
@@ -747,14 +764,15 @@ const matterCommissionerControlClusterID uint32 = 0x0751
 
 // EventReadAuthorizer bundles the accessing subject + ACL checker used to gate
 // event reads and subscriptions, mirroring the (fabricIndex, subject, CATs)
-// tuple the attribute read path threads through [HandleReadRequest]. A zero
-// FabricIndex marks a PASE / pre-commissioning session (ACL not yet
-// applicable); PASE marks the same session after AddNOC adopted it onto the
-// new fabric — the implicit Administer grant is keyed on the auth mode
+// tuple the attribute read path threads through [HandleReadRequest]. PASE
+// marks the commissioning channel, before AddNOC (FabricIndex 0) and after
+// it adopted the session onto the new fabric — the implicit Administer
+// grant is keyed on that auth mode
 // (matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191),
-// so a FabricIndex alone no longer identifies the commissioning channel. A nil
-// Checker disables enforcement (fail-open, matching the attribute path's
-// "dispatcher without ACLChecker" fallback).
+// never on the FabricIndex: a zero FabricIndex without PASE is no grant and
+// is refused (checkSubjectACL). A nil Checker disables enforcement
+// (fail-open, matching the attribute path's "dispatcher without ACLChecker"
+// fallback).
 type EventReadAuthorizer struct {
 	Checker       ACLChecker
 	FabricIndex   uint8

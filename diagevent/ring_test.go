@@ -184,3 +184,52 @@ func TestObserve(t *testing.T) {
 	nilRing.Observe(func(Event) { t.Error("a nil ring called its observer") })()
 	r.Observe(nil)()
 }
+
+// TestRecordKeepsItsOwnDetail: the ring's entry does not share the
+// caller's Detail map (review II, W2-conc-13). Before, Record stored the
+// map by reference, so a caller that reused or changed it after the call
+// rewrote the recorded event — and raced a reader of Snapshot.
+func TestRecordKeepsItsOwnDetail(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	detail := map[string]string{"peer": "fd11::1", "session_id": "7"}
+	r.Record(Event{At: at(1), Kind: KindSession, Message: "opened", Detail: detail})
+	detail["peer"] = "changed after Record"
+	delete(detail, "session_id")
+	detail["added"] = "after Record"
+
+	got := r.Snapshot()
+	if len(got) != 1 {
+		t.Fatalf("Snapshot holds %d events, want 1", len(got))
+	}
+	want := map[string]string{"peer": "fd11::1", "session_id": "7"}
+	if len(got[0].Detail) != len(want) || got[0].Detail["peer"] != want["peer"] || got[0].Detail["session_id"] != want["session_id"] {
+		t.Errorf("recorded Detail = %v after the caller changed its map, want %v", got[0].Detail, want)
+	}
+}
+
+// TestSnapshotDetailIsACopy: a snapshot's Detail maps are the caller's —
+// changing one leaves the ring's entry, and every later snapshot, as it
+// was recorded. Record and the observers already hand out copies; the
+// snapshot handed out the ring's own maps.
+func TestSnapshotDetailIsACopy(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	r.Record(Event{Kind: "session.closed", Message: "closed", Detail: map[string]string{"session_id": "7"}})
+	r.Record(Event{Kind: "plain", Message: "no detail"})
+
+	first := r.Snapshot()
+	if len(first) != 2 {
+		t.Fatalf("snapshot holds %d events, want 2", len(first))
+	}
+	first[1].Detail["session_id"] = "changed"
+	first[1].Detail["added"] = "by the caller"
+
+	second := r.Snapshot()
+	if got := second[1].Detail; len(got) != 1 || got["session_id"] != "7" {
+		t.Fatalf("the ring's entry changed with the caller's snapshot: %v", got)
+	}
+	if second[0].Detail != nil {
+		t.Fatalf("an event recorded without Detail has %v", second[0].Detail)
+	}
+}

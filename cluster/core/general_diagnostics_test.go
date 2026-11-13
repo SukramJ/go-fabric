@@ -39,14 +39,11 @@ func TestGenDiag_ClusterRevision(t *testing.T) {
 	}
 }
 
-// TestGenDiag_ReadNetworkInterfacesNonEmpty asserts that
-// `NetworkInterfaces` (Matter §11.12.4.1) carries at least one
-// NetworkInterfaceStruct entry. Apple Home's HMMTRAccessoryServerBrowser
-// reads this list to build its "topology dictionary"; an empty list
-// makes Apple log "No enumeration/topology dictionary found" + "Nil
-// supported link layer types" and tear the fabric down via
-// RemoveFabric ~5 s after Subscribe-Initial.
-func TestGenDiag_ReadNetworkInterfacesNonEmpty(t *testing.T) {
+// TestGenDiag_ReadNetworkInterfaces reads `NetworkInterfaces` (Matter
+// §11.12.4.1) from the host the test runs on: a list of at most 8 named
+// entries. It may be empty — the server adds no entry of its own
+// (TestGeneralDiagnosticsNetworkInterfacesSelection holds the selection).
+func TestGenDiag_ReadNetworkInterfaces(t *testing.T) {
 	t.Parallel()
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
 	v, ok := g.MatterRead(0x0000)
@@ -57,8 +54,8 @@ func TestGenDiag_ReadNetworkInterfacesNonEmpty(t *testing.T) {
 	if !ok {
 		t.Fatalf("NetworkInterfaces type = %T, want []core.NetworkInterfaceStruct", v)
 	}
-	if len(list) == 0 {
-		t.Fatal("NetworkInterfaces is empty — Apple HAP-Mapper rejects pair on empty list")
+	if len(list) > 8 {
+		t.Fatalf("NetworkInterfaces has %d entries, want at most 8", len(list))
 	}
 	// Every entry must carry a non-empty Name.
 	for i, entry := range list {
@@ -479,12 +476,11 @@ func TestGenDiag_NetworkInterfacesHardwareAddressConstraint(t *testing.T) {
 		t.Fatal("NetworkInterfaces: ok=false")
 	}
 	list := v.([]core.NetworkInterfaceStruct)
-	// Every entry must have HardwareAddress exactly 6 or 8 bytes — the
-	// matter.js `hwadr` constraint that Apple's IM-decoder enforces.
+	// Every entry must have HardwareAddress exactly 6 or 8 bytes, the
+	// hwadr type.
 	for i, entry := range list {
-		n := len(entry.HardwareAddress)
-		if n != 0 && n != 6 && n != 8 {
-			t.Errorf("entry[%d] HardwareAddress len=%d; must be 0, 6, or 8", i, n)
+		if n := len(entry.HardwareAddress); n != 6 && n != 8 {
+			t.Errorf("entry[%d] HardwareAddress len=%d; must be 6 or 8", i, n)
 		}
 	}
 }

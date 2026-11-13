@@ -497,6 +497,12 @@ func (a *Administrator) icacCSRRequest(ctx context.Context, _ any) (any, error) 
 	}
 	csr, err := a.port.IcacCsr(ctx) // :340
 	if err != nil {
+		// The status a host's contract.StatusError or an
+		// im.StatusCodeError names, FAILURE for any other error
+		// (docs/guides/ports.md).
+		if spec.CarriesStatus(err) {
+			return nil, err
+		}
 		return nil, statusErr(im.StatusFailure, "IcacCsr: %v", err)
 	}
 	return jfadef.IcaccsrResponse{StatusCode: jfadef.ICACCSRResponseStatusCodeOk, Icaccsr: &csr}, nil // :342-343

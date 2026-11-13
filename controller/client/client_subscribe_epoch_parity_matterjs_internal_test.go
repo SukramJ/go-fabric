@@ -4,6 +4,7 @@
 package client
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -44,13 +45,13 @@ func TestClientSubscribeEpochParity(t *testing.T) {
 	t.Run("applies data of an interaction that started before a switch to unfiltered without its version", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := peerImage(t, &MemoryStore{})
-		if err := n.adoptFabricFilter(true); err != nil {
+		if _, err := n.adoptFabricFilter(context.Background(), true); err != nil {
 			t.Fatal(err)
 		}
 		in := n.s.epoch
 		// The report's data passes the cache check before the switch.
 		n.applyIn(wildcard, &onOffReport(77).r, false, in)
-		if err := n.adoptFabricFilter(false); err != nil {
+		if _, err := n.adoptFabricFilter(context.Background(), false); err != nil {
 			t.Fatal(err)
 		}
 		if f := onOffFilters(n, false); len(f) != 0 {
@@ -64,11 +65,11 @@ func TestClientSubscribeEpochParity(t *testing.T) {
 	t.Run("applies data of an interaction that started before a switch to filtered without its version", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := peerImage(t, &MemoryStore{})
-		if err := n.adoptFabricFilter(false); err != nil {
+		if _, err := n.adoptFabricFilter(context.Background(), false); err != nil {
 			t.Fatal(err)
 		}
 		in := n.s.epoch
-		if err := n.adoptFabricFilter(true); err != nil {
+		if _, err := n.adoptFabricFilter(context.Background(), true); err != nil {
 			t.Fatal(err)
 		}
 		// The interaction started before the switch; its data arrives
@@ -90,7 +91,7 @@ func TestClientSubscribeEpochParity(t *testing.T) {
 		}
 		unfiltered := newScope([]im.ConcreteAttributePath{{}}, true)
 		in := n.s.epoch
-		if err := n.adoptFabricFilter(false); err != nil {
+		if _, err := n.adoptFabricFilter(context.Background(), false); err != nil {
 			t.Fatal(err)
 		}
 		n.applyIn(unfiltered, &onOffReport(79).r, false, in)

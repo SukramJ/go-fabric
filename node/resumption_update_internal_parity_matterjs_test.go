@@ -18,7 +18,7 @@ import (
 // fabric-updated hook deletes the fabric's resumption records, so no peer
 // resumes a session established under the replaced NOC. Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
-// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:491).
+// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
 // The node here holds only the store and an empty CASE identity table, so
 // the hook stops after the drop (the identity reload fails).
 func TestUpdateNOCDropsResumptionRecordsParity(t *testing.T) {

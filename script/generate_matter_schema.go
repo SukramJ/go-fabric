@@ -9,7 +9,11 @@
 //   - clusters.go  — ClusterRevisions, ClusterNames (map[uint32]uint16/string)
 //   - devicetypes.go — DeviceTypeRevisions, DeviceTypeNames, DeviceTypeServerClusters
 //   - attribute_access_gen.go — attributeWritePrivileges (writable attributes
-//     whose write privilege is above Operate)
+//     whose effective write privilege is above Operate), changesOmittedAttributes,
+//     fabricScopedWritePaths (writable attributes whose effective access
+//     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
+//     attribute below the global range that matter.js does not let a remote
+//     party write)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
 //     type's requirement tree, conditions and composition: the device-type
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
@@ -128,13 +132,56 @@ type snapshotAttribute struct {
 	Name    string `json:"name"`
 	Access  string `json:"access"`
 	Quality string `json:"quality"`
-	// Effective carries the timed quality ("T") as access.timed, as for a
-	// command.
+	// Effective carries the attribute's resolved access — what matter.js's
+	// effectiveAccess answers, a derived cluster's inherited attribute
+	// included — field by field (the extractor's accessOut), with the timed
+	// quality ("T") as access.timed, as for a command — and its resolved
+	// quality, of which the fixed flag ("F") is read here.
 	Effective *struct {
-		Access struct {
-			Timed bool `json:"timed"`
-		} `json:"access"`
+		Access  snapshotAccess `json:"access"`
+		Quality struct {
+			Fixed bool `json:"fixed"`
+		} `json:"quality"`
 	} `json:"effective"`
+}
+
+// snapshotAccess mirrors an effective access in parity/schema.json: the
+// fields of matter.js's Access the extractor writes (accessOut), each
+// absent when matter.js leaves it undefined.
+type snapshotAccess struct {
+	RW        string `json:"rw"`
+	ReadPriv  string `json:"readPriv"`
+	WritePriv string `json:"writePriv"`
+	Fabric    string `json:"fabric"`
+	Timed     bool   `json:"timed"`
+}
+
+// String displays the access in the standard Matter syntax, as matter.js
+// Access.toString does (packages/model/src/aspects/Access.ts:193-223 at
+// db021da0): rw, the fabric flag, the privileges — once when read and write
+// agree — and "T".
+func (a snapshotAccess) String() string {
+	var parts []string
+	if a.RW != "" {
+		parts = append(parts, a.RW)
+	}
+	if a.Fabric != "" {
+		parts = append(parts, a.Fabric)
+	}
+	switch {
+	case a.ReadPriv == a.WritePriv:
+		if a.ReadPriv != "" {
+			parts = append(parts, a.ReadPriv)
+		}
+	case a.ReadPriv != "":
+		parts = append(parts, a.ReadPriv+a.WritePriv)
+	default:
+		parts = append(parts, a.WritePriv)
+	}
+	if a.Timed {
+		parts = append(parts, "T")
+	}
+	return strings.Join(parts, " ")
 }
 
 // snapshotCommand mirrors one command of a cluster in parity/schema.json:
@@ -504,27 +551,31 @@ func conformanceOrNone(c string) string {
 	return c
 }
 
-// writePrivilege derives an attribute's write privilege from its matter.js
-// access string the way matter.js's Access parser does
-// (packages/model/src/aspects/Access.ts): the attribute is writable when the
-// read/write token is "RW" or "R[W]"; every O, M or A in a privilege token
-// raises the write privilege to the highest of them; Operate is the default
-// (Access.Default). It returns 0 for a read-only attribute.
-func writePrivilege(access string) uint8 {
-	fields := strings.Fields(access)
-	if len(fields) == 0 || (fields[0] != "RW" && fields[0] != "R[W]") {
-		return 0
+// writePrivilege is an attribute's write privilege from its effective
+// access in the snapshot: 0 for an attribute that is not writable (matter.js
+// Access.writable, packages/model/src/aspects/Access.ts:44-46 at db021da0:
+// an rw other than "R"), else the level of writePriv — 3 Operate, 4 Manage,
+// 5 Administer. A writable attribute whose effective access names no write
+// privilege, or one this table does not know, is an error: the generator
+// states no privilege the snapshot does not carry.
+func writePrivilege(a snapshotAccess) (uint8, error) {
+	switch a.RW {
+	case "", "R":
+		return 0, nil
+	case "RW", "R[W]", "W":
+	default:
+		return 0, fmt.Errorf("effective access rw %q is not one this generator knows", a.RW)
 	}
-	level := map[rune]uint8{'O': 3, 'M': 4, 'A': 5}
-	priv := uint8(3)
-	for _, f := range fields[1:] {
-		for _, r := range f {
-			if l, ok := level[r]; ok && l > priv {
-				priv = l
-			}
-		}
+	switch a.WritePriv {
+	case "O":
+		return 3, nil
+	case "M":
+		return 4, nil
+	case "A":
+		return 5, nil
+	default:
+		return 0, fmt.Errorf("writable (rw %q) with write privilege %q: want O, M or A", a.RW, a.WritePriv)
 	}
-	return priv
 }
 
 func writeAccessFile(clusters []snapshotCluster) error {
@@ -532,30 +583,28 @@ func writeAccessFile(clusters []snapshotCluster) error {
 	buf.WriteString(fileHeaderTpl)
 	buf.WriteString("// attributeWritePrivileges maps every writable attribute whose matter.js\n")
 	buf.WriteString("// write privilege is above Operate (4 Manage, 5 Administer) to that\n")
-	buf.WriteString("// privilege. Generated from the access strings in parity/schema.json.\n")
+	buf.WriteString("// privilege. Generated from each attribute's effective access in\n")
+	buf.WriteString("// parity/schema.json.\n")
 	buf.WriteString("var attributeWritePrivileges = map[uint32]map[uint32]uint8{\n")
-	// A derived cluster (BridgedDeviceBasicInformation from
-	// BasicInformation, the mode clusters from ModeBase) lists the
-	// attributes it inherits without an access string; it takes the base's,
-	// found as the same (id, name) in a cluster that states one — as
-	// matter.js resolves an inherited element (packages/model).
-	inherited := map[string]string{}
-	for _, c := range clusters {
-		for _, a := range c.Attributes {
-			k := fmt.Sprintf("%d/%s", a.ID, a.Name)
-			if _, ok := inherited[k]; !ok && a.Access != "" {
-				inherited[k] = a.Access
-			}
-		}
-	}
+	// The attribute's own effective access, as writeTimedFile reads it: a
+	// derived cluster (BridgedDeviceBasicInformation from BasicInformation,
+	// the mode clusters from ModeBase) lists the attributes it inherits
+	// without an access string, and matter.js's effectiveAccess — which the
+	// extractor records per attribute — is where the base's is resolved.
+	// Looking the string up by (id, name) in whichever cluster states one
+	// first would take another cluster's privilege as soon as two disagree.
 	for _, c := range clusters {
 		var rows []string
 		for _, a := range c.Attributes {
-			if a.Access == "" {
-				a.Access = inherited[fmt.Sprintf("%d/%s", a.ID, a.Name)]
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
 			}
-			if p := writePrivilege(a.Access); p > 3 {
-				rows = append(rows, fmt.Sprintf("\t\t0x%04X: %d, // %s %q\n", a.ID, p, a.Name, a.Access))
+			p, err := writePrivilege(a.Effective.Access)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			if p > 3 {
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: %d, // %s %q\n", a.ID, p, a.Name, a.Effective.Access))
 			}
 		}
 		if len(rows) == 0 {
@@ -588,6 +637,90 @@ func writeAccessFile(clusters []snapshotCluster) error {
 		}
 		buf.WriteString("\t},\n")
 	}
+	buf.WriteString("}\n\n")
+	// fabricScopedWritePaths: matter.js's limits.fabricScoped
+	// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0,
+	// fabric "F" or "S") on an attribute that is writable — the attributes
+	// AttributeWriteResponse.ts:248-251 refuses without an accessing fabric.
+	buf.WriteString("// fabricScopedWritePaths lists every writable attribute whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or\n")
+	buf.WriteString("// fabric-sensitive (\"S\"): a write to it needs an accessing fabric.\n")
+	buf.WriteString("var fabricScopedWritePaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			switch acc.Fabric {
+			case "":
+				continue
+			case "F", "S":
+			default:
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			p, err := writePrivilege(acc)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			if p == 0 {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	// readOnlyAttributes: the complement of matter.js's limits.writable
+	// (packages/protocol/src/action/server/AccessControl.ts:523 at db021da0,
+	// `access.writable && !fixed`), over every cluster of the snapshot. The
+	// ids of the global range are left to the write gate: the snapshot
+	// lists FeatureMap and ClusterRevision where a cluster's element file
+	// states them and none of the other four, so a table built from it
+	// would cover the range in part.
+	buf.WriteString("// readOnlyAttributes lists every attribute below the global range\n")
+	buf.WriteString("// (0xFFF8) that a remote party may not write: its effective access in\n")
+	buf.WriteString("// parity/schema.json is not writable, or its effective quality is fixed\n")
+	buf.WriteString("// (\"F\"). The global attributes are read-only on every cluster and are\n")
+	buf.WriteString("// answered by AttributeWritable itself.\n")
+	buf.WriteString("var readOnlyAttributes = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.ID >= globalAttributeFirst {
+				continue
+			}
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			p, err := writePrivilege(a.Effective.Access)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			switch {
+			case p == 0:
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Effective.Access))
+			case a.Effective.Quality.Fixed:
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q, fixed\n", a.ID, a.Name, a.Effective.Access))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
 	buf.WriteString("}\n")
 	out, err := format.Source(buf.Bytes())
 	if err != nil {
@@ -595,6 +728,12 @@ func writeAccessFile(clusters []snapshotCluster) error {
 	}
 	return writeIfChanged(accessFile, out)
 }
+
+// globalAttributeFirst is the first id of the global attribute range
+// (GeneratedCommandList 0xFFF8 … ClusterRevision 0xFFFD; matter.js
+// packages/model/src/standard/elements/generated-command-list.element.ts:14
+// at db021da0).
+const globalAttributeFirst = 0xFFF8
 
 // writeTimedFile emits timedInvokePaths: every request command whose
 // effective access carries the timed quality ("T", matter.js

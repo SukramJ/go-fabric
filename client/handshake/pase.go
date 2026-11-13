@@ -137,10 +137,14 @@ func pairPASE(ctx context.Context, mgr *exchange.Manager, us *exchange.Session, 
 	h.Write([]byte(spake2.MatterContext))
 	h.Write(req)
 	h.Write(respBytes)
-	prover, err := spake2.NewProver(passcode, resp.Parameters.Salt, int(resp.Parameters.Iterations), nil, nil, h.Sum(nil))
+	prover, err := newProver(passcode, resp.Parameters.Salt, int(resp.Parameters.Iterations), nil, nil, h.Sum(nil))
 	if err != nil {
 		return nil, fmt.Errorf("handshake: SPAKE2+ prover: %w", err)
 	}
+	// The prover has served on every way out of here: w0, w1 and x when
+	// the handshake ends before Pake2, its own Ke once the session keys
+	// are derived below (review II, R2-P0-rv-B03).
+	defer prover.Close()
 	pA, err := prover.GeneratePake1()
 	if err != nil {
 		return nil, fmt.Errorf("handshake: Pake1: %w", err)
@@ -174,10 +178,16 @@ func pairPASE(ctx context.Context, mgr *exchange.Manager, us *exchange.Session, 
 		return nil, err
 	}
 
-	keys, err := hkdf.Key(sha256.New, prover.SharedSecret(), nil, sessionKeysInfo, 48)
+	// The 48 derived bytes have served once the session holds its own
+	// copies of them: channel.New copies both keys and the manager the
+	// attestation challenge (TestNewKeepsItsOwnKeys in secure/channel
+	// holds the first). They are overwritten on every way out, as Ke is
+	// ([paseKeyBlock]).
+	keys, err := paseKeyBlock(prover)
 	if err != nil {
-		return nil, fmt.Errorf("handshake: session keys: %w", err)
+		return nil, err
 	}
+	defer clear(keys)
 	return mgr.NewSecureSession(exchange.SecureSessionConfig{
 		ID:   sessionID,
 		Addr: us.Addr(),
@@ -191,6 +201,26 @@ func pairPASE(ctx context.Context, mgr *exchange.Manager, us *exchange.Session, 
 		AttestationChallenge: keys[32:48],
 		SuppressPeerLoss:     opts.SuppressPeerLoss,
 	})
+}
+
+// paseKeyBlock derives the 48 bytes the PASE session keys and the
+// attestation challenge are cut from, for the caller to overwrite once the
+// session holds them.
+//
+// Ke has served once they are derived: the copy taken here is overwritten
+// on every way out, the prover's own by its Close in [pairPASE] — best
+// effort, within Go's limits (secure/sigma/zero.go); connectedhomeip
+// clears the same (src/crypto/CHIPCryptoPALOpenSSL.cpp:1150-1151 at
+// 6170af84, `ClearSecretData(Kae)`; review II, W1-sec-05, owner decision
+// 6, R2-P0-rv-B03).
+func paseKeyBlock(prover *spake2.Prover) ([]byte, error) {
+	ke := prover.SharedSecret()
+	defer clear(ke)
+	keys, err := hkdf.Key(sha256.New, ke, nil, sessionKeysInfo, 48)
+	if err != nil {
+		return nil, fmt.Errorf("handshake: session keys: %w", err)
+	}
+	return keys, nil
 }
 
 // encodePBKDFParamRequest is the PBKDFParamRequest TLV of matter.js
@@ -211,3 +241,7 @@ func encodePBKDFParamRequest(random []byte, sessionID uint16, params *sessionpar
 	out, _ := enc.Bytes()
 	return out
 }
+
+// newProver is the test seam that lets a test hold the handshake's prover
+// and see that it was closed. Production code never replaces it.
+var newProver = spake2.NewProver

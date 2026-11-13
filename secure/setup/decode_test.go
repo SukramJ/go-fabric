@@ -82,7 +82,7 @@ func TestDecodeQRCode_MatterJSVectors(t *testing.T) {
 func TestDecodeQRCode_Rejects(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ code, want string }{
-		{"MT:YNJV7VSC00ANG46Y900", "Invalid passcode 12345678"},                                        // :168-171
+		{"MT:YNJV7VSC00ANG46Y900", "Invalid passcode: zero, above 99999998 or one of the disallowed"},  // :168-171; the value is not rendered
 		{"MT:ZNJV7VSC00CMVH7SR00", "Unsupported onboarding payload version 1"},                         // :186-191
 		{"MT:Y.K904KP00KA0648G00", "An onboarding payload naming vendor ID 65521 must name a product"}, // :200-204
 		{"MT:U34J029Q00KA0648G00", "Invalid vendor ID 65525"},                                          // :219-221
@@ -294,7 +294,7 @@ func TestDecodeManualCode_RoundTrip(t *testing.T) {
 func TestDecodeManualCode_Rejects(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ code, want string }{
-		{"00852607537", "Invalid passcode 12345678"},                                                  // :425-428
+		{"00852607537", "Invalid passcode: zero, above 99999998 or one of the disallowed"},            // :425-428; the value is not rendered
 		{"80000000000", "Unsupported onboarding payload version"},                                     // :437-439
 		{"349701123365521327696", "A 21-digit manual pairing code must set VID_PID_PRESENT"},          // :443-448
 		{"74970112334", "An 11-digit manual pairing code must not set VID_PID_PRESENT"},               // :450-454

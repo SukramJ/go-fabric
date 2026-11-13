@@ -35,6 +35,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -137,7 +138,7 @@ func newLiveRegistryHarness(t *testing.T) *liveRegistry {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lr.db, err = sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "controller.db")+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	lr.db, err = store.OpenSQLite(filepath.Join(t.TempDir(), "controller.db"), "journal_mode(WAL)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +469,7 @@ func discardLog() *slog.Logger { return slog.New(slog.DiscardHandler) }
 // controller's address as its operational resolver's answer.
 func liveNodeAt(t *testing.T, path string, controllerAddr func() *net.UDPAddr) (*node.Node, *onoff.Server) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(path)
 	if err != nil {
 		t.Fatal(err)
 	}

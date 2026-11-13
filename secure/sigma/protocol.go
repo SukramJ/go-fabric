@@ -533,6 +533,10 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// what the fast path did with the session id rather than only what
 	// it ended up being.
 	sessionIDBefore := r.sessionID
+	// The resumption keys and the session-key material end here on every
+	// way out ([zero]); the record's shared secret is the store's.
+	var sc scrub
+	defer sc.wipe()
 	rec, err := r.resumptionStore.GetByID(sigma1.ResumptionID)
 	if err != nil || rec == nil {
 		// Unknown id — or a store lookup that failed — both fall
@@ -554,6 +558,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	if err != nil {
 		return Sigma1ProcessResult{}, false, fmt.Errorf("sigma resume: KDFSR1: %w", err)
 	}
+	sc.add("resume.s1rk", peerResumeKey)
 
 	// Verify initiatorResumeMIC = AES-CCM-Encrypt(peerResumeKey, empty,
 	//     nonce="NCASE_SigmaS1"). The MIC is over zero-length plaintext;
@@ -600,6 +605,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	if err != nil {
 		return Sigma1ProcessResult{}, false, fmt.Errorf("sigma resume: KDFSR2: %w", err)
 	}
+	sc.add("resume.s2rk", resumeKey)
 
 	// Sigma2ResumeMIC = AES-CCM-Encrypt(resumeKey, empty,
 	//     nonce="NCASE_SigmaS2"). matter.js CaseServer.ts line 184.
@@ -620,6 +626,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	if err != nil {
 		return Sigma1ProcessResult{}, false, fmt.Errorf("sigma resume: session keys: %w", err)
 	}
+	sc.add("resume.sessionKeyMaterial", finalMat)
 	var keys SessionKeys
 	copy(keys.I2RKey[:], finalMat[0:SessionKeySize])
 	copy(keys.R2IKey[:], finalMat[SessionKeySize:2*SessionKeySize])
@@ -640,6 +647,9 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	r.peerSessionID = sigma1.InitiatorSessionID
 	r.peerNodeID = rec.PeerNodeID
 	r.peerCATs = append([]uint32(nil), rec.PeerCATs...)
+	// The secret of the session a second handshake on this responder
+	// replaces goes before the new one is taken.
+	r.dropSharedLocked()
 	r.shared = append([]byte(nil), rec.SharedSecret...)
 	r.resumptionID = freshResumptionID
 	r.keys = keys
@@ -726,7 +736,7 @@ func (r *Responder) ProcessSigma1(sigma1Bytes []byte) (Sigma2, error) {
 // ProcessSigma1 (which acquires the mutex) and ProcessSigma1WithResume
 // (which holds it across the resume probe + Full-Sigma fallback so the
 // state transition stays atomic against parallel Sigma1 datagrams).
-func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //nolint:funlen // single-purpose SIGMA-1 processing with many crypto/validation branches
+func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error) { //nolint:funlen // single-purpose SIGMA-1 processing with many crypto/validation branches
 	switch {
 	case r.state == responderStateInit:
 		// fresh responder — fall through to the standard processing.
@@ -777,10 +787,23 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //
 		}
 		r.sigma2 = Sigma2{}
 		r.sigma2Bytes = nil
-		r.shared = nil
+		// The previous handshake's shared secret and session keys end
+		// here ([zero]); whoever needed them took a copy when it
+		// finished.
+		r.dropSharedLocked()
 		r.keys = SessionKeys{}
 		r.state = responderStateInit
 	}
+	// S2K and its salt, which carries the IPK, end with this step; a step
+	// that fails takes the shared secret with it.
+	var sc scrub
+	defer func() {
+		sc.wipe()
+		if err != nil {
+			r.dropSharedLocked()
+			r.ephPriv = nil
+		}
+	}()
 	sigma1, err := UnmarshalSigma1(sigma1Bytes)
 	if err != nil {
 		return Sigma2{}, err
@@ -836,6 +859,10 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //
 	if err != nil {
 		return Sigma2{}, err
 	}
+	// The ephemeral private key has served: nothing after the shared
+	// secret reads it, and dropping the reference is all Go allows
+	// ([zero]).
+	r.ephPriv = nil
 
 	// Per Matter §4.14.2.3 the responder signs over a TLV-encoded
 	// `signed_data` carrying (responderNOC, responderICAC?,
@@ -864,11 +891,12 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //
 
 	// S2K derivation per Matter §4.14.2.3:
 	// salt = IPK || responderRandom || responderEphPubKey || SHA256(sigma1).
-	salt2 := sigma2Salt(r.identity.IPK[:], r.random[:], r.ephPubBytes, r.sigma1Bytes)
+	salt2 := sc.add("sigma2.salt", sigma2Salt(r.identity.IPK[:], r.random[:], r.ephPubBytes, r.sigma1Bytes))
 	s2k, err := hkdfDerive(r.shared, salt2, HKDFInfoSigma2, SessionKeySize)
 	if err != nil {
 		return Sigma2{}, err
 	}
+	sc.add("sigma2.s2k", s2k)
 	cipher, err := aesccm.New(s2k)
 	if err != nil {
 		return Sigma2{}, err
@@ -930,7 +958,10 @@ func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
 		// such path: CaseServer reads exactly one Sigma3 and the first
 		// failure ends the exchange
 		// (packages/protocol/src/session/case/CaseServer.ts:275-309).
-		// Only a fresh Sigma1 restarts this responder.
+		// Only a fresh Sigma1 restarts this responder, and it derives its
+		// own shared secret: this one ends with the handshake ([zero]).
+		r.dropSharedLocked()
+		r.keys = SessionKeys{}
 		r.state = responderStateFailed
 		return err
 	}
@@ -948,11 +979,14 @@ func (r *Responder) verifySigma3Locked(sigma3Bytes []byte) error {
 	}
 	// S3K derivation per Matter §4.14.2.3:
 	// salt = IPK || SHA256(sigma1 || sigma2_full).
-	salt3 := sigma3Salt(r.identity.IPK[:], r.sigma1Bytes, r.sigma2Bytes)
+	var sc scrub
+	defer sc.wipe()
+	salt3 := sc.add("sigma3.salt", sigma3Salt(r.identity.IPK[:], r.sigma1Bytes, r.sigma2Bytes))
 	s3k, err := hkdfDerive(r.shared, salt3, HKDFInfoSigma3, SessionKeySize)
 	if err != nil {
 		return err
 	}
+	sc.add("sigma3.s3k", s3k)
 	cipher, err := aesccm.New(s3k)
 	if err != nil {
 		return err
@@ -1039,15 +1073,24 @@ func (r *Responder) verifySigma3Locked(sigma3Bytes []byte) error {
 	}
 
 	// Secure-session salt = IPK || SHA256(sigma1 || sigma2 || sigma3).
-	finalSalt := sessionKeysSalt(r.identity.IPK[:], r.sigma1Bytes, r.sigma2Bytes, sigma3Bytes)
+	finalSalt := sc.add("sessionKeys.salt", sessionKeysSalt(r.identity.IPK[:], r.sigma1Bytes, r.sigma2Bytes, sigma3Bytes))
 	final, err := hkdfDerive(r.shared, finalSalt, HKDFInfoSessionKeys, FinalKeyMaterialSize)
 	if err != nil {
 		return err
 	}
+	sc.add("sessionKeyMaterial", final)
 	copy(r.keys.I2RKey[:], final[0:SessionKeySize])
 	copy(r.keys.R2IKey[:], final[SessionKeySize:2*SessionKeySize])
 	copy(r.keys.AttestationChallenge[:], final[2*SessionKeySize:3*SessionKeySize])
 	return nil
+}
+
+// dropSharedLocked overwrites the responder's copy of the ECDH shared
+// secret and lets it go ([zero]). Caller holds r.mu.
+func (r *Responder) dropSharedLocked() {
+	secretHook("sharedSecret", r.shared)
+	zero(r.shared)
+	r.shared = nil
 }
 
 // SessionKeys returns the derived I2R / R2I / AttestationChallenge.

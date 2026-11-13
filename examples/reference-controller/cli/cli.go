@@ -112,7 +112,9 @@ func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.attestation, "attestation", o.attestation, "on an attestation finding: accept, reject or ask (default ask on a terminal, reject otherwise)")
 	fs.StringVar(&o.logLevel, "log-level", o.logLevel, "log level: debug, info, warn or error")
 	fs.StringVar(&o.listen, "listen", o.listen, "the controller's UDP address")
-	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "the UDP address of the controller's own node (group sender, OTA provider)")
+	// Read nowhere since the second node was retired (phase 37, #416);
+	// kept until the flag's removal so a script that passes it still runs.
+	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "deprecated: no effect since v0.18.0, which retired the controller's second node (the group sender and the OTA provider use --listen); will be removed")
 	fs.Var(&o.timeout, "timeout", "how long a command waits for the network (default 60s)")
 	fs.StringVar(&o.caKey, "ca-key", o.caKey, "the CA root key outside the database: file:<path> (passphrase from "+passphraseEnv+")")
 }
@@ -165,8 +167,10 @@ type env struct {
 	central func(adapter string) (ble.Central, error)
 	// proxies is Options.Proxies.
 	proxies func(flags ProxyFlags, log *slog.Logger) (ble.Central, error)
-	// ownNode is set by a command that needs the controller's own node
-	// (group, ota): the stack opens the controller with its OTA push.
+	// ownNode is set by a command that needs the controller as a node of
+	// its fabric — the group sender, the OTA provider (group, ota): the
+	// stack opens the controller with its OTA push. The name is from the
+	// time the tool ran a second node for it (self.go).
 	ownNode bool
 }
 

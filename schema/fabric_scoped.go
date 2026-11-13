@@ -49,3 +49,19 @@ func IsFabricScopedInvoke(clusterID, commandID uint32) bool {
 	_, ok = cmds[commandID]
 	return ok
 }
+
+// IsFabricScopedWrite reports whether the (cluster, attribute) pair is a
+// writable attribute whose effective access is fabric-scoped ("F") or
+// fabric-sensitive ("S") — matter.js's limits.fabricScoped
+// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0:
+// `access.fabric === Access.Fabric.Scoped || access.fabric ===
+// Access.Fabric.Sensitive`) on an attribute with limits.writable. A write to
+// one on a session with no accessing fabric answers UNSUPPORTED_ACCESS
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:248-251 at
+// db021da0, `limits.fabricScoped && !this.session.fabric`).
+// fabricScopedWritePaths (attribute_access_gen.go) is generated from each
+// attribute's effective access in parity/schema.json.
+func IsFabricScopedWrite(clusterID, attributeID uint32) bool {
+	_, ok := fabricScopedWritePaths[clusterID][attributeID]
+	return ok
+}

@@ -14,8 +14,8 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
-// connectionPragmas are the modernc.org/sqlite `_pragma` query parameters
-// applied to every connection the pool opens, not just the first.
+// walMode is the pragma the tests of this package add to the ones
+// [store.OpenSQLite] puts on the DSN (foreign keys, the busy timeout).
 // Connection-scoped pragmas must ride on the DSN because setting one via
 // ExecContext primes a single pooled connection and leaves the rest on
 // their defaults.
@@ -24,7 +24,7 @@ import (
 // resets it per connection, so ON DELETE CASCADE silently no-ops on any
 // connection that never ran the pragma — which would let this package's
 // cascade assertions pass while orphaned child rows survived.
-const connectionPragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+const walMode = "journal_mode(WAL)"
 
 // openTestDB opens a fresh file-backed SQLite database in t's temp
 // directory with the matter_* schema already applied, and registers a
@@ -36,7 +36,7 @@ const connectionPragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "matter.db")
-	db, err := sql.Open("sqlite", "file:"+path+"?"+connectionPragmas)
+	db, err := store.OpenSQLite(path, walMode)
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}

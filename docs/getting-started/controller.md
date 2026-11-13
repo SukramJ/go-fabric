@@ -63,10 +63,13 @@ builds on `controller.New`: it composes its trust set
 (`attestation.Trust` over the DCL snapshot and the online ledger) into
 `Attestation`, opens its CA key file into `CAKey` and its socket into
 `Listener`, and pairs through `Controller.Pair`, over BLE with
-`PairOptions.BLE`; its own node is reached through `Peers` and
-`Commissioner().Interaction`.
+`PairOptions.BLE`. It runs no second node: its `group` commands send as
+the controller's own identity (`Controller.Groups`) and `ota serve` serves
+images from the controller's own tree (`Config.OTA`), both under
+`Fabric().RootNodeID` — the "own node" of earlier releases was retired
+in v0.18.0.
 
-*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:114-190`, `examples/reference-controller/cli/pair.go` (`cmdPair`), `examples/quickstart-controller/main.go`.*
+*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go` (`openStack`), `examples/reference-controller/cli/self.go`, `examples/reference-controller/cli/group.go` (`Controller.Groups`), `examples/reference-controller/cli/pair.go` (`cmdPair`), `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -325,6 +328,37 @@ _, err := c.Pair(ctx, code, controller.PairOptions{
 })
 ```
 
+A `Pair` or `Commission` whose context ends — cancelled, or past its
+deadline — after the commissioner has started an ArmFailSafe does not
+leave the device armed: the commissioner sends ArmFailSafe with expiry 0
+over the session the commissioning still has (PASE, or CASE after
+`Reconnect`), on a context of its own for at most 10 s, and returns the
+failed step's error as it is. A step that stopped at the ended context
+returns an error that matches the context's with `errors.Is` —
+`context.Canceled` or `context.DeadlineExceeded` — and is not always
+identical to it: a context that ends while `Reconnect` waits for the
+operational connection returns that step's
+`*commissioner.CommissioningError` of kind `ErrOperativeConnectionFailed`,
+which names the device's last report when the device gave one and has
+the context's error as its `Cause`, so both
+`errors.Is(err, commissioner.ErrOperativeConnectionFailed)` and
+`errors.Is(err, context.DeadlineExceeded)` hold. A device left armed
+would refuse a new commissioning until the fail-safe ran out. The disarm
+does not wait for the device to have answered the ArmFailSafe: a context
+that ends while the first one, or a later extension, is still under way
+is followed by the disarm too, since the request may have armed the
+device (one that holds no fail-safe answers the disarm with success and
+nothing happens).
+Nothing is sent before the commissioner has started its first
+ArmFailSafe, once the device has confirmed CommissioningComplete, or on
+a closed session; a disarm that fails is logged
+(`matter.controller.commissioning.reset_failsafe_failed`) and the
+fail-safe then expires on the device by itself. matter.js's flow has no
+abort signal; the behaviour follows connectedhomeip's `StopPairing`
+(*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
+
+*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`).*
+
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is
 `ErrFabricOperationInProgress`. `Registry.Decommission` sends RemoveFabric
@@ -350,8 +384,28 @@ inside its mesh-local prefix or a routing or anycast locator) are
 attempted over CASE at port 5540, each once, beside what discovery
 delivers
 (`matter.controller.peer.address_hinted`), so a Thread node whose border
-router never publishes its operational record is still reached; and a
-`Reconnect` that fails names the device's last report, for example
+router never publishes its operational record is still reached. The
+report is the device's own statement and nothing verifies the addresses
+in it, so what is taken from it is bounded: 8 operational interfaces —
+NetworkInterfaces' list bound — with their at most 8 IPv6 and 4 IPv4
+addresses, only addresses that name one other host (no loopback,
+unspecified, multicast or IPv4 broadcast address), and at most
+`peer.MaxHintedAddresses` (96, the product) hinted addresses per
+connection process however many probes report new ones. A device may
+list more than 8 interfaces, loopback and virtual ones among them, so
+the 8 are chosen before they are counted: the interfaces with an
+address the connection can use (routable as above) come first, in the
+device's order, and only the slots they leave go to the others, whose
+addresses are logged and not attempted. One address in the report is
+more than the device's statement — the one the commissioning session
+itself runs on, when the session runs over IP and the address is
+routable: the interface that names it is taken before any other, and it
+is the first address handed to the connection. What is passed over is
+logged: usable interfaces past the eighth with a changed report
+(`matter.controller.commissioning.reconnect_probe_interfaces_dropped`),
+addresses past the bound once per connection process
+(`matter.controller.peer.address_hint_limit`).
+A `Reconnect` that fails names the device's last report, for example
 `the device reports Thread role=Unassigned …, last networking
 status=NetworkNotFound`. A device that does not answer the probe
 changes nothing. The central on Linux is
@@ -534,6 +588,28 @@ Each names its matter.js counterpart in its doc comment.
 `Config.HooksFor(id)` returns the hooks of the node with that local id
 instead, so a host attributes a report, an event or a subscription signal
 to its node, as matter.js gives each paired node its own events.
+
+The hooks of a subscription report run on the node's ordered job queue,
+after the report's StatusResponse, so a hook may block without holding the
+peer's exchange. `Node.Stop` and `Node.Close` (and with them
+`Registry.Stop`, `Decommission`, `Forget` and `Close`) drain that queue
+within their context, so a hook must not call them. A hook still blocked
+when the context ends makes them return the context's error: the node is
+offline and its flush timer stopped, and the queue runs its jobs to their
+end and then the store's final flush as its last job — the stop completes
+by itself when the hook returns. A second `Node.Stop`, `Node.Close`,
+`Registry.Stop` or `Registry.Close` waits for it within its own context
+and returns nil once it is complete. A database closed before the hook
+returned loses that final flush; the write is refused once and not
+retried. A node whose stop failed is not erased and stays in the
+registry. `Node.Start` and `Node.SetDefaultSubscription` wait for the
+queue as well, before the cache adopts a fabric filter, and within their
+context: a `Start` that returns the context's error has not started the
+node, a `SetDefaultSubscription` that does has not replaced the default
+subscription — the one a started node held has ended — and either call
+can be made again.
+
+*Source: `controller/client/config.go` (`Hooks`), `controller/client/node.go` (`Node.Stop`), `controller/client/jobs.go`.*
 
 ### JSON values
 
@@ -797,6 +873,32 @@ _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
 })
 ```
 
+A store without a ledger offers stored images only. `ImagesConfig.Ledger`
+(a `dcl.OTAVersions` with a `dcl.Client` for the production ledger, the
+test-net ledger or both) turns the ledger lookups and the downloads on:
+`DownloadUpdate` fetches the image a ledger record names and
+`UpdateInfoFromURL` one a URL names, each into memory, verified before it
+is stored. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
+`dcl.DefaultMaxImageSize`, 256 MiB. The size a ledger record announces is
+the vendor's statement and does not raise the bound: a record that
+announces more is refused before the request, an answer longer than its
+announcement is cut there, and an answer without an announced size is cut
+at the bound. All three refusals are a `*dcl.OTAError` that names the
+bound (the cut at the announcement names the announced size too) and
+matches `dcl.ErrOTAImageTooLarge` (and `softwareupdate.ErrOTA` from the
+store). matter.js has no such bound; it streams the answer to storage.
+
+```go
+images := softwareupdate.NewImages(softwareupdate.ImagesConfig{
+	Ledger: &dcl.OTAVersions{
+		Client:       dcl.NewClient(dcl.ProductionURL),
+		MaxImageSize: 64 << 20, // this host's products ship smaller images
+	},
+})
+```
+
+*Source: `controller/dcl/ota.go` (`OTAVersions.Download`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`).*
+
 ### TCP
 
 `controller.Config.TCP` turns the TCP initiator on (`Outgoing`) and a TCP
@@ -909,4 +1011,4 @@ stages. Group messages and OTA images come from the controller's own
 identity (`Controller.Groups`, `Controller.SetGroupKey`, `Config.OTA`); the
 reference controller's `group` and `ota` commands use them.
 
-*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `controller/ota_provider.go`, `controller/groups.go`, `controller/serve.go`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own node).*
+*Source: `controller/ota.go`, `controller/tcp.go`, `controller/advertise.go`, `controller/softwareupdate`, `controller/ota_provider.go`, `controller/groups.go`, `controller/serve.go`, `client/peer/network.go`, `controller/client/complete.go`, `examples/reference-controller/README.md` (The controller's own identity).*

@@ -121,6 +121,14 @@ challenge is the third 16-byte block of the PASE HKDF expansion
 `Entry.AttestationChallenge` exposes it; `SetAttestationChallenge`
 plumbs it into `OperationalCredentials`.
 
+*Note, 2026-11-13:* `SetAttestationChallenge` no longer exists. The server
+holds no challenge of its own: the bridge stamps the challenge of the
+session an invoke arrived on into the invoke's context
+(`core.WithInvokeAttestationChallenge`, read from the session table's
+`AttestationChallengeFor`), the three signing commands use that one only,
+and a request without it answers FAILURE (review II, W3-clusec-10). The
+derivation described above is unchanged.
+
 **Why this is non-obvious:** the spec defines the challenge in §4.13
 (secure channel key schedule) but consumes it in §11.18.4.7
 (operational credentials). The cross-section binding is easy to miss.

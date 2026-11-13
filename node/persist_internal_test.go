@@ -5,7 +5,6 @@ package node
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"path/filepath"
 	"strconv"
@@ -24,7 +23,7 @@ import (
 
 func testStore(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "p.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "p.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

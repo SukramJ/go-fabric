@@ -6,6 +6,7 @@ package sqlitestore_test
 import (
 	"database/sql"
 	"errors"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -133,8 +134,12 @@ func TestBusyWriterIsWaitedOut(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "endpoints.db")
+			// The pragmas are the case's own — one sets no busy timeout,
+			// which store.OpenSQLite always sets — so the URI is built
+			// here, with net/url as the opener builds it.
+			dsn := url.URL{Scheme: "file", OmitHost: true, Path: path, RawQuery: c.pragmas}
 			open := func() *sql.DB {
-				db, err := sql.Open("sqlite", "file:"+path+"?"+c.pragmas)
+				db, err := sql.Open("sqlite", dsn.String())
 				if err != nil {
 					t.Fatal(err)
 				}

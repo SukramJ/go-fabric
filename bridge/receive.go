@@ -421,10 +421,11 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //   - ReadRequest      → ReportData
 //   - WriteRequest     → WriteResponse
 //   - InvokeRequest    → InvokeResponse
-//   - SubscribeRequest → ReportData (initial-report) + a SubscribeResponse
-//     once the report pump catches up. v1.1 ships the initial empty
-//     ReportData; the SubscribeResponse + ongoing pump are tracked
-//     separately.
+//   - SubscribeRequest → the priming ReportData, in as many chunks as
+//     it needs, each answered by the peer's StatusResponse, then the
+//     SubscribeResponse ([Bridge.handleSubscribeRequest]); the ongoing
+//     reports follow from the subscription engine on exchanges the
+//     bridge opens.
 //   - TimedRequest     → StatusResponse(Success); a per-exchange
 //     deadline is stamped into `exchangeRouting.timedDeadlines` and the
 //     matching follow-up Write/Invoke is gated against it via
@@ -440,7 +441,18 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	case imGateRejectUnsupported:
 		return b.rejectUnsupportedOpcode(src, requestHdr, proto)
 	case imGateRejectGroupSession:
-		return b.rejectGroupSession(src, requestHdr, proto)
+		// Dropped without a reply, as the live group path does
+		// ([Bridge.dispatchGroupMessage] — group datagrams leave the
+		// receive path before this function, so this arm only keeps the
+		// two from diverging). matter.js throws InvalidAction and sends
+		// the status only `if (!isGroupSession)`
+		// (packages/protocol/src/interaction/InteractionMessenger.ts
+		// :354-358, :458-460 at db021da0); chip returns without one
+		// (src/app/InteractionModelEngine.cpp:1059-1066 at 6170af84).
+		b.logger.Debug("matter.rx.im.group_reject",
+			slog.String("src", srcString(src)),
+			slog.Int("opcode", int(proto.Opcode)))
+		return nil
 	case imGateDropUnsecured:
 		err := fmt.Errorf("%w: opcode=0x%02X", ErrUnsecuredIM, proto.Opcode)
 		b.logger.Debug("matter.rx.im.unsecured",

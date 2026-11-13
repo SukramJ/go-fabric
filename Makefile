@@ -253,7 +253,7 @@ ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.m
 	exit $$rc
 
 .PHONY: cite-report
-cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js (and matterjs-server) citations checked at the pin
+cite-report: ## regenerate script/citecheck/drift.json, summary.md and registers.json — the matter.js (and matterjs-server) citations checked at the pin
 	@# Reads MATTERJS_DIR and MATTERJS_SERVER_DIR through git plumbing only (a
 	@# clone may stand at any commit that has the cited ones). Exit 2 when a
 	@# clone or the pin is missing.
@@ -266,7 +266,7 @@ cite-check: ## regenerate the citation artefacts, then fail on a hard error or w
 	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR), or no matterjs-server clone at $(MATTERJS_SERVER_DIR)"; exit 2; fi; \
-	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md || { \
+	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
 		echo "Run 'make cite-report', read the diff, and commit it with the change that moved"; \
@@ -383,6 +383,55 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 	@# chiptool-build has just produced.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
 		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$' ./internal/chiptool/...
+
+# `make chiptool-container`: the chip-tool suite's host fallback inside one
+# linux/arm64 container on a user-defined IPv6 bridge network, never the
+# host network — for a machine that cannot run the harness image on its
+# host network (a Mac under Docker Desktop; review II, owner decision 16).
+# The container holds the pinned chip-tool (CHIP_CERT_BINS_IMAGE, arm64
+# only), Go at go.mod's version, and an avahi of its own. Two legs are
+# skipped, each for a measured reason (2026-11-13, main 95e03096): the
+# group toggle of TestChipToolSuite/groups never arrives in the container
+# (the cause — presumably multicast on the bridge network — is not
+# established), and CAMERA-GO needs Docker inside the container. The
+# certification families and the BLE legs need the harness image and stay
+# in CI. CHIPTOOL_CONTAINER_RUN narrows the run, e.g.
+# CHIPTOOL_CONTAINER_RUN='^TestChipToolCommissionsReferenceBridge$$'.
+# The target leaves behind what makes the next run fast: the image
+# $(CHIPTOOL_CONTAINER_IMAGE), the network $(CHIPTOOL_CONTAINER_NETWORK) and
+# the Docker volumes gofabric-chiptool-gomod and gofabric-chiptool-gocache
+# (Go's module and build caches).
+CHIPTOOL_CONTAINER_IMAGE   ?= gofabric-chiptool-container:local
+CHIPTOOL_CONTAINER_NETWORK ?= gofabric-chiptool
+CHIPTOOL_CONTAINER_SUBNET  ?= fd00:6f66:6162:c7::/64
+CHIPTOOL_CONTAINER_RUN     ?= .
+CHIPTOOL_CONTAINER_SKIP    ?= ^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$|^TestChipToolSuite$$/^groups$$|^TestGoCertificationCases$$/^CAMERA-GO$$
+GO_MOD_VERSION := $(shell sed -n 's/^go //p' go.mod)
+
+.PHONY: chiptool-container
+chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 container on a bridge network — the local loop where the harness image cannot use the host network (arm64 + Docker)
+	@arch=$$(uname -m); case "$$arch" in aarch64|arm64) ;; *) \
+		echo "chiptool-container: $(CHIP_CERT_BINS_IMAGE) publishes linux/arm64 only; this host is $$arch."; \
+		echo "  On amd64 Linux use 'make chiptool-test' (the harness image)."; \
+		exit 1;; esac
+	@case "$(CHIPTOOL_CONTAINER_NETWORK)" in host|none|bridge|"") \
+		echo "chiptool-container: CHIPTOOL_CONTAINER_NETWORK must be a user-defined bridge network, not '$(CHIPTOOL_CONTAINER_NETWORK)': this target never runs on the host network."; \
+		exit 1;; esac
+	@docker network inspect $(CHIPTOOL_CONTAINER_NETWORK) >/dev/null 2>&1 || \
+		docker network create --ipv6 --subnet $(CHIPTOOL_CONTAINER_SUBNET) $(CHIPTOOL_CONTAINER_NETWORK) >/dev/null
+	@[ "$$(docker network inspect -f '{{.EnableIPv6}}' $(CHIPTOOL_CONTAINER_NETWORK))" = "true" ] || { \
+		echo "chiptool-container: the network $(CHIPTOOL_CONTAINER_NETWORK) exists without IPv6, which Matter needs; name another with CHIPTOOL_CONTAINER_NETWORK."; \
+		exit 1; }
+	docker build --platform linux/arm64 \
+		--build-arg CHIP_CERT_BINS_IMAGE=$(CHIP_CERT_BINS_IMAGE) \
+		--build-arg GO_IMAGE=golang:$(GO_MOD_VERSION) \
+		-t $(CHIPTOOL_CONTAINER_IMAGE) internal/chiptool/container
+	docker run --rm --platform linux/arm64 --network $(CHIPTOOL_CONTAINER_NETWORK) \
+		-v "$(CURDIR)":/src \
+		-v gofabric-chiptool-gomod:/go/pkg/mod \
+		-v gofabric-chiptool-gocache:/root/.cache/go-build \
+		$(CHIPTOOL_CONTAINER_IMAGE) \
+		-timeout=$(CHIPTOOL_TIMEOUT) -run '$(CHIPTOOL_CONTAINER_RUN)' -skip '$(CHIPTOOL_CONTAINER_SKIP)'
 
 .PHONY: chiptool-ble-wifi
 chiptool-ble-wifi: ## chip-tool-ble commissions examples/ble-wifi-light over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, all-clusters-app-ble as the control (Linux + Docker, a privileged container)

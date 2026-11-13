@@ -307,19 +307,14 @@ func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error
 	if err != nil {
 		return err
 	}
-	b.mu.RLock()
-	ackTracker := b.ackTracker
-	b.mu.RUnlock()
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			return err
 		}
 		chunkTarget := target
-		if ackTracker != nil {
-			if counter, ok := ackTracker.LookupAndDischarge(target.sessionID, target.exchangeID, true); ok {
-				chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
-			}
+		if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, true); ok {
+			chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
 		}
 		waitCh := b.armStatusResponseWait(target.sessionID, target.exchangeID, true)
 		if _, err := b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body); err != nil {

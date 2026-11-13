@@ -269,23 +269,36 @@ func readReportPathFields(dec *tlv.Decoder) (p ConcreteAttributePath, compressed
 			}
 			continue
 		}
+		// A path integer is never masked into range — a device's endpoint
+		// 65536 is not endpoint 0 — as on the request side
+		// ([readAttributePathField], [uintField]).
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttrPathEnableTagCompression:
 			compressed = el.Bool
 		case tagAttrPathNode:
-			p.Node, p.HasNode = el.Uint, true
+			p.Node, err = uint64Field(el)
+			p.HasNode = true
 		case tagAttrPathEndpoint:
-			p.Endpoint, p.HasEndpoint = uint16(el.Uint&0xFFFF), true
+			p.Endpoint, err = uint16Field(el)
+			p.HasEndpoint = true
 		case tagAttrPathCluster:
-			p.Cluster, p.HasCluster = uint32(el.Uint&0xFFFFFFFF), true
+			p.Cluster, err = uint32Field(el)
+			p.HasCluster = true
 		case tagAttrPathAttribute:
-			p.Attribute, p.HasAttribute = uint32(el.Uint&0xFFFFFFFF), true
+			p.Attribute, err = uint32Field(el)
+			p.HasAttribute = true
 		case tagAttrPathListIndex:
-			p.ListIndex, p.HasListIndex, p.ListAppend = uint16(el.Uint&0xFFFF), true, el.IsNull
-		default:
-			if err := skipElement(dec, el); err != nil {
-				return ConcreteAttributePath{}, false, err
+			p.HasListIndex = true
+			if el.IsNull {
+				p.ListAppend = true
+				continue
 			}
+			p.ListIndex, err = uint16Field(el)
+		default:
+			err = skipElement(dec, el)
+		}
+		if err != nil {
+			return ConcreteAttributePath{}, false, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	}
 }
@@ -470,7 +483,12 @@ func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttributeDataDataVersion:
-			rep.DataVersion, rep.HasDataVersion = uint32(el.Uint&0xFFFFFFFF), true
+			// TlvUInt32 (TlvAttributeReportData.ts:15): refused when wider,
+			// never masked ([uintField]).
+			if rep.DataVersion, err = uint32Field(el); err != nil {
+				return err
+			}
+			rep.HasDataVersion = true
 		case tagAttributeDataPath:
 			if !el.IsContainer || el.Type != tlv.TypeList {
 				return errors.New("im: AttributeDataIB path is not a list")
@@ -598,7 +616,13 @@ func readEventDataFields(dec *tlv.Decoder, rep *EventReport, eventReader EventDa
 		case tagEventDataNumber:
 			rep.Number = el.Uint
 		case tagEventDataPriority:
-			rep.Priority = EventPriority(el.Uint & 0xFF)
+			// The priority is an 8-bit value here; one that does not fit is
+			// refused, not masked into another priority.
+			priority, err := uint8Field(el)
+			if err != nil {
+				return err
+			}
+			rep.Priority = EventPriority(priority)
 		case tagEventDataEpochTimestamp:
 			rep.Timestamp, rep.Received.HasEpochTimestamp = el.Uint, true
 		case tagEventDataSystemTimestamp:

@@ -76,6 +76,46 @@ func TestRoundTripAliceToBob(t *testing.T) {
 	}
 }
 
+// TestNewKeepsItsOwnKeys: a session copies the keys it is built from, so the
+// caller may overwrite its buffers once New returned — which the PASE
+// initiator does with the bytes it derived the keys from
+// (client/handshake/pase.go; review II, W1-sec-05). A session that aliased
+// them would go on encrypting under an all-zero key.
+func TestNewKeepsItsOwnKeys(t *testing.T) {
+	aCfg, bCfg := aliceBobConfigs()
+	// The fixture's two configs share their key slices: give Alice her own.
+	aCfg.EncryptKey = bytes.Clone(aCfg.EncryptKey)
+	aCfg.DecryptKey = bytes.Clone(aCfg.DecryptKey)
+	alice, err := New(aCfg)
+	if err != nil {
+		t.Fatalf("alice: %v", err)
+	}
+	clear(aCfg.EncryptKey)
+	clear(aCfg.DecryptKey)
+	bob, err := New(bCfg)
+	if err != nil {
+		t.Fatalf("bob: %v", err)
+	}
+	var hdr message.Header
+	hdr.SessionID = 0x1234
+	out, err := alice.Encrypt(&hdr, 0, []byte("after the caller's copy is gone"))
+	if err != nil {
+		t.Fatalf("alice.Encrypt: %v", err)
+	}
+	if got, _, err := bob.Decrypt(&hdr, 0, out.Ciphertext); err != nil || !bytes.Equal(got, []byte("after the caller's copy is gone")) {
+		t.Fatalf("bob.Decrypt = %q, %v: Alice's session lost its key with the caller's buffer", got, err)
+	}
+	var back message.Header
+	back.SessionID = 0x1234
+	reply, err := bob.Encrypt(&back, 0, []byte("and back"))
+	if err != nil {
+		t.Fatalf("bob.Encrypt: %v", err)
+	}
+	if got, _, err := alice.Decrypt(&back, 0, reply.Ciphertext); err != nil || !bytes.Equal(got, []byte("and back")) {
+		t.Fatalf("alice.Decrypt = %q, %v: Alice's session lost its decrypt key with the caller's buffer", got, err)
+	}
+}
+
 // TestReplayDuplicateFlagged — second copy of the same frame still
 // authenticates (we need the plaintext to extract the ProtocolHeader
 // for the StandaloneAck) but Decrypt flags it as duplicate so the

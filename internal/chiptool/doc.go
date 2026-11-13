@@ -67,6 +67,17 @@
 // puts its key-value stores there by itself; $GOFABRIC_CHIPTOOL_KVS_BASE
 // overrides that.
 //
+// `make chiptool-container` runs that fallback where the harness image
+// cannot have the host network — a Mac under Docker Desktop: one
+// linux/arm64 container on a user-defined IPv6 bridge network holds the
+// pinned chip-tool (CHIP_CERT_BINS_IMAGE), Go and an avahi of its own
+// (internal/chiptool/container). The commissioning test, the chip-tool
+// suite and the Go-TH cases run there; two legs are skipped, each for a
+// measured reason (2026-11-13): the group toggle of TestChipToolSuite/groups
+// never arrives inside the container (the cause is not established), and
+// CAMERA-GO needs Docker inside it. The families and the BLE legs need the
+// harness image. A green run there is a local loop, not the guard: CI is.
+//
 // `make chiptool-setup` makes a sparse connectedhomeip checkout at
 // ../connectedhomeip — the source CLAUDE.md sends you to when chip-tool or a
 // CHIP test case behaves unexpectedly.

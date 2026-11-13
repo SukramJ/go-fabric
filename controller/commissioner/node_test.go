@@ -5,7 +5,6 @@ package commissioner
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net"
 	"path/filepath"
@@ -28,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -50,7 +50,7 @@ func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *n
 // startNodeWith is startNode with the node's passcode and discriminator.
 func startNodeWith(t *testing.T, adv mdns.Advertiser, listen string, passcode uint32, discriminator uint16) (*node.Node, *net.UDPAddr) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "node.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

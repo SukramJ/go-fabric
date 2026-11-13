@@ -163,7 +163,8 @@ func (t *sessionTimer) stop() {
 // the offered size (when above the minimum) and the maximum; the window
 // the smaller of the central's and the maximum; the response written,
 // and only then the acknowledgement timer started for it. maxDataSize 0
-// is matter.js's undefined.
+// is matter.js's undefined. One departure: a request that states a window
+// of 0 is refused and the connection dropped, as connectedhomeip does.
 func NewPeripheral(maxDataSize int, handshakeRequest []byte, cb Callbacks, opts Options) (*Session, error) {
 	req, err := DecodeHandshakeRequest(handshakeRequest)
 	if err != nil {
@@ -192,6 +193,18 @@ func NewPeripheral(maxDataSize int, handshakeRequest []byte, cb Callbacks, opts 
 			attMTU = min(int(req.ATTMTU), maxDataSize, MaximumBTPMTU)
 		}
 	}
+	// A window of 0 is refused, as connectedhomeip does
+	// (src/ble/BLEEndPoint.cpp:1014 at 6170af84,
+	// VerifyOrReturnError(req.mWindowSize > 0, CHIP_ERROR_INVALID_ARGUMENT),
+	// after which Receive releases the connection, :1162-1169, :1294-1297).
+	// matter.js answers it with window 0
+	// (packages/protocol/src/ble/BtpSessionHandler.ts:123 at db021da0); a
+	// peer that can never be sent a packet is no session (owner decision
+	// 2026-11-13, by_design).
+	if req.ClientWindowSize == 0 {
+		_ = cb.Disconnect()
+		return nil, protocolError("BTP handshake request states a window size of 0")
+	}
 	window := min(MaximumWindowSize, int(req.ClientWindowSize))
 	resp := EncodeHandshakeResponse(HandshakeResponse{Version: version, ATTMTU: uint16(attMTU), WindowSize: uint8(window)}) //nolint:gosec // both clamped above
 	s, err := newSession(RolePeripheral, version, attMTU, window, cb, opts)
@@ -212,7 +225,9 @@ func NewPeripheral(maxDataSize int, handshakeRequest []byte, cb Callbacks, opts 
 // requestedSegmentSize, the size the central offered, must be at least
 // the minimum; the segment size is the smallest of the peripheral's
 // choice, the offered size and the maximum, so a peripheral echoing a
-// larger size cannot undo a deliberate reduction.
+// larger size cannot undo a deliberate reduction. One departure: a
+// response that states a window of 0 is refused, as connectedhomeip does;
+// the caller drops the connection, as for every error here.
 func NewCentral(handshakeResponse []byte, cb Callbacks, requestedSegmentSize int, opts Options) (*Session, error) {
 	if requestedSegmentSize < MinimumATTMTU {
 		return nil, fmt.Errorf("btp: requested BTP segment size must be an integer of at least %d, got %d", MinimumATTMTU, requestedSegmentSize)
@@ -220,6 +235,14 @@ func NewCentral(handshakeResponse []byte, cb Callbacks, requestedSegmentSize int
 	resp, err := DecodeHandshakeResponse(handshakeResponse)
 	if err != nil {
 		return nil, err
+	}
+	// Refused as connectedhomeip does (src/ble/BLEEndPoint.cpp:1081 at
+	// 6170af84, VerifyOrReturnError(resp.mWindowSize > 0,
+	// CHIP_ERROR_INVALID_ARGUMENT), which closes the end point, :1151-1152,
+	// :1294-1297); matter.js hands the value to the session unchecked
+	// (BtpSessionHandler.ts:180-191 at db021da0).
+	if resp.WindowSize == 0 {
+		return nil, protocolError("BTP handshake response states a window size of 0")
 	}
 	fragment := min(int(resp.ATTMTU), requestedSegmentSize, MaximumBTPMTU)
 	return newSession(RoleCentral, resp.Version, fragment, int(resp.WindowSize), cb, opts)

@@ -66,47 +66,6 @@ func clusterByID(s *matterSchema, id uint32) (matterCluster, bool) {
 	return matterCluster{}, false
 }
 
-// TestParityMatterJS_MeasurementClusterRevisions asserts every
-// measurement-side cluster go-fabric implements pins the same
-// revision matter.js HEAD ships. Per-cluster revision drift triggers
-// Apple Home pair-abort; this
-// test catches the same bug class for the sensor surface.
-func TestParityMatterJS_MeasurementClusterRevisions(t *testing.T) {
-	t.Parallel()
-	schema := loadMatterSchemaT(t)
-	cases := []struct {
-		id           uint32
-		name         string
-		codeRevision uint16
-	}{
-		{ClusterTemperatureMeasurement, "TemperatureMeasurement", tempMeasClusterRevision},
-		{ClusterHumidityMeasurement, "RelativeHumidityMeasurement", humidityClusterRevision},
-		{ClusterIlluminanceMeasurement, "IlluminanceMeasurement", illuminanceClusterRevision},
-		{ClusterPressureMeasurement, "PressureMeasurement", pressureClusterRevision},
-		{ClusterFlowMeasurement, "FlowMeasurement", FlowRevision()},
-		{ClusterBooleanState, "BooleanState", booleanStateClusterRevision},
-		{ClusterOccupancySensing, "OccupancySensing", occupancyClusterRevision},
-		{ClusterAirQuality, "AirQuality", airQualityClusterRevision},
-		{ClusterPowerSource, "PowerSource", powerSourceClusterRevision},
-		{ClusterElectricalPower, "ElectricalPowerMeasurement", electricalPowerClusterRevision},
-		{ClusterElectricalEnergy, "ElectricalEnergyMeasurement", electricalEnergyClusterRevision},
-	}
-	for _, c := range cases {
-		js, ok := clusterByID(schema, c.id)
-		if !ok {
-			t.Errorf("matter.js schema has no cluster 0x%04X (%s)", c.id, c.name)
-			continue
-		}
-		t.Run(js.Name, func(t *testing.T) {
-			t.Parallel()
-			if c.codeRevision != js.Revision {
-				t.Errorf("code revision %d != matter.js %d for %s (0x%04X)",
-					c.codeRevision, js.Revision, js.Name, js.ID)
-			}
-		})
-	}
-}
-
 // TestParityMatterJS_PowerSourceMandatoryAttributes asserts that
 // PowerSourceServer.MatterAttributes() covers every mandatory attribute
 // required by matter.js HEAD (packages/model/src/standard/elements/

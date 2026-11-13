@@ -90,8 +90,25 @@ func TestAuthorityAtParityMatterJS(t *testing.T) {
 	if got := probeInvoke(WithAuthModePASE(caseCtx), authorityProbeACL{probe}); got != StatusSuccess {
 		t.Errorf("PASE: %v, want the implicit Administer", got)
 	}
-	if got := probeInvoke(WithFabricFilter(context.Background(), false, 0), &authorityProbe{}); got != StatusSuccess {
-		t.Errorf("pre-AddNOC PASE: %v", got)
+	// PASE before AddNOC — fabric 0 with the PASE auth mode — holds the
+	// implicit Administer, with and without an ACL source.
+	preAddNOC := WithAuthModePASE(WithFabricFilter(context.Background(), false, 0))
+	if got := probeInvoke(preAddNOC, &authorityProbe{}); got != StatusSuccess {
+		t.Errorf("pre-AddNOC PASE without an ACL source: %v, want the implicit Administer", got)
+	}
+	if got := probeInvoke(preAddNOC, authorityProbeACL{probe}); got != StatusSuccess {
+		t.Errorf("pre-AddNOC PASE: %v, want the implicit Administer", got)
+	}
+	// Fabric 0 without PASE is no grant: the implicit Administer is keyed
+	// on the auth mode alone (matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
+	// db021da0), as on the read, subscribe and dispatcher gates.
+	noFabric := WithFabricFilter(context.Background(), false, 0)
+	if got := probeInvoke(noFabric, &authorityProbe{}); got != StatusUnsupportedAccess {
+		t.Errorf("fabric 0 without PASE and without an ACL source: %v, want a denial", got)
+	}
+	if got := probeInvoke(noFabric, authorityProbeACL{probe}); got != StatusUnsupportedAccess {
+		t.Errorf("fabric 0 without PASE: %v, want a denial", got)
 	}
 	if got := probeInvoke(caseCtx, &authorityProbe{}); got != StatusUnsupportedAccess {
 		t.Errorf("no ACL source: %v, want a denial", got)

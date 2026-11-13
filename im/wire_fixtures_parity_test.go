@@ -23,9 +23,10 @@
 //
 // Fixtures with byDesignDivergence=true are skipped in the byte-equality
 // assertion. These document cases where the Go encoder intentionally diverges
-// from matter.js (e.g. fixed-width SubscriptionId encoding required by chip-tool
-// and Apple Home, empty-array vs omitted optional fields). See the byDesignNote
-// in each fixture and notes/parity/by_design.md for the rationale.
+// from matter.js (the fixed-width SubscriptionId encoding Apple Home
+// requires). See the byDesignNote in each fixture and notes/parity/by_design.md
+// for the rationale. An empty attributeReports or eventReports array is no
+// such case: both senders omit it (report_data_omit_empty_parity_matterjs_test.go).
 
 package im
 

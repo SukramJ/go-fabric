@@ -60,9 +60,23 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 	if b.outboundReliable == nil {
 		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
 		b.outboundReliable.wake = b.wakeAckPump
+		b.outboundReliable.evicted = b.unsecuredEntryEvicted
 		b.outboundReliable.fixedBackoff.Store(b.icd.fixedBackoff.Load())
 	}
 	b.mu.Unlock()
+}
+
+// unsecuredEntryEvicted is the outbound tracker's report of an
+// unsecured-session message that lost its place — and with it its
+// retransmissions, nothing else — to a newer one ([unsecuredEntryLimit]).
+// Sixteen handshake messages waiting for an acknowledgement at once is not
+// what a home's controllers produce; a line of this kind per datagram is
+// what a flood of handshake openers looks like.
+func (b *Bridge) unsecuredEntryEvicted(exchangeID uint16, counter uint32) {
+	b.logger.Warn("matter.tx.reliable.unsecured_evicted",
+		slog.Int("exchange_id", int(exchangeID)),
+		slog.Uint64("counter", uint64(counter)),
+		slog.Int("max", unsecuredEntryLimit))
 }
 
 // outboundBaseInterval resolves the peer-appropriate MRP base
@@ -111,6 +125,15 @@ type exchangeReplyTarget struct {
 	// ACK. 0 means "unsecured" (PASE pre-fabric); non-zero means the
 	// synthesised StandaloneAck must encrypt under that session.
 	sessionID uint16
+	// owedCounter is the message counter of the latest obligation
+	// recorded with this route.
+	owedCounter uint32
+	// displaced reports that an obligation of the exchange was displaced
+	// by a newer one ([mrp.AckTracker.Owe]) and waits for the pump's next
+	// pass, which routes its standalone ack by this entry: a piggyback of
+	// the newer counter must not release the route. The pump clears it
+	// when it takes the displaced obligation ([Bridge.emitDueAcks]).
+	displaced bool
 }
 
 // owedInboundAck registers an obligation for an inbound Reliable
@@ -136,6 +159,9 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	if tracker == nil {
 		return
 	}
+	// The route and the obligation are recorded in one step, so a release
+	// of the route sees both or neither (exchangeRouting.ackRouteMu).
+	b.routing.ackRouteMu.Lock()
 	if !isNilRoute(src) {
 		// Keyed on (session, exchange, our role): exchange IDs are only
 		// unique per session AND per side, so two controllers sharing an
@@ -143,13 +169,23 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 		// bridge-opened one — must not overwrite each other's reply
 		// route. Mirrors matter.js ExchangeManager.ts:340 (session-scoped
 		// resolution) and :138 (role folded into the exchange key).
-		b.routing.exchangeSrcs.Store(mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}, exchangeReplyTarget{
+		key := mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
+		// An obligation still pending for another counter is displaced by
+		// this one and keeps needing the route until the pump took it.
+		displaced := false
+		if prev, ok := b.replyRoute(key); ok {
+			displaced = prev.displaced ||
+				(prev.owedCounter != hdr.MessageCounter && tracker.Owes(hdr.SessionID, proto.ExchangeID, !proto.Initiator))
+		}
+		b.routing.exchangeSrcs.Store(key, exchangeReplyTarget{
 			src:                 src,
 			hasPeerSourceNodeID: hdr.HasSourceNodeID,
 			peerSourceNodeID:    hdr.SourceNodeID,
 			hasPeerDestNodeID:   hdr.DestSize == message.DestNodeID,
 			peerDestNodeID:      hdr.DestNodeID,
 			sessionID:           hdr.SessionID,
+			owedCounter:         hdr.MessageCounter,
+			displaced:           displaced,
 		})
 	}
 	// [mrp.AckObligation.Initiator] records OUR role on the exchange,
@@ -164,7 +200,33 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	// packages/protocol/src/protocol/ExchangeManager.ts:324), leaving
 	// the peer to retransmit until its cap fires.
 	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, b.clk().Now())
+	b.routing.ackRouteMu.Unlock()
 	b.wakeAckPump()
+}
+
+// replyRoute returns the reply route recorded for key.
+func (b *Bridge) replyRoute(key mrp.ExchangeKey) (exchangeReplyTarget, bool) {
+	raw, ok := b.routing.exchangeSrcs.Load(key)
+	if !ok {
+		return exchangeReplyTarget{}, false
+	}
+	target, ok := raw.(exchangeReplyTarget)
+	return target, ok
+}
+
+// releaseReplyRouteLocked drops the reply route of an exchange once
+// nothing needs it: no obligation is pending on the exchange and none that
+// a newer one displaced waits for the pump. The caller holds
+// exchangeRouting.ackRouteMu, so an arriving obligation is either seen
+// whole or stores its route afterwards.
+func (b *Bridge) releaseReplyRouteLocked(tracker *mrp.AckTracker, key mrp.ExchangeKey) {
+	if tracker.Owes(key.SessionID, key.ExchangeID, key.Initiator) {
+		return
+	}
+	if target, ok := b.replyRoute(key); ok && target.displaced {
+		return
+	}
+	b.routing.exchangeSrcs.Delete(key)
 }
 
 // refreshAckCounter rewrites requestHdr.MessageCounter to the latest
@@ -188,15 +250,37 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 // the tracker is not wired (test paths) or when no obligation exists
 // (e.g. before the peer has acked any chunk yet).
 func (b *Bridge) refreshAckCounter(requestHdr *message.Header, exchangeID uint16, initiator bool) {
+	if counter, ok := b.takeOwedAck(requestHdr.SessionID, exchangeID, initiator); ok {
+		requestHdr.MessageCounter = counter
+	}
+}
+
+// takeOwedAck returns the ack counter the bridge owes on the (session,
+// exchange, role) triple and discharges the obligation, for a message
+// that is about to piggyback it ([mrp.AckTracker.LookupAndDischarge]).
+// The exchange's reply route goes with the obligation — it exists for
+// the pump's standalone ack and nothing is owed any more — unless a
+// newer obligation arrived in between, or an older one this one displaced
+// still waits for the pump: both are routed by it
+// ([Bridge.releaseReplyRouteLocked]). A later reliable message on the
+// exchange stores the route again ([Bridge.owedInboundAck]). (0, false)
+// when nothing is owed or no tracker is wired.
+//
+// Before, only [Bridge.dischargeOwedAck] and the pump released the
+// route: every path that took the ack here left it behind until its
+// session was evicted (review II, W1-conc-08).
+func (b *Bridge) takeOwedAck(sessionID, exchangeID uint16, initiator bool) (uint32, bool) {
 	b.mu.RLock()
 	tracker := b.ackTracker
 	b.mu.RUnlock()
 	if tracker == nil {
-		return
+		return 0, false
 	}
-	if counter, ok := tracker.LookupAndDischarge(requestHdr.SessionID, exchangeID, initiator); ok {
-		requestHdr.MessageCounter = counter
-	}
+	b.routing.ackRouteMu.Lock()
+	defer b.routing.ackRouteMu.Unlock()
+	counter, ok := tracker.LookupAndDischarge(sessionID, exchangeID, initiator)
+	b.releaseReplyRouteLocked(tracker, mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator})
+	return counter, ok
 }
 
 // dischargeOwedAck cancels an obligation because the bridge just
@@ -213,8 +297,10 @@ func (b *Bridge) dischargeOwedAck(sessionID, exchangeID uint16, initiator bool) 
 	if tracker == nil {
 		return
 	}
+	b.routing.ackRouteMu.Lock()
+	defer b.routing.ackRouteMu.Unlock()
 	tracker.Discharge(sessionID, exchangeID, initiator)
-	b.routing.exchangeSrcs.Delete(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator})
+	b.releaseReplyRouteLocked(tracker, mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator})
 }
 
 // expediteDuplicateAck rewrites the just-registered obligation for a
@@ -412,10 +498,7 @@ func (b *Bridge) wakeAckPump() {
 func (b *Bridge) ackPumpTick(tracker *mrp.AckTracker, outbound *outboundReliableTracker, now time.Time) int {
 	emitted := 0
 	if tracker != nil {
-		for _, obl := range tracker.Due(now) {
-			b.emitStandaloneAck(obl)
-			emitted++
-		}
+		emitted = b.emitDueAcks(tracker, now)
 	}
 	if outbound != nil {
 		b.tickOutboundReliable(outbound, now)
@@ -475,6 +558,11 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue
 		}
+		// What is left is a failed send or an unsecured-session entry
+		// dropped after [unsecuredEntryLifetime]. Neither is told to
+		// anybody: the entry's handshake ends on its own clock — the PASE
+		// slot's timeout, the CASE responder's reaper, the context of a
+		// handshake this node opened.
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))
@@ -518,42 +606,60 @@ func (b *Bridge) RunAckPumpOnce(now time.Time) int {
 	if tracker == nil {
 		return 0
 	}
+	return b.emitDueAcks(tracker, now)
+}
+
+// emitDueAcks is one pass of the pump over the tracker: a standalone ack
+// for every obligation that is due, the displaced ones included. The
+// obligations and the routes they go by are taken in one step
+// (exchangeRouting.ackRouteMu): a route goes with the pass unless a newer
+// obligation of its exchange is still pending — that one is emitted over
+// it later — and the displaced mark goes with the obligations it stood
+// for. Two displaced obligations of one exchange in the same pass are
+// both routed; before, the first took the route with it.
+func (b *Bridge) emitDueAcks(tracker *mrp.AckTracker, now time.Time) int {
+	b.routing.ackRouteMu.Lock()
 	due := tracker.Due(now)
-	for _, obl := range due {
-		b.emitStandaloneAck(obl)
+	targets := make([]exchangeReplyTarget, len(due))
+	routed := make([]bool, len(due))
+	for i, obl := range due {
+		key := mrp.ExchangeKey{SessionID: obl.SessionID, ExchangeID: obl.ExchangeID, Initiator: obl.Initiator}
+		targets[i], routed[i] = b.replyRoute(key)
+	}
+	for i, obl := range due {
+		if !routed[i] {
+			continue
+		}
+		key := mrp.ExchangeKey{SessionID: obl.SessionID, ExchangeID: obl.ExchangeID, Initiator: obl.Initiator}
+		if !tracker.Owes(obl.SessionID, obl.ExchangeID, obl.Initiator) {
+			b.routing.exchangeSrcs.Delete(key)
+			continue
+		}
+		if current, ok := b.replyRoute(key); ok && current.displaced {
+			current.displaced = false
+			b.routing.exchangeSrcs.Store(key, current)
+		}
+	}
+	b.routing.ackRouteMu.Unlock()
+	for i, obl := range due {
+		if !routed[i] {
+			b.logger.Debug("matter.tx.ack_pump.no_src",
+				slog.Int("exchange_id", int(obl.ExchangeID)),
+				slog.Int("session_id", int(obl.SessionID)))
+			continue
+		}
+		b.emitStandaloneAck(obl, targets[i])
 	}
 	return len(due)
 }
 
 // emitStandaloneAck synthesises a StandaloneAck datagram for obl and
-// ships it via the bridge's listener. The src is looked up from the
-// per-exchange map (populated by [Bridge.owedInboundAck]); a missing
-// src indicates the exchange's src was never recorded, which means
-// either the obligation was added out-of-band (tests) or the receive
-// pipeline didn't run owedInboundAck — either way we can't route the
-// reply, so log and drop.
-func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
-	key := mrp.ExchangeKey{SessionID: obl.SessionID, ExchangeID: obl.ExchangeID, Initiator: obl.Initiator}
-	raw, ok := b.routing.exchangeSrcs.Load(key)
-	if ok {
-		// The route outlives an obligation that a newer one on the same
-		// exchange displaced ([mrp.AckTracker.Owe]): that newer one is
-		// still pending and is emitted over the same route.
-		b.mu.RLock()
-		tracker := b.ackTracker
-		b.mu.RUnlock()
-		if tracker == nil || !tracker.Owes(obl.SessionID, obl.ExchangeID, obl.Initiator) {
-			b.routing.exchangeSrcs.Delete(key)
-		}
-	}
-	if !ok {
-		b.logger.Debug("matter.tx.ack_pump.no_src",
-			slog.Int("exchange_id", int(obl.ExchangeID)),
-			slog.Int("session_id", int(obl.SessionID)))
-		return
-	}
-	target, ok := raw.(exchangeReplyTarget)
-	if !ok || isNilRoute(target.src) {
+// ships it via the bridge's listener to target, the reply route
+// [Bridge.owedInboundAck] recorded for the exchange. An obligation
+// without a route — added out-of-band (tests), or its session evicted —
+// is logged and dropped by the caller.
+func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation, target exchangeReplyTarget) {
+	if isNilRoute(target.src) {
 		return
 	}
 

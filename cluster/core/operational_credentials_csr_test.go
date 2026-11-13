@@ -5,12 +5,13 @@ package core_test
 
 // ADR-0013 Decision #7: CSRRequest AttestationChallenge binding.
 //
-// Bug-pattern: OperationalCredentials.attestationChalleng was never
-// populated from the session layer, so CSRResponse.AttestationSignature
-// was computed over (NOCSRElements || nil) instead of
-// (NOCSRElements || AttestationChallenge) as required by Matter §11.18.4.7.
-// A commissioner that verifies the signature against the correct
-// challenge would always reject it.
+// Bug-pattern: the session's AttestationChallenge never reached the
+// cluster, so CSRResponse.AttestationSignature was computed over
+// (NOCSRElements || nil) instead of (NOCSRElements || AttestationChallenge)
+// as required by Matter §11.18.4.7. A commissioner that verifies the
+// signature against the correct challenge would always reject it. The
+// challenge arrives with the request ([core.WithInvokeAttestationChallenge]);
+// the cluster holds none of its own (review II, W3-clusec-10).
 
 import (
 	"bytes"
@@ -34,6 +35,7 @@ func newOpcredsWithDAC(t *testing.T) (*core.OperationalCredentials, *ecdsa.Priva
 		t.Fatalf("GenerateKey DAC: %v", err)
 	}
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+		FailSafe:         armedFailSafe(0),
 		SupportedFabrics: 5,
 		DACPrivateKey:    dacKey,
 	})
@@ -48,7 +50,7 @@ func newOpcredsWithDAC(t *testing.T) (*core.OperationalCredentials, *ecdsa.Priva
 //
 // The test:
 //  1. Constructs an OperationalCredentials cluster with a known DAC key.
-//  2. Installs a known 16-byte AttestationChallenge via SetAttestationChallenge.
+//  2. Stamps a known 16-byte AttestationChallenge on the request context.
 //  3. Drives a CSRRequest through MatterInvoke (command 0x04).
 //  4. Decodes the CSRResponse and verifies AttestationSignature against
 //     SHA-256(NOCSRElements || AttestationChallenge) with the DAC public key.
@@ -62,18 +64,17 @@ func TestCSRRequest_AttestationChallengeBound(t *testing.T) {
 	oc, dacKey := newOpcredsWithDAC(t)
 
 	// A known 16-byte challenge — simulates what the PASE/CASE layer
-	// derives during session establishment and hands to SetAttestationChallenge.
+	// derives during session establishment and the bridge stamps on the invoke.
 	knownChallenge := []byte{
 		0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22,
 		0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00,
 	}
-	oc.SetAttestationChallenge(knownChallenge)
 
 	// 32-byte nonce (arbitrary).
 	csrNonce := bytes.Repeat([]byte{0x42}, 32)
 
 	resp, err := oc.MatterInvoke(
-		context.Background(),
+		core.WithInvokeAttestationChallenge(context.Background(), knownChallenge),
 		0x04, // opcredsCmdCSRRequest
 		core.CSRRequest{CSRNonce: csrNonce},
 	)
@@ -106,9 +107,8 @@ func TestCSRRequest_AttestationChallengeBound(t *testing.T) {
 	s := new(big.Int).SetBytes(sig[32:])
 
 	// ADR-0013 D#7 invariant: the signature MUST verify against
-	// (NOCSRElements || knownChallenge). If SetAttestationChallenge was
-	// never called (or the challenge was not bound into the signed digest),
-	// ecdsa.Verify returns false.
+	// (NOCSRElements || knownChallenge). If the challenge was not bound
+	// into the signed digest, ecdsa.Verify returns false.
 	if !ecdsa.Verify(&dacKey.PublicKey, digest, r, s) {
 		t.Error("ADR-0013 D#7: AttestationSignature does not verify against " +
 			"SHA-256(NOCSRElements || AttestationChallenge); " +
@@ -118,23 +118,19 @@ func TestCSRRequest_AttestationChallengeBound(t *testing.T) {
 
 // TestCSRRequest_AttestationChallenge_NilDACKey verifies that a nil DAC key
 // (test-stub path) produces a 64-byte all-zero stub signature that does NOT
-// verify, and that SetAttestationChallenge does not panic when called on a
-// cluster without a key.
+// verify.
 func TestCSRRequest_AttestationChallenge_NilDACKey(t *testing.T) {
 	t.Parallel()
 
 	// Construct without DAC key — production stub mode.
-	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
 
-	// SetAttestationChallenge must not panic even without a DAC key.
-	oc.SetAttestationChallenge(bytes.Repeat([]byte{0x55}, 16))
-
 	csrNonce := bytes.Repeat([]byte{0x11}, 32)
 	resp, err := oc.MatterInvoke(
-		context.Background(),
+		core.WithInvokeAttestationChallenge(context.Background(), bytes.Repeat([]byte{0x55}, 16)),
 		0x04,
 		core.CSRRequest{CSRNonce: csrNonce},
 	)
@@ -153,10 +149,10 @@ func TestCSRRequest_AttestationChallenge_NilDACKey(t *testing.T) {
 	}
 }
 
-// TestCSRRequest_SetAttestationChallenge_DefensiveCopy verifies that mutating
-// the slice passed to SetAttestationChallenge after the call does not affect
-// the challenge used by a subsequent CSRRequest.
-func TestCSRRequest_SetAttestationChallenge_DefensiveCopy(t *testing.T) {
+// TestCSRRequest_AttestationChallenge_DefensiveCopy verifies that mutating
+// the slice passed to WithInvokeAttestationChallenge after the call does not
+// affect the challenge used by a subsequent CSRRequest.
+func TestCSRRequest_AttestationChallenge_DefensiveCopy(t *testing.T) {
 	t.Parallel()
 
 	oc, dacKey := newOpcredsWithDAC(t)
@@ -166,16 +162,16 @@ func TestCSRRequest_SetAttestationChallenge_DefensiveCopy(t *testing.T) {
 		0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
 	}
 	snapshot := append([]byte(nil), challenge...)
-	oc.SetAttestationChallenge(challenge)
+	ctx := core.WithInvokeAttestationChallenge(context.Background(), challenge)
 
-	// Mutate the original slice — must not affect the stored challenge.
+	// Mutate the original slice — must not affect the stamped challenge.
 	for i := range challenge {
 		challenge[i] = 0xFF
 	}
 
 	csrNonce := bytes.Repeat([]byte{0x77}, 32)
 	resp, err := oc.MatterInvoke(
-		context.Background(),
+		ctx,
 		0x04,
 		core.CSRRequest{CSRNonce: csrNonce},
 	)
@@ -196,6 +192,6 @@ func TestCSRRequest_SetAttestationChallenge_DefensiveCopy(t *testing.T) {
 
 	if !ecdsa.Verify(&dacKey.PublicKey, digest, r, s) {
 		t.Error("ADR-0013 D#7 defensive-copy: signature does not verify against snapshot challenge; " +
-			"SetAttestationChallenge did not copy the slice")
+			"WithInvokeAttestationChallenge did not copy the slice")
 	}
 }

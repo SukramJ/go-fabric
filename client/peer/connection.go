@@ -204,6 +204,9 @@ type connection struct {
 	// a discovered address while only they are in flight (hintBesideLocked).
 	// An entry stays for the process: a hint is queued once.
 	hinted map[netip.AddrPort]hintState
+	// hintLimitLogged records that the process said it passed hinted
+	// addresses over at MaxHintedAddresses.
+	hintLimitLogged bool
 	// hintBesideUsed records that the one discovered address a hinted
 	// attempt lets start without the stagger has started.
 	hintBesideUsed bool

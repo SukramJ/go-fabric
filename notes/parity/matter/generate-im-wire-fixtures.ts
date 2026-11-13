@@ -21,10 +21,17 @@
 //   - SubscribeResponse: Go uses PutUint32/PutUint16 for subscriptionId and
 //     maxInterval because chip-tool and Apple Home require explicit-width
 //     encoding per the spec (not magnitude-encoded like matter.js TlvUInt32).
-//   - ReportData keepalive: matter.js omits the attributeReports field
-//     when undefined; Go always emits an empty attributeReports array.
+//   - ReportData: Go keeps SubscriptionId at 4 bytes, as SubscribeResponse.
 //     These by-design cases are marked with "byDesignDivergence: true"
 //     and skipped in the strict byte-equality assertion.
+//
+// A ReportData record names no attributeReports unless it has an entry for
+// it: matter.js's sender starts the array undefined, creates it with its
+// first entry and deletes it after a chunk
+// (packages/protocol/src/interaction/InteractionMessenger.ts:490-491,
+// :512-513, :764-767 at db021da0), and Go omits an empty array the same way
+// since review II (W2-wire-09). An explicit `[]` is a shape neither sender
+// produces.
 
 // Resolve @matter/types from the matter.js checkout. The script may be
 // invoked from any working directory; we use Module._resolveFilename to
@@ -99,25 +106,22 @@ function add(label: string, description: string, msgType: string, input: any, sc
 // ReportData (TlvDataReportForSend)
 // =============================================================
 
-// F3 regression case: suppressResponse=false on a non-empty ReportData.
+// F3 regression case: suppressResponse=false on a ReportData.
 // Before fix F3, go-fabric omitted suppressResponse when value was false.
 // matter.js always emits it as TlvOptionalField with a concrete value.
 add(
     "report_data_supress_false_empty_attrs",
-    "ReportData with empty attributeReports and suppressResponse=false — the F3 regression fixture",
+    "ReportData with no reports and suppressResponse=false — the F3 regression fixture",
     "ReportData",
     {
         suppressResponse: false,
-        attributeReports: [],
         interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
 );
 
-// suppressResponse=true: keepalive path
-// Note: matter.js omits attributeReports when it is undefined.
-// Go always emits an empty attributeReports array even on keepalives.
-// This is a by-design divergence documented in notes/parity/by_design.md.
+// suppressResponse=true: keepalive path. matter.js omits attributeReports
+// when it is undefined, and so does Go.
 add(
     "report_data_keepalive_no_subid",
     "ReportData keepalive (suppressResponse=true, no subscriptionId, no attributeReports field)",
@@ -127,10 +131,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
-    {
-        byDesign: true,
-        byDesignNote: "matter.js omits attributeReports when undefined; Go always emits an empty array",
-    },
 );
 
 // suppressResponse=true with subscriptionId: the typical keepalive from
@@ -147,22 +147,21 @@ add(
     TlvDataReportForSend,
     {
         byDesign: true,
-        byDesignNote: "matter.js omits attributeReports when undefined; Go always emits an empty array",
+        byDesignNote: "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values.",
     },
 );
 
-// suppressResponse=false with subscriptionId + empty attributeReports.
+// suppressResponse=false with subscriptionId, no reports.
 // By-design: Go uses PutUint32 for subscriptionId (always 4-byte); matter.js
 // TlvUInt32 magnitude-encodes (subscriptionId=42 fits in 1 byte → 1-byte wire).
 // The Go code comment in read.go explains the Apple Home requirement.
 add(
     "report_data_with_subid_supress_false",
-    "ReportData: subscriptionId=42, suppressResponse=false, empty attributeReports",
+    "ReportData: subscriptionId=42, suppressResponse=false, no reports",
     "ReportData",
     {
         subscriptionId: 42,
         suppressResponse: false,
-        attributeReports: [],
         interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
@@ -180,7 +179,6 @@ add(
     {
         subscriptionId: 42,
         suppressResponse: false,
-        attributeReports: [],
         moreChunkedMessages: true,
         interactionModelRevision: IM_REVISION,
     },
@@ -198,7 +196,6 @@ add(
     "ReportData",
     {
         suppressResponse: false,
-        attributeReports: [],
         moreChunkedMessages: true,
         interactionModelRevision: IM_REVISION,
     },
@@ -236,7 +233,7 @@ add(
     TlvDataReportForSend,
     {
         byDesign: true,
-        byDesignNote: "matter.js omits attributeReports when undefined; Go always emits an empty array",
+        byDesignNote: "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values.",
     },
 );
 

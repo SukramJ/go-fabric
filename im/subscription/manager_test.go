@@ -1066,12 +1066,15 @@ func TestManager_ClosePeer_DecrementsFabricQuota(t *testing.T) {
 
 // ---- MinIntervalFloor enforced for event-triggered reports ----
 
-// TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor verifies that a
-// Critical event and a dirty attribute coexisting within the MinIntervalFloor
-// window produce exactly ONE reporter call, not two. Apple Home's
-// duplicate-suppression heuristic rejects two consecutive ReportData frames
-// in the same floor window.
-func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
+// TestTick_UrgentEventAndDirty_OneReport verifies that an urgent event and
+// a dirty attribute owed inside the MinIntervalFloor window leave together
+// when the floor ends: one reporter call, carrying both, and no second
+// report a tick or a floor later. matter.js ServerSubscription.ts:539-555
+// at db021da0 (#sendUpdate takes the attribute filter and the events'
+// minimum number in one pass). Until review II (W2-conc-04, W2-conc-05)
+// the Critical event went out inside the floor and the attribute a floor
+// after it.
+func TestTick_UrgentEventAndDirty_OneReport(t *testing.T) {
 	t.Parallel()
 	// Reporter counts how many attribute-report calls arrive.
 	var mu sync.Mutex
@@ -1084,12 +1087,15 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 		}
 	}
 
-	// EventReporter counts how many event-drain calls arrive.
+	// EventReporter counts its calls and the paths it took with the events.
 	var evMu sync.Mutex
 	eventCalls := 0
-	eventReporter := subscription.EventReporter(func(_ context.Context, _ *subscription.Subscription, _ []im.EventReport) {
+	var tookPaths []im.ConcreteAttributePath
+	eventReporter := subscription.EventReporter(func(_ context.Context, sub *subscription.Subscription, _ []im.EventReport) {
+		paths := sub.TakeDuePaths()
 		evMu.Lock()
 		eventCalls++
+		tookPaths = append(tookPaths, paths...)
 		evMu.Unlock()
 	})
 
@@ -1100,6 +1106,7 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 		HasEndpoint: true, Endpoint: 1,
 		HasCluster: true, Cluster: 0x0006,
 		HasEvent: true, Event: 0x0001,
+		IsUrgent: true,
 	}
 	attrPath := mkPath(1, 0x0006, 0x0000)
 	args := defaultArgs()
@@ -1111,10 +1118,9 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
-	sub.TouchLastReport(time.Now()) // prime lastReport so keepalive doesn't immediately fire
-
 	ctx := context.Background()
 	t0 := time.Now()
+	sub.TouchLastReport(t0) // prime lastReport so keepalive doesn't immediately fire
 
 	// Fire a Critical event at t0: in the log first, as the bridge does.
 	log := im.NewEventLog()
@@ -1129,32 +1135,31 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 	// Mark dirty at t0 + 100 ms (within the 2 s floor).
 	m.OnAttributeChanged(attrPath)
 
-	// Tick at t0 + 100 ms — event drains (Critical, bypasses floor);
-	// dirty must NOT drain in the same tick.
+	counts := func() (events, attrs, took int) {
+		mu.Lock()
+		defer mu.Unlock()
+		evMu.Lock()
+		defer evMu.Unlock()
+		return eventCalls, reporterCalls, len(tookPaths)
+	}
+
+	// Tick at t0 + 100 ms — inside the floor neither leaves.
 	m.Tick(ctx, t0.Add(100*time.Millisecond))
-
-	mu.Lock()
-	gotReporter := reporterCalls
-	mu.Unlock()
-	evMu.Lock()
-	gotEvent := eventCalls
-	evMu.Unlock()
-
-	if gotEvent != 1 {
-		t.Errorf("eventCalls = %d, want 1 (critical event drained)", gotEvent)
-	}
-	if gotReporter != 0 {
-		t.Errorf("reporterCalls = %d, want 0 (dirty must be blocked within floor)", gotReporter)
+	if ev, at, _ := counts(); ev != 0 || at != 0 {
+		t.Fatalf("inside the floor: eventCalls = %d, reporterCalls = %d, want 0 and 0", ev, at)
 	}
 
-	// After the floor elapses (t0 + 3 s > 2 s floor), dirty drains.
+	// When the floor has elapsed (t0 + 3 s > 2 s floor), both leave in one report.
 	m.Tick(ctx, t0.Add(3*time.Second))
+	if ev, at, took := counts(); ev != 1 || at != 0 || took != 1 {
+		t.Fatalf("after the floor: eventCalls = %d, reporterCalls = %d, paths taken = %d; want one event report carrying the 1 path", ev, at, took)
+	}
 
-	mu.Lock()
-	gotReporter2 := reporterCalls
-	mu.Unlock()
-	if gotReporter2 != 1 {
-		t.Errorf("reporterCalls after floor = %d, want 1 (dirty should drain after floor)", gotReporter2)
+	// Nothing is left for a report of its own, a tick or a floor later.
+	m.Tick(ctx, t0.Add(3*time.Second+250*time.Millisecond))
+	m.Tick(ctx, t0.Add(6*time.Second))
+	if ev, at, _ := counts(); ev != 1 || at != 0 {
+		t.Fatalf("later: eventCalls = %d, reporterCalls = %d, want still 1 and 0", ev, at)
 	}
 }
 
@@ -1804,9 +1809,9 @@ func TestZeroFloorReportsAChangeRightAfterAReport(t *testing.T) {
 // TestDeferReports ports matter.js packages/node/test/node/DelayReportDataTest.ts:
 // a DelayReportData holds the next report by its delay; a running
 // deferral is only shortened; none outlasts the send interval; a
-// subscription that selects none of the endpoints is not held; a
-// critical event still goes out (urgent events bypass the hold, as they
-// bypass the floor).
+// subscription that selects none of the endpoints is not held. An urgent
+// event is held as an attribute change is
+// (TestEventReportParityMatterJS).
 func TestDeferReports(t *testing.T) {
 	t.Parallel()
 	p := defaultArgs().AttributePaths[0]

@@ -167,7 +167,9 @@ allocates and persists the numbers.
 
 **Event** — A cluster record that something happened, triggered by an
 endpoint, with a priority and an increasing 64-bit event number. In go-fabric: emitted by
-the cluster servers, reported through the subscription engine.
+the cluster servers, reported through the subscription engine. When a
+subscriber hears of an event is the subscriber's choice, not the
+priority's: see **Subscription**.
 
 **Exchange** — One conversation between two nodes over a session, named by
 the exchange id in the protocol header; MRP acknowledges within it. In
@@ -321,7 +323,12 @@ can compose at an earlier one ([Specification levels](spec-levels.md)).
 
 **Subscription (min/max interval, report)** — A client's standing request
 for reports on paths: the server reports a change no sooner than the min
-interval and reports at least every max interval as a keep-alive. See
+interval and reports at least every max interval as a keep-alive. An
+event is reported with the subscription's next report; it triggers one
+itself only when the subscriber marked an event path that covers it
+urgent (`isUrgent`), and that report waits for the min interval too —
+an event of critical priority included. Events and attribute changes due
+together arrive in one report. See
 **Binding** for the difference. In go-fabric:
 [`im/subscription`](https://github.com/SukramJ/go-fabric/tree/main/im/subscription).
 

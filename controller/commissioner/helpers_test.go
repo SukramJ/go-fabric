@@ -68,6 +68,9 @@ type scriptedDevice struct {
 	ch      *channel.Session
 	session uint16
 	handle  func(req imRequest) (opcode uint8, payload []byte, ok bool)
+	// lose, when set, is asked before handle: true drops the datagram as
+	// the network would — the device neither acknowledges nor answers it.
+	lose func(req imRequest) bool
 
 	mu      sync.Mutex
 	counter uint32
@@ -123,6 +126,9 @@ func (d *scriptedDevice) run() {
 			continue
 		}
 		req := imRequest{opcode: proto.Opcode, payload: plain[pl:]}
+		if d.lose != nil && d.lose(req) {
+			continue
+		}
 		op, payload, ok := d.handle(req)
 		reply := message.ProtocolHeader{HasAck: true, AckCounter: hdr.MessageCounter, ExchangeID: proto.ExchangeID, ProtocolID: proto.ProtocolID}
 		if ok {

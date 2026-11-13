@@ -101,8 +101,8 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	b.mu.Lock()
 	b.subManager = m
-	b.wireMeasurementListenersLocked()
 	b.mu.Unlock()
+	b.rewireMeasurementListeners()
 	if m != nil {
 		// The manager owns subscription lifetime; the bridge owns the
 		// routing state keyed by subscription ID. Without this hook the
@@ -206,6 +206,12 @@ type subTarget struct {
 	// ack but is not handed to the outbound reliable tracker
 	// ([Bridge.sendUnsolicitedIM]).
 	flush bool
+	// abort, when it closes, ends the wait for the peer's answer to a
+	// chunk of the report being sent ([errChunkWaitAborted]). The ongoing
+	// reporters set it to their context's Done on the copy they send
+	// with — the subscription engine's stop — and it is never stored in
+	// the routing table. Nil: the wait ends with its answer or its timer.
+	abort <-chan struct{}
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -234,8 +240,9 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // (endpoint, cluster, event) triple.
 //
 // The closure encodes the events under the same per-subscription
-// [subTarget] used for attribute reports, so a single peer session
-// receives both report types interleaved.
+// [subTarget] used for attribute reports, and takes the attribute changes
+// that are due with them ([subscription.Subscription.TakeDuePaths]): one
+// ReportData carries both ([Bridge.reportSubscriptionEvents]).
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
 }
@@ -301,8 +308,15 @@ func (b *Bridge) authorizedEventReports(ctx context.Context, target subTarget, e
 	return im.AuthorizeEventReports(ctx, auth, events)
 }
 
-// reportSubscriptionEvents assembles + ships an event-only ReportData
-// for sub. Called by the manager's engine tick.
+// reportSubscriptionEvents assembles + ships the ReportData of a report
+// of sub that carries events: the events, and in the same message the
+// attribute changes that are due with them
+// ([subscription.Subscription.TakeDuePaths]). Called by the manager's
+// engine tick. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:539-555 at db021da0
+// (#sendUpdate takes the attribute filter and the events' minimum number
+// together) and :860-887, :926-936 (#iterateDataUpdate yields the
+// attributes, then the events, into one DataReport).
 func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
 	if sub == nil || len(events) == 0 {
 		return
@@ -311,24 +325,42 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if !ok {
 		return
 	}
+	// The attribute changes due in this report are this reporter's from
+	// here on: sent below, or marked dirty again when the send fails.
+	paths := sub.TakeDuePaths()
 
 	// Authorize each event against the subscribing subject: a CASE
 	// subject only receives events on (endpoint, cluster) it holds at
 	// least View privilege for (Matter §9.10 — events carry a read
 	// privilege, default View; AccessControlEntryChanged is Administer).
 	// Without this an ACE-less subject would stream every fired event.
-	// PASE (fabricIndex==0) bypasses; a dispatcher without an ACLChecker
-	// keeps the pre-ACL behaviour.
-	authorizedEvents := b.authorizedEventReports(ctx, target, events)
-	if len(authorizedEvents) == 0 {
-		return
-	}
-
+	// A PASE subscriber bypasses (the auth mode, not fabric index 0,
+	// which alone is refused); a dispatcher without an ACLChecker keeps
+	// the pre-ACL behaviour.
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
-		EventReports:    authorizedEvents,
+		EventReports:    b.authorizedEventReports(ctx, target, events),
 	}
+	if dispatcher := b.Dispatcher(); dispatcher != nil && len(paths) > 0 {
+		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
+	}
+	if len(report.EventReports) == 0 && len(report.Reports) == 0 {
+		// Nothing of the report is for this subscriber: no message is
+		// sent, and the engine is told, so that the pass does not count
+		// as the subscription's last report and the keep-alive due with
+		// it is sent ([subscription.Subscription.NothingSent]; review II,
+		// R2-P0-rv-A03). matter.js sends the DataReport empty here
+		// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
+		// db021da0: `suppressEmptyReport: onlyWithData`, which is false
+		// for the pass a change or the send interval starts, :198-200;
+		// its TODO at :923-925 names the case).
+		sub.NothingSent()
+		return
+	}
+
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
+	target.abort = ctx.Done()
 
 	// Same bridge-initiated exchange as the attribute path: the
 	// commissioner closed its Subscribe exchange when the
@@ -340,12 +372,18 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// server-initiated exchanges (ServerSubscription.ts:823).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
-		// Owe the same events again, so the next report retries them;
-		// the third consecutive failure reaps the subscription. Mirrors
-		// matter.js packages/node/src/node/server/ServerSubscription.ts
-		// :566-581 (restores #outstandingEventsMinNumber while
-		// #sendUpdateErrorCounter <= 2).
+		// Owe the same events and attribute changes again, so the next
+		// report retries them; the third consecutive failure reaps the
+		// subscription. Mirrors matter.js
+		// packages/node/src/node/server/ServerSubscription.ts:569-584 at
+		// db021da0 (puts the attribute filter and
+		// #outstandingEventsMinNumber back while #sendUpdateErrorCounter
+		// <= 2).
 		sub.RequeueEvents(events[0].Number)
+		sub.RequeueAttributes(paths)
+		if errors.Is(err, errChunkWaitAborted) {
+			return // the engine stopped; the peer did nothing wrong
+		}
 		b.noteSubscriptionSendError(sub.ID, "event_report", err)
 		return
 	}
@@ -354,9 +392,11 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.event_report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
+		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
 }
 
@@ -364,8 +404,13 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 // implementation. Cluster servers (or model-side cluster servers
 // that implement [contract.EventReceiver]) call this when
 // the underlying DP fires an event that should surface to
-// subscribers. Non-blocking — fan-out into per-subscription queues
-// happens in the manager; the engine tick later drains them.
+// subscribers. Non-blocking — the manager records what each subscription
+// owes; the engine sends it with the subscription's next report. The
+// priority does not decide when: an event that an urgent path (isUrgent)
+// of the subscriber covers asks for a report, which honours the
+// subscription's MinIntervalFloor; any other event leaves with the next
+// report — an attribute change's, an urgent event's or the keep-alive's
+// ([subscription.Manager.OnEventFired]).
 //
 // In addition to the live subscription fan-out, EmitEvent appends
 // the event to the bridge's persistent [im.EventLog] so controllers
@@ -460,11 +505,15 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 	if !hasACL {
 		return results
 	}
-	if fabricIndex == 0 {
+	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
 		// anything to (matter.js FabricAccessControl.ts:189-191 keys the
 		// implicit grant on the PASE auth mode only; review 2026-11
-		// W2-sec-03).
+		// W2-sec-03). An index the bridge could not resolve
+		// (endpoint.FabricIndexUnresolvable) is no accessing fabric
+		// either, as at every gate of im: the filter does not rest on the
+		// access-control source knowing that index (review II,
+		// R2-P0-rv-A08).
 		return nil
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
@@ -495,6 +544,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		return
 	}
 
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
+	target.abort = ctx.Done()
+
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
@@ -517,6 +569,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		// packages/node/src/node/server/ServerSubscription.ts:566-577
 		// (#addOutstandingAttributes while #sendUpdateErrorCounter <= 2).
 		sub.RequeueAttributes(paths)
+		if errors.Is(err, errChunkWaitAborted) {
+			return // the engine stopped; the peer did nothing wrong
+		}
 		b.noteSubscriptionSendError(sub.ID, "report", err)
 		return
 	}
@@ -532,6 +587,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("paths", len(paths)),
@@ -621,6 +677,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
 	b.subSendErrorCount.Delete(sub.ID)
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.flush",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(report.EventReports)),
@@ -731,6 +788,19 @@ func (b *Bridge) rememberReportExchange(subID uint32, sessionID, exchangeID uint
 		}
 	}
 	b.reportExchangeOwner.Store(key, subID)
+}
+
+// releaseReportOfClosed drops what a reporter just recorded for sub —
+// the report's exchange and counters — when sub closed while the report
+// was on its way. The reporter loaded sub's routing target before the
+// send; a close landing after that has run
+// [Bridge.releaseSubscriptionRouting] already, and nothing would forget
+// what the reporter stored afterwards (review II, W2-conc-11). A close
+// after this check finds the records and releases them itself.
+func (b *Bridge) releaseReportOfClosed(sub *subscription.Subscription) {
+	if sub.IsClosed() {
+		b.releaseSubscriptionRouting(sub.ID)
+	}
 }
 
 // forgetReportExchange drops both halves of subID's report-exchange
@@ -962,7 +1032,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+			if err := b.awaitChunkStatusResponseWithin(timeout, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
 				return counters, nil, err
 			}
 		}
@@ -1098,13 +1168,7 @@ func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, e
 // does not also send it standalone. target is returned unchanged when
 // nothing is owed or no tracker is wired.
 func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
-	b.mu.RLock()
-	tracker := b.ackTracker
-	b.mu.RUnlock()
-	if tracker == nil {
-		return target
-	}
-	if counter, ok := tracker.LookupAndDischarge(target.sessionID, target.exchangeID, ourRole); ok {
+	if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, ourRole); ok {
 		target.hasAck = true
 		target.ackCounter = counter
 	}
@@ -1410,7 +1474,7 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 	return b.subManager
 }
 
-// wireMeasurementListenersLocked binds every bridged endpoint whose
+// wireMeasurementListeners binds every bridged endpoint whose
 // Source or Measurement implements [contract.ChangeNotifier] — and then
 // every mounted cluster server of the endpoint that does, whether or not
 // the source notifies — to the subscription manager's OnAttributeChanged
@@ -1429,30 +1493,20 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // observables, so the source notifies and the bridge looks up the
 // reportable paths via [endpoint.ReportablePaths].
 //
-// Caller must hold b.mu.Lock. The bridge re-runs this on every
-// reassemble (topology may add or remove bridged endpoints) and
-// whenever a fresh subscription manager is attached. Old unsubscribe
-// closures are drained before new ones are registered so listeners
-// never leak across reassembles.
-func (b *Bridge) wireMeasurementListenersLocked() {
-	for _, unsub := range b.measurementUnsubscribers {
-		if unsub != nil {
-			unsub()
-		}
-	}
-	b.measurementUnsubscribers = nil
-
-	if b.subManager == nil || b.topology == nil {
-		return
-	}
-	mgr := b.subManager
-	b.wireRootNotifiersLocked(mgr)
-	b.wireAttributeNotifiersLocked(mgr)
+// The bridge runs this through [Bridge.rewireMeasurementListeners] on
+// every reassemble (topology may add or remove bridged endpoints) and
+// whenever a fresh subscription manager is attached. It calls the host's
+// notifiers, so the caller holds no bridge lock; it returns the
+// unsubscribe closures of what it registered.
+func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *endpointpkg.Topology) []func() {
+	set := &listenerSet{}
+	b.wireRootNotifiers(set, mgr, topology)
+	b.wireAttributeNotifiers(set, mgr, topology)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
 	)
-	for _, ep := range b.topology.Endpoints {
+	for _, ep := range topology.Endpoints {
 		if ep == nil || ep.IsRoot() || ep.IsAggregator() {
 			continue
 		}
@@ -1499,7 +1553,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			// report per real cluster-attribute change; mirror that.
 			if pathSet := filterPathsByNotifierCluster(notifier, paths); len(pathSet) > 0 {
 				withPaths++
-				b.wireMeasurementNotifier(mgr, ep, notifier, pathSet)
+				b.wireMeasurementNotifier(set, mgr, ep, notifier, pathSet)
 			}
 			if srv, isSrv := notifier.(contract.ClusterServer); isSrv {
 				primaryCluster = srv.MatterClusterID()
@@ -1532,7 +1586,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 				continue
 			}
 			withPaths++
-			b.wireMeasurementNotifier(mgr, ep, subNotifier, subPaths)
+			b.wireMeasurementNotifier(set, mgr, ep, subNotifier, subPaths)
 		}
 	}
 	if b.logger != nil {
@@ -1541,19 +1595,94 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			slog.Int("measurement_seen", measurementSeen),
 			slog.Int("notifier_ok", notifierOK),
 			slog.Int("with_paths", withPaths),
-			slog.Int("registered", len(b.measurementUnsubscribers)))
+			slog.Int("registered", len(set.unsubs)))
+	}
+	return set.unsubs
+}
+
+// listenerSet collects the unsubscribe closures of one wiring of the
+// host's notifiers.
+type listenerSet struct{ unsubs []func() }
+
+// add keeps unsub; a notifier that returns none has nothing to detach.
+func (l *listenerSet) add(unsub func()) {
+	if unsub == nil {
+		unsub = func() {}
+	}
+	l.unsubs = append(l.unsubs, unsub)
+}
+
+// rewireMeasurementListeners detaches the listeners of the last wiring
+// and registers the bridge with the notifiers of the current topology,
+// for the current subscription manager. Every call into the host — the
+// stale unsubscribers and the registrations — runs with no bridge lock
+// held: a notifier may call the callback back while it registers, and an
+// unsubscribe may wait for a callback in flight, and the callback
+// re-enters the bridge ([Bridge.EmitEvent] reads the manager under b.mu).
+// Before, both ran under b.mu held for writing and such a notifier
+// stopped the bridge (review II, W2-conc-07). b.mu guards the list and
+// the generation only: a wiring a later one overtook while it registered
+// is detached again instead of installed, so the last one wins.
+func (b *Bridge) rewireMeasurementListeners() {
+	b.mu.Lock()
+	stale := b.measurementUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.listenerGeneration++
+	generation := b.listenerGeneration
+	mgr, topology := b.subManager, b.topology
+	b.mu.Unlock()
+	runUnsubscribers(stale)
+	if mgr == nil || topology == nil {
+		return
+	}
+	unsubs := b.wireMeasurementListeners(mgr, topology)
+	b.mu.Lock()
+	overtaken := b.listenerGeneration != generation
+	if !overtaken {
+		b.measurementUnsubscribers = unsubs
+	}
+	b.mu.Unlock()
+	if overtaken {
+		runUnsubscribers(unsubs)
 	}
 }
 
-// wireRootNotifiersLocked subscribes every root cluster server that
+// detachHostListeners unregisters the bridge from every host notifier —
+// the value listeners and the switch hooks — for [Bridge.Stop]: a
+// stopped bridge is not called into (review II, W2-conc-10). The next
+// Start reassembles and wires them again. The unsubscribers run with no
+// bridge lock held.
+func (b *Bridge) detachHostListeners() {
+	b.mu.Lock()
+	measurements := b.measurementUnsubscribers
+	switches := b.switchUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.switchUnsubscribers = nil
+	b.listenerGeneration++ // a wiring still registering detaches itself
+	b.mu.Unlock()
+	runUnsubscribers(measurements)
+	runUnsubscribers(switches)
+}
+
+// runUnsubscribers calls every closure of unsubs.
+func runUnsubscribers(unsubs []func()) {
+	for _, unsub := range unsubs {
+		if unsub != nil {
+			unsub()
+		}
+	}
+}
+
+// wireRootNotifiers subscribes every root cluster server that
 // implements [contract.ChangeNotifier] — today the Groupcast server, whose
 // Membership and counts move with the group state — to its own reportable
 // attributes on endpoint 0: a fire marks them dirty so subscribers get a
 // report. A root server keeps its own DataVersion (it bumps it before it
 // fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
-// reactive state matter.js keeps for root behaviors. Caller holds b.mu.
-func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
-	root := b.topology.FindByID(0)
+// reactive state matter.js keeps for root behaviors. The caller holds no
+// bridge lock.
+func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
+	root := topology.FindByID(0)
 	if root == nil {
 		return
 	}
@@ -1569,19 +1698,15 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 				HasEndpoint: true, HasCluster: true, HasAttribute: true,
 			})
 		}
-		unsub := notifier.OnMatterValueChanged(func() {
+		set.add(notifier.OnMatterValueChanged(func() {
 			for _, p := range paths {
 				mgr.OnAttributeChanged(p)
 			}
-		})
-		if unsub == nil {
-			unsub = func() {}
-		}
-		b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+		}))
 	}
 }
 
-// wireAttributeNotifiersLocked subscribes every cluster server that
+// wireAttributeNotifiers subscribes every cluster server that
 // implements [contract.AttributeChangeNotifier] — the servers that keep
 // their own attribute state, such as cluster/opstate and cluster/modebase
 // on a bridged endpoint or the OTA Software Update Requestor on the root —
@@ -1600,15 +1725,15 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 // requestor's UpdateState is plain behavior state
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
 // server that is also a [contract.ChangeNotifier] is wired by
-// wireRootNotifiersLocked already and is skipped here. A server that is a
+// wireRootNotifiers already and is skipped here. A server that is a
 // [contract.AttributeReportNotifier] is subscribed through its report view
 // — a quieter attribute by its throttle, as matter.js's
 // ServerBehaviorBacking subscribes a QuietEvent's `online` observable
 // (ServerBehaviorBacking.ts:251-259) — and through OnAttributeChange,
 // which tells the host of every change at once, otherwise. Caller holds
 // b.mu.
-func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
-	for _, ep := range b.topology.Endpoints {
+func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
+	for _, ep := range topology.Endpoints {
 		if ep == nil {
 			continue
 		}
@@ -1626,7 +1751,7 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 			if r, reports := srv.(contract.AttributeReportNotifier); reports {
 				subscribe = r.OnAttributeReport
 			}
-			unsub := subscribe(func(change contract.Change) {
+			set.add(subscribe(func(change contract.Change) {
 				attrIDs := change.Attributes
 				if len(attrIDs) == 0 {
 					return
@@ -1648,11 +1773,7 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				if hook := b.onAttributeChange.Load(); hook != nil {
 					(*hook)(ep.ID, clusterID, change)
 				}
-			})
-			if unsub == nil {
-				unsub = func() {}
-			}
-			b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+			}))
 		}
 	}
 }
@@ -1663,12 +1784,12 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 // controller's DataVersionFilter misses on the next read — mirrors matter.js
 // Datasource.ts:1035), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
-func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
+func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
 	occupancy := newOccupancyEvents(b, ep, pathSet)
 	values := newPathValues(ep, pathSet)
-	unsub := notifier.OnMatterValueChanged(func() {
+	set.add(notifier.OnMatterValueChanged(func() {
 		defer occupancy.check()
 		defer boolState.check()
 		// Only the attributes whose value moved are reported, and only
@@ -1695,11 +1816,7 @@ func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpoint
 		for _, p := range changed {
 			mgr.OnAttributeChanged(p)
 		}
-	})
-	if unsub == nil {
-		unsub = func() {}
-	}
-	b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+	}))
 }
 
 // sameNotifier reports whether a and b are the same notifier — the

@@ -78,8 +78,10 @@ const (
 
 // Delegate is the host port chip's AlarmBase::Delegate is
 // (alarm-base-server/Delegate.h): it is asked before a command changes
-// Mask or State. An error refuses the command — the server answers
-// FAILURE and changes nothing. A nil Delegate accepts every command, as
+// Mask or State. An error refuses the command — the server answers the
+// status the error names (a contract.StatusError or an im.StatusCodeError),
+// FAILURE for any other, and changes nothing. A nil Delegate accepts every
+// command, as
 // chip's default implementation does (Delegate.h:63, :82).
 type Delegate interface {
 	// ModifyEnabledAlarms is asked before Mask becomes mask.
@@ -446,7 +448,7 @@ func (s *Server) handleReset(ctx context.Context, fields any) (any, error) {
 	}
 	if s.delegate != nil {
 		if err := s.delegate.ResetAlarms(ctx, alarms); err != nil {
-			return nil, statusError{im.StatusFailure, fmt.Sprintf("alarmbase: Reset refused: %v", err)}
+			return nil, delegateError("Reset", err)
 		}
 	}
 	s.op.Lock()
@@ -466,7 +468,7 @@ func (s *Server) handleModifyEnabledAlarms(ctx context.Context, fields any) (any
 	}
 	if s.delegate != nil {
 		if err := s.delegate.ModifyEnabledAlarms(ctx, mask); err != nil {
-			return nil, statusError{im.StatusFailure, fmt.Sprintf("alarmbase: ModifyEnabledAlarms refused: %v", err)}
+			return nil, delegateError("ModifyEnabledAlarms", err)
 		}
 	}
 	s.op.Lock()
@@ -509,6 +511,16 @@ func (s *Server) SetThresholds(thresholds map[uint32]int16) error {
 type statusError struct {
 	status im.StatusCode
 	msg    string
+}
+
+// delegateError is the answer to the delegate's refusal of cmd: the status
+// a host's contract.StatusError or an im.StatusCodeError names, FAILURE
+// for any other error (docs/guides/ports.md).
+func delegateError(cmd string, err error) error {
+	if spec.CarriesStatus(err) {
+		return err
+	}
+	return statusError{im.StatusFailure, fmt.Sprintf("alarmbase: %s refused: %v", cmd, err)}
 }
 
 func (e statusError) Error() string                   { return e.msg }

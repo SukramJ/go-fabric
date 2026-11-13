@@ -61,8 +61,8 @@ func (d *csrDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bool
 // NOCSRElements must be the one CSRRequest sent — connectedhomeip
 // DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84
 // (VerifyNodeOperationalCSRInformation, `csrNonceSpan.data_equal(csrNonce)`).
-// matter.js draws the nonce (ControllerCommissioningFlow.ts:1395 at
-// 862ad75f) and never reads it back: ahead of matter.js,
+// matter.js draws the nonce (ControllerCommissioningFlow.ts:1412 at
+// db021da0) and never reads it back: ahead of matter.js,
 // BD-chip-Commissioner-CsrNonceEchoed. The DAC key is nil here, so the
 // signature check is skipped and the nonce comparison is the first gate
 // after decoding.

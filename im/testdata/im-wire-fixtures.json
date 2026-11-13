@@ -1,14 +1,13 @@
 [
   {
     "label": "report_data_supress_false_empty_attrs",
-    "description": "ReportData with empty attributeReports and suppressResponse=false — the F3 regression fixture",
+    "description": "ReportData with no reports and suppressResponse=false — the F3 regression fixture",
     "type": "ReportData",
     "fixture": {
       "suppressResponse": false,
-      "attributeReports": [],
       "interactionModelRevision": 12
     },
-    "bytesHex": "15360118280424ff0c18"
+    "bytesHex": "15280424ff0c18"
   },
   {
     "label": "report_data_keepalive_no_subid",
@@ -18,9 +17,7 @@
       "suppressResponse": true,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15290424ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
+    "bytesHex": "15290424ff0c18"
   },
   {
     "label": "report_data_keepalive_with_subid",
@@ -33,19 +30,18 @@
     },
     "bytesHex": "15240005290424ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
+    "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values."
   },
   {
     "label": "report_data_with_subid_supress_false",
-    "description": "ReportData: subscriptionId=42, suppressResponse=false, empty attributeReports",
+    "description": "ReportData: subscriptionId=42, suppressResponse=false, no reports",
     "type": "ReportData",
     "fixture": {
       "subscriptionId": 42,
       "suppressResponse": false,
-      "attributeReports": [],
       "interactionModelRevision": 12
     },
-    "bytesHex": "1524002a360118280424ff0c18",
+    "bytesHex": "1524002a280424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values. Apple Home requires fixed-width."
   },
@@ -56,11 +52,10 @@
     "fixture": {
       "subscriptionId": 42,
       "suppressResponse": false,
-      "attributeReports": [],
       "moreChunkedMessages": true,
       "interactionModelRevision": 12
     },
-    "bytesHex": "1524002a3601182903280424ff0c18",
+    "bytesHex": "1524002a2903280424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values."
   },
@@ -70,11 +65,10 @@
     "type": "ReportData",
     "fixture": {
       "suppressResponse": false,
-      "attributeReports": [],
       "moreChunkedMessages": true,
       "interactionModelRevision": 12
     },
-    "bytesHex": "153601182903280424ff0c18"
+    "bytesHex": "152903280424ff0c18"
   },
   {
     "label": "report_data_event_only",
@@ -101,7 +95,7 @@
     },
     "bytesHex": "15240007290424ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
+    "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values."
   },
   {
     "label": "subscribe_req_minimal_keep_true",

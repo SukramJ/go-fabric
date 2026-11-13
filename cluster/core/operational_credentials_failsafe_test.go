@@ -84,7 +84,7 @@ func TestOpcreds_OnFailSafeExpiry_ClearsAllPendingFields(t *testing.T) {
 	for i := range csrNonce {
 		csrNonce[i] = byte(i + 1)
 	}
-	_, err := oc.MatterInvoke(ctx, 0x04, // CSRRequest
+	_, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, // CSRRequest
 		core.CSRRequest{CSRNonce: csrNonce, IsForUpdateNOC: false})
 	if err != nil {
 		t.Fatalf("CSRRequest: %v", err)
@@ -217,7 +217,7 @@ func TestOpcreds_OnFailSafeExpiry_AllowsNocCycleAfterExpiry(t *testing.T) {
 	}
 
 	// First cycle: CSR + root → partial commissioning.
-	if _, err := oc.MatterInvoke(ctx, 0x04,
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04,
 		core.CSRRequest{CSRNonce: csrNonce}); err != nil {
 		t.Fatalf("cycle1 CSRRequest: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestOpcreds_OnFailSafeExpiry_AllowsNocCycleAfterExpiry(t *testing.T) {
 	oc.OnFailSafeExpiry(ctx, 0)
 
 	// Second cycle: must succeed without duplicate-root or missing-CSR errors.
-	if _, err := oc.MatterInvoke(ctx, 0x04,
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04,
 		core.CSRRequest{CSRNonce: csrNonce}); err != nil {
 		t.Fatalf("cycle2 CSRRequest: %v", err)
 	}

@@ -56,6 +56,9 @@ var ErrNoConnection = errors.New("btp: nil GATT connection or open function")
 //     session runs (:289-296). The session's handshake response and
 //     every later packet go out as indications, each complete once the
 //     central confirmed it (:304-310, :329-336).
+//     A kept request that states a window of 0 starts no session and
+//     drops the connection — connectedhomeip's rule, not matter.js's
+//     ([NewPeripheral]).
 //   - open receives the connection once the session is established, before
 //     any of its messages, and returns the receiver of every reassembled
 //     Matter message, in order; nil drops them (:316-322).

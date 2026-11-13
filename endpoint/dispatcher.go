@@ -8,6 +8,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
@@ -55,8 +56,13 @@ func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
 // and swaps the dispatcher's reference.
 type TopologyDispatcher struct {
 	topology *Topology
-	acl      ACLLister
-	aux      AuxiliaryACLLister
+	// acl and aux are the access-control sources [TopologyDispatcher.CheckACL]
+	// reads, nil for none. A running bridge replaces them on the live
+	// dispatcher (Bridge.AttachACLLister, Bridge.AttachAuxiliaryACL) while
+	// requests are checked, hence the atomics; the boxes keep an
+	// interface value behind one pointer.
+	acl atomic.Pointer[ACLLister]
+	aux atomic.Pointer[AuxiliaryACLLister]
 	// timedWrite reports an attribute with the timed access quality; nil
 	// is [schema.IsTimedWrite]. A test sets it: no attribute of the
 	// snapshot at the pin carries the quality. A pointer keeps the
@@ -130,11 +136,39 @@ func NewTopologyDispatcher(t *Topology) *TopologyDispatcher {
 //
 // Passing nil leaves the gate closed rather than open: every operational
 // (CASE) request is denied until a source is wired. Pass [UnenforcedACL] to
-// run without stored entries on purpose.
+// run without stored entries on purpose. Safe while requests are being
+// checked: the next CheckACL reads l.
 func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
-	if d != nil {
-		d.acl = l
+	if d == nil {
+		return
 	}
+	if l == nil {
+		d.acl.Store(nil)
+		return
+	}
+	d.acl.Store(&l)
+}
+
+// aclLister is the ACL source, nil when none is wired.
+func (d *TopologyDispatcher) aclLister() ACLLister {
+	if d == nil {
+		return nil
+	}
+	if p := d.acl.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
+
+// auxLister is the auxiliary ACL source, nil when none is wired.
+func (d *TopologyDispatcher) auxLister() AuxiliaryACLLister {
+	if d == nil {
+		return nil
+	}
+	if p := d.aux.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // SetAuxiliaryACL wires the auxiliary access control entries
@@ -143,11 +177,17 @@ func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
 // that a Group entry without targets no longer reaches endpoint 0. nil
 // turns the feature off. Mirrors matter.js AccessControlServer
 // #applyFabricAcl, which installs `[...realAcl, ...#auxiliaryAclFor(fabric)]`
-// and sets FabricAccessControl.auxiliaryFeatureEnabled.
+// and sets FabricAccessControl.auxiliaryFeatureEnabled. Safe while
+// requests are being checked, as [TopologyDispatcher.SetACLLister].
 func (d *TopologyDispatcher) SetAuxiliaryACL(l AuxiliaryACLLister) {
-	if d != nil {
-		d.aux = l
+	if d == nil {
+		return
 	}
+	if l == nil {
+		d.aux.Store(nil)
+		return
+	}
+	d.aux.Store(&l)
 }
 
 // Compile-time assertion: TopologyDispatcher satisfies im.Dispatcher
@@ -284,17 +324,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// Read-only-attribute write gate (Matter §8.6). matter.js
 				// rejects a WriteRequest to a non-writable attribute BEFORE
 				// any behavior runs, so the write never reaches the cluster
-				// server (and, downstream, the CCU). The writability verdict
-				// derives from the matter.js schema access string via
-				// schema.AttributeWritable. A concrete path is answered with
-				// UNSUPPORTED_WRITE (mirrors
-				// ../matter.js/packages/protocol/src/action/server/AttributeWriteResponse.ts:229-231
-				// `if (!limits.writable) … return this.#asStatus(path, Status.UnsupportedWrite)`);
-				// a wildcard path silently skips the attribute (mirrors
-				// AttributeWriteResponse.ts:329-331
-				// `if (!attribute.limits.writable) return;`). Attributes with
-				// no read-only record — globals, writable attrs, clusters
-				// outside the table (known == false) — fall through unchanged.
+				// server (and, downstream, the host). The writability verdict
+				// is schema.AttributeWritable's, generated from the effective
+				// access of every attribute of every snapshot cluster. A
+				// concrete path is answered with UNSUPPORTED_WRITE (mirrors
+				// packages/protocol/src/action/server/AttributeWriteResponse.ts:231-234
+				// at db021da0, `if (!limits.writable) … return
+				// this.#asStatus(path, Status.UnsupportedWrite)`; chip
+				// src/app/WriteHandler.cpp:790-791 at 6170af84); a wildcard
+				// path silently skips the attribute (mirrors
+				// AttributeWriteResponse.ts:331-333 at db021da0,
+				// `if (!attribute.limits.writable) return;`). An attribute
+				// without a read-only record — a writable one, one of a
+				// cluster the snapshot does not have (known == false) — falls
+				// through unchanged.
 				// An attribute the cluster does not implement answers
 				// UNSUPPORTED_ATTRIBUTE before its writability is
 				// considered — matter.js AttributeWriteResponse.ts:225-226
@@ -935,8 +978,20 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 // at 862ad75f, core spec §8.7.3.2), so a View subject learns that an
 // attribute is absent, as it does on a read. The dispatcher's Write then
 // answers UNSUPPORTED_ENDPOINT, _CLUSTER or _ATTRIBUTE.
+//
+// An attribute that is not writable needs View only as well: both
+// references answer UNSUPPORTED_WRITE between the View pass and the
+// write-privilege pass (AttributeWriteResponse.ts:215, :231-234, :236-241 at
+// db021da0; chip src/app/WriteHandler.cpp:777, :790-791, :794-795 at
+// 6170af84 — a read-only attribute has no write privilege there at all), so
+// a subject that may view the cluster learns that the attribute is
+// read-only whatever else it may do. Before, such a subject was answered
+// UNSUPPORTED_ACCESS, at the Operate default (review II, W3-clugen-05).
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
 	const privilegeView uint8 = 1
+	if writable, known := schema.AttributeWritable(clusterID, attrID); known && !writable {
+		return privilegeView
+	}
 	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
@@ -1022,11 +1077,13 @@ func (d *TopologyDispatcher) IsTimedCommand(endpoint uint16, clusterID, cmdID ui
 // determine. Matter constrains a fabric index to "1 to 254" (matter.js
 // packages/model/src/standard/elements/operational-credentials.element.ts:129,
 // and three further declarations), so 255 can never collide with a real one,
-// and 0 is already spoken for as "PASE, no fabric yet".
+// and 0 is already spoken for as "no fabric" — a session before AddNOC.
 //
-// The distinction is load-bearing: 0 means the request legitimately has no
-// fabric and [TopologyDispatcher.CheckACL] answers Success; 255 means the
-// bridge does not know which fabric asked, and CheckACL denies.
+// Neither is a grant. 0 means the session has no fabric, 255 that the
+// bridge does not know which fabric asked; [TopologyDispatcher.CheckACL]
+// denies both. What it grants without a fabric it grants to the PASE auth
+// mode ([im.IsPASEFromContext]), never to the index: a request with
+// fabric 0 that is not PASE is refused (review 2026-11 W2-sec-03).
 const FabricIndexUnresolvable uint8 = 255
 
 // CheckACL implements [im.ACLChecker] (Matter §9.10). It grants the request
@@ -1035,9 +1092,10 @@ const FabricIndexUnresolvable uint8 = 255
 // and whose privilege is at least requiredPrivilege; otherwise it returns
 // UnsupportedAccess (0x7e). PASE sessions are already bypassed by the IM
 // gate before this is called; the same grant is repeated here so a direct
-// caller cannot lose it. It is keyed on the session's AUTH MODE as well as
-// on fabricIndex 0, because AddNOC adopts the commissioner's PASE session
-// onto the new fabric (matter.js OperationalCredentialsServer.ts:279-283
+// caller cannot lose it. It is keyed on the session's AUTH MODE alone —
+// fabricIndex 0 without PASE is no grant and is denied, like an index the
+// bridge could not resolve — because AddNOC adopts the commissioner's PASE
+// session onto the new fabric (matter.js OperationalCredentialsServer.ts:279-283
 // `session.fabric = fabric`) while the implicit Administer grant stays
 // (FabricAccessControl.ts:189-191 `authMode === Pase && isCommissioning`).
 // Without the auth-mode term every post-AddNOC ACL write, GroupKeySetWrite
@@ -1070,7 +1128,8 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// W2-sec-03.
 		return im.StatusUnsupportedAccess
 	}
-	if d == nil || d.acl == nil {
+	acl := d.aclLister()
+	if acl == nil {
 		// Fail closed. A dispatcher without an ACL source cannot tell an
 		// authorised controller from any other node that completed CASE, so
 		// answering the request would serve exactly what the AccessControl
@@ -1079,7 +1138,7 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// without stored entries wires [UnenforcedACL].
 		return im.StatusUnsupportedAccess
 	}
-	entries, err := d.acl.ListACL(ctx, fabricIndex)
+	entries, err := acl.ListACL(ctx, fabricIndex)
 	if err != nil {
 		// Fail closed: an ACL that cannot be evaluated must not grant access.
 		return im.StatusUnsupportedAccess
@@ -1099,12 +1158,13 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		// host that mounts Groupcast (which turns AUX on) without
 		// AttachAuxiliaryACL now gets the endpoint 0 restriction and no
 		// auxiliary grants — closed, not open.
-		auxEnabled := d.aux != nil || d.auxiliaryAdvertised()
-		if d.aux != nil {
+		auxSource := d.auxLister()
+		auxEnabled := auxSource != nil || d.auxiliaryAdvertised()
+		if auxSource != nil {
 			// Auxiliary entries are all Group entries, so only a group
 			// subject can match one. An auxiliary source that cannot be
 			// read fails closed like the stored ACL.
-			aux, err := d.aux.AuxiliaryACL(ctx, fabricIndex)
+			aux, err := auxSource.AuxiliaryACL(ctx, fabricIndex)
 			if err != nil {
 				return im.StatusUnsupportedAccess
 			}

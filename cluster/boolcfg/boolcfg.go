@@ -320,6 +320,16 @@ func statusErr(status im.StatusCode, format string, args ...any) error {
 	return spec.Errorf(status, "BooleanStateConfiguration: "+format, args...)
 }
 
+// delegateError is the answer to the delegate's refusal of a change: the
+// status a host's contract.StatusError or an im.StatusCodeError names,
+// FAILURE for any other error (docs/guides/ports.md).
+func delegateError(what string, err error) error {
+	if spec.CarriesStatus(err) {
+		return err
+	}
+	return statusErr(im.StatusFailure, "%s refused: %v", what, err)
+}
+
 // hasAlarms reports VIS or AUD.
 func (s *Server) hasAlarms() bool { return s.HasFeature("VIS") || s.HasFeature("AUD") }
 
@@ -344,7 +354,7 @@ func (k sensitivitySink) MatterWriteAttribute(ctx context.Context, _ uint32, val
 	}
 	if s.delegate != nil { // .cpp:327-330
 		if err := s.delegate.CurrentSensitivityLevelChanged(ctx, level); err != nil {
-			return statusErr(im.StatusFailure, "CurrentSensitivityLevel refused: %v", err)
+			return delegateError("CurrentSensitivityLevel", err)
 		}
 	}
 	s.mu.Lock()
@@ -390,7 +400,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 	if enabled != alarms { // .cpp:156-173
 		if s.delegate != nil {
 			if err := s.delegate.AlarmsEnabledChanged(ctx, alarms); err != nil {
-				return nil, statusErr(im.StatusFailure, "AlarmsEnabled refused: %v", err)
+				return nil, delegateError("AlarmsEnabled", err)
 			}
 		}
 		s.mu.Lock()
@@ -405,7 +415,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		next := active &^ disable
 		if s.delegate != nil {
 			if err := s.delegate.AlarmsActiveChanged(ctx, next); err != nil {
-				return nil, statusErr(im.StatusFailure, "AlarmsActive refused: %v", err)
+				return nil, delegateError("AlarmsActive", err)
 			}
 		}
 		s.mu.Lock()
@@ -418,7 +428,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		next := suppressed &^ disable
 		if s.delegate != nil {
 			if err := s.delegate.AlarmsSuppressedChanged(ctx, next); err != nil {
-				return nil, statusErr(im.StatusFailure, "AlarmsSuppressed refused: %v", err)
+				return nil, delegateError("AlarmsSuppressed", err)
 			}
 		}
 		s.mu.Lock()
@@ -457,7 +467,7 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 	}
 	if s.delegate != nil { // .cpp:418-424
 		if err := s.delegate.AlarmsSuppressedChanged(ctx, alarms); err != nil {
-			return nil, statusErr(im.StatusFailure, "AlarmsSuppressed refused: %v", err)
+			return nil, delegateError("AlarmsSuppressed", err)
 		}
 	}
 	next := suppressed | alarms

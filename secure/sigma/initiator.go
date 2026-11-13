@@ -211,6 +211,9 @@ func (i *Initiator) GenerateSigma1() ([]byte, error) {
 			return nil, fmt.Errorf("sigma resume: KDFSR1: %w", err)
 		}
 		mic, err := sealResumeMIC(key, nonceResume1MIC)
+		// The key has sealed its one MIC ([zero]).
+		secretHook("resume.s1rk", key)
+		zero(key)
 		if err != nil {
 			return nil, fmt.Errorf("sigma resume: initiatorResumeMIC: %w", err)
 		}
@@ -260,7 +263,16 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 	if i.state != initiatorStateSigma1Sent {
 		return nil, fmt.Errorf("%w: GenerateSigma1 must run first", ErrSessionState)
 	}
+	// S2K, S3K, the salts that carry the IPK and the session-key material
+	// end with this step on every way out; a failure takes the shared
+	// secret with it ([zero]).
+	var sc scrub
+	defer sc.wipe()
+	var shared []byte
 	fail := func(err error) ([]byte, error) {
+		secretHook("sharedSecret", shared)
+		zero(shared)
+		i.ephPriv = nil
 		i.state = initiatorStateFailed
 		return nil, err
 	}
@@ -272,18 +284,22 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 	if err != nil {
 		return fail(fmt.Errorf("%w: %v", ErrInvalidPoint, err)) //nolint:errorlint // intentional double-wrap
 	}
-	shared, err := ecdhSharedSecret(i.ephPriv, respECDH)
+	shared, err = ecdhSharedSecret(i.ephPriv, respECDH)
 	if err != nil {
 		return fail(err)
 	}
+	// The ephemeral private key has served; dropping the reference is
+	// all Go allows.
+	i.ephPriv = nil
 
 	// S2K per Matter §4.14.2.3:
 	// salt = IPK || responderRandom || responderEphPubKey || SHA256(sigma1)
-	salt2 := sigma2Salt(i.identity.IPK[:], sigma2.ResponderRandom[:], sigma2.ResponderEphPubKey, i.sigma1Bytes)
+	salt2 := sc.add("sigma2.salt", sigma2Salt(i.identity.IPK[:], sigma2.ResponderRandom[:], sigma2.ResponderEphPubKey, i.sigma1Bytes))
 	s2k, err := hkdfDerive(shared, salt2, HKDFInfoSigma2, SessionKeySize)
 	if err != nil {
 		return fail(err)
 	}
+	sc.add("sigma2.s2k", s2k)
 	// AES-CCM AAD is empty for Sigma2/Sigma3; the transcript binding rides
 	// in the salt (matter.js `crypto.decrypt(key, data, nonce)`).
 	cipher, err := aesccm.New(s2k)
@@ -361,11 +377,12 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 	})
 
 	// S3K: salt = IPK || SHA256(sigma1 || sigma2_as_received).
-	salt3 := sigma3Salt(i.identity.IPK[:], i.sigma1Bytes, sigma2Bytes)
+	salt3 := sc.add("sigma3.salt", sigma3Salt(i.identity.IPK[:], i.sigma1Bytes, sigma2Bytes))
 	s3k, err := hkdfDerive(shared, salt3, HKDFInfoSigma3, SessionKeySize)
 	if err != nil {
 		return fail(err)
 	}
+	sc.add("sigma3.s3k", s3k)
 	enc, err := aesccm.New(s3k)
 	if err != nil {
 		return fail(err)
@@ -377,11 +394,12 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 	i.sigma3Bytes = Sigma3{Encrypted3: enc3}.Marshal()
 
 	// Secure-session salt = IPK || SHA256(sigma1 || sigma2 || sigma3).
-	finalSalt := sessionKeysSalt(i.identity.IPK[:], i.sigma1Bytes, sigma2Bytes, i.sigma3Bytes)
+	finalSalt := sc.add("sessionKeys.salt", sessionKeysSalt(i.identity.IPK[:], i.sigma1Bytes, sigma2Bytes, i.sigma3Bytes))
 	final, err := hkdfDerive(shared, finalSalt, HKDFInfoSessionKeys, FinalKeyMaterialSize)
 	if err != nil {
 		return fail(err)
 	}
+	sc.add("sessionKeyMaterial", final)
 	copy(i.keys.I2RKey[:], final[0:SessionKeySize])
 	copy(i.keys.R2IKey[:], final[SessionKeySize:2*SessionKeySize])
 	copy(i.keys.AttestationChallenge[:], final[2*SessionKeySize:3*SessionKeySize])
@@ -423,11 +441,17 @@ func (i *Initiator) ProcessSigma2Resume(raw []byte) error {
 		return err
 	}
 	rec := i.resumption
+	// The resumption key and the session-key material end here on every
+	// way out ([zero]); the record stays the caller's.
+	var sc scrub
+	defer sc.wipe()
+	i.ephPriv = nil
 	resumeKey, err := hkdfDerive(rec.SharedSecret, resumeSalt(i.random, s2r.ResumptionID), HKDFInfoSigma2Resume, SessionKeySize)
 	if err != nil {
 		i.state = initiatorStateFailed
 		return fmt.Errorf("sigma resume: KDFSR2: %w", err)
 	}
+	sc.add("resume.s2rk", resumeKey)
 	if !verifyResumeMIC(resumeKey, s2r.Sigma2ResumeMIC, nonceResume2MIC) {
 		i.state = initiatorStateFailed
 		return fmt.Errorf("%w: sigma2ResumeMIC", ErrUnauthenticated)
@@ -437,6 +461,7 @@ func (i *Initiator) ProcessSigma2Resume(raw []byte) error {
 		i.state = initiatorStateFailed
 		return fmt.Errorf("sigma resume: session keys: %w", err)
 	}
+	sc.add("resume.sessionKeyMaterial", final)
 	copy(i.keys.I2RKey[:], final[0:SessionKeySize])
 	copy(i.keys.R2IKey[:], final[SessionKeySize:2*SessionKeySize])
 	copy(i.keys.AttestationChallenge[:], final[2*SessionKeySize:3*SessionKeySize])

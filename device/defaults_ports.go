@@ -98,9 +98,9 @@ func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.Clust
 	}
 	if d.Transitions {
 		t := &levelcontrol.Transitions{Clock: b.clock}
-		// Coupled to OnOff under OO only (matter.js LevelControlServer.ts
-		// :141, :558 `this.features.onOff && …`), as the held server is.
-		if srv := b.sibling(onoffdef.ClusterID); srv != nil && b.opts.Features&levelcontrol.FeatureOnOff != 0 {
+		// The server couples to it under OO only ([levelcontrol.NewServer]),
+		// as the held server does.
+		if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 			t.OnOff = onOffOf(srv)
 		}
 		if ct, ok := b.sibling(ccdef.ClusterID).(levelcontrol.ColorTemperatureCoupling); ok {

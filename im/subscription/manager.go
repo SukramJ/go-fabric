@@ -36,7 +36,7 @@ var (
 	// configured minimum) exceeds MaxIntervalCeiling (capped down to
 	// the configured ceiling). Example: cfg.MaxIntervalCeilingSeconds=5,
 	// request min=10, max=30 → after clamp min=10 > max=5. A silent
-	// inversion causes drainDirty to never fire because the
+	// inversion causes a change report to never fire because the
 	// floor can never elapse relative to a ceiling that is below it.
 	ErrCadenceInvertedAfterClamp = errors.New("subscription: cadence inverted after clamp")
 	// ErrNotFound is returned when a Get / Close hits no subscription.
@@ -48,14 +48,26 @@ var (
 
 // Reporter receives ReportData payloads the engine produces. The
 // caller wires this into the bridge's IM dispatcher to encode +
-// transmit the report on the right secure-channel session.
+// transmit the report on the right secure-channel session. ctx ends
+// when the engine stops ([Manager.Stop]); a reporter that waits on its
+// peer ends the wait with it.
 type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAttributePath)
 
-// EventReporter is the symmetrical hook for event drains. The engine
-// invokes it when a subscription has pending events ready to flush
-// (Critical priority bypasses the MinIntervalFloor gate per Matter
-// §10.6.6). Optional — a nil hook means events fan into the queue
-// but never leave the bridge (useful for unit tests of the cadence
+// EventReporter is the hook for a report that carries events. The engine
+// invokes it when a report of the subscription is due and events are owed
+// — see [Subscription.TakeDuePaths] for the attribute changes due in the
+// same report, which a reporter that sends one ReportData for both takes.
+// An event does not leave by its priority: one that an urgent path of the
+// subscriber covers asks for a report, which waits for MinIntervalFloor
+// and a DelayReportData deferral as an attribute change does; any other
+// leaves with the subscription's next report. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:385-409 and
+// :454-478 at db021da0. A reporter that finds nothing left to send for the
+// subscriber — every event filtered by its access check — calls
+// [Subscription.NothingSent] instead of sending an empty report; the
+// engine then sends the keep-alive if one is due and does not count the
+// pass otherwise. Optional — a nil hook means events fan into the
+// queue but never leave the bridge (useful for unit tests of the cadence
 // math alone).
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
@@ -65,7 +77,9 @@ type EventReporter func(ctx context.Context, sub *Subscription, events []im.Even
 // packages/node/src/node/server/ServerSubscription.ts:534-556 at db021da0
 // (#sendUpdate takes the attribute filter and the events' minimum number
 // together) and :926-936 (#sendUpdateMessage sends both in one
-// DataReport). [Reporter] and [EventReporter] stay the ongoing paths.
+// DataReport). [Reporter] and [EventReporter] stay the ongoing paths; an
+// ongoing report with events carries its attribute changes too
+// ([Subscription.TakeDuePaths]).
 type FlushReporter func(ctx context.Context, sub *Subscription, events []im.EventReport, paths []im.ConcreteAttributePath)
 
 // EventSource is where the engine reads a subscription's events when its
@@ -352,7 +366,10 @@ func (m *Manager) Start(ctx context.Context) {
 	})
 }
 
-// Stop terminates the engine and waits for it to drain. Idempotent.
+// Stop terminates the engine and waits for it to drain: the tick loop and
+// every report it started. The context those reports' reporters hold is
+// cancelled first, so a reporter that honours it does not hold Stop.
+// Idempotent.
 func (m *Manager) Stop() {
 	m.stopOnce.Do(func() {
 		close(m.stopCh)
@@ -412,7 +429,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	minFloor := max(req.MinIntervalFloor, m.cfg.MinIntervalFloorSeconds)
 	// Re-validate AFTER clamp: the configured ceiling may be below the
 	// floored minimum, producing a silent inversion that permanently
-	// blocks drainDirty. Reject early so callers can surface
+	// blocks the change report. Reject early so callers can surface
 	// a SubscribeResponse.Status = CONSTRAINT_ERROR rather than silently
 	// delivering a subscription that never reports dirty changes.
 	// matter.js ref: packages/node/src/node/server/ServerSubscription.ts
@@ -619,12 +636,12 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 		if !m.claimReport(ctx, sub) {
 			continue
 		}
-		events := sub.drainEvents(now, m.eventSourceOf(), true)
-		dirty := sub.drainDirty(now, true)
-		if len(events) == 0 && len(dirty) == 0 {
+		work, due := sub.drainDue(now, m.eventSourceOf(), true)
+		if !due {
 			sub.reporting.Store(false)
 			continue
 		}
+		events, dirty := work.events, work.paths
 		wg.Add(1)
 		m.inflight.Enter(inflight.SubscriptionPending)
 		go func() {
@@ -768,7 +785,8 @@ func (m *Manager) FabricHasAtLeastOneActiveSubscription(fabricIndex uint8) bool 
 
 // OnAttributeChanged notifies every subscription whose path-set
 // covers `path` that a new value is available. The engine emits the
-// report on the next tick once MinInterval has elapsed.
+// report on the next tick once MinInterval has elapsed; the events the
+// subscription owes go out in it.
 func (m *Manager) OnAttributeChanged(path im.ConcreteAttributePath) {
 	// A changesOmitted ("C") attribute is never reported on change, however
 	// the change was made — a write, a command, the server itself (matter.js
@@ -855,7 +873,9 @@ type EventFiring struct {
 	Path im.ConcreteEventPath
 	// Number is the monotonic event number per cluster instance.
 	Number uint64
-	// Priority drives the urgency gate (Critical bypasses MinInterval).
+	// Priority is the event's priority. It does not decide when the
+	// event is reported — the subscriber's urgent paths do — and the
+	// report reads the priority it carries from the event log's record.
 	Priority im.EventPriority
 	// The timestamp and the payload are not carried: the report reads
 	// the event log's record for Number (see [EventSource]).
@@ -864,26 +884,31 @@ type EventFiring struct {
 // OnEventFired notifies every subscription whose EventPaths cover the
 // event path. Each matching subscription records only that it owes
 // events from Number on; the engine reads them from the [EventSource]
-// on the next tick honoring MinIntervalFloor (with Critical-priority
-// bypass), so the event must already be in the source when this is
-// called.
+// when the subscription's next report is due, so the event must already
+// be in the source when this is called. The event asks for a report only
+// of a subscription one of whose urgent paths (IsUrgent) covers it, and
+// that report honours MinIntervalFloor; for any other subscription it
+// waits for the next report — an attribute change's, an urgent event's or
+// the send interval's. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:385-409 at db021da0.
 func (m *Manager) OnEventFired(ev EventFiring) {
 	if !ev.Path.HasEndpoint || !ev.Path.HasCluster || !ev.Path.HasEvent {
 		return
 	}
+	type match struct {
+		sub    *Subscription
+		urgent bool
+	}
 	m.mu.RLock()
-	matches := make([]*Subscription, 0)
+	matches := make([]match, 0)
 	for _, sub := range m.byID {
-		for _, p := range sub.EventPaths {
-			if p.Matches(ev.Path) {
-				matches = append(matches, sub)
-				break
-			}
+		if selected, urgent := sub.eventUrgency(ev.Path); selected {
+			matches = append(matches, match{sub: sub, urgent: urgent})
 		}
 	}
 	m.mu.RUnlock()
-	for _, sub := range matches {
-		sub.queueEvent(ev.Number, ev.Priority)
+	for _, hit := range matches {
+		hit.sub.queueEvent(ev.Number, hit.urgent)
 	}
 }
 
@@ -936,7 +961,7 @@ func pathMatches(subscribed, concrete im.ConcreteAttributePath) bool {
 // map at that instant; new subscriptions added after the snapshot are
 // picked up on the next tick, and removed subscriptions are guarded by
 // [Subscription.IsClosed] inside the engine loop. Per-subscription
-// mutations (markDirty, drainDirty, drainEvents) are
+// mutations (markDirty, drainDue) are
 // each protected by [Subscription.mu], so no data race exists. This
 // pattern mirrors matter.js's per-subscription timer model where each
 // ServerSubscription owns its own timer and there is no shared-map

@@ -51,10 +51,14 @@ func (e *emitter) take() []event {
 type delegate struct {
 	calls  []string
 	refuse bool
+	err    error // refuses with this error
 }
 
 func (d *delegate) answer(call string) error {
 	d.calls = append(d.calls, call)
+	if d.err != nil {
+		return d.err
+	}
 	if d.refuse {
 		return errors.New("refused")
 	}
@@ -466,5 +470,29 @@ func TestNotificationsAndVersion(t *testing.T) {
 	}
 	if _, err := spec.New(def.Definition, spec.Options{}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestDelegateStatusPassesThrough: a delegate's refusal that names its
+// status — a host's contract.StatusError — answers that status, not
+// FAILURE (docs/guides/ports.md; review II R2-P0-err-D01): the
+// CurrentSensitivityLevel write, EnableDisableAlarm and SuppressAlarm.
+func TestDelegateStatusPassesThrough(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &delegate{}
+	srv, _ := newServer(t, full(d))
+	if err := srv.SetAlarmsActive(boolcfg.AlarmVisual); err != nil {
+		t.Fatal(err)
+	}
+	d.err = contract.StatusError{Status: uint8(im.StatusBusy), Message: "calibrating"}
+	if err := srv.MatterWrite(ctx, def.AttrCurrentSensitivityLevel, uint64(2)); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("CurrentSensitivityLevel write refused with a host status answered %v, want BUSY", err)
+	}
+	if _, err := srv.MatterInvoke(ctx, def.CmdSuppressAlarm, def.SuppressAlarmRequest{AlarmsToSuppress: boolcfg.AlarmVisual}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("SuppressAlarm refused with a host status answered %v, want BUSY", err)
+	}
+	if _, err := srv.MatterInvoke(ctx, def.CmdEnableDisableAlarm, def.EnableDisableAlarmRequest{AlarmsToEnableDisable: boolcfg.AlarmAudible}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("EnableDisableAlarm refused with a host status answered %v, want BUSY", err)
 	}
 }

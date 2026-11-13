@@ -358,7 +358,19 @@ func (p *persister) remove(c *cache) {
 // for its writes landed after the erase that followed stop, and the
 // erased node was back in the store.
 func (p *persister) stop() {
+	p.halt()
+	p.flushing.Wait()
+	p.flush()
+}
+
+// halt stops the flush timer and arms none until restart; it neither
+// waits nor writes. A flush the timer already started runs to its end,
+// and a flush that fails from here on leaves its caches dirty without a
+// retry: a stopped node writes to its store only when it is asked to
+// (the final flush, a restart).
+func (p *persister) halt() {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.stopped = true
 	if p.timer != nil {
 		if p.timer.Stop() {
@@ -366,9 +378,6 @@ func (p *persister) stop() {
 		}
 		p.timer = nil
 	}
-	p.mu.Unlock()
-	p.flushing.Wait()
-	p.flush()
 }
 
 // restart lets changes arm the timer again.

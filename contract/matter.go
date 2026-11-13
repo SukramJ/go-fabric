@@ -49,6 +49,14 @@ type ClusterServer interface {
 	// returned value uses the cluster's native Go type. Returns
 	// (nil, false) when the underlying DP has not been observed yet
 	// — the bridge maps that to a stale-data Matter status response.
+	//
+	// It takes no context on purpose: a read answers from memory —
+	// the value the server holds or its source last observed — and
+	// does not wait on a backend, so there is nothing to cancel. A
+	// wildcard read or a subscription report calls it for every
+	// attribute of every endpoint, on the request's goroutine. A read
+	// that depends on who asks implements [FabricScopedReader], whose
+	// MatterReadFiltered carries the request's context.
 	MatterRead(attrID uint32) (value any, ok bool)
 
 	// MatterWrite applies an attribute write. The bridge has already
@@ -772,6 +780,14 @@ type ConcentrationReadingsSource interface {
 // Returns an unsubscribe closure; idempotent — calling it more than
 // once is a no-op. The closure is the only safe way to detach the
 // callback; do not retain `cb` references elsewhere.
+//
+// Locking: the bridge registers and unregisters with none of its locks
+// held, so an implementation may invoke `cb` synchronously from inside
+// OnMatterValueChanged (a replay of the current value), and its
+// unsubscribe closure may wait for a `cb` in flight to return. `cb`
+// itself may take the bridge's locks; do not call it, or wait for it,
+// while holding a lock the bridge's readers of this source need. The
+// same holds for [AttributeChangeNotifier] and [AttributeReportNotifier].
 type ChangeNotifier interface {
 	OnMatterValueChanged(cb func()) (unsubscribe func())
 }
@@ -875,8 +891,8 @@ const (
 	EventPriorityDebug EventPriority = 0
 	// EventPriorityInfo — informational.
 	EventPriorityInfo EventPriority = 1
-	// EventPriorityCritical — must be delivered;
-	// bypasses MinIntervalFloor when subscribed.
+	// EventPriorityCritical — must be delivered. The priority does not
+	// decide when a subscriber is told: see [EventEmitter].
 	EventPriorityCritical EventPriority = 2
 )
 
@@ -888,7 +904,13 @@ const (
 // event) triple.
 //
 // `data` is the cluster-native event payload (struct, scalar, …).
-// `priority` drives the urgency gate per Matter §10.6.6.
+// `priority` is the priority the event is recorded and reported with. It
+// does not decide when a subscriber is told: an event is reported with
+// the subscription's next report, and it asks for one itself only when
+// the subscriber marked a path that covers it urgent (isUrgent in the
+// SubscribeRequest) — and then no sooner than the subscription's
+// MinIntervalFloor after the last report, as an attribute change. An
+// emitter cannot make an event jump that floor.
 type EventEmitter interface {
 	MatterEmitEvent(endpoint uint16, cluster, event uint32, data any, priority EventPriority)
 }

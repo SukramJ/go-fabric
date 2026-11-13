@@ -129,8 +129,8 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 // rejectUnsupportedOpcode handles any opcode that is not a request opcode,
 // and a StatusResponse that opens an exchange. As the first message of an
 // exchange on a unicast session it is answered StatusResponse(InvalidAction)
-// and the owed ack discharged (the shape of [Bridge.rejectGroupSession]),
-// so the peer's exchange closes at once instead of timing out. Mirrors
+// and the owed ack discharged, so the peer's exchange closes at once
+// instead of timing out. Mirrors
 // matter.js packages/protocol/src/interaction/InteractionMessenger.ts
 // :415-419 (the default arm throws StatusResponseError InvalidAction) and
 // :431-461 (sendStatus unless the session is a group session); chip
@@ -156,27 +156,6 @@ func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, requestHdr *message.Heade
 	if sendErr := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); sendErr != nil {
 		debugReplyError(b.logger, "send_unsupported_reject", src, sendErr)
 		return sendErr
-	}
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-	return nil
-}
-
-// rejectGroupSession handles Read/Subscribe/Timed request opcodes that
-// arrived over a Secure Group session, which is forbidden by Matter §8.5.7.
-// Sends StatusResponse(InvalidAction) and discharges the owed ACK.
-// The matter.js citation for the group-session rule is on classifyIMOpcode.
-func (b *Bridge) rejectGroupSession(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
-	b.logger.Warn("matter.rx.im.group_reject",
-		slog.String("src", srcString(src)),
-		slog.Int("opcode", int(proto.Opcode)))
-	body, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusInvalidAction})
-	if err != nil {
-		debugReplyError(b.logger, "encode_group_reject", src, err)
-		return err
-	}
-	if err := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); err != nil {
-		debugReplyError(b.logger, "send_group_reject", src, err)
-		return err
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	return nil
@@ -354,15 +333,25 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 // the exchange. op names the loop for the log line ("read" /
 // "subscribe").
 func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
-	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
+	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), nil, waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
 }
 
+// errChunkWaitAborted ends a chunk wait whose sender stopped: the
+// subscription engine, for an ongoing report ([subTarget.abort]). It is
+// no verdict on the peer.
+var errChunkWaitAborted = errors.New("bridge: chunk wait aborted")
+
 // awaitChunkStatusResponseWithin is [Bridge.awaitChunkStatusResponse]
-// bounded by timeout instead of the chunk StatusResponse bound.
-func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+// bounded by timeout instead of the chunk StatusResponse bound, and by
+// abort (nil: never) — the wait ends with [errChunkWaitAborted] when it
+// closes.
+func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {
+	case <-abort:
+		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
+		return fmt.Errorf("%w: exchange %d chunk %d", errChunkWaitAborted, exchangeID, chunkIdx)
 	case status := <-waitCh:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		if status.IsSuccess() {
@@ -427,14 +416,17 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
 	// same way reads do via [im.FabricFilterFromContext]. Without
-	// this stamp AccessControl.MatterWrite falls back to fabric=1
-	// (last resort) and Apple's post-CommissioningComplete ACL
-	// update — which carries the new Resident NodeID + CAT subjects
-	// — never reaches the requesting fabric. Apple then reads the
-	// ACL from its own fabric on the Subscribe-Initial, sees only
-	// the pre-existing case_admin_subject entry, classifies the
-	// bridge as missing Administer privilege, and tears the pair
-	// down with the iOS "accessory could not be added" dialog.
+	// this stamp the write has no accessing fabric and is refused
+	// with UNSUPPORTED_ACCESS — by the write handler's gate for a
+	// fabric-scoped attribute (im/write.go, HasAccessingFabric) and
+	// by AccessControl's own writeFabric — so Apple's
+	// post-CommissioningComplete ACL update — which carries the new
+	// Resident NodeID + CAT subjects — never reaches the requesting
+	// fabric. Apple then reads the ACL from its own fabric on the
+	// Subscribe-Initial, sees only the pre-existing case_admin_subject
+	// entry, classifies the bridge as missing Administer privilege, and
+	// tears the pair down with the iOS "accessory could not be added"
+	// dialog.
 	// Mirrors the Invoke pathway below.
 	writeFabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
 	writeSubjectNodeID, writeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
@@ -591,6 +583,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
 	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
+	b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
 	b.reportInvokeChanges(invokeCtx, dispatcher, before)
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
@@ -687,6 +680,15 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 // StatusResponse with the spec-mandated codes.
 func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, req im.TimedRequest) error {
 	now := b.clk().Now()
+	// A session that already has [maxPendingTimedRequests] timed
+	// interactions waiting gets Busy and no deadline: without the bound
+	// a session could register one entry per exchange id until the
+	// deadlines ran out (review II, W2-conc-12). connectedhomeip answers
+	// Busy when its pool of timed handlers is exhausted
+	// (src/app/InteractionModelEngine.cpp:963-973 at 6170af84).
+	if b.routing.pendingTimedRequests(requestHdr.SessionID, proto.ExchangeID, now) >= maxPendingTimedRequests {
+		return b.replyTimedStatus(src, requestHdr, proto, "too_many_pending", im.StatusBusy)
+	}
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot
 	// consume a deadline registered by another session.

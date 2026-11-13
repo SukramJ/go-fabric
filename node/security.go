@@ -601,7 +601,7 @@ type paseParams struct {
 // OperationalCredentials.
 func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseParams, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	if !setup.IsValidSetupPIN(p.passcode) {
-		return nil, fmt.Errorf("node: passcode %d is invalid or trivially guessable", p.passcode)
+		return nil, errSetupPIN
 	}
 	vc, err := spake2.NewVerifierContext(p.passcode, p.salt, p.iterations)
 	if err != nil {
@@ -635,6 +635,14 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		adapter.SetResponderSessionParams(&p)
 	}
 	adapter.SetOnSessionEstablished(func(sharedSecret []byte, peerSessionID uint16) error {
+		// Ke has served once the session's keys are derived from it, and
+		// this is the only copy outside the handshake's verifier
+		// (bridge.PaseSessionEstablished): overwritten on every way out.
+		// Best effort, within Go's limits (secure/sigma/zero.go);
+		// connectedhomeip clears the same
+		// (src/crypto/CHIPCryptoPALOpenSSL.cpp:1150-1151 at 6170af84,
+		// `ClearSecretData(Kae)`; review II, W1-sec-05, owner decision 6).
+		defer clear(sharedSecret)
 		// PASE predates the fabric, so both node ids are zero.
 		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
 		if err != nil {
@@ -648,9 +656,6 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 			entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
 			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
-		// AttestationRequest and CSRRequest signatures bind to the
-		// session's challenge; without this the commissioner rejects both.
-		root.OperationalCredentials.SetAttestationChallenge(entry.AttestationChallenge)
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
 		// not, so an abandoned attempt still rolls back.
 		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)

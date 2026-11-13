@@ -17,7 +17,7 @@ import (
 
 // encodeExtensionTLV returns a minimal well-formed TLV List — the shape
 // AccessControl.Extension's Data field must decode as per matter.js
-// AccessControlServer.ts:424-441 (extensionEntryValidator). Test helper
+// AccessControlServer.ts:416-434 at db021da0 (extensionEntryValidator). Test helper
 // for the entries validateAccessControlExtensionData is meant to accept.
 func encodeExtensionTLV(t *testing.T) []byte {
 	t.Helper()
@@ -133,7 +133,7 @@ func TestAccessControl_Extension_WriteAndReadBack(t *testing.T) {
 
 // TestAccessControl_Extension_Write_InvalidTLV rejects a Data blob that
 // does not decode as a well-formed TLV List — matter.js
-// AccessControlServer.ts:424-441 (extensionEntryValidator) rejects the
+// AccessControlServer.ts:416-434 at db021da0 (extensionEntryValidator) rejects the
 // same shape with ConstraintError so a garbage write cannot wedge a
 // later fabric-scoped read.
 func TestAccessControl_Extension_Write_InvalidTLV(t *testing.T) {
@@ -143,8 +143,8 @@ func TestAccessControl_Extension_Write_InvalidTLV(t *testing.T) {
 	entries := []core.AccessControlExtensionEntry{
 		{Data: []byte{0x01, 0x02, 0x03}},
 	}
-	if err := ac.MatterWrite(context.Background(), 0x0001, entries); err == nil {
-		t.Fatal("MatterWrite Extension with non-TLV Data: want error, got nil")
+	if err := ac.MatterWrite(im.WithFabricFilter(context.Background(), true, 1), 0x0001, entries); statusOf(err) != im.StatusConstraintError {
+		t.Fatalf("MatterWrite Extension with non-TLV Data: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 	}
 }
 
@@ -152,7 +152,7 @@ func TestAccessControl_Extension_Write_InvalidTLV(t *testing.T) {
 // write carrying more than one entry — every entry in a single write is
 // stamped to the writer's own fabric, so more than one entry always
 // means more than one entry for that fabric. Mirrors matter.js
-// AccessControlServer.ts:352-370
+// AccessControlServer.ts:344-362 at db021da0
 // (#validateAccessControlExtensionChanges): "Extension list must
 // contain a single entry" (ConstraintError).
 func TestAccessControl_Extension_Write_MoreThanOneEntryPerFabric(t *testing.T) {
@@ -164,8 +164,10 @@ func TestAccessControl_Extension_Write_MoreThanOneEntryPerFabric(t *testing.T) {
 		{Data: data},
 		{Data: data},
 	}
-	if err := ac.MatterWrite(context.Background(), 0x0001, entries); err == nil {
-		t.Fatal("MatterWrite Extension with 2 entries: want error, got nil")
+	// matter.js answers ConstraintError ("Extension list must contain a
+	// single entry", AccessControlServer.ts:356-357).
+	if err := ac.MatterWrite(im.WithFabricFilter(context.Background(), true, 1), 0x0001, entries); statusOf(err) != im.StatusConstraintError {
+		t.Fatalf("MatterWrite Extension with 2 entries: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 	}
 }
 
@@ -254,8 +256,10 @@ func TestAccessControl_Extension_Write_TooLarge(t *testing.T) {
 	entries := []core.AccessControlExtensionEntry{
 		{Data: bigData},
 	}
-	if err := ac.MatterWrite(context.Background(), 0x0001, entries); err == nil {
-		t.Fatal("MatterWrite Extension with 129-byte Data: want error, got nil")
+	// Data is "max 128" in the model (access-control.element.ts:206), a
+	// constraint error.
+	if err := ac.MatterWrite(im.WithFabricFilter(context.Background(), true, 1), 0x0001, entries); statusOf(err) != im.StatusConstraintError {
+		t.Fatalf("MatterWrite Extension with 129-byte Data: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 	}
 }
 
@@ -402,8 +406,8 @@ func TestAccessControl_Extension_RejectsAnonymousListMembers(t *testing.T) {
 	ac := newAccessControl(t)
 	ctx := im.WithFabricFilter(context.Background(), true, 1)
 	badElem := []byte{0x17, 0x10, 0x02, 'h', 'i', 0x18}
-	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: badElem}}); err == nil {
-		t.Fatal("an anonymous list member was accepted")
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: badElem}}); statusOf(err) != im.StatusConstraintError {
+		t.Fatalf("an anonymous list member: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 	}
 	okSingle := []byte{0x17, 0xD0, 0x00, 0x00, 0xF1, 0xFF, 0x01, 0x00, 0x02, 'h', 'i', 0x18}
 	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: okSingle}}); err != nil {

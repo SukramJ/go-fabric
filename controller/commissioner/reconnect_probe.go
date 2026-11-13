@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gendiag "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
@@ -27,7 +28,12 @@ import (
 // routable addresses it reports to the connection. Ahead of matter.js and
 // connectedhomeip, which wait for DNS-SD here; a node whose operational
 // record a Thread border router never publishes is otherwise unreachable,
-// and a failure says nothing of why.
+// and a failure says nothing of why. The report is the device's statement
+// and nothing verifies its addresses: what the probe takes from it is
+// bounded by what the attribute may hold — the interfaces the connection
+// can use before any other (addInterfaces) — and filtered to addresses of
+// one other host (routableAddr), and the connection takes at most
+// peer.MaxHintedAddresses of them (peer.Peer.HintAddresses).
 const (
 	// reconnectProbeFirst is how long the transition runs before the
 	// first probe: a reconnect discovery serves at once needs none, and
@@ -66,6 +72,10 @@ type deviceNetworkReport struct {
 	meshLocalCount int
 	// interfacesKnown is NetworkInterfaces read at all.
 	interfacesKnown bool
+	// interfacesOver counts the operational interfaces with a usable
+	// address past the attribute's list bound, which are not taken
+	// (addInterfaces).
+	interfacesOver int
 }
 
 // key is the report as one comparable string: a probe logs when it
@@ -151,13 +161,28 @@ func addrList(addrs []netip.Addr) string {
 	return "[" + strings.Join(s, ", ") + "]"
 }
 
+// The two IPv4 blocks net/netip does not classify and no datagram to a
+// host is addressed to: 0.0.0.0/8 (RFC 1122 §3.2.1.3, "this network") and
+// 240.0.0.0/4 (RFC 1112 §4, reserved) — the blocks, with the quoted text
+// and their RFC 6890 registry entries, of client/peer's hint filter
+// (hint.go, ipv4ThisNetwork and ipv4Reserved).
+var (
+	ipv4ThisNetwork = netip.MustParsePrefix("0.0.0.0/8")
+	ipv4Reserved    = netip.MustParsePrefix("240.0.0.0/4")
+)
+
 // routableAddr reports whether a probed address can carry the operational
-// connection: a link-local address has no zone the controller could use
-// across the border router, and the others name no peer. A Thread
-// mesh-local address is routable by this test but not from off the mesh
-// (meshLocalAddr).
+// connection. [netip.Addr.IsGlobalUnicast] refuses what names no peer —
+// the zero Addr, the unspecified address, multicast, the IPv4 limited
+// broadcast — and loopback and link-local unicast with them: a link-local
+// address has no zone the controller could use across the border router.
+// In IPv4 the two blocks the package does not classify are refused beside
+// them, as peer.Peer.HintAddresses passes them over. An IPv4-mapped
+// address is judged as its IPv4 address. A Thread mesh-local address is
+// routable by this test but not from off the mesh (meshLocalAddr).
 func routableAddr(a netip.Addr) bool {
-	return a.IsValid() && !a.IsLinkLocalUnicast() && !a.IsLoopback() && !a.IsUnspecified() && !a.IsMulticast()
+	a = a.Unmap().WithZone("")
+	return a.IsGlobalUnicast() && !ipv4ThisNetwork.Contains(a) && !ipv4Reserved.Contains(a)
 }
 
 // meshLocalAddr reports whether a is a Thread mesh-local address, which
@@ -278,7 +303,7 @@ func (p *reconnectProbe) once(probing context.Context) bool {
 		}
 		return false
 	}
-	r := parseNetworkReport(report)
+	r := parseNetworkReport(report, sessionAddr(p.ia.Session()))
 	p.mu.Lock()
 	p.last = r
 	changed := r.key() != p.logged
@@ -286,6 +311,10 @@ func (p *reconnectProbe) once(probing context.Context) bool {
 	p.mu.Unlock()
 	if changed {
 		p.f.log.Info("matter.controller.commissioning.reconnect_probe", r.logAttrs()...)
+		if r.interfacesOver > 0 {
+			p.f.log.Warn("matter.controller.commissioning.reconnect_probe_interfaces_dropped",
+				slog.Int("max", maxProbedInterfaces()), slog.Int("dropped", r.interfacesOver))
+		}
 	}
 	if p.hint != nil && len(r.routable) > 0 {
 		targets := make([]netip.AddrPort, len(r.routable))
@@ -295,6 +324,24 @@ func (p *reconnectProbe) once(probing context.Context) bool {
 		p.hint(targets)
 	}
 	return true
+}
+
+// sessionAddr is the address s runs on, without a zone; the zero Addr
+// when it has none (a session over a commissioning channel that is not
+// IP).
+func sessionAddr(s *exchange.Session) netip.Addr {
+	if s == nil {
+		return netip.Addr{}
+	}
+	udp := s.Addr()
+	if udp == nil {
+		return netip.Addr{}
+	}
+	a, ok := netip.AddrFromSlice(udp.IP)
+	if !ok {
+		return netip.Addr{}
+	}
+	return a.Unmap()
 }
 
 // logAttrs are the report's log attributes, the ones it carries.
@@ -362,14 +409,111 @@ func (f *flow) probePaths() []im.ConcreteAttributePath {
 	return paths
 }
 
-// addInterfaces takes the addresses of the operational interfaces, each
-// once, the routable ones marked.
-func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
+// maxProbedInterfaces is how many interfaces the probe takes from one
+// report: the list bound of GeneralDiagnostics NetworkInterfaces, read from
+// the generated definition ("max 8"; matter.js packages/model/src/standard/
+// elements/general-diagnostics.element.ts:27 at db021da0). Without a bound
+// in the definition it takes none.
+func maxProbedInterfaces() int {
+	a := gendiag.Definition.Attribute(gendiag.AttrNetworkInterfaces)
+	if a == nil || !a.Constraint.Max.IsInt() {
+		return 0
+	}
+	return int(a.Constraint.Max.Int)
+}
+
+// addInterfaceList takes a NetworkInterfaces value (addInterfaces). The
+// list itself is decoded whatever its length: connectedhomeip encodes
+// every interface its platform lists
+// (src/app/clusters/general-diagnostics-server/GeneralDiagnosticsCluster.cpp:437-446
+// at 6170af84), so a device with more than the bound is not left out for
+// it. An entry is decoded by the generated NetworkInterface, which holds
+// its address lists to their bounds (8 IPv6, 4 IPv4, each of its exact
+// length; connectedhomeip sizes them the same,
+// src/include/platform/DiagnosticDataProvider.h:42-43): a value with an
+// entry past them does not decode and is left out as a whole.
+func (r *deviceNetworkReport) addInterfaceList(n spec.Node, proven netip.Addr) {
+	if ifaces, err := spec.DecodeList(spec.DecodeStruct[gendiag.NetworkInterface])(n); err == nil {
+		r.addInterfaces(ifaces, proven)
+	}
+}
+
+// addInterfaces takes the addresses of at most maxProbedInterfaces
+// operational interfaces, each address once, the routable ones marked.
+// With the generated entry's own bounds that is at most
+// peer.MaxHintedAddresses addresses per report: the report is the
+// device's statement, and what the probe takes from it is logged, named
+// in the step's failure and attempted.
+//
+// Which interfaces is judged before it is bounded: a device may list
+// every interface of its platform, in the platform's order —
+// connectedhomeip's Linux provider takes each link-layer entry of
+// getifaddrs, none left out for its kind, operational when IFF_RUNNING
+// (src/platform/Linux/DiagnosticDataProviderImpl.cpp:466-476 at 6170af84)
+// — and the bound must not cost it the one it is reached on. The
+// interfaces the connection can use — with an address that is routable
+// and not mesh-local (usableAddr) — are taken first, in the device's
+// order; the usable ones past the bound are counted (interfacesOver,
+// which the probe logs) and not taken. Slots they leave go to the other
+// operational interfaces, in the device's order, for what the log and
+// the step's failure say of them (the ignored and the mesh-local
+// addresses); nothing of those is attempted.
+//
+// Among usable interfaces nothing but the device's order tells one from
+// another — every address is its statement — with one exception: proven,
+// the address the commissioning session runs on (the zero Addr when it
+// has none), is an address the device has answered at. The interface
+// that names it is taken before any other, and it is the first routable
+// address: the bound here does not drop it, and of this report's
+// addresses it is the first to count against the connection's allowance
+// (peer.MaxHintedAddresses, first come over a connection's probes) — an
+// address the device merely states does not take its place. It counts
+// only when it is usable by the test above: a link-local one is not, the
+// report carrying no zone.
+func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface, proven netip.Addr) {
 	r.interfacesKnown = true
-	for _, iface := range ifaces {
+	proven = proven.Unmap().WithZone("")
+	if !r.usableAddr(proven) {
+		proven = netip.Addr{}
+	}
+	// Judge: the interface that names the proven address, the usable
+	// ones, the other operational ones.
+	first := -1 // the interface that names proven
+	var usable, others []int
+	for i, iface := range ifaces {
 		if !iface.IsOperational {
 			continue
 		}
+		names, has := false, false
+		for _, raw := range slices.Concat(iface.IPv6Addresses, iface.IPv4Addresses) {
+			a, ok := netip.AddrFromSlice(raw)
+			if a = a.Unmap(); !ok || !r.usableAddr(a) {
+				continue
+			}
+			has = true
+			names = names || a == proven
+		}
+		switch {
+		case names && first < 0:
+			first = i
+		case has:
+			usable = append(usable, i)
+		default:
+			others = append(others, i)
+		}
+	}
+	if first >= 0 {
+		usable = slices.Insert(usable, 0, first)
+	}
+	// Bound: the usable ones, then the others.
+	limit := max(maxProbedInterfaces(), 0)
+	kept := min(len(usable), limit)
+	r.interfacesOver = len(usable) - kept
+	take := slices.Concat(usable[:kept], others[:min(len(others), limit-kept)])
+	// Take, in the device's order.
+	slices.Sort(take)
+	for _, i := range take {
+		iface := ifaces[i]
 		for _, raw := range slices.Concat(iface.IPv6Addresses, iface.IPv4Addresses) {
 			a, ok := netip.AddrFromSlice(raw)
 			if !ok {
@@ -389,12 +533,22 @@ func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
 			}
 		}
 	}
+	if i := slices.Index(r.routable, proven); i > 0 {
+		r.routable = slices.Insert(slices.Delete(r.routable, i, i+1), 0, proven)
+	}
+}
+
+// usableAddr reports whether the operational connection can use a probed
+// address: routable (routableAddr) and not Thread mesh-local
+// (meshLocalAddr, by the prefix the report carries).
+func (r *deviceNetworkReport) usableAddr(a netip.Addr) bool {
+	return routableAddr(a) && !meshLocalAddr(a, r.meshLocal)
 }
 
 // parseNetworkReport reads a probe's report. A value that does not decode
 // is left out, as one the device did not report: the probe informs, it
 // does not validate.
-func parseNetworkReport(report *interaction.Report) *deviceNetworkReport {
+func parseNetworkReport(report *interaction.Report, proven netip.Addr) *deviceNetworkReport {
 	r := &deviceNetworkReport{}
 	value := func(cluster, attribute uint32) (spec.Node, bool) {
 		return report.Value(rootEndpoint, cluster, attribute)
@@ -422,9 +576,7 @@ func parseNetworkReport(report *interaction.Report) *deviceNetworkReport {
 		}
 	}
 	if n, ok := value(gendiag.ClusterID, gendiag.AttrNetworkInterfaces); ok {
-		if ifaces, err := spec.DecodeList(spec.DecodeStruct[gendiag.NetworkInterface])(n); err == nil {
-			r.addInterfaces(ifaces)
-		}
+		r.addInterfaceList(n, proven)
 	}
 	if n, ok := value(threaddiag.ClusterID, threaddiag.AttrRoutingRole); ok {
 		if v, err := spec.DecodeNullable(spec.DecodeUint[uint8](8))(n); err == nil && !v.Null {

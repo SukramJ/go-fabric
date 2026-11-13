@@ -15,6 +15,29 @@ import (
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
 
+// TestNodeListenFlagIsDeprecatedNotRemoved (review II, the class of
+// R2-P0-doc-C04; phase-0-fix-w4w5 "Noticed" 1):
+// --node-listen has had no effect since the second node was retired
+// (v0.18.0); until its removal it is still accepted, so a script that
+// passes it runs, and its help says what it is.
+func TestNodeListenFlagIsDeprecatedNotRemoved(t *testing.T) {
+	t.Parallel()
+	fs := flag.NewFlagSet("reference-controller", flag.ContinueOnError)
+	defaultOptions().register(fs)
+	f := fs.Lookup("node-listen")
+	if f == nil {
+		t.Fatal("--node-listen is gone: removing it is a CLI break")
+	}
+	for _, want := range []string{"deprecated", "no effect since v0.18.0", "will be removed"} {
+		if !strings.Contains(f.Usage, want) {
+			t.Errorf("--node-listen help %q lacks %q", f.Usage, want)
+		}
+	}
+	if err := fs.Parse([]string{"--node-listen", "127.0.0.1:0", "nodes"}); err != nil {
+		t.Fatalf("--node-listen is no longer accepted: %v", err)
+	}
+}
+
 // TestArguments: the argument errors every command reports before it
 // opens anything, and the parsers behind them.
 func TestArguments(t *testing.T) {
@@ -80,6 +103,15 @@ func TestArguments(t *testing.T) {
 		err := run(append([]string{"--db", db}, tc.args...), strings.NewReader(""), &out)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: err %v, want %q", tc.args, err, tc.want)
+		}
+	}
+
+	// A refused --passcode is not echoed (review II, R2-P0-sec-E04): it is
+	// the passcode of the device being paired, and the text reaches a log.
+	for _, passcode := range []string{"12345678", "87654321", "99999999"} {
+		err := run([]string{"--db", db, "pair", "--passcode", passcode, "--discriminator", "1"}, strings.NewReader(""), &bytes.Buffer{})
+		if err == nil || strings.Contains(err.Error(), passcode) {
+			t.Errorf("pair --passcode %s: err %v, want a refusal without the value", passcode, err)
 		}
 	}
 

@@ -94,7 +94,10 @@ type SubscribeOptions struct {
 // The hooks of a subscription report run on the node's ordered job queue,
 // after the report's StatusResponse (ClientStructure.ts:417-439): a hook
 // may block without holding the peer's exchange, but it must not call
-// Node.Stop or Node.Close, which drain that queue.
+// Node.Stop or Node.Close, which drain that queue, nor Node.Start on a
+// stopped node or Node.SetDefaultSubscription, which wait for it before
+// the cache adopts a fabric filter — all within their context: a hook
+// still blocked when it ends makes them return its error.
 type Hooks struct {
 	// EndpointInstalled: an endpoint joined the image under its owner. Its
 	// clusters come with it; no ClusterInstalled follows for them

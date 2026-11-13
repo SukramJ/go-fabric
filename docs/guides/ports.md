@@ -45,6 +45,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `TimedCommander` | a server | which commands need a timed interaction | the generated table (`schema.IsTimedInvoke`) decides |
 | `ClusterQuiescer` | a server with its own timers | stops the timers when the server leaves the topology or the bridge stops | timers outlive the server's use |
 | `EventReceiver` | a server that emits events | receives the bridge's `EventEmitter` at assembly | the server cannot emit events |
+| `IdentifyHandler` | a host device (an `EndpointSource`); the device layer's `Device` implements it for `HandleIdentify` and `HandleTriggerEffect` | `MatterIdentify` hears the Identify command, an IdentifyTime write and — with 0 — the end of the countdown; `MatterTriggerEffect` the TriggerEffect command. An error refuses the command or the write with its status and leaves IdentifyTime as it was. `MatterIdentify` runs with the server's IdentifyTime queue held (a request and the countdown's tick run one after the other): it must not set IdentifyTime on the same server from inside the call — a write or the Identify command there waits for the queue the call holds and never returns — and it should return promptly, because the countdown does not tick while it runs. Removing the endpoint does not wait for it: the server closes while a `MatterIdentify` is still running, so the handler may take a lock held across the removal | the assembler's Identify server counts IdentifyTime down and accepts both commands without telling the host |
 
 ### Change reporting
 
@@ -157,7 +158,8 @@ These are read once at `Start`, or feed a component `Start` builds.
 | `AttachCaseHandlerProvider` (or `AttachCaseHandler`) | fails closed | no CASE. A singleton rejects the parallel CASE sessions Apple Home opens |
 | `AttachAckTracker` | silent | no standalone ACKs and no retransmission of the bridge's own messages; every reply is best-effort. It wraps the lower-level `AttachAckHandler` |
 | `AttachSubscriptionManager` | silent | a Subscribe returns its initial report with no subscription id, and no report follows |
-| `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, and the re-announce trigger is not installed |
+| `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, the re-announce trigger is not installed, and the PASE sessions are not cleared when a commissioning ends. The bridge clears them itself: after a CommissioningComplete that `core.GeneralCommissioning` answered OK, when that server's fail-safe expires (`AttachRootClusters` wires `Bridge.FailSafeExpired` into it, beside the host's `SetOnFailSafeExpired` hook) and when the attached commissioning window is revoked. A host with a GeneralCommissioning server of its own calls `Bridge.FailSafeExpired(ctx)` when its fail-safe expires |
+| a session table without `AttestationChallengeFor(sessionID uint16) ([]byte, bool)` | fails closed | AttestationRequest, CSRRequest and SignVIDVerificationRequest answer FAILURE: the bridge reads the invoking session's attestation challenge from the registry or, failing that, the session lookup, and the server signs over nothing else. `operational.Manager` has the method |
 | `AttachSubscriptionStore` | silent | nothing survives a restart; controllers wait out their liveness timeout. `SetSubscriptionPersistence(false)` switches persistence off on purpose |
 
 ### Cluster surface
@@ -205,6 +207,32 @@ logged in warn and off, refused in strict. A mode that is none of the three
 fails `node.New`.
 
 *Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
+
+### Capabilities the bridge looks for on what is attached
+
+Beside the ports, the bridge asks the session registry, a cluster server
+and an endpoint's measurement source for optional methods. It finds them
+by type assertion against interfaces that are not exported, so nothing in
+the API names them: a host with its own registry or source implements the
+method with exactly this signature, or the bridge silently does without.
+`secure/operational.Manager` has every registry method.
+
+| On | Method | Without it |
+| --- | --- | --- |
+| the `AttachSessionRegistry` registry | `SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))` | the registry is not handed the bridge's CloseSession sender; a session it closes gracefully ends without the report to its peer |
+| the registry | `SetReannounceTrigger(fn func(fabricIndex uint8))` | the registry cannot ask for the operational record to be announced again when a peer's last session is gone |
+| the registry | `SetOnPaseSessionClose(fn func(sessionID uint16))` | the commissionable record is not announced again when a PASE session closes |
+| the registry | `Active() int` | the `sessions.open` gauge of `AttachMetrics` is not recorded |
+| the registry | `SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint16` | the bridge finds no live session to a peer it wants to reach and establishes a new one each time |
+| the registry | `Sessions() []operational.SessionInfo` | the bridge cannot tell which sessions are PASE: none is cleared after CommissioningComplete, when the fail-safe expires or when the window is revoked |
+| the registry | `CloseFabric(fabricIndex uint8)` | a removed fabric's sessions are not closed by the bridge |
+| the registry | `CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16)` | a fabric's other sessions are not closed while the session that carries the command stays open to answer it |
+| a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
+| a cluster server on a bridged endpoint | `MatterFabricRemoved(fabricIndex uint8)` | the server is not told of a removed fabric and keeps what it holds for that fabric's peers |
+| an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
+| an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
+
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 
 ## `<cluster>def.Host`: the kit server's host methods
 
@@ -276,11 +304,11 @@ by type assertion.
 | `pushavstreamtransportdef.TLSEndpoints`, `TLSCertificates` | `pushavstreamtransportdef.Declare{TLSEndpoints: …, TLSCertificates: …}` (the TLS servers' typed `Host`) | look up the TLS endpoint and its certificates a transport names | every allocation is InvalidTLSEndpoint; without certificates the transport has none |
 | `tls.CertificatePort` (`tlscertificatemanagementdef.CertificatePort`) | `tls.CertificateManagementConfig.Port` | make a client key and its CSR, judge a certificate's validity and key, drop a removed key ([Camera](camera.md#the-transport-model)) | — (required) |
 | `tls.Store` (`tlscertificatemanagementdef.CertificateStore`, `tlsclientmanagementdef.EndpointStore`) | `tls.CertificateManagementConfig.Store`, `tls.ClientManagementConfig.Store` (any `store.Settings`) | persist the certificate and endpoint tables | the tables stay in memory |
-| `closurecontroldef.StopObserver` | a `closurecontroldef.Mover` | hears of a Stop the server ignores because the closure is not in motion (`StopIgnored`); an error answers FAILURE | the idle Stop is a SUCCESS no-op |
+| `closurecontroldef.StopObserver` | a `closurecontroldef.Mover` | hears of a Stop the server ignores because the closure is not in motion (`StopIgnored`); an error answers with its status, FAILURE without one | the idle Stop is a SUCCESS no-op |
 | `TriggerReannounce(ctx)` | the `Advertiser` (`mdns.Responder` has it) | `Node.TriggerReannounce`: one publication of every service per interface now, with the goodbyes of the records that left | `TriggerReannounce` is a no-op |
 | `ServiceConnected`, `ServiceDisconnected`, `ServiceRetransmission` | the `Advertiser` (`mdns.Responder` has them) | matter.js's broadcast events: a CASE session ends the operational broadcast; a session teardown, a terminated subscription and an MRP retransmission resume it, for the session's fabric's operational service only | the advertiser's own announcements only |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
-| `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers FAILURE | changes are stored without asking |
+| `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers with its status, FAILURE without one | changes are stored without asking |
 | `thermo.SchedulePort` (`thermostatdef.SchedulePort`) | `thermostatdef.Declare{SchedulePort: …}`, `thermo.ThermostatConfig.SchedulePort` | with MatterScheduleConfiguration: switches the device to the schedule a SetActiveScheduleRequest named, and stores the schedules an atomic write committed; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md#week-programs-msch)) | schedules live in memory |
 | `threadbr.BorderRouter` (`threadborderroutermanagementdef.BorderRouter`) | `threadborderroutermanagementdef.Declare{BorderRouter: …}`, `threadbr.ManagementConfig.BorderRouter` | the Thread Border Router the ThreadBorderRouterManagement and ThreadNetworkDiagnostics servers manage and read: its name, agent id, Thread version and interface, the datasets, the activation that returns once attached, its commit and revert, the pending dataset, the diagnostics; `otbr.BorderRouter` adapts an OTBR's REST API ([Thread Border Router](thread-border-router.md)) | both clusters keep the generated server |
 | `netinfra.ThreadNetworkStore` (`threadnetworkdirectorydef.ThreadNetworkStore`) | `threadnetworkdirectorydef.Declare{ThreadNetworkStore: …}`, `netinfra.ThreadDirectoryConfig.Store` | persists the ThreadNetworkDirectory's operational datasets and its PreferredExtendedPanID: its capacity, the stored datasets, a save after AddNetwork and a removal after RemoveNetwork passed chip's checks, the preferred network loaded at start and saved on every change; an error answers FAILURE ([Network infrastructure](network-infrastructure.md#threadnetworkdirectory-the-datasets)) | datasets and the preferred network live in memory, 32 networks |

@@ -4,7 +4,9 @@
 package core
 
 import (
+	"fmt"
 	"net"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -145,6 +147,104 @@ func TestGeneralDiagnosticsNetworkInterfaces(t *testing.T) {
 		clk.Advance(2 * netwatch.DefaultInterval)
 		if fired {
 			t.Error("a disabled check reported a change")
+		}
+	})
+}
+
+// TestGeneralDiagnosticsNetworkInterfacesSelection: matter.js filters the
+// unassigned MAC, puts the operational interfaces first, serves at most 8
+// and adds no entry of its own (GeneralDiagnosticsServer.ts:505-518 at
+// db021da0; the model's "max 8", general-diagnostics.element.ts:27).
+func TestGeneralDiagnosticsNetworkInterfacesSelection(t *testing.T) {
+	t.Parallel()
+
+	iface := func(name string, operational bool, lastMACByte byte) NetworkInterfaceStruct {
+		return NetworkInterfaceStruct{
+			Name: name, IsOperational: operational, InterfaceType: InterfaceTypeEthernet,
+			HardwareAddress: []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, lastMACByte},
+			IPv6Addresses:   [][]byte{net.ParseIP("fe80::1").To16()},
+		}
+	}
+	read := func(t *testing.T, candidates []NetworkInterfaceStruct) []string {
+		t.Helper()
+		g := NewGeneralDiagnostics(BootReasonPowerOnReboot)
+		g.interfaces = func() []NetworkInterfaceStruct { return candidates }
+		v, ok := g.MatterRead(gendiagAttrNetworkInterfaces)
+		if !ok {
+			t.Fatal("NetworkInterfaces is not served")
+		}
+		list, ok := v.([]NetworkInterfaceStruct)
+		if !ok || list == nil {
+			t.Fatalf("NetworkInterfaces = %#v, want a non-nil []NetworkInterfaceStruct", v)
+		}
+		names := make([]string, 0, len(list))
+		for _, e := range list {
+			names = append(names, e.Name)
+		}
+		return names
+	}
+
+	t.Run("five interfaces are five entries", func(t *testing.T) {
+		t.Parallel()
+		in := make([]NetworkInterfaceStruct, 0, 5)
+		for i := range 5 {
+			in = append(in, iface(fmt.Sprintf("eth%d", i), true, byte(i+1)))
+		}
+		if got, want := read(t, in), []string{"eth0", "eth1", "eth2", "eth3", "eth4"}; !slices.Equal(got, want) {
+			t.Errorf("NetworkInterfaces %v, want %v", got, want)
+		}
+	})
+
+	t.Run("the list ends after eight entries", func(t *testing.T) {
+		t.Parallel()
+		in := make([]NetworkInterfaceStruct, 0, 10)
+		for i := range 10 {
+			in = append(in, iface(fmt.Sprintf("eth%d", i), true, byte(i+1)))
+		}
+		if got := read(t, in); len(got) != 8 || got[7] != "eth7" {
+			t.Errorf("NetworkInterfaces %v, want the first eight", got)
+		}
+	})
+
+	t.Run("operational interfaces come first, in their listed order", func(t *testing.T) {
+		t.Parallel()
+		in := []NetworkInterfaceStruct{
+			iface("down0", false, 1), iface("up0", true, 2), iface("down1", false, 3), iface("up1", true, 4),
+		}
+		if got, want := read(t, in), []string{"up0", "up1", "down0", "down1"}; !slices.Equal(got, want) {
+			t.Errorf("NetworkInterfaces %v, want %v", got, want)
+		}
+		// The cut comes after the order: a ninth, operational interface
+		// displaces one that is not.
+		in = in[:0]
+		in = append(in, iface("down", false, 1))
+		for i := range 8 {
+			in = append(in, iface(fmt.Sprintf("up%d", i), true, byte(i+2)))
+		}
+		if got := read(t, in); len(got) != 8 || slices.Contains(got, "down") {
+			t.Errorf("NetworkInterfaces %v, want the eight operational ones", got)
+		}
+	})
+
+	t.Run("the unassigned MAC is not listed", func(t *testing.T) {
+		t.Parallel()
+		unassigned := iface("tun0", true, 0)
+		unassigned.HardwareAddress = make([]byte, 6)
+		if got, want := read(t, []NetworkInterfaceStruct{unassigned, iface("eth0", true, 1)}), []string{"eth0"}; !slices.Equal(got, want) {
+			t.Errorf("NetworkInterfaces %v, want %v", got, want)
+		}
+	})
+
+	t.Run("no qualifying interface is an empty list", func(t *testing.T) {
+		t.Parallel()
+		unassigned := iface("tun0", true, 0)
+		unassigned.HardwareAddress = make([]byte, 6)
+		for name, in := range map[string][]NetworkInterfaceStruct{
+			"none": nil, "only the unassigned MAC": {unassigned},
+		} {
+			if got := read(t, in); len(got) != 0 {
+				t.Errorf("%s: NetworkInterfaces %v, want an empty list", name, got)
+			}
 		}
 	})
 }

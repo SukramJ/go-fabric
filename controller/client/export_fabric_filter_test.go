@@ -3,7 +3,11 @@
 
 package client
 
-import "github.com/SukramJ/go-fabric/client/interaction"
+import (
+	"context"
+
+	"github.com/SukramJ/go-fabric/client/interaction"
+)
 
 // The seams of the cache's fabric filter ports (ClientSubscribeTest.ts
 // "cache fabric filter" at 862ad75f).
@@ -36,7 +40,10 @@ func RecordCacheFabricFiltered(n *Node, filtered bool) error {
 }
 
 // AdoptFabricFilter is ClientStructure.adoptFabricFilter.
-func AdoptFabricFilter(n *Node, filtered bool) error { return n.adoptFabricFilter(filtered) }
+func AdoptFabricFilter(n *Node, filtered bool) error {
+	_, err := n.adoptFabricFilter(context.Background(), filtered)
+	return err
+}
 
 // InvalidateVersion forgets one cluster's version in memory only, the
 // stored one kept — DatasourceCache.invalidateVersion.

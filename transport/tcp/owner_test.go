@@ -6,9 +6,36 @@ package tcp
 import (
 	"context"
 	"errors"
+	"net"
 	"sync/atomic"
 	"testing"
+	"time"
 )
+
+// TestConnWaitReturnsForAConnClosedBeforeItsReaderRan pins the sentence in
+// Conn.Wait's doc (review II, W1-conc-07): a connection that is closed
+// before serve started has no reader and no handler to wait for, so Wait
+// returns nil at once. Before, served was closed by serve alone and Wait
+// blocked until its context ended. A serve that starts after the close
+// returns without a second close of served.
+func TestConnWaitReturnsForAConnClosedBeforeItsReaderRan(t *testing.T) {
+	a, b := net.Pipe()
+	t.Cleanup(func() { _ = a.Close(); _ = b.Close() })
+	c := newConn(tcpChannelPipe{b, &net.TCPAddr{IP: net.ParseIP("::1"), Port: 5540}}, 0, true, nil, nil)
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// The bound is wall time only when Wait does not return at once.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := c.Wait(ctx); err != nil {
+		t.Fatalf("Wait on a connection closed before its reader ran = %v, want nil at once", err)
+	}
+	c.serve(func(*Conn, []byte, func()) { t.Error("a handler ran on a closed connection") })
+	if err := c.Wait(ctx); err != nil {
+		t.Fatalf("Wait after a late serve = %v, want nil", err)
+	}
+}
 
 // TestListenerWaitIdleWaitsForTheHandlers pins the owners of a TCP
 // connection's goroutines (G1-14, ADR 0026 P5): the reader returns only

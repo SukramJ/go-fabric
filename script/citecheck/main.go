@@ -57,6 +57,23 @@
 // missing, it is exit 2 like a missing matter.js clone. Drift rows of it
 // carry "tree": "matterjs-server".
 //
+// # The parity registers
+//
+// The *.md files directly under notes/parity — by_design.md, the findings
+// register, pin-lifts.md — cite matter.js the same way and were read by
+// nothing (review 2026-11 W6-reg-12; review II found 169 lines of
+// by_design.md at the pin before last). Their citations are collected by
+// the same rules, a Markdown paragraph, list item or table row standing
+// for the comment paragraph, and checked hard only: the cited file exists
+// at the commit the sentence is checked at — its own `at <sha>`, else the
+// pin — and has the cited lines. The failures go to registers.json (file,
+// line, citation, the commit, the error), which citecheck_test.go holds at
+// citecheckRegisterRatchet, exactly. They do not count as hard errors of
+// the run and are not in summary.md: a register's text is corrected by its
+// owner, not by the commit that touches the code. A citation that resolves
+// says nothing about whether the register's sentence is still true at
+// that commit; that is the re-read of a pin lift.
+//
 // # Exit status
 //
 // 0 when the artefacts were written and no citation has a hard error; 1
@@ -66,9 +83,9 @@
 //
 // # Regenerating
 //
-// `make cite-report` regenerates drift.json and summary.md. `make
-// cite-check` regenerates them and fails when either moved or a hard error
-// exists. When a change legitimately moves the drift count, regenerate,
+// `make cite-report` regenerates drift.json, summary.md and
+// registers.json. `make cite-check` regenerates them and fails when one
+// moved or a hard error exists. When a change legitimately moves the drift count, regenerate,
 // read the diff and commit it with citecheckDriftRatchet adjusted in the
 // same commit. Neither target is in `make ci` (they need the matter.js
 // clone); the cite-check job in ci.yml runs it on a sparse clone at the pin.
@@ -191,41 +208,53 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 	if err != nil {
 		return 2, fmt.Errorf("%w: the pin %s: %w", errEnv, pin, err)
 	}
+	checkAll := func(cites []citation) ([]result, error) {
+		results := make([]result, 0, len(cites))
+		for i := range cites {
+			c := cites[i]
+			if c.Server {
+				if server == nil {
+					if server, err = openRepo(serverDir, serverName, "MATTERJS_SERVER_DIR"); err != nil {
+						return nil, err
+					}
+				}
+				r := result{cite: c, hard: errNoServerCommit}
+				for _, sha := range c.Shas {
+					if own, err := server.at(sha); err == nil {
+						c.Sha = sha
+						r = check(own, c)
+						break
+					}
+				}
+				results = append(results, r)
+				continue
+			}
+			t := pinTree
+			for _, sha := range c.Shas {
+				if own, err := repo.at(sha); err == nil {
+					c.Sha, t = sha, own
+					break
+				}
+			}
+			results = append(results, check(t, c))
+		}
+		return results, nil
+	}
 	cites, err := collect(root)
 	if err != nil {
 		return 2, err
 	}
-	results := make([]result, 0, len(cites))
-	for i := range cites {
-		c := cites[i]
-		if c.Server {
-			if server == nil {
-				if server, err = openRepo(serverDir, serverName, "MATTERJS_SERVER_DIR"); err != nil {
-					return 2, err
-				}
-			}
-			r := result{cite: c, hard: errNoServerCommit}
-			for _, sha := range c.Shas {
-				if own, err := server.at(sha); err == nil {
-					c.Sha = sha
-					r = check(own, c)
-					break
-				}
-			}
-			results = append(results, r)
-			continue
-		}
-		t := pinTree
-		for _, sha := range c.Shas {
-			if own, err := repo.at(sha); err == nil {
-				c.Sha, t = sha, own
-				break
-			}
-		}
-		results = append(results, check(t, c))
+	results, err := checkAll(cites)
+	if err != nil {
+		return 2, err
 	}
 	sum := summarise(pin, results)
 	if err := writeArtefacts(outDir, sum); err != nil {
+		return 2, err
+	}
+	// The parity registers: their own artefact and ratchet, outside the
+	// Go citations' counts and exit status (registers.go).
+	if err := writeRegisters(root, outDir, checkAll); err != nil {
 		return 2, err
 	}
 	if fixFile != "" {

@@ -175,6 +175,9 @@ func (r *Ring) Record(e Event) {
 	if e.Severity == "" {
 		e.Severity = SeverityInfo
 	}
+	// The ring keeps its own Detail: the caller may reuse or change its
+	// map after the call.
+	e = cloneEvent(e)
 	r.mu.Lock()
 	r.events[r.next] = e
 	r.next = (r.next + 1) % len(r.events)
@@ -200,8 +203,8 @@ func (r *Ring) Record(e Event) {
 	}
 }
 
-// cloneEvent copies e's Detail, so an observer that keeps or changes the
-// map does not change the ring's entry.
+// cloneEvent copies e's Detail, so the recording caller's map and an
+// observer that keeps or changes its copy do not change the ring's entry.
 func cloneEvent(e Event) Event {
 	e.Detail = maps.Clone(e.Detail)
 	return e
@@ -209,8 +212,9 @@ func cloneEvent(e Event) Event {
 
 // Snapshot returns the recorded events, newest first.
 //
-// The result is a copy: the caller serialises it while the receive path
-// keeps recording.
+// The result is a copy, each event's Detail included: the caller
+// serialises or changes it while the receive path keeps recording, and
+// the ring's entries stay as they were recorded.
 func (r *Ring) Snapshot() []Event {
 	if r == nil {
 		return nil
@@ -225,7 +229,7 @@ func (r *Ring) Snapshot() []Event {
 	out := make([]Event, 0, count)
 	for i := range count {
 		idx := (r.next - 1 - i + len(r.events)*2) % len(r.events)
-		out = append(out, r.events[idx])
+		out = append(out, cloneEvent(r.events[idx]))
 	}
 	return out
 }

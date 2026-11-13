@@ -35,10 +35,18 @@
 // Cascade-delete on fabric removal is handled at the schema level
 // (FOREIGN KEY ... ON DELETE CASCADE).
 //
-// The operational private key and the fabric records persist in clear;
-// file-system level protection is the operator's responsibility. Two
-// kinds of secret are sealed at rest: the keys of the ICD registrations,
-// which the store seals under SettingICDKey (icd_cipher.go, ADR 0029),
-// and DoorLock credential data, which cluster/lock encrypts before the
-// store sees it.
+// The operational private key and the fabric records persist in clear,
+// and so do the group key sets, the shared secrets of the CASE resumption
+// records (matter_resumption) and, in the settings table, the committed
+// Wi-Fi networks with their credentials, which cluster/core's Wi-Fi
+// NetworkCommissioning server writes under netcomm.wifi.networks. Whoever
+// can read the database, or a copy of it, reads them; file-system level
+// protection is the operator's responsibility. Two kinds of secret are
+// sealed at rest: the keys of the ICD registrations, which the store
+// seals under SettingICDKey (icd_cipher.go, ADR 0029), and DoorLock
+// credential data, which cluster/lock encrypts before the store sees it
+// (SettingDoorLockCredentialKey). Both sealing keys are settings of the
+// same database. Whether the store should seal every secret uniformly is
+// an open architecture question of the 2026-11 review; this list is what
+// holds today.
 package store

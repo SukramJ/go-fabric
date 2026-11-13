@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 
@@ -620,10 +621,22 @@ func extractPendingCSRPubKey(t *testing.T, nocsrElements []byte) (raw []byte, pu
 // NOC over. forUpdate mirrors [core.CSRRequest.IsForUpdateNOC]; callers
 // issuing an UpdateNOC-bound CSR pass a ctx that already carries the
 // CASE fabric filter (see [im.WithFabricFilter]).
+// sessionChallengeCtx names a session attestation challenge on ctx unless
+// the caller stamped its own: AttestationRequest, CSRRequest and
+// SignVIDVerificationRequest sign over the challenge of the session the
+// invoke arrived on and refuse a request that carries none (the bridge
+// stamps it, [core.WithInvokeAttestationChallenge]).
+func sessionChallengeCtx(ctx context.Context) context.Context {
+	if core.InvokeAttestationChallengeFromContext(ctx) != nil {
+		return ctx
+	}
+	return core.WithInvokeAttestationChallenge(ctx, bytes.Repeat([]byte{0xA5}, 16))
+}
+
 func issueCSRPendingPubKey(ctx context.Context, t *testing.T, oc *core.OperationalCredentials, forUpdate bool) []byte {
 	t.Helper()
 
-	resp, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{
+	resp, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
 		IsForUpdateNOC: forUpdate,
 	})
@@ -699,7 +712,10 @@ func mintUpdateNOC(fabCtx context.Context, t *testing.T, oc *core.OperationalCre
 	// Without that reset, the CSRRequest lands in the same window as the
 	// initial AddNOC and is rejected with ConstraintError — matter.js
 	// OperationalCredentialsServer.ts:132-138 (failsafeContext.fabricIndex !==
-	// undefined). Simulate the re-arm here so the helper reflects the real flow.
+	// undefined). Simulate the re-arm here so the helper reflects the real flow:
+	// the new window is armed by the fabric that updates its NOC.
+	_, updating := im.FabricFilterFromContext(fabCtx)
+	oc.SetFailSafe(armedFailSafe(updating))
 	oc.ClearPendingState()
 	pendingPub := issueCSRPendingPubKey(fabCtx, t, oc, true)
 	return buildCoreSignedCertForPubKey(t, pendingPub, false, signerPriv, fabricID, nodeID)

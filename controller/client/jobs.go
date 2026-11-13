@@ -3,7 +3,10 @@
 
 package client
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // maxPendingJobs is the bound past which the report consumer waits for
 // the node's jobs to drain — matter.js MAX_PENDING_JOBS
@@ -20,34 +23,46 @@ const maxPendingJobs = 100
 // none runs while the queue is empty.
 type jobQueue struct {
 	mu      sync.Mutex
-	idle    sync.Cond
 	jobs    []func()
 	running bool
+	// drained is closed when the run that is under way ends with the
+	// queue empty; nil while none runs.
+	drained chan struct{}
 }
 
-func newJobQueue() *jobQueue {
-	q := &jobQueue{}
-	q.idle.L = &q.mu
-	return q
-}
+func newJobQueue() *jobQueue { return &jobQueue{} }
 
 // enqueue appends job; past maxPendingJobs it waits until the queue has
 // drained — the back-pressure of ClientStructure.ts:469-471 (`if
-// (pendingJobs > MAX_PENDING_JOBS) await queue`).
+// (pendingJobs > MAX_PENDING_JOBS) await queue`). That wait takes no
+// context, because the callers that reach it have none to give: a job is
+// queued from a subscription's callbacks (Updated, KeepaliveReceived,
+// ActiveChanged), and the context of the request that established the
+// subscription ended with that request.
+//
+//nolint:contextcheck // the back-pressure runs in subscription callbacks, which outlive the request context their closures were built under
 func (q *jobQueue) enqueue(job func()) {
+	if q.add(job) > maxPendingJobs {
+		q.wait()
+	}
+}
+
+// add appends job as the queue's last, starts the run when none is under
+// way and returns the number of jobs pending, the running one included.
+// It never waits: [Node.Stop] hands the queue the store's final flush
+// with it once its context has ended.
+func (q *jobQueue) add(job func()) int {
 	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.jobs = append(q.jobs, job)
 	pending := len(q.jobs)
 	if q.running {
-		pending++
-	} else {
-		q.running = true
-		go q.run()
+		return pending + 1
 	}
-	q.mu.Unlock()
-	if pending > maxPendingJobs {
-		q.wait()
-	}
+	q.running = true
+	q.drained = make(chan struct{})
+	go q.run()
+	return pending
 }
 
 // run runs the queued jobs in order until none is left.
@@ -56,7 +71,8 @@ func (q *jobQueue) run() {
 		q.mu.Lock()
 		if len(q.jobs) == 0 {
 			q.running = false
-			q.idle.Broadcast()
+			close(q.drained)
+			q.drained = nil
 			q.mu.Unlock()
 			return
 		}
@@ -70,10 +86,24 @@ func (q *jobQueue) run() {
 
 // wait returns once every queued job has run — the drain of
 // ClientStructure.ts:482-486. A job must not call it.
-func (q *jobQueue) wait() {
-	q.mu.Lock()
-	for q.running || len(q.jobs) > 0 {
-		q.idle.Wait()
+func (q *jobQueue) wait() { _ = q.waitContext(context.Background()) }
+
+// waitContext is wait within ctx: when ctx ends first it returns ctx's
+// error and the queue goes on running its jobs. matter.js's drain has no
+// deadline to break; a Go caller hands one in (Node.Stop), and a job runs
+// host hooks that may block.
+func (q *jobQueue) waitContext(ctx context.Context) error {
+	for {
+		q.mu.Lock()
+		drained := q.drained
+		q.mu.Unlock()
+		if drained == nil {
+			return nil
+		}
+		select {
+		case <-drained:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-	q.mu.Unlock()
 }

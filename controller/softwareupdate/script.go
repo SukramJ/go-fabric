@@ -20,8 +20,8 @@ import (
 // 862ad75f, RecordingOtaProviderServer); a Go controller cannot subclass
 // its provider, so the seam is [Config]'s ScriptQueryImage,
 // ScriptApplyUpdate and OnProviderExchange, which [Manager.ProviderConfig]
-// hands the own node as [ProviderCommands]. Without them the provider runs
-// unwrapped.
+// hands the controller as [ProviderCommands]. Without them the provider
+// runs unwrapped.
 
 // QueryImageScript is a scripted answer to one QueryImage — matter.js
 // OtaScriptedQueryAnswer (packages/testing/src/chip/cert/
@@ -89,7 +89,8 @@ type ApplyUpdateExchange struct {
 
 // ProviderCommands wraps the provider's command handlers: each gets the
 // requestor, the request and the provider's own handler, and answers in
-// its place. node/controllernode installs it on the own node's provider.
+// its place. The controller installs it on its provider
+// (controller/ota_provider.go wrapProviderCommands).
 type ProviderCommands struct {
 	QueryImage          func(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest, own func(context.Context) (provdef.QueryImageResponse, error)) (provdef.QueryImageResponse, error)
 	ApplyUpdate         func(ctx context.Context, p mattercore.OTAPeer, req provdef.ApplyUpdateRequestRequest, own func(context.Context) (provdef.ApplyUpdateResponse, error)) (provdef.ApplyUpdateResponse, error)

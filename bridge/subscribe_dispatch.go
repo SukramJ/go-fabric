@@ -514,13 +514,8 @@ func (b *Bridge) sendSubscribeResponse(
 	// `AckCounter: requestHdr.MessageCounter` piggybacks the freshest
 	// observed counter (cumulative ack per Matter §4.12.4.2).
 	subRespHdr := *requestHdr
-	b.mu.RLock()
-	ackTracker := b.ackTracker
-	b.mu.RUnlock()
-	if ackTracker != nil {
-		if counter, ok := ackTracker.LookupAndDischarge(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator); ok {
-			subRespHdr.MessageCounter = counter
-		}
+	if counter, ok := b.takeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator); ok {
+		subRespHdr.MessageCounter = counter
 	}
 	b.load.subscriptionsSucceeded.Add(1)
 	b.recordSubscriptionsActive(b.subscriptionManagerLocked())

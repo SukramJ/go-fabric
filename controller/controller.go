@@ -212,7 +212,8 @@ type Config struct {
 	// defaults. A negative ProvenAddressRetention retains nothing.
 	PeerTiming *client.Timing
 	// OTA, when set, turns on the OTA push: the update manager and the
-	// own node its provider runs on ([OTAConfig]); nil runs neither.
+	// OTA provider on the controller's endpoint tree ([OTAConfig],
+	// [OTAProviderEndpoint]); nil runs neither.
 	OTA *OTAConfig
 	// GroupTransport is the transport group messages leave on; nil is the
 	// controller's own UDP socket, as matter.js's node sends from its own
@@ -287,9 +288,8 @@ type Controller struct {
 	vendorMu   sync.Mutex
 	vendorInfo *dcl.VendorInfoService
 
-	// The OTA push (ota.go): the update manager and the reboot armer, the
-	// own node with its node id and address; registry is reg for the
-	// node hooks, which run while New builds it.
+	// The OTA push (ota.go): the update manager and the reboot armer;
+	// registry is reg for the node hooks, which run while New builds it.
 	ota      atomic.Pointer[softwareupdate.Manager]
 	registry atomic.Pointer[client.Registry]
 	armer    *peer.RebootResubscribeArmer
@@ -557,7 +557,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 }
 
 // Close tears the stack down in the reverse order of [New]: the update
-// manager and the own node, the registry (its nodes and their
+// manager and the OTA provider, the registry (its nodes and their
 // subscriptions), the client
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is

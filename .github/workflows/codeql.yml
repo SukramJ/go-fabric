@@ -3,11 +3,14 @@ name: codeql
 # CodeQL static analysis (SAST): data-flow and taint analysis over the Go
 # source — injection, crypto misuse, unchecked bounds on decoded input.
 # Findings surface in the repository's Security → Code scanning tab; the job
-# does not fail on alerts, and it is not one of the checks branch protection
-# requires. That is deliberate: this module parses attacker-supplied wire
-# bytes (TLV, the Interaction Model, PASE/CASE), which is exactly the shape
-# that produces true positives worth reading and false positives worth
-# dismissing by hand — neither belongs on the merge path.
+# does not fail on alerts. That is deliberate: this module parses
+# attacker-supplied wire bytes (TLV, the Interaction Model, PASE/CASE), which
+# is exactly the shape that produces true positives worth reading and false
+# positives worth dismissing by hand — neither belongs on the merge path.
+# The job itself is one of the checks branch protection requires (`codeql
+# (go)`, script/requiredchecks/required.txt; owner decision 2026-11-13): a
+# pull request merges only when the analysis ran to its end, whatever it
+# found.
 #
 # It complements, rather than duplicates, the other two security legs:
 # `make vuln` (nightly) asks whether a known advisory is reachable, and

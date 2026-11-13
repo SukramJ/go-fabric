@@ -190,7 +190,7 @@ func decodeQRPart(part string) (Payload, error) {
 		return Payload{}, invalid("Unsupported onboarding payload version %d", p.Version)
 	}
 	if !IsValidPasscode(p.Passcode) {
-		return Payload{}, invalid("Invalid passcode %d", p.Passcode)
+		return Payload{}, invalid("Invalid passcode: " + passcodeRule) // the value stays out: [errInvalidPasscode]
 	}
 	if err := assertValidPayloadIdentity(uint32(p.VendorID), uint32(p.ProductID)); err != nil {
 		return Payload{}, err
@@ -425,7 +425,7 @@ func DecodeManualCode(s string) (ManualPayload, error) {
 		vid, pid = num(10, 15), num(15, 20)
 	}
 	if !IsValidPasscode(mp.Passcode) {
-		return ManualPayload{}, invalid("Invalid passcode %d", mp.Passcode)
+		return ManualPayload{}, invalid("Invalid passcode: " + passcodeRule) // the value stays out: [errInvalidPasscode]
 	}
 	if err := assertValidPayloadIdentity(vid, pid); err != nil {
 		return ManualPayload{}, err

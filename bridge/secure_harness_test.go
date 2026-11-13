@@ -14,7 +14,6 @@ package bridge
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net"
 	"path/filepath"
@@ -45,7 +44,7 @@ const harnessLocalSessionID uint16 = 0x0042
 func openHarnessStore(t *testing.T) *store.Store {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "matter.db")
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	db, err := store.OpenSQLite(path, "journal_mode(WAL)")
 	if err != nil {
 		t.Fatalf("open store db: %v", err)
 	}

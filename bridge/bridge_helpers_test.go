@@ -513,6 +513,27 @@ func TestReplyTimedStatus_WithSrc_DoesNotPanic(t *testing.T) {
 
 // ─── handlerContext ───────────────────────────────────────────────────────────
 
+// TestHandlerContext_AfterStop_IsCancelled: a handler dispatched after
+// Stop — an item the ordered pool still drains — runs under the
+// cancelled serve context, not under one that never ends (review II,
+// W2-conc-09). Before, Stop reset the handler context and such a handler
+// got context.Background.
+func TestHandlerContext_AfterStop_IsCancelled(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	if err := b.handlerContext().Err(); err != nil {
+		t.Fatalf("handlerContext on a started bridge: %v, want a live context", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := b.Stop(ctx); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if err := b.handlerContext().Err(); err != context.Canceled { //nolint:errorlint // Err returns the sentinel itself
+		t.Fatalf("handlerContext after Stop: Err() = %v, want context.Canceled", err)
+	}
+}
+
 // TestHandlerContext_NilCtx_ReturnsBackground verifies that a bridge
 // with no handlerCtx set returns context.Background().
 func TestHandlerContext_NilCtx_ReturnsBackground(t *testing.T) {

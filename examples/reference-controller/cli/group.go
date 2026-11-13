@@ -86,7 +86,7 @@ func joinGroup(group, keySet uint16, endpoints []uint16, aux bool) groupcastdef.
 	return req
 }
 
-// invoker is a node or the own node's interaction.
+// invoker is what a command is invoked through: a node.
 type invoker interface {
 	Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error)
 }
@@ -137,9 +137,9 @@ func parseList[T uint16 | uint64](s string, bits int) ([]T, error) {
 // cmdGroupCreate provisions a group: the key set and the group's
 // membership on every node (GroupKeyManagement KeySetWrite, Groupcast
 // JoinGroup with the auxiliary ACL entry on the endpoints — or, on a node
-// whose ServerList lacks Groupcast, legacyJoin), and the key set
-// on the own node as a sender-only member — the provisioning of
-// TestLiveGroupSend (node/groupsend_live_test.go).
+// whose ServerList lacks Groupcast, legacyJoin), and the key set in the
+// controller's own tables, as the sender (Controller.SetGroupKey) — the
+// provisioning of TestLiveGroupSend (node/groupsend_live_test.go).
 func cmdGroupCreate(e *env, args []string) error {
 	var keyArg, nodesArg, epsArg, keySetArg string
 	pos, err := parseArgs(e, "group create", args, func(fs *flag.FlagSet) {
@@ -225,9 +225,10 @@ func cmdGroupCreate(e *env, args []string) error {
 	})
 }
 
-// cmdGroupSend sends a group command from the own node: the node's
-// groups.Manager.Sender for the group, its Invoke — TestLiveGroupSend's
-// send (node/groupsend_live_test.go).
+// cmdGroupSend sends a group command from the controller, as RootNodeID:
+// the controller's groups.Manager.Sender for the group
+// (Controller.Groups), its Invoke — TestLiveGroupSend's send
+// (node/groupsend_live_test.go).
 func cmdGroupSend(e *env, args []string) error {
 	pos, err := parseArgs(e, "group send", args, nil)
 	if err != nil {

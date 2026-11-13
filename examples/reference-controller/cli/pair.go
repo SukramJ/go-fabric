@@ -185,7 +185,9 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 			return errors.New("--discriminator or --passcode out of range")
 		}
 		if !setup.IsValidPasscode(uint32(passcode)) {
-			return fmt.Errorf("--passcode %d is not a valid setup passcode", passcode)
+			// The value is not echoed: it is the passcode of the device
+			// being paired, and the text reaches a log.
+			return errors.New("--passcode is not a valid setup passcode: zero, above 99999998 or one of the disallowed values")
 		}
 		if pr, err = codeOf(uint32(passcode), uint16(discriminator)); err != nil {
 			return err

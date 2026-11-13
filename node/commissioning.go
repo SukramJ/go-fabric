@@ -516,7 +516,7 @@ func (c *WindowCredentials) validate() error {
 		errs = append(errs, err)
 	}
 	if !validSetupPIN(c.Passcode) {
-		errs = append(errs, errSetupPIN(c.Passcode))
+		errs = append(errs, errSetupPIN)
 	}
 	errs = append(errs, checkPBKDF(int64(c.PBKDFIterations), len(c.Salt))...)
 	if c.Timeout < 0 {

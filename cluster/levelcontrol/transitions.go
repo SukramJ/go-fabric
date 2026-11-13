@@ -33,7 +33,8 @@ type Transitions struct {
 	// OnOff is the On/Off cluster on the same endpoint. The server reads
 	// it for the ExecuteIfOff gate and drives it for the "with On/Off"
 	// commands. Nil means the endpoint has none: every command executes
-	// and none couples (matter.js `!this.agent.has(OnOffServer)`).
+	// and none couples (matter.js `!this.agent.has(OnOffServer)`). A
+	// server whose features lack OO does not use it ([NewServer]).
 	OnOff OnOff
 	// ColorTemperature is the ColorControl cluster on the same endpoint,
 	// which follows the level while the CoupleColorTempToLevel option is

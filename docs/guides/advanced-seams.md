@@ -43,7 +43,7 @@ A host names none of the packages below for these:
 | The controller's reads and writes | the role's own types in `controller/client` (`AttributePath`, `ReadRequest`, `SubscribeRequest`, `Report`, `WriteRequest`, `Result`, `StatusError`, `PeerAddress`, `Device`, `Timing`, …, with `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`); a written scalar is a `spec.Value` (`spec.Int16(2250)`, `spec.Null[uint16]()`); a typed read is the generated `<cluster>def.StateFrom` over a client cluster or `Report.Values` |
 | What Matter and the ecosystems make of a source | `eligibility` (`Classify`, `DeriveMatterEligibility`, `EcosystemForVendor`, `VendorName`, `Compat`): a package of the typed surface beside `schema`, not a seam — it imports only `contract` and `schema` and reaches nothing below the facade, so it needs no route |
 | OTA provider values and image files | `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob` (what an `OTAImageSource` returns), `node.OTAConsentGranted` … `OTAConsentUnknown`; `node.CreateOTAImage(node.OTAImageOptions)` and `node.ReadOTAImage` (the image file format, `node.OTAImageHeader`) |
-| The ledger's software versions | `node.NewDCLClient(node.DCLProductionURL)`, `node.DCLOTAVersions` (Lookup, CheckForUpdate, Download), `node.VerifyOTAImage`, `node.DCLSoftwareVersion` |
+| The ledger's software versions | `node.NewDCLClient(node.DCLProductionURL)`, `node.DCLOTAVersions` (Lookup, CheckForUpdate, Download — a download stops at the type's `MaxImageSize`, 256 MiB when unset, with `dcl.ErrOTAImageTooLarge` as the error's cause; the facade has no route for that sentinel), `node.VerifyOTAImage`, `node.DCLSoftwareVersion` |
 | Aggregator Actions, EcosystemInformation | `node.NewActions(node.ActionsConfig{Host})` for `Config.AggregatorServers` (`node.ActionsHost`, `ActionRequest`); `node.NewEcosystemInformation(dir)` over a `node.EcosystemDirectory`, declared with `ecosysteminformationdef.Declare{HostServer: …}` |
 | Root servers a host drives after Start | `Node.Root()`'s fields, named `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer`, `node.PowerSourceConfigurationServer` (its `SetSourcesProvider`) — `RootClusters` itself stays the seam |
 | FixedLabel and UserLabel on a device | `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` and `userlabeldef.Declare{…}` on any device type: the clusters the Base device type allows on every endpoint; `Device.FixedLabel()` and `Device.UserLabel()` are their typed servers, and a node keeps a UserLabel list under the device's stable key |
@@ -102,7 +102,7 @@ semantics, the persistence the facade threads through. A host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
-*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1515-1522` (`AttachACLLister` replaces), `bridge/bridge.go:920`, `:1866`, `:1887`, `:2248`, `bridge/receive.go:567`.*
+*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1647-1670` (`AttachACLLister` replaces, on a running bridge at once), `bridge/bridge.go:1025` (`Reassemble`), `:1317` (`SetOnReassembled`), `:2062` (`Topology`), `:2083` (`EventLog`), `:2549` (`ControllerRTT`), `bridge/receive.go:593` (`NotifyDeviceReachable`).*
 
 ## `endpoint`
 

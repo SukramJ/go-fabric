@@ -96,7 +96,8 @@ interaction and the peer set (`client/discovery`, `client/exchange`,
 `client/handshake`, `client/interaction`, `client/peer`) serve both
 roles — `binding` and `node` use them as much as the commissioner does —
 so they sit below the roles (ADR 0026 principle 12, brief BX4); the old
-`controller/<name>` paths forward to them until v0.12.0.
+`controller/<name>` paths forwarded to them until v0.12.0, which removed
+them.
 
 The request path, top to bottom:
 
@@ -124,9 +125,12 @@ Where the data model comes from:
 
 Everything outside `internal/` is public API, including `bridge/bridgetest`
 and `endpoint/endpointtest` — see `README.md` §API stability for the
-deprecation window before you rename anything. `internal/` holds only the
-one-way test seams (`bridgeseam`, `channelseam`), the shared parity-test
-support (`paritytest`) and the chip-tool suite.
+deprecation window before you rename anything. `internal/` holds three
+kinds of package: the one-way seams (`bridgeseam`, `channelseam` and their
+siblings), the shared internals behind them (such as `serialqueue` and
+`netwatch`) and test support (`paritytest`, `chipdm`, the chip-tool suite
+`chiptool`). `README.md` §API stability names every one, and
+`script/docscheck` holds that list to the tree.
 
 Scope boundaries that are decisions, not backlog — do not "fix" them:
 no Thread radio. Bluetooth on the device side was a second until

@@ -64,11 +64,12 @@
 // next [Reassemble] (or, for the ACK tracker, not at all on a bridge
 // that is already running):
 //
-//   - AttachACLLister — FAILS CLOSED. The lister reaches the dispatcher
-//     only in reassembleLocked, which Start runs. Without one,
-//     TopologyDispatcher.CheckACL denies every fabric-scoped request
-//     with UnsupportedAccess (endpoint/dispatcher.go:790-802): a bridge
-//     that pairs normally and then answers nothing. A deployment that
+//   - AttachACLLister — FAILS CLOSED. Attached before Start so the
+//     first dispatcher carries it; a later call replaces the lister on
+//     the running dispatcher at once (the one port of this group that
+//     does). Without one, TopologyDispatcher.CheckACL denies every
+//     fabric-scoped request with UnsupportedAccess: a bridge that pairs
+//     normally and then answers nothing. A deployment that
 //     means to run unguarded passes [endpoint.UnenforcedACL] — the
 //     explicit spelling of the same effect.
 //   - AttachSessionLookup — silent. The default noopSessionLookup misses
@@ -113,7 +114,21 @@
 //     [Bridge.SessionClosed] besides the subscription manager's
 //     CloseSession; without it a TCP connection whose sessions were
 //     reaped or removed with their fabric stays open until the peer
-//     closes it.
+//     closes it. One capability of the session table FAILS CLOSED: the
+//     registry (or, failing that, the session lookup) names a session's
+//     attestation challenge through AttestationChallengeFor, as
+//     operational.Manager does. Without it AttestationRequest, CSRRequest
+//     and SignVIDVerificationRequest answer FAILURE, so commissioning
+//     stops at the attestation step.
+//     Another is silent: the registry lists its sessions (Sessions, as
+//     operational.Manager does), which is how the bridge clears the PASE
+//     sessions when a commissioning ends — after a CommissioningComplete
+//     core.GeneralCommissioning answered OK, when that server's fail-safe
+//     expires ([Bridge.FailSafeExpired], which AttachRootClusters wires
+//     into it) and when the attached commissioning window is revoked. The
+//     bridge does all three by itself. Without the capability a PASE
+//     session keeps the commissioning channel's implicit Administer after
+//     the commissioning it served is over, until it is reaped.
 //   - AttachSubscriptionStore — silent. Start loads the previous run's
 //     subscriptions from it and clears it; each subscription of a CASE
 //     session is written when it becomes active and deleted when it is
@@ -466,12 +481,17 @@ type Bridge struct {
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for
 	// every bridged endpoint whose source pushes value changes. Called
-	// and cleared at the start of each reassemble + when a fresh
-	// subscription manager is attached, then re-populated by
-	// [Bridge.wireMeasurementListenersLocked]. Without re-wiring on
-	// reassemble the listeners would either leak (no cleanup) or point
-	// at stale topology entries (cleanup but no re-bind).
+	// and cleared at each reassemble + when a fresh subscription manager
+	// is attached, then re-populated — and called at Stop — by
+	// [Bridge.rewireMeasurementListeners], outside b.mu. Without
+	// re-wiring on reassemble the listeners would either leak (no
+	// cleanup) or point at stale topology entries (cleanup but no
+	// re-bind).
 	measurementUnsubscribers []func()
+	// listenerGeneration counts the wirings of the host's notifiers; a
+	// wiring that finds it moved while it registered was overtaken and
+	// detaches what it registered ([Bridge.rewireMeasurementListeners]).
+	listenerGeneration uint64
 	// switchUnsubscribers holds the unsubscribe closures returned by
 	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
 	// matterSwitchSubscribable assertion) and by a position source's
@@ -656,7 +676,7 @@ type Bridge struct {
 	onFabricRemoved func(fabricIndex uint8)
 
 	// onAttributeChange, when set, hears every change a cluster server's
-	// AttributeChangeNotifier reports (wireAttributeNotifiersLocked).
+	// AttributeChangeNotifier reports (wireAttributeNotifiers).
 	// Atomic: a change fires on its own goroutine, b.mu possibly held.
 	onAttributeChange atomic.Pointer[func(endpoint uint16, cluster uint32, change contract.Change)]
 
@@ -852,7 +872,8 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 // call [Stop]) to tear everything down.
 //
 // Calling Start a second time on the same instance returns
-// [ErrAlreadyStarted].
+// [ErrAlreadyStarted], and so does a Start while a [Bridge.Stop] of the
+// run before has not returned: the bridge has not stopped until then.
 //
 //nolint:contextcheck // serve/ack-pump goroutines run in a fresh context torn down explicitly via the stored serveCancel (Stop); rooting them in the caller ctx would race listener teardown
 func (b *Bridge) Start(ctx context.Context) error {
@@ -905,6 +926,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.beginSubscriptionRun()
 
 	serveCtx, cancel := context.WithCancel(context.Background())
+	// Before the serve goroutines start: the first datagram they hand to
+	// a handler runs under the serve context, not under the fallback
+	// that never ends (review II, W2-conc-09).
+	b.mu.Lock()
+	b.handlerCtx = serveCtx
+	b.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -936,7 +963,6 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.tcpServeDone = tcpDone
 	b.serveCancel = cancel
 	b.serveDone = done
-	b.handlerCtx = serveCtx
 	b.started = true
 	committed = true
 	// Spawn the ACK pump only when an AckTracker has been wired
@@ -1131,12 +1157,21 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	b.mu.Lock()
 	prevTopology := b.topology
 	b.topology = topology
+	// The sources once more, under the lock of the swap: an Attach… that
+	// ran since they were read above applied to the dispatcher this one
+	// replaces.
+	dispatcher.SetACLLister(b.aclLister)
+	dispatcher.SetAuxiliaryACL(b.auxACL)
 	b.dispatcher = dispatcher
 	staleSwitchUnsubs := b.switchUnsubscribers
 	b.switchUnsubscribers = switchUnsubs
-	b.wireMeasurementListenersLocked()
 	hook := b.onReassembled
 	b.mu.Unlock()
+
+	// The value listeners follow the swap, outside the lock: the host's
+	// notifiers are called to unregister and to register, and their
+	// callbacks re-enter the bridge (review II, W2-conc-07).
+	b.rewireMeasurementListeners()
 
 	// Drain the swapped-out press-DP hooks now that the new topology
 	// is live. Doing this after the swap (instead of before wiring)
@@ -1615,8 +1650,9 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 // invokes are gated by the AccessControl cluster's stored entries; without
 // one the dispatcher's CheckACL denies every operational request, so a
 // bridge left unwired answers nothing rather than answering everything. The
-// lister is applied to the dispatcher on the next [Reassemble] and on every
-// subsequent rebuild.
+// lister is applied at once to the dispatcher of a running bridge — the
+// next access check reads it — and to every dispatcher a [Reassemble]
+// builds.
 //
 // A setup that means to run without stored entries passes
 // [endpoint.UnenforcedACL].
@@ -1626,6 +1662,10 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	}
 	b.mu.Lock()
 	b.aclLister = l
+	// The live dispatcher too (nil before the first assembly): before, a
+	// lister replaced on a running bridge waited for a Reassemble that a
+	// node with a fixed set of devices never runs (review II, W2-api-10).
+	b.dispatcher.SetACLLister(l)
 	b.mu.Unlock()
 }
 
@@ -1635,8 +1675,9 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 // the auxiliary ones, and a Group entry without targets no longer reaches
 // endpoint 0. Pass the *groups.Manager the Groupcast server was built
 // with — the server turns the feature on in AccessControl, this port makes
-// the dispatcher enforce what that cluster reports. Applied on the next
-// [Reassemble]. nil (the default) keeps the feature off in the
+// the dispatcher enforce what that cluster reports. Applied at once to
+// the dispatcher of a running bridge and to every one a [Reassemble]
+// builds. nil (the default) keeps the feature off in the
 // dispatcher: a Groupcast auxiliary grant is then not honoured, so group
 // commands relying on it are dropped — fails closed, silently, since a
 // group message is never answered. Mirrors matter.js AccessControlServer
@@ -1648,6 +1689,7 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 	}
 	b.mu.Lock()
 	b.auxACL = src
+	b.dispatcher.SetAuxiliaryACL(src)
 	b.mu.Unlock()
 }
 
@@ -1672,11 +1714,19 @@ func (b *Bridge) clk() clock.Clock { return clock.Or(b.clock) }
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	if w != nil {
 		w.SetClock(b.clk())
+		// The bridge owns the sessions: a revoke of its window closes
+		// the PASE sessions, whether or not the host wired a
+		// [PaseSessionCloser] (pase_close.go).
+		w.setSessionOwner(b.closePASESessionsOnRevoke)
 	}
 	b.mu.Lock()
+	previous := b.commissioningWindow
 	b.commissioningWindow = w
 	roots := b.rootClusters
 	b.mu.Unlock()
+	if previous != nil && previous != w {
+		previous.setSessionOwner(nil)
+	}
 	wireCommissioned(roots, w)
 	if w != nil {
 		// A window that opens, times out, is revoked or ends with a
@@ -1724,6 +1774,7 @@ func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.wireDeviceLoad(cp)
 	wireAdminEntryEvents(cp)
+	b.wireFailSafeExpiry(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
 	window := b.commissioningWindow
@@ -1810,7 +1861,8 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // [stopSessionCloseBudget]), closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
-// no-op. Safe to call after a failed [Start].
+// no-op. Safe to call after a failed [Start]. The bridge counts as
+// started until Stop returns: a [Bridge.Start] before that is refused.
 func (b *Bridge) Stop(ctx context.Context) error {
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
@@ -1846,16 +1898,23 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.tcpServeDone = nil
 	b.serveCancel = nil
 	b.serveDone = nil
-	b.handlerCtx = nil
+	// handlerCtx stays: the serve context, cancelled below. A handler
+	// the ordered pool still dispatches after this point runs under a
+	// cancelled context instead of one that never ends; the next Start
+	// replaces it.
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false
 	b.mu.Unlock()
-	// Release the start-claim so a subsequent [Bridge.Start] can
-	// re-arm. Keep this AFTER the b.mu critical section so a
-	// concurrent Start cannot CAS-claim before we've cleared the
-	// per-instance state above.
-	b.startClaim.Store(false)
+	// The start claim is given back when this Stop has finished, not
+	// here: what follows — the wait for the handlers in flight, the
+	// host's listeners, the advertiser, the servers' transitions, the
+	// commissioning window's timer — takes the run apart, and a
+	// [Bridge.Start] let in before it is done had the run it had just
+	// wired taken apart with it (review II, R2-P0-rv-A06: it served
+	// without its value and switch listeners). Until then Start returns
+	// [ErrAlreadyStarted].
+	defer b.startClaim.Store(false)
 
 	// Leave the multicast groups while the socket is still open.
 	b.stopGroupNetworking()
@@ -1876,6 +1935,11 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	}
 	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
 	b.waitPumpStopped(pumpDone)
+
+	// The host's notifiers are detached once nothing is served: a value
+	// change no longer marks paths dirty on a stopped engine or emits
+	// into the event log. Start's reassemble wires them again.
+	b.detachHostListeners()
 
 	// A session re-announce still running publishes on the advertiser;
 	// the serve context's cancel above ends it, and it is gone before the
@@ -1994,6 +2058,13 @@ func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
 // Topology returns the currently assembled topology. Returns nil
 // when the bridge has not been started; safe to call concurrently
 // with [Reassemble].
+//
+// It is the live tree, not a copy: the dispatcher serves requests from
+// the same [endpoint.Topology] and its endpoints. Read it; do not
+// append to Endpoints or change an endpoint's fields — that races
+// every dispatch. The topology changes through the Snapshotter and
+// [Reassemble] alone, which installs a new tree; a pointer kept across
+// a Reassemble is the superseded one.
 func (b *Bridge) Topology() *endpoint.Topology {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -2111,9 +2182,10 @@ func (b *Bridge) waitPumpStopped(pumpDone chan struct{}) {
 }
 
 // handlerContext returns the context every IM/SC handler call runs
-// under. Returns context.Background when the bridge isn't
-// fully-started (the receive loop should not be running in that
-// case, but the defensive default avoids a nil deref).
+// under: the serve context of the current run, set before the serve
+// goroutines start and left in place — cancelled — by Stop. Returns
+// context.Background for a bridge that was never started (no receive
+// loop runs then; the default avoids a nil deref).
 func (b *Bridge) handlerContext() context.Context {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -2321,7 +2393,9 @@ type CommissioningAdvertisement struct {
 // `_L<long>`, `_S<short>`, `_V<vendor>` subtypes per Matter §4.3.1.4)
 // so commissioners discover the bridge by service-type filter while
 // the window is open. Idempotent — a second call replaces the prior
-// publish.
+// publish. A pairing hint and pairing instruction that do not belong
+// together ([mdns.CommissionableServiceConfig.Validate]) are an error
+// wrapping [mdns.ErrInvalidService], and nothing is published.
 //
 // The instance name is remembered on the bridge so
 // [Bridge.WithdrawCommissioning] can withdraw the right record on
@@ -2332,7 +2406,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	}
 	pubCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
-	svc := mdns.BuildCommissionableService(mdns.CommissionableServiceConfig{
+	cfg := mdns.CommissionableServiceConfig{
 		Logger:             b.logger,
 		InstanceID:         params.InstanceID,
 		Discriminator:      params.Discriminator,
@@ -2348,7 +2422,15 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
-	})
+	}
+	// A pairing hint and instruction that do not belong together are
+	// refused, not advertised — matter.js throws in the advertisement's
+	// constructor ([mdns.CommissionableServiceConfig.Validate]).
+	if err := cfg.Validate(); err != nil {
+		b.logger.Warn("matter.mdns.commissioning_invalid", slog.Any("err", err))
+		return fmt.Errorf("matter.mdns.commissioning_publish: %w", err)
+	}
+	svc := mdns.BuildCommissionableService(cfg)
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Warn("matter.mdns.commissioning_publish_err",
 			slog.String("instance", svc.InstanceName),

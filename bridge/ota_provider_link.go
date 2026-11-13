@@ -519,7 +519,6 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	listener := b.listener
 	sessions := b.sessions
 	tracker := b.outboundReliable
-	ackTracker := b.ackTracker
 	b.mu.RUnlock()
 	dest := e.route()
 	if !routeUsesMRP(dest) {
@@ -542,10 +541,8 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 		ProtocolID: protocolID,
 		NeedsAck:   tracker != nil,
 	}
-	if ackTracker != nil {
-		if counter, owed := ackTracker.LookupAndDischarge(e.sessionID, e.exchangeID, !e.responder); owed {
-			proto.HasAck, proto.AckCounter = true, counter
-		}
+	if counter, owed := b.takeOwedAck(e.sessionID, e.exchangeID, !e.responder); owed {
+		proto.HasAck, proto.AckCounter = true, counter
 	}
 	body := append(proto.Marshal(), payload...) //nolint:gocritic // single-allocation join
 	hdr := message.Header{SessionID: e.sessionID}

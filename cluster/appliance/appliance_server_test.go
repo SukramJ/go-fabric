@@ -467,3 +467,27 @@ func TestChangeReporting(t *testing.T) {
 		t.Error("undefined dryness level built")
 	}
 }
+
+// TestMicrowaveHostStatusPassesThrough: a host's contract.StatusError — by
+// value or by pointer — answers its own status from SetCookingParameters
+// and AddMoreTime, not FAILURE (docs/guides/ports.md; review II
+// R2-P0-err-D01, the shape W6-doc-01 gave OnOff and ClosureDimension).
+func TestMicrowaveHostStatusPassesThrough(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	busy := contract.StatusError{Status: uint8(im.StatusBusy), Message: "door open"}
+	for name, refusal := range map[string]error{"value": busy, "pointer": &busy} {
+		srv := newMicrowave(t, &oven{refuse: refusal}, appliance.MicrowaveFeaturePowerAsNumber)
+		if _, err := srv.MatterInvoke(ctx, mwo.CmdSetCookingParameters, mwo.SetCookingParametersRequest{}); spec.StatusOf(err) != im.StatusBusy {
+			t.Errorf("%s: SetCookingParameters refused with a host status answered %v, want BUSY", name, err)
+		}
+		if _, err := srv.MatterInvoke(ctx, mwo.CmdAddMoreTime, mwo.AddMoreTimeRequest{TimeToAdd: 10}); spec.StatusOf(err) != im.StatusBusy {
+			t.Errorf("%s: AddMoreTime refused with a host status answered %v, want BUSY", name, err)
+		}
+	}
+	// Any other host error stays FAILURE.
+	srv := newMicrowave(t, &oven{refuse: errors.New("door open")}, appliance.MicrowaveFeaturePowerAsNumber)
+	if _, err := srv.MatterInvoke(ctx, mwo.CmdAddMoreTime, mwo.AddMoreTimeRequest{TimeToAdd: 10}); spec.StatusOf(err) != im.StatusFailure {
+		t.Errorf("AddMoreTime refused without a status answered %v, want FAILURE", err)
+	}
+}

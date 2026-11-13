@@ -281,16 +281,38 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 }
 
 // receptionWindow returns the reception state for (key, source node),
-// creating it on first use. Only authenticated messages reach here, so
-// the map grows with genuine senders only.
+// creating it on first use.
+//
+// There is one window per source node id under a key and no bound on how
+// many, as in matter.js: receptionStateFor adds an entry for every source
+// node id it is asked for
+// (packages/protocol/src/groups/MessagingState.ts:19, :80-90 at db021da0).
+// Nothing but forgetReceptionState removes one (MessagingState.ts:97-99 at
+// db021da0). That is what keeps a recorded datagram a duplicate for as
+// long as its key is held, however many other senders were seen since: a
+// table that evicts must trust the first counter of a sender it no longer
+// holds, and a party without the key can then replay what it recorded —
+// connectedhomeip's group peer table of CHIP_CONFIG_MAX_GROUP_DATA_PEERS
+// senders does (src/lib/core/CHIPConfig.h:833,
+// src/transport/GroupPeerMessageCounter.cpp:79-95,
+// src/transport/SessionManager.cpp:1287-1294 at 6170af84), and this
+// package did while it was bounded the same way (review II, R2-P0-rv-B01;
+// pinned by TestRecordedGroupMessageStaysADuplicate).
+//
+// What the missing bound costs is memory under a holder of the group key.
+// Only a message that authenticated under a mapped key reaches here
+// ([Manager.Decode]; pinned by
+// TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState), but the
+// source node id of a group message is what its sender states, so a
+// holder of the key adds one entry per id it claims, until the key goes.
+// A party without the key adds none.
 //
 // The state is keyed on the operational key, not on fabric and key set:
 // key sets that derive the same key share one window, as in matter.js
-// packages/protocol/src/groups/MessagingState.ts:80-98
-// (receptionStateFor). It is dropped with the last key set deriving the
-// key — [Manager.Reload] after KeySetWrite / KeySetRemove and
-// [Manager.ForgetFabric] run forgetUnreferenced, matter.js
-// packages/protocol/src/groups/FabricGroups.ts:185-219
+// (MessagingState.ts:80-90, receptionStateFor). It is dropped with the
+// last key set deriving the key — [Manager.Reload] after KeySetWrite /
+// KeySetRemove and [Manager.ForgetFabric] run forgetUnreferenced, matter.js
+// packages/protocol/src/groups/FabricGroups.ts:207-225
 // (#forgetUnreferencedReceptionState). Pinned by
 // TestReceptionStateTeardownParity (review 2026-11 W2-sec-05).
 func (m *Manager) receptionWindow(key []byte, source uint64) *mrp.Window {

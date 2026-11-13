@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestSmokeCoAlarmOrigins is the origin audit of the pull SmokeCoAlarm
@@ -39,7 +40,8 @@ func TestSmokeCoAlarmOrigins(t *testing.T) {
 		!slices.Equal(d.written, []alarm.Sensitivity{alarm.SensitivityHigh}) {
 		t.Errorf("controller write: %v, the source saw %v, want High", err, d.written)
 	}
-	if err := srv.MatterWrite(ctx, smokedef.AttrExpressedState, uint64(0)); err == nil {
-		t.Error("a write of the read-only ExpressedState succeeded")
+	var sce im.StatusCodeError
+	if err := srv.MatterWrite(ctx, smokedef.AttrExpressedState, uint64(0)); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusUnsupportedWrite {
+		t.Errorf("a write of the read-only ExpressedState: %v, want UNSUPPORTED_WRITE", err)
 	}
 }

@@ -190,7 +190,13 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 				return err
 			}
 		case tagCmdStatusRef:
-			ent.CommandRef = uint16(el.Uint & 0xFFFF)
+			// TlvUInt16 (TlvCommandStatus.ts:18): refused when wider, never
+			// masked onto another command's reference ([uintField]).
+			ref, err := uint16Field(el)
+			if err != nil {
+				return err
+			}
+			ent.CommandRef = ref
 			ent.HasCommandRef = true
 		default:
 			if el.IsContainer {
@@ -217,9 +223,15 @@ func readStatusIBFields(dec *tlv.Decoder, st *StatusIB) error {
 		}
 		switch uint8(f.Tag.Number & 0xFF) {
 		case tagStatusIBStatus:
-			st.Status = StatusCode(f.Uint & 0xFF)
+			status, err := statusIBField(f)
+			if err != nil {
+				return err
+			}
+			st.Status = StatusCode(status)
 		case tagStatusIBClusterStatus:
-			st.ClusterStatus = uint8(f.Uint & 0xFF)
+			if st.ClusterStatus, err = statusIBField(f); err != nil {
+				return err
+			}
 			st.HasClusterStatus = true
 		}
 	}

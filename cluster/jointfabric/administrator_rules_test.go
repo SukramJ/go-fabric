@@ -13,7 +13,9 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/client/jcm"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -176,6 +178,13 @@ func TestICACCSRRequestStatuses(t *testing.T) {
 	fx.a.port = &fakePort{err: errors.New("no key")}
 	if _, err := call(ctx); statusOf(err) != im.StatusFailure { // :340
 		t.Errorf("port failure: %v", err)
+	}
+	// A port's refusal that names its status — a host's
+	// contract.StatusError — answers it (docs/guides/ports.md; review II
+	// R2-P0-err-D01).
+	fx.a.port = &fakePort{err: contract.StatusError{Status: uint8(im.StatusBusy), Message: "key store locked"}}
+	if _, err := call(ctx); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("port refusal with a host status answered %v, want BUSY", err)
 	}
 }
 

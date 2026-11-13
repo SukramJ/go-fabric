@@ -18,15 +18,15 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
+	"github.com/SukramJ/go-fabric/store"
 )
 
-// connectionPragmas ride on the DSN so every pooled connection has them
-// (store/testhelper_test.go).
-const connectionPragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
-
+// openEmptyDB opens a fresh database without the schema, with the module's
+// opener: foreign keys and the busy timeout on every pooled connection
+// (store/testhelper_test.go), in WAL mode.
 func openEmptyDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "client.db")+"?"+connectionPragmas)
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "client.db"), "journal_mode(WAL)")
 	if err != nil {
 		t.Fatal(err)
 	}

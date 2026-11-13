@@ -21,6 +21,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -228,8 +229,10 @@ func TestParityMatterJS_AccessControl_PASEForbiddenInACL(t *testing.T) {
 		Subjects:    []uint64{1},
 		FabricIndex: 1,
 	}}
-	if err := ac.MatterWrite(context.Background(), 0x0000, paseEntry); err == nil {
-		t.Error("MatterWrite with PASE AuthMode: expected error, got nil — PASE is forbidden per matter.js")
+	// matter.js answers ConstraintError ("AuthMode for ACL must not be
+	// PASE", AccessControlServer.ts:200-201).
+	if err := ac.MatterWrite(context.Background(), 0x0000, paseEntry); statusOf(err) != im.StatusConstraintError {
+		t.Errorf("MatterWrite with PASE AuthMode: %v (status %v), want CONSTRAINT_ERROR — PASE is forbidden per matter.js", err, statusOf(err))
 	}
 }
 
@@ -250,8 +253,10 @@ func TestParityMatterJS_AccessControl_Administer_GroupAuthMode_Forbidden(t *test
 		Subjects:    []uint64{1},
 		FabricIndex: 1,
 	}}
-	if err := ac.MatterWrite(context.Background(), 0x0000, badEntry); err == nil {
-		t.Error("MatterWrite Administer+Group: expected error, got nil — matter.js forbids this combination")
+	// matter.js answers ConstraintError ("Group ACLs must not have
+	// Administer privilege", AccessControlServer.ts:221-226).
+	if err := ac.MatterWrite(context.Background(), 0x0000, badEntry); statusOf(err) != im.StatusConstraintError {
+		t.Errorf("MatterWrite Administer+Group: %v (status %v), want CONSTRAINT_ERROR — matter.js forbids this combination", err, statusOf(err))
 	}
 }
 
@@ -310,8 +315,8 @@ func TestParityMatterJS_AccessControl_InvokeAlwaysErrors(t *testing.T) {
 	t.Parallel()
 	ac := newAccessControl(t)
 	for _, cmdID := range []uint32{0x00, 0x01, 0xFF} {
-		if _, err := ac.MatterInvoke(context.Background(), cmdID, nil); err == nil {
-			t.Errorf("MatterInvoke(0x%02X): expected error, got nil — AccessControl has no commands", cmdID)
+		if _, err := ac.MatterInvoke(context.Background(), cmdID, nil); !errors.Is(err, im.ErrUnsupportedCommand) || statusOf(err) != im.StatusUnsupportedCommand {
+			t.Errorf("MatterInvoke(0x%02X): %v (status %v), want UNSUPPORTED_COMMAND — AccessControl has no commands", cmdID, err, statusOf(err))
 		}
 	}
 }

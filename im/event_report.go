@@ -73,8 +73,13 @@ type ConcreteEventPath struct {
 	HasEndpoint bool
 	HasCluster  bool
 	HasEvent    bool
-	// IsUrgent flips the per-path urgency bit; combined with
-	// EventPriorityCritical it forces an immediate report.
+	// IsUrgent is the subscriber's per-path urgency flag: an event this
+	// path covers asks for a report of the subscription, which goes out
+	// once MinIntervalFloor has elapsed since the last one. An event no
+	// urgent path covers waits for the subscription's next report. The
+	// event's priority plays no part (matter.js
+	// packages/node/src/node/server/ServerSubscription.ts:401-409 at
+	// db021da0).
 	IsUrgent bool
 }
 

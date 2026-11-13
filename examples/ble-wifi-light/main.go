@@ -65,7 +65,9 @@ func parseFlags(args []string) (options, error) {
 		return options{}, fmt.Errorf("--log-level: %w", err)
 	}
 	if o.passcode > 99999998 {
-		return options{}, fmt.Errorf("--passcode %d is not an 8-digit passcode", o.passcode)
+		// The value is not echoed: a passcode with a digit too many is
+		// still the device's passcode, and the text reaches a log.
+		return options{}, errors.New("--passcode is above 99999998, the largest setup passcode")
 	}
 	if o.discriminator > 0xFFF {
 		return options{}, fmt.Errorf("--discriminator %d is wider than 12 bits", o.discriminator)

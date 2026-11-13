@@ -19,6 +19,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -46,29 +47,7 @@ func answerReportChunks(b *Bridge, peerConn *net.UDPConn) <-chan uint8 {
 	go func() {
 		defer close(opcodes)
 		for {
-			_ = peerConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-			rbuf := make([]byte, 1500)
-			n, _, err := peerConn.ReadFromUDP(rbuf)
-			if err != nil {
-				return
-			}
-			got := rbuf[:n]
-			hdr, hdrLen, err := message.UnmarshalHeader(got)
-			if err != nil {
-				return
-			}
-			// On the PASE test session the reply is sealed: open it.
-			b.mu.RLock()
-			pase, isPASE := b.sessions.(paseTestLookup)
-			b.mu.RUnlock()
-			if isPASE {
-				plain, _, err := pase.peer.Decrypt(&hdr, securityFlagsByte(&hdr), got[hdrLen:])
-				if err != nil {
-					return
-				}
-				got = append(append([]byte{}, got[:hdrLen]...), plain...)
-			}
-			rproto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
+			hdr, rproto, err := readSubscribeReply(b, peerConn, 2*time.Second)
 			if err != nil {
 				return
 			}
@@ -79,6 +58,35 @@ func answerReportChunks(b *Bridge, peerConn *net.UDPConn) <-chan uint8 {
 		}
 	}()
 	return opcodes
+}
+
+// readSubscribeReply reads the next datagram the bridge sent to the peer
+// within d and returns its headers; on the PASE test session the reply is
+// sealed and is opened first.
+func readSubscribeReply(b *Bridge, peerConn *net.UDPConn, d time.Duration) (message.Header, message.ProtocolHeader, error) {
+	_ = peerConn.SetReadDeadline(time.Now().Add(d))
+	rbuf := make([]byte, 1500)
+	n, _, err := peerConn.ReadFromUDP(rbuf)
+	if err != nil {
+		return message.Header{}, message.ProtocolHeader{}, err
+	}
+	got := rbuf[:n]
+	hdr, hdrLen, err := message.UnmarshalHeader(got)
+	if err != nil {
+		return message.Header{}, message.ProtocolHeader{}, err
+	}
+	b.mu.RLock()
+	pase, isPASE := b.sessions.(paseTestLookup)
+	b.mu.RUnlock()
+	if isPASE {
+		plain, _, err := pase.peer.Decrypt(&hdr, securityFlagsByte(&hdr), got[hdrLen:])
+		if err != nil {
+			return message.Header{}, message.ProtocolHeader{}, err
+		}
+		got = append(append([]byte{}, got[:hdrLen]...), plain...)
+	}
+	rproto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
+	return hdr, rproto, err
 }
 
 // nextSubscribeOpcode takes the next opcode the peer observed, failing
@@ -136,6 +144,62 @@ func TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies(t *testing.T)
 	}
 	if n := mgr.Active(); n != 1 {
 		t.Errorf("mgr.Active() = %d, want 1 — a Subscribe matching a real path must register", n)
+	}
+}
+
+// TestHandleSubscribeRequest_PrimingReportRefused_EstablishesNothing: the
+// peer answers the priming report's chunk with
+// StatusResponse(INVALID_SUBSCRIPTION) — the answer a matter.js client
+// gives the priming report of a cancelled subscribe, as
+// notes/parity/pin-lifts.md records for matter.js #4777 — and the
+// Subscribe ends there: the handler returns the rejection, no
+// SubscribeResponse follows the chunk, and the subscription admitted for
+// the priming is gone. Mirrors matter.js InteractionMessenger.ts:844,
+// where the chunk's status is awaited with `waitForSuccess` (it throws on
+// any status but Success), and InteractionServer.ts:828-834, where a
+// failed sendInitialReport closes the subscription and rethrows, so the
+// SubscribeResponse is never sent.
+func TestHandleSubscribeRequest_PrimingReportRefused_EstablishesNothing(t *testing.T) {
+	t.Parallel()
+	b := newACLTestBridge(t, &aclStoreFake{})
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(mgr)
+	attachPASETestPeer(t, b)
+
+	peerConn, peerAddr := newSubscribeTestPeer(t)
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 102}
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
+	req := im.SubscribeRequest{
+		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
+		MaxIntervalCeiling: 60,
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req) }()
+
+	chunkHdr, chunk, err := readSubscribeReply(b, peerConn, 3*time.Second)
+	if err != nil {
+		t.Fatalf("no priming report: %v", err)
+	}
+	if chunk.Opcode != im.OpcodeReportData {
+		t.Fatalf("first reply opcode = 0x%02X, want ReportData (0x%02X)", chunk.Opcode, im.OpcodeReportData)
+	}
+	if n := mgr.Active(); n != 1 {
+		t.Fatalf("mgr.Active() = %d while the priming report is out, want 1 (admitted before its data is read)", n)
+	}
+	b.signalStatusResponseRX(chunkHdr.SessionID, chunk.ExchangeID, chunk.Initiator, im.StatusInvalidSubscription)
+
+	if err := <-done; !errors.Is(err, errChunkRejected) {
+		t.Fatalf("handleSubscribeRequest = %v, want the chunk's rejection", err)
+	}
+	// The handler has returned, so whatever it sent is on the socket.
+	if _, after, err := readSubscribeReply(b, peerConn, 100*time.Millisecond); err == nil {
+		t.Errorf("opcode 0x%02X followed the refused priming report, want nothing (no SubscribeResponse, no further chunk)", after.Opcode)
+	} else if nerr, ok := errors.AsType[net.Error](err); !ok || !nerr.Timeout() {
+		t.Errorf("reading after the refusal: %v, want a read timeout", err)
+	}
+	if n := mgr.Active(); n != 0 {
+		t.Errorf("mgr.Active() = %d after the refused priming report, want 0", n)
 	}
 }
 

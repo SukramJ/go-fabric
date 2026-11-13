@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,6 +85,11 @@ func TestFlags(t *testing.T) {
 		if _, err := parseFlags(args); err == nil {
 			t.Errorf("parseFlags(%v) accepted", args)
 		}
+	}
+	// The refusal names the bound, not the value (review II,
+	// R2-P0-sec-E04): the text reaches a log.
+	if _, err := parseFlags([]string{"--passcode", "202020211"}); err == nil || strings.Contains(err.Error(), "202020211") || !strings.Contains(err.Error(), "--passcode") {
+		t.Errorf("parseFlags(--passcode 202020211) = %v, want a refusal that names the flag and not the value", err)
 	}
 	o, err := parseFlags(nil)
 	if err != nil || o.adapter != "hci0" || o.wifiInterface != "wlan0" || o.passcode != 20202021 || o.discriminator != 3840 || o.logLevel != slog.LevelInfo {

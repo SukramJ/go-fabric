@@ -33,7 +33,7 @@ func TestFailSafeExpiryRevertRunsTheFabricRemovalFanOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatal(err)
 	}

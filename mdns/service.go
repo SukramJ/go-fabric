@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/bits"
 	"net"
 	"os"
 	"runtime"
@@ -582,7 +583,10 @@ type CommissionableServiceConfig struct {
 	// / `PI`). PairingHint defaults to
 	// [PairingHintDefault] (powerCycle | deviceManual = 0x21) when
 	// zero, matching matter.js
-	// CommissionableMdnsAdvertisement.ts:90 DEFAULT_PAIRING_HINT.
+	// CommissionableMdnsAdvertisement.ts:81 at db021da0
+	// (DEFAULT_PAIRING_HINT, MdnsConsts.ts:15). A hint
+	// and an instruction that do not belong together fail
+	// [CommissionableServiceConfig.Validate].
 	PairingHint        uint16
 	PairingInstruction string
 	// RotatingID is the optional Rotating Device Identifier (Matter
@@ -629,6 +633,54 @@ type CommissionableServiceConfig struct {
 // (custom instruction) value the bridge never supplies, so setting it
 // without one is non-conformant.
 const PairingHintDefault uint16 = 0x21
+
+// pairingHintsRequiringInstruction is the pairing hints whose meaning
+// needs the `PI` key: matter.js PAIRING_HINTS_REQUIRING_INSTRUCTION
+// (packages/protocol/src/mdns/MdnsConsts.ts:20-32 at db021da0), each at
+// its bit of PairingHintBitmap
+// (packages/protocol/src/advertisement/PairingHintBitmap.ts at db021da0):
+// customInstruction 4, pressResetButtonForNumberOfSeconds 8,
+// pressResetButtonUntilLightBlinks 9,
+// pressResetButtonForNumberOfSecondsWithApplicationOfPower 10,
+// pressResetButtonUntilLightBlinksWithApplicationOfPower 11,
+// pressResetButtonNumberOfTimes 12, pressSetupButtonForNumberOfSeconds 15,
+// pressSetupButtonUntilLightBlinks 16,
+// pressSetupButtonForNumberOfSecondsWithApplicationOfPower 17,
+// pressSetupButtonUntilLightBlinksWithApplicationOfPower 18,
+// pressSetupButtonNumberOfTimes 19.
+// [CommissionableServiceConfig.PairingHint] is 16 bits wide, so bits 16
+// to 19 cannot be set there today; the mask names them all the same.
+const pairingHintsRequiringInstruction uint32 = 1<<4 | 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 |
+	1<<15 | 1<<16 | 1<<17 | 1<<18 | 1<<19
+
+// Validate checks that the pairing hint and the pairing instruction
+// belong together; a config that fails is not advertised
+// ([ErrInvalidService]). Mirrors matter.js
+// packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts
+// :106-135 at db021da0 (#validatePairingInstructions, called from the
+// constructor at :40): at most one hint that requires an instruction;
+// such a hint needs the instruction; an instruction needs such a hint,
+// and a hint at all. PairingHint 0 is "no hint given" (the default
+// goes out), so matter.js's first refusal — a hint object with every
+// flag false — has no form here.
+func (c CommissionableServiceConfig) Validate() error {
+	if c.PairingHint == 0 {
+		if c.PairingInstruction != "" {
+			return fmt.Errorf("%w: pairing instructions provided but no pairing hint set", ErrInvalidService)
+		}
+		return nil
+	}
+	needsInstruction := bits.OnesCount32(uint32(c.PairingHint) & pairingHintsRequiringInstruction)
+	switch {
+	case needsInstruction > 1:
+		return fmt.Errorf("%w: only one pairing hint requiring instructions can be set, but got %d", ErrInvalidService, needsInstruction)
+	case needsInstruction == 1 && c.PairingInstruction == "":
+		return fmt.Errorf("%w: pairing instructions are required when a pairing hint requiring instructions is set", ErrInvalidService)
+	case needsInstruction == 0 && c.PairingInstruction != "":
+		return fmt.Errorf("%w: pairing instructions provided but no pairing hint requiring instructions set", ErrInvalidService)
+	}
+	return nil
+}
 
 // defaultCommissionableSII is the Session Idle Interval in milliseconds
 // advertised on the commissionable record (Matter §4.3.1.6). matter.js
@@ -756,7 +808,8 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 		txt = append(txt, TXTRecord{Key: "DN", Value: cfg.DeviceName})
 	}
 	// PH (PairingHint): always emitted per matter.js
-	// CommissionableMdnsAdvertisement.ts:90 — DEFAULT_PAIRING_HINT
+	// CommissionableMdnsAdvertisement.ts:90 at db021da0 —
+	// DEFAULT_PAIRING_HINT (:81)
 	// (powerCycle=true, deviceManual=true → 0x21) used when the
 	// caller leaves PairingHint zero.
 	ph := cfg.PairingHint

@@ -11,6 +11,7 @@ import (
 	mrand "math/rand/v2"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -31,7 +32,10 @@ type Node struct {
 	// jobs runs subscription reports' store writes and hooks off their
 	// exchanges, in order (applyDeferred).
 	jobs *jobQueue
-	s    *structure
+	// finalFlush is set while the store's final flush of a Stop whose
+	// context ended is queued on jobs and has not begun.
+	finalFlush atomic.Bool
+	s          *structure
 	// subSync serialises the default subscription's synchronisation
 	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
 	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
@@ -427,21 +431,69 @@ func (n *Node) saveSettingsLocked() {
 // recomputed (:98). A disabled node does not start: [ErrDisabled]
 // (ClientNetworkRuntime.ts:41-43). An error of the initial read is
 // returned; the node stays started.
+//
+// Before anything else Start waits, within ctx, for the node's queued
+// report jobs — their store writes and hooks ([Hooks]) — which the
+// cache's adoption of the default subscription's fabric filter follows,
+// so a hook must not call it on a stopped node. When ctx ends while jobs
+// are still queued — a hook that blocks, the one a [Node.Stop] that timed
+// out left behind included — Start returns ctx's error and nothing has
+// begun: the node is not started, the cache keeps its fabric filter, and
+// a later Start starts it.
 func (n *Node) Start(ctx context.Context) error {
-	n.mu.Lock()
+	started, err := n.start(ctx)
+	if started {
+		n.recompute()
+	}
+	return err
+}
+
+// startDecidedLocked reports whether Start has nothing to do, and with
+// what answer: a node that failed to load, is closing or disabled does
+// not start, a started one is started. The caller holds the lock.
+func (n *Node) startDecidedLocked() (decided bool, err error) {
 	switch {
 	case n.loadErr != nil:
-		n.mu.Unlock()
-		return n.loadErr
+		return true, n.loadErr
 	case n.closing:
-		n.mu.Unlock()
-		return ErrClosed
+		return true, ErrClosed
 	case n.settings.disabled:
-		n.mu.Unlock()
-		return ErrDisabled
+		return true, ErrDisabled
 	case n.started:
+		return true, nil
+	}
+	return false, nil
+}
+
+// start is Start without the closing recompute; started reports whether
+// this call brought the node online.
+func (n *Node) start(ctx context.Context) (started bool, err error) {
+	// Asked without subSync first: a hook that runs under a
+	// synchronisation may call Start on its started node.
+	n.mu.RLock()
+	decided, err := n.startDecidedLocked()
+	n.mu.RUnlock()
+	if decided {
+		return false, err
+	}
+	// The cache adopts the default subscription's fabric filter before
+	// the default subscription syncs, one reaction at a time
+	// (NetworkClient.ts:93-98 at db021da0). matter.js binds the peer's
+	// signals before that reaction and awaits it without a deadline
+	// (NetworkClient.ts:85-88, :93-98 at db021da0); here the adoption,
+	// whose drain ends with ctx, comes before the node goes online, so a
+	// Start that returns ctx's error has started nothing it would have to
+	// take back.
+	n.subSync.Lock()
+	defer n.subSync.Unlock()
+	if err := n.adoptDefaultFabricFilter(ctx); err != nil {
+		return false, err
+	}
+	n.mu.Lock()
+	// Asked again: a Close, a Disable or another Start ran meanwhile.
+	if decided, err := n.startDecidedLocked(); decided {
 		n.mu.Unlock()
-		return nil
+		return false, err
 	}
 	n.started = true
 	n.frozen, n.props = false, nil
@@ -456,22 +508,33 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	n.stopObserve = stop
 	n.mu.Unlock()
-	// The cache adopts the default subscription's fabric filter before
-	// the default subscription syncs, one reaction at a time
-	// (NetworkClient.ts:88-97 at 862ad75f).
-	n.subSync.Lock()
-	n.adoptDefaultFabricFilter()
-	err := n.syncAutoSubscribeLocked(ctx, nil)
-	n.subSync.Unlock()
-	n.recompute()
-	return err
+	return true, n.syncAutoSubscribeLocked(ctx, nil)
 }
 
 // Stop takes the node offline: the default subscription closes
 // (NetworkClient.ts:309-313), the peer's signals are released, the
 // properties freeze, the store is flushed (ClientCacheBuffer.ts:94-101)
 // and the connection state is recomputed. It waits, within ctx, for the
-// subscription to end, so a hook must not call it.
+// subscription to end and for the node's queued report jobs — their store
+// writes and hooks ([Hooks]) — to drain, so a hook must not call it.
+//
+// Whatever ctx does, the node is offline when Stop returns and the store's
+// flush timer is stopped: a stopped node arms none, so nothing of it
+// writes to the store on a timer until [Node.Start].
+//
+// When ctx ends while jobs are still queued — a hook that blocks, on the
+// host's own I/O or on a lock the caller of Stop holds — Stop returns
+// ctx's error and hands the rest of the stop to the queue. What it leaves
+// behind: the queue's goroutine, which runs the jobs to their end, hooks
+// included, and then the store's final flush as its last job (it follows
+// the drain, so no queued write lands behind it); a flush the timer had
+// already started; and, until that last job has run, the cache's
+// unflushed changes. A final flush the store refuses — the host closed
+// its database meanwhile — is logged and not retried. The stop completes
+// by itself when the hook returns. Stop is safe to call again: a second
+// Stop (or Close) waits within its own ctx for the queue and the final
+// flush and returns nil once the stop is complete. Erase and the
+// registry's delete stop first and do nothing after a Stop that failed.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false
@@ -486,6 +549,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	if stop != nil {
 		stop()
 	}
+	// The flush timer stops before anything is waited for: no path out of
+	// Stop leaves it armed (review II, R2-P0-rv-C03).
+	n.persist.halt()
 	var err error
 	if sub != nil {
 		sub.Close()
@@ -498,14 +564,37 @@ func (n *Node) Stop(ctx context.Context) error {
 	// The deferred report jobs drain before the store's final flush, so
 	// none lands after a stop (or the erase that follows a delete) —
 	// ClientStructure.ts:482-486 drains its queue on every exit path.
-	n.jobs.wait()
+	// matter.js has no deadline there; this drain ends with ctx, and the
+	// flush then is the queue's own last job.
+	if werr := n.jobs.waitContext(ctx); werr != nil {
+		n.queueFinalFlush()
+		n.recompute()
+		return werr
+	}
 	n.persist.stop()
 	n.recompute()
 	return err
 }
 
+// queueFinalFlush makes the store's final flush the last job of the
+// node's queue, once however many Stops ask while it waits there. The
+// flush writes what is dirty and arms nothing on a stopped node; on a
+// node started again meanwhile it is an early flush.
+func (n *Node) queueFinalFlush() {
+	if !n.finalFlush.CompareAndSwap(false, true) {
+		return
+	}
+	n.jobs.add(func() {
+		n.finalFlush.Store(false)
+		n.persist.flush()
+	})
+}
+
 // Close stops the node and releases it; it is idempotent. Events that
-// arrive meanwhile are dropped.
+// arrive meanwhile are dropped. A Close that returns its context's error
+// has closed the node — it starts no more, and its ICD client is released
+// — and left the stop to the node's queue as [Node.Stop] describes; a
+// second Close waits for it.
 func (n *Node) Close(ctx context.Context) error {
 	n.mu.Lock()
 	n.closing = true

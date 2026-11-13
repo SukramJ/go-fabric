@@ -12,10 +12,14 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"log/slog"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,7 +61,10 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	}
 	// The CSR comes from the fabric the window is armed for: a window is
 	// armed for its accessing fabric only (chip FailSafeContext.h:76-79).
-	if _, err := root.OperationalCredentials.MatterInvoke(im.WithFabricFilter(ctx, false, fabric), 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	// CSRRequest signs over the invoking session's attestation challenge,
+	// which the bridge stamps on a real invoke.
+	csrCtx := mattercore.WithInvokeAttestationChallenge(im.WithFabricFilter(ctx, false, fabric), make([]byte, 16))
+	if _, err := root.OperationalCredentials.MatterInvoke(csrCtx, 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 
@@ -190,7 +197,7 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 func TestBlindPositionSurvivesARestart(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "reference-bridge.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "reference-bridge.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,5 +238,77 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 	}
 	if v, _ := secondDevice.Server(wcdef.ClusterID).MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
 		t.Fatalf("restarted blind at %v, want 9000", v)
+	}
+}
+
+// TestTheDaemonCallsNoBridgeAccessor parses every non-test file of the
+// daemon and refuses a call of a method named Bridge: the facade lists
+// the endpoints itself (node.Node.Endpoints, node.Node.Topology), so the
+// daemon reads the assembled tree through neither node.Node.Bridge nor
+// anything else spelled that way (review 2026-11 W5-ex-10, gap 1). The
+// check is syntactic — it has no type information, so it refuses the
+// selector whatever its receiver.
+func TestTheDaemonCallsNoBridgeAccessor(t *testing.T) {
+	t.Parallel()
+	files, err := filepath.Glob("*.go")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no Go files (%v)", err)
+	}
+	fset := token.NewFileSet()
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		parsed, err := parser.ParseFile(fset, f, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Bridge" {
+				t.Errorf("%s calls .Bridge(), which is below the facade", fset.Position(call.Pos()))
+			}
+			return true
+		})
+	}
+}
+
+// TestTopologyBlockIsTheAssembledTree holds the block the daemon prints
+// from the facade (node.Node.Endpoints) against the assembled tree it was
+// printed from before: one line per endpoint of Bridge().Topology(),
+// ascending, with the endpoint's DeviceType — the lines the chip-tool
+// suite resolves an endpoint from (internal/chiptool/bridge_test.go
+// endpointFor) — and the banner's count against the tree's bridged
+// endpoints.
+func TestTopologyBlockIsTheAssembledTree(t *testing.T) {
+	_, n := startFleetNode(t)
+	topology := n.Bridge().Topology()
+	if topology == nil {
+		t.Fatal("no topology after Start")
+	}
+	ids := make([]uint16, 0, len(topology.Endpoints))
+	for _, ep := range topology.Endpoints {
+		if ep != nil {
+			ids = append(ids, ep.ID)
+		}
+	}
+	slices.Sort(ids)
+	var want strings.Builder
+	want.WriteString("  topology\n")
+	for _, id := range ids {
+		fmt.Fprintf(&want, "    endpoint %3d  device types 0x%04X\n", id, topology.FindByID(id).DeviceType)
+	}
+	want.WriteString("  topology end\n\n")
+	if got := topologyBlock(n.Endpoints()); got != want.String() {
+		t.Errorf("the topology block from Node.Endpoints differs from the assembled tree:\n got:\n%s\nwant:\n%s", got, want.String())
+	}
+	if got, tree := len(n.Topology().Devices), len(topology.Bridged()); got != tree || got == 0 {
+		t.Errorf("Node.Topology lists %d bridged devices, the assembled tree %d", got, tree)
+	}
+	if got := topologyBlock(nil); got != "" {
+		t.Errorf("the topology block of a node without endpoints = %q, want none", got)
 	}
 }

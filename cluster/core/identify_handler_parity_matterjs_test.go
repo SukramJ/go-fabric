@@ -112,3 +112,97 @@ func TestParityMatterJS_IdentifyTimeReachesTheHost(t *testing.T) {
 		}
 	})
 }
+
+// tickingIdentify is a host IdentifyHandler whose handling of one
+// IdentifyTime takes as long as the countdown's next tick: while it handles
+// during, it advances the clock by a second and lets the countdown act on
+// the tick before it returns — the fake clock's Yield, until the countdown
+// stopped the host or tickYields of them passed. A countdown that waits
+// for the request behind the server's lock shows nothing a test could
+// wait for, so the window is the fake's, not a signal.
+type tickingIdentify struct {
+	recordingIdentify
+	clk     *clocktest.Fake
+	during  uint16
+	stopped chan struct{}
+}
+
+// tickYields is how often tickingIdentify yields to a tick it fired.
+const tickYields = 50
+
+func (h *tickingIdentify) MatterIdentify(ctx context.Context, t uint16) error {
+	if err := h.recordingIdentify.MatterIdentify(ctx, t); err != nil {
+		return err
+	}
+	switch t {
+	case h.during:
+		h.clk.Advance(time.Second)
+		for range tickYields {
+			select {
+			case <-h.stopped:
+				return nil
+			default:
+				h.clk.Yield()
+			}
+		}
+	case 0:
+		close(h.stopped)
+	}
+	return nil
+}
+
+// TestIdentifyCountdownStopDoesNotOvertakeAWrite: the countdown's last tick
+// and a request that sets a new IdentifyTime are one after the other, never
+// interleaved — matter.js's tick is a callback under the behaviour's lock
+// and its handler a reactor of the value the tick and a request both set
+// (IdentifyServer.ts:54, :58, :108-114, :121-127 at db021da0), so the
+// host is told to stop either before the new time arrives or not at all.
+// Here the tick fires while the host handles the write of 10: the host's
+// last instruction must not be "stop" while IdentifyTime counts from 10
+// (review II, R2-P0-conc-B07).
+func TestIdentifyCountdownStopDoesNotOvertakeAWrite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, entry := range []struct {
+		name string
+		run  func(*core.Identify) error
+	}{
+		{"write", func(id *core.Identify) error { return id.MatterWrite(ctx, 0x0000, uint64(10)) }},
+		{"command", func(id *core.Identify) error { _, err := id.MatterInvoke(ctx, 0x00, uint16(10)); return err }},
+	} {
+		t.Run(entry.name, func(t *testing.T) {
+			t.Parallel()
+			clk := clocktest.New(time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC))
+			id := core.NewIdentify()
+			id.SetClock(clk)
+			t.Cleanup(id.Close)
+			h := &tickingIdentify{clk: clk, during: 10, stopped: make(chan struct{})}
+			id.SetHandler(h)
+			// One second left on the countdown.
+			if _, err := id.MatterInvoke(ctx, 0x00, uint16(1)); err != nil {
+				t.Fatal(err)
+			}
+			for range 10_000 {
+				if clk.Pending() > 0 {
+					break
+				}
+				clk.Yield()
+			}
+			// The request of 10 s; the tick fires inside the handler.
+			if err := entry.run(id); err != nil {
+				t.Fatal(err)
+			}
+			// The tick that fired is the new countdown's first: 10 → 9.
+			for range 2_000 {
+				if v, _ := id.MatterRead(0x0000); v == uint16(9) {
+					break
+				}
+				clk.Yield()
+			}
+			v, _ := id.MatterRead(0x0000)
+			if got := h.seen(); len(got) != 2 || got[0] != 1 || got[1] != 10 || v != uint16(9) {
+				t.Fatalf("the host saw %v and IdentifyTime is %v; want [1 10] and 9: the countdown's stop overtook the %s", got, v, entry.name)
+			}
+		})
+	}
+}

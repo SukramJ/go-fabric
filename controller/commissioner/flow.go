@@ -45,6 +45,15 @@ const (
 	FailSafeMaxSendTime      = 10 * time.Second
 )
 
+// abortDisarmTimeout bounds the ArmFailSafe with expiry 0 the flow sends
+// when the caller's context ended after an ArmFailSafe was started
+// (flow.disarmAfterAbort): the caller gave the commissioning up, so the
+// wait for the device is short and the flow's own. The value is this
+// module's choice — neither matter.js nor chip has such a wait — and is
+// what the flow counts for the sending of one command, FailSafeMaxSendTime
+// (FAILSAFE_MAX_SEND_TIME, ControllerCommissioningFlow.ts:302 at db021da0).
+const abortDisarmTimeout = FailSafeMaxSendTime
+
 // rootEndpoint is RootEndpointNumber (:307).
 const rootEndpoint uint16 = 0
 
@@ -152,10 +161,19 @@ type flow struct {
 
 	commissioningExpiry time.Time // zero: undefined
 	failSafeEnd         time.Time // zero: undefined
-	defaultFailSafe     time.Duration
-	dacKey              *ecdsa.PublicKey
-	lastBreadcrumb      uint64
-	data                collectedData
+	// armStarted is set when the flow starts an ArmFailSafe on the
+	// commissioning session and cleared when the device confirms
+	// CommissioningComplete or a disarm: while it is set the device may
+	// hold a fail-safe, whether or not it has answered. failSafeEnd, set
+	// by the answer, is what matter.js's bookkeeping reads; this is what
+	// the disarm after an abort reads (disarmAfterAbort).
+	armStarted      bool
+	defaultFailSafe time.Duration
+	// abortDisarm is abortDisarmTimeout; a test shortens it.
+	abortDisarm    time.Duration
+	dacKey         *ecdsa.PublicKey
+	lastBreadcrumb uint64
+	data           collectedData
 }
 
 func newFlow(c *Commissioner, ia *interaction.Interaction, opts Options, address handshake.PeerAddress, challenge []byte, transition transitionFunc) *flow {
@@ -166,6 +184,7 @@ func newFlow(c *Commissioner, ia *interaction.Interaction, opts Options, address
 		reArmBefore:     map[[2]int]bool{},
 		ble:             opts.Channel != nil,
 		defaultFailSafe: DefaultFailSafeTime,
+		abortDisarm:     abortDisarmTimeout,
 		lastBreadcrumb:  1, // :327
 	}
 	f.initializeSteps()
@@ -233,7 +252,11 @@ func (f *flow) now() time.Time { return f.c.ctx.Clock.Now() }
 // loop (:426-428). A recoverable error is logged and the loop continues
 // (:431-436); a CommissioningError or an IM status error disarms the
 // failsafe and is returned as a CommissioningError (:437-462); any other
-// error is returned as is (:463-465). No retries: a TODO upstream (:443-451).
+// error is returned as is (:463-465). Ahead of matter.js, a step that
+// failed because the caller's context ended (callerAborted) — whichever
+// of the two classes its error is — has the fail-safe disarmed on the
+// flow's own bounded context (disarmAfterAbort) and its error returned as
+// it is. No retries: a TODO upstream (:443-451).
 func (f *flow) execute(ctx context.Context) error {
 	f.sortSteps()
 	// The BLE re-arm timer ends with the flow (close, :2138-2140).
@@ -271,13 +294,21 @@ func (f *flow) execute(ctx context.Context) error {
 			f.report(s, StepFailed, err)
 			continue
 		}
-		if isCommissioningError(err) || isStatusError(err) {
+		classed := isCommissioningError(err) || isStatusError(err)
+		switch {
+		case callerAborted(ctx, err, classed):
+			// Ahead of matter.js, whose flow takes no abort signal and
+			// rethrows a bare error here (:463-465): the caller gave up.
+			// The step's error is returned as it is.
+			f.log.Warn("matter.controller.commissioning.aborted", slog.String("name", s.name), slog.Any("err", err))
+			f.disarmAfterAbort(ctx)
+		case classed:
 			f.log.Error("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.Any("err", err))
 			// The reset outlives ctx: matter.js's has no abort signal
 			// (#resetFailsafeTimer, #invokeCommand), and a step that
-			// failed because ctx ended would otherwise leave the device
-			// holding its fail-safe until it expires. The exchange's own
-			// response timeout bounds it.
+			// failed for a reason of its own while ctx ended would
+			// otherwise leave the device holding its fail-safe until it
+			// expires. The exchange's own response timeout bounds it.
 			f.resetFailsafeTimer(context.WithoutCancel(ctx))
 			// StatusResponseError.accept rethrows anything else as is
 			// (:459, general/src/MatterError.ts:87-92); a status error
@@ -290,6 +321,26 @@ func (f *flow) execute(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// callerAborted reports whether a step failed because the caller's
+// context ended. ctx is the context execute was given, and it has to be
+// done: an error that only looks like a context's — a wait of the
+// connection's or the device's own that ran out — on a live context is
+// the step's failure. With ctx done, an error matter.js's flow would
+// rethrow bare (not classed: neither a CommissioningError nor a status
+// error) is the abort whatever it is, as before; a classed one is the
+// abort when it carries ctx's error — the Reconnect step wraps the
+// operational connection's in ErrOperativeConnectionFailed
+// (reconnectWithDevice), and that connection gives its wait up with the
+// caller's context (peer.Peer.Connect) — and the step's own failure when
+// it does not.
+func callerAborted(ctx context.Context, err error, classed bool) bool {
+	ended := ctx.Err()
+	if ended == nil {
+		return false
+	}
+	return !classed || errors.Is(err, ended)
 }
 
 // report reports the step through Options.Progress ([Step]); a failed
@@ -361,6 +412,34 @@ func (f *flow) failsafeTimes() (end, expiry time.Time) {
 func (f *flow) setFailSafeEnd(t time.Time) {
 	f.mu.Lock()
 	f.failSafeEnd = t
+	f.mu.Unlock()
+}
+
+// markArmStarted records that an ArmFailSafe is about to be started on
+// the commissioning session (armStarted).
+func (f *flow) markArmStarted() {
+	f.mu.Lock()
+	f.armStarted = true
+	f.mu.Unlock()
+}
+
+// failsafeMayBeArmed reports whether the device may hold a fail-safe of
+// this flow: an ArmFailSafe was started and the device has confirmed
+// neither CommissioningComplete nor a disarm since (armStarted).
+func (f *flow) failsafeMayBeArmed() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.armStarted
+}
+
+// failsafeEnded records that the device confirmed the fail-safe's end,
+// by CommissioningComplete or by a zero expiry. matter.js then holds no
+// end time (ControllerCommissioningFlow.ts:2093 and :1104 at db021da0),
+// and an abort has nothing to disarm.
+func (f *flow) failsafeEnded() {
+	f.mu.Lock()
+	f.failSafeEnd = time.Time{}
+	f.armStarted = false
 	f.mu.Unlock()
 }
 
@@ -687,6 +766,11 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 		length = f.defaultFailSafe
 	}
 	length = min(length, maxExpiry)
+	// From here the device may arm whatever becomes of the invoke — its
+	// request queued, retransmitted, answered late or not at all — so an
+	// abort owes it a disarm (disarmAfterAbort). The read above sends no
+	// command: an abort during it owes nothing.
+	f.markArmStarted()
 	res, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{
 		Breadcrumb: f.breadcrumb(), ExpiryLengthSeconds: uint16(length / time.Second), //nolint:gosec // bounded by MaxCumulativeFailsafeSeconds, a uint16
 	}, false)
@@ -734,17 +818,89 @@ func (f *flow) ensureFailsafeTimerFor(ctx context.Context, maxProcessingTime tim
 	return nil
 }
 
-// resetFailsafeTimer is :1077-1093: ArmFailSafe with 0 when a failsafe is
-// armed, the response not checked, a failure only logged.
+// resetFailsafeTimer is #resetFailsafeTimer (:1092-1108 at db021da0):
+// ArmFailSafe with 0 when a failsafe end time is known — the device
+// answered an ArmFailSafe — the response not checked, a failure only
+// logged.
 func (f *flow) resetFailsafeTimer(ctx context.Context) {
 	if end, _ := f.failsafeTimes(); end.IsZero() {
 		return
 	}
+	f.expireFailsafe(ctx)
+}
+
+// expireFailsafe sends #resetFailsafeTimer's request (:1095-1103 at
+// db021da0): ArmFailSafe with expiry 0 and the current breadcrumb, the
+// response not checked, a failure only logged (:1105-1107) — the flow
+// then still counts the fail-safe.
+func (f *flow) expireFailsafe(ctx context.Context) {
 	if _, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{Breadcrumb: f.breadcrumb(), ExpiryLengthSeconds: 0}, false); err != nil {
 		f.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.Any("err", err))
 		return
 	}
-	f.setFailSafeEnd(time.Time{})
+	f.failsafeEnded()
+}
+
+// disarmAfterAbort expires the fail-safe when the caller's context ended —
+// cancelled or past its deadline — once the flow has started an
+// ArmFailSafe and the session it went over still stands; without it the
+// device refuses a new commissioning until the fail-safe runs out. Ahead
+// of matter.js: its flow takes no abort signal (the constructor,
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:333-351 at
+// db021da0; the commissioner hands its AbortSignal to the PASE attempts
+// only, ControllerCommissioner.ts:194-195, :277) and rethrows an error
+// that is neither a CommissioningError nor a status error without the
+// reset (:463-465). Mirrors connectedhomeip
+// src/controller/CHIPDeviceController.cpp:2219-2247 at 6170af84
+// (DeviceCommissioner::CleanupCommissioning: on CHIP_ERROR_CANCELLED,
+// which StopPairing reports at :1225-1226, ArmFailSafe with
+// expiryLengthSeconds 0, :2164-2170, over the session the commissioning
+// holds, :2224-2225, a failure ignored, :2233-2236).
+//
+// The disarm is owed for an ArmFailSafe that was started, not for one
+// that was answered (armStarted, set in armFailsafe before the invoke):
+// the caller's context ends in a wait, and the wait for that answer is
+// one — the request may have armed the device, may still be on its way,
+// or may never have left, and the flow cannot tell which. A device that
+// holds no fail-safe answers the disarm with success and no effect
+// (matter.js
+// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:96-98
+// at db021da0). connectedhomeip does not ask either: its branch sends
+// whatever stage was cancelled (:2219 tests the completion status alone,
+// and a failed stage goes to kCleanup whatever it was,
+// src/controller/AutoCommissioner.cpp:465-468).
+//
+// Three differences from chip, all this module's. Before the flow has
+// started its first ArmFailSafe nothing is sent — the device was never
+// asked to arm. chip sends in the background and returns; here the send
+// is awaited, because Commission closes the PASE session as soon as the
+// flow returns and the command would not leave. It is awaited on a
+// context of the flow's own — the caller's has ended — for at most
+// abortDisarmTimeout. And the request is the one #resetFailsafeTimer
+// sends (:1095-1103), with the current breadcrumb where chip sends 0.
+//
+// The BLE re-arm timer stops first, or its next period would arm the
+// fail-safe again behind the disarm. Once the device has confirmed
+// CommissioningComplete or a disarm nothing is owed and nothing is sent
+// (failsafeEnded); on a closed session nothing can be.
+//
+// What it does not cover: the aborted ArmFailSafe is not retransmitted
+// (exchange.Exchange.Send ends the retransmissions with its context), but
+// a datagram of it still on its way can reach the device behind the
+// disarm and arm it; so can a re-arm of the BLE timer already in flight,
+// which runs beside the steps on a context the abort does not end.
+func (f *flow) disarmAfterAbort(ctx context.Context) {
+	f.stopArmInterval()
+	if !f.failsafeMayBeArmed() {
+		return
+	}
+	if s := f.interaction().Session(); s != nil && s.IsClosed() {
+		f.log.Debug("matter.controller.commissioning.abort_disarm_skipped", slog.String("reason", "session closed"))
+		return
+	}
+	own, cancel := context.WithTimeout(context.WithoutCancel(ctx), f.abortDisarm)
+	defer cancel()
+	f.expireFailsafe(own)
 }
 
 // configureRegulatoryInformation is step 8.1 (:1102-1188): only when a
@@ -1000,7 +1156,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 		return 0, fmt.Errorf("%w: NOCSRElements: %w", errUnexpectedResponse, err)
 	}
 	// Ahead of matter.js: the echoed nonce must be the one sent. matter.js
-	// draws the nonce (ControllerCommissioningFlow.ts:1395 at 862ad75f)
+	// draws the nonce (ControllerCommissioningFlow.ts:1412 at db021da0)
 	// and never reads it back; connectedhomeip refuses a mismatch
 	// (DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84,
 	// VerifyNodeOperationalCSRInformation). See notes/parity/by_design.md
@@ -1134,7 +1290,7 @@ func (f *flow) completeCommissioning(ctx context.Context) (stepResult, error) {
 	if err := f.ensureGeneralCommissioningSuccess("commissioningComplete", resp.ErrorCode, resp.DebugText); err != nil {
 		return 0, err
 	}
-	f.setFailSafeEnd(time.Time{})
+	f.failsafeEnded()
 	return stepSuccess, nil
 }
 

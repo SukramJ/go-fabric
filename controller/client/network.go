@@ -120,6 +120,16 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 // 862ad75f), a reaction to the defaultSubscription state that runs one at
 // a time with Start and [Node.SetAutoSubscribe] (:113-115, :88-97). An
 // unchanged request is nothing.
+//
+// The adoption waits, within ctx, for the node's queued report jobs —
+// their store writes and hooks ([Hooks]) — so a hook must not call
+// SetDefaultSubscription. When ctx ends while jobs are still queued — a
+// hook that blocks — it returns ctx's error and the request is not
+// replaced: the settings, stored ones included, name the default
+// subscription they named before, and the cache keeps its fabric filter,
+// so the two agree. The default subscription a started node held has
+// ended, as after an establishment that failed; the same call again
+// makes the change and establishes the new one.
 func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
@@ -128,6 +138,7 @@ func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) 
 		n.mu.Unlock()
 		return nil
 	}
+	before := n.settings.defaultSubscription
 	n.settings.defaultSubscription = o.clone()
 	n.saveSettingsLocked()
 	started := n.started && !n.closing
@@ -138,7 +149,17 @@ func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) 
 			return err
 		}
 	}
-	n.adoptDefaultFabricFilter()
+	if err := n.adoptDefaultFabricFilter(ctx); err != nil {
+		// The adoption did not begin: the request whose filter the cache
+		// still has is the node's again, so a later start or change adopts
+		// from a state that agrees with itself.
+		n.mu.Lock()
+		n.settings.defaultSubscription = before
+		n.saveSettingsLocked()
+		n.mu.Unlock()
+		n.recompute()
+		return err
+	}
 	if !started {
 		return nil
 	}
@@ -175,22 +196,31 @@ func sameSubscribeOptions(a, b *SubscribeOptions) bool {
 // (packages/node/src/behavior/system/network/NetworkClient.ts:273-298 at
 // 862ad75f): a record that failed while the filter is already the cache's
 // is a warning, a failed switch an error. The caller holds subSync.
-func (n *Node) adoptDefaultFabricFilter() {
+//
+// Its error is ctx's and nothing else: ctx ended while the node's report
+// jobs were still queued, the adoption did not begin, and the caller
+// answers with it — a storage failure is logged here and is no error of
+// the caller's, so the two are never taken for each other.
+func (n *Node) adoptDefaultFabricFilter(ctx context.Context) error {
 	n.mu.RLock()
 	filtered := !n.defaultRequest().NoFabricFilter
 	n.mu.RUnlock()
-	err := n.adoptFabricFilter(filtered)
+	begun, err := n.adoptFabricFilter(ctx, filtered)
+	if !begun {
+		return err
+	}
 	if err == nil {
-		return
+		return nil
 	}
 	n.mu.RLock()
 	kept := n.s.cacheFabricFiltered() == filtered
 	n.mu.RUnlock()
 	if kept {
 		n.log.Warn("matter.controller.client.fabric_filter_record_failed", slog.String("node", n.cfg.ID), slog.Bool("fabric_filtered", filtered), slog.Any("err", err))
-		return
+		return nil
 	}
 	n.log.Error("matter.controller.client.fabric_filter_switch_failed", slog.String("node", n.cfg.ID), slog.Bool("fabric_filtered", filtered), slog.Any("err", err))
+	return nil
 }
 
 // adoptFabricFilter makes filtered the fabric filter of the cache; calls
@@ -205,12 +235,27 @@ func (n *Node) adoptDefaultFabricFilter() {
 // the old record stays — written last, so the next attempt forgets the
 // versions again. Mirrors matter.js ClientStructure.adoptFabricFilter
 // (packages/node/src/node/client/ClientStructure.ts:343-390 at 862ad75f).
-func (n *Node) adoptFabricFilter(filtered bool) error {
+//
+// The drain it starts with ends with ctx, and it is the adoption's first
+// step: when ctx ends while jobs are still queued (a hook that blocks),
+// begun is false, err is ctx's and nothing was adopted — no version
+// forgotten, no filter recorded, no epoch started. With begun true err is
+// the store's. The callers (Start, SetDefaultSubscription) tell the two
+// apart by begun, never by the error's value.
+func (n *Node) adoptFabricFilter(ctx context.Context, filtered bool) (begun bool, err error) {
 	n.adoptMu.Lock()
 	defer n.adoptMu.Unlock()
 	// The deferred report writes and a flush in hand land before a
 	// version is forgotten (DatasourceCache.ts:324-325).
-	n.jobs.wait()
+	if err := n.jobs.waitContext(ctx); err != nil {
+		return false, err
+	}
+	return true, n.adoptFabricFilterDrained(filtered)
+}
+
+// adoptFabricFilterDrained is adoptFabricFilter past its drain. The
+// caller holds adoptMu.
+func (n *Node) adoptFabricFilterDrained(filtered bool) error {
 	n.persist.flushMu.Lock()
 	defer n.persist.flushMu.Unlock()
 	n.mu.Lock()

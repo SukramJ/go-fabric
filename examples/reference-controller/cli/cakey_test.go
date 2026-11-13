@@ -5,7 +5,6 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ import (
 // caSetting is the CA's record in the tool's database.
 func caSetting(t *testing.T, path string) string {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path)
+	db, err := store.OpenSQLite(path)
 	if err != nil {
 		t.Fatal(err)
 	}

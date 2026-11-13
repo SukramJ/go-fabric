@@ -25,13 +25,13 @@
 // advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
 // loads a vendor attestation chain (node.Attestation.Files) and runs the
 // health probe (node.Config.Health); it names none of mdns, secure/* or
-// bridge for them. Three things still reach below the facade, each a gap
-// the facade does not cover yet (review 2026-11 W5-ex-10): the listing of
-// every endpoint with its device types (printTopology and the banner
-// through Node.Bridge — Node.Topology lists the bridged devices only),
-// the thermostat's preset store (store.NewThermostatPresetStore over
-// Node.Store) and the charger's EnergyEvse with its host port
-// (cluster/energy.NewEnergyEvse as the Declare's HostServer).
+// bridge for them, and it lists its endpoints through the facade too
+// (Node.Topology for the banner's count of bridged devices, Node.Endpoints
+// for printTopology). Two things still reach below the facade (review
+// 2026-11 W5-ex-10): the thermostat's preset store
+// (store.NewThermostatPresetStore over Node.Store) and the charger's
+// EnergyEvse with its host port (cluster/energy.NewEnergyEvse as the
+// Declare's HostServer).
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -50,7 +50,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 
@@ -137,7 +136,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that knows the --wifi-sim-ssid networks, connects to one after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
-	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as expvar's /debug/vars; off when empty; see metrics.go")
+	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as /debug/vars, in expvar's JSON shape and without authentication — keep it on loopback; off when empty; see metrics.go")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
@@ -172,7 +171,7 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	// below is safe exactly because of this check.
 	const setupPasscodeMax = 99999998
 	if f.passcode > setupPasscodeMax {
-		return 0, 0, fmt.Errorf("--passcode %d exceeds the Matter maximum %d", f.passcode, setupPasscodeMax)
+		return 0, 0, fmt.Errorf("--passcode exceeds the Matter maximum %d", setupPasscodeMax)
 	}
 	passcode = uint32(f.passcode)
 	if err := node.ValidateSetupPIN(passcode); err != nil {
@@ -567,12 +566,7 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
 		return err
 	}
 	qr, manual := payload.QR, payload.Manual
-	br := n.Bridge()
-	topology := br.Topology()
-	bridged := 0
-	if topology != nil {
-		bridged = len(topology.Bridged())
-	}
+	bridged := len(n.Topology().Devices)
 
 	fmt.Printf(`
   go-fabric reference bridge
@@ -600,28 +594,32 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
 // the endpoint that serves its cluster, without a controller of its own.
 // Like the banner it is for an operator's eyes too.
 func printTopology(n *node.Node) {
-	topology := n.Bridge().Topology()
-	if topology == nil {
-		return
+	fmt.Print(topologyBlock(n.Endpoints()))
+}
+
+// topologyBlock renders the topology block from the node's endpoints
+// (node.Node.Endpoints: ascending by endpoint number): one line per
+// endpoint with the first entry of its Descriptor DeviceTypeList — the
+// device type the assembled endpoint carries, which the Descriptor lists
+// first (endpoint/helpers.go listedDeviceTypes;
+// TestTopologyBlockIsTheAssembledTree holds the block against the tree).
+// Empty for a node that serves no endpoint yet.
+func topologyBlock(endpoints []node.EndpointInfo) string {
+	if len(endpoints) == 0 {
+		return ""
 	}
-	ids := make([]uint16, 0, len(topology.Endpoints))
-	for _, ep := range topology.Endpoints {
-		if ep != nil {
-			ids = append(ids, ep.ID)
-		}
-	}
-	slices.Sort(ids)
 	var b bytes.Buffer
 	b.WriteString("  topology\n")
-	for _, id := range ids {
-		ep := topology.FindByID(id)
-		if ep == nil {
-			continue
+	for i := range endpoints {
+		ep := &endpoints[i]
+		var deviceType uint32
+		if len(ep.DeviceTypes) > 0 {
+			deviceType = ep.DeviceTypes[0].ID
 		}
-		fmt.Fprintf(&b, "    endpoint %3d  device types 0x%04X\n", id, ep.DeviceType)
+		fmt.Fprintf(&b, "    endpoint %3d  device types 0x%04X\n", ep.Endpoint, deviceType)
 	}
 	b.WriteString("  topology end\n\n")
-	fmt.Print(b.String())
+	return b.String()
 }
 
 // deviceTypeRevision reads a device type's revision from the generated

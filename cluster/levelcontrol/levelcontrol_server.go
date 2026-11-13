@@ -439,7 +439,17 @@ func NewServer(cfg Config) *Server {
 	}
 	s := newServer(sourceOf(cfg.Source), cfg.DataVersion, features)
 	if cfg.Transitions != nil {
-		s.initEngine(*cfg.Transitions, true)
+		t := *cfg.Transitions
+		// Coupled to OnOff under OO only, as [New] is: without the
+		// feature a "with On/Off" command switches nothing and no command
+		// is gated on the On/Off state. Mirrors matter.js
+		// packages/node/src/behaviors/level-control/LevelControlServer.ts:558
+		// at db021da0 (`const coupleOnOff = this.features.onOff && withOnOff && …`)
+		// and :729-736 (`#optionsAllowExecution`).
+		if features&FeatureOnOff == 0 {
+			t.OnOff = nil
+		}
+		s.initEngine(t, true)
 	} else if s.src != nil {
 		s.level, s.levelKnown = s.src.CurrentLevel()
 	}

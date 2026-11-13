@@ -659,14 +659,17 @@ func (a *AccessControl) writeFabric(ctx context.Context, attr string, entryFabri
 	return fabric, nil
 }
 
-// MatterWrite handles writes to the cluster's writable attributes.
-// The only writable attribute today is ACL (0x0000) — Apple Home
-// rewrites the entire list ~10 ms after CommissioningComplete to
-// install HomePod / AppleTV edge controllers as additional Administer
-// subjects on the freshly-paired bridge. Without a working write path
-// Apple times out after 10 s and tears the fabric down via
-// RemoveFabric. Extension (0x0001) is not implemented — matter.js does
-// the same and Apple does not write it.
+// MatterWrite handles writes to the cluster's writable attributes: ACL
+// (0x0000) and Extension (0x0001), each a fabric-scoped list the write
+// replaces for the accessing fabric (writeFabric); any other attribute
+// is refused. Apple Home rewrites the entire ACL ~10 ms after
+// CommissioningComplete to install HomePod / AppleTV edge controllers
+// as additional Administer subjects on the freshly-paired bridge.
+// Without a working write path Apple times out after 10 s and tears the
+// fabric down via RemoveFabric. An Extension write is held to matter.js's
+// checks — at most one entry for the fabric, its Data a well-formed TLV
+// list (AccessControlServer.ts:344-362, :416-434 at db021da0) — and to
+// the model's 128 bytes of Data (access-control.element.ts:206).
 func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value any) error { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)
@@ -913,7 +916,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// fabric below (v1.1 has no cross-fabric write path to begin
 		// with), so more than one entry in a single write always means
 		// more than one entry for that fabric. Mirrors matter.js
-		// AccessControlServer.ts:352-370
+		// AccessControlServer.ts:344-362 at db021da0
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
 		// most one AccessControlExtensionStruct.
 		if len(entries) > 1 {
@@ -924,7 +927,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
 			}
 			// Data must itself decode as a well-formed TLV List — mirrors
-			// matter.js AccessControlServer.ts:424-441
+			// matter.js AccessControlServer.ts:416-434 at db021da0
 			// (extensionEntryValidator's default implementation). A blob
 			// that fails this is rejected rather than stored, so a
 			// garbage write cannot wedge a later fabric-scoped read.
@@ -1142,7 +1145,7 @@ func aclIsValidGroupSubject(id uint64) bool {
 // type byte is TlvType.List (0x17) and whose final byte is the
 // EndOfContainer marker (0x18), with everything in between parsing as
 // balanced TLV. Mirrors matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts:424-441
+// packages/node/src/behaviors/access-control/AccessControlServer.ts:416-434 at db021da0
 // (extensionEntryValidator, the default implementation): a controller
 // may attach arbitrary vendor metadata to a fabric's Extension entry,
 // but the octet-string must itself be decodable TLV, or a later

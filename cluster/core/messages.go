@@ -318,11 +318,11 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 	return nil
 }
 
-// messagesStatus keeps the status of an [im.StatusCodeError] and answers
-// any other error FAILURE.
+// messagesStatus is the answer to the presenter's refusal: the status a
+// host's contract.StatusError or an im.StatusCodeError names, FAILURE for
+// any other error (docs/guides/ports.md).
 func messagesStatus(err error) error {
-	var sce im.StatusCodeError
-	if errors.As(err, &sce) {
+	if spec.CarriesStatus(err) {
 		return err
 	}
 	return bindingStatusError{code: im.StatusFailure, msg: "core: Messages: " + err.Error()}

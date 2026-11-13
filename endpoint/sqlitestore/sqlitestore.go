@@ -17,9 +17,13 @@
 // brings its own endpoint.Store never imports it, links nothing of it, and
 // creates none of its tables.
 //
-// Usage:
+// Usage, with this module's driver: [store.OpenSQLite] opens the file with
+// foreign keys on, its `file:` URI built with net/url. A host on another
+// driver builds its DSN with net/url too — never as path+"?_pragma=…",
+// which a path holding `?` or `#` ends early, its pragmas read from the
+// wrong place.
 //
-//	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(1)")
+//	db, err := store.OpenSQLite(path)
 //	...
 //	if err := sqlitestore.Apply(ctx, db); err != nil { ... }
 //	asm, err := endpoint.New(sqlitestore.New(db), cfg, logger)

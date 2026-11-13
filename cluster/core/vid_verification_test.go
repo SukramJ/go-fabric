@@ -53,7 +53,7 @@ func TestSetVidVerificationStatementParityMatterJS(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	fs := newFakeStore()
-	oc, err := core.NewOperationalCredentials(vendorUpdatingStore{fs}, core.OpcredsConfig{SupportedFabrics: 5})
+	oc, err := core.NewOperationalCredentials(vendorUpdatingStore{fs}, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 	if err != nil {
 		t.Fatal(err)
 	}

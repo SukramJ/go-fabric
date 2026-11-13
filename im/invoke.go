@@ -614,15 +614,16 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// The access check a cluster server may consult for a privilege
 	// beyond the command's own ([AuthorityAt]): the same gate the command
 	// itself passed — PASE holds the implicit Administer, a CASE subject
-	// what the ACL grants, and nothing is granted without an ACL source.
+	// what the ACL grants, and nothing is granted without an ACL source:
+	// fabric 0 without PASE is no grant either, the implicit Administer is
+	// keyed on the auth mode alone (matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
+	// db021da0, `authMode === Pase && isCommissioning`).
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
 		if g.pase {
 			return StatusSuccess
 		}
 		if !g.hasACL {
-			if g.fabricIndex == 0 {
-				return StatusSuccess
-			}
 			return StatusUnsupportedAccess
 		}
 		return checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
@@ -779,11 +780,13 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 		}
 	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
-	// session without one — PASE before AddNOC — it answers
-	// UnsupportedAccess. Mirrors matter.js CommandInvokeResponse.ts:287
-	// (`limits.fabricScoped && !this.session.fabric`). Found by the CHIP
-	// Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
-	if g.fabricIndex == 0 && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
+	// session without one — PASE before AddNOC, or a session whose fabric
+	// the caller could not resolve ([HasAccessingFabric]) — it answers
+	// UnsupportedAccess. Mirrors matter.js
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:287-290
+	// at db021da0 (`limits.fabricScoped && !this.session.fabric`). Found by
+	// the CHIP Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
+	if !HasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
 		return StatusUnsupportedAccess
 	}
 	// A timed-required command ("T") outside a timed interaction answers
@@ -819,7 +822,9 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 			return status
 		}
 	}
-	if g.fabricIndex == 0 && schema.IsFabricScopedInvoke(clusterID, commandID) {
+	// CommandInvokeResponse.ts:388 at db021da0, the same check at a
+	// wildcard path's endpoint.
+	if !HasAccessingFabric(g.fabricIndex) && schema.IsFabricScopedInvoke(clusterID, commandID) {
 		return StatusUnsupportedAccess
 	}
 	if g.timedKnown && !g.timed && g.isTimed(at) {

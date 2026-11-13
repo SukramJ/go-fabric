@@ -28,4 +28,9 @@
 // manual — they require dedicated hardware (an iOS / Android device,
 // a Home Hub) and live in [notes/reference/matter-conformance.md] as a release
 // checklist rather than executable Go tests.
+//
+// This package is the conformance suite, not the conformance engine: what
+// evaluates a Matter conformance expression — whether an element is
+// mandatory, optional or disallowed under a feature selection — is
+// cluster/spec (conformance.go, field_conformance.go).
 package conformance

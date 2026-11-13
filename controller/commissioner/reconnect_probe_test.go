@@ -6,6 +6,7 @@ package commissioner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/netip"
 	"slices"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gendiag "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
@@ -327,6 +329,287 @@ func TestReconnectProbeHintsRoutableAddresses(t *testing.T) {
 		if !p.HasEndpoint || p.Endpoint != rootEndpoint || !p.HasCluster || !p.HasAttribute {
 			t.Fatalf("a probe path is not a concrete root path: %+v", p)
 		}
+	}
+}
+
+// interfacesReport is a probe's report whose NetworkInterfaces is ifaces,
+// through the wire encoding and the probe's own parser.
+func interfacesReport(t *testing.T, ifaces []gendiag.NetworkInterface) *deviceNetworkReport {
+	t.Helper()
+	return interfacesReportFor(t, ifaces, netip.Addr{})
+}
+
+// interfacesReportFor is interfacesReport of a probe whose commissioning
+// session runs on the address proven.
+func interfacesReportFor(t *testing.T, ifaces []gendiag.NetworkInterface, proven netip.Addr) *deviceNetworkReport {
+	t.Helper()
+	b := encodeTLV(func(e *tlv.Encoder) { spec.List[gendiag.NetworkInterface](ifaces).EncodeTLV(e, tlv.AnonymousTag()) })
+	n, err := spec.ReadElement(tlv.NewDecoder(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &deviceNetworkReport{}
+	r.addInterfaceList(n, proven)
+	return r
+}
+
+// TestReconnectProbeBoundsReportedAddresses (review II, R2-P0-bound-E01):
+// the probe takes what one NetworkInterfaces attribute may hold and no
+// more — 8 interfaces of 8 IPv6 and 4 IPv4 addresses, the numbers of the
+// generated definition, which peer.MaxHintedAddresses multiplies out. A
+// device that lists more interfaces (connectedhomeip encodes its whole
+// interface list, GeneralDiagnosticsCluster.cpp:437-446 at 6170af84) has
+// its first 8 usable ones taken (TestReconnectProbeJudgesBeforeItBounds);
+// an interface with more addresses than its lists allow does not decode,
+// and the attribute is left out.
+func TestReconnectProbeBoundsReportedAddresses(t *testing.T) {
+	t.Parallel()
+	def := gendiag.Definition.Attribute(gendiag.AttrNetworkInterfaces)
+	listMax := func(name string) int {
+		for _, f := range gendiag.NetworkInterfaceDef.Fields {
+			if f.Name == name && f.Constraint.Max.IsInt() {
+				return int(f.Constraint.Max.Int)
+			}
+		}
+		t.Fatalf("the generated NetworkInterface has no list bound for %s", name)
+		return 0
+	}
+	if def == nil || !def.Constraint.Max.IsInt() {
+		t.Fatal("the generated NetworkInterfaces has no list bound")
+	}
+	v4, v6 := listMax("IPv4Addresses"), listMax("IPv6Addresses")
+	if maxProbedInterfaces() != 8 || v4 != 4 || v6 != 8 {
+		t.Fatalf("bounds %d interfaces, %d IPv4, %d IPv6; want 8, 4, 8", maxProbedInterfaces(), v4, v6)
+	}
+	if got := maxProbedInterfaces() * (v4 + v6); got != peer.MaxHintedAddresses {
+		t.Fatalf("peer.MaxHintedAddresses is %d, the definition allows %d", peer.MaxHintedAddresses, got)
+	}
+
+	// 12 interfaces, each full: the 2nd is not operational, so the first
+	// 8 operational ones are 1 and 3 to 9.
+	full := func(i int, operational bool) gendiag.NetworkInterface {
+		addrs := make([]string, 0, v6+v4)
+		for j := range v6 {
+			addrs = append(addrs, fmt.Sprintf("fd%02x::%x", i, j+1))
+		}
+		for j := range v4 {
+			addrs = append(addrs, fmt.Sprintf("10.%d.0.%d", i, j+1))
+		}
+		return iface(gendiag.InterfaceTypeWiFi, operational, addrs...)
+	}
+	var ifaces []gendiag.NetworkInterface
+	for i := 1; i <= 12; i++ {
+		ifaces = append(ifaces, full(i, i != 2))
+	}
+	r := interfacesReport(t, ifaces)
+	if !r.interfacesKnown || len(r.addresses) != peer.MaxHintedAddresses || len(r.routable) != peer.MaxHintedAddresses || r.interfacesOver != 3 {
+		t.Fatalf("%d addresses, %d routable, %d interfaces passed over; want %d, %d and 3",
+			len(r.addresses), len(r.routable), r.interfacesOver, peer.MaxHintedAddresses, peer.MaxHintedAddresses)
+	}
+	if slices.Contains(r.addresses, netip.MustParseAddr("fd02::1")) || !slices.Contains(r.addresses, netip.MustParseAddr("fd09::1")) ||
+		slices.Contains(r.addresses, netip.MustParseAddr("fd0a::1")) {
+		t.Fatalf("not the first 8 usable interfaces: %v", r.addresses)
+	}
+
+	// One address more than a list allows: the attribute does not decode.
+	over := full(1, true)
+	extra := netip.MustParseAddr("fd01::ffff").As16()
+	over.IPv6Addresses = append(over.IPv6Addresses, extra[:])
+	if r := interfacesReport(t, []gendiag.NetworkInterface{over}); r.interfacesKnown || len(r.addresses) != 0 {
+		t.Fatalf("an interface with %d IPv6 addresses was taken: %v", len(over.IPv6Addresses), r.addresses)
+	}
+}
+
+// TestReconnectProbeJudgesBeforeItBounds (review II, R2-P0-rv-C08): the
+// interface bound counts interfaces the connection can use — operational,
+// with an address that is routable and not mesh-local — before any other,
+// so a device that lists more than 8 interfaces (connectedhomeip encodes
+// its platform's whole list, GeneralDiagnosticsCluster.cpp:437-446 at
+// 6170af84), loopback and virtual ones among them, does not lose its
+// routable one to its position in the list.
+func TestReconnectProbeJudgesBeforeItBounds(t *testing.T) {
+	t.Parallel()
+	const proven = "fd00::2" // deviceAddr, the commissioning session's
+	provenAddr := netip.MustParseAddr(proven)
+	if !provenAddr.IsValid() || deviceAddr.IP.String() != proven {
+		t.Fatalf("the rig's device is at %v, not %s", deviceAddr.IP, proven)
+	}
+
+	t.Run("12 interfaces, the 11th the only routable one", func(t *testing.T) {
+		t.Parallel()
+		// lo, then bridges and veths with a link-local address each, the
+		// Wi-Fi interface eleventh.
+		ifaces := []gendiag.NetworkInterface{iface(gendiag.InterfaceTypeUnspecified, true, "::1", "127.0.0.1")}
+		for i := 2; i <= 12; i++ {
+			if i == 11 {
+				ifaces = append(ifaces, iface(gendiag.InterfaceTypeWiFi, true, "fe80::b", "fd11::5", "192.0.2.7"))
+				continue
+			}
+			ifaces = append(ifaces, iface(gendiag.InterfaceTypeEthernet, true, fmt.Sprintf("fe80::%x", i)))
+		}
+		r := interfacesReport(t, ifaces)
+		want := []netip.Addr{netip.MustParseAddr("fd11::5"), netip.MustParseAddr("192.0.2.7")}
+		if !slices.Equal(r.routable, want) || r.interfacesOver != 0 {
+			t.Fatalf("routable %v, %d usable interfaces passed over; want %v and 0", r.routable, r.interfacesOver, want)
+		}
+		// The slots the usable interface leaves go to the first others,
+		// for the log: lo's two addresses, six link-local ones, and the
+		// eleventh interface's three.
+		if len(r.addresses) != 2+6+3 || !slices.Contains(r.addresses, netip.MustParseAddr("fe80::7")) || slices.Contains(r.addresses, netip.MustParseAddr("fe80::8")) {
+			t.Fatalf("addresses %v, want those of the usable interface and of the first seven others", r.addresses)
+		}
+	})
+
+	t.Run("200 addresses, the commissioning session's last", func(t *testing.T) {
+		t.Parallel()
+		// 16 interfaces of 8 IPv6 and 4 IPv4 addresses, then one of 8
+		// IPv6 addresses whose last is the address the commissioning
+		// session runs on: 200, every one routable.
+		var ifaces []gendiag.NetworkInterface
+		for i := 1; i <= 16; i++ {
+			var addrs []string
+			for j := 1; j <= 8; j++ {
+				addrs = append(addrs, fmt.Sprintf("fd%02x::%x", i, j))
+			}
+			for j := 1; j <= 4; j++ {
+				addrs = append(addrs, fmt.Sprintf("10.%d.0.%d", i, j))
+			}
+			ifaces = append(ifaces, iface(gendiag.InterfaceTypeEthernet, true, addrs...))
+		}
+		var last []string
+		for j := 1; j <= 7; j++ {
+			last = append(last, fmt.Sprintf("fdaa::%x", j))
+		}
+		ifaces = append(ifaces, iface(gendiag.InterfaceTypeWiFi, true, append(last, proven)...))
+
+		// Without a proven address: the first 8 usable interfaces.
+		r := interfacesReport(t, ifaces)
+		if len(r.routable) != peer.MaxHintedAddresses || r.interfacesOver != 9 || slices.Contains(r.routable, provenAddr) {
+			t.Fatalf("%d routable, %d passed over; want %d and 9, without %s", len(r.routable), r.interfacesOver, peer.MaxHintedAddresses, proven)
+		}
+
+		// With it: its interface is one of the 8, it is the first address.
+		r = interfacesReportFor(t, ifaces, provenAddr)
+		if len(r.routable) != 7*12+8 || len(r.routable) > peer.MaxHintedAddresses || r.interfacesOver != 9 {
+			t.Fatalf("%d routable, %d passed over; want %d (7 full interfaces and the session's) and 9", len(r.routable), r.interfacesOver, 7*12+8)
+		}
+		if r.routable[0] != provenAddr {
+			t.Fatalf("the first routable address is %s, want the commissioning session's %s", r.routable[0], proven)
+		}
+		if !slices.Contains(r.routable, netip.MustParseAddr("fdaa::1")) || !slices.Contains(r.routable, netip.MustParseAddr("fd07::1")) ||
+			slices.Contains(r.routable, netip.MustParseAddr("fd08::1")) {
+			t.Fatalf("not the session's interface and the first 7 others: %v", r.routable)
+		}
+
+		// Through a probe: the session's address is the first one handed
+		// to the connection, inside its allowance.
+		dev := &probedDevice{states: []probeState{{interfaces: ifaces}}}
+		rig := newProbeRig(t, dev, true)
+		rig.probe(t, reconnectProbeFirst)
+		h := rig.hinted()
+		if len(h) != 1 || len(h[0]) != 7*12+8 || h[0][0] != netip.AddrPortFrom(provenAddr, operationalPort) {
+			t.Fatalf("hints %v, want one call of %d addresses, [%s]:%d first", h, 7*12+8, proven, operationalPort)
+		}
+		if dropped := rig.log.named("matter.controller.commissioning.reconnect_probe_interfaces_dropped"); len(dropped) != 1 || dropped[0]["dropped"] != "9" {
+			t.Fatalf("the passed-over interfaces are logged as %v, want one line with dropped=9", dropped)
+		}
+		if err := rig.finish(t, nil); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("only unusable entries", func(t *testing.T) {
+		t.Parallel()
+		// 12 operational interfaces without a routable address, and a
+		// routable one on an interface that is not operational.
+		ifaces := []gendiag.NetworkInterface{iface(gendiag.InterfaceTypeWiFi, false, "fd11::5")}
+		for i := 1; i <= 12; i++ {
+			ifaces = append(ifaces, iface(gendiag.InterfaceTypeEthernet, true, fmt.Sprintf("fe80::%x", i), "::1", "ff02::1", "169.254.0.1"))
+		}
+		r := interfacesReportFor(t, ifaces, provenAddr)
+		if !r.interfacesKnown || len(r.routable) != 0 || r.interfacesOver != 0 {
+			t.Fatalf("routable %v, %d usable interfaces passed over; want none and 0", r.routable, r.interfacesOver)
+		}
+		// What is kept for the log stays inside the bound: 8 interfaces.
+		if len(r.addresses) != 8+3 || len(r.addresses) > peer.MaxHintedAddresses {
+			t.Fatalf("%d addresses kept, want the 11 distinct ones of the first 8 interfaces", len(r.addresses))
+		}
+		if got := r.summary(); got != "the device reports no routable address" {
+			t.Fatalf("summary %q", got)
+		}
+
+		dev := &probedDevice{states: []probeState{{interfaces: ifaces}}}
+		rig := newProbeRig(t, dev, true)
+		rig.probe(t, reconnectProbeFirst)
+		if h := rig.hinted(); len(h) != 0 {
+			t.Fatalf("hints %v", h)
+		}
+		if dropped := rig.log.named("matter.controller.commissioning.reconnect_probe_interfaces_dropped"); len(dropped) != 0 {
+			t.Fatalf("interfaces the connection could not use are logged as dropped: %v", dropped)
+		}
+		if err := rig.finish(t, nil); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+// TestReconnectProbeRoutableIsUnicast (review II, R2-P0-bound-E01): what
+// is not a unicast address of another host is not handed to the
+// connection — beside link-local, loopback, unspecified and multicast,
+// the IPv4 limited broadcast with the reserved range around it and IPv4
+// "this network".
+func TestReconnectProbeRoutableIsUnicast(t *testing.T) {
+	t.Parallel()
+	r := interfacesReport(t, []gendiag.NetworkInterface{iface(gendiag.InterfaceTypeWiFi, true,
+		"fe80::1", "::1", "::", "ff02::1", "fd11::5",
+		"255.255.255.255", "240.0.0.1", "0.1.2.3", "192.0.2.7")})
+	want := []netip.Addr{netip.MustParseAddr("fd11::5"), netip.MustParseAddr("192.0.2.7")}
+	if !slices.Equal(r.routable, want) {
+		t.Fatalf("routable %v, want %v", r.routable, want)
+	}
+}
+
+// TestRoutableAddr holds routableAddr's classes one by one (review II,
+// item 5): net/netip's where it has them, RFC 1122 §3.2.1.3 for 0.0.0.0/8
+// and RFC 1112 §4 for 240.0.0.0/4.
+func TestRoutableAddr(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		addr string
+		want bool
+		by   string
+	}{
+		{"0.0.0.0", false, "netip: unspecified"},
+		{"::", false, "netip: unspecified"},
+		{"224.0.0.251", false, "netip: multicast"},
+		{"ff02::1", false, "netip: multicast"},
+		{"255.255.255.255", false, "netip: limited broadcast"},
+		{"127.0.0.1", false, "netip: loopback"},
+		{"::1", false, "netip: loopback"},
+		{"169.254.1.2", false, "netip: link-local"},
+		{"fe80::1", false, "netip: link-local"},
+		{"fe80::1%eth0", false, "netip: link-local"},
+		{"0.1.2.3", false, "RFC 1122 §3.2.1.3 (b)"},
+		{"0.255.255.255", false, "RFC 1122 §3.2.1.3 (b)"},
+		{"240.0.0.1", false, "RFC 1112 §4"},
+		{"255.255.255.254", false, "RFC 1112 §4"},
+		{"::ffff:0.1.2.3", false, "RFC 1122 §3.2.1.3 (b), IPv4-mapped"},
+		{"::ffff:240.0.0.1", false, "RFC 1112 §4, IPv4-mapped"},
+		{"::ffff:127.0.0.1", false, "netip: loopback, IPv4-mapped"},
+		{"1.0.0.0", true, "above 0.0.0.0/8"},
+		{"223.255.255.255", true, "below 224.0.0.0/4"},
+		{"192.0.2.7", true, "unicast"},
+		{"10.1.2.3", true, "unicast (private)"},
+		{"fd11::5", true, "unicast (unique local)"},
+		{"2001:db8::1", true, "unicast"},
+		{"::ffff:192.0.2.7", true, "unicast (IPv4-mapped)"},
+	} {
+		if got := routableAddr(netip.MustParseAddr(tc.addr)); got != tc.want {
+			t.Errorf("routableAddr(%s) = %v, want %v (%s)", tc.addr, got, tc.want, tc.by)
+		}
+	}
+	if routableAddr(netip.Addr{}) {
+		t.Error("the zero Addr is routable")
 	}
 }
 
