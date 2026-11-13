@@ -316,6 +316,72 @@ func TestServeInvoke(t *testing.T) {
 	})
 }
 
+// blockingDispatcher is the fake dispatcher whose Invoke signals entered
+// and returns once release is closed, whatever its context says.
+type blockingDispatcher struct {
+	*fakeDispatcher
+	entered, release chan struct{}
+}
+
+func (d *blockingDispatcher) Invoke(ctx context.Context, p im.ConcreteCommandPath, f any) im.InvokeResult {
+	close(d.entered)
+	<-d.release
+	return d.fakeDispatcher.Invoke(ctx, p, f)
+}
+
+// TestServeBlockedAndAwaited: once the registry blocks new activity a
+// request for the served endpoints is not dispatched — matter.js's
+// InteractionServer ignores anything newly incoming then — and
+// BlockNewActivity waits for a served request already running, as it
+// waits for a report (review II, R2-P1-net-04).
+func TestServeBlockedAndAwaited(t *testing.T) {
+	t.Parallel()
+	t.Run("a request after BlockNewActivity is not dispatched", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			s, reg, d := serverRig(t, 0)
+			if err := reg.BlockNewActivity(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			s.push(t, 0x7251, im.OpcodeInvokeRequest, invokeRequest(t, false, false, 20))
+			s.push(t, 0x7252, im.OpcodeReadRequest, readRequest(t, 20))
+			synctest.Wait()
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			if len(d.timed) != 0 {
+				t.Fatalf("%d invokes reached the dispatcher after BlockNewActivity, want 0", len(d.timed))
+			}
+		})
+	})
+	t.Run("BlockNewActivity waits for a served request in flight", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			s, reg, _, _ := handlerRig(t)
+			d := &blockingDispatcher{
+				fakeDispatcher: &fakeDispatcher{sizes: map[uint32]int{20: 10}},
+				entered:        make(chan struct{}),
+				release:        make(chan struct{}),
+			}
+			reg.Serve(interaction.ServerConfig{Dispatcher: d, MaxPathsPerInvoke: 1, Qualities: plainQualities{}})
+			s.push(t, 0x7253, im.OpcodeInvokeRequest, invokeRequest(t, false, false, 20))
+			<-d.entered
+			blocked := make(chan error, 1)
+			go func() { blocked <- reg.BlockNewActivity(t.Context()) }()
+			synctest.Wait()
+			select {
+			case err := <-blocked:
+				close(d.release)
+				t.Fatalf("BlockNewActivity returned (%v) while a served invoke was running", err)
+			default:
+			}
+			close(d.release)
+			if err := <-blocked; err != nil {
+				t.Fatal(err)
+			}
+		})
+	})
+}
+
 // TestServeInvokeChunked: a batch whose responses exceed the session's
 // payload goes out in chunks; a response no message carries becomes
 // ResourceExhausted for its path; a refused chunk ends the response.

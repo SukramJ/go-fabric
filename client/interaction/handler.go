@@ -55,7 +55,19 @@ func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Mes
 		// A request for the endpoints this stack serves itself
 		// ([Subscriptions.Serve]): matter.js's InteractionServer takes
 		// every first message that is not a report
-		// (InteractionServer.ts:240-249).
+		// (InteractionServer.ts:240-249). Once new activity is blocked it
+		// ignores anything newly incoming (:241-244 at db021da0), and an
+		// exchange it serves is tracked as node activity (:257-260), so
+		// the request is closed unanswered here and counted with the
+		// report reads BlockNewActivity waits for (review II,
+		// R2-P1-net-04).
+		done, ok := r.beginReading()
+		if !ok {
+			r.log.Debug("matter.controller.interaction.served_request_blocked", slog.Int("opcode", int(first.Opcode)))
+			x.Close()
+			return
+		}
+		defer done()
 		s.handle(ctx, x, first)
 		return
 	}
@@ -167,8 +179,8 @@ func (r *Subscriptions) announceReport(session *exchange.Session) {
 	r.reportStarted(session)
 }
 
-// beginReading tracks an in-flight report read; it fails once the
-// registry is blocked, the check and the tracking under one lock
+// beginReading tracks an in-flight report read or served request; it
+// fails once the registry is blocked, the check and the tracking under one lock
 // (beginReading, :97-123, with the isBlocked check of
 // ClientSubscriptionHandler.ts:35-46).
 func (r *Subscriptions) beginReading() (done func(), ok bool) {
