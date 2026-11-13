@@ -52,3 +52,24 @@ func TestAcceptHandshakeInTimeIsUntouched(t *testing.T) {
 		t.Fatal("the timer the accept started dropped an established connection")
 	}
 }
+
+// TestAcceptRefusedHandshakeIsDisconnected (review II, R2-P1-dr-req-03): a
+// subscription whose kept handshake request opens no session — nine bytes
+// that pass for a request but name no version — drops the connection, and
+// the accept timer is stopped only once a session exists. Before, the timer
+// was stopped first and the refusal did not disconnect, so the central held
+// the one connection with no timer left.
+func TestAcceptRefusedHandshakeIsDisconnected(t *testing.T) {
+	clk := newFakeClock()
+	f, o := acceptFake(t, clk)
+	clk.Advance(5 * time.Second)
+	f.write([]byte{0x65, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x05})
+	f.subscribe(100)
+	if o.count() != 0 {
+		t.Fatalf("%d sessions opened on a request with no version, want 0", o.count())
+	}
+	if !f.isGone() {
+		clk.Advance(ConnRspTimeout)
+		t.Fatalf("the refused handshake left the central connected (after the accept timer too: gone=%v)", f.isGone())
+	}
+}

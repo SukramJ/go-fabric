@@ -163,24 +163,32 @@ func (s *gattServer) handleC1Write(data []byte) {
 	}
 }
 
-// handleC2Subscribe is handleC2SubscribeRequest (:288-327).
+// handleC2Subscribe is handleC2SubscribeRequest (:288-327). A kept
+// handshake request that opens no session drops the connection.
 func (s *gattServer) handleC2Subscribe(attMTU int) {
+	if !s.subscribe(attMTU) {
+		s.close()
+	}
+}
+
+// subscribe is handleC2Subscribe under s.mu; false when the handshake
+// opened no session and the connection is to be dropped.
+func (s *gattServer) subscribe(attMTU int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
-		return
+		return true
 	}
 	if s.handshake == nil {
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received before handshake Request"}))
-		return
+		return true
 	}
 	if s.session != nil {
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received but BTP session already initialized. Cannot handle two sessions!"}))
-		return
+		return true
 	}
-	s.stopTimerLocked()
 	// matter.js takes min(Bleno.mtu - 3, maxValueSize) (:300): the ATT_MTU
 	// less the ATT header is both.
 	session, err := NewPeripheral(attMTU-3, s.handshake, Callbacks{
@@ -189,9 +197,17 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 		Message:    s.deliver,
 	}, s.opts)
 	if err != nil {
+		// No session: the connection goes, and the accept timer with it
+		// (review II, R2-P1-dr-req-03). matter.js stops its timer before
+		// the session is created (BlenoBleServer.ts:297, :299) and keeps
+		// the connection — a central whose request names no version
+		// would hold it with no timer left.
 		s.log.Warn("matter.btp.session_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
-		return
+		return false
 	}
+	// The timer stops once the session exists; one that fired meanwhile
+	// waits for s.mu and finds its generation gone.
+	s.stopTimerLocked()
 	s.handshake = nil
 	s.session = session
 	conn := NewConn(session, Addr{Peripheral: s.c.Remote()})
@@ -199,6 +215,7 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 	// A close the session starts itself (the acknowledgement timeout, a
 	// protocol violation) drops the connection through its Disconnect
 	// callback (:313, :326).
+	return true
 }
 
 // handleC2Unsubscribe is the C2 unsubscribe: the server closes (:81-84).
