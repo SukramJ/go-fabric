@@ -140,6 +140,12 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-ControllerDiagnostics | `PeerSet.ts:218` at `db021da0` exposes the peers as a live set (`get peers()`) and `SessionManager.ts:376` the sessions (`get sessions()`); no snapshot, trace or finding type serves a host's diagnostics view (presence) | `packages/protocol/src/peer/PeerSet.ts` | `"    get peers() {"` | this module's node-side facade (`node.SessionDiagnostics`, `diagevent.Ring`, `mdns.Diagnose`) applied to the controller role; matterjs-server at `0bd06f2` serves only Thread diagnostics (`packages/ws-controller/src/server/WebSocketControllerHandler.ts:144`) | no |
 | BD-Matter-OnboardingCodeKept | `CommissioningClient.ts:959` ff. at `db021da0`: `State` persists the discriminator (:1046), vendor and product, and no passcode or pairing code; the passcode's only use is the hand-over to the commissioner (presence, :290-291) | `packages/node/src/behavior/system/commissioning/CommissioningClient.ts` | `"            passcode,\n            discoveryData: this.descriptor,"` | this module's own design (owner decision 2026-11-13); the long manual code of a non-standard flow follows connectedhomeip `src/setup_payload/ManualSetupPayloadGenerator.cpp:116` at `6170af84` | no |
 | BD-Matter-Commissioner-ReconnectProbe | `ControllerCommissioningFlow.ts:2042-2046` at `db021da0`: `#reconnectWithDevice` goes from the fail-safe re-arm (:2029-2038) straight to `transitionToCase` and reads nothing from the device in between; the peer it connects has discovery as its only address source (`ControllerCommissioner.ts:692-709`) (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"            transitionResult = await this.transitionToCase("` | this module's own design (owner decision 2026-11-13); connectedhomeip reads nothing there either (`src/controller/CHIPDeviceController.cpp:4487-4497` at `6170af84`, `FindOrEstablishSession`), its one address beside DNS-SD is the commissioning session's own for UDP and TCP (`:4469-4482`) | no |
+| BD-chip-Commissioner-AbortDisarmsFailSafe | `ControllerCommissioningFlow.ts:463-465` at `db021da0`: `executeCommissioning` rethrows an error that is neither a CommissioningError nor a StatusResponseError without `#resetFailsafeTimer` (presence); the flow's constructor takes no abort signal (`:333-351`), and the commissioner's `abort` option "cancels all in-flight PASE attempts" (`ControllerCommissioner.ts:194-195`, presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioner.ts` | `"                } else {\n                    throw error;\n                }"`<br>`"    /** External abort signal that, when fired, cancels all in-flight PASE attempts. */"` | connectedhomeip `src/controller/CHIPDeviceController.cpp` at `6170af84` (the `CHIP_ERROR_CANCELLED` branch of `CleanupCommissioning` :2219-2247, `DisarmFailsafeRequest` :2164-2170, `StopPairing` :1204-1233) | no |
+| BD-chip-HandshakeSecretsOverwritten | `PaseServer.ts:174` at `db021da0` takes `Ke`, `hAY` and `hBX` as locals and hands `Ke` to `createSecureSession` (`:190`); `CaseServer.ts:243`, `:251` and `:284` hold `sharedSecret`, `sigma2Key` and `sigma3Key` as locals; nothing overwrites them (presence of the locals; a search for `fill(`, `zeroize`, `zeroise` and `wipe` over `packages/protocol/src/session/pase`, `session/case`, `session/NodeSession.ts` and `packages/general/src/crypto/Spake2p.ts` finds no line) | `packages/protocol/src/session/pase/PaseServer.ts`<br>`packages/protocol/src/session/case/CaseServer.ts` | `"const { Ke, hAY, hBX } = await spake2p.computeSecretAndVerifiersFromX(this.L, X, Y);"`<br>`"const sharedSecret = await crypto.generateDhSecret(key, PublicKey(cx.peerEcdhPublicKey));"` | connectedhomeip at `6170af84`: `Spake2p_P256_SHA256_HKDF_HMAC::Clear` (`src/crypto/CHIPCryptoPALOpenSSL.cpp:1119-1154`), `PASESession::Clear` (`src/protocols/secure_channel/PASESession.cpp:137-158`), `SensitiveDataBuffer` and `SensitiveDataFixedBuffer` (`src/crypto/CHIPCryptoPAL.h:299-306`, `:375-394`), `CASESession::Clear` (`src/protocols/secure_channel/CASESession.cpp:376-397`) | no |
+| BD-chip-GroupReceptionPeersBounded | `MessagingState.ts:80-90` at `db021da0`: `receptionStateFor` creates a reception state for every source node id under an operational key, and only `forgetReceptionState` (`:97-99`), which drops a whole key, removes any (presence) | `packages/protocol/src/groups/MessagingState.ts` | `"            keyMap.set(sourceNodeId, receptionState);\n            this.#messageDataReceptionState.set(operationalKeyHex, keyMap);"` | connectedhomeip at `6170af84`: `CHIP_CONFIG_MAX_GROUP_DATA_PEERS` 15 (`src/lib/core/CHIPConfig.h:832-834`), the most-recently-used table of `src/transport/GroupPeerMessageCounter.h:53-57` and `GroupPeerMessageCounter.cpp:58-98`, the trusted first counter (`src/transport/SessionManager.cpp:1287-1294`, `src/transport/PeerMessageCounter.h:102-108`) | no |
+| BD-chip-UnsecuredRetransmitBound | `MessageExchange.ts:285` and `:293` at `db021da0`: the message awaiting its acknowledgement and its retransmission timer are fields of the exchange, with no table and no count over them (presence); `SessionIntervals.ts:52-53` says SII and SAI of the session parameters are "uint32 and accepted unbounded" | `packages/protocol/src/protocol/MessageExchange.ts` | `"    #sentMessageToAck?: Message;"` | connectedhomeip at `6170af84`: the retransmit table's size (`src/messaging/ReliableMessageMgr.h:267`, `src/messaging/ReliableMessageProtocolConfig.h:134`, `:146`, `src/lib/core/CHIPConfig.h:303-305`: 16), the refusal of a message that does not fit (`src/messaging/ReliableMessageMgr.cpp:254-263`, `src/messaging/ExchangeMessageDispatch.cpp:63-64`), the clearing of an aborted exchange's entry (`src/messaging/ExchangeContext.cpp:241-246`, `:277-287`); the 60 s lifetime is this module's own rule | no |
+| BD-Matter-OTAImage-DownloadBound | `DclOtaUpdateService.ts:690-693` at `db021da0` fetches the image with a timeout as its only limit and hands the response body to `store` (`:703`), which streams it to storage (`:571`) before anything is verified (`:573-574`) (presence: the hand-over) | `packages/protocol/src/dcl/DclOtaUpdateService.ts` | `"return await this.store(response.body, updateInfo, mode);"` | this module: `dcl.OTAVersions.MaxImageSize`, default 256 MiB — owner decision 11 of review II, a judgement without measured image sizes; connectedhomeip has no DCL image download to follow | no |
+| BD-Matter-BTP-InFlightBound | `BlenoBleServer.ts:268` at `db021da0`: the peripheral starts `handleIncomingBleData` for every write and does not wait for it, and the session's message callback calls the listener without waiting (`:316-322`); no count limits the messages handed on and not yet handled at this layer (presence) | `packages/nodejs-ble/src/BlenoBleServer.ts` | `"this.btpSession.handleIncomingBleData(new Uint8Array(data)).catch(error => {"` | this module: the bound of its TCP connection (`transport/tcp/conn.go`, `maxInFlightPerConn` = 64) | no |
 
 ---
 
@@ -907,7 +913,7 @@ matter.js waits the delay of a Busy status report — `busyDelay` plus a random 
 
 ### BD-Matter-Commissioner-ReconnectProbe — during Reconnect the commissioner asks the device for its network state and connects to the addresses it reports
 
-matter.js's reconnect step re-arms the fail-safe and calls `transitionToCase` (`ControllerCommissioningFlow.ts:2029-2046` at db021da0); the peer then connects on what DNS-SD delivers (`ControllerCommissioner.ts:692-709`). connectedhomeip does the same (`CHIPDeviceController.cpp:4487-4497` at 6170af84) and knows one address beside DNS-SD, the commissioning session's own, for UDP and TCP only (`:4469-4482`). In a concurrent flow — the commissioning session still open — this module reads over that session, 2 s into the step and every 10 s, one read of at most nine concrete paths on endpoint 0: NetworkCommissioning `LastNetworkingStatus`, `LastConnectErrorValue` and `Networks`, GeneralDiagnostics `NetworkInterfaces`, ThreadNetworkDiagnostics `RoutingRole`, `NetworkName`, `Channel`, `PartitionId` and `MeshLocalPrefix`, each cluster only when the root's ServerList names it. A changed report is logged; the routable addresses of operational interfaces — not link-local, not inside the mesh-local prefix (an `ipv6pre`, the length in bits then the prefix, as connectedhomeip encodes it, `DirectThreadNetworkDiagnosticsProvider.cpp:167-174`), not an RLOC or ALOC — are handed once per connection process to the peer's running process at port 5540 (`Peer.HintAddresses`), ranked after discovered addresses, which are not staggered behind a hinted attempt; a failed step names the last report in its `OperativeConnectionFailed` text. A probe that fails ends the probing and never the step. Reason: on a live Thread network the border router's advertising proxy published a commissioned plug 2 min 47 s after it joined, and never published a bulb, three times — the device was commissioned up to its last step and nothing said whether it had attached. The address needs no trust: CASE authenticates the node. The port is Matter's default because the node's own is only in its SRV record; when discovery delivers it, discovery's addresses take over. Register row above; the row closes when matter.js reads the device at this step.
+matter.js's reconnect step re-arms the fail-safe and calls `transitionToCase` (`ControllerCommissioningFlow.ts:2029-2046` at db021da0); the peer then connects on what DNS-SD delivers (`ControllerCommissioner.ts:692-709`). connectedhomeip does the same (`CHIPDeviceController.cpp:4487-4497` at 6170af84) and knows one address beside DNS-SD, the commissioning session's own, for UDP and TCP only (`:4469-4482`). In a concurrent flow — the commissioning session still open — this module reads over that session, 2 s into the step and every 10 s, one read of at most nine concrete paths on endpoint 0: NetworkCommissioning `LastNetworkingStatus`, `LastConnectErrorValue` and `Networks`, GeneralDiagnostics `NetworkInterfaces`, ThreadNetworkDiagnostics `RoutingRole`, `NetworkName`, `Channel`, `PartitionId` and `MeshLocalPrefix`, each cluster only when the root's ServerList names it. A changed report is logged; the routable addresses of operational interfaces — not link-local, not inside the mesh-local prefix (an `ipv6pre`, the length in bits then the prefix, as connectedhomeip encodes it, `DirectThreadNetworkDiagnosticsProvider.cpp:167-174`), not an RLOC or ALOC — are handed once per connection process to the peer's running process at port 5540 (`Peer.HintAddresses`), ranked after discovered addresses, which are not staggered behind a hinted attempt; a failed step names the last report in its `OperativeConnectionFailed` text. What is taken is bounded by what the attribute may hold: the probe takes at most 8 operational interfaces from one report (more are passed over, counted and logged, not refused), and a connection process takes at most `peer.MaxHintedAddresses` = 96 hinted addresses — 8 interfaces of 8 IPv6 and 4 IPv4 addresses each, the constraints "max 8", "max 8" and "max 4" of `packages/model/src/standard/elements/general-diagnostics.element.ts:27`, `:195` and `:191` at `db021da0`; connectedhomeip sizes the two address arrays the same (`src/include/platform/DiagnosticDataProvider.h:42-43` at `6170af84`) and encodes its platform's whole interface list (`src/app/clusters/general-diagnostics-server/GeneralDiagnosticsCluster.cpp:437-446`), which is why a longer list is cut and not refused. A hinted or probed address must also name a single host: `peer.unicastDestination` and the probe's `routableAddr` pass over the unspecified address, multicast and the IPv4 blocks 0.0.0.0/8 and 240.0.0.0/4 (RFC 1122 §3.2.1.3 and RFC 1112 §4, as the comment in `client/peer/hint.go` quotes them), and judge a zoned or IPv4-mapped address as the address it is. matter.js has no hinted address to filter, and takes a discovered A or AAAA record's value as it stands (`packages/general/src/net/dns-sd/IpService.ts:392-407`: only a zone is added to a link-local address); this module's discovered addresses do not pass the filter either — its one caller is `HintAddresses` — and what `client/discovery` filters was not read (unverified). Review II, R2-P0-bound-E01; pinned by `client/peer:TestHintAddressesBounded`, `TestHintAddressesUnicastOnly`, `TestUnicastDestination`, `controller/commissioner:TestReconnectProbeBoundsReportedAddresses` and `TestRoutableAddr`. A probe that fails ends the probing and never the step. Reason: on a live Thread network the border router's advertising proxy published a commissioned plug 2 min 47 s after it joined, and never published a bulb, three times — the device was commissioned up to its last step and nothing said whether it had attached. The address needs no trust: CASE authenticates the node. The port is Matter's default because the node's own is only in its SRV record; when discovery delivers it, discovery's addresses take over. Register row above; the row closes when matter.js reads the device at this step.
 
 ### BD-Matter-ControllerDiagnostics — the controller serves a diagnostics snapshot, a trace and mDNS findings
 
@@ -6795,3 +6801,220 @@ Mirrored: matter.js decides where it models something (order of authority
 1; review 2026-11 W4-ctlsec-03, verdict "stay with matter.js", no Ahead
 row). No test holds that an expired DAC is accepted (review II,
 W4-ctlsec-03). Retire when matter.js consults the clock.
+
+### BD-chip-Commissioner-AbortDisarmsFailSafe — a commissioning whose context ends disarms the fail-safe it armed
+
+matter.js's `executeCommissioning` resets the fail-safe for an error caused
+by a CommissioningError or a StatusResponseError
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:437-462` at
+`db021da0`, the reset at `:457`) and rethrows anything else as it is
+(`:463-465`). The flow takes no abort signal (the constructor, `:333-351`);
+the commissioner's `abort` option is the "External abort signal that, when
+fired, cancels all in-flight PASE attempts"
+(`packages/protocol/src/peer/ControllerCommissioner.ts:194-195`, handed on
+at `:262` and `:277`), and `executeCommissioning()` is called without one
+(`:721`). A Go caller ends a commissioning through its context: a step that
+returned the context's error left the device's fail-safe armed until it
+expired. `controller/commissioner` follows connectedhomeip, whose
+`CleanupCommissioning` — "If we're cleaning up because cancellation has
+been requested via StopPairing(), expire the failsafe in the background" —
+sends ArmFailSafe with expiry 0 over the session the commissioning holds
+and ignores a failure (`src/controller/CHIPDeviceController.cpp:2219-2247`,
+the request `:2164-2170`, the ignored failure `:2233-2236`, `StopPairing`
+`:1204-1233` at `6170af84`). When `execute`'s context has ended and the
+step's error is neither a CommissioningError nor a status error,
+`disarmAfterAbort` (`controller/commissioner/flow.go`) stops the BLE re-arm
+timer and sends `#resetFailsafeTimer`'s request (`:1092-1108`) on a context
+of its own, then returns the step's error unchanged; nothing is sent when no
+fail-safe is armed or the session is closed. Two differences from
+connectedhomeip, both this module's: the send is awaited, for at most
+`abortDisarmTimeout` = `FailSafeMaxSendTime` (10 s; `FAILSAFE_MAX_SEND_TIME`,
+`:302`), because `Commission` closes the PASE session when the flow returns;
+and the request carries the flow's current breadcrumb where connectedhomeip
+sends 0 (`:2168`). That the disarm leaves over BLE too is inferred from the
+channel keeping its own context, not exercised (unverified). Owner decision 5
+(review II, W4-ctlsec-08). Pinned by
+`controller/commissioner:TestFlowDisarmsFailsafeWhenCallerAborts`. Register
+row above; the row closes when matter.js's flow takes an abort signal and
+resets on it.
+
+### BD-chip-HandshakeSecretsOverwritten — handshake key material is overwritten once it has served or the handshake has failed
+
+matter.js keeps the SPAKE2+ and Sigma secrets as locals and leaves them to
+the collector: `Ke`, `hAY` and `hBX`
+(`packages/protocol/src/session/pase/PaseServer.ts:174` at `db021da0`, `Ke`
+handed to `createSecureSession` at `:190`), `sharedSecret`, `sigma2Key` and
+`sigma3Key` (`packages/protocol/src/session/case/CaseServer.ts:243`, `:251`,
+`:284`). connectedhomeip clears them: `Spake2p_P256_SHA256_HKDF_HMAC::Clear`
+(`src/crypto/CHIPCryptoPALOpenSSL.cpp:1119-1154` at `6170af84`,
+`ClearSecretData(Kcab)` and `(Kae)` at `:1150-1151`), `PASESession::Clear`
+("so that no security related information will be leaked",
+`src/protocols/secure_channel/PASESession.cpp:137-158`), the self-clearing
+`SensitiveDataBuffer` and `SensitiveDataFixedBuffer`
+(`src/crypto/CHIPCryptoPAL.h:299-306`, `:375-394`; the ECDH secret is one,
+`:428`, `src/protocols/secure_channel/CASESession.h:562`), the Sigma salt and
+key of `CASESession.cpp:1201` and `:1207` (the key released through
+`CASESession.h:467`, `src/crypto/SessionKeystore.h:160-164` and
+`src/crypto/RawKeySessionKeystore.cpp:96-99`) and `CASESession::Clear`
+(`CASESession.cpp:376-397`). This module follows connectedhomeip.
+**Overwritten:** in `secure/spake2` the PBKDF2 output and the passcode
+bytes, w1 once L exists, the scalars x and y, the w0 copy, Z, V, the
+transcript, K_main and the confirmation keys — and Ke when the confirmation
+fails; in `secure/sigma` S2K, S3K, the salts that carry the IPK, the
+resumption keys, the bytes the session keys are cut from — and the shared
+secret when the handshake fails or the responder is reset; in the callers
+the initiator's Ke copy and derived key bytes (`client/handshake/pase.go`)
+and the Ke the node facade's PASE callback receives (`node/security.go`).
+**Not overwritten, and why:** Ke of a finished PASE inside the `Verifier` or
+`Prover` (handed out as a copy, the session keys are derived outside the
+package) until the object is collected; the session keys and the ECDH shared
+secret of a finished CASE, which their readers take after Sigma3 and which
+the resumption record keeps; the stored verifier (w0 and L), which serves
+every later handshake; the Ke the bridge's adapter hands to a host's
+`bridge.PaseSessionEstablished` callback — the slice is the callback's to
+overwrite, and overwriting it after the call would break a host that derives
+later; the shared secret passed to `store.Port.UpsertResumption`, because
+the port states no rule that a store does not keep the slice; and the
+derived bytes inside `operational.Manager.OpenFromPase*`. Best effort in any
+case: Go gives no guarantee against copies (stack growth, values passed by
+value, `math/big`, `crypto/ecdh`, `crypto/aes` key schedules, `crypto/hkdf`,
+`hmac`), stated at `secure/sigma/zero.go` and `spake2.zero`. Two behaviour
+changes the overwriting forces: a failed PASE confirmation is final for the
+`Verifier` and the `Prover`, and `Responder.ECDHSharedSecret` is nil after a
+failed Sigma3. Owner decision 6 (review II, W1-sec-05). Pinned by
+`secure/spake2:TestHandshakeSecretsOverwrittenAfterSuccess`,
+`TestVerifierOverwritesAndEndsAfterFailedConfirmation`,
+`TestProverOverwritesAndEndsAfterFailure`, the six tests of
+`secure/sigma/zeroise_test.go`, `secure/channel:TestNewKeepsItsOwnKeys` and
+`bridge:TestPaseAdapter_TheCallbackOwnsKe`; the overwrite in
+`client/handshake` and `node` has no seam and is held by reading only.
+Register row above; the row closes when matter.js clears its handshake
+secrets.
+
+### BD-chip-GroupReceptionPeersBounded — one operational group key keeps reception windows for at most 15 senders
+
+matter.js creates a reception state for every source node id under an
+operational key and removes one only with the whole key
+(`packages/protocol/src/groups/MessagingState.ts:80-90`, `:97-99` at
+`db021da0`); the source node id of a group message is its sender's claim
+under a symmetric key, so every holder of the key can grow the map.
+`groups.Manager.acceptCounter` (`groups/decode.go`, `maxReceptionPeers` =
+15) keeps the windows of a key most recently accepted first: a sender the
+table does not hold enters at the front with its first counter trusted, and
+the last one falls off a full table. The number and the shape are
+connectedhomeip's: `CHIP_CONFIG_MAX_GROUP_DATA_PEERS`
+(`src/lib/core/CHIPConfig.h:832-834` at `6170af84`), the table kept most
+recently used first (`src/transport/GroupPeerMessageCounter.h:53-57`),
+find-or-add with the last entry evicted
+(`src/transport/GroupPeerMessageCounter.cpp:58-98`), and — under the
+trust-first policy — a counter that is not yet synchronised taking the first
+value it sees (`src/transport/SessionManager.cpp:1287-1294`,
+`src/transport/PeerMessageCounter.h:102-108`). **The guarantee now:** a
+recorded message is refused as a replay for the 15 senders most recently
+accepted under its key — before `c87940e2` for every sender, for as long as
+the key lived and the process ran. A sender that fell off the table is
+trusted again on its next message, so one recorded message of an evicted
+sender is accepted once more if it is presented before a newer one of that
+sender. An eviction takes a message that authenticates under the key from a
+sender the table does not hold: a holder of the key can cause it (fifteen
+claimed source node ids empty the table) and gains nothing the key did not
+give it already; a party without the key cannot cause one, and profits only
+where more than 15 real senders share a key or after a key holder's flood.
+No message of a real sender is lost to the bound. Two points are tighter
+than connectedhomeip: the table is per operational key, as matter.js keys
+its state, not per fabric (`GroupPeerMessageCounter.h:46-58`), and only an
+accepted message moves its sender to the front, where connectedhomeip moves
+it on lookup (`GroupPeerMessageCounter.cpp:69-77`, `:95`). Review II,
+R2-P0-bound-A07 = R2-P0-bound-E02. Pinned by
+`groups:TestReceptionStateIsBoundedPerKey` and
+`TestReceptionStateEvictionOrder`. Register row above; the row closes when
+matter.js bounds the map.
+
+### BD-chip-UnsecuredRetransmitBound — the unsecured session holds at most 16 replies awaiting an acknowledgement, each for at most 60 s
+
+matter.js keeps the message awaiting its acknowledgement and its timer on
+the exchange (`packages/protocol/src/protocol/MessageExchange.ts:285`,
+`:293` at `db021da0`); there is no table to bound, and the session intervals
+a peer states are "uint32 and accepted unbounded"
+(`packages/protocol/src/session/SessionIntervals.ts:52-53`). Whether
+matter.js caps its exchanges elsewhere was looked for by name and not found
+(unverified). Before `c97d47f7` any peer could park one entry per Sigma1 on
+this module's unsecured session, paced by the intervals it stated. The
+bridge now holds at most `unsecuredEntryLimit` = 16 replies on the unsecured
+session (`bridge/outbound_reliable.go`); a reply that does not fit is not
+sent, and a Sigma1 refused this way is answered on its retransmission once
+there is room; a handshake that fails, times out or moves on drops its own
+entries. The number and the refusal are connectedhomeip's: the table
+`ObjectPool<RetransTableEntry, CHIP_CONFIG_RMP_RETRANS_TABLE_SIZE>`
+(`src/messaging/ReliableMessageMgr.h:267` at `6170af84`), sized by
+`CHIP_CONFIG_MAX_EXCHANGE_CONTEXTS` (`src/messaging/ReliableMessageProtocolConfig.h:134`,
+`:146`; 16, `src/lib/core/CHIPConfig.h:303-305`), `CHIP_ERROR_RETRANS_TABLE_FULL`
+for a message that does not fit (`src/messaging/ReliableMessageMgr.cpp:254-263`),
+returned before the message is sent (`src/messaging/ExchangeMessageDispatch.cpp:63-64`),
+and an aborted exchange's entry cleared (`src/messaging/ExchangeContext.cpp:241-246`,
+`:277-287`). **The caveat:** connectedhomeip's bound holds only where its
+pools are static — with `CHIP_SYSTEM_CONFIG_POOL_USE_HEAP` "the ObjectPool
+size parameter is ignored" (`src/lib/support/Pool.h:619-626`), and Linux and
+Darwin set it (`src/platform/Linux/SystemPlatformConfig.h:41`,
+`src/platform/Darwin/SystemPlatformConfig.h:39`); this module takes the
+number, not a guarantee connectedhomeip gives on those platforms.
+**This module's own:** the bound covers the unsecured session alone
+(connectedhomeip's table holds every session's entries), and the lifetime —
+`unsecuredEntryLifetime` = 60 s after an entry was tracked, due or not — is
+no reference's rule; the figure is matter.js's PASE pairing timeout
+(`packages/protocol/src/session/pase/PaseServer.ts:33`, `:127`), applied to
+CASE replies as well. Under a flood a legitimate handshake's reply is
+refused like the flooder's; whether evicting the oldest entry would serve
+better is open. Review II, R2-P0-bound-A06. Pinned by
+`bridge:TestUnsecuredRetransmitTableIsBounded`,
+`TestUnsecuredRetransmitEntriesEndWithTheirHandshake`,
+`TestSigma1FloodDoesNotGrowTheRetransmitTable`,
+`TestSigma1RefusedForAFullTableIsAnsweredOnItsRetransmission` and
+`TestUnsecuredRetransmitEntryKeepsItsSchedule`. Register row above; the row
+closes when matter.js bounds what an unauthenticated peer can park.
+
+### BD-Matter-OTAImage-DownloadBound — an OTA image download is bounded by `MaxImageSize`
+
+matter.js fetches an OTA image with a timeout as its only limit
+(`packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693` at `db021da0`),
+hands the response body to `store` (`:703`) and streams it to storage
+(`:571`) before the stored file is verified (`:573-574`).
+`dcl.OTAVersions.Download` (`controller/dcl/ota.go`) refuses a ledger record
+that announces more than `MaxImageSize` before the request, and cuts an
+answer without an announced size one byte past the bound; both are an
+`*OTAError` matching `ErrOTAImageTooLarge`. The default,
+`DefaultMaxImageSize`, is 256 MiB: owner decision 11 of review II — a
+judgement, no image sizes were measured — and a host sets its own.
+connectedhomeip has no DCL image download to follow. The bound matters more
+here than it would in matter.js because this module buffers the image and
+hands the store a slice (`controller/softwareupdate/images.go`), where
+matter.js streams; streaming to the store changes the public `Blobs`
+interface and is left to the architecture phase. Review II, R2-P0-bound-C01
+and W4-ctlint-02. Pinned by `controller/dcl:TestOTADownloadBoundedByMaxImageSize`
+and `controller/softwareupdate:TestImagesHonourTheLedgersMaxImageSize`; the
+default bound cutting an unannounced 256 MiB stream is not tested. Register
+row above; the row closes when matter.js bounds the download.
+
+### BD-Matter-BTP-InFlightBound — a BTP session holds at most 64 delivered messages in flight
+
+matter.js's BLE peripheral starts `handleIncomingBleData` for every write
+without waiting for it
+(`packages/nodejs-ble/src/BlenoBleServer.ts:268` at `db021da0`), the BTP
+session awaits the message callback
+(`packages/protocol/src/ble/BtpSessionHandler.ts:356`), and that callback
+calls the listener and returns without waiting for it
+(`BlenoBleServer.ts:316-322`). No count limits the messages handed on at
+this layer; what the listener's side does with them was not read
+(unverified). In this module the receiver of a BTP session
+(`bridge/ble.go`, `connReceiverMaxInFlight` = 64) takes a slot before it
+queues a message and waits at 64 until a handler returns or the receiver
+closes, so the central's next write is not consumed; nothing is dropped and
+the connection is not closed. The number and the mechanism are this
+module's own, those of its TCP connection (`transport/tcp/conn.go`,
+`maxInFlightPerConn`); connectedhomeip's handling was not read (unverified),
+and how a BLE stack behaves while a write waits was not measured against a
+real central. Review II, R2-P0-bound-E05. Pinned by
+`bridge:TestConnReceiverBoundsTheMessagesInFlight` and
+`TestConnReceiverCloseEndsAWaitingDelivery`. Register row above; the row
+closes when matter.js bounds the messages of a BTP session it has not
+finished.
