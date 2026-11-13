@@ -471,12 +471,17 @@ type Bridge struct {
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for
 	// every bridged endpoint whose source pushes value changes. Called
-	// and cleared at the start of each reassemble + when a fresh
-	// subscription manager is attached, then re-populated by
-	// [Bridge.wireMeasurementListenersLocked]. Without re-wiring on
-	// reassemble the listeners would either leak (no cleanup) or point
-	// at stale topology entries (cleanup but no re-bind).
+	// and cleared at each reassemble + when a fresh subscription manager
+	// is attached, then re-populated — and called at Stop — by
+	// [Bridge.rewireMeasurementListeners], outside b.mu. Without
+	// re-wiring on reassemble the listeners would either leak (no
+	// cleanup) or point at stale topology entries (cleanup but no
+	// re-bind).
 	measurementUnsubscribers []func()
+	// listenerGeneration counts the wirings of the host's notifiers; a
+	// wiring that finds it moved while it registered was overtaken and
+	// detaches what it registered ([Bridge.rewireMeasurementListeners]).
+	listenerGeneration uint64
 	// switchUnsubscribers holds the unsubscribe closures returned by
 	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
 	// matterSwitchSubscribable assertion) and by a position source's
@@ -661,7 +666,7 @@ type Bridge struct {
 	onFabricRemoved func(fabricIndex uint8)
 
 	// onAttributeChange, when set, hears every change a cluster server's
-	// AttributeChangeNotifier reports (wireAttributeNotifiersLocked).
+	// AttributeChangeNotifier reports (wireAttributeNotifiers).
 	// Atomic: a change fires on its own goroutine, b.mu possibly held.
 	onAttributeChange atomic.Pointer[func(endpoint uint16, cluster uint32, change contract.Change)]
 
@@ -1139,9 +1144,13 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	b.dispatcher = dispatcher
 	staleSwitchUnsubs := b.switchUnsubscribers
 	b.switchUnsubscribers = switchUnsubs
-	b.wireMeasurementListenersLocked()
 	hook := b.onReassembled
 	b.mu.Unlock()
+
+	// The value listeners follow the swap, outside the lock: the host's
+	// notifiers are called to unregister and to register, and their
+	// callbacks re-enter the bridge (review II, W2-conc-07).
+	b.rewireMeasurementListeners()
 
 	// Drain the swapped-out press-DP hooks now that the new topology
 	// is live. Doing this after the swap (instead of before wiring)
@@ -1881,6 +1890,11 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	}
 	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
 	b.waitPumpStopped(pumpDone)
+
+	// The host's notifiers are detached once nothing is served: a value
+	// change no longer marks paths dirty on a stopped engine or emits
+	// into the event log. Start's reassemble wires them again.
+	b.detachHostListeners()
 
 	// A session re-announce still running publishes on the advertiser;
 	// the serve context's cancel above ends it, and it is gone before the

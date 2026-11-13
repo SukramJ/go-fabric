@@ -101,8 +101,8 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	b.mu.Lock()
 	b.subManager = m
-	b.wireMeasurementListenersLocked()
 	b.mu.Unlock()
+	b.rewireMeasurementListeners()
 	if m != nil {
 		// The manager owns subscription lifetime; the bridge owns the
 		// routing state keyed by subscription ID. Without this hook the
@@ -1422,7 +1422,7 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 	return b.subManager
 }
 
-// wireMeasurementListenersLocked binds every bridged endpoint whose
+// wireMeasurementListeners binds every bridged endpoint whose
 // Source or Measurement implements [contract.ChangeNotifier] — and then
 // every mounted cluster server of the endpoint that does, whether or not
 // the source notifies — to the subscription manager's OnAttributeChanged
@@ -1441,30 +1441,20 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // observables, so the source notifies and the bridge looks up the
 // reportable paths via [endpoint.ReportablePaths].
 //
-// Caller must hold b.mu.Lock. The bridge re-runs this on every
-// reassemble (topology may add or remove bridged endpoints) and
-// whenever a fresh subscription manager is attached. Old unsubscribe
-// closures are drained before new ones are registered so listeners
-// never leak across reassembles.
-func (b *Bridge) wireMeasurementListenersLocked() {
-	for _, unsub := range b.measurementUnsubscribers {
-		if unsub != nil {
-			unsub()
-		}
-	}
-	b.measurementUnsubscribers = nil
-
-	if b.subManager == nil || b.topology == nil {
-		return
-	}
-	mgr := b.subManager
-	b.wireRootNotifiersLocked(mgr)
-	b.wireAttributeNotifiersLocked(mgr)
+// The bridge runs this through [Bridge.rewireMeasurementListeners] on
+// every reassemble (topology may add or remove bridged endpoints) and
+// whenever a fresh subscription manager is attached. It calls the host's
+// notifiers, so the caller holds no bridge lock; it returns the
+// unsubscribe closures of what it registered.
+func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *endpointpkg.Topology) []func() {
+	set := &listenerSet{}
+	b.wireRootNotifiers(set, mgr, topology)
+	b.wireAttributeNotifiers(set, mgr, topology)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
 	)
-	for _, ep := range b.topology.Endpoints {
+	for _, ep := range topology.Endpoints {
 		if ep == nil || ep.IsRoot() || ep.IsAggregator() {
 			continue
 		}
@@ -1511,7 +1501,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			// report per real cluster-attribute change; mirror that.
 			if pathSet := filterPathsByNotifierCluster(notifier, paths); len(pathSet) > 0 {
 				withPaths++
-				b.wireMeasurementNotifier(mgr, ep, notifier, pathSet)
+				b.wireMeasurementNotifier(set, mgr, ep, notifier, pathSet)
 			}
 			if srv, isSrv := notifier.(contract.ClusterServer); isSrv {
 				primaryCluster = srv.MatterClusterID()
@@ -1544,7 +1534,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 				continue
 			}
 			withPaths++
-			b.wireMeasurementNotifier(mgr, ep, subNotifier, subPaths)
+			b.wireMeasurementNotifier(set, mgr, ep, subNotifier, subPaths)
 		}
 	}
 	if b.logger != nil {
@@ -1553,19 +1543,94 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			slog.Int("measurement_seen", measurementSeen),
 			slog.Int("notifier_ok", notifierOK),
 			slog.Int("with_paths", withPaths),
-			slog.Int("registered", len(b.measurementUnsubscribers)))
+			slog.Int("registered", len(set.unsubs)))
+	}
+	return set.unsubs
+}
+
+// listenerSet collects the unsubscribe closures of one wiring of the
+// host's notifiers.
+type listenerSet struct{ unsubs []func() }
+
+// add keeps unsub; a notifier that returns none has nothing to detach.
+func (l *listenerSet) add(unsub func()) {
+	if unsub == nil {
+		unsub = func() {}
+	}
+	l.unsubs = append(l.unsubs, unsub)
+}
+
+// rewireMeasurementListeners detaches the listeners of the last wiring
+// and registers the bridge with the notifiers of the current topology,
+// for the current subscription manager. Every call into the host — the
+// stale unsubscribers and the registrations — runs with no bridge lock
+// held: a notifier may call the callback back while it registers, and an
+// unsubscribe may wait for a callback in flight, and the callback
+// re-enters the bridge ([Bridge.EmitEvent] reads the manager under b.mu).
+// Before, both ran under b.mu held for writing and such a notifier
+// stopped the bridge (review II, W2-conc-07). b.mu guards the list and
+// the generation only: a wiring a later one overtook while it registered
+// is detached again instead of installed, so the last one wins.
+func (b *Bridge) rewireMeasurementListeners() {
+	b.mu.Lock()
+	stale := b.measurementUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.listenerGeneration++
+	generation := b.listenerGeneration
+	mgr, topology := b.subManager, b.topology
+	b.mu.Unlock()
+	runUnsubscribers(stale)
+	if mgr == nil || topology == nil {
+		return
+	}
+	unsubs := b.wireMeasurementListeners(mgr, topology)
+	b.mu.Lock()
+	overtaken := b.listenerGeneration != generation
+	if !overtaken {
+		b.measurementUnsubscribers = unsubs
+	}
+	b.mu.Unlock()
+	if overtaken {
+		runUnsubscribers(unsubs)
 	}
 }
 
-// wireRootNotifiersLocked subscribes every root cluster server that
+// detachHostListeners unregisters the bridge from every host notifier —
+// the value listeners and the switch hooks — for [Bridge.Stop]: a
+// stopped bridge is not called into (review II, W2-conc-10). The next
+// Start reassembles and wires them again. The unsubscribers run with no
+// bridge lock held.
+func (b *Bridge) detachHostListeners() {
+	b.mu.Lock()
+	measurement := b.measurementUnsubscribers
+	switches := b.switchUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.switchUnsubscribers = nil
+	b.listenerGeneration++ // a wiring still registering detaches itself
+	b.mu.Unlock()
+	runUnsubscribers(measurement)
+	runUnsubscribers(switches)
+}
+
+// runUnsubscribers calls every closure of unsubs.
+func runUnsubscribers(unsubs []func()) {
+	for _, unsub := range unsubs {
+		if unsub != nil {
+			unsub()
+		}
+	}
+}
+
+// wireRootNotifiers subscribes every root cluster server that
 // implements [contract.ChangeNotifier] — today the Groupcast server, whose
 // Membership and counts move with the group state — to its own reportable
 // attributes on endpoint 0: a fire marks them dirty so subscribers get a
 // report. A root server keeps its own DataVersion (it bumps it before it
 // fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
-// reactive state matter.js keeps for root behaviors. Caller holds b.mu.
-func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
-	root := b.topology.FindByID(0)
+// reactive state matter.js keeps for root behaviors. The caller holds no
+// bridge lock.
+func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
+	root := topology.FindByID(0)
 	if root == nil {
 		return
 	}
@@ -1581,19 +1646,15 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 				HasEndpoint: true, HasCluster: true, HasAttribute: true,
 			})
 		}
-		unsub := notifier.OnMatterValueChanged(func() {
+		set.add(notifier.OnMatterValueChanged(func() {
 			for _, p := range paths {
 				mgr.OnAttributeChanged(p)
 			}
-		})
-		if unsub == nil {
-			unsub = func() {}
-		}
-		b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+		}))
 	}
 }
 
-// wireAttributeNotifiersLocked subscribes every cluster server that
+// wireAttributeNotifiers subscribes every cluster server that
 // implements [contract.AttributeChangeNotifier] — the servers that keep
 // their own attribute state, such as cluster/opstate and cluster/modebase
 // on a bridged endpoint or the OTA Software Update Requestor on the root —
@@ -1612,15 +1673,15 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 // requestor's UpdateState is plain behavior state
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
 // server that is also a [contract.ChangeNotifier] is wired by
-// wireRootNotifiersLocked already and is skipped here. A server that is a
+// wireRootNotifiers already and is skipped here. A server that is a
 // [contract.AttributeReportNotifier] is subscribed through its report view
 // — a quieter attribute by its throttle, as matter.js's
 // ServerBehaviorBacking subscribes a QuietEvent's `online` observable
 // (ServerBehaviorBacking.ts:251-259) — and through OnAttributeChange,
 // which tells the host of every change at once, otherwise. Caller holds
 // b.mu.
-func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
-	for _, ep := range b.topology.Endpoints {
+func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
+	for _, ep := range topology.Endpoints {
 		if ep == nil {
 			continue
 		}
@@ -1638,7 +1699,7 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 			if r, reports := srv.(contract.AttributeReportNotifier); reports {
 				subscribe = r.OnAttributeReport
 			}
-			unsub := subscribe(func(change contract.Change) {
+			set.add(subscribe(func(change contract.Change) {
 				attrIDs := change.Attributes
 				if len(attrIDs) == 0 {
 					return
@@ -1660,11 +1721,7 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				if hook := b.onAttributeChange.Load(); hook != nil {
 					(*hook)(ep.ID, clusterID, change)
 				}
-			})
-			if unsub == nil {
-				unsub = func() {}
-			}
-			b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+			}))
 		}
 	}
 }
@@ -1675,12 +1732,12 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 // controller's DataVersionFilter misses on the next read — mirrors matter.js
 // Datasource.ts:1035), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
-func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
+func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
 	occupancy := newOccupancyEvents(b, ep, pathSet)
 	values := newPathValues(ep, pathSet)
-	unsub := notifier.OnMatterValueChanged(func() {
+	set.add(notifier.OnMatterValueChanged(func() {
 		defer occupancy.check()
 		defer boolState.check()
 		// Only the attributes whose value moved are reported, and only
@@ -1707,11 +1764,7 @@ func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpoint
 		for _, p := range changed {
 			mgr.OnAttributeChanged(p)
 		}
-	})
-	if unsub == nil {
-		unsub = func() {}
-	}
-	b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+	}))
 }
 
 // sameNotifier reports whether a and b are the same notifier — the
