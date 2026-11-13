@@ -139,24 +139,39 @@ func TestStartReaper_ActiveSessionSurvivesSweeps(t *testing.T) {
 	}
 }
 
-// TestStartReaper_NeverMarkedSessionIsNotReaped pins the zero-activity
-// guard: an established session that has never exchanged a message
-// (commissioning may still be in flight) is exempt from the sweep —
-// the reaper only trusts sessions whose idle clock has started, i.e.
-// after the receive path recorded their first authenticated message.
-func TestStartReaper_NeverMarkedSessionIsNotReaped(t *testing.T) {
+// TestReapIdleTakesANeverUsedSessionAfterTheTimeout pins the idle clock
+// of a session that never carried a message (review II, W1-sec-06): it
+// starts at the session's creation, so the session survives every sweep
+// inside one idle timeout — commissioning may still be in flight — and is
+// reaped by the first sweep past it, with the close cascade of any other
+// idle session. Before, a zero last-activity time exempted the session
+// for good.
+func TestReapIdleTakesANeverUsedSessionAfterTheTimeout(t *testing.T) {
 	t.Parallel()
-	m, clk, rec := newReaperManager(t)
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m := NewManager(newMinimalFakeStore())
+	m.SetClock(clk)
+	rec := &closeRecorder{}
+	rec.wire(m)
 	never := openReaperSession(t, m, 0xB0B)
-	control := openReaperSession(t, m, 0xC0C)
-	control.MarkActiveRx()
-
-	advanceUntilClosed(t, clk, rec, control.SessionID, nil)
-	if n := m.Active(); n != 1 {
-		t.Fatalf("Active() = %d, want 1 — a never-used session must not be reaped", n)
+	if la := never.LastActivity(); !la.IsZero() {
+		t.Fatalf("LastActivity() = %v on a session that never carried a message, want zero", la)
 	}
-	if graceful, closed, _, _ := rec.snapshot(); slices.Contains(graceful, never.SessionID) || slices.Contains(closed, never.SessionID) {
-		t.Errorf("close hooks fired (graceful %v / closed %v) for a never-used session", graceful, closed)
+
+	clk.Advance(reaperTestIdle - time.Second)
+	m.reapIdle(reaperTestIdle)
+	if n := m.Active(); n != 1 {
+		t.Fatalf("Active() = %d one second before the idle timeout, want 1 — a young never-used session must stay", n)
+	}
+
+	clk.Advance(2 * time.Second)
+	m.reapIdle(reaperTestIdle)
+	if n := m.Active(); n != 0 {
+		t.Fatalf("Active() = %d one idle timeout after creation, want 0 — a never-used session must be reaped", n)
+	}
+	graceful, closed, _, _ := rec.snapshot()
+	if !slices.Contains(graceful, never.SessionID) || !slices.Contains(closed, never.SessionID) {
+		t.Errorf("close hooks (graceful %v / closed %v) did not fire for session %d", graceful, closed, never.SessionID)
 	}
 }
 

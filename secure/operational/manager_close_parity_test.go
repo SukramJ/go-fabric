@@ -152,13 +152,16 @@ func TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenFromPase (idle): %v", err)
 	}
-	if _, err := m.OpenFromPase(0xB0B, 0xA11, 0x2223, []byte("shared-secret")); err != nil {
+	survivor, err := m.OpenFromPase(0xB0B, 0xA11, 0x2223, []byte("shared-secret"))
+	if err != nil {
 		t.Fatalf("OpenFromPase (survivor): %v", err)
 	}
-	// Only the first session ever saw traffic; the survivor's zero
-	// LastActivity exempts it from the reaper.
+	// The first session saw traffic once and fell silent; the survivor's
+	// traffic is inside the idle timeout. (A session without any traffic
+	// is no survivor: its idle clock runs from its creation, W1-sec-06.)
 	idle.MarkActiveRx()
 	clk.Advance(2 * time.Millisecond)
+	survivor.MarkActiveRx()
 
 	m.reapIdle(time.Millisecond)
 

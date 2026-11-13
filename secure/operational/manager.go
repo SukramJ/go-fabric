@@ -1333,9 +1333,10 @@ func (m *Manager) Active() int {
 // default is idleTimeout/2.
 //
 // Sessions with a nil channel (pre-allocated placeholders whose
-// handshake has not completed) and sessions where LastActivity is the
-// zero time (freshly opened, no traffic yet) are skipped so that
-// in-progress commissioning handshakes are not torn down.
+// handshake has not completed) are skipped so that in-progress
+// commissioning handshakes are not torn down. A session where
+// LastActivity is the zero time (opened, no traffic yet) is measured
+// from its creation instead.
 //
 // The manager owns the goroutine: [Manager.StopReaper] cancels it and
 // waits for it to return. One reaper runs at a time; a second StartReaper
@@ -1384,7 +1385,10 @@ func (m *Manager) StopReaper() {
 
 // reapIdle collects and closes sessions whose last-activity timestamp
 // is older than idleTimeout. Only entries with an established channel
-// and a non-zero last-activity time are considered.
+// are considered. A session that never carried a message has no
+// last-activity time; its idle clock starts at its creation, so it is
+// reaped one idle timeout after it was installed (review II, W1-sec-06
+// — before, such a session was exempt for good).
 func (m *Manager) reapIdle(idleTimeout time.Duration) {
 	now := m.clk().Now()
 	cutoff := now.Add(-idleTimeout)
@@ -1407,7 +1411,13 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 		}
 		la := e.LastActivity()
 		if la.IsZero() {
-			continue // never used — commissioning may still be active
+			// Never used: the idle clock runs from the creation. A
+			// commissioning still in flight is inside the timeout; an
+			// entry without a creation time is left alone.
+			la = e.CreatedAt()
+			if la.IsZero() {
+				continue
+			}
 		}
 		if la.Before(cutoff) {
 			victims = append(victims, e)
