@@ -97,3 +97,35 @@ func TestDialedConnWait(t *testing.T) {
 		t.Fatalf("Wait: %v", err)
 	}
 }
+
+// panickingReadConn is a connection whose Read panics.
+type panickingReadConn struct{ tcpChannelPipe }
+
+func (panickingReadConn) Read([]byte) (int, error) { panic("read boom") }
+
+// TestConnServeRecoversAReaderPanic (review II, R2-P1-req-02, defence in
+// depth): a panic in the connection's read loop — the framing of
+// untrusted bytes runs there — closes that connection and is logged and
+// counted like a handler panic, instead of ending the process from a
+// goroutine nothing recovers.
+func TestConnServeRecoversAReaderPanic(t *testing.T) {
+	a, b := net.Pipe()
+	t.Cleanup(func() { _ = a.Close(); _ = b.Close() })
+	var panics panicCounter
+	var hooked atomic.Int32
+	panics.set(func() { hooked.Add(1) })
+	nc := panickingReadConn{tcpChannelPipe{b, &net.TCPAddr{IP: net.ParseIP("::1"), Port: 5540}}}
+	c := newConn(nc, 0, true, nil, &panics)
+	go c.serve(func(*Conn, []byte, func()) {})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := c.Wait(ctx); err != nil {
+		t.Fatalf("Wait after a reader panic: %v", err)
+	}
+	if !c.isClosed() {
+		t.Error("connection still open after its reader panicked")
+	}
+	if got := panics.n.Load(); got != 1 || hooked.Load() != 1 {
+		t.Errorf("recovered = %d, hook ran %d times, want 1 and 1", got, hooked.Load())
+	}
+}

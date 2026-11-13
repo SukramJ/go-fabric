@@ -139,7 +139,7 @@ needs one today can derive it from the logs.
 | `pase.lockouts` (`MetricPASELockouts`) | counter | a PASE lockout engaged at the failure cap (20); the commissioning window closes with it | the same function, where the lockout engages |
 | `aggregator.reassemblies` (`MetricAggregatorReassemblies`) | counter | a completed reassembly of the bridged-device topology | `node/aggregator.go` (`reassemble`) |
 | `mrp.retransmits` (`MetricMRPRetransmits`) | counter | a reliable message sent again | the device side's MRP pump (`bridge/ackpump.go`) and the node's client exchanges (`client/exchange.Config.Retransmitted`) |
-| `panics.recovered` (`MetricPanicsRecovered`) | counter | a panic recovered on a datagram or connection path; the message was dropped | the UDP and TCP listeners' `OnPanicRecovered` hook (`transport/udp`, `transport/tcp`), on the bridge's and the client's sockets |
+| `panics.recovered` (`MetricPanicsRecovered`) | counter | a panic recovered on a datagram or connection path; the message was dropped (a panic in a TCP connection's reader closes that connection) | the UDP and TCP listeners' `OnPanicRecovered` hook (`transport/udp`, `transport/tcp`), on the bridge's and the client's sockets |
 
 Every counter the module kept before keeps its reader:
 `Bridge.DeviceLoad` serves GeneralDiagnostics, the listeners'
