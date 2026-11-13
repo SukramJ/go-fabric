@@ -920,6 +920,13 @@ func (n *Node) startLocked(ctx context.Context) error {
 		n.logger.Warn("fabrics.list_failed", slog.Any("err", err))
 	}
 	stored := len(fabrics)
+	// A node with stored fabrics starts commissioned — marked from this
+	// read, before the CASE identities load: from then on an
+	// administrator can remove the last fabric while Start still runs,
+	// and that removal reopens the window (reopenIfDecommissionedWhenIdle)
+	// only on a node already marked commissioned; marking it at the end
+	// would mark it again from this stale count.
+	n.commissioned.Store(err == nil && stored > 0)
 	loaded := make([]store.FabricRecord, 0, stored)
 	for _, fabric := range fabrics {
 		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
@@ -958,8 +965,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// commissioned node, not a new one: advertising it as commissionable
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
-	// A node with stored fabrics starts commissioned.
-	n.commissioned.Store(err == nil && stored > 0)
 	switch {
 	case err != nil:
 	case stored == 0:
