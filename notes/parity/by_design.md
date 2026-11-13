@@ -146,6 +146,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-UnsecuredRetransmitBound | `MessageExchange.ts:285` and `:293` at `db021da0`: the message awaiting its acknowledgement and its retransmission timer are fields of the exchange, with no table and no count over them (presence); `SessionIntervals.ts:52-53` says SII and SAI of the session parameters are "uint32 and accepted unbounded" | `packages/protocol/src/protocol/MessageExchange.ts` | `"    #sentMessageToAck?: Message;"` | connectedhomeip at `6170af84`: the retransmit table's size (`src/messaging/ReliableMessageMgr.h:267`, `src/messaging/ReliableMessageProtocolConfig.h:134`, `:146`, `src/lib/core/CHIPConfig.h:303-305`: 16), the refusal of a message that does not fit (`src/messaging/ReliableMessageMgr.cpp:254-263`, `src/messaging/ExchangeMessageDispatch.cpp:63-64`), the clearing of an aborted exchange's entry (`src/messaging/ExchangeContext.cpp:241-246`, `:277-287`); the 60 s lifetime is this module's own rule | no |
 | BD-Matter-OTAImage-DownloadBound | `DclOtaUpdateService.ts:690-693` at `db021da0` fetches the image with a timeout as its only limit and hands the response body to `store` (`:703`), which streams it to storage (`:571`) before anything is verified (`:573-574`) (presence: the hand-over) | `packages/protocol/src/dcl/DclOtaUpdateService.ts` | `"return await this.store(response.body, updateInfo, mode);"` | this module: `dcl.OTAVersions.MaxImageSize`, default 256 MiB — owner decision 11 of review II, a judgement without measured image sizes; connectedhomeip has no DCL image download to follow | no |
 | BD-Matter-BTP-InFlightBound | `BlenoBleServer.ts:268` at `db021da0`: the peripheral starts `handleIncomingBleData` for every write and does not wait for it, and the session's message callback calls the listener without waiting (`:316-322`); no count limits the messages handed on and not yet handled at this layer (presence) | `packages/nodejs-ble/src/BlenoBleServer.ts` | `"this.btpSession.handleIncomingBleData(new Uint8Array(data)).catch(error => {"` | this module: the bound of its TCP connection (`transport/tcp/conn.go`, `maxInFlightPerConn` = 64) | no |
+| BD-chip-TimedRequestsBounded | `MessageExchange.ts:1066-1084` at `db021da0`: a timed interaction is a timer on its exchange (`#timedInteractionTimer`, `:272`), started by `startTimedInteraction` with no count over a session's exchanges (presence) | `packages/protocol/src/protocol/MessageExchange.ts` | `"    startTimedInteraction(timeout: Duration) {"` | connectedhomeip at `6170af84`: `CHIP_IM_MAX_NUM_TIMED_HANDLER` 8 (`src/lib/core/CHIPConfig.h:1010-1011`), the pool of `src/app/InteractionModelEngine.h:669`, Busy when it is exhausted (`src/app/InteractionModelEngine.cpp:963-973`); per session here | no |
 
 ---
 
@@ -7141,3 +7142,31 @@ again, the class owner decision 14 of review II closed (R2-P0-test-B09).
 Pinned by `im:TestWriteFabricScopedGateOrder`. Retire when what matter.js
 answers is established and mirrored, or when matter.js gates the wildcard
 path.
+
+### BD-chip-TimedRequestsBounded — a session may leave at most 8 timed interactions waiting
+
+matter.js keeps a timed interaction as a timer on its exchange
+(`packages/protocol/src/protocol/MessageExchange.ts:272`, `:1066-1084` at
+`db021da0`): a second TimedRequest on the same exchange is refused
+(`:1067-1070`), and nothing counts the exchanges of a session that hold
+one. Whether matter.js bounds a session's exchanges elsewhere was not read
+(unverified). The bridge keeps a deadline per (session, exchange) and
+answers the TimedRequest past `maxPendingTimedRequests` = 8 pending ones of
+a session with Busy, registering no deadline (`bridge/exchange_routing.go`,
+`Bridge.dispatchTimedRequest` in `bridge/receive_dispatch.go`); before
+`b1d4dd36` a session could register one entry per exchange id until the
+deadlines ran out. The number and the answer are connectedhomeip's:
+`CHIP_IM_MAX_NUM_TIMED_HANDLER` 8 (`src/lib/core/CHIPConfig.h:1010-1011` at
+`6170af84`), the pool `ObjectPool<TimedHandler, CHIP_IM_MAX_NUM_TIMED_HANDLER>`
+(`src/app/InteractionModelEngine.h:669`) and `Status::Busy` when it gives no
+handler (`src/app/InteractionModelEngine.cpp:963-973`). Two differences,
+both this module's: connectedhomeip's pool is the engine's one pool, the
+bound here is per session, so one session cannot use up another's; and
+connectedhomeip's number binds only where its pools are static (with
+`CHIP_SYSTEM_CONFIG_POOL_USE_HEAP` "the ObjectPool size parameter is
+ignored", `src/lib/support/Pool.h:619-626`; Linux and Darwin set it,
+`src/platform/Linux/SystemPlatformConfig.h:41`,
+`src/platform/Darwin/SystemPlatformConfig.h:39`). Review II, W2-conc-12.
+Pinned by `bridge:TestTimedRequestsOfOneSessionAreBounded`. Register row
+above; the row closes when matter.js bounds the timed interactions a
+session may leave waiting.
