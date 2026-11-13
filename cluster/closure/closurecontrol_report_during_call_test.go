@@ -19,6 +19,7 @@ import (
 type reportingMover struct {
 	report func()
 	async  bool
+	moves  int // MoveTo calls
 }
 
 func (m *reportingMover) during() {
@@ -35,6 +36,7 @@ func (m *reportingMover) during() {
 }
 
 func (m *reportingMover) MoveTo(context.Context, closuredef.TargetPositionEnum) error {
+	m.moves++
 	m.during()
 	return nil
 }

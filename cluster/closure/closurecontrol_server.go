@@ -391,8 +391,8 @@ func (s *ControlServer) MatterInvoke(
 // INVALID_COMMAND; a field of a feature the server does not advertise is
 // ignored rather than refused; with Positioning, an absent Position falls
 // back to OverallTargetState.Position when the request carries no served
-// Latch or Speed, and with that null too the closure does not change its
-// position; a Position outside the advertised set is CONSTRAINT_ERROR.
+// Latch or Speed and the closure is not latched, and with that null too the
+// closure does not change its position; a Position outside the advertised set is CONSTRAINT_ERROR.
 // matter.js has no ClosureControl logic
 // (notes/parity/by_design.md BD-chip-ClosureControl-RulesInServer):
 // connectedhomeip's HandleMoveTo is the authority for the state rules — a
@@ -433,7 +433,11 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		speed = nil
 	}
 	target := (*wire.ClosureTargetPosition)(req.Position)
-	if target == nil && latch == nil && speed == nil {
+	if target == nil && latch == nil && speed == nil && !latched {
+		// The fallback to the outstanding target moves the closure, which
+		// a latched closure may do only with Latch false in the request
+		// (chip :607-620); a request that carries none falls back to
+		// nothing while latched (review II, R2-P1-clu-06).
 		target = fallback
 	}
 	if target != nil {
