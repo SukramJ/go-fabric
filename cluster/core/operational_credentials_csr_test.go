@@ -195,3 +195,46 @@ func TestCSRRequest_AttestationChallenge_DefensiveCopy(t *testing.T) {
 			"WithInvokeAttestationChallenge did not copy the slice")
 	}
 }
+
+// TestAttestationProvider_IncompleteMaterialIsRetried pins R2-P1-core-12:
+// material from the AttestationProvider without a DAC key, DAC, PAI or
+// Certification Declaration fails the request and is asked for again on
+// the next, instead of being kept for the node's lifetime and answered with
+// the zero signature stub.
+func TestAttestationProvider_IncompleteMaterialIsRetried(t *testing.T) {
+	t.Parallel()
+	dacKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := core.OpcredsAttestation{DACPrivateKey: dacKey, DAC: []byte{1}, PAI: []byte{2}, CertificationDeclaration: []byte{3}}
+	calls := 0
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+		FailSafe: armedFailSafe(0), SupportedFabrics: 5,
+		AttestationProvider: func(context.Context) (core.OpcredsAttestation, error) {
+			calls++
+			if calls == 1 {
+				return core.OpcredsAttestation{}, nil // not ready yet
+			}
+			return full, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := sessionChallengeCtx(context.Background())
+	req := core.AttestationRequest{AttestationNonce: make([]byte, 32)}
+	if _, err := oc.MatterInvoke(ctx, 0x00, req); err == nil {
+		t.Fatal("an AttestationRequest over empty attestation material succeeded")
+	}
+	resp, err := oc.MatterInvoke(ctx, 0x00, req)
+	if err != nil {
+		t.Fatalf("AttestationRequest after the provider is ready: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("the provider was called %d times, want 2", calls)
+	}
+	if sig := resp.(core.AttestationResponse).AttestationSignature; bytes.Equal(sig, make([]byte, 64)) {
+		t.Fatal("the AttestationResponse carries the zero signature stub")
+	}
+}

@@ -395,8 +395,9 @@ type OpcredsConfig struct {
 	// AttestationProvider, when set, supplies the attestation material on
 	// its first use — the first AttestationRequest, CertificateChainRequest
 	// or CSRRequest — in place of DACPrivateKey, DAC, PAI and
-	// CertificationDeclaration, which it excludes. A failed call answers
-	// that request with an error and is retried on the next. Mirrors
+	// CertificationDeclaration, which it excludes. A failed call — or one
+	// that returns no DAC key, DAC, PAI or Certification Declaration —
+	// answers that request with an error and is retried on the next. Mirrors
 	// matter.js packages/node/src/behaviors/operational-credentials/
 	// OperationalCredentialsServer.ts:560-572 (getCertification builds the
 	// DeviceCertification on first use) and packages/protocol/src/
@@ -1516,7 +1517,9 @@ type OpcredsAttestation struct {
 
 // resolveAttestation reads the attestation material through
 // [OpcredsConfig.AttestationProvider] on its first use and keeps it; with
-// no provider, or once resolved, it does nothing (matter.js
+// no provider, or once resolved, it does nothing; material without a DAC
+// key, DAC, PAI or Certification Declaration is an error, retried on the
+// next request (matter.js
 // OperationalCredentialsServer.ts:560-572 getCertification, called by
 // attestationRequest :102, csrRequest :140 and certificateChainRequest
 // :153).
@@ -1529,6 +1532,12 @@ func (o *OperationalCredentials) resolveAttestation(ctx context.Context) error {
 	m, err := o.attestationProvider(ctx)
 	if err != nil {
 		return fmt.Errorf("core: attestation material: %w", err)
+	}
+	// Incomplete material is a provider that is not ready: kept, it would
+	// be answered with the zero signature stub for the node's lifetime. It
+	// fails the request and is asked for again (review II, R2-P1-core-12).
+	if m.DACPrivateKey == nil || len(m.DAC) == 0 || len(m.PAI) == 0 || len(m.CertificationDeclaration) == 0 {
+		return errors.New("core: attestation material: the provider returned no DAC key, DAC, PAI or Certification Declaration")
 	}
 	o.mu.Lock()
 	o.devAttestKey = m.DACPrivateKey
