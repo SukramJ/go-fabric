@@ -182,7 +182,7 @@ func TestChipToolBLECases(t *testing.T) {
 	// run runs script with args (the commissioning arguments added) in a
 	// fresh environment and returns the case's log; ok is false when the
 	// app did not come up.
-	run := func(t *testing.T, leg, script string, args []string, app func(string) ([]string, string)) (log string, appLog string, ready bool) {
+	run := func(t *testing.T, leg, script string, args []string, app func(string) ([]string, string)) (log, appLog string, ready bool) {
 		t.Helper()
 		out := filepath.Join(shared, leg)
 		if err := os.MkdirAll(out, 0o777); err != nil { //nolint:gosec // shared with the container's root
