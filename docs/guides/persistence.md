@@ -37,7 +37,9 @@ wires every consumer, holds a `store.Port`.
 **Two implementations.**
 
 - `store.New(db)`, SQLite. `Config.Store.Path` and `Config.Store.DB` build
-  it; `Config.Store.Credentials` takes one you built.
+  it; `Config.Store.Credentials` takes one you built. The factory reset
+  erases the stores the node used — an override as it is, whether the node
+  still runs or was stopped before.
 - `memstore.New()` (`store/memstore`), in memory, for tests and for a small
   daemon that accepts losing its state on restart: a process that exits
   forgets every fabric, and each controller has to commission the node

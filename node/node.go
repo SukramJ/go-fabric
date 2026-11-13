@@ -64,11 +64,18 @@ type Node struct {
 	// across the stop a FactoryReset makes, which erases it afterwards.
 	ownedDB     *sql.DB
 	keepOwnedDB bool
-	groups      *groups.Manager
-	assembler   *endpoint.Assembler
-	br          *bridge.Bridge
-	root        *RootClusters
-	agg         *Aggregator
+	// builtCredentials and builtEndpoints are set when New built the
+	// credential or the endpoint store on Store.DB or Store.Path itself,
+	// not taken from a host override: a FactoryReset after Stop rebuilds
+	// exactly those on the reopened file and erases the overrides as they
+	// are.
+	builtCredentials, builtEndpoints bool
+
+	groups    *groups.Manager
+	assembler *endpoint.Assembler
+	br        *bridge.Bridge
+	root      *RootClusters
+	agg       *Aggregator
 	// aggServers are the Aggregator endpoint's servers ([Node.Surface]);
 	// surfaceDigest is Config.Surface's digest, computed once.
 	aggServers    []contract.ClusterServer
@@ -460,9 +467,11 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 		if n.st == nil {
 			n.st = store.New(sc.DB)
+			n.builtCredentials = true
 		}
 		if sc.Endpoints == nil {
 			n.cfg.Store.Endpoints = sqlitestore.New(sc.DB)
+			n.builtEndpoints = true
 		}
 	}
 	return nil

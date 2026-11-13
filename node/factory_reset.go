@@ -26,6 +26,9 @@ import (
 // every endpoint record of [Config].Store.Endpoints, so the numbers they
 // held are free. A node that is stopped already has its store erased; one
 // whose [Store].Path the stop closed has the file reopened for the erase.
+// The stores erased are the ones the node used: a [Store].Credentials or
+// [Store].Endpoints override as it is, and the store New built on the file
+// for the other.
 //
 // A Go node is single-use — [Node.Stop] ends it, as [ErrStopped] says —
 // so the reset does not bring the node back: the host comes back by
@@ -68,17 +71,23 @@ func (n *Node) FactoryReset(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// eraseStores erases the credential store and the endpoint records; a
-// store file the stop closed is reopened for it.
+// eraseStores erases the credential store and the endpoint records the
+// node used: a host override as it is, and a store New built on a file
+// the stop closed on the file reopened for it.
 func (n *Node) eraseStores(ctx context.Context) error {
 	st, endpoints := n.st, n.cfg.Store.Endpoints
-	if n.ownedDB == nil && n.cfg.Store.Path != "" {
+	if n.ownedDB == nil && n.cfg.Store.Path != "" && (n.builtCredentials || n.builtEndpoints) {
 		db, err := openStorePath(n.cfg.Store.Path)
 		if err != nil {
 			return fmt.Errorf("node: factory reset: %w", err)
 		}
 		defer func() { _ = db.Close() }()
-		st, endpoints = store.New(db), sqlitestore.New(db)
+		if n.builtCredentials {
+			st = store.New(db)
+		}
+		if n.builtEndpoints {
+			endpoints = sqlitestore.New(db)
+		}
 	}
 	var errs []error
 	if err := st.Erase(ctx); err != nil {
