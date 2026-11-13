@@ -237,23 +237,71 @@ func TestAcceptRefusesSubscribeBeforeHandshakeParityMatterJS(t *testing.T) {
 }
 
 // TestAcceptRefusesSecondSessionParityMatterJS: a second handshake and
-// subscription on a running session start no second one (:292-296).
+// subscription on a running session start no second one (:292-296), and
+// the kept second request restarted the handshake timer (:256-258), which
+// the refused subscription did not stop (the throw at :292-296 comes
+// before the stop at :297): matter.js drops the connection when it ends
+// (:413-416; its TODO at :264).
+//
+// The session's own timers are kept out of the way so that the handshake
+// timer is the only cause left: the central acknowledges the handshake
+// response at once, which stops the acknowledgement timer that would
+// otherwise end the session at the same 15 s, and the second request
+// comes one second later, so its timer ends at 16 s — before the 20 s at
+// which the peripheral's standalone acknowledgement (sent at 5 s) would
+// go unanswered. The control case is the same sequence without the second
+// request, and its connection stays. The server closes on another
+// goroutine than the one that notices (accept.go disconnect), so the
+// drop is waited for, never read at once.
 func TestAcceptRefusesSecondSessionParityMatterJS(t *testing.T) {
-	clk := newFakeClock()
-	f, o := acceptFake(t, clk)
-	f.write(handshakeRequest(100))
-	f.subscribe(100)
-	f.write(handshakeRequest(100))
-	f.subscribe(100)
-	if o.count() != 1 || len(f.indicated()) != 1 {
-		t.Fatalf("%d sessions, %d indications, want one of each", o.count(), len(f.indicated()))
-	}
-	// The kept second request restarted the timer, which the refused
-	// subscription did not stop: matter.js drops the connection (its TODO
-	// at :264).
-	clk.Advance(ConnRspTimeout)
-	if !f.isGone() {
-		t.Fatal("a handshake request on a running session left the connection after the timeout")
+	for _, second := range []bool{false, true} {
+		name := "control without a second request"
+		if second {
+			name = "second request"
+		}
+		t.Run(name, func(t *testing.T) {
+			clk := newFakeClock()
+			f, o := acceptFake(t, clk)
+			f.write(handshakeRequest(100))
+			f.subscribe(100)
+			// One Matter message acknowledging the response (sequence 0).
+			f.write(mustEncode(t, Packet{
+				Header:  Header{HasAckNumber: true, IsBeginningSegment: true, IsEndingSegment: true},
+				Payload: Payload{AckNumber: u8(0), SequenceNumber: 0, MessageLength: u16(1), SegmentPayload: []byte{1}},
+			}))
+			clk.Advance(time.Second)
+			if second {
+				f.write(handshakeRequest(100))
+				f.subscribe(100)
+			}
+			if o.count() != 1 || len(f.indicated()) != 1 {
+				t.Fatalf("%d sessions, %d indications, want one of each", o.count(), len(f.indicated()))
+			}
+			// 15 s after the first subscription the acknowledged response
+			// costs nothing, and the second request's timer has 1 s left.
+			clk.Advance(ConnRspTimeout - time.Second)
+			if f.isGone() {
+				t.Fatal("the connection went before the second request's handshake timer ended")
+			}
+			if n := len(f.indicated()); n != 2 {
+				t.Fatalf("%d indications at 15 s, want the handshake response and the standalone acknowledgement", n)
+			}
+			clk.Advance(time.Second)
+			if !second {
+				if f.isGone() {
+					t.Fatal("an established session without a second request lost its connection at 16 s")
+				}
+				return
+			}
+			select {
+			case <-f.Disconnected():
+			case <-deadline(t).Done():
+				t.Fatal("a handshake request on a running session left the connection after the timeout")
+			}
+			if o.count() != 1 {
+				t.Fatalf("%d sessions after the timeout, want 1", o.count())
+			}
+		})
 	}
 }
 
