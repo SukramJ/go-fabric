@@ -252,9 +252,11 @@ func (f *flow) now() time.Time { return f.c.ctx.Clock.Now() }
 // loop (:426-428). A recoverable error is logged and the loop continues
 // (:431-436); a CommissioningError or an IM status error disarms the
 // failsafe and is returned as a CommissioningError (:437-462); any other
-// error is returned as is (:463-465) — after the fail-safe was disarmed
-// when it is the caller's context that ended, which matter.js does not do
-// (disarmAfterAbort). No retries: a TODO upstream (:443-451).
+// error is returned as is (:463-465). Ahead of matter.js, a step that
+// failed because the caller's context ended (callerAborted) — whichever
+// of the two classes its error is — has the fail-safe disarmed on the
+// flow's own bounded context (disarmAfterAbort) and its error returned as
+// it is. No retries: a TODO upstream (:443-451).
 func (f *flow) execute(ctx context.Context) error {
 	f.sortSteps()
 	// The BLE re-arm timer ends with the flow (close, :2138-2140).
@@ -292,13 +294,21 @@ func (f *flow) execute(ctx context.Context) error {
 			f.report(s, StepFailed, err)
 			continue
 		}
-		if isCommissioningError(err) || isStatusError(err) {
+		classed := isCommissioningError(err) || isStatusError(err)
+		switch {
+		case callerAborted(ctx, err, classed):
+			// Ahead of matter.js, whose flow takes no abort signal and
+			// rethrows a bare error here (:463-465): the caller gave up.
+			// The step's error is returned as it is.
+			f.log.Warn("matter.controller.commissioning.aborted", slog.String("name", s.name), slog.Any("err", err))
+			f.disarmAfterAbort(ctx)
+		case classed:
 			f.log.Error("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.Any("err", err))
 			// The reset outlives ctx: matter.js's has no abort signal
 			// (#resetFailsafeTimer, #invokeCommand), and a step that
-			// failed because ctx ended would otherwise leave the device
-			// holding its fail-safe until it expires. The exchange's own
-			// response timeout bounds it.
+			// failed for a reason of its own while ctx ended would
+			// otherwise leave the device holding its fail-safe until it
+			// expires. The exchange's own response timeout bounds it.
 			f.resetFailsafeTimer(context.WithoutCancel(ctx))
 			// StatusResponseError.accept rethrows anything else as is
 			// (:459, general/src/MatterError.ts:87-92); a status error
@@ -306,16 +316,31 @@ func (f *flow) execute(ctx context.Context) error {
 			if se, ok := err.(*interaction.StatusError); ok { //nolint:errorlint // the top-level instanceof of :459
 				err = newError(ErrCommissioning, se.Error(), se)
 			}
-		} else if ctx.Err() != nil {
-			// Ahead of matter.js, whose flow rethrows here (:463-465)
-			// and takes no abort signal: the caller gave up.
-			f.log.Warn("matter.controller.commissioning.aborted", slog.String("name", s.name), slog.Any("err", err))
-			f.disarmAfterAbort(ctx)
 		}
 		f.report(s, StepFailed, err)
 		return err
 	}
 	return nil
+}
+
+// callerAborted reports whether a step failed because the caller's
+// context ended. ctx is the context execute was given, and it has to be
+// done: an error that only looks like a context's — a wait of the
+// connection's or the device's own that ran out — on a live context is
+// the step's failure. With ctx done, an error matter.js's flow would
+// rethrow bare (not classed: neither a CommissioningError nor a status
+// error) is the abort whatever it is, as before; a classed one is the
+// abort when it carries ctx's error — the Reconnect step wraps the
+// operational connection's in ErrOperativeConnectionFailed
+// (reconnectWithDevice), and that connection gives its wait up with the
+// caller's context (peer.Peer.Connect) — and the step's own failure when
+// it does not.
+func callerAborted(ctx context.Context, err error, classed bool) bool {
+	ended := ctx.Err()
+	if ended == nil {
+		return false
+	}
+	return !classed || errors.Is(err, ended)
 }
 
 // report reports the step through Options.Progress ([Step]); a failed

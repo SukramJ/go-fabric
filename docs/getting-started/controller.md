@@ -333,12 +333,22 @@ deadline — after the commissioner has started an ArmFailSafe does not
 leave the device armed: the commissioner sends ArmFailSafe with expiry 0
 over the session the commissioning still has (PASE, or CASE after
 `Reconnect`), on a context of its own for at most 10 s, and returns the
-context's error unchanged. A device left armed would refuse a new
-commissioning until the fail-safe ran out. The disarm does not wait for
-the device to have answered the ArmFailSafe: a context that ends while
-the first one, or a later extension, is still under way is followed by
-the disarm too, since the request may have armed the device (one that
-holds no fail-safe answers the disarm with success and nothing happens).
+failed step's error as it is. A step that stopped at the ended context
+returns an error that matches the context's with `errors.Is` —
+`context.Canceled` or `context.DeadlineExceeded` — and is not always
+identical to it: a context that ends while `Reconnect` waits for the
+operational connection returns that step's
+`*commissioner.CommissioningError` of kind `ErrOperativeConnectionFailed`,
+which names the device's last report when the device gave one and has
+the context's error as its `Cause`, so both
+`errors.Is(err, commissioner.ErrOperativeConnectionFailed)` and
+`errors.Is(err, context.DeadlineExceeded)` hold. A device left armed
+would refuse a new commissioning until the fail-safe ran out. The disarm
+does not wait for the device to have answered the ArmFailSafe: a context
+that ends while the first one, or a later extension, is still under way
+is followed by the disarm too, since the request may have armed the
+device (one that holds no fail-safe answers the disarm with success and
+nothing happens).
 Nothing is sent before the commissioner has started its first
 ArmFailSafe, once the device has confirmed CommissioningComplete, or on
 a closed session; a disarm that fails is logged
@@ -347,7 +357,7 @@ fail-safe then expires on the device by itself. matter.js's flow has no
 abort signal; the behaviour follows connectedhomeip's `StopPairing`
 (*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
 
-*Source: `controller/commissioner/flow.go` (`execute`, `disarmAfterAbort`).*
+*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`).*
 
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is
