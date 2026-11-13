@@ -353,9 +353,18 @@ func (c *Channel) adoptSession(handshakeResponse []byte, segment int) (*btp.Sess
 	session, err := btp.NewCentral(handshakeResponse, btp.Callbacks{
 		Write: func(b []byte) error { return c.conn.WriteC1(c.gattCtx, b) },
 		// Unsubscribing C2 closes the BTP session (§4.19.4.10), then the
-		// connection goes (NobleBleChannel.ts:789-805).
-		Disconnect: func() error { return c.releaseGATT(true) },
-		Message:    c.deliver,
+		// connection goes (NobleBleChannel.ts:789-805). matter.js starts
+		// both without awaiting them (:788-805 at 862ad75f), so its
+		// session's closed observer ends the channel at once; here the
+		// release runs inside Session.Close, before the session's Closed
+		// channel closes, so the channel is ended first — a send in the
+		// release's window (up to DisconnectTimeout on a dead link) reads
+		// as ErrChannelClosed and Closed reports the loss without waiting.
+		Disconnect: func() error {
+			c.endLost()
+			return c.releaseGATT(true)
+		},
+		Message: c.deliver,
 	}, segment, btp.Options{TimeSource: c.clock, Logger: c.log})
 	if err != nil {
 		return nil, err
@@ -527,13 +536,19 @@ func (c *Channel) watch() {
 		case <-swapped:
 			continue
 		}
-		c.mu.Lock()
-		c.lost = true
-		c.mu.Unlock()
-		c.life.end()
-		c.closeOnce.Do(func() { close(c.closed) })
+		c.endLost()
 		return
 	}
+}
+
+// endLost marks the channel lost and closes it — the session closed or
+// the connection gone, what watch observes.
+func (c *Channel) endLost() {
+	c.mu.Lock()
+	c.lost = true
+	c.mu.Unlock()
+	c.life.end()
+	c.closeOnce.Do(func() { close(c.closed) })
 }
 
 // deliver hands a reassembled Matter message to the exchange manager.
