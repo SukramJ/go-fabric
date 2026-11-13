@@ -72,7 +72,11 @@ import (
 //
 // 416 after pin lift wave P4 (#433): the retransmissionRestartSaving and
 // #recomputeConnectionState citations re-cited at db021da0.
-const citecheckDriftRatchet = 416
+//
+// 413 after review II, phase 0: four citations re-cited at the pin with
+// their fixes (bridge/im_gate.go, endpoint/dispatcher.go, node/node.go and
+// its parity test) and one new one left on the ratchet.
+const citecheckDriftRatchet = 413
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

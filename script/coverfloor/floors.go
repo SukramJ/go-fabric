@@ -72,7 +72,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/media", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 97},
@@ -210,7 +210,7 @@ var floors = []packageFloor{
 	// a floor at the median makes the gate flaky rather than strict. Floors
 	// go BELOW the observed minimum, not at the typical measurement -- a
 	// gate that fails on a good day teaches people to re-run it.
-	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 91},
+	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 95},
 	{
 		pkg: "github.com/SukramJ/go-fabric/internal/bridgeseam",
 		min: 0,
@@ -291,6 +291,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/refusalcheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
@@ -341,7 +343,7 @@ var floors = []packageFloor{
 		min: 86,
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (89.1 % to 86.7 %)",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/secure/sessionparams", min: 100},
 	// Brief CA: 85.2 with the contract table (store/storetest) on SQLite.
 	{pkg: "github.com/SukramJ/go-fabric/store", min: 85},
