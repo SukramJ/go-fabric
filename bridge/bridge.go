@@ -872,7 +872,8 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 // call [Stop]) to tear everything down.
 //
 // Calling Start a second time on the same instance returns
-// [ErrAlreadyStarted].
+// [ErrAlreadyStarted], and so does a Start while a [Bridge.Stop] of the
+// run before has not returned: the bridge has not stopped until then.
 //
 //nolint:contextcheck // serve/ack-pump goroutines run in a fresh context torn down explicitly via the stored serveCancel (Stop); rooting them in the caller ctx would race listener teardown
 func (b *Bridge) Start(ctx context.Context) error {
@@ -1860,7 +1861,8 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // [stopSessionCloseBudget]), closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
-// no-op. Safe to call after a failed [Start].
+// no-op. Safe to call after a failed [Start]. The bridge counts as
+// started until Stop returns: a [Bridge.Start] before that is refused.
 func (b *Bridge) Stop(ctx context.Context) error {
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
@@ -1904,11 +1906,15 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.pumpDone = nil
 	b.started = false
 	b.mu.Unlock()
-	// Release the start-claim so a subsequent [Bridge.Start] can
-	// re-arm. Keep this AFTER the b.mu critical section so a
-	// concurrent Start cannot CAS-claim before we've cleared the
-	// per-instance state above.
-	b.startClaim.Store(false)
+	// The start claim is given back when this Stop has finished, not
+	// here: what follows — the wait for the handlers in flight, the
+	// host's listeners, the advertiser, the servers' transitions, the
+	// commissioning window's timer — takes the run apart, and a
+	// [Bridge.Start] let in before it is done had the run it had just
+	// wired taken apart with it (review II, R2-P0-rv-A06: it served
+	// without its value and switch listeners). Until then Start returns
+	// [ErrAlreadyStarted].
+	defer b.startClaim.Store(false)
 
 	// Leave the multicast groups while the socket is still open.
 	b.stopGroupNetworking()
