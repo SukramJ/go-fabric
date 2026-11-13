@@ -547,6 +547,14 @@ func (r *sessionRegistry) named(nodeID uint64, endpointID, sessionID uint16) *li
 	return nil
 }
 
+// names reports whether the id names life: the session it tracks or the
+// registration holding it.
+func (r *sessionRegistry) names(life *lifecycle, nodeID uint64, endpointID, sessionID uint16) bool {
+	r.mu.Lock()
+	defer r.unlock()
+	return life != nil && r.named(nodeID, endpointID, sessionID) == life
+}
+
 // track turns a registration into a tracked session, or says why not:
 // superseded wins over a claim, because ending the id would end another
 // session. Mirrors matterjs-server
@@ -636,6 +644,26 @@ func (r *sessionRegistry) stop(ctx context.Context, nodeID uint64, endpointID, s
 		r.unlock()
 		return endedOnDevice(r.end(ctx, nil, sessionKey{nodeID, endpointID, sessionID}, end, send))
 	}
+	return r.stopLocked(ctx, life, nodeID, endpointID, sessionID, end, send)
+}
+
+// stopOf is stop for the session life is, by identity: when the id no
+// longer names life — the camera ended it and handed the id to a newer
+// session — it sends nothing and reports named false, so the newer
+// session is not ended in its place (review II, R2-P1-dr-rest-05).
+func (r *sessionRegistry) stopOf(ctx context.Context, life *lifecycle, nodeID uint64, endpointID, sessionID uint16, end sessionEnd, send func(context.Context) error) (named, ended bool, err error) {
+	r.mu.Lock()
+	if life == nil || r.named(nodeID, endpointID, sessionID) != life {
+		r.unlock()
+		return false, false, nil
+	}
+	ended, err = r.stopLocked(ctx, life, nodeID, endpointID, sessionID, end, send)
+	return true, ended, err
+}
+
+// stopLocked is stop's shared EndSession for life, which sessionID names;
+// it is called with r.mu held and releases it.
+func (r *sessionRegistry) stopLocked(ctx context.Context, life *lifecycle, nodeID uint64, endpointID, sessionID uint16, end sessionEnd, send func(context.Context) error) (bool, error) {
 	if shared := life.stopping; shared != nil {
 		r.unlock()
 		return shared.wait(ctx)

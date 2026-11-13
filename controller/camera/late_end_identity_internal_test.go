@@ -187,3 +187,35 @@ func TestLateEndSparesTheSessionThatReusedItsID(t *testing.T) {
 		x.intact(t, restarted)
 	})
 }
+
+// TestOverflowEndSparesTheSessionThatReusedItsID (review II,
+// R2-P1-dr-rest-05): a session's Signals overflow, and before the
+// overflow's end runs the camera ends that session and hands its id to a
+// newer one. The overflow's end acts on the session that overflowed, by
+// identity: it sends no EndSession for the id, announces no
+// EndSignalOverflow, and leaves the newer session — its Signals, its
+// recorded offer, its requestor entry — alone. Before, the end resolved
+// the id and ended the newer session.
+func TestOverflowEndSparesTheSessionThatReusedItsID(t *testing.T) {
+	t.Parallel()
+	x := newReuseFixture(t, 42, 42)
+	x.s.cfg.Observer.SessionEnded = x.ended
+	old := x.start(t, "a")
+	// The camera ends 42 and hands it out again.
+	x.s.onSignal(Signal{Kind: SignalEnd, Session: wrdef.WebRTCSessionStruct{Id: 42, PeerNodeId: tNode, PeerEndpointId: tEndpoint}})
+	c := x.start(t, "c")
+	before := len(x.s.m.io.(routedIO).recorded())
+
+	x.s.signalsOverflowed(old, tTarget, 42) // the overflow of the old 42, run late
+	x.s.ending.Wait()
+
+	for _, r := range x.s.m.io.(routedIO).recorded()[before:] {
+		if r.command == callEndSession {
+			t.Errorf("EndSession %+v sent for the newer session that reused id 42", r.fields)
+		}
+	}
+	if got := x.endsOf(42); slices.Contains(got, EndCause(endSignalOverflow)) {
+		t.Errorf("ends of 42 = %v: the old session's overflow was announced for the newer one", got)
+	}
+	x.intact(t, c)
+}

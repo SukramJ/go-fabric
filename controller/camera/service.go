@@ -420,8 +420,12 @@ func (s *Service) onSignal(sig Signal) {
 // controller sends it, announced as EndSignalOverflow. An EndSession that
 // fails ends the session here all the same and hands it to the leftover
 // sweep, as a start that gives a session up does: a session whose signals
-// were dropped is never left open (review II, R2-P1-cam-b-06). After Close
-// it does nothing: Close's own stop ends the session.
+// were dropped is never left open (review II, R2-P1-cam-b-06). The end acts
+// on the session that overflowed, by identity: once the camera ended it and
+// handed its id to a newer session, it does nothing, and the leftover sweep
+// is pointed at the id only while the id still names it (review II,
+// R2-P1-dr-rest-05). After Close it does nothing: Close's own stop ends the
+// session.
 func (s *Service) signalsOverflowed(sess *Session, t target, id uint16) {
 	s.mu.Lock()
 	if s.closed {
@@ -437,14 +441,20 @@ func (s *Service) signalsOverflowed(sess *Session, t target, id uint16) {
 		end := sessionEnd{cause: endSignalOverflow}
 		ctx, cancel := s.m.cleanupContext(s.life)
 		defer cancel()
-		if _, err := s.m.sessions.stop(ctx, t.nodeID, t.endpointID, id, end, s.m.sendEndSession(t, id)); err != nil {
-			s.log.Warn("camera.session.overflow_end_failed", slog.Uint64("node_id", t.nodeID), slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
-			if life != nil {
-				s.m.sessions.abandon(life, end)
-			}
-			if aerr := s.m.io.abandonSession(ctx, t, id); aerr != nil {
-				s.log.Warn("camera.session.abandon_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", aerr))
-			}
+		named, _, err := s.m.sessions.stopOf(ctx, life, t.nodeID, t.endpointID, id, end, s.m.sendEndSession(t, id))
+		if !named || err == nil {
+			return
+		}
+		s.log.Warn("camera.session.overflow_end_failed", slog.Uint64("node_id", t.nodeID), slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
+		// The sweep is pointed at the id while it still names the
+		// session; a newer session under the id keeps its entry.
+		still := s.m.sessions.names(life, t.nodeID, t.endpointID, id)
+		s.m.sessions.abandon(life, end)
+		if !still {
+			return
+		}
+		if aerr := s.m.io.abandonSession(ctx, t, id); aerr != nil {
+			s.log.Warn("camera.session.abandon_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", aerr))
 		}
 	}()
 }
