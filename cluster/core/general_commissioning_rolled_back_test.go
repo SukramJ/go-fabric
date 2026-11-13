@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
@@ -21,6 +22,12 @@ import (
 // when the commissioning completes or nothing was armed. matter.js runs
 // the PASE close inside the same rollback
 // (packages/protocol/src/common/FailsafeContext.ts:271-279 at db021da0).
+//
+// Each case runs in a synctest bubble. The timer's hooks run on the
+// watcher's goroutine, and what the case asserts — both hooks, in order,
+// and no third — is true only once that goroutine has finished:
+// synctest.Wait returns when it has, where a loop that left at the first
+// recorded hook read the list between the two (review II, R2-P0-rv-B05).
 func TestGencomm_FailSafeRolledBackHook(t *testing.T) {
 	t.Parallel()
 	type rig struct {
@@ -62,18 +69,14 @@ func TestGencomm_FailSafeRolledBackHook(t *testing.T) {
 		}
 	}
 	expire := map[string]func(t *testing.T, r *rig){
-		"the timer": func(t *testing.T, r *rig) {
+		"the timer": func(_ *testing.T, r *rig) {
 			r.clk.Advance(61 * time.Second)
-			for range 200 {
-				if len(hooks(r)) != 0 {
-					break
-				}
-				r.clk.Yield()
-				time.Sleep(time.Millisecond)
-			}
 		},
-		"ArmFailSafe with expiry 0": func(t *testing.T, r *rig) { arm(t, r, 0) },
-		"ExpireFailSafe":            func(_ *testing.T, r *rig) { r.gc.ExpireFailSafe(context.Background()) },
+		"ArmFailSafe with expiry 0": func(t *testing.T, r *rig) {
+			t.Helper()
+			arm(t, r, 0)
+		},
+		"ExpireFailSafe": func(_ *testing.T, r *rig) { r.gc.ExpireFailSafe(context.Background()) },
 	}
 	for name, run := range expire {
 		for _, withHost := range []bool{true, false} {
@@ -85,38 +88,49 @@ func TestGencomm_FailSafeRolledBackHook(t *testing.T) {
 			}
 			t.Run(label, func(t *testing.T) {
 				t.Parallel()
-				r := newRig(t, withHost)
-				arm(t, r, 60)
-				if got := hooks(r); len(got) != 0 {
-					t.Fatalf("hooks ran on the arm: %v", got)
-				}
-				run(t, r)
-				if got := hooks(r); !slices.Equal(got, want) {
-					t.Fatalf("hooks ran %v, want %v", got, want)
-				}
-				if r.gc.FailSafeArmed() {
-					t.Error("the fail-safe is still armed")
-				}
+				synctest.Test(t, func(t *testing.T) {
+					r := newRig(t, withHost)
+					arm(t, r, 60)
+					synctest.Wait()
+					if got := hooks(r); len(got) != 0 {
+						t.Fatalf("hooks ran on the arm: %v", got)
+					}
+					run(t, r)
+					// Whatever the expiry started has run to its end.
+					synctest.Wait()
+					if got := hooks(r); !slices.Equal(got, want) {
+						t.Fatalf("hooks ran %v, want %v", got, want)
+					}
+					if r.gc.FailSafeArmed() {
+						t.Error("the fail-safe is still armed")
+					}
+				})
 			})
 		}
 	}
 	t.Run("not without an armed fail-safe", func(t *testing.T) {
 		t.Parallel()
-		r := newRig(t, true)
-		arm(t, r, 0)
-		r.gc.ExpireFailSafe(context.Background())
-		if got := hooks(r); len(got) != 0 {
-			t.Errorf("hooks ran %v with nothing armed", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newRig(t, true)
+			arm(t, r, 0)
+			r.gc.ExpireFailSafe(context.Background())
+			synctest.Wait()
+			if got := hooks(r); len(got) != 0 {
+				t.Errorf("hooks ran %v with nothing armed", got)
+			}
+		})
 	})
 	t.Run("detached", func(t *testing.T) {
 		t.Parallel()
-		r := newRig(t, true)
-		r.gc.SetOnFailSafeRolledBack(nil)
-		arm(t, r, 60)
-		r.gc.ExpireFailSafe(context.Background())
-		if got := hooks(r); !slices.Equal(got, []string{"host"}) {
-			t.Errorf("hooks ran %v, want the host's alone", got)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newRig(t, true)
+			r.gc.SetOnFailSafeRolledBack(nil)
+			arm(t, r, 60)
+			r.gc.ExpireFailSafe(context.Background())
+			synctest.Wait()
+			if got := hooks(r); !slices.Equal(got, []string{"host"}) {
+				t.Errorf("hooks ran %v, want the host's alone", got)
+			}
+		})
 	})
 }
