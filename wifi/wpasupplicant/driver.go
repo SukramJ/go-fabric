@@ -264,9 +264,14 @@ func (d *Driver) run() {
 		case a := <-d.register:
 			// The signals already queued were sent before the reply of the
 			// join's last call before SelectNetwork (godbus delivers a
-			// signal into the channel before it reads the next message):
-			// they belong to the network that was current, to its removal
-			// and to the driver's own Disconnect, not to this attempt.
+			// signal into the channel before it reads the next message —
+			// while the channel has room: a full channel hands each signal
+			// to a goroutine of its own, default_handler.go:316-333 at
+			// v5.2.4, so after an overflow len undercounts and order is
+			// lost; the run loop keeps the channel short unless a join's
+			// State hand-over holds it): they belong to the network that
+			// was current, to its removal and to the driver's own
+			// Disconnect, not to this attempt.
 			// They are handled without it — a scan still sees its
 			// ScanDone — and the attempt follows only what comes after.
 			for n := len(sigs); n > 0; n-- {
