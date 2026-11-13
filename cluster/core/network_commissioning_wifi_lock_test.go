@@ -6,7 +6,6 @@ package core
 import (
 	"context"
 	"testing"
-	"time"
 
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 )
@@ -21,16 +20,17 @@ func TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock(t *testing.T) {
 	ctx := context.Background()
 	var w *WiFiNetworkCommissioning
 	blocked := 0
+	// The write runs on the command's goroutine: the cluster's lock is
+	// free there exactly when the command released it before the write.
+	// The probe decides at once, where a read on a second goroutine had
+	// to be given time (review II, R2-P1-dr-sec-05).
 	readsBack := func(uint64) {
-		done := make(chan struct{})
-		go func() { defer close(done); w.MatterRead(netcommAttrNetworks) }()
-		wait, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
-		defer cancel()
-		select {
-		case <-done:
-		case <-wait.Done():
+		if !w.mu.TryLock() {
 			blocked++
+			return
 		}
+		w.mu.Unlock()
+		w.MatterRead(netcommAttrNetworks)
 	}
 	var err error
 	w, err = NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{

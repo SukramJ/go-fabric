@@ -8,7 +8,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
@@ -53,20 +52,23 @@ func (s *stallingStore) UpsertIdentity(ctx context.Context, rec mstore.IdentityR
 
 // expireDuringStall runs cmd, which stalls in the store, fires the
 // fail-safe expiry while it does, and returns once both are done. The
-// expiry gets a bounded chance to finish first: it must not, because the
-// NOC command has not recorded what it writes yet.
+// command is released only once the expiry has either finished — it must
+// not, because the NOC command has not recorded what it writes yet — or
+// reported that it waits for the command (OnRollbackWaitsForNOC): no
+// wall-clock wait decides the order (review II, R2-P1-dr-sec-05).
 func expireDuringStall(t *testing.T, st *stallingStore, oc *core.OperationalCredentials, cmd func()) (expiryWaited bool) {
 	t.Helper()
+	waits := make(chan struct{})
+	var once sync.Once
+	oc.OnRollbackWaitsForNOC(func() { once.Do(func() { close(waits) }) })
 	cmdDone := make(chan struct{})
 	go func() { defer close(cmdDone); cmd() }()
 	<-st.entered
 	expiryDone := make(chan struct{})
 	go func() { defer close(expiryDone); oc.OnFailSafeExpiry(context.Background(), 0) }()
-	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
-	defer cancel()
 	select {
 	case <-expiryDone:
-	case <-ctx.Done():
+	case <-waits:
 		expiryWaited = true
 	}
 	close(st.release)

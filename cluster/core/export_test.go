@@ -23,3 +23,11 @@ func (g *GeneralDiagnostics) UpTimeFrom(mono, wall time.Duration) time.Duration 
 func (a *AccessControl) RegisterAuxiliaryProvider(ctx context.Context, src AuxiliaryACLSource) {
 	a.registerAuxiliaryProvider(ctx, src)
 }
+
+// OnRollbackWaitsForNOC sets fn to run when the fail-safe's rollback finds
+// a NOC command in flight and waits for it (nocContended).
+func (o *OperationalCredentials) OnRollbackWaitsForNOC(fn func()) {
+	o.mu.Lock()
+	o.nocContended = fn
+	o.mu.Unlock()
+}

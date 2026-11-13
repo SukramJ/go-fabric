@@ -134,6 +134,11 @@ type OperationalCredentials struct {
 	// install outside any fail-safe (review II, R2-P1-core-03). matter.js
 	// runs both on one thread. Taken before mu, never under it.
 	nocMu sync.Mutex
+	// nocContended, when set, runs when the rollback finds nocMu held by
+	// a NOC command and is about to wait for it: a test's observation
+	// point (export_test.go), so a race test decides on the wait itself
+	// rather than on a timeout (review II, R2-P1-dr-sec-05).
+	nocContended func()
 
 	// pendingNOCMarkerOut records that this server wrote the durable
 	// marker of the two fields above ([pendingNOCSettingKey]) and has not
@@ -667,7 +672,7 @@ func (o *OperationalCredentials) ClearPendingState() {
 // It is also safe to call from any other expiry path — it is idempotent
 // and acquires its own lock.
 func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) {
-	o.nocMu.Lock()
+	o.lockNOCForRollback()
 	defer o.nocMu.Unlock()
 	o.mu.Lock()
 	fabricToRevert := o.pendingInstallFabricIndex
@@ -717,6 +722,21 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	if reverted {
 		o.clearPendingNOC(ctx)
 	}
+}
+
+// lockNOCForRollback takes nocMu for the fail-safe's rollback, running
+// the nocContended hook first when a NOC command holds it.
+func (o *OperationalCredentials) lockNOCForRollback() {
+	if o.nocMu.TryLock() {
+		return
+	}
+	o.mu.RLock()
+	contended := o.nocContended
+	o.mu.RUnlock()
+	if contended != nil {
+		contended()
+	}
+	o.nocMu.Lock()
 }
 
 // revertUpdateNOC restores the identity and node id an UpdateNOC in an
