@@ -1,6 +1,6 @@
 # Matter behaviour-parity findings register — closed entries
 
-The closed entries of [`matter_behaviour_findings.md`](./matter_behaviour_findings.md), moved here verbatim under their headings on 2026-11-13 (review II, W6-reg-10) so that the live register holds open entries only: a record of what was wrong and how it was fixed, with the file and line references of each entry's own date, not a statement about the tree today. The register sample of that day (§4.2 of review II's phase-0 report on wave W6) checked 34 of them, beyond W6-reg-01 and W6-reg-02, against the code and found none that says fixed and is not; a line that starts "Review II" is that sample's flag on the entry above it and the only text here that is not the entry's own.
+The closed entries of [`matter_behaviour_findings.md`](./matter_behaviour_findings.md), moved here verbatim under their headings on 2026-11-13 (review II, W6-reg-10) so that the live register holds open entries only: a record of what was wrong and how it was fixed, with the file and line references of each entry's own date, not a statement about the tree today. The register sample of that day (§4.2 of review II's phase-0 report on wave W6) checked 34 of them, beyond W6-reg-01 and W6-reg-02, against the code and found none that says fixed and is not; a line that starts "Review II" is that sample's flag on the entry above it and the only text here that is not the entry's own. An entry closed after that day is moved the same way, with a closing paragraph that starts "Closed" and its date.
 
 ## Suggested implementation order
 
@@ -293,6 +293,64 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
+
+## matter.js pin db021da0 — open items (pin lift 2026-11-06)
+
+- **F-db021da0-5: the Sigma3 success StatusReport is abandoned right after it is queued.**
+  Read, not exercised — no test shows it. The bridge's Sigma3 case runs
+  `handleCase(…, "sigma3", …)`, which sends the responder's reply through
+  `sendHandshakeReplyReliable`, and then drops every unsecured-session entry
+  of the exchange with `AbandonUnsecuredExchange`
+  (`bridge/securechannel.go:385-425`, `:931-934`) — the reply it has just
+  tracked included, if `ProcessSigma3` hands the success StatusReport back
+  as that reply (inferred from the two call sites). The comment there
+  speaks of "still-pending Sigma2 retransmits". If the report is lost the
+  initiator waits out its timeout, and no retransmission follows. matter.js
+  sends the success report through the exchange without `suppressAck`
+  (`packages/protocol/src/session/case/CaseServer.ts:332`,
+  `packages/protocol/src/securechannel/SecureChannelMessenger.ts:174-176`,
+  `:209-232` at `db021da0`); that the exchange retransmits it until it is
+  acknowledged was not traced (unverified). Fix: abandon before the handler
+  runs, as the Pake3 case does (`bridge/securechannel.go:493-500`), so the
+  reply to Sigma3 stays tracked; it changes what a successful CASE sends
+  and wants a test with a lost StatusReport. Found in review II, phase 0
+  (R2-P0-bound-A06).
+  Closed 2026-11-13 (review II, R2-P0-rv-A01 and -A04, `99149871`):
+  confirmed by test first — the rework's run on the unchanged code reported
+  "pending after Sigma3's success StatusReport = 0, want 1" — and fixed as
+  the entry proposes: the Sigma3 case drops what the exchange left
+  unacknowledged before the handler runs (`bridge/securechannel.go`,
+  `abandonHandshakeReplies` ahead of `handleCase(…, "sigma3", …)`), so the
+  StatusReport that answers Sigma3 stays tracked and is retransmitted.
+  Pinned by the subtests "a CASE handshake that completes" and "a CASE
+  handshake the shipped adapter refuses at Sigma3" of
+  `bridge:TestUnsecuredRetransmitEntriesEndWithTheirHandshake`. The
+  entry's "unverified" is read: the exchange asks for the acknowledgement
+  unless `suppressAck` is set, starts the retransmission timer and waits
+  for the acknowledgement
+  (`packages/protocol/src/protocol/MessageExchange.ts:692`, `:785-790`,
+  `:821-830` at `db021da0`). The rule the table follows since is
+  `BD-Matter-UnsecuredRetransmitEviction` in `by_design.md`.
+- **F-db021da0-6: the subscribe path's ACL filter tests fabric index 0 only.**
+  `Bridge.readAuthorizedResults` returns nothing for `fabricIndex == 0`
+  (`bridge/subscribe.go:498-504`) and hands every other index to the ACL
+  checker. Since `6301a66b` every gate of `im` reads an index it cannot
+  resolve (255, `endpoint.FabricIndexUnresolvable`) as no accessing fabric
+  before the access-control source is asked (`im/fabric_context.go`,
+  `hasAccessingFabric`); this filter does not. What it lets through is not
+  established: the module's own checker refuses 255 itself
+  (`endpoint/dispatcher.go:1121`, read), another `im.ACLChecker` may not —
+  not exercised (unverified). No reference models an unresolvable index;
+  the rule is this module's fail-closed reading, and the gap is that one
+  site does not apply it. Fix: the same test as the other gates, with a
+  subscription case beside the write, invoke and group cases of `6301a66b`.
+  Found in review II, phase 0.
+  Closed 2026-11-13 (review II, R2-P0-rv-A08, `16b716d4`):
+  `Bridge.readAuthorizedResults` returns nothing unless
+  `im.HasAccessingFabric(fabricIndex)` — the helper of every other gate,
+  exported for it — before the access-control source is asked. Pinned by
+  `bridge:TestReadAuthorizedResults_UnresolvableFabricIsNoAccessingFabric`,
+  with a checker that grants whatever it is asked.
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 

@@ -119,7 +119,7 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   branch at `packages/node/src/node/server/ServerSubscription.ts:909-920`,
   `suppressResponse: false` at `:914` under the comment "Requested so the
   peer's INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
-  transport". The comment over the Go code (`bridge/subscribe.go:543-548`)
+  transport". The comment over the Go code (`bridge/subscribe.go:556-559`)
   still says matter.js ships empty DataReports with SuppressResponse=true
   and cites `ServerSubscription.ts:782`; at the pin that line is
   `await this.#cancel(flushViaSession, currentExchange);`. The citation is
@@ -595,39 +595,115 @@ with a port of the named case.
   with a dirty path or an owed event, the first report is due at once, and
   the floor counts from that report; move the subtest. Found in review II,
   phase 0 (W2-conc-05).
-- **F-db021da0-5: the Sigma3 success StatusReport is abandoned right after it is queued.**
-  Read, not exercised — no test shows it. The bridge's Sigma3 case runs
-  `handleCase(…, "sigma3", …)`, which sends the responder's reply through
-  `sendHandshakeReplyReliable`, and then drops every unsecured-session entry
-  of the exchange with `AbandonUnsecuredExchange`
-  (`bridge/securechannel.go:385-425`, `:931-934`) — the reply it has just
-  tracked included, if `ProcessSigma3` hands the success StatusReport back
-  as that reply (inferred from the two call sites). The comment there
-  speaks of "still-pending Sigma2 retransmits". If the report is lost the
-  initiator waits out its timeout, and no retransmission follows. matter.js
-  sends the success report through the exchange without `suppressAck`
-  (`packages/protocol/src/session/case/CaseServer.ts:332`,
-  `packages/protocol/src/securechannel/SecureChannelMessenger.ts:174-176`,
-  `:209-232` at `db021da0`); that the exchange retransmits it until it is
-  acknowledged was not traced (unverified). Fix: abandon before the handler
-  runs, as the Pake3 case does (`bridge/securechannel.go:493-500`), so the
-  reply to Sigma3 stays tracked; it changes what a successful CASE sends
-  and wants a test with a lost StatusReport. Found in review II, phase 0
-  (R2-P0-bound-A06).
-- **F-db021da0-6: the subscribe path's ACL filter tests fabric index 0 only.**
-  `Bridge.readAuthorizedResults` returns nothing for `fabricIndex == 0`
-  (`bridge/subscribe.go:498-504`) and hands every other index to the ACL
-  checker. Since `6301a66b` every gate of `im` reads an index it cannot
-  resolve (255, `endpoint.FabricIndexUnresolvable`) as no accessing fabric
-  before the access-control source is asked (`im/fabric_context.go`,
-  `hasAccessingFabric`); this filter does not. What it lets through is not
-  established: the module's own checker refuses 255 itself
-  (`endpoint/dispatcher.go:1121`, read), another `im.ACLChecker` may not —
-  not exercised (unverified). No reference models an unresolvable index;
-  the rule is this module's fail-closed reading, and the gap is that one
-  site does not apply it. Fix: the same test as the other gates, with a
-  subscription case beside the write, invoke and group cases of `6301a66b`.
-  Found in review II, phase 0.
+- **F-db021da0-7: a handshake's failure StatusReport is sent while its previous reply is unacknowledged.**
+  Both references send none. matter.js: `PaseServer.cancelPairing` skips
+  the report "when a sent message is still unacked"
+  (`packages/protocol/src/session/pase/PaseServer.ts:208-210` at
+  `db021da0`), `CaseServer` returns before any `sendError` when
+  `exchange.considerClosed || exchange.hasUnackedMessage`
+  (`packages/protocol/src/session/case/CaseServer.ts:82-86`), and the two
+  initiators test the same
+  (`packages/protocol/src/session/case/CaseClient.ts:86-90`,
+  `packages/protocol/src/session/pase/PaseClient.ts:97-100`);
+  `hasUnackedMessage` is `#sentMessageToAck !== undefined`
+  (`packages/protocol/src/protocol/MessageExchange.ts:450-452`), and the
+  comments give the reason: "the send would only fail with a flow error".
+  connectedhomeip, read at `6170af84`: a retransmit-table entry sets its
+  exchange's waiting-for-ack flag when it is made and clears it when it is
+  destroyed (`src/messaging/ReliableMessageMgr.cpp:53-62`), and it is
+  destroyed with the acknowledgement
+  (`src/messaging/ReliableMessageContext.cpp:89-95`,
+  `ReliableMessageMgr.cpp:340-351`); while the flag is set, a message on the
+  exchange that carries no acknowledgement for it is dropped before the
+  delegate sees it — "Dropping message without piggyback ack when we are
+  waiting for an ack." (`src/messaging/ExchangeContext.cpp:585-595`) — so
+  the pairing session is not handed the message that would make it fail;
+  and a `SendMessage` in that state fails with `CHIP_ERROR_INCORRECT_STATE`
+  in `AddToRetransTable` (`ReliableMessageMgr.cpp:254-256`), before the
+  message is sent (`src/messaging/ExchangeMessageDispatch.cpp:54-64`),
+  which `SendStatusReport` logs and returns
+  (`src/protocols/secure_channel/PairingSession.h:183-189`). Not
+  established for connectedhomeip (unverified): whether a failure that does
+  not come from a received message — a timeout of the pairing session's
+  own — reaches `SendStatusReport` in that state at all. This module drops
+  what the handshake left unacknowledged on the exchange and then sends the
+  report as a reliable message: `Bridge.sendHandshakeFailureReport`
+  (`bridge/securechannel.go`, `abandonHandshakeReplies` first), and the
+  handshake this node opened abandons before it sends its report the same
+  way (`bridge/case_initiator.go`). The cases coincide for an initiator
+  that acknowledges a reply with its next message, which is what makes a
+  handshake fail in the ordinary run (a Pake3 that does not confirm, a
+  Sigma3 that does not verify); they differ when the handshake fails while
+  its last reply is still unacknowledged. Which peers and failures reach
+  that state was not exercised (unverified). Not decided: the report was
+  made reliable by `99149871` (before, it left without the R flag, which
+  neither reference does either), and whether to skip it as the references
+  do or to keep it under a `by_design` entry is an open question of that
+  rework. Fix: skip the report while an entry of the exchange is still
+  unacknowledged, with a case for each role beside
+  `bridge:TestUnsecuredRetransmitEntriesEndWithTheirHandshake`. Found in
+  review II, phase 0 (the rework of R2-P0-rv-A04).
+- **F-db021da0-8: a report pass that leaves nothing for the subscriber sends no DataReport.**
+  matter.js takes what is outstanding, stamps the time of the last update
+  before it sends
+  (`packages/node/src/node/server/ServerSubscription.ts:549-551` at
+  `db021da0`) and takes the data branch whenever an attribute filter or an
+  event number is outstanding (`:909`, `:921-936`), with
+  `suppressEmptyReport: onlyWithData` (`:935`); `onlyWithData` is false for
+  the pass the send delay or the send interval starts (`:198-200`,
+  `:480-484`, the default of `:520`) and true only for a flush (`:757`) and
+  for a queued follow-up with no keep-alive owed (`:622`), and the
+  messenger leaves a report out only when that flag is set and the report
+  is empty (`packages/protocol/src/interaction/InteractionMessenger.ts:794-796`).
+  So a pass whose data is all filtered for the subscriber goes out as an
+  empty DataReport with `suppressResponse: false` (`:928`) and counts as
+  the last update — under a TODO of matter.js's own, "Add correct handling
+  for reports that would have data but in the end not send any because of
+  filtered out" (`:923-925`). Here the bridge's event reporter sends
+  nothing when its access check leaves no event and no attribute for the
+  subscriber and says so (`Subscription.NothingSent`,
+  `im/subscription/subscription.go`; `reportSubscriptionEvents`,
+  `bridge/subscribe.go`), and the engine then sends the keep-alive when the
+  pass was the send interval's and otherwise puts the time of the last
+  report back (`dueReport`, `im/subscription/engine.go`); an event drain
+  that yields no event is no report either (`e506836f`). Since `ab039217`
+  the keep-alive due in such a pass is sent — before, the pass counted and
+  a subscriber heard nothing for two send intervals (review II,
+  R2-P0-rv-A03) — so what still differs is the empty DataReport itself and
+  the send interval it restarts. The attribute path of this module goes the
+  other way: `reportSubscription` sends the report empty when every dirty
+  path was filtered (`bridge/subscribe.go`, "An empty report is a
+  max-interval keepalive"), as matter.js does. The doc of `NothingSent`
+  calls its rule the module's own; no entry of `by_design.md` gives a
+  reason, so it stands here. Pinned as it is by
+  `im/subscription:TestKeepAliveAndAReportThatSendsNothing` and
+  `bridge:TestReportWhoseEventsAreAllFilteredLeavesTheKeepAliveDue`. Fix:
+  one rule for both paths — send the filtered pass as an empty DataReport
+  and count it, as matter.js, together with the keep-alive entry of the
+  `862ad75f` section (`SuppressResponse`), or keep the silence under a
+  `by_design` entry; the owner's decision. Found in review II, phase 0.
+- **F-db021da0-9: `Identify.Close` during a running identify does not tell the host to stop.**
+  matter.js's `IdentifyServer[Symbol.asyncDispose]` calls
+  `#stopIdentifying()`
+  (`packages/node/src/behaviors/identify/IdentifyServer.ts:116-119` at
+  `db021da0`), which, while the identify timer runs, stops it, sets
+  `isIdentifying` to false and emits `stopIdentifying` (`:100-106`), the
+  event the class doc calls mandatory (`:25`). `Identify.Close`
+  (`cluster/core/identify.go`) marks the server closed, closes the
+  countdown's `done` and waits for its goroutine; the tick that finds
+  `done` closed leaves without counting, and the host's
+  `MatterIdentify(ctx, 0)` is called only by the tick that counts to zero
+  (`tick`) and by a request that sets 0 (`setIdentifyTime`). A host that
+  began identifying on an endpoint that is then removed is never told to
+  stop. The comment over `Close` says it mirrors `[Symbol.asyncDispose]`,
+  "which stops the identify timer" — half of what the lines do. Read, not
+  exercised: whether a test closes a server while it identifies and looks
+  at the handler was not searched for (unverified). Fix: `Close` on a
+  running countdown reports the stop as the zero tick does, from a
+  goroutine of its own that `Close` does not wait for (R2-P0-rv-B04), with
+  that test, and `contract/identify.go` says so; whether that call gets a
+  context `Close` ends is the open question beside it. Found in review II,
+  phase 0 (the rework of R2-P0-rv-B04).
 
 ## Tier 3 — LOW
 
