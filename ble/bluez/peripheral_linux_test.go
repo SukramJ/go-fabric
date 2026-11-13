@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -826,4 +827,29 @@ func TestNewPeripheralIsBounded(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("newPeripheral over a silent bluetoothd is unbounded")
 	}
+}
+
+// TestPeripheralC1ReaderEndClosesItsSocket: when C1's reader ends while
+// bluetoothd's end is still open — os.File reads a zero-length packet as
+// io.EOF — the peripheral closes its end, so bluetoothd sees the hang-up
+// instead of writing into a socket nobody reads (review II, R2-P1-drv-04;
+// whether bluetoothd forwards an empty C1 write is not verified).
+func TestPeripheralC1ReaderEndClosesItsSocket(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0D")
+	if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	fd := int(fc.write.Fd())
+	if _, err := syscall.Write(fd, nil); err != nil { // an empty packet
+		t.Fatal(err)
+	}
+	waitUntil(t, "WriteAcquired to clear", func() bool { return !acquiredFlag(t, b, p, 1, "WriteAcquired") })
+	waitUntil(t, "the peripheral's C1 end to close", func() bool {
+		_, err := syscall.Write(fd, []byte{1})
+		return err != nil
+	})
 }

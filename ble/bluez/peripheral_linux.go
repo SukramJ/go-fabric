@@ -870,12 +870,16 @@ func (c *pconn) setWrite(f *os.File) bool {
 		defer func() {
 			// The socket ended — the central closed it, the link went, or
 			// the connection was dropped; a newer AcquireWrite may have
-			// replaced it.
+			// replaced it. os.File also reads a zero-length packet as
+			// io.EOF while bluetoothd's end is open: closing this end lets
+			// bluetoothd see the hang-up instead of writing into a socket
+			// nobody reads, as setNotify's reader closes its own.
 			c.mu.Lock()
 			if c.write == f {
 				c.write = nil
 			}
 			c.mu.Unlock()
+			_ = f.Close()
 			c.p.refreshAcquired(1)
 		}()
 		for {
