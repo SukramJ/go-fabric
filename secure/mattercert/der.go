@@ -6,12 +6,11 @@ package mattercert
 import (
 	"bytes"
 	"encoding/asn1"
-	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,7 +28,9 @@ const MaxOperationalCertDERBytes = 600
 // 600 bytes before parsing, the signature algorithm must be the same
 // inside and outside the TBSCertificate (RFC 5280 §4.1.1.2), the DN
 // attributes come back in their arrival order with the Matter ids parsed
-// from their hex strings, a recognised extension (basicConstraints,
+// from their hex strings (by the stricter rule of the db021da0 pin, see
+// derMatterAttribute; the rest of this path is cited at 862ad75f and not
+// yet re-read at db021da0), a recognised extension (basicConstraints,
 // keyUsage, extendedKeyUsage, subjectKeyIdentifier,
 // authorityKeyIdentifier) without its value OCTET STRING is refused and an
 // extension of any other OID is not read — whatever its value holds.
@@ -244,13 +245,19 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 // into dn: the 64-bit ids and a CAT as hex strings, each single-valued id
 // refused when it repeats (once). It reports false for an OID that is not
 // a Matter attribute.
+//
+// The hex is read as parseMatterRdnHex reads it (Certificate.ts:242-249 at
+// db021da0): exactly 16 uppercase hex digits for a 64-bit id (:331-339,
+// octets 8), exactly 8 for a CAT (:354-358, octets 4), which must also be
+// a valid CASE Authenticated Tag (CaseAuthenticatedTag.isValid: a version
+// other than 0).
 func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value string, once func(asn1.ObjectIdentifier) error) (bool, error) {
 	id := func(bits int) (uint64, error) {
-		v, err := strconv.ParseUint(value, 16, bits)
-		if err != nil {
-			return 0, fmt.Errorf("%w: matter id %q is not hex", ErrMalformed, value)
+		digits := bits / 4
+		if len(value) != digits || strings.IndexFunc(value, func(r rune) bool { return (r < '0' || r > '9') && (r < 'A' || r > 'F') }) >= 0 {
+			return 0, fmt.Errorf("%w: invalid matter id %q: expected exactly %d uppercase hexadecimal digits", ErrMalformed, value, digits)
 		}
-		return v, nil
+		return strconv.ParseUint(value, 16, bits)
 	}
 	var (
 		field *uint64
@@ -275,10 +282,10 @@ func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value
 		if err != nil {
 			return true, err
 		}
-		if v > math.MaxUint32 {
-			return true, errors.New("mattercert: CASE authenticated tag exceeds 32 bits")
+		if v&0xFFFF == 0 {
+			return true, fmt.Errorf("%w: invalid CASE Authenticated Tag %q", ErrMalformed, value)
 		}
-		dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
+		dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v)) //nolint:gosec // id(32) parsed it with bitSize 32
 		dn.Order = append(dn.Order, dnTagMatterCASEAuth)
 		return true, nil
 	default:

@@ -318,10 +318,27 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 		}
 		return v
 	}
-	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterCASEAuthTag} {
-		if _, err := derDN(name(attr(oid, asn1.TagUTF8String, "zz"))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "not hex") {
-			t.Fatalf("derDN(%v = zz) = %v, want the not-hex refusal", oid, err)
+	// The Matter ids are exactly 16 uppercase hex digits, a CAT exactly 8
+	// with a version other than 0 — parseMatterRdnHex and
+	// CaseAuthenticatedTag.isValid (Certificate.ts:242-249, :331-339,
+	// :354-358 at db021da0; review II, R2-P1-sec-03).
+	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterVVSID, oidMatterFirmwareSigningID} {
+		for _, v := range []string{"zz", "ab", "AB", "00000000000000ab", "000000000000000AB", "0x000000000000AB", "+00000000000000A"} {
+			if _, err := derDN(name(attr(oid, asn1.TagUTF8String, v))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "expected exactly 16 uppercase hexadecimal digits") {
+				t.Fatalf("derDN(%v = %q) = %v, want the 16-digit refusal", oid, v, err)
+			}
 		}
+	}
+	for _, v := range []string{"zz", "0001", "0001000a", "000100001", "+0010001"} {
+		if _, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, v))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "expected exactly 8 uppercase hexadecimal digits") {
+			t.Fatalf("derDN(CAT = %q) = %v, want the 8-digit refusal", v, err)
+		}
+	}
+	if _, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, "ABCD0000"))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "invalid CASE Authenticated Tag") {
+		t.Fatalf("derDN(CAT version 0) = %v, want the invalid-CAT refusal", err)
+	}
+	if cat, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, "ABCD0001"))); err != nil || !slices.Equal(cat.CASEAuthTags, []uint32{0xABCD0001}) {
+		t.Fatalf("derDN(CAT ABCD0001) = %+v, %v", cat, err)
 	}
 	if _, err := derDN(asn1.RawValue{Bytes: []byte{0xff}}); err == nil || !strings.Contains(err.Error(), "invalid subject/issuer structure") {
 		t.Fatalf("derDN(unreadable) = %v", err)
