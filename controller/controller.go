@@ -479,7 +479,9 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 	if cfg.OTA != nil {
 		return c.startOTA(ctx, cfg)
 	}
-	return nil
+	// A database that ran the own node is migrated whether or not the
+	// controller serves OTA (review II, R2-P1-ctl-03).
+	return c.retireOwnNode(ctx, store.New(cfg.DB), c.log)
 }
 
 // openTransports builds the network profiles and opens the network over

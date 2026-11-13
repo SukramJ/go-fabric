@@ -245,9 +245,10 @@ func (invalidCommand) MatterStatusCode() im.StatusCode { return im.StatusInvalid
 const ownNodeKey = "controller.ownnode"
 
 // retireOwnNode is the migration of a database that ran the OTA provider
-// on an own node: the node's record goes, and the registry forgets the
-// node, which no longer exists — the controller is the provider now, and
-// the next announcement round rewrites every node's DefaultOTAProviders
+// on an own node, run at every start with or without OTA: the node's
+// record goes, and the registry forgets the node, which no longer exists
+// — the controller is the provider now, and the next announcement round
+// rewrites every node's DefaultOTAProviders
 // (softwareupdate/announcements.go announceDefaultProvider, which writes
 // our record unless the node holds the same one).
 func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *slog.Logger) error {
