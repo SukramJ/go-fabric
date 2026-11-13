@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/alarmbase"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
 	rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	tma "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
@@ -364,5 +365,28 @@ func TestTemperatureThresholdSet(t *testing.T) {
 	}
 	if got := srv.Thresholds(); got[tma.AttrCriticalUnderTemperatureThreshold] != -2000 {
 		t.Errorf("thresholds %v", got)
+	}
+}
+
+// TestDelegateStatusPassesThrough: a delegate's refusal that names its
+// status — a host's contract.StatusError — answers that status from Reset
+// and ModifyEnabledAlarms, not FAILURE (docs/guides/ports.md; review II
+// R2-P0-err-D01).
+func TestDelegateStatusPassesThrough(t *testing.T) {
+	t.Parallel()
+	d := &delegate{err: contract.StatusError{Status: uint8(im.StatusBusy), Message: "cycle running"}}
+	srv, _ := newDishwasher(t, alarmbase.Config{
+		Features: alarmbase.FeatureReset, ModifyEnabledAlarms: true, Delegate: d,
+		Supported: inflow | drain, Latch: drain, Mask: inflow | drain, State: inflow | drain,
+	})
+	ctx := context.Background()
+	if _, err := srv.MatterInvoke(ctx, alarmbase.CmdReset, dwa.ResetRequest{Alarms: dwa.AlarmBitmap(drain)}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("Reset refused with a host status answered %v, want BUSY", err)
+	}
+	if _, err := srv.MatterInvoke(ctx, alarmbase.CmdModifyEnabledAlarms, dwa.ModifyEnabledAlarmsRequest{Mask: dwa.AlarmBitmap(inflow)}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("ModifyEnabledAlarms refused with a host status answered %v, want BUSY", err)
+	}
+	if srv.Mask() != inflow|drain || srv.State() != inflow|drain {
+		t.Errorf("a refused command changed mask 0x%X state 0x%X", srv.Mask(), srv.State())
 	}
 }

@@ -121,8 +121,9 @@ const (
 // (examples/energy-management/device-energy-management/include/
 // DEMManufacturerDelegate.h:32-93). Every hook but
 // ApproxEnergyDuringSession has a do-nothing default there; embed
-// [NopDemManager] for the same. A hook's error fails the command as the
-// delegate fails it (FAILURE).
+// [NopDemManager] for the same. A hook's error fails the command: with the
+// status it names (a contract.StatusError or an im.StatusCodeError),
+// FAILURE for any other, as the delegate fails it.
 //
 // The hooks are called with the server's command queue held and its state
 // lock released (ADR 0026 P6): a hook may call the state setters
@@ -512,6 +513,16 @@ func demFailure(format string, args ...any) error {
 	return spec.Errorf(im.StatusFailure, "energy: "+format, args...)
 }
 
+// demRefusal is the answer to a manager hook's refusal of cmd: the status
+// a host's contract.StatusError or an im.StatusCodeError names, FAILURE
+// for any other error (docs/guides/ports.md).
+func demRefusal(cmd string, err error) error {
+	if spec.CarriesStatus(err) {
+		return err
+	}
+	return demFailure("%s: %v", cmd, err)
+}
+
 func demConstraint(format string, args ...any) error {
 	return spec.Errorf(im.StatusConstraintError, "energy: "+format, args...)
 }
@@ -617,7 +628,7 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 		s.powerAdjustStartUtc = start
 	}
 	if err := s.hook(func() error { return s.manager.PowerAdjust(ctx, r.Power, r.Duration, r.Cause) }); err != nil { // :125-132
-		return demFailure("PowerAdjustRequest: %v", err)
+		return demRefusal("PowerAdjustRequest", err)
 	}
 	if err := s.setLocked(dem.AttrEsaState, EsaStatePowerAdjustActive); err != nil { // :134
 		return err
@@ -709,7 +720,7 @@ func (s *DeviceEnergyManagementServer) cancelPowerAdjustRequest(_ context.Contex
 		return nil, demInvalidInState("ESAState %d, not PowerAdjustActive", st)
 	}
 	if err := s.cancelPowerAdjustLocked(dem.CauseCancelled); err != nil {
-		return nil, demFailure("CancelPowerAdjustRequest: %v", err)
+		return nil, demRefusal("CancelPowerAdjustRequest", err)
 	}
 	if c := s.PowerAdjustmentCapability(); c == nil || c.Cause != dem.PowerAdjustReasonNoAdjustment { // :395-411
 		return nil, demConstraint("PowerAdjustmentCapability cause not reset")
@@ -768,7 +779,7 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 		f.ForecastUpdateReason = dem.ForecastUpdateReasonInternalOptimization
 		f.StartTime, f.EndTime = savedStart, savedEnd
 		_ = s.setForecastLocked(f)
-		return nil, demFailure("StartTimeAdjustRequest: %v", herr)
+		return nil, demRefusal("StartTimeAdjustRequest", herr)
 	}
 	if err := s.setForecastLocked(f); err != nil {
 		return nil, err
@@ -832,7 +843,7 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired)             // :443
 	if herr := s.hook(func() error { return s.manager.Pause(ctx, r.Duration, r.Cause) }); herr != nil { // :451-460
 		s.pauseFailureLocked()
-		return nil, demFailure("PauseRequest: %v", herr)
+		return nil, demRefusal("PauseRequest", herr)
 	}
 	if generateEvent { // :462-473; Paused is listed whenever PauseRequest is (both "PAU")
 		_ = s.emitLocked(dem.EventPaused, dem.PausedEvent{})
@@ -908,7 +919,7 @@ func (s *DeviceEnergyManagementServer) resumeRequest(_ context.Context, _ any) (
 		}
 	}
 	if err := s.cancelPauseLocked(dem.CauseCancelled); err != nil { // :638-642
-		return nil, demFailure("ResumeRequest: %v", err)
+		return nil, demRefusal("ResumeRequest", err)
 	}
 	// The cluster's post-conditions (:609-613).
 	if s.EsaState() == EsaStatePaused {
@@ -966,7 +977,7 @@ func (s *DeviceEnergyManagementServer) modifyForecastRequest(ctx context.Context
 		return nil, demFailure("ForecastID %d, current %d", r.ForecastId, f.ForecastId)
 	}
 	if herr := s.hook(func() error { return s.manager.ModifyForecast(ctx, r.ForecastId, r.SlotAdjustments, r.Cause) }); herr != nil { // :676-684
-		return nil, demFailure("ModifyForecastRequest: %v", herr)
+		return nil, demRefusal("ModifyForecastRequest", herr)
 	}
 	return nil, s.adjustForecastLocked(f, r.Cause)
 }
@@ -1041,7 +1052,7 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 		return nil, demFailure("Forecast is null")
 	}
 	if herr := s.hook(func() error { return s.manager.RequestConstraintBasedForecast(ctx, r.Constraints, r.Cause) }); herr != nil { // :730-738
-		return nil, demFailure("RequestConstraintBasedForecast: %v", herr)
+		return nil, demRefusal("RequestConstraintBasedForecast", herr)
 	}
 	return nil, s.adjustForecastLocked(f, r.Cause)
 }
@@ -1065,7 +1076,7 @@ func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any)
 		return nil, err
 	}
 	if herr := s.hook(func() error { return s.manager.CancelRequest(ctx) }); herr != nil { // :788-795, Cluster.cpp:820
-		return nil, demFailure("CancelRequest: %v", herr)
+		return nil, demRefusal("CancelRequest", herr)
 	}
 	return nil, nil
 }

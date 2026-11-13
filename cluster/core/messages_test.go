@@ -242,6 +242,18 @@ func TestMessagesRefusals(t *testing.T) {
 	wantCoreStatus(t, decodeAndInvoke(t, m, ctx, messagesdef.CmdPresentMessagesRequest, presentRequest(messageID(1), "x")), im.StatusFailure)
 	wantCoreStatus(t, decodeAndInvoke(t, m, ctx, messagesdef.CmdCancelMessagesRequest,
 		messagesdef.CancelMessagesRequestRequest{MessageIds: [][]byte{messageID(1)}}), im.StatusFailure)
+	// A presenter's refusal that names its status — a host's
+	// contract.StatusError — answers it (docs/guides/ports.md; review II
+	// R2-P0-err-D01).
+	d.err = contract.StatusError{Status: uint8(im.StatusBusy), Message: "display busy"}
+	if err := decodeAndInvoke(t, m, ctx, messagesdef.CmdPresentMessagesRequest, presentRequest(messageID(1), "x")); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("PresentMessages refused with a host status answered %v, want BUSY", err)
+	}
+	if err := decodeAndInvoke(t, m, ctx, messagesdef.CmdCancelMessagesRequest,
+		messagesdef.CancelMessagesRequestRequest{MessageIds: [][]byte{messageID(1)}}); spec.StatusOf(err) != im.StatusBusy {
+		t.Errorf("CancelMessages refused with a host status answered %v, want BUSY", err)
+	}
+	d.err = errors.New("display off")
 	wantCoreStatus(t, decodeAndInvoke(t, m, msgCtx(0, false), messagesdef.CmdPresentMessagesRequest, presentRequest(messageID(1), "x")), im.StatusUnsupportedAccess)
 	_, err := m.MatterInvoke(ctx, messagesdef.CmdPresentMessagesRequest, "garbage")
 	wantCoreStatus(t, err, im.StatusInvalidCommand)

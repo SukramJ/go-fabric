@@ -394,14 +394,14 @@ func (s *MicrowaveServer) addMoreTime(ctx context.Context, fields any) (any, err
 	return nil, s.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{mwo.AttrCookTime: final})
 }
 
-// hostError answers a host refusal: its own status when it carries one,
-// FAILURE otherwise.
+// hostError is the answer to the host's refusal of cmd: the status a
+// host's contract.StatusError or an im.StatusCodeError names, FAILURE for
+// any other error (docs/guides/ports.md).
 func hostError(cmd string, err error) error {
-	var sce im.StatusCodeError
-	if errors.As(err, &sce) {
-		return spec.Errorf(sce.MatterStatusCode(), "%s: %v", cmd, err)
+	if spec.CarriesStatus(err) {
+		return err
 	}
-	return spec.Errorf(im.StatusFailure, "%s: %v", cmd, err)
+	return spec.Errorf(im.StatusFailure, "appliance: %s: %v", cmd, err)
 }
 
 // uintList is a list of unsigned integers that encodes itself, each entry
