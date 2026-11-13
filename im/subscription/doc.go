@@ -18,7 +18,8 @@
 //   - An event is reported with the subscription's next report. It asks
 //     for one itself — gated by MinInterval like an attribute change —
 //     only when a path of the subscriber that covers it is marked urgent;
-//     its priority does not matter.
+//     its priority does not matter. Events and attribute changes that are
+//     due together leave in one ReportData.
 //   - Each subscription is fabric-scoped and counts against the
 //     per-fabric MaxSubscriptions quota.
 //

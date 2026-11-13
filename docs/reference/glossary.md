@@ -327,7 +327,8 @@ interval and reports at least every max interval as a keep-alive. An
 event is reported with the subscription's next report; it triggers one
 itself only when the subscriber marked an event path that covers it
 urgent (`isUrgent`), and that report waits for the min interval too —
-an event of critical priority included. See
+an event of critical priority included. Events and attribute changes due
+together arrive in one report. See
 **Binding** for the difference. In go-fabric:
 [`im/subscription`](https://github.com/SukramJ/go-fabric/tree/main/im/subscription).
 

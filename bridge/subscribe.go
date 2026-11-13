@@ -240,8 +240,9 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // (endpoint, cluster, event) triple.
 //
 // The closure encodes the events under the same per-subscription
-// [subTarget] used for attribute reports, so a single peer session
-// receives both report types interleaved.
+// [subTarget] used for attribute reports, and takes the attribute changes
+// that are due with them ([subscription.Subscription.TakeDuePaths]): one
+// ReportData carries both ([Bridge.reportSubscriptionEvents]).
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
 }
@@ -307,8 +308,15 @@ func (b *Bridge) authorizedEventReports(ctx context.Context, target subTarget, e
 	return im.AuthorizeEventReports(ctx, auth, events)
 }
 
-// reportSubscriptionEvents assembles + ships an event-only ReportData
-// for sub. Called by the manager's engine tick.
+// reportSubscriptionEvents assembles + ships the ReportData of a report
+// of sub that carries events: the events, and in the same message the
+// attribute changes that are due with them
+// ([subscription.Subscription.TakeDuePaths]). Called by the manager's
+// engine tick. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:539-555 at db021da0
+// (#sendUpdate takes the attribute filter and the events' minimum number
+// together) and :860-887, :926-936 (#iterateDataUpdate yields the
+// attributes, then the events, into one DataReport).
 func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
 	if sub == nil || len(events) == 0 {
 		return
@@ -317,6 +325,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if !ok {
 		return
 	}
+	// The attribute changes due in this report are this reporter's from
+	// here on: sent below, or marked dirty again when the send fails.
+	paths := sub.TakeDuePaths()
 
 	// Authorize each event against the subscribing subject: a CASE
 	// subject only receives events on (endpoint, cluster) it holds at
@@ -326,19 +337,20 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// A PASE subscriber bypasses (the auth mode, not fabric index 0,
 	// which alone is refused); a dispatcher without an ACLChecker keeps
 	// the pre-ACL behaviour.
-	authorizedEvents := b.authorizedEventReports(ctx, target, events)
-	if len(authorizedEvents) == 0 {
+	report := im.ReportData{
+		HasSubscription: true,
+		SubscriptionID:  sub.ID,
+		EventReports:    b.authorizedEventReports(ctx, target, events),
+	}
+	if dispatcher := b.Dispatcher(); dispatcher != nil && len(paths) > 0 {
+		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
+	}
+	if len(report.EventReports) == 0 && len(report.Reports) == 0 {
 		return
 	}
 
 	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
 	target.abort = ctx.Done()
-
-	report := im.ReportData{
-		HasSubscription: true,
-		SubscriptionID:  sub.ID,
-		EventReports:    authorizedEvents,
-	}
 
 	// Same bridge-initiated exchange as the attribute path: the
 	// commissioner closed its Subscribe exchange when the
@@ -350,12 +362,15 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// server-initiated exchanges (ServerSubscription.ts:823).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
-		// Owe the same events again, so the next report retries them;
-		// the third consecutive failure reaps the subscription. Mirrors
-		// matter.js packages/node/src/node/server/ServerSubscription.ts
-		// :566-581 (restores #outstandingEventsMinNumber while
-		// #sendUpdateErrorCounter <= 2).
+		// Owe the same events and attribute changes again, so the next
+		// report retries them; the third consecutive failure reaps the
+		// subscription. Mirrors matter.js
+		// packages/node/src/node/server/ServerSubscription.ts:569-584 at
+		// db021da0 (puts the attribute filter and
+		// #outstandingEventsMinNumber back while #sendUpdateErrorCounter
+		// <= 2).
 		sub.RequeueEvents(events[0].Number)
+		sub.RequeueAttributes(paths)
 		if errors.Is(err, errChunkWaitAborted) {
 			return // the engine stopped; the peer did nothing wrong
 		}
@@ -371,6 +386,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	b.logger.Debug("matter.tx.subscribe.event_report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
+		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
 }
 
