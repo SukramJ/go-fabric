@@ -1934,6 +1934,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		_ = tcpListener.Close()
 	}
 	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
+	b.waitBLEHandlers(ctx)
 	b.waitPumpStopped(pumpDone)
 
 	// The host's notifiers are detached once nothing is served: a value

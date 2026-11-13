@@ -73,6 +73,10 @@ type bleRuntime struct {
 	adv       bleAdvert
 	// central is the one connected central, nil without one.
 	central contract.BLEConnection
+	// receivers holds the receiver of every BTP connection until its
+	// handlers returned, so [Bridge.Stop] waits for them
+	// (waitBLEHandlers) as it waits for the UDP and TCP listeners' ones.
+	receivers map[*connReceiver]struct{}
 }
 
 // bleAdvert is what the BLE advertisement carries of a
@@ -321,6 +325,54 @@ func (b *Bridge) stopBLEForShutdown(ctx context.Context) {
 	}
 }
 
+// trackBLEReceiver records r until its handlers returned.
+func (b *Bridge) trackBLEReceiver(r *connReceiver) {
+	b.ble.mu.Lock()
+	defer b.ble.mu.Unlock()
+	if b.ble.receivers == nil {
+		b.ble.receivers = make(map[*connReceiver]struct{})
+	}
+	b.ble.receivers[r] = struct{}{}
+}
+
+// untrackBLEReceiver forgets r once its handlers returned.
+func (b *Bridge) untrackBLEReceiver(r *connReceiver) {
+	b.ble.mu.Lock()
+	delete(b.ble.receivers, r)
+	b.ble.mu.Unlock()
+}
+
+// waitBLEHandlers is [Bridge.Stop]'s wait for the handlers of messages
+// delivered over BLE, bounded by ctx: every receiver stops delivering and
+// its handlers in flight are waited for, so none of them writes into a
+// store the host closes or erases after Stop. Stop calls it after the
+// handler context was cancelled, so a handler that honours it ends
+// promptly.
+func (b *Bridge) waitBLEHandlers(ctx context.Context) {
+	b.ble.mu.Lock()
+	rs := make([]*connReceiver, 0, len(b.ble.receivers))
+	for r := range b.ble.receivers {
+		rs = append(rs, r)
+	}
+	b.ble.mu.Unlock()
+	if len(rs) == 0 {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, r := range rs {
+			r.close() // no delivery after this, so wait cannot race an Add
+			r.wait()
+		}
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		b.logger.Warn("matter.bridge.stop.ble_handlers_timeout", slog.Any("err", ctx.Err()))
+	}
+}
+
 // acceptBLE is the GATT service's accept: one central at a time, its BTP
 // session served through the receive path.
 func (b *Bridge) acceptBLE(c contract.BLEConnection) {
@@ -345,12 +397,15 @@ func (b *Bridge) acceptBLE(c contract.BLEConnection) {
 	}()
 	err := btp.Accept(c, func(conn *btp.Conn) func([]byte) {
 		r := b.newConnReceiver(conn)
+		b.trackBLEReceiver(r)
 		go func() {
 			select {
 			case <-conn.Closed():
 			case <-c.Disconnected():
 			}
 			r.close()
+			r.wait()
+			b.untrackBLEReceiver(r)
 		}()
 		return r.deliver
 	}, btp.Options{TimeSource: b.clk(), Logger: b.logger})
