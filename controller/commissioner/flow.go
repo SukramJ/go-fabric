@@ -15,6 +15,7 @@ import (
 	"io"
 	"log/slog"
 	"math/big"
+	"net/netip"
 	"slices"
 	"sync"
 	"time"
@@ -132,8 +133,12 @@ type flow struct {
 	address    handshake.PeerAddress
 	challenge  []byte
 	transition transitionFunc
-	steps      []step
-	results    map[[2]int]stepResult
+	// hint hands addresses the reconnect probe learned to the running
+	// operational connection (peer.Peer.HintAddresses) and returns how
+	// many it queued; nil hands none.
+	hint    func([]netip.AddrPort) int
+	steps   []step
+	results map[[2]int]stepResult
 	// reArmBefore are the steps with reArmFailsafe (:196-198).
 	reArmBefore map[[2]int]bool
 	// ble is the commissioning channel's type: BLE (Options.Channel) or IP
@@ -1069,6 +1074,13 @@ func publicKeyFromCSR(der []byte) ([]byte, error) {
 // OperativeConnectionFailedError; none — FinalizeCommissioning took over —
 // stops the flow (:2035-2041); else the CASE interaction replaces the PASE
 // one (:2043-2044).
+//
+// Beside the transition of a concurrent flow the device is probed over the
+// commissioning session (reconnect_probe.go): its network state logged,
+// its routable addresses handed to the operational connection, and a
+// failure naming its last report — ahead of matter.js, whose step goes
+// from the re-arm straight to transitionToCase
+// (ControllerCommissioningFlow.ts:2029-2046 at db021da0).
 func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 	concurrent := f.data.supportsConcurrentConnection == nil || *f.data.supportsConcurrentConnection
 	f.log.Debug("matter.controller.commissioning.reconnecting", slog.Bool("concurrent", concurrent))
@@ -1079,11 +1091,22 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 	} else {
 		f.stopArmInterval()
 	}
+	// With the commissioning session open beside the transition, the
+	// device is asked what its network state is (reconnect_probe.go).
+	var probe *reconnectProbe
+	if concurrent {
+		probe = f.startReconnectProbe(ctx, f.interaction())
+	}
 	next, err := f.transition(ctx, f.address, concurrent)
 	// The re-arm timer ends with the transition (:2031-2033).
 	f.stopArmInterval()
+	last := probe.stop()
 	if err != nil {
-		return 0, newError(ErrOperativeConnectionFailed, "Operative reconnection with device failed", err)
+		msg := "Operative reconnection with device failed"
+		if last != nil {
+			msg += " (" + last.summary() + ")"
+		}
+		return 0, newError(ErrOperativeConnectionFailed, msg, err)
 	}
 	if next == nil {
 		f.log.Debug("matter.controller.commissioning.finalized_externally")

@@ -338,13 +338,27 @@ A Wi-Fi or Thread device out of the box is found over BLE instead
 discriminator, `ble.Dial` opens the BTP channel, and `Registry.Commission`
 with `Options.Channel` runs PASE over it, then the network steps with
 `Options.WiFiNetwork` or `ThreadNetwork`; operational discovery finds the
-device over DNS-SD for CASE. The central on Linux is
+device over DNS-SD for CASE. While the `Reconnect` step waits for it, a
+device that keeps its commissioning session open (concurrent connection)
+is asked over that session what its network state is — its last
+networking status, whether its network is connected, its Thread role,
+network name and channel, the addresses of its operational interfaces —
+first two seconds into the step, then every ten seconds. A change is
+logged at Info (`matter.controller.commissioning.reconnect_probe`); the
+routable addresses it reports (not link-local) are attempted over CASE
+at port 5540 beside what discovery delivers
+(`matter.controller.peer.address_hinted`), so a Thread node whose border
+router never publishes its operational record is still reached; and a
+`Reconnect` that fails names the device's last report, for example
+`the device reports Thread role=Unassigned …, last networking
+status=NetworkNotFound`. A device that does not answer the probe
+changes nothing. The central on Linux is
 `github.com/SukramJ/go-fabric/ble/bluez`, a module of its own so the main
 module never pulls its D-Bus dependency; the reference controller's BLE
 build is its `cmd/reference-controller` (`pair --ble`, rights and BlueZ
 version in the reference controller's README).
 
-*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/commissioner/progress.go`, `controller/client/registry.go:177-192`.*
+*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/commissioner/progress.go`, `controller/client/registry.go:177-192`, `controller/commissioner/reconnect_probe.go`, `client/peer/hint.go`.*
 
 ## Attestation and the DCL
 

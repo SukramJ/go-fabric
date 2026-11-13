@@ -199,6 +199,10 @@ type connection struct {
 	// besideUsed records that the one discovered address the anchor lets
 	// start beside it without the stagger has started (anchorBesideLocked).
 	besideUsed bool
+	// hinted are the addresses queued by HintAddresses that discovery has
+	// not advertised: ranked after the discovered ones, and no stagger for
+	// a discovered address while only they are in flight (hintBesideLocked).
+	hinted map[netip.AddrPort]bool
 }
 
 // retention is one retained address: the address with the host discovery
@@ -271,6 +275,7 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 		spent:        make(map[netip.AddrPort]bool),
 		hosts:        make(map[netip.AddrPort]string),
 		refall:       make(chan struct{}, 1),
+		hinted:       make(map[netip.AddrPort]bool),
 	}
 	p.connecting = c
 	p.workers.Add(1)
@@ -522,7 +527,8 @@ func (c *connection) sleep(ctx context.Context, d time.Duration, wake <-chan str
 // target has started — the service delivers its addresses one at a time
 // in the desirability order; preemptForProvenLocked then starts it at
 // once, outside the stagger. So does the first discovered address beside
-// an anchored operational address in flight (anchorBesideLocked).
+// an anchored operational address in flight (anchorBesideLocked), and a
+// discovered address while only hinted ones are (hintBesideLocked).
 func (c *connection) scheduleAttempts() {
 	for {
 		c.mu.Lock()
@@ -541,7 +547,7 @@ func (c *connection) scheduleAttempts() {
 		}
 		if !c.lastAttemptAt.IsZero() && c.anchorBesideLocked() {
 			c.besideUsed = true
-		} else if !c.lastAttemptAt.IsZero() {
+		} else if !c.lastAttemptAt.IsZero() && !c.hintBesideLocked() {
 			if delay := c.timing.DelayBeforeNextAddress - c.p.set.clock.Now().Sub(c.lastAttemptAt); delay > 0 {
 				c.mu.Unlock()
 				if !c.sleep(c.ctx, delay, c.wake) {
@@ -562,7 +568,8 @@ func (c *connection) scheduleAttempts() {
 // compareForHost) while discovered, the service's addresses, carries it,
 // and the fallback ahead of every other while it does not
 // (fallbackFirstLocked), then the retained addresses ahead of the rest
-// (retainLocked). The proven host is learned first (learnHost).
+// (retainLocked), the hinted ones after the rest (HintAddresses). The
+// proven host is learned first (learnHost).
 func (c *connection) shiftLocked(discovered []discovery.Address) target {
 	c.p.learnHost(discovered)
 	known := c.p.operationalHost()
@@ -582,6 +589,12 @@ func (c *connection) shiftLocked(discovered []discovery.Address) target {
 				return -1
 			}
 			return 1
+		}
+		if ah, bh := c.hintedLocked(a), c.hintedLocked(b); ah != bh {
+			if ah {
+				return 1
+			}
+			return -1
 		}
 		return compareForHost(host, a, b)
 	}
@@ -890,6 +903,7 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 	if a.Host != "" {
 		c.hosts[ap] = a.Host
 	}
+	delete(c.hinted, ap)
 	for k := range c.spent {
 		if sameEndpoint(k, ap) {
 			delete(c.spent, k)

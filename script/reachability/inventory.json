@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7948,
+  "entry_points": 7958,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17947,
+    "total_exported": 17957,
     "reachable": 12417,
-    "whitelisted": 5530,
+    "whitelisted": 5540,
     "unreachable": 0
   },
   "by_package": [],
@@ -7367,6 +7367,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
       "line": 277
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestHintAddressesAttempted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/hint_test.go",
+      "line": 29
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestHintAddressesDiscoveryTakesOver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/hint_test.go",
+      "line": 58
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestHintAddressesWithoutProcess",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/hint_test.go",
+      "line": 16
     },
     {
       "package": "client/peer",
@@ -25854,6 +25875,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/no_shared_trust_roots_parity_matterjs_test.go",
       "line": 23
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeFailureNamesAddresses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 337
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeFailureNamesReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 313
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeHintsRoutableAddresses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 251
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeNotConcurrent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 403
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbePathsFollowServerList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 418
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeSessionClosed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 385
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestReconnectProbeSilentDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reconnect_probe_test.go",
+      "line": 356
     },
     {
       "package": "controller/commissioner",
