@@ -63,13 +63,16 @@ type Device struct {
 	// clock is the time source of the servers the device built; queue
 	// runs the device's asynchronous callbacks; reachable is what
 	// [Device.SetReachable] set. reachMu orders SetReachable's change
-	// and its notification of the host, so two concurrent calls tell the
-	// host in the order they changed the state; the availability probe
-	// reads reachable without it.
-	clock     *deviceClock
-	queue     *queue
-	reachable atomic.Bool
-	reachMu   sync.Mutex
+	// and the queue of its notifications (reachPending), which one call at
+	// a time (reachPublishing) delivers outside the lock, so two
+	// concurrent calls tell the host in the order they changed the state;
+	// the availability probe reads reachable without it.
+	clock           *deviceClock
+	queue           *queue
+	reachable       atomic.Bool
+	reachMu         sync.Mutex
+	reachPending    []bool
+	reachPublishing bool
 
 	// mu guards parts, host and the host statements of opts (Name,
 	// DeviceAddress, ChannelAddress: Rename, Update).

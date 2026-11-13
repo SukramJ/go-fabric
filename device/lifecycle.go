@@ -112,15 +112,41 @@ func (d *Device) EndpointNumber() (uint16, bool) {
 // matter.js host sets the one reachable state (ADR 0025 principle 2).
 // Before the device is added only the value changes. Concurrent calls tell
 // the host in the order they change the state, so the last value the host
-// hears is the device's.
+// hears is the device's; no lock is held while the host is told, so a host
+// whose notification sets the reachability again (a node observer of the
+// ReachableChanged event) returns. A call that finds another telling the
+// host leaves its notification to that one, in order and under that call's
+// ctx, and returns before the host heard it (review II, R2-P1-dr-rest-06).
 func (d *Device) SetReachable(ctx context.Context, reachable bool) {
 	d.reachMu.Lock()
-	defer d.reachMu.Unlock()
 	if d.reachable.Swap(reachable) == reachable {
+		d.reachMu.Unlock()
 		return
 	}
-	if h := d.hostOf(); h != nil {
-		h.NotifyReachable(ctx, d.opts.StableKey, reachable)
+	d.reachPending = append(d.reachPending, reachable)
+	if d.reachPublishing {
+		d.reachMu.Unlock()
+		return
+	}
+	d.reachPublishing = true
+	locked := true
+	defer func() { // a host's panic leaves the next call to tell the host
+		if !locked {
+			d.reachMu.Lock()
+		}
+		d.reachPublishing = false
+		d.reachMu.Unlock()
+	}()
+	for len(d.reachPending) > 0 {
+		next := d.reachPending[0]
+		d.reachPending = d.reachPending[1:]
+		locked = false
+		d.reachMu.Unlock()
+		if h := d.hostOf(); h != nil {
+			h.NotifyReachable(ctx, d.opts.StableKey, next)
+		}
+		d.reachMu.Lock()
+		locked = true
 	}
 }
 
