@@ -165,7 +165,7 @@ func (g *GeneralCommissioning) commitPendingNOCLocked(ctx context.Context) error
 		if !ok || v == "" {
 			continue
 		}
-		if err := g.tcSettings.SetSetting(ctx, key, ""); err != nil {
+		if err := setPendingNOCSetting(ctx, g.tcSettings, key, ""); err != nil {
 			return fmt.Errorf("core: GeneralCommissioning: commit the pending NOC: %w", err)
 		}
 	}

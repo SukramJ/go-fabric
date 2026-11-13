@@ -34,6 +34,22 @@ const pendingNOCUpdateSettingKey = "operational_credentials.pending_noc_update"
 // back. Each holds one marker, which says by its op what it names.
 var pendingNOCKeys = [...]string{pendingNOCSettingKey, pendingNOCUpdateSettingKey}
 
+// setPendingNOCSetting writes value at key, one of [pendingNOCKeys]. Each
+// key is stated at its own SetSetting call, so what the marker writes is
+// readable from the calls (script/docscheck's settings-keys guard).
+func setPendingNOCSetting(ctx context.Context, st interface {
+	SetSetting(ctx context.Context, key, value string) error
+}, key, value string,
+) error {
+	switch key {
+	case pendingNOCSettingKey:
+		return st.SetSetting(ctx, pendingNOCSettingKey, value)
+	case pendingNOCUpdateSettingKey:
+		return st.SetSetting(ctx, pendingNOCUpdateSettingKey, value)
+	}
+	return fmt.Errorf("core: pending NOC marker key %q", key)
+}
+
 // pendingNOC* name the marker's op.
 const (
 	pendingNOCAdd    = "add"
@@ -107,7 +123,7 @@ func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingN
 	if err != nil {
 		return fmt.Errorf("core: OperationalCredentials: encode the pending NOC marker: %w", err)
 	}
-	if err := st.SetSetting(ctx, m.key(), string(b)); err != nil {
+	if err := setPendingNOCSetting(ctx, st, m.key(), string(b)); err != nil {
 		return fmt.Errorf("core: OperationalCredentials: persist the pending NOC marker: %w", err)
 	}
 	o.mu.Lock()
@@ -142,7 +158,7 @@ func (o *OperationalCredentials) clearPendingNOCKey(ctx context.Context, key str
 		o.mu.Unlock()
 		return
 	}
-	if err := st.SetSetting(ctx, key, ""); err != nil {
+	if err := setPendingNOCSetting(ctx, st, key, ""); err != nil {
 		o.logger().Error("matter.opcreds.pending_noc.clear_failed", slog.String("key", key), slog.Any("err", err))
 		return
 	}
@@ -294,7 +310,7 @@ func (o *OperationalCredentials) recoverPendingNOCKey(ctx context.Context, st vi
 	default:
 		return fmt.Errorf("core: OperationalCredentials: pending NOC marker with op %q", m.Op)
 	}
-	if err := st.SetSetting(ctx, key, ""); err != nil {
+	if err := setPendingNOCSetting(ctx, st, key, ""); err != nil {
 		return fmt.Errorf("core: OperationalCredentials: clear the pending NOC marker: %w", err)
 	}
 	return nil
