@@ -94,9 +94,13 @@ type videoEnvelopeArgs struct {
 
 // floorInt is v rounded down to an int, saturating: the policies' numbers
 // are JavaScript numbers in matterjs-server, which a Go int carries once
-// they are whole.
+// they are whole. NaN — a 0x0 resolution under a max-mbps of 0 is 0/0 —
+// is 0 on every platform, where Go's conversion of it is
+// implementation-defined (review II, R2-P1-cam-a-03).
 func floorInt(v float64) int {
 	switch {
+	case math.IsNaN(v):
+		return 0
 	case v >= math.MaxInt:
 		return math.MaxInt
 	case v <= math.MinInt:
