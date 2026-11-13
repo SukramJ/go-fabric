@@ -41,6 +41,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -563,9 +564,10 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	return nil
 }
 
-// Close tears the stack down in the reverse order of [New]: the update
-// manager and the OTA provider, the registry (its nodes and their
-// subscriptions), the client
+// Close tears the stack down in the reverse order of [New], once no
+// request for the endpoints the controller serves is dispatched any more
+// and the one in flight has returned: the update manager and the OTA
+// provider, the registry (its nodes and their subscriptions), the client
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is
 // idempotent.
@@ -574,6 +576,14 @@ func (c *Controller) Close(ctx context.Context) error {
 	c.closeMu.Lock()
 	c.closed = true
 	c.closeMu.Unlock()
+	if c.subs != nil {
+		// Before a served component stops: a QueryImage that arrived after
+		// the OTA provider stopped would be dispatched to it, and the
+		// update manager behind it. Blocking new activity closes the
+		// request unanswered and waits for one in flight. Its error, ctx's,
+		// is the one subs.Close below returns.
+		_ = c.subs.BlockNewActivity(ctx)
+	}
 	c.unwatchAllICD()
 	if c.stopDiscover != nil {
 		c.stopDiscover()
@@ -587,12 +597,7 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.groups.SetTransport(nil)
 		c.groups = nil
 	}
-	if c.otaProvider != nil {
-		c.otaProvider.stop()
-		c.otaProvider.restore()
-		c.otaProvider.bdx.Close()
-		c.otaProvider = nil
-	}
+	c.closeOTAProvider()
 	if c.armer != nil {
 		c.armer.Close()
 	}
@@ -650,6 +655,21 @@ func (c *Controller) Close(ctx context.Context) error {
 	// ends first): the gauge reads none once the stack is down.
 	c.gauge(MetricSessionsOpen, 0)
 	return errors.Join(errs...)
+}
+
+// closeOTAProvider stops the OTA provider, its BDX handler unregistered
+// first, so no BDX exchange is handed to the responder that closes.
+func (c *Controller) closeOTAProvider() {
+	if c.otaProvider == nil {
+		return
+	}
+	if c.mgr != nil {
+		c.mgr.SetProtocolHandler(bdx.ProtocolID, nil)
+	}
+	c.otaProvider.stop()
+	c.otaProvider.restore()
+	c.otaProvider.bdx.Close()
+	c.otaProvider = nil
 }
 
 // BorderRouterConfig configures the controller's border-router registry
