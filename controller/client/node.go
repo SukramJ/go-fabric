@@ -108,6 +108,8 @@ type Node struct {
 	// storedICD its stored registration until the registry built it.
 	icd       *ICDClient
 	storedICD map[uint32][]byte
+	// onboarding is the stored onboarding code, nil for none; under mu.
+	onboarding *OnboardingCode
 
 	// events is the node's bounded event history ([Node.EventHistory]).
 	events *eventHistory
@@ -160,13 +162,22 @@ func newNode(cfg Config) (*Node, error) {
 				n.record, err = decodeRecord(c.Values)
 			case icdCluster:
 				n.storedICD = c.Values
+			case onboardingCluster:
+				// A code that cannot be read is a lost slip of paper, not
+				// a node that cannot load.
+				var oerr error
+				if n.onboarding, oerr = decodeOnboarding(c.Values); oerr != nil {
+					n.log.Warn("matter.controller.client.onboarding_code_unreadable", slog.String("node", cfg.ID), slog.Any("err", oerr))
+				}
 			}
 			if err != nil {
 				return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 			}
 		}
 		// The record is no cluster of the image.
-		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool { return c.ID == recordCluster || c.ID == icdCluster })
+		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool {
+			return c.ID == recordCluster || c.ID == icdCluster || c.ID == onboardingCluster
+		})
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	if err := n.s.loadCache(stored); err != nil {
@@ -627,6 +638,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Lock()
 	n.settings = settings{}
 	n.record = Record{}
+	n.onboarding = nil
 	for _, ep := range n.s.endpoints {
 		for _, c := range ep.clusters {
 			c.cache.discard()
