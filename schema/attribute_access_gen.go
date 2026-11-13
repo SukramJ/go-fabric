@@ -9,7 +9,8 @@ package schema
 
 // attributeWritePrivileges maps every writable attribute whose matter.js
 // write privilege is above Operate (4 Manage, 5 Administer) to that
-// privilege. Generated from the access strings in parity/schema.json.
+// privilege. Generated from each attribute's effective access in
+// parity/schema.json.
 var attributeWritePrivileges = map[uint32]map[uint32]uint8{
 	0x0006: { // OnOff
 		0x4003: 4, // StartUpOnOff "RW VM"

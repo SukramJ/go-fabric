@@ -12,10 +12,19 @@ import (
 )
 
 // snapshotAttribute is one attribute entry in the matter.js HEAD schema
-// snapshot; only id + access are needed to derive writability.
+// snapshot: its id, the access string the cluster states for it (empty for
+// an attribute a derived cluster inherits) and its effective access, which
+// matter.js resolves for every attribute, inherited ones included.
 type snapshotAttribute struct {
-	ID     uint32 `json:"id"`
-	Access string `json:"access"`
+	ID        uint32 `json:"id"`
+	Name      string `json:"name"`
+	Access    string `json:"access"`
+	Effective *struct {
+		Access struct {
+			RW        string `json:"rw"`
+			WritePriv string `json:"writePriv"`
+		} `json:"access"`
+	} `json:"effective"`
 }
 
 type snapshotCluster struct {
@@ -213,6 +222,64 @@ func TestAttributeWritePrivilege(t *testing.T) {
 	for _, c := range cases {
 		if got := AttributeWritePrivilege(c.cluster, c.attr); got != c.want {
 			t.Errorf("AttributeWritePrivilege(0x%04X, 0x%04X) = %d, want %d", c.cluster, c.attr, got, c.want)
+		}
+	}
+}
+
+// TestAttributeWritePrivilegeParity holds the generated
+// attributeWritePrivileges to the snapshot's effective access, attribute by
+// attribute and in both directions (review II, W3-clugen-04): a writable
+// attribute (rw other than "R", matter.js Access.writable) whose effective
+// write privilege is Manage or Administer has exactly that entry, and the
+// table has no other. The effective layer is each attribute's own — an
+// attribute a derived cluster inherits without an access string included —
+// so a table built from another cluster's string for the same (id, name)
+// fails here the moment the two disagree.
+func TestAttributeWritePrivilegeParity(t *testing.T) {
+	t.Parallel()
+	level := map[string]uint8{"O": PrivilegeOperate, "M": PrivilegeManage, "A": PrivilegeAdminister}
+	want := map[uint32]map[uint32]uint8{}
+	inherited := 0
+	for _, c := range loadWritableSnapshot(t).Clusters {
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				t.Fatalf("%s (0x%04X) attribute %s (0x%04X) has no effective layer in the snapshot", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			if acc.RW == "" || acc.RW == "R" {
+				continue
+			}
+			p, ok := level[acc.WritePriv]
+			if !ok {
+				t.Fatalf("%s (0x%04X) attribute %s (0x%04X): writable (rw %q) with write privilege %q", c.Name, c.ID, a.Name, a.ID, acc.RW, acc.WritePriv)
+			}
+			if p <= PrivilegeOperate {
+				continue
+			}
+			if want[c.ID] == nil {
+				want[c.ID] = map[uint32]uint8{}
+			}
+			want[c.ID][a.ID] = p
+			if a.Access == "" {
+				inherited++
+			}
+		}
+	}
+	if inherited == 0 {
+		t.Error("the snapshot has no inherited attribute above Operate: the case this test exists for is not exercised")
+	}
+	for cid, attrs := range want {
+		for aid, p := range attrs {
+			if got, ok := attributeWritePrivileges[cid][aid]; !ok || got != p {
+				t.Errorf("attributeWritePrivileges[0x%04X][0x%04X] = %d (%v), the effective access says %d", cid, aid, got, ok, p)
+			}
+		}
+	}
+	for cid, attrs := range attributeWritePrivileges {
+		for aid, p := range attrs {
+			if _, ok := want[cid][aid]; !ok {
+				t.Errorf("attributeWritePrivileges[0x%04X][0x%04X] = %d, and the effective access names no privilege above Operate", cid, aid, p)
+			}
 		}
 	}
 }
