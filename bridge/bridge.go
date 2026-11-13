@@ -915,6 +915,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.beginSubscriptionRun()
 
 	serveCtx, cancel := context.WithCancel(context.Background())
+	// Before the serve goroutines start: the first datagram they hand to
+	// a handler runs under the serve context, not under the fallback
+	// that never ends (review II, W2-conc-09).
+	b.mu.Lock()
+	b.handlerCtx = serveCtx
+	b.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -946,7 +952,6 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.tcpServeDone = tcpDone
 	b.serveCancel = cancel
 	b.serveDone = done
-	b.handlerCtx = serveCtx
 	b.started = true
 	committed = true
 	// Spawn the ACK pump only when an AckTracker has been wired
@@ -1860,7 +1865,10 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.tcpServeDone = nil
 	b.serveCancel = nil
 	b.serveDone = nil
-	b.handlerCtx = nil
+	// handlerCtx stays: the serve context, cancelled below. A handler
+	// the ordered pool still dispatches after this point runs under a
+	// cancelled context instead of one that never ends; the next Start
+	// replaces it.
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false
@@ -2130,9 +2138,10 @@ func (b *Bridge) waitPumpStopped(pumpDone chan struct{}) {
 }
 
 // handlerContext returns the context every IM/SC handler call runs
-// under. Returns context.Background when the bridge isn't
-// fully-started (the receive loop should not be running in that
-// case, but the defensive default avoids a nil deref).
+// under: the serve context of the current run, set before the serve
+// goroutines start and left in place — cancelled — by Stop. Returns
+// context.Background for a bridge that was never started (no receive
+// loop runs then; the default avoids a nil deref).
 func (b *Bridge) handlerContext() context.Context {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
