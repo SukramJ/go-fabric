@@ -146,12 +146,13 @@ func (m *manager) startStream(ctx context.Context, args startArgs) (*startResult
 			offer = &rewritten
 		}
 	}
-	if args.clientSessionKey != "" && m.sessions.clientSessionKeyInUse(args.connectionID, args.clientSessionKey) {
+	// Before the first wait, so a release from here on claims this
+	// registration. The key check is part of it: two concurrent starts of
+	// the connection cannot both register one key.
+	pending, ok := m.sessions.beginKeyed(args.t.nodeID, args.t.endpointID, args.connectionID, args.clientSessionKey)
+	if !ok {
 		return nil, invalidArguments("client_session_key %q already names a session of this connection that is starting or open", args.clientSessionKey)
 	}
-	// Before the first wait, so a release from here on claims this
-	// registration.
-	pending := m.sessions.begin(args.t.nodeID, args.t.endpointID, args.connectionID, args.clientSessionKey)
 	defer m.sessions.finish(pending)
 	return withEndpointLock(ctx, m, args.t, func() (*startResult, error) {
 		if err := m.throwIfClaimed(pending); err != nil {

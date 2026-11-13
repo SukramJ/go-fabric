@@ -314,13 +314,31 @@ func (r *sessionRegistry) deleteTracked(k sessionKey) {
 
 // begin registers a session being established. Every exit of the
 // establishing call must finish the returned registration; the caller makes
-// sure clientSessionKey is not clientSessionKeyInUse. Mirrors
-// matterjs-server packages/ws-controller/src/camera/sessionRegistry.ts:124-146
-// at 0bd06f2.
+// sure clientSessionKey is not clientSessionKeyInUse, or calls beginKeyed.
+// Mirrors matterjs-server
+// packages/ws-controller/src/camera/sessionRegistry.ts:124-146 at 0bd06f2.
 func (r *sessionRegistry) begin(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) *pendingSession {
-	p := &pendingSession{scope: sessionScope{nodeID: nodeID, endpointID: endpointID, connectionID: connectionID, clientSessionKey: clientSessionKey}}
 	r.mu.Lock()
 	defer r.unlock()
+	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey)
+}
+
+// beginKeyed is the key check and begin as one step under the lock, so two
+// concurrent starts of a connection cannot both register one key; false
+// when clientSessionKey (non-empty) already names a session of the
+// connection (review II, R2-P1-cam-a-01, R2-P1-cam-b-03).
+func (r *sessionRegistry) beginKeyed(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) (*pendingSession, bool) {
+	r.mu.Lock()
+	defer r.unlock()
+	if clientSessionKey != "" && r.clientSessionKeyInUseLocked(connectionID, clientSessionKey) {
+		return nil, false
+	}
+	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey), true
+}
+
+// beginLocked is begin; the caller holds mu.
+func (r *sessionRegistry) beginLocked(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) *pendingSession {
+	p := &pendingSession{scope: sessionScope{nodeID: nodeID, endpointID: endpointID, connectionID: connectionID, clientSessionKey: clientSessionKey}}
 	r.pending[p] = &pendingRecord{
 		settled: make(chan struct{}),
 		life:    &lifecycle{nodeID: nodeID, endpointID: endpointID},
@@ -336,6 +354,11 @@ func (r *sessionRegistry) begin(nodeID uint64, endpointID uint16, connectionID, 
 func (r *sessionRegistry) clientSessionKeyInUse(connectionID, clientSessionKey string) bool {
 	r.mu.Lock()
 	defer r.unlock()
+	return r.clientSessionKeyInUseLocked(connectionID, clientSessionKey)
+}
+
+// clientSessionKeyInUseLocked is clientSessionKeyInUse; the caller holds mu.
+func (r *sessionRegistry) clientSessionKeyInUseLocked(connectionID, clientSessionKey string) bool {
 	owns := func(s sessionScope) bool {
 		return s.connectionID == connectionID && s.clientSessionKey == clientSessionKey
 	}
