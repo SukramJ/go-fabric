@@ -204,53 +204,7 @@ func (b *Bridge) sendReplyTimed(
 	// AAD; for unsecured the body is shipped verbatim.
 	body := append(protoBytes, responsePayload...) //nolint:gocritic // small, single-allocation join
 
-	respHdr := message.Header{
-		// SessionID is filled below — for unsecured (==0) it stays 0;
-		// for encrypted we look up the session and stamp the peer's
-		// view of the SessionID (PeerSessionID) so the peer's table
-		// can resolve it. Stamping our own local id (which is what
-		// requestHdr.SessionID carries — peer sent that to address
-		// us) results in chip-tool dropping the reply silently.
-		// No P bit: a unicast message never carries privacy
-		// enhancements. Mirrors matter.js MessageExchange.ts:734
-		// (`hasPrivacyEnhancements: false, // Not supported on unicast, as
-		// in the CHIP SDK`); a request that carried the bit was dropped
-		// before it reached here (bridge/privacy.go maybeUnmaskPrivacy, as
-		// matter.js refuses hasPrivacyEnhancements off a group session,
-		// MessageCodec.ts:250-253).
-		Control:      requestHdr.Control,
-		HasExtension: false,
-		SessionType:  requestHdr.SessionType,
-	}
-	// Mirror node-id routing: peer is ALWAYS the destination, we
-	// (the bridge) are the source. chip-tool's commissioner sets
-	// HasSourceNodeID=true on inbound PASE messages with a random
-	// non-zero ephemeral NodeID; the bridge's reply MUST echo it as
-	// DestNodeID with DestSize=DestNodeID, otherwise chip-tool drops
-	// the datagram with "malformed unsecure packet with source
-	// 0x...0 destination 0x...0". Per Matter §4.4.1.2.
-	//
-	// For SECURE unicast (SessionID > 0) Matter §4.4.1.4 says peers
-	// resolve identity via the SessionID alone — the Source / Dest
-	// NodeID fields are typically NOT set on encrypted traffic, and
-	// echoing them confuses chip-tool's secure-receive validator.
-	// Restrict the echo to the unsecured pre-PASE path.
-	if requestHdr.SessionID == 0 && requestHdr.HasSourceNodeID {
-		respHdr.DestSize = message.DestNodeID
-		respHdr.DestNodeID = requestHdr.SourceNodeID
-	}
-	// Bridge's source-node-id is its own ephemeral until CASE
-	// installs an operational identity. For SessionID==0 (PASE
-	// pre-fabric) HasSourceNodeID stays false while the peer named a
-	// source — the reply then carries the destination alone. A peer
-	// that addressed us by node id without a source (the responder of a
-	// CASE the bridge initiated, bridge/case_initiator.go) gets that id
-	// back as our source: an unsecured message carries exactly one of
-	// the two node ids (matter.js MessageCodec.ts:234-239 at db021da0).
-	if requestHdr.SessionID == 0 && !requestHdr.HasSourceNodeID && requestHdr.DestSize == message.DestNodeID {
-		respHdr.HasSourceNodeID = true
-		respHdr.SourceNodeID = requestHdr.DestNodeID
-	}
+	respHdr := unicastReplyHeader(requestHdr)
 
 	if requestHdr.SessionID == 0 {
 		respHdr.SessionID = 0
@@ -322,6 +276,61 @@ func (b *Bridge) sendReplyTimed(
 		return fmt.Errorf("%w: %w", ErrReplySend, err)
 	}
 	return nil
+}
+
+// unicastReplyHeader is the message header of a reply to the unicast
+// request requestHdr, before its session id and message counter are set:
+// no privacy bit, and on the unsecured session exactly one node id — the
+// peer's as the destination, or ours as the source.
+func unicastReplyHeader(requestHdr *message.Header) message.Header {
+	respHdr := message.Header{
+		// SessionID is filled by the caller — for unsecured (==0) it stays 0;
+		// for encrypted we look up the session and stamp the peer's
+		// view of the SessionID (PeerSessionID) so the peer's table
+		// can resolve it. Stamping our own local id (which is what
+		// requestHdr.SessionID carries — peer sent that to address
+		// us) results in chip-tool dropping the reply silently.
+		// No P bit: a unicast message never carries privacy
+		// enhancements. Mirrors matter.js MessageExchange.ts:734
+		// (`hasPrivacyEnhancements: false, // Not supported on unicast, as
+		// in the CHIP SDK`); a request that carried the bit was dropped
+		// before it reached here (bridge/privacy.go maybeUnmaskPrivacy, as
+		// matter.js refuses hasPrivacyEnhancements off a group session,
+		// MessageCodec.ts:250-253).
+		Control:      requestHdr.Control,
+		HasExtension: false,
+		SessionType:  requestHdr.SessionType,
+	}
+	// Mirror node-id routing: peer is ALWAYS the destination, we
+	// (the bridge) are the source. chip-tool's commissioner sets
+	// HasSourceNodeID=true on inbound PASE messages with a random
+	// non-zero ephemeral NodeID; the bridge's reply MUST echo it as
+	// DestNodeID with DestSize=DestNodeID, otherwise chip-tool drops
+	// the datagram with "malformed unsecure packet with source
+	// 0x...0 destination 0x...0". Per Matter §4.4.1.2.
+	//
+	// For SECURE unicast (SessionID > 0) Matter §4.4.1.4 says peers
+	// resolve identity via the SessionID alone — the Source / Dest
+	// NodeID fields are typically NOT set on encrypted traffic, and
+	// echoing them confuses chip-tool's secure-receive validator.
+	// Restrict the echo to the unsecured pre-PASE path.
+	if requestHdr.SessionID == 0 && requestHdr.HasSourceNodeID {
+		respHdr.DestSize = message.DestNodeID
+		respHdr.DestNodeID = requestHdr.SourceNodeID
+	}
+	// Bridge's source-node-id is its own ephemeral until CASE
+	// installs an operational identity. For SessionID==0 (PASE
+	// pre-fabric) HasSourceNodeID stays false while the peer named a
+	// source — the reply then carries the destination alone. A peer
+	// that addressed us by node id without a source (the responder of a
+	// CASE the bridge initiated, bridge/case_initiator.go) gets that id
+	// back as our source: an unsecured message carries exactly one of
+	// the two node ids (matter.js MessageCodec.ts:234-239 at db021da0).
+	if requestHdr.SessionID == 0 && !requestHdr.HasSourceNodeID && requestHdr.DestSize == message.DestNodeID {
+		respHdr.HasSourceNodeID = true
+		respHdr.SourceNodeID = requestHdr.DestNodeID
+	}
+	return respHdr
 }
 
 // EncodeReportData serialises rd into the TLV bytes that ride as the
