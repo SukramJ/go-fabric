@@ -262,6 +262,65 @@ func TestDecodeDERReadsSignatureIntegersAsTheirBytes(t *testing.T) {
 	}
 }
 
+// The basic-constraints pathLenConstraint is read as matter.js reads it:
+// the INTEGER's content bytes as an unsigned number (derUnsignedInteger,
+// Certificate.ts:400-406, called at :505-509 at db021da0) — so a negative
+// INTEGER is its two's-complement bytes, never "absent" — and a value
+// that does not fit the TLV form's TlvUInt8 is refused (review II, core2
+// item 3).
+func TestDecodeDERReadsPathLenAsItsBytes(t *testing.T) {
+	t.Parallel()
+	p := derPartsOf(t, certificatesExternalDER(t, "RCAC"))
+	byOID := p.extensionsByOID(t)
+	withBC := func(bc []byte) []byte {
+		return p.with(6, derCtx3(t, derSeq(t,
+			derExt(t, oidExtBasicConstraints, bc), byOID[oidExtKeyUsage.String()],
+			byOID[oidExtSubjectKeyID.String()], byOID[oidExtAuthorityKeyID.String()],
+		))).cert(t)
+	}
+	read := []struct {
+		name    string
+		bc      []byte
+		has     bool
+		pathLen uint8
+	}{
+		{"absent", derSeq(t, derMust(t, true)), false, 0},
+		{"zero", derSeq(t, derMust(t, true), derMust(t, 0)), true, 0},
+		{"255 with its leading zero", derSeq(t, derMust(t, true), derMust(t, 255)), true, 255},
+		{"-1 as 0xff", derSeq(t, derMust(t, true), derMust(t, -1)), true, 255},
+		{"-5 as 0xfb", derSeq(t, derMust(t, true), derMust(t, -5)), true, 251},
+		{"without cA", derSeq(t, derMust(t, -5)), true, 251},
+	}
+	for _, tc := range read {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := DecodeDER(withBC(tc.bc))
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if got := c.Extensions; got.BasicConstraintsHasPathLen != tc.has || got.BasicConstraintsPathLen != tc.pathLen {
+				t.Fatalf("pathLen = %d (has %v), want %d (has %v)", got.BasicConstraintsPathLen, got.BasicConstraintsHasPathLen, tc.pathLen, tc.has)
+			}
+		})
+	}
+	refused := []struct {
+		name string
+		bc   []byte
+		want string
+	}{
+		{"-129 as 0xff7f", derSeq(t, derMust(t, true), derMust(t, -129)), "pathLenConstraint 65407 exceeds 255"},
+		{"an INTEGER without content", derSeq(t, derMust(t, true), derRaw(t, asn1.ClassUniversal, asn1.TagInteger, false, nil)), "pathLenConstraint is an INTEGER without content"},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeDER(withBC(tc.bc)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("DecodeDER = %v, want ErrMalformed containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
 // A truncated certificate is refused at every length, never read past
 // its end.
 func TestDecodeDERRefusesEveryTruncation(t *testing.T) {

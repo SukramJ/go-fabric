@@ -443,20 +443,28 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 	switch tag {
 	case extTagBasicConstraints:
 		var bc struct {
-			IsCA    bool `asn1:"optional"`
-			PathLen int  `asn1:"optional,default:-1"`
+			IsCA    bool          `asn1:"optional"`
+			PathLen asn1.RawValue `asn1:"optional"`
 		}
 		if _, err := asn1.Unmarshal(value, &bc); err != nil {
 			return fmt.Errorf("%w: basic-constraints: %w", ErrMalformed, err)
 		}
+		ext.HasBasicConstraints, ext.BasicConstraintsIsCA = true, bc.IsCA
+		// The pathLenConstraint is an element only when it is an INTEGER,
+		// read as its content bytes taken unsigned (derUnsignedInteger,
+		// Certificate.ts:400-406, called at :505-509 at db021da0): a
+		// negative INTEGER is its two's-complement bytes, never absent.
 		// The TLV form carries pathLen as TlvUInt8 (operational.ts:42 at
 		// db021da0); a wider one is refused, not cut to its low byte.
-		if bc.PathLen > math.MaxUint8 {
-			return fmt.Errorf("%w: basic-constraints: pathLenConstraint %d exceeds 255", ErrMalformed, bc.PathLen)
-		}
-		ext.HasBasicConstraints, ext.BasicConstraintsIsCA = true, bc.IsCA
-		if bc.PathLen >= 0 {
-			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(bc.PathLen) //nolint:gosec // 0..255, checked above
+		if len(bc.PathLen.FullBytes) > 0 && bc.PathLen.Class == asn1.ClassUniversal && bc.PathLen.Tag == asn1.TagInteger {
+			if len(bc.PathLen.Bytes) == 0 {
+				return fmt.Errorf("%w: basic-constraints: pathLenConstraint is an INTEGER without content", ErrMalformed)
+			}
+			pathLen := new(big.Int).SetBytes(bc.PathLen.Bytes)
+			if !pathLen.IsUint64() || pathLen.Uint64() > math.MaxUint8 {
+				return fmt.Errorf("%w: basic-constraints: pathLenConstraint %s exceeds 255", ErrMalformed, pathLen)
+			}
+			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(pathLen.Uint64()) //nolint:gosec // 0..255, checked above
 		}
 	case extTagKeyUsage:
 		var bits asn1.BitString

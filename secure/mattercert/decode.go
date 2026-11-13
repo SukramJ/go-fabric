@@ -654,7 +654,12 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 		case extBCInnerTagIsCa:
 			ext.BasicConstraintsIsCA = el.Type == tlv.TypeBoolTrue
 		case extBCInnerTagPathLen:
-			ext.BasicConstraintsPathLen = uint8(el.Uint & 0xFF)
+			// pathLen is TlvUInt8 (operational.ts:42 at db021da0): a wider
+			// value is refused, not cut to its low byte.
+			if el.Uint > math.MaxUint8 {
+				return fmt.Errorf("%w: basic-constraints: pathLen %d exceeds 255", ErrMalformed, el.Uint)
+			}
+			ext.BasicConstraintsPathLen = uint8(el.Uint)
 			ext.BasicConstraintsHasPathLen = true
 		default:
 			if el.IsContainer {
