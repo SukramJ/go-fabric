@@ -218,11 +218,16 @@ func (r *Registry) reserveID(id string) {
 	}
 }
 
-// allocateIDLocked is ClientNodeStores.allocateId (:77-81).
+// allocateIDLocked is ClientNodeStores.allocateId (:77-81), past any id
+// a node already holds (review II, R2-P1-ctl-01). The caller holds mu.
 func (r *Registry) allocateIDLocked() string {
-	id := idPrefix + strconv.Itoa(r.nextID)
-	r.nextID++
-	return id
+	for {
+		id := idPrefix + strconv.Itoa(r.nextID)
+		r.nextID++
+		if !slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
+			return id
+		}
+	}
 }
 
 // nodeConfig is the template with the registry's fields.
@@ -679,7 +684,8 @@ func (r *Registry) fabricByIndex(index uint8) *commissioner.Fabric {
 // ForAddress is the node of peer address addr, created when there is none
 // — Peers.forAddress (Peers.ts:445-486): the address must be on one of
 // our fabrics (:446-448); the creation is serialized (:455-462); a new
-// node takes id when given (:464-470) and an allocated one otherwise,
+// node takes id when given (:464-470; reserved, so no allocation hands
+// it out again) and an allocated one otherwise,
 // joins the registry and takes the address, bound to its peer but neither
 // started nor auto-subscribed (:472-484).
 func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
@@ -704,6 +710,13 @@ func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 	} else if slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
 		r.mu.Unlock()
 		return nil, fmt.Errorf("%w: id %q is taken", ErrConfig, id)
+	} else {
+		// A caller-chosen id is reserved as a stored one is, so the
+		// counter never hands it to a second node (review II,
+		// R2-P1-ctl-01; ahead of matter.js, whose Peers.ts:960 takes
+		// options.id and whose ClientNodeStores.ts:77-81 allocateId
+		// reserves no preassigned id).
+		r.reserveID(id)
 	}
 	r.mu.Unlock()
 	p, err := r.cfg.Peers.For(addr)
