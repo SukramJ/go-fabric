@@ -1958,8 +1958,14 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// The durable record that what follows is uncommitted, ahead of the
 	// first write, so a restart before CommissioningComplete rolls it back
 	// (recoverPendingNOC; review II, R2-P1-core-01). A failed write answers
-	// as the identity write below does.
-	if err := o.writePendingNOC(ctx, pendingNOCMarker{Op: pendingNOCAdd, FabricID: rec.FabricID, RootPublicKey: rec.RootPublicKey}); err != nil {
+	// as the identity write below does. It is written twice: first as the
+	// intent, without an index — AddFabric has not assigned one yet, and
+	// may refuse the pair — then, once AddFabric has, naming that index
+	// and before the identity is written. So an intent-only marker names a
+	// fabric without an identity or none, and a refused AddNOC's marker
+	// names no committed fabric (review II, R2-P1-dr-sec-01).
+	marker := pendingNOCMarker{Op: pendingNOCAdd, FabricID: rec.FabricID, RootPublicKey: rec.RootPublicKey}
+	if err := o.writePendingNOC(ctx, marker); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	idx, err := o.store.AddFabric(ctx, rec)
@@ -1974,6 +1980,11 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	o.mu.Lock()
 	o.pendingInstallFabricIndex = idx
 	o.mu.Unlock()
+	marker.FabricIndex = idx
+	if err := o.writePendingNOC(ctx, marker); err != nil {
+		o.revertFailedAddNOC(ctx, idx)
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	}
 
 	identity := store.IdentityRecord{
 		FabricIndex: idx,

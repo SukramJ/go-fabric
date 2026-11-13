@@ -28,12 +28,14 @@ const (
 	pendingNOCUpdate = "update"
 )
 
-// pendingNOCMarker is the persisted marker. An "add" names the new fabric
-// by its identity pair — FabricID and root public key, the pair
-// fabricAlreadyInstalled keeps unique — because it is written before
-// AddFabric assigns the index. An "update" carries what the UpdateNOC
-// replaced ([nocUpdateRevert]) and the identity pair, so a fabric index
-// reused after a removal is never mistaken for the updated fabric.
+// pendingNOCMarker is the persisted marker. An "add" is written twice
+// (handleAddNOC): first as the intent, with the new fabric's identity pair
+// — FabricID and root public key — and no index, before AddFabric; then
+// with the index AddFabric assigned, before the identity is written. An
+// "update" carries what the UpdateNOC replaced ([nocUpdateRevert]) and
+// the identity pair. Either way the pair is checked against the fabric
+// at the index, so a fabric index reused after a removal is never
+// mistaken for the one the marker names.
 type pendingNOCMarker struct {
 	Op            string `json:"op"`
 	FabricIndex   uint8  `json:"fabric_index,omitempty"`
@@ -152,21 +154,18 @@ func (o *OperationalCredentials) recoverPendingNOC(ctx context.Context) error {
 	}
 	switch m.Op {
 	case pendingNOCAdd:
-		fabrics, err := o.store.ListFabrics(ctx)
+		idx, err := o.uncommittedAddFabric(ctx, m)
 		if err != nil {
-			return fmt.Errorf("core: OperationalCredentials: list fabrics: %w", err)
+			return err
 		}
-		for i := range fabrics {
-			f := fabrics[i]
-			if f.FabricID != m.FabricID || !bytes.Equal(f.RootPublicKey, m.RootPublicKey) {
-				continue
-			}
-			if err := o.revertAddNOC(ctx, f.FabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
-				return fmt.Errorf("core: OperationalCredentials: remove the uncommitted fabric %d: %w", f.FabricIndex, err)
-			}
-			o.forgetVidVerification(ctx, f.FabricIndex)
-			o.logger().Warn("matter.opcreds.pending_noc.fabric_reverted", slog.Int("fabric_index", int(f.FabricIndex)))
+		if idx == 0 {
+			break
 		}
+		if err := o.revertAddNOC(ctx, idx); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+			return fmt.Errorf("core: OperationalCredentials: remove the uncommitted fabric %d: %w", idx, err)
+		}
+		o.forgetVidVerification(ctx, idx)
+		o.logger().Warn("matter.opcreds.pending_noc.fabric_reverted", slog.Int("fabric_index", int(idx)))
 	case pendingNOCUpdate:
 		fab, err := o.store.GetFabric(ctx, m.FabricIndex)
 		switch {
@@ -186,4 +185,47 @@ func (o *OperationalCredentials) recoverPendingNOC(ctx context.Context) error {
 		return fmt.Errorf("core: OperationalCredentials: clear the pending NOC marker: %w", err)
 	}
 	return nil
+}
+
+// uncommittedAddFabric is the fabric an "add" marker names, 0 for none.
+// A marker with an index names the fabric at that index when it still
+// carries the marker's pair. An intent-only marker (no index) was left
+// before AddFabric, by an AddFabric that refused the pair, or by a crash
+// before the index was written: the fabric with that pair is the
+// uncommitted one only when it has no identity, because handleAddNOC
+// writes the identity after the index marker — a fabric with an identity
+// was there before this AddNOC, and the store refused the duplicate
+// (review II, R2-P1-dr-sec-01).
+func (o *OperationalCredentials) uncommittedAddFabric(ctx context.Context, m pendingNOCMarker) (uint8, error) {
+	if m.FabricIndex != 0 {
+		fab, err := o.store.GetFabric(ctx, m.FabricIndex)
+		switch {
+		case errors.Is(err, store.ErrFabricNotFound):
+			return 0, nil
+		case err != nil:
+			return 0, fmt.Errorf("core: OperationalCredentials: read fabric %d: %w", m.FabricIndex, err)
+		case fab.FabricID != m.FabricID || !bytes.Equal(fab.RootPublicKey, m.RootPublicKey):
+			return 0, nil
+		}
+		return m.FabricIndex, nil
+	}
+	fabrics, err := o.store.ListFabrics(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("core: OperationalCredentials: list fabrics: %w", err)
+	}
+	for i := range fabrics {
+		f := fabrics[i]
+		if f.FabricID != m.FabricID || !bytes.Equal(f.RootPublicKey, m.RootPublicKey) {
+			continue
+		}
+		_, err := o.store.GetIdentity(ctx, f.FabricIndex)
+		switch {
+		case errors.Is(err, store.ErrIdentityNotFound):
+			return f.FabricIndex, nil
+		case err != nil:
+			return 0, fmt.Errorf("core: OperationalCredentials: read the identity of fabric %d: %w", f.FabricIndex, err)
+		}
+		return 0, nil
+	}
+	return 0, nil
 }
