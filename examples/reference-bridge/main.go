@@ -25,13 +25,13 @@
 // advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
 // loads a vendor attestation chain (node.Attestation.Files) and runs the
 // health probe (node.Config.Health); it names none of mdns, secure/* or
-// bridge for them. Three things still reach below the facade, each a gap
-// the facade does not cover yet (review 2026-11 W5-ex-10): the listing of
-// every endpoint with its device types (printTopology and the banner
-// through Node.Bridge — Node.Topology lists the bridged devices only),
-// the thermostat's preset store (store.NewThermostatPresetStore over
-// Node.Store) and the charger's EnergyEvse with its host port
-// (cluster/energy.NewEnergyEvse as the Declare's HostServer).
+// bridge for them, and it lists its endpoints through the facade too
+// (Node.Topology for the banner's count of bridged devices, Node.Endpoints
+// for printTopology). Two things still reach below the facade (review
+// 2026-11 W5-ex-10): the thermostat's preset store
+// (store.NewThermostatPresetStore over Node.Store) and the charger's
+// EnergyEvse with its host port (cluster/energy.NewEnergyEvse as the
+// Declare's HostServer).
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -50,7 +50,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 
@@ -567,12 +566,7 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
 		return err
 	}
 	qr, manual := payload.QR, payload.Manual
-	br := n.Bridge()
-	topology := br.Topology()
-	bridged := 0
-	if topology != nil {
-		bridged = len(topology.Bridged())
-	}
+	bridged := len(n.Topology().Devices)
 
 	fmt.Printf(`
   go-fabric reference bridge
@@ -600,28 +594,31 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
 // the endpoint that serves its cluster, without a controller of its own.
 // Like the banner it is for an operator's eyes too.
 func printTopology(n *node.Node) {
-	topology := n.Bridge().Topology()
-	if topology == nil {
-		return
+	fmt.Print(topologyBlock(n.Endpoints()))
+}
+
+// topologyBlock renders the topology block from the node's endpoints
+// (node.Node.Endpoints: ascending by endpoint number): one line per
+// endpoint with the first entry of its Descriptor DeviceTypeList — the
+// device type the assembled endpoint carries, which the Descriptor lists
+// first (endpoint/helpers.go listedDeviceTypes;
+// TestTopologyBlockIsTheAssembledTree holds the block against the tree).
+// Empty for a node that serves no endpoint yet.
+func topologyBlock(endpoints []node.EndpointInfo) string {
+	if len(endpoints) == 0 {
+		return ""
 	}
-	ids := make([]uint16, 0, len(topology.Endpoints))
-	for _, ep := range topology.Endpoints {
-		if ep != nil {
-			ids = append(ids, ep.ID)
-		}
-	}
-	slices.Sort(ids)
 	var b bytes.Buffer
 	b.WriteString("  topology\n")
-	for _, id := range ids {
-		ep := topology.FindByID(id)
-		if ep == nil {
-			continue
+	for _, ep := range endpoints {
+		var deviceType uint32
+		if len(ep.DeviceTypes) > 0 {
+			deviceType = ep.DeviceTypes[0].ID
 		}
-		fmt.Fprintf(&b, "    endpoint %3d  device types 0x%04X\n", id, ep.DeviceType)
+		fmt.Fprintf(&b, "    endpoint %3d  device types 0x%04X\n", ep.Endpoint, deviceType)
 	}
 	b.WriteString("  topology end\n\n")
-	fmt.Print(b.String())
+	return b.String()
 }
 
 // deviceTypeRevision reads a device type's revision from the generated
