@@ -620,10 +620,22 @@ func extractPendingCSRPubKey(t *testing.T, nocsrElements []byte) (raw []byte, pu
 // NOC over. forUpdate mirrors [core.CSRRequest.IsForUpdateNOC]; callers
 // issuing an UpdateNOC-bound CSR pass a ctx that already carries the
 // CASE fabric filter (see [im.WithFabricFilter]).
+// sessionChallengeCtx names a session attestation challenge on ctx unless
+// the caller stamped its own: AttestationRequest, CSRRequest and
+// SignVIDVerificationRequest sign over the challenge of the session the
+// invoke arrived on and refuse a request that carries none (the bridge
+// stamps it, [core.WithInvokeAttestationChallenge]).
+func sessionChallengeCtx(ctx context.Context) context.Context {
+	if core.InvokeAttestationChallengeFromContext(ctx) != nil {
+		return ctx
+	}
+	return core.WithInvokeAttestationChallenge(ctx, bytes.Repeat([]byte{0xA5}, 16))
+}
+
 func issueCSRPendingPubKey(ctx context.Context, t *testing.T, oc *core.OperationalCredentials, forUpdate bool) []byte {
 	t.Helper()
 
-	resp, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{
+	resp, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
 		IsForUpdateNOC: forUpdate,
 	})

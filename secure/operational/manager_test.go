@@ -1582,3 +1582,24 @@ func TestManager_AttestationChallengeFor(t *testing.T) {
 		t.Fatal("an unknown session has a challenge")
 	}
 }
+
+// TestManager_AttestationChallengeFor_PASE pins the lookup for the session
+// commissioning runs on: a PASE session opened under a pre-allocated id
+// names its own 16-byte challenge. AttestationRequest and CSRRequest sign
+// over nothing else, so a miss here fails every commissioning.
+func TestManager_AttestationChallengeFor_PASE(t *testing.T) {
+	t.Parallel()
+	m, _ := newTestManager()
+	id, err := m.AllocateID()
+	if err != nil {
+		t.Fatalf("AllocateID: %v", err)
+	}
+	e, err := m.OpenFromPaseWithID(id, 0, 0, 0x2222, []byte("shared-secret"))
+	if err != nil {
+		t.Fatalf("OpenFromPaseWithID: %v", err)
+	}
+	got, ok := m.AttestationChallengeFor(id)
+	if !ok || len(got) != 16 || !bytes.Equal(got, e.AttestationChallenge) {
+		t.Fatalf("AttestationChallengeFor = %x, %v; want the PASE session's 16-byte challenge %x", got, ok, e.AttestationChallenge)
+	}
+}

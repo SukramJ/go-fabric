@@ -57,6 +57,19 @@ Ethernet one.
 A Linux host uses `github.com/SukramJ/go-fabric/wifi/wpasupplicant` as the
 driver ([Operations](operations.md#wi-fi-provisioning)).
 
+## Removed in the next release: `SetAttestationChallenge`
+
+AttestationRequest, CSRRequest and SignVIDVerificationRequest sign over
+the attestation challenge of the session the invoke arrived on and no
+other. The server no longer holds a challenge of its own: the one a PASE
+establishment installed was the latest session's, whichever session the
+request came from.
+
+| Symbol | Route |
+| --- | --- |
+| `(*core.OperationalCredentials).SetAttestationChallenge(challenge)` | nothing to call: the bridge stamps the invoking session's challenge on every invoke (`core.WithInvokeAttestationChallenge`), read from a session table that has `AttestationChallengeFor(sessionID uint16) ([]byte, bool)`, as `operational.Manager` does ([ports](ports.md)) |
+| a direct `MatterInvoke` of one of the three commands (a host's own test) | `core.WithInvokeAttestationChallenge(ctx, challenge)` on the context; without it the command answers FAILURE |
+
 ## Removed in the next release: the controller's own node
 
 Phase 37 (issue 410) serves the OTA provider, the group sender and the

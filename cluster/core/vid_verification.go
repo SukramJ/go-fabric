@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -192,6 +193,10 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 	if len(req.ClientChallenge) != vidClientChallengeSize {
 		return nil, opcredsConstraintErr{msg: "core: SignVIDVerificationRequest: ClientChallenge must be 32 bytes"}
 	}
+	challenge, err := invokeSessionChallenge(ctx, "SignVIDVerificationRequest")
+	if err != nil {
+		return nil, err
+	}
 	fabric, err := o.store.GetFabric(ctx, req.FabricIndex)
 	if err != nil {
 		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SignVIDVerificationRequest: fabric %d does not exist", req.FabricIndex)}
@@ -203,12 +208,6 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 	priv, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), id.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("core: SignVIDVerificationRequest: operational key: %w", err)
-	}
-	challenge := InvokeAttestationChallengeFromContext(ctx)
-	if challenge == nil {
-		o.mu.RLock()
-		challenge = append([]byte(nil), o.attestationChalleng...)
-		o.mu.RUnlock()
 	}
 	tbs := vidVerificationTBS(req.ClientChallenge, challenge, req.FabricIndex, fabric.RootPublicKey, fabric.FabricID, fabric.VendorID,
 		o.vidVerification(ctx, req.FabricIndex).statement)
@@ -266,4 +265,23 @@ func InvokeAttestationChallengeFromContext(ctx context.Context) []byte {
 		return c
 	}
 	return nil
+}
+
+// invokeSessionChallenge returns the attestation challenge of the session
+// the invoke arrived on — the only challenge AttestationRequest, CSRRequest
+// and SignVIDVerificationRequest sign over. matter.js signs with the session
+// and nothing else: packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:113
+// and :148 (`certification.sign(session, …)`), :491
+// (`this.context.session.attestationChallengeKey`),
+// packages/protocol/src/certificate/DeviceCertification.ts:149 at db021da0;
+// each of the three refuses a context without a secure session first
+// (`NodeSession.assert`, OperationalCredentialsServer.ts:105, :126, :482).
+// A request whose context names no challenge answers FAILURE: a challenge
+// held outside the session would be another session's.
+func invokeSessionChallenge(ctx context.Context, command string) ([]byte, error) {
+	c := InvokeAttestationChallengeFromContext(ctx)
+	if len(c) == 0 {
+		return nil, spec.Errorf(im.StatusFailure, "core: %s: the request carries no session attestation challenge", command)
+	}
+	return c, nil
 }

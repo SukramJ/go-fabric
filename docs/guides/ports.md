@@ -158,6 +158,7 @@ These are read once at `Start`, or feed a component `Start` builds.
 | `AttachAckTracker` | silent | no standalone ACKs and no retransmission of the bridge's own messages; every reply is best-effort. It wraps the lower-level `AttachAckHandler` |
 | `AttachSubscriptionManager` | silent | a Subscribe returns its initial report with no subscription id, and no report follows |
 | `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, and the re-announce trigger is not installed |
+| a session table without `AttestationChallengeFor(sessionID uint16) ([]byte, bool)` | fails closed | AttestationRequest, CSRRequest and SignVIDVerificationRequest answer FAILURE: the bridge reads the invoking session's attestation challenge from the registry or, failing that, the session lookup, and the server signs over nothing else. `operational.Manager` has the method |
 | `AttachSubscriptionStore` | silent | nothing survives a restart; controllers wait out their liveness timeout. `SetSubscriptionPersistence(false)` switches persistence off on purpose |
 
 ### Cluster surface

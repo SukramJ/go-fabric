@@ -648,9 +648,6 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 			entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
 			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
-		// AttestationRequest and CSRRequest signatures bind to the
-		// session's challenge; without this the commissioner rejects both.
-		root.OperationalCredentials.SetAttestationChallenge(entry.AttestationChallenge)
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
 		// not, so an abandoned attempt still rolls back.
 		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)

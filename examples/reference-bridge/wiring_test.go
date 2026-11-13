@@ -61,7 +61,10 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	}
 	// The CSR comes from the fabric the window is armed for: a window is
 	// armed for its accessing fabric only (chip FailSafeContext.h:76-79).
-	if _, err := root.OperationalCredentials.MatterInvoke(im.WithFabricFilter(ctx, false, fabric), 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	// CSRRequest signs over the invoking session's attestation challenge,
+	// which the bridge stamps on a real invoke.
+	csrCtx := mattercore.WithInvokeAttestationChallenge(im.WithFabricFilter(ctx, false, fabric), make([]byte, 16))
+	if _, err := root.OperationalCredentials.MatterInvoke(csrCtx, 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 

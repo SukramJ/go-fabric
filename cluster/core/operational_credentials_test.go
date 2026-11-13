@@ -174,7 +174,7 @@ func TestOpcreds_ReadCurrentFabricIndexInitial(t *testing.T) {
 func TestOpcreds_AttestationRequest_BadNonce(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
-	_, err := oc.MatterInvoke(context.Background(), 0x00, core.AttestationRequest{
+	_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x00, core.AttestationRequest{
 		AttestationNonce: make([]byte, 16), // wrong length
 	})
 	if err == nil {
@@ -185,7 +185,7 @@ func TestOpcreds_AttestationRequest_BadNonce(t *testing.T) {
 func TestOpcreds_AttestationRequest_ValidNonce(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
-	resp, err := oc.MatterInvoke(context.Background(), 0x00, core.AttestationRequest{
+	resp, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x00, core.AttestationRequest{
 		AttestationNonce: make([]byte, 32),
 	})
 	if err != nil {
@@ -226,7 +226,7 @@ func TestOpcreds_CertChainRequest_InvalidType(t *testing.T) {
 func TestOpcreds_CSRRequest_BadNonce(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
-	_, err := oc.MatterInvoke(context.Background(), 0x04, core.CSRRequest{
+	_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{
 		CSRNonce: make([]byte, 16), // wrong length
 	})
 	if err == nil {
@@ -237,7 +237,7 @@ func TestOpcreds_CSRRequest_BadNonce(t *testing.T) {
 func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
-	_, err := oc.MatterInvoke(context.Background(), 0x04, core.CSRRequest{
+	_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{
 		CSRNonce: make([]byte, 32),
 	})
 	if err != nil {
@@ -280,7 +280,7 @@ func TestOpcreds_AddNOC_WithoutTrustedRoot(t *testing.T) {
 	oc := newOpcreds(t)
 
 	// Issue CSR first.
-	_, _ = oc.MatterInvoke(context.Background(), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+	_, _ = oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
 
 	// No trusted root → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
@@ -325,7 +325,7 @@ func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T
 	t.Parallel()
 	oc := newOpcreds(t)
 	csrCtx := core.WithInvokeSessionID(context.Background(), 7)
-	if _, err := oc.MatterInvoke(csrCtx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 	add := core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1}
@@ -449,7 +449,7 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 	}
 
 	// CSRRequest succeeds.
-	if _, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 
@@ -581,7 +581,7 @@ func TestAddNOC_RejectsMismatchedCSRSession(t *testing.T) {
 
 	// CSRRequest on session 42.
 	csrCtx := core.WithInvokeSessionID(ctx, 42)
-	if _, err := oc.MatterInvoke(csrCtx, 0x04, core.CSRRequest{
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{
 		CSRNonce: make([]byte, 32),
 	}); err != nil {
 		t.Fatalf("CSRRequest (session 42): %v", err)
@@ -1279,7 +1279,7 @@ func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
 	// CASE session (fabricIndex=1) with a stamped session ID.
 	caseCtx := core.WithInvokeSessionID(im.WithFabricFilter(context.Background(), true, 1), 100)
 	// Issue an AddNOC-targeted CSR (IsForUpdateNOC=false).
-	if _, err := oc.MatterInvoke(caseCtx, 0x04, core.CSRRequest{
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(caseCtx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
 		IsForUpdateNOC: false,
 	}); err != nil {
@@ -1313,7 +1313,7 @@ func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
-	_, invokeErr := oc.MatterInvoke(context.Background(), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+	_, invokeErr := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
 	if invokeErr == nil {
 		t.Fatal("CSRRequest without armed FailSafe: expected error, got nil")
 	}
@@ -1339,7 +1339,7 @@ func TestOpcreds_CSRRequestAfterNOCRejected(t *testing.T) {
 	// flag for this FailSafe window.
 	commissionTestFabric(ctx, t, oc)
 	// A CSRRequest now — without a fresh FailSafe window — must be rejected.
-	_, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+	_, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
 	if err == nil {
 		t.Fatal("CSRRequest after AddNOC: expected ConstraintError, got nil")
 	}

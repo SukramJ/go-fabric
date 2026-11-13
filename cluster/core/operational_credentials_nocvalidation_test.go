@@ -43,7 +43,7 @@ func TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("AddTrustedRootCertificate: %v", err)
 	}
-	if _, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 
@@ -173,7 +173,7 @@ func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	oc.ClearPendingState()
 	// Issue the update CSR (sets a pending key) but mint the NOC over an
 	// unrelated throwaway key instead of the one the CSR carried.
-	if _, err := oc.MatterInvoke(fabCtx, 0x04, core.CSRRequest{
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(fabCtx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
 		IsForUpdateNOC: true,
 	}); err != nil {

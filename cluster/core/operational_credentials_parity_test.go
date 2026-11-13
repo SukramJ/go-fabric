@@ -400,7 +400,7 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 	caseCtx := im.WithFabricFilter(ctx, true, 1)
 	csrCtx := core.WithInvokeSessionID(caseCtx, 100)
 	// Issue CSRRequest with IsForUpdateNOC=true.
-	_, csrErr := oc.MatterInvoke(csrCtx, 0x04, core.CSRRequest{
+	_, csrErr := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
 		IsForUpdateNOC: true,
 	})
@@ -601,7 +601,7 @@ func TestParityOpcreds_FailSafeOfAnotherFabricIsNotArmed(t *testing.T) {
 		ctx := im.WithFabricFilter(context.Background(), false, accessing)
 		for name, call := range map[string]func() error{
 			"CSRRequest": func() error {
-				_, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+				_, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
 				return err
 			},
 			"AddNOC": func() error {
@@ -641,7 +641,7 @@ func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
 		oc.SetFailSafe(func() (uint8, bool) { return armed, true })
 		oc.ClearPendingState() // a fresh fail-safe window
 		fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
-		if _, err := oc.MatterInvoke(fabCtx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32), IsForUpdateNOC: true}); err != nil {
+		if _, err := oc.MatterInvoke(sessionChallengeCtx(fabCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32), IsForUpdateNOC: true}); err != nil {
 			t.Fatalf("CSRRequest (IsForUpdateNOC): %v", err)
 		}
 		return oc, fabCtx, &armed, rootPriv

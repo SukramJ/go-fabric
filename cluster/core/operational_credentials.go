@@ -72,7 +72,6 @@ type OperationalCredentials struct {
 	dacBytes            []byte            // Device Attestation Certificate (X.509 DER)
 	paiBytes            []byte            // Product Attestation Intermediate (X.509 DER)
 	cdBytes             []byte            // Certification Declaration (CMS-signed)
-	attestationChalleng []byte            // current session AttestationChallenge for sig binding
 	// attestationMu serialises the first-use resolution of the
 	// attestation material; attestationProvider is nil once resolved.
 	attestationMu       sync.Mutex
@@ -210,18 +209,6 @@ func (o *OperationalCredentials) SetOnFabricLeaving(hook func(ctx context.Contex
 func (o *OperationalCredentials) SetOnAdminEntryInstalled(hook func(entry store.ACLEntry)) {
 	o.mu.Lock()
 	o.onAdminEntryInstalled = hook
-	o.mu.Unlock()
-}
-
-// SetAttestationChallenge installs the AttestationChallenge derived
-// during PASE/CASE session establishment. The cluster signs every
-// AttestationRequest / CSRRequest response over (TLV-elements ||
-// AttestationChallenge) per Matter §11.18.4.7. Caller is the bridge's
-// PASE-onSessionEstablished hook; sets a fresh challenge on every
-// new session, since each session derives its own.
-func (o *OperationalCredentials) SetAttestationChallenge(challenge []byte) {
-	o.mu.Lock()
-	o.attestationChalleng = append(o.attestationChalleng[:0], challenge...)
 	o.mu.Unlock()
 }
 
@@ -1364,16 +1351,14 @@ func (o *OperationalCredentials) handleAttestationRequest(ctx context.Context, f
 	if err := o.resolveAttestation(ctx); err != nil {
 		return nil, err
 	}
+	challenge, err := invokeSessionChallenge(ctx, "AttestationRequest")
+	if err != nil {
+		return nil, err
+	}
 	o.mu.RLock()
 	cd := o.cdBytes
 	dacKey := o.devAttestKey
-	challenge := o.attestationChalleng
 	o.mu.RUnlock()
-	// The invoking session's own challenge, when the bridge names it
-	// (matter.js signs with session.attestationChallengeKey).
-	if c := InvokeAttestationChallengeFromContext(ctx); c != nil {
-		challenge = c
-	}
 
 	elements := encodeAttestationElements(cd, req.AttestationNonce)
 	sig, err := signAttestationPayload(dacKey, elements, challenge)
@@ -1519,6 +1504,12 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	if len(req.CSRNonce) != 32 {
 		return nil, fmt.Errorf("%w: CSRNonce length=%d (want 32)", errOpcredsInvalidArg, len(req.CSRNonce))
 	}
+	// Before any pending state: without the session's challenge there is
+	// nothing to sign the response with.
+	challenge, err := invokeSessionChallenge(ctx, "CSRRequest")
+	if err != nil {
+		return nil, err
+	}
 	// Mirrors matter.js OperationalCredentialsServer.ts:127-131 —
 	// `IsForUpdateNOC=true` with a PASE session is illegal; UpdateNOC
 	// is a CASE-only operation that re-keys an existing fabric. PASE
@@ -1579,11 +1570,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// Without this both commands happily consume any pending CSR.
 	o.pendingCSRForUpdate = req.IsForUpdateNOC
 	dacKey := o.devAttestKey
-	challenge := append([]byte(nil), o.attestationChalleng...)
 	o.mu.Unlock()
-	if c := InvokeAttestationChallengeFromContext(ctx); c != nil {
-		challenge = c
-	}
 
 	sig, err := signAttestationPayload(dacKey, nocsrElements, challenge)
 	if err != nil {

@@ -113,7 +113,12 @@
 //     [Bridge.SessionClosed] besides the subscription manager's
 //     CloseSession; without it a TCP connection whose sessions were
 //     reaped or removed with their fabric stays open until the peer
-//     closes it.
+//     closes it. One capability of the session table FAILS CLOSED: the
+//     registry (or, failing that, the session lookup) names a session's
+//     attestation challenge through AttestationChallengeFor, as
+//     operational.Manager does. Without it AttestationRequest, CSRRequest
+//     and SignVIDVerificationRequest answer FAILURE, so commissioning
+//     stops at the attestation step.
 //   - AttachSubscriptionStore — silent. Start loads the previous run's
 //     subscriptions from it and clears it; each subscription of a CASE
 //     session is written when it becomes active and deleted when it is
