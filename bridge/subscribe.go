@@ -51,14 +51,21 @@ const (
 
 // chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
 // Initial and Read-response) waits for the peer's IM StatusResponse on
-// one ReportData chunk before abandoning the interaction. Mirrors
-// matter.js MRP.maxPeerResponseTimeOf for a UDP/MRP session
-// (packages/protocol/src/protocol/MRP.ts:79-120): the worst-case time
-// until the peer received the last MRP retransmission — every backoff
-// interval summed with maximum jitter (:198-224 maxResponseTimeOf) —
-// plus the default expected processing time and the response buffer.
-// The base interval is the peer's advertised one when the session
-// lookup can resolve it, else the spec idle default.
+// one ReportData chunk before abandoning the interaction. Mirrors matter.js
+// MRP.maxPeerResponseTimeOf for a UDP/MRP session (MRP.ts:100-108 at
+// db021da0): the worst-case time until the peer received our last
+// retransmission and its answer came back — the peer's retransmission
+// schedule, plus this node's own schedule on its own session intervals,
+// active at first and idle once the wait passes its active threshold, with
+// its sender-side pad (maxResponseTimeOf, :198-224) — plus the default
+// expected processing time and the response buffer (review II,
+// R2-P1-req2-12).
+//
+// The peer's schedule is summed on the base interval the session lookup
+// resolves for it now (the spec idle default when it resolves none) and
+// does not switch from the peer's active to its idle interval past the
+// peer's active threshold, as matter.js's does: the session port names one
+// base interval, not the peer's three parameters.
 //
 // A test may pin the bound through chunkStatusResponseTimeoutOverride;
 // zero means derive it.
@@ -70,11 +77,38 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 	if base <= 0 {
 		base = mrp.SessionIdleIntervalDefault
 	}
-	var backoff time.Duration
-	for n := 0; n <= mrp.MaxRetransmissions; n++ {
-		backoff += mrp.BackoffDuration(base, n, func() float64 { return 1 }) + b.LocalFixedMRPBackoff()
+	peer := maxScheduleTime(base, base, 0, false, 0)
+	local := b.cfg.SessionIntervals
+	if local.Idle <= 0 {
+		local.Idle = mrp.SessionIdleIntervalDefault
 	}
-	return backoff + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+	if local.Active <= 0 {
+		local.Active = mrp.SessionActiveIntervalDefault
+	}
+	if local.ActiveThreshold <= 0 {
+		local.ActiveThreshold = mrp.SessionActiveThresholdDefault
+	}
+	own := maxScheduleTime(local.Idle, local.Active, local.ActiveThreshold, true, b.LocalFixedMRPBackoff())
+	return peer + own + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+}
+
+// maxScheduleTime is matter.js's maxResponseTimeOf (MRP.ts:198-224 at
+// db021da0): every transmission's maximum interval (full jitter) summed,
+// on the active interval while active and the wait has not passed
+// threshold, else on the idle one, each with pad added unamplified.
+func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad time.Duration) time.Duration {
+	var wait time.Duration
+	for n := 0; n <= mrp.MaxRetransmissions; n++ {
+		if isActive && wait > threshold {
+			isActive = false
+		}
+		base := idle
+		if isActive {
+			base = active
+		}
+		wait += mrp.BackoffDuration(base, n, func() float64 { return 1 }) + pad
+	}
+	return wait
 }
 
 // AttachSubscriptionManager wires the subscription manager that
