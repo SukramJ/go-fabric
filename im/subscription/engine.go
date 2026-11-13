@@ -130,13 +130,23 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 //     [Subscription.sendIntervalLocked], not MaxIntervalCeiling: Apple
 //     Home's MTRDevice and chip-tool's ReadClient both drop a subscription
 //     on a timer that fires well before the ceiling.
+//   - An [EventReporter] that found nothing left to send for this
+//     subscriber says so ([Subscription.NothingSent]). The keep-alive
+//     that was due in the same pass then goes to the [Reporter] — the
+//     send interval's report is owed whether or not the events it would
+//     have carried were for this subscriber's eyes — and a pass without
+//     one is no report: it does not move the time of the last report.
+//     Before, such a pass counted, and the keep-alive it had swallowed
+//     came a whole send interval later (review II, R2-P0-rv-A03).
 //
-// Without an [EventReporter] the events drained are not sent.
+// Without an [EventReporter] the events drained are not sent, and a pass
+// that drained nothing else is no report either.
 func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Time, eventReporter EventReporter) func() {
 	work, due := sub.drainDue(now, m.eventSourceOf(), false)
 	if !due {
 		return nil
 	}
+	reporter := m.reporter
 	if len(work.events) > 0 && eventReporter != nil {
 		return func() {
 			sub.offerDuePaths(work.paths)
@@ -144,12 +154,20 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 			if left := sub.TakeDuePaths(); len(left) > 0 {
 				sub.RequeueAttributes(left)
 			}
+			if !sub.takeSentNothing() {
+				return
+			}
+			if work.keepAlive && reporter != nil {
+				reporter(ctx, sub, nil)
+				return
+			}
+			sub.revokeReport(work)
 		}
 	}
-	if m.reporter == nil || (len(work.paths) == 0 && !work.keepAlive) {
+	if reporter == nil || (len(work.paths) == 0 && !work.keepAlive) {
+		sub.revokeReport(work)
 		return nil
 	}
-	reporter := m.reporter
 	return func() { reporter(ctx, sub, work.paths) }
 }
 

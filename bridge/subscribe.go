@@ -346,6 +346,16 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
 	}
 	if len(report.EventReports) == 0 && len(report.Reports) == 0 {
+		// Nothing of the report is for this subscriber: no message is
+		// sent, and the engine is told, so that the pass does not count
+		// as the subscription's last report and the keep-alive due with
+		// it is sent ([subscription.Subscription.NothingSent]; review II,
+		// R2-P0-rv-A03). matter.js sends the DataReport empty here
+		// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
+		// db021da0: `suppressEmptyReport: onlyWithData`, which is false
+		// for the pass a change or the send interval starts, :198-200;
+		// its TODO at :923-925 names the case).
+		sub.NothingSent()
 		return
 	}
 

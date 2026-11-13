@@ -62,7 +62,11 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // and a DelayReportData deferral as an attribute change does; any other
 // leaves with the subscription's next report. Mirrors matter.js
 // packages/node/src/node/server/ServerSubscription.ts:385-409 and
-// :454-478 at db021da0. Optional — a nil hook means events fan into the
+// :454-478 at db021da0. A reporter that finds nothing left to send for the
+// subscriber — every event filtered by its access check — calls
+// [Subscription.NothingSent] instead of sending an empty report; the
+// engine then sends the keep-alive if one is due and does not count the
+// pass otherwise. Optional — a nil hook means events fan into the
 // queue but never leave the bridge (useful for unit tests of the cadence
 // math alone).
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)

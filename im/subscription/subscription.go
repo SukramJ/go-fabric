@@ -102,7 +102,54 @@ type Subscription struct {
 	// with the events it is handing to the [EventReporter], until the
 	// reporter takes them ([Subscription.TakeDuePaths]).
 	duePaths []im.ConcreteAttributePath
-	closed   bool
+	// sentNothing is the [EventReporter]'s word that the report the
+	// engine handed it was not sent because nothing of it was left for
+	// the subscriber ([Subscription.NothingSent]), until the engine reads
+	// it.
+	sentNothing bool
+	closed      bool
+}
+
+// NothingSent tells the engine that the report it is handing to the
+// [EventReporter] was not sent, because nothing of it was left for this
+// subscriber: every event, and every attribute change due with them, was
+// filtered — by the access check, or as a fabric-sensitive event of
+// another fabric. The reporter calls it instead of sending an empty
+// ReportData. The engine then sends the keep-alive when the pass was the
+// send interval's, and otherwise does not count the pass as a report: the
+// time of the last report stays, so the next keep-alive is due a send
+// interval after the last report that reached the subscriber.
+//
+// A reporter that never calls it is taken to have sent what it was
+// handed. This is the module's own rule: matter.js sends an empty
+// DataReport in such a pass and counts it
+// (packages/node/src/node/server/ServerSubscription.ts:549-551 and
+// :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
+// at db021da0), with a TODO of its own for the case
+// (ServerSubscription.ts:923-925).
+func (s *Subscription) NothingSent() {
+	s.mu.Lock()
+	s.sentNothing = true
+	s.mu.Unlock()
+}
+
+// takeSentNothing reads and clears the reporter's [Subscription.NothingSent].
+func (s *Subscription) takeSentNothing() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sent := s.sentNothing
+	s.sentNothing = false
+	return sent
+}
+
+// revokeReport undoes the report time work's pass stamped: the pass sent
+// nothing, so it is no report. A stamp somebody else set meanwhile stays.
+func (s *Subscription) revokeReport(work dueWork) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastReport.Equal(work.stamped) {
+		s.lastReport = work.prev
+	}
 }
 
 // TakeDuePaths returns the changed attribute paths that are due in the
@@ -301,6 +348,9 @@ type dueWork struct {
 	// keepAlive: the send interval has elapsed since the last report, so
 	// a report goes out even when it carries nothing.
 	keepAlive bool
+	// stamped is the time of the last report this pass set, prev the one
+	// it replaced ([Subscription.revokeReport]).
+	stamped, prev time.Time
 }
 
 // drainDue decides whether a report of the subscription is due at now and
@@ -331,7 +381,10 @@ type dueWork struct {
 // to send — no source, the event gone from the log, none of the
 // subscription's paths — is not a report: the time of the last report
 // stays, so a dirty attribute past its floor and the keep-alive are not
-// held back by a report that was never sent.
+// held back by a report that was never sent. The same holds for a pass
+// whose events the reporter filters down to nothing, which only the
+// reporter can see: [Subscription.NothingSent] and
+// [Subscription.revokeReport].
 func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (work dueWork, due bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -353,6 +406,7 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	if len(work.events) == 0 && len(work.paths) == 0 && !work.keepAlive {
 		return dueWork{}, false
 	}
+	work.stamped, work.prev = now, s.lastReport
 	s.lastReport = now
 	return work, true
 }
@@ -376,6 +430,7 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 func (s *Subscription) offerDuePaths(paths []im.ConcreteAttributePath) {
 	s.mu.Lock()
 	s.duePaths = paths
+	s.sentNothing = false
 	s.mu.Unlock()
 }
 

@@ -51,6 +51,10 @@ type eventReportBench struct {
 	mu      sync.Mutex
 	now     time.Duration
 	reports []reportCall
+	// filtered makes the event reporter find nothing left to send for the
+	// subscriber, as the bridge's does when its access check drops every
+	// event: it sends nothing and says so.
+	filtered bool
 }
 
 // newEventReportBench subscribes with args. takePaths makes the event
@@ -76,6 +80,10 @@ func newEventReportBench(t *testing.T, args subscription.SubscribeArgs, takePath
 		b.mu.Lock()
 		defer b.mu.Unlock()
 		call.at = b.now
+		if b.filtered {
+			call.hook = "event, nothing sent"
+			sub.NothingSent()
+		}
 		b.reports = append(b.reports, call)
 	})
 	sub, err := b.m.Subscribe(args)
