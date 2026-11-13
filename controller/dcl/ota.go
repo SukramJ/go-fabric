@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -310,12 +311,18 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 		return &OTAError{Message: fmt.Sprintf("Failed to download OTA image: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))}
 	}
 	// One byte past the limit tells an answer of exactly the limit from a
-	// longer one.
+	// longer one. A limit of math.MaxInt64 has no byte past it an int64
+	// can count, and one more would wrap the reader's limit negative — a
+	// copy of nothing (review II, R2-P0-rv-C04).
 	limit := bound
 	if u.OTAFileSize != 0 {
 		limit = int64(u.OTAFileSize) //nolint:gosec // at most bound, checked above
 	}
-	n, err := io.Copy(w, io.LimitReader(resp.Body, limit+1))
+	probe := limit
+	if probe < math.MaxInt64 {
+		probe++
+	}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, probe))
 	if err != nil {
 		return fail(err)
 	}

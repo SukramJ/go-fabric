@@ -330,3 +330,21 @@ func TestOTAVersionWithoutMaximum(t *testing.T) {
 	}
 	t.Fatal("a stated maximum of 1 applied to version 2")
 }
+
+// TestOTADownloadBoundAtMaxInt64 (review II, R2-P0-rv-C04): a bound at the
+// top of int64 — a host's "no bound" — downloads an image whole, announced
+// or not; the probe byte past the limit must not wrap the limit negative.
+func TestOTADownloadBoundAtMaxInt64(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	f.bytes("/image.ota", bytes.Repeat([]byte{0xAA}, 4096))
+	for _, bound := range []int64{math.MaxInt64, math.MaxInt64 - 1} {
+		o := &OTAVersions{Client: f.client(), MaxImageSize: bound}
+		for _, size := range []uint64{0, 4096, uint64(bound)} {
+			var buf bytes.Buffer
+			if err := o.Download(context.Background(), SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: size}, &buf); err != nil || buf.Len() != 4096 {
+				t.Errorf("bound %d, announced %d: %d bytes, %v; want the 4096-byte image", bound, size, buf.Len(), err)
+			}
+		}
+	}
+}
