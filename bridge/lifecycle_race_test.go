@@ -160,3 +160,45 @@ func TestReassembleOverlappingStopLeavesNoHostListeners(t *testing.T) {
 		t.Fatalf("%d host listeners registered on the stopped bridge, want 0", got)
 	}
 }
+
+// TestStopWithDoneContextTearsDown (review II, R2-P1-dr-req-01): a Stop
+// whose context is already done when no Start or Stop is running still
+// tears the run down — only its waits are bounded by ctx — on every call,
+// not on the half of them a select between the free lifecycle slot and
+// ctx.Done() picks the slot. Every Start binds the same port, so each one
+// succeeding shows the Stop before it released the socket.
+func TestStopWithDoneContextTearsDown(t *testing.T) {
+	t.Parallel()
+	probe, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := probe.LocalAddr().String()
+	if err := probe.Close(); err != nil {
+		t.Fatal(err)
+	}
+	snap := newHeldSnapshotter(t, 0)
+	b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: addr}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, cancel := context.WithCancel(t.Context())
+	cancel()
+	const runs = 200
+	for i := range runs {
+		if err := b.Start(t.Context()); err != nil {
+			t.Fatalf("run %d: Start on %s: %v", i, addr, err)
+		}
+		if err := b.Stop(done); err != nil {
+			t.Fatalf("run %d: Stop with a done context: %v", i, err)
+		}
+		if b.isStarted() || b.LocalAddr() != "" || b.startClaim.Load() {
+			t.Fatalf("run %d: after Stop with a done context: started=%v addr=%q claim=%v", i, b.isStarted(), b.LocalAddr(), b.startClaim.Load())
+		}
+	}
+	free, err := net.ListenPacket("udp", addr)
+	if err != nil {
+		t.Fatalf("the port after the last Stop: %v", err)
+	}
+	_ = free.Close()
+}

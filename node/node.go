@@ -181,6 +181,10 @@ type Node struct {
 	mu      sync.Mutex
 	started atomic.Bool
 	stopped bool
+	// stopBegun: a Stop took the node's own parts down; stopped is set
+	// only once the bridge stopped too, so a Stop whose bridge stop gave
+	// up is resumed by the next one (review II, R2-P1-dr-req-01).
+	stopBegun bool
 }
 
 // New builds the node: everything the reference daemon builds before
@@ -871,7 +875,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	switch {
-	case n.stopped:
+	case n.stopped || n.stopBegun:
 		return ErrStopped
 	case n.started.Load():
 		return nil
@@ -1024,28 +1028,61 @@ func (n *Node) startLocked(ctx context.Context) error {
 // table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
 // bridge, the advertiser and the store the node opened for Store.Path.
 // Stop is idempotent
-// (matter.js Node.stop, Node.ts:193) and safe without Start.
+// (matter.js Node.stop, Node.ts:193) and safe without Start. A context
+// already done cuts short only Stop's waits; Stop returns an error only
+// when the bridge did not stop (a bridge Start or Stop the host runs
+// itself held it until ctx ended), and then the node is not stopped yet:
+// it keeps its store and the next Stop finishes the work. Start is refused
+// from the first Stop on.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.stopLocked(ctx)
 }
 
-// stopLocked is Stop's work; n.mu is held.
+// stopLocked is Stop's work; n.mu is held. When the bridge does not
+// stop (its Stop waited for a bridge Start or Stop in progress until ctx
+// ended), the node is not stopped: the advertiser, the lifetime context
+// and the store stay, and the next Stop resumes at the bridge (review II,
+// R2-P1-dr-req-01).
 func (n *Node) stopLocked(ctx context.Context) error {
 	if n.stopped {
 		return nil
 	}
+	// The stop is work in hand of the node's in-flight group but for the
+	// client stack's close, which waits on its peers (see Start).
+	work := countWork(n.cfg.Clock, inflight.NodeStop)
+	defer work.pause()
+	if !n.stopBegun {
+		n.stopBegun = true
+		n.stopParts(ctx, work)
+	}
+	if err := n.br.Stop(ctx); err != nil {
+		return fmt.Errorf("node: bridge stop: %w", err)
+	}
 	n.stopped = true
+	// The devices are unbound once no controller reaches them: each
+	// device's queue drains before Stop returns.
+	if n.agg != nil {
+		n.agg.detachAll()
+	}
+	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
+	n.callbacks.Stop()
+	_ = n.advertiser.Close()
+	n.cancel()
+	n.keeperWG.Wait()
+	n.closeOwnedDB()
+	return nil
+}
+
+// stopParts is the part of Stop before the bridge's, run once; work is
+// stopLocked's count.
+func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	// No keeper starts and no reopen opens the window from here on
 	// (keeperMu).
 	n.keeperMu.Lock()
 	n.stopping = true
 	n.keeperMu.Unlock()
-	// The stop is work in hand of the node's in-flight group but for the
-	// client stack's close, which waits on its peers (see Start).
-	work := countWork(n.cfg.Clock, inflight.NodeStop)
-	defer work.pause()
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
@@ -1089,22 +1126,6 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	if srv := n.root.ICDManagement; srv != nil {
 		srv.Stop()
 	}
-	err := n.br.Stop(ctx)
-	// The devices are unbound once no controller reaches them: each
-	// device's queue drains before Stop returns.
-	if n.agg != nil {
-		n.agg.detachAll()
-	}
-	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
-	n.callbacks.Stop()
-	_ = n.advertiser.Close()
-	n.cancel()
-	n.keeperWG.Wait()
-	n.closeOwnedDB()
-	if err != nil {
-		return fmt.Errorf("node: bridge stop: %w", err)
-	}
-	return nil
 }
 
 // countedWork is one unit of a node's work in hand on the in-flight group

@@ -1083,7 +1083,11 @@ func (b *Bridge) startAckPump() {
 }
 
 // enterLifecycle waits for the lifecycle slot ([Bridge.lifecycle]) until
-// ctx ends and returns its release.
+// ctx ends and returns its release. A free slot is always taken, whatever
+// ctx's state: only the wait for a Start or Stop in progress is bounded by
+// ctx, so a Stop with a context already done still tears the run down
+// (review II, R2-P1-dr-req-01) — a select over both would pick ctx.Done()
+// at random.
 func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error) {
 	b.mu.Lock()
 	if b.lifecycle == nil {
@@ -1091,6 +1095,11 @@ func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error)
 	}
 	slot := b.lifecycle
 	b.mu.Unlock()
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	default:
+	}
 	select {
 	case slot <- struct{}{}:
 		return func() { <-slot }, nil
@@ -2028,7 +2037,10 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // no-op. Safe to call after a failed [Start]. The bridge counts as
 // started until Stop returns: a [Bridge.Start] before that is refused.
 // A Stop that overlaps a Start waits for it, until ctx ends, and then
-// stops its run.
+// stops its run; only that wait can make Stop return an error, and then
+// it has torn nothing down. A Stop with a context already done when no
+// Start or Stop is running tears the run down all the same and cuts
+// short only the waits ctx bounds.
 //
 //nolint:funlen // one teardown sequence; its order is the contract, and split up it is no longer visible in one place
 func (b *Bridge) Stop(ctx context.Context) error {
