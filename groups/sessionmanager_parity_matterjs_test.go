@@ -96,7 +96,7 @@ func TestSessionManagerGroupDataMessageCounter(t *testing.T) {
 	}
 	// updateMessageCounter throws DuplicateMessageError where Accept is false.
 	accepts := func(m *Manager, key []byte, counter uint32) bool {
-		return m.acceptCounter(key, source, counter)
+		return m.receptionWindow(key, source).Accept(counter)
 	}
 
 	t.Run("exposes one node-global counter shared across group sessions", func(t *testing.T) {

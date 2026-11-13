@@ -277,90 +277,56 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 	}
 	m.mu.RUnlock()
 
-	msg.Duplicate = !m.acceptCounter(c.epoch.key, msg.SourceNodeID, msg.Header.MessageCounter)
+	msg.Duplicate = !m.receptionWindow(c.epoch.key, msg.SourceNodeID).Accept(msg.Header.MessageCounter)
 }
 
-// maxReceptionPeers is how many senders one operational key keeps a
-// reception window for — connectedhomeip's CHIP_CONFIG_MAX_GROUP_DATA_PEERS
-// (src/lib/core/CHIPConfig.h:833 at 6170af84). matter.js has no bound: its
-// map takes one window per source node id for as long as the key lives
-// (packages/protocol/src/groups/MessagingState.ts:80-90 at db021da0), and
-// the source node id of a group message is its sender's claim, so every
-// holder of the key could grow it without end (review II,
-// R2-P0-bound-A07; by_design, Ahead of matter.js).
-const maxReceptionPeers = 15
-
-// receptionPeer is one sender's reception window under one operational
-// key.
-type receptionPeer struct {
-	source uint64
-	window *mrp.Window
-}
-
-// acceptCounter runs counter through the reception window of (key, source
-// node) and reports whether the message is new. Only authenticated
-// messages reach here.
+// receptionWindow returns the reception state for (key, source node),
+// creating it on first use.
 //
-// The windows of a key are kept most recently used first and bounded at
-// [maxReceptionPeers], as connectedhomeip keeps its group peer table: a
-// sender not in the table is added at the front, the least recently used
-// one evicted when the table is full
-// (src/transport/GroupPeerMessageCounter.cpp:79-95 at 6170af84), and its
-// first counter is trusted (SessionManager.cpp:1287-1294 with
-// VerifyOrTrustFirstGroup, src/transport/PeerMessageCounter.h:102-108).
-// No message of a real sender is lost to the bound: an evicted sender's
-// next message re-enters it.
+// There is one window per source node id under a key and no bound on how
+// many, as in matter.js: receptionStateFor adds an entry for every source
+// node id it is asked for and nothing but forgetReceptionState removes one
+// (packages/protocol/src/groups/MessagingState.ts:19, :80-90, :97-99 at
+// db021da0). That is what keeps a recorded datagram a duplicate for as
+// long as its key is held, however many other senders were seen since: a
+// table that evicts must trust the first counter of a sender it no longer
+// holds, and a party without the key can then replay what it recorded —
+// connectedhomeip's group peer table of CHIP_CONFIG_MAX_GROUP_DATA_PEERS
+// senders does (src/lib/core/CHIPConfig.h:833,
+// src/transport/GroupPeerMessageCounter.cpp:79-95,
+// src/transport/SessionManager.cpp:1287-1294 at 6170af84), and this
+// package did while it was bounded the same way (review II, R2-P0-rv-B01;
+// pinned by TestRecordedGroupMessageStaysADuplicate).
 //
-// What the bound costs is that sender's replay protection: with its window
-// gone, a recorded message of an evicted sender is accepted once more
-// when it is presented before a newer one. Eviction takes a message that
-// authenticates under the key from a sender the table does not hold, so
-// whoever lacks the key cannot cause it; a holder of the key can — fifteen
-// claimed source node ids empty the table — and gains nothing by it that
-// the key did not give it already, since it can seal any message under
-// any source node id. Two things narrow it further than connectedhomeip
-// does. The table is per operational key, as matter.js keys the state, not
-// per fabric (GroupPeerMessageCounter.h:46-58), so the holder of one group
-// key cannot evict the senders of another. And only an accepted message
-// moves its sender to the front, where connectedhomeip moves it on lookup
-// (GroupPeerMessageCounter.cpp:69-77, :95): replaying recorded messages of
-// tracked senders, which needs no key, cannot choose who is evicted next.
+// What the missing bound costs is memory under a holder of the group key.
+// Only a message that authenticated under a mapped key reaches here
+// ([Manager.Decode]; pinned by
+// TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState), but the
+// source node id of a group message is what its sender states, so a
+// holder of the key adds one entry per id it claims, until the key goes.
+// A party without the key adds none.
 //
 // The state is keyed on the operational key, not on fabric and key set:
-// key sets that derive the same key share one table, as in matter.js
-// packages/protocol/src/groups/MessagingState.ts:80-98
-// (receptionStateFor). It is dropped with the last key set deriving the
-// key — [Manager.Reload] after KeySetWrite / KeySetRemove and
-// [Manager.ForgetFabric] run forgetUnreferenced, matter.js
-// packages/protocol/src/groups/FabricGroups.ts:185-219
+// key sets that derive the same key share one window, as in matter.js
+// (MessagingState.ts:80-90, receptionStateFor). It is dropped with the
+// last key set deriving the key — [Manager.Reload] after KeySetWrite /
+// KeySetRemove and [Manager.ForgetFabric] run forgetUnreferenced, matter.js
+// packages/protocol/src/groups/FabricGroups.ts:207-225
 // (#forgetUnreferencedReceptionState). Pinned by
 // TestReceptionStateTeardownParity (review 2026-11 W2-sec-05).
-func (m *Manager) acceptCounter(key []byte, source uint64, counter uint32) bool {
+func (m *Manager) receptionWindow(key []byte, source uint64) *mrp.Window {
 	k := hex.EncodeToString(key)
 	m.receptionMu.Lock()
 	defer m.receptionMu.Unlock()
-	peers := m.reception[k]
-	at := slices.IndexFunc(peers, func(p receptionPeer) bool { return p.source == source })
-	if at < 0 {
-		// A sender the table does not hold: its first counter is trusted
-		// (a fresh window accepts whatever it sees first), and it takes
-		// the front; the least recently used sender falls off a full
-		// table.
-		peer := receptionPeer{source: source, window: mrp.NewWindowEncryptedRollover()}
-		accepted := peer.window.Accept(counter)
-		peers = slices.Insert(peers, 0, peer)
-		if len(peers) > maxReceptionPeers {
-			peers[maxReceptionPeers] = receptionPeer{}
-			peers = peers[:maxReceptionPeers]
-		}
-		m.reception[k] = peers
-		return accepted
+	perKey, ok := m.reception[k]
+	if !ok {
+		perKey = make(map[uint64]*mrp.Window)
+		m.reception[k] = perKey
 	}
-	peer := peers[at]
-	if !peer.window.Accept(counter) {
-		return false
+	w, ok := perKey[source]
+	if !ok {
+		w = mrp.NewWindowEncryptedRollover()
+		perKey[source] = w
 	}
-	copy(peers[1:at+1], peers[:at])
-	peers[0] = peer
-	return true
+	return w
 }
