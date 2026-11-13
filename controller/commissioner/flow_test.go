@@ -700,12 +700,15 @@ func TestFlowReconnectAbort(t *testing.T) {
 		done := make(chan error, 1)
 		start := time.Now()
 		go func() { done <- f.execute(ctx) }()
+		// The test's own deadline, as the bridge's tests bound a wait.
+		waitCtx, stopWait := context.WithTimeout(t.Context(), abortDisarmTimeout/2)
+		defer stopWait()
 		select {
 		case err := <-done:
 			if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrOperativeConnectionFailed) || disarms.Load() != 1 {
 				t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want the aborted Reconnect and once", err, disarms.Load())
 			}
-		case <-time.After(abortDisarmTimeout / 2):
+		case <-waitCtx.Done():
 			// The exchange's response timeout runs on the fake clock,
 			// which nothing advances: without the flow's bound the
 			// disarm waits for good.
