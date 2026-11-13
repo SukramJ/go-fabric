@@ -100,8 +100,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller",
-		min: 79, spread: 3,
-		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. 79, not 80, since 2026-11-04: CI measured 79.8 (run 41854166274, the Leave mini-fix, which did not touch the package) while five local runs measured 80.9-81.1 — the floor sat within the package's timing-dependent point; the flake pass (#383) revisits Spread 3 since 2026-11-06: a local run measured 82.2 against CI's 79.8-81.9 (the Leave and reconnect paths depend on timing), so the stale-floor rule reads the floor with the spread.",
+		min: 84,
+		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. Measures 84.6 since 2026-11-12 (six concurrent local runs; CI cannot measure more, it never heard the LAN). The earlier spread of 3 (CI 79.8-81.9 against local 80.9-85.2) had one cause left at that date: TestOperationalPortParityMatterJS opened the real DNS-SD socket, and a Thread border router announcing itself on a developer's LAN reached the border-router arm of watchDiscovery, which CI never hears; the test now runs on an offline Names, and the six profiles differ in no block",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},

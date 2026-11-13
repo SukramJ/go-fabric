@@ -163,8 +163,14 @@ func TestMetricsReassemblyAndRetransmit(t *testing.T) {
 		t.Fatalf("read with the device's reply dropped once: %v", err)
 	}
 	site.Net().Filter(nil)
-	if got := m.Count(node.MetricMRPRetransmits); got < 1 {
-		t.Errorf("mrp.retransmits = %d after a dropped reply", got)
+	// The device counts a retransmission after its MRP tick has sent it
+	// (bridge/ackpump.go tickOutboundReliable), so the controller's read
+	// can return on the re-sent reply before the count lands: wait on the
+	// site rather than read the counter once.
+	if err := site.Eventually(ctx, "the retransmission's count", func() bool {
+		return m.Count(node.MetricMRPRetransmits) >= 1
+	}); err != nil {
+		t.Errorf("mrp.retransmits = %d after a dropped reply: %v", m.Count(node.MetricMRPRetransmits), err)
 	}
 }
 

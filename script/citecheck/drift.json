@@ -3180,7 +3180,7 @@
   },
   {
     "file": "node/groupcast_server_parity_matterjs_test.go",
-    "line": 642,
+    "line": 646,
     "citation": "GroupcastServerTest.ts:2204-2242",
     "resolved": "packages/node/test/behaviors/groupcast/GroupcastServerTest.ts",
     "identifier": "JoinGroup",

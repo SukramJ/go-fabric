@@ -530,7 +530,9 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 			t.Errorf("group state after the restore = %+v, want %+v", got, want)
 		}
 
-		if err := dev.Act(func(n *node.Node) error { return n.RemoveFabric(context.Background(), g.fabric) }); err != nil {
+		if err := g.site.Run(parityCtx(t), func(ctx context.Context) error {
+			return dev.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, g.fabric) })
+		}); err != nil {
 			t.Fatal(err)
 		}
 		g.mu.Lock()

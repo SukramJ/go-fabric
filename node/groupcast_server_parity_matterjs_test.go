@@ -464,7 +464,9 @@ func TestGroupcastFabricRemovalParityMatterJS(t *testing.T) {
 		if len(g.groupProperties(t, g.fabric)) == 0 {
 			t.Fatal("JoinGroup recorded no groupProperties")
 		}
-		if err := g.dev.Act(func(n *node.Node) error { return n.RemoveFabric(context.Background(), g.fabric) }); err != nil {
+		if err := g.site.Run(parityCtx(t), func(ctx context.Context) error {
+			return g.dev.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, g.fabric) })
+		}); err != nil {
 			t.Fatal(err)
 		}
 		if got := g.groupProperties(t, g.fabric); len(got) != 0 {
@@ -487,7 +489,9 @@ func TestGroupcastFabricRemovalParityMatterJS(t *testing.T) {
 			t.Fatal("the group is no member")
 		}
 		before := len(log.messages(slog.LevelError))
-		if err := g.dev.Act(func(n *node.Node) error { return n.RemoveFabric(context.Background(), g.fabric) }); err != nil {
+		if err := g.site.Run(parityCtx(t), func(ctx context.Context) error {
+			return g.dev.Act(func(n *node.Node) error { return n.RemoveFabric(ctx, g.fabric) })
+		}); err != nil {
 			t.Fatal(err)
 		}
 		if err := g.site.Settle(parityCtx(t)); err != nil {
