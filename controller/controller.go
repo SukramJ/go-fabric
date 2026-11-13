@@ -191,6 +191,14 @@ type Config struct {
 	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:219-222,
 	// NetworkClient.ts:73-79 at 862ad75f).
 	TransportPreference exchange.Transport
+	// PeerTiming sets the connection timing of the controller's peer set,
+	// every parameter [client.Timing] names: the connection timeout, the
+	// address stagger, the delays after an error, the kick and probe
+	// cooldowns, the address-change delays and ProvenAddressRetention. It
+	// overrides client/peer's DefaultTiming field-wise, a cooldown group
+	// member by member: a zero field keeps the default; nil is the
+	// defaults. A negative ProvenAddressRetention retains nothing.
+	PeerTiming *client.Timing
 	// OTA, when set, turns on the OTA push: the update manager and the
 	// own node its provider runs on ([OTAConfig]); nil runs neither.
 	OTA *OTAConfig
@@ -366,7 +374,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
 		TransportPreference: cfg.TransportPreference, SessionAdded: c.sessionAdded, PeerAdded: c.peerAdded,
-		PeerRemoved: c.peerRemoved,
+		PeerRemoved: c.peerRemoved, Timing: cfg.PeerTiming,
 	}
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
