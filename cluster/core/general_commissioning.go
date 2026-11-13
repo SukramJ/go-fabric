@@ -65,6 +65,12 @@ type GeneralCommissioning struct {
 	// none runs: one at a time, replaced on a re-arm and stopped on a
 	// disarm ([GeneralCommissioning.startFailSafeWatchLocked]).
 	failSafeWatch *failSafeWatch
+	// expiryRollbacks counts the expiry hooks running outside g.mu over a
+	// fail-safe they disarmed; expiryRollbacksDone is closed when the
+	// count returns to zero, nil while it is zero. An arm waits for it
+	// (general_commissioning_rollback.go).
+	expiryRollbacks     int
+	expiryRollbacksDone chan struct{}
 
 	// Cumulative FailSafe tracking: once the cumulative cap is hit the
 	// bridge must refuse further ArmFailSafe calls with BusyWithOtherAdmin.
@@ -251,7 +257,10 @@ type GeneralCommissioningConfig struct {
 	TermsAndConditions *TermsAndConditionsConfig
 	// Settings keeps the committed terms acceptance across restarts
 	// ([store.SettingTermsAcceptance]); nil keeps it in memory. Read by
-	// [GeneralCommissioning.RestoreTermsAcceptance].
+	// [GeneralCommissioning.RestoreTermsAcceptance]. CommissioningComplete
+	// also clears OperationalCredentials' pending-NOC marker in it before
+	// it answers success, so it is the store OperationalCredentials uses
+	// (the node passes one store to both).
 	Settings store.Settings
 	// Clock is the fail-safe's clock: its expiry, the cumulative limit and
 	// the expiry watcher. nil is [clock.System].
@@ -627,6 +636,15 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		}
 	}()
 
+	// An arm judges the state an expired fail-safe's rollback left, never
+	// the state before it (core2 item 1b). A disarm does not wait: it is
+	// what a rollback itself may run.
+	if req.ExpiryLengthSeconds != 0 {
+		if err := g.settleExpiryLocked(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	// sessFabric is the requesting fabric (0 == PASE / commissioning
 	// session). It gates the fail-safe ownership rules below.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
@@ -704,13 +722,16 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// OpCreds.OnFailSafeExpiry (which acquires its own lock to perform
 		// the AddNOC rollback) runs without our mutex held — matching the
 		// timeout path in watchFailSafeExpiry.
-		hook := g.failSafeExpiryHooksLocked()
+		var hook func(ctx context.Context, fabricIndex uint8)
+		if wasArmed {
+			hook = g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
+		}
 		g.mu.Unlock()
 		unlocked = true
 		if termsReverted {
 			g.changes.Notify(gencommTCAttrs...)
 		}
-		if wasArmed && hook != nil {
+		if hook != nil {
 			hook(ctx, expiredFabric)
 		}
 		return ArmFailSafeResponse{ErrorCode: CommissioningErrorOK}, nil
@@ -801,6 +822,8 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 type failSafeWatch struct {
 	timer clock.Timer
 	stop  chan struct{}
+	// fabricIndex is what its expiry hook is called with.
+	fabricIndex uint8
 }
 
 // startFailSafeWatchLocked replaces the expiry watcher by one for a
@@ -816,8 +839,9 @@ type failSafeWatch struct {
 func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
 	g.stopFailSafeWatchLocked()
 	w := &failSafeWatch{
-		timer: g.clock.NewTimer(clock.Until(g.clock, expiresAt)),
-		stop:  make(chan struct{}),
+		timer:       g.clock.NewTimer(clock.Until(g.clock, expiresAt)),
+		stop:        make(chan struct{}),
+		fabricIndex: fabricIndex,
 	}
 	g.failSafeWatch = w
 	go g.watchFailSafeExpiry(ctx, fabricIndex, w)
@@ -852,30 +876,40 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 	if g.failSafeWatch == w {
 		g.failSafeWatch = nil
 	}
-	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(g.clock.Now())
-	hadBreadcrumb := stillArmed && g.breadcrumb != 0
-	termsReverted := false
-	if stillArmed {
-		g.failSafeArmed = false
-		// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
-		// branch) clears the Breadcrumb when the fail-safe expires —
-		// Matter §11.10.6.1 "Breadcrumb SHALL be set to 0 on FailSafe
-		// expiry". Apple's HomeKitDaemon reads Breadcrumb post-failsafe
-		// and a stale non-zero value can confuse the commissioning-recovery
-		// flow.
-		g.breadcrumb = 0
-		// Reset the cumulative cap so the next commissioning attempt
-		// starts fresh. Mirrors chip FailSafeContext::HandleMaxCumulativeFailSafeTimer
-		// which stops when the fail-safe expires.
-		g.failSafeCumulativeStarted = false
-		termsReverted = g.revertTermsLocked()
-		// As the disarm, ExpireFailSafe and ArmFailSafeFor(0) paths do:
-		// the expiry changed the cluster (review II, R2-P1-core-02).
-		g.dataVersion.Bump()
+	if !g.failSafeArmed || g.failSafeExpiresAt.After(g.clock.Now()) {
+		g.mu.Unlock()
+		return
 	}
-	hook := g.failSafeExpiryHooksLocked()
+	after := g.expireLocked(fabricIndex)
 	g.mu.Unlock()
-	if stillArmed {
+	after(ctx)
+}
+
+// expireLocked ends the armed fail-safe as its deadline does, and returns
+// what then runs without g.mu: the change notifications and the expiry
+// hook, recorded as a rollback in flight until it returns. Caller holds
+// g.mu.
+func (g *GeneralCommissioning) expireLocked(fabricIndex uint8) func(ctx context.Context) {
+	hadBreadcrumb := g.breadcrumb != 0
+	g.failSafeArmed = false
+	g.stopFailSafeWatchLocked()
+	// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
+	// branch) clears the Breadcrumb when the fail-safe expires —
+	// Matter §11.10.6.1 "Breadcrumb SHALL be set to 0 on FailSafe
+	// expiry". Apple's HomeKitDaemon reads Breadcrumb post-failsafe
+	// and a stale non-zero value can confuse the commissioning-recovery
+	// flow.
+	g.breadcrumb = 0
+	// Reset the cumulative cap so the next commissioning attempt
+	// starts fresh. Mirrors chip FailSafeContext::HandleMaxCumulativeFailSafeTimer
+	// which stops when the fail-safe expires.
+	g.failSafeCumulativeStarted = false
+	termsReverted := g.revertTermsLocked()
+	// As the disarm, ExpireFailSafe and ArmFailSafeFor(0) paths do:
+	// the expiry changed the cluster (review II, R2-P1-core-02).
+	g.dataVersion.Bump()
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
+	return func(ctx context.Context) {
 		if termsReverted {
 			g.changes.Notify(gencommTCAttrs...)
 		}
@@ -1002,6 +1036,13 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 			return nil, err
 		}
 	}
+	// The last step that can fail, before anything is disarmed: the
+	// pending AddNOC / UpdateNOC is committed durably, or the command
+	// answers FAILURE as the terms commit does and the fail-safe stays
+	// armed (core2 item 1a).
+	if err := g.commitPendingNOCLocked(ctx); err != nil {
+		return nil, err
+	}
 	g.failSafeArmed = false
 	g.stopFailSafeWatchLocked()
 	g.failSafeFabricIndex = 0
@@ -1091,7 +1132,14 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
 	// override the context's fabric filter if needed, or set directly.
 	g.mu.Lock()
-	fresh := !g.failSafeArmed || !g.failSafeExpiresAt.After(g.clock.Now())
+	// An arm judges the state an expired fail-safe's rollback left: a due
+	// window is expired first, a rollback in flight waited for (core2
+	// item 1b). So a window armed now is not due, and fresh is "disarmed".
+	if err := g.settleExpiryLocked(ctx); err != nil {
+		g.mu.Unlock()
+		return err
+	}
+	fresh := !g.failSafeArmed
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = g.clock.Now().Add(time.Duration(seconds) * time.Second)
 	g.breadcrumb = req.Breadcrumb
@@ -1135,7 +1183,7 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 	g.breadcrumb = 0
 	termsReverted := g.revertTermsLocked()
 	g.dataVersion.Bump()
-	hook := g.failSafeExpiryHooksLocked()
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
 	g.mu.Unlock()
 	if termsReverted {
 		g.changes.Notify(gencommTCAttrs...)

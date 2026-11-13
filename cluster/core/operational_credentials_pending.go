@@ -94,7 +94,9 @@ func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingN
 }
 
 // clearPendingNOC removes the marker once what it names is committed or
-// rolled back. It touches the store only when this server wrote one. A
+// rolled back. It touches the store only when this server wrote one, and
+// writes only when the marker still stands: CommissioningComplete clears
+// it before it answers (GeneralCommissioning.commitPendingNOCLocked). A
 // failed clear is logged: the next start would roll back what it names.
 func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
 	o.mu.Lock()
@@ -107,7 +109,14 @@ func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
 	if !ok {
 		return
 	}
-	if err := st.SetSetting(context.WithoutCancel(ctx), pendingNOCSettingKey, ""); err != nil {
+	ctx = context.WithoutCancel(ctx)
+	if v, found, err := st.GetSetting(ctx, pendingNOCSettingKey); err == nil && (!found || v == "") {
+		o.mu.Lock()
+		o.pendingNOCMarkerOut = false
+		o.mu.Unlock()
+		return
+	}
+	if err := st.SetSetting(ctx, pendingNOCSettingKey, ""); err != nil {
 		o.logger().Error("matter.opcreds.pending_noc.clear_failed", slog.Any("err", err))
 		return
 	}
