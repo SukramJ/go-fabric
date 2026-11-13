@@ -132,10 +132,14 @@ type CommissionOptions struct {
 	NoInitialRead bool
 	// OnboardingCode, when set, is the QR or manual pairing code the
 	// passcode came from; it is kept with the node when the commissioning
-	// succeeds ([Node.OnboardingCode], source [OnboardingPaired]) — unless
-	// the device advertised an Enhanced Commissioning Window, whose code
-	// ends with the window. This module's; matter.js keeps no pairing
-	// code.
+	// succeeds ([Node.OnboardingCode], source [OnboardingPaired]) and the
+	// device advertised Basic commissioning mode — not for an Enhanced
+	// Commissioning Window, whose code ends with the window, and not
+	// without an advertisement. It is kept before the node starts, so
+	// also when Commission then returns the start's error. A plain
+	// string, as the passcode in Options is: it is the caller's input,
+	// and the stored value is a [SecretCode]. This module's; matter.js
+	// keeps no pairing code.
 	OnboardingCode string
 }
 

@@ -136,7 +136,12 @@ type Config struct {
 	// KeepOnboardingCodes keeps the QR or manual pairing code of every
 	// device [Controller.Pair] commissions with the node
 	// (client.Node.OnboardingCode), so that [Controller.Inventory] can
-	// show it again when the paper is lost. Off by default: the code is a
+	// show it again when the paper is lost. It is kept when the
+	// commissioning succeeded — also when the node's start then failed —
+	// and the device advertised Basic commissioning mode: not for an
+	// Enhanced Commissioning Window, whose code ends with it, not for a
+	// pairing by PairOptions.Address, which sees no advertisement, and
+	// not when PairOptions.Edit replaced the passcode. Off by default: the code is a
 	// secret — with it and a factory reset anyone can commission the
 	// device — and the database then holds one per node.
 	KeepOnboardingCodes bool
@@ -850,10 +855,19 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 		return nil, err
 	}
 	o := c.pairOptions(passcode, nil, opts, opts.Progress)
-	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.onboardingCode}); err != nil {
+	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}); err != nil {
 		return n, err
 	}
 	return n, nil
+}
+
+// keptCode is the code to keep for a commissioning with the options o:
+// none when Edit replaced the passcode the code carries.
+func (opts PairOptions) keptCode(o commissioner.Options, passcode uint32) string {
+	if o.Passcode != passcode {
+		return ""
+	}
+	return opts.onboardingCode
 }
 
 // pairOptions are the commissioner's options of a Pair: the passcode,

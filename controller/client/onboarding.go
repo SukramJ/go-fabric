@@ -34,12 +34,18 @@ const (
 	onbChecks   uint32 = 3 // OnboardingChecks
 )
 
-// commissioningModeEnhanced is the commissionable advertisement's CM of an
-// Enhanced Commissioning Window: its passcode and its discriminator are
-// the window's, minted by the administrator that opened it, and gone when
-// it closes (bridge/commissioning_window.go advertises CM=2 for exactly
-// that window).
-const commissioningModeEnhanced = 2
+// The commissionable advertisement's commissioning mode — matter.js
+// CommissioningMode (packages/protocol/src/advertisement/CommissioningMode.ts:7-11
+// at db021da0). Basic is the device's own passcode and discriminator.
+// Enhanced is a window an administrator opened: its passcode and its
+// discriminator are the window's and gone when it closes. A record whose
+// mode is neither saw no such advertisement — a node paired by address
+// has a zero discriminator nobody advertised (Record.applyDevice) — so
+// only a Basic record says anything about the device's own code.
+const (
+	commissioningModeBasic    = 1
+	commissioningModeEnhanced = 2
+)
 
 var (
 	// ErrOnboardingCode is a code [Node.SetOnboardingCode] cannot read:
@@ -69,19 +75,81 @@ const (
 type OnboardingChecks uint8
 
 const (
-	// OnboardingCheckedVendorProduct says the code's vendor and product
-	// ids equal the node's.
-	OnboardingCheckedVendorProduct OnboardingChecks = 1 << iota
+	// OnboardingCheckedVendor says the code's vendor id equals the node's.
+	OnboardingCheckedVendor OnboardingChecks = 1 << iota
 	// OnboardingCheckedDiscriminator says the code's discriminator equals
 	// the one the node advertised while it was commissionable.
 	OnboardingCheckedDiscriminator
+	// OnboardingCheckedProduct says the code's product id equals the
+	// node's. It is compared only together with the vendor id.
+	OnboardingCheckedProduct
 )
+
+// SecretCode is the text of an onboarding code: a QR code's "MT:…" or a
+// manual pairing code's digits. It carries the device's setup passcode, so
+// it is redacted wherever a value is rendered without being asked for:
+// under every fmt verb, in a log record of either slog handler, in
+// encoding/json and every encoding that takes an encoding.TextMarshaler —
+// also as a field of a host's own struct. [SecretCode.Reveal] is the one
+// way to the text. The zero value is no code.
+//
+// A SecretCode is not comparable; compare the revealed texts.
+type SecretCode struct {
+	_ [0]func()
+	// text is behind a pointer because fmt prints a struct's unexported
+	// field without calling its methods: a host that holds a SecretCode in
+	// an unexported field and formats its struct gets an address.
+	text *string
+}
+
+// redacted is what a SecretCode renders as.
+const redacted = "redacted"
+
+// newSecretCode wraps text; "" is the zero value.
+func newSecretCode(text string) SecretCode {
+	if text == "" {
+		return SecretCode{}
+	}
+	return SecretCode{text: &text}
+}
+
+// Reveal is the code's text — the secret. Call it where the code is shown
+// or printed, and nowhere a log or a serialiser can see the result.
+func (s SecretCode) Reveal() string {
+	if s.text == nil {
+		return ""
+	}
+	return *s.text
+}
+
+// IsZero reports no code.
+func (s SecretCode) IsZero() bool { return s.text == nil }
+
+// String keeps the text out of a formatted value.
+func (s SecretCode) String() string {
+	if s.text == nil {
+		return ""
+	}
+	return redacted
+}
+
+// GoString keeps the text out of a %#v.
+func (s SecretCode) GoString() string { return "client.SecretCode(" + s.String() + ")" }
+
+// LogValue keeps the text out of a log record.
+func (s SecretCode) LogValue() slog.Value { return slog.StringValue(s.String()) }
+
+// MarshalText keeps the text out of encoding/json and every other
+// encoding that takes an encoding.TextMarshaler. There is no
+// UnmarshalText: a redacted value does not come back.
+func (s SecretCode) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
 
 // OnboardingCode is a node's stored onboarding code.
 type OnboardingCode struct {
 	// Code is the code as entered, normalised: a QR code's "MT:…" text, or
-	// a manual pairing code's 11 or 21 digits. It is a secret.
-	Code string
+	// a manual pairing code's 11 or 21 digits. It is a secret:
+	// [SecretCode.Reveal] reads it.
+	Code SecretCode
 	// Source tells whether the device accepted the code or it was attached
 	// afterwards.
 	Source OnboardingSource
@@ -96,6 +164,9 @@ type OnboardingCode struct {
 // String keeps the code out of a formatted value.
 func (c OnboardingCode) String() string { return "OnboardingCode(redacted)" }
 
+// GoString keeps the code out of a %#v.
+func (c OnboardingCode) GoString() string { return c.String() }
+
 // LogValue keeps the code out of a log record.
 func (c OnboardingCode) LogValue() slog.Value { return slog.StringValue(c.String()) }
 
@@ -104,26 +175,28 @@ func (c OnboardingCode) LogValue() slog.Value { return slog.StringValue(c.String
 // the short form, or the 21-digit form with the vendor and product ids
 // when the code's commissioning flow is not Standard, as connectedhomeip
 // generates it (src/setup_payload/ManualSetupPayloadGenerator.cpp:116 at
-// f09331bd). A stored manual code yields itself and no QR code: it carries
+// 6170af84). A stored manual code yields itself and no QR code: it carries
 // four of the discriminator's twelve bits and neither the commissioning
 // flow nor the discovery capabilities, and none of those is made up.
-func (c OnboardingCode) Codes() (qr, manual string, err error) {
-	if !strings.HasPrefix(c.Code, "MT:") {
-		return "", c.Code, nil
+func (c OnboardingCode) Codes() (qr, manual SecretCode, err error) {
+	text := c.Code.Reveal()
+	if !strings.HasPrefix(text, "MT:") {
+		return SecretCode{}, c.Code, nil
 	}
-	p, err := setup.DecodeQRCode(c.Code)
+	p, err := setup.DecodeQRCode(text)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %w", ErrOnboardingCode, err)
+		return SecretCode{}, SecretCode{}, fmt.Errorf("%w: %w", ErrOnboardingCode, err)
 	}
+	var digits string
 	if p.CustomFlow != 0 {
-		manual, err = setup.ManualCodeLong(p.Discriminator, p.Passcode, p.VendorID, p.ProductID)
+		digits, err = setup.ManualCodeLong(p.Discriminator, p.Passcode, p.VendorID, p.ProductID)
 	} else {
-		manual, err = setup.ManualCode(p.Discriminator, p.Passcode)
+		digits, err = setup.ManualCode(p.Discriminator, p.Passcode)
 	}
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %w", ErrOnboardingCode, err)
+		return SecretCode{}, SecretCode{}, fmt.Errorf("%w: %w", ErrOnboardingCode, err)
 	}
-	return c.Code, manual, nil
+	return c.Code, newSecretCode(digits), nil
 }
 
 // onboardingIdentity is what a code says about its device.
@@ -183,15 +256,18 @@ func (n *Node) OnboardingCode() (code OnboardingCode, ok bool) {
 //
 //   - the vendor and product ids of a QR code or a 21-digit manual code
 //     with the node's Basic Information, or the ids it advertised;
-//   - the discriminator with the one the node advertised while it was
-//     commissionable — a manual code's four bits with that one's upper
-//     four. This check is skipped for a node commissioned through an
-//     Enhanced Commissioning Window, whose advertised discriminator was
-//     the window's and not the device's.
+//   - the discriminator with the one the node advertised — a manual
+//     code's four bits with that one's upper four. This check runs only
+//     when the node was last seen commissionable in Basic mode: in an
+//     Enhanced Commissioning Window the advertised discriminator is the
+//     window's, and a node paired by address advertised none.
 //
 // A side the node does not know is skipped; the result's Checks name the
 // checks that ran. No check proves the passcode: a commissioned device
-// offers no way to test one, so the code stays [OnboardingAttached].
+// offers no way to test one, so the code is [OnboardingAttached] — unless
+// it is the very code the node was paired with, which stays as it is. Nor
+// does a check prove the unit: the code of another device of the same
+// product with the same discriminator passes every one of them.
 // A node that is not commissioned is [ErrNotCommissioned].
 func (n *Node) SetOnboardingCode(code string) (OnboardingCode, error) {
 	norm, id, err := parseOnboarding(code)
@@ -205,18 +281,25 @@ func (n *Node) SetOnboardingCode(code string) (OnboardingCode, error) {
 	if err != nil {
 		return OnboardingCode{}, err
 	}
-	c := OnboardingCode{Code: norm, Source: OnboardingAttached, StoredAt: n.clock.Now(), Checks: checks}
+	if have, ok := n.OnboardingCode(); ok && have.Code.Reveal() == norm && have.Source == OnboardingPaired {
+		return have, nil
+	}
+	c := OnboardingCode{Code: newSecretCode(norm), Source: OnboardingAttached, StoredAt: n.clock.Now().Truncate(time.Millisecond), Checks: checks}
 	if err := n.storeOnboarding(c); err != nil {
 		return OnboardingCode{}, err
 	}
 	return c, nil
 }
 
-// ClearOnboardingCode removes the node's stored onboarding code.
+// ClearOnboardingCode removes the node's stored onboarding code — from
+// the store also when the stored one could not be read. Like
+// storeOnboarding it writes the store under the node's lock, which
+// [Node.Erase] does not: the write has to be ordered against the erase,
+// or a code stored late would outlive its node.
 func (n *Node) ClearOnboardingCode() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.erased || n.onboarding == nil {
+	if n.erased {
 		return nil
 	}
 	if err := n.store.EraseCluster(n.cfg.ID, 0, onboardingCluster); err != nil {
@@ -235,12 +318,15 @@ func (n *Node) checkOnboarding(id onboardingIdentity) (OnboardingChecks, error) 
 		if id.vendor != *vendor {
 			return 0, fmt.Errorf("%w: its vendor id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, id.vendor, *vendor)
 		}
-		if id.product != 0 && product != nil && id.product != *product {
-			return 0, fmt.Errorf("%w: its product id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, id.product, *product)
+		checks |= OnboardingCheckedVendor
+		if id.product != 0 && product != nil {
+			if id.product != *product {
+				return 0, fmt.Errorf("%w: its product id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, id.product, *product)
+			}
+			checks |= OnboardingCheckedProduct
 		}
-		checks |= OnboardingCheckedVendorProduct
 	}
-	if rec.Discriminator != nil && rec.CommissioningMode != commissioningModeEnhanced {
+	if rec.Discriminator != nil && rec.CommissioningMode == commissioningModeBasic {
 		want := *rec.Discriminator
 		if id.short {
 			want >>= 8
@@ -263,34 +349,41 @@ func (n *Node) identityIDs(rec Record) (vendor, product *uint16) {
 		return vendor, product
 	}
 	bi := root.Cluster(basicinformation.ClusterID)
-	if v, ok := bi.Value(basicinformation.AttrVendorId); ok && isUint(v) {
-		id := uint16(v.El.Uint) //nolint:gosec // a vendor-id attribute
-		vendor = &id
+	if v, ok := bi.Value(basicinformation.AttrVendorId); ok {
+		if id, err := spec.DecodeUint[uint16](16)(v); err == nil {
+			vendor = &id
+		}
 	}
-	if v, ok := bi.Value(basicinformation.AttrProductId); ok && isUint(v) {
-		id := uint16(v.El.Uint) //nolint:gosec // a uint16 attribute
-		product = &id
+	if v, ok := bi.Value(basicinformation.AttrProductId); ok {
+		if id, err := spec.DecodeUint[uint16](16)(v); err == nil {
+			product = &id
+		}
 	}
 	return vendor, product
 }
 
 // keepPairedCode stores the code a commissioning succeeded with. mode is
-// the commissioning mode the device advertised: the code of an Enhanced
-// Commissioning Window is the window's and useless once it closed, so it
-// is not kept. A failure is logged — without the code — and does not fail
-// the commissioning.
+// the commissioning mode the device advertised, and the code is kept for
+// Basic only: the code of an Enhanced Commissioning Window is the window's
+// and useless once it closed, and without an advertisement (a pairing by
+// address) the module cannot tell the one from the other — that code can
+// be attached afterwards, as unproven. A failure is logged — without the
+// code — and does not fail the commissioning.
 func (n *Node) keepPairedCode(code string, mode uint8) {
-	if mode == commissioningModeEnhanced {
-		n.log.Info("matter.controller.client.onboarding_code_not_kept", slog.String("node", n.ID()),
-			slog.String("reason", "the code of an enhanced commissioning window ends with the window"))
+	if mode != commissioningModeBasic {
+		reason := "the device advertised no commissioning mode, so the code may be a commissioning window's"
+		if mode == commissioningModeEnhanced {
+			reason = "the code of an enhanced commissioning window ends with the window"
+		}
+		n.log.Info("matter.controller.client.onboarding_code_not_kept", slog.String("node", n.ID()), slog.String("reason", reason))
 		return
 	}
 	norm, _, err := parseOnboarding(code)
 	if err == nil {
-		err = n.storeOnboarding(OnboardingCode{Code: norm, Source: OnboardingPaired, StoredAt: n.clock.Now()})
+		err = n.storeOnboarding(OnboardingCode{Code: newSecretCode(norm), Source: OnboardingPaired, StoredAt: n.clock.Now().Truncate(time.Millisecond)})
 	}
 	if err != nil {
-		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "onboarding code"), slog.Any("err", err))
+		n.log.Warn("matter.controller.client.store_write_failed", slog.String("node", n.ID()), slog.String("what", "onboarding code"), slog.Any("err", err))
 	}
 }
 
@@ -317,7 +410,7 @@ func (c OnboardingCode) encode() (map[uint32][]byte, error) {
 	anon := tlv.AnonymousTag()
 	out := make(map[uint32][]byte, 4)
 	for id, f := range map[uint32]func(e *tlv.Encoder){
-		onbCode:     func(e *tlv.Encoder) { e.PutUTF8(anon, c.Code) },
+		onbCode:     func(e *tlv.Encoder) { e.PutUTF8(anon, c.Code.Reveal()) },
 		onbSource:   func(e *tlv.Encoder) { e.PutUint(anon, uint64(c.Source)) },
 		onbStoredAt: func(e *tlv.Encoder) { e.PutUint(anon, uint64(max(c.StoredAt.UnixMilli(), 0))) }, //nolint:gosec // clamped
 		onbChecks:   func(e *tlv.Encoder) { e.PutUint(anon, uint64(c.Checks)) },
@@ -346,7 +439,9 @@ func decodeOnboarding(values map[uint32][]byte) (*OnboardingCode, error) {
 		}
 		switch id {
 		case onbCode:
-			c.Code, err = spec.DecodeString(v)
+			var text string
+			text, err = spec.DecodeString(v)
+			c.Code = newSecretCode(text)
 		case onbSource:
 			var s uint8
 			s, err = spec.DecodeUint[uint8](8)(v)
@@ -364,8 +459,12 @@ func decodeOnboarding(values map[uint32][]byte) (*OnboardingCode, error) {
 			return nil, fmt.Errorf("onboarding field %d: %w", id, err)
 		}
 	}
-	if c.Code == "" {
+	if c.Code.IsZero() {
 		return nil, nil //nolint:nilnil // no stored code is not an error
 	}
+	if c.Source != OnboardingPaired && c.Source != OnboardingAttached {
+		return nil, fmt.Errorf("client: onboarding field %d: source %d", onbSource, c.Source)
+	}
+	c.Checks &= OnboardingCheckedVendor | OnboardingCheckedProduct | OnboardingCheckedDiscriminator
 	return &c, nil
 }

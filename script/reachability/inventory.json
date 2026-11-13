@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7956,
+  "entry_points": 7963,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17963,
-    "reachable": 12427,
-    "whitelisted": 5536,
+    "total_exported": 17972,
+    "reachable": 12429,
+    "whitelisted": 5543,
     "unreachable": 0
   },
   "by_package": [],
@@ -23039,14 +23039,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 765
+      "line": 770
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 761
+      "line": 766
     },
     {
       "package": "controller",
@@ -25045,45 +25045,87 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestOnboardingChecksNameWhatRan",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 448
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestOnboardingCodeAttach",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 69
+      "line": 70
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeAttachingThePairedCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 361
     },
     {
       "package": "controller/client",
       "identifier": "TestOnboardingCodeChecksOnlyWhatIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 188
+      "line": 189
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeClearRemovesAnUnreadableRow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 289
     },
     {
       "package": "controller/client",
       "identifier": "TestOnboardingCodeErasedWithTheNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 116
+      "line": 117
     },
     {
       "package": "controller/client",
       "identifier": "TestOnboardingCodeKeptAtPairing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 215
+      "line": 216
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeLongManualForm",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 347
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeOfANodePairedByAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 258
     },
     {
       "package": "controller/client",
       "identifier": "TestOnboardingCodeRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 144
+      "line": 145
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeStoredForm",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 322
     },
     {
       "package": "controller/client",
       "identifier": "TestOnboardingCodeUnreadableInTheStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/onboarding_internal_test.go",
-      "line": 238
+      "line": 239
     },
     {
       "package": "controller/client",
@@ -25280,6 +25322,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/scope_internal_test.go",
       "line": 30
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestSecretCodeIsRedactedEverywhere",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 379
     },
     {
       "package": "controller/client",

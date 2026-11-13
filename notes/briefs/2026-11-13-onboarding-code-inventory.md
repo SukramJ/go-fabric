@@ -20,7 +20,7 @@ in software is the controller's input at `Controller.Pair` — and today it is d
 - **matter.js** (db021da0) does not keep the code: `CommissioningClient.State`
   (`packages/node/src/behavior/system/commissioning/CommissioningClient.ts:959` ff.) persists
   `discriminator` (`:1046`), vendor and product, but has no passcode or pairing-code field; the
-  passcode is only passed on to the commissioning options (`:290`). This is therefore an *Ahead of
+  passcode is only passed on to the commissioning options (`:290-291`). This is therefore an *Ahead of
   matter.js* row with that marker.
 - **matterjs-server** (0bd06f2): **unverified.** A grep shows the code decoded for commissioning
   (`packages/ws-controller/src/controller/ControllerCommandHandler.ts:1975-1998`) and treated as a
@@ -114,7 +114,7 @@ Found while implementing, and built in:
   label code would be refused.
 - **Vendor/product** are compared with the cached Basic Information first, the advertised ids second.
 - **Long manual code.** A QR code with a non-standard flow yields the 21-digit manual code
-  (connectedhomeip `ManualSetupPayloadGenerator.cpp:116` at f09331bd).
+  (connectedhomeip `ManualSetupPayloadGenerator.cpp:116` at 6170af84).
 - **Shape.** `client.CommissionOptions.OnboardingCode` carries the code into `Registry.Commission`;
   `Node.SetOnboardingCode`/`ClearOnboardingCode` take no context (the store has none).
 - matterjs-server (0bd06f2): QR rendering exists for windows it opens only (grep, not a full read).

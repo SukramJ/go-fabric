@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -17,9 +19,11 @@ import (
 // drawing the QR code is the host's.
 //
 // QRCode and ManualCode are secrets: with one of them and physical access
-// to the device (a factory reset) anyone can commission it. An entry is
-// not logged and an export of it needs the protection of the controller's
-// database.
+// to the device (a factory reset) anyone can commission it. They are
+// [client.SecretCode] values, redacted wherever an entry is formatted,
+// logged or serialised; Reveal reads the text, and what a host does with
+// it — an export, an API response — needs the protection of the
+// controller's database.
 type InventoryEntry struct {
 	// Node is the node.
 	Node *client.Node
@@ -36,11 +40,11 @@ type InventoryEntry struct {
 	// HasCode reports a stored onboarding code; the fields below are
 	// zero without one.
 	HasCode bool
-	// QRCode is the QR code's text ("MT:…"); "" when the stored code is a
-	// manual pairing code, from which no QR code is made up.
-	QRCode string
+	// QRCode is the QR code's text ("MT:…"); zero when the stored code is
+	// a manual pairing code, from which no QR code is made up.
+	QRCode client.SecretCode
 	// ManualCode is the manual pairing code, 11 or 21 digits.
-	ManualCode string
+	ManualCode client.SecretCode
 	// Source tells whether the device accepted the code at pairing or it
 	// was attached afterwards and is unproven.
 	Source client.OnboardingSource
@@ -50,20 +54,37 @@ type InventoryEntry struct {
 	StoredAt time.Time
 }
 
+// String keeps the codes out of a formatted entry.
+func (e InventoryEntry) String() string {
+	code := "no code"
+	if e.HasCode {
+		code = "code redacted"
+	}
+	return "InventoryEntry(node " + strconv.FormatUint(e.NodeID, 10) + ", " + code + ")"
+}
+
+// GoString keeps the codes out of a %#v.
+func (e InventoryEntry) GoString() string { return e.String() }
+
+// LogValue keeps the codes out of a log record.
+func (e InventoryEntry) LogValue() slog.Value { return slog.StringValue(e.String()) }
+
 // Inventory lists every commissioned node with its onboarding code, in
-// the order of [Controller.Nodes]. A node has a code when it was paired
-// with [Config].KeepOnboardingCodes on, or one was attached to it
+// the order of [Controller.Nodes]. A node has a code when [Controller.Pair]
+// kept it ([Config].KeepOnboardingCodes), or one was attached to it
 // (client.Node.SetOnboardingCode); a code cannot be read from a
 // commissioned device, which holds a verifier and not the passcode. A
-// stored code that no longer decodes is listed as none.
+// stored code that no longer decodes is listed as none; a node
+// decommissioned while the list is built is left out.
 func (c *Controller) Inventory() []InventoryEntry {
 	nodes := c.reg.Commissioned()
 	out := make([]InventoryEntry, 0, len(nodes))
 	for _, n := range nodes {
-		e := InventoryEntry{Node: n}
-		if addr, ok := n.PeerAddress(); ok {
-			e.NodeID = addr.NodeID
+		addr, ok := n.PeerAddress()
+		if !ok {
+			continue
 		}
+		e := InventoryEntry{Node: n, NodeID: addr.NodeID}
 		rec := n.Record()
 		if rec.VendorID != nil {
 			e.VendorID = *rec.VendorID
