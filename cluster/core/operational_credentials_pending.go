@@ -112,28 +112,21 @@ func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingN
 	}
 	o.mu.Lock()
 	if o.pendingNOCMarkersOut == nil {
-		o.pendingNOCMarkersOut = map[string]bool{}
+		o.pendingNOCMarkersOut = map[string]pendingNOCMarker{}
 	}
-	o.pendingNOCMarkersOut[m.key()] = true
+	o.pendingNOCMarkersOut[m.key()] = m
 	o.mu.Unlock()
 	return nil
 }
 
-// clearPendingNOC removes every marker once what it names is committed or
-// rolled back; clearPendingNOCKey removes the one at key.
-func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
-	for _, key := range pendingNOCKeys {
-		o.clearPendingNOCKey(ctx, key)
-	}
-}
-
-// clearPendingNOCKey touches the store only when this server wrote the
+// clearPendingNOCKey removes the marker at key once what it names is
+// committed or rolled back. It touches the store only when this server wrote the
 // marker at key, and writes only when it still stands: CommissioningComplete
 // clears it before it answers (GeneralCommissioning.commitPendingNOCLocked).
 // A failed clear is logged: the next start would roll back what it names.
 func (o *OperationalCredentials) clearPendingNOCKey(ctx context.Context, key string) {
 	o.mu.Lock()
-	out := o.pendingNOCMarkersOut[key]
+	_, out := o.pendingNOCMarkersOut[key]
 	o.mu.Unlock()
 	if !out {
 		return
@@ -156,6 +149,85 @@ func (o *OperationalCredentials) clearPendingNOCKey(ctx context.Context, key str
 	o.mu.Lock()
 	delete(o.pendingNOCMarkersOut, key)
 	o.mu.Unlock()
+}
+
+// clearSettledPendingNOC clears the markers whose rollback is not owed:
+// a marker an expiry's failed rollback left stays until it lands.
+func (o *OperationalCredentials) clearSettledPendingNOC(ctx context.Context) {
+	o.mu.Lock()
+	updateOwed, addOwed := o.owedUpdateRevert != nil, o.owedAddRevert != 0
+	o.mu.Unlock()
+	if !updateOwed {
+		o.clearPendingNOCKey(ctx, pendingNOCUpdateSettingKey)
+	}
+	if !addOwed {
+		o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
+	}
+}
+
+// retryOwedReverts runs again the rollbacks an earlier expiry could not
+// land. One that lands clears its marker; one that does not keeps it,
+// written again when CommissioningComplete cleared it in between
+// (GeneralCommissioning.commitPendingNOCLocked clears every marker key).
+// A landed AddNOC rollback fires no hook: the expiry that owed it already
+// reported the fabric removed. Caller holds nocMu.
+func (o *OperationalCredentials) retryOwedReverts(ctx context.Context) {
+	o.mu.Lock()
+	update, add := o.owedUpdateRevert, o.owedAddRevert
+	o.mu.Unlock()
+	if update != nil {
+		if o.revertUpdateNOC(ctx, *update) {
+			o.mu.Lock()
+			o.owedUpdateRevert = nil
+			o.mu.Unlock()
+			o.clearPendingNOCKey(ctx, pendingNOCUpdateSettingKey)
+		} else {
+			o.restorePendingNOC(ctx, pendingNOCUpdateSettingKey)
+		}
+	}
+	if add != 0 {
+		if err := o.revertAddNOC(ctx, add); err == nil || errors.Is(err, store.ErrFabricNotFound) {
+			o.mu.Lock()
+			o.owedAddRevert = 0
+			o.mu.Unlock()
+			o.clearPendingNOCKey(ctx, pendingNOCSettingKey)
+		} else {
+			o.restorePendingNOC(ctx, pendingNOCSettingKey)
+		}
+	}
+}
+
+// settleOwedRevert retries the owed rollbacks before an AddNOC (op "add")
+// or UpdateNOC (op "update") writes its own marker over the key one of
+// them holds, and fails while that one is still owed. Caller holds nocMu.
+func (o *OperationalCredentials) settleOwedRevert(ctx context.Context, op string) error {
+	o.retryOwedReverts(ctx)
+	o.mu.Lock()
+	owed := (op == pendingNOCUpdate && o.owedUpdateRevert != nil) || (op == pendingNOCAdd && o.owedAddRevert != 0)
+	o.mu.Unlock()
+	if owed {
+		return fmt.Errorf("core: OperationalCredentials: an expired fail-safe's %s rollback has not landed in the store yet", op)
+	}
+	return nil
+}
+
+// restorePendingNOC writes the marker at key again when the store no
+// longer holds it, from this server's copy. A failed write is logged.
+func (o *OperationalCredentials) restorePendingNOC(ctx context.Context, key string) {
+	o.mu.Lock()
+	m, out := o.pendingNOCMarkersOut[key]
+	o.mu.Unlock()
+	st, ok := o.store.(vidVerificationSettings)
+	if !out || !ok {
+		return
+	}
+	ctx = context.WithoutCancel(ctx)
+	if v, found, err := st.GetSetting(ctx, key); err == nil && found && v != "" {
+		return
+	}
+	if err := o.writePendingNOC(ctx, m); err != nil {
+		o.logger().Error("matter.opcreds.pending_noc.restore_failed", slog.String("key", key), slog.Any("err", err))
+	}
 }
 
 // recoverPendingNOC rolls back what a marker left by a previous run names:
