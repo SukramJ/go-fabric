@@ -196,7 +196,7 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 	// A group session is never timed: the dispatcher skips an attribute
 	// with the timed quality, as matter.js
 	// packages/protocol/src/action/server/AttributeWriteResponse.ts:343-345
-	// does on the wildcard path a group write takes.
+	// at db021da0 does on the wildcard path a group write takes.
 	ctx = WithTimedInteraction(ctx, false)
 	authorize := groupAuthorizer(ctx, d, subject)
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)

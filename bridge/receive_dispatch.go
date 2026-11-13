@@ -113,8 +113,9 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// bridge-initiated exchange, so the peer speaks as the responder —
 	// means the peer no longer honours the subscription
 	// (InvalidSubscription) or could not process the report (Failure).
-	// matter.js ServerSubscription.ts:866-876 closes the subscription on
-	// either; nothing else ever would, because the report itself was
+	// matter.js ServerSubscription.ts:938-950 at db021da0 closes the
+	// subscription on either, as on any other error status (:947);
+	// nothing else ever would, because the report itself was
 	// MRP-acked and the reply refreshes the session's activity.
 	if !status.IsSuccess() && !proto.Initiator {
 		b.closeSubscriptionByExchange(requestHdr.SessionID, proto.ExchangeID, status)

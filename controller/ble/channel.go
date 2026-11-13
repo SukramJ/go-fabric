@@ -354,7 +354,7 @@ func (c *Channel) adoptSession(handshakeResponse []byte, segment int) (*btp.Sess
 		Write: func(b []byte) error { return c.conn.WriteC1(c.gattCtx, b) },
 		// Unsubscribing C2 closes the BTP session (§4.19.4.10), then the
 		// connection goes (NobleBleChannel.ts:789-805). matter.js starts
-		// both without awaiting them (:788-805 at 862ad75f), so its
+		// both without awaiting them (:788-805 at db021da0), so its
 		// session's closed observer ends the channel at once; here the
 		// release runs inside Session.Close, before the session's Closed
 		// channel closes, so the channel is ended first — a send in the

@@ -258,8 +258,9 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 // TestGroupWriteIsNeverTimed: a group session is never timed, so the
 // dispatcher's timed-attribute gate skips an attribute with the timed
 // quality on a group write — matter.js
-// packages/protocol/src/action/server/AttributeWriteResponse.ts:343-345
-// (`if (attribute.limits.timed && !this.session.timed) return;`) on the
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:343-345 at
+// db021da0 (`if (attribute.limits.timed && !this.session.timed) return;`)
+// on the
 // wildcard path a group write takes. Without the stamp the gate does not
 // know and lets the write through.
 func TestGroupWriteIsNeverTimed(t *testing.T) {

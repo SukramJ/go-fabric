@@ -444,9 +444,9 @@ func (r *Registry) add(n *Node) {
 	r.manageExpiration()
 }
 
-// remove drops n and manages the expiry timer (Peers.ts:107), then runs
-// n's Deleted hook — once, for a node the registry held (review II,
-// R2-P1-ctl-05).
+// remove drops n and manages the expiry timer (Peers.ts:112 at db021da0),
+// then runs n's Deleted hook — once, for a node the registry held (review
+// II, R2-P1-ctl-05).
 func (r *Registry) remove(n *Node) {
 	r.mu.Lock()
 	held := len(r.nodes)
@@ -690,12 +690,12 @@ func (r *Registry) fabricByIndex(index uint8) *commissioner.Fabric {
 }
 
 // ForAddress is the node of peer address addr, created when there is none
-// — Peers.forAddress (Peers.ts:445-486): the address must be on one of
-// our fabrics (:446-448); the creation is serialized (:455-462); a new
-// node takes id when given (:464-470; reserved, so no allocation hands
-// it out again) and an allocated one otherwise,
-// joins the registry and takes the address, bound to its peer but neither
-// started nor auto-subscribed (:472-484).
+// — Peers.forAddress (Peers.ts:458-499 at db021da0): the address must be
+// on one of our fabrics (:459-461); the creation is serialized (:468-471);
+// a new node takes id when given (:477-483, :960; reserved, so no
+// allocation hands it out again) and an allocated one otherwise, joins
+// the registry and takes the address, bound to its peer but neither
+// started nor auto-subscribed (:487-495).
 func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 	if r.fabricByIndex(addr.FabricIndex) == nil {
 		return nil, ErrForeignFabric
@@ -723,7 +723,8 @@ func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 		// counter never hands it to a second node (review II,
 		// R2-P1-ctl-01; ahead of matter.js, whose Peers.ts:960 takes
 		// options.id and whose ClientNodeStores.ts:77-81 allocateId
-		// reserves no preassigned id).
+		// reserves no preassigned id, at db021da0; by_design
+		// BD-Matter-ReservedLocalIDs).
 		r.reserveID(id)
 	}
 	r.mu.Unlock()

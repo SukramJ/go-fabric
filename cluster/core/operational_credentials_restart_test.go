@@ -148,7 +148,8 @@ func addNOCWrites(t *testing.T, open func(*testing.T) restartStore) int {
 // operational key, its IPK key set and its Administer ACL entry — what the
 // fail-safe would have rolled back. Both references keep the new fabric
 // pending until CommissioningComplete (matter.js FailsafeContext.ts:141-143
-// completeCommission → persistFabrics; chip OperationalCredentialsCluster.cpp:507
+// at db021da0, completeCommission → persistFabrics; chip
+// OperationalCredentialsCluster.cpp:507 at 6170af84,
 // AddNewPendingFabricWithOperationalKeystore).
 func TestOpcreds_RestartBeforeCommissioningComplete_RevertsAddNOC(t *testing.T) {
 	t.Parallel()

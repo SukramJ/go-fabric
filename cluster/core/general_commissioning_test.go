@@ -1361,9 +1361,10 @@ func TestGeneralCommissioningReportsTheBreadcrumbResetOnExpiry(t *testing.T) {
 // R2-P1-core-02: a Breadcrumb that changes — written, or reset by the
 // fail-safe timer's expiry — advances the cluster's DataVersion, so a
 // DataVersionFilter of the version a controller holds does not hide it.
-// Mirrors matter.js Datasource.ts:1456-1457 (`if (changes) {
-// this.#internals.advanceVersion();`) and chip DefaultServerCluster.cpp:100-102
-// (NotifyAttributeChanged → IncreaseDataVersion). An unchanged write
+// Mirrors matter.js Datasource.ts:1456-1457 at db021da0 (`if (changes) {
+// this.#internals.advanceVersion();`) and chip
+// DefaultServerCluster.cpp:100-102 at 6170af84 (NotifyAttributeChanged →
+// IncreaseDataVersion). An unchanged write
 // keeps the version.
 func TestGeneralCommissioningBumpsDataVersionWithTheBreadcrumb(t *testing.T) {
 	t.Run("write", func(t *testing.T) {

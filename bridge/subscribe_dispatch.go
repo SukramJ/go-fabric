@@ -193,8 +193,8 @@ func (b *Bridge) buildInitialReport(
 // not: no report ever arrives, and the device goes stale with nothing on the
 // wire to explain it.
 //
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:549-566
-// for the KeepSubscriptions teardown, and
+// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:647-665
+// at db021da0 for the KeepSubscriptions teardown, and
 // packages/protocol/src/action/server/EventReadResponse.ts for the
 // EventPaths wiring.
 func (b *Bridge) registerSubscription(
@@ -220,9 +220,13 @@ func (b *Bridge) registerSubscription(
 		// before admitting the new one.
 		//
 		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:549-566 which matches on same-session
-		// for pre-fabric (PASE) subscriptions and on (fabric, peerNodeID)
-		// for operational (CASE) subscriptions. The previous guard
+		// InteractionServer.ts:647-665 at db021da0 for a session with a
+		// fabric: it matches on the peer address, (fabric, peerNodeID).
+		// On a session without one (PASE) matter.js tears nothing down
+		// (`fabric !== undefined`, :647); the same-session teardown
+		// below is this module's own
+		// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
+		// previous guard
 		// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
 		// silently skipped PASE re-subscriptions (fabricIndex=0) so a
 		// PASE subscriber that re-subscribes with KeepSubscriptions=false
@@ -244,8 +248,9 @@ func (b *Bridge) registerSubscription(
 				// PASE session (fabricIndex=0) — tear down by SessionID so
 				// a re-subscribe on the same PASE exchange replaces, rather
 				// than accumulates, the prior subscription.
-				// Mirrors matter.js InteractionServer.ts:549-566 same-session
-				// match for the pre-fabric path.
+				// This module's own: matter.js tears nothing down on a
+				// session without a fabric (InteractionServer.ts:647 at
+				// db021da0; findings F-db021da0-12).
 				m.CloseSession(requestHdr.SessionID)
 			}
 		}
@@ -288,7 +293,7 @@ func (b *Bridge) registerSubscription(
 			// gate every second SubscribeRequest on a session silently
 			// tore down the first one regardless of the flag, contradicting
 			// the KeepSubscriptions=false teardown matter.js performs at
-			// packages/node/src/node/server/InteractionServer.ts:611
+			// packages/node/src/node/server/InteractionServer.ts:647 at db021da0
 			// (`if (fabric !== undefined && !keepSubscriptions)`).
 			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0,
 		})

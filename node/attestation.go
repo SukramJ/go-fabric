@@ -39,7 +39,7 @@ func (c *Config) resolveAttestation() (blocked, err error) {
 	}
 	// The chain must be the product's — matter.js validates the
 	// certification against the product description after the servable
-	// check (DeviceCertification.ts:75-78 at 862ad75f).
+	// check (DeviceCertification.ts:75-78 at db021da0).
 	if pd := c.ProductDescription; (pd.VendorID != 0 || pd.ProductID != 0) && validateProduct(chain, pd) != nil {
 		err := validateProduct(chain, pd)
 		if a.BlockCommissioningOnError {

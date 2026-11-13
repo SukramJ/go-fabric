@@ -581,10 +581,10 @@ func (m *Manager) closeSession(sessionID uint16, terminated bool) {
 // log a meaningful diagnostic.
 //
 // Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:
-// 549-566 — when a SubscribeRequest carries `KeepSubscriptions=false`,
-// every existing subscription from the same peer (matched on
-// PeerAddress = (fabric, peerNodeId)) is cancelled before the new
-// subscription is admitted.
+// 647-665 at db021da0 — when a SubscribeRequest on a session with a
+// fabric carries `KeepSubscriptions=false`, every existing subscription
+// from the same peer (matched on PeerAddress = (fabric, peerNodeId)) is
+// cancelled before the new subscription is admitted.
 //
 // A subscription still priming is left alone: it is not the peer's yet.
 // matter.js adds a subscription to its session only when it activates,

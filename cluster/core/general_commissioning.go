@@ -495,7 +495,8 @@ func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, v
 	g.breadcrumb = v
 	if changed {
 		// A changed attribute advances the cluster's DataVersion
-		// (matter.js Datasource.ts:1456-1457; review II, R2-P1-core-02).
+		// (matter.js Datasource.ts:1456-1457 at db021da0; review II,
+		// R2-P1-core-02).
 		g.dataVersion.Bump()
 	}
 	g.mu.Unlock()

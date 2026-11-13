@@ -58,7 +58,8 @@ var ErrScrubIncomplete = errors.New("store: erased, but the scrub did not finish
 // finish after the deletes committed is [ErrScrubIncomplete]: the store is
 // erased, and a later [Scrub] can remove the bytes. Going beyond matter.js,
 // whose SQLite driver erases with plain DELETE
-// (packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts:201,207,305).
+// (packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts:201, :207,
+// :305 at db021da0; by_design BD-Matter-StoreEraseScrub).
 func (s *Store) Erase(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

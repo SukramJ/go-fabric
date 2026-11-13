@@ -48,7 +48,8 @@ type trustCert struct {
 // the size limit, the DER parse and basicConstraints, keyUsage,
 // subjectKeyIdentifier and — unless paa — authorityKeyIdentifier
 // (Certificate.ts:397-401, :549-551), then the subject's Matter vendor and
-// product id (Certificate.ts:345-352, :379-392).
+// product id (attestation.MatterIDs; Certificate.ts:341-353, :377-381 at
+// db021da0).
 func parseCert(der []byte, paa bool) (*trustCert, error) {
 	if len(der) > maxDERCertificateSize {
 		return nil, fmt.Errorf("dcl: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)

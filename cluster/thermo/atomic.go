@@ -210,7 +210,8 @@ func (w *atomicWrites) closeFabric(fabricIndex uint8, log *slog.Logger) {
 
 // closeAll closes every state — matter.js AtomicWriteHandler.close
 // (AtomicWriteHandler.ts:84-89), which ThermostatServer's
-// [Symbol.asyncDispose] runs (ThermostatServer.ts:1582-1585).
+// [Symbol.asyncDispose] runs (ThermostatServer.ts:1582-1585), both at
+// db021da0.
 func (w *atomicWrites) closeAll() {
 	w.mu.Lock()
 	all := slices.Clone(w.states)

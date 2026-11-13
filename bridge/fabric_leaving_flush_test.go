@@ -21,7 +21,8 @@ import (
 // handed on before, so the answer to the flushed report is not queued
 // behind the command. matter.js's leave closes every session's
 // subscriptions with a flush, the invoking one included (Fabric.ts:447-457
-// at db021da0; Session.ts:312 awaits that shutdown logic at once).
+// at db021da0: one session after another, :450-454, each one's shutdown
+// logic awaited at Session.ts:313).
 func TestFabricLeavingFlushesTheInvokingSession(t *testing.T) {
 	t.Parallel()
 	const invoking, other uint16 = 41, 42

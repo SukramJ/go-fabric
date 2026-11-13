@@ -164,14 +164,15 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// captured datagram decrypts again from anywhere and is reported as
 	// a duplicate for the session's lifetime, so binding a duplicate
 	// would let a third party choose where this session's traffic goes.
-	// connectedhomeip src/transport/SessionManager.cpp:1054-1068 sets the
-	// peer address only inside `if (isDuplicate ==
+	// connectedhomeip src/transport/SessionManager.cpp:1054-1068 at
+	// 6170af84 sets the peer address only inside `if (isDuplicate ==
 	// SessionMessageDelegate::DuplicateMessage::No)`; matter.js
-	// packages/protocol/src/protocol/ExchangeManager.ts:462-485 adopts the
-	// address ("the new message wins") only for a non-duplicate initiator
-	// message that opens a new exchange. This follows connectedhomeip's
-	// rule — every new message — so a peer whose address changed is
-	// reached again by its next message on any exchange.
+	// packages/protocol/src/protocol/ExchangeManager.ts:462-486 at
+	// db021da0 adopts the address ("the new message wins") only for a
+	// non-duplicate initiator message that opens a new exchange. This
+	// follows connectedhomeip's rule — every new message — so a peer
+	// whose address changed is reached again by its next message on any
+	// exchange (by_design BD-chip-SessionRouteByNewCounter).
 	if !duplicate && hdr.SessionID != 0 && !isNilRoute(src) {
 		b.bindSessionRoute(hdr.SessionID, src)
 	}

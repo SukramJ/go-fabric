@@ -199,9 +199,13 @@ func (s *gattServer) subscribe(attMTU int) bool {
 	if err != nil {
 		// No session: the connection goes, and the accept timer with it
 		// (review II, R2-P1-dr-req-03). matter.js stops its timer before
-		// the session is created (BlenoBleServer.ts:297, :299) and keeps
-		// the connection — a central whose request names no version
-		// would hold it with no timer left.
+		// the session is created (BlenoBleServer.ts:297, :299 at
+		// db021da0). A request that names no supported version is
+		// disconnected there too (BtpSessionHandler.ts:106-108); one
+		// whose version nibbles are all zero fails in the decode before
+		// that (BtpCodec.ts:219-222, called at BtpSessionHandler.ts:95),
+		// is only logged (BlenoBleServer.ts:76-78) and keeps the
+		// connection with no timer left.
 		s.log.Warn("matter.btp.session_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
 		return false
 	}

@@ -1852,7 +1852,8 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // afterwards, and it closes every atomic write in progress with its
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
 // AtomicWriteHandler (ThermostatServer.ts:1582-1585,
-// AtomicWriteHandler.ts:84-89). The server stays usable: the next
+// AtomicWriteHandler.ts:84-89 at db021da0). The server stays usable: the
+// next
 // command or MatterTimeChanged arms the suggestion timer again, and so
 // does the [ThermostatServer.SetEndpoint] of a reassembly that puts the
 // server back.

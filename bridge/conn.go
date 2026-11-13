@@ -165,9 +165,12 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 }
 
 // bindSessionRoute records dst as the route of secure session sid,
-// called for every message that authenticated under it. The UDP path
-// keeps its rule — the newest authenticated source address wins
-// (matter.js ExchangeManager.ts:425-431). A session is never moved
+// called for every message with a new counter that authenticated under
+// it. The UDP path keeps its rule — the source address of the newest such
+// message wins, connectedhomeip's rule; matter.js adopts the address only
+// of a message that opens a new exchange (ExchangeManager.ts:480-486 at
+// db021da0; by_design BD-chip-SessionRouteByNewCounter). A session is
+// never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
 // (MessageChannel.ts:140-148), so a session first seen on a TCP

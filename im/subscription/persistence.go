@@ -83,8 +83,8 @@ func (s *Subscription) PeerSubscription(isFabricFiltered bool) PeerSubscription 
 // [Subscription.PrimedEvents] with the report's last event number, when
 // it carried events. matter.js activates the re-established subscription
 // only after its initial report (InteractionServer.ts:906
-// sendInitialReport, then :911 subscription.activate()); review II,
-// R2-P1-dr-req-06.
+// sendInitialReport, then :911 subscription.activate(), at db021da0);
+// review II, R2-P1-dr-req-06.
 //
 // Restore enforces the per-fabric quota and refuses an id that already
 // names a live subscription ([ErrIDInUse]).

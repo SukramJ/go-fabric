@@ -208,7 +208,8 @@ func (r *Registry) findOrCreate(d Device, id string) (*Node, *fabricOp, error) {
 		// counter never hands it to a second node (review II,
 		// R2-P1-ctl-01; ahead of matter.js, whose Peers.ts:960 takes
 		// options.id and whose ClientNodeStores.ts:77-81 allocateId
-		// reserves no preassigned id).
+		// reserves no preassigned id, at db021da0; by_design
+		// BD-Matter-ReservedLocalIDs).
 		r.reserveID(id)
 	}
 	r.mu.Unlock()

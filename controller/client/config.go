@@ -155,8 +155,9 @@ type Hooks struct {
 	// expired commissionable node, or a [Registry.CompleteCommissioning]
 	// that failed after the node was created — once it closed; the
 	// registry no longer holds it. matter.js's Peers carries a deleted
-	// observable of its own (node/client/Peers.ts:112). It can run
-	// inside the registry's fabric operation (Erase, a leave): it must not
+	// observable of its own (node/client/Peers.ts:112 at db021da0). It can
+	// run inside the registry's fabric operation (Erase, a leave): it must
+	// not
 	// start a fabric operation of the same registry.
 	Deleted func()
 	// Commissioned: the registry commissioned the node — matter.js

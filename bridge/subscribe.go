@@ -402,9 +402,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// SubscribeResponse landed, and a report sent there with
 	// Initiator=false is an unsolicited message on an unknown exchange —
 	// matter.js answers it with a standalone ack and drops it
-	// (ExchangeManager.ts:441-452), which the MRP layer here would then
-	// mistake for delivery. Ongoing server reports are always fresh
-	// server-initiated exchanges (ServerSubscription.ts:823).
+	// (ExchangeManager.ts:496-507 at db021da0), which the MRP layer here
+	// would then mistake for delivery. Ongoing server reports are always
+	// fresh server-initiated exchanges (ServerSubscription.ts:900).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Owe the same events and attribute changes again, so the next
@@ -865,9 +865,11 @@ type reportExchangeOrigin struct {
 // because the peer answered that report with the error status given.
 // A report exchange nobody remembers (an initial-report chunk, a
 // timed-request reply, a subscription already reaped) is ignored.
-// Mirrors matter.js ServerSubscription.ts:866-876: InvalidSubscription
-// and Failure mark the subscription terminated, and #closeFromUpdate
-// cancels it for any error status.
+// Mirrors matter.js ServerSubscription.ts:938-950 at db021da0: every
+// error status the peer answers a report with marks the subscription
+// terminated (:947; InvalidSubscription and Failure differ from the
+// others only in the log line, :939-944), and #closeFromUpdate cancels
+// it (:950).
 func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, status im.StatusCode) {
 	raw, ok := b.reportExchangeOwner.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
 	if !ok {
@@ -1079,7 +1081,8 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // exchange** instead of reusing the commissioner's Subscribe exchange.
 // Use this for ongoing subscribe reports (matter.js's
 // ServerSubscription.#sendUpdateMessage pattern,
-// packages/node/src/node/server/ServerSubscription.ts:764). Every
+// packages/node/src/node/server/ServerSubscription.ts:893-900 at
+// db021da0). Every
 // chunk of one report rides the same exchange — a chunk sequence is a
 // single IM transaction. Returns the allocated exchange ID so the
 // caller can correlate the signalStatusResponseRX call back into the
@@ -1125,9 +1128,10 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	// chunked report waits for the peer's StatusResponse to its first
 	// chunk, and the first chunk going unacknowledged there is peer loss
 	// like any first message of an exchange this node opened — matter.js
-	// MessageExchange.ts:605-624 `send` reports `peerLost` on a failed
-	// send when `#reportsPeerLoss` (:626-633: nothing received on the
-	// exchange yet, `#messageReceivedCounter === 0`). Later chunks are
+	// MessageExchange.ts:643-654 at db021da0, `send` reports `peerLost`
+	// on a failed send when `#reportsPeerLoss` (:661-668: nothing received
+	// on the exchange yet, `#messageReceivedCounter === 0`). Later chunks
+	// are
 	// registered by the caller once the report is out, as before.
 	var firstCounter uint32
 	counters, wait, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
@@ -1218,12 +1222,16 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	sessions := b.sessions
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
-	// Route to the address the peer most recently used on this session,
-	// not the one frozen into the target at Subscribe time: a controller
-	// whose source address rotates mid-session keeps authenticating from
-	// the new one, and matter.js adopts it ("the new message wins",
-	// ExchangeManager.ts:425-431) before routing reports through the
-	// session's current channel (ServerSubscription.ts:823).
+	// Route to the address the peer most recently used on this session
+	// with a new message counter, not the one frozen into the target at
+	// Subscribe time: a controller whose source address rotates
+	// mid-session keeps authenticating from the new one. matter.js adopts
+	// the address of a non-duplicate initiator message that opens a new
+	// exchange ("the new message wins", ExchangeManager.ts:480-486 at
+	// db021da0) and opens each report's exchange for the subscription's
+	// peer address (ServerSubscription.ts:900); this module moves the
+	// route on every new counter, connectedhomeip's rule (the route
+	// comment in receive.go; by_design BD-chip-SessionRouteByNewCounter).
 	dest := b.currentPeerAddr(target.sessionID, target.src)
 	if listener == nil && !isConnRoute(dest) {
 		return 0, ErrUnsolicitedListenerMissing
@@ -1380,14 +1388,16 @@ func (b *Bridge) handleSubscribeRequest(
 	// wildcard cluster + concrete event), and a request beyond the path
 	// ceiling with PathsExhausted, before building any report. Mirrors
 	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
-	// §8.4.3.2), which gates Read and Subscribe through the same check,
-	// and the MAX_SUBSCRIBE_PATHS check that follows it (:600-604).
+	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
+	// gates Read and Subscribe through the same check, and the
+	// MAX_SUBSCRIBE_PATHS check (:635-641), which matter.js runs before
+	// it.
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
 	}
 
 	// A Subscribe naming no attribute and no event paths at all is
-	// InvalidAction — matter.js InteractionServer.ts:628-633 ("No
+	// InvalidAction — matter.js InteractionServer.ts:667-672 at db021da0 ("No
 	// attributes or events requested").
 	if len(req.AttributeRequests) == 0 && len(req.EventRequests) == 0 {
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "empty")

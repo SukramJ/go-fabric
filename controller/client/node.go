@@ -719,8 +719,9 @@ func (n *Node) Disabled() bool {
 }
 
 // Erase stops the node and forgets its image, its store included —
-// ClientNode.erase (ClientNode.ts:227-229, :266-271). A store that fails
-// to erase the node's rows is returned: the image is gone, the rows stay,
+// ClientNode.erase (ClientNode.ts:230-232, :269-274 at db021da0). A store
+// that fails to erase the node's rows is returned: the image is gone, the
+// rows stay,
 // and an Erase again retries them (review II).
 func (n *Node) Erase(ctx context.Context) error {
 	if err := n.Stop(ctx); err != nil {

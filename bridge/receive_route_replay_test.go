@@ -41,11 +41,11 @@ func assertHarnessRoute(t *testing.T, h *secureHarness, step string, want net.Ad
 // authentic datagram, sent from another address, is a duplicate — anyone
 // who saw the original can send it — so it must not move the address the
 // session's reports, BDX and OTA exchanges and the CloseSession farewell go
-// to. connectedhomeip src/transport/SessionManager.cpp:1054-1068 updates
-// the peer address only inside `if (isDuplicate ==
+// to. connectedhomeip src/transport/SessionManager.cpp:1054-1068 at
+// 6170af84 updates the peer address only inside `if (isDuplicate ==
 // SessionMessageDelegate::DuplicateMessage::No)`; matter.js
-// packages/protocol/src/protocol/ExchangeManager.ts:462-467 adopts it only
-// in a branch that requires `!isDuplicate`.
+// packages/protocol/src/protocol/ExchangeManager.ts:462-467 at db021da0
+// adopts it only in a branch that requires `!isDuplicate`.
 func TestReceive_ReplayDoesNotMoveSessionRoute(t *testing.T) {
 	t.Parallel()
 	h := newSecureHarness(t, nil, nil)

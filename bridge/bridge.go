@@ -752,13 +752,14 @@ type Bridge struct {
 
 	// sessionPeerAddrs remembers the last authenticated UDP source
 	// address per secure session (sessionID → *net.UDPAddr), fed by
-	// the receive pipeline for every datagram that decrypts under the
-	// session. The outbound CloseSession sender and the ongoing
-	// subscription reporters route on it; matter.js keeps the
-	// equivalent association on the session itself via its
+	// the receive pipeline for every datagram with a new message counter
+	// that decrypts under the session. The outbound CloseSession sender
+	// and the ongoing subscription reporters route on it; matter.js keeps
+	// the equivalent association on the session itself via its
 	// MessageChannel (packages/protocol/src/session/Session.ts,
-	// `get channel()`) and refreshes it from inbound traffic
-	// (ExchangeManager.ts:425-431).
+	// `get channel()`) and refreshes it from a non-duplicate initiator
+	// message that opens a new exchange (ExchangeManager.ts:480-486 at
+	// db021da0; by_design BD-chip-SessionRouteByNewCounter).
 	// Entries are dropped on an inbound CloseSession and on every
 	// graceful close the operational manager notifies. Teardown paths
 	// that skip that notifier (fabric removal, NOC rotation, manager
@@ -1601,8 +1602,10 @@ type fabricSessionExceptCloser interface {
 // carrying the RemoveFabric command (ctx is the command's context)
 // included: the command hands that session's turn on first, so the
 // peer's answer to the flushed report is not queued behind it (review
-// II, R2-P1-req2-04; matter.js's Session.ts:312 awaits the shutdown logic
-// of every session at once, the invoking one included). Mirrors matter.js
+// II, R2-P1-req2-04; matter.js's leave closes the fabric's sessions one
+// after another and excepts none, the invoking one included —
+// Fabric.ts:450-454, each one's shutdown logic awaited at
+// packages/protocol/src/session/Session.ts:313). Mirrors matter.js
 // packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0 `leave`: the
 // leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
 // :186-188), then every session of the fabric runs closeSubscriptions

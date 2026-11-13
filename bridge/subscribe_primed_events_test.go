@@ -78,8 +78,9 @@ func TestEventInThePrimingReportIsNotReportedAgain(t *testing.T) {
 // does — an event fired after the subscription was restored and before its
 // priming report read the log goes out in the priming report and is not
 // reported again by the engine afterwards. matter.js runs the same
-// activation on this path (InteractionServer.ts:906 sendInitialReport,
-// then :911 subscription.activate()).
+// activation on this path (establishFormerSubscription,
+// InteractionServer.ts:851 at db021da0: :906 sendInitialReport, then :911
+// subscription.activate()).
 func TestReestablishedSubscriptionEventInThePrimingReportIsNotReportedAgain(t *testing.T) {
 	t.Parallel()
 	const fabric, subject = 1, 0x1234 // caseOnFabricLookup's subject
