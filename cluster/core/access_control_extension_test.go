@@ -17,7 +17,7 @@ import (
 
 // encodeExtensionTLV returns a minimal well-formed TLV List — the shape
 // AccessControl.Extension's Data field must decode as per matter.js
-// AccessControlServer.ts:424-441 (extensionEntryValidator). Test helper
+// AccessControlServer.ts:416-434 at db021da0 (extensionEntryValidator). Test helper
 // for the entries validateAccessControlExtensionData is meant to accept.
 func encodeExtensionTLV(t *testing.T) []byte {
 	t.Helper()
@@ -133,7 +133,7 @@ func TestAccessControl_Extension_WriteAndReadBack(t *testing.T) {
 
 // TestAccessControl_Extension_Write_InvalidTLV rejects a Data blob that
 // does not decode as a well-formed TLV List — matter.js
-// AccessControlServer.ts:424-441 (extensionEntryValidator) rejects the
+// AccessControlServer.ts:416-434 at db021da0 (extensionEntryValidator) rejects the
 // same shape with ConstraintError so a garbage write cannot wedge a
 // later fabric-scoped read.
 func TestAccessControl_Extension_Write_InvalidTLV(t *testing.T) {
@@ -152,7 +152,7 @@ func TestAccessControl_Extension_Write_InvalidTLV(t *testing.T) {
 // write carrying more than one entry — every entry in a single write is
 // stamped to the writer's own fabric, so more than one entry always
 // means more than one entry for that fabric. Mirrors matter.js
-// AccessControlServer.ts:352-370
+// AccessControlServer.ts:344-362 at db021da0
 // (#validateAccessControlExtensionChanges): "Extension list must
 // contain a single entry" (ConstraintError).
 func TestAccessControl_Extension_Write_MoreThanOneEntryPerFabric(t *testing.T) {

@@ -583,7 +583,8 @@ type CommissionableServiceConfig struct {
 	// / `PI`). PairingHint defaults to
 	// [PairingHintDefault] (powerCycle | deviceManual = 0x21) when
 	// zero, matching matter.js
-	// CommissionableMdnsAdvertisement.ts:90 DEFAULT_PAIRING_HINT. A hint
+	// CommissionableMdnsAdvertisement.ts:81 at db021da0
+	// (DEFAULT_PAIRING_HINT, MdnsConsts.ts:15). A hint
 	// and an instruction that do not belong together fail
 	// [CommissionableServiceConfig.Validate].
 	PairingHint        uint16
@@ -807,7 +808,8 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 		txt = append(txt, TXTRecord{Key: "DN", Value: cfg.DeviceName})
 	}
 	// PH (PairingHint): always emitted per matter.js
-	// CommissionableMdnsAdvertisement.ts:90 — DEFAULT_PAIRING_HINT
+	// CommissionableMdnsAdvertisement.ts:90 at db021da0 —
+	// DEFAULT_PAIRING_HINT (:81)
 	// (powerCycle=true, deviceManual=true → 0x21) used when the
 	// caller leaves PairingHint zero.
 	ph := cfg.PairingHint

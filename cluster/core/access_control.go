@@ -916,7 +916,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// fabric below (v1.1 has no cross-fabric write path to begin
 		// with), so more than one entry in a single write always means
 		// more than one entry for that fabric. Mirrors matter.js
-		// AccessControlServer.ts:352-370
+		// AccessControlServer.ts:344-362 at db021da0
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
 		// most one AccessControlExtensionStruct.
 		if len(entries) > 1 {
@@ -927,7 +927,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
 			}
 			// Data must itself decode as a well-formed TLV List — mirrors
-			// matter.js AccessControlServer.ts:424-441
+			// matter.js AccessControlServer.ts:416-434 at db021da0
 			// (extensionEntryValidator's default implementation). A blob
 			// that fails this is rejected rather than stored, so a
 			// garbage write cannot wedge a later fabric-scoped read.
@@ -1145,7 +1145,7 @@ func aclIsValidGroupSubject(id uint64) bool {
 // type byte is TlvType.List (0x17) and whose final byte is the
 // EndOfContainer marker (0x18), with everything in between parsing as
 // balanced TLV. Mirrors matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts:424-441
+// packages/node/src/behaviors/access-control/AccessControlServer.ts:416-434 at db021da0
 // (extensionEntryValidator, the default implementation): a controller
 // may attach arbitrary vendor metadata to a fabric's Extension entry,
 // but the octet-string must itself be decodable TLV, or a later
