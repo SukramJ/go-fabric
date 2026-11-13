@@ -19,11 +19,38 @@ import (
 )
 
 // sessionListingRegistry is a session registry that lists its sessions, as
-// operational.Manager does, and records what is closed.
+// operational.Manager does, records what is closed and says when the
+// first close came.
 type sessionListingRegistry struct {
 	fakeSessionRegistry
 	listMu   sync.Mutex
 	sessions []operational.SessionInfo
+	// closedOne is closed by the first Close.
+	closedOne  chan struct{}
+	closedOnce sync.Once
+}
+
+func newSessionListingRegistry(sessions ...operational.SessionInfo) *sessionListingRegistry {
+	return &sessionListingRegistry{sessions: sessions, closedOne: make(chan struct{})}
+}
+
+func (r *sessionListingRegistry) Close(sessionID uint16) error {
+	err := r.fakeSessionRegistry.Close(sessionID)
+	r.closedOnce.Do(func() { close(r.closedOne) })
+	return err
+}
+
+// awaitClose returns once the registry closed a session; a registry that
+// closes none holds it for five seconds of the test's context, and the
+// caller's own comparison of what was closed then fails.
+func (r *sessionListingRegistry) awaitClose(t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-r.closedOne:
+	case <-ctx.Done():
+	}
 }
 
 func (r *sessionListingRegistry) Sessions() []operational.SessionInfo {
@@ -82,10 +109,10 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 		t.Fatal(err)
 	}
 	b.AttachRootClusters([]contract.ClusterServer{gc})
-	reg := &sessionListingRegistry{sessions: []operational.SessionInfo{
-		{SessionID: paseSession, FabricIndex: 1, IsPASE: true},
-		{SessionID: caseSession, FabricIndex: 1},
-	}}
+	reg := newSessionListingRegistry(
+		operational.SessionInfo{SessionID: paseSession, FabricIndex: 1, IsPASE: true},
+		operational.SessionInfo{SessionID: caseSession, FabricIndex: 1},
+	)
 	b.AttachSessionRegistry(reg)
 	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, caseSession)
 	b.mu.RLock()
@@ -112,10 +139,7 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 	if gc.FailSafeArmed() {
 		t.Fatal("the fail-safe is still armed: CommissioningComplete did not succeed, the test checks nothing")
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for len(reg.closedIDs()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	reg.awaitClose(t) // the close follows the response by paseCloseGrace
 	if got := reg.closedIDs(); !slices.Equal(got, []uint16{paseSession}) {
 		t.Fatalf("sessions closed after CommissioningComplete = %v, want the PASE session [%d] alone", got, paseSession)
 	}

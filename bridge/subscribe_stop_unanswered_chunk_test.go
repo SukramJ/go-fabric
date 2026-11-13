@@ -59,6 +59,8 @@ func TestManagerStopDoesNotWaitOutAnUnansweredReportChunk(t *testing.T) {
 		t.Fatalf("the report went out in %d chunk(s) (more flags %v); the test needs a first chunk waiting for its answer", len(counts), more)
 	}
 
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
@@ -66,7 +68,7 @@ func TestManagerStopDoesNotWaitOutAnUnansweredReportChunk(t *testing.T) {
 	}()
 	select {
 	case <-stopped:
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("Manager.Stop still waits on a report parked on an unanswered chunk after 5 s")
 	}
 }

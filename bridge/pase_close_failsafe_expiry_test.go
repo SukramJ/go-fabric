@@ -76,10 +76,10 @@ func newFailSafeRig(t *testing.T) *failSafeRig {
 	}
 	r.gc = gc
 	r.b.AttachRootClusters([]contract.ClusterServer{gc})
-	r.reg = &sessionListingRegistry{sessions: []operational.SessionInfo{
-		{SessionID: failSafeRigPASE, FabricIndex: 1, IsPASE: true},
-		{SessionID: failSafeRigCASE, FabricIndex: 1},
-	}}
+	r.reg = newSessionListingRegistry(
+		operational.SessionInfo{SessionID: failSafeRigPASE, FabricIndex: 1, IsPASE: true},
+		operational.SessionInfo{SessionID: failSafeRigCASE, FabricIndex: 1},
+	)
 	r.b.AttachSessionRegistry(r.reg)
 	peerConn, peerSess, peerAddr := chunkTestPeer(t, r.b, failSafeRigCASE)
 	r.b.mu.RLock()
@@ -106,10 +106,7 @@ func newFailSafeRig(t *testing.T) *failSafeRig {
 // distinct ids it closed.
 func (r *failSafeRig) waitClosed(t *testing.T) []uint16 {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for len(r.reg.closedIDs()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	r.reg.awaitClose(t)
 	ids := r.reg.closedIDs()
 	slices.Sort(ids)
 	return slices.Compact(ids)
@@ -138,7 +135,7 @@ func TestFailSafeExpiryThroughTheBridgeClosesThePASESessions(t *testing.T) {
 		// An armed fail-safe closes nothing: the commissioning it covers
 		// is still running.
 		r.clk.Advance(5 * time.Second)
-		time.Sleep(50 * time.Millisecond)
+		r.clk.Yield() // whatever the five seconds made runnable has run
 		if got := r.reg.closedIDs(); len(got) != 0 {
 			t.Fatalf("sessions closed while the fail-safe is armed = %v, want none", got)
 		}
@@ -182,9 +179,11 @@ func TestFailSafeExpiryThroughTheBridgeClosesThePASESessions(t *testing.T) {
 		})
 		r.send(0x3005, 10)
 		r.clk.Advance(11 * time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
 		select {
 		case <-hostRan:
-		case <-time.After(3 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("the host's fail-safe-expiry hook did not run")
 		}
 		if got := r.waitClosed(t); !slices.Equal(got, []uint16{failSafeRigPASE}) {

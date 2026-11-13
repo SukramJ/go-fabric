@@ -109,6 +109,8 @@ func contactBridge(t *testing.T, src *waitingContact) *Bridge {
 // seconds: the bridge is then stuck on its mutex.
 func returnsWithin(t *testing.T, what string, f func()) {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -116,7 +118,7 @@ func returnsWithin(t *testing.T, what string, f func()) {
 	}()
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatalf("%s did not return within 5 s: a host notifier was called under the bridge's mutex", what)
 	}
 }
