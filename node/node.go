@@ -665,7 +665,7 @@ func (n *Node) reopenWhenIdle() {
 // resumption records go with the replaced identity, so no peer resumes a
 // session established under the old NOC. Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
-// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:491).
+// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
 		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))

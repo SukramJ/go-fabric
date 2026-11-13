@@ -212,11 +212,12 @@ func (b *Bridge) sendReplyTimed(
 		// requestHdr.SessionID carries — peer sent that to address
 		// us) results in chip-tool dropping the reply silently.
 		// No P bit: a unicast message never carries privacy
-		// enhancements. Mirrors matter.js MessageExchange.ts:718
-		// (`hasPrivacyEnhancements: false, // Privacy is only defined for
-		// group messages`) at 862ad75f; a request that carried the bit was
-		// dropped before it reached here (bridge/privacy.go
-		// maybeUnmaskPrivacy, as matter.js ExchangeManager.ts:230-235).
+		// enhancements. Mirrors matter.js MessageExchange.ts:734
+		// (`hasPrivacyEnhancements: false, // Not supported on unicast, as
+		// in the CHIP SDK`); a request that carried the bit was dropped
+		// before it reached here (bridge/privacy.go maybeUnmaskPrivacy, as
+		// matter.js refuses it in decodeFixedHeader,
+		// MessageCodec.ts:250-253).
 		Control:      requestHdr.Control,
 		HasExtension: false,
 		SessionType:  requestHdr.SessionType,

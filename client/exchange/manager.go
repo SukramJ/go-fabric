@@ -674,7 +674,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 	}
 	if hdr.SessionType != message.SessionUnsecured || hdr.Privacy {
 		// No group sessions; a unicast message with the privacy flag is
-		// invalid (ExchangeManager.ts:230-235).
+		// invalid (matter.js decodeFixedHeader, MessageCodec.ts:250-253).
 		m.log.Debug("matter.controller.drop", slog.String("reason", "session type"))
 		return
 	}
