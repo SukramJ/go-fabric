@@ -49,6 +49,14 @@ type ClusterServer interface {
 	// returned value uses the cluster's native Go type. Returns
 	// (nil, false) when the underlying DP has not been observed yet
 	// — the bridge maps that to a stale-data Matter status response.
+	//
+	// It takes no context on purpose: a read answers from memory —
+	// the value the server holds or its source last observed — and
+	// does not wait on a backend, so there is nothing to cancel. A
+	// wildcard read or a subscription report calls it for every
+	// attribute of every endpoint, on the request's goroutine. A read
+	// that depends on who asks implements [FabricScopedReader], whose
+	// MatterReadFiltered carries the request's context.
 	MatterRead(attrID uint32) (value any, ok bool)
 
 	// MatterWrite applies an attribute write. The bridge has already

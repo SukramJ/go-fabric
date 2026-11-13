@@ -2034,6 +2034,13 @@ func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
 // Topology returns the currently assembled topology. Returns nil
 // when the bridge has not been started; safe to call concurrently
 // with [Reassemble].
+//
+// It is the live tree, not a copy: the dispatcher serves requests from
+// the same [endpoint.Topology] and its endpoints. Read it; do not
+// append to Endpoints or change an endpoint's fields — that races
+// every dispatch. The topology changes through the Snapshotter and
+// [Reassemble] alone, which installs a new tree; a pointer kept across
+// a Reassemble is the superseded one.
 func (b *Bridge) Topology() *endpoint.Topology {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

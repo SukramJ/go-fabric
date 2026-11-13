@@ -207,6 +207,31 @@ fails `node.New`.
 
 *Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
 
+### Capabilities the bridge looks for on what is attached
+
+Beside the ports, the bridge asks the session registry, a cluster server
+and an endpoint's measurement source for optional methods. It finds them
+by type assertion against interfaces that are not exported, so nothing in
+the API names them: a host with its own registry or source implements the
+method with exactly this signature, or the bridge silently does without.
+`secure/operational.Manager` has every registry method.
+
+| On | Method | Without it |
+| --- | --- | --- |
+| the `AttachSessionRegistry` registry | `SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))` | the registry is not handed the bridge's CloseSession sender; a session it closes gracefully ends without the report to its peer |
+| the registry | `SetReannounceTrigger(fn func(fabricIndex uint8))` | the registry cannot ask for the operational record to be announced again when a peer's last session is gone |
+| the registry | `SetOnPaseSessionClose(fn func(sessionID uint16))` | the commissionable record is not announced again when a PASE session closes |
+| the registry | `Active() int` | the `sessions.open` gauge of `AttachMetrics` is not recorded |
+| the registry | `SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint16` | the bridge finds no live session to a peer it wants to reach and establishes a new one each time |
+| the registry | `CloseFabric(fabricIndex uint8)` | a removed fabric's sessions are not closed by the bridge |
+| the registry | `CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16)` | a fabric's other sessions are not closed while the session that carries the command stays open to answer it |
+| a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
+| a cluster server on a bridged endpoint | `MatterFabricRemoved(fabricIndex uint8)` | the server is not told of a removed fabric and keeps what it holds for that fabric's peers |
+| an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
+| an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
+
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
+
 ## `<cluster>def.Host`: the kit server's host methods
 
 A port is what the kit's server calls on the host. `Host` is the other
