@@ -485,10 +485,17 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	writeCtx = im.WithTimedInteraction(writeCtx, req.TimedRequest)
 	// The chunks of one chunked write share a transaction, as chip's
 	// WriteHandler serves the whole interaction (TC-ACL-2.6, 2.8).
-	writeCtx = im.WithWriteTransaction(writeCtx, b.routing.writeTransaction(
+	// A chunk that would open one chunked write more than the session may
+	// have is answered Busy before anything is held or written
+	// ([maxChunkedWritesPerSession]).
+	tx := b.routing.writeTransaction(
 		mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator},
 		req.MoreChunkedMessages, b.clk().Now(),
-	))
+	)
+	if tx == nil {
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
+	}
+	writeCtx = im.WithWriteTransaction(writeCtx, tx)
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
 	b.reportWrittenAttributes(resp)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the

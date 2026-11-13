@@ -74,6 +74,9 @@ type exchangeRouting struct {
 	//
 	// map[mrp.ExchangeKey]*writeTx
 	writeTxs sync.Map
+	// writeTxOpen makes counting a session's open chunked writes and
+	// storing a new one a single step ([maxChunkedWritesPerSession]).
+	writeTxOpen sync.Mutex
 
 	// writeHolds are the attributes chunked writes hold: another
 	// exchange's concrete write of one is answered BUSY, a wildcard or
@@ -250,6 +253,22 @@ func (r *exchangeRouting) dropSessionTimedDeadlines(sessionID uint16) {
 // (im.WriteTransaction.busyBefore).
 const writeTxTTL = time.Minute
 
+// maxChunkedWritesPerSession bounds the chunked writes one session may
+// have open at once: each keeps the hold of its last chunk's attribute
+// until its final chunk or [writeTxTTL] — a hold taken before the ACL
+// check, as matter.js takes it (InteractionServer.ts:533-543), so without
+// the bound a session could hold one attribute per exchange id, writable
+// or not (review II, R2-P1-req-03, owner decision 30). A controller runs
+// one write interaction per exchange and one chunked write at a time;
+// the number is connectedhomeip's CHIP_IM_MAX_NUM_WRITE_HANDLER
+// (src/lib/core/CHIPConfig.h:991-992 at 6170af84), whose pool is
+// node-wide and answers Busy when exhausted
+// (src/app/InteractionModelEngine.cpp:951-960); per session here, so one
+// session cannot use up another's — the choice
+// [maxPendingTimedRequests] makes. The chunk that would open one more is
+// answered Busy ([Bridge.dispatchWriteRequest]).
+const maxChunkedWritesPerSession = 4
+
 type writeTx struct {
 	tx *im.WriteTransaction
 	// lastChunk is when the interaction's last chunk arrived, Unix
@@ -260,7 +279,9 @@ type writeTx struct {
 // writeTransaction returns the write transaction of the exchange key
 // names: the one a previous chunk of the same Write interaction started,
 // or a fresh one. more is the chunk's MoreChunkedMessages; the final
-// chunk (more=false) takes the transaction out of the table.
+// chunk (more=false) takes the transaction out of the table. Nil when the
+// chunk would open a chunked write and key's session already has
+// [maxChunkedWritesPerSession] open.
 func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now time.Time) *im.WriteTransaction {
 	r.writeTxs.Range(func(k, v any) bool {
 		if w, ok := v.(*writeTx); ok && now.Sub(time.Unix(0, w.lastChunk.Load())) > writeTxTTL {
@@ -277,6 +298,19 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 		}
 		return im.NewWriteTransaction(&r.writeHolds)
 	}
+	if v, ok := r.writeTxs.Load(key); ok {
+		if w, isTx := v.(*writeTx); isTx {
+			w.lastChunk.Store(now.UnixNano())
+			return w.tx
+		}
+	}
+	// Opening one: the count and the store are one step, so two chunks
+	// of the session cannot both take the last place.
+	r.writeTxOpen.Lock()
+	defer r.writeTxOpen.Unlock()
+	if r.openWriteTxs(key.SessionID) >= maxChunkedWritesPerSession {
+		return nil
+	}
 	fresh := &writeTx{tx: im.NewWriteTransaction(&r.writeHolds)}
 	fresh.lastChunk.Store(now.UnixNano())
 	v, _ := r.writeTxs.LoadOrStore(key, fresh)
@@ -285,4 +319,16 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 		return w.tx
 	}
 	return im.NewWriteTransaction(&r.writeHolds)
+}
+
+// openWriteTxs counts the chunked writes sessionID has open.
+func (r *exchangeRouting) openWriteTxs(sessionID uint16) int {
+	n := 0
+	r.writeTxs.Range(func(k, _ any) bool {
+		if key, ok := k.(mrp.ExchangeKey); ok && key.SessionID == sessionID {
+			n++
+		}
+		return true
+	})
+	return n
 }
