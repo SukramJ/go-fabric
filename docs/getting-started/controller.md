@@ -325,6 +325,21 @@ _, err := c.Pair(ctx, code, controller.PairOptions{
 })
 ```
 
+A `Pair` or `Commission` whose context ends — cancelled, or past its
+deadline — while the device holds a fail-safe does not leave it armed:
+the commissioner sends ArmFailSafe with expiry 0 over the session the
+commissioning still has (PASE, or CASE after `Reconnect`), on a context
+of its own for at most 10 s, and returns the context's error unchanged. A
+device left armed would refuse a new commissioning until the fail-safe
+ran out. Nothing is sent before the first ArmFailSafe, after
+CommissioningComplete, or on a closed session; a disarm that fails is
+logged (`matter.controller.commissioning.reset_failsafe_failed`) and the
+fail-safe then expires on the device by itself. matter.js's flow has no
+abort signal; the behaviour follows connectedhomeip's `StopPairing`
+(*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
+
+*Source: `controller/commissioner/flow.go` (`execute`, `disarmAfterAbort`).*
+
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is
 `ErrFabricOperationInProgress`. `Registry.Decommission` sends RemoveFabric

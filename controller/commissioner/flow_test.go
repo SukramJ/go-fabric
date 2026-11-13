@@ -4,11 +4,15 @@
 package commissioner
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -278,6 +282,149 @@ func TestFlowResetsFailsafeAfterContextEnded(t *testing.T) {
 	if !errors.Is(err, ErrOperativeConnectionFailed) || !slices.Equal(dev.armed(), []uint16{60, 0}) {
 		t.Fatalf("error %v, arms %v, want the reset (0) after the ended context", err, dev.armed())
 	}
+}
+
+// abortStep is a step during which the caller gives the commissioning up:
+// it ends the caller's context and returns that context's error bare, as a
+// step's read or invoke does.
+func abortStep(n int, end context.CancelFunc) step {
+	return step{n, 1, "abort", func(ctx context.Context) (stepResult, error) {
+		end()
+		<-ctx.Done()
+		return 0, ctx.Err()
+	}}
+}
+
+// TestFlowDisarmsFailsafeWhenCallerAborts: a commissioning whose context
+// ends — cancelled or past its deadline — expires the fail-safe it armed,
+// on a context of its own, and returns the context's error unchanged.
+// matter.js's flow has no abort signal and rethrows such an error without
+// the reset (ControllerCommissioningFlow.ts:463-465 at db021da0); chip's
+// commissioner expires the fail-safe when StopPairing cancels
+// (src/controller/CHIPDeviceController.cpp:2219-2247 at 6170af84) and
+// ignores a failure to (:2233-2236).
+func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
+	t.Parallel()
+	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
+	arm := func(f *flow) step {
+		return step{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }}
+	}
+
+	t.Run("before the fail-safe is armed nothing is sent", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		f, _ := newTestFlow(t, dev.handle)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f.steps = []step{abortStep(0, cancel), arm(f)}
+		err := f.execute(ctx)
+		if err != context.Canceled || len(dev.armed()) != 0 { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and no ArmFailSafe", err, dev.armed())
+		}
+	})
+
+	t.Run("after the fail-safe is armed it is expired once", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		f, _ := newTestFlow(t, dev.handle)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f.steps = []step{arm(f), abortStep(8, cancel)}
+		err := f.execute(ctx)
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60, 0}) || !f.failSafeEnd.IsZero() { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60 0]", err, dev.armed())
+		}
+	})
+
+	t.Run("a deadline that passes is an abort too", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		f, _ := newTestFlow(t, dev.handle)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+		f.steps = []step{arm(f), abortStep(8, func() {})}
+		err := f.execute(ctx)
+		if err != context.DeadlineExceeded || !slices.Equal(dev.armed(), []uint16{60, 0}) { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.DeadlineExceeded and ArmFailSafe [60 0]", err, dev.armed())
+		}
+	})
+
+	t.Run("after CommissioningComplete nothing is sent", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if req.opcode == im.OpcodeInvokeRequest {
+				if path, _, err := decodeInvoke(req.payload); err == nil && path.Command == gencomm.CmdCommissioningComplete {
+					path.Command = gencomm.CmdCommissioningCompleteResponse
+					return im.OpcodeInvokeResponse, invokeResponseOf(path, gencomm.CommissioningCompleteResponse{}), true
+				}
+			}
+			return dev.handle(req)
+		})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f.steps = []step{arm(f), {20, 1, "complete", f.completeCommissioning}, abortStep(98, cancel)}
+		err := f.execute(ctx)
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60}) { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60]", err, dev.armed())
+		}
+	})
+
+	t.Run("on a closed session nothing is sent", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		f, _ := newTestFlow(t, dev.handle)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f.steps = []step{arm(f), {8, 1, "close and abort", func(ctx context.Context) (stepResult, error) {
+			f.interaction().Session().Close()
+			cancel()
+			return 0, ctx.Err()
+		}}}
+		err := f.execute(ctx)
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60}) { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60]", err, dev.armed())
+		}
+	})
+
+	t.Run("a disarm that fails is logged and the abort is what returns", func(t *testing.T) {
+		t.Parallel()
+		// The device takes ArmFailSafe(0) and never answers it.
+		dev := &failsafeDevice{info: info}
+		var silent atomic.Int32
+		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if req.opcode == im.OpcodeInvokeRequest {
+				if _, fields, err := decodeInvoke(req.payload); err == nil {
+					var arm gencomm.ArmFailSafeRequest
+					if arm.DecodeTLV(fields) == nil && arm.ExpiryLengthSeconds == 0 {
+						silent.Add(1)
+						return 0, nil, false
+					}
+				}
+			}
+			return dev.handle(req)
+		})
+		var logged bytes.Buffer
+		f.log = slog.New(slog.NewTextHandler(&logged, nil))
+		f.abortDisarm = 50 * time.Millisecond
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f.steps = []step{arm(f), abortStep(8, cancel)}
+		start := time.Now()
+		err := f.execute(ctx)
+		if err != context.Canceled || silent.Load() != 1 { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, silent.Load())
+		}
+		if took := time.Since(start); took > abortDisarmTimeout/2 {
+			t.Fatalf("the abort took %v: the disarm is not bounded by its own context", took)
+		}
+		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
+			t.Fatalf("the failed disarm is not logged: %q", logged.String())
+		}
+		if f.failSafeEnd.IsZero() {
+			t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
+		}
+	})
 }
 
 // TestEnsureFailsafeTimerFor: the failsafe must outlive the response wait
