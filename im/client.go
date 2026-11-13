@@ -224,13 +224,19 @@ func UnmarshalWriteResponseTLV(dec *tlv.Decoder) (WriteResponse, error) {
 
 // readAttributeStatusFields reads an AttributeStatusIB after its opener,
 // with its path's EnableTagCompression flag.
+// Its path and its status are mandatory (matter.js TlvAttributeStatus.ts:
+// 16-17 at db021da0, both TlvField; review II, R2-P1-req2-09).
 func readAttributeStatusFields(dec *tlv.Decoder) (st AttributeStatus, compressed bool, err error) {
+	sawPath, sawStatus := false, false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeStatus{}, false, err
 		}
 		if el.IsEndContainer {
+			if !sawPath || !sawStatus {
+				return AttributeStatus{}, false, errors.New("im: AttributeStatusIB without its path or status")
+			}
 			return st, compressed, nil
 		}
 		switch {
@@ -238,10 +244,12 @@ func readAttributeStatusFields(dec *tlv.Decoder) (st AttributeStatus, compressed
 			if st.Path, compressed, err = readReportPathFields(dec); err != nil {
 				return AttributeStatus{}, false, err
 			}
+			sawPath = true
 		case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagAttributeStatusStatus) && el.IsContainer && el.Type == tlv.TypeStructure:
 			if err := readStatusIBFields(dec, &st.Status); err != nil {
 				return AttributeStatus{}, false, err
 			}
+			sawStatus = true
 		default:
 			if err := skipElement(dec, el); err != nil {
 				return AttributeStatus{}, false, err
@@ -274,7 +282,7 @@ func readReportPathFields(dec *tlv.Decoder) (p ConcreteAttributePath, compressed
 		// ([readAttributePathField], [uintField]).
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttrPathEnableTagCompression:
-			compressed = el.Bool
+			compressed, err = boolField(el)
 		case tagAttrPathNode:
 			p.Node, err = uint64Field(el)
 			p.HasNode = true
@@ -381,10 +389,12 @@ func UnmarshalReportDataTLV(dec *tlv.Decoder, valueReader AttributeValueReader, 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagReportSubscriptionID:
-			if el.Uint > 0xFFFFFFFF {
-				return ReportData{}, fmt.Errorf("%w: SubscriptionId exceeds uint32", ErrInvalidReportData)
+			// A scalar field of another type is refused, not read as zero
+			// or entered (review II, R2-P1-req2-09).
+			if rd.SubscriptionID, err = uint32Field(el); err != nil {
+				return ReportData{}, fmt.Errorf("%w: SubscriptionId: %w", ErrInvalidReportData, err)
 			}
-			rd.SubscriptionID, rd.HasSubscription = uint32(el.Uint), true
+			rd.HasSubscription = true
 		case tagReportAttributeReports:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return ReportData{}, fmt.Errorf("%w: AttributeReports is not an array", ErrInvalidReportData)
@@ -400,9 +410,13 @@ func UnmarshalReportDataTLV(dec *tlv.Decoder, valueReader AttributeValueReader, 
 				return ReportData{}, fmt.Errorf("%w: %w", ErrInvalidReportData, err)
 			}
 		case tagReportMoreChunkedMessages:
-			rd.MoreChunkedMessages = el.Bool
+			if rd.MoreChunkedMessages, err = boolField(el); err != nil {
+				return ReportData{}, fmt.Errorf("%w: MoreChunkedMessages: %w", ErrInvalidReportData, err)
+			}
 		case tagReportSuppressResponse:
-			rd.SuppressResponse = el.Bool
+			if rd.SuppressResponse, err = boolField(el); err != nil {
+				return ReportData{}, fmt.Errorf("%w: SuppressResponse: %w", ErrInvalidReportData, err)
+			}
 		default:
 			if err := skipElement(dec, el); err != nil {
 				return ReportData{}, fmt.Errorf("%w: %w", ErrInvalidReportData, err)
@@ -434,14 +448,20 @@ func readAttributeReports(dec *tlv.Decoder, valueReader AttributeValueReader) ([
 }
 
 // readAttributeReport reads one AttributeReportIB after its opener.
+// Exactly one of AttributeStatus and AttributeData is present; a block
+// with neither or both is refused (review II, R2-P1-req2-09).
 func readAttributeReport(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeReport, error) {
 	var rep AttributeReport
+	members := 0
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeReport{}, err
 		}
 		if el.IsEndContainer {
+			if members != 1 {
+				return AttributeReport{}, fmt.Errorf("im: AttributeReportIB carries %d of AttributeStatusIB and AttributeDataIB, want one", members)
+			}
 			return rep, nil
 		}
 		switch {
@@ -451,10 +471,12 @@ func readAttributeReport(dec *tlv.Decoder, valueReader AttributeValueReader) (At
 				return AttributeReport{}, err
 			}
 			rep.IsStatus, rep.Path, rep.Status, rep.TagCompression = true, st.Path, st.Status, compressed
+			members++
 		case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagAttributeReportData) && el.IsContainer && el.Type == tlv.TypeStructure:
 			if err := readAttributeReportData(dec, &rep, valueReader); err != nil {
 				return AttributeReport{}, err
 			}
+			members++
 		default:
 			if err := skipElement(dec, el); err != nil {
 				return AttributeReport{}, err
@@ -614,7 +636,9 @@ func readEventDataFields(dec *tlv.Decoder, rep *EventReport, eventReader EventDa
 				return err
 			}
 		case tagEventDataNumber:
-			rep.Number = el.Uint
+			if rep.Number, err = uint64Field(el); err != nil {
+				return err
+			}
 		case tagEventDataPriority:
 			// The priority is an 8-bit value here; one that does not fit is
 			// refused, not masked into another priority.
@@ -624,13 +648,25 @@ func readEventDataFields(dec *tlv.Decoder, rep *EventReport, eventReader EventDa
 			}
 			rep.Priority = EventPriority(priority)
 		case tagEventDataEpochTimestamp:
-			rep.Timestamp, rep.Received.HasEpochTimestamp = el.Uint, true
+			if rep.Timestamp, err = uint64Field(el); err != nil {
+				return err
+			}
+			rep.Received.HasEpochTimestamp = true
 		case tagEventDataSystemTimestamp:
-			rep.Received.SystemTimestamp, rep.Received.HasSystemTimestamp = el.Uint, true
+			if rep.Received.SystemTimestamp, err = uint64Field(el); err != nil {
+				return err
+			}
+			rep.Received.HasSystemTimestamp = true
 		case tagEventDataDeltaEpochTimestamp:
-			rep.Received.DeltaEpochTimestamp, rep.Received.HasDeltaEpochTimestamp = el.Uint, true
+			if rep.Received.DeltaEpochTimestamp, err = uint64Field(el); err != nil {
+				return err
+			}
+			rep.Received.HasDeltaEpochTimestamp = true
 		case tagEventDataDeltaSystemTimestamp:
-			rep.Received.DeltaSystemTimestamp, rep.Received.HasDeltaSystemTimestamp = el.Uint, true
+			if rep.Received.DeltaSystemTimestamp, err = uint64Field(el); err != nil {
+				return err
+			}
+			rep.Received.HasDeltaSystemTimestamp = true
 		case tagEventDataData:
 			rep.Received.HasData = true
 			if eventReader == nil {

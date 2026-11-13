@@ -79,29 +79,19 @@ func UnmarshalInvokeResponseTLV(dec *tlv.Decoder, fieldsReader CommandFieldsRead
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagInvokeRespSuppressResponse:
-			resp.SuppressResponse = el.Bool
+			if resp.SuppressResponse, err = boolField(el); err != nil {
+				return InvokeResponse{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
+			}
 		case tagInvokeRespMoreChunked:
-			resp.MoreChunkedMessages = el.Bool
+			if resp.MoreChunkedMessages, err = boolField(el); err != nil {
+				return InvokeResponse{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
+			}
 		case tagInvokeRespResponses:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return InvokeResponse{}, fmt.Errorf("%w: InvokeResponses not array", ErrInvalidInvokeRequest)
 			}
-			for {
-				ib, err := dec.Next()
-				if err != nil {
-					return InvokeResponse{}, err
-				}
-				if ib.IsEndContainer {
-					break
-				}
-				if !ib.IsContainer || ib.Type != tlv.TypeStructure {
-					return InvokeResponse{}, fmt.Errorf("%w: InvokeResponseIB not struct", ErrInvalidInvokeRequest)
-				}
-				ent, err := readInvokeResponseIB(dec, fieldsReader)
-				if err != nil {
-					return InvokeResponse{}, err
-				}
-				resp.Responses = append(resp.Responses, ent)
+			if resp.Responses, err = readInvokeResponseIBs(dec, fieldsReader); err != nil {
+				return InvokeResponse{}, err
 			}
 		default:
 			if el.IsContainer {
@@ -113,16 +103,46 @@ func UnmarshalInvokeResponseTLV(dec *tlv.Decoder, fieldsReader CommandFieldsRead
 	}
 }
 
+// readInvokeResponseIBs reads the InvokeResponses array after its opener.
+func readInvokeResponseIBs(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]InvokeResponseEntry, error) {
+	var out []InvokeResponseEntry
+	for {
+		ib, err := dec.Next()
+		if err != nil {
+			return nil, err
+		}
+		if ib.IsEndContainer {
+			return out, nil
+		}
+		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+			return nil, fmt.Errorf("%w: InvokeResponseIB not struct", ErrInvalidInvokeRequest)
+		}
+		ent, err := readInvokeResponseIB(dec, fieldsReader)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ent)
+	}
+}
+
 // readInvokeResponseIB reads one InvokeResponseIB after its opener: a
 // CommandDataIB (tag 0) or a CommandStatusIB (tag 1).
+//
+// Exactly one of the two is present, as in every InvokeResponseIB
+// matter.js decodes (TlvInvokeResponseData.ts); a block with neither or
+// both is refused, not read as a success (review II, R2-P1-req2-09).
 func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (InvokeResponseEntry, error) {
 	var ent InvokeResponseEntry
+	members := 0
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return InvokeResponseEntry{}, err
 		}
 		if el.IsEndContainer {
+			if members != 1 {
+				return InvokeResponseEntry{}, fmt.Errorf("%w: InvokeResponseIB carries %d of CommandDataIB and CommandStatusIB, want one", ErrInvalidInvokeRequest, members)
+			}
 			return ent, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext || !el.IsContainer {
@@ -141,11 +161,13 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 			}
 			ent.Path, ent.Response, ent.HasResponse = inv.Path, inv.Fields, inv.Fields != nil
 			ent.CommandRef, ent.HasCommandRef = inv.CommandRef, inv.HasCommandRef
+			members++
 		case tagInvokeRespCommandStatus:
 			if err := readCommandStatusIB(dec, &ent); err != nil {
 				return InvokeResponseEntry{}, err
 			}
 			ent.IsStatus = true
+			members++
 		default:
 			if err := skipContainer(dec); err != nil {
 				return InvokeResponseEntry{}, err
@@ -154,14 +176,20 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 	}
 }
 
-// readCommandStatusIB reads a CommandStatusIB after its opener.
+// readCommandStatusIB reads a CommandStatusIB after its opener. Its path
+// and its status are mandatory (matter.js TlvCommandStatus.ts:16-17 at
+// db021da0, both TlvField).
 func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
+	sawPath, sawStatus := false, false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if el.IsEndContainer {
+			if !sawPath || !sawStatus {
+				return fmt.Errorf("%w: CommandStatusIB without its path or status", ErrInvalidInvokeRequest)
+			}
 			return nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -181,7 +209,7 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 			if err != nil {
 				return err
 			}
-			ent.Path = p
+			ent.Path, sawPath = p, true
 		case tagCmdStatusStatus:
 			if !el.IsContainer || el.Type != tlv.TypeStructure {
 				return fmt.Errorf("%w: StatusIB not struct", ErrInvalidStatusIB)
@@ -189,6 +217,7 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 			if err := readStatusIBFields(dec, &ent.Status); err != nil {
 				return err
 			}
+			sawStatus = true
 		case tagCmdStatusRef:
 			// TlvUInt16 (TlvCommandStatus.ts:18): refused when wider, never
 			// masked onto another command's reference ([uintField]).
@@ -208,17 +237,28 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 	}
 }
 
-// readStatusIBFields reads a StatusIB's fields after its opener.
+// readStatusIBFields reads a StatusIB's fields after its opener. Status
+// is mandatory (matter.js TlvStatus.ts:15 at db021da0), as
+// [UnmarshalStatusIBTLV] holds it: a block without it is refused, not
+// read as Success; a member it does not know is skipped whole (review
+// II, R2-P1-req2-09).
 func readStatusIBFields(dec *tlv.Decoder, st *StatusIB) error {
+	sawStatus := false
 	for {
 		f, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if f.IsEndContainer {
+			if !sawStatus {
+				return fmt.Errorf("%w: missing Status", ErrInvalidStatusIB)
+			}
 			return nil
 		}
 		if f.Tag.Kind != tlv.TagKindContext {
+			if err := skipElement(dec, f); err != nil {
+				return err
+			}
 			continue
 		}
 		switch uint8(f.Tag.Number & 0xFF) {
@@ -228,11 +268,16 @@ func readStatusIBFields(dec *tlv.Decoder, st *StatusIB) error {
 				return err
 			}
 			st.Status = StatusCode(status)
+			sawStatus = true
 		case tagStatusIBClusterStatus:
 			if st.ClusterStatus, err = statusIBField(f); err != nil {
 				return err
 			}
 			st.HasClusterStatus = true
+		default:
+			if err := skipElement(dec, f); err != nil {
+				return err
+			}
 		}
 	}
 }
