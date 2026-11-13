@@ -160,11 +160,31 @@ func IsPASEFromContext(ctx context.Context) bool {
 // src/access/AccessControl.cpp:355-372 (Check finds no entry for that
 // subject and denies). matter.js never reaches the gate there:
 // InteractionServer.ts:161 `requiresSecureSession = true`.
+//
+// An index the caller could not resolve (endpoint.FabricIndexUnresolvable)
+// is no accessing fabric either and is refused here, before the
+// access-control source is asked: the gate does not rest on every
+// [ACLChecker] knowing that index ([hasAccessingFabric]).
 func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32, endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
-	if fabricIndex == 0 {
+	if !hasAccessingFabric(fabricIndex) {
 		return StatusUnsupportedAccess
 	}
 	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+}
+
+// hasAccessingFabric reports whether fabricIndex names a fabric — the one
+// reading of "no accessing fabric" every gate of this package uses: the
+// subject's access check, the fabric-scoped write and invoke gates, the
+// group authorizer. Matter constrains a fabric index to "1 to 254" (matter.js
+// packages/model/src/standard/elements/fabric-index.element.ts:12-14 at
+// db021da0); 0 is a session without a fabric — PASE before AddNOC,
+// matter.js FabricIndex.NO_FABRIC (packages/types/src/datatype/FabricIndex.ts:28
+// at db021da0) — and anything above 254 an index the caller could not
+// resolve (endpoint.FabricIndexUnresolvable). Neither is an accessing
+// fabric. No reference models an index it cannot resolve; reading it as no
+// fabric is this module's fail-closed rule.
+func hasAccessingFabric(fabricIndex uint8) bool {
+	return fabricIndex >= 1 && fabricIndex <= 254
 }
 
 // timedCtxKey carries whether an Invoke or a Write runs inside a valid timed

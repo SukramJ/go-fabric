@@ -503,17 +503,6 @@ func reachesWriteGates(ctx context.Context, d Dispatcher, p ConcreteAttributePat
 	return true
 }
 
-// hasAccessingFabric reports whether fabricIndex names a fabric. Matter
-// constrains a fabric index to "1 to 254" (matter.js
-// packages/model/src/standard/elements/operational-credentials.element.ts:129
-// at db021da0); 0 is a session without a fabric — PASE before AddNOC,
-// matter.js FabricIndex.NO_FABRIC — and anything above 254 an index the
-// caller could not resolve (endpoint.FabricIndexUnresolvable). Neither is an
-// accessing fabric.
-func hasAccessingFabric(fabricIndex uint8) bool {
-	return fabricIndex >= 1 && fabricIndex <= 254
-}
-
 // allSucceeded reports whether every result of a write is Success.
 func allSucceeded(results []WriteResult) bool {
 	for _, r := range results {
