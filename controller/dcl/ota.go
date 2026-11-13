@@ -262,7 +262,8 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 // bound: no download passes [OTAVersions.MaxImageSize]
 // ([DefaultMaxImageSize] when unset). A record that announces more is
 // refused before the request; an answer without an announced size is cut
-// at the bound. Both are an OTAError that names the bound and wraps
+// at the bound, and one longer than its announced size at that size. All
+// three are an OTAError that names the bound and wraps
 // [ErrOTAImageTooLarge]. The bound is this module's, as the CRL
 // download's is (maxCRLSize): matter.js at db021da0 has none —
 // packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693 fetches with a
@@ -333,7 +334,10 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 				Err:     ErrOTAImageTooLarge,
 			}
 		}
-		return &OTAError{Message: fmt.Sprintf("OTA image from %s exceeds its announced size of %d bytes", u.OTAURL, u.OTAFileSize)}
+		return &OTAError{
+			Message: fmt.Sprintf("OTA image from %s exceeds its announced size of %d bytes (bound of %d bytes, MaxImageSize)", u.OTAURL, u.OTAFileSize, bound),
+			Err:     ErrOTAImageTooLarge,
+		}
 	}
 	return nil
 }

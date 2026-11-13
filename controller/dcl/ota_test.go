@@ -348,3 +348,26 @@ func TestOTADownloadBoundAtMaxInt64(t *testing.T) {
 		}
 	}
 }
+
+// TestOTADownloadLongerThanAnnounced (review II, R2-P0-rv-C05): an answer
+// longer than the record announced is cut, and the refusal is the size
+// bound's — it wraps ErrOTAImageTooLarge and names the announced size and
+// the bound, as ErrOTAImageTooLarge's doc and the controller page say.
+func TestOTADownloadLongerThanAnnounced(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	f.bytes("/image.ota", bytes.Repeat([]byte{0xAA}, 4096))
+	o := &OTAVersions{Client: f.client(), MaxImageSize: 8192}
+	var buf bytes.Buffer
+	err := o.Download(context.Background(), SoftwareVersion{OTAURL: f.url("/image.ota"), OTAFileSize: 2048}, &buf)
+	var oe *OTAError
+	if !errors.As(err, &oe) || !errors.Is(err, ErrOTAImageTooLarge) {
+		t.Fatalf("an answer of 4096 bytes announced as 2048: %v, want an OTAError wrapping ErrOTAImageTooLarge", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "announced size of 2048 bytes") || !strings.Contains(msg, "bound of 8192 bytes") {
+		t.Errorf("refusal %q, want the announced size and the bound named", msg)
+	}
+	if buf.Len() > 2049 {
+		t.Errorf("copied %d bytes, want the stream cut at the announced size (at most 2049)", buf.Len())
+	}
+}

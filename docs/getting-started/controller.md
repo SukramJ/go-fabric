@@ -873,7 +873,8 @@ is stored. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
 the vendor's statement and does not raise the bound: a record that
 announces more is refused before the request, an answer longer than its
 announcement is cut there, and an answer without an announced size is cut
-at the bound. The refusals are a `*dcl.OTAError` that names the bound and
+at the bound. All three refusals are a `*dcl.OTAError` that names the
+bound (the cut at the announcement names the announced size too) and
 matches `dcl.ErrOTAImageTooLarge` (and `softwareupdate.ErrOTA` from the
 store). matter.js has no such bound; it streams the answer to storage.
 
