@@ -227,6 +227,13 @@ func permanent(code dsdef.Status) bool {
 // state the port left in the list, and the node's DeletePending bindings
 // are erased. A push that fails ends the refresh (:602-684).
 func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error {
+	// The node's binding lock, from before the list is taken until it is
+	// written: a binding push in flight writes first, or after this write
+	// with the list this write left (review II, R2-P1-clu-05).
+	unlock, err := d.lockNodeBindings(ctx, nodeID)
+	if err != nil {
+		return fmt.Errorf("%w: binding list of node %d: %w", ErrSync, nodeID, err)
+	}
 	var list []EndpointBindingEntry
 	d.commit(ctx, func() {
 		d.t.Bindings = slices.DeleteFunc(d.t.Bindings, func(e EndpointBindingEntry) bool {
@@ -239,7 +246,9 @@ func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error
 		}
 		d.markLocked(dsdef.AttrEndpointBindingList)
 	})
-	if err := d.sync.SyncBindings(ctx, nodeID, list); err != nil { // :630-641
+	err = d.sync.SyncBindings(ctx, nodeID, list) // :630-641
+	unlock()
+	if err != nil {
 		return fmt.Errorf("%w: SyncBindings: %w", ErrSync, err)
 	}
 	d.commit(ctx, func() {

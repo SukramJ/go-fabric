@@ -774,14 +774,15 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 // 6170af84) and leaves the merge to the delegate; here the module merges,
 // so every host writes a list and the port has no single-entry write
 // (owner decision 2026-11-06). The fetch, the merge and the write run
-// under the lock of the node's endpoint, so two pushes to one endpoint —
-// a host call beside a command's push, or two commands' — cannot both
-// merge into the list read before the other wrote; jf-admin-app's
+// under the node's binding lock, so two pushes to one endpoint — a host
+// call beside a command's push, or two commands' — cannot both merge into
+// the list read before the other wrote, and neither can a push and the
+// refresh's whole-list write (syncBindingsOfNode); jf-admin-app's
 // fetch-then-write has the same race in principle, two SyncNode calls in
 // flight each fetching before either wrote (JFADatastoreSync.cpp:1706-1757
 // at 6170af84).
 func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBindingEntry) error {
-	unlock, err := d.lockEndpoint(ctx, bindingEndpoint{node: nodeID, endpoint: e.EndpointId})
+	unlock, err := d.lockNodeBindings(ctx, nodeID)
 	if err != nil {
 		return fmt.Errorf("binding list of node %d endpoint %d: %w", nodeID, e.EndpointId, err)
 	}

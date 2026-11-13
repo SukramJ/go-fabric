@@ -214,17 +214,18 @@ type Datastore struct {
 	// pushes are the pushes the commands started.
 	pushes sync.WaitGroup
 
-	// bindingMu guards bindingLocks: one lock per node and endpoint, so
-	// the read-merge-write of an endpoint's binding list runs one at a
-	// time ([Datastore.pushBinding]).
+	// bindingMu guards bindingLocks: one lock per node, so the
+	// read-merge-write of one of its endpoints' binding lists
+	// ([Datastore.pushBinding]) and the refresh's write of its whole list
+	// ([Datastore.syncBindingsOfNode]) run one at a time.
 	bindingMu    sync.Mutex
 	bindingLocks map[bindingEndpoint]*endpointLock
 }
 
-// bindingEndpoint names one node's endpoint.
+// bindingEndpoint keys a binding lock: the node, whose endpoints' binding
+// lists the lock guards together ([Datastore.lockNodeBindings]).
 type bindingEndpoint struct {
-	node     uint64
-	endpoint uint16
+	node uint64
 }
 
 // endpointLock is a lock a waiter can leave when its context ends; refs
@@ -234,8 +235,8 @@ type endpointLock struct {
 	refs int
 }
 
-// lockEndpoint takes the lock of the node's endpoint, or fails with the
-// context's error; the returned func releases it.
+// lockEndpoint takes the binding lock k, or fails with the context's
+// error; the returned func releases it.
 func (d *Datastore) lockEndpoint(ctx context.Context, k bindingEndpoint) (func(), error) {
 	d.bindingMu.Lock()
 	if d.bindingLocks == nil {
@@ -266,6 +267,14 @@ func (d *Datastore) lockEndpoint(ctx context.Context, k bindingEndpoint) (func()
 		<-l.held
 		drop()
 	}, nil
+}
+
+// lockNodeBindings takes the binding lock of the node ([Datastore.lockEndpoint]
+// keyed by the node alone): a push to any of its endpoints and the
+// refresh's write of its whole list hold it, so neither writes a list read
+// before the other wrote (review II, R2-P1-clu-05).
+func (d *Datastore) lockNodeBindings(ctx context.Context, nodeID uint64) (func(), error) {
+	return d.lockEndpoint(ctx, bindingEndpoint{node: nodeID})
 }
 
 // Compile-time assertions.
