@@ -836,7 +836,7 @@ are the only Python cases that commission over BLE:
 | --- | --- | --- |
 | TC-CNET-1.4 | passes | |
 | TC-CNET-4.1 | passes | |
-| TC-CNET-4.4 | (a) defect | step 4's ScanNetworks is answered only after the wpa_supplicant driver's 30 s scan timeout (`wifi/wpasupplicant` `DefaultScanTimeout`), past the TH's command timeout; chip's mock ends a scan at once (`matter/testing/linux/wifi.py`:403-412 at `6170af84`); open finding |
+| TC-CNET-4.4 | (c) harness | step 4 expects ScanNetworks to return a network; the light answers at once with the mock's scan results, and chip's mock serves none (`BSSs` is an empty list, `wifi.py`:693-695). The control stops earlier, at step 3 (Networks not connected under the mock's unquoted SSID) |
 | TC-CNET-4.9 | passes | |
 | TC-CNET-4.11 | (c) harness | a second access point (`PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID`) the mock does not serve (one network, `wifi.py`:735-736) and a TH host Wi-Fi to switch; the control fails the same assertion |
 | TC-CNET-4.15 | passes | |

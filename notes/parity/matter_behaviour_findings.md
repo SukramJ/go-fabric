@@ -910,27 +910,6 @@ defect wording.
 
 ## Certification harness — open certifiability findings
 
-- **TC-CNET-4.4 over BLE onto Wi-Fi: the wpa_supplicant driver answers
-  ScanNetworks only at its scan timeout under chip's mock.** In
-  `make chiptool-ble-cases`, step 4's ScanNetworks reaches
-  `examples/ble-wifi-light` and is answered 30.0 s later (the light's
-  `matter.rx.im.invoke` for `cl=0x0031 cmd=0x0`, response `cmd=0x1`, exactly
-  `wifi/wpasupplicant` `DefaultScanTimeout`), after the TH's command timeout
-  (`CommandSender.cpp:378` Timeout). chip's wpa_supplicant mock ends a scan at
-  once: `Scan` sets `Scanning` and emits `ScanDone` from a task scheduled
-  right behind its reply (`matter/testing/linux/wifi.py`:403-412 at
-  `6170af84`). The suspected cause, not yet proven by a unit test: `Driver.run`
-  arms a scan's wait only after the `Scan` call returned and drops the
-  signals already queued at that moment as an earlier scan's, so a ScanDone
-  that arrives between the reply and the arming is lost; connectedhomeip
-  sets its one-shot scan callback before it calls `Scan`
-  (`src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp`:1269-1270,
-  `StartWiFiScan`). A real wpa_supplicant scan takes seconds, so
-  hardware rarely meets it. The same case passes in the CNETWIFI family on the
-  reference daemon's simulated driver. The control, all-clusters-app-ble,
-  stops earlier (step 3, Networks not connected under the mock's SSID
-  quoting), so it does not decide the case.
-
 - **The reference daemon's push transport augments a clip on every motion;
   chip's once per elapsed duration.** `examples/reference-bridge/camera.go`
   `motionTriggered` extends a recording transport's clip on each motion

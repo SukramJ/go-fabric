@@ -117,15 +117,15 @@ type Driver struct {
 
 	mu         sync.Mutex
 	scanning   bool          // a scan runs
-	scan       chan struct{} // non-nil once the running scan's Scan call returned: it waits for ScanDone
+	scan       chan struct{} // non-nil from the running scan's arming, before its Scan call: it waits for ScanDone
 	connecting bool          // a join runs
 	connect    *attempt      // non-nil while a join follows State
 
 	// register hands the run loop a join's attempt once the join has
 	// selected nothing yet (listen).
 	register chan *attempt
-	// armScan hands the run loop a scan's waiter once its Scan call has
-	// returned (armWaiter).
+	// armScan hands the run loop a scan's waiter before its Scan call
+	// (ScanNetworks).
 	armScan chan *scanWaiter
 	// calls counts the scans and joins in flight: Close lets them finish
 	// (a failed join removes its network) before it releases the bus.
@@ -228,10 +228,18 @@ func (d *Driver) run() {
 			}
 			d.handle(s)
 		case w := <-d.armScan:
-			// The signals already queued were sent before the Scan call's
-			// reply (godbus delivers a signal into the channel before it
-			// reads the next message): a ScanDone among them ended an
-			// earlier scan, not this one, and is dropped.
+			// A scan arms before it calls Scan, as connectedhomeip sets its
+			// one-shot scan callback before wpa_supplicant_1_interface_call_scan_sync
+			// (src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:1269-1270
+			// at 6170af84). The signals queued now were sent before that
+			// call: a ScanDone among them ended an earlier scan and is
+			// dropped. Every ScanDone after the arming ends the wait — also
+			// one sent right behind the Scan reply, which a wait armed only
+			// after the call returned could find queued already and drop.
+			// The accepted consequence, as in connectedhomeip: a ScanDone
+			// of a scan another client started that arrives after the
+			// arming ends this wait early, and the BSS read returns that
+			// scan's results.
 			for n := len(sigs); n > 0; n-- {
 				s, ok := <-sigs
 				if !ok {
@@ -322,8 +330,11 @@ func (d *Driver) handle(s *dbus.Signal) {
 // (StartWiFiScan: one scan at a time, Scan({"Type": "active"})) and
 // :1545-1595 (_OnWpaInterfaceScanDone: the BSSs read once the scan is
 // done, each one's properties, a directed scan filtered by SSID at
-// :1568-1573) at 6170af84. A scan that does not end within the timeout or
-// the call's context is UnknownError.
+// :1568-1573) at 6170af84. The wait for ScanDone is armed before the Scan
+// call, as connectedhomeip sets its scan callback first (:1269-1270): a
+// ScanDone sent right behind the call's reply ends it ([Driver.run]); a
+// Scan call that fails disarms it. A scan that does not end within the
+// timeout or the call's context is UnknownError.
 func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
 	d.mu.Lock()
 	switch {
@@ -348,10 +359,7 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	waitCtx, cancel := context.WithTimeout(ctx, d.scanTimeout)
 	defer cancel()
 
-	if _, err := d.bus.Call(waitCtx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
-		d.log.Info("wpasupplicant: failed to start network scan", slog.Any("err", err))
-		return statusUnknown, "scan: " + errName(err), nil
-	}
+	// Armed before the call, so no ScanDone of this scan can precede it.
 	w := &scanWaiter{done: make(chan struct{}, 1), ready: make(chan struct{})}
 	select {
 	case d.armScan <- w:
@@ -362,6 +370,15 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	case <-w.ready:
 	case <-d.closed:
 		return statusUnknown, "the driver is closed", nil
+	}
+	if _, err := d.bus.Call(waitCtx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
+		// Disarmed at once: no waiter of a scan that never started is
+		// left for a ScanDone to fill.
+		d.mu.Lock()
+		d.scan = nil
+		d.mu.Unlock()
+		d.log.Info("wpasupplicant: failed to start network scan", slog.Any("err", err))
+		return statusUnknown, "scan: " + errName(err), nil
 	}
 	select {
 	case <-w.done:

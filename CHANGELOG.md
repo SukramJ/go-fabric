@@ -13,12 +13,16 @@ pseudo-version of `main`.
 ### Added
 
 - `controller.Config.PeerTiming` (`*client.Timing`): a host sets the controller's peer timing — `ProvenAddressRetention` (issue 507) and the other `client/peer.Timing` parameters — overriding `DefaultTiming` field-wise; nil keeps the defaults.
-- Certification harness: `make chiptool-ble-cases` runs connectedhomeip's Python cases whose TH commissions over BLE onto Wi-Fi in the test (the Wi-Fi TC-CNET cases) against `examples/ble-wifi-light` under chip's BlueZ and wpa_supplicant mocks, case by case, with `all-clusters-app-ble` as the control. The harness image gains a second Python controller built with BLE, `/opt/matter-ble` (a venv of the CHIP wheels over the image's site-packages, 48 MB; the base image's controller stays as it is for every other family); until the image is rebuilt from this Dockerfile the leg skips, naming why. CI job `chiptool-ble-cases`, not a required check, part of the release gate. TC-CNET-1.4, 4.1, 4.9 and 4.15 pass over BLE; TC-CNET-4.4 is an open finding (the wpa_supplicant driver's ScanNetworks under chip's mock).
+- Certification harness: `make chiptool-ble-cases` runs connectedhomeip's Python cases whose TH commissions over BLE onto Wi-Fi in the test (the Wi-Fi TC-CNET cases) against `examples/ble-wifi-light` under chip's BlueZ and wpa_supplicant mocks, case by case, with `all-clusters-app-ble` as the control. The harness image gains a second Python controller built with BLE, `/opt/matter-ble` (a venv of the CHIP wheels over the image's site-packages, 48 MB; the base image's controller stays as it is for every other family); until the image is rebuilt from this Dockerfile the leg skips, naming why. CI job `chiptool-ble-cases`, not a required check, part of the release gate. TC-CNET-1.4, 4.1, 4.9 and 4.15 pass over BLE; 4.4, 4.11 and 4.23 need what chip's wpa_supplicant mock does not serve (scan results, a second network, a failing join); 4.25 to 4.29 skip themselves (no per-device credentials).
 
 ### Changed
 
 - Dependencies: `modernc.org/sqlite` 1.61.0 → 1.61.1, which raises it in every consumer's build list (#500); the nested modules and `examples/ble-wifi-light` follow in their `go.mod`.
 - CI: a release pull request (head branch `release/*`) runs every certification family the nightly run covers, `long` included, plus the chip-tool suite, the control leg and the BLE-Wi-Fi leg, and the required check `chip certification cases against the reference daemon` fails unless all of them passed (issue 495); other pull requests run what they ran before.
+
+### Fixed
+
+- `wifi/wpasupplicant`: `ScanNetworks` arms its wait for `ScanDone` before the `Scan` call, as connectedhomeip sets its scan callback first. A `ScanDone` sent right behind the call's reply — chip's wpa_supplicant mock, a fast scan — was dropped as an earlier scan's, and the scan ended only at the 30 s scan timeout (TC-CNET-4.4 over BLE timed out at its ScanNetworks). A `Scan` call that fails disarms the wait.
 
 ## [0.22.2] — 2026-11-12
 

@@ -82,8 +82,8 @@ var bleCases = []bleCase{
 	{id: "TC-CNET-1.4", script: "TC_CNET_1_4.py", want: bleCasePass},
 	{id: "TC-CNET-4.1", script: "TC_CNET_4_1.py", want: bleCasePass},
 	{
-		id: "TC-CNET-4.4", script: "TC_CNET_4_4.py", want: bleCaseDefect,
-		reason: "step 4's ScanNetworks is answered only after the wpa_supplicant driver's 30 s scan timeout (wifi/wpasupplicant DefaultScanTimeout), past the TH's command timeout: chip's mock ends a scan at once (matter/testing/linux/wifi.py:403-412 at 6170af84); open finding in notes/parity/matter_behaviour_findings.md (suspected: a ScanDone between the Scan call's reply and the arming of the wait is dropped)",
+		id: "TC-CNET-4.4", script: "TC_CNET_4_4.py", want: bleCaseHarness,
+		reason: "step 4 expects ScanNetworks to return at least one network; the light answers at once with chip's mock's scan results, and the mock serves none (BSSs is an empty list, matter/testing/linux/wifi.py:693-695 at 6170af84); all-clusters-app-ble stops earlier, at step 3 (Networks not connected under the mock's unquoted SSID)",
 	},
 	{id: "TC-CNET-4.9", script: "TC_CNET_4_9.py", want: bleCasePass},
 	{
