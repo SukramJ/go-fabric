@@ -110,8 +110,15 @@ func (d *failsafeDevice) handle(req imRequest) (opcode uint8, payload []byte, ok
 // newTestFlow is a flow over a scripted device on a fake clock.
 func newTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool)) (*flow, *fakeClock) {
 	t.Helper()
+	return newLossyTestFlow(t, handle, nil)
+}
+
+// newLossyTestFlow is newTestFlow over a device that never receives the
+// requests lose names (scriptedDevice.lose).
+func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool), lose func(imRequest) bool) (*flow, *fakeClock) {
+	t.Helper()
 	clock := newFakeClock()
-	dev := &scriptedDevice{session: 0x0101, inbox: make(chan []byte, 1024), handle: handle}
+	dev := &scriptedDevice{session: 0x0101, inbox: make(chan []byte, 1024), handle: handle, lose: lose}
 	mgr, err := exchange.NewManager(&deviceConn{dev: dev}, exchange.Config{Clock: clock, Rand: func() float64 { return 0.5 }})
 	if err != nil {
 		t.Fatal(err)
@@ -422,6 +429,167 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 			t.Fatalf("the failed disarm is not logged: %q", logged.String())
 		}
 		if f.failSafeEnd.IsZero() {
+			t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
+		}
+	})
+}
+
+// armRequest is the expiry of the ArmFailSafe req carries; false when req
+// is anything else.
+func armRequest(req imRequest) (uint16, bool) {
+	if req.opcode != im.OpcodeInvokeRequest {
+		return 0, false
+	}
+	path, fields, err := decodeInvoke(req.payload)
+	if err != nil || path.Cluster != gencomm.ClusterID || path.Command != gencomm.CmdArmFailSafe {
+		return 0, false
+	}
+	var arm gencomm.ArmFailSafeRequest
+	if arm.DecodeTLV(fields) != nil {
+		return 0, false
+	}
+	return arm.ExpiryLengthSeconds, true
+}
+
+// TestFlowDisarmsFailsafeStartedNotAnswered (review II, R2-P0-rv-C01): the
+// disarm after an abort is owed from the moment the flow starts an
+// ArmFailSafe on the commissioning session, not from the device's answer
+// — a request under way may have armed the device, and the flow cannot
+// know. connectedhomeip's cancel branch sends its ArmFailSafe(0) whatever
+// stage was cancelled (src/controller/CHIPDeviceController.cpp:2219-2247
+// at 6170af84; a failed stage goes to kCleanup whatever it was,
+// src/controller/AutoCommissioner.cpp:465-468); here nothing is sent
+// before the first ArmFailSafe is started. A device without a fail-safe
+// answers ArmFailSafe(0) with success and no effect (matter.js
+// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:96-98
+// at db021da0).
+func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
+	t.Parallel()
+	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
+	arm := func(f *flow) step {
+		return step{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }}
+	}
+	// unanswered is a device that takes the nth ArmFailSafe with an expiry
+	// — it arms — and never answers it; the caller gives up at that
+	// moment.
+	unanswered := func(dev *failsafeDevice, n int, giveUp context.CancelFunc) func(imRequest) (uint8, []byte, bool) {
+		var seen atomic.Int32
+		return func(req imRequest) (uint8, []byte, bool) {
+			if expiry, ok := armRequest(req); ok && expiry != 0 && int(seen.Add(1)) == n {
+				dev.mu.Lock()
+				dev.arms = append(dev.arms, expiry)
+				dev.mu.Unlock()
+				giveUp()
+				return 0, nil, false
+			}
+			return dev.handle(req)
+		}
+	}
+
+	t.Run("the first ArmFailSafe in flight, the device armed", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f, _ := newTestFlow(t, unanswered(dev, 1, cancel))
+		f.steps = []step{arm(f)}
+		err := f.execute(ctx)
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60, 0}) { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60 0]: the device armed and was left armed", err, dev.armed())
+		}
+		if !f.failSafeEnd.IsZero() || f.failsafeMayBeArmed() {
+			t.Fatalf("after the confirmed disarm the flow still counts a fail-safe: end %v", f.failSafeEnd)
+		}
+	})
+
+	t.Run("the first ArmFailSafe in flight, the device never received it", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		var lost atomic.Int32
+		f, _ := newLossyTestFlow(t, dev.handle, func(req imRequest) bool {
+			if expiry, ok := armRequest(req); ok && expiry != 0 {
+				lost.Add(1)
+				cancel()
+				return true
+			}
+			return false
+		})
+		f.steps = []step{arm(f)}
+		err := f.execute(ctx)
+		// The flow cannot tell this from the case above: one disarm, which
+		// the device answers with success and no effect.
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{0}) || lost.Load() != 1 { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, the device saw %v after %d lost ArmFailSafe, want context.Canceled, [0] and 1", err, dev.armed(), lost.Load())
+		}
+	})
+
+	t.Run("the read before the first ArmFailSafe in flight: nothing is sent", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Step 7.1 reads BasicCommissioningInfo before it arms.
+		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if req.opcode == im.OpcodeReadRequest {
+				cancel()
+				return 0, nil, false
+			}
+			return dev.handle(req)
+		})
+		f.steps = []step{arm(f)}
+		err := f.execute(ctx)
+		if err != context.Canceled || len(dev.armed()) != 0 || f.failsafeMayBeArmed() { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and no ArmFailSafe", err, dev.armed())
+		}
+	})
+
+	t.Run("a re-arm in flight", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: info}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		f, clock := newTestFlow(t, unanswered(dev, 2, cancel))
+		// 29 s left after the second step: its bookkeeping re-arms.
+		f.steps = []step{arm(f), advanceStep(clock, 31*time.Second, 8)}
+		err := f.execute(ctx)
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60, 60, 0}) || !f.failSafeEnd.IsZero() { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60 60 0]", err, dev.armed())
+		}
+	})
+
+	t.Run("the disarm of an unanswered first ArmFailSafe failing", func(t *testing.T) {
+		t.Parallel()
+		// The device takes both and answers neither.
+		dev := &failsafeDevice{info: info}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		first := unanswered(dev, 1, cancel)
+		var disarms atomic.Int32
+		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if expiry, ok := armRequest(req); ok && expiry == 0 {
+				disarms.Add(1)
+				return 0, nil, false
+			}
+			return first(req)
+		})
+		var logged bytes.Buffer
+		f.log = slog.New(slog.NewTextHandler(&logged, nil))
+		f.abortDisarm = 50 * time.Millisecond
+		f.steps = []step{arm(f)}
+		start := time.Now()
+		err := f.execute(ctx)
+		if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
+		}
+		if took := time.Since(start); took > abortDisarmTimeout/2 {
+			t.Fatalf("the abort took %v: the disarm is not bounded by its own context", took)
+		}
+		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
+			t.Fatalf("the failed disarm is not logged: %q", logged.String())
+		}
+		if !f.failsafeMayBeArmed() {
 			t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
 		}
 	})

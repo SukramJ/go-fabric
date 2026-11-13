@@ -329,14 +329,20 @@ _, err := c.Pair(ctx, code, controller.PairOptions{
 ```
 
 A `Pair` or `Commission` whose context ends — cancelled, or past its
-deadline — while the device holds a fail-safe does not leave it armed:
-the commissioner sends ArmFailSafe with expiry 0 over the session the
-commissioning still has (PASE, or CASE after `Reconnect`), on a context
-of its own for at most 10 s, and returns the context's error unchanged. A
-device left armed would refuse a new commissioning until the fail-safe
-ran out. Nothing is sent before the first ArmFailSafe, after
-CommissioningComplete, or on a closed session; a disarm that fails is
-logged (`matter.controller.commissioning.reset_failsafe_failed`) and the
+deadline — after the commissioner has started an ArmFailSafe does not
+leave the device armed: the commissioner sends ArmFailSafe with expiry 0
+over the session the commissioning still has (PASE, or CASE after
+`Reconnect`), on a context of its own for at most 10 s, and returns the
+context's error unchanged. A device left armed would refuse a new
+commissioning until the fail-safe ran out. The disarm does not wait for
+the device to have answered the ArmFailSafe: a context that ends while
+the first one, or a later extension, is still under way is followed by
+the disarm too, since the request may have armed the device (one that
+holds no fail-safe answers the disarm with success and nothing happens).
+Nothing is sent before the commissioner has started its first
+ArmFailSafe, once the device has confirmed CommissioningComplete, or on
+a closed session; a disarm that fails is logged
+(`matter.controller.commissioning.reset_failsafe_failed`) and the
 fail-safe then expires on the device by itself. matter.js's flow has no
 abort signal; the behaviour follows connectedhomeip's `StopPairing`
 (*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
