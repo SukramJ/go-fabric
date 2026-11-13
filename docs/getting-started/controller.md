@@ -365,8 +365,16 @@ inside its mesh-local prefix or a routing or anycast locator) are
 attempted over CASE at port 5540, each once, beside what discovery
 delivers
 (`matter.controller.peer.address_hinted`), so a Thread node whose border
-router never publishes its operational record is still reached; and a
-`Reconnect` that fails names the device's last report, for example
+router never publishes its operational record is still reached. The
+report is the device's own statement and nothing verifies the addresses
+in it, so what is taken from it is bounded: the first 8
+operational interfaces — NetworkInterfaces' list bound — with their at
+most 8 IPv6 and 4 IPv4 addresses, only addresses that name one other
+host (no loopback, unspecified, multicast or IPv4 broadcast address), and
+at most `peer.MaxHintedAddresses` (96, the product) hinted addresses per
+connection process however many probes report new ones; the first address
+passed over is logged once (`matter.controller.peer.address_hint_limit`).
+A `Reconnect` that fails names the device's last report, for example
 `the device reports Thread role=Unassigned …, last networking
 status=NetworkNotFound`. A device that does not answer the probe
 changes nothing. The central on Linux is

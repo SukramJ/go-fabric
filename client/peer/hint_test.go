@@ -13,10 +13,12 @@ import (
 	"time"
 )
 
-// hintLog counts the address_hinted lines a logger handled.
+// hintLog counts the address_hinted and address_hint_limit lines a logger
+// handled.
 type hintLog struct {
-	mu sync.Mutex
-	n  int
+	mu     sync.Mutex
+	n      int
+	limits int
 }
 
 func (l *hintLog) Enabled(context.Context, slog.Level) bool { return true }
@@ -25,6 +27,11 @@ func (l *hintLog) Handle(_ context.Context, r slog.Record) error {
 	if r.Message == "matter.controller.peer.address_hinted" {
 		l.mu.Lock()
 		l.n++
+		l.mu.Unlock()
+	}
+	if r.Message == "matter.controller.peer.address_hint_limit" {
+		l.mu.Lock()
+		l.limits++
 		l.mu.Unlock()
 	}
 	return nil
@@ -56,6 +63,100 @@ func attemptsAt(c *connection, addr string) int {
 		}
 	}
 	return n
+}
+
+// hintedCount is how many addresses the process holds as hinted.
+func hintedCount(c *connection) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.hinted)
+}
+
+// TestHintAddressesBounded (review II, R2-P0-bound-E01): one connection
+// process takes at most MaxHintedAddresses hinted addresses — in one call
+// or over many, as a commissionee that reports other addresses on every
+// probe would have it — and says once that it passed some over. The
+// addresses it took stay queued; a known one is still a repeat, not an
+// overflow.
+func TestHintAddressesBounded(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		log := &hintLog{}
+		h := newHarness(t, func(c *Context) { c.Logger = slog.New(log) })
+		p, _ := h.set.For(testAddr)
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		eventually(t, "the process", func() bool { return process(p) != nil && p.status.IsResolving() })
+		hint := func(i int) netip.AddrPort {
+			return netip.AddrPortFrom(netip.AddrFrom16([16]byte{0: 0xfd, 1: 0x77, 14: byte(i >> 8), 15: byte(i)}), 5540)
+		}
+		first := make([]netip.AddrPort, 0, MaxHintedAddresses+10)
+		for i := range MaxHintedAddresses + 10 {
+			first = append(first, hint(i+1))
+		}
+		if n := p.HintAddresses(first...); n != MaxHintedAddresses {
+			t.Fatalf("one call with %d addresses queued %d, want MaxHintedAddresses (%d)", len(first), n, MaxHintedAddresses)
+		}
+		c := process(p)
+		for round := range 3 {
+			later := make([]netip.AddrPort, 0, 50)
+			for i := range 50 {
+				later = append(later, hint(1000+round*50+i))
+			}
+			if n := p.HintAddresses(later...); n != 0 {
+				t.Fatalf("a later probe's %d new addresses queued %d, want 0 past the bound", len(later), n)
+			}
+		}
+		if n := p.HintAddresses(first[0]); n != 0 {
+			t.Fatalf("a repeated hint queued %d", n)
+		}
+		if got := hintedCount(c); got != MaxHintedAddresses {
+			t.Fatalf("the process holds %d hinted addresses, want %d", got, MaxHintedAddresses)
+		}
+		c.mu.Lock()
+		queued := len(c.pending) + len(c.attempts)
+		c.mu.Unlock()
+		if queued > MaxHintedAddresses {
+			t.Fatalf("%d targets pending or attempted, want at most %d", queued, MaxHintedAddresses)
+		}
+		log.mu.Lock()
+		lines, limits := log.n, log.limits
+		log.mu.Unlock()
+		if lines != MaxHintedAddresses || limits != 1 {
+			t.Fatalf("%d address_hinted lines and %d address_hint_limit lines, want %d and 1", lines, limits, MaxHintedAddresses)
+		}
+		p.Close(context.Background())
+	})
+}
+
+// TestHintAddressesUnicastOnly (review II, R2-P0-bound-E01): an address
+// that names no single host — unspecified, multicast, the IPv4 limited
+// broadcast and the reserved range it lies in, IPv4 "this network" — is
+// not queued, in either family and IPv4-mapped; a unicast address beside
+// them is.
+func TestHintAddressesUnicastOnly(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, nil)
+		p, _ := h.set.For(testAddr)
+		connectAsync(p, ConnectOptions{ConnectionTimeout: -1})
+		eventually(t, "the process", func() bool { return process(p) != nil && p.status.IsResolving() })
+		for _, a := range []string{
+			"[::]:5540", "[ff02::1]:5540", "[ff05::fb]:5540",
+			"0.0.0.0:5540", "0.1.2.3:5540", "224.0.0.251:5540", "239.1.1.1:5540", "240.0.0.1:5540", "255.255.255.255:5540",
+			"[::ffff:255.255.255.255]:5540", "[::ffff:224.0.0.251]:5540",
+		} {
+			if n := p.HintAddresses(netip.MustParseAddrPort(a)); n != 0 {
+				t.Errorf("%s was queued", a)
+			}
+		}
+		if got := hintedCount(process(p)); got != 0 {
+			t.Fatalf("%d addresses hinted, want none", got)
+		}
+		if n := p.HintAddresses(netip.MustParseAddrPort("192.0.2.7:5540"), netip.MustParseAddrPort(addr1)); n != 2 {
+			t.Fatalf("two unicast addresses queued %d", n)
+		}
+		p.Close(context.Background())
+	})
 }
 
 // TestHintAddressesWithoutProcess: without a running connection process a

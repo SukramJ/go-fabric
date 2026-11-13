@@ -19,10 +19,14 @@ import (
 // process ends or deletes it (connect). An address is queued once per
 // connection process: one hinted before — whether its attempt still runs
 // or was deleted since — is passed over, and so is an address attempted
-// or queued already, an invalid address, port 0 and an IPv6 link-local
-// address without a zone. Without a running process (none started, or it
-// ended) nothing is queued. CASE authenticates the node, so an address
-// needs no trust of its own: at a wrong one the attempt finds nobody.
+// or queued already, an invalid address, port 0, an IPv6 link-local
+// address without a zone and an address that is no unicast destination
+// (unicastDestination: unspecified, multicast, the IPv4 limited broadcast).
+// Without a running process (none started, or it ended) nothing is queued.
+// CASE authenticates the node, so an address needs no trust of its own: at
+// a wrong one the attempt finds nobody. It does send there, though, so a
+// process takes at most [MaxHintedAddresses] hinted addresses, over all
+// calls; the ones past it are passed over, which the process logs once.
 //
 // A hinted address ranks after the discovered ones (shiftLocked), and
 // while only hinted attempts are in flight the first discovered address
@@ -46,14 +50,18 @@ func (p *Peer) HintAddresses(addrs ...netip.AddrPort) int {
 	if c.ctx.Err() != nil || c.session != nil {
 		return 0
 	}
-	n := 0
+	n, over := 0, 0
 	for _, ap := range addrs {
 		ip := ap.Addr().Unmap()
-		if !ip.IsValid() || ap.Port() == 0 || (ip.Is6() && ip.IsLinkLocalUnicast() && ip.Zone() == "") {
+		if !unicastDestination(ip) || ap.Port() == 0 || (ip.Is6() && ip.IsLinkLocalUnicast() && ip.Zone() == "") {
 			continue
 		}
 		a := discovery.Address{IP: ip, Port: ap.Port()}
 		if _, seen := c.hinted[a.AddrPort()]; seen || c.queuedLocked(a) {
+			continue
+		}
+		if len(c.hinted) >= MaxHintedAddresses {
+			over++
 			continue
 		}
 		c.hinted[a.AddrPort()] = hintActive
@@ -63,7 +71,47 @@ func (p *Peer) HintAddresses(addrs ...netip.AddrPort) int {
 		n++
 		p.log.Info("matter.controller.peer.address_hinted", slog.String("address", a.String()))
 	}
+	if over > 0 && !c.hintLimitLogged {
+		c.hintLimitLogged = true
+		p.log.Warn("matter.controller.peer.address_hint_limit", slog.Int("limit", MaxHintedAddresses), slog.Int("passed_over", over))
+	}
 	return n
+}
+
+// MaxHintedAddresses bounds the hinted addresses of one connection process
+// ([Peer.HintAddresses]). The addresses are a device's own statement that
+// nothing verifies, and every one becomes a CASE target:
+// without a bound a commissionee steers one Sigma1 per address it names at
+// hosts of its choosing, and grows the candidate list for as long as the
+// connection runs.
+//
+// 96 is what one GeneralDiagnostics NetworkInterfaces attribute — the one
+// source of hints this module has, the commissioner's reconnect probe —
+// can hold: at most 8 interfaces, each with at most 8 IPv6 and 4 IPv4
+// addresses (matter.js packages/model/src/standard/elements/
+// general-diagnostics.element.ts:27, :195 and :191 at db021da0, the
+// constraints "max 8", "max 8" and "max 4"; this module's copy is the
+// generated cluster/spec/generaldiagnostics definition, and the
+// commissioner's TestReconnectProbeBoundsReportedAddresses holds the
+// product against it). A device that reports other addresses on a later
+// probe does not get a second allowance: the bound is per process.
+const MaxHintedAddresses = 96
+
+// unicastDestination reports whether ip can be the destination of a
+// datagram to one host: not the unspecified address, not a multicast
+// address, and in IPv4 neither in 0.0.0.0/8 ("this network") nor in
+// 240.0.0.0/4 (reserved; the limited broadcast 255.255.255.255 is its
+// last address). A directed broadcast cannot be told from a host address
+// without the subnet and is not looked for.
+func unicastDestination(ip netip.Addr) bool {
+	if !ip.IsValid() || ip.IsUnspecified() || ip.IsMulticast() {
+		return false
+	}
+	if ip.Is4() {
+		first := ip.As4()[0]
+		return first != 0 && first < 240
+	}
+	return true
 }
 
 // hintState is what the process knows of a hinted address.

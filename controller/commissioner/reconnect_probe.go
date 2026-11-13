@@ -27,7 +27,11 @@ import (
 // routable addresses it reports to the connection. Ahead of matter.js and
 // connectedhomeip, which wait for DNS-SD here; a node whose operational
 // record a Thread border router never publishes is otherwise unreachable,
-// and a failure says nothing of why.
+// and a failure says nothing of why. The report is the device's statement
+// and nothing verifies its addresses: what the probe takes from it is
+// bounded by what the attribute may hold (addInterfaces) and filtered to
+// addresses of one other host (routableAddr), and the connection takes at
+// most peer.MaxHintedAddresses of them (peer.Peer.HintAddresses).
 const (
 	// reconnectProbeFirst is how long the transition runs before the
 	// first probe: a reconnect discovery serves at once needs none, and
@@ -66,6 +70,9 @@ type deviceNetworkReport struct {
 	meshLocalCount int
 	// interfacesKnown is NetworkInterfaces read at all.
 	interfacesKnown bool
+	// interfacesOver counts the operational interfaces past the
+	// attribute's list bound, which are not taken (addInterfaces).
+	interfacesOver int
 }
 
 // key is the report as one comparable string: a probe logs when it
@@ -153,11 +160,20 @@ func addrList(addrs []netip.Addr) string {
 
 // routableAddr reports whether a probed address can carry the operational
 // connection: a link-local address has no zone the controller could use
-// across the border router, and the others name no peer. A Thread
-// mesh-local address is routable by this test but not from off the mesh
-// (meshLocalAddr).
+// across the border router, and the others name no peer — loopback, the
+// unspecified address, multicast, and in IPv4 "this network" (0.0.0.0/8)
+// and the reserved 240.0.0.0/4 with the limited broadcast, which
+// peer.Peer.HintAddresses passes over as well. A Thread mesh-local address
+// is routable by this test but not from off the mesh (meshLocalAddr).
 func routableAddr(a netip.Addr) bool {
-	return a.IsValid() && !a.IsLinkLocalUnicast() && !a.IsLoopback() && !a.IsUnspecified() && !a.IsMulticast()
+	if !a.IsValid() || a.IsLinkLocalUnicast() || a.IsLoopback() || a.IsUnspecified() || a.IsMulticast() {
+		return false
+	}
+	if a.Is4() {
+		first := a.As4()[0]
+		return first != 0 && first < 240
+	}
+	return true
 }
 
 // meshLocalAddr reports whether a is a Thread mesh-local address, which
@@ -326,6 +342,9 @@ func (r *deviceNetworkReport) logAttrs() []any {
 		if n := len(r.addresses) - len(r.routable); n > 0 {
 			out = append(out, slog.Int("ignored", n))
 		}
+		if r.interfacesOver > 0 {
+			out = append(out, slog.Int("interfaces_ignored", r.interfacesOver))
+		}
 	}
 	return out
 }
@@ -362,14 +381,54 @@ func (f *flow) probePaths() []im.ConcreteAttributePath {
 	return paths
 }
 
+// maxProbedInterfaces is how many interfaces the probe takes from one
+// report: the list bound of GeneralDiagnostics NetworkInterfaces, read from
+// the generated definition ("max 8"; matter.js packages/model/src/standard/
+// elements/general-diagnostics.element.ts:27 at db021da0). Without a bound
+// in the definition it takes none.
+func maxProbedInterfaces() int {
+	a := gendiag.Definition.Attribute(gendiag.AttrNetworkInterfaces)
+	if a == nil || !a.Constraint.Max.IsInt() {
+		return 0
+	}
+	return int(a.Constraint.Max.Int)
+}
+
+// addInterfaceList takes a NetworkInterfaces value (addInterfaces). The
+// list itself is decoded whatever its length: connectedhomeip encodes
+// every interface its platform lists
+// (src/app/clusters/general-diagnostics-server/GeneralDiagnosticsCluster.cpp:437-446
+// at 6170af84), so a device with more than the bound is not left out for
+// it. An entry is decoded by the generated NetworkInterface, which holds
+// its address lists to their bounds (8 IPv6, 4 IPv4, each of its exact
+// length; connectedhomeip sizes them the same,
+// src/include/platform/DiagnosticDataProvider.h:42-43): a value with an
+// entry past them does not decode and is left out as a whole.
+func (r *deviceNetworkReport) addInterfaceList(n spec.Node) {
+	if ifaces, err := spec.DecodeList(spec.DecodeStruct[gendiag.NetworkInterface])(n); err == nil {
+		r.addInterfaces(ifaces)
+	}
+}
+
 // addInterfaces takes the addresses of the operational interfaces, each
-// once, the routable ones marked.
+// once, the routable ones marked — of the first maxProbedInterfaces
+// operational interfaces, in the device's order; the ones after them are
+// counted (interfacesOver) and not taken. With the generated entry's own
+// bounds that is at most peer.MaxHintedAddresses addresses per report: the
+// report is the device's statement, and what the probe takes from it is
+// logged, named in the step's failure and attempted.
 func (r *deviceNetworkReport) addInterfaces(ifaces []gendiag.NetworkInterface) {
 	r.interfacesKnown = true
+	limit, taken := maxProbedInterfaces(), 0
 	for _, iface := range ifaces {
 		if !iface.IsOperational {
 			continue
 		}
+		if taken >= limit {
+			r.interfacesOver++
+			continue
+		}
+		taken++
 		for _, raw := range slices.Concat(iface.IPv6Addresses, iface.IPv4Addresses) {
 			a, ok := netip.AddrFromSlice(raw)
 			if !ok {
@@ -422,9 +481,7 @@ func parseNetworkReport(report *interaction.Report) *deviceNetworkReport {
 		}
 	}
 	if n, ok := value(gendiag.ClusterID, gendiag.AttrNetworkInterfaces); ok {
-		if ifaces, err := spec.DecodeList(spec.DecodeStruct[gendiag.NetworkInterface])(n); err == nil {
-			r.addInterfaces(ifaces)
-		}
+		r.addInterfaceList(n)
 	}
 	if n, ok := value(threaddiag.ClusterID, threaddiag.AttrRoutingRole); ok {
 		if v, err := spec.DecodeNullable(spec.DecodeUint[uint8](8))(n); err == nil && !v.Null {
