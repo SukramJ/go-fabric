@@ -708,6 +708,21 @@ type Bridge struct {
 	// b.mu across that, concurrent reads (Topology, Dispatcher)
 	// would block on the listener's bind latency.
 	startClaim atomic.Bool
+	// lifecycle runs Start and Stop one at a time: a Stop that arrives
+	// while a Start is running waits for it and then stops the run,
+	// instead of finding nothing started and letting the bridge come up
+	// after it, or tearing down a run Start goes on to finish — an ACK
+	// pump nobody cancels, the radio marked running (review II,
+	// R2-P1-req2-05; matter.js runs start and stop on the lifecycle's
+	// mutex, BD-Matter-Bridge-StartDuringStopRefused). Start takes it after
+	// its claim, so a Start during a Stop is still refused at once. A
+	// one-slot semaphore, so that the wait for it ends with the caller's
+	// context ([Bridge.lifecycleSlot]); guarded by mu until made.
+	lifecycle chan struct{}
+	// runGen counts the runs Stop ended; guarded by mu. A Reassemble that
+	// started in one run installs nothing once it is over
+	// ([Bridge.Reassemble]).
+	runGen uint64
 
 	// openUDP, when set (internal/bridgeseam UseListener), opens the
 	// UDP listener Start serves instead of binding a socket: fabrictest's
@@ -881,12 +896,19 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// can't both pass the check + race ahead to bind the same UDP
 	// port. If any downstream step fails, the deferred reset gives
 	// the caller a chance to retry without a stale flag blocking it.
-	if !b.startClaim.CompareAndSwap(false, true) {
-		return ErrAlreadyStarted
+	release, err := b.claimStart(ctx)
+	if err != nil {
+		return err
 	}
+	defer release()
 	committed := false
 	defer func() {
 		if !committed {
+			// The initial assembly may have wired the host's listeners;
+			// a Start that failed after it leaves none behind (review II,
+			// R2-P1-req2-06) — Stop on a bridge that never started does
+			// not detach them.
+			b.detachHostListeners()
 			b.startClaim.Store(false)
 		}
 	}()
@@ -901,7 +923,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// denies that instead of reading it as commissioning traffic.
 
 	// --- Topology assembly ---
-	if err := b.reassembleLocked(ctx); err != nil {
+	if err := b.reassembleLocked(ctx, nil); err != nil {
 		return fmt.Errorf("bridge: initial topology: %w", err)
 	}
 
@@ -974,16 +996,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.mu.Unlock()
 	b.setBLERunning(true)
 	if pumpTracker != nil {
-		pumpCtx, pumpCancel := context.WithCancel(context.Background())
-		pumpDone := make(chan struct{})
-		go func() {
-			defer close(pumpDone)
-			b.runAckPump(pumpCtx)
-		}()
-		b.mu.Lock()
-		b.pumpCancel = pumpCancel
-		b.pumpDone = pumpDone
-		b.mu.Unlock()
+		b.startAckPump()
 	}
 
 	// Join the multicast group of every group with a member endpoint, and
@@ -1022,14 +1035,74 @@ func (b *Bridge) Start(ctx context.Context) error {
 // consistent view at every point.
 //
 // Returns [ErrNotStarted] when the bridge has not been [Start]ed.
+//
+// A Reassemble that overlaps a [Bridge.Stop] — it passed this check
+// before the Stop ran — swaps nothing in and leaves no host listener
+// registered once the run it began in is over; it returns
+// [ErrNotStarted] (review II, R2-P1-req2-06).
 func (b *Bridge) Reassemble(ctx context.Context) error {
 	b.mu.RLock()
-	started := b.started
+	started, run := b.started, b.runGen
 	b.mu.RUnlock()
 	if !started {
 		return ErrNotStarted
 	}
-	return b.reassembleLocked(ctx)
+	return b.reassembleLocked(ctx, &run)
+}
+
+// claimStart takes the start claim — [ErrAlreadyStarted] when a run or
+// a Stop holds it — and then the lifecycle slot; the claim is given back
+// when the slot cannot be had.
+func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
+	if !b.startClaim.CompareAndSwap(false, true) {
+		return nil, ErrAlreadyStarted
+	}
+	release, err = b.enterLifecycle(ctx)
+	if err != nil {
+		b.startClaim.Store(false)
+		return nil, err
+	}
+	return release, nil
+}
+
+// startAckPump runs the ACK pump of the run Start is bringing up until
+// Stop cancels it.
+//
+//nolint:contextcheck // the pump runs in a fresh context torn down explicitly via the stored pumpCancel (Stop)
+func (b *Bridge) startAckPump() {
+	pumpCtx, pumpCancel := context.WithCancel(context.Background())
+	pumpDone := make(chan struct{})
+	go func() {
+		defer close(pumpDone)
+		b.runAckPump(pumpCtx)
+	}()
+	b.mu.Lock()
+	b.pumpCancel = pumpCancel
+	b.pumpDone = pumpDone
+	b.mu.Unlock()
+}
+
+// enterLifecycle waits for the lifecycle slot ([Bridge.lifecycle]) until
+// ctx ends and returns its release.
+func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error) {
+	b.mu.Lock()
+	if b.lifecycle == nil {
+		b.lifecycle = make(chan struct{}, 1)
+	}
+	slot := b.lifecycle
+	b.mu.Unlock()
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("bridge: waiting for a start or stop in progress: %w", ctx.Err())
+	}
+}
+
+// runEndedLocked reports whether the run a Reassemble began in (run, nil
+// for Start's own assembly) is over. Caller holds b.mu.
+func (b *Bridge) runEndedLocked(run *uint64) bool {
+	return run != nil && (!b.started || b.runGen != *run)
 }
 
 // reassembleLocked is the shared implementation behind initial
@@ -1038,8 +1111,10 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 // and only the swap into b.topology / b.dispatcher takes the write
 // lock. Concurrent Reassembles serialise harmlessly: each finishes
 // independently, and the last writer wins (subsequent reads see one
-// of the two assembled topologies, never a torn intermediate).
-func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
+// of the two assembled topologies, never a torn intermediate). run is
+// the run a Reassemble began in ([Bridge.runEndedLocked]); nil for
+// Start's assembly.
+func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
 	topology, err := b.snapshotter(ctx)
 	if err != nil {
 		return fmt.Errorf("bridge: assemble: %w", err)
@@ -1155,6 +1230,13 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	}
 
 	b.mu.Lock()
+	if b.runEndedLocked(run) {
+		// Stop ran while this was assembled: nothing is swapped into the
+		// stopped bridge, and the switch hooks wired for it go again.
+		b.mu.Unlock()
+		runUnsubscribers(switchUnsubs)
+		return ErrNotStarted
+	}
 	prevTopology := b.topology
 	b.topology = topology
 	// The sources once more, under the lock of the swap: an Attach… that
@@ -1172,6 +1254,15 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// notifiers are called to unregister and to register, and their
 	// callbacks re-enter the bridge (review II, W2-conc-07).
 	b.rewireMeasurementListeners()
+	// A Stop that set in after the swap detaches what it finds; one that
+	// set in before this wiring was installed missed it, so the wiring
+	// goes again here.
+	b.mu.RLock()
+	ended := b.runEndedLocked(run)
+	b.mu.RUnlock()
+	if ended {
+		b.detachHostListeners()
+	}
 
 	// Drain the swapped-out press-DP hooks now that the new topology
 	// is live. Doing this after the swap (instead of before wiring)
@@ -1869,7 +1960,18 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // the serve goroutine to exit. Idempotent — a second call is a
 // no-op. Safe to call after a failed [Start]. The bridge counts as
 // started until Stop returns: a [Bridge.Start] before that is refused.
+// A Stop that overlaps a Start waits for it, until ctx ends, and then
+// stops its run.
+//
+//nolint:funlen // one teardown sequence; its order is the contract, and split up it is no longer visible in one place
 func (b *Bridge) Stop(ctx context.Context) error {
+	// A Start still running finishes first; Stop then stops its run
+	// (review II, R2-P1-req2-05).
+	release, err := b.enterLifecycle(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
 	// CASE sessions and show the bridge unresponsive for minutes after
@@ -1911,6 +2013,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false
+	b.runGen++
 	b.mu.Unlock()
 	// The start claim is given back when this Stop has finished, not
 	// here: what follows — the wait for the handlers in flight, the
