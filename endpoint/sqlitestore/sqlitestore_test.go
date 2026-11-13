@@ -18,22 +18,22 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // The store must satisfy the port it exists to implement; a signature drift
 // on either side is a compile error rather than a test failure.
 var _ endpoint.Store = (*sqlitestore.Store)(nil)
 
-// connectionPragmas ride on the DSN because SQLite resets connection-scoped
-// pragmas per connection, and a pool opens more than one.
-const connectionPragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
-
 // openAt opens (creating on first use) a database at path with the schema
 // applied, and closes it when the test ends. Two calls with the same path
-// are what a restart looks like from this package's side.
+// are what a restart looks like from this package's side. The module's
+// opener puts the pragmas on the DSN — foreign keys, the busy timeout and
+// here WAL — because SQLite resets connection-scoped pragmas per
+// connection, and a pool opens more than one.
 func openAt(t *testing.T, path string) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path+"?"+connectionPragmas)
+	db, err := store.OpenSQLite(path, "journal_mode(WAL)")
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}

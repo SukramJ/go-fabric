@@ -6,7 +6,6 @@ package bridgetest_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -22,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -36,7 +36,7 @@ const (
 // commissioner is tested against.
 func newDevice(t *testing.T, adv mdns.Advertiser, path string) *node.Node {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(path)
 	if err != nil {
 		t.Fatal(err)
 	}

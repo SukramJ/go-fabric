@@ -24,15 +24,16 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 const testPasscode = 20202021
 
-// openDB opens a file-backed SQLite database with the pragmas the daemon
-// uses (examples/reference-bridge/persist.go:34).
+// openDB opens a file-backed SQLite database with the module's opener, as
+// the node opens its own file (node/store_path.go).
 func openDB(t *testing.T, path string) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(path)
 	if err != nil {
 		t.Fatal(err)
 	}

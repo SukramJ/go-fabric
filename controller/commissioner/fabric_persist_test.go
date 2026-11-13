@@ -6,7 +6,6 @@ package commissioner
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -95,7 +94,7 @@ func TestFabricPersistsAcrossRestart(t *testing.T) {
 	_, addr := startNode(t, nil, "127.0.0.1:0")
 	path := filepath.Join(t.TempDir(), "controller.db")
 	open := func() (*controller, func()) {
-		db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+		db, err := store.OpenSQLite(path, "journal_mode(WAL)")
 		if err != nil {
 			t.Fatal(err)
 		}

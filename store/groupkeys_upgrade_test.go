@@ -5,7 +5,6 @@ package store_test
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -90,7 +89,7 @@ CREATE TABLE matter_group_key_map (
 func TestUpgrade_RebuildsLegacyGroupKeyMap(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "legacy.db")+"?"+connectionPragmas)
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "legacy.db"), walMode)
 	if err != nil {
 		t.Fatal(err)
 	}

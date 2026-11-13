@@ -11,7 +11,6 @@ package node_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -37,6 +36,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -105,7 +105,7 @@ func (r *unicastRedirect) SendMulticast(group net.IP, port int, payload []byte) 
 
 func groupLiveNode(t *testing.T, name string) (*node.Node, *onoff.Server) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), name+".db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), name+".db"))
 	if err != nil {
 		t.Fatal(err)
 	}

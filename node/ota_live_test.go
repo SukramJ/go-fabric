@@ -14,7 +14,6 @@ package node_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -43,6 +42,7 @@ import (
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -149,7 +149,7 @@ func (f *liveFabric) commission(ctx context.Context, t *testing.T, n *node.Node,
 // liveNode is a node.Node on loopback; edit amends its configuration.
 func liveNode(t *testing.T, name string, edit func(*node.Config)) *node.Node {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), name+".db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), name+".db"))
 	if err != nil {
 		t.Fatal(err)
 	}

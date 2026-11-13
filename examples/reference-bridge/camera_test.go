@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"database/sql"
 	"log/slog"
 	"math/big"
 	"path/filepath"
@@ -26,7 +25,7 @@ import (
 
 func openTestStore(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "reference-bridge.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "reference-bridge.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

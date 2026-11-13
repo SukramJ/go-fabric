@@ -5,7 +5,6 @@ package dcl_test
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"net"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 func init() { dcl.SetHarnessNode(startNode) }
@@ -25,7 +25,7 @@ func init() { dcl.SetHarnessNode(startNode) }
 // chain) for the commission tests of commission_test.go.
 func startNode(t *testing.T, chain *secattestation.Chain) *net.UDPAddr {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "node.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

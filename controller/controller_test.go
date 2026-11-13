@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // silentConn is a DNS-SD socket on which nothing answers.
@@ -34,7 +35,7 @@ func silentNames(log *slog.Logger) (*discovery.Names, error) {
 
 func openDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "controller.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "controller.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

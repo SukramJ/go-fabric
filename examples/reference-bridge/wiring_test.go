@@ -12,7 +12,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -195,7 +194,7 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 func TestBlindPositionSurvivesARestart(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "reference-bridge.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "reference-bridge.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ import (
 // openEmptyDB opens a fresh database without the schema.
 func openEmptyDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "empty.db")+"?"+connectionPragmas)
+	db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "empty.db"), walMode)
 	if err != nil {
 		t.Fatal(err)
 	}

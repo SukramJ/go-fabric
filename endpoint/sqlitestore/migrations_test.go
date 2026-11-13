@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestMigrationsMatchApply: the steps, applied to an empty database, give
@@ -18,7 +19,7 @@ func TestMigrationsMatchApply(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	empty := func() *sql.DB {
-		db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "m.db")+"?"+connectionPragmas)
+		db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "m.db"), "journal_mode(WAL)")
 		if err != nil {
 			t.Fatal(err)
 		}
