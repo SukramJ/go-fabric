@@ -385,7 +385,8 @@ func (r *RootClusters) configured() []contract.ClusterServer {
 // withAttestation puts the attestation material into opcredsCfg: with
 // Attestation.Provider a provider the server calls on the commissioner's
 // first ask, never here (OperationalCredentialsServer.ts:560-572), else the
-// configured or test material.
+// configured or test material; a host's chain is checked against the
+// product description either way (checkProduct).
 func withAttestation(cfg *Config, opcredsCfg *mattercore.OpcredsConfig) error {
 	if provider := cfg.Attestation.Provider; provider != nil {
 		opcredsCfg.AttestationProvider = func(ctx context.Context) (mattercore.OpcredsAttestation, error) {
@@ -393,9 +394,15 @@ func withAttestation(cfg *Config, opcredsCfg *mattercore.OpcredsConfig) error {
 			if err != nil {
 				return mattercore.OpcredsAttestation{}, err
 			}
+			if err := checkProduct(cfg, chain); err != nil {
+				return mattercore.OpcredsAttestation{}, fmt.Errorf("node: attestation provider: %w", err)
+			}
 			return attestationMaterialOf(cfg, chain, cd)
 		}
 		return nil
+	}
+	if err := checkProduct(cfg, cfg.Attestation.Chain); err != nil {
+		return fmt.Errorf("node: attestation chain: %w", err)
 	}
 	m, err := attestationMaterialOf(cfg, cfg.Attestation.Chain, cfg.Attestation.CertificationDeclaration)
 	if err != nil {
@@ -404,6 +411,21 @@ func withAttestation(cfg *Config, opcredsCfg *mattercore.OpcredsConfig) error {
 	opcredsCfg.DACPrivateKey, opcredsCfg.DAC, opcredsCfg.PAI = m.DACPrivateKey, m.DAC, m.PAI
 	opcredsCfg.CertificationDeclaration = m.CertificationDeclaration
 	return nil
+}
+
+// checkProduct holds a host's chain — Attestation.Chain at New, the one
+// Attestation.Provider returns on the commissioner's ask — to the product
+// description, as resolveAttestation holds the one Attestation.Files
+// loads: matter.js validates every certification against the product,
+// whether configured or supplied by a function (DeviceCertification.ts:45,
+// :76-77 at db021da0). A nil chain is the test chain built for the
+// product, and a product description without ids checks nothing.
+func checkProduct(cfg *Config, chain *attestation.Chain) error {
+	pd := cfg.ProductDescription
+	if chain == nil || (pd.VendorID == 0 && pd.ProductID == 0) {
+		return nil
+	}
+	return validateProduct(chain, pd)
 }
 
 // attestationMaterialOf returns chain and cd, the CSA test material for

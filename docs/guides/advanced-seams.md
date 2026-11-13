@@ -191,7 +191,11 @@ only). `Node.Stop` closes it either way.
 
 **When.** A host with a chain the files cannot express — a DAC key held
 in an HSM — builds an `attestation.Chain` and sets
-`Config.Attestation.Chain`. A host that prints a payload for a node it
+`Config.Attestation.Chain` (or returns it from `Config.Attestation.Provider`);
+its DAC and PAI must name `Config.ProductDescription`'s vendor and product
+id, as a chain `Attestation.Files` loads must — another product's fails
+`node.New` (from the provider: that commissioner's request) with
+`attestation.ErrProductMismatch`. A host that prints a payload for a node it
 does not run encodes it with `secure/setup`.
 
 A validator that runs without a node — a configuration package, a CLI
@@ -216,7 +220,7 @@ and sessions into its own hands. Reading them is a facade route,
 seam, for a host that needs what the diagnostics leave out. Closing is
 the node's.
 
-*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
+*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/root.go` (`checkProduct`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
 
 ## `groups`
 
