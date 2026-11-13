@@ -431,3 +431,119 @@ func TestCitecheckSecondTree(t *testing.T) {
 		t.Errorf("a matter.js path cited as matterjs-server's = %d, want 1 (not found in the second tree)", code)
 	}
 }
+
+// citecheckRegisterRatchet is the number of citations in the parity
+// registers (notes/parity/*.md) that do not resolve: the cited file is not
+// in the tree at the commit the sentence is checked at, or lacks the cited
+// lines (registers.json, written by `make cite-report`; review II,
+// W6-reg-12). Exact in both directions, as citecheckDriftRatchet is: a new
+// one fails, and a corrected one fails until the constant is lowered in
+// the same commit. The goal is 0.
+//
+// 20 at the first measurement, at matter.js db021da0 (2026-11-13): 17 in
+// by_design.md and 3 in the findings register; 8 "file not found", 7
+// "ambiguous", 4 "line beyond end of file" and 1 "no matterjs-server
+// commit"; 7 of them cite matterjs-server.
+const citecheckRegisterRatchet = 20
+
+func TestCitecheckRegistersOnRatchet(t *testing.T) {
+	data, err := os.ReadFile("registers.json")
+	if err != nil {
+		t.Fatalf("read the committed registers.json: %v (regenerate with make cite-report)", err)
+	}
+	var entries []registerEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("registers.json does not parse: %v", err)
+	}
+	if got := len(entries); got != citecheckRegisterRatchet {
+		t.Errorf("registers.json lists %d citations of the parity registers that do not resolve, the ratchet is %d: a new one is corrected in the register, a drop lowers citecheckRegisterRatchet in the same commit", got, citecheckRegisterRatchet)
+	}
+	sorted := sort.SliceIsSorted(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if a.File != b.File {
+			return a.File < b.File
+		}
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		return a.Citation < b.Citation
+	})
+	if !sorted {
+		t.Error("registers.json is not sorted by file, line and citation")
+	}
+	for _, e := range entries {
+		if !strings.HasPrefix(e.File, registerDir+"/") || e.Line < 1 || e.Citation == "" || e.Error == "" {
+			t.Errorf("incomplete register entry %+v", e)
+		}
+	}
+}
+
+// TestCitecheckRegisters runs the tool over a module with one register:
+// a citation that resolves leaves no row, one beyond the file's end and
+// one of a file the tree lacks are rows of registers.json — in a
+// paragraph that wraps, a table row, a list item and a fenced block —
+// and none of them is a hard error of the run or a citation of summary.md.
+func TestCitecheckRegisters(t *testing.T) {
+	// Spelt in pieces, as in TestCitecheckSecondTree.
+	const ts = ".t" + "s"
+	matter, pin := gitInit(t, map[string]string{"packages/a/src/Bar" + ts: strings.Repeat("// line\n", 20)})
+	root := t.TempDir()
+	write := func(name, body string) {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("parity/schema.json", fmt.Sprintf(`{"matter": {"sourceCommit": %q}}`, pin))
+	write("a.go", "package a\n")
+	write(registerDir+"/reg.md", strings.Join([]string{
+		"# Register",
+		"",
+		"A paragraph that cites Bar" + ts + ":3 and wraps packages/a/",
+		"src/Bar" + ts + ":4 over two lines.",
+		"",
+		"| ID | where |",
+		"| --- | --- |",
+		"| X | `Bar" + ts + ":99` |",
+		"",
+		"- an item citing Gone" + ts + ":1",
+		"  and continuing",
+		"",
+		"```",
+		"Bar" + ts + ":21",
+		"```",
+		"",
+	}, "\n"))
+	write("notes/other/unread.md", "Gone"+ts+":7 is outside the registers.\n")
+
+	out := t.TempDir()
+	if code, err := run(root, matter, filepath.Join(t.TempDir(), "none"), out, ""); code != 0 {
+		t.Fatalf("run = %d, %v; want 0: a register's failure is not a hard error of the run", code, err)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "registers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []registerEntry
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []registerEntry{
+		{File: registerDir + "/reg.md", Line: 8, Citation: "Bar" + ts + ":99", Error: errLine},
+		{File: registerDir + "/reg.md", Line: 10, Citation: "Gone" + ts + ":1", Error: errNotFound},
+		{File: registerDir + "/reg.md", Line: 14, Citation: "Bar" + ts + ":21", Error: errLine},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("registers.json = %+v\nwant %+v", got, want)
+	}
+	sum, err := os.ReadFile(filepath.Join(out, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(sum), "| Citations | 0 |") {
+		t.Errorf("the register's citations are counted in summary.md:\n%s", sum)
+	}
+}

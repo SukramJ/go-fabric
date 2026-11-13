@@ -253,7 +253,7 @@ ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.m
 	exit $$rc
 
 .PHONY: cite-report
-cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js (and matterjs-server) citations checked at the pin
+cite-report: ## regenerate script/citecheck/drift.json, summary.md and registers.json — the matter.js (and matterjs-server) citations checked at the pin
 	@# Reads MATTERJS_DIR and MATTERJS_SERVER_DIR through git plumbing only (a
 	@# clone may stand at any commit that has the cited ones). Exit 2 when a
 	@# clone or the pin is missing.
@@ -266,7 +266,7 @@ cite-check: ## regenerate the citation artefacts, then fail on a hard error or w
 	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR), or no matterjs-server clone at $(MATTERJS_SERVER_DIR)"; exit 2; fi; \
-	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md || { \
+	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
 		echo "Run 'make cite-report', read the diff, and commit it with the change that moved"; \
