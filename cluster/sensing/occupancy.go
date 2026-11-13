@@ -103,6 +103,14 @@ type Occupancy struct {
 	clock clock.Clock
 	event bool // OCCEVENT
 
+	// occMu makes a decision about Occupancy and its store one step: the
+	// hold timer's check that it is still current and its store of
+	// unoccupied, a host report's stop of the timer and its store, and
+	// setHoldTime's clear of an elapsed hold. Without it a host's
+	// occupied report could land between the timer's check and its store
+	// and be overwritten (review II, R2-P1-clu-03). Taken before mu.
+	occMu sync.Mutex
+
 	// mu guards endpoint, hold, limits, holdTime, timer, started and gen.
 	mu       sync.Mutex
 	endpoint uint16
@@ -284,6 +292,8 @@ func (k occSink) MatterWriteAttribute(_ context.Context, attrID uint32, value an
 // change report, and a running timer re-armed for what remains of the new
 // hold time — or Occupancy cleared at once when that has elapsed.
 func (o *Occupancy) setHoldTime(h uint16) error {
+	o.occMu.Lock()
+	defer o.occMu.Unlock()
 	o.mu.Lock()
 	if !o.hold { // :208
 		o.mu.Unlock()
@@ -347,6 +357,8 @@ func (o *Occupancy) stopLocked() {
 
 // timerFired is chip's TimerFired (OccupancySensingCluster.cpp:299-302).
 func (o *Occupancy) timerFired(gen uint64) {
+	o.occMu.Lock()
+	defer o.occMu.Unlock()
 	o.mu.Lock()
 	if gen != o.gen {
 		o.mu.Unlock()
@@ -361,6 +373,8 @@ func (o *Occupancy) timerFired(gen uint64) {
 // with the hold timer, occupied cancels it and sets Occupancy, unoccupied
 // starts it from now and leaves Occupancy as it is until it fires.
 func (o *Occupancy) setOccupancy(occupied bool) {
+	o.occMu.Lock()
+	defer o.occMu.Unlock()
 	o.mu.Lock()
 	if o.hold {
 		if occupied {
