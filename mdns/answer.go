@@ -62,18 +62,76 @@ const (
 	// goes — matter.js INTERFACE_LIFETIME (InterfaceResponder.ts:37-40 at
 	// db021da0, Minutes(15)).
 	recordCacheLifetime = 15 * time.Minute
+
+	// truncatedWait and truncatedWaitJitter are the wait for the
+	// continuation packets of a truncated query: 400–500 ms, RFC 6762 §7.2,
+	// counted from the query's first packet.
+	truncatedWait       = 400 * time.Millisecond
+	truncatedWaitJitter = 100
+	// maxTruncatedPackets is how many packets of one truncated query are
+	// gathered before it is answered, the wait cut short — the module's own
+	// choice: a querier fills a packet of the usual 1500-byte MTU with about
+	// 29 PTR known answers of a Matter instance name (48 bytes each
+	// compressed), so 32 packets carry some 900 — more than the instances of
+	// one service type a single link holds.
+	maxTruncatedPackets = 32
+	// maxTruncatedQuestions is how many distinct questions a held
+	// truncated query keeps; the packet that brings more completes it — the
+	// module's own choice. RFC 6762 §7.2 has the continuation packets carry
+	// no questions, so the questions of the first packet are what a querier
+	// needs, and a querier asks a few per packet.
+	maxTruncatedQuestions = 64
+	// maxTruncatedQueries is how many truncated queries wait at once,
+	// across every source, interface and transaction id; a truncated query
+	// beyond it is answered at once with its first packet — the module's
+	// own choice: each waits at most 500 ms, and a link has a few queriers
+	// with a known-answer list too long for one packet.
+	maxTruncatedQueries = 64
 )
 
 // answerState is the engine's memory between queries: the truncated
 // queries waiting for their continuation, by transaction id, interface and
-// source. The Responder's mutex guards it.
+// source, at most [maxTruncatedQueries]. The Responder's mutex guards it.
 type answerState struct {
 	truncated map[string]*truncatedQuery
 }
 
+// truncatedQuery is a truncated query gathered so far: its transaction id,
+// its distinct questions and the known answers that suppress a record of
+// the interface — no more than the interface publishes, whatever the
+// querier lists. Its timer runs out 400–500 ms after the first packet.
 type truncatedQuery struct {
-	msg   *dns.Msg
-	timer clock.Timer
+	msg       *dns.Msg
+	questions map[string]bool
+	packets   int
+	timer     clock.Timer
+}
+
+// absorb adds one packet of the query: its questions not held yet, and each
+// known answer that suppresses a record of records (the interface's, each
+// once) no held known answer suppresses yet. It reports whether the query
+// is complete by its bounds: [maxTruncatedPackets] packets, or more than
+// [maxTruncatedQuestions] questions.
+func (t *truncatedQuery) absorb(msg *dns.Msg, records []dns.RR) bool {
+	t.packets++
+	for _, q := range msg.Question {
+		k := strings.ToLower(q.Name) + "-" + strconv.Itoa(int(q.Qtype)) + "-" + strconv.Itoa(int(q.Qclass))
+		if !t.questions[k] {
+			t.questions[k] = true
+			t.msg.Question = append(t.msg.Question, q)
+		}
+	}
+	if len(msg.Answer) > 0 {
+		open := slices.DeleteFunc(slices.Clone(records), func(rr dns.RR) bool { return knownTo(t.msg.Answer, rr) })
+		for _, k := range msg.Answer {
+			suppressed := func(rr dns.RR) bool { return knownTo([]dns.RR{k}, rr) }
+			if slices.ContainsFunc(open, suppressed) {
+				t.msg.Answer = append(t.msg.Answer, k)
+				open = slices.DeleteFunc(open, suppressed)
+			}
+		}
+	}
+	return t.packets >= maxTruncatedPackets || len(t.msg.Question) > maxTruncatedQuestions
 }
 
 func newAnswerState() answerState {
@@ -179,34 +237,56 @@ func truncatedKey(msg *dns.Msg, ifIndex int, src *net.UDPAddr) string {
 // 862ad75f): only queries are handled; a truncated query is held for
 // 400–500 ms (RFC 6762 §7.2) and merged with its continuation packets; nil
 // when there is nothing to answer yet. Caller holds r.mu.
+//
+// Every dimension of the merge an unauthenticated sender controls is
+// bounded, where matter.js bounds none — its #prepareMessage spreads the
+// held queries, answers and additionals with the new ones and re-arms the
+// 400–500 ms timer on every truncated continuation, and its
+// #truncatedQueryCache has no size limit (MdnsServer.ts:506-546, :61 at
+// db021da0); a sender that kept the TC bit set held one ever-growing query
+// alive, copied whole on each packet (review II, R2-P1-net-01):
+//
+//   - the wait runs from the first packet and a continuation does not move
+//     it, so a query is answered at most 500 ms after it began;
+//   - a held query keeps its distinct questions and only the known answers
+//     that suppress a record of the interface, each record once; the
+//     additionals, which the answer does not read, are not kept;
+//   - [maxTruncatedPackets] packets, or a packet that takes the questions
+//     past [maxTruncatedQuestions], complete the query;
+//   - past [maxTruncatedQueries] held queries a new truncated query is not
+//     held.
+//
+// At every bound the query is answered at once with what has arrived; no
+// question that arrived is dropped, and a known answer that came too late
+// only costs a record the querier already had.
 func (r *Responder) prepareLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) *dns.Msg {
 	if msg.Response {
 		return nil
 	}
 	key := truncatedKey(msg, ifIndex, src)
-	query := msg
-	if prev, ok := r.answers.truncated[key]; ok {
-		delete(r.answers.truncated, key)
-		prev.timer.Stop()
-		merged := prev.msg.Copy()
-		merged.Question = append(merged.Question, msg.Question...)
-		merged.Answer = append(merged.Answer, msg.Answer...)
-		merged.Extra = append(merged.Extra, msg.Extra...)
-		merged.Truncated = msg.Truncated
-		query = merged
-	}
-	if !query.Truncated {
-		if len(query.Question) == 0 {
+	held, ok := r.answers.truncated[key]
+	if !ok && (!msg.Truncated || len(r.answers.truncated) >= maxTruncatedQueries) {
+		if len(msg.Question) == 0 {
 			return nil
 		}
-		return query
+		return msg
 	}
-	wait := 400*time.Millisecond + time.Duration(rand.IntN(100))*time.Millisecond //nolint:gosec // G404: a timing jitter, not a secret
-	r.answers.truncated[key] = &truncatedQuery{
-		msg:   query,
-		timer: r.clock.Load().AfterFunc(wait, func() { r.processTruncated(key, ifIndex, src) }),
+	if !ok {
+		held = &truncatedQuery{msg: &dns.Msg{MsgHdr: dns.MsgHdr{Id: msg.Id}}, questions: map[string]bool{}}
+		wait := truncatedWait + time.Duration(rand.IntN(truncatedWaitJitter))*time.Millisecond //nolint:gosec // G404: a timing jitter, not a secret
+		held.timer = r.clock.Load().AfterFunc(wait, func() { r.processTruncated(key, ifIndex, src) })
+		r.answers.truncated[key] = held
 	}
-	return nil
+	full := held.absorb(msg, r.recordsForLocked(ifIndex, r.addrsOf(ifIndex)).complete)
+	if msg.Truncated && !full {
+		return nil
+	}
+	delete(r.answers.truncated, key)
+	held.timer.Stop()
+	if len(held.msg.Question) == 0 {
+		return nil
+	}
+	return held.msg
 }
 
 // processTruncated answers a truncated query whose wait ran out
