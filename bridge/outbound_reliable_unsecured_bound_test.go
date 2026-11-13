@@ -57,20 +57,6 @@ func (r *unsecuredRig) request(opcode uint8, exchangeID uint16) (*message.Header
 		message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: opcode, ExchangeID: exchangeID, ProtocolID: mrp.SecureChannelProtocolID}
 }
 
-// replies reads what reached the peer's socket within wait.
-func (r *unsecuredRig) replies(t *testing.T, wait time.Duration) int {
-	t.Helper()
-	n := 0
-	buf := make([]byte, 1500)
-	for {
-		_ = r.peer.SetReadDeadline(time.Now().Add(wait))
-		if _, _, err := r.peer.ReadFromUDP(buf); err != nil {
-			return n
-		}
-		n++
-	}
-}
-
 func (r *unsecuredRig) pending() int { return r.b.outboundReliable.Pending() }
 
 // next reads the bridge's next message to the peer and returns its

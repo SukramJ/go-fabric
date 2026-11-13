@@ -257,14 +257,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	// over. The unsecured session's entries only: exchange ids are per
 	// initiator, and a secure session's peer may have picked the same one.
 	reported := false
-	abandon := func() {
-		b.mu.RLock()
-		tracker := b.outboundReliable
-		b.mu.RUnlock()
-		if tracker != nil {
-			tracker.AbandonUnsecuredExchange(exchangeID)
-		}
-	}
+	abandon := func() { b.abandonHandshakeReplies(exchangeID) }
 	defer func() {
 		if !reported {
 			abandon()
