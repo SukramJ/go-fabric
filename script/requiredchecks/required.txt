@@ -1,0 +1,19 @@
+build
+vet
+test (linux, race)
+lint
+coverage floor
+reachability
+bench (smoke)
+codeql (go)
+chip-tool commissions the reference daemon
+chip certification cases against the reference daemon
+chip-tool control leg (CHIP app, no go-fabric)
+build (32-bit)
+apidiff
+testparity
+matter.js citations
+chip data model cross-check
+ble/bluez
+ble/esphome
+chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
