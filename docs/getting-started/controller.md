@@ -386,13 +386,22 @@ delivers
 (`matter.controller.peer.address_hinted`), so a Thread node whose border
 router never publishes its operational record is still reached. The
 report is the device's own statement and nothing verifies the addresses
-in it, so what is taken from it is bounded: the first 8
-operational interfaces — NetworkInterfaces' list bound — with their at
-most 8 IPv6 and 4 IPv4 addresses, only addresses that name one other
-host (no loopback, unspecified, multicast or IPv4 broadcast address), and
-at most `peer.MaxHintedAddresses` (96, the product) hinted addresses per
-connection process however many probes report new ones. What is passed
-over is logged: interfaces past the eighth with a changed report
+in it, so what is taken from it is bounded: 8 operational interfaces —
+NetworkInterfaces' list bound — with their at most 8 IPv6 and 4 IPv4
+addresses, only addresses that name one other host (no loopback,
+unspecified, multicast or IPv4 broadcast address), and at most
+`peer.MaxHintedAddresses` (96, the product) hinted addresses per
+connection process however many probes report new ones. A device may
+list more than 8 interfaces, loopback and virtual ones among them, so
+the 8 are chosen before they are counted: the interfaces with an
+address the connection can use (routable as above) come first, in the
+device's order, and only the slots they leave go to the others, whose
+addresses are logged and not attempted. One address in the report is
+more than the device's statement — the one the commissioning session
+itself runs on, when the session runs over IP and the address is
+routable: the interface that names it is taken before any other, and it
+is the first address handed to the connection. What is passed over is
+logged: usable interfaces past the eighth with a changed report
 (`matter.controller.commissioning.reconnect_probe_interfaces_dropped`),
 addresses past the bound once per connection process
 (`matter.controller.peer.address_hint_limit`).
