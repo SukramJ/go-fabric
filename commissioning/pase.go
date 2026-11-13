@@ -56,11 +56,25 @@ var (
 // commissioner sends Pake1; the responder produces Pake2; the
 // commissioner sends Pake3; the responder validates the confirmation
 // and emits the session keys.
+//
+// What the handshake leaves behind: [PASEResponder.HandlePake3] derives
+// the 48-byte key block from the shared secret Ke and overwrites Ke with
+// the rest of the SPAKE2+ state, whether the confirmation held or not. The
+// block — the two session keys and the attestation challenge, the
+// handshake's result — lives on in the responder, because
+// [PASEResponder.Session] and [PASEResponder.AttestationChallenge] hand it
+// out on every call, until [PASEResponder.Close]. Call Close once the
+// session and the challenge are taken, and on a handshake that is given
+// up. All of it is a best effort within Go's limits (secure/spake2, zero).
 type PASEResponder struct {
 	cfg       PASEConfig
 	verifier  *spake2.Verifier
 	pake1Done bool
 	finished  bool
+	closed    bool
+	// keys is the PASE key block, I2RKey || R2IKey || AttestationChallenge:
+	// set by a successful HandlePake3, overwritten by Close.
+	keys []byte
 }
 
 // NewPASEResponder constructs a responder with cfg validated. The
@@ -93,7 +107,7 @@ func NewPASEResponder(cfg PASEConfig) (*PASEResponder, error) {
 // the bridge's Pake2 (which the caller wires onto the wire). Must be
 // called before HandlePake3.
 func (r *PASEResponder) HandlePake1(pake1 []byte) (*spake2.Pake2Output, error) {
-	if r.pake1Done || r.finished {
+	if r.pake1Done || r.finished || r.closed {
 		return nil, ErrPASEStateMismatch
 	}
 	out, err := r.verifier.ProcessPake1(pake1)
@@ -109,14 +123,35 @@ func (r *PASEResponder) HandlePake1(pake1 []byte) (*spake2.Pake2Output, error) {
 // success; on failure the responder is poisoned and must be
 // discarded.
 func (r *PASEResponder) HandlePake3(pake3 []byte) error {
-	if !r.pake1Done || r.finished {
+	if !r.pake1Done || r.finished || r.closed {
 		return ErrPASEStateMismatch
 	}
+	// The verifier has served after this step on every way out: a cA that
+	// does not match ends it, and one that does leaves only Ke, which the
+	// key block below is derived from once.
+	defer r.verifier.Close()
 	if err := r.verifier.ProcessPake3(pake3); err != nil {
 		return fmt.Errorf("commissioning: PASE Pake3: %w", err)
 	}
+	keys, err := r.sessionKeys()
+	if err != nil {
+		return err
+	}
+	r.keys = keys
 	r.finished = true
 	return nil
+}
+
+// Close ends the responder and overwrites the key material it still
+// holds: the key block after a finished handshake, the SPAKE2+ state of
+// one that was given up. A [channel.Session] and a challenge taken before
+// are their holders' and stay as they are. Afterwards every method returns
+// [ErrPASEStateMismatch]; a second Close does nothing.
+func (r *PASEResponder) Close() {
+	r.verifier.Close()
+	clear(r.keys)
+	r.keys = nil
+	r.closed = true
 }
 
 // Session derives the AES-CCM session keys and constructs a
@@ -124,18 +159,17 @@ func (r *PASEResponder) HandlePake3(pake3 []byte) error {
 // nil. The responder encrypts with R2I and decrypts with I2R — the
 // same orientation [secure/operational.Manager.OpenFromPase] gives the
 // running bridge, and the one matter.js PaseServer.ts:184-192 hands to
-// NodeSession.ts:78-88 (`isInitiator: false`).
+// NodeSession.ts:80-90 (`isInitiator: false`).
+//
+// The session copies both keys (channel.New), so it outlives
+// [PASEResponder.Close].
 func (r *PASEResponder) Session() (*channel.Session, error) {
-	if !r.finished {
+	if !r.finished || r.closed {
 		return nil, ErrPASEStateMismatch
 	}
-	keys, err := r.sessionKeys()
-	if err != nil {
-		return nil, err
-	}
 	return channel.New(channel.Config{
-		EncryptKey:  keys.r2i,
-		DecryptKey:  keys.i2r,
+		EncryptKey:  r.keys[16:32], // R2IKey
+		DecryptKey:  r.keys[0:16],  // I2RKey
 		LocalNodeID: r.cfg.LocalNodeID,
 		PeerNodeID:  r.cfg.PeerNodeID,
 	})
@@ -145,38 +179,33 @@ func (r *PASEResponder) Session() (*channel.Session, error) {
 // downstream Attestation / CSR signing. It is the third slice of the
 // same HKDF output the session keys come from, not a derivation of its
 // own: a challenge from a second HKDF with its own info string is one
-// no commissioner reproduces, and every AttestationResponse / NOCSRResponse
 // signed with it fails the commissioner's check.
+//
+// The slice is a copy and the caller's; it outlives [PASEResponder.Close].
 func (r *PASEResponder) AttestationChallenge() ([]byte, error) {
-	if !r.finished {
+	if !r.finished || r.closed {
 		return nil, ErrPASEStateMismatch
 	}
-	keys, err := r.sessionKeys()
-	if err != nil {
-		return nil, err
-	}
-	return keys.challenge, nil
-}
-
-// paseKeys is the split of the single 48-byte PASE key block.
-type paseKeys struct {
-	i2r, r2i, challenge []byte
+	return append([]byte(nil), r.keys[32:48]...), nil
 }
 
 // sessionKeys runs the one PASE key schedule of Matter §4.13.2.5 /
 // §4.13.4.2: HKDF-SHA256(IKM=Ke, salt="", info="SessionKeys", L=48),
-// split into I2RKey (16) || R2IKey (16) || AttestationChallenge (16).
-// Mirrors matter.js NodeSession.ts:78-88 (`createHkdfKey(sharedSecret,
+// laid out I2RKey (16) || R2IKey (16) || AttestationChallenge (16).
+// Mirrors matter.js NodeSession.ts:80-90 (`createHkdfKey(sharedSecret,
 // salt, SESSION_KEYS_INFO, 16*3)`, `attestationKey = keys.slice(32, 48)`)
-// and this module's secure/operational OpenFromPase.
-func (r *PASEResponder) sessionKeys() (paseKeys, error) {
+// and this module's secure/operational OpenFromPase. It runs once, from
+// HandlePake3: the copy of Ke it takes is overwritten here, the verifier's
+// own by the Close that follows.
+func (r *PASEResponder) sessionKeys() ([]byte, error) {
 	shared := r.verifier.SharedSecret()
 	if len(shared) == 0 {
-		return paseKeys{}, errors.New("commissioning: PASE shared secret unavailable")
+		return nil, errors.New("commissioning: PASE shared secret unavailable")
 	}
+	defer clear(shared)
 	out, err := hkdf.Key(sha256.New, shared, nil, "SessionKeys", 48)
 	if err != nil {
-		return paseKeys{}, fmt.Errorf("commissioning: PASE key derive: %w", err)
+		return nil, fmt.Errorf("commissioning: PASE key derive: %w", err)
 	}
-	return paseKeys{i2r: out[0:16], r2i: out[16:32], challenge: out[32:48]}, nil
+	return out, nil
 }

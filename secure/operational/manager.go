@@ -820,22 +820,9 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 // to signal that; callers that need to gate fabric-scoped operations
 // must check for FabricIndex==0.
 func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
-	if len(sharedSecret) == 0 {
-		return nil, errors.New("operational: empty PASE shared secret")
-	}
-	derived, err := hkdf.Key(sha256.New, sharedSecret, nil, "SessionKeys", 48)
+	sess, challenge, err := paseSession(localNodeID, peerNodeID, peerSessionID, sharedSecret)
 	if err != nil {
-		return nil, fmt.Errorf("operational: PASE hkdf: %w", err)
-	}
-	sess, err := channel.New(channel.Config{
-		EncryptKey:    derived[16:32], // R2IKey — bridge → peer (responder→initiator)
-		DecryptKey:    derived[0:16],  // I2RKey — peer → bridge
-		LocalNodeID:   localNodeID,
-		PeerNodeID:    peerNodeID,
-		PeerSessionID: peerSessionID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("operational: build PASE session: %w", err)
+		return nil, err
 	}
 	m.mu.Lock()
 	id, err := m.allocateIDLocked()
@@ -848,7 +835,7 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		SessionID:            id,
 		fabricIndex:          0, // PASE pre-dates the operational fabric
 		Session:              sess,
-		AttestationChallenge: append([]byte(nil), derived[32:48]...),
+		AttestationChallenge: challenge,
 		isPase:               true,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
@@ -864,6 +851,51 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 	return entry, nil
 }
 
+// paseSession runs the PASE key schedule of [Manager.OpenFromPase] and
+// returns the session built on the two keys and a copy of the attestation
+// challenge.
+//
+// The 48 derived bytes have served once the session holds its own copies
+// of the keys (channel.New copies both; TestNewKeepsItsOwnKeys in
+// secure/channel) and the challenge is copied out: they are overwritten on
+// every way out, as the initiator overwrites its own
+// (client/handshake/pase.go) and connectedhomeip the secret they come from
+// (src/crypto/CHIPCryptoPALOpenSSL.cpp:1150-1151 at 6170af84,
+// `ClearSecretData(Kae)`). Best effort, within Go's limits
+// (secure/sigma/zero.go): crypto/hkdf and crypto/aes keep working state of
+// their own. sharedSecret is the caller's and is not touched; what lives
+// on is what the session is — its two keys, for as long as it is open, and
+// the challenge in the entry (review II, W1-sec-05, R2-P0-rv-B03).
+func paseSession(localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*channel.Session, []byte, error) {
+	if len(sharedSecret) == 0 {
+		return nil, nil, errors.New("operational: empty PASE shared secret")
+	}
+	derived, err := hkdf.Key(sha256.New, sharedSecret, nil, "SessionKeys", 48)
+	if err != nil {
+		return nil, nil, fmt.Errorf("operational: PASE hkdf: %w", err)
+	}
+	defer func() {
+		secretHook("pase.sessionKeyMaterial", derived)
+		clear(derived)
+	}()
+	sess, err := channel.New(channel.Config{
+		EncryptKey:    derived[16:32], // R2IKey — bridge → peer (responder→initiator)
+		DecryptKey:    derived[0:16],  // I2RKey — peer → bridge
+		LocalNodeID:   localNodeID,
+		PeerNodeID:    peerNodeID,
+		PeerSessionID: peerSessionID,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("operational: build PASE session: %w", err)
+	}
+	return sess, append([]byte(nil), derived[32:48]...), nil
+}
+
+// secretHook is the test seam that sees a short-lived secret buffer just
+// before it is overwritten, so a test can hold the slice and read it
+// afterwards. Production code never replaces it.
+var secretHook = func(string, []byte) {}
+
 // OpenFromPaseWithID is a variant of [Manager.OpenFromPase] that
 // registers the new PASE session under a pre-allocated id (see
 // [Manager.AllocateID]). It overwrites any placeholder entry left by
@@ -877,28 +909,15 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 // the correct entry for every subsequent datagram, even when other
 // sessions occupy the lower-numbered slots.
 func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
-	if len(sharedSecret) == 0 {
-		return nil, errors.New("operational: empty PASE shared secret")
-	}
-	derived, err := hkdf.Key(sha256.New, sharedSecret, nil, "SessionKeys", 48)
+	sess, challenge, err := paseSession(localNodeID, peerNodeID, peerSessionID, sharedSecret)
 	if err != nil {
-		return nil, fmt.Errorf("operational: PASE hkdf: %w", err)
-	}
-	sess, err := channel.New(channel.Config{
-		EncryptKey:    derived[16:32], // R2IKey — bridge → peer (responder→initiator)
-		DecryptKey:    derived[0:16],  // I2RKey — peer → bridge
-		LocalNodeID:   localNodeID,
-		PeerNodeID:    peerNodeID,
-		PeerSessionID: peerSessionID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("operational: build PASE session: %w", err)
+		return nil, err
 	}
 	entry := &Entry{
 		SessionID:            id,
 		fabricIndex:          0, // PASE pre-dates the operational fabric
 		Session:              sess,
-		AttestationChallenge: append([]byte(nil), derived[32:48]...),
+		AttestationChallenge: challenge,
 		isPase:               true,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js

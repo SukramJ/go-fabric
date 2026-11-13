@@ -32,8 +32,13 @@ package sigma
 // expanded key schedule where nothing outside them can reach — the
 // reference to the ephemeral key is dropped once the shared secret
 // exists, which is all that can be done about it; crypto/hkdf and
-// crypto/sha256 keep working state of their own. What is overwritten is
-// every buffer this package holds a reference to.
+// crypto/sha256 keep working state of their own.
+//
+// So what is overwritten is the short-lived material of the first
+// paragraph, in every buffer this package holds a reference to — not every
+// secret it holds. The two results above stay for as long as the Responder
+// or Initiator is held, and the [Identity] it was configured with — the
+// IPK and the signing key — serves every handshake and is its owner's.
 func zero(b []byte) {
 	clear(b)
 }

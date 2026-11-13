@@ -301,7 +301,10 @@ func NewVerifierFromValue(w0Bytes, lBytes []byte) (*VerifierContext, error) {
 // with it and ends the Verifier — it answers no second Pake3. Two things
 // live on: the [VerifierContext], which is the stored verifier and serves
 // every later handshake, and after a success Ke, which
-// [Verifier.SharedSecret] hands out for as long as the Verifier is held.
+// [Verifier.SharedSecret] hands out until [Verifier.Close]. Call Close
+// once the session holds its keys, and on a handshake that is given up: a
+// Verifier that is only dropped leaves Ke — before Pake3 KcA too — to the
+// collector.
 type Verifier struct {
 	ctx      *VerifierContext
 	idA, idB []byte
@@ -325,6 +328,9 @@ const (
 	// verifierStateFailed is terminal: the confirmation keys are gone, so
 	// a second cA could only be compared against an overwritten key.
 	verifierStateFailed
+	// verifierStateClosed is terminal: [Verifier.Close] has overwritten
+	// what the handshake held.
+	verifierStateClosed
 )
 
 // NewVerifier returns a Verifier ready to process Pake1.
@@ -354,6 +360,9 @@ type Pake2Output struct {
 // ProcessPake1 consumes the prover's pA = X and produces the
 // verifier's Pake2 reply.
 func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
+	if v.state == verifierStateClosed {
+		return nil, fmt.Errorf("%w: the Verifier is closed", ErrSessionState)
+	}
 	if v.state != verifierStateInit {
 		return nil, fmt.Errorf("%w: ProcessPake1 already called", ErrSessionState)
 	}
@@ -446,6 +455,9 @@ func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
 // cA that does not match is final: every later call returns
 // [ErrSessionState].
 func (v *Verifier) ProcessPake3(cA []byte) error {
+	if v.state == verifierStateClosed {
+		return fmt.Errorf("%w: the Verifier is closed", ErrSessionState)
+	}
 	if v.state != verifierStatePake1Processed {
 		return fmt.Errorf("%w: ProcessPake1 must run first", ErrSessionState)
 	}
@@ -463,7 +475,8 @@ func (v *Verifier) ProcessPake3(cA []byte) error {
 }
 
 // SharedSecret returns the 16-byte session key (Ke). Valid only
-// after a successful [Verifier.ProcessPake3].
+// after a successful [Verifier.ProcessPake3] and until [Verifier.Close].
+// The slice is a copy and the caller's, to overwrite when it has served.
 func (v *Verifier) SharedSecret() []byte {
 	if v.state != verifierStateFinished {
 		return nil
@@ -471,6 +484,23 @@ func (v *Verifier) SharedSecret() []byte {
 	out := make([]byte, len(v.ke))
 	copy(out, v.ke)
 	return out
+}
+
+// Close ends the Verifier and overwrites what the handshake still holds
+// (see [zero] for what that can and cannot promise): Ke after a success,
+// KcA and Ke when Pake3 never came. Afterwards [Verifier.SharedSecret]
+// returns nil and every step [ErrSessionState]; a second Close does
+// nothing. The [VerifierContext] is not the handshake's and is left
+// alone, and so is a slice SharedSecret returned earlier.
+func (v *Verifier) Close() {
+	zeroInt(v.y)
+	zero(v.zMarshal)
+	zero(v.vMarshal)
+	zero(v.kcA)
+	zero(v.kcB)
+	zero(v.ke)
+	v.y, v.zMarshal, v.vMarshal, v.kcA, v.kcB, v.ke = nil, nil, nil, nil, nil, nil
+	v.state = verifierStateClosed
 }
 
 // Prover drives the commissioner-side of PASE. The flow mirrors
@@ -483,8 +513,10 @@ func (v *Verifier) SharedSecret() []byte {
 // w0, w1 and the random scalar x are the passcode's equivalent for this
 // handshake; [Prover.ProcessPake2] overwrites them on every way out, with
 // Z, V and the confirmation keys (see [zero]). After a success only Ke
-// lives on, for [Prover.SharedSecret]; after any error past the state
-// check nothing does, and the Prover answers no second Pake2.
+// lives on, for [Prover.SharedSecret], until [Prover.Close]; after any
+// error past the state check nothing does, and the Prover answers no
+// second Pake2. Call Close on every way out: a Prover that is only dropped
+// leaves Ke to the collector, and one whose Pake2 never came w0, w1 and x.
 type Prover struct {
 	w0, w1   *big.Int
 	idA, idB []byte
@@ -507,6 +539,9 @@ const (
 	proverStateFinished
 	// proverStateFailed is terminal: the scalars are gone.
 	proverStateFailed
+	// proverStateClosed is terminal: [Prover.Close] has overwritten what
+	// the handshake held.
+	proverStateClosed
 )
 
 // NewProver returns a Prover ready to compute Pake1.
@@ -527,6 +562,9 @@ func NewProver(passcode uint32, salt []byte, iterations int, idA, idB, context [
 
 // GeneratePake1 returns pA = X for transmission to the verifier.
 func (p *Prover) GeneratePake1() ([]byte, error) {
+	if p.state == proverStateClosed {
+		return nil, fmt.Errorf("%w: the Prover is closed", ErrSessionState)
+	}
 	if p.state != proverStateInit {
 		return nil, fmt.Errorf("%w: GeneratePake1 already called", ErrSessionState)
 	}
@@ -560,6 +598,9 @@ func (p *Prover) GeneratePake1() ([]byte, error) {
 // cA on success; on cB mismatch returns [ErrConfirmationFailed]
 // without exposing Ke.
 func (p *Prover) ProcessPake2(yBytes, cB []byte) (cA []byte, err error) {
+	if p.state == proverStateClosed {
+		return nil, fmt.Errorf("%w: the Prover is closed", ErrSessionState)
+	}
 	if p.state != proverStatePake1Generated {
 		return nil, fmt.Errorf("%w: GeneratePake1 must run first", ErrSessionState)
 	}
@@ -639,7 +680,8 @@ func (p *Prover) ProcessPake2(yBytes, cB []byte) (cA []byte, err error) {
 }
 
 // SharedSecret returns the 16-byte session key (Ke). Valid only after
-// a successful [Prover.ProcessPake2].
+// a successful [Prover.ProcessPake2] and until [Prover.Close]. The slice
+// is a copy and the caller's, to overwrite when it has served.
 func (p *Prover) SharedSecret() []byte {
 	if p.state != proverStateFinished {
 		return nil
@@ -647,6 +689,24 @@ func (p *Prover) SharedSecret() []byte {
 	out := make([]byte, len(p.ke))
 	copy(out, p.ke)
 	return out
+}
+
+// Close ends the Prover and overwrites what the handshake still holds
+// (see [zero]): Ke after a success; w0, w1 and x — the passcode's
+// equivalent — when Pake2 never came. Afterwards [Prover.SharedSecret]
+// returns nil and every step [ErrSessionState]; a second Close does
+// nothing. A slice SharedSecret returned earlier is left alone.
+func (p *Prover) Close() {
+	zeroInt(p.x)
+	zeroInt(p.w0)
+	zeroInt(p.w1)
+	zero(p.zMarshal)
+	zero(p.vMarshal)
+	zero(p.kcA)
+	zero(p.kcB)
+	zero(p.ke)
+	p.x, p.w0, p.w1, p.zMarshal, p.vMarshal, p.kcA, p.kcB, p.ke = nil, nil, nil, nil, nil, nil, nil, nil
+	p.state = proverStateClosed
 }
 
 // zero overwrites b. It is how this package ends the life of handshake
@@ -664,8 +724,16 @@ func (p *Prover) SharedSecret() []byte {
 // value; math/big, crypto/hmac, crypto/hkdf, crypto/pbkdf2 and the nistec
 // points keep working state of their own that nothing outside them can
 // reach; and a slice the caller was handed ([Verifier.SharedSecret]) is
-// the caller's. What is overwritten is every buffer this package holds a
-// reference to.
+// the caller's.
+//
+// Not every buffer this package holds is overwritten by itself. Three
+// outlive a handshake step, each for a use that is still to come: the
+// stored verifier ([VerifierContext]) serves every later handshake and is
+// never overwritten here; the scalars w0 and w1 [PBKDF] returns are the
+// caller's; and Ke of a finished handshake stays in the [Verifier] or
+// [Prover] until its Close, because SharedSecret may be asked for it
+// until then. Close is the caller's to call: this package cannot know
+// when the session holds its keys.
 func zero(b []byte) {
 	clear(b)
 }

@@ -289,3 +289,144 @@ func TestProverOverwritesAndEndsAfterFailure(t *testing.T) {
 		})
 	}
 }
+
+// finishedHandshake runs one handshake to its end and returns both sides.
+func finishedHandshake(t *testing.T) (*VerifierContext, *Verifier, *Prover) {
+	t.Helper()
+	salt := testSalt()
+	vc, err := NewVerifierContext(testPasscode, salt, testIterations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prover, err := NewProver(testPasscode, salt, testIterations, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pA, err := prover.GeneratePake1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier := NewVerifier(vc, nil, nil, nil)
+	pake2, err := verifier.ProcessPake1(pA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cA, err := prover.ProcessPake2(pake2.Y, pake2.CB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifier.ProcessPake3(cA); err != nil {
+		t.Fatal(err)
+	}
+	return vc, verifier, prover
+}
+
+// TestCloseOverwritesKeAfterSuccess: Ke is the one thing a finished
+// handshake still holds, and Close is what ends it — the object's own
+// copy, not the one SharedSecret handed out (review II, R2-P0-rv-B03).
+func TestCloseOverwritesKeAfterSuccess(t *testing.T) {
+	vc, verifier, prover := finishedHandshake(t)
+	w0Context := new(big.Int).Set(vc.W0)
+	verifierKe, proverKe := verifier.ke, prover.ke
+	if allZero(verifierKe) || allZero(proverKe) {
+		t.Fatal("no Ke after the handshake")
+	}
+	handedOut := verifier.SharedSecret()
+	want := bytes.Clone(handedOut)
+
+	verifier.Close()
+	prover.Close()
+	if !allZero(verifierKe) || !allZero(proverKe) {
+		t.Errorf("Ke still readable after Close: verifier % x, prover % x", verifierKe, proverKe)
+	}
+	if v, p := verifier.SharedSecret(), prover.SharedSecret(); v != nil || p != nil {
+		t.Errorf("SharedSecret after Close: verifier % x, prover % x, want nil", v, p)
+	}
+	// The slice the caller was handed is the caller's.
+	if !bytes.Equal(handedOut, want) {
+		t.Errorf("Close reached into the slice SharedSecret had returned: % x", handedOut)
+	}
+	// A closed handshake answers nothing more.
+	if _, err := verifier.ProcessPake1(make([]byte, PointSize)); !errors.Is(err, ErrSessionState) {
+		t.Errorf("ProcessPake1 after Close: %v, want ErrSessionState", err)
+	}
+	if err := verifier.ProcessPake3(make([]byte, ConfirmTagSize)); !errors.Is(err, ErrSessionState) {
+		t.Errorf("ProcessPake3 after Close: %v, want ErrSessionState", err)
+	}
+	if _, err := prover.GeneratePake1(); !errors.Is(err, ErrSessionState) {
+		t.Errorf("GeneratePake1 after Close: %v, want ErrSessionState", err)
+	}
+	if _, err := prover.ProcessPake2(make([]byte, PointSize), make([]byte, ConfirmTagSize)); !errors.Is(err, ErrSessionState) {
+		t.Errorf("ProcessPake2 after Close: %v, want ErrSessionState", err)
+	}
+	// A second Close is harmless, and the stored verifier is not the
+	// handshake's to overwrite.
+	verifier.Close()
+	prover.Close()
+	if vc.W0.Cmp(w0Context) != 0 {
+		t.Fatal("Close overwrote the stored verifier's w0; it serves every later handshake")
+	}
+}
+
+// TestCloseOverwritesAnAbandonedHandshake: a handshake the peer never
+// finished holds more than Ke — the prover its x, w0 and w1 until Pake2,
+// the verifier KcA and Ke until Pake3 — and Close takes all of it.
+func TestCloseOverwritesAnAbandonedHandshake(t *testing.T) {
+	scalars := scriptScalars(t, someScalar(0x44))
+	salt := testSalt()
+	vc, err := NewVerifierContext(testPasscode, salt, testIterations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A prover that was never started.
+	fresh, err := NewProver(testPasscode, salt, testIterations, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshW0, freshW1 := fresh.w0.Bits(), fresh.w1.Bits()
+	fresh.Close()
+	if !wordsZero(freshW0) || !wordsZero(freshW1) {
+		t.Error("w0 or w1 of a prover closed before Pake1 is still readable")
+	}
+
+	// A prover whose Pake1 was never answered.
+	prover, err := NewProver(testPasscode, salt, testIterations, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w0, w1 := prover.w0.Bits(), prover.w1.Bits()
+	pA, err := prover.GeneratePake1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wordsZero(scalars[0]) || wordsZero(w0) || wordsZero(w1) {
+		t.Fatal("precondition: the prover holds no x, w0 or w1 while it waits for Pake2")
+	}
+
+	// A verifier whose Pake2 was never answered.
+	verifier := NewVerifier(vc, nil, nil, nil)
+	pake2, err := verifier.ProcessPake1(pA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kcA, ke := verifier.kcA, verifier.ke
+	if allZero(kcA) || allZero(ke) {
+		t.Fatal("precondition: the verifier holds no KcA or Ke while it waits for Pake3")
+	}
+
+	prover.Close()
+	if !wordsZero(scalars[0]) || !wordsZero(w0) || !wordsZero(w1) {
+		t.Error("x, w0 or w1 of a prover closed before Pake2 is still readable")
+	}
+	if _, err := prover.ProcessPake2(pake2.Y, pake2.CB); !errors.Is(err, ErrSessionState) {
+		t.Errorf("ProcessPake2 after Close: %v, want ErrSessionState", err)
+	}
+	verifier.Close()
+	if !allZero(kcA) || !allZero(ke) {
+		t.Errorf("after Close before Pake3: KcA % x, Ke % x", kcA, ke)
+	}
+	if got := verifier.SharedSecret(); got != nil {
+		t.Errorf("SharedSecret of a verifier closed before Pake3: % x", got)
+	}
+}
