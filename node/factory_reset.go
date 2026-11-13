@@ -28,7 +28,9 @@ import (
 // whose [Store].Path the stop closed has the file reopened for the erase.
 // The stores erased are the ones the node used: a [Store].Credentials or
 // [Store].Endpoints override as it is, and the store New built on the file
-// for the other.
+// for the other. A SQLite file the node's stores are on is scrubbed after
+// every delete ([store.Scrub]), so none of the erased bytes — endpoint
+// records included — remain in it.
 //
 // A Go node is single-use — [Node.Stop] ends it, as [ErrStopped] says —
 // so the reset does not bring the node back: the host comes back by
@@ -74,14 +76,21 @@ func (n *Node) FactoryReset(ctx context.Context) error {
 // eraseStores erases the credential store and the endpoint records the
 // node used: a host override as it is, and a store New built on a file
 // the stop closed on the file reopened for it.
+//
+// The endpoint records go first: the SQLite credential store's Erase ends
+// with the scrub that leaves no erased byte in the file ([store.Scrub]), so
+// it runs after every delete on that file. Endpoint records New built on a
+// file whose credential store is a host override get the scrub on their
+// own (TestFactoryResetLeavesNoEndpointRecordResidue).
 func (n *Node) eraseStores(ctx context.Context) error {
-	st, endpoints := n.st, n.cfg.Store.Endpoints
+	st, endpoints, db := n.st, n.cfg.Store.Endpoints, n.cfg.Store.DB
 	if n.ownedDB == nil && n.cfg.Store.Path != "" && (n.builtCredentials || n.builtEndpoints) {
-		db, err := openStorePath(n.cfg.Store.Path)
+		reopened, err := openStorePath(n.cfg.Store.Path)
 		if err != nil {
 			return fmt.Errorf("node: factory reset: %w", err)
 		}
-		defer func() { _ = db.Close() }()
+		defer func() { _ = reopened.Close() }()
+		db = reopened
 		if n.builtCredentials {
 			st = store.New(db)
 		}
@@ -90,13 +99,18 @@ func (n *Node) eraseStores(ctx context.Context) error {
 		}
 	}
 	var errs []error
+	if endpoints != nil {
+		errs = append(errs, eraseEndpointRecords(ctx, endpoints))
+	}
 	if err := st.Erase(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("node: factory reset: erase the store: %w", err))
 	} else if err := n.pinFreshUniqueID(ctx, st); err != nil {
 		errs = append(errs, fmt.Errorf("node: factory reset: pin a fresh UniqueID: %w", err))
 	}
-	if endpoints != nil {
-		errs = append(errs, eraseEndpointRecords(ctx, endpoints))
+	if n.builtEndpoints && !n.builtCredentials && db != nil {
+		if err := store.Scrub(ctx, db); err != nil {
+			errs = append(errs, fmt.Errorf("node: factory reset: scrub the endpoint records: %w", err))
+		}
 	}
 	return errors.Join(errs...)
 }

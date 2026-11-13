@@ -75,6 +75,44 @@ func TestStoreEraseLeavesNoResidue(t *testing.T) {
 	}
 }
 
+// TestScrubLeavesNoResidue: Scrub on its own removes the bytes of rows a
+// plain delete removed — what node.Node.FactoryReset relies on for the
+// endpoint records of a file whose credential store is a host override.
+func TestScrubLeavesNoResidue(t *testing.T) {
+	t.Parallel()
+	const marker = "SCRUB-RESIDUE-MARKER-0a9d47e2-SECRET"
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), walMode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(db)
+	for i := range 300 {
+		if err := s.SetSetting(ctx, fmt.Sprintf("deleted.%d", i), marker+"-row-padding-padding"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range 300 {
+		if err := s.DeleteSetting(ctx, fmt.Sprintf("deleted.%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hits := filesHolding(t, dir, marker); len(hits) == 0 {
+		t.Fatal("the deleted rows' bytes are in no file before Scrub: the test cannot see a residue")
+	}
+	if err := store.Scrub(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if hits := filesHolding(t, dir, marker); len(hits) > 0 {
+		t.Errorf("after Scrub the deleted rows' bytes are still in %v", hits)
+	}
+}
+
 // filesHolding names the files of dir whose bytes contain needle.
 func filesHolding(t *testing.T, dir, needle string) []string {
 	t.Helper()
