@@ -431,21 +431,69 @@ func (n *Node) saveSettingsLocked() {
 // recomputed (:98). A disabled node does not start: [ErrDisabled]
 // (ClientNetworkRuntime.ts:41-43). An error of the initial read is
 // returned; the node stays started.
+//
+// Before anything else Start waits, within ctx, for the node's queued
+// report jobs — their store writes and hooks ([Hooks]) — which the
+// cache's adoption of the default subscription's fabric filter follows,
+// so a hook must not call it on a stopped node. When ctx ends while jobs
+// are still queued — a hook that blocks, the one a [Node.Stop] that timed
+// out left behind included — Start returns ctx's error and nothing has
+// begun: the node is not started, the cache keeps its fabric filter, and
+// a later Start starts it.
 func (n *Node) Start(ctx context.Context) error {
-	n.mu.Lock()
+	started, err := n.start(ctx)
+	if started {
+		n.recompute()
+	}
+	return err
+}
+
+// startDecidedLocked reports whether Start has nothing to do, and with
+// what answer: a node that failed to load, is closing or disabled does
+// not start, a started one is started. The caller holds the lock.
+func (n *Node) startDecidedLocked() (decided bool, err error) {
 	switch {
 	case n.loadErr != nil:
-		n.mu.Unlock()
-		return n.loadErr
+		return true, n.loadErr
 	case n.closing:
-		n.mu.Unlock()
-		return ErrClosed
+		return true, ErrClosed
 	case n.settings.disabled:
-		n.mu.Unlock()
-		return ErrDisabled
+		return true, ErrDisabled
 	case n.started:
+		return true, nil
+	}
+	return false, nil
+}
+
+// start is Start without the closing recompute; started reports whether
+// this call brought the node online.
+func (n *Node) start(ctx context.Context) (started bool, err error) {
+	// Asked without subSync first: a hook that runs under a
+	// synchronisation may call Start on its started node.
+	n.mu.RLock()
+	decided, err := n.startDecidedLocked()
+	n.mu.RUnlock()
+	if decided {
+		return false, err
+	}
+	// The cache adopts the default subscription's fabric filter before
+	// the default subscription syncs, one reaction at a time
+	// (NetworkClient.ts:88-97 at 862ad75f). matter.js binds the peer's
+	// signals before that reaction and awaits it without a deadline
+	// (NetworkClient.ts:85-87, :92-97 at 862ad75f); here the adoption,
+	// whose drain ends with ctx, comes before the node goes online, so a
+	// Start that returns ctx's error has started nothing it would have to
+	// take back.
+	n.subSync.Lock()
+	defer n.subSync.Unlock()
+	if err := n.adoptDefaultFabricFilter(ctx); err != nil {
+		return false, err
+	}
+	n.mu.Lock()
+	// Asked again: a Close, a Disable or another Start ran meanwhile.
+	if decided, err := n.startDecidedLocked(); decided {
 		n.mu.Unlock()
-		return nil
+		return false, err
 	}
 	n.started = true
 	n.frozen, n.props = false, nil
@@ -460,15 +508,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	n.stopObserve = stop
 	n.mu.Unlock()
-	// The cache adopts the default subscription's fabric filter before
-	// the default subscription syncs, one reaction at a time
-	// (NetworkClient.ts:88-97 at 862ad75f).
-	n.subSync.Lock()
-	n.adoptDefaultFabricFilter()
-	err := n.syncAutoSubscribeLocked(ctx, nil)
-	n.subSync.Unlock()
-	n.recompute()
-	return err
+	return true, n.syncAutoSubscribeLocked(ctx, nil)
 }
 
 // Stop takes the node offline: the default subscription closes

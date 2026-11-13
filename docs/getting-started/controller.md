@@ -602,7 +602,12 @@ by itself when the hook returns. A second `Node.Stop`, `Node.Close`,
 and returns nil once it is complete. A database closed before the hook
 returned loses that final flush; the write is refused once and not
 retried. A node whose stop failed is not erased and stays in the
-registry.
+registry. `Node.Start` and `Node.SetDefaultSubscription` wait for the
+queue as well, before the cache adopts a fabric filter, and within their
+context: a `Start` that returns the context's error has not started the
+node, a `SetDefaultSubscription` that does has not replaced the default
+subscription — the one a started node held has ended — and either call
+can be made again.
 
 *Source: `controller/client/config.go` (`Hooks`), `controller/client/node.go` (`Node.Stop`), `controller/client/jobs.go`.*
 

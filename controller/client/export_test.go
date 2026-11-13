@@ -179,3 +179,32 @@ func HoldsDefaultSubscription(n *Node) bool {
 	defer n.mu.RUnlock()
 	return n.subOwner != nil
 }
+
+// Started reports whether n is started.
+func Started(n *Node) bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.started
+}
+
+// StoredDefaultSubscription is the default subscription st holds in node
+// id's settings, nil when it holds none.
+func StoredDefaultSubscription(st Store, id string) (*SubscribeOptions, error) {
+	eps, err := st.Load(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, ep := range eps {
+		if ep.Number != 0 {
+			continue
+		}
+		for _, c := range ep.Clusters {
+			if c.ID != settingsCluster {
+				continue
+			}
+			s, err := decodeSettings(c.Values)
+			return s.defaultSubscription, err
+		}
+	}
+	return nil, nil
+}
