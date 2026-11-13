@@ -421,10 +421,11 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //   - ReadRequest      → ReportData
 //   - WriteRequest     → WriteResponse
 //   - InvokeRequest    → InvokeResponse
-//   - SubscribeRequest → ReportData (initial-report) + a SubscribeResponse
-//     once the report pump catches up. v1.1 ships the initial empty
-//     ReportData; the SubscribeResponse + ongoing pump are tracked
-//     separately.
+//   - SubscribeRequest → the priming ReportData, in as many chunks as
+//     it needs, each answered by the peer's StatusResponse, then the
+//     SubscribeResponse ([Bridge.handleSubscribeRequest]); the ongoing
+//     reports follow from the subscription engine on exchanges the
+//     bridge opens.
 //   - TimedRequest     → StatusResponse(Success); a per-exchange
 //     deadline is stamped into `exchangeRouting.timedDeadlines` and the
 //     matching follow-up Write/Invoke is gated against it via

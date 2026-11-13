@@ -1062,11 +1062,13 @@ func (d *TopologyDispatcher) IsTimedCommand(endpoint uint16, clusterID, cmdID ui
 // determine. Matter constrains a fabric index to "1 to 254" (matter.js
 // packages/model/src/standard/elements/operational-credentials.element.ts:129,
 // and three further declarations), so 255 can never collide with a real one,
-// and 0 is already spoken for as "PASE, no fabric yet".
+// and 0 is already spoken for as "no fabric" — a session before AddNOC.
 //
-// The distinction is load-bearing: 0 means the request legitimately has no
-// fabric and [TopologyDispatcher.CheckACL] answers Success; 255 means the
-// bridge does not know which fabric asked, and CheckACL denies.
+// Neither is a grant. 0 means the session has no fabric, 255 that the
+// bridge does not know which fabric asked; [TopologyDispatcher.CheckACL]
+// denies both. What it grants without a fabric it grants to the PASE auth
+// mode ([im.IsPASEFromContext]), never to the index: a request with
+// fabric 0 that is not PASE is refused (review 2026-11 W2-sec-03).
 const FabricIndexUnresolvable uint8 = 255
 
 // CheckACL implements [im.ACLChecker] (Matter §9.10). It grants the request
@@ -1075,9 +1077,10 @@ const FabricIndexUnresolvable uint8 = 255
 // and whose privilege is at least requiredPrivilege; otherwise it returns
 // UnsupportedAccess (0x7e). PASE sessions are already bypassed by the IM
 // gate before this is called; the same grant is repeated here so a direct
-// caller cannot lose it. It is keyed on the session's AUTH MODE as well as
-// on fabricIndex 0, because AddNOC adopts the commissioner's PASE session
-// onto the new fabric (matter.js OperationalCredentialsServer.ts:279-283
+// caller cannot lose it. It is keyed on the session's AUTH MODE alone —
+// fabricIndex 0 without PASE is no grant and is denied, like an index the
+// bridge could not resolve — because AddNOC adopts the commissioner's PASE
+// session onto the new fabric (matter.js OperationalCredentialsServer.ts:279-283
 // `session.fabric = fabric`) while the implicit Administer grant stays
 // (FabricAccessControl.ts:189-191 `authMode === Pase && isCommissioning`).
 // Without the auth-mode term every post-AddNOC ACL write, GroupKeySetWrite

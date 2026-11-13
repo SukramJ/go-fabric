@@ -323,8 +323,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// least View privilege for (Matter §9.10 — events carry a read
 	// privilege, default View; AccessControlEntryChanged is Administer).
 	// Without this an ACE-less subject would stream every fired event.
-	// PASE (fabricIndex==0) bypasses; a dispatcher without an ACLChecker
-	// keeps the pre-ACL behaviour.
+	// A PASE subscriber bypasses (the auth mode, not fabric index 0,
+	// which alone is refused); a dispatcher without an ACLChecker keeps
+	// the pre-ACL behaviour.
 	authorizedEvents := b.authorizedEventReports(ctx, target, events)
 	if len(authorizedEvents) == 0 {
 		return
