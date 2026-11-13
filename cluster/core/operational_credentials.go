@@ -126,6 +126,11 @@ type OperationalCredentials struct {
 	// fabric; TC-OPCREDS-3.5 step 10).
 	pendingUpdateRevert *nocUpdateRevert
 
+	// pendingNOCMarkerOut records that this server wrote the durable
+	// marker of the two fields above ([pendingNOCSettingKey]) and has not
+	// cleared it yet.
+	pendingNOCMarkerOut bool
+
 	// changeListeners receive [OperationalCredentials.OnMatterValueChanged]
 	// notifications.
 	changeListeners    map[uint64]func()
@@ -486,7 +491,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		// `TableFull` and abort.
 		cfg.SupportedFabrics = 254
 	}
-	return &OperationalCredentials{
+	o := &OperationalCredentials{
 		log:                    cmp.Or(cfg.Logger, slog.Default()),
 		store:                  s,
 		supportedFabrics:       cfg.SupportedFabrics,
@@ -503,7 +508,15 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		onFabricUpdated:        cfg.OnFabricUpdated,
 		onFabricWithdraw:       cfg.OnFabricWithdraw,
 		failSafe:               cfg.FailSafe,
-	}, nil
+	}
+	// A restart inside a fail-safe window left what AddNOC or UpdateNOC
+	// wrote uncommitted; it goes before anything reads the stored fabrics
+	// (review II, R2-P1-core-01). Fails closed: a fabric that never passed
+	// CommissioningComplete is not served.
+	if err := o.recoverPendingNOC(context.Background()); err != nil {
+		return nil, fmt.Errorf("core: OperationalCredentials: roll back the commissioning a restart interrupted: %w", err)
+	}
+	return o, nil
 }
 
 // SetFailSafe wires the fail-safe accessor ([OpcredsConfig.FailSafe])
@@ -614,10 +627,15 @@ type nocUpdateRevert struct {
 //
 // Acquires the cluster lock so callers do not need to coordinate with
 // the read-side. Safe to invoke even when no pending state exists.
+//
+// It is also the commit of CommissioningComplete (the node wires it as
+// that hook): the durable marker of a pending AddNOC / UpdateNOC goes
+// with the memory state, so a later restart keeps what was committed.
 func (o *OperationalCredentials) ClearPendingState() {
 	o.mu.Lock()
 	o.clearPendingState()
 	o.mu.Unlock()
+	o.clearPendingNOC(context.Background())
 }
 
 // OnFailSafeExpiry is the explicit cluster-level FailSafe-expiry handler.
@@ -642,8 +660,11 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	updateRevert := o.pendingUpdateRevert
 	o.clearPendingState()
 	o.mu.Unlock()
+	// The durable marker goes once every revert it names has landed; a
+	// failed one leaves it for the next start (review II, R2-P1-core-01).
+	reverted := true
 	if updateRevert != nil {
-		o.revertUpdateNOC(ctx, *updateRevert)
+		reverted = o.revertUpdateNOC(ctx, *updateRevert)
 	}
 	// Roll back the half-paired fabric when AddNOC completed but
 	// CommissioningComplete was never received. Without the rollback the
@@ -652,7 +673,12 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	// CommissioningWindowManager::OnFailSafeTimerExpired which calls
 	// RevertPendingOpCertsExceptRoot to evict the pending fabric record.
 	if fabricToRevert != 0 {
-		o.revertAddNOC(ctx, fabricToRevert)
+		if err := o.revertAddNOC(ctx, fabricToRevert); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+			reverted = false
+		}
+		if reverted {
+			o.clearPendingNOC(ctx)
+		}
 		// The revert is a fabric removal: core§11.9.7.2 step 6 asks for
 		// "the equivalent effect of invoking the RemoveFabric command",
 		// which matter.js reaches by deleting the fabric
@@ -672,27 +698,24 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 		if hook != nil {
 			hook(ctx, fabricToRevert)
 		}
+		return
+	}
+	if reverted {
+		o.clearPendingNOC(ctx)
 	}
 }
 
 // revertUpdateNOC restores the identity and node id an UpdateNOC in an
 // expired fail-safe replaced, and lets the host follow (onFabricUpdated:
 // CASE identity, operational record). Mirrors matter.js FailsafeContext
-// rollback, which restores the fabric the update replaced.
-func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdateRevert) {
-	if err := o.store.UpsertIdentity(ctx, r.identity); err != nil {
-		return
+// rollback, which restores the fabric the update replaced. It reports
+// whether the store writes landed.
+func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdateRevert) bool {
+	fab, moved, err := o.restoreUpdateNOC(ctx, r)
+	if err != nil {
+		return false
 	}
-	_ = o.storeVidVerification(ctx, r.fabricIndex, r.vid)
-	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.VendorID != r.vendorID {
-		if up, ok := o.store.(fabricVendorIDUpdater); ok {
-			_ = up.UpdateFabricVendorID(ctx, r.fabricIndex, r.vendorID)
-		}
-	}
-	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.NodeID != r.nodeID {
-		if err := o.store.UpdateFabricNodeID(ctx, r.fabricIndex, r.nodeID); err != nil {
-			return
-		}
+	if moved {
 		o.mu.RLock()
 		withdraw := o.onFabricWithdraw
 		o.mu.RUnlock()
@@ -708,6 +731,29 @@ func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdat
 	if hook != nil {
 		hook(ctx, r.fabricIndex)
 	}
+	return true
+}
+
+// restoreUpdateNOC writes back what an UpdateNOC replaced: the identity,
+// the VID verification data, the vendor id and the node id. moved reports
+// that the node id moved back, fab is the fabric as it was before that.
+func (o *OperationalCredentials) restoreUpdateNOC(ctx context.Context, r nocUpdateRevert) (fab store.FabricRecord, moved bool, err error) {
+	if err := o.store.UpsertIdentity(ctx, r.identity); err != nil {
+		return store.FabricRecord{}, false, err
+	}
+	_ = o.storeVidVerification(ctx, r.fabricIndex, r.vid)
+	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.VendorID != r.vendorID {
+		if up, ok := o.store.(fabricVendorIDUpdater); ok {
+			_ = up.UpdateFabricVendorID(ctx, r.fabricIndex, r.vendorID)
+		}
+	}
+	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.NodeID != r.nodeID {
+		if err := o.store.UpdateFabricNodeID(ctx, r.fabricIndex, r.nodeID); err != nil {
+			return fab, false, err
+		}
+		return fab, true, nil
+	}
+	return store.FabricRecord{}, false, nil
 }
 
 // OnMatterValueChanged implements [contract.ChangeNotifier]: cb fires when
@@ -1863,8 +1909,16 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if cid, derr := computeCompressedFabricID(rec.RootPublicKey, rec.FabricID); derr == nil {
 		copy(rec.CompressedID[:], cid)
 	}
+	// The durable record that what follows is uncommitted, ahead of the
+	// first write, so a restart before CommissioningComplete rolls it back
+	// (recoverPendingNOC; review II, R2-P1-core-01). A failed write answers
+	// as the identity write below does.
+	if err := o.writePendingNOC(ctx, pendingNOCMarker{Op: pendingNOCAdd, FabricID: rec.FabricID, RootPublicKey: rec.RootPublicKey}); err != nil {
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	}
 	idx, err := o.store.AddFabric(ctx, rec)
 	if err != nil {
+		o.clearPendingNOC(ctx)
 		return NOCResponse{StatusCode: NOCStatusFabricConflict, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	// Record the fabric slot so FailSafe expiry can revert it when
@@ -1883,7 +1937,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		IPK:         append([]byte(nil), req.IPKValue...),
 	}
 	if err := o.store.UpsertIdentity(ctx, identity); err != nil {
-		o.revertAddNOC(ctx, idx)
+		o.revertFailedAddNOC(ctx, idx)
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 
@@ -1928,7 +1982,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		Position:    0,
 	}}
 	if err := o.store.ReplaceACL(ctx, idx, defaultACL); err != nil {
-		o.revertAddNOC(ctx, idx)
+		o.revertFailedAddNOC(ctx, idx)
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode
 	}
 
@@ -2166,6 +2220,12 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 		r := &nocUpdateRevert{
 			fabricIndex: idx, identity: existing, nodeID: fab.NodeID,
 			vid: o.vidVerification(ctx, idx), vendorID: fab.VendorID,
+		}
+		// The durable twin of the revert record, ahead of the first write
+		// (review II, R2-P1-core-01); a failed write answers as the
+		// identity write below does.
+		if err := o.writePendingNOC(ctx, updateMarker(fab, r)); err != nil {
+			return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 		}
 		o.mu.Lock()
 		if o.pendingUpdateRevert == nil {
@@ -2532,14 +2592,25 @@ func EncodeECDHFromPrivate(priv *ecdsa.PrivateKey) (*ecdh.PrivateKey, error) {
 // and callers must not see a secondary error masking the root cause. Using
 // a single helper ensures that any future AddNOC state (e.g. ARLs) is
 // rolled back in one place rather than scattered across each failure branch.
-func (o *OperationalCredentials) revertAddNOC(ctx context.Context, fabricIndex uint8) {
+//
+// It returns the fabric removal's error, which decides whether the durable
+// pending marker may go.
+func (o *OperationalCredentials) revertAddNOC(ctx context.Context, fabricIndex uint8) error {
 	// Clear any ACL entries that were written for this fabric before
 	// reverting the fabric record. Mirrors chip
 	// operational-credentials-server.cpp HandleAddNOC needRevert exit block
 	// step 3: accessControl.DeleteAllEntriesForFabric.
 	_ = o.store.ReplaceACL(ctx, fabricIndex, nil)
 	_ = o.store.RemoveGroupKeysByFabric(ctx, fabricIndex)
-	_ = o.store.RemoveFabric(ctx, fabricIndex)
+	return o.store.RemoveFabric(ctx, fabricIndex)
+}
+
+// revertFailedAddNOC is revertAddNOC for an AddNOC that fails after
+// AddFabric: the pending marker goes once the fabric is gone.
+func (o *OperationalCredentials) revertFailedAddNOC(ctx context.Context, fabricIndex uint8) {
+	if err := o.revertAddNOC(ctx, fabricIndex); err == nil || errors.Is(err, store.ErrFabricNotFound) {
+		o.clearPendingNOC(ctx)
+	}
 }
 
 // nocVerificationFailure maps a failed NOC chain verification to its

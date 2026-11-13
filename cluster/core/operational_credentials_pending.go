@@ -1,0 +1,180 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package core
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/SukramJ/go-fabric/store"
+)
+
+// pendingNOCSettingKey is the settings key of the durable twin of
+// pendingInstallFabricIndex / pendingUpdateRevert: what an AddNOC or
+// UpdateNOC wrote to the store before CommissioningComplete committed it.
+// The fail-safe that would roll it back lives in memory; this marker is
+// what lets a restart inside the window roll it back too (review II,
+// R2-P1-core-01). Empty means no marker.
+const pendingNOCSettingKey = "operational_credentials.pending_noc"
+
+// pendingNOC* name the marker's op.
+const (
+	pendingNOCAdd    = "add"
+	pendingNOCUpdate = "update"
+)
+
+// pendingNOCMarker is the persisted marker. An "add" names the new fabric
+// by its identity pair — FabricID and root public key, the pair
+// fabricAlreadyInstalled keeps unique — because it is written before
+// AddFabric assigns the index. An "update" carries what the UpdateNOC
+// replaced ([nocUpdateRevert]) and the identity pair, so a fabric index
+// reused after a removal is never mistaken for the updated fabric.
+type pendingNOCMarker struct {
+	Op            string `json:"op"`
+	FabricIndex   uint8  `json:"fabric_index,omitempty"`
+	FabricID      uint64 `json:"fabric_id"`
+	RootPublicKey []byte `json:"root_public_key"`
+	NOC           []byte `json:"noc,omitempty"`
+	ICAC          []byte `json:"icac,omitempty"`
+	PrivateKey    []byte `json:"private_key,omitempty"`
+	IPK           []byte `json:"ipk,omitempty"`
+	NodeID        uint64 `json:"node_id,omitempty"`
+	VendorID      uint16 `json:"vendor_id,omitempty"`
+	VIDStatement  []byte `json:"vid_statement,omitempty"`
+	VVSC          []byte `json:"vvsc,omitempty"`
+}
+
+// updateRevert is the marker's update as the in-memory revert record.
+func (m pendingNOCMarker) updateRevert() nocUpdateRevert {
+	return nocUpdateRevert{
+		fabricIndex: m.FabricIndex,
+		identity: store.IdentityRecord{
+			FabricIndex: m.FabricIndex, NOC: m.NOC, ICAC: m.ICAC, PrivateKey: m.PrivateKey, IPK: m.IPK,
+		},
+		nodeID:   m.NodeID,
+		vid:      vidData{statement: m.VIDStatement, vvsc: m.VVSC},
+		vendorID: m.VendorID,
+	}
+}
+
+// updateMarker is the marker of an UpdateNOC that replaces r on fab.
+func updateMarker(fab store.FabricRecord, r *nocUpdateRevert) pendingNOCMarker {
+	return pendingNOCMarker{
+		Op: pendingNOCUpdate, FabricIndex: r.fabricIndex,
+		FabricID: fab.FabricID, RootPublicKey: fab.RootPublicKey,
+		NOC: r.identity.NOC, ICAC: r.identity.ICAC, PrivateKey: r.identity.PrivateKey, IPK: r.identity.IPK,
+		NodeID: r.nodeID, VendorID: r.vendorID,
+		VIDStatement: r.vid.statement, VVSC: r.vid.vvsc,
+	}
+}
+
+// writePendingNOC persists m before the command's first store write. A
+// store without settings keeps the pending state in memory only, as before.
+func (o *OperationalCredentials) writePendingNOC(ctx context.Context, m pendingNOCMarker) error {
+	st, ok := o.store.(vidVerificationSettings)
+	if !ok {
+		return nil
+	}
+	b, err := json.Marshal(m) //nolint:gosec // an update's marker carries the replaced operational key, persisted as the identity table holds it (store.IdentityRecord.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("core: OperationalCredentials: encode the pending NOC marker: %w", err)
+	}
+	if err := st.SetSetting(ctx, pendingNOCSettingKey, string(b)); err != nil {
+		return fmt.Errorf("core: OperationalCredentials: persist the pending NOC marker: %w", err)
+	}
+	o.mu.Lock()
+	o.pendingNOCMarkerOut = true
+	o.mu.Unlock()
+	return nil
+}
+
+// clearPendingNOC removes the marker once what it names is committed or
+// rolled back. It touches the store only when this server wrote one. A
+// failed clear is logged: the next start would roll back what it names.
+func (o *OperationalCredentials) clearPendingNOC(ctx context.Context) {
+	o.mu.Lock()
+	out := o.pendingNOCMarkerOut
+	o.mu.Unlock()
+	if !out {
+		return
+	}
+	st, ok := o.store.(vidVerificationSettings)
+	if !ok {
+		return
+	}
+	if err := st.SetSetting(context.WithoutCancel(ctx), pendingNOCSettingKey, ""); err != nil {
+		o.logger().Error("matter.opcreds.pending_noc.clear_failed", slog.Any("err", err))
+		return
+	}
+	o.mu.Lock()
+	o.pendingNOCMarkerOut = false
+	o.mu.Unlock()
+}
+
+// recoverPendingNOC rolls back what a marker left by a previous run names:
+// the node went down inside a fail-safe window, after an AddNOC or
+// UpdateNOC and before CommissioningComplete. Both references come back
+// from such a restart without the uncommitted fabric: chip keeps it
+// pending until CommissioningComplete (OperationalCredentialsCluster.cpp:507
+// AddNewPendingFabricWithOperationalKeystore at 6170af84) and matter.js
+// persists it only in completeCommission (FailsafeContext.ts:141-143 at
+// db021da0). It runs at construction, before the node reads the stored
+// fabrics; no hook fires, since nothing has been announced or opened yet.
+func (o *OperationalCredentials) recoverPendingNOC(ctx context.Context) error {
+	st, ok := o.store.(vidVerificationSettings)
+	if !ok {
+		return nil
+	}
+	raw, found, err := st.GetSetting(ctx, pendingNOCSettingKey)
+	if err != nil {
+		return fmt.Errorf("core: OperationalCredentials: read the pending NOC marker: %w", err)
+	}
+	if !found || raw == "" {
+		return nil
+	}
+	var m pendingNOCMarker
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return fmt.Errorf("core: OperationalCredentials: decode the pending NOC marker: %w", err)
+	}
+	switch m.Op {
+	case pendingNOCAdd:
+		fabrics, err := o.store.ListFabrics(ctx)
+		if err != nil {
+			return fmt.Errorf("core: OperationalCredentials: list fabrics: %w", err)
+		}
+		for i := range fabrics {
+			f := fabrics[i]
+			if f.FabricID != m.FabricID || !bytes.Equal(f.RootPublicKey, m.RootPublicKey) {
+				continue
+			}
+			if err := o.revertAddNOC(ctx, f.FabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+				return fmt.Errorf("core: OperationalCredentials: remove the uncommitted fabric %d: %w", f.FabricIndex, err)
+			}
+			o.forgetVidVerification(ctx, f.FabricIndex)
+			o.logger().Warn("matter.opcreds.pending_noc.fabric_reverted", slog.Int("fabric_index", int(f.FabricIndex)))
+		}
+	case pendingNOCUpdate:
+		fab, err := o.store.GetFabric(ctx, m.FabricIndex)
+		switch {
+		case errors.Is(err, store.ErrFabricNotFound):
+		case err != nil:
+			return fmt.Errorf("core: OperationalCredentials: read fabric %d: %w", m.FabricIndex, err)
+		case fab.FabricID == m.FabricID && bytes.Equal(fab.RootPublicKey, m.RootPublicKey):
+			if _, _, err := o.restoreUpdateNOC(ctx, m.updateRevert()); err != nil {
+				return fmt.Errorf("core: OperationalCredentials: restore the credentials of fabric %d: %w", m.FabricIndex, err)
+			}
+			o.logger().Warn("matter.opcreds.pending_noc.update_reverted", slog.Int("fabric_index", int(m.FabricIndex)))
+		}
+	default:
+		return fmt.Errorf("core: OperationalCredentials: pending NOC marker with op %q", m.Op)
+	}
+	if err := st.SetSetting(ctx, pendingNOCSettingKey, ""); err != nil {
+		return fmt.Errorf("core: OperationalCredentials: clear the pending NOC marker: %w", err)
+	}
+	return nil
+}

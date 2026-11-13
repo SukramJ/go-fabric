@@ -201,14 +201,14 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if err := withAttestation(cfg, &opcredsCfg); err != nil {
 		return nil, err
 	}
-	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, opcredsCfg)
+	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, opcredsCfg) //nolint:contextcheck // the constructor takes no context; it reads the store once
 	if err != nil {
 		return nil, fmt.Errorf("operational credentials: %w", err)
 	}
 	opCreds := r.OperationalCredentials
 
 	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
-	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() })
+	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() }) //nolint:contextcheck // ClearPendingState takes no context
 	// The topology's fail-safe participants revert after the root's own
 	// rollback (failsafe.go).
 	participants := d.onFailSafeExpired
@@ -231,7 +231,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	otaRequestor := r.OTARequestor
 	observer := d.onCommissioningComplete
 	commissioned := func(ctx context.Context, fabricIndex uint8) {
-		opCreds.ClearPendingState()
+		opCreds.ClearPendingState() //nolint:contextcheck // ClearPendingState takes no context
 		if otaRequestor != nil {
 			// A query 30 s after a commissioning (wiring.go:210-215 at b4ea1f96^).
 			otaRequestor.Commissioned()
