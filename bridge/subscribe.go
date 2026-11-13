@@ -366,6 +366,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.event_report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
@@ -550,6 +551,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("paths", len(paths)),
@@ -639,6 +641,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
 	b.subSendErrorCount.Delete(sub.ID)
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
+	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.flush",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(report.EventReports)),
@@ -749,6 +752,19 @@ func (b *Bridge) rememberReportExchange(subID uint32, sessionID, exchangeID uint
 		}
 	}
 	b.reportExchangeOwner.Store(key, subID)
+}
+
+// releaseReportOfClosed drops what a reporter just recorded for sub —
+// the report's exchange and counters — when sub closed while the report
+// was on its way. The reporter loaded sub's routing target before the
+// send; a close landing after that has run
+// [Bridge.releaseSubscriptionRouting] already, and nothing would forget
+// what the reporter stored afterwards (review II, W2-conc-11). A close
+// after this check finds the records and releases them itself.
+func (b *Bridge) releaseReportOfClosed(sub *subscription.Subscription) {
+	if sub.IsClosed() {
+		b.releaseSubscriptionRouting(sub.ID)
+	}
 }
 
 // forgetReportExchange drops both halves of subID's report-exchange
