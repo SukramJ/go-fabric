@@ -853,3 +853,37 @@ func TestPeripheralC1ReaderEndClosesItsSocket(t *testing.T) {
 		return err != nil
 	})
 }
+
+// TestPeripheralCentralGoneBeforeItsAcquire: a central whose
+// Connected=false was handled before its AcquireWrite reached the
+// peripheral — godbus runs method calls on goroutines of their own,
+// signals in order on its dispatch loop — is not left as the accepted
+// central: the peripheral reads Device1.Connected after it took the
+// central in and ends the connection when it is false (review II,
+// R2-P1-drv-05).
+func TestPeripheralCentralGoneBeforeItsAcquire(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0E")
+	b.mu.Lock()
+	b.objs[fc.device][ifaceDevice]["Connected"] = dbus.MakeVariant(false) // its signal already handled
+	b.mu.Unlock()
+	_ = fc.acquireWrite(p.charPath(1), 100)
+	conn := a.conn(t)
+	waitUntil(t, "the gone central's connection to end", func() bool {
+		select {
+		case <-conn.Disconnected():
+			return true
+		default:
+			return false
+		}
+	})
+	p.mu.Lock()
+	left := len(p.conns)
+	p.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("%d connections left after the central was gone", left)
+	}
+}

@@ -616,6 +616,7 @@ func (p *peripheral) connFor(device dbus.ObjectPath) (*pconn, *dbus.Error) {
 	p.mu.Unlock()
 	accept(c)
 	c.startEvents()
+	go c.checkConnected()
 	return c, nil
 }
 
@@ -1078,6 +1079,27 @@ func (c *pconn) Disconnect() error {
 
 // Disconnected implements contract.BLEConnection.
 func (c *pconn) Disconnected() <-chan struct{} { return c.gone }
+
+// checkConnected ends a connection whose device was gone before it was
+// admitted: godbus runs a method call such as AcquireWrite on a goroutine
+// of its own but handles signals in order on its dispatch loop, so the
+// device's Connected=false can be handled before connFor inserted the
+// connection and find nothing to end. Device1.Connected is read once the
+// connection is in, as the central does after its registration
+// (central_linux.go), on a bounded context and off the method call, whose
+// reply bluetoothd waits for. A failed read leaves the connection to the
+// signals (review II, R2-P1-drv-05).
+func (c *pconn) checkConnected() {
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	v, err := getProperty(ctx, c.p.bus, c.device, ifaceDevice, "Connected")
+	if err != nil {
+		return
+	}
+	if connected, ok := variantAs[bool](v, true); ok && !connected {
+		c.markGone()
+	}
+}
 
 // markGone ends the connection: the sockets closed, Disconnected closed.
 func (c *pconn) markGone() {
