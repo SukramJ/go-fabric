@@ -774,7 +774,10 @@ func caseSWTCH32() goCertCase {
 			}},
 			{n: "3d", line: 644, title: "subscribe to all switch events on the endpoint", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
 				sub, err := n.Subscribe(th.ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
-					Events:           []im.ConcreteEventPath{{Endpoint: th.ep, Cluster: switchcluster.ClusterID, HasEndpoint: true, HasCluster: true}},
+					// Urgent, as the TS subscribes (`urgent: true`, :281): a
+					// device reports an event when it occurs only on an urgent
+					// path, otherwise with its next report.
+					Events:           []im.ConcreteEventPath{{Endpoint: th.ep, Cluster: switchcluster.ClusterID, HasEndpoint: true, HasCluster: true, IsUrgent: true}},
 					MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Minute),
 					Updated: ev.add,
 				}})
