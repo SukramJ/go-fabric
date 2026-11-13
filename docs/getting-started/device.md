@@ -268,7 +268,11 @@ layer never does. To make the device blink, declare
 assembler's Identify server runs your handler before it counts
 IdentifyTime, and an error refuses the command — or install them at run
 time with `light.Identify().HandleIdentify(fn)`. An Identify declaration
-takes these two handlers only; the assembler keeps IdentifyTime.
+takes these two handlers only; the assembler keeps IdentifyTime. The
+Identify handler runs while the server holds its IdentifyTime queue, so it
+must not set IdentifyTime on the same endpoint from inside the call — that
+request would wait for the handler's own return — and it should return
+promptly ([Host ports](../guides/ports.md), `IdentifyHandler`).
 
 `device.Options` identifies the device:
 
