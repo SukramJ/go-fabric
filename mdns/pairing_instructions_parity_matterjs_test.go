@@ -39,7 +39,7 @@ func TestPairingInstructionsParity(t *testing.T) {
 		instruction string
 		wantErr     string // empty: accepted
 	}{
-		// :130-132 — `else if (pairingInstructions)`: no hint at all.
+		// :131-133 — `else if (pairingInstructions)`: no hint at all.
 		{"instruction without a hint", 0, "5", "pairing instructions provided but no pairing hint set"},
 		{"neither", 0, "", ""},
 		// :118-121 — more than one hint that requires an instruction.
