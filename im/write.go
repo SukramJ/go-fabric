@@ -406,16 +406,12 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// matter.js AttributeWriteResponse.ts:254-257 and chip
 		// WriteHandler.cpp DataVersion guard. A zero DataVersion in the
 		// request means "caller does not constrain the version" — skip.
-		if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
-			if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
-				if current != w.DataVersion && reachesWriteGates(ctx, d, w.Path) {
-					wr.Responses = append(wr.Responses, AttributeStatus{
-						Path:   w.Path,
-						Status: StatusIB{Status: StatusDataVersionMismatch},
-					})
-					continue
-				}
-			}
+		if namesStaleDataVersion(ctx, d, dvReader, hasDV, w) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusDataVersionMismatch},
+			})
+			continue
 		}
 		// Dispatch. A wildcard-endpoint write expands inside the
 		// dispatcher and mutates state as it goes, so every resolved
@@ -475,6 +471,24 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		tx.releaseHolds(nil)
 	}
 	return wr
+}
+
+// namesStaleDataVersion is the DataVersion gate of [HandleWriteRequest],
+// whose comment at the call gives its sources: a write to a concrete
+// endpoint that names a DataVersion other than the cluster's current one
+// is refused with DataVersionMismatch — when the dispatcher reads versions
+// (hasDV, dvReader), the write constrains the version (a non-zero
+// DataVersion), the cluster's current version is known and non-zero, and
+// the write reaches the gate at all ([reachesWriteGates], asked last).
+func namesStaleDataVersion(ctx context.Context, d Dispatcher, dvReader DataVersionReader, hasDV bool, w AttributeWrite) bool {
+	if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
+		if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
+			if current != w.DataVersion && reachesWriteGates(ctx, d, w.Path) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // reachesWriteGates reports whether a write's accessing fabric and
