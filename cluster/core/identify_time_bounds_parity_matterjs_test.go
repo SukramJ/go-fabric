@@ -51,6 +51,37 @@ func TestParityMatterJS_IdentifyTimeBounds(t *testing.T) {
 	}
 }
 
+// TestParityMatterJS_IdentifyCommandTimeBounds pins R2-P1-core-08: the
+// Identify command refuses the IdentifyTime values the attribute write
+// refuses, with the same status, and leaves a running identify alone,
+// where it used to coerce them to 0 and answer success.
+func TestParityMatterJS_IdentifyCommandTimeBounds(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	id := core.NewIdentify()
+	t.Cleanup(id.Close)
+	if _, err := id.MatterInvoke(ctx, 0x00, map[uint8]any{0: uint64(30)}); err != nil {
+		t.Fatalf("Identify(30): %v", err)
+	}
+	for _, c := range []struct {
+		fields any
+		want   im.StatusCode
+	}{
+		{map[uint8]any{0: uint64(70000)}, im.StatusConstraintError},
+		{uint32(65536), im.StatusConstraintError},
+		{int64(-1), im.StatusConstraintError},
+		{"bad", im.StatusInvalidAction},
+	} {
+		_, err := id.MatterInvoke(ctx, 0x00, c.fields)
+		if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != c.want {
+			t.Errorf("Identify(%T %v): %v, want status %v", c.fields, c.fields, err, c.want)
+		}
+		if v, _ := id.MatterRead(0x0000); v == uint16(0) {
+			t.Fatalf("the refused Identify(%v) stopped the running identify", c.fields)
+		}
+	}
+}
+
 // TestParityMatterJS_IdentifyCountdownZeroReported: the countdown reaching
 // zero is reported once and advances the DataVersion, the per-second ticks
 // are not — matter.js IdentifyServer.ts:41-47 at 862ad75f (the quiet
