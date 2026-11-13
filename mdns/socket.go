@@ -294,7 +294,7 @@ func (s *sockets) link(ifIndex int) link {
 // supportsIpv4 at 862ad75f), and the families of all its addresses.
 func (s *sockets) linkOf(ifi net.Interface) link {
 	h := hostIfaceOf(ifi)
-	l := link{index: ifi.Index, name: ifi.Name, listed: true}
+	l := link{index: ifi.Index, name: ifi.Name, listed: true, nets: h.nets}
 	for _, ip := range h.ips {
 		if ip.To4() != nil {
 			l.has4 = true
@@ -406,6 +406,8 @@ type hostIface struct {
 	loopback     bool
 	pointToPoint bool
 	ips          []net.IP
+	// nets are the addresses with their prefixes, the on-link check's.
+	nets []*net.IPNet
 }
 
 // primaryHostIPs returns the curated host-IP list the Matter mDNS
@@ -527,6 +529,7 @@ func hostIfaceOf(ifi net.Interface) hostIface {
 	for _, a := range addrs {
 		if ipn, ok := a.(*net.IPNet); ok {
 			info.ips = append(info.ips, ipn.IP)
+			info.nets = append(info.nets, ipn)
 		}
 	}
 	return info

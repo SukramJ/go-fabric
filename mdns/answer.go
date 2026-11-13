@@ -151,6 +151,11 @@ type linkRecords struct {
 	setKeys  map[string]bool
 	complete []dns.RR
 	at       time.Time
+	// nets are the interface's prefixes, read at the first query the
+	// record sets answer (netsRead), so they go with them when the
+	// interface's addresses change.
+	nets     []*net.IPNet
+	netsRead bool
 }
 
 // recordsForLocked returns the record sets on ifIndex, from the cache while
@@ -213,7 +218,16 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 		return
 	}
 	// Ignore an interface without records.
-	if len(r.recordsForLocked(ifIndex, r.addrsOf(ifIndex)).byService) == 0 {
+	lr := r.recordsForLocked(ifIndex, r.addrsOf(ifIndex))
+	if len(lr.byService) == 0 {
+		return
+	}
+	if !lr.netsRead {
+		lr.nets, lr.netsRead = r.wire.link(ifIndex).nets, true
+	}
+	// The sockets hand no packet without a source; a nil one is the
+	// engine's own call.
+	if src != nil && !onLink(src.IP, lr.nets) {
 		return
 	}
 	query := r.prepareLocked(msg, ifIndex, src)
@@ -221,6 +235,36 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 		return
 	}
 	r.answerLocked(query, ifIndex, src)
+}
+
+// onLink reports whether a query's source is on the link of the interface
+// it arrived on, whose prefixes are nets: an IPv6 link-local address, or an
+// address inside one of the prefixes (RFC 6762 §11, the source address
+// check). The sockets bind the wildcard address, so a datagram sent by
+// unicast to the host's port 5353 from anywhere reaches the engine; a query
+// from off the link is not answered, by multicast or unicast, and not held
+// as a truncated query (review II, R2-P1-net-02).
+//
+// matter.js gets the same filter from how it finds a packet's interface
+// when its socket has none configured (packages/nodejs/src/net/
+// NodeJsUdpSocket.ts:227 at db021da0): the source's zone, else the
+// interface whose address and netmask contain the source
+// (NodeJsNetwork.ts:144-166, onSameNetwork packages/general/src/util/
+// Ip.ts:108-130), else "" for an IPv6 ULA source and undefined otherwise.
+// A packet without an
+// interface is dropped (packages/general/src/net/udp/UdpMulticastServer.ts:
+// 142-155), and the "" interface has no details (NodeJsNetwork.ts:207-209
+// getIpMac; InterfaceResponder.ts:206-213 #setDetails), so its query is not
+// answered (InterfaceResponder.ts:254-259 answer, :796-800 #currentView).
+// matter.js matches the source against every interface of the host and
+// answers on the one that contains it; this engine answers on the
+// interface the query arrived on (the control message's, socket.go), so
+// it checks that interface's prefixes.
+func onLink(ip net.IP, nets []*net.IPNet) bool {
+	if ip.To4() == nil && ip.IsLinkLocalUnicast() {
+		return true
+	}
+	return slices.ContainsFunc(nets, func(n *net.IPNet) bool { return n.Contains(ip) })
 }
 
 // truncatedKey is matter.js's `${transactionId}-${sourceIntf}-${sourceIp}`

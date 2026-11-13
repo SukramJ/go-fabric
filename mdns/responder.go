@@ -182,9 +182,13 @@ type wire interface {
 // loopback, tunnel, container bridge, down), and the address families it
 // has an address of, which a multicast is sent on.
 type link struct {
-	index      int
-	name       string
-	addrs      []net.IP
+	index int
+	name  string
+	addrs []net.IP
+	// nets are the prefixes of every address of the interface, the
+	// advertise policy's or not: the on-link check of a query's source
+	// (onLink).
+	nets       []*net.IPNet
 	has4, has6 bool
 	// listed says the interface is in the current listing (up and
 	// multicast-capable): matter.js's InterfaceResponder.isListed. A
