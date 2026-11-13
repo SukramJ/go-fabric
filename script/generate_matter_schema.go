@@ -9,9 +9,11 @@
 //   - clusters.go  — ClusterRevisions, ClusterNames (map[uint32]uint16/string)
 //   - devicetypes.go — DeviceTypeRevisions, DeviceTypeNames, DeviceTypeServerClusters
 //   - attribute_access_gen.go — attributeWritePrivileges (writable attributes
-//     whose effective write privilege is above Operate), changesOmittedAttributes
-//     and fabricScopedWritePaths (writable attributes whose effective access
-//     is fabric-scoped or fabric-sensitive)
+//     whose effective write privilege is above Operate), changesOmittedAttributes,
+//     fabricScopedWritePaths (writable attributes whose effective access
+//     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
+//     attribute below the global range that matter.js does not let a remote
+//     party write)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
 //     type's requirement tree, conditions and composition: the device-type
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
@@ -133,9 +135,13 @@ type snapshotAttribute struct {
 	// Effective carries the attribute's resolved access — what matter.js's
 	// effectiveAccess answers, a derived cluster's inherited attribute
 	// included — field by field (the extractor's accessOut), with the timed
-	// quality ("T") as access.timed, as for a command.
+	// quality ("T") as access.timed, as for a command — and its resolved
+	// quality, of which the fixed flag ("F") is read here.
 	Effective *struct {
-		Access snapshotAccess `json:"access"`
+		Access  snapshotAccess `json:"access"`
+		Quality struct {
+			Fixed bool `json:"fixed"`
+		} `json:"quality"`
 	} `json:"effective"`
 }
 
@@ -672,6 +678,49 @@ func writeAccessFile(clusters []snapshotCluster) error {
 		}
 		buf.WriteString("\t},\n")
 	}
+	buf.WriteString("}\n\n")
+	// readOnlyAttributes: the complement of matter.js's limits.writable
+	// (packages/protocol/src/action/server/AccessControl.ts:523 at db021da0,
+	// `access.writable && !fixed`), over every cluster of the snapshot. The
+	// ids of the global range are left to the write gate: the snapshot
+	// lists FeatureMap and ClusterRevision where a cluster's element file
+	// states them and none of the other four, so a table built from it
+	// would cover the range in part.
+	buf.WriteString("// readOnlyAttributes lists every attribute below the global range\n")
+	buf.WriteString("// (0xFFF8) that a remote party may not write: its effective access in\n")
+	buf.WriteString("// parity/schema.json is not writable, or its effective quality is fixed\n")
+	buf.WriteString("// (\"F\"). The global attributes are read-only on every cluster and are\n")
+	buf.WriteString("// answered by AttributeWritable itself.\n")
+	buf.WriteString("var readOnlyAttributes = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.ID >= globalAttributeFirst {
+				continue
+			}
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			p, err := writePrivilege(a.Effective.Access)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			switch {
+			case p == 0:
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Effective.Access))
+			case a.Effective.Quality.Fixed:
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q, fixed\n", a.ID, a.Name, a.Effective.Access))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
 	buf.WriteString("}\n")
 	out, err := format.Source(buf.Bytes())
 	if err != nil {
@@ -679,6 +728,12 @@ func writeAccessFile(clusters []snapshotCluster) error {
 	}
 	return writeIfChanged(accessFile, out)
 }
+
+// globalAttributeFirst is the first id of the global attribute range
+// (GeneratedCommandList 0xFFF8 … ClusterRevision 0xFFFD; matter.js
+// packages/model/src/standard/elements/generated-command-list.element.ts:14
+// at db021da0).
+const globalAttributeFirst = 0xFFF8
 
 // writeTimedFile emits timedInvokePaths: every request command whose
 // effective access carries the timed quality ("T", matter.js

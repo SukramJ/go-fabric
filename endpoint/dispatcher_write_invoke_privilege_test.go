@@ -141,9 +141,9 @@ func TestTopologyDispatcher_MinWritePrivilege(t *testing.T) {
 		generalCommID     uint32 = 0x0030
 		accessControlACL  uint32 = 0x0000
 		accessControlExt  uint32 = 0x0001
-		accessControlCap  uint32 = 0x0002 // SubjectsPerAccessControlEntry — no write-privilege override
+		accessControlCap  uint32 = 0x0002 // SubjectsPerAccessControlEntry — "R V", read-only
 		gcBreadcrumb      uint32 = 0x0000
-		gcCommissioningIn uint32 = 0x0001 // BasicCommissioningInfo — no write-privilege override
+		gcCommissioningIn uint32 = 0x0001 // BasicCommissioningInfo — "R V", read-only
 	)
 
 	tests := []struct {
@@ -155,13 +155,22 @@ func TestTopologyDispatcher_MinWritePrivilege(t *testing.T) {
 	}{
 		{"AccessControl.ACL requires Administer", 0, accessControlID, accessControlACL, 5},
 		{"AccessControl.Extension requires Administer", 0, accessControlID, accessControlExt, 5},
-		{"AccessControl attribute without override defaults to Operate", 0, accessControlID, accessControlCap, 3},
+		// A read-only attribute needs View only: both references answer
+		// UNSUPPORTED_WRITE between the View pass and the write-privilege
+		// pass (AttributeWriteResponse.ts:215, :231-234, :236-241 at
+		// db021da0; chip src/app/WriteHandler.cpp:777, :790-791, :794-795
+		// at 6170af84). These three rows read Operate before review II,
+		// W3-clugen-05, and a View subject was answered UNSUPPORTED_ACCESS.
+		{"AccessControl read-only attribute needs View", 0, accessControlID, accessControlCap, 1},
 		// GeneralCommissioning.Breadcrumb is itself Administer-gated
 		// (Matter §11.10, access "RW VA") — not the Operate-level control
 		// case one might expect from a "commissioning" attribute.
 		{"GeneralCommissioning.Breadcrumb requires Administer", 0, generalCommID, gcBreadcrumb, 5},
-		{"GeneralCommissioning attribute without override defaults to Operate", 0, generalCommID, gcCommissioningIn, 3},
-		{"plain cluster attribute defaults to Operate", 0, plainClusterID, 0x0000, 3},
+		{"GeneralCommissioning read-only attribute needs View", 0, generalCommID, gcCommissioningIn, 1},
+		// Thermostat.LocalTemperature "R V", OccupiedHeatingSetpoint "RW VO".
+		{"plain cluster read-only attribute needs View", 0, plainClusterID, 0x0000, 1},
+		{"plain cluster writable attribute defaults to Operate", 0, plainClusterID, 0x0012, 3},
+		{"a global attribute needs View", 0, plainClusterID, 0xFFFD, 1},
 		// A path that does not resolve needs View only: the View pass
 		// precedes the existence checks, the write privilege applies to
 		// an attribute that exists (matter.js

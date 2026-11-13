@@ -324,17 +324,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// Read-only-attribute write gate (Matter §8.6). matter.js
 				// rejects a WriteRequest to a non-writable attribute BEFORE
 				// any behavior runs, so the write never reaches the cluster
-				// server (and, downstream, the CCU). The writability verdict
-				// derives from the matter.js schema access string via
-				// schema.AttributeWritable. A concrete path is answered with
-				// UNSUPPORTED_WRITE (mirrors
-				// ../matter.js/packages/protocol/src/action/server/AttributeWriteResponse.ts:229-231
-				// `if (!limits.writable) … return this.#asStatus(path, Status.UnsupportedWrite)`);
-				// a wildcard path silently skips the attribute (mirrors
-				// AttributeWriteResponse.ts:329-331
-				// `if (!attribute.limits.writable) return;`). Attributes with
-				// no read-only record — globals, writable attrs, clusters
-				// outside the table (known == false) — fall through unchanged.
+				// server (and, downstream, the host). The writability verdict
+				// is schema.AttributeWritable's, generated from the effective
+				// access of every attribute of every snapshot cluster. A
+				// concrete path is answered with UNSUPPORTED_WRITE (mirrors
+				// packages/protocol/src/action/server/AttributeWriteResponse.ts:231-234
+				// at db021da0, `if (!limits.writable) … return
+				// this.#asStatus(path, Status.UnsupportedWrite)`; chip
+				// src/app/WriteHandler.cpp:790-791 at 6170af84); a wildcard
+				// path silently skips the attribute (mirrors
+				// AttributeWriteResponse.ts:331-333 at db021da0,
+				// `if (!attribute.limits.writable) return;`). An attribute
+				// without a read-only record — a writable one, one of a
+				// cluster the snapshot does not have (known == false) — falls
+				// through unchanged.
 				// An attribute the cluster does not implement answers
 				// UNSUPPORTED_ATTRIBUTE before its writability is
 				// considered — matter.js AttributeWriteResponse.ts:225-226
@@ -975,8 +978,20 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 // at 862ad75f, core spec §8.7.3.2), so a View subject learns that an
 // attribute is absent, as it does on a read. The dispatcher's Write then
 // answers UNSUPPORTED_ENDPOINT, _CLUSTER or _ATTRIBUTE.
+//
+// An attribute that is not writable needs View only as well: both
+// references answer UNSUPPORTED_WRITE between the View pass and the
+// write-privilege pass (AttributeWriteResponse.ts:215, :231-234, :236-241 at
+// db021da0; chip src/app/WriteHandler.cpp:777, :790-791, :794-795 at
+// 6170af84 — a read-only attribute has no write privilege there at all), so
+// a subject that may view the cluster learns that the attribute is
+// read-only whatever else it may do. Before, such a subject was answered
+// UNSUPPORTED_ACCESS, at the Operate default (review II, W3-clugen-05).
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
 	const privilegeView uint8 = 1
+	if writable, known := schema.AttributeWritable(clusterID, attrID); known && !writable {
+		return privilegeView
+	}
 	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {

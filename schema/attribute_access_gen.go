@@ -297,3 +297,1211 @@ var fabricScopedWritePaths = map[uint32]map[uint32]struct{}{
 		0x0004: {}, // GroupcastAdoption "RW F A"
 	},
 }
+
+// readOnlyAttributes lists every attribute below the global range
+// (0xFFF8) that a remote party may not write: its effective access in
+// parity/schema.json is not writable, or its effective quality is fixed
+// ("F"). The global attributes are read-only on every cluster and are
+// answered by AttributeWritable itself.
+var readOnlyAttributes = map[uint32]map[uint32]struct{}{
+	0x0003: { // Identify
+		0x0001: {}, // IdentifyType "R V"
+	},
+	0x0004: { // Groups
+		0x0000: {}, // NameSupport "R V"
+	},
+	0x0006: { // OnOff
+		0x0000: {}, // OnOff "R V"
+		0x4000: {}, // GlobalSceneControl "R V"
+	},
+	0x0008: { // LevelControl
+		0x0000: {}, // CurrentLevel "R V"
+		0x0001: {}, // RemainingTime "R V"
+		0x0002: {}, // MinLevel "R V"
+		0x0003: {}, // MaxLevel "R V"
+		0x0004: {}, // CurrentFrequency "R V"
+		0x0005: {}, // MinFrequency "R V"
+		0x0006: {}, // MaxFrequency "R V"
+	},
+	0x001D: { // Descriptor
+		0x0000: {}, // DeviceTypeList "R V"
+		0x0001: {}, // ServerList "R V"
+		0x0002: {}, // ClientList "R V"
+		0x0003: {}, // PartsList "R V"
+		0x0004: {}, // TagList "R V"
+		0x0005: {}, // EndpointUniqueId "R V"
+	},
+	0x001F: { // AccessControl
+		0x0002: {}, // SubjectsPerAccessControlEntry "R V"
+		0x0003: {}, // TargetsPerAccessControlEntry "R V"
+		0x0004: {}, // AccessControlEntriesPerFabric "R V"
+		0x0005: {}, // CommissioningArl "R V"
+		0x0006: {}, // Arl "R F V"
+		0x0007: {}, // AuxiliaryAcl "R F A"
+	},
+	0x0025: { // Actions
+		0x0000: {}, // ActionList "R V"
+		0x0001: {}, // EndpointLists "R V"
+		0x0002: {}, // SetupUrl "R V"
+	},
+	0x0028: { // BasicInformation
+		0x0000: {}, // DataModelRevision "R V"
+		0x0001: {}, // VendorName "R V"
+		0x0002: {}, // VendorId "R V"
+		0x0003: {}, // ProductName "R V"
+		0x0004: {}, // ProductId "R V"
+		0x0007: {}, // HardwareVersion "R V"
+		0x0008: {}, // HardwareVersionString "R V"
+		0x0009: {}, // SoftwareVersion "R V"
+		0x000A: {}, // SoftwareVersionString "R V"
+		0x000B: {}, // ManufacturingDate "R V"
+		0x000C: {}, // PartNumber "R V"
+		0x000D: {}, // ProductUrl "R V"
+		0x000E: {}, // ProductLabel "R V"
+		0x000F: {}, // SerialNumber "R V"
+		0x0011: {}, // Reachable "R V"
+		0x0012: {}, // UniqueId "R V"
+		0x0013: {}, // CapabilityMinima "R V"
+		0x0014: {}, // ProductAppearance "R V"
+		0x0015: {}, // SpecificationVersion "R V"
+		0x0016: {}, // MaxPathsPerInvoke "R V"
+		0x0018: {}, // ConfigurationVersion "R V"
+	},
+	0x002A: { // OtaSoftwareUpdateRequestor
+		0x0001: {}, // UpdatePossible "R V"
+		0x0002: {}, // UpdateState "R V"
+		0x0003: {}, // UpdateStateProgress "R V"
+	},
+	0x002B: { // LocalizationConfiguration
+		0x0001: {}, // SupportedLocales "R V"
+	},
+	0x002C: { // TimeFormatLocalization
+		0x0002: {}, // SupportedCalendarTypes "R V"
+	},
+	0x002D: { // UnitLocalization
+		0x0001: {}, // SupportedTemperatureUnits "R V"
+	},
+	0x002E: { // PowerSourceConfiguration
+		0x0000: {}, // Sources "R V"
+	},
+	0x002F: { // PowerSource
+		0x0000: {}, // Status "R V"
+		0x0001: {}, // Order "R V"
+		0x0002: {}, // Description "R V"
+		0x0003: {}, // WiredAssessedInputVoltage "R V"
+		0x0004: {}, // WiredAssessedInputFrequency "R V"
+		0x0005: {}, // WiredCurrentType "R V"
+		0x0006: {}, // WiredAssessedCurrent "R V"
+		0x0007: {}, // WiredNominalVoltage "R V"
+		0x0008: {}, // WiredMaximumCurrent "R V"
+		0x0009: {}, // WiredPresent "R V"
+		0x000A: {}, // ActiveWiredFaults "R V"
+		0x000B: {}, // BatVoltage "R V"
+		0x000C: {}, // BatPercentRemaining "R V"
+		0x000D: {}, // BatTimeRemaining "R V"
+		0x000E: {}, // BatChargeLevel "R V"
+		0x000F: {}, // BatReplacementNeeded "R V"
+		0x0010: {}, // BatReplaceability "R V"
+		0x0011: {}, // BatPresent "R V"
+		0x0012: {}, // ActiveBatFaults "R V"
+		0x0013: {}, // BatReplacementDescription "R V"
+		0x0014: {}, // BatCommonDesignation "R V"
+		0x0015: {}, // BatAnsiDesignation "R V"
+		0x0016: {}, // BatIecDesignation "R V"
+		0x0017: {}, // BatApprovedChemistry "R V"
+		0x0018: {}, // BatCapacity "R V"
+		0x0019: {}, // BatQuantity "R V"
+		0x001A: {}, // BatChargeState "R V"
+		0x001B: {}, // BatTimeToFullCharge "R V"
+		0x001C: {}, // BatFunctionalWhileCharging "R V"
+		0x001D: {}, // BatChargingCurrent "R V"
+		0x001E: {}, // ActiveBatChargeFaults "R V"
+		0x001F: {}, // EndpointList "R V"
+	},
+	0x0030: { // GeneralCommissioning
+		0x0001: {}, // BasicCommissioningInfo "R V"
+		0x0002: {}, // RegulatoryConfig "R V"
+		0x0003: {}, // LocationCapability "R V"
+		0x0004: {}, // SupportsConcurrentConnection "R V"
+		0x0005: {}, // TcAcceptedVersion "R A"
+		0x0006: {}, // TcMinRequiredVersion "R A"
+		0x0007: {}, // TcAcknowledgements "R A"
+		0x0008: {}, // TcAcknowledgementsRequired "R A"
+		0x0009: {}, // TcUpdateDeadline "R A"
+		0x000A: {}, // RecoveryIdentifier "R M"
+		0x000B: {}, // NetworkRecoveryReason "R M"
+		0x000C: {}, // IsCommissioningWithoutPower "R V"
+	},
+	0x0031: { // NetworkCommissioning
+		0x0000: {}, // MaxNetworks "R A"
+		0x0001: {}, // Networks "R A"
+		0x0002: {}, // ScanMaxTimeSeconds "R V"
+		0x0003: {}, // ConnectMaxTimeSeconds "R V"
+		0x0005: {}, // LastNetworkingStatus "R A"
+		0x0006: {}, // LastNetworkId "R A"
+		0x0007: {}, // LastConnectErrorValue "R A"
+		0x0008: {}, // SupportedWiFiBands "R V"
+		0x0009: {}, // SupportedThreadFeatures "R V"
+		0x000A: {}, // ThreadVersion "R V"
+	},
+	0x0033: { // GeneralDiagnostics
+		0x0000: {}, // NetworkInterfaces "R V"
+		0x0001: {}, // RebootCount "R V"
+		0x0002: {}, // UpTime "R V"
+		0x0003: {}, // TotalOperationalHours "R V"
+		0x0004: {}, // BootReason "R V"
+		0x0005: {}, // ActiveHardwareFaults "R V"
+		0x0006: {}, // ActiveRadioFaults "R V"
+		0x0007: {}, // ActiveNetworkFaults "R V"
+		0x0008: {}, // TestEventTriggersEnabled "R V"
+		0x000A: {}, // DeviceLoadStatus "R V"
+	},
+	0x0034: { // SoftwareDiagnostics
+		0x0000: {}, // ThreadMetrics "R V"
+		0x0001: {}, // CurrentHeapFree "R V"
+		0x0002: {}, // CurrentHeapUsed "R V"
+		0x0003: {}, // CurrentHeapHighWatermark "R V"
+	},
+	0x0035: { // ThreadNetworkDiagnostics
+		0x0000: {}, // Channel "R V"
+		0x0001: {}, // RoutingRole "R V"
+		0x0002: {}, // NetworkName "R V"
+		0x0003: {}, // PanId "R V"
+		0x0004: {}, // ExtendedPanId "R V"
+		0x0005: {}, // MeshLocalPrefix "R V"
+		0x0006: {}, // OverrunCount "R V"
+		0x0007: {}, // NeighborTable "R V"
+		0x0008: {}, // RouteTable "R V"
+		0x0009: {}, // PartitionId "R V"
+		0x000A: {}, // Weighting "R V"
+		0x000B: {}, // DataVersion "R V"
+		0x000C: {}, // StableDataVersion "R V"
+		0x000D: {}, // LeaderRouterId "R V"
+		0x000E: {}, // DetachedRoleCount "R V"
+		0x000F: {}, // ChildRoleCount "R V"
+		0x0010: {}, // RouterRoleCount "R V"
+		0x0011: {}, // LeaderRoleCount "R V"
+		0x0012: {}, // AttachAttemptCount "R V"
+		0x0013: {}, // PartitionIdChangeCount "R V"
+		0x0014: {}, // BetterPartitionAttachAttemptCount "R V"
+		0x0015: {}, // ParentChangeCount "R V"
+		0x0016: {}, // TxTotalCount "R V"
+		0x0017: {}, // TxUnicastCount "R V"
+		0x0018: {}, // TxBroadcastCount "R V"
+		0x0019: {}, // TxAckRequestedCount "R V"
+		0x001A: {}, // TxAckedCount "R V"
+		0x001B: {}, // TxNoAckRequestedCount "R V"
+		0x001C: {}, // TxDataCount "R V"
+		0x001D: {}, // TxDataPollCount "R V"
+		0x001E: {}, // TxBeaconCount "R V"
+		0x001F: {}, // TxBeaconRequestCount "R V"
+		0x0020: {}, // TxOtherCount "R V"
+		0x0021: {}, // TxRetryCount "R V"
+		0x0022: {}, // TxDirectMaxRetryExpiryCount "R V"
+		0x0023: {}, // TxIndirectMaxRetryExpiryCount "R V"
+		0x0024: {}, // TxErrCcaCount "R V"
+		0x0025: {}, // TxErrAbortCount "R V"
+		0x0026: {}, // TxErrBusyChannelCount "R V"
+		0x0027: {}, // RxTotalCount "R V"
+		0x0028: {}, // RxUnicastCount "R V"
+		0x0029: {}, // RxBroadcastCount "R V"
+		0x002A: {}, // RxDataCount "R V"
+		0x002B: {}, // RxDataPollCount "R V"
+		0x002C: {}, // RxBeaconCount "R V"
+		0x002D: {}, // RxBeaconRequestCount "R V"
+		0x002E: {}, // RxOtherCount "R V"
+		0x002F: {}, // RxAddressFilteredCount "R V"
+		0x0030: {}, // RxDestAddrFilteredCount "R V"
+		0x0031: {}, // RxDuplicatedCount "R V"
+		0x0032: {}, // RxErrNoFrameCount "R V"
+		0x0033: {}, // RxErrUnknownNeighborCount "R V"
+		0x0034: {}, // RxErrInvalidSrcAddrCount "R V"
+		0x0035: {}, // RxErrSecCount "R V"
+		0x0036: {}, // RxErrFcsCount "R V"
+		0x0037: {}, // RxErrOtherCount "R V"
+		0x0038: {}, // ActiveTimestamp "R V"
+		0x0039: {}, // PendingTimestamp "R V"
+		0x003A: {}, // Delay "R V"
+		0x003B: {}, // SecurityPolicy "R V"
+		0x003C: {}, // ChannelPage0Mask "R V"
+		0x003D: {}, // OperationalDatasetComponents "R V"
+		0x003E: {}, // ActiveNetworkFaultsList "R V"
+		0x003F: {}, // ExtAddress "R V"
+		0x0040: {}, // Rloc16 "R V"
+	},
+	0x0036: { // WiFiNetworkDiagnostics
+		0x0000: {}, // Bssid "R V"
+		0x0001: {}, // SecurityType "R V"
+		0x0002: {}, // WiFiVersion "R V"
+		0x0003: {}, // ChannelNumber "R V"
+		0x0004: {}, // Rssi "R V"
+		0x0005: {}, // BeaconLostCount "R V"
+		0x0006: {}, // BeaconRxCount "R V"
+		0x0007: {}, // PacketMulticastRxCount "R V"
+		0x0008: {}, // PacketMulticastTxCount "R V"
+		0x0009: {}, // PacketUnicastRxCount "R V"
+		0x000A: {}, // PacketUnicastTxCount "R V"
+		0x000B: {}, // CurrentMaxRate "R V"
+		0x000C: {}, // OverrunCount "R V"
+	},
+	0x0037: { // EthernetNetworkDiagnostics
+		0x0000: {}, // PhyRate "R V"
+		0x0001: {}, // FullDuplex "R V"
+		0x0002: {}, // PacketRxCount "R V"
+		0x0003: {}, // PacketTxCount "R V"
+		0x0004: {}, // TxErrCount "R V"
+		0x0005: {}, // CollisionCount "R V"
+		0x0006: {}, // OverrunCount "R V"
+		0x0007: {}, // CarrierDetect "R V"
+		0x0008: {}, // TimeSinceReset "R V"
+	},
+	0x0038: { // TimeSynchronization
+		0x0000: {}, // UtcTime "R V"
+		0x0001: {}, // Granularity "R V"
+		0x0002: {}, // TimeSource "R V"
+		0x0003: {}, // TrustedTimeSource "R V"
+		0x0004: {}, // DefaultNtp "R V"
+		0x0005: {}, // TimeZone "R V"
+		0x0006: {}, // DstOffset "R V"
+		0x0007: {}, // LocalTime "R V"
+		0x0008: {}, // TimeZoneDatabase "R V"
+		0x0009: {}, // NtpServerAvailable "R V"
+		0x000A: {}, // TimeZoneListMaxSize "R V"
+		0x000B: {}, // DstOffsetListMaxSize "R V"
+		0x000C: {}, // SupportsDnsResolve "R V"
+	},
+	0x0039: { // BridgedDeviceBasicInformation
+		0x0000: {}, // DataModelRevision "R V"
+		0x0001: {}, // VendorName "R V"
+		0x0002: {}, // VendorId "R V"
+		0x0003: {}, // ProductName "R V"
+		0x0004: {}, // ProductId "R V"
+		0x0007: {}, // HardwareVersion "R V"
+		0x0008: {}, // HardwareVersionString "R V"
+		0x0009: {}, // SoftwareVersion "R V"
+		0x000A: {}, // SoftwareVersionString "R V"
+		0x000B: {}, // ManufacturingDate "R V"
+		0x000C: {}, // PartNumber "R V"
+		0x000D: {}, // ProductUrl "R V"
+		0x000E: {}, // ProductLabel "R V"
+		0x000F: {}, // SerialNumber "R V"
+		0x0011: {}, // Reachable "R V"
+		0x0012: {}, // UniqueId "R V"
+		0x0013: {}, // CapabilityMinima "R V"
+		0x0014: {}, // ProductAppearance "R V"
+		0x0015: {}, // SpecificationVersion "R V"
+		0x0016: {}, // MaxPathsPerInvoke "R V"
+		0x0018: {}, // ConfigurationVersion "R V"
+	},
+	0x003B: { // Switch
+		0x0000: {}, // NumberOfPositions "R V"
+		0x0001: {}, // CurrentPosition "R V"
+		0x0002: {}, // MultiPressMax "R V"
+	},
+	0x003C: { // AdministratorCommissioning
+		0x0000: {}, // WindowStatus "R V"
+		0x0001: {}, // AdminFabricIndex "R V"
+		0x0002: {}, // AdminVendorId "R V"
+	},
+	0x003E: { // OperationalCredentials
+		0x0000: {}, // Nocs "R F A"
+		0x0001: {}, // Fabrics "R F V"
+		0x0002: {}, // SupportedFabrics "R V"
+		0x0003: {}, // CommissionedFabrics "R V"
+		0x0004: {}, // TrustedRootCertificates "R V"
+		0x0005: {}, // CurrentFabricIndex "R V"
+	},
+	0x003F: { // GroupKeyManagement
+		0x0001: {}, // GroupTable "R F V"
+		0x0002: {}, // MaxGroupsPerFabric "R V"
+		0x0003: {}, // MaxGroupKeysPerFabric "R V"
+	},
+	0x0040: { // FixedLabel
+		0x0000: {}, // LabelList "R V"
+	},
+	0x0045: { // BooleanState
+		0x0000: {}, // StateValue "R V"
+	},
+	0x0046: { // IcdManagement
+		0x0000: {}, // IdleModeDuration "R V"
+		0x0001: {}, // ActiveModeDuration "R V"
+		0x0002: {}, // ActiveModeThreshold "R V"
+		0x0003: {}, // RegisteredClients "R F A"
+		0x0004: {}, // IcdCounter "R A"
+		0x0005: {}, // ClientsSupportedPerFabric "R V"
+		0x0006: {}, // UserActiveModeTriggerHint "R V"
+		0x0007: {}, // UserActiveModeTriggerInstruction "R V"
+		0x0008: {}, // OperatingMode "R V"
+		0x0009: {}, // MaximumCheckInBackoff "R V"
+	},
+	0x0048: { // OvenCavityOperationalState
+		0x0000: {}, // PhaseList "R V"
+		0x0001: {}, // CurrentPhase "R V"
+		0x0002: {}, // CountdownTime "R V"
+		0x0003: {}, // OperationalStateList "R V"
+		0x0004: {}, // OperationalState "R V"
+		0x0005: {}, // OperationalError "R V"
+	},
+	0x0049: { // OvenMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x004A: { // LaundryDryerControls
+		0x0000: {}, // SupportedDrynessLevels "R V"
+	},
+	0x0050: { // ModeSelect
+		0x0000: {}, // Description "R V"
+		0x0001: {}, // StandardNamespace "R V"
+		0x0002: {}, // SupportedModes "R V"
+		0x0003: {}, // CurrentMode "R V"
+	},
+	0x0051: { // LaundryWasherMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x0052: { // RefrigeratorAndTemperatureControlledCabinetMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x0053: { // LaundryWasherControls
+		0x0000: {}, // SpinSpeeds "R V"
+		0x0003: {}, // SupportedRinses "R V"
+	},
+	0x0054: { // RvcRunMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x0055: { // RvcCleanMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x0056: { // TemperatureControl
+		0x0000: {}, // TemperatureSetpoint "R V"
+		0x0001: {}, // MinTemperature "R V"
+		0x0002: {}, // MaxTemperature "R V"
+		0x0003: {}, // Step "R V"
+		0x0004: {}, // SelectedTemperatureLevel "R V"
+		0x0005: {}, // SupportedTemperatureLevels "R V"
+	},
+	0x0057: { // RefrigeratorAlarm
+		0x0000: {}, // Mask "R V"
+		0x0001: {}, // Latch "R V"
+		0x0002: {}, // State "R V"
+		0x0003: {}, // Supported "R V"
+	},
+	0x0059: { // DishwasherMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x005B: { // AirQuality
+		0x0000: {}, // AirQuality "R V"
+	},
+	0x005C: { // SmokeCoAlarm
+		0x0000: {}, // ExpressedState "R V"
+		0x0001: {}, // SmokeState "R V"
+		0x0002: {}, // CoState "R V"
+		0x0003: {}, // BatteryAlert "R V"
+		0x0004: {}, // DeviceMuted "R V"
+		0x0005: {}, // TestInProgress "R V"
+		0x0006: {}, // HardwareFaultAlert "R V"
+		0x0007: {}, // EndOfServiceAlert "R V"
+		0x0008: {}, // InterconnectSmokeAlarm "R V"
+		0x0009: {}, // InterconnectCoAlarm "R V"
+		0x000A: {}, // ContaminationState "R V"
+		0x000C: {}, // ExpiryDate "R V"
+		0x000D: {}, // Unmounted "R V"
+	},
+	0x005D: { // DishwasherAlarm
+		0x0000: {}, // Mask "R V"
+		0x0001: {}, // Latch "R V"
+		0x0002: {}, // State "R V"
+		0x0003: {}, // Supported "R V"
+	},
+	0x005E: { // MicrowaveOvenMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x005F: { // MicrowaveOvenControl
+		0x0000: {}, // CookTime "R V"
+		0x0001: {}, // MaxCookTime "R V"
+		0x0002: {}, // PowerSetting "R V"
+		0x0003: {}, // MinPower "R V"
+		0x0004: {}, // MaxPower "R V"
+		0x0005: {}, // PowerStep "R V"
+		0x0006: {}, // SupportedWatts "R V"
+		0x0007: {}, // SelectedWattIndex "R V"
+		0x0008: {}, // WattRating "R V"
+	},
+	0x0060: { // OperationalState
+		0x0000: {}, // PhaseList "R V"
+		0x0001: {}, // CurrentPhase "R V"
+		0x0002: {}, // CountdownTime "R V"
+		0x0003: {}, // OperationalStateList "R V"
+		0x0004: {}, // OperationalState "R V"
+		0x0005: {}, // OperationalError "R V"
+	},
+	0x0061: { // RvcOperationalState
+		0x0000: {}, // PhaseList "R V"
+		0x0001: {}, // CurrentPhase "R V"
+		0x0002: {}, // CountdownTime "R V"
+		0x0003: {}, // OperationalStateList "R V"
+		0x0004: {}, // OperationalState "R V"
+		0x0005: {}, // OperationalError "R V"
+	},
+	0x0062: { // ScenesManagement
+		0x0000: {}, // DoNotUse "R V"
+		0x0001: {}, // SceneTableSize "R V"
+		0x0002: {}, // FabricSceneInfo "R F V"
+	},
+	0x0064: { // TemperatureAlarm
+		0x0000: {}, // Mask "R V"
+		0x0001: {}, // Latch "R V"
+		0x0002: {}, // State "R V"
+		0x0003: {}, // Supported "R V"
+		0x0080: {}, // CriticalOverTemperatureThreshold "R V"
+		0x0081: {}, // MajorOverTemperatureThreshold "R V"
+		0x0082: {}, // MinorOverTemperatureThreshold "R V"
+		0x0083: {}, // MinorUnderTemperatureThreshold "R V"
+		0x0084: {}, // MajorUnderTemperatureThreshold "R V"
+		0x0085: {}, // CriticalUnderTemperatureThreshold "R V"
+	},
+	0x0065: { // Groupcast
+		0x0000: {}, // Membership "R F V"
+		0x0001: {}, // MaxMembershipCount "R V"
+		0x0002: {}, // MaxMcastAddrCount "R V"
+		0x0003: {}, // UsedMcastAddrCount "R V"
+		0x0004: {}, // FabricUnderTest "R V"
+	},
+	0x0071: { // HepaFilterMonitoring
+		0x0000: {}, // Condition "R V"
+		0x0001: {}, // DegradationDirection "R V"
+		0x0002: {}, // ChangeIndication "R V"
+		0x0003: {}, // InPlaceIndicator "R V"
+		0x0005: {}, // ReplacementProductList "R V"
+	},
+	0x0072: { // ActivatedCarbonFilterMonitoring
+		0x0000: {}, // Condition "R V"
+		0x0001: {}, // DegradationDirection "R V"
+		0x0002: {}, // ChangeIndication "R V"
+		0x0003: {}, // InPlaceIndicator "R V"
+		0x0005: {}, // ReplacementProductList "R V"
+	},
+	0x0079: { // WaterTankLevelMonitoring
+		0x0000: {}, // Condition "R V"
+		0x0001: {}, // DegradationDirection "R V"
+		0x0002: {}, // ChangeIndication "R V"
+		0x0003: {}, // InPlaceIndicator "R V"
+		0x0005: {}, // ReplacementProductList "R V"
+	},
+	0x0080: { // BooleanStateConfiguration
+		0x0001: {}, // SupportedSensitivityLevels "R V"
+		0x0002: {}, // DefaultSensitivityLevel "R V"
+		0x0003: {}, // AlarmsActive "R V"
+		0x0004: {}, // AlarmsSuppressed "R V"
+		0x0005: {}, // AlarmsEnabled "R V"
+		0x0006: {}, // AlarmsSupported "R V"
+		0x0007: {}, // SensorFault "R V"
+	},
+	0x0081: { // ValveConfigurationAndControl
+		0x0000: {}, // OpenDuration "R V"
+		0x0002: {}, // AutoCloseTime "R V"
+		0x0003: {}, // RemainingDuration "R V"
+		0x0004: {}, // CurrentState "R V"
+		0x0005: {}, // TargetState "R V"
+		0x0006: {}, // CurrentLevel "R V"
+		0x0007: {}, // TargetLevel "R V"
+		0x0009: {}, // ValveFault "R V"
+		0x000A: {}, // LevelStep "R V"
+	},
+	0x0090: { // ElectricalPowerMeasurement
+		0x0000: {}, // PowerMode "R V"
+		0x0001: {}, // NumberOfMeasurementTypes "R V"
+		0x0002: {}, // Accuracy "R V"
+		0x0003: {}, // Ranges "R V"
+		0x0004: {}, // Voltage "R V"
+		0x0005: {}, // ActiveCurrent "R V"
+		0x0006: {}, // ReactiveCurrent "R V"
+		0x0007: {}, // ApparentCurrent "R V"
+		0x0008: {}, // ActivePower "R V"
+		0x0009: {}, // ReactivePower "R V"
+		0x000A: {}, // ApparentPower "R V"
+		0x000B: {}, // RmsVoltage "R V"
+		0x000C: {}, // RmsCurrent "R V"
+		0x000D: {}, // RmsPower "R V"
+		0x000E: {}, // Frequency "R V"
+		0x000F: {}, // HarmonicCurrents "R V"
+		0x0010: {}, // HarmonicPhases "R V"
+		0x0011: {}, // PowerFactor "R V"
+		0x0012: {}, // NeutralCurrent "R V"
+	},
+	0x0091: { // ElectricalEnergyMeasurement
+		0x0000: {}, // Accuracy "R V"
+		0x0001: {}, // CumulativeEnergyImported "R V"
+		0x0002: {}, // CumulativeEnergyExported "R V"
+		0x0003: {}, // PeriodicEnergyImported "R V"
+		0x0004: {}, // PeriodicEnergyExported "R V"
+		0x0005: {}, // CumulativeEnergyReset "R V"
+	},
+	0x0094: { // WaterHeaterManagement
+		0x0000: {}, // HeaterTypes "R V"
+		0x0001: {}, // HeatDemand "R V"
+		0x0002: {}, // TankVolume "R V"
+		0x0003: {}, // EstimatedHeatRequired "R V"
+		0x0004: {}, // TankPercentage "R V"
+		0x0005: {}, // BoostState "R V"
+	},
+	0x0095: { // CommodityPrice
+		0x0000: {}, // TariffUnit "R V"
+		0x0001: {}, // Currency "R V"
+		0x0002: {}, // CurrentPrice "R V"
+		0x0003: {}, // PriceForecast "R V"
+	},
+	0x0097: { // Messages
+		0x0000: {}, // Messages "R F V"
+		0x0001: {}, // ActiveMessageIds "R V"
+	},
+	0x0098: { // DeviceEnergyManagement
+		0x0000: {}, // EsaType "R V"
+		0x0001: {}, // EsaCanGenerate "R V"
+		0x0002: {}, // EsaState "R V"
+		0x0003: {}, // AbsMinPower "R V"
+		0x0004: {}, // AbsMaxPower "R V"
+		0x0005: {}, // PowerAdjustmentCapability "R V"
+		0x0006: {}, // Forecast "R V"
+		0x0007: {}, // OptOutState "R V"
+	},
+	0x0099: { // EnergyEvse
+		0x0000: {}, // State "R V"
+		0x0001: {}, // SupplyState "R V"
+		0x0002: {}, // FaultState "R V"
+		0x0003: {}, // ChargingEnabledUntil "R V"
+		0x0004: {}, // DischargingEnabledUntil "R V"
+		0x0005: {}, // CircuitCapacity "R V"
+		0x0006: {}, // MinimumChargeCurrent "R V"
+		0x0007: {}, // MaximumChargeCurrent "R V"
+		0x0008: {}, // MaximumDischargeCurrent "R V"
+		0x0023: {}, // NextChargeStartTime "R V"
+		0x0024: {}, // NextChargeTargetTime "R V"
+		0x0025: {}, // NextChargeRequiredEnergy "R V"
+		0x0026: {}, // NextChargeTargetSoC "R V"
+		0x0030: {}, // StateOfCharge "R V"
+		0x0031: {}, // BatteryCapacity "R V"
+		0x0032: {}, // VehicleId "R V"
+		0x0040: {}, // SessionId "R V"
+		0x0041: {}, // SessionDuration "R V"
+		0x0042: {}, // SessionEnergyCharged "R V"
+		0x0043: {}, // SessionEnergyDischarged "R V"
+	},
+	0x009B: { // EnergyPreference
+		0x0000: {}, // EnergyBalances "R V"
+		0x0002: {}, // EnergyPriorities "R V"
+		0x0003: {}, // LowPowerModeSensitivities "R V"
+	},
+	0x009C: { // PowerTopology
+		0x0000: {}, // AvailableEndpoints "R V"
+		0x0001: {}, // ActiveEndpoints "R V"
+	},
+	0x009D: { // EnergyEvseMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x009E: { // WaterHeaterMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x009F: { // DeviceEnergyManagementMode
+		0x0000: {}, // SupportedModes "R V"
+		0x0001: {}, // CurrentMode "R V"
+	},
+	0x00A0: { // ElectricalGridConditions
+		0x0001: {}, // CurrentConditions "R V"
+		0x0002: {}, // ForecastConditions "R V"
+	},
+	0x0101: { // DoorLock
+		0x0000: {}, // LockState "R V"
+		0x0001: {}, // LockType "R V"
+		0x0002: {}, // ActuatorEnabled "R V"
+		0x0003: {}, // DoorState "R V"
+		0x0011: {}, // NumberOfTotalUsersSupported "R V"
+		0x0012: {}, // NumberOfPinUsersSupported "R V"
+		0x0013: {}, // NumberOfRfidUsersSupported "R V"
+		0x0014: {}, // NumberOfWeekDaySchedulesSupportedPerUser "R V"
+		0x0015: {}, // NumberOfYearDaySchedulesSupportedPerUser "R V"
+		0x0016: {}, // NumberOfHolidaySchedulesSupported "R V"
+		0x0017: {}, // MaxPinCodeLength "R V"
+		0x0018: {}, // MinPinCodeLength "R V"
+		0x0019: {}, // MaxRfidCodeLength "R V"
+		0x001A: {}, // MinRfidCodeLength "R V"
+		0x001B: {}, // CredentialRulesSupport "R V"
+		0x001C: {}, // NumberOfCredentialsSupportedPerUser "R V"
+		0x0026: {}, // SupportedOperatingModes "R V"
+		0x0027: {}, // DefaultConfigurationRegister "R V"
+		0x0034: {}, // SecurityLevel "R V"
+		0x0080: {}, // AliroReaderVerificationKey "R A"
+		0x0081: {}, // AliroReaderGroupIdentifier "R A"
+		0x0082: {}, // AliroReaderGroupSubIdentifier "R A"
+		0x0083: {}, // AliroExpeditedTransactionSupportedProtocolVersions "R A"
+		0x0084: {}, // AliroGroupResolvingKey "R A"
+		0x0085: {}, // AliroSupportedBleuwbProtocolVersions "R A"
+		0x0086: {}, // AliroBleAdvertisingVersion "R A"
+		0x0087: {}, // NumberOfAliroCredentialIssuerKeysSupported "R V"
+		0x0088: {}, // NumberOfAliroEndpointKeysSupported "R V"
+	},
+	0x0102: { // WindowCovering
+		0x0000: {}, // Type "R V"
+		0x0005: {}, // NumberOfActuationsLift "R V"
+		0x0006: {}, // NumberOfActuationsTilt "R V"
+		0x0007: {}, // ConfigStatus "R V"
+		0x0008: {}, // CurrentPositionLiftPercentage "R V"
+		0x0009: {}, // CurrentPositionTiltPercentage "R V"
+		0x000A: {}, // OperationalStatus "R V"
+		0x000B: {}, // TargetPositionLiftPercent100ths "R V"
+		0x000C: {}, // TargetPositionTiltPercent100ths "R V"
+		0x000D: {}, // EndProductType "R V"
+		0x000E: {}, // CurrentPositionLiftPercent100ths "R V"
+		0x000F: {}, // CurrentPositionTiltPercent100ths "R V"
+		0x001A: {}, // SafetyStatus "R V"
+	},
+	0x0104: { // ClosureControl
+		0x0000: {}, // CountdownTime "R V"
+		0x0001: {}, // MainState "R V"
+		0x0002: {}, // CurrentErrorList "R V"
+		0x0003: {}, // OverallCurrentState "R V"
+		0x0004: {}, // OverallTargetState "R V"
+		0x0005: {}, // LatchControlModes "R V"
+	},
+	0x0105: { // ClosureDimension
+		0x0000: {}, // CurrentState "R V"
+		0x0001: {}, // TargetState "R V"
+		0x0002: {}, // Resolution "R V"
+		0x0003: {}, // StepValue "R V"
+		0x0004: {}, // Unit "R V"
+		0x0005: {}, // UnitRange "R V"
+		0x0006: {}, // LimitRange "R V"
+		0x0007: {}, // TranslationDirection "R V"
+		0x0008: {}, // RotationAxis "R V"
+		0x0009: {}, // Overflow "R V"
+		0x000A: {}, // ModulationType "R V"
+		0x000B: {}, // LatchControlModes "R V"
+	},
+	0x0150: { // ServiceArea
+		0x0000: {}, // SupportedAreas "R V"
+		0x0001: {}, // SupportedMaps "R V"
+		0x0002: {}, // SelectedAreas "R V"
+		0x0003: {}, // CurrentArea "R V"
+		0x0004: {}, // EstimatedEndTime "R V"
+		0x0005: {}, // Progress "R V"
+	},
+	0x0200: { // PumpConfigurationAndControl
+		0x0000: {}, // MaxPressure "R V"
+		0x0001: {}, // MaxSpeed "R V"
+		0x0002: {}, // MaxFlow "R V"
+		0x0003: {}, // MinConstPressure "R V"
+		0x0004: {}, // MaxConstPressure "R V"
+		0x0005: {}, // MinCompPressure "R V"
+		0x0006: {}, // MaxCompPressure "R V"
+		0x0007: {}, // MinConstSpeed "R V"
+		0x0008: {}, // MaxConstSpeed "R V"
+		0x0009: {}, // MinConstFlow "R V"
+		0x000A: {}, // MaxConstFlow "R V"
+		0x000B: {}, // MinConstTemp "R V"
+		0x000C: {}, // MaxConstTemp "R V"
+		0x0010: {}, // PumpStatus "R V"
+		0x0011: {}, // EffectiveOperationMode "R V"
+		0x0012: {}, // EffectiveControlMode "R V"
+		0x0013: {}, // Capacity "R V"
+		0x0014: {}, // Speed "R V"
+		0x0016: {}, // Power "R V"
+	},
+	0x0201: { // Thermostat
+		0x0000: {}, // LocalTemperature "R V"
+		0x0001: {}, // OutdoorTemperature "R V"
+		0x0002: {}, // Occupancy "R V"
+		0x0003: {}, // AbsMinHeatSetpointLimit "R V"
+		0x0004: {}, // AbsMaxHeatSetpointLimit "R V"
+		0x0005: {}, // AbsMinCoolSetpointLimit "R V"
+		0x0006: {}, // AbsMaxCoolSetpointLimit "R V"
+		0x0007: {}, // PiCoolingDemand "R V"
+		0x0008: {}, // PiHeatingDemand "R V"
+		0x001E: {}, // ThermostatRunningMode "R V"
+		0x0029: {}, // ThermostatRunningState "R V"
+		0x0030: {}, // SetpointChangeSource "R V"
+		0x0031: {}, // SetpointChangeAmount "R V"
+		0x0032: {}, // SetpointChangeSourceTimestamp "R V"
+		0x0035: {}, // OccupiedSetbackMin "R V"
+		0x0036: {}, // OccupiedSetbackMax "R V"
+		0x0038: {}, // UnoccupiedSetbackMin "R V"
+		0x0039: {}, // UnoccupiedSetbackMax "R V"
+		0x0046: {}, // AcCoilTemperature "R V"
+		0x0048: {}, // PresetTypes "R V"
+		0x0049: {}, // ScheduleTypes "R V"
+		0x004A: {}, // NumberOfPresets "R V"
+		0x004B: {}, // NumberOfSchedules "R V"
+		0x004C: {}, // NumberOfScheduleTransitions "R V"
+		0x004D: {}, // NumberOfScheduleTransitionPerDay "R V"
+		0x004E: {}, // ActivePresetHandle "R V"
+		0x004F: {}, // ActiveScheduleHandle "R V"
+		0x0052: {}, // SetpointHoldExpiryTimestamp "R V"
+		0x0053: {}, // MaxThermostatSuggestions "R V"
+		0x0054: {}, // ThermostatSuggestions "R V"
+		0x0055: {}, // CurrentThermostatSuggestion "R V"
+		0x0056: {}, // ThermostatSuggestionNotFollowingReason "R V"
+	},
+	0x0202: { // FanControl
+		0x0001: {}, // FanModeSequence "R V"
+		0x0003: {}, // PercentCurrent "R V"
+		0x0004: {}, // SpeedMax "R V"
+		0x0006: {}, // SpeedCurrent "R V"
+		0x0007: {}, // RockSupport "R V"
+		0x0009: {}, // WindSupport "R V"
+	},
+	0x0300: { // ColorControl
+		0x0000: {}, // CurrentHue "R V"
+		0x0001: {}, // CurrentSaturation "R V"
+		0x0002: {}, // RemainingTime "R V"
+		0x0003: {}, // CurrentX "R V"
+		0x0004: {}, // CurrentY "R V"
+		0x0005: {}, // DriftCompensation "R V"
+		0x0006: {}, // CompensationText "R V"
+		0x0007: {}, // ColorTemperatureMireds "R V"
+		0x0008: {}, // ColorMode "R V"
+		0x0010: {}, // NumberOfPrimaries "R V"
+		0x0011: {}, // Primary1X "R V"
+		0x0012: {}, // Primary1Y "R V"
+		0x0013: {}, // Primary1Intensity "R V"
+		0x0015: {}, // Primary2X "R V"
+		0x0016: {}, // Primary2Y "R V"
+		0x0017: {}, // Primary2Intensity "R V"
+		0x0019: {}, // Primary3X "R V"
+		0x001A: {}, // Primary3Y "R V"
+		0x001B: {}, // Primary3Intensity "R V"
+		0x0020: {}, // Primary4X "R V"
+		0x0021: {}, // Primary4Y "R V"
+		0x0022: {}, // Primary4Intensity "R V"
+		0x0024: {}, // Primary5X "R V"
+		0x0025: {}, // Primary5Y "R V"
+		0x0026: {}, // Primary5Intensity "R V"
+		0x0028: {}, // Primary6X "R V"
+		0x0029: {}, // Primary6Y "R V"
+		0x002A: {}, // Primary6Intensity "R V"
+		0x0030: {}, // WhitePointX "R V"
+		0x0031: {}, // WhitePointY "R V"
+		0x0032: {}, // ColorPointRx "R V"
+		0x0033: {}, // ColorPointRy "R V"
+		0x0034: {}, // ColorPointRIntensity "R V"
+		0x0036: {}, // ColorPointGx "R V"
+		0x0037: {}, // ColorPointGy "R V"
+		0x0038: {}, // ColorPointGIntensity "R V"
+		0x003A: {}, // ColorPointBx "R V"
+		0x003B: {}, // ColorPointBy "R V"
+		0x003C: {}, // ColorPointBIntensity "R V"
+		0x4000: {}, // EnhancedCurrentHue "R V"
+		0x4001: {}, // EnhancedColorMode "R V"
+		0x4002: {}, // ColorLoopActive "R V"
+		0x4003: {}, // ColorLoopDirection "R V"
+		0x4004: {}, // ColorLoopTime "R V"
+		0x4005: {}, // ColorLoopStartEnhancedHue "R V"
+		0x4006: {}, // ColorLoopStoredEnhancedHue "R V"
+		0x400A: {}, // ColorCapabilities "R V"
+		0x400B: {}, // ColorTempPhysicalMinMireds "R V"
+		0x400C: {}, // ColorTempPhysicalMaxMireds "R V"
+		0x400D: {}, // CoupleColorTempToLevelMinMireds "R V"
+	},
+	0x0400: { // IlluminanceMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // Tolerance "R V"
+		0x0004: {}, // LightSensorType "R V"
+	},
+	0x0402: { // TemperatureMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // Tolerance "R V"
+	},
+	0x0403: { // PressureMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // Tolerance "R V"
+		0x0010: {}, // ScaledValue "R V"
+		0x0011: {}, // MinScaledValue "R V"
+		0x0012: {}, // MaxScaledValue "R V"
+		0x0013: {}, // ScaledTolerance "R V"
+		0x0014: {}, // Scale "R V"
+	},
+	0x0404: { // FlowMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // Tolerance "R V"
+	},
+	0x0405: { // RelativeHumidityMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // Tolerance "R V"
+	},
+	0x0406: { // OccupancySensing
+		0x0000: {}, // Occupancy "R V"
+		0x0001: {}, // OccupancySensorType "R V"
+		0x0002: {}, // OccupancySensorTypeBitmap "R V"
+		0x0004: {}, // HoldTimeLimits "R V"
+	},
+	0x040C: { // CarbonMonoxideConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x040D: { // CarbonDioxideConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x0413: { // NitrogenDioxideConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x0415: { // OzoneConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042A: { // Pm25ConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042B: { // FormaldehydeConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042C: { // Pm1ConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042D: { // Pm10ConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042E: { // TotalVolatileOrganicCompoundsConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x042F: { // RadonConcentrationMeasurement
+		0x0000: {}, // MeasuredValue "R V"
+		0x0001: {}, // MinMeasuredValue "R V"
+		0x0002: {}, // MaxMeasuredValue "R V"
+		0x0003: {}, // PeakMeasuredValue "R V"
+		0x0004: {}, // PeakMeasuredValueWindow "R V"
+		0x0005: {}, // AverageMeasuredValue "R V"
+		0x0006: {}, // AverageMeasuredValueWindow "R V"
+		0x0007: {}, // Uncertainty "R V"
+		0x0008: {}, // MeasurementUnit "R V"
+		0x0009: {}, // MeasurementMedium "R V"
+		0x000A: {}, // LevelValue "R V"
+	},
+	0x0430: { // SoilMeasurement
+		0x0000: {}, // SoilMoistureMeasurementLimits "R V"
+		0x0001: {}, // SoilMoistureMeasuredValue "R V"
+	},
+	0x0431: { // AmbientContextSensing
+		0x0000: {}, // HumanActivityDetected "R V"
+		0x0001: {}, // ObjectIdentified "R V"
+		0x0002: {}, // AudioContextDetected "R V"
+		0x0003: {}, // AmbientContextType "R V"
+		0x0004: {}, // AmbientContextTypeSupported "R V"
+		0x0005: {}, // ObjectCountThresholdReached "R V"
+		0x0007: {}, // ObjectCount "R V"
+		0x0008: {}, // SimultaneousDetectionLimit "R V"
+		0x000A: {}, // HoldTimeLimits "R V"
+		0x000B: {}, // PredictedActivity "R V"
+	},
+	0x0451: { // WiFiNetworkManagement
+		0x0000: {}, // Ssid "R V"
+		0x0001: {}, // PassphraseSurrogate "R M"
+	},
+	0x0452: { // ThreadBorderRouterManagement
+		0x0000: {}, // BorderRouterName "R V"
+		0x0001: {}, // BorderAgentId "R V"
+		0x0002: {}, // ThreadVersion "R V"
+		0x0003: {}, // InterfaceEnabled "R V"
+		0x0004: {}, // ActiveDatasetTimestamp "R V"
+		0x0005: {}, // PendingDatasetTimestamp "R V"
+	},
+	0x0453: { // ThreadNetworkDirectory
+		0x0001: {}, // ThreadNetworks "R V"
+		0x0002: {}, // ThreadNetworkTableSize "R V"
+	},
+	0x0503: { // WakeOnLan
+		0x0000: {}, // MacAddress "R V"
+		0x0001: {}, // LinkLocalAddress "R V"
+	},
+	0x0504: { // Channel
+		0x0000: {}, // ChannelList "R V"
+		0x0001: {}, // Lineup "R V"
+		0x0002: {}, // CurrentChannel "R V"
+	},
+	0x0505: { // TargetNavigator
+		0x0000: {}, // TargetList "R V"
+		0x0001: {}, // CurrentTarget "R V"
+	},
+	0x0506: { // MediaPlayback
+		0x0000: {}, // CurrentState "R V"
+		0x0001: {}, // StartTime "R V"
+		0x0002: {}, // Duration "R V"
+		0x0003: {}, // SampledPosition "R V"
+		0x0004: {}, // PlaybackSpeed "R V"
+		0x0005: {}, // SeekRangeEnd "R V"
+		0x0006: {}, // SeekRangeStart "R V"
+		0x0007: {}, // ActiveAudioTrack "R V"
+		0x0008: {}, // AvailableAudioTracks "R V"
+		0x0009: {}, // ActiveTextTrack "R V"
+		0x000A: {}, // AvailableTextTracks "R V"
+	},
+	0x0507: { // MediaInput
+		0x0000: {}, // InputList "R V"
+		0x0001: {}, // CurrentInput "R V"
+	},
+	0x050A: { // ContentLauncher
+		0x0000: {}, // AcceptHeader "R V"
+		0x0001: {}, // SupportedStreamingProtocols "R V"
+	},
+	0x050B: { // AudioOutput
+		0x0000: {}, // OutputList "R V"
+		0x0001: {}, // CurrentOutput "R V"
+	},
+	0x050C: { // ApplicationLauncher
+		0x0000: {}, // CatalogList "R V"
+		0x0001: {}, // CurrentApp "R V"
+	},
+	0x050D: { // ApplicationBasic
+		0x0000: {}, // VendorName "R V"
+		0x0001: {}, // VendorId "R V"
+		0x0002: {}, // ApplicationName "R V"
+		0x0003: {}, // ProductId "R V"
+		0x0004: {}, // Application "R V"
+		0x0005: {}, // Status "R V"
+		0x0006: {}, // ApplicationVersion "R V"
+		0x0007: {}, // AllowedVendorList "R A"
+	},
+	0x050F: { // ContentControl
+		0x0000: {}, // Enabled "R V"
+		0x0001: {}, // OnDemandRatings "R V"
+		0x0002: {}, // OnDemandRatingThreshold "R V"
+		0x0003: {}, // ScheduledContentRatings "R V"
+		0x0004: {}, // ScheduledContentRatingThreshold "R V"
+		0x0005: {}, // ScreenDailyTime "R V"
+		0x0006: {}, // RemainingScreenTime "R V"
+		0x0007: {}, // BlockUnrated "R V"
+		0x0008: {}, // BlockChannelList "R V"
+		0x0009: {}, // BlockApplicationList "R V"
+		0x000A: {}, // BlockContentTimeWindow "R V"
+	},
+	0x0550: { // ZoneManagement
+		0x0000: {}, // MaxUserDefinedZones "R V"
+		0x0001: {}, // MaxZones "R V"
+		0x0002: {}, // Zones "R V"
+		0x0003: {}, // Triggers "R V"
+		0x0004: {}, // SensitivityMax "R V"
+		0x0006: {}, // TwoDCartesianMax "R V"
+	},
+	0x0551: { // CameraAvStreamManagement
+		0x0000: {}, // MaxConcurrentEncoders "R V"
+		0x0001: {}, // MaxEncodedPixelRate "R V"
+		0x0002: {}, // VideoSensorParams "R V"
+		0x0003: {}, // NightVisionUsesInfrared "R V"
+		0x0004: {}, // MinViewportResolution "R V"
+		0x0005: {}, // RateDistortionTradeOffPoints "R V"
+		0x0006: {}, // MaxContentBufferSize "R V"
+		0x0007: {}, // MicrophoneCapabilities "R V"
+		0x0008: {}, // SpeakerCapabilities "R V"
+		0x0009: {}, // TwoWayTalkSupport "R V"
+		0x000A: {}, // SnapshotCapabilities "R V"
+		0x000B: {}, // MaxNetworkBandwidth "R V"
+		0x000C: {}, // CurrentFrameRate "R V"
+		0x000E: {}, // SupportedStreamUsages "R V"
+		0x000F: {}, // AllocatedVideoStreams "R V"
+		0x0010: {}, // AllocatedAudioStreams "R V"
+		0x0011: {}, // AllocatedSnapshotStreams "R V"
+		0x0012: {}, // StreamUsagePriorities "R V"
+		0x0015: {}, // HardPrivacyModeOn "R V"
+		0x001B: {}, // SpeakerMaxLevel "R M"
+		0x001C: {}, // SpeakerMinLevel "R M"
+		0x001F: {}, // MicrophoneMaxLevel "R M"
+		0x0020: {}, // MicrophoneMinLevel "R M"
+	},
+	0x0552: { // CameraAvSettingsUserLevelManagement
+		0x0000: {}, // MptzPosition "R V"
+		0x0001: {}, // MaxPresets "R V"
+		0x0002: {}, // MptzPresets "R V"
+		0x0003: {}, // DptzStreams "R V"
+		0x0004: {}, // ZoomMax "R V"
+		0x0005: {}, // TiltMin "R V"
+		0x0006: {}, // TiltMax "R V"
+		0x0007: {}, // PanMin "R V"
+		0x0008: {}, // PanMax "R V"
+		0x0009: {}, // MovementState "R V"
+	},
+	0x0553: { // WebRtcTransportProvider
+		0x0000: {}, // CurrentSessions "R S M"
+	},
+	0x0554: { // WebRtcTransportRequestor
+		0x0000: {}, // CurrentSessions "R S A"
+	},
+	0x0555: { // PushAvStreamTransport
+		0x0000: {}, // SupportedFormats "R V"
+		0x0001: {}, // CurrentConnections "R S V"
+	},
+	0x0556: { // Chime
+		0x0000: {}, // InstalledChimeSounds "R V"
+	},
+	0x0700: { // CommodityTariff
+		0x0000: {}, // TariffInfo "R V"
+		0x0001: {}, // TariffUnit "R V"
+		0x0002: {}, // StartDate "R V"
+		0x0003: {}, // DayEntries "R V"
+		0x0004: {}, // DayPatterns "R V"
+		0x0005: {}, // CalendarPeriods "R V"
+		0x0006: {}, // IndividualDays "R V"
+		0x0007: {}, // CurrentDay "R V"
+		0x0008: {}, // NextDay "R V"
+		0x0009: {}, // CurrentDayEntry "R V"
+		0x000A: {}, // CurrentDayEntryDate "R V"
+		0x000B: {}, // NextDayEntry "R V"
+		0x000C: {}, // NextDayEntryDate "R V"
+		0x000D: {}, // TariffComponents "R V"
+		0x000E: {}, // TariffPeriods "R V"
+		0x000F: {}, // CurrentTariffComponents "R V"
+		0x0010: {}, // NextTariffComponents "R V"
+		0x0011: {}, // DefaultRandomizationOffset "R V"
+		0x0012: {}, // DefaultRandomizationType "R V"
+	},
+	0x0750: { // EcosystemInformation
+		0x0000: {}, // DeviceDirectory "R F M"
+		0x0001: {}, // LocationDirectory "R F M"
+	},
+	0x0751: { // CommissionerControl
+		0x0000: {}, // SupportedDeviceCategories "R M"
+	},
+	0x0752: { // JointFabricDatastore
+		0x0000: {}, // AnchorRootCa "R A"
+		0x0001: {}, // AnchorNodeId "R A"
+		0x0002: {}, // AnchorVendorId "R A"
+		0x0003: {}, // FriendlyName "R A"
+		0x0004: {}, // GroupKeySetList "R A"
+		0x0005: {}, // GroupList "R A"
+		0x0006: {}, // NodeList "R A"
+		0x0007: {}, // AdminList "R A"
+		0x0008: {}, // Status "R A"
+		0x0009: {}, // EndpointGroupIdList "R A"
+		0x000A: {}, // EndpointBindingList "R A"
+		0x000B: {}, // NodeKeySetList "R A"
+		0x000C: {}, // NodeAclList "R A"
+		0x000D: {}, // NodeEndpointList "R A"
+	},
+	0x0753: { // JointFabricAdministrator
+		0x0000: {}, // AdministratorFabricIndex "R A"
+	},
+	0x0801: { // TlsCertificateManagement
+		0x0000: {}, // MaxRootCertificates "R V"
+		0x0001: {}, // ProvisionedRootCertificates "R S V"
+		0x0002: {}, // MaxClientCertificates "R V"
+		0x0003: {}, // ProvisionedClientCertificates "R S V"
+	},
+	0x0802: { // TlsClientManagement
+		0x0000: {}, // MaxProvisioned "R V"
+		0x0001: {}, // ProvisionedEndpoints "R S V"
+	},
+	0x0B06: { // MeterIdentification
+		0x0000: {}, // MeterType "R V"
+		0x0001: {}, // PointOfDelivery "R V"
+		0x0002: {}, // MeterSerialNumber "R V"
+		0x0003: {}, // ProtocolVersion "R V"
+		0x0004: {}, // PowerThreshold "R V"
+	},
+	0x0B07: { // CommodityMetering
+		0x0000: {}, // MeteredQuantity "R V"
+		0x0001: {}, // MeteredQuantityTimestamp "R V"
+		0x0002: {}, // TariffUnit "R V"
+		0x0003: {}, // MaximumMeteredQuantities "R V"
+	},
+}

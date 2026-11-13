@@ -18,15 +18,23 @@ import (
 // an attribute a derived cluster inherits) and its effective access, which
 // matter.js resolves for every attribute, inherited ones included.
 type snapshotAttribute struct {
-	ID        uint32 `json:"id"`
-	Name      string `json:"name"`
-	Access    string `json:"access"`
-	Effective *struct {
-		Access struct {
-			RW        string `json:"rw"`
-			WritePriv string `json:"writePriv"`
-		} `json:"access"`
-	} `json:"effective"`
+	ID        uint32             `json:"id"`
+	Name      string             `json:"name"`
+	Access    string             `json:"access"`
+	Effective *snapshotEffective `json:"effective"`
+}
+
+// snapshotEffective is the part of an attribute's effective layer the write
+// gate rests on: its resolved access and the fixed flag of its resolved
+// quality.
+type snapshotEffective struct {
+	Access struct {
+		RW        string `json:"rw"`
+		WritePriv string `json:"writePriv"`
+	} `json:"access"`
+	Quality struct {
+		Fixed bool `json:"fixed"`
+	} `json:"quality"`
 }
 
 type snapshotCluster struct {
@@ -51,28 +59,30 @@ func loadWritableSnapshot(t *testing.T) *snapshotSchema {
 	return &s
 }
 
-// effectiveWritable mirrors matter.js Access.writable
-// (packages/model/src/aspects/Access.ts:44-46 at db021da0,
-// `!!this.rw && this.rw !== Access.Rw.Read`) on an attribute's effective
-// rw: "R" or none is read-only; "RW" and the optional-write "R[W]" are
-// writable.
+// effectiveWritable mirrors matter.js limits.writable
+// (packages/protocol/src/action/server/AccessControl.ts:523 at db021da0,
+// `access.writable && !fixed`) on an attribute's effective layer:
+// Access.writable (packages/model/src/aspects/Access.ts:44-46 at db021da0,
+// `!!this.rw && this.rw !== Access.Rw.Read`) — "R" or none is read-only,
+// "RW" and the optional-write "R[W]" are writable — and not the fixed
+// quality.
 func effectiveWritable(a snapshotAttribute) bool {
-	return a.Effective != nil && a.Effective.Access.RW != "" && a.Effective.Access.RW != "R"
+	return a.Effective != nil && a.Effective.Access.RW != "" && a.Effective.Access.RW != "R" && !a.Effective.Quality.Fixed
 }
 
 // globalAttribute reports an id in the global attribute range
 // (GeneratedCommandList 0xFFF8 … ClusterRevision 0xFFFD). The snapshot lists
-// FeatureMap and ClusterRevision as attributes of a cluster; the write gate
-// answers the range itself (endpoint/dispatcher.go isGlobalAttribute), so
+// FeatureMap and ClusterRevision as attributes of a cluster and none of the
+// other four; AttributeWritable answers the range itself, so
 // readOnlyAttributes leaves it out.
 func globalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 
-// readOnlyDrift compares table, cluster by cluster, with the read-only
-// attributes of the snapshot clusters — every attribute whose effective
-// access is not writable, the global range excepted — and returns one line
-// per difference: a table cluster the snapshot does not have, a read-only
-// attribute the table lacks, a table entry the snapshot marks writable or
-// does not list. The effective access is each attribute's own (review II,
+// readOnlyDrift compares table with the read-only attributes of every
+// snapshot cluster — every attribute whose effective access is not
+// writable, the global range excepted — and returns one line per
+// difference: a table cluster the snapshot does not have, a read-only
+// attribute the table lacks (a whole cluster's included), a table entry the
+// snapshot marks writable or does not list. The effective access is each attribute's own (review II,
 // W3-clugen-05): an attribute a derived cluster inherits states no access
 // string, and a comparison by that string skipped it, so a read-only
 // inherited attribute could be missing from the table unnoticed.
@@ -82,12 +92,13 @@ func readOnlyDrift(clusters []snapshotCluster, table map[uint32]map[uint32]struc
 		byID[c.ID] = c
 	}
 	var drift []string
-	for clusterID, tableSet := range table {
-		sc, ok := byID[clusterID]
-		if !ok {
+	for clusterID := range table {
+		if _, ok := byID[clusterID]; !ok {
 			drift = append(drift, fmt.Sprintf("readOnlyAttributes has cluster 0x%04X but the snapshot does not — stale table entry", clusterID))
-			continue
 		}
+	}
+	for clusterID, sc := range byID {
+		tableSet := table[clusterID]
 		want := make(map[uint32]struct{})
 		for _, a := range sc.Attributes {
 			if a.Effective == nil {
@@ -113,13 +124,13 @@ func readOnlyDrift(clusters []snapshotCluster, table map[uint32]map[uint32]struc
 	return drift
 }
 
-// TestReadOnlyAttributeParity pins readOnlyAttributes (via AttributeWritable)
-// against the committed matter.js HEAD schema snapshot. For every cluster in
-// the table it derives the read-only attribute set straight from the
-// snapshot's per-attribute effective access and asserts an EXACT match — no
-// missing read-only attribute, no stray/writable attribute — so the
-// hand-maintained table cannot drift from matter.js when the snapshot is
-// regenerated.
+// TestReadOnlyAttributeParity pins the generated readOnlyAttributes (and
+// AttributeWritable over it) against the committed matter.js HEAD schema
+// snapshot. For every cluster of the snapshot it derives the read-only
+// attribute set straight from the per-attribute effective access and
+// quality and asserts an EXACT match — no missing read-only attribute, no
+// stray/writable attribute, no cluster left out — so a snapshot that moved
+// without a regeneration fails here.
 func TestReadOnlyAttributeParity(t *testing.T) {
 	t.Parallel()
 
@@ -129,17 +140,20 @@ func TestReadOnlyAttributeParity(t *testing.T) {
 	}
 
 	// Cross-check the public AttributeWritable verdict for every attribute
-	// of the table's clusters.
+	// of every cluster, the two global ones the snapshot lists included.
+	entries := 0
+	for _, set := range readOnlyAttributes {
+		entries += len(set)
+	}
+	t.Logf("readOnlyAttributes: %d attributes of %d clusters; the snapshot has %d clusters", entries, len(readOnlyAttributes), len(snap.Clusters))
 	for _, sc := range snap.Clusters {
-		if _, ok := readOnlyAttributes[sc.ID]; !ok {
-			continue
-		}
 		for _, a := range sc.Attributes {
-			if globalAttribute(a.ID) {
-				continue
-			}
 			writable, known := AttributeWritable(sc.ID, a.ID)
 			if effectiveWritable(a) {
+				if globalAttribute(a.ID) {
+					t.Errorf("%s (0x%04X) attribute 0x%04X: the snapshot marks a global attribute writable (access %q); AttributeWritable answers the range read-only",
+						sc.Name, sc.ID, a.ID, a.Access)
+				}
 				if !writable {
 					t.Errorf("AttributeWritable(0x%04X, 0x%04X) writable=false, want true (access %q)",
 						sc.ID, a.ID, a.Access)
@@ -159,16 +173,12 @@ func TestReadOnlyAttributeParity(t *testing.T) {
 func TestReadOnlyDriftSeesAnInheritedAttribute(t *testing.T) {
 	t.Parallel()
 	attr := func(id uint32, access, rw string) snapshotAttribute {
-		a := snapshotAttribute{ID: id, Access: access}
-		a.Effective = &struct {
-			Access struct {
-				RW        string `json:"rw"`
-				WritePriv string `json:"writePriv"`
-			} `json:"access"`
-		}{}
+		a := snapshotAttribute{ID: id, Access: access, Effective: &snapshotEffective{}}
 		a.Effective.Access.RW = rw
 		return a
 	}
+	fixed := attr(0x0004, "RW VO", "RW")
+	fixed.Effective.Quality.Fixed = true
 	clusters := []snapshotCluster{{ID: 0x1234, Name: "Derived", Attributes: []snapshotAttribute{
 		attr(0x0000, "R V", "R"),
 		attr(0x0001, "", "R"), // inherited, read-only
@@ -176,12 +186,30 @@ func TestReadOnlyDriftSeesAnInheritedAttribute(t *testing.T) {
 		attr(0xFFFD, "", "R"), // ClusterRevision: the gate's own
 	}}}
 	set := func(ids ...uint32) map[uint32]map[uint32]struct{} {
-		return map[uint32]map[uint32]struct{}{0x1234: newReadOnlySet(ids...)}
+		m := make(map[uint32]struct{}, len(ids))
+		for _, id := range ids {
+			m[id] = struct{}{}
+		}
+		return map[uint32]map[uint32]struct{}{0x1234: m}
 	}
 	if d := readOnlyDrift(clusters, set(0x0000, 0x0001)); len(d) != 0 {
 		t.Errorf("the exact table drifts: %q", d)
 	}
-	d := readOnlyDrift(clusters, set(0x0000))
+	// A cluster the table leaves out altogether is as much a drift as a
+	// missing attribute: the hand-written table this replaced knew 41 of
+	// the snapshot's clusters and the comparison walked only those.
+	d := readOnlyDrift(clusters, map[uint32]map[uint32]struct{}{})
+	if len(d) != 2 || !strings.Contains(d[0], "attr 0x0000 is read-only in matter.js but missing") {
+		t.Errorf("a table without the cluster: %q, want its two read-only attributes missing", d)
+	}
+	// A writable attribute with the fixed quality is read-only
+	// (AccessControl.ts:523 at db021da0, `access.writable && !fixed`).
+	withFixed := []snapshotCluster{{ID: 0x1234, Name: "Derived", Attributes: append(slices.Clone(clusters[0].Attributes), fixed)}}
+	d = readOnlyDrift(withFixed, set(0x0000, 0x0001))
+	if len(d) != 1 || !strings.Contains(d[0], "attr 0x0004 is read-only in matter.js but missing") {
+		t.Errorf("a table without the fixed attribute: %q, want the one missing entry", d)
+	}
+	d = readOnlyDrift(clusters, set(0x0000))
 	if len(d) != 1 || !strings.Contains(d[0], "attr 0x0001 is read-only in matter.js but missing") {
 		t.Errorf("a table without the inherited read-only attribute: %q, want the one missing entry", d)
 	}
@@ -231,10 +259,31 @@ func TestAttributeWritable(t *testing.T) {
 		{"OperationalState/OperationalState read-only", 0x0060, 0x0004, false, true},
 		// RvcOperationalState.CountdownTime (0x0002, inherited "R V") — read-only.
 		{"RvcOperationalState/CountdownTime read-only", 0x0061, 0x0002, false, true},
-		// Cluster the bridge does not expose → unknown, treated writable.
+		// Clusters the hand-written table did not know (review II,
+		// W3-clugen-05): AirQuality.AirQuality (0x0000, "R V"),
+		// HepaFilterMonitoring.Condition (0x0000, "R V") and
+		// LastChangedTime (0x0004, "RW VO"), Chime.InstalledChimeSounds.
+		{"AirQuality/AirQuality read-only", 0x005B, 0x0000, false, true},
+		{"HepaFilterMonitoring/Condition read-only", 0x0071, 0x0000, false, true},
+		{"HepaFilterMonitoring/LastChangedTime writable", 0x0071, 0x0004, true, false},
+		{"Chime/InstalledChimeSounds read-only", 0x0556, 0x0000, false, true},
+		// Inherited, in clusters outside the old table: the base's access
+		// (BasicInformation, ModeBase) is the effective one.
+		{"BridgedDeviceBasicInformation/VendorName read-only", 0x0039, 0x0001, false, true},
+		{"BridgedDeviceBasicInformation/NodeLabel writable", 0x0039, 0x0005, true, false},
+		{"RvcRunMode/SupportedModes read-only", 0x0054, 0x0000, false, true},
+		// A cluster the snapshot does not have → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
-		// Global attribute (no access string) → not tracked.
-		{"OnOff ClusterRevision global", 0x0006, 0xFFFD, true, false},
+		// An attribute the cluster does not define → unknown.
+		{"OnOff undefined attribute", 0x0006, 0x7777, true, false},
+		// The global attributes are read-only on every cluster, a cluster
+		// the snapshot does not have included.
+		{"OnOff ClusterRevision global", 0x0006, 0xFFFD, false, true},
+		{"OnOff AttributeList global", 0x0006, 0xFFFB, false, true},
+		{"OnOff GeneratedCommandList global", 0x0006, 0xFFF8, false, true},
+		{"unknown cluster FeatureMap global", 0xBEEF, 0xFFFC, false, true},
+		{"below the global range", 0xBEEF, 0xFFF7, true, false},
+		{"above the global range", 0xBEEF, 0xFFFE, true, false},
 	}
 
 	for _, tc := range cases {
