@@ -207,3 +207,29 @@ func TestRecordKeepsItsOwnDetail(t *testing.T) {
 		t.Errorf("recorded Detail = %v after the caller changed its map, want %v", got[0].Detail, want)
 	}
 }
+
+// TestSnapshotDetailIsACopy: a snapshot's Detail maps are the caller's —
+// changing one leaves the ring's entry, and every later snapshot, as it
+// was recorded. Record and the observers already hand out copies; the
+// snapshot handed out the ring's own maps.
+func TestSnapshotDetailIsACopy(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	r.Record(Event{Kind: "session.closed", Message: "closed", Detail: map[string]string{"session_id": "7"}})
+	r.Record(Event{Kind: "plain", Message: "no detail"})
+
+	first := r.Snapshot()
+	if len(first) != 2 {
+		t.Fatalf("snapshot holds %d events, want 2", len(first))
+	}
+	first[1].Detail["session_id"] = "changed"
+	first[1].Detail["added"] = "by the caller"
+
+	second := r.Snapshot()
+	if got := second[1].Detail; len(got) != 1 || got["session_id"] != "7" {
+		t.Fatalf("the ring's entry changed with the caller's snapshot: %v", got)
+	}
+	if second[0].Detail != nil {
+		t.Fatalf("an event recorded without Detail has %v", second[0].Detail)
+	}
+}
