@@ -68,6 +68,8 @@ type systemBus struct {
 	conn    *dbus.Conn
 	signals chan *dbus.Signal
 	sent    *sentFDs
+	// exportMu serialises Export: see there.
+	exportMu sync.Mutex
 }
 
 // dialSystemBus connects to the system bus and subscribes to org.bluez's
@@ -105,7 +107,19 @@ func (b *systemBus) Call(ctx context.Context, path dbus.ObjectPath, method strin
 
 func (b *systemBus) Signals() <-chan *dbus.Signal { return b.signals }
 
+// Export is serialised here because godbus does not do it: its export
+// reads the handler's object map without the handler's lock
+// (Conn.export, export.go:396 and :406 at v5.2.4, through
+// defaultHandler.PathExists, default_handler.go:41-43) while AddObject
+// and DeleteObject write it under that lock (default_handler.go:104-113).
+// Two exports at once — the GATT application's from Serve and the
+// advertisement's from Advertise, which the bridge runs on two goroutines
+// — are a concurrent map read and write, which the runtime ends the
+// process for. An incoming call's lookup takes the handler's lock
+// (LookupObject, default_handler.go:67-69) and needs no help.
 func (b *systemBus) Export(path dbus.ObjectPath, iface string, methods map[string]any) error {
+	b.exportMu.Lock()
+	defer b.exportMu.Unlock()
 	if methods == nil {
 		return b.conn.Export(nil, path, iface)
 	}
