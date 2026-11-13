@@ -184,6 +184,14 @@ type ControlServer struct {
 	currentLatch, targetLatch *bool
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
 
+	// stateReports and currentReports count the drive's reports —
+	// SetMainState and the OverallCurrentState setters. MoveTo and
+	// Calibrate compare them across the mover call: a report made while
+	// the mover had the command, from inside it or from another goroutine,
+	// is newer than the outcome the command writes after it returned, and
+	// is kept (review II, R2-P1-clu-01).
+	stateReports, currentReports uint64
+
 	// emitter and endpoint address the events (closurecontrol_events.go);
 	// the bridge wires both at reassembly.
 	emitter  contract.EventEmitter
@@ -413,6 +421,7 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	fallback := s.targetPosition
 	state := s.mainState
 	latched := s.currentLatch != nil && *s.currentLatch
+	stateReports, currentReports := s.stateReports, s.currentReports
 	s.mu.RUnlock()
 	// Latch and Speed of a feature the server does not advertise are
 	// ignored (cluster§5.4.8.2; chip :579, :592).
@@ -455,7 +464,8 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	// Stopped MoveTo is INVALID_IN_STATE, after the field checks and
 	// before the delegate — so an Error, SetupRequired, Protected,
 	// Disengaged or Calibrating state the host set is not overwritten
-	// with Moving.
+	// with Moving. One the host reports while the mover has the command
+	// is kept by the report counters below.
 	switch state {
 	case wire.ClosureMainStateMoving, wire.ClosureMainStateWaitingForMotion, wire.ClosureMainStateStopped:
 	default:
@@ -479,6 +489,19 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		// happened.
 		return fmt.Errorf("closure: MoveTo: %w", err)
 	}
+	s.recordMove(target, latch, speed, stateReports, currentReports)
+	return nil
+}
+
+// recordMove writes the outcome of a MoveTo the mover accepted. It is
+// written after the mover returned, as chip writes it after the delegate
+// (ClosureControlCluster.cpp:623-637 at 6170af84). chip's handler holds
+// the stack lock, so no report interleaves with it; here the drive may
+// report while the mover has the command, and that report is newer than
+// this write: a MainState it reported stays (stateReports moved), and a
+// target the position or latch it reported already fulfils is not left
+// outstanding (currentReports moved; the arrival rule of setCurrent).
+func (s *ControlServer) recordMove(target *wire.ClosureTargetPosition, latch *bool, speed *closuredef.ThreeLevelAutoEnum, stateReports, currentReports uint64) {
 	s.mu.Lock()
 	if target != nil {
 		t := *target
@@ -490,10 +513,16 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	if speed != nil {
 		s.targetSpeed = copyOf(speed)
 	}
-	s.mainState = wire.ClosureMainStateMoving
+	if s.currentReports != currentReports {
+		s.clearFulfilledTargetsLocked(true, true)
+	}
+	attrs := []uint32{wire.ClosureControlAttrOverallTargetState}
+	if s.stateReports == stateReports {
+		s.mainState = wire.ClosureMainStateMoving
+		attrs = []uint32{wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState}
+	}
 	s.mu.Unlock()
-	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
-	return nil
+	s.NotifyFrom(contract.OriginCommand, attrs...)
 }
 
 // drive hands a checked MoveTo to the mover in the order a drive carries
@@ -540,7 +569,7 @@ func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
 		}
 	}
 	s.mu.RLock()
-	state := s.mainState
+	state, stateReports := s.mainState, s.stateReports
 	s.mu.RUnlock()
 	switch state {
 	case wire.ClosureMainStateCalibrating:
@@ -556,10 +585,19 @@ func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
 	if err := calibrator.Calibrate(ctx); err != nil {
 		return fmt.Errorf("closure: Calibrate: %w", err)
 	}
+	// chip sets Calibrating after the delegate (:658-661) under its stack
+	// lock; a MainState the drive reported while the calibrator had the
+	// command (Stopped from a calibration already done, Error) is newer
+	// and stays.
 	s.mu.Lock()
-	s.mainState = wire.ClosureMainStateCalibrating
+	written := s.stateReports == stateReports
+	if written {
+		s.mainState = wire.ClosureMainStateCalibrating
+	}
 	s.mu.Unlock()
-	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
+	if written {
+		s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
+	}
 	return nil
 }
 
@@ -768,6 +806,7 @@ func (s *ControlServer) setCurrent(r currentReport) {
 	defer s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrOverallCurrentState, wire.ClosureControlAttrOverallTargetState)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.currentReports++
 	prevSecure := s.secureState
 	if r.setPosition {
 		s.currentPosition = r.position
@@ -798,10 +837,17 @@ func (s *ControlServer) setCurrent(r currentReport) {
 	// The drive arrived at the target, so nothing is outstanding; a
 	// position on the way (PartiallyOpened while moving to FullyOpen) keeps
 	// it (W3-club1-05). The latch alike.
-	if p := s.currentPosition; r.setPosition && p != nil && s.targetPosition != nil && reachedTarget(*p, *s.targetPosition) {
+	s.clearFulfilledTargetsLocked(r.setPosition, r.setLatch)
+}
+
+// clearFulfilledTargetsLocked clears the position target the current
+// position has reached (position) and the latch target the current latch
+// equals (latch). Caller holds s.mu.
+func (s *ControlServer) clearFulfilledTargetsLocked(position, latch bool) {
+	if p := s.currentPosition; position && p != nil && s.targetPosition != nil && reachedTarget(*p, *s.targetPosition) {
 		s.targetPosition = nil
 	}
-	if l := s.currentLatch; r.setLatch && l != nil && s.targetLatch != nil && *l == *s.targetLatch {
+	if l := s.currentLatch; latch && l != nil && s.targetLatch != nil && *l == *s.targetLatch {
 		s.targetLatch = nil
 	}
 }
@@ -872,6 +918,7 @@ func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mu.Lock()
 	prev := s.mainState
 	s.mainState = state
+	s.stateReports++
 	s.mu.Unlock()
 	if prev != state {
 		s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)
