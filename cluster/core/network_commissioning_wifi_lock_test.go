@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package core
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+)
+
+// TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock pins R2-P1-core-07:
+// the Wi-Fi commands write their Breadcrumb after releasing the cluster's
+// lock, so a listener on that write — GeneralCommissioning's change
+// listeners reach the host's attribute hook synchronously — may read this
+// cluster without deadlocking it.
+func TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var w *WiFiNetworkCommissioning
+	blocked := 0
+	readsBack := func(uint64) {
+		done := make(chan struct{})
+		go func() { defer close(done); w.MatterRead(netcommAttrNetworks) }()
+		wait, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		defer cancel()
+		select {
+		case <-done:
+		case <-wait.Done():
+			blocked++
+		}
+	}
+	var err error
+	w, err = NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
+		Driver: &simDriver{}, IsFailSafeArmed: func() bool { return true }, SetBreadcrumb: readsBack,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		cmd  uint32
+		req  any
+	}{
+		{"AddOrUpdateWiFiNetwork", netcommdef.CmdAddOrUpdateWiFiNetwork, netcommdef.AddOrUpdateWiFiNetworkRequest{Ssid: []byte("lab"), Credentials: []byte("secret12"), Breadcrumb: bc(1)}},
+		{"ReorderNetwork", netcommdef.CmdReorderNetwork, netcommdef.ReorderNetworkRequest{NetworkId: []byte("lab"), NetworkIndex: 0, Breadcrumb: bc(2)}},
+		{"ConnectNetwork", netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("lab"), Breadcrumb: bc(3)}},
+		{"RemoveNetwork", netcommdef.CmdRemoveNetwork, netcommdef.RemoveNetworkRequest{NetworkId: []byte("lab"), Breadcrumb: bc(4)}},
+	} {
+		blocked = 0
+		if _, err := w.MatterInvoke(ctx, c.cmd, c.req); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if blocked != 0 {
+			t.Errorf("%s wrote its Breadcrumb with the cluster's lock held: a read of the cluster from the write blocked", c.name)
+		}
+	}
+}
