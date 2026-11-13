@@ -285,8 +285,9 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 //
 // There is one window per source node id under a key and no bound on how
 // many, as in matter.js: receptionStateFor adds an entry for every source
-// node id it is asked for and nothing but forgetReceptionState removes one
-// (packages/protocol/src/groups/MessagingState.ts:19, :80-90, :97-99 at
+// node id it is asked for
+// (packages/protocol/src/groups/MessagingState.ts:19, :80-90 at db021da0).
+// Nothing but forgetReceptionState removes one (MessagingState.ts:97-99 at
 // db021da0). That is what keeps a recorded datagram a duplicate for as
 // long as its key is held, however many other senders were seen since: a
 // table that evicts must trust the first counter of a sender it no longer

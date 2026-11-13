@@ -432,10 +432,10 @@ func (f *flow) failsafeMayBeArmed() bool {
 	return f.armStarted
 }
 
-// failsafeEnded records that the device confirmed the fail-safe's end —
-// CommissioningComplete or an ArmFailSafe with expiry 0: no end time
-// (ControllerCommissioningFlow.ts:2093 and :1104 at db021da0) and nothing
-// an abort would have to disarm.
+// failsafeEnded records that the device confirmed the fail-safe's end,
+// by CommissioningComplete or by a zero expiry. matter.js then holds no
+// end time (ControllerCommissioningFlow.ts:2093 and :1104 at db021da0),
+// and an abort has nothing to disarm.
 func (f *flow) failsafeEnded() {
 	f.mu.Lock()
 	f.failSafeEnd = time.Time{}

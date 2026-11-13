@@ -122,7 +122,7 @@ type Subscription struct {
 //
 // A reporter that never calls it is taken to have sent what it was
 // handed. This is the module's own rule: matter.js sends an empty
-// DataReport in such a pass and counts it
+// report in such a pass and counts it
 // (packages/node/src/node/server/ServerSubscription.ts:549-551 and
 // :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
 // at db021da0), with a TODO of its own for the case
@@ -311,8 +311,8 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // #sendUpdatesActivated, packages/node/src/node/server/ServerSubscription.ts:412).
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
-// events alike (ServerSubscription.ts:443-445 at db021da0) — at once
-// there, after MinIntervalFloor here.
+// events alike (ServerSubscription.ts:443-445 at db021da0). There they
+// go at once; here they wait for MinIntervalFloor.
 func (s *Subscription) EndPriming(now time.Time) {
 	s.mu.Lock()
 	s.priming = false

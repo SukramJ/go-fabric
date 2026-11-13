@@ -21,7 +21,7 @@ import (
 // (packages/protocol/src/peer/PeerSet.ts:248-256 at db021da0), after which
 // the peer context's exchanges accessor throws (:83-86). An attempt reads
 // it when it creates its exchange
-// (packages/protocol/src/peer/PeerConnection.ts:544), and an error that is
+// (packages/protocol/src/peer/PeerConnection.ts:544). An error that is
 // neither a status response nor a TransientPeerCommunicationError gets
 // timing.delayAfterUnhandledError and the category "general" (:715-717), a
 // warning (:762-764) and another attempt.

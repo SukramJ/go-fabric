@@ -371,7 +371,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// at db021da0 (`limits.fabricScoped && !this.session.fabric` →
 		// Status.UnsupportedAccess); chip src/app/WriteHandler.cpp:804-812
 		// at 6170af84 answers the same status, for a fabric-scoped list.
-		// A PASE session has no fabric until AddNOC gives it one
+		// A PASE session has no fabric until the commissioning gives it one
 		// (OperationalCredentialsServer.ts:280-282 at db021da0, `session.fabric
 		// = fabric`; chip OperationalCredentialsCluster.cpp:543-546
 		// AdoptFabricIndex), so the implicit Administer of the commissioning
