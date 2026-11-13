@@ -119,7 +119,7 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.C
 		}
 		return nodeID, true
 	}
-	return n, c.reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe})
+	return n, c.reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
 }
 
 // bothContexts is a context that ends with a or b.

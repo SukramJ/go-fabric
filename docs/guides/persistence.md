@@ -235,6 +235,7 @@ and `sqlstore.Apply`:
 | `matter_client_values` | each paired node's attribute values, as TLV |
 | `matter_client_versions` | each stored cluster's DataVersion |
 | `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
+| `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. Controller-side CASE resumption records are kept in

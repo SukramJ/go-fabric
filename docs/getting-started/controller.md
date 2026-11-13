@@ -647,6 +647,59 @@ code with matter.js's validation: `Manual`, `Version`, `VendorID`,
 the discovery selector. A code it refuses is `controller.ErrPairingCode`,
 and `Pair` returns the same error for the same code.
 
+### The onboarding code inventory
+
+A device's QR code or manual pairing code is needed again after a factory
+reset, and it cannot be read from a commissioned device: the device holds a
+verifier, not the passcode. The controller can keep the code instead.
+
+- `Config.KeepOnboardingCodes` keeps the code of every commissioning `Pair`
+  completes (`client.OnboardingPaired`). It is off by default. A code is
+  kept only when the device advertised Basic commissioning mode (CM=1): the
+  code of an Enhanced Commissioning Window (CM=2) was minted by the
+  administrator that opened the window and ends with it, and a pairing by
+  `PairOptions.Address` sees no advertisement, so the module cannot tell
+  the two apart — attach that code afterwards.
+- `Node.SetOnboardingCode(code)` attaches the code printed on a device that
+  is already commissioned — typed, scanned or decoded from a photograph by
+  the host; the module takes the text. The code is validated like a pairing
+  code (`client.ErrOnboardingCode`) and compared with the node: vendor and
+  product id with its Basic Information (or what it advertised), the
+  discriminator with the one it advertised (a manual code's four bits with
+  the upper four) when it was last seen commissionable in Basic mode — not
+  after an Enhanced Commissioning Window, whose discriminator is the
+  window's, and not for a node paired by address. A difference is `client.ErrOnboardingMismatch` and
+  nothing is stored; a side the node does not know is skipped, and
+  `OnboardingCode.Checks` names the checks that ran (vendor, product,
+  discriminator — each its own bit). No check proves the passcode — a
+  commissioned device offers no way to test one — so an attached code is
+  `client.OnboardingAttached`; attaching the very code the node was paired
+  with leaves it as paired. Nor does a check prove the unit: the code of
+  another device of the same product with the same discriminator passes
+  all three.
+- `Node.OnboardingCode()` reads it, `Node.ClearOnboardingCode()` removes it;
+  it is deleted with the node (`Forget`, `Decommission`, `Erase`).
+- `Controller.Inventory()` lists every commissioned node with its node id,
+  NodeLabel, vendor and product name, serial number and the two forms to
+  show or print: `QRCode` (`MT:…`) and `ManualCode`. A stored QR code yields
+  both; a stored manual code yields itself and no QR code, because it
+  carries four of the discriminator's twelve bits and no commissioning
+  flow. Both are `client.SecretCode` values: `Reveal()` returns the text.
+  Drawing the QR image is the host's.
+
+The code is a secret: with it and physical access to the device (a factory
+reset) anyone can commission it. It is stored in the controller database
+beside the fabric's keys and held as a `client.SecretCode`, which renders
+as `redacted` under every `fmt` verb, in a log record, in `encoding/json`
+and wherever a `TextMarshaler` is taken — also inside a host's own struct.
+`Reveal()` is the one way to the text; what a host does with the result
+(an export, an API response) needs the protection the database has. See
+the [security model](../security.md#controller-side).
+
+*Source: `controller/client/onboarding.go`, `controller/inventory.go`,
+`controller/controller.go` (`Config.KeepOnboardingCodes`),
+`controller/client/fabricops.go` (`CommissionOptions.OnboardingCode`).*
+
 ### The commissioning window
 
 `Node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions{})` opens
