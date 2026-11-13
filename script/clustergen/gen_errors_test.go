@@ -42,6 +42,10 @@ func TestGenerateRejects(t *testing.T) {
 		{"colliding anonymous struct", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"struct","metatype":"object","fields":[]}},{"id":1,"name":"X","effective":{"type":"struct","metatype":"object","fields":[]}}],"commands":[],"events":[]}`, "collides"},
 		{"bad anonymous field", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"struct","metatype":"object","fields":[{"id":0,"name":"F","metatype":"weird"}]}}],"commands":[],"events":[]}`, "unsupported metatype"},
 		{"bad named struct field", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"S","metatype":"object"}}],"commands":[],"events":[],"datatypes":[{"name":"S","metatype":"object","fields":[{"id":0,"name":"F","metatype":"weird"}]}]}`, "unsupported metatype"},
+		// A bound the runtime could not compute is no expression that
+		// admits every value (R2-P0-par-B05).
+		{"unknown bound node", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"max sqrt(4)","max":{"type":"sqrt","args":[4]}}}}],"commands":[],"events":[]}`, `unknown bound node type "sqrt"`},
+		{"unknown bound node in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"min ?","min":{"type":"-","lhs":1}}}]}]}`, `without both operands`},
 		{"bad named enum", `{"id":1,"name":"A","attributes":[{"id":0,"name":"Feature","effective":{"type":"Feature","metatype":"enum","primitive":"uint8"}}],"commands":[],"events":[],"datatypes":[]}`, ""},
 	}
 	for _, tc := range cases {

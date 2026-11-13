@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/format"
 	"math"
@@ -134,7 +135,7 @@ type generator struct {
 func generate(snap *snapshot, name string) (out *output, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ce, ok := r.(confError)
+			ce, ok := r.(renderError)
 			if !ok {
 				panic(r)
 			}
@@ -1494,6 +1495,13 @@ func constraintLiteral(c *constraint, typeName, metatype string) string {
 // (cluster/spec/bound_expr.go). A unit the type does not scale stays an
 // expression and admits every value, as matter.js's unscaled bound does
 // (EncodedConstraint.ts:56-61).
+//
+// A bound of any other shape fails the generation ([renderError], recovered
+// in generate): the runtime reads an expression it does not know as one
+// without a number, which admits every value, so a snapshot that states a
+// bound in a new way must not turn a constrained element into an
+// unconstrained one unnoticed (R2-P0-par-B05, as confLiteral refuses an
+// unknown conformance node).
 func boundLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
@@ -1510,12 +1518,116 @@ func boundLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if ref := referenceOf(raw); ref != "" {
 		return fmt.Sprintf("&spec.Bound{Ref: %q}", ref)
 	}
+	if err := checkBoundExpr(raw); err != nil {
+		panic(renderError{fmt.Errorf("constraint bound %s: %w", raw, err)})
+	}
 	var compact bytes.Buffer
 	if json.Compact(&compact, raw) != nil {
 		compact.Reset()
 		compact.Write(raw)
 	}
 	return fmt.Sprintf("&spec.Bound{Expr: %q}", compact.String())
+}
+
+// The node types of a bound expression the runtime computes
+// (cluster/spec/bound_expr.go parseBoundNode and evalBound), beside a
+// number and a reference. TestBoundNodeTypesAreComputed holds the two
+// lists together: a type added here that the runtime does not compute
+// fails there.
+var (
+	boundOperators = map[string]bool{"+": true, "-": true, "*": true, "/": true, "^": true}
+	boundFunctions = map[string]bool{"maxOf": true, "minOf": true}
+	// boundUnits are the unit values encodedUnit restates; one the
+	// carrying type does not scale is the whole bound, never an operand.
+	boundUnits = map[string]bool{"celsius": true, "percent": true}
+)
+
+// checkBoundExpr accepts a bound boundLiteral renders as an expression: a
+// number, a unit value the type does not scale, or a tree of the node
+// types above.
+func checkBoundExpr(raw json.RawMessage) error {
+	var node struct {
+		Type  string   `json:"type"`
+		Value *float64 `json:"value"`
+	}
+	if json.Unmarshal(raw, &node) == nil && boundUnits[node.Type] {
+		if node.Value == nil {
+			return fmt.Errorf("unit value %q without a number", node.Type)
+		}
+		return nil
+	}
+	return checkBoundNode(raw)
+}
+
+func checkBoundNode(raw json.RawMessage) error {
+	var n float64
+	if json.Unmarshal(raw, &n) == nil && string(bytes.TrimSpace(raw)) != "null" {
+		return nil
+	}
+	var node struct {
+		Type string            `json:"type"`
+		Name string            `json:"name"`
+		LHS  json.RawMessage   `json:"lhs"`
+		RHS  json.RawMessage   `json:"rhs"`
+		Args []json.RawMessage `json:"args"`
+	}
+	if err := json.Unmarshal(raw, &node); err != nil {
+		return fmt.Errorf("neither a number nor a node: %w", err)
+	}
+	switch {
+	case node.Type == "reference":
+		if node.Name == "" {
+			return errors.New("reference without a name")
+		}
+		return nil
+	case node.Type == ".":
+		// The rhs names a member of the lhs; both sides are names.
+		for _, side := range []json.RawMessage{node.LHS, node.RHS} {
+			if !dottedName(side) {
+				return fmt.Errorf("dotted reference with the operand %s", side)
+			}
+		}
+		return nil
+	case boundOperators[node.Type]:
+		if len(node.LHS) == 0 || len(node.RHS) == 0 {
+			return fmt.Errorf("operator %q without both operands", node.Type)
+		}
+		if err := checkBoundNode(node.LHS); err != nil {
+			return err
+		}
+		return checkBoundNode(node.RHS)
+	case boundFunctions[node.Type]:
+		if len(node.Args) == 0 {
+			return fmt.Errorf("function %q without arguments", node.Type)
+		}
+		for _, a := range node.Args {
+			if err := checkBoundNode(a); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown bound node type %q", node.Type)
+}
+
+// dottedName reports whether raw is a reference or a "." of two names.
+func dottedName(raw json.RawMessage) bool {
+	var node struct {
+		Type string          `json:"type"`
+		Name string          `json:"name"`
+		LHS  json.RawMessage `json:"lhs"`
+		RHS  json.RawMessage `json:"rhs"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &node) != nil {
+		return false
+	}
+	switch node.Type {
+	case "reference":
+		return node.Name != ""
+	case ".":
+		return dottedName(node.LHS) && dottedName(node.RHS)
+	}
+	return false
 }
 
 // referenceOf reads a FieldValue reference ({"type":"reference","name":…}).
@@ -1617,7 +1729,7 @@ func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 
 // confLiteral renders a conformance AST as a spec.Conformance literal.
 //
-// A node it cannot render fails the generation ([confError], recovered
+// A node it cannot render fails the generation ([renderError], recovered
 // into generate's error) rather than degrading to "desc": a pin lift that
 // adds a conformance node must not turn a mandatory or disallowed element
 // into a conditional one unnoticed, as script/generate_matter_schema.go
@@ -1629,14 +1741,14 @@ func confLiteral(c *conformance) string {
 	}
 	body, err := astLiteral(c.AST)
 	if err != nil {
-		panic(confError{fmt.Errorf("conformance %q: %w", c.Text, err)})
+		panic(renderError{fmt.Errorf("conformance %q: %w", c.Text, err)})
 	}
 	return fmt.Sprintf("spec.Conformance{Text: %q, %s}", c.Text, body)
 }
 
-// confError carries a conformance confLiteral cannot render out of the
-// writers, which return no error, to generate.
-type confError struct{ err error }
+// renderError carries a conformance confLiteral or a bound boundLiteral
+// cannot render out of the writers, which return no error, to generate.
+type renderError struct{ err error }
 
 var opLiteral = map[string]string{
 	"M": "spec.ConfMandatory", "O": "spec.ConfOptional", "P": "spec.ConfProvisional", "D": "spec.ConfDeprecated",

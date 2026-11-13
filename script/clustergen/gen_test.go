@@ -238,8 +238,40 @@ func TestLiterals(t *testing.T) {
 			t.Errorf("defaultLiteral(%s, %s) = %q, want %q", c.in, c.typ, got, c.want)
 		}
 	}
-	if got := boundLiteral(raw(`{"type":"-","lhs":1}`), "", ""); !strings.Contains(got, "Expr") {
+	if got := boundLiteral(raw(`{"type":"-","lhs":{"type":"reference","name":"x"},"rhs":1}`), "", ""); !strings.Contains(got, "Expr") {
 		t.Errorf("boundLiteral expression %q", got)
+	}
+	// A bound the runtime could not compute fails the generation: as an
+	// opaque expression it would admit every value (R2-P0-par-B05).
+	for _, in := range []string{
+		`{"type":"bogus"}`, `{"type":"sqrt","args":[4]}`, `{"type":"-","lhs":1}`, `{"type":"*","rhs":2}`,
+		`{"type":"+","lhs":{"type":"bogus"},"rhs":1}`, `{"type":"maxOf","args":[]}`, `{"type":"minOf","args":[1,{"type":"bogus"}]}`,
+		`{"type":"reference"}`, `{"type":".","lhs":{"type":"reference","name":"a"},"rhs":1}`,
+		`{"type":"+","lhs":{"type":"celsius","value":1},"rhs":1}`, `{"type":"fahrenheit","value":70}`, `{"type":"celsius"}`,
+		`"text"`, `true`, `[1]`, `{`,
+	} {
+		func() {
+			defer func() {
+				if _, ok := recover().(renderError); !ok {
+					t.Errorf("boundLiteral(%s) did not fail", in)
+				}
+			}()
+			boundLiteral(raw(in), "uint8", "integer")
+		}()
+	}
+	// Every shape the generator accepts is rendered.
+	for in, want := range map[string]string{
+		`12.5`:                           `&spec.Bound{Expr: "12.5"}`,
+		`{"type":"^","lhs":-2,"rhs":62}`: "Expr",
+		`{"type":"/","lhs":{"type":"reference","name":"a"},"rhs":2}`:                               "Expr",
+		`{"type":"*","lhs":-1,"rhs":{"type":"+","lhs":1,"rhs":2}}`:                                 "Expr",
+		`{"type":"maxOf","args":[{"type":"reference","name":"a"},10]}`:                             "Expr",
+		`{"type":"minOf","args":[1]}`:                                                              "Expr",
+		`{"type":".","lhs":{"type":"reference","name":"a"},"rhs":{"type":"reference","name":"b"}}`: "Expr",
+	} {
+		if got := boundLiteral(raw(in), "uint8", "integer"); !strings.Contains(got, want) {
+			t.Errorf("boundLiteral(%s) = %s, want %s", in, got, want)
+		}
 	}
 	if got := boundLiteral(raw(`{"type":"reference","name":"x"}`), "", ""); got != `&spec.Bound{Ref: "x"}` {
 		t.Errorf("boundLiteral reference %q", got)
@@ -284,7 +316,7 @@ func TestLiterals(t *testing.T) {
 	// (W3-clugen-03).
 	func() {
 		defer func() {
-			if _, ok := recover().(confError); !ok {
+			if _, ok := recover().(renderError); !ok {
 				t.Error("confLiteral of an unknown node did not fail")
 			}
 		}()
