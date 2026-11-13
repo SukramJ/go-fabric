@@ -81,7 +81,9 @@ func (p Payload) Validate() error {
 		return fmt.Errorf("setup: Discriminator=0x%X exceeds 12-bit width", p.Discriminator)
 	}
 	if p.Passcode == 0 || p.Passcode > 99999998 {
-		return fmt.Errorf("setup: Passcode=%d outside 1..99999998", p.Passcode)
+		// The value stays out of the text: an error is logged and travels
+		// into diagnostics, and the passcode is the secret ([errInvalidPasscode]).
+		return errors.New("setup: Passcode outside 1..99999998")
 	}
 	return nil
 }
@@ -126,7 +128,7 @@ func qrCode(p Payload, check bool) (string, error) {
 		return "", fmt.Errorf("setup: unsupported onboarding payload version %d", p.Version)
 	}
 	if !IsValidSetupPIN(p.Passcode) {
-		return "", fmt.Errorf("setup: invalid passcode %d", p.Passcode)
+		return "", errInvalidPasscode
 	}
 	return qrEncode(p)
 }
@@ -247,7 +249,7 @@ func manualCode(discriminator uint16, passcode uint32, vendorProduct *[2]uint16,
 		return "", fmt.Errorf("setup: Discriminator=0x%X exceeds 12-bit width", discriminator)
 	}
 	if passcode > 99999998 || (validate && !IsValidSetupPIN(passcode)) {
-		return "", fmt.Errorf("setup: invalid passcode %d", passcode)
+		return "", errInvalidPasscode
 	}
 
 	upperDisc := uint32(discriminator>>10) & 0x3
@@ -344,6 +346,18 @@ var trivialPINs = [...]uint32{
 	12345678,
 	87654321,
 }
+
+// passcodeRule is what [IsValidSetupPIN] refuses, for an error text.
+const passcodeRule = "zero, above 99999998 or one of the disallowed values"
+
+// errInvalidPasscode is the encoders' refusal of a passcode
+// [IsValidSetupPIN] rejects. It names the rule and not the value: an error
+// text is logged and travels into a controller's diagnostics, and a
+// passcode on the disallowed list is still the passcode of a device that
+// ships with it. matter.js prints the value
+// (packages/types/src/schema/PairingCodeSchema.ts:183 at db021da0,
+// `Invalid passcode ${passcode}`); the departure is this text only.
+var errInvalidPasscode = errors.New("setup: invalid passcode: " + passcodeRule)
 
 // IsValidSetupPIN returns true when passcode is a legal Matter Setup PIN:
 // non-zero, within the 27-bit range 1..99999998, and not in the trivial-code

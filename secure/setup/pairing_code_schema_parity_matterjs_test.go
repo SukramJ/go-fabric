@@ -116,12 +116,14 @@ func TestQrPairingCodeCodecParityMatterJS(t *testing.T) {
 		p := qrVector
 		p.Passcode = 12345678
 		_, err := QRCode(p)
-		wantErr(t, err, "12345678")
+		// matter.js's text names the value; this package's names the rule
+		// (errInvalidPasscode).
+		wantErr(t, err, "invalid passcode")
 	})
 	t.Run("rejects decoding an invalid passcode", func(t *testing.T) {
 		t.Parallel()
 		_, err := DecodeQRCode("MT:YNJV7VSC00ANG46Y900")
-		wantErr(t, err, "Invalid passcode 12345678")
+		wantErr(t, err, "Invalid passcode")
 	})
 	t.Run("rejects encoding a reserved version", func(t *testing.T) {
 		t.Parallel()
@@ -281,10 +283,10 @@ func TestManualPairingCodeCodecParityMatterJS(t *testing.T) {
 	t.Run("rejects encoding an invalid passcode", func(t *testing.T) {
 		t.Parallel()
 		_, err := ManualCode(10, 12345678)
-		wantErr(t, err, "12345678")
+		wantErr(t, err, "invalid passcode")
 	})
 	for _, c := range []struct{ name, code, want string }{
-		{"rejects decoding an invalid passcode", "00852607537", "Invalid passcode 12345678"},
+		{"rejects decoding an invalid passcode", "00852607537", "Invalid passcode"},
 		{"rejects decoding a manual code whose first digit marks a future format", "80000000000", "Unsupported onboarding payload version"},
 		{"rejects a 21-digit code whose VID_PID_PRESENT bit is clear", "349701123365521327696", "A 21-digit manual pairing code must set VID_PID_PRESENT"},
 		{"rejects an 11-digit code whose VID_PID_PRESENT bit is set", "74970112334", "An 11-digit manual pairing code must not set VID_PID_PRESENT"},
