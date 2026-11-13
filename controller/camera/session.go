@@ -279,10 +279,16 @@ type mailbox struct {
 	closed bool
 	wake   chan struct{}
 	out    chan Signal
+	// done closes when the pump has ended.
+	done chan struct{}
+	// abandoned closes when no one will ever read out: the pump drops
+	// what it holds and ends.
+	abandoned chan struct{}
+	abandon   sync.Once
 }
 
 func newMailbox(life context.Context) *mailbox {
-	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal)}
+	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal), done: make(chan struct{}), abandoned: make(chan struct{})}
 	go b.pump(life)
 	return b
 }
@@ -303,6 +309,17 @@ func (b *mailbox) close() {
 	b.notify()
 }
 
+// discard ends a mailbox whose Session never reached the host: the queued
+// signals go and the pump ends at once, where close would have it wait for
+// a reader of out that never comes (review II, R2-P1-cam-b-01).
+func (b *mailbox) discard() {
+	b.mu.Lock()
+	b.closed = true
+	b.queue = nil
+	b.mu.Unlock()
+	b.abandon.Do(func() { close(b.abandoned) })
+}
+
 func (b *mailbox) notify() {
 	select {
 	case b.wake <- struct{}{}:
@@ -311,8 +328,9 @@ func (b *mailbox) notify() {
 }
 
 // pump hands the queued signals on in order and closes out once the box
-// is closed and drained, or the service's life ended.
+// is closed and drained, discarded, or the service's life ended.
 func (b *mailbox) pump(life context.Context) {
+	defer close(b.done)
 	defer close(b.out)
 	for {
 		b.mu.Lock()
@@ -325,6 +343,8 @@ func (b *mailbox) pump(life context.Context) {
 			case b.out <- queue[i]:
 			case <-life.Done():
 				return
+			case <-b.abandoned:
+				return
 			}
 		}
 		if len(queue) > 0 {
@@ -336,6 +356,8 @@ func (b *mailbox) pump(life context.Context) {
 		select {
 		case <-b.wake:
 		case <-life.Done():
+			return
+		case <-b.abandoned:
 			return
 		}
 	}
@@ -368,7 +390,8 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 	}
 	res, err := s.m.startStream(ctx, args)
 	if err != nil {
-		// The host never learned the session's id: its held signals go.
+		// The host never learned the session's id: its held signals go,
+		// and with them the pump that would wait for a reader.
 		if registered != nil {
 			s.mu.Lock()
 			if s.sessions[*registered] == sess {
@@ -376,7 +399,7 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 			}
 			s.mu.Unlock()
 		}
-		sess.box.close()
+		sess.box.discard()
 		return nil, err
 	}
 	sess.ID, sess.Mode, sess.Talkback = res.sessionID, res.mode, res.talkback
