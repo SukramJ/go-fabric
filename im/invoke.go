@@ -614,15 +614,16 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// The access check a cluster server may consult for a privilege
 	// beyond the command's own ([AuthorityAt]): the same gate the command
 	// itself passed — PASE holds the implicit Administer, a CASE subject
-	// what the ACL grants, and nothing is granted without an ACL source.
+	// what the ACL grants, and nothing is granted without an ACL source:
+	// fabric 0 without PASE is no grant either, the implicit Administer is
+	// keyed on the auth mode alone (matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
+	// db021da0, `authMode === Pase && isCommissioning`).
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
 		if g.pase {
 			return StatusSuccess
 		}
 		if !g.hasACL {
-			if g.fabricIndex == 0 {
-				return StatusSuccess
-			}
 			return StatusUnsupportedAccess
 		}
 		return checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
