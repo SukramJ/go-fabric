@@ -8,6 +8,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -470,5 +472,34 @@ func TestDecode_PublicKeyAbsentOrEmptyRejected(t *testing.T) {
 				t.Fatalf("Decode: expected ErrMalformed, got %v", err)
 			}
 		})
+	}
+}
+
+// A validity time beyond 32 bits is refused: the TLV schema carries
+// notBefore and notAfter as TlvUInt32 (operational.ts:138-139 at
+// db021da0), which matter.js's Schema.decode validates (review II,
+// R2-P1-sec-04).
+func TestDecode_ValidityBeyond32BitsRejected(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		mod  func(*certOptions)
+	}{
+		{"notBefore", func(o *certOptions) { o.notBefore = 1 << 32 }},
+		{"notAfter", func(o *certOptions) { o.notAfter = 6311433600 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			opts := makeRootCertOpts()
+			tc.mod(&opts)
+			if _, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 32 bits") {
+				t.Fatalf("Decode = %v, want ErrMalformed (exceeds 32 bits)", err)
+			}
+		})
+	}
+	opts := makeRootCertOpts()
+	opts.notAfter = math.MaxUint32
+	if _, err := Decode(buildTestCert(t, opts)); err != nil {
+		t.Fatalf("Decode(notAfter = MaxUint32) = %v", err)
 	}
 }

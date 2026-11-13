@@ -197,6 +197,12 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 		{"signature r wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, wide, one)), "too many bytes", ErrMalformed},
 		{"signature s wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, one, wide)), "too many bytes", ErrMalformed},
 		{"signature r of 300 bits", derSeq(t, p.tbs(t), p.alg, derSigValue(t, new(big.Int).Lsh(big.NewInt(1), 300), one)), "too many bytes", ErrMalformed},
+		// Values the TLV form cannot carry: pathLen is a TlvUInt8, the
+		// validity times TlvUInt32 (operational.ts:42, :138-139 at
+		// db021da0; review II, R2-P1-sec-04).
+		{"pathLen 256", p.with(6, exts(derExt(t, oidExtBasicConstraints, derSeq(t, derMust(t, true), derMust(t, 256))))).cert(t), "pathLenConstraint 256", ErrMalformed},
+		{"notAfter beyond 32 bits", p.with(3, derSeq(t, derUTC(t, "210101000000Z"), derRaw(t, asn1.ClassUniversal, asn1.TagGeneralizedTime, false, []byte("22000101000000Z")))).cert(t), "exceeds 32 bits", ErrMalformed},
+		{"notBefore beyond 32 bits", p.with(3, derSeq(t, derRaw(t, asn1.ClassUniversal, asn1.TagGeneralizedTime, false, []byte("21370101000000Z")), derUTC(t, "301230000000Z"))).cert(t), "exceeds 32 bits", ErrMalformed},
 		{"signature r not an INTEGER", derSeq(t, p.tbs(t), p.alg, derSigBits(t, derSeq(t, derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1}), derMust(t, one)))), "not an ECDSA-Sig-Value", ErrMalformed},
 	}
 	for _, tc := range cases {

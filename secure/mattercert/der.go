@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"fmt"
+	"math"
 	"math/big"
 	"slices"
 	"strconv"
@@ -342,6 +343,11 @@ func derDate(v asn1.RawValue) (uint64, error) {
 	if secs < 0 {
 		return 0, fmt.Errorf("%w: date %v before the Matter epoch", ErrMalformed, t)
 	}
+	// The TLV form carries notBefore/notAfter as TlvUInt32
+	// (operational.ts:138-139 at db021da0).
+	if secs > math.MaxUint32 {
+		return 0, fmt.Errorf("%w: date %v exceeds 32 bits of Matter epoch seconds", ErrMalformed, t)
+	}
 	return uint64(secs), nil
 }
 
@@ -443,9 +449,14 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 		if _, err := asn1.Unmarshal(value, &bc); err != nil {
 			return fmt.Errorf("%w: basic-constraints: %w", ErrMalformed, err)
 		}
+		// The TLV form carries pathLen as TlvUInt8 (operational.ts:42 at
+		// db021da0); a wider one is refused, not cut to its low byte.
+		if bc.PathLen > math.MaxUint8 {
+			return fmt.Errorf("%w: basic-constraints: pathLenConstraint %d exceeds 255", ErrMalformed, bc.PathLen)
+		}
 		ext.HasBasicConstraints, ext.BasicConstraintsIsCA = true, bc.IsCA
 		if bc.PathLen >= 0 {
-			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(bc.PathLen) //nolint:gosec // Matter caps the path length at 1
+			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(bc.PathLen) //nolint:gosec // 0..255, checked above
 		}
 	case extTagKeyUsage:
 		var bits asn1.BitString
