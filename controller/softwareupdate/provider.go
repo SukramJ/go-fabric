@@ -39,8 +39,8 @@ type ProviderConfig struct {
 }
 
 // ProviderConfig is the provider configuration that serves the manager's
-// updates. The controller hands it to its own node
-// (controller.OwnNodeSpec.Provider).
+// updates. The controller builds its provider from it
+// (controller/ota_provider.go newOTAProvider).
 func (m *Manager) ProviderConfig() ProviderConfig {
 	return ProviderConfig{
 		ImageSource:     providerPorts{m},
@@ -60,7 +60,7 @@ func (m *Manager) ProviderConfig() ProviderConfig {
 }
 
 // SetBDX gives the manager the provider's BDX responder, once the
-// provider node is built (controller.OwnNode.BDX).
+// controller has built its provider (controller/ota.go openOTA).
 func (m *Manager) SetBDX(r *bdx.Responder) {
 	m.mu.Lock()
 	m.cfg.BDX = r

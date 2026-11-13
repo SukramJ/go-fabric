@@ -491,7 +491,8 @@ func (m *Manager) NodeSubscription(n *client.Node, active bool) {
 	}
 }
 
-// SetProvider names the provider's endpoint, once the provider node runs.
+// SetProvider names the provider's node id and endpoint, once the
+// controller has built its provider (controller/ota.go openOTA).
 func (m *Manager) SetProvider(nodeID uint64, endpoint uint16) {
 	m.mu.Lock()
 	m.cfg.ProviderNodeID, m.cfg.ProviderEndpoint = nodeID, endpoint

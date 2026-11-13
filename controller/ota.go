@@ -24,15 +24,18 @@ import (
 // ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts at
 // 862ad75f; docs/OTA.md "Enable OTA Provider on Controller Creation").
 //
-// matter.js serves the provider from the controller's ServerNode. This
-// module's controller role runs no server node: a server node is the node
-// facade, a layer above the roles (ADR 0026 principle 1). So the controller
-// has [OTAConfig].StartNode start one — the controller's own node, in the
-// controller's database, commissioned into our fabric by our commissioner
-// on its first start — with node/'s OTA provider mounted and the update
-// manager as its image source, consent and apply policy
-// (controller/softwareupdate); node/controllernode.Start is that starter.
-// The provider is one implementation, the device-side one.
+// The controller serves the provider itself, under its one operational
+// identity: [New] builds the update manager (controller/softwareupdate)
+// and the device side's provider server (cluster/core.NewOTAProvider) over
+// the manager's image source, consent and apply policy, mounts the server
+// at [OTAProviderEndpoint] of the controller's endpoint tree (serve.go)
+// and gives the manager the fabric's root node id and that endpoint as
+// the provider it announces; the provider's BDX responder serves the
+// downloads on the controller's own exchanges (ota_provider.go). Until
+// phase 37 the provider ran on a second node the controller commissioned
+// into its fabric; a database of that time is migrated on its next start
+// (retireOwnNode). The provider is one implementation, the device-side
+// one.
 type OTAConfig struct {
 	// Images is the image store and the ledger lookups; nil is an
 	// in-memory store without ledgers, which offers local images only.
@@ -117,10 +120,6 @@ func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
 }
 
 func (c *Controller) fabricIndex() uint8 { return c.fabric.AddressOf(0).FabricIndex }
-
-// OwnNode is the controller's own node — the node the OTA provider runs on
-// and the group sender a program may use — with its node id and address;
-// nil without [Config].OTA.
 
 // SoftwareUpdates is the update manager — matter.js's SoftwareUpdateManager
 // (docs/OTA.md "Triggering an Update", "Monitoring Update Progress" at
