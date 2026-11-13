@@ -34,7 +34,8 @@ wpa_supplicant's configuration (the node's store keeps the committed network)
 and runs no DHCP client. The Wi-Fi credential is never logged. The
 interface's D-Bus path is resolved once, at `New`: after a wpa_supplicant
 restart the driver's calls fail, and the host builds a new `Driver` — that
-supervision is the host's.
+supervision is the host's. A lost system-bus connection fails every later
+call at once ("the driver's bus connection is gone"), the same signal.
 
 `make wpasupplicant-check` builds (Linux and the `!linux` stub), vets, tests
 (over an in-process bus that plays wpa_supplicant) and lints the module; the

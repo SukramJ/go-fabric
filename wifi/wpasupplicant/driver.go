@@ -88,7 +88,9 @@ const (
 // Options configures [New]. The zero value is wlan0 with connectedhomeip's
 // maxima. The interface's D-Bus path is resolved once, at New: when
 // wpa_supplicant restarts, the Driver's calls fail and the host builds a
-// new Driver (its process supervision).
+// new Driver (its process supervision). When the system-bus connection
+// itself is lost (godbus closes the signal channel), the run loop ends and
+// every later call fails at once with [debugBusGone].
 type Options struct {
 	// Interface is the Wi-Fi interface wpa_supplicant manages ("" is
 	// wlan0).
@@ -144,6 +146,9 @@ var _ contract.WiFiDriver = (*Driver)(nil)
 type scanWaiter struct {
 	done  chan struct{}
 	ready chan struct{}
+	// abandoned (d.mu) is set once its scan returned: a waiter the run
+	// loop takes after its caller gave up is not installed.
+	abandoned bool
 }
 
 // attempt is one join's view of the interface's State changes.
@@ -152,7 +157,15 @@ type attempt struct {
 	// ready is closed once the run loop installed the attempt.
 	ready chan struct{}
 	done  chan struct{}
+	// abandoned (d.mu) is set when listen gave up on the hand-over: the
+	// run loop does not install the attempt.
+	abandoned bool
 }
+
+// debugBusGone is the debug text of a call made after the run loop ended
+// because the system-bus connection was lost (its signal channel closed):
+// the host builds a new Driver.
+const debugBusGone = "the driver's bus connection is gone"
 
 // removeTimeout bounds the RemoveNetwork of a failed join's network, which
 // runs after the join's own context may have ended.
@@ -247,10 +260,7 @@ func (d *Driver) run() {
 				}
 				d.handle(s)
 			}
-			d.mu.Lock()
-			d.scan = w.done
-			d.mu.Unlock()
-			close(w.ready)
+			d.installScan(w)
 		case a := <-d.register:
 			// The signals already queued were sent before the reply of the
 			// join's last call before SelectNetwork (godbus delivers a
@@ -266,11 +276,65 @@ func (d *Driver) run() {
 				}
 				d.handle(s)
 			}
-			d.mu.Lock()
-			d.connect = a
-			d.mu.Unlock()
-			close(a.ready)
+			d.installAttempt(a)
 		}
+	}
+}
+
+// handOverScan hands w to the run loop and waits until the loop installed
+// it; a non-empty debug text is why it did not.
+func (d *Driver) handOverScan(ctx context.Context, w *scanWaiter) (debugText string) {
+	select {
+	case d.armScan <- w:
+	case <-ctx.Done():
+		return "the scan did not start in time"
+	case <-d.closed:
+		return "the driver is closed"
+	case <-d.loopDone:
+		return debugBusGone
+	}
+	select {
+	case <-w.ready:
+		return ""
+	case <-ctx.Done():
+		return "the scan did not start in time"
+	case <-d.closed:
+		return "the driver is closed"
+	case <-d.loopDone:
+		return debugBusGone
+	}
+}
+
+// installScan makes w the scan's ScanDone wait, unless its scan already
+// returned (its context ended during the hand-over).
+func (d *Driver) installScan(w *scanWaiter) {
+	d.mu.Lock()
+	if !w.abandoned {
+		d.scan = w.done
+	}
+	d.mu.Unlock()
+	close(w.ready)
+}
+
+// installAttempt makes a the join's view of the State changes, unless
+// listen gave up on it.
+func (d *Driver) installAttempt(a *attempt) {
+	d.mu.Lock()
+	if !a.abandoned {
+		d.connect = a
+	}
+	d.mu.Unlock()
+	close(a.ready)
+}
+
+// loopGone reports whether the run loop ended without Close: the
+// system-bus connection was lost.
+func (d *Driver) loopGone() bool {
+	select {
+	case <-d.loopDone:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -334,13 +398,18 @@ func (d *Driver) handle(s *dbus.Signal) {
 // call, as connectedhomeip sets its scan callback first (:1269-1270): a
 // ScanDone sent right behind the call's reply ends it ([Driver.run]); a
 // Scan call that fails disarms it. A scan that does not end within the
-// timeout or the call's context is UnknownError.
+// timeout or the call's context is UnknownError — also one whose hand-over
+// to the run loop the context or the bound ends first. A scan after the
+// system-bus connection was lost fails at once ([debugBusGone]).
 func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
 	d.mu.Lock()
 	switch {
 	case d.isClosed():
 		d.mu.Unlock()
 		return statusUnknown, "the driver is closed", nil
+	case d.loopGone():
+		d.mu.Unlock()
+		return statusUnknown, debugBusGone, nil
 	case d.scanning:
 		d.mu.Unlock()
 		return statusUnknown, "a scan is in progress", nil
@@ -348,9 +417,13 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	d.scanning = true
 	d.calls.Add(1)
 	d.mu.Unlock()
+	var w *scanWaiter
 	defer func() {
 		d.mu.Lock()
 		d.scanning, d.scan = false, nil
+		if w != nil {
+			w.abandoned = true
+		}
 		d.mu.Unlock()
 		d.calls.Done()
 	}()
@@ -360,16 +433,13 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 	defer cancel()
 
 	// Armed before the call, so no ScanDone of this scan can precede it.
-	w := &scanWaiter{done: make(chan struct{}, 1), ready: make(chan struct{})}
-	select {
-	case d.armScan <- w:
-	case <-d.closed:
-		return statusUnknown, "the driver is closed", nil
-	}
-	select {
-	case <-w.ready:
-	case <-d.closed:
-		return statusUnknown, "the driver is closed", nil
+	// The hand-over ends with the call's context as well: a run loop held
+	// by a join or gone with the bus connection must not keep the call.
+	// A waiter the loop takes after the call gave up is marked abandoned
+	// by the deferred reset and never installed ([Driver.installScan]).
+	w = &scanWaiter{done: make(chan struct{}, 1), ready: make(chan struct{})}
+	if debugText := d.handOverScan(waitCtx, w); debugText != "" {
+		return statusUnknown, debugText, nil
 	}
 	if _, err := d.bus.Call(waitCtx, d.iface, ifaceInterface+".Scan", map[string]dbus.Variant{"Type": dbus.MakeVariant("active")}); err != nil {
 		// Disarmed at once: no waiter of a scan that never started is
@@ -386,6 +456,8 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 		return statusUnknown, "the scan did not end in time", nil
 	case <-d.closed:
 		return statusUnknown, "the driver is closed", nil
+	case <-d.loopDone:
+		return statusUnknown, debugBusGone, nil
 	}
 	ctx, cancelRead := context.WithTimeout(ctx, scanReadTimeout)
 	defer cancelRead()
@@ -442,6 +514,9 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 	case d.isClosed():
 		d.mu.Unlock()
 		return statusUnknown, "the driver is closed", 0
+	case d.loopGone():
+		d.mu.Unlock()
+		return statusUnknown, debugBusGone, 0
 	case d.connecting:
 		d.mu.Unlock()
 		return statusUnknown, "a connect is in progress", 0
@@ -465,10 +540,10 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 		return statusUnknown, debugText, 0
 	}
 	_, _ = d.bus.Call(ctx, d.iface, ifaceInterface+".Disconnect")
-	a, ok := d.listen()
-	if !ok {
+	a, debugText := d.listen(ctx)
+	if a == nil {
 		d.removeAdded(ctx, network)
-		return statusUnknown, "the driver is closed", 0
+		return statusUnknown, debugText, 0
 	}
 	defer close(a.done)
 	if err := d.selectNetwork(ctx, network); err != nil {
@@ -486,19 +561,36 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 // changes are its own. It runs after the driver's Disconnect has returned
 // and right before SelectNetwork, so a change caused by the network that
 // was current, its removal or the Disconnect does not decide the join
-// (the run loop drains them first). False when the driver closed.
-func (d *Driver) listen() (*attempt, bool) {
-	a := &attempt{states: make(chan string, 16), ready: make(chan struct{}), done: make(chan struct{})}
+// (the run loop drains them first). Nil, with the debug text, when the
+// driver closed, the run loop ended with the bus connection, or ctx ended
+// before the loop took the attempt over; an attempt handed over by then
+// is marked abandoned, so the loop does not install it
+// ([Driver.installAttempt]).
+func (d *Driver) listen(ctx context.Context) (a *attempt, debugText string) {
+	a = &attempt{states: make(chan string, 16), ready: make(chan struct{}), done: make(chan struct{})}
 	select {
 	case d.register <- a:
+		select {
+		case <-a.ready:
+			return a, ""
+		case <-ctx.Done():
+			debugText = "the connect did not complete in time"
+		case <-d.closed:
+			debugText = "the driver is closed"
+		case <-d.loopDone:
+			debugText = debugBusGone
+		}
+		d.mu.Lock()
+		a.abandoned = true
+		d.mu.Unlock()
+		close(a.done)
+		return nil, debugText
+	case <-ctx.Done():
+		return nil, "the connect did not complete in time"
 	case <-d.closed:
-		return nil, false
-	}
-	select {
-	case <-a.ready:
-		return a, true
-	case <-d.closed:
-		return nil, false
+		return nil, "the driver is closed"
+	case <-d.loopDone:
+		return nil, debugBusGone
 	}
 }
 

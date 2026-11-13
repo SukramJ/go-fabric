@@ -166,7 +166,10 @@ succeed removes the network it added, so wpa_supplicant does not keep
 trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
 timeout when the network is out of range. The driver resolves the
 interface once, at `New`: after a wpa_supplicant restart the host builds a
-new driver.
+new driver. When the system-bus connection itself is lost, every later scan
+and join fails at once with UnknownError and the debug text "the driver's
+bus connection is gone" — the same signal to build a new driver. A scan or
+join also ends with its caller's context while it waits for the driver.
 
 *Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
