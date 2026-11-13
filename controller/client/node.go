@@ -11,6 +11,7 @@ import (
 	mrand "math/rand/v2"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -31,7 +32,10 @@ type Node struct {
 	// jobs runs subscription reports' store writes and hooks off their
 	// exchanges, in order (applyDeferred).
 	jobs *jobQueue
-	s    *structure
+	// finalFlush is set while the store's final flush of a Stop whose
+	// context ended is queued on jobs and has not begun.
+	finalFlush atomic.Bool
+	s          *structure
 	// subSync serialises the default subscription's synchronisation
 	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
 	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
@@ -474,12 +478,22 @@ func (n *Node) Start(ctx context.Context) error {
 // subscription to end and for the node's queued report jobs — their store
 // writes and hooks ([Hooks]) — to drain, so a hook must not call it.
 //
+// Whatever ctx does, the node is offline when Stop returns and the store's
+// flush timer is stopped: a stopped node arms none, so nothing of it
+// writes to the store on a timer until [Node.Start].
+//
 // When ctx ends while jobs are still queued — a hook that blocks, on the
 // host's own I/O or on a lock the caller of Stop holds — Stop returns
-// ctx's error and the stop is not complete: the queue runs its jobs to
-// their end, hooks included, and the store's final flush has not run (it
-// follows the drain, so no queued write lands behind it). The node is
-// offline all the same; a second Stop completes it. Erase and the
+// ctx's error and hands the rest of the stop to the queue. What it leaves
+// behind: the queue's goroutine, which runs the jobs to their end, hooks
+// included, and then the store's final flush as its last job (it follows
+// the drain, so no queued write lands behind it); a flush the timer had
+// already started; and, until that last job has run, the cache's
+// unflushed changes. A final flush the store refuses — the host closed
+// its database meanwhile — is logged and not retried. The stop completes
+// by itself when the hook returns. Stop is safe to call again: a second
+// Stop (or Close) waits within its own ctx for the queue and the final
+// flush and returns nil once the stop is complete. Erase and the
 // registry's delete stop first and do nothing after a Stop that failed.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
@@ -495,6 +509,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	if stop != nil {
 		stop()
 	}
+	// The flush timer stops before anything is waited for: no path out of
+	// Stop leaves it armed (review II, R2-P0-rv-C03).
+	n.persist.halt()
 	var err error
 	if sub != nil {
 		sub.Close()
@@ -508,8 +525,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	// none lands after a stop (or the erase that follows a delete) —
 	// ClientStructure.ts:482-486 drains its queue on every exit path.
 	// matter.js has no deadline there; this drain ends with ctx, and the
-	// flush then waits for the Stop that sees the queue empty.
+	// flush then is the queue's own last job.
 	if werr := n.jobs.waitContext(ctx); werr != nil {
+		n.queueFinalFlush()
 		n.recompute()
 		return werr
 	}
@@ -518,8 +536,25 @@ func (n *Node) Stop(ctx context.Context) error {
 	return err
 }
 
+// queueFinalFlush makes the store's final flush the last job of the
+// node's queue, once however many Stops ask while it waits there. The
+// flush writes what is dirty and arms nothing on a stopped node; on a
+// node started again meanwhile it is an early flush.
+func (n *Node) queueFinalFlush() {
+	if !n.finalFlush.CompareAndSwap(false, true) {
+		return
+	}
+	n.jobs.add(func() {
+		n.finalFlush.Store(false)
+		n.persist.flush()
+	})
+}
+
 // Close stops the node and releases it; it is idempotent. Events that
-// arrive meanwhile are dropped.
+// arrive meanwhile are dropped. A Close that returns its context's error
+// has closed the node — it starts no more, and its ICD client is released
+// — and left the stop to the node's queue as [Node.Stop] describes; a
+// second Close waits for it.
 func (n *Node) Close(ctx context.Context) error {
 	n.mu.Lock()
 	n.closing = true

@@ -42,20 +42,27 @@ func newJobQueue() *jobQueue { return &jobQueue{} }
 //
 //nolint:contextcheck // the back-pressure runs in subscription callbacks, which outlive the request context their closures were built under
 func (q *jobQueue) enqueue(job func()) {
+	if q.add(job) > maxPendingJobs {
+		q.wait()
+	}
+}
+
+// add appends job as the queue's last, starts the run when none is under
+// way and returns the number of jobs pending, the running one included.
+// It never waits: [Node.Stop] hands the queue the store's final flush
+// with it once its context has ended.
+func (q *jobQueue) add(job func()) int {
 	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.jobs = append(q.jobs, job)
 	pending := len(q.jobs)
 	if q.running {
-		pending++
-	} else {
-		q.running = true
-		q.drained = make(chan struct{})
-		go q.run()
+		return pending + 1
 	}
-	q.mu.Unlock()
-	if pending > maxPendingJobs {
-		q.wait()
-	}
+	q.running = true
+	q.drained = make(chan struct{})
+	go q.run()
+	return pending
 }
 
 // run runs the queued jobs in order until none is left.

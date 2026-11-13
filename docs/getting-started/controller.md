@@ -592,12 +592,17 @@ to its node, as matter.js gives each paired node its own events.
 The hooks of a subscription report run on the node's ordered job queue,
 after the report's StatusResponse, so a hook may block without holding the
 peer's exchange. `Node.Stop` and `Node.Close` (and with them
-`Registry.Decommission`, `Forget` and `Close`) drain that queue within
-their context, so a hook must not call them. A hook still blocked when the
-context ends makes them return the context's error: the node is offline,
-the queue runs its jobs to their end, and the store's final flush waits
-for a second `Stop` — a node whose stop failed is not erased and stays in
-the registry.
+`Registry.Stop`, `Decommission`, `Forget` and `Close`) drain that queue
+within their context, so a hook must not call them. A hook still blocked
+when the context ends makes them return the context's error: the node is
+offline and its flush timer stopped, and the queue runs its jobs to their
+end and then the store's final flush as its last job — the stop completes
+by itself when the hook returns. A second `Node.Stop`, `Node.Close`,
+`Registry.Stop` or `Registry.Close` waits for it within its own context
+and returns nil once it is complete. A database closed before the hook
+returned loses that final flush; the write is refused once and not
+retried. A node whose stop failed is not erased and stays in the
+registry.
 
 *Source: `controller/client/config.go` (`Hooks`), `controller/client/node.go` (`Node.Stop`), `controller/client/jobs.go`.*
 

@@ -518,7 +518,10 @@ func (r *Registry) Start(ctx context.Context) error {
 }
 
 // Stop takes the registry offline — Peers.#nodeOffline (Peers.ts:171-176):
-// the expiry timer is cancelled and every node stopped in turn.
+// the expiry timer is cancelled and every node stopped in turn. It returns
+// the nodes' errors joined: a node whose stop outlasted ctx is offline and
+// completes its stop by itself ([Node.Stop]); a second Stop stops every
+// node again and waits, within its own ctx, for those.
 func (r *Registry) Stop(ctx context.Context) error {
 	r.cancelExpiration()
 	nodes := r.Nodes()
@@ -533,11 +536,20 @@ func (r *Registry) Stop(ctx context.Context) error {
 // closed, the expiry timer cancelled, the running fabric operations'
 // registrations and the cull drained, every node closed. The stored nodes
 // stay. It is idempotent.
+//
+// It returns the nodes' errors joined. A node whose stop outlasted ctx is
+// closed and offline, with no flush timer armed, and completes its stop —
+// the queued report jobs, then the store's final flush — by itself
+// ([Node.Stop]); a host that closes its database right after such a Close
+// loses that flush, and nothing of the registry writes to the database
+// again once the node's queue has ended. A second Close closes the nodes
+// again and waits, within its own ctx, for the stops the first could not
+// wait for; it returns nil once every node's stop is complete.
 func (r *Registry) Close(ctx context.Context) error {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return nil
+		return r.closeNodes(ctx)
 	}
 	r.closed = true
 	r.mu.Unlock()
@@ -550,12 +562,7 @@ func (r *Registry) Close(ctx context.Context) error {
 	}()
 	r.cancel()
 	r.work.Wait()
-	nodes := r.Nodes()
-	errs := make([]error, 0, len(nodes))
-	for _, n := range nodes {
-		r.unbindPeer(n)
-		errs = append(errs, n.Close(ctx))
-	}
+	err := r.closeNodes(ctx)
 	// The fabrics' ICD state goes with the registry (Fabric.ts:308-311).
 	r.cfg.Exchanges.SetCheckInReceiver(nil)
 	r.icdMu.Lock()
@@ -563,6 +570,19 @@ func (r *Registry) Close(ctx context.Context) error {
 		t.Close()
 	}
 	r.icdMu.Unlock()
+	return err
+}
+
+// closeNodes stops following each node's peer and closes the node, in
+// turn, and joins the nodes' errors. Closing a closed node waits for what
+// is left of its stop ([Node.Close]).
+func (r *Registry) closeNodes(ctx context.Context) error {
+	nodes := r.Nodes()
+	errs := make([]error, 0, len(nodes))
+	for _, n := range nodes {
+		r.unbindPeer(n)
+		errs = append(errs, n.Close(ctx))
+	}
 	return errors.Join(errs...)
 }
 
