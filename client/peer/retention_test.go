@@ -450,6 +450,50 @@ func TestIssue507_SessionEndsAnchor(t *testing.T) {
 	}
 }
 
+// TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt: a Busy answered from
+// an address no session proved to be the node's — another SRV target's,
+// here the router's — is waited out by the attempt that received it, as
+// matter.js waits it (PeerConnection.ts:700-701 at db021da0), and holds no
+// Sigma1 to the node's proven addresses; a Busy at the proven address
+// still holds the peer (review II, R2-P1-net-05).
+func TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct{ name, host string }{{"proven host", i507Host}, {"host never learned", ""}} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				r := newRig507(t)
+				busyAt := time.Duration(-1)
+				r.respond = func(u unsecured, to string) {
+					if to == routerLL {
+						if busyAt < 0 {
+							busyAt = r.now()
+						}
+						r.status(u, to, generalStatusBusy, secureChannelStatusBusy, busyData(65535))
+					}
+				}
+				p := r.peer(c.host)
+				r.nodeOnly()
+				r.routerAlso()
+				r.connect(p)
+				if _, ok := r.advanceUntil(5*time.Minute, func() bool { return busyAt >= 0 }); !ok {
+					t.Fatalf("the router's address was never answered Busy; order: %s; %s", r.order(), r.state(p))
+				}
+				if d := p.busyRemaining(); d > 0 {
+					t.Fatalf("the router's Busy holds the peer for %v", d)
+				}
+				r.advance(i507BusyWait)
+				if d := p.busyRemaining(); d > 0 {
+					t.Fatalf("the router's repeated Busy holds the peer for %v", d)
+				}
+				if got := r.fresh(routerLL, busyAt+i507Step, busyAt+65535*time.Millisecond); len(got) > 0 {
+					t.Fatalf("fresh Sigma1 to the router at %v, inside its own Busy wait from %v; order: %s", got, busyAt, r.order())
+				}
+			})
+		})
+	}
+}
+
 // TestIssue507_BusyHoldsTheHandlersDelay: the error handler's replacement
 // of the Busy delay is the delay the peer's deadline holds.
 func TestIssue507_BusyHoldsTheHandlersDelay(t *testing.T) {
