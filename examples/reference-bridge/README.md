@@ -126,7 +126,10 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   `ErrorEvent`, `Docked`, `Reset`, `ChargerFound`, `Charging`, `Charged`,
   plus this fleet's own (`SetSensorValue`,
   `SetLocalTemperature`, `SetLockJammed`, `PumpEvent`, …). The CHIP Python
-  certification cases drive a device through exactly this pipe.
+  certification cases drive a device through exactly this pipe. The pipe
+  is owner- and group-writable only (0660); a pipe already at the path is
+  reused only when it is the daemon user's own (its mode is then set to
+  0660), and a symbolic link or another user's pipe there is refused.
 - `--enable-key <hex>` arms GeneralDiagnostics TestEventTrigger with that
   test enable key; the SmokeCoAlarm and ClosureControl triggers are CHIP's.
 - `--mdns-os-hostname` advertises the OS host name as the SRV target instead
