@@ -200,7 +200,9 @@ func TestGencomm_ArmInTheExpiryGapWaitsForTheRollback(t *testing.T) {
 // a window whose deadline has passed but whose watcher has not run yet
 // counted as fresh for ArmFailSafeFor, which dropped the pending AddNOC
 // and replaced the watcher — the window's rollback never ran. The fake's
-// wall step moves Now past the deadline without firing the timer.
+// wall step moves Now past the deadline without firing the timer. The rig
+// wires no PASE close, so the auto-arm's session survives the rollback and
+// is armed for (the session it ends: general_commissioning_due_window_test.go).
 func TestGencomm_ArmOverADueWindowRollsItBack(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
