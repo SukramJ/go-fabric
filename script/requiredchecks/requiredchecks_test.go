@@ -184,8 +184,9 @@ func readRequired(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []string
-	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
+	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
 		if line != strings.TrimSpace(line) || line == "" {
 			t.Fatalf("required.txt: %q is not a context; the file is the command's output, unedited", line)
 		}

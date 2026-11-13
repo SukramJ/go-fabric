@@ -254,15 +254,7 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 	}
 	// The parity registers: their own artefact and ratchet, outside the
 	// Go citations' counts and exit status (registers.go).
-	registerCites, err := collectRegisters(root)
-	if err != nil {
-		return 2, err
-	}
-	registerResults, err := checkAll(registerCites)
-	if err != nil {
-		return 2, err
-	}
-	if err := writeRegisters(outDir, registerEntries(registerResults)); err != nil {
+	if err := writeRegisters(root, outDir, checkAll); err != nil {
 		return 2, err
 	}
 	if fixFile != "" {

@@ -4,6 +4,7 @@
 package requiredchecks
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,10 +42,10 @@ func (j job) key() string {
 
 var (
 	topKey   = regexp.MustCompile(`^("?)([A-Za-z_][\w-]*)("?):(.*)$`)
-	jobKey   = regexp.MustCompile(`^  ([A-Za-z_][\w-]*):\s*(?:#.*)?$`)
-	eventKey = regexp.MustCompile(`^  ([a-z_]+):`)
-	eventSeq = regexp.MustCompile(`^  - ([a-z_]+)\s*(?:#.*)?$`)
-	jobField = regexp.MustCompile(`^    ([A-Za-z_][\w-]*):(.*)$`)
+	jobKey   = regexp.MustCompile(`^ {2}([A-Za-z_][\w-]*):\s*(?:#.*)?$`)
+	eventKey = regexp.MustCompile(`^ {2}([a-z_]+):`)
+	eventSeq = regexp.MustCompile(`^ {2}- ([a-z_]+)\s*(?:#.*)?$`)
+	jobField = regexp.MustCompile(`^ {4}([A-Za-z_][\w-]*):(.*)$`)
 )
 
 // parseWorkflow reads the three things the guard needs and nothing else.
@@ -71,7 +72,7 @@ func parseWorkflow(file, src string) (workflow, error) {
 		}
 		if indent == 0 {
 			m := topKey.FindStringSubmatch(line)
-			if m == nil || m[1] != m[3] {
+			if len(m) != 5 || m[1] != m[3] {
 				return wf, fmt.Errorf("%s:%d: not a top-level key: %q", file, n+1, line)
 			}
 			section = m[2]
@@ -104,16 +105,16 @@ func parseWorkflow(file, src string) (workflow, error) {
 				return wf, fmt.Errorf("%s:%d: not an event under on: %q", file, n+1, line)
 			}
 		case "jobs":
-			switch {
-			case indent == 2:
+			switch indent {
+			case 2:
 				m := jobKey.FindStringSubmatch(line)
 				if m == nil {
 					return wf, fmt.Errorf("%s:%d: not a job key: %q", file, n+1, line)
 				}
 				wf.jobs = append(wf.jobs, job{id: m[1], line: n + 1})
-			case indent == 1 || indent == 3:
+			case 1, 3:
 				return wf, fmt.Errorf("%s:%d: indentation %d under jobs", file, n+1, indent)
-			case indent == 4:
+			case 4:
 				if len(wf.jobs) == 0 {
 					return wf, fmt.Errorf("%s:%d: a job field before a job", file, n+1)
 				}
@@ -142,7 +143,7 @@ func parseWorkflow(file, src string) (workflow, error) {
 		return wf, fmt.Errorf("%s: no on: key", file)
 	}
 	if !sawJobs || len(wf.jobs) == 0 {
-		return wf, fmt.Errorf("%s: no job under jobs:", file)
+		return wf, fmt.Errorf("%s: jobs: holds no job", file)
 	}
 	if len(wf.events) == 0 {
 		return wf, fmt.Errorf("%s: on: names no event", file)
@@ -184,9 +185,9 @@ func scalar(rest string) (string, error) {
 	rest = strings.TrimSpace(rest)
 	switch {
 	case rest == "":
-		return "", fmt.Errorf("an empty name")
+		return "", errors.New("an empty name")
 	case rest[0] == '|' || rest[0] == '>':
-		return "", fmt.Errorf("a block scalar as name")
+		return "", errors.New("a block scalar as name")
 	case rest[0] == '"':
 		end := strings.Index(rest[1:], `"`)
 		if end < 0 || strings.Contains(rest[1:1+end], `\`) || stripComment(rest[end+2:]) != "" {
@@ -278,7 +279,7 @@ jobs:
 	if got := strings.Join(wf.events, ","); got != "pull_request,schedule" {
 		t.Errorf("events = %s", got)
 	}
-	var keys []string
+	keys := make([]string, 0, len(wf.jobs))
 	for _, j := range wf.jobs {
 		keys = append(keys, j.key())
 	}

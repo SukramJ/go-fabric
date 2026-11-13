@@ -135,7 +135,8 @@ func collectRegisters(root string) ([]citation, error) {
 // sorted by file, line and citation.
 func registerEntries(results []result) []registerEntry {
 	out := []registerEntry{}
-	for _, r := range results {
+	for i := range results {
+		r := &results[i]
 		if r.hard == "" {
 			continue
 		}
@@ -158,9 +159,18 @@ func registerEntries(results []result) []registerEntry {
 	return out
 }
 
-// writeRegisters writes registers.json.
-func writeRegisters(dir string, entries []registerEntry) error {
-	data, err := json.MarshalIndent(entries, "", "  ")
+// writeRegisters collects the registers' citations under root, checks
+// them with checkAll and writes registers.json to dir.
+func writeRegisters(root, dir string, checkAll func([]citation) ([]result, error)) error {
+	cites, err := collectRegisters(root)
+	if err != nil {
+		return err
+	}
+	results, err := checkAll(cites)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(registerEntries(results), "", "  ")
 	if err != nil {
 		return err
 	}
