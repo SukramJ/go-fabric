@@ -3,7 +3,7 @@
 The commit ids below are those of the phase 0 pull request's branch
 (`review2/p0`): the pull request is merged as one squashed commit, and its
 single commits stay retrievable through the pull request's reference
-(`refs/pull/<number>/head`). Reports named here that are not in this
+(`refs/pull/524/head`). Reports named here that are not in this
 directory are held back with the open security items they mention
 (owner decision 25) and follow with the pull requests that fix those.
 
