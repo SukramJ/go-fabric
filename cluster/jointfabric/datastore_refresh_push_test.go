@@ -118,3 +118,50 @@ func TestRefreshAndBindingPushDoNotLoseAWrite(t *testing.T) {
 		}
 	})
 }
+
+// TestBindingPushAfterARefreshThatDeliveredIt (review II, R2-P1-dr-rest-04):
+// a binding push that waited on the node's binding lock behind a refresh
+// finds the refresh already wrote its Pending entry with the node's whole
+// list. The push does not write the entry a second time. The interleaving
+// is laid out in sequence: the add's first push fails (the entry stays
+// Pending), the refresh delivers it, and then the push runs.
+func TestBindingPushAfterARefreshThatDeliveredIt(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	s := &nodeBindingSync{trackingSync: *newTrackingSync(), device: map[uint16][]EndpointBindingEntry{}}
+	s.endpointsToFetch = []EndpointEntry{{EndpointId: 1}}
+	d := newStore(t, s)
+	mustOK(t, d.AddPendingNode(ctx, 123, "controller-a"))
+	d.addEndpointEntry(ctx, 1, 123, "endpoint-a")
+	x := BindingTarget{Group: ptr[uint16](10)}
+	s.mu2.Lock()
+	s.writeErr = errors.New("node unreachable")
+	s.mu2.Unlock()
+	if err := d.AddBindingToEndpointForNode(ctx, 123, 1, x); err == nil {
+		t.Fatal("the add's push succeeded against an unreachable node")
+	}
+	s.mu2.Lock()
+	s.writeErr = nil
+	s.mu2.Unlock()
+	var entry EndpointBindingEntry
+	for _, e := range d.EndpointBindingList() {
+		if bindingMatches(e.Binding, x) {
+			entry = e
+		}
+	}
+	mustOK(t, d.RefreshNode(ctx, 123))
+	mustOK(t, d.pushBinding(ctx, 123, entry))
+
+	s.mu2.Lock()
+	onNode := slices.Clone(s.device[1])
+	s.mu2.Unlock()
+	n := 0
+	for _, e := range onNode {
+		if bindingMatches(e.Binding, x) {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("the node's list %+v holds the binding %d times, want once", onNode, n)
+	}
+}

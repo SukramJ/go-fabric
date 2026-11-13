@@ -765,7 +765,8 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 // 6170af84): the endpoint's current bindings are fetched (:1717-1719), a
 // DeletePending entry removes the entries whose target matches
 // (:1731-1741, the fields BindingMatches compares), any other entry is
-// appended (:1744), and the list is written (:1747). A fetch that fails is
+// appended (:1744) unless the list holds a matching one already, and the
+// list is written (:1747). A fetch that fails is
 // the push's error, so the entry stays Pending or DeletePending for the
 // next RefreshNode — jf-admin-app writes the one entry over an empty list
 // instead (:1726-1730 at 6170af84), which would drop the node's other
@@ -799,6 +800,13 @@ func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBi
 			}
 		}
 	} else {
+		// A refresh the push waited behind on the lock may have written
+		// the entry with the node's whole list already: the push is then
+		// done, and appending would hold it twice (review II,
+		// R2-P1-dr-rest-04).
+		if slices.ContainsFunc(current, func(c EndpointBindingEntry) bool { return bindingMatches(c.Binding, e.Binding) }) {
+			return nil
+		}
 		merged = append(append(merged, current...), e)
 	}
 	if err := d.sync.SyncEndpointBindings(ctx, nodeID, e.EndpointId, merged); err != nil {
