@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -16,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // display is a MessagePresenter that records what it was asked to show.
@@ -261,5 +263,78 @@ func wantCoreStatus(t *testing.T, err error, code im.StatusCode) {
 	var sce im.StatusCodeError
 	if !errors.As(err, &sce) || sce.MatterStatusCode() != code {
 		t.Fatalf("error %v, want %s", err, code)
+	}
+}
+
+// presentWithBareOption encodes a PresentMessagesRequest whose one
+// response option carries a MessageResponseId and no Label.
+type presentWithBareOption struct {
+	messagesdef.PresentMessagesRequestRequest
+}
+
+func (p presentWithBareOption) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	enc.StartStruct(tag)
+	spec.PutBytes(enc, tlv.ContextTag(0), p.MessageId)
+	spec.PutUint[messagesdef.MessagePriorityEnum](enc, tlv.ContextTag(1), p.Priority)
+	spec.PutUint[messagesdef.MessageControlBitmap](enc, tlv.ContextTag(2), p.MessageControl)
+	spec.PutNullable(spec.PutUint[uint32])(enc, tlv.ContextTag(3), p.StartTime)
+	spec.PutNullable(spec.PutUint[uint64])(enc, tlv.ContextTag(4), p.Duration)
+	spec.PutString(enc, tlv.ContextTag(5), p.MessageText)
+	enc.StartArray(tlv.ContextTag(6))
+	enc.StartStruct(tlv.AnonymousTag())
+	spec.PutUint[uint32](enc, tlv.ContextTag(0), 1)
+	_ = enc.EndContainer()
+	_ = enc.EndContainer()
+	_ = enc.EndContainer()
+}
+
+// TestMessagesResponseOptionRules pins where connectedhomeip's rules for
+// the response options of PresentMessagesRequest are held: in the generated
+// decoder, before the server sees the request (review II, W3-clucore-09).
+// chip src/app/clusters/messages-server/messages-server.cpp at 6170af84:
+// more than four options CONSTRAINT_ERROR (:365-367), an option without id
+// or label INVALID_COMMAND (:375-377), a MessageResponseID below 1
+// CONSTRAINT_ERROR (:379-381), a label above 32 CONSTRAINT_ERROR
+// (:383-385). None of them reaches the presenter.
+func TestMessagesResponseOptionRules(t *testing.T) {
+	t.Parallel()
+	m, d, _ := newMessages(t, messagesdef.FeatureReceivedConfirmation|messagesdef.FeatureConfirmationResponse)
+	ctx := msgCtx(1, true)
+	with := func(options ...messagesdef.MessageResponseOptionStruct) messagesdef.PresentMessagesRequestRequest {
+		req := presentRequest(messageID(1), "x")
+		req.Responses = &options
+		return req
+	}
+	if err := decodeAndInvoke(t, m, ctx, messagesdef.CmdPresentMessagesRequest,
+		with(messagesdef.MessageResponseOptionStruct{MessageResponseId: 1, Label: strings.Repeat("l", 32)})); err != nil {
+		t.Fatalf("an option with id 1 and a 32-byte label: %v", err)
+	}
+	if len(d.shown) != 1 {
+		t.Fatalf("presented %d messages, want 1", len(d.shown))
+	}
+
+	five := make([]messagesdef.MessageResponseOptionStruct, 5)
+	for i := range five {
+		five[i] = messagesdef.MessageResponseOptionStruct{MessageResponseId: uint32(i + 1), Label: "OK"} //nolint:gosec // 1..5
+	}
+	for _, tc := range []struct {
+		name string
+		req  spec.Encodable
+		want im.StatusCode
+	}{
+		{"MessageResponseID 0", with(messagesdef.MessageResponseOptionStruct{MessageResponseId: 0, Label: "OK"}), im.StatusConstraintError},
+		{"a 33-byte label", with(messagesdef.MessageResponseOptionStruct{MessageResponseId: 1, Label: strings.Repeat("l", 33)}), im.StatusConstraintError},
+		{"five options", with(five...), im.StatusConstraintError},
+		{"an option without a label", presentWithBareOption{presentRequest(messageID(2), "x")}, im.StatusInvalidCommand},
+	} {
+		_, err := messagesdef.Definition.Command(messagesdef.CmdPresentMessagesRequest, spec.Request).
+			Decode(spectest.Decode(t, spectest.Encode(t, tc.req)))
+		var sce im.StatusCodeError
+		if !errors.As(err, &sce) || sce.MatterStatusCode() != tc.want {
+			t.Errorf("%s: the decoder answers %v, want %s", tc.name, err, tc.want)
+		}
+	}
+	if len(d.shown) != 1 {
+		t.Errorf("presented %d messages, want the first only", len(d.shown))
 	}
 }
