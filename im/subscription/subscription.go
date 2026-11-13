@@ -357,7 +357,8 @@ func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
 
 // drainEvents mirrors drainDirty for events: when the
 // owed events are due it takes the watermark and reads the subscription's
-// events from src. Critical-priority events bypass the MinIntervalFloor
+// events from src, and counts as the subscription's last report when it
+// returns any. Critical-priority events bypass the MinIntervalFloor
 // gate per Matter §10.6.6 — controllers expect immediate delivery.
 // Number order and timestamps are the log's, the same as a Read answers
 // (matter.js ServerSubscription.ts:537-555 reads the occurrences for
@@ -378,7 +379,6 @@ func (s *Subscription) drainEvents(now time.Time, src EventSource, force bool) [
 	minNumber := s.eventsMin
 	s.eventsPending = false
 	s.eventsUrgent = false
-	s.lastReport = now
 	if src == nil {
 		return nil
 	}
@@ -404,6 +404,14 @@ func (s *Subscription) drainEvents(now time.Time, src EventSource, force bool) [
 			Timestamp: rec.EpochMS,
 			Data:      im.AttributeValue{Value: rec.Payload},
 		})
+	}
+	// Only a drain that hands out an event is a report. One that yields
+	// none — no source, the event gone from the log, none of the
+	// subscription's paths — leaves the time of the last report alone, so
+	// a dirty attribute past its floor and the keep-alive are not held
+	// back by a report that was never sent.
+	if len(out) > 0 {
+		s.lastReport = now
 	}
 	return out
 }

@@ -114,7 +114,7 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 	// behind a value sweep.
 	//
 	// After an event drain the same-tick dirty drain is explicitly
-	// skipped. drainEvents stamps lastReport=now,
+	// skipped. A drainEvents that returns events stamps lastReport=now,
 	// which makes drainDirty return nil (0 < MinIntervalFloor)
 	// for floor>0, but the skip-flag makes the intent unambiguous and
 	// prevents a double-report when floor=0 (degenerate subscription
