@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 7948,
+  "entry_points": 7956,
   "entry_packages": [
     ".",
     "bdx",
@@ -283,9 +283,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 17947,
-    "reachable": 12417,
-    "whitelisted": 5530,
+    "total_exported": 17963,
+    "reachable": 12427,
+    "whitelisted": 5536,
     "unreachable": 0
   },
   "by_package": [],
@@ -23039,14 +23039,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 752
+      "line": 765
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 748
+      "line": 761
     },
     {
       "package": "controller",
@@ -25042,6 +25042,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
       "line": 241
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeAttach",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 69
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeChecksOnlyWhatIsKnown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 188
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeErasedWithTheNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 116
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeKeptAtPairing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 215
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 144
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestOnboardingCodeUnreadableInTheStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 238
     },
     {
       "package": "controller/client",

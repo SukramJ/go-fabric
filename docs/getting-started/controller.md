@@ -647,6 +647,47 @@ code with matter.js's validation: `Manual`, `Version`, `VendorID`,
 the discovery selector. A code it refuses is `controller.ErrPairingCode`,
 and `Pair` returns the same error for the same code.
 
+### The onboarding code inventory
+
+A device's QR code or manual pairing code is needed again after a factory
+reset, and it cannot be read from a commissioned device: the device holds a
+verifier, not the passcode. The controller can keep the code instead.
+
+- `Config.KeepOnboardingCodes` keeps the code every `Pair` succeeds with
+  (`client.OnboardingPaired`). It is off by default. A code is not kept when
+  the device advertised an Enhanced Commissioning Window (CM=2): that code
+  was minted by the administrator that opened the window and ends with it.
+- `Node.SetOnboardingCode(code)` attaches the code printed on a device that
+  is already commissioned — typed, scanned or decoded from a photograph by
+  the host; the module takes the text. The code is validated like a pairing
+  code (`client.ErrOnboardingCode`) and compared with the node: vendor and
+  product id with its Basic Information (or what it advertised), the
+  discriminator with the one it advertised while commissionable (a manual
+  code's four bits with the upper four; skipped after an Enhanced
+  Commissioning Window). A difference is `client.ErrOnboardingMismatch` and
+  nothing is stored; a side the node does not know is skipped, and
+  `OnboardingCode.Checks` names the checks that ran. No check proves the
+  passcode — a commissioned device offers no way to test one — so an
+  attached code stays `client.OnboardingAttached`.
+- `Node.OnboardingCode()` reads it, `Node.ClearOnboardingCode()` removes it;
+  it is deleted with the node (`Forget`, `Decommission`, `Erase`).
+- `Controller.Inventory()` lists every commissioned node with its node id,
+  NodeLabel, vendor and product name, serial number and the two forms to
+  show or print: `QRCode` (`MT:…`) and `ManualCode`. A stored QR code yields
+  both; a stored manual code yields itself and no QR code, because it
+  carries four of the discriminator's twelve bits and no commissioning
+  flow. Drawing the QR image is the host's.
+
+The code is a secret: with it and physical access to the device (a factory
+reset) anyone can commission it. It is stored in the controller database
+beside the fabric's keys, is never logged (`OnboardingCode` formats and logs
+as redacted), and an export of the inventory needs the protection the
+database has.
+
+*Source: `controller/client/onboarding.go`, `controller/inventory.go`,
+`controller/controller.go` (`Config.KeepOnboardingCodes`),
+`controller/client/fabricops.go` (`CommissionOptions.OnboardingCode`).*
+
 ### The commissioning window
 
 `Node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions{})` opens

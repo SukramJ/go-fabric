@@ -130,6 +130,13 @@ type CommissionOptions struct {
 	// NoInitialRead skips the initial read of the newly commissioned node
 	// (autoStateInitialize false, :312).
 	NoInitialRead bool
+	// OnboardingCode, when set, is the QR or manual pairing code the
+	// passcode came from; it is kept with the node when the commissioning
+	// succeeds ([Node.OnboardingCode], source [OnboardingPaired]) — unless
+	// the device advertised an Enhanced Commissioning Window, whose code
+	// ends with the window. This module's; matter.js keeps no pairing
+	// code.
+	OnboardingCode string
 }
 
 // defaultCASEConnectionTiming is the timing of the operational CASE
@@ -223,6 +230,9 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	n.newlyCommissioned = true
 	n.saveSettingsLocked()
 	n.mu.Unlock()
+	if o.OnboardingCode != "" {
+		n.keepPairedCode(o.OnboardingCode, rec.CommissioningMode)
+	}
 	r.log.Info("matter.controller.client.registry.commissioned", slog.String("node", n.ID()), slog.String("peer", peerAddressString(res.Address)))
 	if h := n.cfg.Hooks.Commissioned; h != nil {
 		h()
