@@ -85,8 +85,16 @@ func (c *Controller) Groups() *groups.Manager { return c.groups }
 // SetGroupKey keeps a key set in the controller's own tables and maps
 // groupID to it — what KeySetWrite and a GroupKeyMap write do on a
 // member node — so that [Groups] can send to the group. The caller writes
-// the same key set to the members.
+// the same key set to the members. On a closed controller it writes
+// nothing and returns [ErrConfiguration].
 func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, groupID uint16) error {
+	// Close takes closeMu before it lets the group manager go, so the
+	// manager stays for the whole call (review II, R2-P1-ctl-06).
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed || c.groups == nil {
+		return fmt.Errorf("%w: the controller is closed", ErrConfiguration)
+	}
 	st := store.New(c.db)
 	keySet.FabricIndex = c.fabricIndex()
 	if err := st.UpsertGroupKeySet(ctx, keySet); err != nil {

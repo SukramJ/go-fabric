@@ -312,8 +312,8 @@ type Controller struct {
 	diagRing *diagevent.Ring
 	metrics  contract.Metrics
 	peerSet  atomic.Pointer[peer.Set]
-	// closeMu orders DiagnoseMDNS against Close, which clears adv and
-	// names: Close sets closed under it first.
+	// closeMu orders DiagnoseMDNS and SetGroupKey against Close, which
+	// clears adv, names and groups: Close sets closed under it first.
 	closeMu      sync.RWMutex
 	closed       bool
 	icdMu        sync.Mutex
