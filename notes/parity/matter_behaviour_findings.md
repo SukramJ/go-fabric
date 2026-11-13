@@ -115,7 +115,16 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
   `SuppressResponse = false`, wait for the status, end the subscription on
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
-  reports. (Triage 2026-10-29: wave H1, the device IM and write path.)
+  reports. Re-read at `db021da0` (review II, phase 0): the keep-alive is the
+  branch at `packages/node/src/node/server/ServerSubscription.ts:909-920`,
+  `suppressResponse: false` at `:914` under the comment "Requested so the
+  peer's INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
+  transport". The comment over the Go code (`bridge/subscribe.go:543-548`)
+  still says matter.js ships empty DataReports with SuppressResponse=true
+  and cites `ServerSubscription.ts:782`; at the pin that line is
+  `await this.#cancel(flushViaSession, currentExchange);`. The citation is
+  stale and goes with the fix. (Triage 2026-10-29: wave H1, the device IM
+  and write path.)
 - **A "startup" advertisement is not turned into "retransmit" when the
   fabric holds a subscription.** matter.js's `#advertiseFabric` converts a
   "startup" event into "retransmit" — one broadcast instead of the full
@@ -542,6 +551,83 @@ with a port of the named case.
   servers' `MatterWrite` would have to return that verdict, or the
   dispatcher compares the encoded value before and after the write). Found in the review
   of #454 (issue 414); a bridge-wide change, left out of that PR.
+- **F-db021da0-3: a failed subscription report is retried one MinIntervalFloor later.**
+  matter.js, after a report that could not be sent, owes the data again and
+  schedules nothing: the attribute filter goes back through
+  `#addOutstandingAttributes`, which only fills the set
+  (`packages/node/src/node/server/ServerSubscription.ts:346-357` at
+  `db021da0`), the event number is set back (`:582-584`), and neither calls
+  `#prepareDataUpdate` as the change handler does (`:380-382`); the send loop
+  ends unless another update was queued behind the failed one (`:610-612`).
+  The retry leaves with whatever starts the next report — a change, an urgent
+  event, the send interval — and after three failed updates a subscription
+  whose error is a communication error is given up (`:569`, `:585-603`).
+  This module asks for a report again:
+  `Subscription.RequeueAttributes` marks the paths dirty and
+  `Subscription.RequeueEvents` marks the owed events urgent
+  (`im/subscription/subscription.go`), so the retry goes out once
+  MinIntervalFloor has elapsed since the failed report. Not deliberate: it
+  is what the attribute path did before events shared its report, and the
+  event half was kept the same so that one report has one rule (review II,
+  W2-conc-05). Pinned as it is by the subtest "events owed again after a
+  failed report are retried when the floor ends" of
+  `im/subscription:TestEventReportParityMatterJS`. What this module does
+  after several failed reports in a row was not read for this entry
+  (unverified). Fix: requeue without asking for a report — the paths and the
+  event number are owed and leave with the next pass something else starts —
+  and move the subtest onto matter.js's rule. Found in review II, phase 0.
+- **F-db021da0-4: what is outstanding when a subscription is activated waits for MinIntervalFloor.**
+  matter.js sends what is outstanding at activation at once: `activate`
+  calls `#triggerSendUpdate()` when an attribute update or an event number
+  is outstanding
+  (`packages/node/src/node/server/ServerSubscription.ts:443-445` at
+  `db021da0`), and `#triggerSendUpdate` starts `#sendUpdate` directly —
+  no floor, no send delay (`:520-529`); an event the initial report already
+  carried is not owed again (`:431-437`). `Subscription.EndPriming`
+  (`im/subscription/subscription.go`) stamps `lastReport` with the end of
+  the priming report and marks the events fired meanwhile urgent, so the
+  changes and events of the priming window go out once MinIntervalFloor has
+  elapsed since the priming report. Not deliberate: no entry of
+  `by_design.md` gives a reason, and the function's comment states the
+  difference without one. Pinned as it is by the subtest "an event fired
+  while the subscription was priming is reported after the floor" of
+  `im/subscription:TestEventReportParityMatterJS`. Fix: when priming ends
+  with a dirty path or an owed event, the first report is due at once, and
+  the floor counts from that report; move the subtest. Found in review II,
+  phase 0 (W2-conc-05).
+- **F-db021da0-5: the Sigma3 success StatusReport is abandoned right after it is queued.**
+  Read, not exercised — no test shows it. The bridge's Sigma3 case runs
+  `handleCase(…, "sigma3", …)`, which sends the responder's reply through
+  `sendHandshakeReplyReliable`, and then drops every unsecured-session entry
+  of the exchange with `AbandonUnsecuredExchange`
+  (`bridge/securechannel.go:385-425`, `:931-934`) — the reply it has just
+  tracked included, if `ProcessSigma3` hands the success StatusReport back
+  as that reply (inferred from the two call sites). The comment there
+  speaks of "still-pending Sigma2 retransmits". If the report is lost the
+  initiator waits out its timeout, and no retransmission follows. matter.js
+  sends the success report through the exchange without `suppressAck`
+  (`packages/protocol/src/session/case/CaseServer.ts:332`,
+  `packages/protocol/src/securechannel/SecureChannelMessenger.ts:174-176`,
+  `:209-232` at `db021da0`); that the exchange retransmits it until it is
+  acknowledged was not traced (unverified). Fix: abandon before the handler
+  runs, as the Pake3 case does (`bridge/securechannel.go:493-500`), so the
+  reply to Sigma3 stays tracked; it changes what a successful CASE sends
+  and wants a test with a lost StatusReport. Found in review II, phase 0
+  (R2-P0-bound-A06).
+- **F-db021da0-6: the subscribe path's ACL filter tests fabric index 0 only.**
+  `Bridge.readAuthorizedResults` returns nothing for `fabricIndex == 0`
+  (`bridge/subscribe.go:498-504`) and hands every other index to the ACL
+  checker. Since `6301a66b` every gate of `im` reads an index it cannot
+  resolve (255, `endpoint.FabricIndexUnresolvable`) as no accessing fabric
+  before the access-control source is asked (`im/fabric_context.go`,
+  `hasAccessingFabric`); this filter does not. What it lets through is not
+  established: the module's own checker refuses 255 itself
+  (`endpoint/dispatcher.go:1121`, read), another `im.ACLChecker` may not —
+  not exercised (unverified). No reference models an unresolvable index;
+  the rule is this module's fail-closed reading, and the gap is that one
+  site does not apply it. Fix: the same test as the other gates, with a
+  subscription case beside the write, invoke and group cases of `6301a66b`.
+  Found in review II, phase 0.
 
 ## Tier 3 — LOW
 
