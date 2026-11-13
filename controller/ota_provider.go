@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -265,8 +264,11 @@ func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *sl
 	if rec.NodeID != 0 {
 		addr := c.fabric.AddressOf(rec.NodeID)
 		if n := c.reg.GetByAddress(addr); n != nil {
-			if err := c.reg.Forget(ctx, n); err != nil && !errors.Is(err, context.Canceled) {
+			if err := c.reg.Forget(ctx, n); err != nil {
+				// The record stays, so the next start retires the node
+				// again; the start goes on unless ctx ended (review II).
 				log.Warn("controller.ota.own_node.forget", slog.Any("err", err))
+				return ctx.Err()
 			}
 		}
 	}

@@ -463,7 +463,8 @@ func (r *Registry) remove(n *Node) {
 // its subscriptions close, its rows and its peer go. For a node that no
 // longer exists — the controller's former own node (phase 37) — not for a
 // node still on the fabric, which [Node.Decommission] removes from both
-// sides.
+// sides. A store that fails to erase the rows is returned and the node,
+// closed, stays in the registry, so a Forget again retries the erase.
 func (r *Registry) Forget(ctx context.Context, n *Node) error { return r.deleteNode(ctx, n, nil) }
 
 // deleteNode deletes a node — ClientNode.delete (node/ClientNode.ts:213-225):
