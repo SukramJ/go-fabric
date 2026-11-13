@@ -352,6 +352,8 @@ func subscribeRejectStatus(err error) im.StatusCode {
 // inbound ReportData and stays in the per-chunk read state until
 // that response is on the wire.
 func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack synchronisation loop mirrors matter.js sendDataReportMessage; splitting would obscure the atomic arm→send→wait sequence
+	ctx context.Context,
+	abort <-chan struct{},
 	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
@@ -439,7 +441,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// peer is not consuming the priming report, and matter.js's
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
 		// MessageExchange.ts:855-863).
-		if err := b.awaitChunkStatusResponse(waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+		if err := b.awaitChunkStatusResponse(ctx, abort, waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
 			return err
 		}
 

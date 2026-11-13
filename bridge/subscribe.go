@@ -142,6 +142,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 // observer, so it must not take b.mu (the manager can close a
 // subscription from within a bridge call).
 func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
+	b.closePrimingAbort(subID)
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
 	b.forgetReportExchange(subID)
@@ -1032,7 +1033,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+			if err := b.awaitChunkStatusResponseWithin(timeout, nil, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
 				return counters, nil, err
 			}
 		}
@@ -1373,6 +1374,16 @@ func (b *Bridge) handleSubscribeRequest(
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
 
+	// The priming report waits for the peer's answer to each chunk; a
+	// session already holding [maxChunkWaitsPerSession] such waits is
+	// answered Busy before anything is registered or torn down (review
+	// II, R2-P1-req2-01).
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	if !claimed {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
+	}
+	defer release()
+
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.
 	// Mirrors matter.js InteractionServer.handleSubscribeRequest emitting
@@ -1419,9 +1430,13 @@ func (b *Bridge) handleSubscribeRequest(
 	}
 	initialReport.HasSubscription, initialReport.SubscriptionID = stamp.HasSubscription, stamp.SubscriptionID
 	// The priming report waits for the peer's StatusResponse per chunk,
-	// which arrives on this session: hand its turn on.
+	// which arrives on this session: hand its turn on. The wait ends with
+	// the subscription too — a KeepSubscriptions=false request that
+	// replaces it, its session's close.
+	abort := b.primingAbort(subID)
+	defer b.forgetPrimingAbort(subID)
 	leaveSessionOrder(ctx)
-	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
+	if err := b.streamInitialReportChunks(ctx, abort, src, requestHdr, proto, subID, initialReport); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}

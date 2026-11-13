@@ -324,9 +324,13 @@ func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error
 		timeout := b.chunkStatusResponseTimeout(target.sessionID)
 		timer := b.clk().NewTimer(timeout)
 		select {
-		case status := <-waitCh:
+		case status, ok := <-waitCh:
 			timer.Stop()
 			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
+			if !ok {
+				// Disarmed without an answer: the session closed.
+				return fmt.Errorf("%w: chunk %d: session closed", errPeerGone, i)
+			}
 			if !status.IsSuccess() {
 				return &chunkStatusError{status: status}
 			}
