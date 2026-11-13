@@ -109,6 +109,12 @@ const (
 	// EndReleased: this controller ended it for a released owner or at
 	// Close.
 	EndReleased EndCause = EndCause(endReleased)
+	// EndSignalOverflow: this controller ended it because the host did not
+	// read the session's Signals while the camera kept signalling, past
+	// the bounds [Session.Signals] states; the signals not yet read were
+	// dropped. The module's own cause, which matterjs-server does not
+	// spell.
+	EndSignalOverflow EndCause = EndCause(endSignalOverflow)
 )
 
 // SessionEnd is the end of a session. Owner and Key are the session's
@@ -158,6 +164,9 @@ type Service struct {
 	closed   bool
 	sessions map[sessionKey]*Session
 	lastSeen map[watchKey][]sessionPeer
+	// ending counts the ends of overflowed sessions in flight; Close waits
+	// for them. Added to under mu while not closed only.
+	ending sync.WaitGroup
 }
 
 // New starts a service over ctrl, attaching to its requestor
@@ -226,6 +235,7 @@ func (s *Service) Close(ctx context.Context) error {
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
 	s.m.shutdown(ctx)
+	s.ending.Wait()
 	if s.unsub != nil {
 		s.unsub()
 	}
@@ -384,7 +394,9 @@ func (s *Service) onSignal(sig Signal) {
 	s.mu.Unlock()
 	switch _, owned := s.m.sessions.signallingOwner(t.nodeID, t.endpointID, sig.Session.Id); {
 	case sess != nil:
-		sess.box.put(sig)
+		if sess.box.put(sig) {
+			s.signalsOverflowed(sess, t, sig.Session.Id)
+		}
 	case owned:
 		// A start the host never learned the id of: its signals go with it.
 	case s.cfg.Observer.Signal != nil:
@@ -394,6 +406,40 @@ func (s *Service) onSignal(sig Signal) {
 		s.ps.sessionEnded(s.ps.key(t, sig.Session.Id))
 		s.m.sessions.peerEnded(t.nodeID, t.endpointID, sig.Session.Id, sig.Reason, true)
 	}
+}
+
+// signalsOverflowed ends a session whose host let its Signals fill past the
+// mailbox's bounds: an EndSession to the camera, as any stop of this
+// controller sends it, announced as EndSignalOverflow. An EndSession that
+// fails ends the session here all the same and hands it to the leftover
+// sweep, as a start that gives a session up does: a session whose signals
+// were dropped is never left open (review II, R2-P1-cam-b-06). After Close
+// it does nothing: Close's own stop ends the session.
+func (s *Service) signalsOverflowed(sess *Session, t target, id uint16) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return
+	}
+	life := sess.life
+	s.ending.Add(1)
+	s.mu.Unlock()
+	s.log.Warn("camera.session.signals_overflow", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(id)), slog.Int("max", signalMailboxLimit), slog.Int("max_bytes", signalMailboxBytes))
+	go func() {
+		defer s.ending.Done()
+		end := sessionEnd{cause: endSignalOverflow}
+		ctx, cancel := s.m.cleanupContext(s.life)
+		defer cancel()
+		if _, err := s.m.sessions.stop(ctx, t.nodeID, t.endpointID, id, end, s.m.sendEndSession(t, id)); err != nil {
+			s.log.Warn("camera.session.overflow_end_failed", slog.Uint64("node_id", t.nodeID), slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
+			if life != nil {
+				s.m.sessions.abandon(life, end)
+			}
+			if aerr := s.m.io.abandonSession(ctx, t, id); aerr != nil {
+				s.log.Warn("camera.session.abandon_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", aerr))
+			}
+		}
+	}()
 }
 
 // nodeRemoved forgets a node that left the fabric.

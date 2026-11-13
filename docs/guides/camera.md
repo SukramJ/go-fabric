@@ -463,7 +463,10 @@ the controller's requestor, and `Controller.OnCameraSignal` hands each to
 its listeners as a `CameraSignal`: Offer, Answer, ICECandidates and End
 with the session they name, which `camera.Service` routes to the
 session's `Signals` (or to `Observer.Signal` for a session no `Session`
-holds). The requestor answers `NOT_FOUND` to a command for a session it
+holds). A `Session` holds what its host has not read yet up to 1024
+signals and 1 MiB; a camera that signals past that while the host does
+not read ends the session (`camera.EndSignalOverflow`, the
+[limits page](limits.md) has the row). The requestor answers `NOT_FOUND` to a command for a session it
 does not hold — chip's camera app only logs a refused Answer and sends
 nothing else — so the refusal is logged (`camera.requestor.refused`, with
 the command, the session id and the node) and surfaces as

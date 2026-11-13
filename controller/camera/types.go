@@ -211,7 +211,8 @@ type managedSession struct {
 // matterjs-server at 0bd06f2.
 type sessionEndCause string
 
-// The causes: the five a client hears, and released, which it never does.
+// The causes: the five a client hears, released, which it never does, and
+// signalOverflow, the module's own.
 const (
 	// endPeer: the camera sent End.
 	endPeer sessionEndCause = "peer"
@@ -228,6 +229,10 @@ const (
 	// endReleased: this controller ended it for its closing owner or at
 	// shutdown.
 	endReleased sessionEndCause = "released"
+	// endSignalOverflow: this controller ended it because its host let the
+	// session's signals pile up past the mailbox's bounds (review II,
+	// R2-P1-cam-b-06); the module's own, matterjs-server has no such end.
+	endSignalOverflow sessionEndCause = "signal_overflow"
 )
 
 // sessionEnd is how a tracked session ended. Mirrors matterjs-server

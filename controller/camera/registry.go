@@ -793,6 +793,20 @@ func (r *sessionRegistry) forgetNode(nodeID uint64) {
 	}
 }
 
+// abandon ends a session here whose EndSession failed: a tracked one is
+// closed and announced with end, one still being established is marked
+// ended, so its start gives it up. A session that already ended stays as
+// it is (review II, R2-P1-cam-b-06).
+func (r *sessionRegistry) abandon(life *lifecycle, end sessionEnd) {
+	r.mu.Lock()
+	defer r.unlock()
+	if life.session != nil {
+		r.close(life, end)
+		return
+	}
+	life.over = true
+}
+
 // claim takes responsibility for every session in scope, established or
 // being established; a claimed registration ends itself instead of being
 // tracked. Mirrors matterjs-server
