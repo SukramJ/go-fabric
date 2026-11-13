@@ -193,11 +193,28 @@ func newSubjectFacts(tree DeviceTypeTree) *subjectFacts {
 			if _, claimed := f.parent[part]; claimed || slices.Contains(f.children[ep], part) {
 				continue
 			}
+			// Nor does a part that is ep's ancestor: the claim would close a
+			// cycle, and every walk of the tree would run round it (review
+			// II, R2-P1-req2-07). The parents taken so far form a forest,
+			// so the walk ends.
+			if f.isAncestor(part, ep) {
+				continue
+			}
 			f.parent[part] = ep
 			f.children[ep] = append(f.children[ep], part)
 		}
 	}
 	return f
+}
+
+// isAncestor reports whether anc is ep or one of its ancestors.
+func (f *subjectFacts) isAncestor(anc, ep uint16) bool {
+	for cur, ok := ep, true; ok; cur, ok = f.parent[cur] {
+		if cur == anc {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *subjectFacts) parentOf(ep uint16) (uint16, bool) {
