@@ -2321,7 +2321,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 413,
+    "line": 424,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",

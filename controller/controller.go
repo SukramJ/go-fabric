@@ -133,6 +133,18 @@ type Config struct {
 	// autoConnect is false (CommissioningController.ts:864-866). A
 	// program that only pairs, or reads once, sets it.
 	ManualStart bool
+	// KeepOnboardingCodes keeps the QR or manual pairing code of every
+	// device [Controller.Pair] commissions with the node
+	// (client.Node.OnboardingCode), so that [Controller.Inventory] can
+	// show it again when the paper is lost. It is kept when the
+	// commissioning succeeded — also when the node's start then failed —
+	// and the device advertised Basic commissioning mode: not for an
+	// Enhanced Commissioning Window, whose code ends with it, not for a
+	// pairing by PairOptions.Address, which sees no advertisement, and
+	// not when PairOptions.Edit replaced the passcode. Off by default: the code is a
+	// secret — with it and a factory reset anyone can commission the
+	// device — and the database then holds one per node.
+	KeepOnboardingCodes bool
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
 	Names func(*slog.Logger) (*discovery.Names, error)
@@ -238,19 +250,21 @@ type Config struct {
 // Controller is a running controller: one fabric, the nodes paired into
 // it, and the stack under them. Its methods are safe for concurrent use.
 type Controller struct {
-	db     *sql.DB
-	log    *slog.Logger
-	clock  clock.Clock
-	fabric *commissioner.Fabric
-	mgr    *exchange.Manager
-	names  *discovery.Names
-	brs    *brdiscovery.Registry
-	peers  *peer.Set
-	subs   *interaction.Subscriptions
-	com    *commissioner.Commissioner
-	reg    *client.Registry
-	udp    *udp.Listener
-	stop   func()
+	db  *sql.DB
+	log *slog.Logger
+	// keepCodes is Config.KeepOnboardingCodes.
+	keepCodes bool
+	clock     clock.Clock
+	fabric    *commissioner.Fabric
+	mgr       *exchange.Manager
+	names     *discovery.Names
+	brs       *brdiscovery.Registry
+	peers     *peer.Set
+	subs      *interaction.Subscriptions
+	com       *commissioner.Commissioner
+	reg       *client.Registry
+	udp       *udp.Listener
+	stop      func()
 	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address;
 	// tcp is the configuration they follow.
 	stopTCP func()
@@ -338,7 +352,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk)}
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk), keepCodes: cfg.KeepOnboardingCodes}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -735,6 +749,10 @@ type PairOptions struct {
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).
 	Edit func(*commissioner.Options)
+
+	// onboardingCode is the code Pair was called with, set when
+	// Config.KeepOnboardingCodes is on.
+	onboardingCode string
 }
 
 // PairingStep is one report of [PairOptions].Progress: the step's
@@ -801,6 +819,9 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 		return nil, err
 	}
 	opts.Progress = c.tracePairing(pc, tr, opts.Progress)
+	if c.keepCodes {
+		opts.onboardingCode = code
+	}
 	if opts.BLE != nil && opts.Address != nil {
 		return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
 	}
@@ -834,10 +855,19 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 		return nil, err
 	}
 	o := c.pairOptions(passcode, nil, opts, opts.Progress)
-	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe}); err != nil {
+	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}); err != nil {
 		return n, err
 	}
 	return n, nil
+}
+
+// keptCode is the code to keep for a commissioning with the options o:
+// none when Edit replaced the passcode the code carries.
+func (opts PairOptions) keptCode(o commissioner.Options, passcode uint32) string {
+	if o.Passcode != passcode {
+		return ""
+	}
+	return opts.onboardingCode
 }
 
 // pairOptions are the commissioner's options of a Pair: the passcode,
