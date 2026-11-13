@@ -4,7 +4,6 @@
 package spake2
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hkdf"
@@ -179,8 +178,16 @@ func PBKDF(passcode uint32, salt []byte, iterations int) (w0, w1 *big.Int, err e
 		return nil, nil, fmt.Errorf("spake2: pbkdf2: %w", err)
 	}
 	order := curve().Params().N
-	w0 = new(big.Int).Mod(new(big.Int).SetBytes(out[:WSize]), order)
-	w1 = new(big.Int).Mod(new(big.Int).SetBytes(out[WSize:]), order)
+	// The PBKDF2 output and its two unreduced halves are the passcode's
+	// equivalent; only the reduced scalars leave this function.
+	wide0, wide1 := new(big.Int).SetBytes(out[:WSize]), new(big.Int).SetBytes(out[WSize:])
+	w0 = new(big.Int).Mod(wide0, order)
+	w1 = new(big.Int).Mod(wide1, order)
+	secretHook("pbkdf2", out)
+	zero(out)
+	zero(pwd)
+	zeroInt(wide0)
+	zeroInt(wide1)
 	return w0, w1, nil
 }
 
@@ -212,7 +219,12 @@ func NewVerifierContext(passcode uint32, salt []byte, iterations int) (*Verifier
 	if err != nil {
 		return nil, err
 	}
-	lPt, err := nistec.NewP256Point().ScalarBaseMult(scalarTo32Bytes(w1))
+	// w1 is needed for L only: the verifier keeps (w0, L) and never w1.
+	w1Scalar := scalarTo32Bytes(w1)
+	lPt, err := nistec.NewP256Point().ScalarBaseMult(w1Scalar)
+	secretHook("context.w1", w1Scalar)
+	zero(w1Scalar)
+	zeroInt(w1)
 	if err != nil {
 		return nil, fmt.Errorf("spake2: derive L: %w", err)
 	}
@@ -281,6 +293,15 @@ func NewVerifierFromValue(w0Bytes, lBytes []byte) (*VerifierContext, error) {
 // send the returned [Pake2Output.Y] + [Pake2Output.CB] back, then
 // call [Verifier.ProcessPake3] with the prover's cA. On success
 // [Verifier.SharedSecret] returns Ke.
+//
+// What a handshake leaves behind is overwritten as soon as it has served
+// (see [zero] for what that can and cannot promise): the random scalar y
+// and the points Z and V once the keys are derived, KcB once cB is
+// computed, KcA once cA is compared; a cA that does not match takes Ke
+// with it and ends the Verifier — it answers no second Pake3. Two things
+// live on: the [VerifierContext], which is the stored verifier and serves
+// every later handshake, and after a success Ke, which
+// [Verifier.SharedSecret] hands out for as long as the Verifier is held.
 type Verifier struct {
 	ctx      *VerifierContext
 	idA, idB []byte
@@ -301,6 +322,9 @@ const (
 	verifierStateInit verifierState = iota
 	verifierStatePake1Processed
 	verifierStateFinished
+	// verifierStateFailed is terminal: the confirmation keys are gone, so
+	// a second cA could only be compared against an overwritten key.
+	verifierStateFailed
 )
 
 // NewVerifier returns a Verifier ready to process Pake1.
@@ -347,6 +371,20 @@ func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
 
 	yScalar := scalarTo32Bytes(y)
 	w0Scalar := scalarTo32Bytes(v.ctx.W0)
+	// y, Z and V serve the key derivation below and nothing after it; on
+	// an error before it they are of no use either.
+	defer func() {
+		secretHook("verifier.y", yScalar)
+		secretHook("verifier.w0", w0Scalar)
+		secretHook("verifier.Z", v.zMarshal)
+		secretHook("verifier.V", v.vMarshal)
+		zero(yScalar)
+		zero(w0Scalar)
+		zeroInt(v.y)
+		zero(v.zMarshal)
+		zero(v.vMarshal)
+		v.y, v.zMarshal, v.vMarshal = nil, nil, nil
+	}()
 
 	// Y = y·G + w0·N.
 	yG, err := nistec.NewP256Point().ScalarBaseMult(yScalar)
@@ -398,18 +436,26 @@ func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
 	v.deriveKeys()
 
 	cB := hmacSHA256(v.kcB, v.xMarshal)
+	zero(v.kcB)
 	v.state = verifierStatePake1Processed
 	return &Pake2Output{Y: v.yMarshal, CB: cB[:ConfirmTagSize]}, nil
 }
 
 // ProcessPake3 verifies the prover's cA tag and finalises the
-// session. On success [Verifier.SharedSecret] returns the 16-byte Ke.
+// session. On success [Verifier.SharedSecret] returns the 16-byte Ke. A
+// cA that does not match is final: every later call returns
+// [ErrSessionState].
 func (v *Verifier) ProcessPake3(cA []byte) error {
 	if v.state != verifierStatePake1Processed {
 		return fmt.Errorf("%w: ProcessPake1 must run first", ErrSessionState)
 	}
 	expected := hmacSHA256(v.kcA, v.yMarshal)
+	zero(v.kcA)
 	if subtle.ConstantTimeCompare(cA, expected[:ConfirmTagSize]) != 1 {
+		// Ke goes with the failed handshake, and the Verifier with it:
+		// KcA is overwritten, so nothing may be compared against it again.
+		zero(v.ke)
+		v.state = verifierStateFailed
 		return ErrConfirmationFailed
 	}
 	v.state = verifierStateFinished
@@ -433,6 +479,12 @@ func (v *Verifier) SharedSecret() []byte {
 // with the verifier's reply. On success [Prover.SharedSecret] returns
 // the same 16-byte Ke as the verifier and [Prover.Pake3] returns the
 // final cA bytes.
+//
+// w0, w1 and the random scalar x are the passcode's equivalent for this
+// handshake; [Prover.ProcessPake2] overwrites them on every way out, with
+// Z, V and the confirmation keys (see [zero]). After a success only Ke
+// lives on, for [Prover.SharedSecret]; after any error past the state
+// check nothing does, and the Prover answers no second Pake2.
 type Prover struct {
 	w0, w1   *big.Int
 	idA, idB []byte
@@ -453,6 +505,8 @@ const (
 	proverStateInit proverState = iota
 	proverStatePake1Generated
 	proverStateFinished
+	// proverStateFailed is terminal: the scalars are gone.
+	proverStateFailed
 )
 
 // NewProver returns a Prover ready to compute Pake1.
@@ -481,12 +535,19 @@ func (p *Prover) GeneratePake1() ([]byte, error) {
 		return nil, err
 	}
 	p.x = x
+	xScalar, w0Scalar := scalarTo32Bytes(x), scalarTo32Bytes(p.w0)
+	defer func() {
+		secretHook("prover.x", xScalar)
+		secretHook("prover.w0", w0Scalar)
+		zero(xScalar)
+		zero(w0Scalar)
+	}()
 	// X = x·G + w0·M.
-	xG, err := nistec.NewP256Point().ScalarBaseMult(scalarTo32Bytes(x))
+	xG, err := nistec.NewP256Point().ScalarBaseMult(xScalar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: x·G: %w", ErrInvalidPoint, err)
 	}
-	w0M, err := nistec.NewP256Point().ScalarMult(mPoint, scalarTo32Bytes(p.w0))
+	w0M, err := nistec.NewP256Point().ScalarMult(mPoint, w0Scalar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: w0·M: %w", ErrInvalidPoint, err)
 	}
@@ -502,13 +563,39 @@ func (p *Prover) ProcessPake2(yBytes, cB []byte) (cA []byte, err error) {
 	if p.state != proverStatePake1Generated {
 		return nil, fmt.Errorf("%w: GeneratePake1 must run first", ErrSessionState)
 	}
+	xScalar, w0Scalar, w1Scalar := scalarTo32Bytes(p.x), scalarTo32Bytes(p.w0), scalarTo32Bytes(p.w1)
+	// Every way out of here ends the use of x, w0, w1, Z, V and the
+	// confirmation keys; one that is not the success takes Ke as well and
+	// leaves the Prover failed.
+	defer func() {
+		secretHook("prover.x", xScalar)
+		secretHook("prover.w0", w0Scalar)
+		secretHook("prover.w1", w1Scalar)
+		secretHook("prover.Z", p.zMarshal)
+		secretHook("prover.V", p.vMarshal)
+		zero(xScalar)
+		zero(w0Scalar)
+		zero(w1Scalar)
+		zeroInt(p.x)
+		zeroInt(p.w0)
+		zeroInt(p.w1)
+		zero(p.zMarshal)
+		zero(p.vMarshal)
+		zero(p.kcA)
+		zero(p.kcB)
+		p.x, p.w0, p.w1, p.zMarshal, p.vMarshal = nil, nil, nil, nil, nil
+		if err != nil {
+			zero(p.ke)
+			p.state = proverStateFailed
+		}
+	}()
 	yPoint, err := unmarshalAndValidate(yBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	// Z = x·(Y - w0·N).
-	w0N, err := nistec.NewP256Point().ScalarMult(nPoint, scalarTo32Bytes(p.w0))
+	w0N, err := nistec.NewP256Point().ScalarMult(nPoint, w0Scalar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: w0·N: %w", ErrInvalidPoint, err)
 	}
@@ -523,14 +610,14 @@ func (p *Prover) ProcessPake2(yBytes, cB []byte) (cA []byte, err error) {
 	if yMinusW0N.IsInfinity() == 1 {
 		return nil, fmt.Errorf("%w: Y equals w0*N (Y - w0*N is the identity)", ErrInvalidPoint)
 	}
-	z, err := nistec.NewP256Point().ScalarMult(yMinusW0N, scalarTo32Bytes(p.x))
+	z, err := nistec.NewP256Point().ScalarMult(yMinusW0N, xScalar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: x·(Y-w0·N): %w", ErrInvalidPoint, err)
 	}
 	p.zMarshal = z.Bytes()
 
 	// V = w1·(Y - w0·N).
-	vPt, err := nistec.NewP256Point().ScalarMult(yMinusW0N, scalarTo32Bytes(p.w1))
+	vPt, err := nistec.NewP256Point().ScalarMult(yMinusW0N, w1Scalar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: w1·(Y-w0·N): %w", ErrInvalidPoint, err)
 	}
@@ -541,9 +628,8 @@ func (p *Prover) ProcessPake2(yBytes, cB []byte) (cA []byte, err error) {
 
 	expected := hmacSHA256(p.kcB, p.xMarshal)
 	if subtle.ConstantTimeCompare(cB, expected[:ConfirmTagSize]) != 1 {
-		// Wipe any partial state so an attacker cannot probe Ke after
-		// a confirmation-tag failure.
-		p.zero()
+		// The deferred overwrite takes Ke with the rest, so nothing of a
+		// handshake whose confirmation failed can be probed.
 		return nil, ErrConfirmationFailed
 	}
 
@@ -563,19 +649,43 @@ func (p *Prover) SharedSecret() []byte {
 	return out
 }
 
-func (p *Prover) zero() {
-	zero(p.kcA)
-	zero(p.kcB)
-	zero(p.ke)
-	zero(p.zMarshal)
-	zero(p.vMarshal)
+// zero overwrites b. It is how this package ends the life of handshake
+// key material — the scalars, the points Z and V, the transcript and what
+// the key schedule derives from it — once the value has served or the
+// handshake has failed; connectedhomeip does the same in Spake2p's Clear
+// and with its SensitiveDataBuffer (src/crypto/CHIPCryptoPALOpenSSL.cpp:
+// 1119-1154, src/crypto/CHIPCryptoPAL.h:299-306 at 6170af84), matter.js
+// does not (packages/protocol/src/session/pase/PaseServer.ts:174-190 at
+// db021da0 hands Ke on and drops the rest to the collector).
+//
+// It is a best effort, and Go sets its limit: the runtime gives no
+// guarantee that the bytes overwritten here were the only copy. Values
+// are copied when a goroutine's stack grows and when they are passed by
+// value; math/big, crypto/hmac, crypto/hkdf, crypto/pbkdf2 and the nistec
+// points keep working state of their own that nothing outside them can
+// reach; and a slice the caller was handed ([Verifier.SharedSecret]) is
+// the caller's. What is overwritten is every buffer this package holds a
+// reference to.
+func zero(b []byte) {
+	clear(b)
 }
 
-func zero(b []byte) {
-	for i := range b {
-		b[i] = 0
+// zeroInt overwrites the words of n, capacity included, and leaves it 0.
+// The limit stated at [zero] applies: math/big may have left earlier
+// copies of the value in buffers it grew out of.
+func zeroInt(n *big.Int) {
+	if n == nil {
+		return
 	}
+	words := n.Bits()
+	clear(words[:cap(words)])
+	n.SetInt64(0)
 }
+
+// secretHook is the test seam that sees a short-lived secret buffer just
+// before it is overwritten, so a test can hold the slice and read it
+// afterwards. Production code never replaces it.
+var secretHook = func(string, []byte) {}
 
 // --- shared key-derivation pipeline ---
 
@@ -604,10 +714,23 @@ func (p *Prover) deriveKeys() {
 // our cB tag is unrelated to its locally-computed expectation.
 func deriveKeys(context, idA, idB, x, y, z, v []byte, w0 *big.Int) (kcA, kcB, ke []byte) {
 	tt := buildTranscript(context, idA, idB, x, y, z, v, w0)
-	kMain := sha256.Sum256(tt)
+	// Summed into a slice, not sha256.Sum256's array: that would be a
+	// second copy, returned by value, for the overwrite below to miss.
+	h := sha256.New()
+	h.Write(tt)
+	kMain := h.Sum(nil)
 	ka := kMain[0:16]
 	ke = make([]byte, 16)
 	copy(ke, kMain[16:32])
+	var confKeys []byte
+	defer func() {
+		secretHook("transcript", tt)
+		secretHook("kMain", kMain)
+		secretHook("confirmationKeys", confKeys)
+		zero(tt)
+		zero(kMain)
+		zero(confKeys)
+	}()
 
 	// connectedhomeip's Spake2p::GenerateKeys (CHIPCryptoPAL.cpp):
 	//   KDF(Ka, hash_size/2=16, nullptr, 0,
@@ -615,7 +738,8 @@ func deriveKeys(context, idA, idB, x, y, z, v []byte, w0 *big.Int) (kcA, kcB, ke
 	//   then split Kcab into KcA (first 16) || KcB (second 16).
 	// hkdf.Key does HKDF-Extract(salt=nil, IKM=Ka) followed by
 	// HKDF-Expand(PRK, info, L=32) — equivalent to chip-tool's KDF.
-	confKeys, err := hkdf.Key(sha256.New, ka, nil, "ConfirmationKeys", 32)
+	var err error
+	confKeys, err = hkdf.Key(sha256.New, ka, nil, "ConfirmationKeys", 32)
 	if err != nil {
 		// invariant: hkdf.Key only errors when the requested output
 		// length exceeds the hash's expansion limit (255 * 32 bytes for
@@ -647,15 +771,21 @@ func buildTranscript(context, idA, idB, x, y, z, v []byte, w0 *big.Int) []byte {
 	nBytes := nPoint.Bytes()
 
 	w0Bytes := scalarTo32Bytes(w0)
+	defer zero(w0Bytes)
 
-	var buf bytes.Buffer
-	for _, part := range [][]byte{
-		context, idA, idB, mBytes, nBytes, x, y, z, v, w0Bytes,
-	} {
-		_ = binary.Write(&buf, binary.LittleEndian, uint64(len(part)))
-		buf.Write(part)
+	parts := [][]byte{context, idA, idB, mBytes, nBytes, x, y, z, v, w0Bytes}
+	size := 0
+	for _, part := range parts {
+		size += 8 + len(part)
 	}
-	return buf.Bytes()
+	// Sized once: a buffer that grew would leave Z, V and w0 behind in
+	// the arrays it outgrew, where the caller's overwrite cannot reach.
+	out := make([]byte, 0, size)
+	for _, part := range parts {
+		out = binary.LittleEndian.AppendUint64(out, uint64(len(part)))
+		out = append(out, part...)
+	}
+	return out
 }
 
 // scalarTo32Bytes returns a left-zero-padded 32-byte big-endian
