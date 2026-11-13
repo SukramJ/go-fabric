@@ -149,16 +149,16 @@ func TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies(t *testing.T)
 
 // TestHandleSubscribeRequest_PrimingReportRefused_EstablishesNothing: the
 // peer answers the priming report's chunk with
-// StatusResponse(INVALID_SUBSCRIPTION) — what a client does with the
-// priming report of a subscribe it no longer wants (matter.js #4777 in
-// notes/parity/pin-lifts.md; ClientSubscriptionHandler.ts
-// sendInvalidSubscription) — and the Subscribe ends there: the handler
-// returns the rejection, no SubscribeResponse follows the chunk, and the
-// subscription admitted for the priming is gone. Mirrors matter.js
-// InteractionMessenger.ts:844 (sendDataReportMessage waits for the chunk's
-// status with waitForSuccess, :221-227, which throws on any other status)
-// and InteractionServer.ts:828-834 (a failed sendInitialReport closes the
-// subscription and rethrows, so the SubscribeResponse is never sent).
+// StatusResponse(INVALID_SUBSCRIPTION) — the answer a matter.js client
+// gives the priming report of a cancelled subscribe, as
+// notes/parity/pin-lifts.md records for matter.js #4777 — and the
+// Subscribe ends there: the handler returns the rejection, no
+// SubscribeResponse follows the chunk, and the subscription admitted for
+// the priming is gone. Mirrors matter.js InteractionMessenger.ts:844,
+// where the chunk's status is awaited with `waitForSuccess` (it throws on
+// any status but Success), and InteractionServer.ts:828-834, where a
+// failed sendInitialReport closes the subscription and rethrows, so the
+// SubscribeResponse is never sent.
 func TestHandleSubscribeRequest_PrimingReportRefused_EstablishesNothing(t *testing.T) {
 	t.Parallel()
 	b := newACLTestBridge(t, &aclStoreFake{})

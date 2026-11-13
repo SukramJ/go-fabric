@@ -307,7 +307,7 @@ func TestMaybeUnmaskPrivacy_TooShortForMIC_AfterSessionResolve(t *testing.T) {
 // bit, whatever the request header says, and the peer decrypts it as it
 // is. matter.js sends unicast with hasPrivacyEnhancements false
 // (MessageExchange.ts:734) and refuses a unicast message that carries
-// the flag (decodeFixedHeader, MessageCodec.ts:250-253), as the bridge's inbound
+// the flag (hasPrivacyEnhancements, MessageCodec.ts:250-253), as the bridge's inbound
 // gate does, so a P-flagged request never reaches the reply path; the
 // test calls sendReply directly to pin that the echo is gone
 // (review 2026-11 W6-reg-07).
@@ -363,8 +363,8 @@ func TestSendReply_NeverSetsThePrivacyFlag(t *testing.T) {
 // TestPrivacy_UnicastWithPBitIsDropped — privacy enhancements are defined
 // for group messages only; a unicast frame carrying the P bit is invalid
 // and is dropped rather than unmasked and handed to a unicast session.
-// Mirrors matter.js MessageCodec.ts:250-253 (decodeFixedHeader) and the
-// chip SDK.
+// Mirrors matter.js MessageCodec.ts:250-253 (hasPrivacyEnhancements off
+// a group session) and the chip SDK.
 func TestPrivacy_UnicastWithPBitIsDropped(t *testing.T) {
 	t.Parallel()
 	bridgeKey := bytes.Repeat([]byte{0xAA}, 16)

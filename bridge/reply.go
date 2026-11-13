@@ -216,7 +216,7 @@ func (b *Bridge) sendReplyTimed(
 		// (`hasPrivacyEnhancements: false, // Not supported on unicast, as
 		// in the CHIP SDK`); a request that carried the bit was dropped
 		// before it reached here (bridge/privacy.go maybeUnmaskPrivacy, as
-		// matter.js refuses it in decodeFixedHeader,
+		// matter.js refuses hasPrivacyEnhancements off a group session,
 		// MessageCodec.ts:250-253).
 		Control:      requestHdr.Control,
 		HasExtension: false,
