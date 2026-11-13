@@ -43,7 +43,7 @@ func TestMetricsEndpointServesNoCommandLine(t *testing.T) {
 	get := func(h http.Handler) string {
 		t.Helper()
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/debug/vars", nil))
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/debug/vars", http.NoBody))
 		body, err := io.ReadAll(rec.Result().Body)
 		if err != nil || rec.Code != http.StatusOK {
 			t.Fatalf("GET /debug/vars: status %d, %v", rec.Code, err)

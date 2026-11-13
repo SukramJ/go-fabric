@@ -186,7 +186,7 @@ func TestGeneralDiagnosticsNetworkInterfacesSelection(t *testing.T) {
 
 	t.Run("five interfaces are five entries", func(t *testing.T) {
 		t.Parallel()
-		var in []NetworkInterfaceStruct
+		in := make([]NetworkInterfaceStruct, 0, 5)
 		for i := range 5 {
 			in = append(in, iface(fmt.Sprintf("eth%d", i), true, byte(i+1)))
 		}
@@ -197,7 +197,7 @@ func TestGeneralDiagnosticsNetworkInterfacesSelection(t *testing.T) {
 
 	t.Run("the list ends after eight entries", func(t *testing.T) {
 		t.Parallel()
-		var in []NetworkInterfaceStruct
+		in := make([]NetworkInterfaceStruct, 0, 10)
 		for i := range 10 {
 			in = append(in, iface(fmt.Sprintf("eth%d", i), true, byte(i+1)))
 		}

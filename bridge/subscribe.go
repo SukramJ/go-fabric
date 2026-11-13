@@ -1640,13 +1640,13 @@ func (b *Bridge) rewireMeasurementListeners() {
 // bridge lock held.
 func (b *Bridge) detachHostListeners() {
 	b.mu.Lock()
-	measurement := b.measurementUnsubscribers
+	measurements := b.measurementUnsubscribers
 	switches := b.switchUnsubscribers
 	b.measurementUnsubscribers = nil
 	b.switchUnsubscribers = nil
 	b.listenerGeneration++ // a wiring still registering detaches itself
 	b.mu.Unlock()
-	runUnsubscribers(measurement)
+	runUnsubscribers(measurements)
 	runUnsubscribers(switches)
 }
 

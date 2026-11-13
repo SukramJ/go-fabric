@@ -610,7 +610,8 @@ func topologyBlock(endpoints []node.EndpointInfo) string {
 	}
 	var b bytes.Buffer
 	b.WriteString("  topology\n")
-	for _, ep := range endpoints {
+	for i := range endpoints {
+		ep := &endpoints[i]
 		var deviceType uint32
 		if len(ep.DeviceTypes) > 0 {
 			deviceType = ep.DeviceTypes[0].ID

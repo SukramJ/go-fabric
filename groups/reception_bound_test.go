@@ -23,8 +23,9 @@ import (
 func trackedSources(m *Manager, key []byte) []uint64 {
 	m.receptionMu.Lock()
 	defer m.receptionMu.Unlock()
-	var out []uint64
-	for _, p := range m.reception[hex.EncodeToString(key)] {
+	windows := m.reception[hex.EncodeToString(key)]
+	out := make([]uint64, 0, len(windows))
+	for _, p := range windows {
 		out = append(out, p.source)
 	}
 	return out

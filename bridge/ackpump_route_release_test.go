@@ -47,9 +47,10 @@ func TestPiggybackedAckReleasesTheReplyRoute(t *testing.T) {
 	b.ackTracker = mrp.NewAckTracker(time.Hour) // obligations only; no pump
 	b.mu.Unlock()
 	peerConn, peerAddr := openPeerSocket(t)
-	defer peerConn.Close()
+	t.Cleanup(func() { _ = peerConn.Close() })
 
 	t.Run("refreshAckCounter", func(t *testing.T) {
+		t.Parallel()
 		const exchangeID uint16 = 21
 		b.owedInboundAck(peerAddr, buildMsgHdr(700), buildNeedsAckProto(exchangeID, 700))
 		if n := routesOfExchange(b, 0, exchangeID); n != 1 {
@@ -65,6 +66,7 @@ func TestPiggybackedAckReleasesTheReplyRoute(t *testing.T) {
 		}
 	})
 	t.Run("piggybackOwedAck", func(t *testing.T) {
+		t.Parallel()
 		const exchangeID uint16 = 22
 		b.owedInboundAck(peerAddr, buildMsgHdr(701), buildNeedsAckProto(exchangeID, 701))
 		got := b.piggybackOwedAck(subTarget{sessionID: 0, exchangeID: exchangeID}, true)

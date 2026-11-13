@@ -380,7 +380,7 @@ func TestReconnectProbeBoundsReportedAddresses(t *testing.T) {
 	// 12 interfaces, each full: the 2nd is not operational, so the first
 	// 8 operational ones are 1 and 3 to 9.
 	full := func(i int, operational bool) gendiag.NetworkInterface {
-		var addrs []string
+		addrs := make([]string, 0, v6+v4)
 		for j := range v6 {
 			addrs = append(addrs, fmt.Sprintf("fd%02x::%x", i, j+1))
 		}

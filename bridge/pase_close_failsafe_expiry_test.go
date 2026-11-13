@@ -30,7 +30,7 @@ type failSafeRig struct {
 	reg *sessionListingRegistry
 	// send dispatches an ArmFailSafe on the CASE session and reads its
 	// response.
-	send func(exchangeID uint16, expirySeconds uint16)
+	send func(exchangeID, expirySeconds uint16)
 }
 
 const (

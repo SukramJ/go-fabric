@@ -382,30 +382,27 @@ func (s *Subscription) offerDuePaths(paths []im.ConcreteAttributePath) {
 // queueEvent records that the event numbered number is owed to the
 // subscriber: it lowers the watermark to number and, when urgent — an
 // urgent path of the subscriber covers the event — asks for a report.
-// Returns true on the first owed event (so callers can wake the engine).
 // Mirrors matter.js ServerSubscription.ts:385-399 at db021da0
 // (#handleAddedEvents: the number is kept for every event, :392-394, and
 // #prepareDataUpdate runs only for an urgent one, :396-398); the minimum
 // rather than the first number keeps a firing that lost a race to a later
 // one in the report.
-func (s *Subscription) queueEvent(number uint64, urgent bool) (firstQueued bool) {
+func (s *Subscription) queueEvent(number uint64, urgent bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return false
+		return
 	}
 	if s.eventsHaveReported && number <= s.eventsReported {
-		return false
+		return
 	}
-	first := !s.eventsPending
-	if first || number < s.eventsMin {
+	if !s.eventsPending || number < s.eventsMin {
 		s.eventsMin = number
 	}
 	s.eventsPending = true
 	if urgent {
 		s.eventsUrgent = true
 	}
-	return first
 }
 
 // eventUrgency reports whether one of the subscription's event paths
