@@ -35,7 +35,7 @@ import (
 // test, and a removed one fails it until the constant is lowered in the same
 // commit, so the count only falls.
 const (
-	sleepRatchet = 66
+	sleepRatchet = 65
 	afterRatchet = 126
 )
 
