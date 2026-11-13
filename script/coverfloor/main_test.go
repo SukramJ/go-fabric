@@ -164,6 +164,33 @@ func TestCheckFailsAStaleFloor(t *testing.T) {
 	}
 }
 
+// TestCheckFailsAZeroFloorThatMeasuresCoverage: a zero floor — an entry
+// for a package with no statements or only a main — is held to the same
+// slack: a package that measures more than staleFloorSlack points has
+// gained tested code and needs a real floor, so the check fails and names
+// the floor to set. One that measures 0.0% (only main, as the reference
+// controller) or reports no statements passes (review II, R2-P1-misc-05).
+func TestCheckFailsAZeroFloorThatMeasuresCoverage(t *testing.T) {
+	t.Parallel()
+	res := check(
+		[]measurement{
+			{pkg: "grown", pct: 41.7, measurable: true},
+			{pkg: "mainonly", pct: 0, measurable: true},
+			{pkg: "seam", note: "no statements"},
+			{pkg: "slight", pct: 2.5, measurable: true},
+		},
+		[]packageFloor{
+			{pkg: "grown", min: 0, why: "declaration-only seam"},
+			{pkg: "mainonly", min: 0, why: "only main"},
+			{pkg: "seam", min: 0, why: "declaration-only seam"},
+			{pkg: "slight", min: 0, why: "only main"},
+		},
+	)
+	if len(res.problems) != 1 || !strings.Contains(res.problems[0], "grown is") || !strings.Contains(res.problems[0], "41.0") {
+		t.Fatalf("problems = %v, want one for grown suggesting 41.0%%", res.problems)
+	}
+}
+
 // TestFloorsTableIsWellFormed checks the committed table itself: no
 // duplicate package, every path inside this module, no floor outside 0..100,
 // and a stated reason for every zero floor. A duplicate entry would make the
