@@ -115,6 +115,11 @@ func (b *Bridge) setBLERunning(on bool) {
 // BLE announces a basic window only: adv.CommissioningMode must be 1
 // (matter.js BleAdvertiser.getAdvertisement, BleAdvertiser.ts:37-45).
 //
+// A service the platform refuses or withdraws ends the advertisement as
+// well — StartBLE cannot report it, Serve fails on its own goroutine
+// (logged as matter.ble.serve) — and the next StartBLE registers the
+// service again.
+//
 // A service or advertisement still ending after a [Bridge.StopBLE] that
 // gave up waiting is waited for first, until ctx ends. The bridge must be
 // started; [Bridge.Stop] ends what StartBLE started.
@@ -149,20 +154,7 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 		done := make(chan struct{})
 		b.ble.serveCancel, b.ble.serveDone = cancel, done
-		go func() {
-			defer close(done)
-			if err := p.Serve(serveCtx, nil, b.acceptBLE); err != nil {
-				b.logger.Warn("matter.ble.serve", slog.Any("err", err))
-			}
-			// The service ended — asked to, or on its own (refused,
-			// withdrawn): the next StartBLE registers it again.
-			b.ble.mu.Lock()
-			if b.ble.serveDone == done {
-				b.ble.serveCancel, b.ble.serveDone = nil, nil
-			}
-			b.ble.mu.Unlock()
-			cancel()
-		}()
+		go b.serveBLE(serveCtx, cancel, done, p)
 		b.logger.Info("matter.ble.serving")
 	}
 	if b.ble.advCancel != nil && b.ble.adv == want {
@@ -199,6 +191,35 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		b.advertiseBLE(advCtx, p, want)
 	}()
 	return nil
+}
+
+// serveBLE runs the GATT service of one StartBLE until it ends, then
+// closes done.
+func (b *Bridge) serveBLE(serveCtx context.Context, cancel context.CancelFunc, done chan struct{}, p contract.BLEPeripheral) {
+	defer close(done)
+	err := p.Serve(serveCtx, nil, b.acceptBLE)
+	if err != nil {
+		b.logger.Warn("matter.ble.serve", slog.Any("err", err))
+	}
+	// The service ended — asked to, or on its own (refused, withdrawn):
+	// the next StartBLE registers it again. A service that failed on its
+	// own also ends the advertisement: the node does not announce itself
+	// as commissionable over BLE with no service behind it (review II,
+	// R2-P1-req-06).
+	var advCancel context.CancelFunc
+	b.ble.mu.Lock()
+	if b.ble.serveDone == done {
+		b.ble.serveCancel, b.ble.serveDone = nil, nil
+		if err != nil && serveCtx.Err() == nil {
+			advCancel = b.ble.advCancel
+			b.ble.advCancel = nil
+		}
+	}
+	b.ble.mu.Unlock()
+	if advCancel != nil {
+		advCancel()
+	}
+	cancel()
 }
 
 // WithdrawBLE ends the BLE advertisement and leaves the GATT service and a
