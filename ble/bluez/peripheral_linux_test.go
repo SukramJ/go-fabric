@@ -764,3 +764,66 @@ func TestPeripheralAcquiredSignalsInOrder(t *testing.T) {
 	wg.Wait()
 	settledAcquired(t, b, p, true)
 }
+
+// TestPeripheralRegistrationWithoutAReply: a RegisterAdvertisement or
+// RegisterApplication whose reply the caller stopped waiting for leaves
+// its outcome unknown — bluetoothd may complete it. The peripheral then
+// unregisters before it unexports, so it does not believe nothing is
+// registered while BlueZ holds the path, and the next registration starts
+// clean (review II, R2-P1-drv-03; whether bluetoothd does complete such a
+// registration is not verified).
+func TestPeripheralRegistrationWithoutAReply(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	b.failWith(ifaceAdvertising+".RegisterAdvertisement", errLateReply)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err == nil {
+		t.Fatal("Advertise without a reply succeeded")
+	}
+	if _, adv := b.registered(); adv != nil || b.exported(p.advPath()) {
+		t.Fatalf("after a registration without a reply: registered %v, exported %v", adv != nil, b.exported(p.advPath()))
+	}
+	b.mu.Lock()
+	delete(b.errs, ifaceAdvertising+".RegisterAdvertisement")
+	b.mu.Unlock()
+	if err := p.Advertise(t.Context(), contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatalf("Advertise after it: %v", err)
+	}
+	if _, adv := b.registered(); adv == nil {
+		t.Fatal("the next advertisement is not registered")
+	}
+
+	b.failWith(ifaceGattManager+".RegisterApplication", errLateReply)
+	sctx, scancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer scancel()
+	if err := p.Serve(sctx, nil, func(contract.BLEConnection) {}); err == nil {
+		t.Fatal("Serve without a registration reply succeeded")
+	}
+	if app, _ := b.registered(); app != nil || b.exported(p.root) {
+		t.Fatalf("after an application registration without a reply: registered %v, exported %v", app != nil, b.exported(p.root))
+	}
+}
+
+// TestNewPeripheralIsBounded: the construction read of BlueZ's objects is
+// bounded by peripheralTimeout as every call the peripheral makes on its
+// own (review II, R2-P1-drv-07).
+func TestNewPeripheralIsBounded(t *testing.T) {
+	b := newFakeBus()
+	b.failWith(methodGetManaged, errHang)
+	done := make(chan error, 1)
+	go func() {
+		_, err := newPeripheral(b, testAdapter)
+		done <- err
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*peripheralTimeout)
+	defer cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("newPeripheral over a silent bluetoothd = %v, want its bound", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("newPeripheral over a silent bluetoothd is unbounded")
+	}
+}

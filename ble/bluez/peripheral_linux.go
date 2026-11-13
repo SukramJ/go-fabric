@@ -121,7 +121,9 @@ var _ contract.BLEPeripheral = (*peripheral)(nil)
 
 // newPeripheral is the peripheral over b: the adapter must exist.
 func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {
-	objs, err := getManagedObjects(context.Background(), b)
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	objs, err := getManagedObjects(ctx, b)
 	if err != nil {
 		return nil, err
 	}
@@ -298,6 +300,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		return err
 	}
 	if _, err := call(ctx, p.bus, p.adapter, ifaceAdvertising+".RegisterAdvertisement", p.advPath(), map[string]dbus.Variant{}); err != nil {
+		p.releaseUnanswered(ctx, err, ifaceAdvertising+".UnregisterAdvertisement", p.advPath())
 		p.unexportAdvertisement()
 		return err
 	}
@@ -325,6 +328,25 @@ func (p *peripheral) StopAdvertising(ctx context.Context) error {
 		return nil // released by BlueZ meanwhile
 	}
 	return err
+}
+
+// releaseUnanswered undoes a Register call that failed without BlueZ's
+// answer — its context ended, the bus daemon gave up waiting, the
+// connection broke — before the caller unexports the objects: bluetoothd
+// may still carry such a call out, and the peripheral would believe
+// nothing registered while BlueZ held the path. The matching Unregister
+// runs on a fresh bounded context, its error (DoesNotExist when nothing
+// was registered) ignored. A refusal BlueZ answered (an error with a
+// D-Bus name other than NoReply) registered nothing and needs no undo.
+// Whether bluetoothd completes a registration whose caller stopped
+// waiting is not verified (review II, R2-P1-drv-03).
+func (p *peripheral) releaseUnanswered(ctx context.Context, err error, unregister string, path dbus.ObjectPath) {
+	if name := dbusName(err); name != "" && name != "org.freedesktop.DBus.Error.NoReply" {
+		return
+	}
+	uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), peripheralTimeout)
+	defer cancel()
+	_, _ = call(uctx, p.bus, p.adapter, unregister, path)
 }
 
 func (p *peripheral) exportAdvertisement() error {
@@ -411,6 +433,7 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 	_, err := call(regCtx, p.bus, p.adapter, ifaceGattManager+".RegisterApplication", p.root, map[string]dbus.Variant{})
 	cancel()
 	if err != nil {
+		p.releaseUnanswered(ctx, err, ifaceGattManager+".UnregisterApplication", p.root)
 		p.unexportApplication()
 		return err
 	}
