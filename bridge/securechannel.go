@@ -373,8 +373,15 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// session on the channel).
 		b.holdHandshake(src, proto.ExchangeID, false)
 		ch := b.resolveCaseHandler(proto.ExchangeID)
-		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
+		err := b.handleCase(src, requestHdr, proto, payload, "sigma1",
 			ch.ProcessSigma1, ch)
+		if errors.Is(err, errRetransmitTableFull) {
+			// The reply was not sent ([unsecuredEntryLimit]): the peer's
+			// retransmission of this Sigma1 is no replay of an answered
+			// one, and is answered once the table has room.
+			b.forgetSigma1Replied(proto.ExchangeID)
+		}
+		return err
 	case mrp.SCOpcodeSigma3:
 		ch := b.resolveCaseHandler(proto.ExchangeID)
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
@@ -409,7 +416,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		tracker := b.outboundReliable
 		b.mu.RUnlock()
 		if tracker != nil {
-			if cleared := tracker.AbandonExchange(proto.ExchangeID); cleared > 0 {
+			if cleared := tracker.AbandonUnsecuredExchange(proto.ExchangeID); cleared > 0 {
 				b.logger.Debug("matter.sc.sigma3.abandon_prior",
 					slog.Int("exchange_id", int(proto.ExchangeID)),
 					slog.Int("cleared", cleared))
@@ -484,6 +491,10 @@ func (b *Bridge) dispatchPase(
 		return b.handlePase(src, requestHdr, proto, payload, "pake1",
 			h.ProcessPake1, h)
 	case mrp.SCOpcodePake3:
+		// The commissioner has moved past Pake2: whatever of the
+		// handshake still waits for an acknowledgement is done. Before
+		// the handler runs, so the reply to Pake3 itself stays tracked.
+		b.abandonHandshakeReplies(proto.ExchangeID)
 		h := b.resolvePaseHandler(proto.ExchangeID)
 		err := b.handlePase(src, requestHdr, proto, payload, "pake3",
 			h.ProcessPake3, h)
@@ -552,15 +563,41 @@ const (
 // retransmit). Mirrors matter.js PaseServer.ts:80-86 onNewExchange.
 func (b *Bridge) claimPaseInFlight(exchangeID uint16) bool {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	now := b.clk().Now()
 	idle := b.paseInFlightSince.IsZero() || now.Sub(b.paseInFlightSince) > pasePairingTimeout
 	if !idle && b.paseInFlightExchange != exchangeID {
+		b.mu.Unlock()
 		return false
 	}
+	timedOut, expired := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange != exchangeID, b.paseInFlightExchange
 	b.paseInFlightExchange = exchangeID
 	b.paseInFlightSince = now
+	b.mu.Unlock()
+	if timedOut {
+		// The handshake that held the slot timed out: its replies stop
+		// waiting for an acknowledgement with it. Outside b.mu — the
+		// tracker resolves a session's interval through the bridge.
+		b.abandonHandshakeReplies(expired)
+	}
 	return true
+}
+
+// abandonHandshakeReplies drops the replies of the handshake on exchangeID
+// that still wait for their acknowledgement on the unsecured session: the
+// handshake ended, or moved past them
+// ([outboundReliableTracker.AbandonUnsecuredExchange]).
+func (b *Bridge) abandonHandshakeReplies(exchangeID uint16) {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if tracker == nil {
+		return
+	}
+	if cleared := tracker.AbandonUnsecuredExchange(exchangeID); cleared > 0 {
+		b.logger.Debug("matter.sc.handshake.abandon_replies",
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.Int("cleared", cleared))
+	}
 }
 
 // releasePaseInFlight clears the single-active-PASE claim held by
@@ -792,6 +829,8 @@ func (b *Bridge) handlePase(
 		// termination, not only on success.
 		if !isStateReplay {
 			b.releasePaseInFlight(proto.ExchangeID)
+			// And its replies stop waiting for an acknowledgement.
+			b.abandonHandshakeReplies(proto.ExchangeID)
 		}
 		return err
 	}
@@ -873,6 +912,10 @@ func (b *Bridge) handleCase(
 					slog.String("stage", stage),
 					slog.Any("err", sendErr))
 			}
+			// The handshake is over: a Sigma2 still waiting for its
+			// acknowledgement is not retransmitted to a peer whose
+			// Sigma3 was refused.
+			b.abandonHandshakeReplies(proto.ExchangeID)
 		}
 		return err
 	}
@@ -961,6 +1004,9 @@ func (b *Bridge) forgetSigma1Replied(exchangeID uint16) {
 func (b *Bridge) ForgetSigma1Replied(exchangeID uint16) {
 	b.forgetSigma1Replied(exchangeID)
 	b.releaseCASEHandshakeEverywhere(exchangeID)
+	// A Sigma2 or StatusReport still waiting for its acknowledgement
+	// goes with the responder it came from.
+	b.abandonHandshakeReplies(exchangeID)
 }
 
 // ---------------------------------------------------------------------------
@@ -1089,6 +1135,7 @@ func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Heade
 		slog.Int("protocol_code", int(protocolCode)))
 	b.recordPaseFailure()
 	b.releasePaseInFlight(proto.ExchangeID)
+	b.abandonHandshakeReplies(proto.ExchangeID)
 	// The report itself is acked by the pump, like any reliable message
 	// that elicits no reply.
 	return true

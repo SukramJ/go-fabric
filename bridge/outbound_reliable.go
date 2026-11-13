@@ -54,6 +54,9 @@ type outboundReliableTracker struct {
 	// mu guards pending, waiters and rtt; it is not held while Tick sends.
 	mu      sync.Mutex
 	pending map[outboundKey]*outboundEntry
+	// unsecured counts the entries of session 0 in pending, which
+	// [unsecuredEntryLimit] bounds.
+	unsecured int
 	// waiters lets callers block on Ack via [WaitForAck] — used by the
 	// Subscribe-initial chunked send path so the bridge mirrors
 	// matter.js's per-chunk handshake (one ReportData → wait for
@@ -97,6 +100,9 @@ type outboundEntry struct {
 	dest       net.Addr
 	retries    int
 	nextSendAt time.Time
+	// trackedAt is when the entry was tracked, on the schedule's clock; an
+	// unsecured-session entry is dropped [unsecuredEntryLifetime] after it.
+	trackedAt time.Time
 	// margin joins the base interval of every (re)transmission, so the
 	// backoff amplifies it: the exchange's additional MRP delay (matter.js
 	// MRP.ts retransmissionIntervalOf, `additionalDelay`). Zero for every
@@ -228,11 +234,67 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 // when the reply answers its handshake (peer set), on the idle default
 // otherwise. Its base interval then comes from peer, not from the session
 // resolver, which knows no session 0.
-func (t *outboundReliableTracker) trackUnsecured(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
-	t.track(counter, 0, exchangeID, datagram, dest, now, 0, peer)
+//
+// It reports false, and tracks nothing, when the unsecured session already
+// holds [unsecuredEntryLimit] replies awaiting their acknowledgement: the
+// caller then does not send the reply ([errRetransmitTableFull]).
+func (t *outboundReliableTracker) trackUnsecured(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) bool {
+	return t.track(counter, 0, exchangeID, datagram, dest, now, 0, peer)
 }
 
-func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) {
+// unsecuredEntryLimit bounds the replies the unsecured session holds for
+// retransmission — the part of the table a peer fills without having
+// authenticated: every PBKDFParamResponse, Pake2, Sigma2 and StatusReport
+// of a handshake is one, paced by the intervals that peer stated, which
+// neither reference clamps (matter.js
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db021da0; chip
+// src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
+//
+// The number is connectedhomeip's: its retransmission table is
+// `ObjectPool<RetransTableEntry, CHIP_CONFIG_RMP_RETRANS_TABLE_SIZE>`
+// (src/messaging/ReliableMessageMgr.h:267), sized
+// CHIP_CONFIG_MAX_EXCHANGE_CONTEXTS (src/messaging/ReliableMessageProtocolConfig.h:134
+// and :146), 16 by default (src/lib/core/CHIPConfig.h:303-305), all at
+// 6170af84. A full table fails AddToRetransTable with
+// CHIP_ERROR_RETRANS_TABLE_FULL (ReliableMessageMgr.cpp:254-263) and the
+// message is neither prepared nor sent (ExchangeMessageDispatch.cpp:63-64);
+// the same here. chip's bound covers every session and holds where its
+// pools are static — on a platform whose pools live on the heap the size
+// parameter is ignored (src/lib/support/Pool.h:619-626; Linux:
+// src/platform/Linux/SystemPlatformConfig.h:41). Here it covers the
+// unsecured session alone: a secure session's entries belong to an
+// authenticated peer and are bounded by its subscriptions and exchanges.
+// matter.js has no table: the message awaiting its acknowledgement and its
+// timer are fields of the exchange
+// (packages/protocol/src/protocol/MessageExchange.ts:285 and :293 at
+// db021da0).
+const unsecuredEntryLimit = 16
+
+// unsecuredEntryLifetime is how long a reply on the unsecured session may
+// wait for its acknowledgement: no handshake outlives it. matter.js gives a
+// PASE pairing 60 s (packages/protocol/src/session/pase/PaseServer.ts:33 at
+// db021da0, PASE_PAIRING_TIMEOUT — [pasePairingTimeout] here), and a
+// per-exchange CASE responder nobody resolved for its TTL is reaped
+// ([PerExchangeCaseProvider.StartReaper]; the node facade's is one minute).
+// Past it the retransmission would reach a peer whose handshake this node
+// can no longer complete. Without the limit an entry stayed until its
+// retries were spent, which a peer that states 0xFFFFFFFF ms intervals puts
+// months away (review II, R2-P0-bound-A06). The value is
+// [pasePairingTimeout]'s, stated here so the limits page can hold it.
+const unsecuredEntryLifetime = 60 * time.Second
+
+var (
+	// errRetransmitTableFull refuses a reliable reply on the unsecured
+	// session that would be the [unsecuredEntryLimit]+1st awaiting its
+	// acknowledgement; the reply is not sent.
+	errRetransmitTableFull = errors.New("bridge: outbound retransmit table full for the unsecured session")
+	// errUnsecuredEntryExpired is [outboundReliableTracker.Tick]'s report
+	// of an unsecured-session entry dropped after
+	// [unsecuredEntryLifetime].
+	errUnsecuredEntryExpired = errors.New("bridge: outbound retransmit: the handshake's time is over")
+)
+
+func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) bool {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
@@ -240,21 +302,43 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	// peer-appropriate base interval for every transmission including
 	// the first.
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
-	if t.wake != nil {
-		defer t.wake() // after the unlock below: the entry is in pending first
-	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.pending[outboundKey{sessionID, counter}] = &outboundEntry{
+	if sessionID == 0 && t.unsecured >= unsecuredEntryLimit {
+		t.mu.Unlock()
+		return false
+	}
+	key := outboundKey{sessionID, counter}
+	if _, replaced := t.pending[key]; !replaced && sessionID == 0 {
+		t.unsecured++
+	}
+	t.pending[key] = &outboundEntry{
 		counter:    counter,
 		sessionID:  sessionID,
 		exchangeID: exchangeID,
 		datagram:   cp,
 		dest:       dest,
 		nextSendAt: now.Add(delay),
+		trackedAt:  now,
 		margin:     margin,
 		peer:       peer,
 		sentWall:   t.clock.Now(),
+	}
+	t.mu.Unlock()
+	if t.wake != nil {
+		t.wake() // after the unlock: the entry is in pending first
+	}
+	return true
+}
+
+// dropLocked removes the entry at key, keeping the unsecured session's
+// count; every removal from pending goes through it. Caller holds t.mu.
+func (t *outboundReliableTracker) dropLocked(key outboundKey) {
+	if _, ok := t.pending[key]; !ok {
+		return
+	}
+	delete(t.pending, key)
+	if key.sessionID == 0 {
+		t.unsecured--
 	}
 }
 
@@ -276,18 +360,37 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	delete(t.pending, outboundKey{sessionID, counter})
+	t.dropLocked(outboundKey{sessionID, counter})
 }
 
 func (t *outboundReliableTracker) AbandonExchange(exchangeID uint16) int {
+	return t.abandonExchange(exchangeID, false)
+}
+
+// AbandonUnsecuredExchange is [outboundReliableTracker.AbandonExchange]
+// for the unsecured session alone: the replies of the handshake on
+// exchangeID that still wait for their acknowledgement. Called when that
+// handshake ends — it failed, timed out, its responder was reaped, or it
+// moved past the reply — as connectedhomeip clears an exchange's entry when
+// the exchange is aborted (src/messaging/ExchangeContext.cpp:241-246 and
+// :277-287 at 6170af84, `DoClose(true)` → `ClearRetransTable(this)`; a
+// pairing session that is cleared aborts an exchange still waiting on a
+// response, src/protocols/secure_channel/PairingSession.cpp:285-290). An
+// entry of a secure session whose peer happened to pick the same exchange
+// id stays.
+func (t *outboundReliableTracker) AbandonUnsecuredExchange(exchangeID uint16) int {
+	return t.abandonExchange(exchangeID, true)
+}
+
+func (t *outboundReliableTracker) abandonExchange(exchangeID uint16, unsecuredOnly bool) int {
 	t.mu.Lock()
 	cleared := 0
 	wakers := make([]chan error, 0)
 	for key, entry := range t.pending {
-		if entry.exchangeID != exchangeID {
+		if entry.exchangeID != exchangeID || (unsecuredOnly && key.sessionID != 0) {
 			continue
 		}
-		delete(t.pending, key)
+		t.dropLocked(key)
 		if ch, has := t.waiters[key]; has {
 			delete(t.waiters, key)
 			wakers = append(wakers, ch)
@@ -331,7 +434,7 @@ func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
 		return false
 	}
 	entry := t.pending[key]
-	delete(t.pending, key)
+	t.dropLocked(key)
 	// Only a first-try datagram yields a usable round-trip. After a
 	// retransmit there is no way to tell whether the ACK answers the original
 	// or the resend, so timing it from the first send overstates the peer's
@@ -452,11 +555,23 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 	)
 	t.mu.Lock()
 	for key, p := range t.pending {
+		// A reply on the unsecured session whose handshake's time is over
+		// is dropped, due or not: [unsecuredEntryLifetime].
+		if key.sessionID == 0 && now.Sub(p.trackedAt) >= unsecuredEntryLifetime {
+			t.dropLocked(key)
+			if ch, has := t.waiters[key]; has {
+				delete(t.waiters, key)
+				ch <- errUnsecuredEntryExpired
+				close(ch)
+			}
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: errUnsecuredEntryExpired})
+			continue
+		}
 		if now.Before(p.nextSendAt) {
 			continue
 		}
 		if p.retries >= mrp.MaxRetransmissions {
-			delete(t.pending, key)
+			t.dropLocked(key)
 			if ch, has := t.waiters[key]; has {
 				delete(t.waiters, key)
 				ch <- mrp.ErrMaxRetransmissionsReached

@@ -262,8 +262,17 @@ func (b *Bridge) sendReplyTimed(
 		// handled on another goroutine) before Send returns, and an ack
 		// for an untracked message is lost — the message then goes out
 		// again as a spurious retransmission.
-		if needsAck {
-			tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
+		if needsAck && !tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer) {
+			// The unsecured session's retransmission table is full: the
+			// reply is not sent, as connectedhomeip does not send a
+			// message it cannot add to its table
+			// (src/messaging/ExchangeMessageDispatch.cpp:63-64 at 6170af84).
+			b.logger.Warn("matter.tx.reliable.unsecured_table_full",
+				slog.String("peer", srcString(src)),
+				slog.Int("exchange_id", int(requestProto.ExchangeID)),
+				slog.Int("opcode", int(responseOpcode)),
+				slog.Int("max", unsecuredEntryLimit))
+			return fmt.Errorf("%w: %w", ErrReplySend, errRetransmitTableFull)
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {

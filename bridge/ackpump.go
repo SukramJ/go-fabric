@@ -544,6 +544,11 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue
 		}
+		if errors.Is(r.Err, errUnsecuredEntryExpired) {
+			// A handshake this node opened whose Sigma1 was never
+			// acknowledged ends like one whose retries are spent.
+			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
+		}
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))
