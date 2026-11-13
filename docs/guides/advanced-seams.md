@@ -102,7 +102,7 @@ semantics, the persistence the facade threads through. A host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
-*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1647-1670` (`AttachACLLister` replaces, on a running bridge at once), `bridge/bridge.go:1025` (`Reassemble`), `:1317` (`SetOnReassembled`), `:2054` (`Topology`), `:2075` (`EventLog`), `:2541` (`ControllerRTT`), `bridge/receive.go:593` (`NotifyDeviceReachable`).*
+*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1647-1670` (`AttachACLLister` replaces, on a running bridge at once), `bridge/bridge.go:1025` (`Reassemble`), `:1317` (`SetOnReassembled`), `:2062` (`Topology`), `:2083` (`EventLog`), `:2549` (`ControllerRTT`), `bridge/receive.go:593` (`NotifyDeviceReachable`).*
 
 ## `endpoint`
 
