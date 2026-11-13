@@ -86,6 +86,18 @@ type Identify struct {
 	// outlive a single dispatch — a per-call instance both loses the
 	// state and strands one ticker goroutine per invoke.
 	//
+	// op puts the changes of IdentifyTime one after the other: a request
+	// holds it from the host's handler to the stored value, the countdown
+	// from its decrement to the host's stop. Without it the countdown's
+	// last tick could land between a request's handler call and its
+	// store, and stop the host while IdentifyTime counted from the new
+	// value. matter.js's tick is a callback under the behaviour's lock
+	// and its handler a reactor of the same value
+	// (packages/node/src/behaviors/identify/IdentifyServer.ts:54, :58,
+	// :108-114, :121-127 at db021da0). The host's MatterIdentify runs
+	// with op held: it must not set IdentifyTime on this server (a write
+	// or the Identify command) from inside the call.
+	op sync.Mutex
 	// timerMu guards timerActive and closed.
 	timerMu     sync.Mutex
 	timerActive bool
@@ -255,16 +267,29 @@ func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) er
 	// Mirrors matter.js packages/node/src/behaviors/identify/
 	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
 	// command reach one reactor (#identifyTimeChangedHandler).
+	if err := i.setIdentifyTime(ctx, t); err != nil {
+		return err
+	}
+	i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
+	// Bump DataVersion after a successful IdentifyTime write so
+	// DataVersionFilter evaluation correctly detects the cluster changed.
+	i.dataVersion.Bump()
+	return nil
+}
+
+// setIdentifyTime is a request's change of IdentifyTime: the host's
+// handler first, the stored value when it consents — one step for the
+// countdown (op), which therefore sees the value before the request or
+// after it and never the handler's call without its store.
+func (i *Identify) setIdentifyTime(ctx context.Context, t uint16) error {
+	i.op.Lock()
+	defer i.op.Unlock()
 	if h := i.hostHandler(); h != nil {
 		if err := h.MatterIdentify(ctx, t); err != nil {
 			return err
 		}
 	}
 	i.identifyTime.Store(uint32(t))
-	i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
-	// Bump DataVersion after a successful IdentifyTime write so
-	// DataVersionFilter evaluation correctly detects the cluster changed.
-	i.dataVersion.Bump()
 	return nil
 }
 
@@ -278,12 +303,9 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 		// commissioner's encoding; coerceUint16 handles both with a
 		// best-effort fallback to 0 (= clear identify).
 		t, _ := coerceUint16(fields)
-		if h := i.hostHandler(); h != nil {
-			if err := h.MatterIdentify(ctx, t); err != nil {
-				return nil, err
-			}
+		if err := i.setIdentifyTime(ctx, t); err != nil {
+			return nil, err
 		}
-		i.identifyTime.Store(uint32(t))
 		i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
 		// Bump DataVersion after a successful Identify command so
 		// DataVersionFilter evaluation correctly detects the cluster changed.
@@ -356,32 +378,49 @@ func (i *Identify) maybeStartCountdown() {
 			case <-done:
 				return
 			case <-ticker.C():
-				v := i.identifyTime.Load()
-				if v == 0 {
-					i.timerMu.Lock()
-					i.timerActive = false
-					i.timerMu.Unlock()
+				over, zero := i.tick()
+				if zero {
+					// Reported outside op, so a listener may call
+					// back into this server.
+					i.attributeChanges().Notify(identifyAttrTime)
+				}
+				if over {
 					return
-				}
-				// A CompareAndSwap, so a write or command landing
-				// between the load and the store is not overwritten.
-				if !i.identifyTime.CompareAndSwap(v, v-1) || v != 1 {
-					continue
-				}
-				// The countdown reached zero: the edge is reported and
-				// advances the DataVersion (W3-clucore-05), and the host
-				// is told to stop,
-				// as matter.js's tick drives the reactor to
-				// #stopIdentifying (IdentifyServer.ts:100-114, :121-127
-				// at 862ad75f); 0 is the contract's "stops".
-				i.dataVersion.Bump()
-				i.attributeChanges().Notify(identifyAttrTime)
-				if h := i.hostHandler(); h != nil {
-					_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
 				}
 			}
 		}
 	}()
+}
+
+// tick is one second of the countdown; over reports that the countdown
+// ended, zero that this tick took IdentifyTime to zero. The decrement and
+// — at zero — the host's stop are one step for a request (op), so a new
+// IdentifyTime arrives before the tick, which then counts it down, or
+// after the stop.
+func (i *Identify) tick() (over, zero bool) {
+	i.op.Lock()
+	defer i.op.Unlock()
+	v := i.identifyTime.Load()
+	if v == 0 {
+		i.timerMu.Lock()
+		i.timerActive = false
+		i.timerMu.Unlock()
+		return true, false
+	}
+	i.identifyTime.Store(v - 1)
+	if v != 1 {
+		return false, false
+	}
+	// The countdown reached zero: the edge advances the DataVersion and
+	// is reported by the caller (W3-clucore-05), and the host is told to
+	// stop, as matter.js's tick drives the reactor to #stopIdentifying
+	// (IdentifyServer.ts:100-114, :121-127 at 862ad75f); 0 is the
+	// contract's "stops".
+	i.dataVersion.Bump()
+	if h := i.hostHandler(); h != nil {
+		_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the countdown ended
+	}
+	return false, true
 }
 
 // triggerEffectOf reads TriggerEffect's EffectIdentifier and EffectVariant
