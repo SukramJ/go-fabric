@@ -71,16 +71,18 @@ type PaseVerifierInstaller interface {
 	InstallVerifier(verifier []byte, iterations uint32, salt []byte) (restore func(), err error)
 }
 
-// PaseSessionCloser is the optional bridge-side hook CommissioningWindow
+// PaseSessionCloser is the optional host-side hook CommissioningWindow
 // calls at the start of RevokeWindow. Matter §11.19.7.3 step 1 mandates
-// closing any open PASE session regardless of window state. The bridge's
-// secure-channel layer owns PASE session cleanup; this interface lets
-// CommissioningWindow drive it without importing the secure package.
+// closing any open PASE session regardless of window state. A window
+// attached to a bridge ([Bridge.AttachCommissioningWindow]) closes the
+// PASE sessions of the bridge's session registry by itself; the hook is
+// for a window used without one, or for sessions the host keeps
+// elsewhere, and runs before the bridge's own close.
 //
 // Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/
-// AdministratorCommissioningServer.ts:revokeCommissioning call to
-// paseCommissioner.close().
+// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
+// at db021da0 (revokeCommissioning: `SessionManager.getPaseSession()` →
+// `paseSession.initiateClose()`).
 type PaseSessionCloser interface {
 	ClosePaseSessions(ctx context.Context) error
 }
@@ -194,6 +196,10 @@ type CommissioningWindow struct {
 	// paseSessionCloser, when non-nil, is called at the start of
 	// RevokeWindow to evict any open PASE session per Matter §11.19.7.3.
 	paseSessionCloser PaseSessionCloser
+	// sessionOwner, when non-nil, closes the PASE sessions of the bridge
+	// the window is attached to; RevokeWindow runs it after
+	// paseSessionCloser. Set by [Bridge.AttachCommissioningWindow].
+	sessionOwner func()
 
 	// paseVerifierInstaller, when non-nil, installs a window-lifetime PASE
 	// acceptor from a commissioner-supplied PAKE verifier on the Enhanced
@@ -238,6 +244,14 @@ func (w *CommissioningWindow) SetFailSafeArmer(a FailSafeArmer) {
 func (w *CommissioningWindow) SetPaseSessionCloser(c PaseSessionCloser) {
 	w.mu.Lock()
 	w.paseSessionCloser = c
+	w.mu.Unlock()
+}
+
+// setSessionOwner wires (or clears, when nil) the bridge's own close of
+// its PASE sessions; see the sessionOwner field.
+func (w *CommissioningWindow) setSessionOwner(closePASE func()) {
+	w.mu.Lock()
+	w.sessionOwner = closePASE
 	w.mu.Unlock()
 }
 
@@ -741,13 +755,17 @@ type failSafeExpirer interface {
 }
 
 // RevokeWindow implements [wire.WindowController]. Per Matter §11.19.7.3
-// step 1, any open PASE session is evicted first (via [PaseSessionCloser]
-// when wired), regardless of whether a commissioning window is open.
-// Then the window is closed (if open) and the transition hook fires.
+// step 1, any open PASE session is evicted first — by the host's
+// [PaseSessionCloser] when one is wired, and by the bridge the window is
+// attached to, which owns the sessions — regardless of whether a
+// commissioning window is open. Then the window is closed (if open) and
+// the transition hook fires.
 func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// Matter §11.19.7.3 step 1: close any open PASE session before
-	// touching window state. Mirrors matter.js AdministratorCommissioningServer.ts:
-	// revokeCommissioning → paseCommissioner.close().
+	// touching window state. Mirrors matter.js
+	// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
+	// at db021da0 (revokeCommissioning, step 1: getPaseSession() →
+	// paseSession.initiateClose()).
 	//
 	// Revoked over the PASE session itself, the close waits for the
 	// command's response, as matter.js's paseSession.initiateClose defers
@@ -756,9 +774,17 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// unanswered (TC-CADMIN-1.10 step 9).
 	w.mu.RLock()
 	closer := w.paseSessionCloser
+	owner := w.sessionOwner
 	w.mu.RUnlock()
-	if closer != nil {
-		closeNow := func() { _ = closer.ClosePaseSessions(context.WithoutCancel(ctx)) }
+	if closer != nil || owner != nil {
+		closeNow := func() {
+			if closer != nil {
+				_ = closer.ClosePaseSessions(context.WithoutCancel(ctx))
+			}
+			if owner != nil {
+				owner()
+			}
+		}
 		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, closeNow) {
 			closeNow()
 		}

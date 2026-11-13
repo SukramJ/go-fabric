@@ -122,6 +122,10 @@ type GeneralCommissioning struct {
 	// CommissioningComplete; the bridge wires it (bridge.AttachRootClusters
 	// / AttachCommissioningWindow), separately from the host's hook.
 	onCommissioned func()
+	// onFailSafeRolledBack runs after onFailSafeExpired, whenever that
+	// would run; the bridge wires it (bridge.AttachRootClusters) to clear
+	// the PASE sessions, separately from the host's hook.
+	onFailSafeRolledBack func(ctx context.Context)
 	// Hook invoked every time ArmFailSafe arms the FailSafe window from
 	// the disarmed state — a re-arm extends the fail-safe in force and
 	// keeps its state, as matter.js failsafeContext.extend does. The bridge
@@ -321,6 +325,42 @@ func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context,
 	g.mu.Lock()
 	g.onFailSafeExpired = fn
 	g.mu.Unlock()
+}
+
+// SetOnFailSafeRolledBack wires what the owner of the sessions does when
+// the fail-safe expires without a CommissioningComplete — its timer, an
+// ArmFailSafe with expiry 0, [GeneralCommissioning.ExpireFailSafe]: it runs
+// after the host's [GeneralCommissioning.SetOnFailSafeExpired] hook, and
+// with or without one. The bridge wires it to clear the PASE sessions
+// ([bridge.Bridge.AttachRootClusters]), as matter.js's fail-safe context
+// does in its rollback (packages/protocol/src/common/FailsafeContext.ts:277-279
+// at db021da0, "1. Terminate any open PASE secure session by clearing any
+// associated Secure Session Context at the Server" → closePaseSession); a
+// host leaves it alone. ctx is the expiring command's context, or — on the
+// timer — the context of the ArmFailSafe that armed the fail-safe, whose
+// interaction is over. Pass nil to detach.
+func (g *GeneralCommissioning) SetOnFailSafeRolledBack(fn func(ctx context.Context)) {
+	g.mu.Lock()
+	g.onFailSafeRolledBack = fn
+	g.mu.Unlock()
+}
+
+// failSafeExpiryHooksLocked returns what runs when the fail-safe expires:
+// the host's hook, then the session owner's. Nil when neither is wired.
+// Caller holds g.mu and calls the result without it.
+func (g *GeneralCommissioning) failSafeExpiryHooksLocked() func(ctx context.Context, fabricIndex uint8) {
+	host, rolledBack := g.onFailSafeExpired, g.onFailSafeRolledBack
+	if host == nil && rolledBack == nil {
+		return nil
+	}
+	return func(ctx context.Context, fabricIndex uint8) {
+		if host != nil {
+			host(ctx, fabricIndex)
+		}
+		if rolledBack != nil {
+			rolledBack(ctx)
+		}
+	}
 }
 
 // SetOnCommissioned wires what ends the commissioning window after a
@@ -659,7 +699,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// OpCreds.OnFailSafeExpiry (which acquires its own lock to perform
 		// the AddNOC rollback) runs without our mutex held — matching the
 		// timeout path in watchFailSafeExpiry.
-		hook := g.onFailSafeExpired
+		hook := g.failSafeExpiryHooksLocked()
 		g.mu.Unlock()
 		unlocked = true
 		if termsReverted {
@@ -759,14 +799,15 @@ type failSafeWatch struct {
 }
 
 // startFailSafeWatchLocked replaces the expiry watcher by one for a
-// window that ends at expiresAt; without an expiry hook none runs. One
+// window that ends at expiresAt; without an expiry hook — the host's or
+// the session owner's — none runs. One
 // watcher serves the window: before, every arm and re-arm started a
 // goroutine that slept to its own deadline, so a commissioner that
 // re-armed every few seconds left one parked per re-arm until that
 // deadline (review II, W2-conc-15). Caller holds g.mu.
 func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
 	g.stopFailSafeWatchLocked()
-	if g.onFailSafeExpired == nil {
+	if g.onFailSafeExpired == nil && g.onFailSafeRolledBack == nil {
 		return
 	}
 	w := &failSafeWatch{
@@ -824,7 +865,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 		g.failSafeCumulativeStarted = false
 		termsReverted = g.revertTermsLocked()
 	}
-	hook := g.onFailSafeExpired
+	hook := g.failSafeExpiryHooksLocked()
 	g.mu.Unlock()
 	if stillArmed {
 		if termsReverted {
@@ -1086,7 +1127,7 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 	g.breadcrumb = 0
 	termsReverted := g.revertTermsLocked()
 	g.dataVersion.Bump()
-	hook := g.onFailSafeExpired
+	hook := g.failSafeExpiryHooksLocked()
 	g.mu.Unlock()
 	if termsReverted {
 		g.changes.Notify(gencommTCAttrs...)

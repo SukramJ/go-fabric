@@ -31,4 +31,16 @@ func TestAfterResponse(t *testing.T) {
 	if len(got) != 3 || got[0] != 0 || got[2] != 2 {
 		t.Fatalf("ran %v, want [0 1 2] once", got)
 	}
+	// Once the response is out nothing is deferred until after it: the
+	// caller is told to do the work itself. A context outlives its
+	// interaction — the fail-safe timer an ArmFailSafe starts hands its
+	// expiry hooks that command's context — and work registered then
+	// would never run.
+	if DeferAfterResponse(ctx, func() { got = append(got, 99) }) {
+		t.Fatal("registered after the response was sent")
+	}
+	a.Run()
+	if len(got) != 3 {
+		t.Fatalf("ran %v after a refused registration, want the first three alone", got)
+	}
 }

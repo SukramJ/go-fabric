@@ -74,17 +74,16 @@ func (n *Node) failSafeParticipants() []failSafeParticipant {
 }
 
 // failSafeExpired reverts every participant after the root's rollback
-// (kFailSafeTimerExpired), then has the bridge terminate every open PASE
-// session — after the response when the expiry runs inside an interaction
-// (ArmFailSafe with expiry 0). The close is the bridge's
-// ([bridge.Bridge.FailSafeExpired]), which owns the sessions; mirrors
-// matter.js packages/protocol/src/common/FailsafeContext.ts:277-279
+// (kFailSafeTimerExpired). The PASE sessions are terminated by the bridge,
+// which owns them: it has its own hook in the root's fail-safe expiry
+// ([bridge.Bridge.FailSafeExpired], wired by AttachRootClusters) and runs
+// after this one — matter.js
+// packages/protocol/src/common/FailsafeContext.ts:277-279 at db021da0
 // (rollback step 1: closePaseSession with the current exchange).
 func (n *Node) failSafeExpired(ctx context.Context, _ uint8) {
 	for _, p := range n.failSafeParticipants() {
 		p.OnFailSafeExpired(ctx)
 	}
-	n.br.FailSafeExpired(ctx)
 }
 
 // failSafeCommitted commits every participant at CommissioningComplete

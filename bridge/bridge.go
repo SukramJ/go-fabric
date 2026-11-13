@@ -122,14 +122,13 @@
 //     stops at the attestation step.
 //     Another is silent: the registry lists its sessions (Sessions, as
 //     operational.Manager does), which is how the bridge clears the PASE
-//     sessions when a commissioning ends — by itself after a
-//     CommissioningComplete core.GeneralCommissioning answered OK, and in
-//     [Bridge.FailSafeExpired], which the host calls from the root's
-//     fail-safe-expiry hook (GeneralCommissioning.SetOnFailSafeExpired,
-//     after its own rollback; the node facade does). Without the
-//     capability, or without that call, a PASE session keeps the
-//     commissioning channel's implicit Administer after the commissioning
-//     it served is over, until it is reaped.
+//     sessions when a commissioning ends — after a CommissioningComplete
+//     core.GeneralCommissioning answered OK, when that server's fail-safe
+//     expires ([Bridge.FailSafeExpired], which AttachRootClusters wires
+//     into it) and when the attached commissioning window is revoked. The
+//     bridge does all three by itself. Without the capability a PASE
+//     session keeps the commissioning channel's implicit Administer after
+//     the commissioning it served is over, until it is reaped.
 //   - AttachSubscriptionStore — silent. Start loads the previous run's
 //     subscriptions from it and clears it; each subscription of a CASE
 //     session is written when it becomes active and deleted when it is
@@ -1714,11 +1713,19 @@ func (b *Bridge) clk() clock.Clock { return clock.Or(b.clock) }
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	if w != nil {
 		w.SetClock(b.clk())
+		// The bridge owns the sessions: a revoke of its window closes
+		// the PASE sessions, whether or not the host wired a
+		// [PaseSessionCloser] (pase_close.go).
+		w.setSessionOwner(b.closePASESessionsOnRevoke)
 	}
 	b.mu.Lock()
+	previous := b.commissioningWindow
 	b.commissioningWindow = w
 	roots := b.rootClusters
 	b.mu.Unlock()
+	if previous != nil && previous != w {
+		previous.setSessionOwner(nil)
+	}
 	wireCommissioned(roots, w)
 	if w != nil {
 		// A window that opens, times out, is revoked or ends with a
@@ -1766,6 +1773,7 @@ func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.wireDeviceLoad(cp)
 	wireAdminEntryEvents(cp)
+	b.wireFailSafeExpiry(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
 	window := b.commissioningWindow
