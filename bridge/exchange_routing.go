@@ -134,6 +134,16 @@ type exchangeRouting struct {
 	statusResponseWaits sync.Map
 }
 
+// maxPendingTimedRequests bounds the timed interactions one session may
+// have waiting for their Write or Invoke; the TimedRequest past it is
+// answered Busy ([Bridge.dispatchTimedRequest]). The number is
+// connectedhomeip's CHIP_IM_MAX_NUM_TIMED_HANDLER
+// (src/lib/core/CHIPConfig.h:1010-1011 at 6170af84), whose pool is
+// node-wide and answers Busy when exhausted
+// (src/app/InteractionModelEngine.cpp:963-973); per session here, so one
+// session cannot use up another's.
+const maxPendingTimedRequests = 8
+
 // hasTimedDeadlines reports whether any timed deadline is registered —
 // one the ACK pump's sweep may still have to reclaim.
 func (r *exchangeRouting) hasTimedDeadlines() bool {
@@ -182,6 +192,24 @@ func (r *exchangeRouting) sweepExpiredTimedDeadlines(now time.Time) int {
 		return true
 	})
 	return reclaimed
+}
+
+// pendingTimedRequests counts the timed deadlines of sessionID that have
+// not elapsed at now, the one of exceptExchange left out — a TimedRequest
+// repeated on an exchange replaces its own entry.
+func (r *exchangeRouting) pendingTimedRequests(sessionID, exceptExchange uint16, now time.Time) int {
+	n := 0
+	r.timedDeadlines.Range(func(k, v any) bool {
+		key, ok := k.(timedKey)
+		if !ok || key.sessionID != sessionID || key.exchangeID == exceptExchange {
+			return true
+		}
+		if deadline, ok := v.(time.Time); ok && !now.After(deadline) {
+			n++
+		}
+		return true
+	})
+	return n
 }
 
 // dropSessionTimedDeadlines deletes every timed deadline registered by

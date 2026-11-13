@@ -676,6 +676,15 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 // StatusResponse with the spec-mandated codes.
 func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, req im.TimedRequest) error {
 	now := b.clk().Now()
+	// A session that already has [maxPendingTimedRequests] timed
+	// interactions waiting gets Busy and no deadline: without the bound
+	// a session could register one entry per exchange id until the
+	// deadlines ran out (review II, W2-conc-12). connectedhomeip answers
+	// Busy when its pool of timed handlers is exhausted
+	// (src/app/InteractionModelEngine.cpp:963-973 at 6170af84).
+	if b.routing.pendingTimedRequests(requestHdr.SessionID, proto.ExchangeID, now) >= maxPendingTimedRequests {
+		return b.replyTimedStatus(src, requestHdr, proto, "too_many_pending", im.StatusBusy)
+	}
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot
 	// consume a deadline registered by another session.
