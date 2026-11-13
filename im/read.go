@@ -381,11 +381,24 @@ func (r ReportData) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWrite
 		// explicit-width helper to lock the wire type.
 		enc.PutUint32(tlv.ContextTag(tagReportSubscriptionID), r.SubscriptionID)
 	}
-	enc.StartArray(tlv.ContextTag(tagReportAttributeReports))
-	for _, rep := range r.Reports {
-		rep.marshal(enc, valueWriter)
+	// Each report array is written only when it has an entry: a
+	// keep-alive, an event-only report and an empty read response carry no
+	// attributeReports field. Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:490-491 at
+	// db021da0 (`attributeReports: undefined, eventReports: undefined`),
+	// :764-767 and :782-785 (an array is created with its first entry) and
+	// :512-513 (both deleted once a chunk went out) — for every message
+	// sendDataReport sends, the read response, the priming report and the
+	// subscription's reports alike. A receiver takes an absent array and
+	// an empty one alike ([UnmarshalReportDataTLV]; chip
+	// src/app/ReadClient.cpp:688-712 at 6170af84).
+	if len(r.Reports) > 0 {
+		enc.StartArray(tlv.ContextTag(tagReportAttributeReports))
+		for _, rep := range r.Reports {
+			rep.marshal(enc, valueWriter)
+		}
+		_ = enc.EndContainer()
 	}
-	_ = enc.EndContainer()
 	if len(r.EventReports) > 0 {
 		enc.StartArray(tlv.ContextTag(tagReportEventReports))
 		for _, ev := range r.EventReports {
