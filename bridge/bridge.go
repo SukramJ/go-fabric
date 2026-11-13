@@ -2326,7 +2326,9 @@ type CommissioningAdvertisement struct {
 // `_L<long>`, `_S<short>`, `_V<vendor>` subtypes per Matter §4.3.1.4)
 // so commissioners discover the bridge by service-type filter while
 // the window is open. Idempotent — a second call replaces the prior
-// publish.
+// publish. A pairing hint and pairing instruction that do not belong
+// together ([mdns.CommissionableServiceConfig.Validate]) are an error
+// wrapping [mdns.ErrInvalidService], and nothing is published.
 //
 // The instance name is remembered on the bridge so
 // [Bridge.WithdrawCommissioning] can withdraw the right record on
@@ -2337,7 +2339,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	}
 	pubCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
-	svc := mdns.BuildCommissionableService(mdns.CommissionableServiceConfig{
+	cfg := mdns.CommissionableServiceConfig{
 		Logger:             b.logger,
 		InstanceID:         params.InstanceID,
 		Discriminator:      params.Discriminator,
@@ -2353,7 +2355,15 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
-	})
+	}
+	// A pairing hint and instruction that do not belong together are
+	// refused, not advertised — matter.js throws in the advertisement's
+	// constructor ([mdns.CommissionableServiceConfig.Validate]).
+	if err := cfg.Validate(); err != nil {
+		b.logger.Warn("matter.mdns.commissioning_invalid", slog.Any("err", err))
+		return fmt.Errorf("matter.mdns.commissioning_publish: %w", err)
+	}
+	svc := mdns.BuildCommissionableService(cfg)
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Warn("matter.mdns.commissioning_publish_err",
 			slog.String("instance", svc.InstanceName),
