@@ -429,15 +429,18 @@ func (b *Bridge) closeConnRoute(r *connRoute) {
 // that also cascades into the subscription manager
 // (operational.Manager.SetOnSessionClose) — so every close path reaches
 // it: CloseSession, fabric removal, NOC rotation, the idle reaper, a
-// peer-loss eviction. The bridge ends the session's chunk waits, forgets
-// the session's route and closes a TCP connection whose last session
-// this was (unbindSessionRoute;
+// peer-loss eviction. The bridge ends the session's chunk waits and its
+// open chunked writes, forgets the session's route and closes a TCP
+// connection whose last session this was (unbindSessionRoute;
 // matter.js ExchangeManager.ts:674-681). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	// A handler waiting for the session's answer to a chunk stops now,
 	// not at its timer (review II, R2-P1-req2-01).
 	b.endSessionChunkWaits(sessionID)
+	// Its open chunked writes end and release their holds (review II,
+	// R2-P1-dr-req-02).
+	b.routing.dropSessionWriteTxs(sessionID)
 	b.unbindSessionRoute(sessionID)
 	b.recordSessionsOpen()
 }
@@ -552,6 +555,7 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 		return true
 	})
 	b.routing.dropSessionTimedDeadlines(sid)
+	b.routing.dropSessionWriteTxs(sid)
 	b.sessionPeerAddrs.Delete(sid)
 	b.sessionRouteOwners.Delete(sid)
 

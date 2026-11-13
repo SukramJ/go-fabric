@@ -80,3 +80,78 @@ func TestChunkedWritesOfOneSessionAreBounded(t *testing.T) {
 		}
 	}
 }
+
+// TestClosedSessionReleasesItsChunkedWrites (review II, R2-P1-dr-req-02): a
+// session's open chunked writes end with the session — on SessionClosed
+// and on a peer-loss eviction, where its chunk waits and timed deadlines
+// go — so the attributes they held are writable from another session at
+// once, not only after writeTxTTL, and a session given the same id starts
+// with none open. A chunk whose handling overlapped the close gives back
+// what it took when it ends. matter.js releases the holds when
+// handleWriteRequest leaves its scope (InteractionServer.ts:460-469 at
+// db021da0), which the session's force-close ends.
+func TestClosedSessionReleasesItsChunkedWrites(t *testing.T) {
+	t.Parallel()
+	attr := func(i uint32) im.ConcreteAttributePath {
+		return im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: i, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	for _, tc := range []struct {
+		name  string
+		close func(b *Bridge, sid uint16)
+	}{
+		{"SessionClosed", func(b *Bridge, sid uint16) { b.SessionClosed(sid) }},
+		{"evictSession", func(b *Bridge, sid uint16) { b.evictSession(sid, nil) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := newStartedBridge(t)
+			now := b.clk().Now()
+			write := func(key mrp.ExchangeKey, p im.ConcreteAttributePath, more bool) (im.StatusCode, bool) {
+				t.Helper()
+				tx := b.routing.writeTransaction(key, more, now)
+				if tx == nil {
+					return 0, false
+				}
+				resp := im.HandleWriteRequest(im.WithWriteTransaction(t.Context(), tx), holdDispatcher{}, im.WriteRequest{
+					MoreChunkedMessages: more,
+					Writes:              []im.AttributeWrite{{Path: p, Value: im.AttributeValue{Value: "x"}}},
+				})
+				b.routing.endWriteChunk(key, tx, more)
+				if len(resp.Responses) != 1 {
+					t.Fatalf("responses %+v, want one", resp.Responses)
+				}
+				return resp.Responses[0].Status.Status, true
+			}
+			const sid, other = 0x77, 0x78
+			for i := range uint32(maxChunkedWritesPerSession) {
+				if _, opened := write(mrp.ExchangeKey{SessionID: sid, ExchangeID: uint16(1 + i)}, attr(i), true); !opened {
+					t.Fatalf("chunked write %d refused", i)
+				}
+			}
+			// A chunk in hand when the session closes: its transaction was
+			// looked up before the close, its holds are taken after it.
+			late := mrp.ExchangeKey{SessionID: sid, ExchangeID: 1}
+			lateTx := b.routing.writeTransaction(late, true, now)
+			tc.close(b, sid)
+			im.HandleWriteRequest(im.WithWriteTransaction(t.Context(), lateTx), holdDispatcher{}, im.WriteRequest{
+				MoreChunkedMessages: true,
+				Writes:              []im.AttributeWrite{{Path: attr(100), Value: im.AttributeValue{Value: "x"}}},
+			})
+			b.routing.endWriteChunk(late, lateTx, true)
+
+			for i := range uint32(maxChunkedWritesPerSession) {
+				if s, _ := write(mrp.ExchangeKey{SessionID: other, ExchangeID: uint16(0x100 + i)}, attr(i), false); s != im.StatusSuccess {
+					t.Errorf("attribute %d held by the closed session's chunked write: another session's write answered %v, want SUCCESS", i, s)
+				}
+			}
+			if s, _ := write(mrp.ExchangeKey{SessionID: other, ExchangeID: 0x200}, attr(100), false); s != im.StatusSuccess {
+				t.Errorf("the attribute a chunk overlapping the close took: another session's write answered %v, want SUCCESS", s)
+			}
+			for i := range uint32(maxChunkedWritesPerSession) {
+				if _, opened := write(mrp.ExchangeKey{SessionID: sid, ExchangeID: uint16(0x300 + i)}, attr(0x10+i), true); !opened {
+					t.Fatalf("a session reusing the id: chunked write %d refused, want the count to start at zero", i)
+				}
+			}
+		})
+	}
+}

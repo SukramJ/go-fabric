@@ -332,3 +332,39 @@ func (r *exchangeRouting) openWriteTxs(sessionID uint16) int {
 	})
 	return n
 }
+
+// dropSessionWriteTxs ends the chunked writes sessionID has open and
+// releases what they hold: they go with the session, as its chunk waits
+// and timed deadlines do, not at [writeTxTTL] — so a session's holds and
+// its count against [maxChunkedWritesPerSession] do not outlive it (review
+// II, R2-P1-dr-req-02). matter.js releases a chunked write's holds when
+// handleWriteRequest leaves its scope (InteractionServer.ts:460-469 at
+// db021da0), which the session's force-close ends.
+func (r *exchangeRouting) dropSessionWriteTxs(sessionID uint16) {
+	r.writeTxs.Range(func(k, _ any) bool {
+		if key, ok := k.(mrp.ExchangeKey); ok && key.SessionID == sessionID {
+			if v, loaded := r.writeTxs.LoadAndDelete(k); loaded {
+				if w, isTx := v.(*writeTx); isTx {
+					w.tx.Release()
+				}
+			}
+		}
+		return true
+	})
+}
+
+// endWriteChunk follows a chunk's handling: a chunk with more to come
+// whose transaction is no longer in the table — its session closed while
+// the chunk ran ([exchangeRouting.dropSessionWriteTxs]) — gives back what
+// it took, which no later chunk or sweep would.
+func (r *exchangeRouting) endWriteChunk(key mrp.ExchangeKey, tx *im.WriteTransaction, more bool) {
+	if !more {
+		return
+	}
+	if v, ok := r.writeTxs.Load(key); ok {
+		if w, isTx := v.(*writeTx); isTx && w.tx == tx {
+			return
+		}
+	}
+	tx.Release()
+}
