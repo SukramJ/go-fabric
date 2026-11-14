@@ -278,12 +278,17 @@ CREATE INDEX IF NOT EXISTS matter_persistent_subscriptions_fabric
 -- the im/subscription.PeerSubscription encoding and is opaque to this
 -- package. The bridge clears the table when it loads it at start-up and
 -- writes back each subscription that becomes active again.
+--
+-- save_seq (v8) is the save order: each save sets it one past the table's
+-- largest, so the rows load in the exact order they were saved, where
+-- updated_at's whole seconds tie; 0 is a row saved before v8.
 CREATE TABLE IF NOT EXISTS matter_server_subscriptions (
     subscription_id     INTEGER  PRIMARY KEY,
     fabric_index        INTEGER  NOT NULL,
     peer_node_id        BLOB     NOT NULL,
     payload             BLOB     NOT NULL,
-    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    save_seq INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS matter_server_subscriptions_fabric

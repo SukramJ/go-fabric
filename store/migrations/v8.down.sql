@@ -7,7 +7,8 @@
 -- rows go with it through the foreign keys' ON DELETE CASCADE, which needs
 -- PRAGMA foreign_keys on the connection). The VID verification data moves
 -- back into the settings v7 reads (lower-case hex, the encoding of
--- cluster/core's storeVidVerification). Then the columns go.
+-- cluster/core's storeVidVerification). Then the columns go; the server
+-- subscriptions fall back to updated_at's order.
 
 UPDATE matter_node_identities
 SET noc = prior_noc, icac = prior_icac, private_key = prior_private_key
@@ -25,6 +26,7 @@ INSERT OR REPLACE INTO matter_settings (key, value)
 SELECT 'matter.fabric.' || fabric_index || '.vid.vvsc', lower(hex(vvsc))
 FROM matter_fabrics WHERE vvsc IS NOT NULL;
 
+ALTER TABLE matter_server_subscriptions DROP COLUMN save_seq;
 ALTER TABLE matter_node_identities DROP COLUMN prior_private_key;
 ALTER TABLE matter_node_identities DROP COLUMN prior_icac;
 ALTER TABLE matter_node_identities DROP COLUMN prior_noc;

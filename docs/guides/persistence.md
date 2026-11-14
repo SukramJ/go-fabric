@@ -162,7 +162,7 @@ idempotent.
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
 | `matter_groupcast_groups` | v2 | the Groupcast cluster's per-group properties |
-| `matter_server_subscriptions` | v2 | the subscriptions of active CASE sessions, to re-establish after a restart |
+| `matter_server_subscriptions` | v2, a column added in v8 | the subscriptions of active CASE sessions, to re-establish after a restart; since v8 the exact order they were saved in (`save_seq`), which the re-establishment walks newest first |
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
 | `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |

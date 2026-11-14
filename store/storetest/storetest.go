@@ -79,6 +79,7 @@ var cases = []testCase{
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
 	{"server-subscriptions", serverSubscriptionsCase},
+	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},
 	{"settings/set-settings", setSettingsCase},
 	{"ota", otaCase},
@@ -598,9 +599,7 @@ func resumptionCase(ctx context.Context, t *testing.T, p store.Port) {
 }
 
 // serverSubscriptionsCase checks the load order the bridge restores
-// subscriptions in (ADR 0008): the least recently saved first. Rows saved
-// within one tick of a store's clock are ordered by subscription id, so the
-// case saves them in id order.
+// subscriptions in (ADR 0008): the least recently saved first.
 func serverSubscriptionsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err := p.LoadServerSubscriptions(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("LoadServerSubscriptions on an empty store = %v, %v", got, err)
@@ -624,6 +623,25 @@ func serverSubscriptionsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err = p.LoadServerSubscriptions(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("LoadServerSubscriptions after Clear = %v, %v", got, err)
 	}
+}
+
+// serverSubscriptionsSaveOrder: the load order is the exact save order,
+// not the subscription ids' — saves in one instant, ids descending — and a
+// save of an existing row makes it the most recent. The bridge's
+// re-establishment walks a peer's subscriptions newest first by this order
+// and re-saves them to restore it (review II, rework of R2-P2-sess-01).
+func serverSubscriptionsSaveOrder(ctx context.Context, t *testing.T, p store.Port) {
+	for _, id := range []byte{30, 20, 10} {
+		must(t, p.SaveServerSubscription(ctx, uint32(id), 1, 0x10, []byte{id}))
+	}
+	got, err := p.LoadServerSubscriptions(ctx)
+	must(t, err)
+	wantEqual(t, "LoadServerSubscriptions after saving 30, 20, 10", got, [][]byte{{30}, {20}, {10}})
+	must(t, p.SaveServerSubscription(ctx, 30, 1, 0x10, []byte{30}))
+	must(t, p.SaveServerSubscription(ctx, 20, 1, 0x10, []byte{20}))
+	got, err = p.LoadServerSubscriptions(ctx)
+	must(t, err)
+	wantEqual(t, "LoadServerSubscriptions after re-saving 30, 20", got, [][]byte{{10}, {30}, {20}})
 }
 
 func settingsCase(ctx context.Context, t *testing.T, p store.Port) {

@@ -134,7 +134,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "2ea481ee09b4587f250352728cc5f6e65a03bffe1a66ae96447bd7673ded5fdc"
+	const want = "dbf27c133dac78346ac538dfb586d205594450d68c9edcc497d4f2f3dead5460"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}

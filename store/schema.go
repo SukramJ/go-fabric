@@ -81,8 +81,9 @@ func Apply(ctx context.Context, db *sql.DB) error {
 //     unchanged, so the step has no migration of its own.
 //   - matter_fabrics and matter_node_identities gain the columns of
 //     migration v8 (the pending mark, the VID verification data, the prior
-//     values of an uncommitted UpdateNOC), each one its table lacks, with
-//     v8's statements, in one transaction.
+//     values of an uncommitted UpdateNOC), and matter_server_subscriptions
+//     its save order, each one its table lacks, with v8's statements, in
+//     one transaction.
 //   - The settings matter.fabric.<index>.vid.statement and
 //     matter.fabric.<index>.vid.vvsc, where releases before v8 kept a
 //     fabric's VID verification data, move into that fabric's
