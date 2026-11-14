@@ -311,8 +311,8 @@ func (m *Manager) handler(protocol uint16) ProtocolHandler {
 // (from its DNS-SD record), nil for none. Our side is the initiator: the
 // session draws a random ephemeral node id, sends with the global
 // unencrypted counter and counts the peer as idle until it answers —
-// matter.js SessionManager.ts:418-458 (createUnsecuredSession) and
-// UnsecuredSession.ts:26-34. The peer's intervals are clamped to
+// matter.js SessionManager.ts:469-509 (createUnsecuredSession) and
+// UnsecuredSession.ts:26-40 at db021da0. The peer's intervals are clamped to
 // [sessionparams.MaxUnauthenticatedInterval]: nothing has authenticated
 // them (review II, owner decision 45).
 func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Parameters) (*Session, error) {
@@ -629,9 +629,9 @@ type exchangeKey struct {
 }
 
 // Initiate opens an exchange on s for protocol — matter.js
-// ExchangeManager.ts:145-156 (initiateExchangeForSession): the exchange id
+// ExchangeManager.ts:170-181 (initiateExchangeForSession): the exchange id
 // is the next value of a counter that starts at random and wraps at
-// 0xFFFF (:729-743), skipping an id an open exchange this node started on
+// 0xFFFF (:794-808), skipping an id an open exchange this node started on
 // s still holds (#freeExchangeIdFor, :189-199 at db021da0), and the
 // exchange is indexed apart from received ones.
 func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange, error) {

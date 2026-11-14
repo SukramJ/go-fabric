@@ -219,7 +219,7 @@ func (s *Session) ReportedParameters() *sessionparams.Parameters {
 
 // SetTimingParameters replaces the peer's MRP intervals with those p
 // states, the fallback for each one it does not — matter.js
-// Session.ts:249-254 (set timingParameters), which the handshakes call
+// Session.ts:261-266 (set timingParameters), which the handshakes call
 // when the responder's parameters arrive (PaseClient.ts:163-165,
 // CaseClient.ts:245-247). The peer has not authenticated when it states
 // them, so each interval is clamped to
