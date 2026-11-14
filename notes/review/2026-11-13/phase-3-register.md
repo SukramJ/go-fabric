@@ -1,7 +1,7 @@
 # Phase 3 — the dispositions
 
 The commit ids below are those of the branch of this phase's pull request
-(`review2/p3`, `8c9088ee..58d60b96`, 100 commits). If that pull request merges
+(`review2/p3`, `8c9088ee..46109272`, 107 commits). If that pull request merges
 squashed, as the three before it did, its single commits stay retrievable
 through the pull request's reference. Items that are still open after this
 branch and describe a weakness a party on the network could use are held back
@@ -32,13 +32,13 @@ coordinator's open list, `decisions.md` (owner decisions 50 to 57), the
 coordinator's note on the six commits after the fixes — the third citation
 pass, a repaired test and the notes pass (`02f96a64`, `97850231`, `b0b7e8e0`:
 CHANGELOG, `by_design.md`, the limits page) — and `git log
-8c9088ee..58d60b96`. The notes are not part of this change; one that mentions
+8c9088ee..46109272`. The notes are not part of this change; one that mentions
 an item held back follows with the pull request that fixes that item (owner
 decision 25).
 
 How a row was placed — by rule:
 
-- **fixed `<commit>`** — the commit is in `8c9088ee..58d60b96`, and its
+- **fixed `<commit>`** — the commit is in `8c9088ee..46109272`, and its
   subject or its fix note's table names the ID. The fix notes carry the ids
   the commits had before they were rebased onto the branch; the branch's
   commit is the one with the same subject. For every finding of high or medium
@@ -49,10 +49,10 @@ How a row was placed — by rule:
   repaired it; "On the fix of" in the later finding's row names the same
   pairing from the other side. The pairing is the register editor's: by the
   finding a later one names, or by the mechanism it names and the commit that
-  brought it. The row gives the state at `58d60b96` and says what the code
+  brought it. The row gives the state at `46109272` and says what the code
   does now, not what the defect allowed.
 - **by_design `<row>`**, **Ahead `<row>`** — the row is in
-  `notes/parity/by_design.md` at `58d60b96`.
+  `notes/parity/by_design.md` at `46109272`.
 - **parity, no change** — the behaviour is matter.js's at the pin; the lines
   were re-read for this file.
 - **struck: `<reason>`** — the reason is the fix note's or the coordinator's;
@@ -340,6 +340,8 @@ and 2 used `N-…` for theirs.
 | N3-coord-4 | the coordinator's list | register rows owed for what was fixed after `2155ad38`: the race's two numbers, the BTP send queue, the commissioner's disarm on every failure after PASE, the bound on a BLE central without PASE, the TCP listener's replacement rule, the stake calls | fixed `97850231` | `notes/parity/by_design.md` — two Ahead rows with their entries (`BD-Matter-Controller-CommissioningRaceBounded`, `BD-Matter-BTP-SendQueueBounded`), three more entries (`BD-Matter-CASE-HandshakeStateBounded`, `BD-Matter-BLE-CentralWithoutPASEGivenUp`, `BD-Matter-Controller-ResumedSessionCountedAtRegistration`), and nine entries and four rows amended, `BD-chip-Commissioner-AbortDisarmsFailSafe`, `BD-chip-TCP-InboundConnectionsBounded` and `BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly` among them |
 | N3-coord-5 | the coordinator's guards on `3b6b250f` | `TestSubscriptionEndsWhenItsSubjectReadsNothing`, a test this branch added with `fc8186bf`, failed in the race run and under load: 77 of 324 runs under the stress recipe with the race detector (the coordinator's measure). One step of a minute on the fake clock fired the keep-alive's timer and, in the same advance, every retransmission timer armed behind it (`clock/clocktest/fake.go:205-212`), so the device gave its subscriber up as unreachable (the coordinator's reading of a failing run's log) | fixed `6d6cf533` | `fabrictest/subscription_quota_test.go` — the quota tests let the clock pass under the quiet protocol (`letPass`, over `Site.Eventually`), and the repaired test's subscriptions ask for a ceiling of five seconds; 0 of 300 runs of the two changed tests failed after (the coordinator's measure). No product code changed |
 | N3-coord-6 | the coordinator's guards on `3b6b250f` | `TestDeprecatedIdentifiersAreAnnounced` was red again: `Manager.ReleaseID`, `MRPAckAdapter` and `NewMRPAckAdapter`, deprecated by `2299af59` and `d78b583f`, were in `README.md`'s table and not in `CHANGELOG.md` | fixed `02f96a64` | `CHANGELOG.md` — the two Deprecated lines; the same commit brings the lines for what was fixed after `f85e8cbc`. Green after it is the notes pass's run, not repeated here |
+| N3-coord-7 | the coordinator's guards after the notes pass | `TestNodeServesPASEReadAndSubscription` failed once in the coverage run and under load: 4 of 200 runs under the stress recipe with the race detector, 0 of 400 on `8c9088ee` (the coordinator's measure). The test closed its PASE session and commissioned at once; since `557eb391` (R2-P3-pase-01) the device accepts no new PASE exchange while a PASE session exists that is not closing, and a CloseSession asks for no acknowledgement, so the test could not know the device had handled it | fixed `53a13ada` | `node/node_test.go` — the test waits until the node's session table holds no PASE session (`waitNoPASE`, as `node/issue87_test.go` waited before this branch); 0 of 400 runs failed after (the coordinator's measure). No product code changed. Other tests of the same shape were looked for only by a search of the three lines before a `Commission` or `PASE` call |
+| N3-coord-8 | the coordinator's guards after the notes pass | `make cover-check` was red: `secure/operational` measured 94.5 % against its floor of 95 — `Manager.PASESessionIDs` and the compaction of the placeholder queue, both new on this branch, were reached by no test of the package — and `transport/tcp` stood more than three points above its floor in one run | fixed `aa063f04`, `d5b33ffd` | `secure/operational/manager_placeholder_queue_test.go` — two tests, 96.2 % after; they cover code that was there and were not seen red. `script/coverfloor/floors.go` — `transport/tcp`'s floor 92 to 93: the package measures 94.7 % or 95.7 % from run to run (five and one of six runs, the coordinator's measure), and the 95 `aa063f04` set did not hold the lower value |
 
 ## Unread
 
@@ -372,7 +374,7 @@ roles) and not repeated.
 
 ## The citation passes
 
-Three passes read citations of matter.js and connectedhomeip in the exported
+Four passes read citations of matter.js and connectedhomeip in the exported
 trees of the pins. The first two read every citation that a wave of the branch
 added or changed in a Go file or a docs page — `8c9088ee..dd6e5bf3` and
 `dd6e5bf3..c8baf5c3` — and the fix agents' lists of new citations. Their
@@ -407,10 +409,24 @@ lines added and 35 removed in 14 files.
   without one of the three patterns was not found, and a statement about a
   reference without a line number was not read. `3b6b250f`, the last of the
   twelve, is itself the correction of one citation (R2-P3-rr-dev-01).
-- The notes pass's three commits (`02f96a64`, `97850231`, `b0b7e8e0`) add 85
-  citations on the lines they write in `CHANGELOG.md`, `by_design.md` and the
-  limits page. They are their author's reading; the sources name no citation
-  pass over them. `6d6cf533` adds none.
+- The fourth pass read the lines the notes pass's three commits (`02f96a64`,
+  `97850231`, `b0b7e8e0`) add to `CHANGELOG.md`, `by_design.md` and the limits
+  page, by its own count: 165 cited ranges in 87 statements, and three
+  searches for an absence run again. 4 ranges were corrected (the lookup line
+  of `ExchangeManager.ts` once, the line that sends connectedhomeip's disarm
+  three times), 1 statement was corrected (that a Busy answer reaches
+  matter.js's status-error branch stood as not traced; it is traced now for
+  the AddOrUpdateWiFiNetwork invoke, not for ScanNetworks or ConnectNetwork),
+  4 statements that had no line or too few got lines; none was marked
+  unverified, none was not found, and no citation given as the reason for
+  behaviour failed. Its corrections are `4570794c` and `1fd5c4d3`; `46109272`
+  moves two ranges in Go comments to the same lines. Its limits, as it states
+  them: the absences are searches over the named files and directories; a
+  statement about this module's own behaviour was checked only where it is a
+  number or a constant; statements about connectedhomeip that the text already
+  marks unverified were left so. `6d6cf533`, `aa063f04`, `53a13ada` and
+  `d5b33ffd` add no line that names a reference (a search of their added
+  lines).
 - Re-read for this file, in the exported trees: matter.js
   `PeerConnection.ts:703-707`, `CaseServer.ts:211-216`,
   `SessionManager.ts:312-318` and `:699-726`; connectedhomeip
@@ -423,7 +439,7 @@ lines added and 35 removed in 14 files.
 
 ## Counts
 
-Generated from the rows above, at `58d60b96` (`fixed`, `parity`, `struck`,
+Generated from the rows above, at `46109272` (`fixed`, `parity`, `struck`,
 `phase N` and held back are read off the head of each disposition).
 
 The 76 findings, by their first disposition:
@@ -449,13 +465,15 @@ What phases 0 to 2 handed over: 68 rows — 31 fixed on this branch, 17 struck,
 7 closed before this phase, 1 phase 5, 12 held back; 6 of the public rows
 carry a part that stays held back.
 
-The 61 noticed items: 22 fixed, 1 a `by_design` entry, 3 struck, 5 phase 4, 5
+The 63 noticed items: 24 fixed, 1 a `by_design` entry, 3 struck, 5 phase 4, 5
 phase 5, 12 phase 6, 13 held back.
 
 Unread: 12 units, phase 6, and 6 held-back rows.
 
-Rows written in `by_design.md` (`git diff 8c9088ee..58d60b96`, two commits,
-`2155ad38` and `97850231`): 12 Ahead rows with their entries, 8 more entries
+Rows written in `by_design.md` (`git diff 8c9088ee..46109272`, two commits,
+`2155ad38` and `97850231`; a third, `1fd5c4d3`, the fourth citation pass,
+changes ranges and one statement in entries and adds no row): 12 Ahead rows
+with their entries, 8 more entries
 (`BD-Matter-Controller-ResponderSessionsPerPeer`,
 `BD-Matter-Controller-ResumedSessionCountedAtRegistration`,
 `BD-Matter-CASE-HandshakeStateBounded`,
@@ -555,20 +573,23 @@ N-net-1 but for one part) and N-bridge2-3 and N-req3-1 stay.
 - Phase 0's held-back row "rework-bridge, one item on the unsecured session"
   was not compared with this branch; it stays held back with phase 0's text.
 - The map from finding to commit came from a script over the commit subjects
-  and the fix notes' tables; the six commits after `3b6b250f` have no fix note
-  and were placed from the coordinator's note on them, each statement taken
-  into a row checked against the tree: of the commit ids the notes carry, 16
-  are the branch's own and 69 are from before the rebase; those were resolved
-  in the object store and matched to the branch by identical subject, every
-  one with a match. One statement of a fix note about a commit did not hold
-  and is not in the rows: `phase-3-fix-rwtcp.md` names `743b9bf3` as the
+  and the fix notes' tables; the commits after `3b6b250f` have no fix note:
+  the first six were placed from the coordinator's note on them, each
+  statement taken into a row checked against the tree; those after `58d60b96`
+  — N3-coord-7, N3-coord-8 and the fourth citation pass — are the
+  coordinator's own entries, written without the other rows being read again,
+  which stand as they were checked at `58d60b96`: of the commit ids the notes
+  carry, 16 are the branch's own and 69 are from before the rebase; those were
+  resolved in the object store and matched to the branch by identical subject,
+  every one with a match. One statement of a fix note about a commit did not
+  hold and is not in the rows: `phase-3-fix-rwtcp.md` names `743b9bf3` as the
   commit that deprecated `AutoArmOnPaseEstablished`; it is `7daa7ea3` (read
   off the two diffs). Two rows say what a commit touches instead of the file
-  the finding names: R2-P3-ctl-lan-02 and R2-P3-net-01 (its second commit). 4
-  of the 100 commits are named nowhere above: 3 notes (`af465dd2`, `175f63c2`,
-  `dd6e5bf3`); 1 docs (`6abf136a`). The nine citation commits are named by
-  their section only, `2155ad38` by "Counts" only. All of these were placed by
-  their subjects, not read one by one.
+  the finding names: R2-P3-ctl-lan-02 and R2-P3-net-01 (its second commit). 5
+  of the 107 commits are named nowhere above: 4 notes (`af465dd2`, `175f63c2`,
+  `dd6e5bf3`, `b5b60f3f`); 1 docs (`6abf136a`). The nine citation commits are
+  named by their section only, `2155ad38` by "Counts" only. All of these were
+  placed by their subjects, not read one by one.
 - Whether the sibling checkouts hold what the exported pins hold was not
   compared; the exported trees carry no `.git`, so that they are the pins is
   taken from how they were made (a verifier says the same).
