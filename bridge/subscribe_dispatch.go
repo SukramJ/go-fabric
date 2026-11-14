@@ -66,10 +66,10 @@ func (b *Bridge) buildInitialReport(
 // AttributeReadResponse.ts:88-100 at db021da0) — so two paths are no longer
 // merged into one sorted run: the second path's reports follow the first's.
 //
-// Mirrors matter.js InteractionServer.ts:startReadInteraction for the
-// Subscribe path (attribute reading + event merging), generated as
-// ServerSubscription.ts #processAttributesAndEventsReport pulls
-// AttributeReadResponse.process.
+// Mirrors matter.js ServerSubscription.ts:629-722 at db021da0
+// (#processAttributesAndEventsReport: the attributes, then the events) for
+// the Subscribe path, generated as it pulls AttributeReadResponse.process
+// (:644-645).
 type primingSource struct {
 	b       *Bridge
 	exp     *im.AttributeExpansion
@@ -154,8 +154,9 @@ func (p *primingSource) next() (im.AttributeReport, bool) {
 		// DataVersion matches the controller's cached version.
 		// Matter §10.6.5 — the controller infers "no change since
 		// cached" from the absence of reports for that cluster.
-		// Mirrors matter.js InteractionServer.ts:startReadInteraction
-		// DataVersionFilter evaluation.
+		// Mirrors matter.js AttributeReadResponse.ts:69-85 at db021da0
+		// (the filters indexed) and :276-281, :366-385 (a cluster at its
+		// filter's version skipped).
 		//
 		// Sentinel guard: clusters without per-instance tracking
 		// return rr.DataVersion=0 and the wire encoder substitutes
@@ -236,9 +237,9 @@ func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatc
 }
 
 // primingEvents returns the EventReports of a priming report.
-// EventRequests handling — matter.js's `InteractionServer.ts:
-// startReadInteraction` (mirrored here for Subscribe) walks
-// req.EventRequests and emits any cached events that match. Apple
+// EventRequests handling — matter.js's ServerSubscription.ts:677-705 at
+// db021da0 (#processAttributesAndEventsReport, mirrored here) runs the
+// request through EventReadResponse and emits its reports. Apple
 // Home's MTRDevice (`MTRDevice_Concrete`) transitions from
 // `Subscribing` to `InitialSubscriptionEstablished` only AFTER
 // the report-end frame; an Apple Subscribe with `events: *.*.*`
@@ -266,7 +267,7 @@ func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher,
 
 // primingMatches reports whether req establishes a subscription: one of
 // its event paths or attribute paths matches what the subject may read
-// (matter.js ServerSubscription.ts:610-614 rejects "no attributes or
+// (matter.js ServerSubscription.ts:707-711 at db021da0 rejects "no attributes or
 // events are matching the query"). The attribute half runs an expansion
 // of its own that stops at the first match and keeps nothing.
 func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) bool {

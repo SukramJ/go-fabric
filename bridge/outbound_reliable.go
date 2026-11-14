@@ -464,8 +464,9 @@ var errOutboundSessionClosed = errors.New("bridge: outbound retransmit: the sess
 // dropped. Session 0 (the unsecured session) is left alone: its entries
 // belong to handshakes, which end on their own clock. matter.js stops
 // retransmitting when the send fails with SessionClosedError
-// (MessageExchange.ts:975-981 at 862ad75f, cited at [outboundReliableTracker.Tick]);
-// review II, R2-P2-sess-06.
+// (MessageExchange.ts:1008-1014 at db021da0, the lines
+// [outboundReliableTracker.Tick] cites at 862ad75f); review II,
+// R2-P2-sess-06.
 func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 	if t == nil || sessionID == 0 {
 		return 0

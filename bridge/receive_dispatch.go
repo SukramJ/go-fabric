@@ -228,7 +228,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// response. Mirrors matter.js
 	// packages/protocol/src/action/server/AttributeReadResponse.ts:64 at
 	// db021da0 (*process, a generator) and its consumer,
-	// InteractionMessenger.ts:470-512 (sendDataReport).
+	// InteractionMessenger.ts:470-797 (sendDataReport, which pulls the next
+	// report at :555).
 	reports := im.NewReadReports(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
 	attributeReports := 0
 	attributes := func() (im.AttributeReport, bool) {
@@ -328,7 +329,7 @@ func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *me
 	// a Standalone MRP-Ack, so the controller never emits an IM
 	// StatusResponse for it; waiting would only run out the exchange timeout.
 	// Mirrors matter.js
-	// packages/protocol/src/interaction/InteractionMessenger.ts:679,701
+	// packages/protocol/src/interaction/InteractionMessenger.ts:824-845 at db021da0
 	// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
 	// wait). Reliable delivery of the final chunk is still guaranteed by
 	// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.

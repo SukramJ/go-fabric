@@ -481,9 +481,9 @@ func sliceAttributeReports(reports []im.AttributeReport) attributeReportSource {
 // What it holds between two calls of next is the chunk being filled, the
 // chunks a split list completed and not yet handed out, and the source's
 // own cursor. Mirrors matter.js
-// packages/protocol/src/interaction/InteractionMessenger.ts:470-512 at
-// db021da0 (sendDataReport fills a message from its payload iterator — the
-// read response's generator, AttributeReadResponse.ts:64 — and
+// packages/protocol/src/interaction/InteractionMessenger.ts:470-797 at
+// db021da0 (sendDataReport fills a message from its payload iterator, pulled
+// at :555 — the read response's generator, AttributeReadResponse.ts:64 — and
 // sendAndResetReport awaits sendDataReportMessage, :510, before it pulls
 // further).
 //
