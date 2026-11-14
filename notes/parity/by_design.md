@@ -119,7 +119,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp`, `examples/jf-admin-app/linux/JFADatastoreSync.cpp` (the endpoint's whole binding list, `SyncEndpointBindings`: the delegate's merge :1706-1757, the write :1759-1779 and :661-685) | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
-| BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:576-583` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :573-585) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
+| BD-chip-JCM-Commissioner | `ControllerCommissioningFlow.ts:575-583` at `db021da0` runs `OperationalCredentials.Certificates` right after `OperationalCredentials.DeviceAttestation`, no Joint Commissioning step between (absence: the two step pushes, :572-584) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"name: \"OperationalCredentials.DeviceAttestation\",\n            stepLogic: () => this.#deviceAttestation(),\n        });\n\n        this.commissioningSteps.push({\n            stepNumber: 11, // includes 11-13"` | connectedhomeip `src/controller/jcm/DeviceCommissioner.cpp` at `6170af84` (:45-550), `src/controller/jcm/AutoCommissioner.{h,cpp}` (the read paths `.h:56-66`), `src/controller/AutoCommissioner.cpp:522-531` (the stage after attestation), tests `src/controller/tests/jcm/TestJCMCommissioner.cpp` | no |
 | BD-Matter-SurfaceChange-ConfigurationVersion | `BasicInformationServer.ts:35-37` leaves the "when" to the application: the version is "seeded to 1 and constrained to only ever increase", and the application bumps it "with `increaseConfigurationVersion`" (`:132`); the only production caller at the pin is the bridged-to-root coupling, `BridgedDeviceBasicInformationServer.ts:86` | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts` | `"node's configuration changes in a way clients should detect, bump it with {@link increaseConfigurationVersion},"` | this module: concept v11 §C.9, ADR 0030 decision 6, wave S4 — the node persists each endpoint's effective surface next to its ConfigurationVersion and raises the bridged and the root ConfigurationVersion (one change, matter.js's coupling) when the surface of a returning endpoint differs (`node/surface_stability.go`) | no |
 | BD-chip-FailSafeOfTheAccessingFabric | `OperationalCredentialsServer.ts:602-604` reads the one `failsafeContext` without asking for whose fabric it was armed (presence) | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` | `"get #failsafeContext() {\n        return this.env.get(DeviceCommissioner).failsafeContext;\n    }"` | connectedhomeip `src/app/FailSafeContext.h:76-79` at `6170af84` (`IsFailSafeArmed(accessingFabricIndex)`), its callers `OperationalCredentialsCluster.cpp:341, :472, :760`, `ThreadBorderRouterManagementCluster.cpp:212`, `joint-fabric-administrator-server.cpp:325, :369`, `NetworkCommissioningCluster.cpp:155-172, :380, :568, :609` | no |
 | BD-chip-ClosureControl-RulesInServer | `ClosureControlServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-control/ClosureControlServer.ts` | `"export class ClosureControlServer extends ClosureControlBehavior {}"` | connectedhomeip `src/app/clusters/closure-control-server/ClosureControlCluster.cpp` at `6170af84` (`HandleStop` :531-551, `HandleMoveTo` :554-639, `HandleCalibrate` :642-665, the feature checks :45-66, :81, :107-117) | yes |
@@ -5982,10 +5982,10 @@ large-payload transport (:136-166) is not mirrored (owner decision
 2026-10-28); and `ClientCSR` publishes a change notification for the new
 entry. The consequence over a UDP-sized message: a list entry that does
 not fit a report chunk on its own turns the whole attribute into an
-AttributeStatusIB(RESOURCE_EXHAUSTED) (`bridge/reply.go:441-446`,
+AttributeStatusIB(RESOURCE_EXHAUSTED) (`bridge/reply.go:497-503`,
 `chunkReportData`; the cap is `udp.MaxDatagramSize - 200` = 1848 bytes,
-`bridge/reply.go:357`, `transport/udp/listener.go:39`), and a certificate
-may be 3000 bytes (`cluster/tls/certificates.go:39`) — the case chip's
+`bridge/reply.go:435`, `transport/udp/listener.go:39`), and a certificate
+may be 3000 bytes (`cluster/tls/certificates.go:40`) — the case chip's
 id-only encoding avoids (`TLSCertificateManagementCluster.cpp:139-150`,
 `:158-169` at `6170af84`: "Drop the certificate payload if transport
 doesn't support large payload"). The findings register holds it as
@@ -6104,8 +6104,8 @@ cases; the storage cases are chip's buffers) and `pushtransport_rules_test.go`.
 ### BD-matterjs-server-CameraStreamManagement — the controller manages a camera's streams and WebRTC sessions, ahead of matter.js
 
 matter.js at `862ad75f` gives the controller side of cameras the
-WebRtcTransportRequestor and nothing above it (`camera-controller.ts:133`
-mandates the requestor; `git ls-tree 862ad75f packages | grep -i webrtc`
+WebRtcTransportRequestor and nothing above it
+(`packages/node/src/devices/camera-controller.ts:133` mandates the requestor; `git ls-tree 862ad75f packages | grep -i webrtc`
 lists six behaviour files and one test). The stream allocation against a
 camera's capacity, the SDP narrowing, the session table a camera calls
 back into, the leases and their eviction, the leftover sweep and the
@@ -6150,7 +6150,7 @@ codes (:181-2373), the refresh (:241-1130), the pending/committed state
 and the 20 commands the model has at the pin
 (`joint-fabric-datastore-server.cpp:293-785`). The pushes to the member
 nodes are the host's behind `DatastoreSync` (chip's `Delegate`,
-`.h:166-250`), synchronous — chip's two failure points collapse into one,
+`.h:166-285`), synchronous — chip's two failure points collapse into one,
 handled as chip handles the completion; the tables persist as one record
 per server (chip keeps them in memory) and every attribute a change
 touches is reported (chip reports NodeList only). Two recorded
@@ -6220,7 +6220,7 @@ AnnounceJointFabricAdministrator :239-290, ICACCSRRequest :305-354, AddICAC
 `JCMCommissionee.cpp` (the commissionee's trust verification, 510 lines),
 with `client/jcm` after `src/credentials/jcm` (`TrustVerification.cpp`,
 `VendorIdVerificationClient.cpp`), behind `AdministratorPort` (chip's
-`GetIcacCsr` delegate, `JointFabricAdministrator.h:29-36`) and
+`GetIcacCsr` delegate, `JointFabricAdministrator.h:34-41`) and
 `CommissionerReach` (the reads of the announcing commissioner; a node
 adapter follows in wave 27-B). TransferAnchorRequest and
 TransferAnchorComplete answer SUCCESS without effect, as chip's empty
@@ -6456,7 +6456,7 @@ counts the composing endpoint itself only for a utility device type it
 lists (`listsUtility`, :601-613), every other candidate comes from the
 composition scope — the endpoint's children, never the endpoint itself
 (`ResolvedEndpoint.ts:216-243`) — and the device type id must match
-exactly (:590-591). OnOffLight, Camera and Doorbell are simple, so
+exactly (:591-592 at `db021da0`). OnOffLight, Camera and Doorbell are simple, so
 `device.NewVideoDoorbell` and `NewFloodlightCamera` (devicegen, wave 27-B)
 add the components as parts, the kit's one-device-type-per-endpoint rule
 stays, and a superset type on the composite's own endpoint is not offered
@@ -6637,8 +6637,8 @@ UnsupportedCommand: **WaterTankLevelMonitoring** (0x0079; chip has no server
 at all — `src/app/clusters/water-tank-level-monitoring-server` is absent at
 `6170af84` — and matter.js's `WaterTankLevelMonitoringServer.ts:14` is the
 empty subclass; brief 26-C), **MeterIdentification** (0x0B06), **ElectricalGridConditions**
-(0x00A0; one `Status::Failure` on a read error,
-`electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
+(0x00A0; one `Status::Failure` when the CurrentConditionsChanged event
+cannot be logged, `electrical-grid-conditions-server.cpp:160`), **FixedLabel**, and the
 attribute-only measurement clusters (Temperature, RelativeHumidity,
 Illuminance, Pressure, Flow, BooleanState, the ten concentration
 measurements, ElectricalPowerMeasurement, SoilMeasurement — their host
