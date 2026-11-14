@@ -61,7 +61,11 @@ An ICD node also changes behaviour on its own, beyond serving the cluster:
 
 The registrations and their keys are stored in the `store.ICD` area
 (table `matter_icd_registrations`, schema version 7). The counter is the
-metadata counter `icd_management.counter`. See
+metadata counter `icd_management.counter`, stored at every advance; a
+restart starts it 1000 past the stored value. A Check-In goes out only
+with a counter at most that far past the stored value: when the store
+refused the counter's writes while it ran further, the counter is stored
+first, and a store that refuses that too sends no Check-In. See
 [Persistence](persistence.md).
 
 ### The mode machine: `Node.ICD()`

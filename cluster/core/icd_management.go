@@ -262,8 +262,13 @@ type ICDManagement struct {
 
 	// mu guards the fields below it. It is never held across the store,
 	// the sender, a port or a callback.
-	mu            sync.Mutex
-	counter       *icd.Counter
+	mu      sync.Mutex
+	counter *icd.Counter
+	// counterSaved is the last counter value the store took
+	// (saveCounter); a restart seeds the counter icd.BootBump past it, so
+	// a Check-In counter at most that far past it is never handed out
+	// again (coveredCheckIn).
+	counterSaved  uint32
 	clients       []icdClient                  // registeredClients with icdKeys, in registration order
 	fabrics       map[uint8]*icd.Registrations // fabric.icd, the operational view
 	forced        *icddef.OperatingModeEnum
@@ -484,7 +489,31 @@ func (s *ICDManagement) saveCounter(ctx context.Context, v uint32) error {
 			return fmt.Errorf("core: icd management: save counter: %w", err)
 		}
 	}
+	s.mu.Lock()
+	s.counterSaved = v
+	s.mu.Unlock()
 	return nil
+}
+
+// coveredCheckIn reports whether the counter's next Check-In value is
+// covered by the stored one: a restart seeds the counter at the stored
+// value plus icd.BootBump (icd.NewCounter, IcdManagementServer.ts:260-272),
+// so a value at most that far past it is never handed out again. One
+// further past it — the store refused the counter's writes while it ran
+// on — is stored first; a store that refuses that too sends no Check-In.
+func (s *ICDManagement) coveredCheckIn(ctx context.Context, counter *icd.Counter) bool {
+	next := counter.Value() + 1
+	s.mu.Lock()
+	saved := s.counterSaved
+	s.mu.Unlock()
+	if next-saved <= icd.BootBump { // uint32 arithmetic: the counter wraps (Core §4.6.3)
+		return true
+	}
+	if err := s.saveCounter(ctx, next); err != nil {
+		s.logger.Warn("icd.management.persist_counter", slog.Any("err", err))
+		return false
+	}
+	return true
 }
 
 // loadClients reads the persisted registrations and prunes the keys of
@@ -785,6 +814,9 @@ func (s *ICDManagement) sendCheckIns(ctx context.Context) {
 			}
 			if !s.backOff.ShouldSend(key) {
 				continue
+			}
+			if !s.coveredCheckIn(ctx, counter) {
+				return
 			}
 			s.backOff.RecordSent(key)
 			if ctx.Err() != nil {
