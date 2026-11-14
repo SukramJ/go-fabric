@@ -14,9 +14,10 @@ import (
 
 // fabricStateServers returns every server of the node that holds state
 // keyed by fabric index ([contract.FabricScopedState]): the root's, the
-// Aggregator's and those of every endpoint of t, each once. A nil t has
-// no endpoints beyond the root's and the Aggregator's servers.
-func (n *Node) fabricStateServers(t *endpoint.Topology) []contract.FabricScopedState {
+// Aggregator's and those of every endpoint of each of ts, each server once.
+// A nil topology has no endpoints beyond the root's and the Aggregator's
+// servers.
+func (n *Node) fabricStateServers(ts ...*endpoint.Topology) []contract.FabricScopedState {
 	var out []contract.FabricScopedState
 	seen := map[any]bool{}
 	add := func(servers []contract.ClusterServer) {
@@ -38,7 +39,10 @@ func (n *Node) fabricStateServers(t *endpoint.Topology) []contract.FabricScopedS
 		add(n.root.Servers())
 	}
 	add(n.aggServers)
-	if t != nil {
+	for _, t := range ts {
+		if t == nil {
+			continue
+		}
 		for _, ep := range t.Endpoints {
 			if ep != nil {
 				add(endpoint.ClusterServers(ep))
@@ -54,8 +58,18 @@ func (n *Node) fabricStateServers(t *endpoint.Topology) []contract.FabricScopedS
 // on fabrics.events.deleting, node/server/ServerEnvironment.ts:188-196 at
 // db021da0). An endpoint absent now is reconciled when it joins
 // ([Node.reconcileFabricState]).
+//
+// It walks the topology the node observed last and the one the bridge
+// serves: they differ while a snapshot the bridge goes on to refuse has
+// been observed, and the bridge then keeps serving the topology it had
+// (review II, R2-P2-dr-node-03). The binding manager reads the observed
+// one only.
 func (n *Node) dropFabricState(ctx context.Context, fabricIndex uint8) {
-	for _, s := range n.fabricStateServers(nodeTopology{n}.topology()) {
+	var served *endpoint.Topology
+	if n.br != nil {
+		served = n.br.Topology()
+	}
+	for _, s := range n.fabricStateServers(nodeTopology{n}.topology(), served) {
 		if err := s.MatterDropFabric(ctx, fabricIndex); err != nil {
 			n.logger.Warn("fabric.state.drop_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		}
