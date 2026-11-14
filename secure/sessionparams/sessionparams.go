@@ -71,10 +71,19 @@ type Parameters struct {
 // the intervals it advertises (mdns/service.go:726, maxAdvertisedInterval).
 // The active threshold needs no bound: its field is 16 bits wide.
 //
-// Neither reference bounds what an unauthenticated peer states (review II,
-// owner decision 45; this module's own rule): a stated 0xFFFFFFFF ms
-// would otherwise pace a handshake's retransmissions — and the wait for
-// their acknowledgement — over weeks.
+// This module's own rule (review II, owner decision 45): a stated
+// 0xFFFFFFFF ms would otherwise pace a handshake's retransmissions — and
+// the wait for their acknowledgement — over weeks. Both references take
+// the intervals of a PASE or CASE message as stated (matter.js
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db021da0,
+// "accepted unbounded"; connectedhomeip
+// src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
+// A DNS-SD interval above one hour connectedhomeip reads as not stated
+// (src/lib/dnssd/TxtFields.cpp:210-218 GetRetryInterval, kMaxRetryInterval
+// at TxtFields.h:38), and matter.js keeps from a discovered record only
+// an interval an advertisement can carry (SessionIntervals.ts:99-118
+// advertisable, in toLongForm at
+// packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:223-227).
 const MaxUnauthenticatedInterval uint32 = 3_600_000
 
 // ClampUnauthenticated returns p with SessionIdleInterval and
