@@ -270,7 +270,8 @@ var (
 	// same bridge instance.
 	ErrAlreadyStarted = errors.New("bridge: already started")
 	// ErrStopped is returned by [Bridge.Start] after [Bridge.Stop]: a
-	// bridge is not restarted; a host builds a new one.
+	// bridge is not restarted; a host builds a new one. Its commissioning
+	// window's opens return it too once Stop has stopped the window.
 	ErrStopped = errors.New("bridge: stopped")
 )
 

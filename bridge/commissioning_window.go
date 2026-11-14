@@ -159,6 +159,10 @@ type CommissioningWindow struct {
 	// reverts to "no PASE acceptor". Cancelled when RevokeWindow
 	// closes the window early.
 	closeTimer clock.Timer
+	// stopped: the bridge stopped ([CommissioningWindow.stopTimer]); no
+	// window opens and no timer is armed from then on (review II,
+	// R2-P2-stop-02).
+	stopped bool
 
 	// restore, when non-nil, is invoked on every window-close
 	// transition (early revoke or timer expiry) so the ephemeral
@@ -464,6 +468,10 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	}
 
 	w.mu.Lock()
+	if w.stopped {
+		w.mu.Unlock()
+		return ErrStopped
+	}
 	if w.open && !w.own {
 		w.mu.Unlock()
 		return ErrAdministratorWindowOpen
@@ -499,14 +507,30 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	return nil
 }
 
+// adminOpenRefusedLocked is why an administrator's window cannot open
+// now: the bridge stopped ([ErrStopped]) or an administrator's window is
+// open (Busy); nil when it can. Caller holds w.mu.
+func (w *CommissioningWindow) adminOpenRefusedLocked() error {
+	switch {
+	case w.stopped:
+		return ErrStopped
+	case w.open && !w.own:
+		return wire.ErrAdmCommBusy
+	}
+	return nil
+}
+
 // stopTimer stops the window's expiry timer, own or administrator, without
 // closing the window or firing its hooks: [Bridge.Stop] calls it so no
 // timer stays armed on the bridge's clock after Stop (ADR 0026 P5). A
-// window open at Stop keeps its state; the node's next start replaces it
-// (OpenOwnWindow), an expiry it would have had is not run.
+// window open at Stop keeps its state, and an expiry it would have had is
+// not run. The bridge is single-run: from then on OpenOwnWindow and
+// OpenWindow return [ErrStopped] and arm nothing (review II,
+// R2-P2-stop-02).
 func (w *CommissioningWindow) stopTimer() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.stopped = true
 	if w.closeTimer != nil {
 		w.closeTimer.Stop()
 		w.closeTimer = nil // a callback already running sees it is stale
@@ -612,9 +636,9 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	}
 
 	w.mu.Lock()
-	if w.open && !w.own {
+	if err := w.adminOpenRefusedLocked(); err != nil {
 		w.mu.Unlock()
-		return wire.ErrAdmCommBusy
+		return err
 	}
 	maxTimeout := uint32(commissioningWindowMaxSec)
 	if params.IsUncommissioned {

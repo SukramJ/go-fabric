@@ -37,7 +37,9 @@ import (
 )
 
 // ErrStopped is returned by [Node.Start] after [Node.Stop]: a node is not
-// restarted; a host builds a new one on the same store.
+// restarted; a host builds a new one on the same store. [Node.OpenOwnWindow],
+// [Node.OpenBasicWindow] and [Node.CloseWindow] return it from the first
+// Stop on.
 var ErrStopped = errors.New("node: stopped")
 
 // ErrNotStarted is returned by a call that needs the running node's
@@ -703,6 +705,15 @@ func (n *Node) reopenUnlessStopping() {
 		return
 	}
 	n.window.reopenIfDecommissioned(n.windowLife, n.st)
+}
+
+// stopBegan reports whether a Stop began: the gate of the keepers
+// (keeperMu, stopping), which the host's window calls share (review II,
+// R2-P2-stop-02).
+func (n *Node) stopBegan() bool {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	return n.stopping
 }
 
 // goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
