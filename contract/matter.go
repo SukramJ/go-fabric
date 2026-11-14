@@ -176,7 +176,8 @@ type ClusterDataVersion interface {
 // advances no DataVersion and is reported to no subscriber, as matter.js
 // advances a datasource's version only for a commit that changed a value
 // (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
-// db021da0) and holds an equal value as no change (:1479, oldval ===
+// db021da0), tells no one of a commit that changed none (postCommit,
+// :1287-1289) and holds an equal value as no change (:1479, oldval ===
 // newval or isDeepEqual). A server without it is taken to have changed
 // something with every successful write: its cluster's version advances
 // and the written attribute is reported.
@@ -897,13 +898,15 @@ type AttributeChangeNotifier interface {
 // emits. The bridge marks a server's attributes dirty from here when a
 // server implements it, and advances the cluster's DataVersion from
 // [AttributeChangeNotifier.OnAttributeChange], when the change happens, as
-// matter.js advances it at the commit. Mirrors matter.js's OnlineEvent.online — the observable "that emits
-// only those events conveyed between nodes", the event itself normally
-// and its QuietObservable for a server-side quieter element
-// (packages/node/src/behavior/Events.ts:228-236, :267-297;
-// cluster/ClusterBehaviorType.ts:343-344) — to which
-// ServerBehaviorBacking subscribes the report of a quieter property
-// (internal/ServerBehaviorBacking.ts:223-262).
+// matter.js advances it at the commit
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0). Mirrors matter.js's OnlineEvent.online — the observable "that
+// emits only those events conveyed between nodes", the event itself
+// normally and its QuietObservable for a server-side quieter element
+// (packages/node/src/behavior/Events.ts:231-239, :269-300;
+// internal/ClusterDerivation.ts:171-172, :182 at db021da0) — which
+// ServerBehaviorBacking subscribes, as the event's `quiet`, for the report
+// of a quieter property (internal/ServerBehaviorBacking.ts:253-261).
 //
 // A type that forwards OnAttributeChange to a server implementing this
 // forwards OnAttributeReport too, or the bridge reports every change of
