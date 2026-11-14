@@ -88,6 +88,13 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 	return r
 }
 
+// MaxReportBytesPerSession is the bound on the report chunks a session's
+// interactions hold that the registry carries
+// ([SubscriptionsConfig].MaxReportBytesPerSession, the default when it
+// was zero or less), so an interaction bound outside the registry takes
+// it too.
+func (r *Subscriptions) MaxReportBytesPerSession() int { return r.maxReport }
+
 // IsBlocked reports whether new report processing is blocked (:58-63).
 func (r *Subscriptions) IsBlocked() bool {
 	r.mu.Lock()

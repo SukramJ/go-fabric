@@ -555,7 +555,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 	if opts.Channel != nil {
 		mgr = opts.Channel.Exchanges()
 	}
-	f := newFlow(c, interaction.New(mgr, pase, c.log), opts, address, pase.AttestationChallenge(),
+	f := newFlow(c, c.sessionInteraction(mgr, pase), opts, address, pase.AttestationChallenge(),
 		func(ctx context.Context, addr handshake.PeerAddress, concurrent bool) (*interaction.Interaction, error) {
 			return c.transitionToCase(ctx, pase, addr, concurrent, opts)
 		})
@@ -649,7 +649,21 @@ func (c *Commissioner) transitionToCase(ctx context.Context, pase *exchange.Sess
 	if err != nil {
 		return nil, err
 	}
-	return interaction.New(c.ctx.Exchanges, s, c.log), nil
+	return c.sessionInteraction(c.ctx.Exchanges, s), nil
+}
+
+// sessionInteraction is the interaction of a commissioning step over
+// session s of mgr: interaction.New with the report bound the
+// controller's subscription registry carries (Config.MaxReportBytesPerSession
+// of the controller), the default without one. The registry itself is
+// not attached, so the step's interaction closes no subscription of the
+// peer.
+func (c *Commissioner) sessionInteraction(mgr *exchange.Manager, s *exchange.Session) *interaction.Interaction {
+	cfg := interaction.Config{Logger: c.log}
+	if c.ctx.Subscriptions != nil {
+		cfg.MaxReportBytesPerSession = c.ctx.Subscriptions.MaxReportBytesPerSession()
+	}
+	return interaction.Bind(interaction.SessionProvider(mgr, s), cfg)
 }
 
 // handleNoSharedTrustRoots is the CASE connection's error handler during
