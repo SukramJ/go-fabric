@@ -80,10 +80,11 @@ type CaseHandler interface {
 	ProcessSigma2Resume(payload []byte) (uint8, []byte, error)
 }
 
-// AckHandler is the inbound MRP-ack port — the [mrp.AckTracker]
-// typically backs it. The router calls Discharge for any datagram
-// that carries HasAck=true regardless of opcode, so the IM and
-// SecureChannel paths share this hook.
+// AckHandler is the inbound MRP-ack port: the router calls Discharge for
+// any Secure Channel datagram that carries HasAck=true regardless of
+// opcode. The bridge wires none by default; an [mrp.AckTracker] does not
+// back it — its obligations are this node's own acknowledgements, which a
+// peer's acknowledgement does not fulfil ([Bridge.AttachAckTracker]).
 type AckHandler interface {
 	// Discharge marks the obligation for the (session, exchange, role)
 	// triple as fulfilled (the peer ACKed our outbound message).
@@ -405,11 +406,10 @@ func (b *Bridge) AttachAckHandler(h AckHandler) {
 // errors so operators can tail the bridge during commissioner
 // pairing without grepping noise.
 func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
-	// Per-exchange owe-tracker discharge: when an inbound datagram
-	// piggybacks an ACK we use the exchange ID to clear any pending
-	// owe — the legacy AckHandler is keyed on exchange, distinct
-	// from the outbound-reliable counter tracker handled in
-	// receive.go.
+	// The attached AckHandler learns of the peer's acknowledgement, keyed
+	// on the exchange. The acknowledgement this node owes for the
+	// message is not its to clear ([Bridge.AttachAckTracker]); the
+	// outbound-reliable counter tracker is handled in receive.go.
 	if proto.HasAck {
 		b.mu.RLock()
 		ack := b.ackHandler
@@ -440,7 +440,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 	switch proto.Opcode {
 	case mrp.StandaloneAckOpcode:
 		// Pure StandaloneAck has no payload after the protocol header.
-		// The HasAck path above already discharged the obligation;
+		// receive.go stopped the retransmission it acknowledges;
 		// nothing more to do.
 		b.logger.Debug("matter.rx.sc.ack",
 			slog.String("src", srcString(src)),
@@ -1637,7 +1637,7 @@ func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Heade
 	b.releasePaseInFlight(key)
 	b.abandonHandshakeReplies(key)
 	// The report itself is acked by the pump, like any reliable message
-	// that elicits no reply.
+	// that elicits no reply ([Bridge.AttachAckTracker]).
 	return true
 }
 

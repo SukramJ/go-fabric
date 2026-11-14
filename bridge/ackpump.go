@@ -37,16 +37,24 @@ const ackPumpInterval = 50 * time.Millisecond
 // starve the pump's exit path.
 const pumpStopGrace = 500 * time.Millisecond
 
-// AttachAckTracker wires the [mrp.AckTracker] in two roles at once:
+// AttachAckTracker wires the [mrp.AckTracker] that holds the
+// acknowledgements this node owes for the reliable messages it received,
+// and the pump that sends a StandaloneAck for each one no reply carried.
+// A pump goroutine spawns from [Bridge.Start] when this method has been
+// called; without it the bridge falls back to noop ACK handling (useful
+// for tests that do not need ACK emission).
 //
-//  1. The Discharge half (peer ACKs of our outbound messages) goes
-//     through [AckHandler] just like before — the adapter is
-//     constructed and registered transparently.
-//  2. The Owe + Pump half (synthesising StandaloneAck datagrams for
-//     un-piggybacked obligations) gets direct access to the tracker.
-//     A pump goroutine spawns from [Bridge.Start] when this method
-//     has been called; without it the bridge falls back to noop ACK
-//     handling (useful for tests that do not need ACK emission).
+// The tracker is not the [AckHandler]: a peer's acknowledgement of this
+// node's message stops that message's retransmissions (the outbound
+// reliability tracker, receive.go) and fulfils none of the
+// acknowledgements this node owes — those end only with an
+// acknowledgement this node sends. matter.js keeps the two apart: an
+// acknowledgement the message carries stops the exchange's
+// retransmission (packages/protocol/src/protocol/MessageExchange.ts:536-542
+// at db021da0), and a message that requires one is acknowledged in any
+// case (:553-560). Wired as the AckHandler before, a
+// failure StatusReport that ended a handshake and acknowledged the
+// node's last reply was never acknowledged (review II, phase 3).
 //
 // Calling AttachAckTracker AFTER [Bridge.Start] is allowed, but the
 // pump goroutine starts only at the next Start (or never if the
@@ -54,7 +62,6 @@ const pumpStopGrace = 500 * time.Millisecond
 // tracker before Start). For tests that wire post-Start, schedule
 // pump exercises via direct [Bridge.RunAckPumpOnce] calls instead.
 func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
-	b.AttachAckHandler(NewMRPAckAdapter(t))
 	b.mu.Lock()
 	b.ackTracker = t
 	if b.outboundReliable == nil {

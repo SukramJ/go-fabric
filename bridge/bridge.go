@@ -92,10 +92,10 @@
 //     sendReply never sets NeedsAck (reply.go:149,157): the bridge
 //     neither emits standalone ACKs nor retransmits its own reliable
 //     messages, and every reply degrades to best-effort UDP.
-//   - AttachAckHandler — silent and narrow: the per-exchange owed-ack
-//     tracker an inbound piggybacked ACK discharges (securechannel.go);
-//     unwired, the bridge still acknowledges through the AckTracker, it
-//     only cannot clear an owed standalone ACK early.
+//   - AttachAckHandler — silent and narrow: a port told of every
+//     inbound piggybacked ACK on the Secure Channel (securechannel.go);
+//     the bridge acknowledges through the AckTracker whether or not one
+//     is wired.
 //   - AttachSubscriptionManager — silent, and the most deceptive of the
 //     set. A Subscribe still returns the complete initial ReportData,
 //     but with HasSubscription=false and SubscriptionID=0, and no report

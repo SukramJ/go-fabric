@@ -1008,11 +1008,18 @@ func (a *CaseAdapter) ProcessSigma2Resume(_ []byte) (opcode uint8, respPayload [
 // Trivial passthrough — the MRP layer owns the obligation
 // bookkeeping; the adapter exists so the bridge can stay decoupled
 // from the concrete tracker type (tests substitute a fake).
+//
+// Deprecated: an AckTracker holds the acknowledgements this node owes,
+// which a peer's acknowledgement does not fulfil, so it is not an
+// [AckHandler]; [Bridge.AttachAckTracker] no longer wires one. There is
+// no replacement. Removable in v0.23.0.
 type MRPAckAdapter struct {
 	tracker *mrp.AckTracker
 }
 
 // NewMRPAckAdapter wraps t.
+//
+// Deprecated: see [MRPAckAdapter]. Removable in v0.23.0.
 func NewMRPAckAdapter(t *mrp.AckTracker) *MRPAckAdapter {
 	return &MRPAckAdapter{tracker: t}
 }
