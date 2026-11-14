@@ -103,6 +103,9 @@ func buildProtocolHeader(protocolID uint16, opcode uint8) []byte {
 		ProtocolID: protocolID,
 		Opcode:     opcode,
 		ExchangeID: 1,
+		// The peer opens the exchange: a request that is not an initiator
+		// message is not served (ExchangeManager.ts:462-467 at db021da0).
+		Initiator: true,
 	}.Marshal()
 }
 

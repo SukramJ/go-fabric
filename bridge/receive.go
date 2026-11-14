@@ -703,6 +703,9 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	b.count(contract.MetricIMReceived)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType, requestHdr.SessionID) {
 	case imGateProceed:
+		if b.unsolicitedRequest(src, proto) {
+			return nil
+		}
 		// fall through to decode + dispatch below
 	case imGateAbsorbStatusResp:
 		return b.absorbStatusResponse(src, requestHdr, proto, payload)
@@ -785,6 +788,26 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 		return b.dispatchTimedRequest(src, requestHdr, proto, req)
 	}
 	return nil
+}
+
+// unsolicitedRequest reports, and logs, an IM request that is not an
+// initiator message. Such a request reaches handleIMOpcode only on an
+// exchange this node did not open ([Bridge.deliverInitiatedSecure] claims
+// the others): it is acknowledged — the ack owed since receipt — and not
+// served. Mirrors matter.js
+// packages/protocol/src/protocol/ExchangeManager.ts:462-467 at db021da0 (an
+// exchange for a protocol handler only for
+// `message.payloadHeader.isInitiatorMessage`) and :496-507 (an unsolicited
+// message that requires an ack is acknowledged and ignored).
+func (b *Bridge) unsolicitedRequest(src net.Addr, proto message.ProtocolHeader) bool {
+	if proto.Initiator {
+		return false
+	}
+	b.logger.Debug("matter.rx.im.unsolicited",
+		slog.String("src", srcString(src)),
+		slog.Int("opcode", int(proto.Opcode)),
+		slog.Int("exchange_id", int(proto.ExchangeID)))
+	return true
 }
 
 // checkTimedGate enforces the Matter §8.7 timed-interaction rules on

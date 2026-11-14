@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -358,4 +359,45 @@ func TestWriteContinuationChunkParity(t *testing.T) {
 			t.Fatalf("OnTime %v after %d writes, want 9 after two", v, srv.writes())
 		}
 	})
+}
+
+// TestNonInitiatorRequestIgnoredParity: an IM request that is not an
+// initiator message, on an exchange this node did not open, is not served
+// — matter.js opens an exchange for a protocol handler only for an
+// initiator message and otherwise acknowledges and ignores it
+// (packages/protocol/src/protocol/ExchangeManager.ts:462-467, :496-507 at
+// db021da0).
+func TestNonInitiatorRequestIgnoredParity(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	srv := &countingInvokeServer{id: 0x0006}
+	b.AttachRootClusters([]contract.ClusterServer{srv})
+	p := newIMPeer(t, b)
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeInvokeRequest, ExchangeID: 0x4205, NeedsAck: true}.Marshal()
+	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true})
+	if err := b.dispatch(context.Background(), secureTestDatagram(t, b, proto, payload), p.conn.LocalAddr()); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if !p.silent(300 * time.Millisecond) {
+		t.Error("the bridge answered a request that is not an initiator message")
+	}
+	if n := srv.invokes.Load(); n != 0 {
+		t.Errorf("the command ran %d times, want 0", n)
+	}
+}
+
+// countingInvokeServer serves cluster id and counts the commands it runs.
+type countingInvokeServer struct {
+	id      uint32
+	invokes atomic.Int32
+}
+
+func (s *countingInvokeServer) MatterClusterID() uint32                        { return s.id }
+func (s *countingInvokeServer) MatterRead(uint32) (any, bool)                  { return nil, false }
+func (s *countingInvokeServer) MatterWrite(context.Context, uint32, any) error { return nil }
+func (s *countingInvokeServer) MatterReportable() []uint32                     { return nil }
+
+func (s *countingInvokeServer) MatterInvoke(context.Context, uint32, any) (any, error) {
+	s.invokes.Add(1)
+	return nil, nil
 }
