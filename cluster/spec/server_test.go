@@ -161,7 +161,7 @@ func TestServerWrite(t *testing.T) {
 	if got, ok := srv.MatterRead(hepa.AttrLastChangedTime); !ok || got != nil {
 		t.Errorf("null write: %#v %v", got, ok)
 	}
-	if !slices.Equal(sk.writes, []any{uint32(1000), uint32(1000), nil}) {
+	if !slices.Equal(sk.writes, []any{uint32(1000), nil}) { // the equal write reaches no Sink
 		t.Errorf("sink saw %#v", sk.writes)
 	}
 

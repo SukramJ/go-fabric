@@ -184,8 +184,9 @@ type ClusterDataVersion interface {
 //
 // "Unchanged" means this write stored nothing: the written value, in its
 // stored form, equalled the one the server holds, so the server kept what
-// it held — for a state the host holds, no setter of the host's was
-// called. A write that stored, or one the server cannot tell, answers
+// it held and the host heard nothing of it — no setter of a state the
+// host holds and no write port (a Sink) the host is told writes through
+// was called. A write that stored, or one the server cannot tell, answers
 // changed: an over-report costs a version and a report, a missed change a
 // subscriber's view of the attribute. The verdict is the write's own: the
 // read of the held value, the comparison and the store are one step under

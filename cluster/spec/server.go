@@ -43,8 +43,11 @@ type Source interface {
 }
 
 // Sink is the optional write port: told about every controller write that
-// passed the definition's checks, before the server stores it; an error
-// refuses the write and leaves the stored value as it was.
+// passed the definition's checks and changes the value the server holds,
+// before the server stores it; an error refuses the write and leaves the
+// stored value as it was. A write of the held value reaches no Sink and
+// answers unchanged (matter.js observes no field whose value is equal,
+// Datasource.ts:1406-1407 and :1479 at db021da0).
 //
 // value is the stored form described on [Server] — the Go type of the
 // attribute's width (a uint32 for an epoch-s, a uint8 for an enum8), nil
@@ -305,9 +308,10 @@ func (s *Server) peers(attrID uint32) (any, bool) { return s.MatterRead(attrID) 
 
 // MatterWrite implements [contract.ClusterServer]: [Instance.ValidateWrite]
 // answers the status of a write the definition refuses; the
-// [ServerConfig.BeforeWrite] veto, when set, may refuse it next, then the
-// Sink, each handed the value in its stored form; then the value is
-// stored, and a change bumps the data version and is notified.
+// [ServerConfig.BeforeWrite] veto, when set, may refuse it next; a value
+// the server holds then ends the write, unchanged; another goes to the
+// Sink, each handed the value in its stored form, and is stored, and a
+// change bumps the data version and is notified.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	_, err := s.MatterWriteChanged(ctx, attrID, value)
 	return err
@@ -340,12 +344,41 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 			return false, err
 		}
 	}
+	// The value the server holds reaches no Sink and stores nothing:
+	// matter.js emits neither `$Changing` (Datasource.ts:1406-1407 at
+	// db021da0, #computePreCommitChange) nor `$Changed` (:1479,
+	// #noteIfChanged) for a field equal to the held value and stores only
+	// the noted fields (:1447-1451). The store's comparison below, under
+	// the lock that stores, stays the deciding one: this check skips only
+	// when every answer the server gives equals the value, so a write it
+	// lets through at worst stores an equal value and answers unchanged.
+	if s.holds(attrID, v) {
+		return false, nil
+	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
 			return false, err
 		}
 	}
 	return s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v}), nil
+}
+
+// holds reports whether the server holds v for attrID: its stored value
+// is v (the comparison [Server.store] makes) and, when a Source answers
+// the attribute, the Source's answer is v too.
+func (s *Server) holds(attrID uint32, v any) bool {
+	s.mu.Lock()
+	old, ok := s.values[attrID]
+	s.mu.Unlock()
+	if !ok || !reflect.DeepEqual(old, v) {
+		return false
+	}
+	if s.source != nil {
+		if answer, ok := s.source.MatterAttribute(attrID); ok && !reflect.DeepEqual(answer, v) {
+			return false
+		}
+	}
+	return true
 }
 
 // Set records a change the device made to attrID. The value is checked
