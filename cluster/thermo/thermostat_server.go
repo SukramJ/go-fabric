@@ -256,19 +256,20 @@ type ThermostatConfig struct {
 // nothing is stored. It is the Go form of a matter.js host refusing by
 // throwing in occupied*Setpoint$Changing / systemMode$Changing: the
 // validation runs before the state changes
-// (packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601,
-// :614 at matter.js 0ceb202d). For comparison, onoff's Sink answers every
+// (packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-603,
+// :614 at db021da0). For comparison, onoff's Sink answers every
 // error, a status error included, with FAILURE.
 //
 // With [ThermostatConfig.TemperatureSetpointHold] a write of
 // TemperatureSetpointHold reaches the Sink the same way, as
 // SetTemperatureSetpointHold. matter.js stores the hold only (its
-// reaction is commented out, ThermostatServer.ts:381 at 862ad75f) and
-// connectedhomeip gives it no behaviour either
-// (src/app/clusters/thermostat-server/ThermostatClusterBase.cpp:357-358 at
-// 6170af84, an optional attribute only); the hold reaching the host is
-// this module's port, so a device that follows a week program learns that
-// a controller asked it to hold or to resume.
+// reaction is commented out, ThermostatServer.ts:381 at db021da0);
+// connectedhomeip hands the write to its hold delegate, whose status
+// answers it
+// (src/app/clusters/thermostat-server/ThermostatClusterHold.cpp:76-93 at
+// 6170af84). The hold reaching the host follows connectedhomeip
+// (BD-Matter-Thermostat-Hold-ReachesHost), so a device that follows a week
+// program learns that a controller asked it to hold or to resume.
 //
 // The setpoint limits (Min/MaxHeat/CoolSetpointLimit) are configuration,
 // not device commands: their writes do not call the Sink, and neither
@@ -312,8 +313,9 @@ type Sink interface {
 	//
 	// A value equal to the stored one is no change: the write or command
 	// answers SUCCESS without calling the Sink (matter.js Datasource.ts
-	// skips an equal value on commit, :760-762, and fires $Changing only
-	// for fields that changed, :1042-1043).
+	// notes no change for an equal value on commit, :1476-1481, and fires
+	// $Changing only for fields that changed, :1203-1213 with
+	// #computePreCommitChange :1405-1408, at db021da0).
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
 	// SetTemperatureSetpointHold is a TemperatureSetpointHold write the
 	// definition admitted (0 SetpointHoldOff, 1 SetpointHoldOn), on a
@@ -980,7 +982,7 @@ func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
 // MatterReadFiltered implements [contract.FabricScopedReader] for the two
 // attributes whose value depends on the reader: Presets and Schedules,
 // which the peer holding an atomic write of them reads as it staged them —
-// matter.js's Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f),
+// matter.js's Presets getter (ThermostatServer.ts:1665-1685 at db021da0),
 // chip's Schedules read (ThermostatClusterSchedules.cpp:517-533 at
 // 645b267a). Every other attribute falls through to
 // [ThermostatServer.MatterRead].
@@ -1037,9 +1039,10 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		// The written attribute and what the reconcile moved besides it
 		// reach the listeners from the write, as matter.js emits each
 		// <setpoint>$Changed on the commit of the write's transaction
-		// (Datasource.ts:1473-1476). The subscriber's report of the
-		// written attribute is the write path's as well; a subscription
-		// reports it once.
+		// (queued with the write's session, Datasource.ts:1486-1492,
+		// emitted by postCommit, :1302-1317, at db021da0). The
+		// subscriber's report of the written attribute is the write
+		// path's as well; a subscription reports it once.
 		slices.Sort(changed)
 		s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
 		return nil
@@ -1096,8 +1099,8 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 
 // writePresets is a controller's write of Presets: outside the local
 // actor and a command, the Presets setter hands it to the atomic write
-// that holds the attribute (matter.js ThermostatServer.ts:1702-1716 at
-// 862ad75f, AtomicWriteHandler.writeAttribute), which validates it against
+// that holds the attribute (matter.js ThermostatServer.ts:1687-1702 at
+// db021da0, AtomicWriteHandler.writeAttribute), which validates it against
 // the stored presets — presets$AtomicChanging, #validatePresetWriteRequest
 // (:1289-1291) — and stages it. A list arrives element by element (the
 // REPLACE-ALL, then one append each): every step is validated and staged,
@@ -1134,10 +1137,11 @@ func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
 // [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
 // s.op.
 func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
-	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:760-762
-	// (isDeepEqual skips an unchanged value on commit) and :1042-1043
-	// ($Changing only for changed fields) at 0ceb202d: an unchanged mode
-	// is no change, and the Sink is not called.
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1476-1481
+	// (#noteIfChanged: isDeepEqual notes no change for an unchanged value
+	// on commit) and :1203-1213 with :1405-1408 ($Changing only for
+	// changed fields) at db021da0: an unchanged mode is no change, and
+	// the Sink is not called.
 	s.mu.RLock()
 	same := s.systemMode == v
 	s.mu.RUnlock()
@@ -1167,8 +1171,8 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 // writeHold applies a TemperatureSetpointHold the definition admitted. With
 // a [Sink] the hold goes to the host first; a refusal stores nothing and
 // answers as [Sink] describes. An unchanged hold is no change and does not
-// call the Sink (Datasource.ts:760-762 at 0ceb202d, as for SystemMode).
-// matter.js stores the value only (ThermostatServer.ts:381 at 862ad75f);
+// call the Sink (Datasource.ts:1476-1481 at db021da0, as for SystemMode).
+// matter.js stores the value only (ThermostatServer.ts:381 at db021da0);
 // the Sink call is this module's. The caller holds s.op.
 func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) error {
 	s.mu.RLock()
@@ -1234,9 +1238,10 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	s.mu.Lock()
 	// Served only with its feature, per ValidateWrite.
 	cur := s.setpointState()
-	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:760-762
-	// and :1042-1043 at 0ceb202d: an occupied setpoint equal to the stored
-	// one is no change — no $Changing, so neither the assert nor the Sink.
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1203-1213
+	// with :1405-1408, and :1476-1481, at db021da0: an occupied setpoint
+	// equal to the stored one is no change — no $Changing, so neither the
+	// assert nor the Sink.
 	if !t.limit && v == cur.value(attrID) {
 		s.mu.Unlock()
 		return nil, nil
@@ -1561,7 +1566,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 // its companion when both move, matter.js's order (ThermostatServer.ts:219-220,
 // :222, :224, :247, :269 at 0ceb202d), the one that moves alone otherwise —
 // and stores once the call succeeded. A setpoint that does not move is no
-// change (Datasource.ts:760-762, :1042-1043): when neither moves, the Sink is
+// change (Datasource.ts:1476-1481, :1203-1213 at db021da0): when neither moves, the Sink is
 // not called. prevHeat / prevCool are the setpoints the command read.
 //
 // The Sink runs without s.mu. Once it consented, what the command moved is
@@ -1610,7 +1615,8 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool,
 	s.mu.Unlock()
 	s.flushSetpointEvents(ctx)
 	// What the command moved reaches the listeners from the command, as
-	// applyCommandSetpoints reports it (Datasource.ts:1473-1476).
+	// applyCommandSetpoints reports it (Datasource.ts:1486-1492 at
+	// db021da0).
 	slices.Sort(changed)
 	s.changes.NotifyFrom(contract.OriginCommand, changed...)
 	return nil

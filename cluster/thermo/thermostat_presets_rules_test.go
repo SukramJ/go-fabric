@@ -16,9 +16,9 @@ import (
 )
 
 // TestPresetWriteRules holds the remaining rules of matter.js
-// #validatePresetWriteRequest (ThermostatServer.ts:1356-1484) and
-// #normalizeAndValidatePresetCommit (:1508-1595) to their statuses and
-// texts, on local writes.
+// #validatePresetWriteRequest (ThermostatServer.ts:1367-1493 at db021da0),
+// #normalizePresets (:1516-1537) and #validatePresetCommit (:1544-1580) to
+// their statuses and texts, on local writes.
 func TestPresetWriteRules(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

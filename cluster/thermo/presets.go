@@ -21,11 +21,12 @@ import (
 )
 
 // The Presets feature of the Thermostat server: the port of matter.js
-// packages/node/src/behaviors/thermostat/ThermostatServer.ts at 862ad75f —
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts at db021da0 —
 // the seed and the active-handle check of initialize (:134-152),
-// #validatePresetWriteRequest (:1356-1484), #normalizeAndValidatePresetCommit
-// (:1508-1595), handleSetActivePresetRequest / setActivePresetRequest
-// (:281-316) and the Presets accessor over persistedPresets (:1660-1722).
+// #validatePresetWriteRequest (:1367-1493), #normalizePresets (:1516-1537)
+// and #validatePresetCommit (:1544-1580), handleSetActivePresetRequest /
+// setActivePresetRequest (:281-316) and the Presets accessor over
+// persistedPresets (:1660-1703).
 
 // Preset is the PresetStruct of the generated definition.
 type Preset = tdef.PresetStruct
@@ -128,7 +129,7 @@ func presetsValue(v any) ([]Preset, error) {
 func handleKey(h []byte) string { return hex.EncodeToString(h) }
 
 // presetName is a preset's name, nil for "no name": absent and null are
-// one value (ThermostatServer.ts:1387-1389).
+// one value (ThermostatServer.ts:1396-1398).
 func presetName(p Preset) *string {
 	if p.Name == nil || p.Name.Null {
 		return nil
@@ -174,7 +175,7 @@ func (s *ThermostatServer) presetRules() presetRules {
 }
 
 // validatePresetWrite is matter.js #validatePresetWriteRequest
-// (ThermostatServer.ts:1356-1484): presets a client wants to store, against
+// (ThermostatServer.ts:1367-1493): presets a client wants to store, against
 // the presets they replace (seeding — old undefined — admits the handles
 // the application states). issued are the handles this write's
 // normalisation issued.
@@ -278,8 +279,10 @@ func nameJSON(n *string) string {
 	return fmt.Sprintf("%q", *n)
 }
 
-// normalizePresetCommit is matter.js #normalizeAndValidatePresetCommit
-// (ThermostatServer.ts:1508-1595): it issues a handle to every preset
+// normalizePresetCommit is matter.js #normalizePresets and
+// #validatePresetCommit (ThermostatServer.ts:1516-1537, :1544-1580), which
+// the stored write runs one after the other (:1310-1311): it issues a
+// handle to every preset
 // lacking one (recorded in issued), resolves a null BuiltIn — false for a
 // seed or a new preset, the stored preset's value otherwise — and refuses
 // the removal of a built-in preset and of the active preset. presets is
@@ -323,7 +326,7 @@ func normalizePresetCommit(presets, old []Preset, seeding bool, issued map[strin
 		}
 	}
 	// The specification refuses the removal of the active preset, not a
-	// handle that named no preset to begin with (:1582-1594).
+	// handle that named no preset to begin with (:1567-1579).
 	if active != nil && !handles[handleKey(active)] && slices.ContainsFunc(old, func(o Preset) bool {
 		return !o.PresetHandle.Null && bytes.Equal(o.PresetHandle.Value, active)
 	}) {
@@ -346,7 +349,7 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 
 // applyPresets validates, normalises, persists and stores presets — the
 // stored write of matter.js (persistedPresets$Changing,
-// #handlePersistedPresetsChanging, ThermostatServer.ts:1296-1313, then the
+// #handlePersistedPresetsChanging, ThermostatServer.ts:1300-1320, then the
 // commit). The caller holds s.op; presets are the caller's and are
 // normalised in place.
 func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) error {
@@ -369,22 +372,25 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 	s.presets = presets
 	s.mu.Unlock()
 	// Presets is computed from persistedPresets, whose change announces it
-	// (#handlePersistedPresetsChanged, ThermostatServer.ts:1497-1503).
+	// (#handlePersistedPresetsChanged, ThermostatServer.ts:1508-1510).
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrPresets)
 	return nil
 }
 
-// commitPresets applies the presets an atomic write staged: validated as
-// staged against the stored presets ($AtomicChanging, :1289-1291),
-// normalised with the commit checks ($AtomicChanged, :1489-1495), then
-// stored. The caller holds s.op.
+// commitPresets applies the presets an atomic write staged, as matter.js's
+// commit does: its checks before the transaction commits ($AtomicChanging,
+// ThermostatServer.ts:1289-1291, $AtomicChanged, :1500-1502) are
+// precommitAtomic's; the stored write then validates, normalises and
+// checks them (:1300-1320) — the commit assigns the staged value, which
+// the Presets setter stores for a command (:1687-1690,
+// AtomicWriteHandler.ts:299). The caller holds s.op.
 func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) error {
 	return s.applyPresets(ctx, clonePresets(staged))
 }
 
 // SetPresets is a local write of the Presets attribute — matter.js
 // `state.presets = …` with a local actor, which stores at once
-// (ThermostatServer.ts:1702-1706, hasLocalActor): the presets are
+// (ThermostatServer.ts:1687-1690, hasLocalActor): the presets are
 // validated as a controller's would be against the stored ones (a handle
 // the device has not issued is NOT_FOUND, counts per type, names only with
 // SupportsNames, the setpoints within the limits), new presets get a
@@ -455,7 +461,7 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 // clearActivePresetOnDirectWrite clears the active preset after a direct
 // (not a command's) setpoint change of the setpoints in effect — matter.js
 // #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:682-706,
-// :744-768 at 862ad75f): a setpoint someone set by hand is no longer the
+// :744-768 at db021da0): a setpoint someone set by hand is no longer the
 // preset's. It takes s.mu only, so the inbound setters may call it while a
 // write waits on the Sink.
 func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
@@ -578,7 +584,7 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 
 // seedPresets is matter.js initialize's preset part
 // (ThermostatServer.ts:134-152) with the validation its commit runs
-// (persistedPresets$Changing with no old value, :1296-1313): the stored
+// (persistedPresets$Changing with no old value, :1300-1320): the stored
 // presets when the PresetStore has them, else the configured ones —
 // validated as a seed and normalised — saved; then an ActivePresetHandle
 // that matches no preset is cleared with a warning.

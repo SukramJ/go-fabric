@@ -223,8 +223,9 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 
 // TestUnchangedValueDoesNotCallTheSink: a write of the stored SystemMode
 // or setpoint, and a SetpointRaiseLower that moves nothing, answer SUCCESS
-// without the Sink — matter.js Datasource.ts:760-762 skips an equal value
-// on commit and :1042-1043 fires $Changing only for changed fields (0ceb202d).
+// without the Sink — matter.js Datasource.ts:1476-1481 notes no change for
+// an equal value on commit and :1203-1213 with :1405-1408 fires $Changing
+// only for changed fields (db021da0).
 // A cooling-only Both moves one setpoint, which travels alone.
 func TestUnchangedValueDoesNotCallTheSink(t *testing.T) {
 	t.Parallel()
