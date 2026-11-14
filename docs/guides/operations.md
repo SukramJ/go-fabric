@@ -179,7 +179,10 @@ doubling up to 5 minutes, for its lifetime, on its clock
 committed networks starts the same rejoin at once, and so does a
 `CommissioningComplete`. An attempt waits while a fail-safe is armed or a
 NetworkCommissioning command runs, and each one sets
-`LastNetworkingStatus`. After a join that failed, the node asks a
+`LastNetworkingStatus`; a NetworkCommissioning command that arrives while
+an attempt runs cancels it and runs once it ended, so a commissioner's
+network step is not answered `Busy`, and the cancelled attempt sets
+nothing but the link. After a join that failed, the node asks a
 driver that reports its link (`contract.WiFiLinkReporter`, which this
 driver implements) where the radio is: `Networks` reads that network
 connected — the one the failed join went back to — and a fail-safe expiry

@@ -81,11 +81,14 @@ type WiFiNetworkCommissioning struct {
 	// committed network runs under it ([WiFiNetworkCommissioning.rejoin]).
 	// rejoinTimer is the armed retry, rejoinDelay the backoff of the next
 	// one (0 before the first failure), rejoining set while an attempt
-	// runs.
-	life        context.Context
-	rejoinTimer clock.Timer
-	rejoinDelay time.Duration
-	rejoining   bool
+	// runs; rejoinCancel cancels the running attempt and rejoinDone closes
+	// once it ended (nil while none runs).
+	life         context.Context
+	rejoinTimer  clock.Timer
+	rejoinDelay  time.Duration
+	rejoining    bool
+	rejoinCancel context.CancelFunc
+	rejoinDone   chan struct{}
 	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
 	// ConnectNetwork whose driver call outlives the window that admitted it
 	// sees it moved and drops its result.
@@ -336,21 +339,51 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 		return
 	}
 	target := w.committed[0]
-	w.busy, w.rejoining = true, true
+	attempt := w.beginAttemptLocked(ctx)
 	w.mu.Unlock()
-	ok := w.joinCommitted(ctx, target)
+	w.runAttempt(attempt, target)
+}
+
+// beginAttemptLocked starts a rejoin attempt under parent: the driver is
+// the attempt's (busy, rejoining) until [WiFiNetworkCommissioning.runAttempt]
+// ends it, and a command cancels it through rejoinCancel. w.mu is held.
+func (w *WiFiNetworkCommissioning) beginAttemptLocked(parent context.Context) context.Context {
+	attempt, cancel := context.WithCancel(parent)
+	w.busy, w.rejoining = true, true
+	w.rejoinCancel, w.rejoinDone = cancel, make(chan struct{})
+	return attempt
+}
+
+// runAttempt joins target as the attempt begun by beginAttemptLocked and
+// ends it: a join that succeeded resets the backoff, one that failed arms
+// the next attempt with it, and one a command cancelled arms the next
+// after the backoff's current wait, at least wifiRejoinFirstDelay, so the
+// command has its turn (review II, R2-P3-dr-net-06).
+func (w *WiFiNetworkCommissioning) runAttempt(attempt context.Context, target wifiNetwork) {
+	ok := w.joinCommitted(attempt, target)
 	w.mu.Lock()
+	defer w.mu.Unlock()
+	cancelled := attempt.Err() != nil
+	w.rejoinCancel()
+	close(w.rejoinDone)
+	w.rejoinCancel, w.rejoinDone = nil, nil
 	w.busy, w.rejoining = false, false
-	if !ok {
+	switch {
+	case ok:
+		w.rejoinDelay = 0
+	case cancelled:
+		w.armRejoinLocked(max(w.rejoinDelay, wifiRejoinFirstDelay))
+	default:
 		w.backoffLocked()
 	}
-	w.mu.Unlock()
 }
 
 // joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
 // records the result as Start does; it reports whether the join
 // succeeded. After a failed join the link is where the driver reports the
-// radio ([WiFiNetworkCommissioning.linkAfterFailure]).
+// radio ([WiFiNetworkCommissioning.linkAfterFailure]). A join whose ctx
+// ended — a command cancelled the attempt, or the lifetime ended —
+// records the link only: nothing failed on the air.
 func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wifiNetwork) bool {
 	jctx, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
 	defer cancel()
@@ -365,16 +398,21 @@ func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wif
 	}
 	w.mu.Lock()
 	w.link = link
+	w.markConnectedLocked()
+	w.dataVersion.Bump()
+	if !ok && ctx.Err() != nil {
+		w.mu.Unlock()
+		w.changes.Notify(netcommAttrNetworks)
+		return false
+	}
 	if ok {
 		w.lastConnectErr = nil
 	} else {
 		v := errValue
 		w.lastConnectErr = &v
 	}
-	w.markConnectedLocked()
 	w.lastNetworkID = bytes.Clone(target.ssid)
 	w.setStatusLocked(status)
-	w.dataVersion.Bump()
 	w.mu.Unlock()
 	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 	return ok
@@ -484,17 +522,9 @@ func (w *WiFiNetworkCommissioning) rejoin() {
 		return
 	}
 	target := w.committed[0]
-	w.busy, w.rejoining = true, true
+	attempt := w.beginAttemptLocked(life)
 	w.mu.Unlock()
-	ok := w.joinCommitted(life, target)
-	w.mu.Lock()
-	w.busy, w.rejoining = false, false
-	if ok {
-		w.rejoinDelay = 0
-	} else {
-		w.backoffLocked()
-	}
-	w.mu.Unlock()
+	w.runAttempt(attempt, target)
 }
 
 // anyFailSafeArmed reports whether a fail-safe is armed, for any fabric.
@@ -675,12 +705,34 @@ func netcommStatus(code im.StatusCode, format string, args ...any) error {
 }
 
 // MatterInvoke implements [contract.ClusterServer] (InvokeCommand,
-// :1138-1194): Busy while a scan or a connect runs.
+// :1138-1194): Busy while a command's scan or connect runs. A rejoin
+// attempt of the committed network that runs is cancelled instead and
+// the command waits for it to end, then takes its turn: neither
+// reference's commissioner retries a failed command at the network step —
+// matter.js's flow terminates commissioning on a StatusResponseError
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:437-461 at
+// db021da0), connectedhomeip completes the AddOrUpdateWiFiNetwork stage
+// with the failure (OnBasicFailure, src/controller/CHIPDeviceController.cpp:2157-2162,
+// :4287 at 6170af84) and AutoCommissioner goes to kCleanup on any error
+// (src/controller/AutoCommissioner.cpp:465-468) — so a Busy from the
+// node's own retry would fail a commissioning (review II, R2-P3-dr-net-06).
+// A command whose ctx ends while it waits is answered Busy.
 func (w *WiFiNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	w.mu.Lock()
-	if w.busy {
+	for w.busy {
+		if !w.rejoining {
+			w.mu.Unlock()
+			return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
+		}
+		w.rejoinCancel()
+		done := w.rejoinDone
 		w.mu.Unlock()
-		return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
+		}
+		w.mu.Lock()
 	}
 	w.mu.Unlock()
 	switch cmdID {

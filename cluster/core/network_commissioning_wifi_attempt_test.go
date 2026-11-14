@@ -157,3 +157,41 @@ func TestAFailSafeExpiryLeavesARunningRejoinTheDriver(t *testing.T) {
 	close(d.release)
 	awaitClosed(t, advanced, "the end of the rejoin attempt")
 }
+
+// TestACommandCancelsARunningRejoinAndTakesItsTurn: a NetworkCommissioning
+// command that arrives while a rejoin attempt runs — a commissioning's
+// network step — is not answered Busy: it cancels the attempt and runs.
+// The cancelled attempt records no networking status, and the next one is
+// armed after the backoff's first wait, not at once.
+func TestACommandCancelsARunningRejoinAndTakesItsTurn(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	var armed atomic.Bool
+	d := newHeldDriver()
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, IsFailSafeArmed: armed.Load, Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanced := rejoinRunning(t, w, d, clk, &armed)
+	_, _, errBefore := wifiLast(w)
+
+	armed.Store(true) // the commissioner's PASE armed a fail-safe
+	r, err := w.MatterInvoke(t.Context(), netcommdef.CmdScanNetworks, netcommdef.ScanNetworksRequest{})
+	if err != nil {
+		t.Fatalf("ScanNetworks during a rejoin attempt = %v, want it run", err)
+	}
+	if got := r.(netcommdef.ScanNetworksResponse).NetworkingStatus; got != netcommdef.NetworkCommissioningStatusSuccess {
+		t.Fatalf("ScanNetworks status %v", got)
+	}
+	awaitClosed(t, advanced, "the end of the cancelled attempt")
+	if _, cancelled := d.stats(); cancelled != 1 {
+		t.Errorf("%d joins cancelled, want the rejoin attempt's", cancelled)
+	}
+	if _, _, errAfter := wifiLast(w); errAfter != errBefore {
+		t.Errorf("LastConnectErrorValue %v after the cancelled attempt, want %v unchanged", errAfter, errBefore)
+	}
+	if got := clk.Armed(); len(got) != 1 || got[0] != wifiRejoinFirstDelay {
+		t.Errorf("armed %v after the cancelled attempt, want the next one in %v", got, wifiRejoinFirstDelay)
+	}
+	close(d.release)
+}
