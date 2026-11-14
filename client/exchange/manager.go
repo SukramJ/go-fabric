@@ -1174,7 +1174,14 @@ func (m *Manager) HandlePeerLoss(peer PeerAddress, cause error, asOf time.Time) 
 
 func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, current *Exchange) {
 	for _, s := range m.SessionsFor(peer) {
-		if !asOf.IsZero() && !s.createdAt.Before(asOf) {
+		// The exchange that observed the loss runs on a session that
+		// existed before it, so that session is never spared by the
+		// cutoff, even when the clock did not move between the two (a
+		// fake clock, a coarse one): matter.js compares the same instants
+		// (SessionManager.ts:740-742 against ExchangeManager.ts:614 and
+		// Session.ts:60) and relies on the clock moving.
+		own := current != nil && s == current.session
+		if !own && !asOf.IsZero() && !s.createdAt.Before(asOf) {
 			continue
 		}
 		s.handlePeerLoss(cause, current)

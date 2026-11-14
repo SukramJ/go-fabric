@@ -150,3 +150,34 @@ func TestExchangePeerLossClosesThePeersSessions(t *testing.T) {
 		t.Fatalf("closed %v, hooks %d/%d", s.IsClosed(), rec.count(s), rec.count(sibling))
 	}
 }
+
+// TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant: the session an
+// exchange runs on is lost when the exchange shows the peer gone, even
+// when the clock did not move between the session's creation and the
+// exchange's — the session precedes its exchange whatever the clock's
+// resolution, so the asOf cutoff (SessionManager.ts:740-742) cannot spare
+// it. A session created later at that instant is still kept.
+func TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant(t *testing.T) {
+	t.Parallel()
+	var rec lossRecorder
+	m, conn, clock := newTestManager(t, Config{PeerLost: rec.hook})
+	s := newFabricSession(t, m, 0x0361)
+	x, _ := m.Initiate(s, im.InteractionModelProtocolID, Options{})
+	later := newFabricSession(t, m, 0x0362)
+	if !s.CreatedAt().Equal(x.createdAt) || !later.CreatedAt().Equal(x.createdAt) {
+		t.Fatalf("the clock moved: session %v, exchange %v, later %v", s.CreatedAt(), x.createdAt, later.CreatedAt())
+	}
+	done := sendAsync(x, im.OpcodeReadRequest, nil, SendOptions{})
+	conn.nextOn(t, x)
+	clock.Advance(time.Hour)
+	clock.Advance(time.Hour)
+	if err := waitErr(t, done); !errors.Is(err, ErrTransient) {
+		t.Fatal(err)
+	}
+	if !s.IsPeerLost() || rec.count(s) != 1 {
+		t.Fatalf("the failing exchange's own session: lost %v, hooks %d; want it lost", s.IsPeerLost(), rec.count(s))
+	}
+	if later.IsPeerLost() {
+		t.Fatal("a session created at the exchange's instant, after it, was lost")
+	}
+}
