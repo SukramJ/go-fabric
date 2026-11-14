@@ -457,9 +457,11 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		// AdministratorCommissioningServer.ts:200 at db021da0
 		// `this.state.adminFabricIndex = adminFabric.fabricIndex`.
 		// AdminVendorID comes from the daemon-wired VendorIDResolver
-		// (fabric store lookup); fabricIndex==0 (PASE) keeps the
-		// VendorID at zero, which the bridge controller surfaces as
-		// AdminVendorIsNull.
+		// (fabric store lookup; matter.js :201 takes the admin fabric's
+		// rootVendorId). A session without a fabric never gets here — it
+		// was refused above (#adminFabric) — so fabIdx is never 0; a
+		// VendorID left at zero (no resolver wired, or one that answers
+		// 0) is what the bridge controller surfaces as AdminVendorIsNull.
 		params.AdminFabricIndex = fabIdx
 		if fabIdx != 0 && vr != nil && params.AdminVendorID == 0 {
 			params.AdminVendorID = vr(ctx, fabIdx)

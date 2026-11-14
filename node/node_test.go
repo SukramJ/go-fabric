@@ -814,10 +814,14 @@ func TestAggregatorAfterStop(t *testing.T) {
 
 // TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser: every entry of
 // GeneralDiagnostics NetworkInterfaces carries the root's network type —
-// Ethernet, WiFi for a Wi-Fi node — and IsOperational holds for the
-// interfaces the node's advertiser is restricted to, every interface
-// without a restriction (matter.js GeneralDiagnosticsServer.ts:477-503 at
-// db021da0). Read over the host's own interfaces.
+// Ethernet, WiFi for a Wi-Fi node: matter.js's fallback for an interface
+// the platform gives no type (GeneralDiagnosticsServer.ts:527, :477-494 at
+// db021da0), which every entry takes here, the module having no platform
+// mapping (matter.js's Node.js platform types every interface Ethernet
+// unless configured, NodeJsNetwork.ts:195-202) — and IsOperational holds
+// for the interfaces the node's advertiser is restricted to, every
+// interface without a restriction (:496-503). Read over the host's own
+// interfaces.
 func TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser(t *testing.T) {
 	t.Parallel()
 	read := func(t *testing.T, n *node.Node) []mattercore.NetworkInterfaceStruct {

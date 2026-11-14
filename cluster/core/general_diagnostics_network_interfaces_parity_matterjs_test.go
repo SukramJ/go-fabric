@@ -256,8 +256,12 @@ func TestGeneralDiagnosticsNetworkInterfacesSelection(t *testing.T) {
 // matter.js GeneralDiagnosticsServer.ts #updateNetworkList (:477-494 the
 // type from the root's NetworkCommissioning feature, :496-503 the
 // operational test against mdnsService.limitedToNetInterface, :521 and
-// :527) at db021da0. Read over the host's own interfaces: every entry
-// the host yields is held to the rule.
+// :527) at db021da0: the root's type is :527's fallback for an interface
+// the platform gives no type, which every entry takes here, the module
+// having no platform mapping (matter.js's Node.js platform types every
+// interface Ethernet unless configured, NodeJsNetwork.ts:195-202). Read
+// over the host's own interfaces: every entry the host yields is held to
+// the rule.
 func TestGeneralDiagnosticsNetworkInterfacesTypeAndOperational(t *testing.T) {
 	t.Parallel()
 	read := func(t *testing.T, g *GeneralDiagnostics) []NetworkInterfaceStruct {

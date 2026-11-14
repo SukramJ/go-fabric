@@ -12,9 +12,11 @@ import (
 )
 
 // TestNetworkInterfaceRules: every entry carries the root's network type,
-// Ethernet by default, whatever its name; without an advertiser
-// restriction every interface is operational, with one the advertised
-// ones alone (GeneralDiagnosticsServer.ts:477-503 at db021da0).
+// Ethernet by default, whatever its name — matter.js's fallback for an
+// interface the platform gives no type (GeneralDiagnosticsServer.ts:527,
+// :477-494 at db021da0), which every entry takes here, the module having
+// no platform mapping; without an advertiser restriction every interface
+// is operational, with one the advertised ones alone (:496-503).
 func TestNetworkInterfaceRules(t *testing.T) {
 	t.Parallel()
 	var zero networkInterfaceRules

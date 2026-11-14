@@ -1137,14 +1137,21 @@ const (
 // projected into a [NetworkInterfaceStruct]. A failed listing is nil.
 //
 // InterfaceType and IsOperational follow matter.js's
-// GeneralDiagnosticsServer.ts #updateNetworkList at db021da0: every entry
-// carries the root's network type, Ethernet unless the root's
-// NetworkCommissioning has the Wi-Fi or Thread feature (:477-494, :527 —
-// the platform's own type comes first there, and Node.js's
-// NodeJsNetwork.ts:195-202 sets none but a configured one); an entry is
-// operational when the advertiser is not restricted to interfaces or is
-// restricted to it (:496-503, :521, mdnsService.limitedToNetInterface,
-// one name there and a list here, BD-matterjs-mdns-interface-allowlist).
+// GeneralDiagnosticsServer.ts #updateNetworkList at db021da0. An entry's
+// type is the platform's type of the interface, else the root's network
+// type — Ethernet unless the root's NetworkCommissioning has the Wi-Fi or
+// Thread feature (`type: type ?? networkType`, :527; :477-494). This
+// module has no platform mapping of interfaces to types, so every entry
+// takes that fallback, the root's network type. matter.js on Node.js never
+// reaches it: its platform types every interface Ethernet unless the
+// configuration maps the name to another type
+// (packages/nodejs/src/net/NodeJsNetwork.ts:184, :195-202;
+// packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:102-126
+// passes the type on), so a Wi-Fi root
+// serves WiFi here and Ethernet there. An entry is operational when the
+// advertiser is not restricted to interfaces or is restricted to it
+// (:496-503, :521, mdnsService.limitedToNetInterface, one name there and a
+// list here, BD-matterjs-mdns-interface-allowlist).
 //
 // What this server decides without matter.js:
 //

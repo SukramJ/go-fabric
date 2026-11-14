@@ -1479,11 +1479,14 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
 // setNetworkInterfaceRules states GeneralDiagnostics NetworkInterfaces'
-// rules: the root's network type for every entry, and the interfaces the
-// node's own advertiser is restricted to as the operational ones (matter.js
-// GeneralDiagnosticsServer.ts:477-503 at db021da0; cluster/core
-// enumerateNetworkInterfaces). A host's advertiser restricts nothing the
-// node knows of.
+// rules: the root's network type for every entry — matter.js's fallback for
+// an interface the platform gives no type (GeneralDiagnosticsServer.ts:527,
+// :477-494 at db021da0), which every entry takes here because the module
+// has no platform mapping; matter.js's Node.js platform types every
+// interface Ethernet unless configured (cluster/core
+// enumerateNetworkInterfaces) — and the interfaces the node's own
+// advertiser is restricted to as the operational ones (:496-503). A host's
+// advertiser restricts nothing the node knows of.
 func (n *Node) setNetworkInterfaceRules() {
 	if n.cfg.Network.WiFi != nil {
 		n.root.GeneralDiagnostics.SetNetworkInterfaceType(mattercore.InterfaceTypeWiFi)
