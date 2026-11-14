@@ -431,6 +431,14 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// accepts the requested MaxInterval; such a request was refused as
 	// inverted after the clamp.
 	maxCeil := max(min(req.MaxIntervalCeiling, m.cfg.MaxIntervalCeilingSeconds), req.MinIntervalFloor)
+	// Never below matter.js's minimum interval of 2 s, whatever the
+	// subscriber's ceiling (review II, R2-P4-imread-11): matter.js
+	// packages/node/src/node/server/ServerSubscription.ts at db021da0,
+	// #genericMaxInterval (:326-343) raises the granted MaxInterval to
+	// subscriptionMinInterval, which is MIN_INTERVAL = Seconds(2) (:73) or a
+	// configured value never below it (:111). The ICD branch below keeps
+	// matter.js's #icdIdleMaxInterval, which has no such bound.
+	maxCeil = max(maxCeil, minGrantedIntervalSeconds)
 	if idle := uint16(m.icdIdleMax.Load()); idle > 0 { //nolint:gosec // G115: SetICDIdleModeDuration stores a uint16
 		maxCeil = max(req.MinIntervalFloor, idle)
 	}

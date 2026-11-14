@@ -271,16 +271,24 @@ func (s *Subscription) sendIntervalLocked() time.Duration {
 		send = maxSendInterval
 	}
 	// Final clamp: never below the requested MinIntervalFloor
-	// (commissioner-side rate limit) and never below 1 s.
+	// (commissioner-side rate limit) and never below matter.js's minimum
+	// interval of 2 s (ServerSubscription.ts:285-290 at db021da0,
+	// #determineSendingIntervals; review II, R2-P4-imread-11).
 	floor := time.Duration(s.MinIntervalFloor) * time.Second
 	if send < floor {
 		send = floor
 	}
-	if send < time.Second {
-		send = time.Second
+	if minSend := minGrantedIntervalSeconds * time.Second; send < minSend {
+		send = minSend
 	}
 	return send
 }
+
+// minGrantedIntervalSeconds is the shortest MaxInterval a subscription is
+// granted and the shortest interval its reports are sent at: matter.js
+// packages/node/src/node/server/ServerSubscription.ts:73 at db021da0,
+// MIN_INTERVAL = Seconds(2).
+const minGrantedIntervalSeconds = 2
 
 // SendInterval returns the publisher heartbeat cadence the engine uses for
 // this subscription — matter.js ServerSubscription.sendInterval.
