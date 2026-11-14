@@ -877,6 +877,9 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	if snap == nil {
 		return nil, errors.New("bridge: snapshotter is required")
 	}
+	if cfg.TCP.MaxInboundConnections < 0 {
+		return nil, fmt.Errorf("bridge: TCP.MaxInboundConnections %d is negative", cfg.TCP.MaxInboundConnections)
+	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second
 	}

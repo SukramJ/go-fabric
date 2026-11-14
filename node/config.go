@@ -714,6 +714,9 @@ func (c *Config) optionalErrors() []error {
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
+	if n := c.Network.TCP.MaxInboundConnections; n < 0 {
+		errs = append(errs, fmt.Errorf("node: Network.TCP.MaxInboundConnections %d is negative", n))
+	}
 	if w := c.Network.WiFi; w != nil && w.Driver == nil && w.Reporter == nil {
 		errs = append(errs, errors.New("node: Network.WiFi needs its Driver, its Reporter or both"))
 	}

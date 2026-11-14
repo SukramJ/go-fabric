@@ -916,7 +916,10 @@ it (`Config.TransportPreference`) or an interaction carries a large message
 (`ClientRequest.LargeMessage`; an invoke that leaves it nil sets it when one
 of its commands has matter.js's Large Message quality, as
 `schema.CommandLargeMessage` reports it); the sessions of a dropped connection close. `Controller.TCPAddr()` is the listener's
-address.
+address. `TCPConfig.MaxInboundConnections` bounds the connections the
+listener holds in all (zero is 256; a negative value is
+`ErrConfiguration`): at the bound a new connection takes the place of the
+oldest one that has delivered no message yet, or is closed.
 
 ### Network profiles
 

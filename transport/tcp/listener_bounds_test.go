@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"syscall"
 	"testing"
@@ -235,4 +236,57 @@ func TestServeRetriesAFailedAccept(t *testing.T) {
 			t.Errorf("Serve after its context ended = %v, want nil", err)
 		}
 	})
+}
+
+// TestListenerHoldsAtMostItsConfiguredInboundConnections: Config's
+// MaxInboundConnections is the listener's total bound, zero meaning
+// MaxInboundConnections; once each held connection has delivered a
+// message, a further one is closed.
+func TestListenerHoldsAtMostItsConfiguredInboundConnections(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		configured, want int
+	}{
+		{0, MaxInboundConnections},
+		{1, 1},
+		{2 * MaxInboundConnections, 2 * MaxInboundConnections},
+	} {
+		t.Run(strconv.Itoa(tc.configured), func(t *testing.T) {
+			t.Parallel()
+			l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64, MaxInboundConnections: tc.configured})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = l.Close() })
+			got := make(chan struct{}, 1)
+			handler := func(_ *Conn, _ []byte, release func()) { release(); got <- struct{}{} }
+			for i := range tc.want {
+				c, cli := acceptFrom(t, l, i, handler)
+				if c == nil {
+					t.Fatalf("connection %d of %d was not held", i+1, tc.want)
+				}
+				if _, err := cli.Write(frameOf([]byte{1})); err != nil {
+					t.Fatal(err)
+				}
+				<-got
+			}
+			if c, _ := acceptFrom(t, l, tc.want, handler); c != nil {
+				t.Fatalf("the listener bounded at %d took connection %d", tc.want, tc.want+1)
+			}
+			if n := l.Conns(); n != tc.want {
+				t.Fatalf("the listener holds %d connections, want %d", n, tc.want)
+			}
+		})
+	}
+}
+
+// TestListenRefusesANegativeInboundBound: a negative MaxInboundConnections
+// is a configuration error, and nothing is bound.
+func TestListenRefusesANegativeInboundBound(t *testing.T) {
+	t.Parallel()
+	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxInboundConnections: -1})
+	if err == nil {
+		_ = l.Close()
+		t.Fatal("Listen with MaxInboundConnections -1 succeeded")
+	}
 }

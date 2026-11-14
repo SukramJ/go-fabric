@@ -27,6 +27,24 @@ type TCPConfig struct {
 	Incoming bool
 	// Outgoing may open TCP connections (the "tcpClient" role).
 	Outgoing bool
+	// MaxInboundConnections is the most inbound connections the TCP
+	// listener holds in all, whatever their source addresses; at the
+	// bound a new connection takes the place of the oldest one that has
+	// delivered no complete message yet, or is closed when every held one
+	// has. Zero is the device's default, tcp.MaxInboundConnections (4,
+	// connectedhomeip's CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS); a
+	// negative value is refused by [New]. A bridge that several
+	// controllers reach over TCP may raise it.
+	MaxInboundConnections int
+}
+
+// maxInboundConnections is the listener's total bound t selects: the
+// configured one, tcp.MaxInboundConnections for zero.
+func (t TCPConfig) maxInboundConnections() int {
+	if t.MaxInboundConnections == 0 {
+		return tcp.MaxInboundConnections
+	}
+	return t.MaxInboundConnections
 }
 
 // maxPortAssignmentRetries bounds the attempts to find a port free for
@@ -66,6 +84,8 @@ func (b *Bridge) openTransports() (udpListener *udp.Listener, tcpListener *tcp.L
 			PreferIPv4: b.cfg.PreferIPv4,
 			Logger:     b.logger,
 			Clock:      b.clk(),
+
+			MaxInboundConnections: b.cfg.TCP.maxInboundConnections(),
 		})
 		if err == nil {
 			return udpListener, tcpListener, nil

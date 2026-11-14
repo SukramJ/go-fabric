@@ -25,6 +25,29 @@ type TCPConfig struct {
 	// Outgoing opens TCP connections to peers that serve TCP when an
 	// interaction requires or prefers it (the tcpClient role).
 	Outgoing bool
+	// MaxInboundConnections is the most inbound connections the TCP
+	// listener holds in all, whatever their source addresses; at the
+	// bound a new connection takes the place of the oldest one that has
+	// delivered no complete message yet, or is closed when every held one
+	// has. Zero is the controller's default, 256; a negative value is
+	// [ErrConfiguration].
+	MaxInboundConnections int
+}
+
+// defaultMaxInboundTCPConnections is the controller's default total bound
+// on inbound TCP connections: the bound on its inbound unsecured sessions
+// (client/exchange/manager.go:949, maxInboundUnsecuredSessions = 256),
+// owner decision 56 (review II). The device's default is the smaller
+// tcp.MaxInboundConnections.
+const defaultMaxInboundTCPConnections = 256
+
+// maxInboundConnections is the listener's total bound t selects: the
+// configured one, defaultMaxInboundTCPConnections for zero.
+func (t TCPConfig) maxInboundConnections() int {
+	if t.MaxInboundConnections == 0 {
+		return defaultMaxInboundTCPConnections
+	}
+	return t.MaxInboundConnections
 }
 
 // localParameters are our session parameters with the TCP roles: TCP is
@@ -74,6 +97,7 @@ func (c *Controller) listenTCP(ctx context.Context) error {
 	l, err := tcp.Listen(tcp.Config{
 		LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
 		Logger:    c.log, Clock: c.clock,
+		MaxInboundConnections: c.tcp.maxInboundConnections(),
 	})
 	if err != nil {
 		return err

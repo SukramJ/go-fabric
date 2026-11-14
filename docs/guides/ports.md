@@ -129,7 +129,7 @@ Use `Observers` instead.
 | `OTA` (`controller.OTAConfig`) | the OTA push: the update manager (`Controller.SoftwareUpdates`) over an image store (`Images`, nil is an in-memory one without ledgers), with the OTA provider served at `controller.OTAProviderEndpoint` of the controller's own tree and its BDX responder (`Controller.BDX`) | no OTA push, no provider endpoint |
 | `Camera` (`controller.CameraConfig`) | the controller side of Matter cameras: the Camera Controller endpoint (`controller.CameraControllerEndpoint`) with a WebRtcTransportRequestor the fabric's cameras reach (`Controller.CameraRequestor`, `Controller.OnCameraSignal`), and the operational record of RootNodeID | no camera endpoint |
 | `GroupTransport` (`groups.MulticastTransport`) | the transport group messages leave on (`Controller.Groups`, `Controller.SetGroupKey`) | the controller's own UDP socket |
-| `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
+| `TCP` (`controller.TCPConfig{Incoming, Outgoing, MaxInboundConnections}`) | a TCP listener (`Controller.TCPAddr`), holding at most `MaxInboundConnections` connections (zero is 256), and the TCP initiator | UDP only |
 | `TransportPreference` | the transport each peer prefers | UDP |
 | `PeerTiming` (`*client.Timing`) | the peer set's connection timing, overriding the defaults field-wise (a zero field keeps its default; a negative `ProvenAddressRetention` retains nothing) | `client/peer.DefaultTiming` |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |

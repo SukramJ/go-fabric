@@ -26,8 +26,8 @@ const MatterPort = 5540
 // (MAX_CONNECTIONS_PER_PEER_IP = 3).
 const MaxConnectionsPerPeerIP = 3
 
-// MaxInboundConnections caps the inbound connections a listener holds in
-// all — connectedhomeip's CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS
+// MaxInboundConnections is the default of [Config].MaxInboundConnections,
+// the inbound connections a listener holds in all — connectedhomeip's CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS
 // (src/transport/raw/TCPConfig.h:39-46 at 6170af84, "Maximum Number of TCP
 // connections a device can simultaneously have", the pool of the server's
 // and the controller's transport, src/app/server/Server.h:100,
@@ -62,7 +62,7 @@ var ErrListenerClosed = errors.New("tcp: listener closed")
 var errIdle = errors.New("tcp: no message within the new-connection idle timeout")
 
 // errReclaimed closes a connection that had delivered no message when a
-// new one needed its place ([MaxInboundConnections]).
+// new one needed its place ([Config].MaxInboundConnections).
 var errReclaimed = errors.New("tcp: no message yet, its place taken by a new connection")
 
 // Config controls the listener.
@@ -81,6 +81,12 @@ type Config struct {
 	// Clock paces the idle timeout of a new connection; nil is
 	// [clock.System].
 	Clock clock.Clock
+	// MaxInboundConnections is the most inbound connections the listener
+	// holds in all; at the bound a new connection takes the place of the
+	// oldest one that has delivered no complete message yet, or is closed
+	// when every held one has. Zero means [MaxInboundConnections]; a
+	// negative value is refused by [Listen].
+	MaxInboundConnections int
 }
 
 // Listener accepts inbound Matter TCP connections — the server role of
@@ -91,6 +97,9 @@ type Listener struct {
 	logger         *slog.Logger
 	idleTimeout    time.Duration
 	clock          clock.Clock
+	// maxConns is the total bound on held connections
+	// ([Config].MaxInboundConnections).
+	maxConns int
 
 	recoveredPanics panicCounter
 
@@ -124,8 +133,12 @@ func bindAddr(cfg Config) (network, addr string) {
 	return network, addr
 }
 
-// Listen opens the TCP socket per cfg.
+// Listen opens the TCP socket per cfg. A negative
+// cfg.MaxInboundConnections is refused before anything is bound.
 func Listen(cfg Config) (*Listener, error) {
+	if cfg.MaxInboundConnections < 0 {
+		return nil, fmt.Errorf("tcp: MaxInboundConnections %d is negative", cfg.MaxInboundConnections)
+	}
 	network, addr := bindAddr(cfg)
 	tcpAddr, err := net.ResolveTCPAddr(network, addr)
 	if err != nil {
@@ -148,12 +161,17 @@ func newListener(ln net.Listener, cfg Config) *Listener {
 	if maxPayload <= 0 {
 		maxPayload = DefaultMaxPayloadSize
 	}
+	maxConns := cfg.MaxInboundConnections
+	if maxConns <= 0 {
+		maxConns = MaxInboundConnections
+	}
 	return &Listener{
 		ln:             ln,
 		maxPayloadSize: maxPayload,
 		logger:         logger,
 		idleTimeout:    NewConnectionIdleTimeout,
 		clock:          clock.Or(cfg.Clock),
+		maxConns:       maxConns,
 		conns:          make(map[*Conn]uint64),
 	}
 }
@@ -276,7 +294,7 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 		return
 	}
 	var reclaim *Conn
-	if len(l.conns) >= MaxInboundConnections {
+	if len(l.conns) >= l.maxConns {
 		reclaim = l.unclaimedLocked()
 		if reclaim == nil {
 			l.mu.Unlock()

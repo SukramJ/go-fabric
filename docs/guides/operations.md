@@ -68,7 +68,7 @@ So the operator's rules are the persistence guide's
 | What | Default | Why |
 | --- | --- | --- |
 | UDP `node.Config.Network.Listen` | `:5540` | Every Matter message — commissioning, operational sessions, reports — arrives here. |
-| TCP on the same port | off | Only with `Network.TCP.Incoming`: the node then also accepts Matter over TCP and says so in its session parameters, and the TCP listener takes the UDP socket's port. |
+| TCP on the same port | off | Only with `Network.TCP.Incoming`: the node then also accepts Matter over TCP and says so in its session parameters, and the TCP listener takes the UDP socket's port. It holds at most `Network.TCP.MaxInboundConnections` connections in all (zero is 4; see the limits guide). |
 | IPv6 on the LAN | required | Matter's operational network is IPv6: the node advertises its IPv6 addresses and controllers reach it there. `Network.PreferIPv4` forces an IPv4-only socket, for a test network. |
 | UDP 5353, multicast `224.0.0.251` and `ff02::fb` | required | DNS-SD over mDNS, below. |
 

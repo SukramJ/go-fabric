@@ -365,7 +365,7 @@ type Controller struct {
 }
 
 // checkRequired refuses a configuration without its required fields or
-// with a negative report or image bound.
+// with a negative report, image or inbound TCP bound.
 func checkRequired(cfg *Config) error {
 	switch {
 	case cfg.DB == nil:
@@ -376,6 +376,8 @@ func checkRequired(cfg *Config) error {
 		return fmt.Errorf("%w: MaxReportBytesPerSession %d is negative", ErrConfiguration, cfg.MaxReportBytesPerSession)
 	case cfg.MaxImageBytesPerNode < 0:
 		return fmt.Errorf("%w: MaxImageBytesPerNode %d is negative", ErrConfiguration, cfg.MaxImageBytesPerNode)
+	case cfg.TCP.MaxInboundConnections < 0:
+		return fmt.Errorf("%w: TCP.MaxInboundConnections %d is negative", ErrConfiguration, cfg.TCP.MaxInboundConnections)
 	}
 	return nil
 }
