@@ -219,11 +219,20 @@ type initiatedExchange struct {
 // deliverInitiatedSecureChannel hands an unsecured Secure-Channel message
 // the peer sent as the *responder* on an exchange this node initiated to
 // the waiting handshake. Returns false when no handshake owns the exchange.
+//
+// The handshake is found by its [HandshakeKey]: the exchange id and the
+// ephemeral node id this node chose as the initiator, which a response
+// names as its destination. A message on the exchange id that names another
+// initiator is not this handshake's — matter.js finds the unsecured session
+// of a response by that destination node id ("Responses include our
+// ephemeral initiator nodeId as destNodeId",
+// packages/protocol/src/protocol/ExchangeManager.ts:306-308 at db021da0) and
+// the exchange inside it (:398-401), as the responder side does here.
 func (b *Bridge) deliverInitiatedSecureChannel(hdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
 	if proto.Initiator || hdr.SessionID != 0 || proto.Opcode == mrp.StandaloneAckOpcode {
 		return false
 	}
-	raw, ok := b.resumption.initiated.Load(proto.ExchangeID)
+	raw, ok := b.resumption.initiated.Load(handshakeKeyOf(hdr, proto.ExchangeID))
 	if !ok {
 		return false
 	}
@@ -245,9 +254,18 @@ func (b *Bridge) deliverInitiatedSecureChannel(hdr *message.Header, proto messag
 // sent by the initiator.
 func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *CaseInitiation) (uint16, error) {
 	exchangeID := b.nextOutboundExchangeID()
+	// The unsecured session of the initiator is identified by an
+	// ephemeral source node id (Matter §4.13.2.1 / chip
+	// UnauthenticatedSession); the responder addresses its replies to it,
+	// and the handshake takes only replies addressed so.
+	ephemeral, err := randomEphemeralNodeID()
+	if err != nil {
+		return 0, err
+	}
+	key := HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}
 	ex := &initiatedExchange{ch: make(chan initiatedMessage, 4)}
-	b.resumption.initiated.Store(exchangeID, ex)
-	defer b.resumption.initiated.Delete(exchangeID)
+	b.resumption.initiated.Store(key, ex)
+	defer b.resumption.initiated.Delete(key)
 	// A handshake that ends takes what it sent and the peer has not
 	// acknowledged with it — a Sigma1 or Sigma3 nobody answers any more.
 	// The StatusReport that ends it is the exception, as on the responder
@@ -256,25 +274,15 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	// acknowledged, its retries are spent or [unsecuredEntryLifetime] is
 	// over. The unsecured session's entries of this handshake only:
 	// exchange ids are per initiator, and a secure session's peer or
-	// another initiator may have picked the same one. ephemeral is set
-	// below, before anything is sent.
+	// another initiator may have picked the same one.
 	reported := false
-	var ephemeral uint64
-	abandon := func() { b.abandonHandshakeReplies(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}) }
+	abandon := func() { b.abandonHandshakeReplies(key) }
 	defer func() {
 		if !reported {
 			abandon()
 		}
 	}()
 
-	// The unsecured session of the initiator is identified by an
-	// ephemeral source node id (Matter §4.13.2.1 / chip
-	// UnauthenticatedSession); the responder addresses its replies to it.
-	eph, err := randomEphemeralNodeID()
-	if err != nil {
-		return 0, err
-	}
-	ephemeral = eph
 	sigma1, err := init.Initiator.GenerateSigma1()
 	if err != nil {
 		return 0, err
