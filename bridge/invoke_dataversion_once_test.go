@@ -79,8 +79,9 @@ func (s *valueNotifyingCounterServer) MatterInvoke(context.Context, uint32, any)
 // command is one commit and advances its cluster's DataVersion once,
 // whether the server reports its own change during the command, reports
 // it as a value change, or reports nothing and the before/after comparison
-// finds it (matter.js Datasource.ts:1440-1448, advanceVersion once per
-// commit). A change the server reports outside a command still advances
+// finds it (matter.js packages/node/src/behavior/state/managed/
+// Datasource.ts:1445-1457 at db021da0: a commit notes each changed
+// property, then advances the version once). A change the server reports outside a command still advances
 // the version by itself, once.
 func TestCommandAdvancesTheDataVersionOnce(t *testing.T) {
 	t.Parallel()

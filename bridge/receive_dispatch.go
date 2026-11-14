@@ -891,8 +891,9 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 // runs against a cluster instance, its servers' reports are held here
 // instead of advancing the version and marking the attributes dirty; the
 // command's end advances once and marks the held attributes with the
-// compared ones (matter.js Datasource.ts:1440-1448, advanceVersion once
-// per commit). A report outside a command is not held. Nothing is reported
+// compared ones (matter.js packages/node/src/behavior/state/managed/
+// Datasource.ts:1445-1457 at db021da0: a commit notes each changed
+// property, then advances the version once). A report outside a command is not held. Nothing is reported
 // before the version moves, so no report carries the command's change at
 // the version before it.
 type invokeCommitTable struct {
