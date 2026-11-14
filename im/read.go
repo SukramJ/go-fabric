@@ -415,9 +415,11 @@ func (r ReportData) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWrite
 	// Always emit SuppressResponse, including the explicit `false`. matter.js
 	// (packages/types/src/protocol/messages/TlvDataReportForSend.ts:27)
 	// declares this as a TlvOptionalField that ServerSubscription always
-	// fills with a concrete value: `false` for non-empty data reports and
-	// `true` for empty keepalives. Apple Home's IM layer treats an absent
-	// SuppressResponse differently from an explicit `false` — without the
+	// fills with a concrete value: `false` for every ongoing report, the
+	// keep-alive included
+	// (packages/node/src/node/server/ServerSubscription.ts:914, :928 at
+	// db021da0). Apple Home's IM layer treats an absent SuppressResponse
+	// differently from an explicit `false` — without the
 	// field the controller answers with only a Standalone MRP-ACK and never
 	// emits the StatusResponse the spec §10.6.4.1 mandates for
 	// non-suppressed reports, which leaves matter.js's waitForSuccess gate

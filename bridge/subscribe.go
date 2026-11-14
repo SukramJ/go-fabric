@@ -636,13 +636,18 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		Reports:         b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths),
 	}
 
-	// An empty report is a max-interval keepalive (nothing changed, or every
-	// dirty path was dropped by the ACL gate). matter.js ships empty
-	// DataReports with SuppressResponse=true (ServerSubscription.ts:782) so
-	// the controller does not owe an IM StatusResponse for a no-op heartbeat.
-	if len(report.Reports) == 0 {
-		report.SuppressResponse = true
-	}
+	// An empty report is a max-interval keep-alive (nothing changed, or
+	// every dirty path was dropped by the ACL gate). It asks for the peer's
+	// StatusResponse like a report with data — SuppressResponse stays
+	// false — so the peer's INVALID_SUBSCRIPTION answer is read and ends
+	// the subscription ([Bridge.closeSubscriptionByExchange]); a keep-alive
+	// that is never acknowledged is a failed update as any other report
+	// ([Bridge.noteReportUndelivered]). Mirrors matter.js
+	// packages/node/src/node/server/ServerSubscription.ts:909-920 at
+	// db021da0 (the keep-alive branch of #sendUpdateMessage,
+	// `suppressResponse: false` at :914, "Requested so the peer's
+	// INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
+	// transport", :913) and :938-950 (an error status ends it).
 
 	seq := b.beginUpdate(sub.ID)
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
