@@ -719,3 +719,43 @@ func TestParityFabricLeave_OpcredsLeavingHookRunsBeforeTheRowsGo(t *testing.T) {
 	}
 	oc.SetOnFabricLeaving(nil)
 }
+
+// TestParityOpcreds_UpdateFabricLabelConflictsOnTheEmptyLabel pins that
+// the label conflict holds for every label, the empty one included: a
+// fabric whose label another fabric already carries — every fabric starts
+// with "" — is answered LabelConflict.
+//
+// Mirrors matter.js db021da0 packages/node/src/behaviors/
+// operational-credentials/OperationalCredentialsServer.ts:396-402
+// (`fabrics.find(f => f.label === label && f.fabricIndex !==
+// currentFabricIndex)`, no exception for ""); connectedhomeip 6170af84
+// src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:719-725
+// compares the same way.
+func TestParityOpcreds_UpdateFabricLabelConflictsOnTheEmptyLabel(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := newFakeStore()
+	one, two := newFabricForTest(1), newFabricForTest(2)
+	one.Label, two.Label = "", "two"
+	if _, err := s.AddFabric(ctx, one); err != nil {
+		t.Fatal(err)
+	}
+	idx2, err := s.AddFabric(ctx, two)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := oc.MatterInvoke(im.WithFabricFilter(ctx, true, idx2), 0x09, core.UpdateFabricLabelRequest{Label: ""})
+	if err != nil {
+		t.Fatalf("UpdateFabricLabel(\"\"): %v", err)
+	}
+	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusLabelConflict {
+		t.Fatalf("UpdateFabricLabel(\"\") while fabric 1 holds \"\": StatusCode %d, want LabelConflict (%d)", got, core.NOCStatusLabelConflict)
+	}
+	if rec, _ := s.GetFabric(ctx, idx2); rec.Label != "two" {
+		t.Fatalf("label after the conflict = %q, want %q", rec.Label, "two")
+	}
+}

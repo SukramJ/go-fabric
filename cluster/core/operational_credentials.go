@@ -2542,23 +2542,22 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if idx == 0 {
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
 	}
-	// Mirrors matter.js packages/node/src/behaviors/operational-credentials/
-	// OperationalCredentialsServer.ts:394-401 — reject non-empty Labels
-	// already used by another fabric on this node with LabelConflict.
-	// Empty Labels are always allowed; the spec treats a fabric with
-	// empty Label as "unnamed" and multi-fabric admins may legitimately
-	// share that state.
-	if req.Label != "" {
-		fabrics, err := o.store.ListFabrics(ctx)
-		if err == nil {
-			for i := range fabrics {
-				f := &fabrics[i]
-				if f.FabricIndex != idx && f.Label == req.Label {
-					return NOCResponse{
-						StatusCode: NOCStatusLabelConflict,
-						DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
-					}, nil
-				}
+	// A label another fabric on this node already carries — the empty
+	// label every fabric starts with included — is answered LabelConflict.
+	// Mirrors matter.js db021da0 packages/node/src/behaviors/
+	// operational-credentials/OperationalCredentialsServer.ts:396-402
+	// (`fabrics.find(f => f.label === label && f.fabricIndex !==
+	// currentFabricIndex)`, no exception for ""); connectedhomeip 6170af84
+	// OperationalCredentialsCluster.cpp:719-725 compares the same way.
+	fabrics, err := o.store.ListFabrics(ctx)
+	if err == nil {
+		for i := range fabrics {
+			f := &fabrics[i]
+			if f.FabricIndex != idx && f.Label == req.Label {
+				return NOCResponse{
+					StatusCode: NOCStatusLabelConflict,
+					DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
+				}, nil
 			}
 		}
 	}
