@@ -985,10 +985,19 @@ type peerSessionParamsSource interface {
 // parameters before it replies (PaseServer.ts:153-156,
 // CaseServer.ts:120-123), so its PBKDFParamResponse, Pake2 and Sigma2
 // retransmit at the peer's active interval (MRP.ts:181).
+//
+// The initiator has not authenticated yet, so its intervals are clamped to
+// [sessionparams.MaxUnauthenticatedInterval] here, where the bridge adopts
+// them for the handshake's own replies (review II, owner decision 45; the
+// controller side clamps at the same point, client/exchange). The secure
+// session the handshake establishes keeps them as stated.
 func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 	var params *sessionparams.Parameters
 	if s, ok := handler.(peerSessionParamsSource); ok {
-		params = s.PeerSessionParams()
+		if stated := s.PeerSessionParams(); stated != nil {
+			clamped := sessionparams.ClampUnauthenticated(*stated)
+			params = &clamped
+		}
 	}
 	return newHandshakePeerTiming(params, rxAt)
 }

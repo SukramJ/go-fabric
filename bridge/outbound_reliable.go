@@ -301,8 +301,9 @@ const unsecuredEntryLimit = 16
 // ([outboundReliableTracker.AbandonUnsecuredExchange]) — but three kinds
 // are bounded by no handshake timeout: the StatusReport that ends a
 // handshake, which is retransmitted after the handshake is over and paced
-// by the intervals the peer stated (0xFFFFFFFF ms puts the first
-// retransmission weeks away); a CASE reply of a host that runs no reaper
+// by the intervals the peer stated (clamped to an hour,
+// [sessionparams.MaxUnauthenticatedInterval], where they are adopted —
+// [handshakePeerTimingOf]); a CASE reply of a host that runs no reaper
 // ([PerExchangeCaseProvider.StartReaper]); and a PASE reply whose slot
 // nobody takes over, since [pasePairingTimeout] is looked at by the next
 // PBKDFParamRequest only. The value is [pasePairingTimeout]'s — matter.js's

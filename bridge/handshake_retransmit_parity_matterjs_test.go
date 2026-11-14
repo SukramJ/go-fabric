@@ -117,3 +117,28 @@ func TestHandshakeRetransmitFallsBackToIdleAfterTheActiveThreshold(t *testing.T)
 		t.Fatalf("wait after the threshold %v, want the idle range %v to %v", w, lo, hi)
 	}
 }
+
+// TestHandshakeRetransmitClampsUnauthenticatedIntervals (review II, owner
+// decision 45): the intervals an initiator states before it authenticated
+// pace the handshake reply only up to sessionparams.MaxUnauthenticatedInterval
+// — the bound the controller side applies (sessionparams.ClampUnauthenticated)
+// — so a stated 0xFFFFFFFF ms does not push the reply's retransmission
+// weeks away. The secure session keeps the values as stated.
+func TestHandshakeRetransmitClampsUnauthenticatedIntervals(t *testing.T) {
+	t.Parallel()
+	rx := time.Unix(1_000_000, 0)
+	stated := &sessionparams.Parameters{
+		SessionIdleInterval: 0xFFFFFFFF, SessionActiveInterval: 0xFFFFFFFF,
+	}
+	peerTiming := handshakePeerTimingOf(paramsCaseHandler{params: stated}, rx)
+	bound := time.Duration(sessionparams.MaxUnauthenticatedInterval) * time.Millisecond
+	if got := peerTiming.base(rx); got != bound {
+		t.Fatalf("active base %v, want the bound %v", got, bound)
+	}
+	if got := peerTiming.base(rx.Add(time.Hour)); got != bound {
+		t.Fatalf("idle base %v, want the bound %v", got, bound)
+	}
+	if stated.SessionIdleInterval != 0xFFFFFFFF || stated.SessionActiveInterval != 0xFFFFFFFF {
+		t.Fatalf("the stated parameters were changed: %+v", stated)
+	}
+}
