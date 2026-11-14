@@ -142,29 +142,32 @@ func TestReportSubscription_UnknownSubID_IsNoop(t *testing.T) {
 		[]im.ConcreteAttributePath{{Endpoint: 0, HasEndpoint: true}})
 }
 
-// ─── closeSubscriptionByCounter ─────────────────────────────────────────────
+// ─── noteReportUndelivered ──────────────────────────────────────────────────
 
-// TestCloseSubscriptionByCounter_WrongType_IsNoop verifies that if the
-// stored value is not a uint32 (wrong type assertion), the function returns
-// without panicking.
-func TestCloseSubscriptionByCounter_WrongType_IsNoop(t *testing.T) {
+// TestNoteReportUndelivered_WrongType_IsNoop verifies that if the
+// stored value is not an *owedReport (wrong type assertion), the function
+// returns without panicking.
+func TestNoteReportUndelivered_WrongType_IsNoop(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	// Store a string instead of uint32 to force the type-assertion failure.
-	b.reportCounterOwner.Store(reportCounterKey(0, 55), "not-a-uint32")
-	b.closeSubscriptionByCounter(0, 55)
+	// Store a string instead of *owedReport to force the type-assertion failure.
+	b.reportCounterOwner.Store(reportCounterKey(0, 55), "not-an-owed-report")
+	b.noteReportUndelivered(0, 55)
 }
 
-// TestCloseSubscriptionByCounter_ZeroSubID_IsNoop verifies that a stored
-// subID of 0 does not proceed to delete or close anything.
-func TestCloseSubscriptionByCounter_ZeroSubID_IsNoop(t *testing.T) {
+// TestNoteReportUndelivered_ZeroSubID_IsNoop verifies that a stored
+// subID of 0 counts nothing and leaves no entry.
+func TestNoteReportUndelivered_ZeroSubID_IsNoop(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	b.reportCounterOwner.Store(reportCounterKey(0, 66), uint32(0))
-	b.closeSubscriptionByCounter(0, 66)
+	b.reportCounterOwner.Store(reportCounterKey(0, 66), &owedReport{})
+	b.noteReportUndelivered(0, 66)
 	// entry must be gone
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(0, 66)); ok {
-		t.Error("reportCounterOwner still has entry after closeSubscriptionByCounter with subID=0")
+		t.Error("reportCounterOwner still has entry after noteReportUndelivered with subID=0")
+	}
+	if _, ok := b.subSendErrorCount.Load(uint32(0)); ok {
+		t.Error("a failed update counted against subscription 0")
 	}
 }
 
@@ -174,7 +177,7 @@ func TestReleaseReportCounter_ZeroIsNoop(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	// Pre-store something to confirm nothing is deleted for counter=0.
-	b.reportCounterOwner.Store(reportCounterKey(0, 1), uint32(42))
+	b.reportCounterOwner.Store(reportCounterKey(0, 1), &owedReport{subID: 42})
 	b.releaseReportCounter(0, 0) // must not panic, must not touch counter=1
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(0, 1)); !ok {
 		t.Error("releaseReportCounter(0) deleted an unrelated counter entry")
@@ -186,7 +189,7 @@ func TestReleaseReportCounter_ZeroIsNoop(t *testing.T) {
 func TestReleaseReportCounter_NonZeroDeletesEntry(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	b.reportCounterOwner.Store(reportCounterKey(0, 99), uint32(7))
+	b.reportCounterOwner.Store(reportCounterKey(0, 99), &owedReport{subID: 7})
 	b.releaseReportCounter(0, 99)
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(0, 99)); ok {
 		t.Error("releaseReportCounter(99): entry still present, expected deleted")

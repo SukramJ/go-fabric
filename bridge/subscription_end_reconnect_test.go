@@ -30,8 +30,8 @@ func subscribeOn(t *testing.T, m *subscription.Manager, fabricIndex uint8, peerN
 // packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at 862ad75f:
 // a subscription that ends for good (isTerminated) starts the "reconnect"
 // broadcast of its session's fabric — the peer's error status
-// (closeSubscriptionByExchange) and the ack pump's abandonment
-// (closeSubscriptionByCounter) each start one for that fabric's
+// (closeSubscriptionByExchange) and the ack pump's abandonment of the
+// third report in a row (noteReportUndelivered) each start one for that fabric's
 // operational service only. A released subscription (Release, not
 // terminated) starts none, and neither does the CloseFabric of a fabric
 // whose service was already withdrawn.
@@ -59,8 +59,10 @@ func TestSubscriptionTerminated_StartsTheFabricsReconnect(t *testing.T) {
 		m := subscription.NewManager(subscription.Config{}, nil, nil)
 		b.AttachSubscriptionManager(m)
 		sub := subscribeOn(t, m, 1, 0xC1, 0x10)
-		b.reportCounterOwner.Store(reportCounterKey(0x10, 77), sub.ID)
-		b.closeSubscriptionByCounter(0x10, 77)
+		b.routing.subTargets.Store(sub.ID, subTarget{sessionID: 0x10, fabricIndex: 1})
+		b.subSendErrorCount.Store(sub.ID, sendErrorRetryLimit)
+		b.reportCounterOwner.Store(reportCounterKey(0x10, 77), &owedReport{subID: sub.ID})
+		b.noteReportUndelivered(0x10, 77)
 		b.reannounces.Wait()
 		if d, _ := adv.events(); !slices.Equal(d, op(op1)) {
 			t.Errorf("disconnected events %v, want %v", d, op(op1))

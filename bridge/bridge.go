@@ -579,14 +579,14 @@ type Bridge struct {
 	// by mu.
 	sigma1Seq uint64
 
-	// reportCounterOwner maps an outbound-reliable MessageCounter to
-	// the subscription ID that owns it. Populated by
-	// reportSubscription right after tracker.Track; consumed when the
-	// ACK pump observes [mrp.ErrMaxRetransmissionsReached] so the
-	// peer-vanished subscription can be reaped from the manager
-	// instead of staying live and burning ticks forever. Cleared on
-	// successful Ack via [Bridge.releaseReportCounter].
-	reportCounterOwner sync.Map // map[uint32]uint32  (counter → subscriptionID)
+	// reportCounterOwner maps the outbound-reliable MessageCounter of an
+	// ongoing report's last message ([reportCounterKey]) to what the
+	// report owes its subscription ([Bridge.noteReportSent]). The peer's
+	// acknowledgement takes it as a delivered update
+	// ([Bridge.releaseReportCounter]); the ACK pump's
+	// [mrp.ErrMaxRetransmissionsReached] as a failed one
+	// ([Bridge.noteReportUndelivered]).
+	reportCounterOwner sync.Map // map[uint64]*owedReport
 
 	// subSendErrorCount tracks how many consecutive send failures the
 	// ongoing report path has accumulated per subscription. matter.js's
@@ -594,7 +594,8 @@ type Bridge struct {
 	// before cancelling; this counter implements the same back-off so
 	// a transient send error (e.g. a momentary socket-write hiccup or
 	// fabric reload race) does not immediately reap an otherwise-healthy
-	// subscription. Reset to 0 on the first successful send. Subs that
+	// subscription. Reset by a delivered update: a report the peer
+	// acknowledged, or one sent without a tracked message. Subs that
 	// never reach 0 again — peer truly gone — exceed the cap and get
 	// closed via the existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
@@ -849,13 +850,6 @@ type Bridge struct {
 	// map[mrp.ExchangeKey]uint32 / map[uint32]mrp.ExchangeKey
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
-	// reportExchangeOrigins holds, per report exchange in
-	// reportExchangeOwner, when it was opened and the counter of its first
-	// message (map[mrp.ExchangeKey]reportExchangeOrigin) — what the
-	// peer-loss path needs when that message is never acknowledged
-	// (ackpump.go tickOutboundReliable). Kept and dropped with the two
-	// maps above.
-	reportExchangeOrigins sync.Map
 
 	// resumption holds subscription persistence and the re-establishment
 	// of former subscriptions after a restart (docs/adr/0008). See

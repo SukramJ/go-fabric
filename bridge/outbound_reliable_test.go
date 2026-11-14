@@ -314,28 +314,32 @@ func TestOutboundReliable_AckIsSessionScoped(t *testing.T) {
 	}
 }
 
-// TestSubscription_AutoCloseOnMaxRetries verifies that when an
-// outbound report counter hits the retransmit cap and the bridge has
-// recorded its counter→subscription mapping, the bookkeeping is
-// cleared. Pure white-box — operates on the maps directly because
-// constructing a real subscription.Manager requires more wiring than
-// the assertion needs.
+// TestSubscription_AutoCloseOnMaxRetries verifies that an outbound
+// report counter hitting the retransmit cap is one failed update of the
+// subscription that recorded it: the record is consumed, and the third
+// such update in a row reaps the subscription's routing target. Pure
+// white-box — operates on the maps directly because constructing a real
+// subscription.Manager requires more wiring than the assertion needs.
 func TestSubscription_AutoCloseOnMaxRetries(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
 	const sessionID = uint16(0)
-	const counter = uint32(99)
 	const subID = uint32(7)
-	b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), subID)
 	b.routing.subTargets.Store(subID, subTarget{})
 
-	b.closeSubscriptionByCounter(sessionID, counter)
+	for failed := 1; failed <= 3; failed++ {
+		counter := uint32(98 + failed)
+		b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), &owedReport{subID: subID})
 
-	if _, ok := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); ok {
-		t.Error("counter→subID mapping still present after close")
-	}
-	if _, ok := b.routing.subTargets.Load(subID); ok {
-		t.Error("subTarget still present after close")
+		b.noteReportUndelivered(sessionID, counter)
+
+		if _, ok := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); ok {
+			t.Fatalf("failed update %d: counter record still present", failed)
+		}
+		_, live := b.routing.subTargets.Load(subID)
+		if live != (failed < 3) {
+			t.Fatalf("after %d failed updates subTarget present=%v, want %v", failed, live, failed < 3)
+		}
 	}
 }
 
@@ -354,12 +358,14 @@ func TestCloseSubscriptionByCounter_IsSessionScoped(t *testing.T) {
 	const subA = uint32(101)
 	const subB = uint32(202)
 
-	b.reportCounterOwner.Store(reportCounterKey(sessionA, sharedCounter), subA)
-	b.reportCounterOwner.Store(reportCounterKey(sessionB, sharedCounter), subB)
+	b.reportCounterOwner.Store(reportCounterKey(sessionA, sharedCounter), &owedReport{subID: subA})
+	b.reportCounterOwner.Store(reportCounterKey(sessionB, sharedCounter), &owedReport{subID: subB})
 	b.routing.subTargets.Store(subA, subTarget{})
 	b.routing.subTargets.Store(subB, subTarget{})
+	// Session A's subscription is at its third failed update.
+	b.subSendErrorCount.Store(subA, sendErrorRetryLimit)
 
-	b.closeSubscriptionByCounter(sessionA, sharedCounter)
+	b.noteReportUndelivered(sessionA, sharedCounter)
 
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(sessionA, sharedCounter)); ok {
 		t.Error("session A counter→subID mapping still present after close")
@@ -386,12 +392,17 @@ func TestSubscription_ReleaseCounterOnPeerAck(t *testing.T) {
 	b := &Bridge{}
 	const sessionID = uint16(0)
 	const counter = uint32(0xCAFE)
-	b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), uint32(42))
+	b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), &owedReport{subID: 42})
+	b.subSendErrorCount.Store(uint32(42), 2)
 
 	b.releaseReportCounter(sessionID, counter)
 
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); ok {
 		t.Error("counter mapping still present after release")
+	}
+	// A delivered update starts the count of failed ones again.
+	if _, counted := b.subSendErrorCount.Load(uint32(42)); counted {
+		t.Error("failed updates still counted after a delivered one")
 	}
 }
 
@@ -562,7 +573,7 @@ func TestSubscription_CloseUnknownCounterNoOp(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
 	// Must not panic; Pending stays empty.
-	b.closeSubscriptionByCounter(0, uint32(0xDEAD))
+	b.noteReportUndelivered(0, uint32(0xDEAD))
 	count := 0
 	b.routing.subTargets.Range(func(_, _ any) bool { count++; return true })
 	if count != 0 {

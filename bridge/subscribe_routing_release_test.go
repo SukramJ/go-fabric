@@ -78,7 +78,7 @@ func TestSubscriptionCloseReleasesBridgeRouting(t *testing.T) {
 			b.AttachSubscriptionManager(m)
 
 			subID := subscribeAndCapture(t, b, m, 9, 4)
-			b.reportCounterOwner.Store(reportCounterKey(9, 4242), subID)
+			b.reportCounterOwner.Store(reportCounterKey(9, 4242), &owedReport{subID: subID})
 
 			tc.close(m, subID)
 

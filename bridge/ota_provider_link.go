@@ -378,8 +378,8 @@ type peerLossCloser interface {
 // ExchangeManager.ts:561-585 (a commissioned peer: SessionManager.
 // handlePeerLoss for the peer address, asOf the exchange context's
 // creation; otherwise the session alone) → SessionManager.ts:677-695.
-// An exhausted counter of a subscription report takes the same path
-// through [Bridge.reportPeerLoss].
+// An exhausted counter of a subscription report is no peer loss
+// ([Bridge.noteReportUndelivered]).
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: sessionID, exchangeID: exchangeID})
 	if !ok {
@@ -391,30 +391,6 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	}
 	b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
 	ex.fail(mrp.ErrMaxRetransmissionsReached)
-}
-
-// reportPeerLoss reports whether the exhausted message (sessionID,
-// exchangeID, counter) is evidence that the peer is lost, and the exchange's
-// creation time to bound the sweep: the message is a live ongoing report's
-// (its counter is still owned) and the first one sent on its exchange, so
-// nothing was heard from the peer on it. matter.js reports peer loss when a
-// send fails "only if we never heard from it on this exchange"
-// (MessageExchange.ts:616-621, #reportsPeerLoss :630-633,
-// #messageReceivedCounter === 0); a later chunk is sent only after the
-// peer's StatusResponse to the previous one, so its loss is not.
-func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (time.Duration, bool) {
-	if _, owned := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); !owned {
-		return 0, false
-	}
-	raw, ok := b.reportExchangeOrigins.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
-	if !ok {
-		return 0, false
-	}
-	origin, ok := raw.(reportExchangeOrigin)
-	if !ok || origin.firstCounter != counter {
-		return 0, false
-	}
-	return origin.createdAtMono, true
 }
 
 // closeLostPeer force-closes the sessions of the peer of sessionID that
