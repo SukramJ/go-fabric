@@ -156,3 +156,92 @@ func TestWildcardInvokeUndecodableFieldsParity(t *testing.T) {
 		t.Errorf("denied everywhere: responses %+v, want none", resp.Responses)
 	}
 }
+
+// TestInvokeLargeMessageParity: a command with the Large Message quality
+// runs only on a session whose transport carries large messages. On any
+// other session a concrete path answers INVALID_TRANSPORT_TYPE after the
+// existence and access checks and before the fabric-scope and timed ones
+// (CommandInvokeResponse.ts:281-285 at db021da0), a wildcard path skips the
+// endpoint (:384-386); connectedhomeip
+// src/app/InteractionModelEngine.cpp:1878-1884 at 6170af84 (CheckCommandFlags).
+// matter.js's session.largeMessage is the channel's supportsLargeMessages:
+// TCP true (packages/protocol/src/transport/tcp/TcpChannel.ts:45), UDP and
+// BLE false (packages/general/src/net/udp/UdpTransport.ts:69,
+// packages/protocol/src/ble/Ble.ts:39).
+func TestInvokeLargeMessageParity(t *testing.T) {
+	t.Parallel()
+	const (
+		tlsCerts       = uint32(0x0801) // TlsCertificateManagement
+		provisionRoot  = uint32(0x00)   // ProvisionRootCertificate, "L"
+		findRoot       = uint32(0x02)   // FindRootCertificate, "L"
+		onOff, onOffOn = uint32(0x0006), uint32(0x01)
+	)
+	large := im.WithLargeMessageSession
+	for _, c := range []struct {
+		name    string
+		ctx     context.Context
+		path    im.ConcreteCommandPath
+		want    im.StatusCode
+		invokes int
+	}{
+		{"concrete, UDP session", large(caseCtx(false), false), cmdAt(2, tlsCerts, provisionRoot), im.StatusInvalidTransportType, 0},
+		{"concrete, TCP session", large(caseCtx(false), true), cmdAt(2, tlsCerts, provisionRoot), im.StatusSuccess, 1},
+		{"concrete, no stamp: the caller's check", caseCtx(false), cmdAt(2, tlsCerts, provisionRoot), im.StatusSuccess, 1},
+		{"concrete, UDP session, endpoint absent: existence first", large(caseCtx(false), false), cmdAt(42, tlsCerts, provisionRoot), im.StatusUnsupportedEndpoint, 0},
+		{"concrete, UDP session, command without the quality", large(caseCtx(false), false), cmdAt(2, onOff, onOffOn), im.StatusSuccess, 0},
+	} {
+		srvTLS := &gateServer{id: tlsCerts, attrs: []uint32{0x0000}, vals: map[uint32]any{}}
+		srvOnOff := &gateServer{id: onOff, attrs: []uint32{0x0000}, vals: map[uint32]any{}}
+		d := gateDispatcher(t, store.PrivilegeAdminister, srvTLS, srvOnOff)
+		if got := invokeStatus(c.ctx, t, d, c.path); got != c.want {
+			t.Errorf("%s: status %v, want %v", c.name, got, c.want)
+		}
+		if srvTLS.invokes != c.invokes {
+			t.Errorf("%s: TLS server ran %d commands, want %d", c.name, srvTLS.invokes, c.invokes)
+		}
+	}
+
+	// A wildcard path skips the endpoint on a session without large
+	// messages: no status, nothing runs.
+	for _, on := range []bool{false, true} {
+		srvTLS := &gateServer{id: tlsCerts, attrs: []uint32{0x0000}, vals: map[uint32]any{}}
+		d := gateDispatcher(t, store.PrivilegeAdminister, srvTLS)
+		wild := im.ConcreteCommandPath{Cluster: tlsCerts, Command: findRoot, HasCluster: true, HasCommand: true}
+		resp := im.HandleInvokeRequest(large(caseCtx(false), on), d, im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: wild}}})
+		want := 0
+		if on {
+			want = 1
+		}
+		if len(resp.Responses) != want || srvTLS.invokes != want {
+			t.Errorf("wildcard, large message session %t: responses %+v, invokes %d, want %d of each", on, resp.Responses, srvTLS.invokes, want)
+		}
+		if got := im.DispatchEndpoints(large(caseCtx(false), on), d, im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: wild}}}); len(got) != want {
+			t.Errorf("wildcard, large message session %t: dispatch endpoints %v, want %d", on, got, want)
+		}
+	}
+}
+
+// TestGroupInvokeLargeMessageParity: a group message travels UDP multicast,
+// whose channel carries no large messages (UdpTransport.ts:69 at db021da0),
+// so a group command with the Large Message quality is skipped on every
+// member endpoint, the way #wildcardTargetOf skips it
+// (CommandInvokeResponse.ts:384-386).
+func TestGroupInvokeLargeMessageParity(t *testing.T) {
+	t.Parallel()
+	const tlsCerts, provisionRoot = uint32(0x0801), uint32(0x00)
+	srv := &gateServer{id: tlsCerts, attrs: []uint32{0x0000}, vals: map[uint32]any{}}
+	d := NewTopologyDispatcher(makeTopology(&Endpoint{ID: 2, Source: gateSource{srvs: []contract.ClusterServer{srv}}}))
+	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, nil)}})
+	ctx := im.WithGroupSubject(im.WithFabricFilter(context.Background(), true, 1), im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{2}})
+	wild := im.ConcreteCommandPath{Cluster: tlsCerts, Command: provisionRoot, HasCluster: true, HasCommand: true}
+	report := im.HandleGroupInvoke(ctx, d, im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: wild}}}, nil)
+	if len(report.Dispatched) != 0 || srv.invokes != 0 {
+		t.Fatalf("group Large Message command: dispatched %+v, invokes %d, want none", report.Dispatched, srv.invokes)
+	}
+	// Control: a command without the quality runs on the member endpoint.
+	wild.Command = 0x01 // an id schema/large_message_gen.go does not list for 0x0801
+	report = im.HandleGroupInvoke(ctx, d, im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: wild}}}, nil)
+	if len(report.Dispatched) != 1 || srv.invokes != 1 {
+		t.Fatalf("group command without the quality: dispatched %+v, invokes %d, want one", report.Dispatched, srv.invokes)
+	}
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -67,6 +68,17 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 // through camera.Provider — recognises with cluster/camera alone.
 var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
 
+// ErrLargeMessageTransport is an Invoke of a command with the Large Message
+// quality ([schema.CommandLargeMessage]) to a peer this node holds no
+// session with over a transport that carries large messages (TCP). It is
+// not sent: matter.js's client requires the TCP transport for such a
+// command (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
+// :1235 at db021da0) and takes only a session of that transport
+// (packages/protocol/src/peer/Peer.ts:374-375, :439-448), never one over
+// UDP; this node opens no TCP connection of its own, so it can use one
+// only when the peer connected to it over TCP.
+var ErrLargeMessageTransport = errors.New("bridge: a command with the Large Message quality needs a TCP session with the peer, and none is open")
+
 // ConnectOtaProvider implements [core.OtaProviderConnector]: it returns a
 // secure session with the provider (matter.js
 // OtaSoftwareUpdateRequestorServer.ts:553-565 #connectOtaProviderFor →
@@ -96,7 +108,7 @@ func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 	if err != nil {
 		return nil, err
 	}
-	return &PeerSession{b: b, link: link}, nil
+	return &PeerSession{b: b, link: link, fabricIndex: fabricIndex, peerNodeID: peerNodeID}, nil
 }
 
 // PeerSession is a secure session with a peer this node reached as the
@@ -105,6 +117,46 @@ func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 type PeerSession struct {
 	b    *Bridge
 	link peerLink
+	// fabricIndex and peerNodeID name the peer, for the TCP session a
+	// command with the Large Message quality needs ([PeerSession.Invoke]).
+	fabricIndex uint8
+	peerNodeID  uint64
+}
+
+// largeMessageLink is the session a command with the Large Message quality
+// goes over: the link itself when its route carries large messages,
+// otherwise the newest live session of the peer whose route does. Mirrors
+// matter.js Peer.connect with a required transport
+// (packages/protocol/src/peer/Peer.ts:374-375 at db021da0, "transport
+// explicitly required"; :439-448, newestSession of that transport, never
+// another), which ClientInteraction asks for when the request is a large
+// message (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
+// :1235). matter.js then establishes a session over TCP when none is open;
+// this node opens no TCP connection of its own, so none is
+// [ErrLargeMessageTransport].
+func (s *PeerSession) largeMessageLink() (peerLink, error) {
+	if routeCarriesLargeMessages(s.b.currentPeerAddr(s.link.sessionID, s.link.addr)) {
+		return s.link, nil
+	}
+	b := s.b
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lister, ok := reg.(peerSessionLister); ok && lookup != nil && s.peerNodeID != 0 {
+		ids := lister.SessionIDsForPeer(s.fabricIndex, s.peerNodeID)
+		for i := len(ids) - 1; i >= 0; i-- {
+			if _, live := lookup.Lookup(ids[i]); !live {
+				continue
+			}
+			raw, known := b.sessionPeerAddrs.Load(ids[i])
+			addr, isAddr := raw.(net.Addr)
+			if known && isAddr && routeCarriesLargeMessages(addr) {
+				return peerLink{sessionID: ids[i], addr: addr}, nil
+			}
+		}
+	}
+	return peerLink{}, ErrLargeMessageTransport
 }
 
 // invokeStatusError is a command the peer answered with a status other
@@ -131,9 +183,20 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it
 // ([im.StatusCodeError]). A request larger than one message of the
-// session is [ErrPayloadTooLarge] and is not sent.
+// session is [ErrPayloadTooLarge] and is not sent. A command with the
+// Large Message quality goes over a TCP session of the peer only
+// ([PeerSession.largeMessageLink]); without one it is
+// [ErrLargeMessageTransport] and is not sent.
 func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error) {
-	ex, err := s.b.openInitiatedExchange(s.link)
+	link := s.link
+	if schema.CommandLargeMessage(clusterID, commandID) {
+		l, err := s.largeMessageLink()
+		if err != nil {
+			return nil, fmt.Errorf("%w: command 0x%02x of cluster 0x%04x", err, commandID, clusterID)
+		}
+		link = l
+	}
+	ex, err := s.b.openInitiatedExchange(link)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +224,7 @@ func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	if err := ex.Send(ctx, im.InteractionModelProtocolID, im.OpcodeInvokeRequest, payload); err != nil {
 		return nil, err
 	}
-	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(s.link.sessionID))
+	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(link.sessionID))
 	defer cancel()
 	for {
 		msg, err := ex.Receive(waitCtx)

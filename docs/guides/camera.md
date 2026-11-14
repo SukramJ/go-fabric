@@ -70,7 +70,8 @@ deletion, and the port's `End` is told of each with UnknownReason, so the
 host tears the stream down (`contract.FabricScopedState`).
 
 The four commands are large messages, so a controller sends them over
-TCP. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
+TCP; one that arrives over UDP or BLE answers `INVALID_TRANSPORT_TYPE` and
+does not run, as in matter.js. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
 sessions only.
 
 **The ACL entry.** The node installs the access the camera needs. At
@@ -120,16 +121,17 @@ A session id `CurrentSessions` does not hold is `camera.ErrUnknownSession`.
 The peer's refusal comes back as an error carrying its status
 (`im.StatusCodeError`): `NOT_FOUND` when the requestor holds no session of
 that id from this node, `UNSUPPORTED_ACCESS` when its ACL lacks the Operate
-entry (the node installs it on its own requestors, see above). The signals
-carry an SDP, so they can exceed one UDP message (1178 bytes of payload).
-The node initiates CASE over UDP only and reuses the newest live session
-with the peer, of either transport; a signal that does not fit the session
-it would go over is refused with `camera.ErrPayloadTooLarge` and not sent
-(`bridge.ErrPayloadTooLarge` is the same value; a camera host needs
-`cluster/camera` alone).
-connectedhomeip establishes a TCP session for them
-(`TransportPayloadCapability::kLargePayload`); a controller that reached
-the camera over TCP leaves the session the signals need.
+entry (the node installs it on its own requestors, see above). The
+signals are large messages: each goes over a TCP session with the peer
+only, as matter.js's client sends such a command, and connectedhomeip
+establishes a TCP session for them
+(`TransportPayloadCapability::kLargePayload`). The node initiates CASE over
+UDP only and opens no TCP connection itself, so a signal reaches the peer
+over the newest live TCP session the peer opened to the camera; without
+one it is refused with `bridge.ErrLargeMessageTransport` and not sent. A
+signal that does not fit the TCP connection's largest message is refused
+with `camera.ErrPayloadTooLarge` (`bridge.ErrPayloadTooLarge` is the same
+value).
 
 ## Chime
 

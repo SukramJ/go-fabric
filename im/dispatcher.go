@@ -263,3 +263,30 @@ type InvokeResult struct {
 	ClusterStatus    uint8
 	HasClusterStatus bool
 }
+
+// largeMessageCtxKey carries whether the request's session runs over a
+// transport that carries large messages.
+type largeMessageCtxKey struct{}
+
+// WithLargeMessageSession stamps whether the request's session runs over a
+// transport that carries large messages — the session's
+// supportsLargeMessages in matter.js
+// (packages/protocol/src/session/Session.ts:372-373 at db021da0, the
+// channel's flag: TCP true, packages/protocol/src/transport/tcp/TcpChannel.ts:45;
+// UDP false, packages/general/src/net/udp/UdpTransport.ts:69; BLE false,
+// packages/protocol/src/ble/Ble.ts:39), which the request context reads
+// (packages/node/src/behavior/context/server/RemoteActorContext.ts:208).
+// The transport stamps it where it knows the route a request arrived on;
+// [HandleInvokeRequest] then answers a command with the Large Message
+// quality on a session without it with InvalidTransportType.
+func WithLargeMessageSession(ctx context.Context, large bool) context.Context {
+	return context.WithValue(ctx, largeMessageCtxKey{}, large)
+}
+
+// LargeMessageSessionFromContext reports the stamp of
+// [WithLargeMessageSession]; known is false when the caller stamped
+// nothing, in which case the Large Message check is the caller's.
+func LargeMessageSessionFromContext(ctx context.Context) (large, known bool) {
+	large, known = ctx.Value(largeMessageCtxKey{}).(bool)
+	return large, known
+}
