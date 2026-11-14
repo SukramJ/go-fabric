@@ -67,7 +67,8 @@ type attributeHolder interface {
 // the module holds (owner decision 38): every attribute whose generated
 // definition carries the N quality and write access, not fabric-scoped
 // and not kept elsewhere (keptElsewhere), of a server the module built
-// and holds the state of — the root's servers, and on a bridged endpoint
+// and holds the state of — the root's own servers (not one the host
+// mounts there, Config.RootServers), and on a bridged endpoint
 // a server its device built itself and no host port takes the attribute's
 // writes of (device.Device.HoldsAttribute). A controller's write is
 // stored before the server takes it ([endpoint.WritePersister]); the
@@ -102,7 +103,8 @@ func (v *nonVolatile) key(ep *endpoint.Endpoint, srv contract.ClusterServer, att
 	}
 	switch {
 	case ep.IsRoot():
-		if !slices.Contains(v.n.root.servers, srv) {
+		// The node's own: a server the host mounts there is the host's.
+		if !slices.Contains(v.n.root.servers, srv) || slices.Contains(v.n.cfg.RootServers, srv) {
 			return "", false
 		}
 	case ep.IsAggregator():
