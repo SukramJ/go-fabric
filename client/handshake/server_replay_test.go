@@ -105,6 +105,18 @@ func TestCASEServerAnswersASigma1Once(t *testing.T) {
 // to the controller completes while one Sigma1 is sent again under 256
 // fresh source node ids between the node's Sigma2 and its Sigma3 — the
 // repeats hold no session that could take the node's place in the table.
+//
+// The relay between node and controller passes each message once, its
+// first transmission, and drops the MRP retransmissions of it. While it
+// holds the node's Sigma3, the controller retransmits Sigma2, and its
+// global unsecured message counter moves on by the acknowledgements of
+// the repeats. The held retransmissions leave in one burst just ahead of
+// the controller's answers to Sigma3; the node handles unsecured
+// datagrams on concurrent goroutines (no order key for session 0,
+// message.SessionOrderKey), so a retransmission handled after an answer
+// lies more than 32 counters behind it, and the rollover window of the
+// unsecured session (transport/mrp Window) takes it for a restarted
+// counter and delivers it as a new Sigma2.
 func TestCASEServerCompletesAHandshakeWhileASigma1IsRepeated(t *testing.T) {
 	t.Parallel()
 	r := newResponderRig(t)
@@ -122,6 +134,11 @@ func TestCASEServerCompletesAHandshakeWhileASigma1IsRepeated(t *testing.T) {
 	go func() {
 		var node *net.UDPAddr
 		repeated := false
+		type sent struct {
+			fromServer bool
+			counter    uint32
+		}
+		passed := map[sent]bool{}
 		buf := make([]byte, 4096)
 		for {
 			n, from, err := relay.ReadFromUDP(buf)
@@ -129,6 +146,15 @@ func TestCASEServerCompletesAHandshakeWhileASigma1IsRepeated(t *testing.T) {
 				return
 			}
 			d := append([]byte(nil), buf[:n]...)
+			h, _, err := message.UnmarshalHeader(d)
+			if err != nil {
+				continue
+			}
+			key := sent{fromServer: from.Port == r.serverAddr.Port, counter: h.MessageCounter}
+			if passed[key] {
+				continue
+			}
+			passed[key] = true
 			if from.Port == r.serverAddr.Port {
 				if node != nil {
 					_, _ = relay.WriteToUDP(d, node)
