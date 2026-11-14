@@ -208,3 +208,80 @@ func TestPendingFabricsSurviveReopen(t *testing.T) {
 		t.Errorf("the rolled-back add after reopening: %v, want ErrFabricNotFound", err)
 	}
 }
+
+// TestCommitAndRollbackErasePriorColumns is R2-P2-dr-noc-06: after
+// CommitFabric and after RollbackFabric of an update, no prior value is
+// left in the row — not the replaced NOC, ICAC or operational private key,
+// not the node id, vendor id or VID data. A leftover is unobservable
+// through the port, so the columns are read.
+func TestCommitAndRollbackErasePriorColumns(t *testing.T) {
+	t.Parallel()
+	for _, end := range []string{"commit", "rollback"} {
+		t.Run(end, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			db, err := store.OpenSQLite(filepath.Join(t.TempDir(), "matter.db"), walMode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			if err := store.Apply(ctx, db); err != nil {
+				t.Fatal(err)
+			}
+			s := store.New(db)
+			rec := newFabricRecord(0, 1)
+			rec.VIDVerificationStatement, rec.VVSC = []byte{4}, []byte{5}
+			idx, err := s.AddFabric(ctx, rec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: idx, NOC: []byte{1}, ICAC: []byte{2}, PrivateKey: bytes.Repeat([]byte{3}, 32), IPK: bytes.Repeat([]byte{6}, 16)}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{9}, ICAC: []byte{9}, PrivateKey: bytes.Repeat([]byte{9}, 32), NodeID: 9}); err != nil {
+				t.Fatal(err)
+			}
+			if got := priorColumns(t, db, idx); got != allPriorColumns {
+				t.Fatalf("prior columns set by the update = %#b, want %#b: the read does not see them", got, allPriorColumns)
+			}
+			if end == "commit" {
+				err = s.CommitFabric(ctx, idx)
+			} else {
+				_, err = s.RollbackFabric(ctx, idx)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := priorColumns(t, db, idx); got != 0 {
+				t.Fatalf("prior columns left after the %s = %#b (bit i: %v), want none", end, got, priorColumnNames)
+			}
+		})
+	}
+}
+
+// priorColumnNames are the prior_* columns, identity first.
+var priorColumnNames = []string{"prior_noc", "prior_icac", "prior_private_key", "prior_node_id", "prior_vendor_id", "prior_vid_statement", "prior_vvsc"}
+
+const allPriorColumns = 1<<7 - 1
+
+// priorColumns is a bit set of the prior_* columns of fabric idx that are
+// not NULL, bit i for priorColumnNames[i].
+func priorColumns(t *testing.T, db *sql.DB, idx uint8) int {
+	t.Helper()
+	row := db.QueryRowContext(t.Context(), `
+SELECT i.prior_noc IS NOT NULL, i.prior_icac IS NOT NULL, i.prior_private_key IS NOT NULL,
+       f.prior_node_id IS NOT NULL, f.prior_vendor_id IS NOT NULL, f.prior_vid_statement IS NOT NULL, f.prior_vvsc IS NOT NULL
+FROM matter_fabrics f JOIN matter_node_identities i ON i.fabric_index = f.fabric_index
+WHERE f.fabric_index = ?`, idx)
+	var set [7]bool
+	if err := row.Scan(&set[0], &set[1], &set[2], &set[3], &set[4], &set[5], &set[6]); err != nil {
+		t.Fatal(err)
+	}
+	bits := 0
+	for i, b := range set {
+		if b {
+			bits |= 1 << i
+		}
+	}
+	return bits
+}
