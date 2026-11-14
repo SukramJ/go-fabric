@@ -14,7 +14,7 @@ import (
 
 // TestEvseMatterQuiesceStopsTheEnabledTimer: the bridge quiesces a server
 // that leaves the topology through contract.ClusterQuiescer
-// (bridge.quiesceServers). Afterwards the enabled-until timer is not
+// (bridge.reconcileQuiescers). Afterwards the enabled-until timer is not
 // armed — neither the deadline timer nor the 30-s re-check a node without
 // a time re-arms for ever — and advancing the clock past the deadline
 // leaves the supply enabled, tells the host nothing and emits no event

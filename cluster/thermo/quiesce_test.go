@@ -16,7 +16,7 @@ import (
 
 // TestThermostatMatterQuiesceStopsItsTimers: the bridge quiesces a server
 // that leaves the topology through contract.ClusterQuiescer
-// (bridge.quiesceServers). Afterwards neither the ThermostatSuggestions
+// (bridge.reconcileQuiescers). Afterwards neither the ThermostatSuggestions
 // timer nor an atomic write's timeout is armed, and advancing the clock
 // past both changes nothing: no preset is activated and no change is
 // reported for a device the bridge no longer serves. The server stays
