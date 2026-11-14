@@ -97,7 +97,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-EVSE-TargetsServerHeld | `CommandInvokeResponse.ts:484-487` validates the request against the model before the invoker (presence), and `EnergyEvseServer.ts:14` is the empty subclass (absence: the class line) | `packages/protocol/src/action/server/CommandInvokeResponse.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"            if (!skipValidation) {\n                requestTlv.validate(request);\n            }"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip `src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp` at `6170af84` (`ValidateTargets` :564-565), case `src/python_testing/TC_EEVSE_2_3.py` step 19 (:411-439) | no |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
-| BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81`, the class doc's list of the features it does not implement (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
+| BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81`, the class doc's list of the features it does not implement (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1782 lines at `db021da0`) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
 | BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` | no |
@@ -115,7 +115,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
 | BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, `src/system/SystemClock.cpp:284-306` (`GetClock_MatterEpochS`, the node's one Matter time), tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
-| BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1790 lines) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
+| BD-chip-Thermostat-Events | `ThermostatServer.ts:525` is the only `events.` emit of the server, the custom `calibratedTemperature$Changed` (absence: none of the model's eight Thermostat events is emitted anywhere in the file, 1782 lines at `db021da0`) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"this.events.calibratedTemperature$Changed.emit(temperature, oldTemperature, this.context);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp`, `examples/jf-admin-app/linux/JFADatastoreSync.cpp` (the endpoint's whole binding list, `SyncEndpointBindings`: the delegate's merge :1706-1757, the write :1759-1779 and :661-685) | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
@@ -5341,13 +5341,14 @@ new schedule at commit, as matter.js does for a preset
 (`ThermostatClusterSchedules.h:134-145`), and the `SchedulePort` receives
 the list with its handles so a host need not invent them. (3) CommitWrite
 precommits every staged attribute before it commits any
-(`ThermostatClusterAtomic.cpp:442-447`); matter.js validates and applies
+(`ThermostatClusterAtomic.cpp:362-367` at `6170af84`); matter.js validates and applies
 in one unit (`AtomicWriteHandler.ts:271-339`), and the observable result
 is the same — the five "CommitWrite of more than one attribute" cases of
 `AtomicWriteHandlerTest.ts:392-516` are ported and pass. (4) With MSCH a
 Presets commit refuses to drop a preset a schedule or a transition names,
-INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724`); matter.js has
-no schedules to check. Hosts serve MSCH behind a flag, off by default,
+INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724`; unverified: the
+file at `6170af84` holds no schedule check, and `645b267a` was not read);
+matter.js has no schedules to check. Hosts serve MSCH behind a flag, off by default,
 until a live pairing with Apple Home is verified (owner decision
 2026-10-26; the reference bridge's `--thermostat-schedules`). Retire the
 register row when matter.js implements the feature; then reconcile onto
@@ -5372,8 +5373,8 @@ as the conformance says (chip's test serves it without AUTO). Pinned by
 the thermostat event cases of `cluster/thermo` (5 chip cases, 6 rules).
 ### BD-chip-Thermostat-Suggestions — ThermostatSuggestions follows connectedhomeip; matter.js does not implement it
 
-matter.js's `ThermostatServer` has no suggestion logic: the 1790 lines of
-`packages/node/src/behaviors/thermostat/ThermostatServer.ts` at `862ad75f`
+matter.js's `ThermostatServer` has no suggestion logic: the 1782 lines of
+`packages/node/src/behaviors/thermostat/ThermostatServer.ts` at `db021da0`
 hold no "suggestion" text, and its class doc (`:81-85`) lists the features
 it leaves out without naming this one. The TSUGGEST feature
 (`cluster/thermo/suggestions.go`) therefore follows connectedhomeip at
@@ -5434,9 +5435,10 @@ reconcile onto it.
 matter.js's `ThermostatServer` initialises the hold's companions and
 nothing else: its reaction to a hold change is commented out
 (`ThermostatServer.ts:381`, `#handleTemperatureSetpointHoldChange` at
-`:385`, at `862ad75f`), and connectedhomeip gives the attribute no
-behaviour either (`src/app/clusters/thermostat-server/ThermostatClusterBase.cpp:357-358`
-at `6170af84`, an optional attribute). `cluster/thermo` serves the hold on
+`:385`, at `862ad75f`), and connectedhomeip hands a write of the
+attribute to its hold delegate, whose status answers it
+(`src/app/clusters/thermostat-server/ThermostatClusterHold.cpp:76-93` at
+`6170af84`; an optional attribute, `ThermostatClusterBase.cpp:357-358`). `cluster/thermo` serves the hold on
 request (`ThermostatConfig.TemperatureSetpointHold`) and hands a
 controller's write to `Sink.SetTemperatureSetpointHold` after the
 definition admitted it and before it is stored, as a SystemMode write is
@@ -5556,7 +5558,7 @@ CASE, NOT_FOUND), and the `PreferredExtendedPanID` write (`:139-151`: null
 or an id of a stored network, CONSTRAINT_ERROR otherwise). The host's
 storage is the generated `ThreadNetworkStore` port (`Declare.ThreadNetworkStore`,
 in the spirit of chip's `ThreadNetworkDirectoryStorage.h`): the networks
-and the preferred id, which chip keeps in attribute storage (`:151`) and
+and the preferred id, which chip keeps in attribute storage (`:150`) and
 this port persists through `LoadPreferred` / `SavePreferred` as the
 `PresetStore` persists the active preset; an in-memory store of 32
 networks (chip's default, `CHIP_CONFIG_MAX_THREAD_NETWORK_DIRECTORY_STORAGE_CAPACITY`
@@ -5628,7 +5630,7 @@ the Sensitivity write (:259-284), the handlers (:462-659), the events
 (`camera.ZoneSelfIntersecting`). chip checks only the user-defined budget
 on create (:473), not MaxZones over every zone, and so does the server
 (owner decision 2026-10-27). Two chip tests build USERDEFINED without
-TWODCART (`TestZoneManagementCluster.cpp:223-239`, `:308-315`); the
+TWODCART (`TestZoneManagementCluster.cpp:231-247`, `:319-326` at `6170af84`); the
 matter.js model makes USERDEFINED `[TWODCART]`, so the server refuses that
 configuration (`ErrZonesConfig`) and the port asserts the refusal. Pinned
 by `zone_chip_test.go` (11 cluster cases, 16 polygons) and
@@ -5711,8 +5713,8 @@ or Stopped INVALID_IN_STATE before the mover is called (`:599-605`;
 W3-club1-01, `TestClosureControlMoveToMainStateChip`); the server starts in
 SetupRequired until the host reports a state. The CONSTRAINT_ERROR for a
 Position whose feature is not advertised is this server's, from the enum
-value's conformance and before the mover (`cluster/closure/closurecontrol_server.go:431`,
-`:620-630`, ahead of the mover call at `:518`;
+value's conformance and before the mover (`cluster/closure/closurecontrol_server.go:444`,
+`:662-672`, ahead of the mover call at `:551`;
 `TestMoveToTakesTheGeneratedRequest`): connectedhomeip answers
 CONSTRAINT_ERROR for a value outside the enum only (`:574`) and, for a
 defined position whose feature it lacks, FAILURE after the delegate ran and
@@ -5787,7 +5789,7 @@ missing. TS reads the node's Matter time, the root TimeSynchronization's
 UTC, which the node hands the server as its endpoint joins the topology
 (`valve.Server.AttachMatterTime`, the server's one input of it), as chip's
 tracker asks the node's TimeSynchronization for a valid time and reads the
-clock SetUTCTime sets (`CodegenIntegration.cpp:46-58`, `:391-400`). Chip's
+clock SetUTCTime sets (`CodegenIntegration.cpp:46-58`; the cluster's `:391-400`). Chip's
 Startup refuses TS without a time tracker (`:46-50`): a node with
 `TimeSynchronization.Off` refuses a TS valve in the same way: the
 Aggregator's Add and Replace refuse it before it joins the set, with an
@@ -5802,7 +5804,7 @@ command's TargetLevel, else DefaultOpenLevel where served, else 100 — and a
 TargetLevel off the LevelStep grid is CONSTRAINT_ERROR (`:312-341`); the
 resolved level reaches the source in the request's TargetLevel, as chip
 hands it to `HandleOpenValve(level)`
-(`valve-configuration-and-control-delegate.h:40`). AutoCloseTime is the
+(`valve-configuration-and-control-delegate.h:39`). AutoCloseTime is the
 Matter time at the Open plus the opening's duration (`:391-413`), set anew
 as the time plus RemainingDuration whenever the node adopts a time while
 the valve counts down — chip's `UpdateAutoCloseTime` (`:415-423`), which
@@ -5853,7 +5855,7 @@ at `862ad75f`) passes checksum options to `OtaImageReader.file` only when the
 DCL record carries `otaChecksum`; without them `calculateFullChecksum`
 defaults to true (`OtaImageReader.ts:70`), the reader takes the full-checksum
 branch and verifies the payload size only (`:246-260`); the header's payload
-digest is checked later, at extraction (`:262-278`,
+digest is checked later, at extraction (`:282-332` at `db021da0`,
 `#extractAndValidatePayload`). `controller/softwareupdate.Images.Store` runs
 `otaimage.ValidateFile` with the payload digest in both cases
 (`storeValidation`), so a corrupted local image is refused when it is stored,
