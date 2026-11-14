@@ -185,3 +185,31 @@ func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
 		t.Fatalf("the retransmission counted %d PASE failures, want %d: it was not a duplicate", n, failures)
 	}
 }
+
+// TestUnsecuredWindowExchangesAreBounded (review II, R2-P2-rr-dev-02): while
+// one message of an unsecured source is in dispatch its window is not
+// pruned, and every new message of that source on another exchange used to
+// add the exchange to the window's set — up to every exchange id, each
+// further message then scanning and cloning the whole set under the
+// table's lock. The set holds at most maxUnsecuredWindowExchanges.
+func TestUnsecuredWindowExchangesAreBounded(t *testing.T) {
+	t.Parallel()
+	b := newUnstartedBridge(t)
+	hdr := &message.Header{HasSourceNodeID: true, SourceNodeID: 0xC0FFEE}
+	b.acquireUnsecuredWindow(hdr.SourceNodeID, true) // held in dispatch
+	for exchange := range uint16(1024) {
+		b.acquireUnsecuredWindow(hdr.SourceNodeID, true)
+		b.bindUnsecuredWindow(hdr, exchange)
+		b.releaseUnsecuredWindow(hdr)
+	}
+	b.unsecuredWindows.mu.Lock()
+	n := len(b.unsecuredWindows.entries[hdr.SourceNodeID].exchanges)
+	b.unsecuredWindows.mu.Unlock()
+	if n > maxUnsecuredWindowExchanges {
+		t.Fatalf("the window of one source is bound to %d exchanges, want at most %d", n, maxUnsecuredWindowExchanges)
+	}
+	b.releaseUnsecuredWindow(hdr)
+	if n := b.unsecuredWindows.len(); n != 0 {
+		t.Fatalf("%d windows after the held message ended, want 0", n)
+	}
+}

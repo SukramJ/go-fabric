@@ -338,7 +338,8 @@ type unsecuredWindowEntry struct {
 	// the messages in dispatch; empty until the first message's protocol
 	// header was read (and for a window the bridgetest seam anchored).
 	// A message's end prunes those that hold no state any more, so the
-	// set stays within the live handshakes and the messages in dispatch.
+	// set stays within the live handshakes and the messages in dispatch,
+	// and it never holds more than [maxUnsecuredWindowExchanges].
 	exchanges []uint16
 	// inUse counts the source's messages between their window lookup and
 	// the end of their dispatch; such a window is never swept.
@@ -407,9 +408,21 @@ func unsecuredSource(hdr *message.Header) (uint64, bool) {
 	return hdr.SourceNodeID, true
 }
 
+// maxUnsecuredWindowExchanges caps the exchanges one unsecured source's
+// window is bound to, as [maxUnsecuredWindows] caps the windows: the source
+// node id and the exchange id are the sender's unauthenticated choice, and
+// while one message of a source is in dispatch its set is not pruned, so a
+// source rotating exchange ids grew it to every exchange id, each further
+// message scanning and cloning it under the table's lock (review II,
+// R2-P2-rr-dev-02). Past the cap a new exchange is not bound: its window
+// lives on only while an exchange bound before holds handshake state, and
+// once the window goes the handshake handler's own state-replay guard
+// rejects a genuine replay, as past [maxUnsecuredWindows].
+const maxUnsecuredWindowExchanges = 4
+
 // bindUnsecuredWindow adds exchangeID to the exchanges of hdr's unsecured
-// source; the caller binds new messages only, so a replayed datagram moves
-// nothing.
+// source, up to [maxUnsecuredWindowExchanges]; the caller binds new
+// messages only, so a replayed datagram moves nothing.
 func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
 	id, ok := unsecuredSource(hdr)
 	if !ok {
@@ -418,7 +431,7 @@ func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if e, ok := t.entries[id]; ok && !slices.Contains(e.exchanges, exchangeID) {
+	if e, ok := t.entries[id]; ok && len(e.exchanges) < maxUnsecuredWindowExchanges && !slices.Contains(e.exchanges, exchangeID) {
 		e.exchanges = append(e.exchanges, exchangeID)
 	}
 }
