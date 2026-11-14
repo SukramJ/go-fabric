@@ -5061,7 +5061,7 @@ file, not against theft of the whole store, which holds the sealing key.
 
 ### BD-Matter-ICD-ZeroBackoffIsIdleDuration — a zero `MaximumCheckInBackoff` in the facade means IdleModeDuration
 
-matter.js's state carries `maximumCheckInBackOff` with the schema default
+matter.js's state carries `maximumCheckInBackoff` with the schema default
 (IdleModeDuration, `icd-management.element.ts`) and a host that leaves it
 gets that value. Go's `node.ICDConfig` is a plain struct, so its zero value
 has to mean something: `node/icd.go` (where the configuration is resolved) turns a zero
