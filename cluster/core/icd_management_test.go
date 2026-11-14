@@ -454,3 +454,32 @@ func TestICDVerificationKeyLengthIsTheHandlersToJudge(t *testing.T) {
 		t.Errorf("Administer with a 5-byte VerificationKey = %v, want the key ignored", err)
 	}
 }
+
+// TestICDManagementInstructionServedOnlyWhenSet: with the
+// UserActiveModeTrigger feature, UserActiveModeTriggerInstruction is in
+// AttributeList and readable only when the host gave an instruction.
+// Mirrors matter.js packages/model/src/standard/elements/
+// icd-management.element.ts:62-65 at db021da0 (conformance "desc", no
+// default) and packages/node/src/behavior/cluster/ValidatedElements.ts:
+// 247-279 (an attribute whose state holds no value, :252, is not an element
+// of the endpoint).
+func TestICDManagementInstructionServedOnlyWhenSet(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		instruction string
+		served      bool
+	}{{"", false}, {"Press the button", true}} {
+		s := newICDServer(t, core.ICDManagementConfig{
+			Features:                         icddef.FeatureCheckInProtocolSupport | icddef.FeatureUserActiveModeTrigger,
+			UserActiveModeTriggerHint:        icddef.UserActiveModeTriggerPowerCycle,
+			UserActiveModeTriggerInstruction: tc.instruction,
+		})
+		if got := slices.Contains(s.MatterAttributes(), icddef.AttrUserActiveModeTriggerInstruction); got != tc.served {
+			t.Errorf("instruction %q: AttributeList lists UserActiveModeTriggerInstruction %v, want %v", tc.instruction, got, tc.served)
+		}
+		v, ok := s.MatterRead(icddef.AttrUserActiveModeTriggerInstruction)
+		if ok != tc.served || (ok && v != tc.instruction) {
+			t.Errorf("instruction %q: read (%v, %v), want served %v", tc.instruction, v, ok, tc.served)
+		}
+	}
+}

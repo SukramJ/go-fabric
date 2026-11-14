@@ -104,7 +104,8 @@ type ICDManagementConfig struct {
 	// MaximumCheckInBackoff is in seconds, at least IdleModeDuration.
 	MaximumCheckInBackoff uint32
 	// UserActiveModeTriggerHint and UserActiveModeTriggerInstruction are
-	// served with the UserActiveModeTrigger feature.
+	// served with the UserActiveModeTrigger feature, the instruction only
+	// when it is not empty.
 	UserActiveModeTriggerHint        icddef.UserActiveModeTriggerBitmap
 	UserActiveModeTriggerInstruction string
 	// OperatingMode is the initial OperatingMode, mandatory with
@@ -323,7 +324,13 @@ func NewICDManagement(cfg ICDManagementConfig) (*ICDManagement, error) {
 	}
 	cfg = cfg.withDefaults()
 	opts := spec.Options{Features: uint32(cfg.Features), Commands: []uint32{icddef.CmdStayActiveRequest}}
-	if cfg.has(icddef.FeatureUserActiveModeTrigger) {
+	// UserActiveModeTriggerInstruction is served when the host gave one: its
+	// conformance is "desc" without a default, and matter.js lists an
+	// attribute whose state holds no value as no element of the endpoint
+	// (packages/model/src/standard/elements/icd-management.element.ts:62-65,
+	// packages/node/src/behavior/cluster/ValidatedElements.ts:247-279 at
+	// db021da0).
+	if cfg.has(icddef.FeatureUserActiveModeTrigger) && cfg.UserActiveModeTriggerInstruction != "" {
 		opts.Attributes = []uint32{icddef.AttrUserActiveModeTriggerInstruction}
 	}
 	inst, err := spec.New(icddef.Definition, opts)
