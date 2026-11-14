@@ -1366,7 +1366,8 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 // Orchestrates the Subscribe flow in four steps — each extracted into
 // its own method in subscribe_dispatch.go (mirrors the ADR 0031 pattern
 // for handleIMOpcode → receive_dispatch.go):
-//  1. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
+//  1. teardownForSubscribe — the KeepSubscriptions=false teardown, before
+//     the request's refusals; registerSubscription — manager Subscribe.
 //  2. primingMatches — reject a Subscribe that matches nothing.
 //  3. streamPrimingChunks — the priming report, generated chunk by chunk
 //     (newPrimingSource, primingEvents), with a per-chunk ack wait.
@@ -1409,24 +1410,44 @@ func (b *Bridge) subscribeWith(
 	proto message.ProtocolHeader,
 	req im.SubscribeRequest,
 ) error {
-	// Reject illegal paths up front with a top-level InvalidAction
-	// StatusResponse (wildcard cluster + concrete non-global attribute, or
-	// wildcard cluster + concrete event), and a request beyond the path
-	// ceiling with PathsExhausted, before building any report. Mirrors
-	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
-	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
-	// gates Read and Subscribe through the same check, and the
-	// MAX_SUBSCRIBE_PATHS check (:635-641), which matter.js runs before
-	// it.
-	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
-		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
+	// The order is matter.js InteractionServer.handleSubscribeRequest's
+	// at db021da0 (F-db021da0-14, review II R2-P2-sess-04): the path
+	// count (:635-641), the KeepSubscriptions=false teardown (:647-665),
+	// the request naming no path (:667-672), the illegal paths
+	// (validateReadPaths, :699). A request refused for naming no path or
+	// an illegal one has cost the peer its subscriptions, as there.
+	if len(req.AttributeRequests)+len(req.EventRequests) > im.MaxReadPaths {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", im.StatusPathsExhausted)
 	}
+
+	// The priming report waits for the peer's answer to each chunk; a
+	// session already holding [maxChunkWaitsPerSession] such waits is
+	// answered Busy before anything is registered or torn down (review
+	// II, R2-P1-req2-01). matter.js has no such refusal; this module's
+	// own bound refuses side-effect free, and the controller retries.
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	if !claimed {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
+	}
+	defer release()
+
+	b.teardownForSubscribe(src, requestHdr, req)
 
 	// A Subscribe naming no attribute and no event paths at all is
 	// InvalidAction — matter.js InteractionServer.ts:667-672 at db021da0 ("No
 	// attributes or events requested").
 	if len(req.AttributeRequests) == 0 && len(req.EventRequests) == 0 {
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "empty")
+	}
+
+	// Reject illegal paths with a top-level InvalidAction StatusResponse
+	// (wildcard cluster + concrete non-global attribute, or wildcard
+	// cluster + concrete event) before building any report. Mirrors
+	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
+	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
+	// gates Read and Subscribe through the same check.
+	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
 	}
 
 	// Stamp the FabricFiltered flag + requesting FabricIndex into the
@@ -1447,16 +1468,6 @@ func (b *Bridge) subscribeWith(
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
-
-	// The priming report waits for the peer's answer to each chunk; a
-	// session already holding [maxChunkWaitsPerSession] such waits is
-	// answered Busy before anything is registered or torn down (review
-	// II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
-	if !claimed {
-		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
-	}
-	defer release()
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.

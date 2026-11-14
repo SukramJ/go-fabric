@@ -277,7 +277,8 @@ func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher
 }
 
 // registerSubscription registers the subscribe request in the subscription
-// manager (handling KeepSubscriptions teardown), captures the routing
+// manager (the KeepSubscriptions=false teardown ran before, in
+// [Bridge.teardownForSubscribe]), captures the routing
 // subTarget, and stamps HasSubscription + SubscriptionID on initialReport in
 // place. Returns the allocated subID, or 0 with a nil error when no manager
 // is wired (test fixtures — the orchestrator then answers with a synthetic
@@ -289,8 +290,7 @@ func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher
 // not: no report ever arrives, and the device goes stale with nothing on the
 // wire to explain it.
 //
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:647-665
-// at db021da0 for the KeepSubscriptions teardown, and
+// Mirrors matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts for the
 // EventPaths wiring.
 func (b *Bridge) registerSubscription(
@@ -310,46 +310,6 @@ func (b *Bridge) registerSubscription(
 		fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
 		subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
 		peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
-		// KeepSubscriptions=false teardown — Matter §10.6.5: when the
-		// commissioner clears `KeepSubscriptions`, the bridge MUST
-		// cancel every existing subscription owned by the same peer
-		// before admitting the new one.
-		//
-		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:647-665 at db021da0 for a session with a
-		// fabric: it matches on the peer address, (fabric, peerNodeID).
-		// On a session without one (PASE) matter.js tears nothing down
-		// (`fabric !== undefined`, :647); the same-session teardown
-		// below is this module's own
-		// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
-		// previous guard
-		// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
-		// silently skipped PASE re-subscriptions (fabricIndex=0) so a
-		// PASE subscriber that re-subscribes with KeepSubscriptions=false
-		// would accumulate stale subscriptions.
-		if !req.KeepSubscriptions {
-			if fabricIndex != 0 && peerNodeID != 0 {
-				// CASE session — tear down by (fabric, peer) tuple. The
-				// peer is the session's subject, whatever source node id
-				// the frame's header claims (subscriptionPeerNodeID), as
-				// matter.js matches on session.peerAddress.
-				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
-					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
-						slog.String("src", srcString(src)),
-						slog.Int("fabric_index", int(fabricIndex)),
-						slog.Uint64("node_id", peerNodeID),
-						slog.Int("cleared", cleared))
-				}
-			} else {
-				// PASE session (fabricIndex=0) — tear down by SessionID so
-				// a re-subscribe on the same PASE exchange replaces, rather
-				// than accumulates, the prior subscription.
-				// This module's own: matter.js tears nothing down on a
-				// session without a fabric (InteractionServer.ts:647 at
-				// db021da0; findings F-db021da0-12).
-				m.CloseSession(requestHdr.SessionID)
-			}
-		}
 		sub, err := m.Subscribe(subscription.SubscribeArgs{
 			FabricIndex:        fabricIndex,
 			PeerNodeID:         peerNodeID,
@@ -411,6 +371,61 @@ func (b *Bridge) registerSubscription(
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
 	}
 	return subID, nil
+}
+
+// teardownForSubscribe runs the KeepSubscriptions=false teardown of a
+// SubscribeRequest: before the request is checked any further, so a
+// request refused afterwards (no path, an illegal path) has cancelled the
+// peer's subscriptions too, as matter.js InteractionServer.ts:647-665 at
+// db021da0 runs it before those refusals (F-db021da0-14, review II
+// R2-P2-sess-04). A no-op when the request keeps its subscriptions or no
+// manager is attached.
+func (b *Bridge) teardownForSubscribe(src net.Addr, requestHdr *message.Header, req im.SubscribeRequest) {
+	m := b.subscriptionManagerLocked()
+	if m == nil || req.KeepSubscriptions {
+		return
+	}
+	fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
+	subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
+	peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
+	// KeepSubscriptions=false teardown — Matter §10.6.5: when the
+	// commissioner clears `KeepSubscriptions`, the bridge MUST
+	// cancel every existing subscription owned by the same peer
+	// before admitting the new one.
+	//
+	// Mirrors matter.js packages/node/src/node/server/
+	// InteractionServer.ts:647-665 at db021da0 for a session with a
+	// fabric: it matches on the peer address, (fabric, peerNodeID).
+	// On a session without one (PASE) matter.js tears nothing down
+	// (`fabric !== undefined`, :647); the same-session teardown
+	// below is this module's own
+	// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
+	// previous guard
+	// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
+	// silently skipped PASE re-subscriptions (fabricIndex=0) so a
+	// PASE subscriber that re-subscribes with KeepSubscriptions=false
+	// would accumulate stale subscriptions.
+	if fabricIndex != 0 && peerNodeID != 0 {
+		// CASE session — tear down by (fabric, peer) tuple. The
+		// peer is the session's subject, whatever source node id
+		// the frame's header claims (subscriptionPeerNodeID), as
+		// matter.js matches on session.peerAddress.
+		if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
+			b.logger.Info("matter.rx.im.subscribe.peer_teardown",
+				slog.String("src", srcString(src)),
+				slog.Int("fabric_index", int(fabricIndex)),
+				slog.Uint64("node_id", peerNodeID),
+				slog.Int("cleared", cleared))
+		}
+	} else {
+		// PASE session (fabricIndex=0) — tear down by SessionID so
+		// a re-subscribe on the same PASE exchange replaces, rather
+		// than accumulates, the prior subscription.
+		// This module's own: matter.js tears nothing down on a
+		// session without a fabric (InteractionServer.ts:647 at
+		// db021da0; findings F-db021da0-12).
+		m.CloseSession(requestHdr.SessionID)
+	}
 }
 
 // pathsForThisNode returns paths with the node cleared from each path
