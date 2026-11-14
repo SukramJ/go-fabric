@@ -53,7 +53,7 @@ its own:
 | the group key sets, up to three epoch keys each | `matter_group_keys` |
 | the CASE resumption records: one shared secret per fabric and peer, which lets a returning peer skip the full CASE handshake | `matter_resumption`, column `shared_secret` |
 | on a Wi-Fi node (`node.Network.WiFi`): the committed networks, each SSID with its credentials — a secret of the home network, not only of this node | `matter_settings`, key `netcomm.wifi.networks`, as JSON |
-| while an UpdateNOC waits for CommissioningComplete: the operational private key and IPK it replaced, so a restart inside the fail-safe window can restore them | `matter_settings`, key `operational_credentials.pending_noc_update`, as JSON; cleared at CommissioningComplete or when the fail-safe rolls the update back |
+| while an UpdateNOC waits for CommissioningComplete: the operational private key it replaced, so a restart inside the fail-safe window can restore it | `matter_node_identities`, column `prior_private_key` (since v8); cleared when CommissioningComplete commits the update or the fail-safe's end or a start rolls it back. A database a release before v8 left in the middle of an UpdateNOC holds it, with the IPK, in `matter_settings`, key `operational_credentials.pending_noc_update`, until the first start clears it |
 
 Whoever can read the database file, or a copy of it — a backup, a support
 bundle — reads all four, as does the host process. `store.OpenSQLite`

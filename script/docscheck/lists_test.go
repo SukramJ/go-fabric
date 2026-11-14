@@ -223,10 +223,6 @@ var variableKeySites = map[string][]string{
 	"cluster/core/time_synchronization_features.go:TimeSynchronization.save": {
 		"timesync.trusted_time_source", "timesync.default_ntp", "timesync.time_zone", "timesync.dst_offset",
 	},
-	// vidSettingKey(fabricIndex, "statement" | "vvsc")
-	"cluster/core/vid_verification.go:OperationalCredentials.storeVidVerification": {
-		"matter.fabric.<fabric>.vid.statement", "matter.fabric.<fabric>.vid.vvsc",
-	},
 	// settingPrefix + DatastoreConfig.Key, set by the constructor
 	"cluster/jointfabric/datastore.go:Datastore.saveLocked": {"jointfabric.datastore:<key>"},
 	// ThermostatUIConfig.SettingKey, DefaultKeypadLockoutSetting when empty

@@ -31,12 +31,12 @@ func (s *listFailingStore) ListFabrics(ctx context.Context) ([]mstore.FabricReco
 }
 
 // TestOpcreds_RefusedAddNOCMarkerNeverRemovesACommittedFabric pins
-// R2-P1-dr-sec-01: an AddNOC for a committed fabric's (FabricID, root)
-// pair that reaches the store — ListFabrics failed, so the pair check saw
-// no conflict — is refused by the store's uniqueness verdict. Whatever
-// marker a crash at any of its writes leaves standing, the next start
-// keeps the committed fabric: the marker names what this AddNOC wrote,
-// never a fabric by its pair alone.
+// R2-P1-dr-sec-01 on the fabric row (owner decision 36): an AddNOC for a
+// committed fabric's (FabricID, root) pair whose fabric list cannot be
+// read is refused before it writes anything (R2-P2-comm-10). Whatever a
+// crash at any write leaves, the next start keeps the committed fabric
+// and finds no row left pending: a start rolls back pending rows only,
+// never a fabric by its pair.
 func TestOpcreds_RefusedAddNOCMarkerNeverRemovesACommittedFabric(t *testing.T) {
 	t.Parallel()
 	for name, open := range restartStores {
@@ -63,7 +63,7 @@ func testRefusedAddNOCKeepsCommitted(t *testing.T, inner restartStore, crashAfte
 		t.Fatal(err)
 	}
 	rootRaw, rootPriv, idx := commissionTestFabric(ctx, t, oc)
-	oc.ClearPendingState() // CommissioningComplete
+	commitForTest(t, oc) // CommissioningComplete
 	before, err := inner.GetIdentity(ctx, idx)
 	if err != nil {
 		t.Fatal(err)
@@ -83,16 +83,8 @@ func testRefusedAddNOCKeepsCommitted(t *testing.T, inner restartStore, crashAfte
 	st.fail.Store(true)
 	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{NOCValue: noc, IPKValue: make([]byte, 16), CaseAdminSubject: 0xABCD, AdminVendorID: 0x1234})
 	st.fail.Store(false)
-	if err != nil {
-		t.Fatalf("AddNOC: %v", err)
-	}
-	if nr, _ := resp.(core.NOCResponse); nr.StatusCode == core.NOCStatusOK {
+	if nr, _ := resp.(core.NOCResponse); err == nil && nr.StatusCode == core.NOCStatusOK {
 		t.Fatalf("AddNOC of a committed fabric's pair answered OK")
-	}
-	if crashAfter < 0 {
-		if v, _, _ := inner.GetSetting(ctx, pendingNOCKey); v != "" {
-			t.Fatalf("the refused AddNOC left the marker %s", v)
-		}
 	}
 	restartOpcreds(t, inner)
 	after, err := inner.GetIdentity(ctx, idx)
@@ -108,13 +100,14 @@ func testRefusedAddNOCKeepsCommitted(t *testing.T, inner restartStore, crashAfte
 	if acl, _ := inner.ListACL(ctx, idx); len(acl) != 1 {
 		t.Fatalf("crash after write %d: the committed fabric has %d ACL entries after the restart, want 1", crashAfter, len(acl))
 	}
-	if v, _, _ := inner.GetSetting(ctx, pendingNOCKey); v != "" {
-		t.Fatalf("crash after write %d: the restart left the marker %s", crashAfter, v)
+	if fabrics, _ := inner.ListFabrics(ctx); len(fabrics) != 1 || fabrics[0].Pending != mstore.FabricCommitted {
+		t.Fatalf("crash after write %d: fabrics after the restart = %+v, want the one committed fabric", crashAfter, fabrics)
 	}
 }
 
-// nodeIDFailingStore is a store whose UpdateFabricNodeID fails while fail
-// is set.
+// nodeIDFailingStore is a store whose node id write — UpdateFabricNodeID,
+// or UpdateNOC's UpdateFabricCredentials that carries it — fails while
+// fail is set.
 type nodeIDFailingStore struct {
 	restartStore
 	fail atomic.Bool
@@ -127,13 +120,19 @@ func (s *nodeIDFailingStore) UpdateFabricNodeID(ctx context.Context, fabricIndex
 	return s.restartStore.UpdateFabricNodeID(ctx, fabricIndex, nodeID)
 }
 
+func (s *nodeIDFailingStore) UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c mstore.FabricCredentials) error {
+	if s.fail.Load() {
+		return errors.New("node id: busy")
+	}
+	return s.restartStore.UpdateFabricCredentials(ctx, fabricIndex, c)
+}
+
 // TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth pins
-// R2-P1-dr-sec-04: an UpdateNOC that fails after its identity write
-// (UpdateFabricNodeID refused) leaves its revert pending without counting
-// as the fail-safe's NOC command, so an AddNOC in the same fail-safe is
-// admitted. A node that goes down then restores the updated fabric's
-// credentials as well as removing the added fabric — the durable marker
-// holds both, as the memory state does.
+// R2-P1-dr-sec-04 on the fabric row (owner decision 36): an UpdateNOC
+// whose one write fails writes nothing and does not count as the
+// fail-safe's NOC command, so an AddNOC in the same fail-safe is admitted.
+// A node that goes down then keeps the updated fabric's credentials and
+// removes the added fabric, whose row is pending.
 func TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth(t *testing.T) {
 	t.Parallel()
 	for name, open := range restartStores {
@@ -147,7 +146,7 @@ func TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth(t *testing.T) 
 				t.Fatal(err)
 			}
 			_, rootPriv, idx := commissionTestFabric(ctx, t, oc)
-			oc.ClearPendingState() // CommissioningComplete
+			commitForTest(t, oc) // CommissioningComplete
 			before, _ := inner.GetIdentity(ctx, idx)
 			fabCtx := im.WithFabricFilter(ctx, true, idx)
 			nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
@@ -157,8 +156,8 @@ func TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth(t *testing.T) 
 			if nr, _ := resp.(core.NOCResponse); err != nil || nr.StatusCode != core.NOCStatusInvalidNOC {
 				t.Fatalf("UpdateNOC with a failing node id write: %+v, %v; want InvalidNOC", resp, err)
 			}
-			if after, _ := inner.GetIdentity(ctx, idx); bytes.Equal(after.NOC, before.NOC) {
-				t.Fatal("the failed UpdateNOC wrote no identity: the scenario needs a half-applied update")
+			if after, _ := inner.GetIdentity(ctx, idx); !bytes.Equal(after.NOC, before.NOC) {
+				t.Fatal("the failed UpdateNOC changed the identity")
 			}
 			resp, err = oc.MatterInvoke(fabCtx, 0x06, prepareAddNOC(fabCtx, t, oc))
 			if nr, _ := resp.(core.NOCResponse); err != nil || nr.StatusCode != core.NOCStatusOK {
@@ -177,7 +176,7 @@ func TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth(t *testing.T) 
 				t.Fatal(err)
 			}
 			if !bytes.Equal(after.NOC, before.NOC) || !bytes.Equal(after.PrivateKey, before.PrivateKey) {
-				t.Fatal("the half-applied UpdateNOC's identity survived the restart: the AddNOC's marker replaced the update's")
+				t.Fatal("the restart left the updated fabric with other credentials than before the failed UpdateNOC")
 			}
 		})
 	}

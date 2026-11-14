@@ -34,6 +34,15 @@ type fakeStore struct {
 	acls      map[uint8][]mstore.ACLEntry          // key: fabric
 	table     map[[2]uint64]mstore.GroupTableEntry // key: [fabric, group-id]
 	gcast     map[[2]uint64]mstore.GroupcastGroup  // key: [fabric, group-id]
+	prior     map[uint8]fakePrior                  // key: fabric of a pending UpdateNOC
+	settings  map[string]string
+}
+
+// fakePrior is what a pending UpdateNOC replaced (store.Fabrics
+// UpdateFabricCredentials).
+type fakePrior struct {
+	identity mstore.IdentityRecord
+	fabric   mstore.FabricRecord
 }
 
 func newFakeStore() *fakeStore {
@@ -46,7 +55,135 @@ func newFakeStore() *fakeStore {
 		acls:      make(map[uint8][]mstore.ACLEntry),
 		table:     make(map[[2]uint64]mstore.GroupTableEntry),
 		gcast:     make(map[[2]uint64]mstore.GroupcastGroup),
+		prior:     make(map[uint8]fakePrior),
+		settings:  make(map[string]string),
 	}
+}
+
+func (f *fakeStore) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	value, ok = f.settings[key]
+	return value, ok, nil
+}
+
+func (f *fakeStore) SetSetting(_ context.Context, key, value string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.settings[key] = value
+	return nil
+}
+
+func (f *fakeStore) SetSettings(_ context.Context, values map[string]string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k, v := range values {
+		f.settings[k] = v
+	}
+	return nil
+}
+
+func (f *fakeStore) UpdateFabricVendorID(_ context.Context, fabricIndex uint8, vendorID uint16) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		return mstore.ErrFabricNotFound
+	}
+	r.VendorID = vendorID
+	f.fabrics[fabricIndex] = r
+	return nil
+}
+
+func (f *fakeStore) UpdateFabricVIDVerification(_ context.Context, fabricIndex uint8, statement, vvsc []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		return mstore.ErrFabricNotFound
+	}
+	r.VIDVerificationStatement, r.VVSC = noneIfEmpty(statement), noneIfEmpty(vvsc)
+	f.fabrics[fabricIndex] = r
+	return nil
+}
+
+func noneIfEmpty(b []byte) []byte {
+	if len(b) == 0 {
+		return nil
+	}
+	return append([]byte(nil), b...)
+}
+
+// UpdateFabricCredentials keeps the prior values on a committed row and
+// marks it pending, as store.Fabrics describes.
+func (f *fakeStore) UpdateFabricCredentials(_ context.Context, fabricIndex uint8, c mstore.FabricCredentials) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		return mstore.ErrFabricNotFound
+	}
+	id, ok := f.identity[fabricIndex]
+	if !ok {
+		return mstore.ErrIdentityNotFound
+	}
+	if r.Pending == mstore.FabricCommitted {
+		f.prior[fabricIndex] = fakePrior{identity: id, fabric: r}
+		r.Pending = mstore.FabricPendingUpdate
+	}
+	id.NOC, id.ICAC, id.PrivateKey = c.NOC, c.ICAC, c.PrivateKey
+	r.NodeID, r.VendorID = c.NodeID, c.VendorID
+	r.VIDVerificationStatement, r.VVSC = noneIfEmpty(c.VIDVerificationStatement), noneIfEmpty(c.VVSC)
+	f.identity[fabricIndex] = id
+	f.fabrics[fabricIndex] = r
+	return nil
+}
+
+func (f *fakeStore) CommitFabric(_ context.Context, fabricIndex uint8) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		return mstore.ErrFabricNotFound
+	}
+	r.Pending = mstore.FabricCommitted
+	f.fabrics[fabricIndex] = r
+	delete(f.prior, fabricIndex)
+	return nil
+}
+
+func (f *fakeStore) RollbackFabric(ctx context.Context, fabricIndex uint8) (mstore.FabricPending, error) {
+	f.mu.Lock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		f.mu.Unlock()
+		return mstore.FabricCommitted, mstore.ErrFabricNotFound
+	}
+	switch r.Pending {
+	case mstore.FabricCommitted:
+	case mstore.FabricPendingAdd:
+		delete(f.acls, fabricIndex)
+		for k := range f.table {
+			if k[0] == uint64(fabricIndex) {
+				delete(f.table, k)
+			}
+		}
+		f.mu.Unlock()
+		return mstore.FabricPendingAdd, f.RemoveFabric(ctx, fabricIndex)
+	case mstore.FabricPendingUpdate:
+		p := f.prior[fabricIndex]
+		delete(f.prior, fabricIndex)
+		f.identity[fabricIndex] = p.identity
+		r.NodeID, r.VendorID = p.fabric.NodeID, p.fabric.VendorID
+		r.VIDVerificationStatement, r.VVSC = p.fabric.VIDVerificationStatement, p.fabric.VVSC
+		was := r.Pending
+		r.Pending = mstore.FabricCommitted
+		f.fabrics[fabricIndex] = r
+		f.mu.Unlock()
+		return was, nil
+	}
+	f.mu.Unlock()
+	return r.Pending, nil
 }
 
 func (f *fakeStore) ListGroupcastGroups(_ context.Context, fabricIndex uint8) ([]mstore.GroupcastGroup, error) {
@@ -715,8 +852,22 @@ func mintUpdateNOC(fabCtx context.Context, t *testing.T, oc *core.OperationalCre
 	// undefined). Simulate the re-arm here so the helper reflects the real flow:
 	// the new window is armed by the fabric that updates its NOC.
 	_, updating := im.FabricFilterFromContext(fabCtx)
+	commitForTest(t, oc)
 	oc.SetFailSafe(armedFailSafe(updating))
 	oc.ClearPendingState()
 	pendingPub := issueCSRPendingPubKey(fabCtx, t, oc, true)
 	return buildCoreSignedCertForPubKey(t, pendingPub, false, signerPriv, fabricID, nodeID)
+}
+
+// commitForTest is CommissioningComplete's durable commit
+// (OperationalCredentials.CommitFailSafe) as GeneralCommissioning runs it;
+// it fails the test when the commit fails.
+func commitForTest(t *testing.T, oc *core.OperationalCredentials) {
+	t.Helper()
+	ctx := context.Background()
+	oc.CommitFailSafe(ctx, func(commit func(context.Context) error) {
+		if err := commit(ctx); err != nil {
+			t.Fatalf("commit: %v", err)
+		}
+	})
 }

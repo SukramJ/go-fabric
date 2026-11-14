@@ -136,6 +136,10 @@ type GeneralCommissioning struct {
 	// stays open for the full duration (typ. 180 s) and a second,
 	// unintended fabric can be admitted.
 	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
+	// failSafeCommit is CommissioningComplete's durable commit
+	// ([GeneralCommissioning.SetFailSafeCommit]); nil commits the terms
+	// acceptance only.
+	failSafeCommit FailSafeCommitFunc
 	// onCommissioned ends the commissioning window after a successful
 	// CommissioningComplete; the bridge wires it (bridge.AttachRootClusters
 	// / AttachCommissioningWindow), separately from the host's hook.
@@ -269,10 +273,7 @@ type GeneralCommissioningConfig struct {
 	TermsAndConditions *TermsAndConditionsConfig
 	// Settings keeps the committed terms acceptance across restarts
 	// ([store.SettingTermsAcceptance]); nil keeps it in memory. Read by
-	// [GeneralCommissioning.RestoreTermsAcceptance]. CommissioningComplete
-	// also clears OperationalCredentials' pending-NOC marker in it before
-	// it answers success, so it is the store OperationalCredentials uses
-	// (the node passes one store to both).
+	// [GeneralCommissioning.RestoreTermsAcceptance].
 	Settings store.Settings
 	// Clock is the fail-safe's clock: its expiry, the cumulative limit and
 	// the expiry watcher. nil is [clock.System].
@@ -397,12 +398,10 @@ func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
 }
 
 // SetOnCommissioningComplete replaces the commissioning-complete hook after
-// construction. The daemon uses this to augment the window-revoke-only hook
-// installed at construction time with OpCreds.ClearPendingState, which resets
-// pendingInstallFabricIndex so a subsequent FailSafe expiry cannot
-// accidentally revert an already-confirmed fabric.
-// Mirrors chip FailSafeContext::Reset() called from the success path in
-// CommissioningWindowManager::OnCommissioningComplete.
+// construction. It runs after a successful CommissioningComplete has
+// committed ([GeneralCommissioning.SetFailSafeCommit]) and disarmed the
+// fail-safe. Mirrors chip FailSafeContext::Reset() called from the success
+// path in CommissioningWindowManager::OnCommissioningComplete.
 func (g *GeneralCommissioning) SetOnCommissioningComplete(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onCommissioningComplete = fn
@@ -987,6 +986,50 @@ func (g *GeneralCommissioning) handleSetRegulatoryConfig(fields any) (any, error
 }
 
 func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) (any, error) {
+	// The durable commit holds off what it must not interleave with — the
+	// NOC commands, RemoveFabric, the fail-safe's rollback — before this
+	// cluster's lock is taken, so the lock order is the commit's, then
+	// g.mu (OperationalCredentials.CommitFailSafe).
+	g.mu.RLock()
+	commitFn := g.failSafeCommit
+	g.mu.RUnlock()
+	var (
+		resp  any
+		err   error
+		hooks func()
+	)
+	complete := func(commit func(ctx context.Context) error) {
+		resp, hooks, err = g.completeCommissioning(ctx, commit)
+	}
+	if commitFn != nil {
+		commitFn(ctx, complete)
+	} else {
+		complete(nil)
+	}
+	if hooks != nil {
+		hooks()
+	}
+	return resp, err
+}
+
+// completeCommissioning is CommissioningComplete under the durable
+// commit's hold: the checks, then every store write in an order where the
+// commit of the fabric row is the last (review II, R2-P2-comm-07):
+//
+//  1. a tentative terms acceptance is persisted — a failure answers
+//     FAILURE and has written nothing;
+//  2. commit — the Wi-Fi network list (R2-P2-store-01), then the fabric
+//     row — a failure has undone its own writes; the terms acceptance is
+//     written back to the committed one, and the command answers FAILURE;
+//
+// on a FAILURE the fail-safe stays armed and nothing in memory moved, so
+// its end rolls the window back as if CommissioningComplete never came. A
+// write-back that fails too is logged: the store then holds the window's
+// acceptance while the fail-safe's end reverts it in memory — what a crash
+// between the writes leaves as well. On success the acceptance is
+// committed in memory and the fail-safe disarmed; hooks is what runs
+// after the commit's hold and this cluster's lock are released.
+func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit func(ctx context.Context) error) (resp any, hooks func(), err error) {
 	// Mirrors matter.js packages/node/src/behaviors/general-commissioning/
 	// GeneralCommissioningServer.ts:216-265:
 	//   1. Reject PASE (and Group) sessions with InvalidAuthentication.
@@ -1003,20 +1046,21 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	// the PASE branch is purely a defence-in-depth.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	// A PASE session adopted onto the fabric AddNOC installed has a
 	// fabric and is still PASE (TC-CGEN-2.4 step kSendNOC).
 	if sessFabric == 0 || im.IsPASEFromContext(ctx) {
+		g.mu.Unlock()
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorInvalidAuthentication,
 			DebugText: "Command must be executed over CASE session.",
-		}, nil
+		}, nil, nil
 	}
 	if !g.failSafeArmed {
+		g.mu.Unlock()
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorNoFailSafe,
 			DebugText: "fail-safe not armed",
-		}, nil
+		}, nil, nil
 	}
 	// Plain equality, as both references have it — chip
 	// FailSafeContext.h:92-96 MatchesFabricIndex, matter.js
@@ -1036,28 +1080,44 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	// a first pairing still completes: by the time CommissioningComplete
 	// arrives, the window belongs to the fabric AddNOC created.
 	if sessFabric != g.failSafeFabricIndex {
+		g.mu.Unlock()
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorInvalidAuthentication,
 			DebugText: fmt.Sprintf("session fabric %d != failsafe fabric %d", sessFabric, g.failSafeFabricIndex),
-		}, nil
+		}, nil, nil
 	}
 	// The terms-and-conditions gate, then the commit of a tentative
 	// acceptance (chip GeneralCommissioningCluster.cpp:476-525 at 6170af84;
 	// general_commissioning_tc.go).
 	if code := g.termsGateLocked(); code != CommissioningErrorOK {
-		return CommissioningCompleteResponse{ErrorCode: code, DebugText: "terms and conditions not accepted"}, nil
+		g.mu.Unlock()
+		return CommissioningCompleteResponse{ErrorCode: code, DebugText: "terms and conditions not accepted"}, nil, nil
 	}
-	if g.tcTouched {
-		if err := g.commitTermsLocked(ctx); err != nil {
-			return nil, err
+	termsWritten := false
+	if g.tcTouched && g.tcTemporal != nil {
+		if err := g.persistTermsLocked(ctx, g.tcTemporal); err != nil {
+			// The window's flag stays: the acceptance is still tentative,
+			// and the fail-safe's expiry reverts it (chip keeps
+			// UpdateTermsAndConditionsHasBeenInvoked on a failed commit,
+			// GeneralCommissioningCluster.cpp:512-526).
+			g.mu.Unlock()
+			return nil, nil, err
+		}
+		termsWritten = true
+	}
+	if commit != nil {
+		if err := commit(ctx); err != nil {
+			if termsWritten {
+				if werr := g.persistTermsLocked(context.WithoutCancel(ctx), g.tcCommitted); werr != nil {
+					g.logger().Error("matter.gencomm.terms.write_back_failed", slog.Any("err", werr))
+				}
+			}
+			g.mu.Unlock()
+			return nil, nil, fmt.Errorf("core: GeneralCommissioning: commit the commissioning: %w", err)
 		}
 	}
-	// The last step that can fail, before anything is disarmed: the
-	// pending AddNOC / UpdateNOC is committed durably, or the command
-	// answers FAILURE as the terms commit does and the fail-safe stays
-	// armed (core2 item 1a).
-	if err := g.commitPendingNOCLocked(ctx); err != nil {
-		return nil, err
+	if g.tcTouched {
+		g.tcCommitted, g.tcTemporal, g.tcTouched = g.tcTemporal, nil, false
 	}
 	g.failSafeArmed = false
 	g.stopFailSafeWatchLocked()
@@ -1073,24 +1133,24 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	g.dataVersion.Bump()
 	hook := g.onCommissioningComplete
 	commissioned := g.onCommissioned
-	// Release the read lock before firing the hook — the hook may take
-	// arbitrary locks (commissioning window mutex, mDNS unpublish, …)
-	// and holding ours invites deadlock.
+	// The hooks run without the lock — they may take arbitrary locks
+	// (commissioning window mutex, mDNS unpublish, …) — and after the
+	// commit's hold is released.
 	g.mu.Unlock()
-	if hook != nil {
-		// chip's CommissioningWindowManager auto-closes the open
-		// enhanced-commissioning window on a successful
-		// CommissioningComplete (Matter §11.20.6.1). Wire the same
-		// behaviour via the daemon-supplied hook so the window does
-		// not stay open until its full timeout (typ. 180s) and admit
-		// a second, unintended fabric.
-		hook(ctx, sessFabric)
-	}
-	if commissioned != nil {
-		commissioned()
-	}
-	g.mu.Lock() // re-acquire so the deferred Unlock in MatterInvoke balances correctly
-	return CommissioningCompleteResponse{ErrorCode: CommissioningErrorOK}, nil
+	return CommissioningCompleteResponse{ErrorCode: CommissioningErrorOK}, func() {
+		if hook != nil {
+			// chip's CommissioningWindowManager auto-closes the open
+			// enhanced-commissioning window on a successful
+			// CommissioningComplete (Matter §11.20.6.1). Wire the same
+			// behaviour via the daemon-supplied hook so the window does
+			// not stay open until its full timeout (typ. 180s) and admit
+			// a second, unintended fabric.
+			hook(ctx, sessFabric)
+		}
+		if commissioned != nil {
+			commissioned()
+		}
+	}, nil
 }
 
 // ArmFailSafeFor is the public entry-point called by the

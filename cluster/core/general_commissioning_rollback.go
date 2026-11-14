@@ -167,56 +167,22 @@ func (g *GeneralCommissioning) settleExpiryLocked(ctx context.Context) (settledE
 	}
 }
 
-// commitPendingNOCLocked clears OperationalCredentials' durable pending-NOC
-// markers ([pendingNOCKeys]) as part of CommissioningComplete, before
-// the fail-safe is disarmed: while the marker stands, a restart rolls the
-// fabric back, so CommissioningComplete must not answer success over it
-// (core2 item 1a). The marker is the fail-safe context's durable half;
-// the fail-safe's commit ends it, as matter.js persists the new fabric
-// inside CommissioningComplete (FailsafeContext.ts:141-143 at db021da0).
-// It reads the Settings this cluster was given — the node gives both
-// clusters one store; without Settings there is nothing to clear here and
-// OperationalCredentials.ClearPendingState clears it as before. Caller
-// holds g.mu.
-//
-// The settings port has no call that clears two keys at once, so the
-// commit reads both keys before it clears either — a failed read clears
-// nothing — and clears them in [pendingNOCKeys] order, the AddNOC's
-// first. A failed clear writes back the keys this commit already cleared,
-// so the FAILURE it answers leaves both markers standing and a restart
-// rolls back both commands. What is left: a node that goes down between
-// the two clears, before it answers, comes back with the AddNOC committed
-// and the UpdateNOC rolled back; and a write-back that fails as well
-// leaves the same state behind a FAILURE, until the fail-safe's expiry
-// rolls the AddNOC back from memory (review II, R2-P1-rw-06).
-func (g *GeneralCommissioning) commitPendingNOCLocked(ctx context.Context) error {
-	if g.tcSettings == nil {
-		return nil
-	}
-	standing := make([]string, 0, len(pendingNOCKeys))
-	for _, key := range pendingNOCKeys {
-		v, _, err := g.tcSettings.GetSetting(ctx, key)
-		if err != nil {
-			return fmt.Errorf("core: GeneralCommissioning: read the pending NOC marker: %w", err)
-		}
-		standing = append(standing, v)
-	}
-	for i, key := range pendingNOCKeys {
-		if standing[i] == "" {
-			continue
-		}
-		if err := setPendingNOCSetting(ctx, g.tcSettings, key, ""); err != nil {
-			wctx := context.WithoutCancel(ctx)
-			for j := range i {
-				if standing[j] == "" {
-					continue
-				}
-				if werr := setPendingNOCSetting(wctx, g.tcSettings, pendingNOCKeys[j], standing[j]); werr != nil {
-					err = errors.Join(err, fmt.Errorf("write the cleared marker back: %w", werr))
-				}
-			}
-			return fmt.Errorf("core: GeneralCommissioning: commit the pending NOC: %w", err)
-		}
-	}
-	return nil
+// FailSafeCommitFunc is the durable commit of CommissioningComplete
+// ([GeneralCommissioning.SetFailSafeCommit]): it runs complete with
+// everything the commit must not interleave with held off — on the node,
+// OperationalCredentials' NOC commands, RemoveFabric and the fail-safe's
+// rollback — and hands it commit, the last fallible write of the
+// commissioning: on the node, the Wi-Fi network list, then the commit of
+// the fabric row this fail-safe's AddNOC or UpdateNOC wrote. A commit
+// error must leave what it wrote undone. [OperationalCredentials.CommitFailSafe]
+// is one.
+type FailSafeCommitFunc func(ctx context.Context, complete func(commit func(ctx context.Context) error))
+
+// SetFailSafeCommit wires CommissioningComplete's durable commit. Without
+// one CommissioningComplete commits the terms acceptance only. Pass nil
+// to detach.
+func (g *GeneralCommissioning) SetFailSafeCommit(fn FailSafeCommitFunc) {
+	g.mu.Lock()
+	g.failSafeCommit = fn
+	g.mu.Unlock()
 }

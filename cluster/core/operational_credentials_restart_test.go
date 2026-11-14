@@ -115,6 +115,32 @@ func (c *crashingStore) UpsertGroupKeySet(ctx context.Context, rec mstore.GroupK
 	return c.write(func() error { return c.restartStore.UpsertGroupKeySet(ctx, rec) })
 }
 
+func (c *crashingStore) UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, cr mstore.FabricCredentials) error {
+	return c.write(func() error { return c.restartStore.UpdateFabricCredentials(ctx, fabricIndex, cr) })
+}
+
+func (c *crashingStore) UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error {
+	return c.write(func() error { return c.restartStore.UpdateFabricVIDVerification(ctx, fabricIndex, statement, vvsc) })
+}
+
+func (c *crashingStore) CommitFabric(ctx context.Context, fabricIndex uint8) error {
+	return c.write(func() error { return c.restartStore.CommitFabric(ctx, fabricIndex) })
+}
+
+func (c *crashingStore) RollbackFabric(ctx context.Context, fabricIndex uint8) (mstore.FabricPending, error) {
+	was := mstore.FabricCommitted
+	err := c.write(func() error {
+		var err error
+		was, err = c.restartStore.RollbackFabric(ctx, fabricIndex)
+		return err
+	})
+	return was, err
+}
+
+func (c *crashingStore) SetSettings(ctx context.Context, values map[string]string) error {
+	return c.write(func() error { return c.restartStore.SetSettings(ctx, values) })
+}
+
 func (c *crashingStore) RemoveGroupKeysByFabric(ctx context.Context, fabricIndex uint8) error {
 	return c.write(func() error { return c.restartStore.RemoveGroupKeysByFabric(ctx, fabricIndex) })
 }
@@ -164,6 +190,7 @@ func TestOpcreds_RestartBeforeCommissioningComplete_RevertsAddNOC(t *testing.T) 
 func testRestartRevertsAddNOC(t *testing.T, open func(*testing.T) restartStore) {
 	t.Helper()
 	total := addNOCWrites(t, open)
+	// AddFabric (pending), the identity, the IPK key set, the ACL.
 	if total < 4 {
 		t.Fatalf("a clean AddNOC made %d store writes, want at least 4", total)
 	}
@@ -254,7 +281,7 @@ func testRestartKeepsFabric(t *testing.T, st restartStore) {
 		t.Fatal(err)
 	}
 	_, _, idx := commissionTestFabric(ctx, t, oc)
-	oc.ClearPendingState() // CommissioningComplete (node/root.go wires it so)
+	commitForTest(t, oc) // CommissioningComplete
 	restartOpcreds(t, st)
 	if _, err := st.GetFabric(ctx, idx); err != nil {
 		t.Fatalf("a committed fabric did not survive the restart: %v", err)
@@ -291,7 +318,7 @@ func testRestartRevertsUpdateNOC(t *testing.T, open func(*testing.T) restartStor
 			t.Fatal(err)
 		}
 		_, rootPriv, fi := commissionTestFabric(ctx, t, oc)
-		oc.ClearPendingState() // CommissioningComplete
+		commitForTest(t, oc) // CommissioningComplete
 		before, _ = inner.GetIdentity(ctx, fi)
 		fab, _ := inner.GetFabric(ctx, fi)
 		fabCtx := im.WithFabricFilter(ctx, true, fi)
@@ -309,8 +336,10 @@ func testRestartRevertsUpdateNOC(t *testing.T, open func(*testing.T) restartStor
 		return inner, before, fab.NodeID, fi, writes
 	}
 	_, _, _, _, total := updateWrites(t, -1)
-	if total < 2 {
-		t.Fatalf("a clean UpdateNOC made %d store writes, want at least 2", total)
+	// One: UpdateFabricCredentials, which marks the row pending with
+	// what it replaced (owner decision 36).
+	if total < 1 {
+		t.Fatalf("a clean UpdateNOC made %d store writes, want at least 1", total)
 	}
 	for crashAfter := 1; crashAfter <= total; crashAfter++ {
 		t.Run("", func(t *testing.T) {
@@ -372,6 +401,7 @@ func TestOpcreds_RemoveFabricStoreFailureAfterLeaving(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _, idx := commissionTestFabric(ctx, t, oc)
+	commitForTest(t, oc)
 	oc.ClearPendingState()
 	left := 0
 	oc.SetOnFabricLeaving(func(context.Context, uint8) { left++ })
