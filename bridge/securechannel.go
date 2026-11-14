@@ -511,7 +511,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// own: matter.js's CASE server has no such step (its entry
 		// points are onNewExchange and #handleSigma1,
 		// packages/protocol/src/session/case/CaseServer.ts:61-63,
-		// :102-133 at db021da0); a retransmission meets its exchange
+		// :102-146 at db021da0); a retransmission meets its exchange
 		// layer, where a duplicate is acknowledged or the pending
 		// message's retransmission kicked
 		// (packages/protocol/src/protocol/MessageExchange.ts:501-511),

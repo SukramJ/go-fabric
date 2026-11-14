@@ -778,7 +778,7 @@ func sealResumeMIC(key []byte, nonceStr string) ([]byte, error) {
 // unreachable` ~16 s later. The cache holds while the handshake is in
 // progress ([Responder.processSigma1Locked]) and is this module's own:
 // matter.js's CASE server keeps no Sigma2 to send again
-// (packages/protocol/src/session/case/CaseServer.ts:102-133 at
+// (packages/protocol/src/session/case/CaseServer.ts:102-146 at
 // db021da0); its exchange layer acknowledges a duplicate or kicks the
 // pending message's retransmission
 // (packages/protocol/src/protocol/MessageExchange.ts:501-511), and
@@ -833,7 +833,7 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	// :521-534 at db021da0), and once that exchange is gone
 	// (CaseServer.ts:95-98) the CASE server begins afresh with a new
 	// random and key pair (packages/protocol/src/session/case/CaseServer.ts:61-63,
-	// :102-133, :236, :241). Apple Home opens new CASE sessions on the
+	// :102-146, :236, :241). Apple Home opens new CASE sessions on the
 	// SAME ExchangeID after CommissioningComplete (the iCloud Hub
 	// Companion fabric grafts onto the existing exchange).
 	//

@@ -582,7 +582,7 @@ type Bridge struct {
 	// ([Bridge.sigma3Handled]).
 	// The gate is this module's own: matter.js's CASE server has no
 	// replay step (its entry points are onNewExchange and #handleSigma1,
-	// packages/protocol/src/session/case/CaseServer.ts:61-63, :102-133
+	// packages/protocol/src/session/case/CaseServer.ts:61-63, :102-146
 	// at db021da0). A retransmitted Sigma1 meets its exchange layer,
 	// where a duplicate is acknowledged or the pending message's
 	// retransmission kicked
