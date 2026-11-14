@@ -599,10 +599,23 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 }
 
 // dispatchSigma2Resume routes a Sigma2_Resume to the handler of its
-// handshake; one no Sigma1 began is acknowledged and no more
-// ([Bridge.dropHandshakeNotBegun]).
+// handshake; one no Sigma1 began, or of a handshake that completed, is
+// acknowledged and no more ([Bridge.dropHandshakeNotBegun]): after
+// completion only the completing Sigma3 over its route is answered
+// ([Bridge.handleSigma3OfCompleted]), and nothing else takes the success
+// report that waits for its acknowledgement from the retransmission — in
+// matter.js a message on the handshake's live exchange that does not
+// acknowledge that report fails before the retransmission timer is touched
+// (packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0),
+// and a Sigma2_Resume opening an exchange is not taken
+// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146-153)
+// (review II, R2-P4-rr-sec-03).
 func (b *Bridge) dispatchSigma2Resume(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
-	ch, _, begun := b.resolveCaseContinuation(handshakeKeyOf(requestHdr, proto.ExchangeID))
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
+	if _, ok := b.completedHandshake(key); ok {
+		return b.dropHandshakeNotBegun(src, proto)
+	}
+	ch, _, begun := b.resolveCaseContinuation(key)
 	if !begun {
 		return b.dropHandshakeNotBegun(src, proto)
 	}
