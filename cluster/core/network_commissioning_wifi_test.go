@@ -13,6 +13,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -117,8 +119,8 @@ func TestWiFiNetworkCommissioningAttributes(t *testing.T) {
 	if w.MinInvokePrivilege(netcommdef.CmdConnectNetwork) != 5 || w.MatterClusterID() != netcommClusterID || w.MatterDataVersion() == 0 || len(w.MatterAttributes()) == 0 || len(w.MatterReportable()) == 0 {
 		t.Fatal("privileges or identity")
 	}
-	if err := w.MatterWrite(context.Background(), netcommAttrInterfaceEnabled, false); err != nil {
-		t.Fatal(err)
+	if err := w.MatterWrite(context.Background(), netcommAttrInterfaceEnabled, false); wifiStatusOf(t, err) != im.StatusInvalidAction {
+		t.Fatalf("InterfaceEnabled false without a switch: %v, want INVALID_ACTION", err)
 	}
 	if err := w.MatterWrite(context.Background(), netcommAttrInterfaceEnabled, 1); err == nil {
 		t.Fatal("a non-bool write accepted")
@@ -145,9 +147,7 @@ func TestWiFiNetworkCommissioningAttributes(t *testing.T) {
 // Ethernet server does.
 func TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange(t *testing.T) {
 	t.Parallel()
-	armed := false
-	var crumbs []uint64
-	w, _ := newWiFiNC(t, &armed, &crumbs)
+	w, _ := newSwitchingWiFiNC(t)
 	before := w.MatterDataVersion()
 	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, true); err != nil {
 		t.Fatal(err)
@@ -163,6 +163,138 @@ func TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange(t *testing.T) {
 	}
 	if got := w.MatterDataVersion(); got != before+1 {
 		t.Errorf("a changed InterfaceEnabled moved the DataVersion %d -> %d, want +1", before, got)
+	}
+}
+
+// switchDriver is a simDriver that can switch its interface
+// (contract.WiFiInterfaceSwitcher): it records each switch and answers
+// err, leaving the interface as it was then.
+type switchDriver struct {
+	*simDriver
+	switchMu sync.Mutex
+	switches []bool
+	err      error
+}
+
+func (d *switchDriver) SetInterfaceEnabled(_ context.Context, enabled bool) error {
+	d.switchMu.Lock()
+	defer d.switchMu.Unlock()
+	d.switches = append(d.switches, enabled)
+	return d.err
+}
+
+func (d *switchDriver) switched() []bool {
+	d.switchMu.Lock()
+	defer d.switchMu.Unlock()
+	return slices.Clone(d.switches)
+}
+
+func (d *switchDriver) answer(err error) {
+	d.switchMu.Lock()
+	defer d.switchMu.Unlock()
+	d.err = err
+}
+
+func newSwitchingWiFiNC(t *testing.T) (*WiFiNetworkCommissioning, *switchDriver) {
+	t.Helper()
+	d := &switchDriver{simDriver: &simDriver{}}
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, Clock: clocktest.New(time.Unix(0, 0))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return w, d
+}
+
+// TestWiFiInterfaceEnabledWithoutASwitch: a driver that cannot switch its
+// interface leaves InterfaceEnabled true — a write of false answers
+// INVALID_ACTION, a write of true succeeds and changes nothing, and a
+// stored false restored after a restart is not served. Mirrors
+// connectedhomeip src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1120-1132
+// at 6170af84 (WriteAttribute: CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE from
+// the driver's SetEnabled answers InvalidAction, citing spec 11.9.6.5) and
+// src/include/platform/NetworkCommissioning.h:225-234 (the base driver's
+// SetEnabled returns that error, its GetEnabled true). matter.js's server
+// is the generated stub (NetworkCommissioningServer.ts), a plain writable
+// attribute.
+func TestWiFiInterfaceEnabledWithoutASwitch(t *testing.T) {
+	t.Parallel()
+	armed := false
+	var crumbs []uint64
+	w, _ := newWiFiNC(t, &armed, &crumbs)
+	before := w.MatterDataVersion()
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); wifiStatusOf(t, err) != im.StatusInvalidAction {
+		t.Fatalf("InterfaceEnabled false: %v, want INVALID_ACTION", err)
+	}
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, true); err != nil {
+		t.Fatalf("InterfaceEnabled true: %v", err)
+	}
+	if err := w.SetAttributes(map[uint32]any{netcommAttrInterfaceEnabled: false}); err == nil {
+		t.Error("a restored false was taken without a switch")
+	}
+	if v, _ := w.MatterRead(netcommAttrInterfaceEnabled); v != true {
+		t.Errorf("InterfaceEnabled %v, want true", v)
+	}
+	if got := w.MatterDataVersion(); got != before {
+		t.Errorf("DataVersion %d -> %d, want unchanged", before, got)
+	}
+}
+
+// TestWiFiInterfaceEnabledSwitchesTheInterface: with a driver that
+// switches its interface, a write that changes InterfaceEnabled switches
+// it and the attribute reads what the driver did — a refusal leaves the
+// interface and the attribute as they were, one the driver cannot carry
+// out answering INVALID_ACTION and any other FAILURE; a write or restore
+// of the value already held reaches the driver no more. Mirrors
+// connectedhomeip NetworkCommissioningCluster.cpp:1120-1132 at 6170af84
+// (SetInterfaceEnabled is the driver's SetEnabled; its error answers the
+// write) and NetworkCommissioningCluster.h:134,144 (the attribute is the
+// driver's GetEnabled).
+func TestWiFiInterfaceEnabledSwitchesTheInterface(t *testing.T) {
+	t.Parallel()
+	w, d := newSwitchingWiFiNC(t)
+	read := func() any {
+		t.Helper()
+		v, _ := w.MatterRead(netcommAttrInterfaceEnabled)
+		return v
+	}
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := d.switched(); len(got) != 0 {
+		t.Fatalf("an unchanged InterfaceEnabled switched the interface %v", got)
+	}
+
+	d.answer(errors.New("rfkill"))
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); err == nil || errors.As(err, new(im.StatusCodeError)) {
+		t.Fatalf("a switch the driver failed: %v, want FAILURE", err)
+	}
+	d.answer(fmt.Errorf("not now: %w", errors.ErrUnsupported))
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); wifiStatusOf(t, err) != im.StatusInvalidAction {
+		t.Fatalf("a switch the driver cannot carry out: %v, want INVALID_ACTION", err)
+	}
+	if v := read(); v != true {
+		t.Fatalf("InterfaceEnabled %v after refused switches, want true", v)
+	}
+
+	d.answer(nil)
+	before := w.MatterDataVersion()
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); err != nil {
+		t.Fatal(err)
+	}
+	if v := read(); v != false || w.MatterDataVersion() != before+1 {
+		t.Fatalf("InterfaceEnabled %v, DataVersion %d -> %d after the switch off, want false and +1", v, before, w.MatterDataVersion())
+	}
+	if err := w.SetAttributes(map[uint32]any{netcommAttrInterfaceEnabled: false}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetAttributes(map[uint32]any{netcommAttrInterfaceEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if v := read(); v != true {
+		t.Fatalf("InterfaceEnabled %v after the restored true, want true", v)
+	}
+	if got, want := d.switched(), []bool{false, false, false, true}; !slices.Equal(got, want) {
+		t.Errorf("switches %v, want %v", got, want)
 	}
 }
 

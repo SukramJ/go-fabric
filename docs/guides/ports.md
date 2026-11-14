@@ -78,6 +78,7 @@ in the module.
 | --- | --- | --- | --- |
 | `BLEPeripheral` (`BLEAdvertisement`, `BLEConnection`) | the host's BLE stack: `ble/bluez.NewPeripheral` on Linux, `bletest.Peripheral.Radio` in tests | advertises the payload the node gives, serves the Matter GATT service (C1, C2, C3) and hands each central's connection to the node | no BLE: the node is commissionable over IP only and its QR code says so |
 | `WiFiDriver` | the host's Wi-Fi stack: `wifi/wpasupplicant.New` on Linux, the reference daemon's `--wifi-sim` in tests | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
+| `WiFiInterfaceSwitcher` (optional on a `WiFiDriver`) | a host Wi-Fi stack that can switch its interface on and off | switches the interface a controller's write of `InterfaceEnabled` names; the attribute takes the value once the driver switched | `InterfaceEnabled` stays true: a write of false answers `INVALID_ACTION` |
 
 *Source: `contract/doc.go:4-18`, `contract/ble.go`, `contract/wifi.go`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 

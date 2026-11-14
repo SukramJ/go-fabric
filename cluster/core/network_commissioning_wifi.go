@@ -43,6 +43,10 @@ type WiFiNetworkCommissioning struct {
 	// mu guards busy, committed, interfaceEnabled, lastConnectErr, lastNetworkID, lastStatus and networks.
 	mu          sync.Mutex
 	dataVersion cluster.DataVersionTracker
+	// switchMu serialises the changes of InterfaceEnabled: the driver's
+	// switch runs outside mu, and the value it switched to is set before
+	// the next change asks the driver ([WiFiNetworkCommissioning.switchInterface]).
+	switchMu sync.Mutex
 	// changes reports what moves outside the cluster's own commands — the
 	// failsafe revert, the rejoin at Start
 	// ([WiFiNetworkCommissioning.OnAttributeChange]).
@@ -692,8 +696,9 @@ func (w *WiFiNetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 	return nil, false
 }
 
-// MatterWrite handles InterfaceEnabled (WriteAttribute, :1115-1136).
-func (w *WiFiNetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
+// MatterWrite handles InterfaceEnabled (WriteAttribute, :1115-1136):
+// [WiFiNetworkCommissioning.switchInterface].
+func (w *WiFiNetworkCommissioning) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != netcommAttrInterfaceEnabled {
 		_, err := wifiNetcommInst.ValidateWrite(attrID, value, nil)
 		return refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
@@ -702,22 +707,63 @@ func (w *WiFiNetworkCommissioning) MatterWrite(_ context.Context, attrID uint32,
 	if !ok {
 		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
-	w.mu.Lock()
-	w.setInterfaceEnabledLocked(v)
-	w.mu.Unlock()
-	return nil
+	return w.switchInterface(ctx, v)
 }
 
 // SetAttributes implements [spec.AttributeSetter] for InterfaceEnabled,
 // as [NetworkCommissioning.SetAttributes]: the node restores a
-// controller's write of it through this after a restart.
+// controller's write of it through this after a restart. The value is
+// set as a write's is ([WiFiNetworkCommissioning.switchInterface]): a
+// stored false a driver without a [contract.WiFiInterfaceSwitcher] cannot
+// carry out — one an earlier version took without switching anything —
+// leaves InterfaceEnabled true, the interface's state, and is returned as
+// the error.
 func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
 	enabled, set, err := netcommInterfaceEnabledOf(wifiNetcommInst, values)
 	if err != nil || !set {
 		return err
 	}
+	// SetAttributes takes no context; the driver bounds its own wait
+	// (contract.WiFiInterfaceSwitcher).
+	return w.switchInterface(context.Background(), enabled) //nolint:contextcheck // see above
+}
+
+// switchInterface sets InterfaceEnabled to v through the driver's
+// [contract.WiFiInterfaceSwitcher]: a value already held reaches the
+// driver no more, a change switches the interface first and is set only
+// once the driver switched it. A driver without the switch, or one whose
+// error wraps errors.ErrUnsupported, answers INVALID_ACTION and leaves
+// the value; any other error of the driver answers with that error.
+// Mirrors connectedhomeip
+// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1120-1132
+// at 6170af84 (WriteAttribute: SetInterfaceEnabled is the driver's
+// SetEnabled, CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE answers InvalidAction
+// per spec 11.9.6.5, any other error the write's status) and
+// src/include/platform/NetworkCommissioning.h:225-234 (a driver without
+// the feature: SetEnabled unsupported, GetEnabled true). Unlike chip, a
+// write of the value held does not call the driver, and a write of true
+// to a driver without the switch succeeds: the interface is on.
+func (w *WiFiNetworkCommissioning) switchInterface(ctx context.Context, v bool) error {
+	w.switchMu.Lock()
+	defer w.switchMu.Unlock()
 	w.mu.Lock()
-	w.setInterfaceEnabledLocked(enabled)
+	held := w.interfaceEnabled
+	w.mu.Unlock()
+	if held == v {
+		return nil
+	}
+	err := errors.ErrUnsupported
+	if sw, ok := w.driver.(contract.WiFiInterfaceSwitcher); ok {
+		err = sw.SetInterfaceEnabled(ctx, v)
+	}
+	switch {
+	case errors.Is(err, errors.ErrUnsupported):
+		return netcommStatus(im.StatusInvalidAction, "core: InterfaceEnabled %t: the Wi-Fi driver cannot switch its interface: %v", v, err)
+	case err != nil:
+		return fmt.Errorf("core: InterfaceEnabled %t: the Wi-Fi driver did not switch its interface: %w", v, err)
+	}
+	w.mu.Lock()
+	w.setInterfaceEnabledLocked(v)
 	w.mu.Unlock()
 	return nil
 }

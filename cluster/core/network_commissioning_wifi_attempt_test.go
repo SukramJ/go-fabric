@@ -197,6 +197,12 @@ func TestACommandCancelsARunningRejoinAndTakesItsTurn(t *testing.T) {
 	close(d.release)
 }
 
+// switchingLinkDriver is a linkDriver whose interface switches
+// (contract.WiFiInterfaceSwitcher).
+type switchingLinkDriver struct{ *linkDriver }
+
+func (switchingLinkDriver) SetInterfaceEnabled(context.Context, bool) error { return nil }
+
 // TestADisabledInterfaceStopsTheRejoin: while InterfaceEnabled is false
 // no rejoin attempt is armed or runs — a fail-safe expiry arms none
 // either — and writing it true again starts the rejoin at once.
@@ -216,7 +222,7 @@ func TestADisabledInterfaceStopsTheRejoin(t *testing.T) {
 	d.mu.Unlock()
 	d.setReachable("home", false)
 
-	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, IsFailSafeArmed: armed.Load, Store: st, Clock: clk})
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: switchingLinkDriver{d}, IsFailSafeArmed: armed.Load, Store: st, Clock: clk})
 	if err != nil {
 		t.Fatal(err)
 	}
