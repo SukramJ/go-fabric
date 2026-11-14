@@ -458,7 +458,10 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 		}
 	}
 	s.st = colorState{
-		mireds:        min(max(cfg.InitialMireds, cfg.MinMireds), cfg.MaxMireds),
+		// Cropped to the range the server works in, an unset physical
+		// bound read as matter.js reads it (#cropColorTemperature,
+		// ColorControlServer.ts:1790-1796 at db021da0).
+		mireds:        min(max(cfg.InitialMireds, s.minimumMireds()), s.maximumMireds()),
 		x:             cfg.InitialX,
 		y:             cfg.InitialY,
 		hue:           min(cfg.InitialHue, maxHueValue),

@@ -70,3 +70,35 @@ func TestStartUpColorTemperatureMiredsIsApplied(t *testing.T) {
 		}
 	}
 }
+
+// TestInitialMiredsCropsToTheEffectiveRange: the initial
+// ColorTemperatureMireds is cropped to the range the server works in, where
+// an unset (0) physical maximum is 0xFEFF and an unset minimum 0. Mirrors
+// matter.js packages/node/src/behaviors/color-control/ColorControlServer.ts
+// :1790-1796 at db021da0 (#cropColorTemperature over
+// minimumColorTemperatureMireds and maximumColorTemperatureMireds,
+// :239-253, MIN_TEMPERATURE_VALUE 0 and MAX_TEMPERATURE_VALUE 0xfeff,
+// :54-55).
+func TestInitialMiredsCropsToTheEffectiveRange(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		min, max, initial, want uint16
+	}{
+		{153, 0, 250, 250},
+		{0, 0, 250, 250},
+		{153, 500, 250, 250},
+		{153, 500, 600, 500},
+		{153, 0, 100, 153},
+	} {
+		srv, err := light.NewColorControl(light.ColorControlServerConfig{
+			Features:  light.ColorFeatureColorTemperature,
+			MinMireds: c.min, MaxMireds: c.max, InitialMireds: c.initial,
+		})
+		if err != nil {
+			t.Fatalf("min %d max %d: %v", c.min, c.max, err)
+		}
+		if got, _ := srv.MatterRead(ccdef.AttrColorTemperatureMireds); got != c.want {
+			t.Errorf("min %d max %d initial %d: ColorTemperatureMireds %v, want %d", c.min, c.max, c.initial, got, c.want)
+		}
+	}
+}
