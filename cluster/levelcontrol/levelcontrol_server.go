@@ -395,10 +395,14 @@ type Server struct {
 	// hand-off path and the levels the engine is handing it, so a change
 	// the host's notifier reports meanwhile is the command's.
 	forwarding atomic.Int32
-	// notified counts the host notifications [Server.OnMatterValueChanged]
-	// advanced the DataVersion for: a hand-off command during which it
-	// moved adds no advance of its own ([Server.bumpIfMoved]).
-	notified atomic.Uint64
+	// noteMu guards noted and makes a notification's count, the level it
+	// read and its advance of the DataVersion one step.
+	noteMu sync.Mutex
+	// noted is the last host notification [Server.OnMatterValueChanged]
+	// advanced the DataVersion for — their count and the level it read —,
+	// against which a hand-off command's move is compared
+	// ([Server.bumpIfMoved]).
+	noted levelReading
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -530,8 +534,11 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		return func() {}
 	}
 	return n.OnMatterValueChanged(func() {
-		s.notified.Add(1)
+		level, known := s.sourceLevel()
+		s.noteMu.Lock()
+		s.noted = levelReading{level, known, s.noted.notified + 1}
 		s.tracker().Bump()
+		s.noteMu.Unlock()
 		if cb != nil {
 			cb()
 		}
@@ -924,32 +931,51 @@ func (s *Server) finish(name string, err error, before levelReading) (any, error
 
 // levelReading is CurrentLevel as the source reports it — the level of
 // an unknown one is 0 — and the count of host notifications that had
-// advanced the DataVersion when it was read ([Server.notified]).
+// advanced the DataVersion before it was read ([Server.noted]).
 type levelReading struct {
 	level    uint8
 	known    bool
 	notified uint64
 }
 
-// levelNow reads CurrentLevel from the source, which is not nil.
-func (s *Server) levelNow() levelReading {
-	notified := s.notified.Load()
+// sourceLevel reads CurrentLevel from the source, which is not nil; the
+// level of an unknown one is 0.
+func (s *Server) sourceLevel() (uint8, bool) {
 	level, known := s.src.CurrentLevel()
 	if !known {
 		level = 0
 	}
+	return level, known
+}
+
+// levelNow reads CurrentLevel from the source after the count of host
+// notifications, so a notification between the two is one the reading
+// may already show and [Server.bumpIfMoved] compares with its value.
+func (s *Server) levelNow() levelReading {
+	s.noteMu.Lock()
+	notified := s.noted.notified
+	s.noteMu.Unlock()
+	level, known := s.sourceLevel()
 	return levelReading{level, known, notified}
 }
 
-// bumpIfMoved advances the DataVersion when CurrentLevel differs from
-// before, once for the command: when the host's notifier reported a
-// change since before, that notification advanced the version already,
-// before its report. Mirrors matter.js
-// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
-// db021da0 (a commit advances the version once `if (changes)`).
+// bumpIfMoved advances the DataVersion once for the command when
+// CurrentLevel now differs from the level last served under a version of
+// its own: the level the last host notification since before read — that
+// notification advanced the version for it —, or before's when none
+// fired. A notification that fired before the port moved the level, for
+// a change of something else, leaves the move to this advance. Mirrors
+// matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+// at db021da0 (a commit advances the version once `if (changes)`).
 func (s *Server) bumpIfMoved(before levelReading) {
-	now := s.levelNow()
-	if (now.level != before.level || now.known != before.known) && now.notified == before.notified {
+	level, known := s.sourceLevel()
+	s.noteMu.Lock()
+	defer s.noteMu.Unlock()
+	last := before
+	if s.noted.notified != before.notified {
+		last = s.noted
+	}
+	if level != last.level || known != last.known {
 		s.tracker().Bump()
 	}
 }

@@ -397,6 +397,87 @@ func TestChangeToModeAdvancesTheDataVersionOnceWithTheHostsNotification(t *testi
 	}
 }
 
+// earlyNotifying reports, inside ChangeToMode, a change of something else
+// of the same source before the mode moves, and moves it silently.
+type earlyNotifying struct{ *notifyingSource }
+
+func (n earlyNotifying) ChangeToMode(ctx context.Context, mode uint8) error {
+	if n.cb != nil {
+		n.cb()
+	}
+	return n.fakeSource.ChangeToMode(ctx, mode)
+}
+
+// readNotifying is a device that changes its mode by itself to 0, and
+// notifies, while the server reads the mode a command starts from; the
+// command's own change is silent.
+type readNotifying struct {
+	*notifyingSource
+	pending *bool // the device's own change is still to come
+}
+
+func (n readNotifying) CurrentMode() uint8 {
+	if *n.pending && n.cb != nil {
+		*n.pending = false
+		n.current = 0
+		n.cb()
+	}
+	return n.fakeSource.CurrentMode()
+}
+
+// TestChangeToModeServesEveryModeUnderItsOwnDataVersion: no two modes are
+// served under one DataVersion, whenever the host's notifier fires while a
+// ChangeToMode runs — after the change, before it for a change of
+// something else, or for a change of the device's own while the server
+// reads the mode the command starts from. A notification advances the
+// version for the value it saw; the command advances it once more when
+// the mode differs from that value. Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode writes state.currentMode) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 (each
+// commit that changed a value advances the version).
+func TestChangeToModeServesEveryModeUnderItsOwnDataVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		src  func(*notifyingSource) modeselect.ModeSource
+	}{
+		{"the notifier reports the change", func(n *notifyingSource) modeselect.ModeSource { return notifyingInCommand{n} }},
+		{"the notifier fires before the change", func(n *notifyingSource) modeselect.ModeSource { return earlyNotifying{n} }},
+		{"the device changes while the command reads its mode", func(n *notifyingSource) modeselect.ModeSource {
+			pending := true
+			return readNotifying{n, &pending}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := modeselect.NewServer(modeselect.Config{Source: tc.src(&notifyingSource{fakeSource: coffeeSource()})})
+			type served struct {
+				version uint32
+				mode    any
+			}
+			now := func() served {
+				v, _ := srv.MatterRead(modeselect.AttrCurrentMode)
+				return served{srv.MatterDataVersion(), v}
+			}
+			seen := []served{now()}
+			defer srv.OnMatterValueChanged(func() { seen = append(seen, now()) })()
+			if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+				t.Fatal(err)
+			}
+			final := now()
+			if final.mode != uint8(1) {
+				t.Fatalf("CurrentMode is %v, want 1", final.mode)
+			}
+			for _, s := range seen {
+				if s.version == final.version && s.mode != final.mode {
+					t.Errorf("CurrentMode %v and %v were both served under DataVersion %d", s.mode, final.mode, final.version)
+				}
+			}
+		})
+	}
+}
+
 // TestDeviceSideChangeReachesSubscribers pins the change hop: a mode the
 // device changed on its own reaches a subscriber. CurrentMode is
 // quality N and is listed as reportable, so without a push path from

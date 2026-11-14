@@ -22,7 +22,7 @@ package modeselect
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -144,10 +144,21 @@ type Server struct {
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
-	// notified counts the host notifications [Server.OnMatterValueChanged]
-	// advanced the DataVersion for: a ChangeToMode during which it moved
-	// adds no advance of its own.
-	notified atomic.Uint64
+	// noteMu guards noted and makes a notification's count, the mode it
+	// read and its advance of the DataVersion one step.
+	noteMu sync.Mutex
+	// noted is the last host notification [Server.OnMatterValueChanged]
+	// advanced the DataVersion for — their count and the mode it read —,
+	// against which a ChangeToMode's change is compared.
+	noted modeReading
+}
+
+// modeReading is CurrentMode as the source reports it and the count of
+// host notifications that had advanced the DataVersion before it was read
+// ([Server.noted]).
+type modeReading struct {
+	mode     uint8
+	notified uint64
 }
 
 // Compile-time assertions.
@@ -224,8 +235,11 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		return func() {}
 	}
 	return n.OnMatterValueChanged(func() {
-		s.notified.Add(1)
+		mode := s.src.CurrentMode()
+		s.noteMu.Lock()
+		s.noted = modeReading{mode, s.noted.notified + 1}
 		s.tracker().Bump()
+		s.noteMu.Unlock()
 		if cb != nil {
 			cb()
 		}
@@ -353,8 +367,12 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (re
 			fmt.Sprintf("modeselect: mode %d provided in NewMode is not supported", req.NewMode),
 		}
 	}
-	before := s.src.CurrentMode()
-	notified := s.notified.Load()
+	// The count first, then the mode: a notification between the two is
+	// one the reading may already show, compared below with its value.
+	s.noteMu.Lock()
+	notified := s.noted.notified
+	s.noteMu.Unlock()
+	before := modeReading{s.src.CurrentMode(), notified}
 	if err := s.src.ChangeToMode(ctx, req.NewMode); err != nil {
 		// Deliberately no version bump: the device refused, so nothing
 		// a subscriber caches has changed.
@@ -365,12 +383,22 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (re
 	// db021da0 (changeToMode writes state.currentMode) under
 	// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
 	// :1476-1480 (#noteIfChanged returns for an equal value). The command
-	// is one commit, one advance: when the host's notifier reported a
-	// change while the port ran it, that notification advanced the
-	// version already, before its report.
-	if s.src.CurrentMode() != before && s.notified.Load() == notified {
+	// is one commit, one advance, when CurrentMode now differs from the
+	// mode last served under a version of its own: the mode the last host
+	// notification since before read — that notification advanced the
+	// version for it —, or before's when none fired. A notification that
+	// fired before the port changed the mode, for a change of something
+	// else, leaves the change to this advance.
+	mode := s.src.CurrentMode()
+	s.noteMu.Lock()
+	last := before
+	if s.noted.notified != before.notified {
+		last = s.noted
+	}
+	if mode != last.mode {
 		s.tracker().Bump()
 	}
+	s.noteMu.Unlock()
 	return nil, nil
 }
 

@@ -614,6 +614,98 @@ func TestHandOffCommandAdvancesTheDataVersionOnce(t *testing.T) {
 	}
 }
 
+// earlyNotifyHost reports, inside MoveToLevel, a change of something else
+// of the same source before it moves the level, and moves it silently.
+type earlyNotifyHost struct{ *fakeHost }
+
+func (h earlyNotifyHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	if h.notify != nil {
+		h.notify()
+	}
+	h.level, h.levelKnown = req.Level, true
+	return nil
+}
+
+// readNotifyHost is a device that changes its level by itself to 100, and
+// notifies, while the server reads the level a command starts from; the
+// command's own move is silent.
+type readNotifyHost struct {
+	*fakeHost
+	pending *bool // the device's own change is still to come
+}
+
+func (h readNotifyHost) CurrentLevel() (uint8, bool) {
+	if *h.pending && h.notify != nil {
+		*h.pending = false
+		h.level, h.levelKnown = 100, true
+		h.notify()
+	}
+	return h.fakeHost.CurrentLevel()
+}
+
+func (h readNotifyHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	h.level, h.levelKnown = req.Level, true
+	return nil
+}
+
+// TestHandOffCommandServesEveryLevelUnderItsOwnDataVersion: on the
+// hand-off path no two levels are served under one DataVersion, whenever
+// the host's notifier fires while a command runs — after the move, before
+// it for a change of something else, or for a change of the device's own
+// while the server reads the level the command starts from. A notification
+// advances the version for the value it saw; the command's move advances
+// it once more when the level differs from that value. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (each commit that changed a value advances the version).
+func TestHandOffCommandServesEveryLevelUnderItsOwnDataVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		src  func(*fakeHost) levelcontrol.LevelSource
+	}{
+		{"the notifier reports the move", func(h *fakeHost) levelcontrol.LevelSource { return movingHost{h, true} }},
+		{"the notifier fires before the move", func(h *fakeHost) levelcontrol.LevelSource { return earlyNotifyHost{h} }},
+		{"the device moves while the command reads its level", func(h *fakeHost) levelcontrol.LevelSource {
+			pending := true
+			return readNotifyHost{h, &pending}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			host := observedHost()
+			srv := levelcontrol.NewServer(levelcontrol.Config{Source: tc.src(host)})
+			type served struct {
+				version uint32
+				level   any
+			}
+			now := func() served {
+				v, _ := srv.MatterRead(levelcontrol.AttrCurrentLevel)
+				return served{srv.MatterDataVersion(), v}
+			}
+			seen := []served{now()}
+			defer srv.OnMatterValueChanged(func() { seen = append(seen, now()) })()
+			if _, err := srv.MatterInvoke(context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60}); err != nil {
+				t.Fatal(err)
+			}
+			final := now()
+			if final.level != uint8(60) {
+				t.Fatalf("CurrentLevel is %v, want 60", final.level)
+			}
+			for _, s := range seen {
+				if s.version == final.version && s.level != final.level {
+					t.Errorf("CurrentLevel %v and %v were both served under DataVersion %d", s.level, final.level, final.version)
+				}
+			}
+		})
+	}
+}
+
 // TestChangeNotifierIsOptional pins that a port which cannot notify
 // still yields a usable, releasable subscription.
 func TestChangeNotifierIsOptional(t *testing.T) {
