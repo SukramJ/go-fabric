@@ -50,3 +50,59 @@ func TestFailedUpdateCountIsOneStep(t *testing.T) {
 		}
 	}
 }
+
+// TestReportNumberDoesNotOutliveItsSubscription: no report number and no
+// count of failed updates is kept for a subscription whose routing is
+// released — not for a report begun after the release, whose send then
+// fails, and not for a failure taken at the same moment as the one that
+// reaches the cap and reaps the subscription.
+func TestReportNumberDoesNotOutliveItsSubscription(t *testing.T) {
+	t.Parallel()
+	const subID = uint32(91)
+	errSend := errors.New("send failed")
+	kept := func(b *Bridge) (number, count bool) {
+		b.subUpdateMu.Lock()
+		_, number = b.subUpdateSeq[subID]
+		b.subUpdateMu.Unlock()
+		_, count = b.subSendErrorCount.Load(subID)
+		return number, count
+	}
+
+	t.Run("a report begun after the release", func(t *testing.T) {
+		t.Parallel()
+		b := &Bridge{}
+		b.routing.subTargets.Store(subID, subTarget{})
+		b.beginUpdate(subID)
+		b.releaseSubscriptionRouting(subID)
+		seq := b.beginUpdate(subID)
+		b.noteSubscriptionSendError(subID, seq, "report", errSend)
+		if number, count := kept(b); number || count {
+			t.Errorf("after the release: report number kept %v, failure count kept %v; want neither", number, count)
+		}
+	})
+
+	t.Run("a failure beside the one that reaps", func(t *testing.T) {
+		t.Parallel()
+		for round := range 2000 {
+			b := &Bridge{}
+			b.routing.subTargets.Store(subID, subTarget{})
+			b.subSendErrorCount.Store(subID, sendErrorRetryLimit)
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for range 2 {
+				wg.Go(func() {
+					<-start
+					b.noteSubscriptionSendError(subID, 0, "report", errSend)
+				})
+			}
+			close(start)
+			wg.Wait()
+			if _, live := b.routing.subTargets.Load(subID); live {
+				t.Fatalf("round %d: the subscription was not reaped", round)
+			}
+			if number, count := kept(b); number || count {
+				t.Fatalf("round %d: after the reap: report number kept %v, failure count kept %v; want neither", round, number, count)
+			}
+		}
+	})
+}

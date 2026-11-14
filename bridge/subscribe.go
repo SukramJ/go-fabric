@@ -1035,12 +1035,16 @@ const sendErrorRetryLimit = 2
 //
 // op names the reporter for the log line ("report" / "event_report").
 func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, err error) {
+	b.subUpdateMu.Lock()
 	if _, live := b.routing.subTargets.Load(subID); !live {
 		// Closed while the report was being sent: nothing is left to
-		// count against.
+		// count against. Taken under subUpdateMu, which every release
+		// takes after it drops the routing target
+		// ([Bridge.resetFailedUpdates]), so no count is stored after the
+		// release has reset it.
+		b.subUpdateMu.Unlock()
 		return
 	}
-	b.subUpdateMu.Lock()
 	order := b.subUpdateSeq[subID]
 	if seq != 0 && order != nil && seq <= order.resolved {
 		b.subUpdateMu.Unlock()
@@ -1066,6 +1070,10 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 	if failures <= sendErrorRetryLimit {
 		b.subSendErrorCount.Store(subID, failures)
 	} else {
+		// The routing target goes under the lock, so a failure taken at
+		// the same moment finds the subscription closed and counts
+		// nothing.
+		b.routing.subTargets.Delete(subID)
 		b.subSendErrorCount.Delete(subID)
 		delete(b.subUpdateSeq, subID)
 	}
@@ -1080,9 +1088,8 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 		}
 		return
 	}
-	// Cap reached — drop the routing target and evict the subscription
+	// Cap reached — the routing target is dropped; evict the subscription
 	// from the manager so the engine stops ticking a dead subscription.
-	b.routing.subTargets.Delete(subID)
 	b.forgetReportExchange(subID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(subID) // ErrNotFound is fine — racing with peer or ACK-pump Close
@@ -1123,10 +1130,17 @@ type updateOrder struct {
 }
 
 // beginUpdate numbers the ongoing report of subID about to be sent; the
-// first is 1.
+// first is 1. A subscription whose routing target is gone is released
+// and gets no number (0): numbered, it would keep its entry for the
+// process lifetime, since its release reset it already. The target is
+// read under subUpdateMu, which every release takes after it drops the
+// target ([Bridge.resetFailedUpdates]).
 func (b *Bridge) beginUpdate(subID uint32) uint64 {
 	b.subUpdateMu.Lock()
 	defer b.subUpdateMu.Unlock()
+	if _, live := b.routing.subTargets.Load(subID); !live {
+		return 0
+	}
 	if b.subUpdateSeq == nil {
 		b.subUpdateSeq = make(map[uint32]*updateOrder)
 	}
