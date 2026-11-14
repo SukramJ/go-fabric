@@ -600,6 +600,88 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 	})
 }
 
+// TestFlowDisarmAfterFailureIsBoundedByTheCaller (review II,
+// R2-P3-rr-ctl-03): the disarm after a step's own failure, with the
+// device's answer to an ArmFailSafe known, is bounded as every disarm on a
+// way out is — by the caller's context while it lives, and by the flow's
+// own abort bound (abortDisarmTimeout) once it has ended. A device that
+// stops answering after it armed keeps neither the caller's cancel nor an
+// ended context from returning.
+func TestFlowDisarmAfterFailureIsBoundedByTheCaller(t *testing.T) {
+	t.Parallel()
+	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
+	// rig is a flow over a device that answers the first ArmFailSafe and
+	// then nothing: disarmed is closed when its ArmFailSafe(0) arrives.
+	rig := func(t *testing.T, fail step) (f *flow, disarmed <-chan struct{}) {
+		t.Helper()
+		dev := &failsafeDevice{info: info}
+		got := make(chan struct{})
+		var once sync.Once
+		f, _ = newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if expiry, ok := armRequest(req); ok && expiry == 0 {
+				once.Do(func() { close(got) })
+				return 0, nil, false
+			}
+			return dev.handle(req)
+		})
+		f.log = discard()
+		f.abortDisarm = 50 * time.Millisecond
+		f.steps = []step{{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }}, fail}
+		return f, got
+	}
+	// within waits for c within the test's own deadline, as
+	// TestFlowReconnectAbort does. The exchange's response timeout runs on
+	// the fake clock, which nothing advances: a disarm that only it bounds
+	// never returns.
+	within := func(t *testing.T, c <-chan struct{}, what string) {
+		t.Helper()
+		waitCtx, stopWait := context.WithTimeout(t.Context(), abortDisarmTimeout/2)
+		defer stopWait()
+		select {
+		case <-c:
+		case <-waitCtx.Done():
+			t.Fatal(what)
+		}
+	}
+	// run runs the flow and returns its error once it returned.
+	run := func(t *testing.T, ctx context.Context, f *flow, disarmed <-chan struct{}, afterDisarm func()) error {
+		t.Helper()
+		var err error
+		done := make(chan struct{})
+		go func() { err = f.execute(ctx); close(done) }()
+		within(t, disarmed, "the flow sent no ArmFailSafe(0) after the failure")
+		afterDisarm()
+		within(t, done, "the flow has not returned: the disarm after the failure is not bounded by the caller")
+		return err
+	}
+
+	t.Run("the caller's cancel ends the disarm", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		gone := errors.New("the device stopped answering")
+		f, disarmed := rig(t, step{8, 1, "fail", func(context.Context) (stepResult, error) { return 0, gone }})
+		if err := run(t, ctx, f, disarmed, cancel); err != gone { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, want the step's", err)
+		}
+	})
+
+	t.Run("after the caller's context ended the disarm has the abort bound", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// A classed failure that does not carry the context's error is the
+		// step's own (callerAborted), although the context has ended.
+		f, disarmed := rig(t, step{8, 1, "fail", func(context.Context) (stepResult, error) {
+			cancel()
+			return 0, newError(ErrCommissioning, "the device stopped answering", nil)
+		}})
+		if err := run(t, ctx, f, disarmed, func() {}); !errors.Is(err, ErrCommissioning) {
+			t.Fatalf("error %v, want the step's ErrCommissioning", err)
+		}
+	})
+}
+
 // TestFlowReconnectAbort (review II, R2-P0-rv-C02): the caller's context
 // ending in the Reconnect step — the flow's longest wait — is the abort
 // it is in any other step, although the step wraps the transition's error

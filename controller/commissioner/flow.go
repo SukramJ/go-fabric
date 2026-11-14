@@ -926,11 +926,7 @@ func (f *flow) disarmAfterAbort(ctx context.Context) {
 // at db021da0), and until then the device accepts no new PASE exchange
 // (PaseServer.ts:80-82 at db021da0). With a fail-safe end known — the
 // device answered an ArmFailSafe of the flow's — it is matter.js's
-// #resetFailsafeTimer (:457, :1092-1108), on a context that outlives
-// ctx: matter.js's reset has no abort signal (#resetFailsafeTimer,
-// #invokeCommand), and a step that failed for a reason of its own while
-// ctx ended would otherwise leave the device holding its fail-safe until
-// it expires; the exchange's own response timeout bounds it.
+// #resetFailsafeTimer (:457, :1092-1108).
 //
 // Ahead of matter.js otherwise, which resets only with that end known and
 // only after a CommissioningError or a status error, and rethrows any
@@ -943,16 +939,25 @@ func (f *flow) disarmAfterAbort(ctx context.Context) {
 // next attempt"); matter.js's flow notes that a commissioner restarting
 // from step 2 may expire the fail-safe at once or else waits for it to
 // expire before the device accepts PASE again
-// (ControllerCommissioningFlow.ts:453-456 at db021da0). That disarm is bounded by ctx and the exchange's response
-// timeout, or — ctx having ended — by the flow's own context as after an
-// abort; it is skipped on a closed session.
+// (ControllerCommissioningFlow.ts:453-456 at db021da0). Without the
+// fail-safe end it is skipped on a closed session.
+//
+// Either disarm is bounded as every disarm on a way out is
+// (Commissioner.disarmPASE too): by ctx and the exchange's response
+// timeout while ctx lives, so the caller can still cancel it — matter.js's
+// reset has no abort signal (#resetFailsafeTimer, #invokeCommand), this
+// module's caller has one — and, ctx having ended (a step that failed for
+// a reason of its own while it ended, callerAborted), by the flow's own
+// context as after an abort (disarmAfterAbort), so the device is still
+// asked to give its fail-safe up.
 func (f *flow) disarmAfterFailure(ctx context.Context) {
-	if end, _ := f.failsafeTimes(); !end.IsZero() {
-		f.resetFailsafeTimer(context.WithoutCancel(ctx))
-		return
-	}
 	if ctx.Err() != nil {
-		f.disarmAfterAbort(ctx)
+		own, cancel := context.WithTimeout(context.WithoutCancel(ctx), f.abortDisarm)
+		defer cancel()
+		ctx = own
+	}
+	if end, _ := f.failsafeTimes(); !end.IsZero() {
+		f.resetFailsafeTimer(ctx)
 		return
 	}
 	f.disarmIfMayBeArmed(ctx)

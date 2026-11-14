@@ -366,7 +366,9 @@ A commissioning that fails for any other reason after the PASE session
 was established — the device's terms not acknowledged, its attestation
 refused, a refused or unanswered command, a node id claim lost to
 another candidate — disarms the same way, bounded by the caller's
-context and the exchange's response timeout: the device ends its PASE
+context and the exchange's response timeout, so cancelling the context
+ends the disarm too, or, when that context has already ended, by the
+same 10 s as after an abort: the device ends its PASE
 session with the fail-safe, and while that session exists it accepts no
 new PASE, so without the disarm the next `Pair` would be refused until
 the fail-safe ran out. matter.js disarms only after an ArmFailSafe of
