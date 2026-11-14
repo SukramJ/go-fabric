@@ -4650,14 +4650,14 @@ matter.js builds `GroupcastServer` with any feature subset and its tests
 run a Listener-only and an IANA-only root (`GroupcastServerTest.ts:48-61`
 at `db021da0`);
 its own RootEndpoint installs Listener, Sender and PerGroup
-(`GroupcastServer.ts:82-84`: Listener and Sender meet the Root Node
+(`GroupcastServer.ts:82-84` at `db021da0`: Listener and Sender meet the Root Node
 GroupcastListenerCond and GroupcastSenderCond of Matter 1.6.1, PerGroup
 keeps the groups the Groups cluster created on their per-group address).
 The Go `cluster/core` Groupcast server has that one feature set: the
 module serves root nodes, where the conditions make Listener and Sender
 mandatory together, so a Listener-only server is a test configuration
 without a device. The matter.js case "removes a group a wildcard request
-empties without the Sender feature" (`GroupcastServerTest.ts:368-414`,
+empties without the Sender feature" (`GroupcastServerTest.ts:368-414` at `db021da0`,
 the loop's second title) stays `missing` in the register with this entry
 as its reason. A host-selectable feature set is milestone 4's node
 options, with the other feature selections.
