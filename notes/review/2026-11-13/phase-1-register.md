@@ -369,3 +369,24 @@ puts the alternative to the owner: keep an uncommitted fabric in memory
 until CommissioningComplete, as both references do, instead of writing it
 at once and rolling it back from a marker.
 
+## Found by CI on the pull request (coordinator, 2026-11-14)
+
+| ID | sev | disposition | where |
+| --- | --- | --- | --- |
+| R2-P1-ci-01 | medium | fixed `224a9495` | `controller/commissioner/network.go` `decodeNetworks`: the commissioner refused a device whose Networks holds an entry with an empty NetworkID ("octet string length 0 outside 1..32"); a reported Networks value is now decoded by its shape, as matter.js decodes a data report. Red and green: `TestDecodeNetworksReadsAReportedValueByShape` |
+
+Measured: `CAMERA-GO-1.1` step 2 failed with that text in the job
+"chip-tool commissions the reference daemon" at `5a5ad671` (run
+43535654108) and passed at `9b4b7886` (run 43493734634) with the same
+harness image (`d683bf5bbca6`) and the same runner image version; phase 1
+changed neither `controller/commissioner/` nor `cluster/spec/`
+(`git log e1f18a2e..5a5ad671` for both is empty). At the pin, chip's Linux
+Ethernet driver reports one connected entry whose NetworkID is the name of
+the first interface it classifies as Ethernet, and an empty one when it
+finds none (`src/platform/Linux/NetworkCommissioningEthernetDriver.cpp:39-46`,
+`NetworkCommissioningDriver.h:210-232`, `ConnectivityUtils.cpp:619-648`
+at `6170af84`). Not measured: why the camera app found no such interface
+on that runner and one on the other — the runner's interfaces are in
+neither log. The local container skips CAMERA-GO, so the leg runs in CI
+only. The wider gap — the other reported values the controller holds to
+their constraints — is `F-db021da0-15`, phase 4.

@@ -796,6 +796,29 @@ with a port of the named case.
   relies on is not known. Fix: the teardown before the two refusals, as
   the lines have it, with a parity case — or a `by_design` row. Found in
   review II, phase 1 (the citation pass).
+- **F-db021da0-15: the controller holds reported values to their
+  constraints, and fails on a malformed one, where matter.js decodes by
+  shape and skips.** matter.js decodes each attribute of a data report
+  with `decodeTlv` (`InputChunk.ts:299-303` at `db021da0`), which does
+  not validate (`TlvSchema.ts:64-66`): an octet string is read at any
+  length (`TlvString.ts:57-71`), a missing mandatory field is left unset
+  (`TlvObject.ts:236-250`); an entry that does not decode is logged and
+  skipped, and the read goes on (`InputChunk.ts:312-320`). The
+  commissioner decodes reported values with the generated decoders, which
+  check constraints, and returns `errUnexpectedResponse` for one that
+  fails: BasicCommissioningInfo (`controller/commissioner/flow.go:750`),
+  the JCM reads of Fabrics, NOCs and TrustedRootCertificates
+  (`jcm.go:162`, `:186`, `:217`), and — until `224a9495` — Networks,
+  which failed the commissioning of a chip Linux app that reports an
+  empty NetworkID (R2-P1-ci-01, fixed for Networks alone, where a value
+  of the wrong shape is still an error rather than a skipped entry). How
+  matter.js decodes a command response was not read (unverified), and no
+  device is known that reports the other values outside their
+  constraints. Fix: one decoder for a reported value in the controller —
+  `spec.DecodeValue`, which checks no constraint, or a shape-only mode of
+  the generated decoders — and the skip-and-continue rule, each with a
+  parity case; phase 4. Found by CAMERA-GO-1.1 on a CI runner of pull
+  request 525.
 
 ## Tier 3 — LOW
 

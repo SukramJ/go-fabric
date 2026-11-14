@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8263,
+  "entry_points": 8264,
   "entry_packages": [
     ".",
     "bdx",
@@ -286,9 +286,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18181,
+    "total_exported": 18182,
     "reachable": 12437,
-    "whitelisted": 5744,
+    "whitelisted": 5745,
     "unreachable": 0
   },
   "by_package": [],
@@ -26382,6 +26382,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
       "line": 805
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestDecodeNetworksReadsAReportedValueByShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 565
     },
     {
       "package": "controller/commissioner",
