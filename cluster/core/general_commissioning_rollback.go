@@ -29,8 +29,11 @@ type expiryRollbackKey struct{}
 
 // trackRollbackLocked records hook as a rollback in flight and returns it
 // wrapped: it runs with a marked context and ends the record when it
-// returns. A nil hook is nothing to wait for. Caller holds g.mu.
-func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context, fabricIndex uint8)) func(ctx context.Context, fabricIndex uint8) {
+// returns, counting what it ended — the PASE sessions when
+// onFailSafeRolledBack is wired, and windowFabric when the window's
+// AddNOC added it (failSafeFabricAdded). A nil hook is nothing to wait
+// for. Caller holds g.mu.
+func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context, fabricIndex uint8), windowFabric uint8) func(ctx context.Context, fabricIndex uint8) {
 	if hook == nil {
 		return nil
 	}
@@ -38,9 +41,23 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context
 		g.expiryRollbacksDone = make(chan struct{})
 	}
 	g.expiryRollbacks++
+	pasesClosed := g.onFailSafeRolledBack != nil
+	var removed uint8
+	if g.failSafeFabricAdded {
+		removed = windowFabric
+	}
 	return func(ctx context.Context, fabricIndex uint8) {
 		defer func() {
 			g.mu.Lock()
+			if pasesClosed {
+				g.rollbackPaseCloses++
+			}
+			if removed != 0 {
+				if g.rollbackFabricRemovals == nil {
+					g.rollbackFabricRemovals = map[uint8]uint64{}
+				}
+				g.rollbackFabricRemovals[removed]++
+			}
 			g.expiryRollbacks--
 			if g.expiryRollbacks == 0 {
 				close(g.expiryRollbacksDone)
@@ -87,14 +104,22 @@ func (s settledExpiry) endedSession(sessFabric uint8) bool {
 var errGencommArmRolledBack = errors.New("core: GeneralCommissioning: the fail-safe this arm found had expired, and its rollback ended the arming session")
 
 // settleArmLocked is settleExpiryLocked for an arm from sessFabric's
-// session: errGencommArmRolledBack when the rollback it ran itself ended
-// that session. Caller holds g.mu, as for settleExpiryLocked.
+// session: errGencommArmRolledBack when a rollback it settled ended that
+// session — one it ran itself over a due window, or one in flight on
+// another goroutine that it waited for (review II, R2-P1-rw-05). A
+// rollback that finishes while the arm waits ran its PASE close or its
+// fabric removal after the arm's session existed. Caller holds g.mu, as
+// for settleExpiryLocked.
 func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric uint8) error {
+	paseCloses, removals := g.rollbackPaseCloses, g.rollbackFabricRemovals[sessFabric]
 	settled, err := g.settleExpiryLocked(ctx)
 	if err != nil {
 		return err
 	}
 	if settled.endedSession(sessFabric) {
+		return errGencommArmRolledBack
+	}
+	if (sessFabric == 0 && g.rollbackPaseCloses != paseCloses) || (sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals) {
 		return errGencommArmRolledBack
 	}
 	return nil

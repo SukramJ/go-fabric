@@ -76,6 +76,13 @@ type GeneralCommissioning struct {
 	// (general_commissioning_rollback.go).
 	expiryRollbacks     int
 	expiryRollbacksDone chan struct{}
+	// rollbackPaseCloses and rollbackFabricRemovals count the finished
+	// expiry hooks by what they ended: every PASE session (the hook ran
+	// onFailSafeRolledBack), or the fabric the window's AddNOC added. An
+	// arm compares them across its settle to learn whether a rollback it
+	// waited for ended its own session (review II, R2-P1-rw-05).
+	rollbackPaseCloses     uint64
+	rollbackFabricRemovals map[uint8]uint64
 
 	// Cumulative FailSafe tracking: once the cumulative cap is hit the
 	// bridge must refuse further ArmFailSafe calls with BusyWithOtherAdmin.
@@ -644,8 +651,9 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 
 	// An arm judges the state an expired fail-safe's rollback left, never
 	// the state before it (core2 item 1b). A disarm does not wait: it is
-	// what a rollback itself may run. An arm whose own session the
-	// rollback it ran itself ended arms nothing (settledExpiry.endedSession).
+	// what a rollback itself may run. An arm whose own session a rollback
+	// it settled ended — one it ran or one it waited for — arms nothing
+	// (settleArmLocked).
 	//
 	// sessFabric is the requesting fabric (0 == PASE / commissioning
 	// session). It gates the fail-safe ownership rules below.
@@ -731,7 +739,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// timeout path in watchFailSafeExpiry.
 		var hook func(ctx context.Context, fabricIndex uint8)
 		if wasArmed {
-			hook = g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
+			hook = g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), expiredFabric)
 		}
 		g.mu.Unlock()
 		unlocked = true
@@ -916,7 +924,7 @@ func (g *GeneralCommissioning) expireLocked(fabricIndex uint8) func(ctx context.
 	// As the disarm, ExpireFailSafe and ArmFailSafeFor(0) paths do:
 	// the expiry changed the cluster (review II, R2-P1-core-02).
 	g.dataVersion.Bump()
-	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), g.failSafeFabricIndex)
 	return func(ctx context.Context) {
 		if termsReverted {
 			g.changes.Notify(gencommTCAttrs...)
@@ -1102,7 +1110,8 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 
 // armFailSafeFor is ArmFailSafeFor; forSession says the arm is made for a
 // session that exists now (the PASE auto-arm), whose fabricIndex the
-// rollback of a due window may end — then nothing is armed. An arm for a
+// rollback of a due window, or one in flight it waits for, may end — then
+// nothing is armed. An arm for a
 // session to come (OpenCommissioningWindow's) arms either way.
 func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8, forSession bool) error {
 	if seconds == 0 {
@@ -1206,7 +1215,7 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 	g.breadcrumb = 0
 	termsReverted := g.revertTermsLocked()
 	g.dataVersion.Bump()
-	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked())
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), fabric)
 	g.mu.Unlock()
 	if termsReverted {
 		g.changes.Notify(gencommTCAttrs...)
