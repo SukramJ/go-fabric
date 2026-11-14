@@ -10494,11 +10494,6 @@
       "reason": "The asynchronous MockServerNode lifecycle has no unit-level counterpart; the PartsList lifecycle is ported in the DescriptorServer tests the register names."
     },
     {
-      "test": "cluster/core:TestParityOpcreds_PendingRootAppearsInTrustedRoots",
-      "source": "chip operational-credentials-server.cpp",
-      "reason": "Needs a valid RCAC TLV fixture from a test-key generator to drive AddTrustedRootCertificate."
-    },
-    {
       "test": "im/subscription:TestHandlerParity_SKIP_SendAlreadyInProgress_Deferred",
       "source": "matter.js packages/node/src/node/server/ServerSubscription.ts:429-437",
       "reason": "The engine's Tick is synchronous and holds no in-flight send state; concurrent sends are exercised by the engine's race test."
