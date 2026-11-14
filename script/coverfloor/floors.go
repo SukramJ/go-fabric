@@ -365,7 +365,10 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},
-	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 95},
+	// transport/tcp measures 94.7 % or 95.7 % from run to run (five and one
+	// of six runs after review II's phase 3; an accept path that depends on
+	// timing): 93 holds both under the floor's three-point rule.
+	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/udp", min: 93},
 	// ADR 0013: the cluster-definition runtime, its test support, the
 	// generator, the first server built on it, and the committed generated
