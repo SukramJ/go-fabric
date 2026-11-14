@@ -234,6 +234,17 @@ var (
 //
 // Concrete (non-wildcard) reads return exactly one ReadResult.
 //
+// A status answers a fully concrete request path only (review II,
+// R2-P4-imread-02, -03): a path naming no endpoint returns what exists
+// and nothing else — an endpoint lacking the cluster or the attribute is
+// skipped, an empty node answers nothing. A path naming an endpoint keeps
+// its statuses here (UnsupportedEndpoint, UnsupportedCluster, an
+// attribute whose read fails): node.Node.ReadCluster reports
+// them to the host. On the wire [im.AttributeExpansion] hands out a
+// status for a fully concrete path alone, as matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at
+// db021da0 does (addWildcard :88-94 answers no status).
+//
 // ctx carries the FabricFiltered flag + FabricIndex via
 // [im.WithFabricFilter] / [im.FabricFilterFromContext]. Cluster servers
 // that implement [contract.FabricScopedReader] receive MatterReadFiltered
@@ -244,10 +255,13 @@ var (
 // (:306-326 at 862ad75f).
 func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttributePath) []im.ReadResult {
 	endpoints := d.resolveEndpoints(path)
+	wildcardEndpoint := !path.HasEndpoint
 	if len(endpoints) == 0 {
+		if wildcardEndpoint {
+			return nil
+		}
 		return []im.ReadResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
 	}
-	wildcardEndpoint := !path.HasEndpoint
 	var results []im.ReadResult
 	for _, ep := range endpoints {
 		results = d.readAt(ctx, ep, path, wildcardEndpoint, results)
@@ -281,7 +295,8 @@ func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.Concret
 // readAt appends to results what path reads at ep: one result per
 // attribute of each matching cluster server. A concrete endpoint lacking
 // the cluster answers UnsupportedCluster; under a wildcard endpoint it is
-// skipped.
+// skipped, and so is an attribute whose read does not succeed
+// (AttributeReadResponse.ts:386-387, :418-423 at db021da0).
 func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
 	ePath := path
 	ePath.Endpoint = ep.ID
@@ -312,7 +327,11 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 			aPath := cPath
 			aPath.Attribute = attrID
 			aPath.HasAttribute = true
-			results = append(results, readOne(ctx, ep, srv, aPath))
+			res := readOne(ctx, ep, srv, aPath)
+			if wildcardEndpoint && res.Status != im.StatusSuccess {
+				continue
+			}
+			results = append(results, res)
 		}
 	}
 	return results

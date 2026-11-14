@@ -174,3 +174,41 @@ func TestAttributeExpansionLeavesTheDispatchersSlice(t *testing.T) {
 		}
 	}
 }
+
+// TestAttributeExpansionStatusOnlyForConcretePath (review II,
+// R2-P4-imread-02, -03): whatever a dispatcher answers, the expansion hands
+// out a status only for a fully concrete request path; a path with a
+// wildcard yields its successful results alone. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at db021da0:
+// addStatus (:489) is reached from addConcrete and #authorize only, a
+// wildcard path (:88-94) skips what does not exist (:190-191, :341,
+// :386-387).
+func TestAttributeExpansionStatusOnlyForConcretePath(t *testing.T) {
+	t.Parallel()
+	at := func(attr uint32) ConcreteAttributePath {
+		return ConcreteAttributePath{Endpoint: 3, Cluster: 6, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	d := &retainedDispatcher{results: []ReadResult{
+		{Path: at(1), Status: StatusUnsupportedAttribute},
+		{Path: at(2), Value: AttributeValue{Value: true}, Status: StatusSuccess},
+	}}
+	for _, tc := range []struct {
+		name string
+		path ConcreteAttributePath
+		want []ReadResult
+	}{
+		{"wildcard attribute", ConcreteAttributePath{Endpoint: 3, Cluster: 6, HasEndpoint: true, HasCluster: true}, d.results[1:]},
+		{"wildcard endpoint", ConcreteAttributePath{Cluster: 6, Attribute: 1, HasCluster: true, HasAttribute: true}, d.results[1:]},
+		{"wildcard cluster", ConcreteAttributePath{Endpoint: 3, Attribute: 1, HasEndpoint: true, HasAttribute: true}, d.results[1:]},
+		{"concrete", at(1), d.results},
+	} {
+		var got []ReadResult
+		e := NewAttributeExpansion(context.Background(), d, []ConcreteAttributePath{tc.path})
+		for _, r, ok := e.Next(); ok; _, r, ok = e.Next() {
+			got = append(got, r)
+		}
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: results %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+}

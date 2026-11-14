@@ -41,6 +41,18 @@ type EndpointExpander interface {
 // carries this node's id ([WithLocalNodeID]), a path naming another node
 // selects nothing, or, a concrete one, yields one UnsupportedNode result.
 //
+// A status answers only a fully concrete request path (endpoint, cluster
+// and attribute named): a result that is not Success is handed out for
+// such a path alone, whatever the [Dispatcher] returned — a path with a
+// wildcard yields what exists and nothing else (review II,
+// R2-P4-imread-02, -03). Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at
+// db021da0: a path missing an endpoint, cluster or attribute goes to
+// addWildcard (:88-94), which installs nothing for a named endpoint the
+// node lacks (:190-191) and skips a named cluster (:341) or attribute
+// (:386-387) that is absent; addStatus (:489) is reached from addConcrete
+// and #authorize only.
+//
 // Mirrors matter.js packages/protocol/src/action/server/
 // AttributeReadResponse.ts at db021da0: *process (:64) registers one
 // producer per request path (:88-94) and runs them in request order
@@ -101,6 +113,9 @@ func (e *AttributeExpansion) Next() (requested ConcreteAttributePath, result Rea
 			// it (review II, R2-P2-dr-req-04).
 			r := e.batch[e.pos]
 			e.pos++
+			if r.Status != StatusSuccess && !isConcreteAttributePath(e.path) {
+				continue
+			}
 			if e.flags != 0 && wildcardPathSkipped(r.Path, e.flags, e.qualities) {
 				continue
 			}
@@ -144,8 +159,8 @@ func (e *AttributeExpansion) fill() bool {
 		}
 		e.flags = effectiveWildcardPathFlags(e.ctx, e.d, e.path)
 		if !e.path.HasEndpoint && e.expander != nil {
-			// No endpoint to visit: Read answers the path whole (an
-			// empty node's UnsupportedEndpoint).
+			// No endpoint to visit: Read answers the path whole (a status
+			// it returns is not handed out: the path is a wildcard).
 			if eps := e.expander.ExpansionEndpoints(e.path); len(eps) > 0 {
 				if e.ascending {
 					eps = slices.Clone(eps)
@@ -158,6 +173,12 @@ func (e *AttributeExpansion) fill() bool {
 		e.setBatch(e.d.Read(e.ctx, e.path))
 		return true
 	}
+}
+
+// isConcreteAttributePath reports whether p names an endpoint, a cluster
+// and an attribute.
+func isConcreteAttributePath(p ConcreteAttributePath) bool {
+	return p.HasEndpoint && p.HasCluster && p.HasAttribute
 }
 
 // setBatch makes results the batch Next hands out. Under Ascending an

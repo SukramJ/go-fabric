@@ -79,9 +79,10 @@ func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attr
 // the global attributes among them, in the order a controller's wildcard
 // read reports them, each as [Node.ReadAttribute] returns it — an
 // attribute whose read fails among them, with its Status and a nil Value,
-// as the wildcard read reports a status for its path. An endpoint or
-// cluster the node does not serve is a [contract.StatusError]; before
-// [Node.Start] it is [ErrNotStarted].
+// which a controller's wildcard read leaves out (it answers a status for a
+// fully concrete path only). An endpoint or cluster the node does not
+// serve is a [contract.StatusError]; before [Node.Start] it is
+// [ErrNotStarted].
 func (n *Node) ReadCluster(ctx context.Context, endpoint uint16, cluster uint32) ([]AttributeValue, error) {
 	results, err := n.readServed(ctx, im.ConcreteAttributePath{
 		Endpoint: endpoint, Cluster: cluster, HasEndpoint: true, HasCluster: true,
