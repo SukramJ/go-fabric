@@ -104,7 +104,8 @@ func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]u
 		s.cmd.Lock()
 		defer s.cmd.Unlock()
 	}
-	if current, known := s.src.CurrentLevel(); known && current == level {
+	before := s.levelNow()
+	if before.known && before.level == level {
 		return
 	}
 	if s.engine != nil {
@@ -115,7 +116,7 @@ func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]u
 		}
 		if err := s.transition(ctx, float64(level), 0, rateFrom, false, OptionExecuteIfOff); err == nil {
 			s.invalidateScenes()
-			s.tracker().Bump()
+			s.bumpIfMoved(before)
 		}
 		return
 	}
@@ -132,5 +133,5 @@ func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]u
 	}
 	s.observeLevel(contract.OriginCommand)
 	s.invalidateScenes()
-	s.tracker().Bump()
+	s.bumpIfMoved(before)
 }

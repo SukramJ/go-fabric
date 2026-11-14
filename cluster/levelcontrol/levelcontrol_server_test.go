@@ -57,6 +57,7 @@ func (h *fakeHost) SetOptions(_ context.Context, options lvldef.OptionsBitmap) e
 		return h.setErr
 	}
 	h.optionSets = append(h.optionSets, uint8(options))
+	h.options = uint8(options)
 	return nil
 }
 
@@ -336,8 +337,11 @@ func TestEveryCommandReachesThePort(t *testing.T) {
 			if !reflect.DeepEqual(host.calls, []string{tc.want}) {
 				t.Errorf("port saw %v, want [%s]", host.calls, tc.want)
 			}
-			if got := srv.MatterDataVersion(); got == before {
-				t.Errorf("DataVersion stayed %d across an accepted %s", got, tc.want)
+			// The port recorded the command and moved nothing: no
+			// attribute changed, so the DataVersion stays
+			// (TestDataVersionAdvancesOnlyOnAChange).
+			if got := srv.MatterDataVersion(); got != before {
+				t.Errorf("DataVersion %d -> %d across an accepted %s that changed nothing", before, got, tc.want)
 			}
 		})
 	}
@@ -581,13 +585,12 @@ func TestWritesReachThePort(t *testing.T) {
 		host := observedHost()
 		srv := levelcontrol.NewServer(levelcontrol.Config{Source: host})
 		before := srv.MatterDataVersion()
-		if err := srv.MatterWrite(
-			context.Background(), levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff),
-		); err != nil {
+		// The host starts with ExecuteIfOff; the write clears it.
+		if err := srv.MatterWrite(context.Background(), levelcontrol.AttrOptions, uint64(0)); err != nil {
 			t.Fatalf("MatterWrite(Options): %v", err)
 		}
-		if !reflect.DeepEqual(host.optionSets, []uint8{levelcontrol.OptionExecuteIfOff}) {
-			t.Errorf("port saw %v, want [%d]", host.optionSets, levelcontrol.OptionExecuteIfOff)
+		if !reflect.DeepEqual(host.optionSets, []uint8{0}) {
+			t.Errorf("port saw %v, want [0]", host.optionSets)
 		}
 		if srv.MatterDataVersion() == before {
 			t.Error("DataVersion stayed put across an accepted Options write")
@@ -819,3 +822,67 @@ func TestSurfaceLists(t *testing.T) {
 		t.Errorf("Revision() = %d, want the snapshot's %d", got, schema.ClusterRevisions[levelcontrol.ClusterID])
 	}
 }
+
+// TestDataVersionAdvancesOnlyOnAChange holds the cluster's DataVersion to
+// matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+// at db021da0 (a commit advances the version only `if (changes)`) and
+// :1476-1480 (#noteIfChanged notes no change for an equal value): a
+// command or a write that changes no attribute leaves the version, one
+// that changes an attribute advances it.
+func TestDataVersionAdvancesOnlyOnAChange(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	lvl := uint8(100)
+	srv, err := levelcontrol.New(levelcontrol.HeldConfig{
+		Features: levelcontrol.FeatureOnOff | levelcontrol.FeatureLighting, CurrentLevel: &lvl,
+		OnOff: offSwitch{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged := func(what string, act func() error) {
+		t.Helper()
+		before := srv.MatterDataVersion()
+		if err := act(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if got := srv.MatterDataVersion(); got != before {
+			t.Errorf("%s changed nothing but advanced the DataVersion %d -> %d", what, before, got)
+		}
+	}
+	advanced := func(what string, act func() error) {
+		t.Helper()
+		before := srv.MatterDataVersion()
+		if err := act(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if srv.MatterDataVersion() == before {
+			t.Errorf("%s changed an attribute but left the DataVersion", what)
+		}
+	}
+	invoke := func(cmd uint32, fields any) func() error {
+		return func() error { _, err := srv.MatterInvoke(ctx, cmd, fields); return err }
+	}
+	write := func(attr uint32, v any) func() error {
+		return func() error { return srv.MatterWrite(ctx, attr, v) }
+	}
+	unchanged("MoveToLevel the ExecuteIfOff gate refused", invoke(levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200}))
+	unchanged("Stop the ExecuteIfOff gate refused", invoke(levelcontrol.CmdStop, wire.StopRequest{}))
+	execute := wire.MoveToLevelRequest{Level: 100, OptionsMask: levelcontrol.OptionExecuteIfOff, OptionsOverride: levelcontrol.OptionExecuteIfOff}
+	unchanged("MoveToLevel to the current level", invoke(levelcontrol.CmdMoveToLevel, execute))
+	execute.Level = 150
+	advanced("MoveToLevel to a new level", invoke(levelcontrol.CmdMoveToLevel, execute))
+
+	advanced("an Options write of a new value", write(levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff)))
+	unchanged("an Options write of the same value", write(levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff)))
+	advanced("an OnLevel write of a new value", write(levelcontrol.AttrOnLevel, uint64(64)))
+	unchanged("an OnLevel write of the same value", write(levelcontrol.AttrOnLevel, uint64(64)))
+	advanced("a StartUpCurrentLevel write of a new value", write(levelcontrol.AttrStartUpCurrentLevel, uint64(20)))
+	unchanged("a StartUpCurrentLevel write of the same value", write(levelcontrol.AttrStartUpCurrentLevel, uint64(20)))
+}
+
+// offSwitch is an On/Off cluster that stays off.
+type offSwitch struct{}
+
+func (offSwitch) OnOff() bool                          { return false }
+func (offSwitch) SetOnOff(context.Context, bool) error { return nil }
