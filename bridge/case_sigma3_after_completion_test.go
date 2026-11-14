@@ -37,8 +37,11 @@ type completedCase struct {
 	controller *pipelinePeer
 	sigma1     []byte
 	sigma3     []byte
-	ring       *diagevent.Ring
-	sessions   *atomic.Int32
+	// report is the message counter of the success report that answered
+	// the completing Sigma3.
+	report   uint32
+	ring     *diagevent.Ring
+	sessions *atomic.Int32
 }
 
 // completeCASE runs one CASE handshake to completion, through a
@@ -95,7 +98,7 @@ func completeCASE(t *testing.T, clk clock.Clock, viaProvider bool) *completedCas
 	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &counter); err != nil {
 		t.Fatal(err)
 	}
-	c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the report on Sigma3")
+	c.report = c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the report on Sigma3")
 	if got := c.route(t); got != c.controller.conn.LocalAddr().String() {
 		t.Fatalf("the established session's route is %s, want the controller's %s", got, c.controller.conn.LocalAddr())
 	}
@@ -134,15 +137,16 @@ func (c *completedCase) otherPeer(t *testing.T) *pipelinePeer {
 	return p
 }
 
-// expectReport reads the StatusReport p receives and checks its general
-// status.
-func (c *completedCase) expectReport(t *testing.T, p *pipelinePeer, want uint16, what string) {
+// expectReport reads the StatusReport p receives, checks its general
+// status and returns its message counter.
+func (c *completedCase) expectReport(t *testing.T, p *pipelinePeer, want uint16, what string) uint32 {
 	t.Helper()
-	report, _, _ := p.recv(mrp.SCOpcodeStatusReport, what)
+	report, counter, _ := p.recv(mrp.SCOpcodeStatusReport, what)
 	general, _, protocol, ok := decodeStatusReport(report)
 	if !ok || general != want {
 		t.Fatalf("%s: general status %d (protocol %d), want %d", what, general, protocol, want)
 	}
+	return counter
 }
 
 // expectAcknowledgedOnly fails t unless the Sigma3 just sent on the
@@ -468,5 +472,211 @@ func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 				t.Fatalf("the handshake installed %d sessions, want 1", got)
 			}
 		})
+	}
+}
+
+// recordHeld reports whether the router holds a Sigma1 record of the
+// completed handshake's key.
+func (c *completedCase) recordHeld() bool {
+	c.r.b.mu.RLock()
+	defer c.r.b.mu.RUnlock()
+	_, held := c.r.b.sigma1Replied[HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}]
+	return held
+}
+
+// TestSingletonCompletedRecordEndsWithItsSuccessReport: the record of a CASE
+// handshake the singleton handler completed, and the unsecured duplicate
+// window it holds, end when the success report is acknowledged or given up
+// — the retransmission the record serves is over then — and a Sigma3 of the
+// handshake that arrives after is acknowledged and not answered. Through a
+// PerExchangeCaseProvider the record ends with the adapter, at the
+// provider's TTL, as before (review II, R2-P3-rr-dev-01, R2-P4-rr-sec-02).
+// matter.js's CASE server waits for the success report's acknowledgement
+// (packages/protocol/src/session/case/CaseServer.ts:332;
+// packages/protocol/src/protocol/MessageExchange.ts:830, given up at
+// :973-976 and thrown at :840 at db021da0) and then removes the handshake's
+// unsecured session, reception state included
+// (CaseServer.ts:95-98, packages/protocol/src/session/UnsecuredSession.ts:94-102).
+func TestSingletonCompletedRecordEndsWithItsSuccessReport(t *testing.T) {
+	t.Parallel()
+	t.Run("acknowledged, through the singleton handler", func(t *testing.T) {
+		t.Parallel()
+		c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
+		if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.report); err != nil {
+			t.Fatal(err)
+		}
+		if c.recordHeld() {
+			t.Fatal("the completed handshake's record outlived the acknowledgement of its success report")
+		}
+		if got := c.r.b.unsecuredWindows.len(); got != 0 {
+			t.Fatalf("%d unsecured windows held after the success report was acknowledged, want 0", got)
+		}
+		if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+			t.Fatal(err)
+		}
+		c.expectNoReply(t, 0, "the completing Sigma3 after its report was acknowledged")
+	})
+	t.Run("given up, through the singleton handler", func(t *testing.T) {
+		t.Parallel()
+		c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
+		c.r.b.outboundReliable.Tick(c.r.b.clk().Now().Add(unsecuredEntryLifetime), func(net.Addr, []byte) error { return nil })
+		if c.successReportPending() {
+			t.Fatal("the success report is still in retransmission past its lifetime")
+		}
+		if w := c.r.b.acquireUnsecuredWindow(0xFEED, false); w == nil {
+			t.Fatal("a new unsecured source got no window")
+		}
+		if c.recordHeld() {
+			t.Fatal("the completed handshake's record outlived its success report")
+		}
+		if got := c.r.b.unsecuredWindows.len(); got != 1 {
+			t.Fatalf("%d unsecured windows held, want only the new source's", got)
+		}
+	})
+	t.Run("acknowledged, through a provider", func(t *testing.T) {
+		t.Parallel()
+		clk := clocktest.New(time.Unix(1_700_000_000, 0))
+		c := completeCASE(t, clk, true)
+		if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.report); err != nil {
+			t.Fatal(err)
+		}
+		if !c.recordHeld() {
+			t.Fatal("the record of a handshake a provider completed ended before its adapter")
+		}
+		const ttl = 30 * time.Second
+		clk.Advance(ttl + time.Second)
+		c.provider.reapLocked(ttl)
+		if c.recordHeld() {
+			t.Fatal("the completed handshake's record outlived its adapter")
+		}
+		c.r.b.sweepUnsecuredWindows()
+		if got := c.r.b.unsecuredWindows.len(); got != 0 {
+			t.Fatalf("%d unsecured windows held after the adapter went, want 0", got)
+		}
+	})
+}
+
+// TestSingletonCompletedHandshakesHoldNoWindows: more CASE handshakes than
+// [maxUnsecuredWindows], each completed through one singleton CaseAdapter
+// and its success report acknowledged, leave no record and no unsecured
+// window behind, so a new unsecured source still gets its duplicate window
+// (review II, R2-P4-rr-sec-02).
+func TestSingletonCompletedHandshakesHoldNoWindows(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	root, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPub := elliptic.Marshal(elliptic.P256(), root.X, root.Y) //nolint:staticcheck // the uncompressed point the CASE destination id hashes
+	ipk := newCaseTestIPK(t)
+	ours := newCaseTestIdentity(t, 0xBBBB, 1, ipk)
+	responder := sigma.NewResponder(ours, caseTestVerifier{}, completedCaseSessionID)
+	responder.SetIdentityResolver(oneFabricResolver{ours: ours, rootPub: rootPub})
+	a := NewCaseAdapter(responder)
+	established := 0
+	a.SetOnSessionEstablished(func(sigma.SessionKeys, uint16) error { established++; return nil })
+	r.b.AttachCaseHandler(a)
+	peerID := newCaseTestIdentity(t, 0xAAAA, 1, ipk)
+	n := maxUnsecuredWindows + 4
+	for i := range n {
+		p := newPipelinePeer(t, r.b, uint64(0x9000+i))
+		ini, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+			Identity: peerID, Verifier: caseTestVerifier{},
+			SessionID: uint16(0x1002 + i), PeerNodeID: 0xBBBB, RootPublicKey: rootPub,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s1, err := ini.GenerateSigma1()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := p.send(mrp.SCOpcodeSigma1, 0x0300, s1, nil); err != nil {
+			t.Fatalf("handshake %d, Sigma1: %v", i, err)
+		}
+		s2, c2, _ := p.recv(mrp.SCOpcodeSigma2, "Sigma2")
+		s3, err := ini.ProcessSigma2Bytes(s2)
+		if err != nil {
+			t.Fatalf("handshake %d: %v", i, err)
+		}
+		if err := p.send(mrp.SCOpcodeSigma3, 0x0300, s3, &c2); err != nil {
+			t.Fatal(err)
+		}
+		report, c3, _ := p.recv(mrp.SCOpcodeStatusReport, "the report on Sigma3")
+		if g, _, _, ok := decodeStatusReport(report); !ok || g != mrp.SCStatusGeneralSuccess {
+			t.Fatalf("handshake %d: report general status %d", i, g)
+		}
+		if err := p.send(mrp.StandaloneAckOpcode, 0x0300, nil, &c3); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if established != n {
+		t.Fatalf("%d handshakes established a session, want %d", established, n)
+	}
+	r.b.mu.RLock()
+	records := len(r.b.sigma1Replied)
+	r.b.mu.RUnlock()
+	if records != 0 || r.b.unsecuredWindows.len() != 0 {
+		t.Fatalf("%d completed handshakes with acknowledged reports left %d records and %d unsecured windows, want none", n, records, r.b.unsecuredWindows.len())
+	}
+	if w := r.b.acquireUnsecuredWindow(0xFEED, false); w == nil {
+		t.Fatal("a new unsecured source got no window")
+	}
+}
+
+// TestAttachCaseHandlerEndsTheReplacedHandlersHandshakes: a CASE handshake
+// the singleton handler began and did not complete ends when
+// AttachCaseHandler replaces that handler: its Sigma2 is no longer
+// retransmitted, and its Sigma3 is acknowledged and not answered, as one no
+// Sigma1 began, instead of reaching a handler that never saw its Sigma1
+// (review II, R2-P4-rr-sec-02).
+func TestAttachCaseHandlerEndsTheReplacedHandlersHandshakes(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	root, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPub := elliptic.Marshal(elliptic.P256(), root.X, root.Y) //nolint:staticcheck // the uncompressed point the CASE destination id hashes
+	ipk := newCaseTestIPK(t)
+	ours := newCaseTestIdentity(t, 0xBBBB, 1, ipk)
+	responder := sigma.NewResponder(ours, caseTestVerifier{}, completedCaseSessionID)
+	responder.SetIdentityResolver(oneFabricResolver{ours: ours, rootPub: rootPub})
+	r.b.AttachCaseHandler(NewCaseAdapter(responder))
+	p := newPipelinePeer(t, r.b, completedCaseInitiator)
+	ini, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+		Identity: newCaseTestIdentity(t, 0xAAAA, 1, ipk), Verifier: caseTestVerifier{},
+		SessionID: 0x1002, PeerNodeID: 0xBBBB, RootPublicKey: rootPub,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s1, err := ini.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.send(mrp.SCOpcodeSigma1, completedCaseExchange, s1, nil); err != nil {
+		t.Fatal(err)
+	}
+	s2, c2, _ := p.recv(mrp.SCOpcodeSigma2, "Sigma2")
+	s3, err := ini.ProcessSigma2Bytes(s2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replacement := &recordingCaseHandler{}
+	r.b.AttachCaseHandler(replacement)
+	if got := pendingOnUnsecuredExchange(r.b, completedCaseExchange); got != 0 {
+		t.Fatalf("%d replies of the replaced handler's handshake wait for an acknowledgement, want 0", got)
+	}
+	if err := p.send(mrp.SCOpcodeSigma3, completedCaseExchange, s3, &c2); err != nil {
+		t.Fatal(err)
+	}
+	if got := replacement.sigma3Calls.Load(); got != 0 {
+		t.Fatalf("the replacing handler was handed %d Sigma3s of a handshake it never began", got)
+	}
+	if !r.b.ackTracker.Owes(0, completedCaseExchange, false) {
+		t.Fatal("the Sigma3 was answered: no acknowledgement owed")
 	}
 }

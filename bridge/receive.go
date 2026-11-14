@@ -538,16 +538,19 @@ func (b *Bridge) sweepUnsecuredWindows() {
 // handshake key names on the unsecured session — that initiator's, on that
 // exchange: a reply that waits for its acknowledgement, the
 // single-active-PASE claim within [pasePairingTimeout], or the CASE
-// responder's Sigma1 record that ends with Sigma3 or the host's reaper
-// ([Bridge.ForgetSigma1Replied]).
+// responder's Sigma1 record that ends with a failed Sigma3, the host's
+// reaper ([Bridge.ForgetSigma1Replied]) or — for a handshake the singleton
+// handler completed — its success report ([Bridge.sigma1RecordHeld]).
 func (b *Bridge) unsecuredExchangeLive(key HandshakeKey) bool {
+	if b.sigma1RecordHeld(key) {
+		return true
+	}
 	b.mu.RLock()
 	tracker := b.outboundReliable
-	_, sigma1 := b.sigma1Replied[key]
 	pase := !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
 		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
 	b.mu.RUnlock()
-	if sigma1 || pase {
+	if pase {
 		return true
 	}
 	return tracker != nil && tracker.holdsUnsecuredExchange(key)

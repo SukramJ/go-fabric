@@ -358,21 +358,37 @@ func (b *Bridge) dropHandshakeNotBegun(src net.Addr, proto message.ProtocolHeade
 }
 
 // AttachCaseHandler wires the CASE port. Pass nil to revert to noop. The
-// records of the handshakes the handler it replaces completed end with it
-// ([Bridge.sigma3Handled]).
+// records of the handshakes the handler it replaces began end with it
+// ([Bridge.sigma3Handled]): a completed one's success report is still
+// retransmitted until it is acknowledged; one that did not complete ends as
+// an evicted one does ([Bridge.boundSigma1Records]) — its Sigma2 is no
+// longer retransmitted, and its Sigma3 is acknowledged and not answered, as
+// one no Sigma1 began, instead of reaching a handler that never saw its
+// Sigma1 (review II, R2-P4-rr-sec-02).
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
+	var unfinished []HandshakeKey
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	for key, rec := range b.sigma1Replied {
-		if rec.completed != nil && rec.completed.bySingleton {
+		switch {
+		case rec.completed != nil:
+			if rec.completed.bySingleton {
+				delete(b.sigma1Replied, key)
+			}
+		case rec.bySingleton:
 			delete(b.sigma1Replied, key)
+			unfinished = append(unfinished, key)
 		}
 	}
 	if h == nil {
 		b.caseHandler = noopCaseHandler{}
-		return
+	} else {
+		b.caseHandler = h
 	}
-	b.caseHandler = h
+	b.mu.Unlock()
+	for _, key := range unfinished {
+		b.releaseCASEHandshakeEverywhere(key)
+		b.abandonHandshakeReplies(key)
+	}
 }
 
 // AttachAckHandler wires the MRP-ack port. Pass nil to revert to noop.
@@ -1325,13 +1341,22 @@ func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) (replay, ove
 	return false, false
 }
 
-// replaceCompletedSigma1Record makes the record of a Sigma1 that began a
-// handshake on the key of a completed one ([Bridge.markSigma1Replied]).
-func (b *Bridge) replaceCompletedSigma1Record(key HandshakeKey, hash [32]byte) {
+// sigma1BeganHandshake follows a Sigma1 of hash that began a handshake on
+// key: on the key of a completed one ([Bridge.markSigma1Replied]) its record
+// is made now, replacing the completed one; bySingleton records that the
+// singleton handler runs the handshake ([Bridge.AttachCaseHandler]).
+func (b *Bridge) sigma1BeganHandshake(key HandshakeKey, hash [32]byte, overCompleted, bySingleton bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.sigma1Seq++
-	b.sigma1Replied[key] = sigma1Record{hash: hash, seq: b.sigma1Seq}
+	if overCompleted {
+		b.sigma1Seq++
+		b.sigma1Replied[key] = sigma1Record{hash: hash, seq: b.sigma1Seq, bySingleton: bySingleton}
+		return
+	}
+	if rec, ok := b.sigma1Replied[key]; ok && rec.hash == hash && rec.completed == nil {
+		rec.bySingleton = bySingleton
+		b.sigma1Replied[key] = rec
+	}
 }
 
 // boundSigma1Records takes their place from the oldest records past
@@ -1364,6 +1389,9 @@ type sigma1Record struct {
 	// completed is set once a Sigma3 completed the handshake
 	// ([Bridge.sigma3Handled]).
 	completed *completedSigma3
+	// bySingleton is set once the Sigma1 began a handshake the singleton
+	// handler runs, not a provider's ([Bridge.AttachCaseHandler]).
+	bySingleton bool
 }
 
 // oldestSigma1Record returns the key of the record made first, other than
@@ -1391,7 +1419,7 @@ func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeK
 // (overCompleted, [Bridge.markSigma1Replied]) the completed record stays
 // unless the Sigma1 began a handshake (review II, R2-P4-rr-sec-04).
 func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overCompleted bool) error {
-	ch := b.resolveCaseHandler(key)
+	ch, provided := b.resolveCaseHandlerOf(key)
 	begun := true
 	processSigma1 := func(p []byte) (uint8, []byte, error) {
 		op, reply, err := ch.ProcessSigma1(p)
@@ -1405,9 +1433,8 @@ func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto me
 	case !begun:
 		b.forgetSigma1Replied(key)
 		return err
-	case overCompleted:
-		b.replaceCompletedSigma1Record(key, hash)
 	}
+	b.sigma1BeganHandshake(key, hash, overCompleted, !provided)
 	b.boundSigma1Records(key)
 	return err
 }
@@ -1439,7 +1466,8 @@ func sigma1Began(respOpcode uint8, respPayload []byte, err error) bool {
 // ([Bridge.markSigma1Replied]; one that begins nothing leaves it), when
 // it loses its place past [maxCaseHandshakes]
 // ([Bridge.boundSigma1Records]), and — for a handshake the singleton
-// handler completed — when [Bridge.AttachCaseHandler] replaces that
+// handler completed — when its success report is acknowledged or given up
+// ([Bridge.sigma1RecordHeld]) or [Bridge.AttachCaseHandler] replaces that
 // handler. A Sigma3 of a handshake that had completed already leaves the
 // record as it is.
 func (b *Bridge) sigma3Handled(key HandshakeKey, outcome sigma3Outcome, done completedSigma3) {
@@ -1455,6 +1483,44 @@ func (b *Bridge) sigma3Handled(key HandshakeKey, outcome sigma3Outcome, done com
 	default:
 		delete(b.sigma1Replied, key)
 	}
+}
+
+// sigma1RecordHeld reports whether the router's Sigma1 record of the
+// handshake key names holds that handshake's state on the unsecured
+// session ([Bridge.unsecuredExchangeLive]). The record of a handshake the
+// singleton handler completed holds it only while the success report waits
+// for its acknowledgement: once that report is acknowledged or given up the
+// retransmission the record serves is over, and the record ends here
+// (review II, R2-P4-rr-sec-02). matter.js lets go of the handshake's
+// unsecured session, its reception state included, at the same point: the
+// CASE server sends the success report and waits for its acknowledgement
+// (packages/protocol/src/session/case/CaseServer.ts:332;
+// packages/protocol/src/protocol/MessageExchange.ts:830, given up at
+// :973-976 and thrown at :840 at db021da0), and then detaches and closes
+// that session (CaseServer.ts:95-98), which leaves the manager's table
+// (packages/protocol/src/session/UnsecuredSession.ts:94-102). The record of
+// a handshake a provider completed ends with the provider's adapter
+// ([Bridge.ForgetSigma1Replied]), as before.
+func (b *Bridge) sigma1RecordHeld(key HandshakeKey) bool {
+	b.mu.RLock()
+	rec, ok := b.sigma1Replied[key]
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if !ok {
+		return false
+	}
+	if rec.completed == nil || !rec.completed.bySingleton {
+		return true
+	}
+	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
+		return true
+	}
+	b.mu.Lock()
+	if cur, held := b.sigma1Replied[key]; held && cur.completed == rec.completed {
+		delete(b.sigma1Replied, key)
+	}
+	b.mu.Unlock()
+	return false
 }
 
 // completedSigma3 identifies the Sigma3 that completed a handshake: the
