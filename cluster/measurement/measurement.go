@@ -808,10 +808,16 @@ func (s *OccupancySensingServer) MatterClusterID() uint32 { return ClusterOccupa
 func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrOccupancy:
-		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
+		// Occupancy is a map8 with conformance M and no quality X
+		// (matter.js packages/model/src/standard/elements/
+		// occupancy-sensing.element.ts:36 at db021da0), so an unobserved
+		// source reads 0, unoccupied — the default matter.js gives a
+		// non-nullable bitmap (packages/model/src/logic/
+		// SelectDefaultValue.ts:155-171), as BooleanStateServer.MatterRead
+		// answers false.
 		v, ok := s.src.MatterBoolValue()
 		if !ok {
-			return nil, true
+			return uint8(0), true
 		}
 		if v {
 			return uint8(1), true
