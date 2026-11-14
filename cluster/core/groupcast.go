@@ -978,8 +978,11 @@ func (g *Groupcast) setFabricUnderTest(fabric uint8, gen uint64) {
 // not reported; one that names none (it failed to authenticate) is
 // reported on the fabric under test. The destination address is derived
 // from the group id — the datagram's own is not available — as the
-// group's address when the fabric knows the group, the shared IANA address
-// otherwise. Mirrors matter.js GroupcastServer #onGroupMessage.
+// group's address when the fabric's group table holds endpoints for the
+// group (the address the node joined), the shared IANA address otherwise.
+// Mirrors matter.js GroupcastServer #onGroupMessage and, at db021da0,
+// packages/node/src/behaviors/groupcast/GroupcastServer.ts:514-519
+// (#arrivalAddress, `groups.endpoints.has(groupId)`).
 func (g *Groupcast) onGroupMessage(ev groups.GroupMessageEvent) {
 	g.mu.RLock()
 	fut, emitter, endpoint := g.fabricUnderTest, g.emitter, g.endpoint
@@ -997,11 +1000,10 @@ func (g *Groupcast) onGroupMessage(ev groups.GroupMessageEvent) {
 		groupForAddress, haveGroup = ev.HeaderGroupID, ev.HasHeaderGroupID
 	}
 	if haveGroup {
-		if ms, err := g.groups.GroupcastMemberships(ctx); err == nil {
-			if _, known := memberOf(ms, fut, groupForAddress); known {
-				if addr, err := g.groups.MulticastAddressFor(ctx, fut, groupForAddress); err == nil {
-					dest = addr
-				}
+		if table, err := g.groups.GroupTable(ctx, fut); err == nil &&
+			slices.ContainsFunc(table, func(e groups.TableEntry) bool { return e.GroupID == groupForAddress && len(e.Endpoints) > 0 }) {
+			if addr, err := g.groups.MulticastAddressFor(ctx, fut, groupForAddress); err == nil {
+				dest = addr
 			}
 		}
 	}

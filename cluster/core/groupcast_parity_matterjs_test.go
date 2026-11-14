@@ -1774,6 +1774,30 @@ func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
 			t.Errorf("destinations %+v, want [IANA, %v]", evs, addr)
 		}
 	})
+
+	// The group's own address only when the group table holds endpoints
+	// for it — the address the node joined; a sender-only PerGroup group
+	// was never joined, so its message most likely arrived on the IANA
+	// address. Mirrors matter.js GroupcastServer.ts:514-519 at db021da0
+	// (#arrivalAddress, `!groups.endpoints.has(groupId)`).
+	t.Run("a sender-only group's message arrives on the IANA address", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		if _, st := f.invoke(admin, 0x00, core.JoinGroupRequest{
+			GroupID: 2, Endpoints: []uint16{}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyPerGroup),
+		}); st != im.StatusSuccess {
+			t.Fatalf("sender-only PerGroup join: %v", st)
+		}
+		enable(t, f, 1)
+		f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+			Result: groups.TestResultSuccess, FabricIndex: 1, GroupID: 2, HasGroupID: true,
+			SourceIP: net.ParseIP("fd00::1"), AccessAllowed: &allowed,
+		})
+		evs := events(f)
+		if len(evs) != 1 || !slices.Equal(evs[0].DestinationIPAddress, iana) {
+			t.Errorf("events %+v, want one from the IANA address", evs)
+		}
+	})
 }
 
 // TestGroupcastDerivedMembershipParityMatterJS ports the server-side cases
