@@ -268,16 +268,24 @@ func (b *Bridge) AttachCaseHandlerProvider(p CaseHandlerProvider) {
 // Returns the noop handler when both the provider returned nil AND
 // no singleton was wired — the caller surfaces a debug log.
 func (b *Bridge) resolveCaseHandler(key HandshakeKey) CaseHandler {
+	h, _ := b.resolveCaseHandlerOf(key)
+	return h
+}
+
+// resolveCaseHandlerOf is [Bridge.resolveCaseHandler] that also reports
+// whether the provider answered for key — false when the singleton serves
+// it.
+func (b *Bridge) resolveCaseHandlerOf(key HandshakeKey) (h CaseHandler, provided bool) {
 	b.mu.RLock()
 	provider := b.caseProvider
 	singleton := b.caseHandler
 	b.mu.RUnlock()
 	if provider != nil {
 		if h := provider(key); h != nil {
-			return h
+			return h, true
 		}
 	}
-	return singleton
+	return singleton, false
 }
 
 // errHandshakeNotBegun is the failure of a CASE message the router's own
@@ -285,21 +293,24 @@ func (b *Bridge) resolveCaseHandler(key HandshakeKey) CaseHandler {
 var errHandshakeNotBegun = errors.New("bridge: no Sigma1 or PBKDFParamRequest began this handshake")
 
 // resolveCaseContinuation is [Bridge.resolveCaseHandler] for a Sigma3 or
-// Sigma2_Resume: with a provider wired, a handshake no Sigma1 began
-// ([Bridge.markSigma1Replied]) has no handler — begun is false — and the
-// provider is not asked: it would build an adapter for a handshake that
-// cannot start. matter.js routes only a Sigma1 that opens an exchange to its
-// CASE server (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146
+// Sigma2_Resume: a handshake no Sigma1 began ([Bridge.markSigma1Replied])
+// has no handler — begun is false — whatever the wiring: the provider is
+// not asked, as it would build an adapter for a handshake that cannot
+// start, and the singleton is not handed a message of a handshake it does
+// not run (review II, R2-P4-nw-01). provided reports whether the provider
+// answered for key ([Bridge.resolveCaseHandlerOf]). matter.js routes only
+// a Sigma1 that opens an exchange to its CASE server
+// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146-147
 // at db021da0).
-func (b *Bridge) resolveCaseContinuation(key HandshakeKey) (h CaseHandler, begun bool) {
+func (b *Bridge) resolveCaseContinuation(key HandshakeKey) (h CaseHandler, provided, begun bool) {
 	b.mu.RLock()
 	_, begun = b.sigma1Replied[key]
-	provider := b.caseProvider
 	b.mu.RUnlock()
-	if provider != nil && !begun {
-		return nil, false
+	if !begun {
+		return nil, false, false
 	}
-	return b.resolveCaseHandler(key), true
+	h, provided = b.resolveCaseHandlerOf(key)
+	return h, provided, true
 }
 
 // resolvePaseContinuation is [Bridge.resolvePaseHandler] for a Pake1 or
@@ -346,10 +357,17 @@ func (b *Bridge) dropHandshakeNotBegun(src net.Addr, proto message.ProtocolHeade
 	return nil
 }
 
-// AttachCaseHandler wires the CASE port. Pass nil to revert to noop.
+// AttachCaseHandler wires the CASE port. Pass nil to revert to noop. The
+// records of the handshakes the handler it replaces completed end with it
+// ([Bridge.sigma3Handled]).
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	for key, rec := range b.sigma1Replied {
+		if rec.completed != nil && rec.completed.bySingleton {
+			delete(b.sigma1Replied, key)
+		}
+	}
 	if h == nil {
 		b.caseHandler = noopCaseHandler{}
 		return
@@ -530,7 +548,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	if done, ok := b.completedHandshake(key); ok {
 		return b.handleSigma3OfCompleted(src, requestHdr, proto, payload, key, done)
 	}
-	ch, begun := b.resolveCaseContinuation(key)
+	ch, provided, begun := b.resolveCaseContinuation(key)
 	if !begun {
 		return b.dropHandshakeNotBegun(src, proto)
 	}
@@ -541,6 +559,17 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	processSigma3 := func(p []byte) (uint8, []byte, error) {
 		op, reply, outcome, err := processSigma3With(ch, p)
 		step.outcome = outcome
+		if outcome == sigma3OfCompleted {
+			// The handler's handshake had completed before this Sigma3
+			// began it here again: the route it completed on is the
+			// router's knowledge, and the record that held it is gone —
+			// a Sigma1 began the handshake again on the finished
+			// handler. The Sigma3 is acknowledged and not answered, as
+			// one of a completed handshake that is not its
+			// retransmission ([Bridge.handleSigma3OfCompleted]; review
+			// II, R2-P4-nw-01).
+			return 0, nil, nil
+		}
 		return op, reply, err
 	}
 	if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
@@ -548,9 +577,10 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 		return err
 	}
 	b.sigma3Handled(key, step.outcome, completedSigma3{
-		digest: sha256.Sum256(payload),
-		route:  src,
-		params: step.PeerSessionParams(),
+		digest:      sha256.Sum256(payload),
+		route:       src,
+		params:      step.PeerSessionParams(),
+		bySingleton: !provided,
 	})
 	if step.outcome != sigma3Established {
 		return nil
@@ -572,7 +602,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 // handshake; one no Sigma1 began is acknowledged and no more
 // ([Bridge.dropHandshakeNotBegun]).
 func (b *Bridge) dispatchSigma2Resume(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
-	ch, begun := b.resolveCaseContinuation(handshakeKeyOf(requestHdr, proto.ExchangeID))
+	ch, _, begun := b.resolveCaseContinuation(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	if !begun {
 		return b.dropHandshakeNotBegun(src, proto)
 	}
@@ -1298,8 +1328,8 @@ func (b *Bridge) boundSigma1Records(key HandshakeKey) {
 type sigma1Record struct {
 	hash [32]byte
 	seq  uint64
-	// completed is set once a Sigma3 completed the handshake of a
-	// provider's adapter ([Bridge.sigma3Handled]).
+	// completed is set once a Sigma3 completed the handshake
+	// ([Bridge.sigma3Handled]).
 	completed *completedSigma3
 }
 
@@ -1359,20 +1389,24 @@ func sigma1Began(respOpcode uint8, respPayload []byte, err error) bool {
 
 // sigma3Handled follows a Sigma3 the handler of the handshake key names
 // answered: a Sigma3 that failed the handshake ends the handshake's
-// Sigma1 record, as Sigma3 closes the CASE handshake on the wire, and so
-// does one that completed a handshake a single handler served. A completed
-// one of a provider keeps its record, completed by done, until the
-// provider lets its adapter go ([Bridge.ForgetSigma1Replied]): a Sigma3 of
-// it that arrives again is then answered by the router
+// Sigma1 record, as Sigma3 closes the CASE handshake on the wire. A
+// completed one keeps its record, completed by done, whatever the wiring:
+// a Sigma3 of it that arrives again is answered by the router
 // ([Bridge.handleSigma3OfCompleted]), not by the handler of a handshake no
-// Sigma1 began (review II, R2-P3-dr-dev-02). A Sigma3 of a handshake that
-// had completed already leaves the record as it is.
+// Sigma1 began (review II, R2-P3-dr-dev-02, R2-P4-nw-01). The record ends
+// when the provider lets its adapter go ([Bridge.ForgetSigma1Replied]), when
+// another Sigma1 on the key replaces it ([Bridge.markSigma1Replied]), when
+// it loses its place past [maxCaseHandshakes]
+// ([Bridge.boundSigma1Records]), and — for a handshake the singleton
+// handler completed — when [Bridge.AttachCaseHandler] replaces that
+// handler. A Sigma3 of a handshake that had completed already leaves the
+// record as it is.
 func (b *Bridge) sigma3Handled(key HandshakeKey, outcome sigma3Outcome, done completedSigma3) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	switch {
-	case outcome == sigma3OfCompleted:
-	case outcome == sigma3Established && b.caseProvider != nil:
+	switch outcome {
+	case sigma3OfCompleted:
+	case sigma3Established:
 		if rec, ok := b.sigma1Replied[key]; ok {
 			rec.completed = &done
 			b.sigma1Replied[key] = rec
@@ -1390,6 +1424,9 @@ type completedSigma3 struct {
 	digest [32]byte
 	route  net.Addr
 	params *sessionparams.Parameters
+	// bySingleton is set when the singleton handler completed the
+	// handshake, not a provider's ([Bridge.AttachCaseHandler]).
+	bySingleton bool
 }
 
 // matches reports whether a Sigma3 of payload over src is the

@@ -163,10 +163,11 @@ func (c *completedCase) expectAcknowledgedOnly(t *testing.T, pendingBefore int, 
 // handshake completed, a Sigma3 under its initiator node id and exchange —
 // any payload, the accepted one included, from another address — leaves
 // the session that handshake established as it was: its route, the
-// diagnostic that records its establishment, its installation. That holds
-// through a PerExchangeCaseProvider, through the singleton handler, and
-// when the handshake's record lost its place and the same Sigma1 began it
-// again on the finished adapter (review II, R2-P3-rr-dev-01).
+// diagnostic that records its establishment, its installation — and is
+// acknowledged and not answered. That holds through a
+// PerExchangeCaseProvider, through the singleton handler, and when the
+// handshake's record lost its place and the same Sigma1 began it again on
+// the finished adapter (review II, R2-P3-rr-dev-01, R2-P4-nw-01).
 func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -208,14 +209,7 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 				if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, payload, nil); err != nil {
 					t.Fatal(err)
 				}
-				if len(payload) == len(c.sigma3) && (!tc.viaProvider || tc.rebegin) {
-					// The accepted bytes reach the adapter, which answers
-					// them as their retransmission: only the router knows
-					// the route they completed on.
-					other.recv(mrp.SCOpcodeStatusReport, "the report to the other sender")
-				} else {
-					c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
-				}
+				c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
 				if got := c.route(t); got != controllerRoute {
 					t.Fatalf("a Sigma3 of %d bytes after completion moved the session's route from %s to %s", len(payload), controllerRoute, got)
 				}
@@ -292,4 +286,84 @@ func TestSigma3RetransmissionKeepsNoRecordAlive(t *testing.T) {
 	if held {
 		t.Fatal("the completed handshake's record outlived its adapter")
 	}
+}
+
+// pendingDestsOnUnsecuredExchange lists where the unsecured-session
+// messages on exchangeID that wait for their acknowledgement go.
+func pendingDestsOnUnsecuredExchange(b *Bridge, exchangeID uint16) []string {
+	tr := b.outboundReliable
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	var dests []string
+	for key, e := range tr.pending {
+		if key.sessionID == 0 && e.exchangeID == exchangeID {
+			dests = append(dests, e.dest.String())
+		}
+	}
+	return dests
+}
+
+// TestSigma3AfterCompletionKeepsTheSuccessReportPending: once a CASE
+// handshake completed, the success report that waits for the initiator's
+// acknowledgement stays tracked to the initiator through any Sigma3 that is
+// not that acknowledgement — other bytes, or the completing bytes from
+// another address — through a PerExchangeCaseProvider and through the
+// singleton handler alike (review II, R2-P4-nw-01, R2-P4-nw-02). In
+// matter.js a new message on the exchange while the report is
+// unacknowledged throws before the retransmission timer is touched; only
+// the matching acknowledgement stops it
+// (packages/protocol/src/protocol/MessageExchange.ts:521-538 at db021da0).
+func TestSigma3AfterCompletionKeepsTheSuccessReportPending(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		viaProvider bool
+	}{
+		{"through a provider", true},
+		{"through the singleton handler", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
+			want := c.controller.conn.LocalAddr().String()
+			before := pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange)
+			if len(before) != 1 || before[0] != want {
+				t.Fatalf("after completion the replies waiting for an acknowledgement go to %v, want the report to %s", before, want)
+			}
+			for _, payload := range [][]byte{{0x15, 0x18}, c.sigma3} {
+				other := c.otherPeer(t)
+				if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, payload, nil); err != nil {
+					t.Fatal(err)
+				}
+				c.expectAcknowledgedOnly(t, 1, "a Sigma3 from another sender")
+				if got := pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange); len(got) != 1 || got[0] != want {
+					t.Fatalf("a Sigma3 of %d bytes from another sender left the replies waiting for an acknowledgement going to %v, want the report to %s", len(payload), got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestSingletonCompletedRecordEndsWithItsHandler: the record of a handshake
+// the singleton handler completed answers the retransmission of its Sigma3
+// over its route until AttachCaseHandler replaces that handler; after that
+// the Sigma3 is acknowledged and not answered, as one no Sigma1 began
+// (review II, R2-P4-nw-01).
+func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
+	t.Parallel()
+	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
+	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+		t.Fatal(err)
+	}
+	c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the retransmission over the completing route")
+
+	c.r.b.AttachCaseHandler(nil)
+	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); ok {
+		t.Fatal("the completed handshake's record outlived the handler that completed it")
+	}
+	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
+	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+		t.Fatal(err)
+	}
+	c.expectAcknowledgedOnly(t, pending, "the retransmission after the handler was replaced")
 }
