@@ -29,7 +29,11 @@ var writeChangedExempt = map[string]string{
 // every successful write, an unchanged one included.
 func TestEveryMatterWriteSaysWhetherItChanged(t *testing.T) {
 	t.Parallel()
-	declared := map[string]map[string]bool{} // "pkg.Type" → method names
+	// A type is keyed by its directory, not its package name: a
+	// hand-written package and its generated definition under spec/ share
+	// a name (levelcontrol, modeselect, onoff, servicearea), each with a
+	// type Server, and must not stand in for each other.
+	declared := map[string]map[string]bool{} // "dir.Type" → method names
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -55,7 +59,7 @@ func TestEveryMatterWriteSaysWhetherItChanged(t *testing.T) {
 			if !ok {
 				continue
 			}
-			key := f.Name.Name + "." + ident.Name
+			key := filepath.ToSlash(filepath.Dir(path)) + "." + ident.Name
 			if declared[key] == nil {
 				declared[key] = map[string]bool{}
 			}
