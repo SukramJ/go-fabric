@@ -82,3 +82,36 @@ func TestPrimingReportAnswersADeniedConcretePath(t *testing.T) {
 		t.Error("a denied concrete path established the subscription")
 	}
 }
+
+// countingReads is an endpointZeroDenied that counts the dispatcher reads.
+type countingReads struct {
+	endpointZeroDenied
+	reads int
+}
+
+func (d *countingReads) Read(ctx context.Context, p im.ConcreteAttributePath) []im.ReadResult {
+	d.reads++
+	return d.endpointZeroDenied.Read(ctx, p)
+}
+
+// TestPrimingMatchesStopsAtTheFirstMatch: whether a Subscribe matches
+// anything (matter.js ServerSubscription.ts:707-711 at db021da0, "no
+// attributes or events are matching the query") is decided by reading the
+// request's paths in turn up to the first readable attribute; the order the
+// priming report gives its statuses plays no part in it.
+func TestPrimingMatchesStopsAtTheFirstMatch(t *testing.T) {
+	t.Parallel()
+	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 0x1111, nil)
+	b := &Bridge{logger: slog.New(slog.DiscardHandler)}
+	paths := make([]im.ConcreteAttributePath, 5)
+	for i := range paths {
+		paths[i] = im.ConcreteAttributePath{Endpoint: 1, HasEndpoint: true, Cluster: 6, HasCluster: true, Attribute: uint32(i), HasAttribute: true}
+	}
+	d := &countingReads{endpointZeroDenied: endpointZeroDenied{status: im.StatusUnsupportedAccess}}
+	if !b.primingMatches(ctx, d, im.SubscribeRequest{AttributeRequests: paths}) {
+		t.Fatal("a readable concrete path did not match")
+	}
+	if d.reads != 1 {
+		t.Errorf("%d dispatcher reads to find the first match, want 1", d.reads)
+	}
+}

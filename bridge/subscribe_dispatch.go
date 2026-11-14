@@ -103,19 +103,7 @@ type primingSource struct {
 // against dispatcher for the subject subCtx carries (fabric, subject,
 // auth mode, fabric filter).
 func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) *primingSource {
-	allow := readResultAuthorizer(subCtx, dispatcher)
-	if allow == nil {
-		allow = func(im.ReadResult) bool { return true }
-	}
-	p := &primingSource{
-		b: b,
-		// A wildcard path's WildcardPathFlags skip their paths as in a
-		// read (AttributeReadResponse.ts:149-197).
-		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
-		allow:   allow,
-		denial:  func(rr im.ReadResult) im.StatusCode { return readDenialStatus(subCtx, dispatcher, rr) },
-		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
-	}
+	p := b.primingSourceInPathOrder(subCtx, dispatcher, req)
 	// Every status of a concrete path precedes the first value, as in a
 	// read: matter.js ServerSubscription.ts:643-671 at db021da0 emits
 	// AttributeReadResponse's reports, statuses first, and holds them back
@@ -131,6 +119,27 @@ func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatch
 		}
 		return rr.Status != im.StatusSuccess
 	})
+	return p
+}
+
+// primingSourceInPathOrder is [Bridge.newPrimingSource] with every result
+// at its path's place, the statuses of the concrete paths included: what
+// [primingSource.matches] asks, which reads the paths in turn up to the
+// first match, as the order of the statuses plays no part in its answer.
+func (b *Bridge) primingSourceInPathOrder(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) *primingSource {
+	allow := readResultAuthorizer(subCtx, dispatcher)
+	if allow == nil {
+		allow = func(im.ReadResult) bool { return true }
+	}
+	p := &primingSource{
+		b: b,
+		// A wildcard path's WildcardPathFlags skip their paths as in a
+		// read (AttributeReadResponse.ts:149-197).
+		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
+		allow:   allow,
+		denial:  func(rr im.ReadResult) im.StatusCode { return readDenialStatus(subCtx, dispatcher, rr) },
+		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
+	}
 	return p
 }
 
@@ -351,7 +360,7 @@ func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher
 	if len(req.EventRequests) > 0 && b.primingEventPaths(subCtx, dispatcher, req) > 0 {
 		return true
 	}
-	return b.newPrimingSource(subCtx, dispatcher, req).matches()
+	return b.primingSourceInPathOrder(subCtx, dispatcher, req).matches()
 }
 
 // registerSubscription registers the subscribe request in the subscription
