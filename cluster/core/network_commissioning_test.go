@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -224,6 +225,46 @@ func TestNetcomm_WriteInterfaceEnabled_False(t *testing.T) {
 	}
 	if v.(bool) {
 		t.Fatal("InterfaceEnabled = true after write false, want false")
+	}
+}
+
+// TestNetcomm_WriteInterfaceEnabled_AdvancesDataVersion: a write that
+// changes InterfaceEnabled advances the cluster's DataVersion once and
+// reports Networks, whose Connected follows it; an unchanged write does
+// neither. Mirrors matter.js packages/node/src/behavior/state/managed/
+// Datasource.ts:1446-1457 at db021da0 (a commit that changed a value calls
+// advanceVersion), the server being the generated class
+// (NetworkCommissioningServer.ts:18).
+func TestNetcomm_WriteInterfaceEnabled_AdvancesDataVersion(t *testing.T) {
+	t.Parallel()
+	nc := defaultNetcomm()
+	var mu sync.Mutex
+	var changes []contract.Change
+	if notifier, ok := any(nc).(contract.AttributeChangeNotifier); ok {
+		defer notifier.OnAttributeChange(func(c contract.Change) {
+			mu.Lock()
+			changes = append(changes, c)
+			mu.Unlock()
+		})()
+	}
+
+	before := nc.MatterDataVersion()
+	if err := nc.MatterWrite(t.Context(), 0x0004, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := nc.MatterDataVersion(); got != before {
+		t.Errorf("an unchanged write moved DataVersion %d -> %d", before, got)
+	}
+	if err := nc.MatterWrite(contract.WithOrigin(t.Context(), contract.OriginControllerWrite), 0x0004, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := nc.MatterDataVersion(); got == before {
+		t.Error("a write that changed InterfaceEnabled left DataVersion unchanged")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(changes) != 1 || !slices.Equal(changes[0].Attributes, []uint32{0x0001}) || changes[0].Origin != contract.OriginControllerWrite {
+		t.Errorf("changes %+v, want one of Networks (0x0001) from the controller", changes)
 	}
 }
 
