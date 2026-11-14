@@ -365,7 +365,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},
-	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 92},
+	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/transport/udp", min: 93},
 	// ADR 0013: the cluster-definition runtime, its test support, the
 	// generator, the first server built on it, and the committed generated
