@@ -817,9 +817,6 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 		// HAP service map from these reports.
 		extra = srv.MatterReportable()
 	}
-	if len(extra) == 0 {
-		return out
-	}
 	seen := make(map[uint32]struct{}, len(out)+len(extra))
 	for _, id := range out {
 		seen[id] = struct{}{}
@@ -832,7 +829,10 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 		out = append(out, id)
 	}
 	// The cluster's attribute order is the one every report uses
-	// (im.CompareAttributeIDs).
+	// (im.CompareAttributeIDs) — a cluster without attributes of its own
+	// included, whose globals matter.js lists in its model's order too
+	// (packages/node/src/node/integration/ProtocolService.ts:449-522 at
+	// db021da0).
 	clusterID := srv.MatterClusterID()
 	slices.SortFunc(out, func(a, b uint32) int { return im.CompareAttributeIDs(clusterID, a, b) })
 	return out

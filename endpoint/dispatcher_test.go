@@ -398,6 +398,41 @@ func TestRead_WildcardAttributeReturnsGlobals(t *testing.T) {
 	}
 }
 
+// TestRead_WildcardAttribute_GlobalsOnlyInModelOrder: a wildcard read of a
+// cluster that lists no attribute of its own reports the globals in the
+// order of the cluster model's members (im.CompareAttributeIDs), the order
+// a priming report and a change report use for the same cluster. matter.js
+// builds every cluster's attribute list in Scope.membersOf order, a
+// globals-only cluster's included
+// (packages/node/src/node/integration/ProtocolService.ts:449-522 at
+// db021da0); DiagnosticLogs (0x0032) is one, OnOff served without a lister
+// another.
+func TestRead_WildcardAttribute_GlobalsOnlyInModelOrder(t *testing.T) {
+	t.Parallel()
+	want := []uint32{
+		cluster.AttrGlobalClusterRevision,
+		cluster.AttrGlobalFeatureMap,
+		cluster.AttrGlobalAttributeList,
+		cluster.AttrGlobalAcceptedCommandList,
+		cluster.AttrGlobalGeneratedCommandList,
+	}
+	for _, clusterID := range []uint32{0x0032, 0x0006} {
+		ep := &Endpoint{ID: 2, Source: singleServerSource{srv: &globalAttrServer{id: clusterID}}}
+		d := NewTopologyDispatcher(makeTopology(ep))
+		results := d.Read(context.Background(), im.ConcreteAttributePath{Endpoint: 2, Cluster: clusterID, HasEndpoint: true, HasCluster: true})
+		got := make([]uint32, len(results))
+		for i, r := range results {
+			got[i] = r.Path.Attribute
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("cluster 0x%04X: attributes %#x, want %#x", clusterID, got, want)
+		}
+		if !slices.IsSortedFunc(got, func(a, b uint32) int { return im.CompareAttributeIDs(clusterID, a, b) }) {
+			t.Errorf("cluster 0x%04X: attributes %#x not in im.CompareAttributeIDs order", clusterID, got)
+		}
+	}
+}
+
 // listingAttrServer is a globalAttrServer extended with a
 // MatterAttributes() lister that advertises two cluster-specific
 // attributes (0x0000 OnOff, 0x4001 OnTime). Used to verify that a
