@@ -253,9 +253,10 @@ type Endpoint struct {
 	// endpoint's DataVersion survives an UNRELATED topology change (a
 	// sibling endpoint added / removed), and only a state change on the
 	// endpoint itself bumps it. Mirrors matter.js
-	// packages/node/src/behavior/state/managed/Datasource.ts:410 (version
+	// packages/node/src/behavior/state/managed/Datasource.ts:597 (version
 	// sampled once per behavior lifetime, bound to the endpoint's own
-	// lifecycle) / :949 (increment per committed change). The root and
+	// lifecycle) / :1456-1457 (increment per committed change,
+	// advanceVersion :690-699). The root and
 	// the Aggregator an [Assembler] builds carry its own root and
 	// Aggregator state, for the clusters whose reattached instance-hosted
 	// servers keep no tracker of their own. nil for bare

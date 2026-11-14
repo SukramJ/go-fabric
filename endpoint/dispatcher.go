@@ -496,7 +496,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
-				// Datasource.ts:1035). A root or Aggregator server with a
+				// Datasource.ts:1456-1457). A root or Aggregator server with a
 				// tracker of its own bumps it inside the write handler.
 				if _, own := ownDataVersion(ep, srv); res.Status == im.StatusSuccess && !own {
 					ep.BumpClusterDataVersion(cPath.Cluster)
