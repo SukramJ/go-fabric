@@ -20,7 +20,10 @@
 // Listener (TcpTransport.ts:78-110): at most three connections per peer
 // IP address (MAX_CONNECTIONS_PER_PEER_IP, :27-28); an inbound
 // connection that has not delivered a complete message within ten
-// seconds is closed (NEW_CONNECTION_IDLE_TIMEOUT, :30-31, :89-104).
+// seconds is closed (NEW_CONNECTION_IDLE_TIMEOUT, :30-31, :89-104). Ahead
+// of matter.js, after connectedhomeip: at most [MaxInboundConnections]
+// inbound connections in all, and an accept that fails is retried rather
+// than ending Serve.
 //
 // A connection is reliable ([Conn.Reliable] is true): the layers above
 // do not run MRP over it (matter.js Session.ts:355-356). Each

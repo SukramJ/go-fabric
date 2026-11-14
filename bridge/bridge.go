@@ -1023,8 +1023,11 @@ func (b *Bridge) Start(ctx context.Context) error {
 		tcpDone = make(chan struct{})
 		go func() {
 			defer close(tcpDone)
+			// Serve retries a failed accept and returns nil on its close,
+			// so an error means TCP is not served: the operator must see
+			// it (review II, R2-P3-ctl-lan-04).
 			if err := tcpListener.Serve(serveCtx, b.handleTCPMessage, b.handleTCPClose); err != nil {
-				b.logger.Debug("matter.tcp.serve.exit", slog.Any("err", err))
+				b.logger.Warn("matter.tcp.serve.exit", slog.Any("err", err))
 			}
 		}()
 	}

@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"strconv"
 
@@ -82,7 +83,12 @@ func (c *Controller) listenTCP(ctx context.Context) error {
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
-		_ = l.Serve(serveCtx, func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) }, nil)
+		// Serve retries a failed accept and returns nil on its close, so
+		// an error means TCP is not served: the host must see it (review
+		// II, R2-P3-ctl-lan-04).
+		if err := l.Serve(serveCtx, func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) }, nil); err != nil {
+			c.log.Warn("matter.tcp.serve.exit", slog.Any("err", err))
+		}
 	}()
 	c.tcpAddr = l.Addr()
 	c.stopTCP = func() { cancel(); _ = l.Close(); <-served }
