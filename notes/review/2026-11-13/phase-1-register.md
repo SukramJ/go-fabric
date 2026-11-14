@@ -1,14 +1,9 @@
 # Phase 1 — the dispositions
 
 The commit ids below are those of the phase 1 pull request's branch
-(`review2/p1`, #525): it is merged as one squashed commit, and its single
-commits stay retrievable through the pull request's reference
-(`refs/pull/525/head`).
-
-The commit ids below are those of the phase 1 pull request's branch
-(`review2/p1`, the code at `c6f8325f`, then this change); if the pull
-request merges squashed, as phase 0's did, they stay retrievable through
-the pull request's reference. Items that are still open after this branch
+(`review2/p1`, #525); the pull request merges squashed, as phase 0's
+did, and its single commits stay retrievable through the pull request's
+reference (`refs/pull/525/head`). Items that are still open after this branch
 and describe a weakness a party on the network could use are held back
 with their text until the pull request that fixes them (owner decision
 25); the table carries their id, severity and phase only, and "Counts"
