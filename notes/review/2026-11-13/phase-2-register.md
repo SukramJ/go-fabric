@@ -252,7 +252,7 @@ No severity: a design note is a question or a recommendation, not a finding.
 | D-ctr-3 | the secure session's reception window anchors on the first counter seen | fixed `da8c16ef` |
 | D-ctr-4 | the unsecured reception state lives with the commissioning window | fixed `18e138b1` |
 | D-ctr-5 | citations on the counter path at three matter.js commits, three of them hiding a drift | the three drifts are R2-P2-ctr-01, -02 and -03, fixed; the citations are phase 4: owner decision 13 |
-| D-ctr-6 | DataVersions are random per process start, so a restart primes every controller's cache again; the reviewer calls it the owner's call, not a finding | not put to the owner, no phase named: unplaced |
+| D-ctr-6 | DataVersions are random per process start, so a restart primes every controller's cache again; the reviewer calls it the owner's call, not a finding | phase 4: open finding `F-db021da0-17`, which names the decision |
 | D-store-1 | the scope and cut of owner decision 15 | owner decision 38; fixed `d17f858d`; outside the cut: N-persist-1 |
 | D-store-2 | one persister at the node, keyed by the generated quality flag | owner decision 38 |
 | D-store-3 | an atomic multi-key write in the settings port | owner decision 39; fixed `af18e97e` |
@@ -288,7 +288,8 @@ No severity: none of these was reviewed or verified as a finding.
 | N-ctl-3 | `phase-2-fix-ctl.md` | an OTA download of indefinite length over BDX had no size cap | fixed `54e8fb24`; Ahead `BD-Matter-OTARequestor-BDXSizeCap` | `cluster/core/ota_requestor_query.go` |
 | N-ctr-1 | — | — | held back until its fix merges (owner decision 25) — phase 3 | — |
 | N-ctr-2 | `phase-2-fix-ctr.md` | two comments still described the constant 1 (`cluster/measurement/measurement.go`, `contract.ClusterDataVersion` "MUST return ≥ 1") | fixed `67b562e4` | — |
-| N-ctr-3 | `phase-2-fix-ctr.md`; the third citation pass | `contract.DataVersionTracker` never holds 0: it starts non-zero, `Bump` skips 0 with a comment that names the specification (not read), and `Current` uses 0 for "not installed"; matter.js starts at a random uint32 and wraps to 0 (`packages/node/src/behavior/state/managed/Datasource.ts:597`, `:695-698` at `db021da0`, re-read) | phase 4: a parity finding to open — the coordinator's list names it `F-db021da0-17`, which is not in the register at `540cb0eb` | `contract/dataversion.go` |
+| N-ctr-3 | `phase-2-fix-ctr.md`; the third citation pass | `contract.DataVersionTracker` never holds 0: it starts non-zero, `Bump` skips 0 with a comment that names the specification (not read), and `Current` uses 0 for "not installed"; matter.js starts at a random uint32 and wraps to 0 (`packages/node/src/behavior/state/managed/Datasource.ts:597`, `:695-698` at `db021da0`, re-read) | phase 4: open finding `F-db021da0-17` | `contract/dataversion.go` |
+| N-flake-1 | the coordinator (a test of this branch that failed once under load) | `BasicInformation.SetSoftwareVersion` advances the DataVersion and reports nothing to a subscription that is already running; its one caller at run time (`node/ota.go`) restarts the node afterwards. Whether matter.js would report such a change is unverified. The three Erase tests that relied on a priming report carrying the change now change NodeLabel (`10818538`) | phase 4: parity, low | `cluster/core/basic_information.go` |
 | N-ctr-4 | `phase-2-fix-ctr.md` | ADR 0001 records the old default of 1 | struck: an ADR, left as history | `docs/adr/0001-matter-commissioning-bring-up.md` |
 | N-ctr-5 | the coordinator's list | `bridgetest.SubscriptionTarget.PeerCounter` and `ErrNoPeerCounter` are kept; whether anything still needs them | phase 5: the API bundle | `bridge/bridgetest` |
 | N-ctr-6 | the coordinator's list | a parity case of the controller's default subscription failed once every cluster had a version: its priming report came back empty | fixed `d23227f4` | `controller/client` |
@@ -455,9 +456,9 @@ this branch.
 
 The 31 design notes: 25 settled by a decision, a fix or a register row (20
 of the 31 name an owner decision), 5 with a part placed in a later phase, 1
-unplaced.
+placed in phase 4 as a whole (D-ctr-6, `F-db021da0-17`).
 
-The 70 noticed items: 23 fixed, 1 open finding, 4 struck, 12 phase 4, 13
+The 71 noticed items: 23 fixed, 2 open findings, 4 struck, 12 phase 4, 13
 phase 5, 13 phase 6, 4 held back.
 
 Unread: 13 units, phase 6, and 3 held-back rows.

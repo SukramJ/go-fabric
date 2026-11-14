@@ -823,6 +823,28 @@ with a port of the named case.
   order, or the difference becomes a `by_design` entry with its reason, each
   with a parity case; phase 4. Found in review II, phase 2 (the rework of the
   priming report for R2-P2-alloc-04).
+- **F-db021da0-17: a DataVersion here is never 0 and is new at every
+  start; matter.js's can be 0 and comes back from its store.** A
+  `contract.DataVersionTracker` starts at a random value that is not 0,
+  `Bump` skips 0 on its way round ("reserved per Matter §10.6.5" in its
+  comment — the specification was not read), and `Current` uses 0 for
+  "not installed yet" (`contract/dataversion.go`). matter.js starts a
+  datasource's version at `entropy.randomUint32`, which can be 0
+  (`packages/node/src/behavior/state/managed/Datasource.ts:597` at
+  `db021da0`), and `advanceVersion` wraps past 0xFFFF_FFFF to 0
+  (`:690-699`). It also takes the version from its store where there is
+  one (`:802`, `:837`: `this.version = store.version`); which datasources
+  have such a store, and so which versions survive a restart there, was
+  not read (unverified) — here every version is new at each start, so a
+  controller's cached versions never match after one and every priming
+  report is whole. Neither difference is in `by_design.md`. Since owner
+  decision 46 the wire and the filters treat 0 as an ordinary version; the
+  tracker's own zero state is what is left of the sentinel. Fix: the
+  tracker holds "installed" beside the value and 0 becomes a version, or a
+  `by_design` entry with the reason; and a decision whether versions are
+  kept across a restart, with what matter.js keeps read first; phase 4.
+  Found in review II, phase 2 (the third citation pass; design note 6 of
+  the counters flow).
 
 ## Tier 3 — LOW
 

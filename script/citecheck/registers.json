@@ -49,69 +49,69 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 383,
+    "line": 397,
     "citation": "DeviceTypeConformance.ts:1189-1215",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 926,
+    "line": 940,
     "citation": "packages/ws-controller/src/server/WebSocketControllerHandler.ts:144",
     "error": "no matterjs-server commit"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 957,
+    "line": 971,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 986,
+    "line": 1000,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 987,
+    "line": 1001,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1160,
+    "line": 1174,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1957,
+    "line": 1971,
     "citation": "endpoints/ota-provider.ts:57-64",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2608,
+    "line": 2622,
     "citation": "packages/node/src/devices/.../RequirementGenerator.ts:188-199",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2627,
+    "line": 2641,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4125,
+    "line": 4139,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 6035,
+    "line": 6066,
     "citation": "camera-controller.ts:133",
     "at": "862ad75f",
     "error": "ambiguous"
@@ -132,7 +132,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 831,
+    "line": 857,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }
