@@ -172,6 +172,114 @@ var attributeWritePrivileges = map[uint32]map[uint32]uint8{
 	},
 }
 
+// attributeReadPrivileges maps every attribute whose matter.js read
+// privilege is above View (3 Operate, 4 Manage, 5 Administer) to that
+// privilege. Generated from each attribute's effective access in
+// parity/schema.json, as attributeWritePrivileges is.
+var attributeReadPrivileges = map[uint32]map[uint32]uint8{
+	0x001F: { // AccessControl
+		0x0000: 5, // Acl "RW F A"
+		0x0001: 5, // Extension "RW F A"
+		0x0007: 5, // AuxiliaryAcl "R F A"
+	},
+	0x0030: { // GeneralCommissioning
+		0x0005: 5, // TcAcceptedVersion "R A"
+		0x0006: 5, // TcMinRequiredVersion "R A"
+		0x0007: 5, // TcAcknowledgements "R A"
+		0x0008: 5, // TcAcknowledgementsRequired "R A"
+		0x0009: 5, // TcUpdateDeadline "R A"
+		0x000A: 4, // RecoveryIdentifier "R M"
+		0x000B: 4, // NetworkRecoveryReason "R M"
+	},
+	0x0031: { // NetworkCommissioning
+		0x0000: 5, // MaxNetworks "R A"
+		0x0001: 5, // Networks "R A"
+		0x0005: 5, // LastNetworkingStatus "R A"
+		0x0006: 5, // LastNetworkId "R A"
+		0x0007: 5, // LastConnectErrorValue "R A"
+	},
+	0x003E: { // OperationalCredentials
+		0x0000: 5, // Nocs "R F A"
+	},
+	0x003F: { // GroupKeyManagement
+		0x0004: 5, // GroupcastAdoption "RW F A"
+	},
+	0x0046: { // IcdManagement
+		0x0003: 5, // RegisteredClients "R F A"
+		0x0004: 5, // IcdCounter "R A"
+	},
+	0x0101: { // DoorLock
+		0x0080: 5, // AliroReaderVerificationKey "R A"
+		0x0081: 5, // AliroReaderGroupIdentifier "R A"
+		0x0082: 5, // AliroReaderGroupSubIdentifier "R A"
+		0x0083: 5, // AliroExpeditedTransactionSupportedProtocolVersions "R A"
+		0x0084: 5, // AliroGroupResolvingKey "R A"
+		0x0085: 5, // AliroSupportedBleuwbProtocolVersions "R A"
+		0x0086: 5, // AliroBleAdvertisingVersion "R A"
+	},
+	0x0451: { // WiFiNetworkManagement
+		0x0001: 4, // PassphraseSurrogate "R M"
+	},
+	0x050D: { // ApplicationBasic
+		0x0007: 5, // AllowedVendorList "R A"
+	},
+	0x0551: { // CameraAvStreamManagement
+		0x000D: 4, // HdrModeEnabled "RW M"
+		0x0016: 4, // NightVision "RW M"
+		0x0017: 4, // NightVisionIllum "RW M"
+		0x0018: 4, // Viewport "RW M"
+		0x0019: 4, // SpeakerMuted "RW M"
+		0x001A: 4, // SpeakerVolumeLevel "RW M"
+		0x001B: 4, // SpeakerMaxLevel "R M"
+		0x001C: 4, // SpeakerMinLevel "R M"
+		0x001D: 4, // MicrophoneMuted "RW M"
+		0x001E: 4, // MicrophoneVolumeLevel "RW M"
+		0x001F: 4, // MicrophoneMaxLevel "R M"
+		0x0020: 4, // MicrophoneMinLevel "R M"
+		0x0021: 4, // MicrophoneAgcEnabled "RW M"
+		0x0022: 4, // ImageRotation "RW M"
+		0x0023: 4, // ImageFlipHorizontal "RW M"
+		0x0024: 4, // ImageFlipVertical "RW M"
+		0x0025: 4, // LocalVideoRecordingEnabled "RW M"
+		0x0026: 4, // LocalSnapshotRecordingEnabled "RW M"
+		0x0027: 4, // StatusLightEnabled "RW M"
+		0x0028: 4, // StatusLightBrightness "RW M"
+		0x0029: 4, // ImageRotationDiscreteAngles "RW M"
+	},
+	0x0553: { // WebRtcTransportProvider
+		0x0000: 4, // CurrentSessions "R S M"
+	},
+	0x0554: { // WebRtcTransportRequestor
+		0x0000: 5, // CurrentSessions "R S A"
+	},
+	0x0750: { // EcosystemInformation
+		0x0000: 4, // DeviceDirectory "R F M"
+		0x0001: 4, // LocationDirectory "R F M"
+	},
+	0x0751: { // CommissionerControl
+		0x0000: 4, // SupportedDeviceCategories "R M"
+	},
+	0x0752: { // JointFabricDatastore
+		0x0000: 5, // AnchorRootCa "R A"
+		0x0001: 5, // AnchorNodeId "R A"
+		0x0002: 5, // AnchorVendorId "R A"
+		0x0003: 5, // FriendlyName "R A"
+		0x0004: 5, // GroupKeySetList "R A"
+		0x0005: 5, // GroupList "R A"
+		0x0006: 5, // NodeList "R A"
+		0x0007: 5, // AdminList "R A"
+		0x0008: 5, // Status "R A"
+		0x0009: 5, // EndpointGroupIdList "R A"
+		0x000A: 5, // EndpointBindingList "R A"
+		0x000B: 5, // NodeKeySetList "R A"
+		0x000C: 5, // NodeAclList "R A"
+		0x000D: 5, // NodeEndpointList "R A"
+	},
+	0x0753: { // JointFabricAdministrator
+		0x0000: 5, // AdministratorFabricIndex "R A"
+	},
+}
+
 // changesOmittedAttributes lists every attribute whose matter.js quality
 // carries "C" (changesOmitted): a change to it is never reported to a
 // subscriber. Generated from the quality strings in parity/schema.json.

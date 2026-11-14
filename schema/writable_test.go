@@ -30,6 +30,7 @@ type snapshotAttribute struct {
 type snapshotEffective struct {
 	Access struct {
 		RW        string `json:"rw"`
+		ReadPriv  string `json:"readPriv"`
 		WritePriv string `json:"writePriv"`
 	} `json:"access"`
 	Quality struct {
@@ -373,6 +374,49 @@ func TestAttributeWritePrivilegeParity(t *testing.T) {
 		for aid, p := range attrs {
 			if _, ok := want[cid][aid]; !ok {
 				t.Errorf("attributeWritePrivileges[0x%04X][0x%04X] = %d, and the effective access names no privilege above Operate", cid, aid, p)
+			}
+		}
+	}
+}
+
+// TestAttributeReadPrivilegeParity holds the generated
+// attributeReadPrivileges to the snapshot's effective access, attribute by
+// attribute and in both directions: an attribute whose effective read
+// privilege is Operate, Manage or Administer has exactly that entry, the
+// table has no other, and AttributeReadPrivilege answers View for every
+// attribute without one (review II, R2-P3-admin-02).
+func TestAttributeReadPrivilegeParity(t *testing.T) {
+	t.Parallel()
+	level := map[string]uint8{"V": PrivilegeView, "O": PrivilegeOperate, "M": PrivilegeManage, "A": PrivilegeAdminister}
+	want := map[uint32]map[uint32]uint8{}
+	for _, c := range loadWritableSnapshot(t).Clusters {
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				t.Fatalf("%s (0x%04X) attribute %s (0x%04X) has no effective layer in the snapshot", c.Name, c.ID, a.Name, a.ID)
+			}
+			p, ok := level[a.Effective.Access.ReadPriv]
+			if !ok {
+				t.Fatalf("%s (0x%04X) attribute %s (0x%04X): read privilege %q", c.Name, c.ID, a.Name, a.ID, a.Effective.Access.ReadPriv)
+			}
+			if got := AttributeReadPrivilege(c.ID, a.ID); got != p {
+				t.Errorf("AttributeReadPrivilege(0x%04X, 0x%04X) = %d, the effective access says %d", c.ID, a.ID, got, p)
+			}
+			if p == PrivilegeView {
+				continue
+			}
+			if want[c.ID] == nil {
+				want[c.ID] = map[uint32]uint8{}
+			}
+			want[c.ID][a.ID] = p
+		}
+	}
+	if len(want) == 0 {
+		t.Fatal("the snapshot names no attribute above View: the case this test exists for is not exercised")
+	}
+	for cid, attrs := range attributeReadPrivileges {
+		for aid, p := range attrs {
+			if _, ok := want[cid][aid]; !ok {
+				t.Errorf("attributeReadPrivileges[0x%04X][0x%04X] = %d, and the effective access names no privilege above View", cid, aid, p)
 			}
 		}
 	}
