@@ -662,6 +662,10 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// The last fabric's removal resets the terms-and-conditions acceptance
 	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
 	if srv := n.root.GeneralCommissioning; srv != nil {
+		// A fail-safe armed for the removed fabric expires with its
+		// rollback (review II, R2-P3-admin-06); one the rollback itself
+		// removed the fabric of is disarmed already.
+		srv.FabricRemoved(ctx, fabricIndex)
 		switch fabrics, err := n.st.ListFabrics(ctx); {
 		case err != nil:
 			n.logger.Warn("node.terms.reset", slog.Any("err", err))

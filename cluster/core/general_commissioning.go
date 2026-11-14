@@ -1405,6 +1405,27 @@ func (g *GeneralCommissioning) ExpireFailSafeArmedOverPASE(ctx context.Context) 
 	g.expireNowLocked(ctx)
 }
 
+// FabricRemoved expires the fail-safe armed for fabricIndex, a fabric
+// whose row is gone, with the rollback its timeout runs; a fail-safe armed
+// for another fabric, or over PASE before an AddNOC, is left alone. The
+// node calls it after every removal of a fabric. Before, the fail-safe
+// stayed armed for the removed index until it ran out, every other
+// fabric's ArmFailSafe answered BusyWithOtherAdmin and
+// OpenCommissioningWindow Busy meanwhile (review II, R2-P3-admin-06). This
+// is the owner's rule; connectedhomeip's
+// GeneralCommissioningCluster::OnFabricRemoved resets the terms only and
+// leaves the fail-safe as it is
+// (src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:357-375
+// at 6170af84).
+func (g *GeneralCommissioning) FabricRemoved(ctx context.Context, fabricIndex uint8) {
+	g.mu.Lock()
+	if fabricIndex == 0 || !g.failSafeArmed || g.failSafeFabricIndex != fabricIndex {
+		g.mu.Unlock()
+		return
+	}
+	g.expireNowLocked(ctx)
+}
+
 // expireNowLocked expires the armed fail-safe at once and runs its
 // rollback; g.mu is held and released.
 func (g *GeneralCommissioning) expireNowLocked(ctx context.Context) {
