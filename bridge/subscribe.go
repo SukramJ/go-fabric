@@ -2534,14 +2534,17 @@ func quietIntervalOf(clusterID, attrID uint32) time.Duration {
 // parks it ([Bridge.parkQuietPath]) and the next wiring takes it up with
 // its last value, its throttle's last report and a report the throttle
 // holds back, so a re-wiring neither drops a held change nor restarts the
-// interval. matter.js's QuietEvent lives with its behavior
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
-// db021da0, the backing's quiet observers); that a change of the node's
-// topology elsewhere does not re-create the behavior was not read at the
-// pin (unverified). Parked, it reads nothing and reports nothing: a notification
-// that still reaches it is left to the next wiring, which sees the change
-// against the last value, and a report its throttle sends is owed to that
-// wiring (review II, R2-P4-dr-sub-01, R2-P4-dr-sub-05).
+// interval. A re-wiring keeps the endpoint's cluster version, and the
+// throttle is kept with it: matter.js's QuietEvent observer lives as long
+// as its behavior's backing — registered in the backing's constructor and
+// closed only with it
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:35-38,
+// :214-216, #configureEventSuppression :224-262 at db021da0). Parked, it
+// reads nothing and reports nothing: a notification that still reaches it
+// is left to the next wiring, which compares the value with the last one
+// when it takes the path up ([listenerSet.quietPathFor]), and a report
+// its throttle sends is owed to that wiring (review II, R2-P4-dr-sub-01,
+// R2-P4-dr-sub-05, R2-P4-rr-im-04).
 type quietPath struct {
 	path im.ConcreteAttributePath
 	q    *clusterpkg.Quieter
@@ -2559,7 +2562,10 @@ type quietPath struct {
 }
 
 // quietPathFor returns the set's quietPath of p: the one a torn-down
-// wiring parked for p, taken up, or a new one, reading its first value.
+// wiring parked for p, taken up and compared once with its last value — a
+// change no live wiring saw advances the version and goes to the throttle,
+// as a notification's would ([quietPath.check]) —, or a new one, reading
+// its first value.
 func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *endpointpkg.Endpoint, p im.ConcreteAttributePath) *quietPath {
 	if qp, ok := l.quiet[p]; ok {
 		return qp
@@ -2575,6 +2581,9 @@ func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *end
 		}
 	}
 	qp.attach(ep, mgr, fresh)
+	if !fresh {
+		qp.check(make(map[uint32]struct{}, 1))
+	}
 	if l.quiet == nil {
 		l.quiet = make(map[im.ConcreteAttributePath]*quietPath)
 	}

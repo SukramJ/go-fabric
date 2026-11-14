@@ -177,6 +177,38 @@ func TestHeldQuieterChangeSurvivesReassemble(t *testing.T) {
 	r.step(t, "a change after the re-wiring within the second", v0, 3, false)
 }
 
+// TestQuieterChangeInTheRewiringGapIsReportedAtAttach: a change of a
+// projected quieter attribute that no live wiring saw — it came while the
+// path was parked between two wirings — is compared when the next wiring
+// takes the path up: the DataVersion advances and the throttle is told,
+// as the change's commit would have done (matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0), without waiting for the source's next notification. Review
+// II, R2-P4-rr-im-04.
+func TestQuieterChangeInTheRewiringGapIsReportedAtAttach(t *testing.T) {
+	t.Parallel()
+	r := newQuietMeterRig(t, epmActivePower)
+	v0 := r.version()
+	r.src.setPower(10)
+	r.step(t, "a change from null", v0, 1, true)
+	r.clk.Advance(cluster.QuietMinimumInterval + time.Millisecond)
+	// The change no live wiring sees: the source's notification reached
+	// the path while it was parked.
+	r.src.mu.Lock()
+	r.src.power = 20
+	r.src.mu.Unlock()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := r.b.Reassemble(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.step(t, "the re-wiring that takes the path up", v0, 2, true)
+	if err := r.b.Reassemble(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.step(t, "a re-wiring with nothing changed", v0, 2, false)
+}
+
 // TestStoppedBridgeQuieterPathIsSilent: once the bridge stopped, a
 // notification that still reaches the listener of its last wiring — a
 // host that delivers one while the bridge detaches — moves neither the
