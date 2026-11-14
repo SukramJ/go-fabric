@@ -669,7 +669,11 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
 		// #wildcardTargetOf: the command's privilege, its fabric scope,
 		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
-		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint && inv.DecodeStatus.IsSuccess() {
+		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint {
+			if !inv.DecodeStatus.IsSuccess() {
+				ir.Responses = append(ir.Responses, undecodedWildcardEntries(ctx, wild, g, inv)...)
+				continue
+			}
 			for _, res := range wild.InvokeAuthorized(ctx, inv.Path, inv.Fields, g.wildcardTarget) {
 				ir.Responses = append(ir.Responses, resultEntry(inv, res))
 			}
@@ -690,6 +694,30 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		ir.Responses = append(ir.Responses, resultEntry(inv, d.Invoke(ctx, inv.Path, inv.Fields)))
 	}
 	return ir
+}
+
+// undecodedWildcardEntries answers a wildcard-endpoint command whose fields
+// the reader refused: the decode status once for every endpoint the
+// command targets, the command run nowhere. The endpoints are the ones its
+// expansion admits ([invokeGate.wildcardTarget]); the authorizer answers
+// the decode status for an admitted endpoint, which the dispatcher treats as
+// "do not invoke", as the group path does ([HandleGroupInvoke]). Mirrors
+// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:330-361
+// at db021da0 (#processEndpointForWildcard selects the endpoints first) and
+// :484-487, :509-546 (#invokeCommand validates per endpoint and adds the
+// failure as that endpoint's status); no target, no status.
+func undecodedWildcardEntries(ctx context.Context, wild AuthorizingInvoker, g *invokeGate, inv CommandInvocation) []InvokeResponseEntry {
+	var out []InvokeResponseEntry
+	wild.InvokeAuthorized(ctx, inv.Path, nil, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+		if status := g.wildcardTarget(endpoint, clusterID, commandID); !status.IsSuccess() {
+			return status
+		}
+		at := inv
+		at.Path.Endpoint, at.Path.HasEndpoint = endpoint, true
+		out = append(out, pathStatusEntry(at, inv.DecodeStatus))
+		return inv.DecodeStatus
+	})
+	return out
 }
 
 // DispatchEndpoints returns the endpoints req would dispatch a command to

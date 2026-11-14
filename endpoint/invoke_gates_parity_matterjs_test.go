@@ -122,3 +122,37 @@ func TestInvokeExistenceBeforeFlagGatesParity(t *testing.T) {
 		t.Errorf("server ran %d commands, want 0", srv.invokes)
 	}
 }
+
+// TestWildcardInvokeUndecodableFieldsParity: a wildcard-endpoint command
+// whose fields do not decode answers the decode status once per endpoint it
+// targets, and runs nowhere. matter.js selects the endpoints first
+// (#processEndpointForWildcard → #wildcardTargetOf,
+// CommandInvokeResponse.ts:330-361 at db021da0) and decodes per endpoint in
+// #invokeCommand (:484-487, the failure a status for that endpoint
+// :509-546); no target, no status.
+func TestWildcardInvokeUndecodableFieldsParity(t *testing.T) {
+	t.Parallel()
+	const onOff, off = uint32(0x0006), uint32(0x00)
+	wild := im.ConcreteCommandPath{Cluster: onOff, Command: off, HasCluster: true, HasCommand: true}
+	inv := im.CommandInvocation{Path: wild, DecodeStatus: im.StatusInvalidCommand, CommandRef: 4, HasCommandRef: true}
+
+	srv := &gateServer{id: onOff, attrs: []uint32{0x0000}, vals: map[uint32]any{}}
+	d := gateDispatcher(t, store.PrivilegeAdminister, srv)
+	resp := im.HandleInvokeRequest(caseCtx(false), d, im.InvokeRequest{Invokes: []im.CommandInvocation{inv}})
+	if len(resp.Responses) != 1 {
+		t.Fatalf("responses %+v, want one", resp.Responses)
+	}
+	r := resp.Responses[0]
+	if !r.IsStatus || r.Status.Status != im.StatusInvalidCommand || r.Path != cmdAt(2, onOff, off) || r.CommandRef != 4 || !r.HasCommandRef {
+		t.Errorf("response %+v, want INVALID_COMMAND at endpoint 2 with CommandRef 4", r)
+	}
+	if srv.invokes != 0 {
+		t.Errorf("server ran %d commands, want 0", srv.invokes)
+	}
+
+	// No endpoint the session may invoke the command on: no status at all.
+	denied := gateDispatcher(t, store.PrivilegeView, &gateServer{id: onOff, attrs: []uint32{0x0000}, vals: map[uint32]any{}})
+	if resp := im.HandleInvokeRequest(caseCtx(false), denied, im.InvokeRequest{Invokes: []im.CommandInvocation{inv}}); len(resp.Responses) != 0 {
+		t.Errorf("denied everywhere: responses %+v, want none", resp.Responses)
+	}
+}
