@@ -52,10 +52,15 @@ func (v AttributeValue) JSON() (json.RawMessage, error) {
 // ReadAttribute returns the value one attribute of the node serves, read
 // through the node's own read path — the cluster server's MatterRead, as a
 // controller's read reaches it — with the cluster's DataVersion. It applies
-// no access control (the host reads its own node) and no fabric: a
-// fabric-scoped list holds every fabric's entries, their fabric-sensitive
-// fields withheld. An attribute the node does not serve is a
-// [contract.StatusError] with the status a controller's read receives
+// no access control (the host reads its own node) and no fabric: it reads
+// as matter.js's local actor, so a fabric-scoped list holds every fabric's
+// entries whole, their fabric-sensitive fields included
+// (packages/protocol/src/action/server/AccessControl.ts:250-253, :342-345
+// and packages/node/src/behavior/state/managed/values/ListManager.ts:609-616
+// at db021da0). A value read here is the node's own; a host that shows it
+// to a less trusted viewer withholds what that viewer may not see. An
+// attribute the node does not serve is a [contract.StatusError] with the
+// status a controller's read receives
 // (UNSUPPORTED_ENDPOINT, UNSUPPORTED_CLUSTER, UNSUPPORTED_ATTRIBUTE);
 // before [Node.Start] it is [ErrNotStarted].
 func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attribute uint32) (AttributeValue, error) {
