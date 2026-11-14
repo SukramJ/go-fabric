@@ -155,11 +155,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	body := buf[hdrLen:]
 
 	plain, duplicate, err := b.decryptIfNeeded(&hdr, body)
-	if unsecuredSource := hdr.SessionID == 0 && hdr.HasSourceNodeID && hdr.SourceNodeID != 0; unsecuredSource {
-		// The source's window lives on past this message only if a
-		// handshake holds its exchange ([unsecuredWindowTable]).
-		defer b.releaseUnsecuredWindow(hdr.SourceNodeID)
-	}
+	// An unsecured source's window lives on past this message only if a
+	// handshake holds its exchange ([unsecuredWindowTable]).
+	defer b.releaseUnsecuredWindow(&hdr)
 	if err != nil {
 		return err
 	}
@@ -198,16 +196,14 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Any("err", err))
 		return err
 	}
-	if hdr.SessionID == 0 && hdr.HasSourceNodeID && hdr.SourceNodeID != 0 {
-		b.bindUnsecuredWindow(hdr.SourceNodeID, proto.ExchangeID)
-	}
+	b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
 
 	// Reliable inbound traffic: register an ACK obligation. The
 	// pump goroutine fires a StandaloneAck if no piggyback opportunity
 	// arises within the grace window; sendReply paths discharge the
 	// obligation directly when they fire.
 	if proto.NeedsAck {
-		b.owedInboundAck(src, &hdr, proto)
+		b.owedInboundAck(b.inboundAckRoute(src, &hdr, proto, duplicate), &hdr, proto)
 	}
 
 	// Authentic duplicate (MRP retransmit): we already ran the IM
@@ -396,9 +392,22 @@ func (b *Bridge) acquireUnsecuredWindow(id uint64, use bool) *mrp.Window {
 	return e.window
 }
 
-// bindUnsecuredWindow records exchangeID as the exchange of id's latest
-// message.
-func (b *Bridge) bindUnsecuredWindow(id uint64, exchangeID uint16) {
+// unsecuredSource returns the source node id an unsecured message's window
+// is keyed by, and false for a message that has none.
+func unsecuredSource(hdr *message.Header) (uint64, bool) {
+	if hdr.SessionID != 0 || !hdr.HasSourceNodeID || hdr.SourceNodeID == 0 {
+		return 0, false
+	}
+	return hdr.SourceNodeID, true
+}
+
+// bindUnsecuredWindow records exchangeID as the exchange of the latest
+// message of hdr's unsecured source.
+func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
+	id, ok := unsecuredSource(hdr)
+	if !ok {
+		return
+	}
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -407,10 +416,15 @@ func (b *Bridge) bindUnsecuredWindow(id uint64, exchangeID uint16) {
 	}
 }
 
-// releaseUnsecuredWindow ends one message of id in dispatch and drops the
-// window when no message of id is in dispatch and its exchange holds no
-// handshake state — the message was not adopted by a handshake, or ended it.
-func (b *Bridge) releaseUnsecuredWindow(id uint64) {
+// releaseUnsecuredWindow ends one message of hdr's unsecured source in
+// dispatch and drops the window when no message of that source is in
+// dispatch and its exchange holds no handshake state — the message was not
+// adopted by a handshake, or ended it.
+func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
+	id, ok := unsecuredSource(hdr)
+	if !ok {
+		return
+	}
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	e, ok := t.entries[id]
@@ -478,6 +492,30 @@ func (b *Bridge) unsecuredExchangeLive(exchangeID uint16) bool {
 		return true
 	}
 	return tracker != nil && tracker.holdsUnsecuredExchange(exchangeID)
+}
+
+// inboundAckRoute is the route the acknowledgement of an inbound message
+// goes by: where it came from, unless it is a secure session's duplicate.
+// A duplicate does not move the exchange's acknowledgement route, the rule
+// the session route follows (by_design BD-chip-SessionRouteByNewCounter): a
+// captured datagram decrypts again from anywhere, so it is answered at the
+// route the exchange already has, else the session's route (bound by new
+// messages only), else none — the obligation is then dropped by the pump,
+// and the peer's next new message repairs the route.
+func (b *Bridge) inboundAckRoute(src net.Addr, hdr *message.Header, proto message.ProtocolHeader, duplicate bool) net.Addr {
+	if !duplicate || hdr.SessionID == 0 || !routeUsesMRP(src) {
+		return src
+	}
+	key := mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
+	if target, ok := b.replyRoute(key); ok && !isNilRoute(target.src) {
+		return target.src
+	}
+	if raw, ok := b.sessionPeerAddrs.Load(hdr.SessionID); ok {
+		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
+			return addr
+		}
+	}
+	return nil
 }
 
 // decryptIfNeeded returns the plaintext body for the datagram. For
