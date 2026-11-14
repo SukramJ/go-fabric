@@ -5,6 +5,8 @@ package bridge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -21,6 +23,7 @@ import (
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -197,6 +200,7 @@ func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 	b.closePrimingAbort(subID)
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
+	b.subAccess.Delete(subID)
 	b.forgetReportExchange(subID)
 	// reportCounterOwner is keyed by (session, counter), so the owning
 	// subscription is only visible in the value — a scan is the only
@@ -378,6 +382,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	}
 	target, ok := b.subscriptionTargetOf(sub)
 	if !ok {
+		return
+	}
+	if dispatcher := b.Dispatcher(); dispatcher != nil && b.endIfSubjectReadsNothing(ctx, dispatcher, target, sub) {
 		return
 	}
 	// The attribute changes due in this report are this reporter's from
@@ -612,6 +619,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	if !ok {
 		return
 	}
+	if b.endIfSubjectReadsNothing(ctx, dispatcher, target, sub) {
+		return
+	}
 
 	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
 	target.abort = ctx.Done()
@@ -662,6 +672,230 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		slog.Int("paths", len(paths)),
 		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
+}
+
+// endIfSubjectReadsNothing ends sub, terminated, when the subject it was
+// established for may read none of its paths any more
+// ([Bridge.subjectReadsNothing]) and reports whether it did: a report finds
+// the subject without a readable path after an ACL change, and the
+// subscription gives its place in the fabric's quota back instead of
+// living on on keep-alives (review II, R2-P3-admin-03, owner decision 53).
+// The rule is the module's own, beside its own quota; it mirrors no
+// reference line.
+func (b *Bridge) endIfSubjectReadsNothing(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
+	if !b.subjectReadsNothing(ctx, dispatcher, target, sub) {
+		return false
+	}
+	b.routing.subTargets.Delete(sub.ID)
+	b.subSendErrorCount.Delete(sub.ID)
+	b.subAccess.Delete(sub.ID)
+	b.forgetReportExchange(sub.ID)
+	if m := b.subscriptionManagerLocked(); m != nil {
+		_ = m.Close(sub.ID) // ErrNotFound is fine — racing with peer Close
+	}
+	if b.logger != nil {
+		b.logger.Info("matter.subscribe.subject_reads_nothing",
+			slog.Int("subscription_id", int(sub.ID)),
+			slog.Int("fabric_index", int(target.fabricIndex)))
+	}
+	return true
+}
+
+// subjectAccess is what [Bridge.subjectReadsNothing] remembers of one
+// subscription between its reports.
+type subjectAccess struct {
+	mu sync.Mutex
+	// passed: the subject last read a path of the subscription under
+	// passedACL, the fabric's entries, and the served topology passedGen.
+	passed    bool
+	passedACL []store.ACLEntry
+	passedGen uint64
+	// refused: a first observation found every path refused under
+	// refusedACL, the paths the node served then fingerprinted by
+	// refusedServed; a second one under the same ends the subscription.
+	refused       bool
+	refusedACL    []store.ACLEntry
+	refusedServed [sha256.Size]byte
+}
+
+// subjectReadsNothing reports whether the subscription's subject is
+// refused every attribute and every event cluster its paths resolve to,
+// at least one of them, at two consecutive observations of one unchanged
+// ACL of its fabric and one set of the subscription's paths the node
+// serves — not a count of reassemblies, which moves without a change
+// (review II, R2-P3-rr-dev-03) — one observation is not
+// enough, since a list write of the ACL stores its REPLACE before its
+// appends and an observation between them finds the entries missing
+// (review II, R2-P3-dr-dev-01). It decides nothing while a chunked write
+// of the fabric's ACL is in progress (the write's hold, owner decision
+// 52), nor on a fabric ACL it cannot list: the walk over the paths is
+// judged against the entries listed for it, never against a second read
+// that may fail (R2-P3-dr-dev-05). A path that resolves to no attribute
+// the node serves is no refusal (R2-P3-dr-dev-04). The walk runs only when
+// the fabric's entries or the served topology differ from those the
+// subject last passed under, not before every report (R2-P3-dr-dev-06);
+// the entries are read at each report, the one store read the decision
+// costs. A PASE subscription, a dispatcher without an ACL, a session
+// without an accessing fabric, a bridge without an ACL source, and any
+// answer of the access check other than UNSUPPORTED_ACCESS leave the
+// subscription alone.
+func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
+	checker, hasACL := dispatcher.(im.ACLChecker)
+	if target.pase || !hasACL || !im.HasAccessingFabric(target.fabricIndex) {
+		return false
+	}
+	b.mu.RLock()
+	lister := b.aclLister
+	gen := b.servedGen
+	b.mu.RUnlock()
+	if lister == nil || b.aclWriteInProgress(target.fabricIndex) {
+		return false
+	}
+	entries, err := lister.ListACL(ctx, target.fabricIndex)
+	if err != nil {
+		return false
+	}
+	raw, _ := b.subAccess.LoadOrStore(sub.ID, &subjectAccess{})
+	st, ok := raw.(*subjectAccess)
+	if !ok {
+		return false
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.passed && st.passedGen == gen && reflect.DeepEqual(st.passedACL, entries) {
+		return false
+	}
+	refused, served := b.subjectRefusedEveryPath(withPinnedACL(ctx, target.fabricIndex, entries), checker, dispatcher, target, sub)
+	if ctx.Err() != nil {
+		return false
+	}
+	if !refused {
+		st.passed, st.passedACL, st.passedGen = true, entries, gen
+		st.refused, st.refusedACL = false, nil
+		return false
+	}
+	if st.refused && st.refusedServed == served && reflect.DeepEqual(st.refusedACL, entries) && !b.aclWriteInProgress(target.fabricIndex) {
+		return true
+	}
+	st.passed, st.passedACL = false, nil
+	st.refused, st.refusedACL, st.refusedServed = true, entries, served
+	return false
+}
+
+// aclWriteInProgress reports whether a chunked write of fabricIndex's ACL
+// (AccessControl, endpoint 0, attribute ACL) holds the attribute.
+func (b *Bridge) aclWriteInProgress(fabricIndex uint8) bool {
+	return b.routing.writeHolds.Held(fabricIndex, 0, accessControlClusterID, accessControlACLAttributeID)
+}
+
+// accessControlClusterID and accessControlACLAttributeID name the
+// AccessControl cluster's ACL attribute, the ids im/write_chunking.go
+// names (accessControlCluster, accessControlACL).
+const (
+	accessControlClusterID      uint32 = 0x001F
+	accessControlACLAttributeID uint32 = 0x0000
+)
+
+// subjectRefusedEveryPath walks the subscription's paths, as ctx's subject
+// under its pinned ACL, and reports whether at least one is refused and
+// none may be read; it stops at the first path the subject may read. For
+// a refusal, served fingerprints the paths the walk found served — every
+// concrete attribute path and event cluster it judged, in walk order.
+func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) (refused bool, served [sha256.Size]byte) {
+	digest := sha256.New()
+	note := func(kind byte, endpoint uint16, cluster, attribute uint32) {
+		var rec [11]byte
+		rec[0] = kind
+		binary.BigEndian.PutUint16(rec[1:], endpoint)
+		binary.BigEndian.PutUint32(rec[3:], cluster)
+		binary.BigEndian.PutUint32(rec[7:], attribute)
+		digest.Write(rec[:])
+	}
+	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
+	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
+	exp := im.NewAttributeExpansion(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
+	for {
+		_, rr, ok := exp.Next()
+		if !ok {
+			break
+		}
+		if notServed(rr.Status) {
+			continue // nothing the node serves: no refusal (R2-P3-dr-dev-04)
+		}
+		var priv uint8 = 1 // View default
+		if hasPriv {
+			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
+		}
+		if checker.CheckACL(readCtx, target.fabricIndex, target.subjectNodeID, target.subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv) != im.StatusUnsupportedAccess {
+			return false, served
+		}
+		note('a', rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
+		refused = true
+	}
+	auth := b.eventReadAuthorizer(dispatcher, target.fabricIndex, false, target.subjectNodeID, target.subjectCATs)
+	for _, p := range sub.EventPaths {
+		probe := im.ConcreteAttributePath{
+			Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
+			Cluster: p.Cluster, HasCluster: p.HasCluster,
+			Attribute: clusterRevisionAttributeID, HasAttribute: true,
+		}
+		for _, rr := range dispatcher.Read(readCtx, probe) {
+			if rr.Status != im.StatusSuccess {
+				continue
+			}
+			if auth.Allows(readCtx, rr.Path.Endpoint, rr.Path.Cluster) {
+				return false, served
+			}
+			note('e', rr.Path.Endpoint, rr.Path.Cluster, 0)
+			refused = true
+		}
+	}
+	digest.Sum(served[:0])
+	return refused, served
+}
+
+// notServed reports whether a read result's status says that its path
+// resolves to nothing the node serves.
+func notServed(st im.StatusCode) bool {
+	return st == im.StatusUnsupportedNode || st == im.StatusUnsupportedEndpoint ||
+		st == im.StatusUnsupportedCluster || st == im.StatusUnsupportedAttribute
+}
+
+// pinnedACL is a fabric's ACL as one listing returned it, attached to a
+// context by [withPinnedACL].
+type pinnedACL struct {
+	fabricIndex uint8
+	entries     []store.ACLEntry
+}
+
+type pinnedACLKey struct{}
+
+// withPinnedACL has every access check made under ctx judge fabricIndex
+// against entries instead of reading the ACL source again.
+func withPinnedACL(ctx context.Context, fabricIndex uint8, entries []store.ACLEntry) context.Context {
+	return context.WithValue(ctx, pinnedACLKey{}, pinnedACL{fabricIndex: fabricIndex, entries: entries})
+}
+
+// pinnedACLSource is the ACL source the bridge hands its dispatcher: the
+// attached one, except for a context that carries a pinned ACL of the
+// fabric asked for ([withPinnedACL]).
+type pinnedACLSource struct{ inner endpointpkg.ACLLister }
+
+func (s pinnedACLSource) ListACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
+	if pin, ok := ctx.Value(pinnedACLKey{}).(pinnedACL); ok && pin.fabricIndex == fabricIndex {
+		return pin.entries, nil
+	}
+	return s.inner.ListACL(ctx, fabricIndex)
+}
+
+// pinnableACL wraps l for the dispatcher; nil stays nil, so a bridge
+// without an ACL source keeps denying every operational request.
+func pinnableACL(l endpointpkg.ACLLister) endpointpkg.ACLLister {
+	if l == nil {
+		return nil
+	}
+	return pinnedACLSource{inner: l}
 }
 
 // subscriptionAttributeReports reads paths for sub — the changed ones its
@@ -1514,6 +1748,21 @@ func (b *Bridge) subscribeWith(
 	// (subscription_reestablish.go) already admits first.
 	var stamp im.ReportData
 	subID, regErr := b.registerSubscription(src, requestHdr, proto, req, &stamp)
+	if errors.Is(regErr, subscription.ErrFabricQuotaExceeded) {
+		// The fabric holds its quota. connectedhomeip's rule: the access
+		// check first — a request whose paths the subject may read none of
+		// is InvalidAction (src/app/InteractionModelEngine.cpp:861-868 at
+		// 6170af84), as it is here with room (no_match below) — then the
+		// eviction that makes room, so the request is admitted in the
+		// place of the fabric's oldest subscription (:871-875,
+		// :1341-1350). A subject that may read nothing takes nobody's
+		// place (review II, R2-P3-admin-03, owner decision 53).
+		if !b.primingMatches(subCtx, dispatcher, primingRequest(req, subLocalNodeID)) {
+			return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
+		}
+		stamp = im.ReportData{}
+		subID, regErr = b.registerSubscriptionAt(src, requestHdr, proto, req, &stamp, true)
+	}
 	if regErr != nil {
 		// The manager refused the subscription (per-fabric quota, cadence
 		// out of range, cadence inverted after clamp). The controller must
@@ -1539,8 +1788,7 @@ func (b *Bridge) subscribeWith(
 	// One EventFilterIB applies to the priming report: the first for this
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
-	primingReq := req
-	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, subLocalNodeID)
+	primingReq := primingRequest(req, subLocalNodeID)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
@@ -1590,6 +1838,14 @@ func (b *Bridge) subscribeWith(
 	// SubscribeResponse).
 	b.persistSubscription(ctx, subID)
 	return nil
+}
+
+// primingRequest is req as its priming report reads it: one EventFilterIB
+// applies, the first for this node (matter.js EventReadResponse.ts:68-77;
+// review 2026-11 W2-wire-05).
+func primingRequest(req im.SubscribeRequest, localNodeID uint64) im.SubscribeRequest {
+	req.EventFilters = im.EventFiltersFor(req.EventFilters, localNodeID)
+	return req
 }
 
 // rejectSubscribeInvalidAction ships a top-level

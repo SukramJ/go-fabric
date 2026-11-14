@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/SukramJ/go-fabric/transport"
 )
@@ -66,6 +67,15 @@ type Conn struct {
 	// idle timer reads it (TcpTransport.ts:89-104 receivedData).
 	received atomic.Bool
 
+	// now is the monotonic reading of the accepting listener's clock;
+	// nil for a dialed connection, whose traffic nothing measures. With
+	// it, every complete message received and every message sent stores
+	// its reading in lastTraffic and sets traffic: the listener's measure
+	// of how long the connection has been idle at its total bound.
+	now         func() time.Duration
+	traffic     atomic.Bool
+	lastTraffic atomic.Int64
+
 	recoveredPanics *panicCounter
 }
 
@@ -113,7 +123,27 @@ func (c *Conn) Send(msg []byte) error {
 		}
 		return fmt.Errorf("tcp: write %s: %w", c.remote, err)
 	}
+	c.markTraffic()
 	return nil
+}
+
+// markTraffic records a message received or sent at the listener's
+// current reading; a no-op on a dialed connection.
+func (c *Conn) markTraffic() {
+	if c.now == nil {
+		return
+	}
+	c.lastTraffic.Store(int64(c.now()))
+	c.traffic.Store(true)
+}
+
+// idleSince is the reading of the connection's last message received or
+// sent, and false when it carried none.
+func (c *Conn) idleSince() (time.Duration, bool) {
+	if !c.traffic.Load() {
+		return 0, false
+	}
+	return time.Duration(c.lastTraffic.Load()), true
 }
 
 // Remote is the peer's address (a [*net.TCPAddr]).
@@ -246,6 +276,7 @@ func (c *Conn) serve(handler Handler) {
 			msgs, ferr := asm.push(buf[:n])
 			for _, msg := range msgs {
 				c.received.Store(true)
+				c.markTraffic()
 				select {
 				case sem <- struct{}{}:
 				case <-c.closed:

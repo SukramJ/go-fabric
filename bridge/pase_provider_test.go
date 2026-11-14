@@ -23,8 +23,8 @@ func TestPerExchangePaseProvider_Reuses(t *testing.T) {
 			calls.Add(1)
 			return NewPaseAdapter(nil)
 		})
-		first := p.Resolve(42)
-		second := p.Resolve(42)
+		first := p.Resolve(onExchange(42))
+		second := p.Resolve(onExchange(42))
 		if first != second {
 			t.Errorf("Resolve same exchange returned distinct adapters: %p vs %p", first, second)
 		}
@@ -48,8 +48,8 @@ func TestPerExchangePaseProvider_IsolatesExchanges(t *testing.T) {
 			calls.Add(1)
 			return NewPaseAdapter(nil)
 		})
-		a1 := p.Resolve(1)
-		a2 := p.Resolve(2)
+		a1 := p.Resolve(onExchange(1))
+		a2 := p.Resolve(onExchange(2))
 		if a1 == a2 {
 			t.Error("Resolve different exchanges returned the same adapter; state would race")
 		}
@@ -69,7 +69,7 @@ func TestPerExchangePaseProvider_NilFactory(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangePaseProvider(nil)
-		if h := p.Resolve(7); h != nil {
+		if h := p.Resolve(onExchange(7)); h != nil {
 			t.Errorf("nil factory: Resolve returned %v, want nil", h)
 		}
 		if got := p.Active(); got != 0 {
@@ -85,7 +85,7 @@ func TestPerExchangePaseProvider_FactoryReturnsNil(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter { return nil })
-		if h := p.Resolve(9); h != nil {
+		if h := p.Resolve(onExchange(9)); h != nil {
 			t.Errorf("factory returned nil: Resolve should also return nil, got %v", h)
 		}
 		if got := p.Active(); got != 0 {
@@ -100,12 +100,12 @@ func TestPerExchangePaseProvider_ForgetReleases(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter { return NewPaseAdapter(nil) })
-		first := p.Resolve(5)
-		p.Forget(5)
+		first := p.Resolve(onExchange(5))
+		p.Forget(onExchange(5))
 		if got := p.Active(); got != 0 {
 			t.Errorf("Active after Forget: %d, want 0", got)
 		}
-		second := p.Resolve(5)
+		second := p.Resolve(onExchange(5))
 		if first == second {
 			t.Error("Resolve after Forget returned the stale adapter")
 		}
@@ -119,7 +119,7 @@ func TestPerExchangePaseProvider_ResetClearsAll(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter { return NewPaseAdapter(nil) })
 		for id := uint16(1); id <= 5; id++ {
-			p.Resolve(id)
+			p.Resolve(onExchange(id))
 		}
 		if got := p.Active(); got != 5 {
 			t.Errorf("Active before Reset: %d, want 5", got)
@@ -141,7 +141,7 @@ func TestPerExchangePaseProvider_ReapBefore_EvictsStale(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter { return NewPaseAdapter(nil) })
 
 		// First Resolve populates exchange 1.
-		_ = p.Resolve(1)
+		_ = p.Resolve(onExchange(1))
 		earlyTouch := time.Now()
 
 		// The bubble's virtual clock moves 10 ms: the second entry's
@@ -149,7 +149,7 @@ func TestPerExchangePaseProvider_ReapBefore_EvictsStale(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Second Resolve populates exchange 2.
-		_ = p.Resolve(2)
+		_ = p.Resolve(onExchange(2))
 
 		// Reap with a cutoff between the two — exchange 1 must die,
 		// exchange 2 must survive.
@@ -196,7 +196,7 @@ func TestPerExchangePaseProvider_FactoryProducesRealAdapter(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter {
 			return NewPaseAdapter(spake2.NewVerifier(vc, nil, nil, []byte(spake2.MatterContext)))
 		})
-		if h := p.Resolve(11); h == nil {
+		if h := p.Resolve(onExchange(11)); h == nil {
 			t.Error("Resolve returned nil for a fully-functional factory")
 		}
 	})

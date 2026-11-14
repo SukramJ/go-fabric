@@ -36,6 +36,16 @@ func (d reannouncingDriver) ConnectNetwork(ctx context.Context, ssid, credential
 	return status, debugText, errorValue
 }
 
+// CurrentNetwork forwards to the host's driver when it is a
+// [contract.WiFiLinkReporter], so the cluster asks it where the radio is
+// after a failed join; without one the network is not known.
+func (d reannouncingDriver) CurrentNetwork(ctx context.Context) (ssid []byte, known bool) {
+	if r, ok := d.WiFiDriver.(contract.WiFiLinkReporter); ok {
+		return r.CurrentNetwork(ctx)
+	}
+	return nil, false
+}
+
 // wifiDriver is [Network].WiFi's Driver wrapped for the cluster, nil
 // without one.
 func (n *Node) wifiDriver() contract.WiFiDriver {

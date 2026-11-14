@@ -89,6 +89,9 @@ type PaseAdapter struct {
 	// established is set once Pake3 verified and the pickup callback
 	// registered the session under responderSessionID.
 	established bool
+	// onUnfinished and releasedStaked: see [PaseAdapter.SetOnUnfinished].
+	onUnfinished   func(sessionID uint16)
+	releasedStaked bool
 	// randomSource feeds ResponderRandom in ProcessPBKDFParamRequest.
 	// Nil means crypto/rand. In-package tests assign a deterministic
 	// source directly, before the handshake starts (no concurrent
@@ -194,6 +197,36 @@ func (a *PaseAdapter) SetOnSessionEstablished(cb PaseSessionEstablished) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.onEstablished = cb
+}
+
+// SetOnUnfinished installs fn, called once with the responder session id
+// the adapter announces when its provider drops the adapter
+// ([PerExchangePaseProvider]: the 60 s exchange timeout, the reaper,
+// Forget, Reset) without a session established under that id, so the host
+// returns the id it staked for the handshake (operational
+// Manager.ReleaseID). matter.js reserves no id ahead of the session
+// (packages/protocol/src/session/SessionManager.ts:581-598 at db021da0);
+// an id staked for the PBKDFParamResponse goes back as soon as the
+// handshake can no longer finish. Pass nil to clear.
+func (a *PaseAdapter) SetOnUnfinished(fn func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onUnfinished = fn
+}
+
+// releaseStakedID calls the [PaseAdapter.SetOnUnfinished] hook with the
+// announced session id, unless a session was established under it or the
+// id was returned already.
+func (a *PaseAdapter) releaseStakedID() {
+	a.mu.Lock()
+	fn, id := a.onUnfinished, a.responderSessionID
+	if fn == nil || a.established || a.releasedStaked {
+		a.mu.Unlock()
+		return
+	}
+	a.releasedStaked = true
+	a.mu.Unlock()
+	fn(id)
 }
 
 // SetPBKDFParams configures the PBKDF salt + iteration count the
@@ -503,7 +536,8 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 // resumptionId + initiatorResumeMic triggers a one-round-trip resume
 // instead of Full Sigma.
 type CaseAdapter struct {
-	// mu guards established, establishedSessionID, lastSigma2 and responder.
+	// mu guards established, establishedSessionID, lastSigma2, sigma3Digest,
+	// sigma3Accepted and responder.
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished
@@ -530,6 +564,78 @@ type CaseAdapter struct {
 	// a Sigma1 that yields the same bytes is recognised as the
 	// responder's idempotent replay rather than a restart.
 	lastSigma2 []byte
+	// sigma3Digest is the SHA-256 of the Sigma3 that established the
+	// current session, when sigma3Accepted: a Sigma3 of the same bytes is
+	// its retransmission, any other Sigma3 on the established handshake is
+	// refused ([CaseAdapter.ProcessSigma3]). A resume establishes without
+	// a Sigma3 and accepts none.
+	sigma3Digest   [32]byte
+	sigma3Accepted bool
+	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
+	onUnfinished   func(sessionID uint16)
+	releasedStaked bool
+	// detach, set by the [PerExchangeCaseProvider] that built the adapter,
+	// drops the adapter from the provider once its handshake failed.
+	detach func()
+}
+
+// SetOnUnfinished installs fn, called once with the session id the
+// adapter's responder announces when the adapter's handshake ends without
+// a session established under that id — a failed Sigma1 or Sigma3 on an
+// adapter a [PerExchangeCaseProvider] manages, or the provider dropping
+// the adapter (the reaper, Forget, Reset) — so the host returns the id it
+// staked for the handshake (operational Manager.ReleaseID). matter.js
+// reserves no id ahead of the session (packages/protocol/src/session/SessionManager.ts:581-598
+// at db021da0). A failed adapter leaves its provider at once, so the id
+// it returned is never announced again. Pass nil to clear.
+func (a *CaseAdapter) SetOnUnfinished(fn func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onUnfinished = fn
+}
+
+// setDetach is the provider's hook that drops the adapter
+// ([PerExchangeCaseProvider.Resolve]).
+func (a *CaseAdapter) setDetach(fn func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.detach = fn
+}
+
+// releaseStakedID calls the [CaseAdapter.SetOnUnfinished] hook with the
+// session id the responder announces, unless a session was established
+// under it or the id was returned already.
+func (a *CaseAdapter) releaseStakedID() {
+	r := a.snapshotResponder()
+	if r == nil {
+		return
+	}
+	id := r.SessionID()
+	a.mu.Lock()
+	fn := a.onUnfinished
+	if fn == nil || a.releasedStaked || (a.established && a.establishedSessionID == id) {
+		a.mu.Unlock()
+		return
+	}
+	a.releasedStaked = true
+	a.mu.Unlock()
+	fn(id)
+}
+
+// handshakeFailed ends a failed handshake on an adapter its provider
+// manages: the adapter leaves the provider (a later message of the same
+// initiator and exchange meets a fresh one) and returns its staked id. An
+// adapter without a provider's detach hook keeps its id: whoever holds it
+// may run the next handshake on it, under that id.
+func (a *CaseAdapter) handshakeFailed() {
+	a.mu.RLock()
+	detach := a.detach
+	a.mu.RUnlock()
+	if detach == nil {
+		return
+	}
+	a.releaseStakedID()
+	detach()
 }
 
 // CaseSessionEstablished fires after a successful Sigma3 verification.
@@ -624,6 +730,7 @@ func (a *CaseAdapter) SetResponder(r *sigma.Responder) {
 	a.established = false
 	a.establishedSessionID = 0
 	a.lastSigma2 = nil
+	a.sigma3Accepted = false
 	a.mu.Unlock()
 }
 
@@ -699,6 +806,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			caseFailureProtocolCode(err),
 			nil,
 		)
+		a.handshakeFailed()
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 
@@ -720,6 +828,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		install := !a.established || sessionID != a.establishedSessionID
 		a.established = true
 		a.establishedSessionID = sessionID
+		a.sigma3Accepted = false
 		a.mu.Unlock()
 		if install && a.onEstablished != nil {
 			// The callback's second argument is the PEER's session id
@@ -749,6 +858,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	a.mu.Lock()
 	if !bytes.Equal(out, a.lastSigma2) {
 		a.established = false
+		a.sigma3Accepted = false
 		a.lastSigma2 = out
 	}
 	a.mu.Unlock()
@@ -776,56 +886,111 @@ func caseFailureProtocolCode(err error) uint16 {
 // session AFTER receiving this success report. Without it Apple
 // retransmits Sigma1 every ~30s and the pairing UI hangs at
 // "verbinden …".
+//
+// Once the handshake established its session, a Sigma3 of the same bytes
+// as the one that established it is answered with the success report
+// again, and any other Sigma3 with StatusReport(FAILURE, InvalidParameter);
+// neither reaches the responder or changes the session (review II,
+// R2-P3-rr-dev-01).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
-	r := a.snapshotResponder()
+	opcode, respPayload, _, err = a.processSigma3(payload)
+	return opcode, respPayload, err
+}
+
+// sigma3Outcome is what one Sigma3 did to the handshake it names.
+type sigma3Outcome uint8
+
+const (
+	// sigma3Failed: the Sigma3 ended the handshake without a session —
+	// refused, or failed with an error.
+	sigma3Failed sigma3Outcome = iota
+	// sigma3Established: this Sigma3 established the session.
+	sigma3Established
+	// sigma3OfCompleted: the handshake had established its session
+	// before; the Sigma3 changed nothing (answered with the success
+	// report when it is the accepted Sigma3's retransmission, refused
+	// otherwise).
+	sigma3OfCompleted
+)
+
+// processSigma3 is [CaseAdapter.ProcessSigma3] with the outcome of this
+// one call, which the bridge binds the session's route and records its
+// establishment by: read back from shared state it could belong to
+// another, concurrent Sigma3.
+func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, err error) {
+	digest := sha256.Sum256(payload)
+	// Held across the responder's step so the check of an established
+	// handshake and the establishment itself are one step for concurrent
+	// Sigma3 datagrams; released before the callbacks.
+	a.mu.Lock()
+	r := a.responder
 	if r == nil {
-		return 0, nil, errors.New("bridge: CaseAdapter without responder")
+		a.mu.Unlock()
+		return 0, nil, sigma3Failed, errors.New("bridge: CaseAdapter without responder")
+	}
+	if a.established {
+		retransmitted := a.sigma3Accepted && digest == a.sigma3Digest
+		a.mu.Unlock()
+		if retransmitted {
+			return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3OfCompleted, nil
+		}
+		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3OfCompleted, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
+		a.mu.Unlock()
 		// Emit StatusReport(FAILURE, InvalidParameter) so the commissioner
 		// terminates the CASE exchange immediately instead of retransmitting
 		// Sigma3. Mirrors chip CASESession.cpp error-exit pattern.
-		body := mrp.EncodeStatusReport(
-			mrp.SCStatusGeneralFailure,
-			uint32(mrp.SecureChannelProtocolID),
-			mrp.SCStatusProtocolInvalidParameter,
-			nil,
-		)
-		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
+		a.handshakeFailed()
+		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3Failed, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 	// onEstablished must fire EXACTLY ONCE per CASE handshake. Apple's
 	// MRP-layer retransmits Sigma3 when our StatusReport ACK is
-	// in-flight; the Responder treats those as idempotent (success
-	// without re-deriving keys), but we must NOT re-register the
-	// operational session each time — that double-registers the same
-	// session-id in opMgr and confuses Apple's session table.
-	a.mu.Lock()
-	firstEstablish := !a.established
+	// in-flight; such a retransmission meets the established branch
+	// above and does not re-register the operational session — that
+	// double-registers the same session-id in opMgr and confuses Apple's
+	// session table.
 	a.established = true
 	a.establishedSessionID = r.SessionID()
+	a.sigma3Digest, a.sigma3Accepted = digest, true
 	a.mu.Unlock()
-	if firstEstablish && a.onEstablished != nil {
+	if a.onEstablished != nil {
 		keys, ok := r.SessionKeys()
 		if !ok {
-			return 0, nil, errors.New("bridge: CASE keys missing after Sigma3 success")
+			return 0, nil, sigma3Failed, errors.New("bridge: CASE keys missing after Sigma3 success")
 		}
 		if err := a.onEstablished(keys, r.PeerSessionID()); err != nil {
-			return 0, nil, fmt.Errorf("bridge: CASE session pickup: %w", err)
+			return 0, nil, sigma3Failed, fmt.Errorf("bridge: CASE session pickup: %w", err)
 		}
 	}
-	// Per Matter Core §4.13.2.3 + matter.js's CaseServer.#generateSigma2:
-	// after Sigma3 verifies, the responder ships a Secure-Channel
-	// StatusReport(Success/Success) so the commissioner knows the CASE
-	// session is live and operational reads may begin. Without this
-	// reply Apple Home keeps retransmitting Sigma1 and never sends a
-	// single packet on the freshly-allocated session.
-	statusReport := mrp.EncodeStatusReport(
+	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, nil
+}
+
+// caseEstablishedReport is the StatusReport(Success, SessionEstablishmentSuccess)
+// that answers the Sigma3 establishing a CASE session. Per Matter Core
+// §4.13.2.3 + matter.js's CaseServer.#generateSigma2: after Sigma3
+// verifies, the responder ships it so the commissioner knows the CASE
+// session is live and operational reads may begin. Without this reply
+// Apple Home keeps retransmitting Sigma1 and never sends a single packet
+// on the freshly-allocated session.
+func caseEstablishedReport() []byte {
+	return mrp.EncodeStatusReport(
 		mrp.SCStatusGeneralSuccess,
 		uint32(mrp.SecureChannelProtocolID),
 		mrp.SCStatusProtocolSessionEstablishmentSuccess,
 		nil,
 	)
-	return mrp.SCOpcodeStatusReport, statusReport, nil
+}
+
+// caseSigma3Refusal is the StatusReport(FAILURE, InvalidParameter) that
+// refuses a Sigma3.
+func caseSigma3Refusal() []byte {
+	return mrp.EncodeStatusReport(
+		mrp.SCStatusGeneralFailure,
+		uint32(mrp.SecureChannelProtocolID),
+		mrp.SCStatusProtocolInvalidParameter,
+		nil,
+	)
 }
 
 // ProcessSigma2Resume handles an inbound Sigma2_Resume (opcode 0x33)
@@ -843,11 +1008,18 @@ func (a *CaseAdapter) ProcessSigma2Resume(_ []byte) (opcode uint8, respPayload [
 // Trivial passthrough — the MRP layer owns the obligation
 // bookkeeping; the adapter exists so the bridge can stay decoupled
 // from the concrete tracker type (tests substitute a fake).
+//
+// Deprecated: an AckTracker holds the acknowledgements this node owes,
+// which a peer's acknowledgement does not fulfil, so it is not an
+// [AckHandler]; [Bridge.AttachAckTracker] no longer wires one. There is
+// no replacement. Removable in v0.23.0.
 type MRPAckAdapter struct {
 	tracker *mrp.AckTracker
 }
 
 // NewMRPAckAdapter wraps t.
+//
+// Deprecated: see [MRPAckAdapter]. Removable in v0.23.0.
 func NewMRPAckAdapter(t *mrp.AckTracker) *MRPAckAdapter {
 	return &MRPAckAdapter{tracker: t}
 }

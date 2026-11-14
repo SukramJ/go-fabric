@@ -49,6 +49,13 @@ type Manager struct {
 	sessions       map[uint16]*Entry
 	nextID         uint16
 	onSessionClose func(sessionID uint16)
+	// placeholders are the ids [Manager.AllocateID] staked, oldest first,
+	// each with the entry it staked: at a full table the allocator takes
+	// the oldest that still stakes its id from the front instead of
+	// walking the table ([Manager.allocateIDLocked]). An id that left the
+	// table, or holds another entry now, is skipped there and dropped by
+	// [Manager.compactPlaceholdersLocked].
+	placeholders []placeholderRef
 	// onPaseSessionClose fires after onSessionClose for a session
 	// established via PASE (SetOnPaseSessionClose).
 	onPaseSessionClose func(sessionID uint16)
@@ -311,11 +318,14 @@ const SessionIdleTimeout = 5 * time.Minute
 // reaching [Manager.OpenFromSigmaWithID]. Past it the reaper hands the
 // slot back.
 //
-// matter.js has no equivalent because it never reserves an id ahead of
-// the session: `getNextAvailableSessionId`
-// (packages/protocol/src/session/SessionManager.ts:537) is called at
-// the moment the secure session is created. Our CASE responder must
-// announce the id in Sigma2, one round-trip earlier, so an aborted
+// matter.js has no equivalent because it stakes nothing:
+// `getNextAvailableSessionId`
+// (packages/protocol/src/session/SessionManager.ts:581-599 at db021da0)
+// returns the next id no session holds and moves its cursor on
+// (#takeSessionId, :602-606); a handshake takes its id before its
+// session exists (the CASE responder for Sigma2, case/CaseServer.ts:266,
+// the session created at :316) and nothing records the id until then.
+// Our CASE responder stakes the id it announces in Sigma2, so an aborted
 // handshake leaves an id behind and something has to reclaim it —
 // otherwise a peer that opens exchanges and never answers Sigma2 walks
 // the daemon through all 65534 slots and every later CASE handshake,
@@ -653,8 +663,9 @@ func randomInitialSessionID() uint16 {
 // keeps every session it established until it holds more than
 // [MaxSessionsPerPeer], at which point the least recently active ones
 // are force-closed (no CloseSession on the wire). Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:185-189
-// (MAX_SESSIONS_PER_PEER) and :641-680 (#evictExcessSessionsFor).
+// packages/protocol/src/session/SessionManager.ts:201-205
+// (MAX_SESSIONS_PER_PEER) and :690-725 (#evictExcessSessionsFor) at
+// db021da0.
 func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint64, keys sigma.SessionKeys) (*Entry, error) {
 	sess, err := channel.New(channel.Config{
 		EncryptKey:  keys.R2IKey[:], // bridge → peer
@@ -692,9 +703,9 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
-	// Force close, no CloseSession: matter.js SessionManager.ts:676-678
-	// skips the graceful path for the cap because the eviction target
-	// is typically the peer it can no longer reach.
+	// Force close, no CloseSession: matter.js SessionManager.ts:721-723
+	// at db021da0 skips the graceful path for the cap because the
+	// eviction target is typically the peer it can no longer reach.
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return entry, nil
@@ -714,27 +725,152 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 // Hard-coding "1" (the previous behaviour) would collide every
 // parallel CASE session into a single lookup slot and break peer →
 // bridge routing.
+//
+// The id comes back unbound to its stake: at a full table a later
+// allocation may give it to another handshake, and [Manager.ReleaseID] then
+// frees that one's stake. A caller that releases takes a [Stake] from
+// [Manager.AllocateStake] instead.
 func (m *Manager) AllocateID() (uint16, error) {
+	s, err := m.AllocateStake()
+	return s.ID, err
+}
+
+// Stake is a session id [Manager.AllocateStake] reserved for one
+// handshake, and the reservation itself: [Manager.ReleaseStake] frees the
+// id only while it still holds this reservation (review II,
+// R2-P3-dr-dev-07). The zero Stake reserves nothing.
+type Stake struct {
+	// ID is the reserved session id.
+	ID uint16
+	e  *Entry
+}
+
+// AllocateStake is [Manager.AllocateID] returning the stake it made, for
+// [Manager.ReleaseStake].
+func (m *Manager) AllocateStake() (Stake, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	id, err := m.allocateIDLocked()
-	if err != nil {
-		return 0, err
+	// Every id held by a live session — one fabric's administrator can
+	// open them for as many node ids as it issues NOCs: the least recently
+	// active session is closed and its id reused, as matter.js closes
+	// findOldestInactiveSession's session and takes its id
+	// (packages/protocol/src/session/SessionManager.ts:590-598, :564-572
+	// at db021da0). Its close runs below, outside the lock (review II,
+	// R2-P3-admin-05).
+	var evicted *Entry
+	if errors.Is(err, ErrSessionExhausted) {
+		if evicted = m.leastRecentlyActiveLocked(); evicted != nil {
+			delete(m.sessions, evicted.SessionID)
+			id, err = evicted.SessionID, nil
+		}
 	}
+	if err != nil {
+		m.mu.Unlock()
+		return Stake{}, err
+	}
+	defer m.closeEvicted(evicted)
+	defer m.mu.Unlock()
 	// Stake a placeholder so concurrent allocators do not hand the
 	// same id out twice; OpenFromSigmaWithID overwrites it. The stamp
 	// is what lets the reaper tell an in-flight handshake from one
 	// that was abandoned — see [PlaceholderIDTTL].
-	m.sessions[id] = &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
-	return id, nil
+	e := &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
+	m.sessions[id] = e
+	m.placeholders = append(m.placeholders, placeholderRef{id: id, e: e})
+	m.compactPlaceholdersLocked()
+	return Stake{ID: id, e: e}, nil
 }
+
+// leastRecentlyActiveLocked returns the live session with the least recent
+// traffic, any fabric, PASE or CASE, as matter.js's findOldestInactiveSession
+// filters none (SessionManager.ts:564-572, #leastRecentlyUsedSession
+// :553-562 at db021da0); nil when no live session exists. The order is
+// [lessRecentlyActive]'s. Caller holds m.mu.
+func (m *Manager) leastRecentlyActiveLocked() *Entry {
+	var oldest *Entry
+	for _, e := range m.sessions {
+		if e.Session == nil {
+			continue
+		}
+		if oldest == nil || lessRecentlyActive(e, oldest) {
+			oldest = e
+		}
+	}
+	return oldest
+}
+
+// closeEvicted closes the session [Manager.AllocateID] took the id of,
+// outside the manager's lock, as every local close does: the peer is told
+// with a CloseSession (matter.js initiateClose on the evicted session,
+// SessionManager.ts:594-596; "A final exchange will be opened to notify the
+// peer of closure unless the peer is marked as lost", NodeSession.ts:365 at
+// db021da0), then the keys go and the hooks fire. Nil is nothing to close.
+func (m *Manager) closeEvicted(e *Entry) {
+	if e == nil {
+		return
+	}
+	victims := []*Entry{e}
+	m.notifyGracefulClose(victims, time.Time{})
+	closeStaleEntries(victims)
+	m.fireOnSessionClose(victims)
+	m.fireReannounceIfPeerGone(victims)
+}
+
+// placeholderRef is one id [Manager.AllocateID] staked and the entry it
+// staked it with.
+type placeholderRef struct {
+	id uint16
+	e  *Entry
+}
+
+// stakes reports whether ref's id still holds the placeholder ref staked.
+// Caller holds m.mu.
+func (m *Manager) stakes(ref placeholderRef) bool {
+	cur, ok := m.sessions[ref.id]
+	return ok && cur == ref.e && cur.Session == nil
+}
+
+// compactPlaceholdersLocked drops the queue's references to ids that no
+// longer hold their placeholder once they outnumber the table twice over,
+// so the queue stays within a constant factor of the table and each
+// reference is dropped once (amortised constant time per allocation).
+// Caller holds m.mu in write mode.
+func (m *Manager) compactPlaceholdersLocked() {
+	if len(m.placeholders) <= 2*len(m.sessions)+placeholderQueueSlack {
+		return
+	}
+	m.placeholders = slices.DeleteFunc(m.placeholders, func(ref placeholderRef) bool { return !m.stakes(ref) })
+}
+
+// placeholderQueueSlack keeps a small table from compacting its placeholder
+// queue on every allocation; any constant does, the bound is the factor
+// two in [Manager.compactPlaceholdersLocked].
+const placeholderQueueSlack = 64
 
 // ReleaseID frees a previously allocated id when the handshake that
 // reserved it never reached OpenFromSigmaWithID.
+//
+// Deprecated: ReleaseID frees whatever placeholder holds id, also the
+// stake an allocation at a full table made for another handshake after it
+// took the caller's (review II, R2-P3-dr-dev-07). Use [Manager.AllocateStake]
+// and [Manager.ReleaseStake], which free the caller's own stake only;
+// ReleaseID is removable in v0.23.0.
 func (m *Manager) ReleaseID(id uint16) {
 	m.mu.Lock()
 	if e, ok := m.sessions[id]; ok && e.Session == nil {
 		delete(m.sessions, id)
+	}
+	m.mu.Unlock()
+}
+
+// ReleaseStake frees s's id when the handshake that staked it never
+// reached OpenFromSigmaWithID — only while the id still holds s's
+// placeholder: an id an allocation at a full table gave to another
+// handshake since, or one a session holds now, stays as it is.
+func (m *Manager) ReleaseStake(s Stake) {
+	m.mu.Lock()
+	if m.stakes(placeholderRef{id: s.ID, e: s.e}) {
+		delete(m.sessions, s.ID)
 	}
 	m.mu.Unlock()
 }
@@ -1187,6 +1323,24 @@ func (m *Manager) ClosePASESessions() int {
 	return len(victims)
 }
 
+// PASESessionIDs returns the ids of the established PASE sessions in the
+// table, the ones AddNOC adopted onto a fabric included. The bridge accepts
+// no new PASE exchange while one of them is not closing, as matter.js
+// ignores a new PASE exchange while `getPaseSession()` finds a PASE session
+// that is not closing (packages/protocol/src/session/SessionManager.ts:614-618,
+// packages/protocol/src/session/pase/PaseServer.ts:80-82 at db021da0).
+func (m *Manager) PASESessionIDs() []uint16 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var ids []uint16
+	for id, entry := range m.sessions {
+		if entry.isPase && entry.Session != nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // ClosePeer tears down every live session matching the
 // (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
 // first. Returns the number of sessions closed. A peer that stopped
@@ -1295,8 +1449,8 @@ func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(
 // time. A new CASE does not close the peer's previous sessions, so a
 // peer that reconnects repeatedly accumulates them; the cap is per
 // peer rather than global so one noisy peer cannot evict another's.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:185-189
-// MAX_SESSIONS_PER_PEER.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:201-205
+// at db021da0, MAX_SESSIONS_PER_PEER.
 const MaxSessionsPerPeer = 5
 
 // evictExcessPeerSessionsLocked removes the least recently active
@@ -1339,22 +1493,29 @@ func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	// them; a session that never carried traffic sorts before every one
 	// that did; the lower session id breaks a tie so the eviction order
 	// is deterministic.
-	sort.Slice(claimants, func(i, j int) bool {
-		ti, oki := claimants[i].lastActivityMonotonic()
-		tj, okj := claimants[j].lastActivityMonotonic()
-		switch {
-		case oki != okj:
-			return !oki
-		case ti != tj:
-			return ti < tj
-		}
-		return claimants[i].SessionID < claimants[j].SessionID
-	})
+	sort.Slice(claimants, func(i, j int) bool { return lessRecentlyActive(claimants[i], claimants[j]) })
 	evicted := claimants[:excess]
 	for _, entry := range evicted {
 		delete(m.sessions, entry.SessionID)
 	}
 	return evicted
+}
+
+// lessRecentlyActive orders a before b when a was active less recently, on
+// the monotonic reading, so a wall-clock step between two sessions' traffic
+// does not reorder them; a session that never carried traffic sorts before
+// every one that did; the lower session id breaks a tie so the order is
+// deterministic.
+func lessRecentlyActive(a, b *Entry) bool {
+	ta, oka := a.lastActivityMonotonic()
+	tb, okb := b.lastActivityMonotonic()
+	switch {
+	case oka != okb:
+		return !oka
+	case ta != tb:
+		return ta < tb
+	}
+	return a.SessionID < b.SessionID
 }
 
 // closeStaleEntries shuts down each session outside any lock. Safe
@@ -1563,38 +1724,42 @@ func GenerateResumptionID() ([]byte, error) {
 // staked for a handshake that never completed — rather than refusing
 // the allocation, so a burst of aborted handshakes cannot lock out
 // every later CASE exchange. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:537
+// packages/protocol/src/session/SessionManager.ts:581-599 at db021da0
 // (`getNextAvailableSessionId` falls back to `findOldestInactiveSession`
 // and reuses its id). We stop at placeholders and never evict a live
 // session here: closing one has to run its graceful-close cascade
-// outside this lock — see notes/parity/by_design.md
-// BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly.
+// outside this lock, so [Manager.AllocateID] does that after this returns
+// [ErrSessionExhausted] (review II, R2-P3-admin-05); see
+// notes/parity/by_design.md BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly.
 func (m *Manager) allocateIDLocked() (uint16, error) {
 	const maxID = uint16(SessionIDSpace)
-	for range maxID {
-		id := m.nextID
-		m.nextID++
-		if m.nextID == 0 || m.nextID > maxID {
-			m.nextID = 1
-		}
-		if _, in := m.sessions[id]; !in && id != 0 {
-			return id, nil
-		}
-	}
-	var oldest *Entry
-	for _, e := range m.sessions {
-		if e.Session != nil || e.allocatedAt.IsZero() {
-			continue
-		}
-		if oldest == nil || e.allocatedAt.Before(oldest.allocatedAt) {
-			oldest = e
+	// The table holds ids 1..maxID only, so below that size an id is free
+	// and the walk finds it; at that size there is none to find, and the
+	// walk is skipped (review II, R2-P3-lan-dev-02).
+	if len(m.sessions) < int(maxID) {
+		for range maxID {
+			id := m.nextID
+			m.nextID++
+			if m.nextID == 0 || m.nextID > maxID {
+				m.nextID = 1
+			}
+			if _, in := m.sessions[id]; !in && id != 0 {
+				return id, nil
+			}
 		}
 	}
-	if oldest == nil {
-		return 0, ErrSessionExhausted
+	// The oldest placeholder, from the front of the queue AllocateID
+	// appends to in allocation order: references that no longer stake
+	// their id are dropped on the way, each once.
+	for len(m.placeholders) > 0 {
+		ref := m.placeholders[0]
+		m.placeholders = m.placeholders[1:]
+		if m.stakes(ref) {
+			delete(m.sessions, ref.id)
+			return ref.id, nil
+		}
 	}
-	delete(m.sessions, oldest.SessionID)
-	return oldest.SessionID, nil
+	return 0, ErrSessionExhausted
 }
 
 // SessionInfo is a read-only view of one secure session, for operator

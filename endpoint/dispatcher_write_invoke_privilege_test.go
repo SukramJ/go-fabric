@@ -515,3 +515,40 @@ func TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint(t *t
 		}
 	}
 }
+
+// TestTopologyDispatcher_MinReadPrivilege locks the read privilege the
+// dispatcher reports: the data model's (schema.AttributeReadPrivilege),
+// raised by a server that asks for more, View for an attribute the data
+// model reads at View, and View for a path that does not resolve — an
+// attribute its cluster does not list included, so a View subject is told
+// that it is absent (matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts:250-274 at
+// db021da0: the View pass, the existence statuses, then readLevel).
+func TestTopologyDispatcher_MinReadPrivilege(t *testing.T) {
+	t.Parallel()
+	d := NewTopologyDispatcher(privilegeTestTopology(t))
+	tests := []struct {
+		name      string
+		endpoint  uint16
+		cluster   uint32
+		attribute uint32
+		want      uint8
+	}{
+		{"AccessControl.ACL reads at Administer", 0, 0x001F, 0x0000, 5},
+		{"GeneralCommissioning.Breadcrumb reads at View", 0, 0x0030, 0x0000, 1},
+		{"an unlisted attribute the data model reads at Administer needs View", 0, 0x0030, 0x0005, 1},
+		{"a plain cluster attribute reads at View", 0, plainClusterID, 0x0000, 1},
+		{"a global attribute reads at View", 0, 0x0030, 0xFFFD, 1},
+		{"unmounted cluster on a real endpoint needs View", 0, 0x0046, 0x0003, 1},
+		{"unmounted endpoint needs View", 42, 0x001F, 0x0000, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := d.MinReadPrivilege(tt.endpoint, tt.cluster, tt.attribute); got != tt.want {
+				t.Errorf("MinReadPrivilege(ep=%d, cluster=0x%04X, attr=0x%04X) = %d, want %d",
+					tt.endpoint, tt.cluster, tt.attribute, got, tt.want)
+			}
+		})
+	}
+}

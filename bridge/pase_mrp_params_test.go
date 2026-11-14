@@ -136,17 +136,17 @@ func TestBridge_SingleActivePASE(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
 
-	if !b.claimPaseInFlight(0x1111) {
+	if !b.claimPaseInFlight(onExchange(0x1111)) {
 		t.Fatal("first claim must succeed on an idle slot")
 	}
-	if b.claimPaseInFlight(0x2222) {
+	if b.claimPaseInFlight(onExchange(0x2222)) {
 		t.Error("a different exchange must be refused while the slot is held")
 	}
-	if !b.claimPaseInFlight(0x1111) {
+	if !b.claimPaseInFlight(onExchange(0x1111)) {
 		t.Error("the SAME exchange must re-claim (PBKDFParamRequest retransmit)")
 	}
-	b.releasePaseInFlight(0x1111)
-	if !b.claimPaseInFlight(0x2222) {
+	b.releasePaseInFlight(onExchange(0x1111))
+	if !b.claimPaseInFlight(onExchange(0x2222)) {
 		t.Error("after release the slot must be free for a new exchange")
 	}
 }
@@ -156,11 +156,11 @@ func TestBridge_SingleActivePASE(t *testing.T) {
 func TestBridge_SingleActivePASE_ReleaseWrongExchangeIgnored(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
-	if !b.claimPaseInFlight(0x1111) {
+	if !b.claimPaseInFlight(onExchange(0x1111)) {
 		t.Fatal("first claim must succeed")
 	}
-	b.releasePaseInFlight(0x9999) // not the owner
-	if b.claimPaseInFlight(0x2222) {
+	b.releasePaseInFlight(onExchange(0x9999)) // not the owner
+	if b.claimPaseInFlight(onExchange(0x2222)) {
 		t.Error("slot must stay held after a non-owner release")
 	}
 }

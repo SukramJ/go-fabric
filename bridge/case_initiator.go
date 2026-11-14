@@ -219,11 +219,20 @@ type initiatedExchange struct {
 // deliverInitiatedSecureChannel hands an unsecured Secure-Channel message
 // the peer sent as the *responder* on an exchange this node initiated to
 // the waiting handshake. Returns false when no handshake owns the exchange.
+//
+// The handshake is found by its [HandshakeKey]: the exchange id and the
+// ephemeral node id this node chose as the initiator, which a response
+// names as its destination. A message on the exchange id that names another
+// initiator is not this handshake's — matter.js finds the unsecured session
+// of a response by that destination node id ("Responses include our
+// ephemeral initiator nodeId as destNodeId",
+// packages/protocol/src/protocol/ExchangeManager.ts:306-312 at db021da0) and
+// the exchange inside it (:398-401), as the responder side does here.
 func (b *Bridge) deliverInitiatedSecureChannel(hdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
 	if proto.Initiator || hdr.SessionID != 0 || proto.Opcode == mrp.StandaloneAckOpcode {
 		return false
 	}
-	raw, ok := b.resumption.initiated.Load(proto.ExchangeID)
+	raw, ok := b.resumption.initiated.Load(handshakeKeyOf(hdr, proto.ExchangeID))
 	if !ok {
 		return false
 	}
@@ -245,32 +254,35 @@ func (b *Bridge) deliverInitiatedSecureChannel(hdr *message.Header, proto messag
 // sent by the initiator.
 func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *CaseInitiation) (uint16, error) {
 	exchangeID := b.nextOutboundExchangeID()
+	// The unsecured session of the initiator is identified by an
+	// ephemeral source node id (Matter §4.13.2.1 / chip
+	// UnauthenticatedSession); the responder addresses its replies to it,
+	// and the handshake takes only replies addressed so.
+	ephemeral, err := randomEphemeralNodeID()
+	if err != nil {
+		return 0, err
+	}
+	key := HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}
 	ex := &initiatedExchange{ch: make(chan initiatedMessage, 4)}
-	b.resumption.initiated.Store(exchangeID, ex)
-	defer b.resumption.initiated.Delete(exchangeID)
+	b.resumption.initiated.Store(key, ex)
+	defer b.resumption.initiated.Delete(key)
 	// A handshake that ends takes what it sent and the peer has not
 	// acknowledged with it — a Sigma1 or Sigma3 nobody answers any more.
 	// The StatusReport that ends it is the exception, as on the responder
 	// side ([Bridge.sendHandshakeFailureReport]): it is sent after the
 	// handshake dropped the rest and stays tracked until it is
 	// acknowledged, its retries are spent or [unsecuredEntryLifetime] is
-	// over. The unsecured session's entries only: exchange ids are per
-	// initiator, and a secure session's peer may have picked the same one.
+	// over. The unsecured session's entries of this handshake only:
+	// exchange ids are per initiator, and a secure session's peer or
+	// another initiator may have picked the same one.
 	reported := false
-	abandon := func() { b.abandonHandshakeReplies(exchangeID) }
+	abandon := func() { b.abandonHandshakeReplies(key) }
 	defer func() {
 		if !reported {
 			abandon()
 		}
 	}()
 
-	// The unsecured session of the initiator is identified by an
-	// ephemeral source node id (Matter §4.13.2.1 / chip
-	// UnauthenticatedSession); the responder addresses its replies to it.
-	ephemeral, err := randomEphemeralNodeID()
-	if err != nil {
-		return 0, err
-	}
 	sigma1, err := init.Initiator.GenerateSigma1()
 	if err != nil {
 		return 0, err
@@ -429,7 +441,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 	// Tracked before it is sent, so an ack handled before Send returns is
 	// not lost (bridge/reply.go sendReplyReliable).
 	if tracker != nil {
-		tracker.trackUnsecured(hdr.MessageCounter, exchangeID, datagram, addr, b.clk().Now(), nil)
+		tracker.trackUnsecured(hdr.MessageCounter, HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, datagram, addr, b.clk().Now(), nil)
 	}
 	if err := listener.Send(addr, datagram); err != nil {
 		if tracker != nil {
@@ -438,7 +450,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 		return err
 	}
 	if ackCounter != nil {
-		b.dischargeOwedAck(0, exchangeID, true)
+		b.dischargeOwedHandshakeAck(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, true)
 	}
 	return nil
 }
@@ -471,7 +483,7 @@ func (b *Bridge) sendInitiatedAck(addr *net.UDPAddr, exchangeID uint16, ephemera
 	if err := listener.Send(addr, datagram); err != nil {
 		b.logger.Debug("matter.case.initiator.ack_send", slog.Any("err", err))
 	}
-	b.dischargeOwedAck(0, exchangeID, true)
+	b.dischargeOwedHandshakeAck(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, true)
 }
 
 // randomEphemeralNodeID draws the initiator's ephemeral node id for the

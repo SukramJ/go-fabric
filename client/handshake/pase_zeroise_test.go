@@ -20,10 +20,15 @@ import (
 // TestCloseOverwritesAnAbandonedHandshake); here a closed prover is told
 // by what it answers: no shared secret, and ErrSessionState to a step its
 // state would otherwise take. Not parallel: it replaces the prover seam.
+//
+// Each case opens PASE to a device of its own. A device ignores a new PASE
+// exchange while it holds an established PASE session that is not closing
+// (bridge/securechannel.go, paseSessionExists), and the CloseSession that
+// ends the first case's session asks for no acknowledgement
+// (client/exchange Manager.CloseSession), so on a shared device the next
+// case's PBKDFParamRequest can be handled first and go unanswered.
 func TestPASEClosesItsProver(t *testing.T) {
 	held := handshake.HoldProvers(t)
-	_, addr := startNode(t)
-	m, _ := newManager(t)
 	closed := func(t *testing.T, p *spake2.Prover) {
 		t.Helper()
 		if ke := p.SharedSecret(); ke != nil {
@@ -48,6 +53,8 @@ func TestPASEClosesItsProver(t *testing.T) {
 	}
 
 	t.Run("after a success", func(t *testing.T) {
+		_, addr := startNode(t)
+		m, _ := newManager(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		s, err := handshake.PASE(ctx, m, addr, testPasscode, handshake.PASEOptions{SuppressPeerLoss: true})
@@ -61,6 +68,8 @@ func TestPASEClosesItsProver(t *testing.T) {
 	})
 
 	t.Run("cancelled before Pake1 is sent", func(t *testing.T) {
+		_, addr := startNode(t)
+		m, _ := newManager(t)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		if _, err := handshake.PASE(ctx, m, addr, testPasscode, handshake.PASEOptions{OnPBKDFParamResponse: cancel}); !errors.Is(err, context.Canceled) {
@@ -70,6 +79,8 @@ func TestPASEClosesItsProver(t *testing.T) {
 	})
 
 	t.Run("after a wrong passcode", func(t *testing.T) {
+		_, addr := startNode(t)
+		m, _ := newManager(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if _, err := handshake.PASE(ctx, m, addr, testPasscode+1, handshake.PASEOptions{}); !errors.Is(err, handshake.ErrPasscodeMismatch) {

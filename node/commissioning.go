@@ -331,11 +331,13 @@ func (h *commissioningHost) followOnBLE(ctx context.Context, adv bridge.Commissi
 	}
 }
 
-// withdrawBLE ends the BLE advertisement and leaves the GATT service and a
-// connected central alone: a window's end stops only the advertisement
-// (BleAdvertisement.ts:69-71), so a commissioning that runs over BLE when
-// the window closes — the own window's timer runs whatever the fail-safe
-// does — completes over the same link. Without a radio it does nothing.
+// withdrawBLE ends the BLE advertisement and leaves the GATT service
+// alone ([bridge.Bridge.WithdrawBLE]): a window's end stops the
+// advertisement (BleAdvertisement.ts:69-71), so a commissioning that runs
+// over BLE when the window closes — the own window's timer runs whatever
+// the fail-safe does — completes over the same link once PASE has bound a
+// secure session to it; a connected central that has not completed PASE is
+// disconnected. Without a radio it does nothing.
 func (h *commissioningHost) withdrawBLE(ctx context.Context) {
 	if !h.ble {
 		return

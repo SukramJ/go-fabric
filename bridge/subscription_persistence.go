@@ -80,7 +80,9 @@ type resumptionState struct {
 	block *peerBlockList
 
 	// initiated routes Secure-Channel replies on exchanges this node
-	// opened as CASE initiator: exchange id → *initiatedExchange.
+	// opened as CASE initiator: [HandshakeKey] (this node's ephemeral
+	// node id and the exchange id) → *initiatedExchange; the OTA link's
+	// secure exchanges share it under a secureExchangeKey.
 	initiated sync.Map
 }
 

@@ -1316,10 +1316,27 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	if fresh {
 		g.failSafeOverPASE = fabricIndex == 0
 	}
+	now := g.clock.Now()
+	// An arm from the disarmed state — the PASE auto-arm included — starts
+	// the new context's cumulative limit, as the wire arm does: connectedhomeip
+	// FailSafeContext::ArmFailSafe starts the max-cumulative timer whenever
+	// it arms from disarmed (src/app/FailSafeContext.cpp:112-115 at
+	// 6170af84), the arm on PASE establishment among them
+	// (src/app/server/CommissioningWindowManager.cpp:236); matter.js builds
+	// a new ServerNodeFailsafeContext with maxCumulativeFailsafe
+	// (GeneralCommissioningServer.ts:100-106 at db021da0), whose timer
+	// starts with it (packages/protocol/src/common/FailsafeTimer.ts:33-35).
+	// Before, a chain of PASE sessions re-armed without a limit (review II,
+	// R2-P3-pase-02).
+	if fresh || !g.failSafeCumulativeStarted {
+		g.failSafeCumulativeStarted = true
+		g.failSafeCumulativeDeadline = now.Add(time.Duration(g.cumulativeFailSafeMaxSec) * time.Second)
+	}
 	g.failSafeArmed = true
-	g.failSafeExpiresAt = g.clock.Now().Add(time.Duration(seconds) * time.Second)
-	// A re-arm stays within the cumulative limit, as the wire arm does.
-	if !fresh && g.failSafeCumulativeStarted && g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
+	g.failSafeExpiresAt = now.Add(time.Duration(seconds) * time.Second)
+	// No arm carries the deadline past the cumulative limit, as the wire
+	// arm's does not.
+	if g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
 		g.failSafeExpiresAt = g.failSafeCumulativeDeadline
 	}
 	// The PASE auto-arm (forSession) keeps the Breadcrumb, fresh or not, as
@@ -1382,6 +1399,27 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 func (g *GeneralCommissioning) ExpireFailSafeArmedOverPASE(ctx context.Context) {
 	g.mu.Lock()
 	if !g.failSafeArmed || !g.failSafeOverPASE {
+		g.mu.Unlock()
+		return
+	}
+	g.expireNowLocked(ctx)
+}
+
+// FabricRemoved expires the fail-safe armed for fabricIndex, a fabric
+// whose row is gone, with the rollback its timeout runs; a fail-safe armed
+// for another fabric, or over PASE before an AddNOC, is left alone. The
+// node calls it after every removal of a fabric. Before, the fail-safe
+// stayed armed for the removed index until it ran out, every other
+// fabric's ArmFailSafe answered BusyWithOtherAdmin and
+// OpenCommissioningWindow Busy meanwhile (review II, R2-P3-admin-06). This
+// is the owner's rule; connectedhomeip's
+// GeneralCommissioningCluster::OnFabricRemoved resets the terms only and
+// leaves the fail-safe as it is
+// (src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:357-375
+// at 6170af84).
+func (g *GeneralCommissioning) FabricRemoved(ctx context.Context, fabricIndex uint8) {
+	g.mu.Lock()
+	if fabricIndex == 0 || !g.failSafeArmed || g.failSafeFabricIndex != fabricIndex {
 		g.mu.Unlock()
 		return
 	}
@@ -1478,8 +1516,26 @@ const PaseSessionAutoArmSeconds uint16 = 60
 //
 // The daemon wires it from the PaseAdapter's onEstablished callback so the
 // arm fires exactly once per successful Pake3 completion.
+//
+// Deprecated: use [GeneralCommissioning.ArmOnPaseEstablished], which
+// returns the refusal: a session whose arm was refused must be closed.
 func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
-	_ = g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
+	_ = g.ArmOnPaseEstablished(ctx)
+}
+
+// ArmOnPaseEstablished is the arm of [GeneralCommissioning.AutoArmOnPaseEstablished]
+// and returns its refusal: the session's own end by the rollback of a
+// fail-safe the arm settled — one it ran over a due window, or one in
+// flight it waited for, whose PASE close may have named the sessions
+// before this one existed — or ctx's end while it waited. A fail-safe
+// another fabric armed is no refusal: it is left as it is, and nil is
+// returned. The caller closes the session on an error, as connectedhomeip
+// does when this arm fails ("Don't allow a PASE session to hang around
+// without a fail-safe", src/app/server/CommissioningWindowManager.cpp:240-241
+// at 6170af84): without the close the session kept its implicit
+// Administer with no fail-safe to end it (review II, R2-P3-pase-03).
+func (g *GeneralCommissioning) ArmOnPaseEstablished(ctx context.Context) error {
+	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
 }
 
 // logger is the server's logger ([GeneralCommissioningConfig.Logger]); a

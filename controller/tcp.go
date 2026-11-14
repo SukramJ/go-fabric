@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"strconv"
 
@@ -24,6 +25,30 @@ type TCPConfig struct {
 	// Outgoing opens TCP connections to peers that serve TCP when an
 	// interaction requires or prefers it (the tcpClient role).
 	Outgoing bool
+	// MaxInboundConnections is the most inbound connections the TCP
+	// listener holds in all, whatever their source addresses; at the
+	// bound a new connection takes the place of the held one idle longest
+	// (no message received or sent for the longest time) among those that
+	// carried no traffic within the secure session's idle timeout (5
+	// minutes), or is closed when every held one did. Zero is the
+	// controller's default, 256; a negative value is [ErrConfiguration].
+	MaxInboundConnections int
+}
+
+// defaultMaxInboundTCPConnections is the controller's default total bound
+// on inbound TCP connections: the bound on its inbound unsecured sessions
+// (client/exchange/manager.go:949, maxInboundUnsecuredSessions = 256),
+// owner decision 56 (review II). The device's default is the smaller
+// tcp.MaxInboundConnections.
+const defaultMaxInboundTCPConnections = 256
+
+// maxInboundConnections is the listener's total bound t selects: the
+// configured one, defaultMaxInboundTCPConnections for zero.
+func (t TCPConfig) maxInboundConnections() int {
+	if t.MaxInboundConnections == 0 {
+		return defaultMaxInboundTCPConnections
+	}
+	return t.MaxInboundConnections
 }
 
 // localParameters are our session parameters with the TCP roles: TCP is
@@ -73,6 +98,7 @@ func (c *Controller) listenTCP(ctx context.Context) error {
 	l, err := tcp.Listen(tcp.Config{
 		LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
 		Logger:    c.log, Clock: c.clock,
+		MaxInboundConnections: c.tcp.maxInboundConnections(),
 	})
 	if err != nil {
 		return err
@@ -82,7 +108,12 @@ func (c *Controller) listenTCP(ctx context.Context) error {
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
-		_ = l.Serve(serveCtx, func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) }, nil)
+		// Serve retries a failed accept and returns nil on its close, so
+		// an error means TCP is not served: the host must see it (review
+		// II, R2-P3-ctl-lan-04).
+		if err := l.Serve(serveCtx, func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) }, nil); err != nil {
+			c.log.Warn("matter.tcp.serve.exit", slog.Any("err", err))
+		}
 	}()
 	c.tcpAddr = l.Addr()
 	c.stopTCP = func() { cancel(); _ = l.Close(); <-served }

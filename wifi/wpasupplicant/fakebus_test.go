@@ -38,6 +38,8 @@ type fakeBus struct {
 	props map[string]dbus.Variant
 	// bss are the BSS objects' properties.
 	bss map[dbus.ObjectPath]map[string]dbus.Variant
+	// networks are the network objects' Properties property.
+	networks map[dbus.ObjectPath]map[string]dbus.Variant
 	// fail answers a method (interface.member) with an error.
 	fail map[string]error
 	// noScanDone: a scan never ends.
@@ -72,6 +74,7 @@ func newFakeBus() *fakeBus {
 		sigs:     make(chan *dbus.Signal, 256),
 		props:    map[string]dbus.Variant{"State": dbus.MakeVariant("disconnected"), "CurrentNetwork": dbus.MakeVariant(dbus.ObjectPath("/"))},
 		bss:      map[dbus.ObjectPath]map[string]dbus.Variant{},
+		networks: map[dbus.ObjectPath]map[string]dbus.Variant{},
 		fail:     map[string]error{},
 		selected: make(chan struct{}, 64),
 	}
@@ -157,6 +160,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	case ifaceRoot + ".GetInterface", ifaceRoot + ".CreateInterface":
 		return []any{fakeIface}, nil
 	case methodGet:
+		if props, ok := b.networks[path]; ok && args[0] == ifaceNetwork && args[1] == "Properties" {
+			return []any{dbus.MakeVariant(props)}, nil
+		}
 		if path != fakeIface {
 			return nil, dbus.NewError("org.freedesktop.DBus.Error.UnknownObject", nil)
 		}
@@ -194,7 +200,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	case ifaceInterface + ".AddNetwork":
 		return []any{fakeNetwork}, nil
 	case ifaceInterface + ".RemoveNetwork":
-		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		if cur, _ := b.props["CurrentNetwork"].Value().(dbus.ObjectPath); cur == args[0] {
+			b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		}
 	case ifaceInterface + ".Disconnect":
 		if b.onDisconnect != nil {
 			b.onDisconnect(b)

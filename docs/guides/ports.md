@@ -39,8 +39,8 @@ these interfaces does not drag the host's dependencies into the module.
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList | EventList is empty |
 | `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | the endpoint keeps the cluster's DataVersion, on the root and the Aggregator too, and advances it on every change the stack sees; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
-| `ClusterAttributeReadPrivilege` | a server | a read privilege above View | View |
-| `ClusterAttributeWritePrivilege` | a server | a write privilege above Operate | Operate |
+| `ClusterAttributeReadPrivilege` | a server | a read privilege above the data model's; it can only raise it | the data model's read privilege (`schema.AttributeReadPrivilege`, from parity/schema.json) |
+| `ClusterAttributeWritePrivilege` | a server | a write privilege above the data model's; it can only raise it | the data model's write privilege (`schema.AttributeWritePrivilege`, from parity/schema.json) |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |
 | `TimedCommander` | a server | which commands need a timed interaction | the generated table (`schema.IsTimedInvoke`) decides |
 | `ClusterQuiescer` | a server with its own timers | stops the timers when the server leaves the topology or the bridge stops | timers outlive the server's use |
@@ -93,7 +93,7 @@ in the module.
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
 | `Network.BLE` | the node's Bluetooth LE radio (`contract.BLEPeripheral`): while the node has no fabric its own window is advertised over BLE and PASE is served over BTP; the QR code carries the BLE discovery bit ([Operations](operations.md#ble-commissioning)) | no BLE; the node never touches a radio |
-| `Network.WiFi.Driver` | the node's Wi-Fi radio (`contract.WiFiDriver`): mounts NetworkCommissioning with the Wi-Fi feature in place of the Ethernet one; the committed network is kept in the node's store and rejoined at `Start`, and a successful join re-announces the node's DNS-SD records at once ([Operations](operations.md#wi-fi-provisioning)) | NetworkCommissioning serves the Ethernet feature |
+| `Network.WiFi.Driver` | the node's Wi-Fi radio (`contract.WiFiDriver`): mounts NetworkCommissioning with the Wi-Fi feature in place of the Ethernet one; the committed network is kept in the node's store and rejoined at `Start` and, with a backoff, whenever a join left the node off it, and a successful join re-announces the node's DNS-SD records at once ([Operations](operations.md#wi-fi-provisioning)) | NetworkCommissioning serves the Ethernet feature |
 | `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null. A `Network.WiFi` with neither `Driver` nor `Reporter` is refused |
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
@@ -129,7 +129,7 @@ Use `Observers` instead.
 | `OTA` (`controller.OTAConfig`) | the OTA push: the update manager (`Controller.SoftwareUpdates`) over an image store (`Images`, nil is an in-memory one without ledgers), with the OTA provider served at `controller.OTAProviderEndpoint` of the controller's own tree and its BDX responder (`Controller.BDX`) | no OTA push, no provider endpoint |
 | `Camera` (`controller.CameraConfig`) | the controller side of Matter cameras: the Camera Controller endpoint (`controller.CameraControllerEndpoint`) with a WebRtcTransportRequestor the fabric's cameras reach (`Controller.CameraRequestor`, `Controller.OnCameraSignal`), and the operational record of RootNodeID | no camera endpoint |
 | `GroupTransport` (`groups.MulticastTransport`) | the transport group messages leave on (`Controller.Groups`, `Controller.SetGroupKey`) | the controller's own UDP socket |
-| `TCP` (`controller.TCPConfig{Incoming, Outgoing}`) | a TCP listener (`Controller.TCPAddr`) and the TCP initiator | UDP only |
+| `TCP` (`controller.TCPConfig{Incoming, Outgoing, MaxInboundConnections}`) | a TCP listener (`Controller.TCPAddr`), holding at most `MaxInboundConnections` connections (zero is 256), and the TCP initiator | UDP only |
 | `TransportPreference` | the transport each peer prefers | UDP |
 | `PeerTiming` (`*client.Timing`) | the peer set's connection timing, overriding the defaults field-wise (a zero field keeps its default; a negative `ProvenAddressRetention` retains nothing) | `client/peer.DefaultTiming` |
 | `Networks`, `OwnNetworkProfile` | the network profiles' defaults and the profile our own MRP margin comes from | matter.js's defaults (`peer.DefaultTemplates`); `fast` |
@@ -137,6 +137,7 @@ Use `Observers` instead.
 | `Diagnostics` (`diag.Diagnostics{Capacity}`) | the size of the diagnostic trace (`Controller.DiagnosticEvents`, `Controller.OnDiagnosticEvent`) | 256 events |
 | `Metrics` (`contract.Metrics`) | the named counters and gauges (`controller.Metric…`) | nothing recorded |
 | `MaxReportBytesPerSession` | the bound on the report chunks a session's interactions with a paired node (the commissioning steps' included) hold while the rest arrive (`interaction.ErrReportTooLarge` past it; [limits](limits.md)); negative is `controller.ErrConfiguration` | `interaction.DefaultMaxReportBytesPerSession` (2 MiB) |
+| `MaxImageBytesPerNode` | the bound on what one paired node's reports leave in the controller's image of it and in `DB` — the image is charged its values' stored bytes and what each endpoint, cluster, attribute and TLV element holds in memory: a report that would raise the image above it is not applied, an image stored above it is cut back to what the node's structure names when it loads ([limits](limits.md)); negative is `controller.ErrConfiguration` | `client.DefaultMaxImageBytesPerNode` (32 MiB) |
 
 `controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the
 scanners told to forget a device once it is commissioned; nil is none.
@@ -157,7 +158,7 @@ These are read once at `Start`, or feed a component `Start` builds.
 | `AttachSessionLookup` | silent | every encrypted datagram is dropped. CASE completes and carries no traffic |
 | `AttachPaseHandlerProvider` (or `AttachPaseHandler`) | fails closed | commissioning cannot begin. Prefer the provider: the singleton serialises commissioners |
 | `AttachCaseHandlerProvider` (or `AttachCaseHandler`) | fails closed | no CASE. A singleton rejects the parallel CASE sessions Apple Home opens |
-| `AttachAckTracker` | silent | no standalone ACKs and no retransmission of the bridge's own messages; every reply is best-effort. It wraps the lower-level `AttachAckHandler` |
+| `AttachAckTracker` | silent | no standalone ACKs and no retransmission of the bridge's own messages; every reply is best-effort. A peer's acknowledgement never discharges an acknowledgement the bridge owes; `AttachAckHandler` is a separate port that is only told of the peer's acknowledgements |
 | `AttachSubscriptionManager` | silent | a Subscribe returns its initial report with no subscription id, and no report follows |
 | `AttachSessionRegistry` | silent | CloseSession closes nothing, `Stop` sends no farewell, the re-announce trigger is not installed, and the PASE sessions are not cleared when a commissioning ends. The bridge clears them itself: after a CommissioningComplete that `core.GeneralCommissioning` answered OK, when that server's fail-safe expires (`AttachRootClusters` wires `Bridge.FailSafeExpired` into it, beside the host's `SetOnFailSafeExpired` hook) and when the attached commissioning window is revoked. A host with a GeneralCommissioning server of its own calls `Bridge.FailSafeExpired(ctx)` when its fail-safe expires |
 | a session table without `AttestationChallengeFor(sessionID uint16) ([]byte, bool)` | fails closed | AttestationRequest, CSRRequest and SignVIDVerificationRequest answer FAILURE: the bridge reads the invoking session's attestation challenge from the registry or, failing that, the session lookup, and the server signs over nothing else. `operational.Manager` has the method |
@@ -321,7 +322,7 @@ Host ports of the root servers, reached through `node.Config` or
 | Port | What it does |
 | --- | --- |
 | `core.WiFiReporter` | the Wi-Fi link values; the module ships no reporter |
-| `core.OtaApplier` | the host's part of an OTA update |
+| `core.OtaApplier` | the host's part of an OTA update. Before `ApplyUpdate` the requestor has checked the image's header syntax, that its payload has the size the header states, and its version (the offered one, or newer than the running one) — not the payload digest, not the header's vendor and product IDs, and no signature. Those are the applier's: the facade's own applier verifies the digest and compares vendor and product with the node's (`node/ota.go`) |
 | `core.OtaHTTPClient` | the GET of an HTTPS OTA download; `*http.Client` implements it, so a host restricts egress there |
 | `core.OTAImageSource`, `core.OTAConsent`, `core.OTAApplyPolicy` | the provider's catalogue, user consent, and apply decision |
 | `core.CommissioningApprover`, `core.ReverseCommissioner` | CommissionerControl's approval, and the commissioning of the approved node |

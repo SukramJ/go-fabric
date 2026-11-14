@@ -62,8 +62,12 @@ type connRoute struct {
 
 // handshakeHold is one handshake in flight on a connection.
 type handshakeHold struct {
-	pase  bool
-	since time.Time
+	pase bool
+	// initiator is the handshake's initiator node id ([HandshakeKey]): an
+	// eviction of another initiator's handshake on the same exchange id
+	// leaves this hold ([Bridge.releaseCASEHandshakeEverywhere]).
+	initiator uint64
+	since     time.Time
 }
 
 // Network names the transport of the connection's peer address.
@@ -281,23 +285,22 @@ func (r *connRoute) liveHandshakesLocked(now time.Time) int {
 	return len(r.handshakes)
 }
 
-// holdHandshake records a PASE (pase) or CASE handshake starting on
-// exchangeID over src. Only a connection is held; over UDP there is
-// nothing to keep open.
-func (b *Bridge) holdHandshake(src net.Addr, exchangeID uint16, pase bool) {
+// holdHandshake records a PASE (pase) or CASE handshake key starting over
+// src. Only a connection is held; over UDP there is nothing to keep open.
+func (b *Bridge) holdHandshake(src net.Addr, key HandshakeKey, pase bool) {
 	r, ok := src.(*connRoute)
 	if !ok || r == nil || r.conn == nil {
 		return
 	}
 	b.routeBindMu.Lock()
 	defer b.routeBindMu.Unlock()
-	if _, held := r.handshakes[exchangeID]; held {
+	if _, held := r.handshakes[key.ExchangeID]; held {
 		return // a retransmitted first message: the handshake already counts
 	}
 	if r.handshakes == nil {
 		r.handshakes = make(map[uint16]handshakeHold)
 	}
-	r.handshakes[exchangeID] = handshakeHold{pase: pase, since: b.clk().Now()}
+	r.handshakes[key.ExchangeID] = handshakeHold{pase: pase, initiator: key.InitiatorNodeID, since: b.clk().Now()}
 }
 
 // releaseHandshake ends the hold of the handshake on exchangeID over src.
@@ -312,17 +315,19 @@ func (b *Bridge) releaseHandshake(src net.Addr, exchangeID uint16) {
 	b.routeBindMu.Unlock()
 }
 
-// releaseCASEHandshakeEverywhere ends the hold of a CASE handshake on
-// exchangeID on every connection — its per-exchange state was evicted.
-func (b *Bridge) releaseCASEHandshakeEverywhere(exchangeID uint16) {
+// releaseCASEHandshakeEverywhere ends the hold of the CASE handshake key on
+// every connection — its per-exchange state was evicted. A hold of another
+// initiator on the same exchange id stays: exchange ids are the
+// initiator's choice ([HandshakeKey]).
+func (b *Bridge) releaseCASEHandshakeEverywhere(key HandshakeKey) {
 	b.connRoutes.Range(func(_, v any) bool {
 		r, ok := v.(*connRoute)
 		if !ok || r == nil {
 			return true
 		}
 		b.routeBindMu.Lock()
-		if h, held := r.handshakes[exchangeID]; held && !h.pase {
-			delete(r.handshakes, exchangeID)
+		if h, held := r.handshakes[key.ExchangeID]; held && !h.pase && h.initiator == key.InitiatorNodeID {
+			delete(r.handshakes, key.ExchangeID)
 		}
 		b.routeBindMu.Unlock()
 		return true

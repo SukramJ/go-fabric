@@ -43,15 +43,25 @@ func startNode(t *testing.T) (*node.Node, *net.UDPAddr) {
 }
 
 // recorder is the manager's socket: a udp.Listener whose sends are kept
-// and optionally observed.
+// and optionally observed, and optionally refused as a socket refuses a
+// send (refuse returns the error).
 type recorder struct {
 	l      *udp.Listener
 	mu     sync.Mutex
 	sent   [][]byte
 	onSend func(datagram []byte)
+	refuse func(datagram []byte) error
 }
 
 func (r *recorder) Send(dst *net.UDPAddr, payload []byte) error {
+	r.mu.Lock()
+	refuse := r.refuse
+	r.mu.Unlock()
+	if refuse != nil {
+		if err := refuse(payload); err != nil {
+			return err
+		}
+	}
 	r.mu.Lock()
 	r.sent = append(r.sent, append([]byte(nil), payload...))
 	hook := r.onSend
@@ -60,6 +70,12 @@ func (r *recorder) Send(dst *net.UDPAddr, payload []byte) error {
 		hook(payload)
 	}
 	return r.l.Send(dst, payload)
+}
+
+func (r *recorder) setRefuse(f func([]byte) error) {
+	r.mu.Lock()
+	r.refuse = f
+	r.mu.Unlock()
 }
 
 func (r *recorder) setHook(f func([]byte)) {

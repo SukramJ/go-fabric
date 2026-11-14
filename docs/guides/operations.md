@@ -68,7 +68,7 @@ So the operator's rules are the persistence guide's
 | What | Default | Why |
 | --- | --- | --- |
 | UDP `node.Config.Network.Listen` | `:5540` | Every Matter message — commissioning, operational sessions, reports — arrives here. |
-| TCP on the same port | off | Only with `Network.TCP.Incoming`: the node then also accepts Matter over TCP and says so in its session parameters, and the TCP listener takes the UDP socket's port. |
+| TCP on the same port | off | Only with `Network.TCP.Incoming`: the node then also accepts Matter over TCP and says so in its session parameters, and the TCP listener takes the UDP socket's port. It holds at most `Network.TCP.MaxInboundConnections` connections in all (zero is 4; see the limits guide). |
 | IPv6 on the LAN | required | Matter's operational network is IPv6: the node advertises its IPv6 addresses and controllers reach it there. `Network.PreferIPv4` forces an IPv4-only socket, for a test network. |
 | UDP 5353, multicast `224.0.0.251` and `ff02::fb` | required | DNS-SD over mDNS, below. |
 
@@ -100,7 +100,7 @@ cfg.Network.BLE = radio
 | When | On the radio |
 | --- | --- |
 | uncommissioned, its own window open (at start, after the last fabric is removed, or `Node.OpenBasicWindow`) | the GATT service is registered and the window advertised — 20 ms for 30 s, 150 ms until 15 minutes, then the extended announcement (no vendor and product id) at 1285 ms; one central at a time |
-| the window closes: its timeout, `Node.CloseWindow` | only the advertisement stops; the service and a connected central stay, so a commissioning over BLE in progress completes over the same link, and a new own window advertises again on the same service |
+| the window closes: its timeout, `Node.CloseWindow` | the advertisement stops; the service stays, and so does a connected central that completed PASE, so a commissioning over BLE in progress completes over the same link; a central that has not completed PASE is disconnected, so it does not hold the one BLE slot into the next window; a new own window advertises again on the same service |
 | commissioned: CommissioningComplete commits the fail-safe | the advertisement stops, the central is disconnected, the service unregistered — after the response, not before it |
 | commissioned | nothing: no advertisement, no service, also for a window an administrator opens |
 | `Node.Stop` | off the radio |
@@ -108,7 +108,12 @@ cfg.Network.BLE = radio
 The QR code of `Node.SetupPayload` names BLE discovery beside the IP
 network only with `Network.BLE` set; the manual code carries no discovery
 bits. BTP is reliable, so MRP does not run over it; a lost BLE connection
-closes the sessions it carried.
+closes the sessions it carried. Whether a window is open or not, a
+central that has neither a secure session nor a PASE handshake in flight
+on its connection 15 s after the BTP handshake (`btp.ConnRspTimeout`), or
+at any 15 s step after, is disconnected (log event `matter.ble.central_dropped`),
+so a central that never starts PASE, or idles after a failed attempt,
+does not hold the one place.
 
 `ble/bluez` speaks BlueZ's D-Bus API and shares the adapter with
 bluetoothd. It needs the system-bus rights its central needs (the
@@ -159,15 +164,38 @@ The host's part:
   on the interface; an IPv4 or global address is the host's affair;
 - wpa_supplicant's configuration file stays untouched: the committed
   network lives in the node's store, so the credential is kept in one
-  place, and the node rejoins it at start.
+  place, and the node rejoins it at start and whenever a join left it off
+  that network.
 
 The credential is never logged, nor part of a debug text or an error. An
 SSID that is valid UTF-8 goes to wpa_supplicant as a string, any other as
 its bytes; a credential of exactly 64 hex digits is the raw PSK, any other
-a passphrase. Empty credentials join an open network. A join that does not
+a passphrase. Empty credentials join an open network. A join keeps the
+network the interface was on until it has ended: one that does not
 succeed removes the network it added, so wpa_supplicant does not keep
-trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
-timeout when the network is out of range. The driver resolves the
+trying it, and selects the earlier network again; one that succeeds
+removes the earlier network. A network that was joined stays configured
+in wpa_supplicant; reconnecting it after a lost link is left to
+wpa_supplicant. The rejoin at
+`Node.Start` holds `Start` for up to the connect timeout when the network
+is out of range; when it fails, the node tries again after 5 s, the wait
+doubling up to 5 minutes, for its lifetime, on its clock
+(`Config.Clock`). A fail-safe expiry that leaves the link on none of the
+committed networks starts the same rejoin at once, and so does a
+`CommissioningComplete`. An attempt waits while a fail-safe is armed or a
+NetworkCommissioning command runs, and each one sets
+`LastNetworkingStatus`; a NetworkCommissioning command that arrives while
+an attempt runs cancels it and runs once it ended, so a commissioner's
+network step is not answered `Busy`, and the cancelled attempt sets
+nothing but the link. While a controller has written `InterfaceEnabled`
+false no attempt runs, the start's included; writing it true again starts
+the rejoin at once. After a join that failed, the node asks a
+driver that reports its link (`contract.WiFiLinkReporter`, which this
+driver implements) where the radio is: `Networks` reads that network
+connected — the one the failed join went back to — and a fail-safe expiry
+or `CommissioningComplete` that finds it among the committed networks
+joins nothing. A driver that does not report its link leaves no network
+read as connected after a failed join. The driver resolves the
 interface once, at `New`: after a wpa_supplicant restart the host builds a
 new driver. When the system-bus connection itself is lost, every later scan
 and join fails at once with UnknownError and the debug text "the driver's
@@ -176,7 +204,7 @@ join also ends with its caller's context while it waits for the driver.
 
 *Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
-[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`).*
+[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
 
 ## mDNS
 

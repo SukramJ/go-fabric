@@ -201,6 +201,7 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 	authorize := groupAuthorizer(ctx, d, subject)
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	tx := writeTransactionFromContext(ctx)
+	_, fabricIndex := FabricFilterFromContext(ctx)
 	for _, w := range req.Writes {
 		// WildcardPathFlags belong to Read and Subscribe: the element
 		// ends the interaction with InvalidAction, after the writes
@@ -221,7 +222,7 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 		writer.WriteAuthorized(ctx, w.Path, w.Value, func(endpoint uint16, clusterID, attrID uint32) StatusCode {
 			// A group write skips an attribute a chunked write holds
 			// (matter.js AttributeWriteResponse.ts:355-358).
-			if tx.heldByOther(endpoint, clusterID, attrID) {
+			if tx.heldByOther(fabricIndex, endpoint, clusterID, attrID) {
 				return StatusBusy
 			}
 			priv := uint8(3) // Operate, the default write privilege

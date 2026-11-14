@@ -159,11 +159,16 @@ func (s *server) serve(ctx context.Context, x *exchange.Exchange, msg *exchange.
 // requestContext is the context a served request runs under: the
 // session's fabric and subject, as the device-side bridge builds it
 // (bridge/receive_dispatch.go) — a client stack's sessions are CASE, so no
-// PASE mark; the wildcard-read qualities when configured.
+// PASE mark; our node id on the session's fabric, so a path that names
+// another node is answered as the device side answers it (UnsupportedNode
+// for a concrete path, nothing for a wildcard; review II,
+// R2-P3-ctl-dev-03; matter.js AttributeReadResponse.ts:160-162 and
+// :205-208 at db021da0); the wildcard-read qualities when configured.
 func (s *server) requestContext(ctx context.Context, x *exchange.Exchange, fabricFiltered bool) context.Context {
 	sess := x.Session()
 	ctx = im.WithFabricFilter(ctx, fabricFiltered, sess.FabricIndex())
 	ctx = im.WithSubject(ctx, sess.PeerNodeID(), sess.CaseAuthenticatedTags())
+	ctx = im.WithLocalNodeID(ctx, sess.NodeID())
 	if s.cfg.Qualities != nil {
 		ctx = im.WithElementQualities(ctx, s.cfg.Qualities)
 	}

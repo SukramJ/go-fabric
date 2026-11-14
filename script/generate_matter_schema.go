@@ -9,7 +9,9 @@
 //   - clusters.go  — ClusterRevisions, ClusterNames (map[uint32]uint16/string)
 //   - devicetypes.go — DeviceTypeRevisions, DeviceTypeNames, DeviceTypeServerClusters
 //   - attribute_access_gen.go — attributeWritePrivileges (writable attributes
-//     whose effective write privilege is above Operate), changesOmittedAttributes,
+//     whose effective write privilege is above Operate),
+//     attributeReadPrivileges (attributes whose effective read privilege is
+//     above View), changesOmittedAttributes,
 //     fabricScopedWritePaths (writable attributes whose effective access
 //     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
 //     attribute below the global range that matter.js does not let a remote
@@ -578,6 +580,27 @@ func writePrivilege(a snapshotAccess) (uint8, error) {
 	}
 }
 
+// readPrivilege is an attribute's read privilege from its effective access
+// in the snapshot: the level of readPriv — 1 View, 3 Operate, 4 Manage,
+// 5 Administer (matter.js Access.readPriv, AccessControl.ts readLevel). An
+// attribute whose effective access names no read privilege, or one this
+// table does not know, is an error: the generator states no privilege the
+// snapshot does not carry.
+func readPrivilege(a snapshotAccess) (uint8, error) {
+	switch a.ReadPriv {
+	case "V":
+		return 1, nil
+	case "O":
+		return 3, nil
+	case "M":
+		return 4, nil
+	case "A":
+		return 5, nil
+	default:
+		return 0, fmt.Errorf("read privilege %q: want V, O, M or A", a.ReadPriv)
+	}
+}
+
 func writeAccessFile(clusters []snapshotCluster) error {
 	var buf bytes.Buffer
 	buf.WriteString(fileHeaderTpl)
@@ -604,6 +627,32 @@ func writeAccessFile(clusters []snapshotCluster) error {
 				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
 			}
 			if p > 3 {
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: %d, // %s %q\n", a.ID, p, a.Name, a.Effective.Access))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// attributeReadPrivileges maps every attribute whose matter.js read\n")
+	buf.WriteString("// privilege is above View (3 Operate, 4 Manage, 5 Administer) to that\n")
+	buf.WriteString("// privilege. Generated from each attribute's effective access in\n")
+	buf.WriteString("// parity/schema.json, as attributeWritePrivileges is.\n")
+	buf.WriteString("var attributeReadPrivileges = map[uint32]map[uint32]uint8{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			p, err := readPrivilege(a.Effective.Access)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
+			}
+			if p > 1 {
 				rows = append(rows, fmt.Sprintf("\t\t0x%04X: %d, // %s %q\n", a.ID, p, a.Name, a.Effective.Access))
 			}
 		}

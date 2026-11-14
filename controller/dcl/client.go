@@ -106,6 +106,31 @@ func (c *Client) httpClient() *http.Client {
 	return http.DefaultClient
 }
 
+// downloadClient is hc for the download of a URL a ledger record names —
+// an OTA image, a CRL: a redirect away from https is refused, so the
+// bytes of a URL the ledger named https come over https (review II,
+// R2-P3-net-06). hc's own redirect policy applies besides; without one,
+// net/http's default (ten redirects, src/net/http/client.go:845-850 at
+// go1.27.4). matter.js follows fetch's redirects
+// (packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693 at db021da0).
+func downloadClient(hc *http.Client) *http.Client {
+	c := *hc
+	own := hc.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if first := via[0].URL; strings.EqualFold(first.Scheme, "https") && !strings.EqualFold(req.URL.Scheme, "https") {
+			return fmt.Errorf("dcl: redirect from %s to %s refused: it leaves https", first.Redacted(), req.URL.Redacted())
+		}
+		if own != nil {
+			return own(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("dcl: stopped after 10 redirects")
+		}
+		return nil
+	}
+	return &c
+}
+
 func (c *Client) timeout() time.Duration {
 	if c.Timeout > 0 {
 		return c.Timeout

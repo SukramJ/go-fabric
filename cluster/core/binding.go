@@ -129,6 +129,17 @@ const (
 	bindingAttrBinding = bindingdef.AttrBinding
 )
 
+// bindingMaxEntries bounds the Binding list of a server, every fabric's
+// entries together: connectedhomeip's table size
+// Binding::Table::kMaxBindingEntries, CHIP_CONFIG_MAX_BINDING_ENTRIES_PER_FABRIC
+// (4) times CHIP_CONFIG_MAX_FABRICS (16)
+// (src/app/clusters/bindings/binding-table.h:134-135,
+// src/lib/core/CHIPConfig.h:1149 and :799 at 6170af84). connectedhomeip's
+// table is the node's; this bound is each endpoint's server's. The
+// definition gives the list no maximum (constraint "desc", matter.js
+// packages/model/src/standard/elements/binding.element.ts:23 at db021da0).
+const bindingMaxEntries = 4 * 16
+
 // bindingInst is the definition (cluster/spec/binding, ADR 0013, from
 // matter.js binding.element.ts): the attribute list and the status of a
 // write to anything but Binding come from it, and a write of the
@@ -363,23 +374,41 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if origin == contract.OriginUnknown {
 		origin = contract.OriginControllerWrite // a local writer writes as a controller does
 	}
-	return b.replace(origin, func(before []TargetStruct) []TargetStruct {
-		if !request {
-			return list
+	return b.replace(origin, func(before []TargetStruct) ([]TargetStruct, error) {
+		after := list
+		if request {
+			after = append(slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric }), list...)
 		}
-		after := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric })
-		return append(after, list...)
+		// The table's bound, checked as connectedhomeip checks a write: the
+		// list less the accessing fabric's entries plus the written ones
+		// (src/app/clusters/bindings/BindingCluster.cpp:79-80 at 6170af84;
+		// a list ADD arrives here as the whole list). A write that does not
+		// grow the list is taken, so a list the host set past the bound
+		// still shrinks. Before, the list took any number of entries
+		// (review II, R2-P3-admin-04).
+		if len(after) > bindingMaxEntries && len(after) > len(before) {
+			return nil, bindingStatusError{
+				code: im.StatusResourceExhausted,
+				msg:  fmt.Sprintf("core: Binding: %d entries exceed the table's %d", len(after), bindingMaxEntries),
+			}
+		}
+		return after, nil
 	})
 }
 
 // replace commits the list build makes of the current one: saved first,
-// then stored, then told to the [Binding.OnChange] observers.
-func (b *Binding) replace(origin contract.Origin, build func(before []TargetStruct) []TargetStruct) error {
+// then stored, then told to the [Binding.OnChange] observers. An error of
+// build is the write's, and changes nothing.
+func (b *Binding) replace(origin contract.Origin, build func(before []TargetStruct) ([]TargetStruct, error)) error {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	before := b.bindings
 	b.mu.RUnlock()
-	after := build(before)
+	after, err := build(before)
+	if err != nil {
+		b.writeMu.Unlock()
+		return err
+	}
 	if after == nil {
 		after = []TargetStruct{}
 	}
@@ -430,7 +459,7 @@ func (b *Binding) SetAttributes(values map[uint32]any) error {
 	if !set {
 		return nil
 	}
-	return b.replace(contract.OriginHostSet, func([]TargetStruct) []TargetStruct { return list })
+	return b.replace(contract.OriginHostSet, func([]TargetStruct) ([]TargetStruct, error) { return list, nil })
 }
 
 // Handle implements [spec.CommandRegistrar]. Binding has no command, so

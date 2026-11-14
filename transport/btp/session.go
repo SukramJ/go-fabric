@@ -67,6 +67,21 @@ type Options struct {
 	Logger     *slog.Logger
 }
 
+// maxQueuedMessages bounds the messages waiting in a session's send queue
+// for room in the peer's window. How many wait is the peer's to decide: a
+// peer that acknowledges nothing leaves every message the node sends after
+// its window filled in the queue, and the ack-received timeout ([AckTimeout])
+// bounds that in time only — a peer that acknowledges one segment within
+// each timeout keeps the session. A message past the bound is refused
+// ([Session.Send]); the queued ones stay. The number is the largest window
+// a session may negotiate ([MaximumWindowSize]): as many messages as that
+// window has segments. Neither reference bounds the queue — matter.js
+// queues every message (packages/protocol/src/ble/BtpSessionHandler.ts:42
+// and :390 at db021da0), connectedhomeip chains each onto its send queue
+// (src/ble/BLEEndPoint.cpp:591-602 at 6170af84); the bound is this
+// module's own.
+const maxQueuedMessages = MaximumWindowSize
+
 // outgoing is one queued Matter message and how much of it is sent —
 // matter.js keeps a DataReader per message (BtpSessionHandler.ts:42).
 type outgoing struct {
@@ -388,9 +403,16 @@ func (s *Session) handleIncomingLocked(data []byte) error {
 	if h.HasAckNumber && p.AckNumber != nil {
 		// A valid ack lies in the outstanding interval
 		// (prevIncomingAck, seq], as a wrap-safe distance (:287-304).
+		// The interval is open at prevIncomingAck: an ack number already
+		// received acknowledges nothing and is refused, as is any ack
+		// while nothing is outstanding — connectedhomeip
+		// src/ble/BtpEngine.cpp:142-162 (IsValidAck) and :169
+		// (BLE_ERROR_INVALID_ACK) at 6170af84, where matter.js accepts
+		// the repeated one (BtpSessionHandler.ts:287-304 at db021da0;
+		// review II, R2-P3-ble-03).
 		ack := int(*p.AckNumber)
 		outstanding := modularDistance(s.prevIncomingAck, s.seq)
-		if modularDistance(s.prevIncomingAck, ack) > outstanding {
+		if d := modularDistance(s.prevIncomingAck, ack); d == 0 || d > outstanding {
 			return protocolError(fmt.Sprintf("Invalid Ack Number, Ack Number: %d, Sequence Number: %d, Previous AckNumber: %d", ack, s.seq, s.prevIncomingAck))
 		}
 		s.ackReceiveTimer.stop()
@@ -457,6 +479,9 @@ func (s *Session) Send(msg []byte) error {
 	if len(msg) > 0xFFFF {
 		// The message length field is 16 bits (BtpCodec.ts:182).
 		return &FlowError{Message: fmt.Sprintf("BTP message of %d bytes exceeds the 16-bit message length", len(msg))}
+	}
+	if len(s.queue) >= maxQueuedMessages {
+		return &FlowError{Message: fmt.Sprintf("BTP send queue holds %d messages the peer has not made room for", len(s.queue))}
 	}
 	data := append([]byte(nil), msg...)
 	if s.pendingLive {

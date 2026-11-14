@@ -13,9 +13,11 @@ import (
 )
 
 // PerExchangeCaseProvider is a [CaseHandlerProvider] that lazily
-// allocates a fresh [CaseAdapter] per inbound CASE exchange ID. It
-// supports concurrent operational sessions by isolating responder
-// state per exchange — Apple Home opens parallel CASE sessions from
+// allocates a fresh [CaseAdapter] per inbound CASE handshake — one
+// initiator's exchange, [HandshakeKey]. It supports concurrent
+// operational sessions by isolating responder state per handshake, and
+// keeps a message of one initiator from reaching another initiator's
+// responder on the same exchange id — Apple Home opens parallel CASE sessions from
 // the iPhone (IPv6) and HomePod (IPv4); a singleton CaseAdapter
 // gets stuck in `Finished` after the first successful Sigma3 and
 // rejects every subsequent Sigma1 with `ProcessSigma1 already called`.
@@ -41,9 +43,9 @@ type PerExchangeCaseProvider struct {
 	clock clockvar.Var // see SetClock
 	// mu guards cancel, entries and onEvict.
 	mu       sync.Mutex
-	entries  map[uint16]*caseEntry
+	entries  map[HandshakeKey]*caseEntry
 	factory  func() *CaseAdapter
-	onEvict  func(exchangeID uint16) // optional; called when an entry is TTL-reaped
+	onEvict  func(key HandshakeKey) // optional; called when an entry is TTL-reaped
 	cancel   context.CancelFunc
 	reaperWG sync.WaitGroup
 }
@@ -63,32 +65,96 @@ func (p *PerExchangeCaseProvider) SetClock(c clock.Clock) { p.clock.Store(c) }
 // degrades to a debug-logged drop.
 func NewPerExchangeCaseProvider(factory func() *CaseAdapter) *PerExchangeCaseProvider {
 	return &PerExchangeCaseProvider{
-		entries: make(map[uint16]*caseEntry),
+		entries: make(map[HandshakeKey]*caseEntry),
 		factory: factory,
 	}
 }
 
 // Resolve implements [CaseHandlerProvider]. Returns the existing
-// adapter for exchangeID, allocating a fresh one via the factory on
-// first sighting. Returns nil when the factory is nil or returned
-// nil; callers (the SC router) drop the datagram on nil. Every
-// successful Resolve refreshes the entry's `lastTouched`.
-func (p *PerExchangeCaseProvider) Resolve(exchangeID uint16) CaseHandler {
+// adapter for key, allocating a fresh one via the factory on first
+// sighting. Returns nil when the factory is nil or returned nil;
+// callers (the SC router) drop the datagram on nil. Every successful
+// Resolve refreshes the entry's `lastTouched`. The provider holds at most
+// [maxCaseHandshakes] adapters: a new one takes the place of the least
+// recently used, which goes as a reaped one goes (review II,
+// R2-P3-dr-dev-03).
+func (p *PerExchangeCaseProvider) Resolve(key HandshakeKey) CaseHandler {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if e, ok := p.entries[exchangeID]; ok {
+	if e, ok := p.entries[key]; ok {
 		e.lastTouched = p.clock.Load().Now()
+		p.mu.Unlock()
 		return e.adapter
 	}
 	if p.factory == nil {
+		p.mu.Unlock()
 		return nil
 	}
 	a := p.factory()
 	if a == nil {
+		p.mu.Unlock()
 		return nil
 	}
-	p.entries[exchangeID] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
+	a.setDetach(func() { p.drop(key, a) })
+	var (
+		evictedKey HandshakeKey
+		evicted    *caseEntry
+	)
+	if len(p.entries) >= maxCaseHandshakes {
+		evictedKey, evicted = p.leastRecentlyUsedLocked()
+		delete(p.entries, evictedKey)
+	}
+	p.entries[key] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
+	onEvict := p.onEvict
+	p.mu.Unlock()
+	if evicted != nil {
+		dropped([]*caseEntry{evicted})
+		if onEvict != nil {
+			onEvict(evictedKey)
+		}
+	}
 	return a
+}
+
+// leastRecentlyUsedLocked returns the entry touched longest ago and its
+// key. The caller holds p.mu and has at least one entry.
+func (p *PerExchangeCaseProvider) leastRecentlyUsedLocked() (HandshakeKey, *caseEntry) {
+	var (
+		oldestKey HandshakeKey
+		oldest    *caseEntry
+	)
+	for k, e := range p.entries {
+		if oldest == nil || e.lastTouched.Before(oldest.lastTouched) {
+			oldestKey, oldest = k, e
+		}
+	}
+	return oldestKey, oldest
+}
+
+// drop removes key's entry when it still holds a — the adapter's handshake
+// failed ([CaseAdapter.SetOnUnfinished]) — and reports the eviction.
+func (p *PerExchangeCaseProvider) drop(key HandshakeKey, a *CaseAdapter) {
+	p.mu.Lock()
+	e, ok := p.entries[key]
+	if !ok || e.adapter != a {
+		p.mu.Unlock()
+		return
+	}
+	delete(p.entries, key)
+	onEvict := p.onEvict
+	p.mu.Unlock()
+	if onEvict != nil {
+		onEvict(key)
+	}
+}
+
+// dropped returns the staked session id of each adapter the provider let
+// go ([CaseAdapter.SetOnUnfinished]). Called without p.mu.
+func dropped(entries []*caseEntry) {
+	for _, e := range entries {
+		if e != nil && e.adapter != nil {
+			e.adapter.releaseStakedID()
+		}
+	}
 }
 
 // SetOnEvict wires the TTL-eviction callback. The bridge sets this to
@@ -100,20 +166,22 @@ func (p *PerExchangeCaseProvider) Resolve(exchangeID uint16) CaseHandler {
 // handler automatically on exchange.close(); Go needs an explicit hook
 // because the dedupe map is Bridge-owned, not handler-owned.
 // Pass nil to detach.
-func (p *PerExchangeCaseProvider) SetOnEvict(fn func(exchangeID uint16)) {
+func (p *PerExchangeCaseProvider) SetOnEvict(fn func(key HandshakeKey)) {
 	p.mu.Lock()
 	p.onEvict = fn
 	p.mu.Unlock()
 }
 
-// Forget removes the adapter for exchangeID so the next [Resolve]
+// Forget removes the adapter for key so the next [Resolve]
 // allocates a fresh one. Operators wire this from a post-Sigma3
 // hook for immediate cleanup; production daemons typically rely on
 // the TTL reaper instead.
-func (p *PerExchangeCaseProvider) Forget(exchangeID uint16) {
+func (p *PerExchangeCaseProvider) Forget(key HandshakeKey) {
 	p.mu.Lock()
-	delete(p.entries, exchangeID)
+	e := p.entries[key]
+	delete(p.entries, key)
 	p.mu.Unlock()
+	dropped([]*caseEntry{e})
 }
 
 // Reset drops every per-exchange adapter. Operators call this when
@@ -123,13 +191,16 @@ func (p *PerExchangeCaseProvider) Forget(exchangeID uint16) {
 // is also cleared.
 func (p *PerExchangeCaseProvider) Reset() {
 	p.mu.Lock()
-	evicted := make([]uint16, 0, len(p.entries))
-	for k := range p.entries {
+	evicted := make([]HandshakeKey, 0, len(p.entries))
+	gone := make([]*caseEntry, 0, len(p.entries))
+	for k, e := range p.entries {
 		delete(p.entries, k)
 		evicted = append(evicted, k)
+		gone = append(gone, e)
 	}
 	onEvict := p.onEvict
 	p.mu.Unlock()
+	dropped(gone)
 	if onEvict != nil {
 		for _, id := range evicted {
 			onEvict(id)
@@ -189,15 +260,20 @@ func (p *PerExchangeCaseProvider) StopReaper() {
 func (p *PerExchangeCaseProvider) reapLocked(ttl time.Duration) {
 	cutoff := p.clock.Load().Now().Add(-ttl)
 	p.mu.Lock()
-	var evicted []uint16
+	var (
+		evicted []HandshakeKey
+		gone    []*caseEntry
+	)
 	for k, e := range p.entries {
 		if e.lastTouched.Before(cutoff) {
 			delete(p.entries, k)
 			evicted = append(evicted, k)
+			gone = append(gone, e)
 		}
 	}
 	onEvict := p.onEvict
 	p.mu.Unlock()
+	dropped(gone)
 	// Call onEvict outside the lock; the callback (forgetSigma1Replied)
 	// acquires the bridge's write lock and must not nest inside our mutex.
 	if onEvict != nil {

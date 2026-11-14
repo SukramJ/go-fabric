@@ -92,10 +92,10 @@
 //     sendReply never sets NeedsAck (reply.go:149,157): the bridge
 //     neither emits standalone ACKs nor retransmits its own reliable
 //     messages, and every reply degrades to best-effort UDP.
-//   - AttachAckHandler — silent and narrow: the per-exchange owed-ack
-//     tracker an inbound piggybacked ACK discharges (securechannel.go);
-//     unwired, the bridge still acknowledges through the AckTracker, it
-//     only cannot clear an owed standalone ACK early.
+//   - AttachAckHandler — silent and narrow: a port told of every
+//     inbound piggybacked ACK on the Secure Channel (securechannel.go);
+//     the bridge acknowledges through the AckTracker whether or not one
+//     is wired.
 //   - AttachSubscriptionManager — silent, and the most deceptive of the
 //     set. A Subscribe still returns the complete initial ReportData,
 //     but with HasSubscription=false and SubscriptionID=0, and no report
@@ -551,7 +551,8 @@ type Bridge struct {
 	icd icdPorts
 
 	// sigma1Replied tracks the SHA-256 hash of the Sigma1 payload we
-	// already produced a Sigma2 reply for, keyed by exchangeID. Apple
+	// already produced a Sigma2 reply for, keyed by the handshake
+	// (initiator node id and exchange id, [HandshakeKey]). Apple
 	// iOS multicasts the same Sigma1 onto IPv4 + IPv6-LL + IPv6-Global
 	// simultaneously, so the same exchange receives 5 identical Sigma1
 	// datagrams in rapid succession. Bug A (sigma.Responder mutex +
@@ -567,10 +568,16 @@ type Bridge struct {
 	// first Sigma1 arrival on an exchange records its payload hash and
 	// fires the reply; subsequent arrivals on the same exchange with
 	// matching hash log + drop. Sigma3 receive forgets the exchange so
-	// re-use under the same exchange-id-after-rollover stays correct.
+	// re-use under the same exchange-id-after-rollover stays correct —
+	// for a handshake a provider completed, once the provider lets its
+	// adapter go ([Bridge.sigma3Handled]).
 	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
 	// short-circuits replays via `fabric.locked` + per-exchange state.
-	sigma1Replied map[uint16][32]byte
+	sigma1Replied map[HandshakeKey]sigma1Record
+	// sigma1Seq numbers the Sigma1 records in the order they were made,
+	// for the oldest to lose its place past [maxCaseHandshakes]; guarded
+	// by mu.
+	sigma1Seq uint64
 
 	// reportCounterOwner maps an outbound-reliable MessageCounter to
 	// the subscription ID that owns it. Populated by
@@ -591,6 +598,11 @@ type Bridge struct {
 	// never reach 0 again — peer truly gone — exceed the cap and get
 	// closed via the existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
+
+	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
+	// last found: the ACL and topology the subject last read a path
+	// under, and the ACL and topology of a first refusing observation.
+	subAccess sync.Map // map[uint32]*subjectAccess (subscriptionID → state)
 
 	// eventLog is the persistent (in-process lifetime) event buffer.
 	// Every call to [Bridge.EmitEvent] appends to this log in addition
@@ -641,19 +653,27 @@ type Bridge struct {
 	// leaves the flag clear and still starts with a clean budget.
 	preserveLockoutOnReset atomic.Bool
 
-	// paseInFlightExchange / paseInFlightSince implement the
+	// paseInFlight / paseInFlightSince implement the
 	// single-active-PASE invariant (Matter §4.13.1): while one PASE
 	// handshake is in progress the bridge SHALL NOT accept another —
 	// otherwise a second commissioner's PBKDFParamRequest silently
 	// replaces the first one's in-flight verifier state. Guarded by
-	// b.mu; zero exchange + zero time = idle. An abandoned handshake
+	// b.mu; zero key + zero time = idle. The claim names the handshake
+	// — initiator and exchange — so a message of another initiator on the
+	// same exchange id is not the claimed handshake. An abandoned handshake
 	// self-expires after [pasePairingTimeout] so a crashed
 	// commissioner cannot lock pairing out for the whole window.
 	// Mirrors matter.js PaseServer.ts:80-86 onNewExchange (reject
 	// while a pairing messenger / timer is active) + :127 the 60 s
 	// pairing timer.
-	paseInFlightExchange uint16
-	paseInFlightSince    time.Time
+	paseInFlight      HandshakeKey
+	paseInFlightSince time.Time
+
+	// paseClosing names the PASE sessions whose close the bridge has
+	// scheduled and not yet run ([Bridge.paseSessionsCloser]): they are
+	// closing, and do not keep a new PASE exchange out
+	// ([Bridge.paseSessionExists]). Guarded by b.mu.
+	paseClosing map[uint16]struct{}
 
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
 	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
@@ -868,6 +888,9 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	if snap == nil {
 		return nil, errors.New("bridge: snapshotter is required")
 	}
+	if cfg.TCP.MaxInboundConnections < 0 {
+		return nil, fmt.Errorf("bridge: TCP.MaxInboundConnections %d is negative", cfg.TCP.MaxInboundConnections)
+	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second
 	}
@@ -890,7 +913,7 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		ackHandler:     noopAckHandler{},
 		groupMessaging: noopGroupMessaging{},
 		eventLog:       im.NewEventLog(),
-		sigma1Replied:  make(map[uint16][32]byte),
+		sigma1Replied:  make(map[HandshakeKey]sigma1Record),
 	}
 	br.eventLog.SetClock(br.clock)
 	if err := br.seedCounters(); err != nil {
@@ -1023,8 +1046,11 @@ func (b *Bridge) Start(ctx context.Context) error {
 		tcpDone = make(chan struct{})
 		go func() {
 			defer close(tcpDone)
+			// Serve retries a failed accept and returns nil on its close,
+			// so an error means TCP is not served: the operator must see
+			// it (review II, R2-P3-ctl-lan-04).
 			if err := tcpListener.Serve(serveCtx, b.handleTCPMessage, b.handleTCPClose); err != nil {
-				b.logger.Debug("matter.tcp.serve.exit", slog.Any("err", err))
+				b.logger.Warn("matter.tcp.serve.exit", slog.Any("err", err))
 			}
 		}()
 	}
@@ -1251,7 +1277,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	aclLister := b.aclLister
 	auxACL := b.auxACL
 	b.mu.RUnlock()
-	dispatcher.SetACLLister(aclLister)
+	dispatcher.SetACLLister(pinnableACL(aclLister))
 	dispatcher.SetAuxiliaryACL(auxACL)
 
 	// Wire MatterEventReceiver-aware cluster servers so they can fire
@@ -1337,7 +1363,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// The sources once more, under the lock of the swap: an Attach… that
 	// ran since they were read above applied to the dispatcher this one
 	// replaces.
-	dispatcher.SetACLLister(b.aclLister)
+	dispatcher.SetACLLister(pinnableACL(b.aclLister))
 	dispatcher.SetAuxiliaryACL(b.auxACL)
 	b.dispatcher = dispatcher
 	staleSwitchUnsubs := b.switchUnsubscribers
@@ -1926,7 +1952,7 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	// The live dispatcher too (nil before the first assembly): before, a
 	// lister replaced on a running bridge waited for a Reassemble that a
 	// node with a fixed set of devices never runs (review II, W2-api-10).
-	b.dispatcher.SetACLLister(l)
+	b.dispatcher.SetACLLister(pinnableACL(l))
 	b.mu.Unlock()
 }
 

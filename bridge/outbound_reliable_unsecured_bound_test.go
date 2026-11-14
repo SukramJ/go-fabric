@@ -233,7 +233,7 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		}
 		// What a per-exchange provider's reaper calls for a responder
 		// nobody resolved within its TTL.
-		r.b.ForgetSigma1Replied(0x5003)
+		r.b.ForgetSigma1Replied(scKey(0x5003))
 		if got := r.pending(); got != 0 {
 			t.Errorf("pending after the responder was reaped = %d, want 0", got)
 		}
@@ -241,7 +241,7 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 	t.Run("a PASE handshake whose claim another takes over after the timeout", func(t *testing.T) {
 		t.Parallel()
 		r := newUnsecuredRig(t)
-		if !r.b.claimPaseInFlight(0x5004) {
+		if !r.b.claimPaseInFlight(scKey(0x5004)) {
 			t.Fatal("the first PBKDFParamRequest did not get the slot")
 		}
 		hdr, proto := r.request(mrp.SCOpcodePBKDFParamRequest, 0x5004)
@@ -251,7 +251,7 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		r.b.mu.Lock()
 		r.b.paseInFlightSince = r.b.paseInFlightSince.Add(-pasePairingTimeout - time.Second)
 		r.b.mu.Unlock()
-		if !r.b.claimPaseInFlight(0x5005) {
+		if !r.b.claimPaseInFlight(scKey(0x5005)) {
 			t.Fatal("the slot was not free after the pairing timeout")
 		}
 		if got := r.pending(); got != 0 {
@@ -266,7 +266,7 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		tr := newOutboundReliableTracker(nil, nil)
 		t0 := time.Unix(1_000_000, 0)
 		dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
-		tr.trackUnsecured(7, 9, []byte{1}, dest, t0, newHandshakePeerTiming(parkedPeer.params, t0))
+		tr.trackUnsecured(7, onExchange(9), []byte{1}, dest, t0, newHandshakePeerTiming(parkedPeer.params, t0))
 		sent := 0
 		send := func(net.Addr, []byte) error { sent++; return nil }
 		if out := tr.Tick(t0.Add(unsecuredEntryLifetime-time.Second), send); len(out) != 0 || tr.Pending() != 1 {
@@ -307,7 +307,7 @@ func TestUnsecuredRetransmitEntryKeepsItsSchedule(t *testing.T) {
 	tr := newOutboundReliableTracker(nil, nil)
 	t0 := time.Unix(1_000_000, 0)
 	dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
-	tr.trackUnsecured(7, 9, []byte{1}, dest, t0, newHandshakePeerTiming(nil, t0))
+	tr.trackUnsecured(7, onExchange(9), []byte{1}, dest, t0, newHandshakePeerTiming(nil, t0))
 	sent := 0
 	send := func(net.Addr, []byte) error { sent++; return nil }
 	// The active interval's first wait is at most 300 ms × 1.1 × 1.25.
@@ -401,14 +401,14 @@ func TestUnsecuredRetransmitTableEvictsItsOldestEntry(t *testing.T) {
 	}
 	// The secure session's entry, older than all of them, is still there,
 	// and is no unsecured exchange's.
-	if cleared := r.b.outboundReliable.AbandonUnsecuredExchange(0x6000); cleared != 0 {
+	if cleared := r.b.outboundReliable.AbandonUnsecuredExchange(onExchange(0x6000)); cleared != 0 {
 		t.Errorf("AbandonUnsecuredExchange cleared %d entries of a secure session", cleared)
 	}
 	if !r.b.outboundReliable.Ack(5, 1) {
 		t.Error("the secure session's entry was evicted by the unsecured session's")
 	}
 	// A handshake that ends makes room: the next reply evicts nothing.
-	if cleared := r.b.outboundReliable.AbandonUnsecuredExchange(0x6001); cleared != 1 {
+	if cleared := r.b.outboundReliable.AbandonUnsecuredExchange(scKey(0x6001)); cleared != 1 {
 		t.Fatalf("AbandonUnsecuredExchange cleared %d entries, want 1", cleared)
 	}
 	hdr, proto = r.request(mrp.SCOpcodeSigma1, 0x6101)
@@ -428,14 +428,14 @@ func TestUnsecuredRetransmitEvictionWakesItsWaiter(t *testing.T) {
 		tr := newOutboundReliableTracker(nil, nil)
 		t0 := time.Now()
 		dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
-		tr.trackUnsecured(1, 0x10, []byte{1}, dest, t0, nil)
+		tr.trackUnsecured(1, onExchange(0x10), []byte{1}, dest, t0, nil)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		result := make(chan error, 1)
 		go func() { result <- tr.WaitForAck(ctx, 0, 1) }()
 		synctest.Wait()
 		for i := range unsecuredEntryLimit {
-			tr.trackUnsecured(uint32(2+i), uint16(0x11+i), []byte{1}, dest, t0, nil)
+			tr.trackUnsecured(uint32(2+i), onExchange(uint16(0x11+i)), []byte{1}, dest, t0, nil)
 		}
 		synctest.Wait()
 		select {
@@ -462,7 +462,7 @@ func TestInitiatedHandshakeIsTrackedAtAFullTable(t *testing.T) {
 	r := newUnsecuredRig(t)
 	now := time.Now()
 	for i := range unsecuredEntryLimit {
-		r.b.outboundReliable.trackUnsecured(uint32(1000+i), uint16(0x6000+i), []byte{1}, r.peer.LocalAddr(), now, nil)
+		r.b.outboundReliable.trackUnsecured(uint32(1000+i), onExchange(uint16(0x6000+i)), []byte{1}, r.peer.LocalAddr(), now, nil)
 	}
 	peerAddr, _ := r.peer.LocalAddr().(*net.UDPAddr)
 	if err := r.b.sendInitiatedUnsecured(peerAddr, 0x0042, 0xE0E0, mrp.SCOpcodeSigma1, []byte{0x15, 0x18}, nil); err != nil {

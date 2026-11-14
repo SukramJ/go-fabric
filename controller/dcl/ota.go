@@ -303,7 +303,7 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if o.Client != nil {
 		hc = o.Client.httpClient()
 	}
-	resp, err := hc.Do(req)
+	resp, err := downloadClient(hc).Do(req)
 	if err != nil {
 		return fail(err)
 	}

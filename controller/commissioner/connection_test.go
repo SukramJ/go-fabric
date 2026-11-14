@@ -39,6 +39,8 @@ type connectionHarness struct {
 	mgr   *exchange.Manager
 	calls chan *attemptCall
 	done  chan struct{}
+	// giveUp is connectionConfig.giveUp; set before start.
+	giveUp func(*exchange.Session, error)
 
 	mu     sync.Mutex
 	result connectionResult
@@ -65,7 +67,7 @@ func newConnectionHarness(t *testing.T) *connectionHarness {
 func (h *connectionHarness) start(ctx context.Context, timeout time.Duration, devices ...*candidate) {
 	go func() {
 		res, err := connectPASE(ctx, connectionConfig{
-			devices: devices, timeout: timeout, clock: h.clock, log: discard(),
+			devices: devices, timeout: timeout, clock: h.clock, log: discard(), giveUp: h.giveUp,
 			establish: func(actx context.Context, addr *net.UDPAddr, c *candidate, onPBKDF func()) (*exchange.Session, error) {
 				call := &attemptCall{ctx: actx, addr: addr.String(), device: c.identifier, onPBKDF: onPBKDF, result: make(chan attemptResult, 1)}
 				h.calls <- call
@@ -243,6 +245,69 @@ func TestConnectionPasscodeDropsDevice(t *testing.T) {
 		_, err := h.wait(t)
 		if !errors.Is(err, handshake.ErrPasscodeMismatch) {
 			t.Fatalf("error %v", err)
+		}
+	})
+}
+
+// TestConnectionLosingDisarmRunsBesideTheNextAddress (review II,
+// R2-P3-rr-ctl-05): a session established on a device already dropped is
+// given up (connectionConfig.giveUp, the commissioner's disarm), and while
+// that runs the next address — another device's — is launched: the
+// attempt is decided and holds the responder no longer. A run without a
+// winner still returns only once the give-up has returned.
+func TestConnectionLosingDisarmRunsBesideTheNextAddress(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h := newConnectionHarness(t)
+		givingUp, release := make(chan struct{}), make(chan struct{})
+		h.giveUp = func(s *exchange.Session, cause error) {
+			close(givingUp)
+			<-release
+			s.HandlePeerLoss(cause)
+		}
+		h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
+		first := h.next(t)
+		h.armed(t)
+		h.clock.Advance(DelayBeforeNextAddress)
+		second := h.next(t)
+		second.onPBKDF()
+		// A wrong passcode on a's first address drops a; the attempt on its
+		// second address, which holds the responder, still establishes.
+		first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
+		h.none(t)
+		<-second.ctx.Done()
+		late := h.session(t)
+		second.result <- attemptResult{s: late}
+		<-givingUp
+		synctest.Wait()
+		released := false
+		var third *attemptCall
+		select {
+		case third = <-h.calls:
+		default:
+			t.Error("no next address launched while the losing session was given up")
+			close(release)
+			released = true
+			third = h.next(t)
+		}
+		if third.device != "b" {
+			t.Errorf("the next attempt is on %s (%s), want b", third.device, third.addr)
+		}
+		third.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
+		if !released {
+			synctest.Wait()
+			select {
+			case <-h.done:
+				t.Error("the run returned before the losing session's give-up did")
+			default:
+			}
+			close(release)
+		}
+		if _, err := h.wait(t); !errors.Is(err, handshake.ErrPasscodeMismatch) {
+			t.Fatalf("error %v, want the passcode mismatch", err)
+		}
+		if !late.IsPeerLost() {
+			t.Fatal("the losing session was not given up")
 		}
 	})
 }

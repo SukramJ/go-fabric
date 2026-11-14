@@ -662,6 +662,10 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// The last fabric's removal resets the terms-and-conditions acceptance
 	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
 	if srv := n.root.GeneralCommissioning; srv != nil {
+		// A fail-safe armed for the removed fabric expires with its
+		// rollback (review II, R2-P3-admin-06); one the rollback itself
+		// removed the fabric of is disarmed already.
+		srv.FabricRemoved(ctx, fabricIndex)
 		switch fabrics, err := n.st.ListFabrics(ctx); {
 		case err != nil:
 			n.logger.Warn("node.terms.reset", slog.Any("err", err))
@@ -1117,10 +1121,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.camerasOnline(ctx)
 	// The committed Wi-Fi network is rejoined before the fabrics'
 	// subscriptions and records go out ([Network].WiFi's Driver): chip's
-	// link comes back with the device (WiFiNetworkCommissioning.Start).
+	// link comes back with the device (WiFiNetworkCommissioning.Start). A
+	// rejoin that fails is retried for the node's lifetime (review II,
+	// R2-P3-net-01).
 	if wifi := n.root.WiFiNetworkCommissioning; wifi != nil {
 		work.pause()
-		wifi.Start(ctx)
+		wifi.Start(n.life) //nolint:contextcheck // the rejoin is retried for the node's lifetime, not the call's
 		work.resume()
 	}
 
@@ -1429,8 +1435,10 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 // non-nil — the node's own window (at Start and after the last fabric is
 // removed), [Node.OpenBasicWindow], the host's opener and both
 // AdministratorCommissioning commands of a paired controller, which
-// answer FAILURE — and revokes a window that is open; controllers already
-// paired keep working. nil lifts the block and, on a node without a
+// answer FAILURE — and ends a commissioning under way, as
+// RevokeCommissioning does: the PASE sessions close, the fail-safe armed
+// over PASE expires and an open window is revoked, whether or not a window
+// is still open; controllers already paired keep working. nil lifts the block and, on a node without a
 // fabric, reopens its own window at once. A host that cannot serve the
 // attestation chain it was configured with calls it before [Node.Start].
 // See [bridge.CommissioningWindow.SetBlocked]; matter.js has no

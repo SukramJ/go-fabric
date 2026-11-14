@@ -155,9 +155,24 @@ func (b *Bridge) paseSessionsCloser() func() {
 	if len(ids) == 0 {
 		return nil
 	}
+	// Named for closing, the sessions are closing: no new PASE exchange
+	// waits for their grace ([Bridge.paseSessionExists]).
+	b.mu.Lock()
+	if b.paseClosing == nil {
+		b.paseClosing = make(map[uint16]struct{})
+	}
+	for _, id := range ids {
+		b.paseClosing[id] = struct{}{}
+	}
+	b.mu.Unlock()
 	return func() {
 		for _, id := range ids {
 			_ = reg.Close(id) // gone already: nothing to clear
 		}
+		b.mu.Lock()
+		for _, id := range ids {
+			delete(b.paseClosing, id)
+		}
+		b.mu.Unlock()
 	}
 }

@@ -37,16 +37,24 @@ const ackPumpInterval = 50 * time.Millisecond
 // starve the pump's exit path.
 const pumpStopGrace = 500 * time.Millisecond
 
-// AttachAckTracker wires the [mrp.AckTracker] in two roles at once:
+// AttachAckTracker wires the [mrp.AckTracker] that holds the
+// acknowledgements this node owes for the reliable messages it received,
+// and the pump that sends a StandaloneAck for each one no reply carried.
+// A pump goroutine spawns from [Bridge.Start] when this method has been
+// called; without it the bridge falls back to noop ACK handling (useful
+// for tests that do not need ACK emission).
 //
-//  1. The Discharge half (peer ACKs of our outbound messages) goes
-//     through [AckHandler] just like before — the adapter is
-//     constructed and registered transparently.
-//  2. The Owe + Pump half (synthesising StandaloneAck datagrams for
-//     un-piggybacked obligations) gets direct access to the tracker.
-//     A pump goroutine spawns from [Bridge.Start] when this method
-//     has been called; without it the bridge falls back to noop ACK
-//     handling (useful for tests that do not need ACK emission).
+// The tracker is not the [AckHandler]: a peer's acknowledgement of this
+// node's message stops that message's retransmissions (the outbound
+// reliability tracker, receive.go) and fulfils none of the
+// acknowledgements this node owes — those end only with an
+// acknowledgement this node sends. matter.js keeps the two apart: an
+// acknowledgement the message carries stops the exchange's
+// retransmission (packages/protocol/src/protocol/MessageExchange.ts:536-542
+// at db021da0), and a message that requires one is acknowledged in any
+// case (:553-560). Wired as the AckHandler before, a
+// failure StatusReport that ended a handshake and acknowledged the
+// node's last reply was never acknowledged (review II, phase 3).
 //
 // Calling AttachAckTracker AFTER [Bridge.Start] is allowed, but the
 // pump goroutine starts only at the next Start (or never if the
@@ -54,7 +62,6 @@ const pumpStopGrace = 500 * time.Millisecond
 // tracker before Start). For tests that wire post-Start, schedule
 // pump exercises via direct [Bridge.RunAckPumpOnce] calls instead.
 func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
-	b.AttachAckHandler(NewMRPAckAdapter(t))
 	b.mu.Lock()
 	b.ackTracker = t
 	if b.outboundReliable == nil {
@@ -136,6 +143,19 @@ type exchangeReplyTarget struct {
 	displaced bool
 }
 
+// initiator is the node id of the initiator of the unsecured exchange the
+// route belongs to, as [handshakeKeyOf] reads it off the message: the
+// destination node id it named, else its source node id.
+func (t exchangeReplyTarget) initiator() uint64 {
+	switch {
+	case t.hasPeerDestNodeID:
+		return t.peerDestNodeID
+	case t.hasPeerSourceNodeID:
+		return t.peerSourceNodeID
+	}
+	return 0
+}
+
 // owedInboundAck registers an obligation for an inbound Reliable
 // message. Caller is the receive pipeline; src plus the peer's
 // SourceNodeID (when set) are captured per exchange-id so the pump
@@ -170,14 +190,7 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 		// route. Mirrors matter.js ExchangeManager.ts:340 (session-scoped
 		// resolution) and :138 (role folded into the exchange key).
 		key := mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
-		// An obligation still pending for another counter is displaced by
-		// this one and keeps needing the route until the pump took it.
-		displaced := false
-		if prev, ok := b.replyRoute(key); ok {
-			displaced = prev.displaced ||
-				(prev.owedCounter != hdr.MessageCounter && tracker.Owes(hdr.SessionID, proto.ExchangeID, !proto.Initiator))
-		}
-		b.routing.exchangeSrcs.Store(key, exchangeReplyTarget{
+		target := exchangeReplyTarget{
 			src:                 src,
 			hasPeerSourceNodeID: hdr.HasSourceNodeID,
 			peerSourceNodeID:    hdr.SourceNodeID,
@@ -185,8 +198,33 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 			peerDestNodeID:      hdr.DestNodeID,
 			sessionID:           hdr.SessionID,
 			owedCounter:         hdr.MessageCounter,
-			displaced:           displaced,
-		})
+		}
+		// An obligation still pending for another counter is displaced by
+		// this one and keeps needing the route until the pump took it.
+		displaced := false
+		if prev, ok := b.replyRoute(key); ok {
+			owes := tracker.Owes(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
+			if hdr.SessionID == 0 && prev.initiator() != target.initiator() && (prev.displaced || owes) {
+				// The unsecured session's exchange ids are each
+				// initiator's own: another initiator's message on an
+				// exchange whose route still serves the first one's
+				// acknowledgement neither takes that route nor displaces
+				// that obligation. Its own acknowledgement goes to it at
+				// once. matter.js keeps each initiator's exchanges in its
+				// own unsecured session (ExchangeManager.ts:308-312 and
+				// :401 at db021da0); review II, R2-P3-lan-dev-07.
+				b.routing.ackRouteMu.Unlock()
+				b.emitStandaloneAck(mrp.AckObligation{
+					AckCounter: hdr.MessageCounter,
+					ExchangeID: proto.ExchangeID,
+					Initiator:  !proto.Initiator,
+				}, target)
+				return
+			}
+			displaced = prev.displaced || (prev.owedCounter != hdr.MessageCounter && owes)
+		}
+		target.displaced = displaced
+		b.routing.exchangeSrcs.Store(key, target)
 	}
 	// [mrp.AckObligation.Initiator] records OUR role on the exchange,
 	// which is the inverse of the inbound message's flag: a peer-opened
@@ -301,6 +339,39 @@ func (b *Bridge) dischargeOwedAck(sessionID, exchangeID uint16, initiator bool) 
 	defer b.routing.ackRouteMu.Unlock()
 	tracker.Discharge(sessionID, exchangeID, initiator)
 	b.releaseReplyRouteLocked(tracker, mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator})
+}
+
+// dischargeOwedHandshakeAck is [Bridge.dischargeOwedAck] for a handshake
+// reply on the unsecured session: the obligation of the exchange is
+// discharged only when its route belongs to the handshake's initiator, so
+// a reply to one initiator does not take the acknowledgement another
+// initiator is owed on the same exchange id ([Bridge.owedInboundAck]).
+func (b *Bridge) dischargeOwedHandshakeAck(key HandshakeKey, initiator bool) {
+	b.mu.RLock()
+	tracker := b.ackTracker
+	b.mu.RUnlock()
+	if tracker == nil {
+		return
+	}
+	route := mrp.ExchangeKey{SessionID: 0, ExchangeID: key.ExchangeID, Initiator: initiator}
+	b.routing.ackRouteMu.Lock()
+	defer b.routing.ackRouteMu.Unlock()
+	if target, ok := b.replyRoute(route); ok && target.initiator() != key.InitiatorNodeID {
+		return
+	}
+	tracker.Discharge(0, key.ExchangeID, initiator)
+	b.releaseReplyRouteLocked(tracker, route)
+}
+
+// dischargeOwedReplyAck discharges what the reply to requestHdr's message
+// carried the acknowledgement of: [Bridge.dischargeOwedHandshakeAck] on the
+// unsecured session, [Bridge.dischargeOwedAck] on a secure one.
+func (b *Bridge) dischargeOwedReplyAck(requestHdr *message.Header, proto message.ProtocolHeader) {
+	if requestHdr.SessionID == 0 {
+		b.dischargeOwedHandshakeAck(handshakeKeyOf(requestHdr, proto.ExchangeID), !proto.Initiator)
+		return
+	}
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 }
 
 // expediteDuplicateAck rewrites the just-registered obligation for a

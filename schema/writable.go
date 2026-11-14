@@ -89,6 +89,19 @@ func AttributeWritePrivilege(clusterID, attrID uint32) uint8 {
 	return PrivilegeOperate
 }
 
+// AttributeReadPrivilege returns the privilege a subject needs to read the
+// attribute: matter.js's read privilege from the access string (generated
+// into attributeReadPrivileges), View when it names none higher. Mirrors
+// AccessControl(attribute).limits.readLevel, which matter.js authorizes
+// every read against (packages/protocol/src/action/server/AttributeReadResponse.ts:272,
+// :410 at db021da0).
+func AttributeReadPrivilege(clusterID, attrID uint32) uint8 {
+	if p, ok := attributeReadPrivileges[clusterID][attrID]; ok {
+		return p
+	}
+	return PrivilegeView
+}
+
 // AttributeChangesOmitted reports whether matter.js gives the attribute the
 // "C" (changesOmitted) quality: a change to it is never reported to a
 // subscriber, though it reads normally. Mirrors matter.js

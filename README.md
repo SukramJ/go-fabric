@@ -196,10 +196,13 @@ becomes permissible in:
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
 | `im.EventLog.SetCounterPersistence` | `EventLog.SetCeilingPersistence`, whose persist function returns the store's error | `v0.23.0` |
+| `secure/operational.Manager.ReleaseID` | `Manager.AllocateStake` and `Manager.ReleaseStake`, which free the caller's own stake only | `v0.23.0` |
 | `secure/operational.Manager.ClosePeer` | none with the CloseSession farewell; `Manager.Close` on each id `Manager.SessionIDsForPeer` returns closes without it | `v0.23.0` |
 | `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.23.0` |
 | `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |
 | `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseEstablished`, which returns the refusal of the arm | `v0.23.0` |
+| `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

@@ -307,6 +307,20 @@ func (b *Bridge) registerSubscription(
 	req im.SubscribeRequest,
 	initialReport *im.ReportData,
 ) (uint32, error) {
+	return b.registerSubscriptionAt(src, requestHdr, proto, req, initialReport, false)
+}
+
+// registerSubscriptionAt is [Bridge.registerSubscription]; evictAtQuota
+// admits the subscription at its fabric's quota by ending the fabric's
+// oldest ([subscription.SubscribeArgs.EvictAtQuota]).
+func (b *Bridge) registerSubscriptionAt(
+	src net.Addr,
+	requestHdr *message.Header,
+	proto message.ProtocolHeader,
+	req im.SubscribeRequest,
+	initialReport *im.ReportData,
+	evictAtQuota bool,
+) (uint32, error) {
 	// Subscribe in the manager so quota + cadence bookkeeping is
 	// centralised there. The report pump is wired in the daemon bring-up
 	// (SetEventReporter / SubscriptionReporter in daemon_matter.go); the
@@ -365,9 +379,18 @@ func (b *Bridge) registerSubscription(
 			// packages/node/src/node/server/InteractionServer.ts:647 at db021da0
 			// (`if (fabric !== undefined && !keepSubscriptions)`).
 			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0,
+			EvictAtQuota:            evictAtQuota,
 		})
 		if err != nil {
-			b.logger.Warn("matter.rx.im.subscribe.manager",
+			// At the quota without eviction the caller decides what
+			// follows — the eviction that admits the request, or the
+			// refusal it logs itself ([Bridge.handleSubscribeRequest]) —
+			// so that first attempt is no refusal of its own.
+			log := b.logger.Warn
+			if !evictAtQuota && errors.Is(err, subscription.ErrFabricQuotaExceeded) {
+				log = b.logger.Debug
+			}
+			log("matter.rx.im.subscribe.manager",
 				slog.String("src", srcString(src)),
 				slog.Any("err", err))
 			return 0, err

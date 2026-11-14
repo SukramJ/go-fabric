@@ -602,11 +602,12 @@ func TestAckPump_ExpediteDuplicateAck_UnknownObligationNoOp(t *testing.T) {
 	}
 }
 
-// TestAckPump_AttachAckTrackerAlsoSetsAckHandler verifies that after
-// AttachAckTracker, the bridge's AckHandler (wired via AttachAckHandler
-// internally) discharges through the same tracker when dispatchSecureChannel
-// receives a datagram with HasAck=true.
-func TestAckPump_AttachAckTrackerAlsoSetsAckHandler(t *testing.T) {
+// TestAckPump_PeerAckLeavesTheAckTheBridgeOwes: a peer's acknowledgement
+// on an exchange — a StandaloneAck that acknowledges the bridge's message
+// — does not discharge the acknowledgement the bridge owes on that
+// exchange: the AckTracker AttachAckTracker wires holds the bridge's own
+// acknowledgements, which only the bridge's own acknowledgement ends.
+func TestAckPump_PeerAckLeavesTheAckTheBridgeOwes(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	tracker := mrp.NewAckTracker(0)
@@ -617,16 +618,15 @@ func TestAckPump_AttachAckTrackerAlsoSetsAckHandler(t *testing.T) {
 		msgCounter uint32 = 500
 	)
 
-	// Plant an obligation so Discharge has something to clear. The
-	// inbound StandaloneAck below carries Initiator=false (the peer is
-	// responding on an exchange WE opened), so our role on that exchange
-	// is initiator=true — the obligation has to be keyed the same way.
+	// The bridge owes an acknowledgement on the exchange. The inbound
+	// StandaloneAck below carries Initiator=false (the peer is responding
+	// on an exchange WE opened), so our role on that exchange is
+	// initiator=true — the obligation is keyed the same way.
 	tracker.Owe(msgCounter, 0, exchangeID, true, time.Now())
 	if tracker.Pending() != 1 {
 		t.Fatalf("pre-condition: tracker.Pending() = %d, want 1", tracker.Pending())
 	}
 
-	// Send a StandaloneAck with HasAck=true targeting the exchange.
 	proto := message.ProtocolHeader{
 		ProtocolID: mrp.SecureChannelProtocolID,
 		Opcode:     mrp.StandaloneAckOpcode,
@@ -637,9 +637,8 @@ func TestAckPump_AttachAckTrackerAlsoSetsAckHandler(t *testing.T) {
 	hdr := buildMsgHdr(1)
 	_ = b.dispatchSecureChannel(loopbackSrc(), hdr, proto, nil)
 
-	// The AckHandler wired by AttachAckTracker should have discharged the obligation.
-	if tracker.Pending() != 0 {
-		t.Errorf("tracker.Pending() = %d after dispatchSecureChannel with HasAck=true; want 0 (discharged)", tracker.Pending())
+	if tracker.Pending() != 1 {
+		t.Errorf("tracker.Pending() = %d after the peer's acknowledgement; want 1 — the acknowledgement the bridge owes is still owed", tracker.Pending())
 	}
 }
 

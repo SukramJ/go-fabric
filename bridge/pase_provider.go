@@ -13,7 +13,8 @@ import (
 )
 
 // PerExchangePaseProvider is a [PaseHandlerProvider] that lazily
-// allocates a fresh [PaseAdapter] per inbound PASE exchange ID. It
+// allocates a fresh [PaseAdapter] per inbound PASE handshake — one
+// initiator's exchange, [HandshakeKey]. It
 // enforces the Matter §11.19.7 single-active-PASE-session invariant
 // and the 60 s per-exchange hard timeout (Matter §4.13.1.7).
 //
@@ -31,7 +32,7 @@ type PerExchangePaseProvider struct {
 	clock clockvar.Var // see SetClock
 	// mu guards cancel and entries.
 	mu       sync.Mutex
-	entries  map[uint16]*paseEntry
+	entries  map[HandshakeKey]*paseEntry
 	factory  func() *PaseAdapter
 	cancel   context.CancelFunc
 	reaperWG sync.WaitGroup
@@ -41,7 +42,7 @@ type paseEntry struct {
 	adapter     *PaseAdapter
 	lastTouched time.Time
 	// expireTimer is the per-exchange 60 s hard-timeout timer started at
-	// Resolve-time. Fires Forget(exchangeID) when the PASE exchange does
+	// Resolve-time. Fires Forget(key) when the PASE exchange does
 	// not complete within 60 s per Matter §4.13.1.7.
 	// Mirrors matter.js packages/protocol/src/session/pase/PaseServer.ts:37
 	// `PASE_PAIRING_TIMEOUT = Seconds(60)`.
@@ -59,13 +60,13 @@ func (p *PerExchangePaseProvider) SetClock(c clock.Clock) { p.clock.Store(c) }
 // degrades to a debug-logged drop.
 func NewPerExchangePaseProvider(factory func() *PaseAdapter) *PerExchangePaseProvider {
 	return &PerExchangePaseProvider{
-		entries: make(map[uint16]*paseEntry),
+		entries: make(map[HandshakeKey]*paseEntry),
 		factory: factory,
 	}
 }
 
 // Resolve implements [PaseHandlerProvider]. Returns the existing
-// adapter for exchangeID, allocating a fresh one via the factory on
+// adapter for key, allocating a fresh one via the factory on
 // first sighting. Returns nil when the factory is nil or returned
 // nil; callers (the SC router) drop the datagram on nil. Every
 // successful Resolve refreshes the entry's `lastTouched`.
@@ -77,12 +78,12 @@ func NewPerExchangePaseProvider(factory func() *PaseAdapter) *PerExchangePasePro
 // datagrams of the SAME active window across retransmits.
 //
 // 60 s hard timeout per Matter §4.13.1.7: every new exchange starts a
-// 60 s timer that calls Forget(exchangeID) on expiry. Mirrors
+// 60 s timer that calls Forget(key) on expiry. Mirrors
 // matter.js PaseServer.ts:37 `PASE_PAIRING_TIMEOUT = Seconds(60)`.
-func (p *PerExchangePaseProvider) Resolve(exchangeID uint16) PaseHandler {
+func (p *PerExchangePaseProvider) Resolve(key HandshakeKey) PaseHandler {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if e, ok := p.entries[exchangeID]; ok {
+	if e, ok := p.entries[key]; ok {
 		e.lastTouched = p.clock.Load().Now()
 		return e.adapter
 	}
@@ -93,12 +94,12 @@ func (p *PerExchangePaseProvider) Resolve(exchangeID uint16) PaseHandler {
 	if a == nil {
 		return nil
 	}
-	eid := exchangeID // capture for closure
+	eid := key // capture for closure
 	// Enforce 60 s per-exchange hard timeout per Matter §4.13.1.7.
 	expireTimer := p.clock.Load().AfterFunc(60*time.Second, func() {
 		p.Forget(eid)
 	})
-	p.entries[exchangeID] = &paseEntry{
+	p.entries[key] = &paseEntry{
 		adapter:     a,
 		lastTouched: p.clock.Load().Now(),
 		expireTimer: expireTimer,
@@ -106,18 +107,21 @@ func (p *PerExchangePaseProvider) Resolve(exchangeID uint16) PaseHandler {
 	return a
 }
 
-// Forget removes the adapter for exchangeID so the next
+// Forget removes the adapter for key so the next
 // [Resolve] call allocates a fresh one. Operators wire this from a
 // post-Pake3 hook when they want immediate cleanup; production
 // daemons typically rely on the TTL reaper instead.
 // Also cancels the entry's 60 s hard-timeout timer.
-func (p *PerExchangePaseProvider) Forget(exchangeID uint16) {
+func (p *PerExchangePaseProvider) Forget(key HandshakeKey) {
 	p.mu.Lock()
-	e := p.entries[exchangeID]
-	delete(p.entries, exchangeID)
+	e := p.entries[key]
+	delete(p.entries, key)
 	p.mu.Unlock()
 	if e != nil && e.expireTimer != nil {
 		e.expireTimer.Stop()
+	}
+	if e != nil && e.adapter != nil {
+		e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
 	}
 }
 
@@ -128,11 +132,14 @@ func (p *PerExchangePaseProvider) Forget(exchangeID uint16) {
 func (p *PerExchangePaseProvider) Reset() {
 	p.mu.Lock()
 	old := p.entries
-	p.entries = make(map[uint16]*paseEntry)
+	p.entries = make(map[HandshakeKey]*paseEntry)
 	p.mu.Unlock()
 	for _, e := range old {
 		if e.expireTimer != nil {
 			e.expireTimer.Stop()
+		}
+		if e.adapter != nil {
+			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
 		}
 	}
 }
@@ -212,6 +219,9 @@ func (p *PerExchangePaseProvider) reapBefore(cutoff time.Time) {
 	for _, e := range reaped {
 		if e.expireTimer != nil {
 			e.expireTimer.Stop()
+		}
+		if e.adapter != nil {
+			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
 		}
 	}
 }

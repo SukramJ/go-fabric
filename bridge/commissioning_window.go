@@ -420,10 +420,14 @@ var ErrCommissioningBlocked = errors.New("bridge: commissioning is blocked by th
 // return an error wrapping [ErrCommissioningBlocked] and err, so the
 // node's own window, a basic window, the host's opener and both
 // AdministratorCommissioning commands stay closed and no commissionable
-// record is advertised; a window open when the block is set is revoked.
-// nil lifts the block; nothing reopens by itself here (the node facade
-// reopens an uncommissioned node's own window). Paired controllers are
-// unaffected: the block concerns new commissioning only.
+// record is advertised; a commissioning under way when the block is set
+// ends as RevokeCommissioning ends it — the PASE sessions close, the
+// fail-safe armed over PASE expires and an open window is revoked —
+// whether or not a window is still open: the window's timer ends the
+// window, not the commissioner's session or its fail-safe (review II,
+// R2-P3-pase-04). nil lifts the block; nothing reopens by itself here (the
+// node facade reopens an uncommissioned node's own window). Paired
+// controllers are unaffected: the block concerns new commissioning only.
 //
 // matter.js has no counterpart; it is a host extension for a node that
 // cannot serve the attestation it promised (issue #133,
@@ -431,9 +435,8 @@ var ErrCommissioningBlocked = errors.New("bridge: commissioning is blocked by th
 func (w *CommissioningWindow) SetBlocked(ctx context.Context, err error) {
 	w.mu.Lock()
 	w.blocked = err
-	open := w.open
 	w.mu.Unlock()
-	if err != nil && open {
+	if err != nil {
 		_ = w.RevokeWindow(ctx)
 	}
 }

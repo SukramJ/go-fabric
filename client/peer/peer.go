@@ -97,19 +97,16 @@ func (p *Peer) holdBusy(d time.Duration) {
 	}
 }
 
-// provenAddress reports whether a is an address a session proved to be
-// the node's: one of its operational host's (Descriptor.OperationalHost)
-// or, zone aside, its operational address. A Busy status report arrives
-// before CASE, unauthenticated, so only one received at such an address is
-// the node's and holds the peer (holdBusy); one from another address — a
-// foreign SRV target's (issue 507) — holds only its attempt (review II,
-// R2-P1-net-05).
+// provenAddress reports whether a is the address a session proved to be
+// the node's: its operational address, zone aside. A Busy status report
+// arrives before CASE, unauthenticated, so only one received there is the
+// node's and holds the peer (holdBusy); one from another address — a
+// foreign SRV target's (issue 507, review II, R2-P1-net-05), or another
+// address of the node's own host, whose AAAA record any host on the link
+// can announce (review II, R2-P3-ctl-lan-07) — holds only its attempt.
 func (p *Peer) provenAddress(a discovery.Address) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if h := p.desc.OperationalHost; h != "" && a.Host == h {
-		return true
-	}
 	op := p.desc.OperationalAddress
 	if op == nil {
 		return false

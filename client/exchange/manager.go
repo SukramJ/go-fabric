@@ -42,6 +42,14 @@ const initiatedExchangeFlag uint32 = 0x10000
 // (ID_SPACE_UPPER_BOUND = 0xffff), :552-557.
 const sessionIDUpperBound uint16 = 0xFFFF
 
+// maxSessionsPerPeer is the number of sessions one peer may hold that it
+// established with us (the CASE responder's): a new CASE does not close
+// the peer's previous sessions, so beyond it the least recently used is
+// closed. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:205
+// (MAX_SESSIONS_PER_PEER = 5) at db021da0; the device side's counterpart is
+// secure/operational.MaxSessionsPerPeer.
+const maxSessionsPerPeer = 5
+
 // Operational node id bounds an ephemeral initiator node id is drawn
 // from — matter.js packages/types/src/datatype/NodeId.ts:45-52
 // (randomOperationalNodeId) with OPERATIONAL_NODE_MIN / MAX.
@@ -448,6 +456,13 @@ type SecureSessionConfig struct {
 	// the channel's peer node id it is the session's peer address
 	// (NodeSession.ts:408-413), the key of [Manager.HandlePeerLoss].
 	FabricIndex uint8
+	// Responder marks a CASE session the peer established with us (we
+	// were the responder). Such sessions are capped per peer: registering
+	// one beyond [maxSessionsPerPeer] closes the peer's least recently used
+	// one — matter.js NodeSession.isInitiator false, the sessions
+	// SessionManager.ts:312-318 hands to #evictExcessSessionsFor (:697-725)
+	// at db021da0.
+	Responder bool
 }
 
 // NewSecureSession registers the secure session a handshake established.
@@ -475,6 +490,7 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		attestationChallenge: append([]byte(nil), cfg.AttestationChallenge...),
 		suppressPeerLoss:     cfg.SuppressPeerLoss,
 		resumed:              cfg.Resumed,
+		responder:            cfg.Responder,
 		fabricIndex:          cfg.FabricIndex,
 		createdAt:            now,
 		closing:              make(chan struct{}),
@@ -489,17 +505,67 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		s.reported = &p
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.closed {
+		m.mu.Unlock()
 		ch.Close()
 		return nil, ErrSessionClosed
 	}
 	if _, taken := m.sessions[cfg.ID]; taken {
+		m.mu.Unlock()
 		ch.Close()
 		return nil, fmt.Errorf("exchange: session id %d is taken", cfg.ID)
 	}
 	m.sessions[cfg.ID] = s
+	victims := m.excessPeerSessionsLocked(s)
+	m.mu.Unlock()
+	for _, v := range victims {
+		m.log.Info("matter.controller.session_evicted",
+			slog.Int("session_id", int(v.id)), slog.Int("fabric_index", int(v.fabricIndex)),
+			slog.Uint64("node_id", v.secure.PeerNodeID()), slog.Int("max", maxSessionsPerPeer))
+		// Closed without a CloseSession: the graceful path would wait on a
+		// peer the eviction typically cannot reach (SessionManager.ts:721-723).
+		v.Close()
+	}
 	return s, nil
+}
+
+// excessPeerSessionsLocked returns the least recently used sessions of
+// added's peer beyond [maxSessionsPerPeer], for the caller to close
+// outside m.mu. Only sessions the peer established claim a slot; added
+// itself is never chosen, so a burst of new sessions cannot evict the one
+// that prompted the check; a session already closing still counts but is
+// not chosen again. Mirrors matter.js SessionManager.ts:697-725
+// (#evictExcessSessionsFor) and :554-562 (#leastRecentlyUsedSession on
+// the session's timestamp, the time of its last traffic) at db021da0.
+func (m *Manager) excessPeerSessionsLocked(added *Session) []*Session {
+	if !added.responder || added.fabricIndex == 0 {
+		return nil
+	}
+	peer := added.secure.PeerNodeID()
+	count := 1
+	var candidates []*Session
+	for _, s := range m.sessions {
+		if s == added || !s.responder || s.fabricIndex != added.fabricIndex || s.secure.PeerNodeID() != peer {
+			continue
+		}
+		count++
+		if !s.IsClosing() {
+			candidates = append(candidates, s)
+		}
+	}
+	excess := count - maxSessionsPerPeer
+	if excess <= 0 {
+		return nil
+	}
+	// Least recently used first; the older session breaks a tie, as
+	// matter.js's iteration in insertion order does.
+	slices.SortFunc(candidates, func(a, b *Session) int {
+		if c := a.lastTimestamp().Compare(b.lastTimestamp()); c != 0 {
+			return c
+		}
+		return a.createdAt.Compare(b.createdAt)
+	})
+	return candidates[:min(excess, len(candidates))]
 }
 
 // Session returns the secure session with local id id, nil for none.

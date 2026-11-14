@@ -1030,32 +1030,46 @@ func hostStatusError(err error) (contract.StatusError, bool) {
 	return contract.StatusError{}, false
 }
 
-// MinReadPrivilege implements [im.AttributeReadPrivilegeProvider]. It
-// looks up the cluster server for (endpoint, clusterID) and consults
-// the server's [contract.ClusterAttributeReadPrivilege] optional
-// interface for the given attrID. Returns 1 (View) when the cluster is
-// not found, does not implement the interface, or reports no elevated
-// requirement for the attribute. Returns the server-reported value (e.g.
-// 5 = Administer for AccessControl ACL/Extension) otherwise. Mirrors the
-// per-cluster read-access annotations in chip
-// src/app/clusters/access-control-server/access-control-server.cpp and
-// matter.js packages/model/src/standard/elements/access-control.element.ts.
+// MinReadPrivilege implements [im.AttributeReadPrivilegeProvider]: the
+// read privilege of the data model ([schema.AttributeReadPrivilege],
+// generated from the effective access strings of parity/schema.json, as
+// the write and invoke privileges are), raised further when the cluster
+// server's [contract.ClusterAttributeReadPrivilege] asks for more. A
+// server's answer cannot lower it: a hand-written server that does not
+// forward the optional interface (ICDManagement, GeneralCommissioning)
+// used to fall back to View, so a View subject read their Administer
+// attributes (review II, R2-P3-admin-02). matter.js authorizes every read
+// against the attribute's limits.readLevel
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:272, and
+// :408-411 on the wildcard path, at db021da0).
+//
+// A path that does not resolve — no such endpoint, no such cluster on it,
+// an attribute the cluster does not list — takes no floor from the data
+// model: matter.js authorizes a concrete read at View first, answers the
+// existence statuses next and checks limits.readLevel only for an
+// attribute that exists (AttributeReadResponse.ts:250-274 at db021da0), as
+// [MinWritePrivilege] does for a write. The attribute list is asked only
+// for an attribute the data model reads above View.
 func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
+	const privilegeView uint8 = 1
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return 1
+		return privilegeView
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		priv, ok := srv.(contract.ClusterAttributeReadPrivilege)
-		if !ok {
-			return 1
+		want := schema.AttributeReadPrivilege(clusterID, attrID)
+		if want > privilegeView && !isGlobalAttribute(attrID) && !attributeListed(srv, attrID) {
+			want = privilegeView
 		}
-		return priv.MinReadPrivilege(attrID)
+		if priv, ok := srv.(contract.ClusterAttributeReadPrivilege); ok {
+			want = max(want, priv.MinReadPrivilege(attrID))
+		}
+		return want
 	}
-	return 1
+	return privilegeView
 }
 
 // MinWritePrivilege implements [im.AttributeWritePrivilegeProvider]: the

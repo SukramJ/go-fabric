@@ -178,7 +178,9 @@ type ClusterEventLister interface {
 // calls MinReadPrivilege for the attribute ID before calling Read; if
 // the method returns a value > 1 the ACLChecker is consulted with that
 // higher privilege, resulting in UnsupportedAccess (0x7e) for
-// insufficiently privileged sessions.
+// insufficiently privileged sessions. The dispatcher takes the data
+// model's read privilege of the attribute as the floor (its
+// MinReadPrivilege); a server's answer can only raise it, never lower it.
 //
 // Example: AccessControl (0x001F) attributes ACL (0x0000) and Extension
 // (0x0001) require Administer (5) per Matter §9.10.5.3. Mirrors chip

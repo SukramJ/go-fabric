@@ -20,7 +20,7 @@ func TestCaseProvider_Resolve_NilFactory_ReturnsNil(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(nil)
-		if h := p.Resolve(1); h != nil {
+		if h := p.Resolve(onExchange(1)); h != nil {
 			t.Errorf("nil factory: expected nil handler, got %T", h)
 		}
 	})
@@ -34,7 +34,7 @@ func TestCaseProvider_Resolve_AllocatesFreshAdapter(t *testing.T) {
 			count.Add(1)
 			return &CaseAdapter{}
 		})
-		h1 := p.Resolve(10)
+		h1 := p.Resolve(onExchange(10))
 		if h1 == nil {
 			t.Fatal("first Resolve: expected non-nil handler")
 		}
@@ -52,8 +52,8 @@ func TestCaseProvider_Resolve_ReusesByExchangeID(t *testing.T) {
 			count.Add(1)
 			return &CaseAdapter{}
 		})
-		h1 := p.Resolve(10)
-		h2 := p.Resolve(10)
+		h1 := p.Resolve(onExchange(10))
+		h2 := p.Resolve(onExchange(10))
 		if h1 != h2 {
 			t.Error("same exchange ID: expected identical handler on second Resolve")
 		}
@@ -69,8 +69,8 @@ func TestCaseProvider_Resolve_DifferentExchanges(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter {
 			return &CaseAdapter{}
 		})
-		h10 := p.Resolve(10)
-		h20 := p.Resolve(20)
+		h10 := p.Resolve(onExchange(10))
+		h20 := p.Resolve(onExchange(20))
 		if h10 == nil || h20 == nil {
 			t.Fatal("expected non-nil handlers for both exchanges")
 		}
@@ -86,7 +86,7 @@ func TestCaseProvider_Resolve_FactoryReturnsNil(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter {
 			return nil
 		})
-		if h := p.Resolve(5); h != nil {
+		if h := p.Resolve(onExchange(5)); h != nil {
 			t.Errorf("factory returning nil: expected nil from Resolve, got %T", h)
 		}
 		// No entry should be cached when factory returned nil.
@@ -102,11 +102,11 @@ func TestCaseProvider_Forget_RemovesEntry(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(7)
+		p.Resolve(onExchange(7))
 		if p.Active() != 1 {
 			t.Fatalf("expected 1 active before Forget, got %d", p.Active())
 		}
-		p.Forget(7)
+		p.Forget(onExchange(7))
 		if p.Active() != 0 {
 			t.Errorf("expected 0 after Forget, got %d", p.Active())
 		}
@@ -117,8 +117,8 @@ func TestCaseProvider_Forget_UnknownIDIsNoop(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(7)
-		p.Forget(99) // does not exist — must not panic
+		p.Resolve(onExchange(7))
+		p.Forget(onExchange(99)) // does not exist — must not panic
 		if p.Active() != 1 {
 			t.Errorf("Active after noop Forget: want 1, got %d", p.Active())
 		}
@@ -133,9 +133,9 @@ func TestCaseProvider_ForgetCausesNextResolveFresh(t *testing.T) {
 			count.Add(1)
 			return &CaseAdapter{}
 		})
-		h1 := p.Resolve(10)
-		p.Forget(10)
-		h2 := p.Resolve(10)
+		h1 := p.Resolve(onExchange(10))
+		p.Forget(onExchange(10))
+		h2 := p.Resolve(onExchange(10))
 		if h1 == h2 {
 			t.Error("after Forget, next Resolve should produce a fresh handler")
 		}
@@ -151,9 +151,9 @@ func TestCaseProvider_Reset_DropsAll(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(1)
-		p.Resolve(2)
-		p.Resolve(3)
+		p.Resolve(onExchange(1))
+		p.Resolve(onExchange(2))
+		p.Resolve(onExchange(3))
 		if p.Active() != 3 {
 			t.Fatalf("expected 3 active before Reset, got %d", p.Active())
 		}
@@ -168,10 +168,10 @@ func TestCaseProvider_Reset_CallsOnEvict(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		var evicted []uint16
-		p.SetOnEvict(func(id uint16) { evicted = append(evicted, id) })
-		p.Resolve(10)
-		p.Resolve(20)
+		var evicted []HandshakeKey
+		p.SetOnEvict(func(key HandshakeKey) { evicted = append(evicted, key) })
+		p.Resolve(onExchange(10))
+		p.Resolve(onExchange(20))
 		p.Reset()
 		if len(evicted) != 2 {
 			t.Errorf("Reset: expected 2 eviction callbacks, got %d", len(evicted))
@@ -183,7 +183,7 @@ func TestCaseProvider_Reset_NoOnEvictIsNoop(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(1)
+		p.Resolve(onExchange(1))
 		p.Reset() // must not panic
 		if p.Active() != 0 {
 			t.Errorf("Active after Reset: want 0, got %d", p.Active())
@@ -209,11 +209,11 @@ func TestCaseProvider_Reaper_EvictsStaleEntries(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(42)
+		p.Resolve(onExchange(42))
 
 		// Manually backdate the entry so it looks stale.
 		p.mu.Lock()
-		p.entries[42].lastTouched = time.Now().Add(-10 * time.Minute)
+		p.entries[onExchange(42)].lastTouched = time.Now().Add(-10 * time.Minute)
 		p.mu.Unlock()
 
 		ctx := t.Context()
@@ -233,11 +233,11 @@ func TestCaseProvider_Reaper_CallsOnEvict(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var evictedID atomic.Uint32
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.SetOnEvict(func(id uint16) { evictedID.Store(uint32(id)) })
-		p.Resolve(77)
+		p.SetOnEvict(func(key HandshakeKey) { evictedID.Store(uint32(key.ExchangeID)) })
+		p.Resolve(onExchange(77))
 
 		p.mu.Lock()
-		p.entries[77].lastTouched = time.Now().Add(-10 * time.Minute)
+		p.entries[onExchange(77)].lastTouched = time.Now().Add(-10 * time.Minute)
 		p.mu.Unlock()
 
 		ctx := t.Context()
@@ -275,7 +275,7 @@ func TestCaseProvider_Reaper_DoesNotEvictRecentEntries(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
-		p.Resolve(33)
+		p.Resolve(onExchange(33))
 
 		ctx := t.Context()
 		// TTL is 10 minutes — entry should not be reaped in this test window.

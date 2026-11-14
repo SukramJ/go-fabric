@@ -6,6 +6,7 @@ package schema
 // Invoke privileges, as matter.js's AccessLevel numbers them (View=1,
 // ProxyView=2, Operate=3, Manage=4, Administer=5).
 const (
+	PrivilegeView       uint8 = 1
 	PrivilegeOperate    uint8 = 3
 	PrivilegeManage     uint8 = 4
 	PrivilegeAdminister uint8 = 5

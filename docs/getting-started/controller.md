@@ -334,8 +334,9 @@ _, err := c.Pair(ctx, code, controller.PairOptions{
 ```
 
 A `Pair` or `Commission` whose context ends — cancelled, or past its
-deadline — after the commissioner has started an ArmFailSafe does not
-leave the device armed: the commissioner sends ArmFailSafe with expiry 0
+deadline — after the PASE session was established does not leave the
+device armed: the device arms its fail-safe when the PASE session is
+established, and the commissioner sends ArmFailSafe with expiry 0
 over the session the commissioning still has (PASE, or CASE after
 `Reconnect`), on a context of its own for at most 10 s, and returns the
 failed step's error as it is. A step that stopped at the ended context
@@ -354,15 +355,31 @@ that ends while the first one, or a later extension, is still under way
 is followed by the disarm too, since the request may have armed the
 device (one that holds no fail-safe answers the disarm with success and
 nothing happens).
-Nothing is sent before the commissioner has started its first
-ArmFailSafe, once the device has confirmed CommissioningComplete, or on
-a closed session; a disarm that fails is logged
+Nothing is sent once the device has confirmed CommissioningComplete, or
+on a closed session; a disarm that fails is logged
 (`matter.controller.commissioning.reset_failsafe_failed`) and the
 fail-safe then expires on the device by itself. matter.js's flow has no
 abort signal; the behaviour follows connectedhomeip's `StopPairing`
 (*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
 
-*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`).*
+A commissioning that fails for any other reason after the PASE session
+was established — the device's terms not acknowledged, its attestation
+refused, a refused or unanswered command, a node id claim lost to
+another candidate — disarms the same way, bounded by the caller's
+context and the exchange's response timeout, so cancelling the context
+ends the disarm too, or, when that context has already ended, by the
+same 10 s as after an abort: the device ends its PASE
+session with the fail-safe, and while that session exists it accepts no
+new PASE, so without the disarm the next `Pair` would be refused until
+the fail-safe ran out. matter.js disarms only after an ArmFailSafe of
+its own was answered and only for a commissioning or status error;
+connectedhomeip disarms after any failure before its network setup.
+A PASE session the commissioner does not keep is disarmed before it is
+closed as well: one established on a candidate after another candidate
+won the connection (an aborted connection returns only once those are
+disarmed), and one that `EstablishPASE`'s `ContinueAfterPASE` refuses.
+
+*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`, `disarmAfterFailure`), `controller/commissioner/commissioner.go` (`disarmPASE`, `giveUpPASE`, `EstablishPASE`), `controller/commissioner/connection.go` (`launch`).*
 
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is
@@ -674,8 +691,11 @@ every device until the timeout, `Stop` or the context ends; a callback per
 device), `discovery.FindInstance` (InstanceDiscovery: the first device),
 and the PASE races `discovery.Race`, `discovery.CommissioningRace` and
 `discovery.PASERace` (ParallelPaseDiscovery, CommissioningDiscovery,
-PaseDiscovery): every device found gets an attempt, one second apart, and
-the first to establish PASE wins; the others are cancelled. A session runs
+PaseDiscovery): every device found gets an attempt, one second apart while
+one runs and at most 16 s after it was found, at most 16 at once — a later
+one takes the place of the oldest attempt whose device has not answered PASE
+yet (`discovery.AttemptAnswered`) — and the first to establish PASE wins;
+the others are cancelled. A session runs
 on `discovery.Transport`s — `discovery.IPTransport` over DNS-SD,
 `ble.Transport` over a BLE scanner — selected by the payload's discovery
 capabilities (`discovery.SelectTransports`: the IP network always, BLE where
@@ -708,8 +728,10 @@ SetTCAcknowledgements after the regulatory configuration. The information
 step reads the device's requirement — TCMinRequiredVersion,
 TCAcknowledgementsRequired and TCUpdateDeadline — and when the device holds
 no satisfying acceptance and the option is absent or names a lower
-version, `Pair` fails right after that step, before ArmFailSafe and
-AddNOC, with a `*commissioner.TermsRequiredError`: `Version` is the
+version, `Pair` fails right after that step, before the commissioner arms
+the fail-safe or sends AddNOC — it only expires the fail-safe the device
+armed with the PASE session, so the next `Pair` is accepted at once —
+with a `*commissioner.TermsRequiredError`: `Version` is the
 version to acknowledge, `Deadline` the TCUpdateDeadline in Matter epoch
 seconds (nil when null). The error names no acknowledgement bits: a device
 serves no attribute naming the bits it requires, so they come from the
@@ -916,7 +938,10 @@ it (`Config.TransportPreference`) or an interaction carries a large message
 (`ClientRequest.LargeMessage`; an invoke that leaves it nil sets it when one
 of its commands has matter.js's Large Message quality, as
 `schema.CommandLargeMessage` reports it); the sessions of a dropped connection close. `Controller.TCPAddr()` is the listener's
-address.
+address. `TCPConfig.MaxInboundConnections` bounds the connections the
+listener holds in all (zero is 256; a negative value is
+`ErrConfiguration`): at the bound a new connection takes the place of the
+oldest one that has delivered no message yet, or is closed.
 
 ### Network profiles
 

@@ -58,6 +58,13 @@ type Subscription struct {
 	// event fan-out for this subscription.
 	EventPaths []im.ConcreteEventPath
 
+	// admitted orders the subscriptions by admission: the manager's
+	// count when it admitted this one, so the lowest is a fabric's
+	// oldest (connectedhomeip's GetTransactionStartGeneration,
+	// src/app/InteractionModelEngine.cpp:1224 at 6170af84). Guarded by
+	// the manager's mu.
+	admitted uint64
+
 	// sendIntervalOverride, when non-zero, replaces the derived heartbeat
 	// cadence. Set only by [Manager.Restore], which re-creates a former
 	// subscription with the send interval it negotiated in its first run

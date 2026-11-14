@@ -26,11 +26,48 @@ const MatterPort = 5540
 // (MAX_CONNECTIONS_PER_PEER_IP = 3).
 const MaxConnectionsPerPeerIP = 3
 
+// MaxInboundConnections is the default of [Config].MaxInboundConnections,
+// the inbound connections a listener holds in all — connectedhomeip's CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS
+// (src/transport/raw/TCPConfig.h:39-46 at 6170af84, "Maximum Number of TCP
+// connections a device can simultaneously have", the pool of the server's
+// and the controller's transport, src/app/server/Server.h:100,
+// src/controller/CHIPDeviceControllerSystemState.h:74). matter.js caps per
+// peer address only (TcpTransport.ts:27-28, :81 at db021da0). At the cap
+// a new connection takes the place of the one that has been idle longest
+// — no message received or sent for the longest time, measured from its
+// accept when it carried none — among those that carried no traffic
+// within [idleGrace]; without one the new connection is closed (review
+// II, R2-P3-ctl-lan-03, R2-P3-dr-net-02). connectedhomeip reclaims, when
+// out of space, only a connection no message has claimed
+// (src/transport/raw/TCP.cpp:133-163); here a connection that delivered
+// a message is no longer exempt, so a held message does not hold a place
+// for good.
+const MaxInboundConnections = 4
+
+// acceptRetryFirst and acceptRetryMax pace the retry of a failed accept:
+// net/http's Server.Serve waits 5 ms after the first failure, doubling up
+// to 1 s (src/net/http/server.go:3584-3593 at go1.27.4).
+const (
+	acceptRetryFirst = 5 * time.Millisecond
+	acceptRetryMax   = time.Second
+)
+
 // NewConnectionIdleTimeout is how long an inbound connection may stay
 // open without delivering a complete message before it is closed.
 // Mirrors TcpTransport.ts:30-31 (NEW_CONNECTION_IDLE_TIMEOUT =
 // Seconds(10)); the timer stops on the first message (:98-103).
 const NewConnectionIdleTimeout = 10 * time.Second
+
+// idleGrace is how long a connection that carried traffic keeps its place
+// at the total bound: a connection that received or sent a message within
+// it is never replaced. It is the idle timeout of the secure sessions such
+// a connection carries — secure/operational.SessionIdleTimeout
+// (secure/operational/manager.go:314), after which the session reaper
+// closes a session without traffic, and which a subscription's reports
+// beat (im/subscription/subscription.go:14-21) — so a connection past it
+// carries no session the module still keeps alive.
+// TestIdleGraceIsTheSessionIdleTimeout holds the two equal.
+const idleGrace = 5 * time.Minute
 
 // ErrListenerClosed is returned by [Listener.Serve] when it is called
 // on a closed listener.
@@ -39,6 +76,10 @@ var ErrListenerClosed = errors.New("tcp: listener closed")
 // errIdle closes a connection whose first message did not arrive in
 // time.
 var errIdle = errors.New("tcp: no message within the new-connection idle timeout")
+
+// errReclaimed closes the connection idle longest when a new one needed
+// its place ([Config].MaxInboundConnections).
+var errReclaimed = errors.New("tcp: idle longest, its place taken by a new connection")
 
 // Config controls the listener.
 type Config struct {
@@ -56,16 +97,27 @@ type Config struct {
 	// Clock paces the idle timeout of a new connection; nil is
 	// [clock.System].
 	Clock clock.Clock
+	// MaxInboundConnections is the most inbound connections the listener
+	// holds in all; at the bound a new connection takes the place of the
+	// held one idle longest (no message received or sent for the longest
+	// time) among those that carried no traffic within the secure
+	// session's idle timeout (5 minutes), or is closed when every held one
+	// did. Zero means [MaxInboundConnections]; a negative value is refused
+	// by [Listen].
+	MaxInboundConnections int
 }
 
 // Listener accepts inbound Matter TCP connections — the server role of
 // matter.js TcpTransport (TcpTransport.ts:78-112).
 type Listener struct {
-	ln             *net.TCPListener
+	ln             net.Listener
 	maxPayloadSize int
 	logger         *slog.Logger
 	idleTimeout    time.Duration
 	clock          clock.Clock
+	// maxConns is the total bound on held connections
+	// ([Config].MaxInboundConnections).
+	maxConns int
 
 	recoveredPanics panicCounter
 
@@ -74,10 +126,20 @@ type Listener struct {
 	// is open and waited for by [Listener.WaitIdle].
 	work sync.WaitGroup
 
-	// mu guards conns and closed.
-	mu     sync.Mutex
-	conns  map[*Conn]struct{}
+	// mu guards conns, seq and closed.
+	mu sync.Mutex
+	// conns maps each open connection to its admission.
+	conns  map[*Conn]admission
+	seq    uint64
 	closed bool
+}
+
+// admission is when a connection was accepted: its order, and the
+// monotonic reading of the listener's clock its idleness counts from
+// until it carried a message.
+type admission struct {
+	seq uint64
+	at  time.Duration
 }
 
 // bindAddr resolves the (network, address) pair Listen binds for cfg.
@@ -97,8 +159,12 @@ func bindAddr(cfg Config) (network, addr string) {
 	return network, addr
 }
 
-// Listen opens the TCP socket per cfg.
+// Listen opens the TCP socket per cfg. A negative
+// cfg.MaxInboundConnections is refused before anything is bound.
 func Listen(cfg Config) (*Listener, error) {
+	if cfg.MaxInboundConnections < 0 {
+		return nil, fmt.Errorf("tcp: MaxInboundConnections %d is negative", cfg.MaxInboundConnections)
+	}
 	network, addr := bindAddr(cfg)
 	tcpAddr, err := net.ResolveTCPAddr(network, addr)
 	if err != nil {
@@ -108,6 +174,11 @@ func Listen(cfg Config) (*Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tcp: listen %s: %w", addr, err)
 	}
+	return newListener(ln, cfg), nil
+}
+
+// newListener is the Listener over the bound ln.
+func newListener(ln net.Listener, cfg Config) *Listener {
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -116,14 +187,19 @@ func Listen(cfg Config) (*Listener, error) {
 	if maxPayload <= 0 {
 		maxPayload = DefaultMaxPayloadSize
 	}
+	maxConns := cfg.MaxInboundConnections
+	if maxConns <= 0 {
+		maxConns = MaxInboundConnections
+	}
 	return &Listener{
 		ln:             ln,
 		maxPayloadSize: maxPayload,
 		logger:         logger,
 		idleTimeout:    NewConnectionIdleTimeout,
 		clock:          clock.Or(cfg.Clock),
-		conns:          make(map[*Conn]struct{}),
-	}, nil
+		maxConns:       maxConns,
+		conns:          make(map[*Conn]admission),
+	}
 }
 
 // Addr returns the bound address — useful when binding port 0.
@@ -156,6 +232,14 @@ func (l *Listener) Conns() int {
 // matter.js's ExchangeManager subscribes to for session eviction
 // (TcpTransport.ts:216-223, ExchangeManager.ts:605-614). It is safe to
 // call Serve at most once.
+//
+// An accept that fails for any reason other than the listener's close —
+// the process out of descriptors (EMFILE, ENFILE), a connection aborted
+// in the backlog — is logged (matter.tcp.accept_error) and retried after
+// a wait on the listener's clock, 5 ms doubling to 1 s as net/http's
+// Server.Serve waits, so a transient failure does not end the service
+// (review II, R2-P3-ctl-lan-04, R2-P3-lan-dev-05). Serve returns nil once
+// the listener is closed or ctx ends; an error only when it cannot start.
 func (l *Listener) Serve(ctx context.Context, handler Handler, onClose func(*Conn)) error {
 	if handler == nil {
 		return errors.New("tcp: nil handler")
@@ -177,15 +261,35 @@ func (l *Listener) Serve(ctx context.Context, handler Handler, onClose func(*Con
 		case <-done:
 		}
 	}()
+	var delay time.Duration
 	for {
 		nc, err := l.ln.Accept()
 		if err != nil {
 			if l.isClosed() || errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			return fmt.Errorf("tcp: accept: %w", err)
+			delay = min(max(2*delay, acceptRetryFirst), acceptRetryMax)
+			l.logger.Warn("matter.tcp.accept_error", slog.Any("err", err), slog.Duration("retry_in", delay))
+			if !l.waitRetry(ctx, delay) {
+				return nil
+			}
+			continue
 		}
+		delay = 0
 		l.accept(nc, handler, onClose)
+	}
+}
+
+// waitRetry waits d on the listener's clock before the next accept; false
+// when ctx ended first.
+func (l *Listener) waitRetry(ctx context.Context, d time.Duration) bool {
+	t := l.clock.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C():
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -193,6 +297,7 @@ func (l *Listener) Serve(ctx context.Context, handler Handler, onClose func(*Con
 // and the idle timer. Mirrors TcpTransport.ts:78-112.
 func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 	c := newConn(nc, l.maxPayloadSize, true, l.logger, &l.recoveredPanics)
+	c.now = l.monotonic
 	ip := peerIP(c.remote)
 
 	l.mu.Lock()
@@ -215,9 +320,32 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 		c.close(nil)
 		return
 	}
-	l.conns[c] = struct{}{}
+	now := l.monotonic()
+	var reclaim *Conn
+	if len(l.conns) >= l.maxConns {
+		reclaim = l.idleLongestLocked(now)
+		if reclaim == nil {
+			l.mu.Unlock()
+			l.logger.Warn("matter.tcp.reject",
+				slog.String("conn", c.String()),
+				slog.String("reason", "too many connections"))
+			c.close(nil)
+			return
+		}
+		// Out of the table at once, so the count holds while its close
+		// watcher runs.
+		delete(l.conns, reclaim)
+	}
+	l.seq++
+	l.conns[c] = admission{seq: l.seq, at: now}
 	l.work.Add(2) // the close watcher and the reader below
 	l.mu.Unlock()
+	if reclaim != nil {
+		l.logger.Warn("matter.tcp.reclaim",
+			slog.String("conn", reclaim.String()),
+			slog.String("reason", "idle longest and the connection table is full"))
+		reclaim.close(errReclaimed)
+	}
 
 	// Detect and close zombie connections (TcpTransport.ts:89-104).
 	idle := l.clock.AfterFunc(l.idleTimeout, func() {
@@ -285,6 +413,31 @@ func (l *Listener) Close() error {
 	}
 	return err
 }
+
+// idleLongestLocked is the open connection idle longest at now — its last
+// message received or sent, or its accept when it carried none, earliest,
+// the earlier accept first on a tie — among those that carried no traffic
+// within [idleGrace]; nil when every one did. l.mu is held.
+func (l *Listener) idleLongestLocked(now time.Duration) *Conn {
+	var pick *Conn
+	var pickSince time.Duration
+	var pickSeq uint64
+	for c, adm := range l.conns {
+		since, carried := c.idleSince()
+		if !carried {
+			since = adm.at
+		} else if now-since < idleGrace {
+			continue
+		}
+		if pick == nil || since < pickSince || (since == pickSince && adm.seq < pickSeq) {
+			pick, pickSince, pickSeq = c, since, adm.seq
+		}
+	}
+	return pick
+}
+
+// monotonic is the listener clock's monotonic reading.
+func (l *Listener) monotonic() time.Duration { return clock.MonotonicOf(l.clock) }
 
 func (l *Listener) isClosed() bool {
 	l.mu.Lock()

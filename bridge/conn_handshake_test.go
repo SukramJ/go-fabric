@@ -155,8 +155,8 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 	}
 	failure := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
 
-	b.holdHandshake(route, 1, false)
-	b.holdHandshake(route, 1, false) // a retransmitted Sigma1 counts once
+	b.holdHandshake(route, onExchange(1), false)
+	b.holdHandshake(route, onExchange(1), false) // a retransmitted Sigma1 counts once
 	b.settleHandshake(route, 1, nil, mrp.SCOpcodeSigma2, []byte{1}, nil)
 	b.settleHandshake(route, 1, nil, 0, nil, sigma.ErrSessionState)
 	b.settleHandshake(route, 1, nil, 0, nil, spake2.ErrSessionState)
@@ -164,16 +164,16 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 		t.Fatalf("%d holds after a continuing and two replayed steps, want 1", n)
 	}
 	b.settleHandshake(route, 1, nil, mrp.SCOpcodeStatusReport, failure, nil)
-	b.holdHandshake(route, 2, false)
+	b.holdHandshake(route, onExchange(2), false)
 	b.settleHandshake(route, 2, nil, 0, nil, errors.New("decode"))
-	b.holdHandshake(route, 3, false)
-	b.ForgetSigma1Replied(3)
+	b.holdHandshake(route, onExchange(3), false)
+	b.ForgetSigma1Replied(onExchange(3))
 	if n := held(); n != 0 {
 		t.Fatalf("%d holds after failures and an eviction, want 0", n)
 	}
 
 	// The peer's failure StatusReport on the handshake's exchange.
-	b.holdHandshake(route, 4, true)
+	b.holdHandshake(route, onExchange(4), true)
 	hdr := &message.Header{SessionID: 0, MessageCounter: 9, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	if err := b.dispatchSecureChannel(route, hdr, scProto(mrp.SCOpcodeStatusReport, 4, false, 0), failure); err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 
 	// A resume establishes at once; without a named session the hold
 	// just ends.
-	b.holdHandshake(route, 5, false)
+	b.holdHandshake(route, onExchange(5), false)
 	b.settleHandshake(route, 5, nil, mrp.SCOpcodeSigma2Resume, []byte{1}, nil)
 	if n := held(); n != 0 {
 		t.Fatalf("%d holds after a resume, want 0", n)
@@ -214,7 +214,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 
 	// Over UDP nothing is held.
 	udp := loopbackSrc()
-	b.holdHandshake(udp, 8, false)
+	b.holdHandshake(udp, onExchange(8), false)
 	b.settleHandshake(udp, 8, nil, mrp.SCOpcodeStatusReport, failure, nil)
 	b.releaseHandshake(udp, 8)
 	b.releaseHandshake(nil, 8)

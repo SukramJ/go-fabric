@@ -286,7 +286,7 @@ func (b *Bridge) sendReplyTimed(
 		// Always: a full table gives up its oldest entry, never this reply
 		// ([unsecuredEntryLimit]).
 		if needsAck {
-			tracker.trackUnsecured(counter, requestProto.ExchangeID, datagram, src, b.clk().Now(), peer)
+			tracker.trackUnsecured(counter, handshakeKeyOf(requestHdr, requestProto.ExchangeID), datagram, src, b.clk().Now(), peer)
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {

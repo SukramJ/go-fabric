@@ -445,8 +445,9 @@ AdministratorCommissioning, or when you call `Node.OpenBasicWindow` with
 fresh credentials.
 
 `Node.SetCommissioningBlocked(ctx, err)` refuses every new commissioning
-while `err` is non-nil, and controllers that are already paired keep
-working. A host calls it before `Start` when, for example, it cannot serve
+while `err` is non-nil and ends one under way (its PASE sessions close, the
+fail-safe armed over PASE expires, an open window is revoked), and
+controllers that are already paired keep working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
 *Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go:424-452`, `node/node.go` (`Node.SetCommissioningBlocked`).*

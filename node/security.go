@@ -573,10 +573,11 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 		if !ok {
 			return nil, fmt.Errorf("node: no CASE identity loaded for fabric %d", fabricIndex)
 		}
-		sessionID, err := sessions.AllocateID()
+		stake, err := sessions.AllocateStake()
 		if err != nil {
 			return nil, fmt.Errorf("allocate CASE session id: %w", err)
 		}
+		sessionID := stake.ID
 		var resumption *sigma.ResumptionRecord
 		if rec, rerr := st.GetResumptionByPeer(ctx, fabricIndex, peerNodeID); rerr == nil {
 			resumption = &sigma.ResumptionRecord{
@@ -596,7 +597,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			Resumption:    resumption,
 		})
 		if err != nil {
-			sessions.ReleaseID(sessionID)
+			sessions.ReleaseStake(stake)
 			return nil, err
 		}
 		localNodeID := fabric.identity.NodeID
@@ -622,7 +623,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				}
 				return nil
 			},
-			OnAbandoned: func() { sessions.ReleaseID(sessionID) },
+			OnAbandoned: func() { sessions.ReleaseStake(stake) },
 		}, nil
 	}
 }
@@ -662,14 +663,20 @@ func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseP
 // watchFailSafeExpiry): [Node.Stop] cancels it, so a stopped node leaves
 // no watcher behind (W5-ex-06).
 func buildPaseAdapterFromContext(life context.Context, sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
-	sessionID, err := sessions.AllocateID()
+	stake, err := sessions.AllocateStake()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
 	}
+	sessionID := stake.ID
 	adapter := bridge.NewPaseAdapterWithFactory(func(transcript []byte) *spake2.Verifier {
 		return spake2.NewVerifier(vc, nil, nil, transcript)
 	})
 	adapter.SetPBKDFParams(uint32(iterations), salt, sessionID) //nolint:gosec // NewVerifierContext / the window's command validation bound the iteration count
+	// The staked id goes back when the handshake can no longer finish
+	// (review II, R2-P3-lan-dev-02) — this handshake's stake only, which
+	// leaves a live session and another handshake's stake alone
+	// (R2-P3-dr-dev-07).
+	adapter.SetOnUnfinished(func(uint16) { sessions.ReleaseStake(stake) })
 	// Our session parameters, the TCP roles included (PaseServer.ts:151
 	// responderSessionParams = sessions.sessionParameters); nil keeps the
 	// adapter's defaults.
@@ -689,7 +696,7 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// PASE predates the fabric, so both node ids are zero.
 		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
 		if err != nil {
-			sessions.ReleaseID(sessionID)
+			sessions.ReleaseStake(stake)
 			return err
 		}
 		// The commissioner's SessionParameters size the session's
@@ -700,11 +707,59 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
-		// not, so an abandoned attempt still rolls back.
-		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)
+		// not, so an abandoned attempt still rolls back. A session whose
+		// arm is refused — a fail-safe rollback ended it, its PASE close
+		// possibly naming the sessions before this one existed — is
+		// closed, and the handshake fails: no PASE session stays without
+		// a fail-safe (connectedhomeip
+		// src/app/server/CommissioningWindowManager.cpp:240-242 at
+		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
+		// R2-P3-pase-03).
+		if err := root.GeneralCommissioning.ArmOnPaseEstablished(life); err != nil {
+			_ = sessions.Close(sessionID)
+			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
+		}
 		return nil
 	})
 	return adapter, nil
+}
+
+// handshakeStake is the session id stake one CASE responder handshake
+// holds: the id it announces, staked anew when the handshake starts over.
+// Only this stake is ever released, never whatever holds its id now
+// (review II, R2-P3-dr-dev-07).
+type handshakeStake struct {
+	sessions *operational.Manager
+	mu       sync.Mutex
+	stake    operational.Stake
+}
+
+// renew stakes an id for a handshake whose Sigma1 the responder accepted —
+// its first, or one that starts over — and releases the stake it held
+// before, if any: the responder's [sigma.Responder.SetSessionIDRenewer]
+// source.
+func (h *handshakeStake) renew(uint16) (uint16, bool) {
+	next, err := h.sessions.AllocateStake()
+	if err != nil {
+		return 0, false
+	}
+	h.mu.Lock()
+	previous := h.stake
+	h.stake = next
+	h.mu.Unlock()
+	h.sessions.ReleaseStake(previous)
+	return next.ID, true
+}
+
+// release releases the stake when it is the one of id, the id the
+// handshake announced.
+func (h *handshakeStake) release(id uint16) {
+	h.mu.Lock()
+	s := h.stake
+	h.mu.Unlock()
+	if s.ID == id {
+		h.sessions.ReleaseStake(s)
+	}
 }
 
 // buildCaseAdapter wires one CASE exchange: a responder seeded from the
@@ -716,10 +771,12 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 // (the node's OnSessionOpened).
 func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger, onOpened func(sessionID uint16)) (*bridge.CaseAdapter, error) {
 	current := ids.current()
-	sessionID, err := sessions.AllocateID()
-	if err != nil {
-		return nil, fmt.Errorf("allocate CASE session id: %w", err)
-	}
+	// The handshake stakes its session id once its Sigma1 is accepted, not
+	// here: a Sigma1 that starts no handshake stakes nothing, so it cannot
+	// close the least recently active session at a full table (review II,
+	// R2-P3-dr-dev-08). The responder is built without an id and takes it
+	// from the renewer ([sigma.Responder.SetSessionIDRenewer]).
+	held := &handshakeStake{sessions: sessions}
 
 	identity := (*sigma.Identity)(nil)
 	var verifier sigma.PeerVerifier
@@ -737,7 +794,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		verifier = rejectingVerifier{}
 	}
 
-	responder := sigma.NewResponder(identity, verifier, sessionID)
+	responder := sigma.NewResponder(identity, verifier, 0)
 	responder.SetIdentityResolver(ids)
 	// Our session parameters ride in Sigma2 (CaseServer.ts:272
 	// responderSessionParams: sessions.sessionParameters); nil leaves
@@ -746,16 +803,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		p := *responderParams
 		responder.SetSessionParameters(&p)
 	}
-	// A second Sigma1 on the same exchange — Apple grafts its iCloud
-	// companion fabric onto one — must not reuse the first session's slot.
-	responder.SetSessionIDRenewer(func(previous uint16) (uint16, bool) {
-		next, renewErr := sessions.AllocateID()
-		if renewErr != nil {
-			return 0, false
-		}
-		sessions.ReleaseID(previous)
-		return next, true
-	})
+	// The handshake's id, staked when its Sigma1 is accepted; a second
+	// Sigma1 on the same exchange — Apple grafts its iCloud companion
+	// fabric onto one — must not reuse the first session's slot.
+	responder.SetSessionIDRenewer(held.renew)
 
 	// Session resumption as the responder (Matter §4.13.2.4): a Sigma1
 	// presenting a resumption id this node issued resumes with
@@ -765,6 +816,11 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	responder.SetResumptionStore(resumptionLookup{sessions})
 
 	adapter := bridge.NewCaseAdapter(responder)
+	// The staked id goes back when the handshake fails or its adapter is
+	// dropped unfinished (review II, R2-P3-lan-dev-02) — this handshake's
+	// stake only, which leaves a live session and another handshake's
+	// stake alone (R2-P3-dr-dev-07).
+	adapter.SetOnUnfinished(held.release)
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
 		// factory time: the destination resolver may have landed on a
@@ -773,7 +829,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		fabricIndex := identity.FabricIndex
 		localNodeID := identity.NodeID
 		peerNodeID := uint64(0)
-		effectiveID := sessionID
+		var effectiveID uint16
 		var peerCATs []uint32
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			peerNodeID = resp.PeerNodeID()
@@ -787,7 +843,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			return sessions.OpenFromSigmaWithID(effectiveID, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 		})
 		if openErr != nil {
-			sessions.ReleaseID(effectiveID)
+			held.release(effectiveID)
 			return openErr
 		}
 		// The initiator's Sigma1 SessionParameters size the session's

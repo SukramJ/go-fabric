@@ -40,6 +40,19 @@ const revocationCacheExpiry = time.Hour
 // (:1436).
 const revocationTimeout = 3 * time.Second
 
+// maxConcurrentCRLDownloads bounds the CRL downloads one lookup holds
+// open at once, and revocationLookupTimeout the whole lookup: the ledger
+// lists an issuer's distribution points without a bound of its own, and
+// each download costs a connection and up to maxCRLSize. matter.js starts
+// them all at once (Promise.allSettled over crlPoints,
+// DclCertificateService.ts:1587-1593 at db021da0) under no total bound
+// (review II, R2-P3-net-05). A lookup the bound cuts short is incomplete:
+// not cached, its CRLs that did arrive still count.
+const (
+	maxConcurrentCRLDownloads = 4
+	revocationLookupTimeout   = 10 * time.Second
+)
+
 // revocationEntry is DclCertificateService.RevocationEntry (:2117-2120):
 // one authority's revoked serials (uppercase hex) and its Name DER as hex.
 type revocationEntry struct {
@@ -200,7 +213,9 @@ func (s *CertificateStore) IsRevoked(akid, serial []byte, issuerDN string) (bool
 	if s.offline() {
 		return false, nil
 	}
-	lookup, err := s.revocations.get(context.Background(), id)
+	ctx, cancel := context.WithTimeout(context.Background(), revocationLookupTimeout)
+	defer cancel()
+	lookup, err := s.revocations.get(ctx, id)
 	if err != nil {
 		// The fetch logged the cause; an unreachable CRL is not-revoked
 		// (:715-718).
@@ -248,6 +263,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	}
 	results := make([]result, len(crlPoints))
 	var wg sync.WaitGroup
+	slots := make(chan struct{}, maxConcurrentCRLDownloads)
 	for i := range crlPoints {
 		p := crlPoints[i]
 		sameVID := 0
@@ -256,9 +272,16 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 				sameVID++
 			}
 		}
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			results[i] = result{err: ctx.Err()}
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() { <-slots }()
 			e, err := s.processRevocationPoint(ctx, p, sameVID > 1)
 			results[i] = result{e, err}
 		}()
@@ -350,7 +373,7 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, data
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s.opts.Client.httpClient().Do(req)
+	resp, err := downloadClient(s.opts.Client.httpClient()).Do(req)
 	if err != nil {
 		return nil, err
 	}
