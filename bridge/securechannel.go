@@ -1448,6 +1448,12 @@ type sigma1Record struct {
 	sigma2AckedAt time.Time
 }
 
+// runBySingleton reports whether the singleton handler runs, or completed,
+// the handshake of the record ([Bridge.AttachCaseHandler]).
+func (rec *sigma1Record) runBySingleton() bool {
+	return rec.bySingleton || (rec.completed != nil && rec.completed.bySingleton)
+}
+
 // oldestSigma1Record returns the key of the record made first, other than
 // except's.
 func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeKey) (HandshakeKey, bool) {
@@ -1625,14 +1631,14 @@ func (b *Bridge) sigma1RecordHeld(key HandshakeKey) bool {
 //   - Over TCP no acknowledgement comes, and the wait runs from the Sigma2
 //     (matter.js sends it without waiting for an acknowledgement when the
 //     session uses no MRP: MessageExchange.ts:692, :822).
-//   - A Sigma2 that left the retransmission unacknowledged — given up, or
-//     evicted from the full table, which costs it its retransmissions and
-//     nothing else ([unsecuredEntryLimit]) — holds the record until
+//   - A Sigma2 given up ends the record at the give-up
+//     ([Bridge.unsecuredReplyGivenUp]). One evicted from the full table,
+//     which costs it its retransmissions and nothing else
+//     ([unsecuredEntryLimit]), holds the record until
 //     [unsecuredEntryLifetime] after it was sent, the longest the tracker
-//     keeps it; the two are not told apart here.
+//     would have kept it.
 func (b *Bridge) sigma1RecordOver(key HandshakeKey, rec sigma1Record, tracker *outboundReliableTracker) bool {
-	singleton := rec.bySingleton || (rec.completed != nil && rec.completed.bySingleton)
-	if !singleton {
+	if !rec.runBySingleton() {
 		return false
 	}
 	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
@@ -1682,7 +1688,7 @@ func (b *Bridge) endOverSigma1Records() {
 	b.mu.RLock()
 	tracker := b.outboundReliable
 	for key, rec := range b.sigma1Replied {
-		if rec.bySingleton || (rec.completed != nil && rec.completed.bySingleton) {
+		if rec.runBySingleton() {
 			candidates = append(candidates, candidate{key, rec})
 		}
 	}
@@ -1691,6 +1697,34 @@ func (b *Bridge) endOverSigma1Records() {
 		if c := &candidates[i]; b.sigma1RecordOver(c.key, c.rec, tracker) {
 			b.endSigma1Record(c.key, c.rec)
 		}
+	}
+}
+
+// unsecuredReplyGivenUp follows the give-up of a reply of the handshake key
+// names — its retransmissions spent, or its [unsecuredEntryLifetime] over —
+// in the sweep of the retransmission table that gave it up
+// ([Bridge.tickOutboundReliable]): when nothing else of the handshake waits
+// for its acknowledgement, the record of a handshake the singleton handler
+// runs ends there, a completed one's included, unless its Sigma2 was
+// acknowledged and it waits for Sigma3 ([Bridge.sigma1RecordOver]). A
+// provider's record ends with its adapter, as before. Mirrors matter.js:
+// the exchange gives the message up and the send throws
+// (packages/protocol/src/protocol/MessageExchange.ts:973-976, :840 at
+// db021da0), and the CASE server's error path closes the handshake's
+// unsecured session (packages/protocol/src/session/case/CaseServer.ts:61-99).
+func (b *Bridge) unsecuredReplyGivenUp(key HandshakeKey) {
+	b.mu.RLock()
+	rec, ok := b.sigma1Replied[key]
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if !ok || !rec.runBySingleton() {
+		return
+	}
+	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
+		return
+	}
+	if rec.completed != nil || rec.sigma2AckedAt.IsZero() {
+		b.endSigma1Record(key, rec)
 	}
 }
 

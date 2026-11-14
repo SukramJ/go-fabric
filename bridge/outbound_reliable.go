@@ -686,8 +686,11 @@ func (t *outboundReliableTracker) Pending() int {
 type outboundTickResult struct {
 	SessionID  uint16
 	ExchangeID uint16
-	Counter    uint32
-	Err        error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	// Initiator is the initiator node id of an unsecured-session entry's
+	// handshake: with ExchangeID it names the handshake ([HandshakeKey]).
+	Initiator uint64
+	Counter   uint32
+	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
 }
 
 // Tick walks every entry whose nextSendAt has elapsed: re-sends via
@@ -734,7 +737,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 				ch <- errUnsecuredEntryExpired
 				close(ch)
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: errUnsecuredEntryExpired})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired})
 			continue
 		}
 		if now.Before(p.nextSendAt) {
@@ -750,7 +753,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 				ch <- mrp.ErrMaxRetransmissionsReached
 				close(ch)
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
 			continue
 		}
 		p.retries++

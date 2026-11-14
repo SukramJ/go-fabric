@@ -262,3 +262,42 @@ func TestSingletonCompletedRecordEndsAtItsAcknowledgement(t *testing.T) {
 		t.Fatal("the completed handshake's record outlived the acknowledgement of its success report")
 	}
 }
+
+// TestSingletonRecordEndsAtTheGiveUpOfItsReply: through the singleton
+// handler, a handshake whose Sigma2 is given up after its retransmissions —
+// or whose success report is — ends at the give-up, in the sweep of the
+// retransmission table that gave it up, not at the next sweep of the
+// unsecured windows (review II, phase 4 fr-sec round 2). matter.js ends the
+// handshake when the exchange gives up the message: the send throws
+// (packages/protocol/src/protocol/MessageExchange.ts:973-976, :840 at
+// db021da0) and the CASE server's error path closes the handshake's
+// unsecured session (packages/protocol/src/session/case/CaseServer.ts:61-99).
+func TestSingletonRecordEndsAtTheGiveUpOfItsReply(t *testing.T) {
+	t.Parallel()
+	for _, completed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "the Sigma2", true: "the success report"}[completed], func(t *testing.T) {
+			t.Parallel()
+			clk := clocktest.New(time.Unix(1_700_000_000, 0))
+			r := newUnsecuredRigOn(t, clk)
+			c := beginCASE(t, r, clk, false)
+			if completed {
+				if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+					t.Fatal(err)
+				}
+				c.report = c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the report on Sigma3")
+			}
+			key := HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}
+			start := clk.Now()
+			for c.r.b.outboundReliable.holdsUnsecuredExchange(key) {
+				if clk.Now().Sub(start) >= unsecuredEntryLifetime {
+					t.Fatal("the reply was not given up before its lifetime ran out")
+				}
+				clk.Advance(500 * time.Millisecond)
+				c.r.b.tickOutboundReliable(c.r.b.outboundReliable, clk.Now())
+			}
+			if c.recordHeld() {
+				t.Fatalf("the record outlived the give-up of its reply (%v after it was sent)", clk.Now().Sub(start))
+			}
+		})
+	}
+}

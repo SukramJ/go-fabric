@@ -617,16 +617,23 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			}
 			continue
 		}
-		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
+		givenUp := errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached)
+		if r.SessionID == 0 && (givenUp || errors.Is(r.Err, errUnsecuredEntryExpired)) {
+			// A handshake reply given up, or dropped after
+			// [unsecuredEntryLifetime]: the CASE responder's record of
+			// its handshake ends here ([Bridge.unsecuredReplyGivenUp]).
+			b.unsecuredReplyGivenUp(HandshakeKey{InitiatorNodeID: r.Initiator, ExchangeID: r.ExchangeID})
+		}
+		if givenUp {
 			b.noteReportUndelivered(r.SessionID, r.Counter)
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue
 		}
 		// What is left is a failed send or an unsecured-session entry
 		// dropped after [unsecuredEntryLifetime]. Neither is told to
-		// anybody: the entry's handshake ends on its own clock — the PASE
-		// slot's timeout, the CASE responder's reaper, the context of a
-		// handshake this node opened.
+		// anybody else: the entry's handshake ends on its own clock — the
+		// PASE slot's timeout, the CASE responder's reaper or record
+		// (above), the context of a handshake this node opened.
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
 			slog.Any("err", r.Err))
