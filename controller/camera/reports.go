@@ -67,7 +67,12 @@ func (r *Reports) attach(s *Service) {
 	if r.known == nil {
 		r.known = map[string]uint64{}
 	}
-	for _, n := range s.ctrl.Registry().Nodes() {
+	// The registry is nil once the controller's Close has begun.
+	reg := s.ctrl.Registry()
+	if reg == nil {
+		return
+	}
+	for _, n := range reg.Nodes() {
 		if addr, ok := n.PeerAddress(); ok {
 			r.known[n.ID()] = addr.NodeID
 		}
@@ -93,10 +98,14 @@ func (r *Reports) with(id string, fn func(s *Service, nodeID uint64)) {
 		return
 	}
 	nodeID, ok := uint64(0), false
-	if n := s.ctrl.Registry().Get(id); n != nil {
-		var addr client.PeerAddress
-		if addr, ok = n.PeerAddress(); ok {
-			nodeID = addr.NodeID
+	// The registry is nil once the controller's Close has begun; the node
+	// is then named by the id it had.
+	if reg := s.ctrl.Registry(); reg != nil {
+		if n := reg.Get(id); n != nil {
+			var addr client.PeerAddress
+			if addr, ok = n.PeerAddress(); ok {
+				nodeID = addr.NodeID
+			}
 		}
 	}
 	r.mu.Lock()

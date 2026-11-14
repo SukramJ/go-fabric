@@ -86,9 +86,14 @@ func (io *clientIO) call(ctx context.Context, t target, cluster, command uint32,
 	return invokeDecoded(ctx, n, t.endpointID, cluster, command, fields)
 }
 
-// node is the client node of a camera, nil when the registry holds none.
+// node is the client node of a camera, nil when the registry holds none
+// or the controller's Close has begun (its registry is then nil).
 func (io *clientIO) node(nodeID uint64) *client.Node {
-	return io.ctrl.Registry().GetByAddress(client.PeerAddress{FabricIndex: io.ctrl.Fabric().FabricIndex, NodeID: nodeID})
+	reg := io.ctrl.Registry()
+	if reg == nil {
+		return nil
+	}
+	return reg.GetByAddress(client.PeerAddress{FabricIndex: io.ctrl.Fabric().FabricIndex, NodeID: nodeID})
 }
 
 // cluster is a cluster of the camera's image, nil when absent.
