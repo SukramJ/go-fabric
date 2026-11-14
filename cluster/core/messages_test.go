@@ -144,14 +144,17 @@ func TestMessagesPerFabric(t *testing.T) {
 	if l := v.(spec.List[messagesdef.MessageStruct]); len(l) != 1 || l[0].MessageText != "two" {
 		t.Errorf("fabric 2 filtered read %+v", l)
 	}
+	// An unfiltered read lists both, fabric 1's without its
+	// fabric-sensitive fields (TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields).
 	v, _ = m.MatterReadFiltered(msgCtx(2, false), messagesdef.AttrMessages)
-	if l := v.(spec.List[messagesdef.MessageStruct]); len(l) != 2 {
+	if l := v.(spec.List[spec.Encodable]); len(l) != 2 {
 		t.Errorf("unfiltered read %+v", l)
 	}
-	spectest.RoundTripAttribute(t, messagesdef.Definition, messagesdef.AttrMessages, v.(spec.List[messagesdef.MessageStruct]))
-	if v, _ := m.MatterRead(messagesdef.AttrMessages); len(v.(spec.List[messagesdef.MessageStruct])) != 2 {
-		t.Errorf("local read %+v", v)
+	local, _ := m.MatterRead(messagesdef.AttrMessages)
+	if len(local.(spec.List[messagesdef.MessageStruct])) != 2 {
+		t.Errorf("local read %+v", local)
 	}
+	spectest.RoundTripAttribute(t, messagesdef.Definition, messagesdef.AttrMessages, local.(spec.List[messagesdef.MessageStruct]))
 	// Fabric 2 cannot cancel fabric 1's message.
 	if err := decodeAndInvoke(t, m, msgCtx(2, false), messagesdef.CmdCancelMessagesRequest,
 		messagesdef.CancelMessagesRequestRequest{MessageIds: [][]byte{messageID(1)}}); err != nil {
