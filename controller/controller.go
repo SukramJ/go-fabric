@@ -257,6 +257,16 @@ type Config struct {
 	// included; the commissioning steps themselves, over PASE and the CASE
 	// session they open, keep the default.
 	MaxReportBytesPerSession int
+	// MaxImageBytesPerNode bounds what one paired node's reports leave in
+	// the controller's image of it and in DB: the bytes of the attribute
+	// values, in their stored form. A report that would raise the image
+	// above it is not applied (the image stays as it was), and an image
+	// stored above it is cut back to what the node's own structure names
+	// when it loads. Below it, the image keeps only what the node's
+	// structure names or the interaction asked for. 0 is
+	// client.DefaultMaxImageBytesPerNode (32 MiB); a negative bound is
+	// [ErrConfiguration].
+	MaxImageBytesPerNode int
 	// Metrics receives the controller's named counters and gauges
 	// (controller/metrics.go: sessions.open, mrp.retransmits,
 	// pair.failures, case.unresponsive, reachability.probes,
@@ -355,7 +365,7 @@ type Controller struct {
 }
 
 // checkRequired refuses a configuration without its required fields or
-// with a negative report bound.
+// with a negative report or image bound.
 func checkRequired(cfg *Config) error {
 	switch {
 	case cfg.DB == nil:
@@ -364,6 +374,8 @@ func checkRequired(cfg *Config) error {
 		return fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
 	case cfg.MaxReportBytesPerSession < 0:
 		return fmt.Errorf("%w: MaxReportBytesPerSession %d is negative", ErrConfiguration, cfg.MaxReportBytesPerSession)
+	case cfg.MaxImageBytesPerNode < 0:
+		return fmt.Errorf("%w: MaxImageBytesPerNode %d is negative", ErrConfiguration, cfg.MaxImageBytesPerNode)
 	}
 	return nil
 }
@@ -499,6 +511,7 @@ func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, cl
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
 		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: nodeCfg, HooksFor: hooksFor, AutoStart: !cfg.ManualStart,
+		MaxImageBytesPerNode: cfg.MaxImageBytesPerNode,
 	}); err != nil {
 		return err
 	}

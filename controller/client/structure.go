@@ -80,6 +80,13 @@ type structure struct {
 
 	events  []emission
 	delayed []EventData
+
+	// maxImageBytes is the node's image quota, zero or less the default
+	// ([structure.quota]); droppedLogged and quotaLogged keep the image
+	// bounds' warnings to one each per node ([structure.admit]).
+	maxImageBytes int
+	droppedLogged bool
+	quotaLogged   bool
 }
 
 // newStructure is a structure with its root endpoint (ClientStructure.ts:155-164):
@@ -131,6 +138,7 @@ func (s *structure) takeEmissions() []emission {
 // (:215); only installations may be pending (:217-229); the structure
 // events emitted (:231).
 func (s *structure) loadCache(stored []StoredEndpoint) error {
+	stored = s.cutBackStored(stored)
 	for _, se := range stored {
 		ep := s.endpointFor(se.Number)
 		clusters := slices.Clone(se.Clusters)
@@ -283,8 +291,9 @@ func (s *structure) mutate(sc scope, r *Report, emitEvents bool, in *epoch) {
 	}
 	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}, emitsEvents: emitEvents, epoch: in}
 	var cur *batch
-	for i := range r.Attributes {
-		cur = s.mutateAttribute(&r.Attributes[i], sc, cur, q)
+	attrs := s.admit(sc, r)
+	for i := range attrs {
+		cur = s.mutateAttribute(&attrs[i], sc, cur, q)
 	}
 	for i := range r.Events {
 		s.emitEvent(&r.Events[i], q)

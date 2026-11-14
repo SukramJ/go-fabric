@@ -26,6 +26,11 @@ type cache struct {
 	cluster uint32
 
 	values map[uint32]spec.Node
+	// sizes is each value's stored size (encodeValue), bytes their sum:
+	// what the cluster counts towards the node's image quota
+	// ([structure.imageBytes]).
+	sizes map[uint32]int
+	bytes int
 	// version is the cluster's DataVersion; hasVersion false is
 	// Datasource.UNKNOWN_VERSION (DatasourceCache.ts:47-48).
 	version    uint32
@@ -43,9 +48,12 @@ type cache struct {
 
 // newCache is a cache seeded with stored values (DatasourceCache.ts:38-49).
 func newCache(p *persister, ep uint16, cluster uint32, values map[uint32]spec.Node, version *uint32) *cache {
-	c := &cache{p: p, ep: ep, cluster: cluster, values: values, dirty: map[uint32]struct{}{}}
+	c := &cache{p: p, ep: ep, cluster: cluster, values: values, sizes: map[uint32]int{}, dirty: map[uint32]struct{}{}}
 	if c.values == nil {
 		c.values = map[uint32]spec.Node{}
+	}
+	for k, v := range c.values {
+		c.setSize(k, valueSize(v))
 	}
 	if version != nil {
 		c.version, c.hasVersion = *version, true
@@ -68,9 +76,11 @@ func (c *cache) externalSet(values map[uint32]*spec.Node, version *uint32) {
 	for k, v := range values {
 		if v == nil {
 			delete(c.values, k)
+			c.setSize(k, 0)
 			continue
 		}
 		c.values[k] = *v
+		c.setSize(k, valueSize(*v))
 	}
 	if c.p.interval > 0 {
 		for k := range values {
@@ -139,6 +149,26 @@ func (c *cache) erase() {
 	if err := c.p.store.EraseCluster(c.p.nodeID, c.ep, c.cluster); err != nil {
 		c.p.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
 	}
+}
+
+// setSize records value k's stored size; 0 forgets it.
+func (c *cache) setSize(k uint32, size int) {
+	c.bytes += size - c.sizes[k]
+	if size == 0 {
+		delete(c.sizes, k)
+		return
+	}
+	c.sizes[k] = size
+}
+
+// valueSize is the size of a value's stored form; a value that does not
+// encode counts nothing, as the store keeps nothing of it.
+func valueSize(n spec.Node) int {
+	b, err := encodeValue(n)
+	if err != nil {
+		return 0
+	}
+	return len(b)
 }
 
 // encodeValue is a value's stored form: its TLV encoding, anonymous.

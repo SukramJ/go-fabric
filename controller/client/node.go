@@ -184,6 +184,7 @@ func newNode(cfg Config) (*Node, error) {
 		})
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
+	n.s.maxImageBytes = n.cfg.maxImageBytes
 	if err := n.s.loadCache(stored); err != nil {
 		return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 	}
@@ -750,6 +751,7 @@ func (n *Node) Erase(ctx context.Context) error {
 		}
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
+	n.s.maxImageBytes = n.cfg.maxImageBytes
 	n.props = nil
 	n.frozen = false
 	n.erased = true

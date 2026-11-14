@@ -18,6 +18,12 @@ type scope struct {
 	// fabricFiltered: the read's data was filtered by fabric —
 	// isFabricFiltered ?? true (ReadScope.ts:50).
 	fabricFiltered bool
+	// asks: a path of the request names the endpoint or the cluster (or
+	// both) and matches; the full wildcard names neither. The image keeps
+	// what the request asked for beside what the peer's structure names
+	// ([structure.admission]; review II, R2-P3-ctl-dev-02, owner decision
+	// 54). Module's own: matter.js's ReadScope has no such tester.
+	asks func(ep uint16, cluster uint32) bool
 }
 
 // newScope is the scope of a read of paths — ReadScope(read)
@@ -27,6 +33,27 @@ func newScope(paths []im.ConcreteAttributePath, noFabricFilter bool) scope {
 		isRelevant:     scopeTester(paths, false),
 		isWildcard:     scopeTester(paths, true),
 		fabricFiltered: !noFabricFilter,
+		asks:           askTester(paths),
+	}
+}
+
+// askTester is scope.asks over paths.
+func askTester(paths []im.ConcreteAttributePath) func(ep uint16, cluster uint32) bool {
+	clusters := map[uint32]bool{}
+	endpoints := map[uint16]bool{}
+	pairs := map[[2]uint32]bool{}
+	for _, p := range paths {
+		switch {
+		case p.HasEndpoint && p.HasCluster:
+			pairs[[2]uint32{uint32(p.Endpoint), p.Cluster}] = true
+		case p.HasEndpoint:
+			endpoints[p.Endpoint] = true
+		case p.HasCluster:
+			clusters[p.Cluster] = true
+		}
+	}
+	return func(ep uint16, cluster uint32) bool {
+		return endpoints[ep] || clusters[cluster] || pairs[[2]uint32{uint32(ep), cluster}]
 	}
 }
 

@@ -60,6 +60,11 @@ type Config struct {
 	// Rand returns the jitter draw in [0, 1) of the subscription ceiling;
 	// nil is math/rand/v2.Float64.
 	Rand func() float64
+
+	// maxImageBytes is the node's image quota
+	// ([RegistryConfig].MaxImageBytesPerNode); zero or less is
+	// [DefaultMaxImageBytesPerNode].
+	maxImageBytes int
 }
 
 // SubscribeOptions narrows the default subscription — the fields of

@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
 )
@@ -81,5 +82,47 @@ func TestMaxReportBytesPerSessionNegativeIsRefused(t *testing.T) {
 			_ = c.Close(context.Background())
 		}
 		t.Fatalf("New with a negative MaxReportBytesPerSession returned %v, want ErrConfiguration", err)
+	}
+}
+
+// TestMaxImageBytesPerNodeReachesTheNodes: Config.MaxImageBytesPerNode
+// bounds a paired node's image (owner decision 54): under a bound below
+// the node's first read, the read's report is not applied and the image
+// holds no endpoint beyond the root, which holds no cluster.
+func TestMaxImageBytesPerNodeReachesTheNodes(t *testing.T) {
+	t.Parallel()
+	site, dev, c := siteController(t, fabrictest.Topology{}, func(cfg *controller.Config) {
+		cfg.ManualStart = true
+		cfg.MaxImageBytesPerNode = 1
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	var n *client.Node
+	err := site.Run(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = c.Pair(ctx, manualCode(t, dev), controller.PairOptions{OnAttestationFailure: attestation.Accept()})
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Pair under a 1-byte image bound: %v", err)
+	}
+	for _, ep := range n.Endpoints() {
+		if ep.Number() != 0 || len(ep.Clusters()) != 0 {
+			t.Fatalf("endpoint %d with %d clusters in an image bounded at 1 byte", ep.Number(), len(ep.Clusters()))
+		}
+	}
+}
+
+// TestMaxImageBytesPerNodeNegativeIsRefused: a negative bound is a
+// configuration error.
+func TestMaxImageBytesPerNodeNegativeIsRefused(t *testing.T) {
+	t.Parallel()
+	cfg := config(openDB(t))
+	cfg.MaxImageBytesPerNode = -1
+	if c, err := controller.New(t.Context(), cfg); !errors.Is(err, controller.ErrConfiguration) {
+		if err == nil {
+			_ = c.Close(t.Context())
+		}
+		t.Fatalf("New with a negative MaxImageBytesPerNode returned %v, want ErrConfiguration", err)
 	}
 }
