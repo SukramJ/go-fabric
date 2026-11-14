@@ -207,6 +207,80 @@ neither list; `TestCommittedPackagesAreCurrent` covers both;
 `script/devicegen` treats only a package with `server_gen.go` as a typed
 package of a device.
 
+## Amendment of 2026-11-14 — the definition is the one check, and carries its server's relaxations
+
+Review II, phase 4 (owner decision 64): **the fields of a request and of a
+written value are held to the cluster's definition in one place each, in
+front of the hand-written servers too, and a server that judges a value
+the model's constraint would refuse says so in the definition.** matter.js
+validates a request against the command's schema before the behavior runs
+(`requestTlv.validate`,
+`packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487` at
+`db021da0`) and relaxes a field by extending its server's schema
+(`constraint: "none"`,
+`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75`)
+or skips the validation for a cluster with a supervised command
+(`packages/node/src/node/integration/ProtocolService.ts:343-348`). Before
+this amendment the generated decoders made that check for the requests
+they decode, relaxed by two maps of the generator (ICDManagement's
+VerificationKey, EnergyEvse's ChargingTargets); DoorLock's request rules
+were code in the bridge, and each hand-written server checked its own
+requests and written values.
+
+- **Requests.** A request the bridge decodes through its definition passes
+  `spec.Command.DecodeRequest`, which applies the check the command
+  declares, before its server runs. The requests the bridge decodes by
+  hand — GeneralCommissioning, OperationalCredentials,
+  AdministratorCommissioning, Groups, GroupKeyManagement, Groupcast and
+  ScenesManagement — are read into a node, held to their definition's
+  request check and then handed to the hand-written reader
+  (`bridge/fields_reader.go`, `heldByDefinition`). This narrows a sentence
+  of the amendment of 2026-10-25: the requests of OperationalCredentials
+  and GroupKeyManagement still never decode *into* the generated structs,
+  but they are checked by the definitions.
+- **Written values.** The dispatcher holds a controller's written value to
+  the definition before any server runs (`spec.CheckWritten`, called from
+  `endpoint.TopologyDispatcher`'s write entry), for every server whose
+  cluster has a registered definition. A hand-written write form — the
+  AccessControl Acl and Extension entries, a GroupKeyMap entry — is read
+  through a declared field map (`spec.MapFields`), never by matching
+  names; `spec.VerifyFieldMaps` fails for a definition field without a Go
+  field.
+- **Relaxations.** `script/clustergen/relaxed.go` is the one table: one
+  section per server, each entry with its reference line — a request
+  field, a struct field, an attribute's written value, a cluster whose
+  request fields are not held to their constraints, or the status a refused
+  request of a command answers. The generator writes each entry into the
+  definition (`spec.Field.Relaxed`, `spec.Attribute.Relaxed`,
+  `spec.Command.Check`) and drops the relaxed constraint from the
+  generated decoder; the definition keeps the model's constraint verbatim
+  beside it, and an entry that names nothing of its cluster fails the
+  generation. The table holds ICDManagement, OperationalCredentials,
+  AdministratorCommissioning, Groups, ScenesManagement, DoorLock and
+  Thermostat after matter.js, and EnergyEvse, PushAvStreamTransport and
+  LaundryWasherControls after connectedhomeip, each of the three under an
+  owner decision the entry names.
+
+What this changes about the decision above:
+
+- Decision 2 called `Definition` the model's elements. It is now the model
+  and, beside each relaxed element, this module's departure from the
+  model's check with its reference. The model's values are still what the
+  snapshot says; what a generated decoder refuses is the model less the
+  table.
+- Decision 4 — "a server author writes the host port and the rules,
+  nothing else" — gains one duty: a rule that judges a value the model's
+  constraint would refuse is a table entry as well, or the definition
+  answers before the server does.
+- "What stays as it was" said a server built on a definition answers its
+  write check itself. The check of a written value now runs in the
+  dispatcher too, for every server with a definition, the hand-written
+  ones included; a server's own `ValidateWrite` is unchanged.
+
+Not covered: a cluster without a definition — Schedules (0x0024) and a
+host's vendor cluster — is checked by its server alone, and the response
+side is not part of the check.
+
 ## Migration list
 
 Every cluster server in the module, whether it is a candidate for its
