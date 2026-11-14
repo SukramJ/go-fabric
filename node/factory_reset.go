@@ -59,8 +59,8 @@ import (
 // fabrics, occurrences, credentials and the node store); the node that
 // comes back is a new one here (BD-Matter-FactoryResetEndsTheNode).
 func (n *Node) FactoryReset(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.lifecycle <- struct{}{}
+	defer n.leaveLifecycle()
 	var errs []error
 	if !n.stopped {
 		recs, err := n.st.ListFabrics(ctx)

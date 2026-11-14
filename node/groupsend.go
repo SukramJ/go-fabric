@@ -25,7 +25,7 @@ const groupSendAddr = "[::]:0"
 // GroupSession.ts:143-153 at 0ceb202d). matter.js sends from its
 // operational socket; the bridge keeps that socket to itself, so the node
 // sends from one of its own. Without IPv6 no socket opens, and Sender
-// answers groups.ErrNoInterface. Called by Start with n.mu held.
+// answers groups.ErrNoInterface. Called by Start with the lifecycle slot held.
 func (n *Node) startGroupSender() {
 	l, err := udp.New(udp.Config{LocalAddr: groupSendAddr, Logger: n.logger})
 	if err != nil {
@@ -37,7 +37,7 @@ func (n *Node) startGroupSender() {
 }
 
 // stopGroupSender detaches and closes the group send socket. Called by
-// Stop with n.mu held.
+// Stop with the lifecycle slot held.
 func (n *Node) stopGroupSender() {
 	if n.groupTx == nil {
 		return

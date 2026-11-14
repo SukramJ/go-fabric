@@ -185,13 +185,15 @@ type Node struct {
 	windowLife   context.Context //nolint:containedctx // a child of life that Stop cancels first
 	cancelWindow context.CancelFunc
 
-	// mu serialises Start and Stop, the lifecycle; it is held across
-	// them, host callbacks included (the host's Snapshotter), and
-	// taken by nothing else. started is atomic so a host's call during
-	// either (SetCommissioningBlocked) never waits for it (ADR 0026 P6).
-	mu      sync.Mutex
-	started atomic.Bool
-	stopped bool
+	// lifecycle serialises Start, Stop and FactoryReset: a slot of
+	// capacity one, held across them, host callbacks included (the host's
+	// Snapshotter), and taken by nothing else. Stop's wait for it ends
+	// with Stop's ctx (enterLifecycle; review II, R2-P2-stop-08). started
+	// is atomic so a host's call during either (SetCommissioningBlocked)
+	// never waits for it (ADR 0026 P6).
+	lifecycle chan struct{}
+	started   atomic.Bool
+	stopped   bool
 	// stopBegun: a Stop took the node's own parts down; stopped is set
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
@@ -237,7 +239,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
 		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
-		attestationErr: attestationErr,
+		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	n.windowLife, n.cancelWindow = context.WithCancel(n.life)
@@ -894,8 +896,8 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // socket and no open window behind. A host that gives up calls Stop;
 // [Node.Run] does.
 func (n *Node) Start(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.lifecycle <- struct{}{}
+	defer n.leaveLifecycle()
 	switch {
 	case n.stopped || n.stopBegun:
 		return ErrStopped
@@ -909,7 +911,7 @@ func (n *Node) Start(ctx context.Context) error {
 	return nil
 }
 
-// startLocked is Start's work; n.mu is held. It fails only before it has
+// startLocked is Start's work; the lifecycle slot is held. It fails only before it has
 // started anything (see Start): every fallible step comes first.
 func (n *Node) startLocked(ctx context.Context) error {
 	// The start is work in hand of the node's in-flight group but for its
@@ -1053,16 +1055,41 @@ func (n *Node) startLocked(ctx context.Context) error {
 // (matter.js Node.stop, Node.ts:193) and safe without Start. A context
 // already done cuts short only Stop's waits; Stop returns an error only
 // when the bridge did not stop (a bridge Start or Stop the host runs
-// itself held it until ctx ended), and then the node is not stopped yet:
-// it keeps its store and the next Stop finishes the work. Start is refused
-// from the first Stop on.
+// itself held it until ctx ended, or a Start of the node's own was still
+// running when ctx ended), and then the node is not stopped yet: it keeps
+// its store and the next Stop finishes the work. Start is refused from the
+// first Stop on.
 func (n *Node) Stop(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	if err := n.enterLifecycle(ctx); err != nil {
+		return err
+	}
+	defer n.leaveLifecycle()
 	return n.stopLocked(ctx)
 }
 
-// stopLocked is Stop's work; n.mu is held. When the bridge does not
+// enterLifecycle takes the lifecycle slot, waiting for a Start or
+// FactoryReset in progress until ctx ends. A free slot is taken whatever
+// ctx's state, so a Stop with a context already done still stops an idle
+// node. The shape of bridge.Bridge.enterLifecycle (review II,
+// R2-P2-stop-08).
+func (n *Node) enterLifecycle(ctx context.Context) error {
+	select {
+	case n.lifecycle <- struct{}{}:
+		return nil
+	default:
+	}
+	select {
+	case n.lifecycle <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("node: waiting for a start in progress: %w", ctx.Err())
+	}
+}
+
+// leaveLifecycle releases the lifecycle slot.
+func (n *Node) leaveLifecycle() { <-n.lifecycle }
+
+// stopLocked is Stop's work; the lifecycle slot is held. When the bridge does not
 // stop (its Stop waited for a bridge Start or Stop in progress until ctx
 // ended), the node is not stopped: the advertiser, the lifetime context
 // and the store stay, and the next Stop resumes at the bridge (review II,
@@ -1265,7 +1292,7 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 		return
 	}
 	// Lock-free: a host may call this from a callback that runs inside
-	// Start or Stop, which hold n.mu (a Snapshotter, say).
+	// Start or Stop, which hold the lifecycle slot (a Snapshotter, say).
 	if n.started.Load() && n.window != nil && n.st != nil {
 		n.window.reopenIfDecommissioned(ctx, n.st)
 	}
