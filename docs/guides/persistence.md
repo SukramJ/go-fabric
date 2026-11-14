@@ -68,7 +68,10 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   fabric the store does not hold is refused. What a cluster server keeps
   for a fabric under its own settings key — the AccessControl Extension
   entry, Binding lists, scene tables, the TLS tables, the trusted time
-  source — the server drops itself when the node removes the fabric
+  source, and a lock user's or credential's creator and last-modified
+  fabric, which the DoorLock server sets to 0 as connectedhomeip does
+  while the users, credentials and schedules stay — the server
+  drops itself when the node removes the fabric
   (`contract.FabricScopedState`), and the node drops what is stored for a
   fabric the table no longer holds before it serves a topology: at start
   and whenever an endpoint joins.

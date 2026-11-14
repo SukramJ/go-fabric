@@ -155,9 +155,17 @@ func newLockFixture(t *testing.T, cfg lock.DoorLockConfig) *lockFixture {
 		t.Fatalf("lock.New: %v", err)
 	}
 	hw.srv = srv
-	pair := site.CommissionedPair(fabrictest.PairOptions{
-		Device: fabrictest.Topology{Bridged: []node.Endpoint{fabrictest.Endpoint("lock", deviceTypeDoorLock, srv)}},
-	})
+	// The seeded records name the pair's fabric as their creator, and a
+	// node clears a fabric its table does not hold from them when the lock
+	// joins (contract.FabricScopedState), so the lock joins the node once
+	// the pair's fabric is committed, as a host adds an endpoint to a
+	// commissioned node.
+	pair := site.CommissionedPair(fabrictest.PairOptions{})
+	if err := pair.Device.Act(func(n *node.Node) error {
+		return n.Aggregator().Add(ctx, fabrictest.Endpoint("lock", deviceTypeDoorLock, srv))
+	}); err != nil {
+		t.Fatalf("add the lock: %v", err)
+	}
 	ep, ok := pair.Device.EndpointOf("lock")
 	if !ok {
 		t.Fatal("the lock has no endpoint")
