@@ -535,8 +535,10 @@ settings key.
 4. PASE, the commissioning window and the CASE reaper stop;
 5. the subscription engine, the group sender, BDX and the health probe
    stop;
-6. the bridge stops (sessions are closed with a CloseSession to each
-   peer, then the socket closes and the mDNS records are withdrawn);
+6. the bridge stops (what each subscription owes is reported, the
+   ShutDown event among it, then the sessions are closed with a
+   CloseSession to each peer, then the socket closes and the mDNS
+   records are withdrawn);
 7. the advertiser closes, and the store the node opened for
    `Store.Path`.
 

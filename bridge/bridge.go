@@ -2087,9 +2087,10 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 	return false
 }
 
-// Stop tears down the bridge: gracefully closes every secure session
-// (best-effort CloseSession StatusReport per peer, capped by
-// [stopSessionCloseBudget]), closes the UDP listener, withdraws
+// Stop tears down the bridge: reports what every subscription owes,
+// gracefully closes every secure session (best-effort CloseSession
+// StatusReport per peer; each step capped by [stopSessionCloseBudget]),
+// closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
 // no-op. Safe to call after a failed [Start]. The bridge is single-run:
@@ -2116,7 +2117,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// a restart. Mirrors matter.js's shutdown ordering: sessions close
 	// gracefully (Session.ts:248 initiateClose → gracefulClose →
 	// ExchangeManager.ts:716-726 #sendCloseSession) before the transport
-	// is torn down (ServerNetworkRuntime.ts:410-447 stop()).
+	// is torn down (ServerNetworkRuntime.ts:410-447 stop()). What the
+	// subscriptions owe goes out before the sessions close.
+	b.flushSubscriptionsForShutdown(ctx)
 	b.closeSecureSessionsForShutdown()
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.
@@ -2238,6 +2241,49 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// flushSubscriptionsForShutdown reports what every subscription owes —
+// the pending events, the ShutDown event the node emitted a moment before
+// among them, and the dirty attributes — before [Bridge.Stop] closes the
+// sessions, one fabric's subscriptions beside the other's
+// ([subscription.Manager.FlushFabric], each report waiting for its
+// answer), bounded by ctx and by [stopSessionCloseBudget]. The
+// subscriptions stay open; they close with their sessions right after,
+// not terminated, so they stay persisted for the re-establishment on the
+// next start (ADR 0008). A subscription engine the node stopped before
+// still flushes; without a subscription manager or its flush reporter, or
+// on a bridge that is not started, nothing is sent (review II,
+// R2-P2-sess-03).
+//
+// Mirrors the flush of matter.js's shutdown at db021da0:
+// ServerNode.ts:152-155 prepareRuntimeShutdown → SessionManager.ts:1097-1113
+// closeAllSessions, which runs each session's closeSubscriptionsForShutdown
+// (NodeSession.ts:326-329, a flush through the session; the subscription
+// is closed without being terminated, ServerSubscription.ts:772-774) before
+// the session ends.
+func (b *Bridge) flushSubscriptionsForShutdown(ctx context.Context) {
+	b.mu.RLock()
+	started := b.started
+	m := b.subManager
+	b.mu.RUnlock()
+	if !started || m == nil {
+		return
+	}
+	fabrics := map[uint8]struct{}{}
+	for _, info := range m.Snapshot() {
+		fabrics[info.FabricIndex] = struct{}{}
+	}
+	if len(fabrics) == 0 {
+		return
+	}
+	ctx, cancel := clock.WithTimeout(ctx, b.clk(), stopSessionCloseBudget)
+	defer cancel()
+	var wg sync.WaitGroup
+	for fabricIndex := range fabrics {
+		wg.Go(func() { m.FlushFabric(ctx, fabricIndex, 0) })
+	}
+	wg.Wait()
 }
 
 // waitServeStopped waits, bounded by ctx, for the UDP and TCP serve loops

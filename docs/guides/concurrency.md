@@ -164,7 +164,7 @@ on every `Reassemble`, and its result is never cached.
 | `node.New(ctx, cfg)` | bounds the store open and migration, the group load and the store reads. The node's lifetime is its own: a `ctx` that ends after `New` returned ends nothing, `Stop` does |
 | `Node.Start(ctx)` | used for the start-up work (assembly, loading the stored fabrics). A cancelled `ctx` fails `Start` |
 | `Node.Run(ctx)` | starts, waits for `ctx` to end, then stops with a fresh 5-second budget |
-| `Node.Stop(ctx)` | bounds the bridge's wait for its read loop. It closes the sessions with a CloseSession each, stops the engine and reapers, withdraws the mDNS records and closes the advertiser |
+| `Node.Stop(ctx)` | bounds the bridge's wait for its read loop and for the answers to the subscriptions' final reports. It stops the engine and reapers, reports what each subscription owes, closes the sessions with a CloseSession each, withdraws the mDNS records and closes the advertiser |
 
 `Stop` waits for the read loop and the datagram handlers it dispatched,
 the TCP loop with its connection readers and their handler calls, the
