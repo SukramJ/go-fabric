@@ -143,3 +143,34 @@ func TestWriteOtherNodeParity(t *testing.T) {
 		t.Errorf("group, another node: status %v after %d writes, want Success after none", st, srv.writes)
 	}
 }
+
+// TestWriteAppendToNonListParity: an ADD (null ListIndex) to an attribute
+// that is not a list answers INVALID_ACTION for its path
+// (AttributeWriteResponse.ts:436-443 at db021da0, thrown inside the try of
+// writeValue, :452-458); an element of the wrong type for a list stays
+// CONSTRAINT_ERROR.
+func TestWriteAppendToNonListParity(t *testing.T) {
+	t.Parallel()
+	add := func(p im.ConcreteAttributePath) im.ConcreteAttributePath {
+		p.HasListIndex, p.ListAppend = true, true
+		return p
+	}
+	const listAttr = uint32(0x4005)
+	srv := &gateServer{id: gateOnOff, attrs: []uint32{gateOnTime, listAttr}, vals: map[uint32]any{gateOnTime: uint16(0), listAttr: []uint16{1}}}
+	d := gateDispatcher(t, store.PrivilegeAdminister, srv)
+	resp := im.HandleWriteRequest(caseCtx(false), d, im.WriteRequest{Writes: []im.AttributeWrite{
+		writeOf(concreteAttrPath(2, gateOnOff, gateOnTime), uint16(7)),
+		writeOf(add(concreteAttrPath(2, gateOnOff, gateOnTime)), []uint16{9}),
+		writeOf(concreteAttrPath(2, gateOnOff, listAttr), []uint16{1}),
+		writeOf(add(concreteAttrPath(2, gateOnOff, listAttr)), []string{"x"}),
+	}})
+	want := []im.StatusCode{im.StatusSuccess, im.StatusInvalidAction, im.StatusSuccess, im.StatusConstraintError}
+	if len(resp.Responses) != len(want) {
+		t.Fatalf("responses %+v, want %v", resp.Responses, want)
+	}
+	for i, r := range resp.Responses {
+		if r.Status.Status != want[i] {
+			t.Errorf("response %d: status %v, want %v", i, r.Status.Status, want[i])
+		}
+	}
+}

@@ -1584,6 +1584,14 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 // appended. matter.js AttributeWriteResponse applies a ListIndex-null write
 // as an append to the current list the same way. A value that is not a
 // one-element list of the attribute's element type is a CONSTRAINT_ERROR.
+//
+// An attribute whose value is not a list — a slice other than an octet
+// string — answers INVALID_ACTION. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:436-443 at
+// db021da0 (`if (!(tlv instanceof ArraySchema)) throw … Status.InvalidAction`,
+// inside the try of writeValue, so the path's status). The attribute's type
+// is read from its current value: a nil one (a null list, or none) stays
+// CONSTRAINT_ERROR.
 func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
 	var current any
 	var ok bool
@@ -1592,6 +1600,11 @@ func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uin
 		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
 	} else {
 		current, ok = srv.MatterRead(attrID)
+	}
+	if ok && current != nil {
+		if _, octets := current.([]byte); octets || reflect.ValueOf(current).Kind() != reflect.Slice {
+			return value, im.StatusInvalidAction
+		}
 	}
 	item := reflect.ValueOf(value.Value)
 	if !ok || current == nil || item.Kind() != reflect.Slice || item.Len() != 1 {
