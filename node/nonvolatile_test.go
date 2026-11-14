@@ -223,3 +223,27 @@ func TestBridgedUserLabelStoredBeforeTheWriteAnswers(t *testing.T) {
 		t.Errorf("stored list %q (found %v, %v) after the write answered", v, ok, err)
 	}
 }
+
+// TestNonVolatileStoresTheCommittedValue: a write the server commits in a
+// normalised form — WindowCovering clears CalibrationMode under
+// MaintenanceMode, so a Mode of 6 is served as 4 — is served the same
+// after a restart.
+func TestNonVolatileStoresTheCommittedValue(t *testing.T) {
+	t.Parallel()
+	tc := nvCases["WindowCovering.Mode"]
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, tc)
+	path := attrPath(ep, tc.cluster, tc.attr)
+	if st := dispatchWrite(t, n, path, uint64(6)); st != im.StatusSuccess {
+		t.Fatalf("write: %v", st)
+	}
+	served := dispatchRead(t, n, path)
+	if err := n.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	again, ep := nvRun(t, cfg, tc)
+	if got := dispatchRead(t, again, attrPath(ep, tc.cluster, tc.attr)); got != served {
+		t.Fatalf("Mode after the restart %s, served %s before it", got, served)
+	}
+}

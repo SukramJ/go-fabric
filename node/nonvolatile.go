@@ -12,6 +12,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/bridge"
@@ -164,6 +165,7 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	return func(applied bool) {
 		defer v.mu.Unlock()
 		if applied {
+			v.storeCommitted(ctx, srv, attrID, key, stored)
 			return
 		}
 		// The server refused the value: the store holds what it held.
@@ -176,6 +178,36 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 			v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
 		}
 	}, nil
+}
+
+// storeCommitted stores the value srv holds after it committed a write
+// stored as stored under key, when it differs: a server may commit a
+// normalised form of the written value (WindowCovering clears
+// CalibrationMode under MaintenanceMode), and a restart serves what is
+// stored. The write already answered, so a refused store write is logged;
+// the store then keeps the written value. A bridged LabelList, kept in
+// its own form, is not re-read.
+func (v *nonVolatile) storeCommitted(ctx context.Context, srv contract.ClusterServer, attrID uint32, key, stored string) {
+	if strings.HasPrefix(key, bridgedUserLabelKeyRoot) {
+		return
+	}
+	val, ok := srv.MatterRead(attrID)
+	if !ok {
+		return
+	}
+	b, err := bridge.AttributeValueTLV(val)
+	if err != nil {
+		// A form the codec does not take: the written value stays.
+		v.n.logger.Debug("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
+		return
+	}
+	committed := hex.EncodeToString(b)
+	if committed == stored {
+		return
+	}
+	if err := v.n.persisted.st.SetSetting(ctx, key, committed); err != nil {
+		v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
+	}
 }
 
 // storedForm is the key and the settings value of a write the persister
