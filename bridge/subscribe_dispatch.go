@@ -58,12 +58,15 @@ func (b *Bridge) buildInitialReport(
 // Descriptor (0x001D) cached BEFORE the cluster surfaces it references —
 // otherwise `_attributeValueDictionaryForAttributePath` reports "PartsList
 // absent from cache" and HAP-Build aborts with HAPErrorDomain Code=14 ~5s
-// after Subscribe-Initial. matter.js emits its reports in the same
-// ascending order (`packages/protocol/src/interaction/InteractionServer.ts:
-// generateAttributeListReport` walks endpoints sorted then clusters sorted
-// then attributes sorted), and the request's paths one after the other, a
-// producer each (packages/protocol/src/action/server/
-// AttributeReadResponse.ts:88-100 at db021da0) — so two paths are no longer
+// after Subscribe-Initial. The ascending order is not read from matter.js,
+// which sorts nothing in a read at db021da0: a wildcard walks the node's
+// endpoints, an endpoint's clusters and a cluster's attributes
+// (packages/protocol/src/action/server/
+// AttributeReadResponse.ts:183-185, :337-339, :378-380) in the order each
+// was added to its Set or list (packages/node/src/node/integration/
+// ProtocolService.ts:153, :177, :206; :227, :248, :279; :432-434, :522).
+// matter.js emits the request's paths one after the other, a producer each
+// (AttributeReadResponse.ts:88-100 at db021da0) — so two paths are no longer
 // merged into one sorted run: the second path's reports follow the first's.
 //
 // Mirrors matter.js ServerSubscription.ts:629-722 at db021da0
