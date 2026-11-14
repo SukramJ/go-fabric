@@ -338,3 +338,34 @@ noticed items and 2 unread parts; 9 in phase 3, 1 in phase 2.
   compared; every line cited here was read in the exported trees, and the
   Ahead markers were also checked by `script/aheadcheck` against the
   `db021da0` commit of the local matter.js clone.
+
+## The review of the rework (coordinator, 2026-11-14)
+
+One reviewer read the 24 commits of the rework after the diff review as a
+whole (ids `R2-P1-rw-NN`). Seven of its eight findings are fixed in this
+branch; the dispositions above do not count them.
+
+| ID | sev | disposition | where |
+| --- | --- | --- | --- |
+| R2-P1-rw-01 | medium | fixed `634112e7` | AddNOC and UpdateNOC retry an owed rollback before they read the fabric table; reproduced by the reviewer's test |
+| R2-P1-rw-02 | low | fixed `44affd25` | an owed UpdateNOC rollback whose fabric was removed meanwhile is settled; reproduced |
+| R2-P1-rw-03 | low | fixed `da8f0961` | a `FactoryReset` whose stop did not stop the bridge erases and closes nothing |
+| R2-P1-rw-04 | low | fixed `5b55ff86` | the quiesce and re-arm of a reassembly follow the topology the bridge serves |
+| R2-P1-rw-05 | low | fixed `8d041204` | an arm that waited for an expired fail-safe's rollback arms nothing when that rollback ended its own session; phase 2: a PASE session established between the rollback's PASE close and its end is refused although it survived |
+| R2-P1-rw-06 | low | fixed `36f70a1f` in part; phase 2 | CommissioningComplete reads both markers before it clears either and writes back a cleared one; the settings port has no call that writes two keys at once, so one in-between state remains and is pinned by a test |
+| R2-P1-rw-07 | note | phase 4 | a restored subscription is admitted priming and gets no priming abort; what the reference does was not read |
+| R2-P1-rw-08 | low | fixed `3be12e66` | the re-entry deadlock tests are bounded by the test's own deadline |
+
+Two states of the pending-NOC marker that its last author found by reading
+and did not exercise are held back until their fix merges (owner decision
+25; phase 2): 12 rows are held back in all.
+
+**For phase 2.** Three rounds changed the pending-NOC marker in turn
+(R2-P1-core-01, its residuals, R2-P1-dr-sec-01 to -04, R2-P1-rw-01, -02,
+-06), and each change opened something. Phase 2
+(flows: commissioning and fail-safe, persistence and crash consistency)
+reads the mechanism as a whole against `BD-Matter-PendingNOCMarker` and
+puts the alternative to the owner: keep an uncommitted fabric in memory
+until CommissioningComplete, as both references do, instead of writing it
+at once and rolling it back from a marker.
+
