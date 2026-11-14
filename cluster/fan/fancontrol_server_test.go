@@ -545,6 +545,49 @@ func TestStepAdvancesTheDataVersionOnlyOnAChange(t *testing.T) {
 	}
 }
 
+// TestWriteAdvancesTheDataVersionOnlyOnAChange: a write that leaves every
+// attribute as it was — a setting written over itself, a null
+// PercentSetting or SpeedSetting, which "shall NOT change" the value —
+// leaves the DataVersion; a write that changed the fan advances it once,
+// as Step does. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1481 at db021da0 (#noteIfChanged returns for an equal value; the
+// version advances only when the commit changed something).
+func TestWriteAdvancesTheDataVersionOnlyOnAChange(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	d := &device{st: fandef.State{
+		FanMode: fan.FanModeHigh, SpeedSetting: u8(10), PercentSetting: u8(100),
+		RockSetting: fan.RockLeftRight, WindSetting: fan.WindNatural, AirflowDirection: fan.AirflowReverse,
+	}}
+	srv := newFull(t, d)
+	for _, w := range []struct {
+		name string
+		attr uint32
+		v    any
+		want uint32
+	}{
+		{"PercentSetting 100 over 100", fan.AttrPercentSetting, uint64(100), 0},
+		{"PercentSetting null", fan.AttrPercentSetting, nil, 0},
+		{"SpeedSetting 10 over 10", fan.AttrSpeedSetting, uint64(10), 0},
+		{"SpeedSetting null", fan.AttrSpeedSetting, nil, 0},
+		{"FanMode High over High", fan.AttrFanMode, uint64(fan.FanModeHigh), 0},
+		{"RockSetting over itself", fan.AttrRockSetting, uint64(fan.RockLeftRight), 0},
+		{"WindSetting over itself", fan.AttrWindSetting, uint64(fan.WindNatural), 0},
+		{"AirflowDirection over itself", fan.AttrAirflowDirection, uint64(fan.AirflowReverse), 0},
+		{"SpeedSetting 5 over 10", fan.AttrSpeedSetting, uint64(5), 1},
+		{"RockSetting UpDown over LeftRight", fan.AttrRockSetting, uint64(fan.RockUpDown), 1},
+	} {
+		before := srv.MatterDataVersion()
+		if err := srv.MatterWrite(ctx, w.attr, w.v); err != nil {
+			t.Fatalf("%s: %v", w.name, err)
+		}
+		if got := srv.MatterDataVersion() - before; got != w.want {
+			t.Errorf("%s moved the DataVersion by %d, want %d", w.name, got, w.want)
+		}
+	}
+}
+
 func step(dir uint8, wrap, lowestOff bool) clusterwire.FanStepRequest {
 	return clusterwire.FanStepRequest{Direction: dir, Wrap: wrap, LowestOff: lowestOff}
 }

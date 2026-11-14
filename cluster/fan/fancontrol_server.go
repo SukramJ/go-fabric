@@ -444,8 +444,12 @@ func nullableCapped(v *uint8, ceiling uint8) (any, bool) {
 // served, writable, the type, "max 100", "max speedMax", the defined bits
 // of RockBitmap / WindBitmap, the AirflowDirectionEnum values; the rules
 // beyond it (FanMode's deprecated values and sequence, the Support masks,
-// the coupling) are the server's.
+// the coupling) are the server's. The DataVersion advances once when the
+// fan the host reports differs from before the write, as after a Step
+// ([Server.bumpIfChanged]): a value written over itself and a null
+// PercentSetting or SpeedSetting leave it.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	before := s.src.FanState()
 	var err error
 	if attrID == AttrFanMode {
 		err = s.writeFanMode(ctx, value)
@@ -455,7 +459,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
-	s.tracker().Bump()
+	s.bumpIfChanged(before)
 	return nil
 }
 
@@ -699,10 +703,10 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 }
 
 // bumpIfChanged advances the DataVersion when the fan the host reports
-// differs from before: a Step that left the fan as it was changes no
-// attribute. Mirrors matter.js
+// differs from before: a Step or a write that left the fan as it was
+// changes no attribute. Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
-// :1476-1480 at db021da0 (#noteIfChanged returns for an equal value; the
+// :1476-1481 at db021da0 (#noteIfChanged returns for an equal value; the
 // version advances only when the commit changed something).
 func (s *Server) bumpIfChanged(before fanState) {
 	if !sameFanState(before, s.src.FanState()) {
