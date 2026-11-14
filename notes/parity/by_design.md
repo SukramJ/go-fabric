@@ -165,6 +165,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-Camera-FabricRemovalEndsStreams | `WebRtcTransportProviderServer.ts:14` and `PushAvStreamTransportServer.ts:14` at `db021da0` are empty subclasses (absence: the class lines), and `WebRtcTransportRequestorServer.ts:42-183` reacts to no fabric's deletion (absence: the whole class body); the node strips a removed fabric's entries from the three fabric-sensitive lists (`FabricScopedDataHandler.ts:41-73`, on `fabrics.events.deleting`, `ServerEnvironment.ts:188-195`) and tells no stream | `packages/node/src/behaviors/web-rtc-transport-provider/WebRtcTransportProviderServer.ts`<br>`packages/node/src/behaviors/push-av-stream-transport/PushAvStreamTransportServer.ts`<br>`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts` | `"export class WebRtcTransportProviderServer extends WebRtcTransportProviderBehavior {}"`<br>`"export class PushAvStreamTransportServer extends PushAvStreamTransportBehavior {}"`<br>`class WebRtcTransportRequestorServer` | this module's own rule (review II, R2-P2-fabric-04): a removed fabric's WebRTC sessions and push transports end through the host's ports, a session with the end reason UnknownReason (12), a value chosen because no reference names one. connectedhomeip at `6170af84`: a search of its three servers' directories finds no fabric-removal handler; an application's delegate was not read (unverified) | no |
 | BD-Matter-OTARequestor-BDXSizeCap | `OtaSoftwareUpdateRequestorServer.ts:971-977` at `db021da0`: the BDX receiver is built from the two designators, the driver mode and the block size, with no size limit among its options (presence: the whole call), and a transfer that fails is tried up to three times whatever the failure (`:965`, `:991-1004`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"                const bdx = BdxClient.asReceiver(messenger, {\n                    transferFileDesignator: fileDesignator, // We need to use the original designator here for transfer\n                    fileDesignator: await this.getDownloadLocation(), // But we store in a different location\n                    preferredDriverModes: [Flow.DriverMode.ReceiverDrive],\n                    maxBlockSize:\n                        messenger.channel.type === \"tcp\" ? OTA_BDX_MAX_BLOCK_SIZE_TCP : OTA_BDX_MAX_BLOCK_SIZE_NON_TCP,\n                });"` | this module's own rule (review II, rework of R2-P2-ctl): a BDX download takes at most 256 MiB, the default of the HTTPS path's cap; the block beyond is refused with LengthTooLarge and the transfer is not tried again. connectedhomeip was not read (unverified) | no |
 | BD-Matter-Controller-UnsecuredSessionOneHandshake | `SecureChannelProtocol.ts:146-148` at `db021da0`: every Sigma1 that opens an exchange is handed to the CASE server (presence), which starts a handshake for it without a look at what its session already carries (`CaseServer.ts:61-64`); the PASE server ignores a new exchange while a pairing is in progress (`PaseServer.ts:80-86`) | `packages/protocol/src/securechannel/SecureChannelProtocol.ts` | `"            case SecureMessageType.Sigma1:\n                await this.#caseCommissioner.onNewExchange(exchange);"` | this module's own rule (review II, R2-P2-dr-ctl-04, owner decision 45): a session an unauthenticated peer opened on the controller holds one exchange that a Sigma1 opened, and a further one is acknowledged and dropped while it runs — the device side's rule for a second PASE handshake. connectedhomeip was not read (unverified) | no |
+| BD-Matter-UnsecuredWindowExchangesBounded | `ExchangeManager.ts:579-582` at `db021da0`: the bound on a session's open exchanges — 30, the least recently active one closed beyond it (`:63`, `:583-595`) — leaves out a session that is not secure (presence), and an exchange is opened for every initiator message, not a duplicate, whose exchange id the session does not hold (`:478-492`) | `packages/protocol/src/protocol/ExchangeManager.ts` | `"            // PASE/CASE exchanges are not relevant for this limit\n            return;"` | this module's own rule (review II, R2-P2-rr-dev-02): on the device the duplicate-detection window of an unsecured source is bound to at most 4 exchanges of that source, a number chosen without a source; the message that names a further exchange is handled and its exchange is not bound. connectedhomeip at `6170af84` sizes one pool of 16 exchange contexts for the whole node (`src/lib/core/CHIPConfig.h:303-305`, `src/messaging/ExchangeMgr.h:253`); a bound per unauthenticated peer was not looked for there (unverified) | no |
 
 ---
 
@@ -7915,6 +7916,73 @@ R2-P2-dr-ctl-04, owner decision 45. Pinned by
 in `docs/guides/limits.md`. Register row above; the row closes when matter.js
 bounds the handshakes one unsecured session carries.
 
+### BD-Matter-UnsecuredWindowExchangesBounded — the duplicate-detection window of an unsecured source on the device is bound to at most four exchanges
+
+matter.js keeps the reception state of unsecured traffic in the unsecured
+session of the initiator node id a message names
+(`packages/protocol/src/session/UnsecuredSession.ts:37`,
+`packages/protocol/src/protocol/ExchangeManager.ts:308-312` at `db021da0`),
+and a session created for an inbound message lives on only while it has an
+open exchange (`ExchangeManager.ts:245-256`;
+`packages/protocol/src/session/Session.ts:381-383`). It opens an exchange for
+every initiator message, not a duplicate, whose exchange id the session does
+not hold (`ExchangeManager.ts:478-492`), and for any other new message that
+asks for an acknowledgement, until that is sent (`:496-503`). The session's
+open exchanges are one map (`:551-566`), and the bound matter.js puts on that
+map — 30 exchanges, the least recently active one closed beyond it (`:63`,
+`:583-595`) — leaves out a session that is not secure (`:579-582`, "PASE/CASE
+exchanges are not relevant for this limit"). Nothing at these lines bounds the
+exchanges one unsecured session holds; the search went no further than
+`ExchangeManager.ts` and `UnsecuredSession.ts` (unverified beyond them).
+
+Here the reception state of an unsecured source is its window in
+`unsecuredWindowTable` (`bridge/receive.go`), with matter.js's lifetime in
+this module's terms: the window is bound to the exchanges of the source's new
+messages and stays while one of them holds handshake state — a reply that
+awaits its acknowledgement, the PASE exchange, a Sigma1 record
+(`unsecuredExchangeLive`). The end of a message drops the exchanges that hold
+none, but not while another message of the source is in dispatch. The set
+holds at most `maxUnsecuredWindowExchanges` = 4 exchanges: the message that
+names a further one is handled as any other, and its exchange is not bound.
+
+The number is this module's choice and has no source in a reference. matter.js
+has none at the lines above, and connectedhomeip's
+`CHIP_CONFIG_MAX_EXCHANGE_CONTEXTS`, 16, sizes the one pool of its exchange
+manager (`src/lib/core/CHIPConfig.h:303-305`,
+`src/messaging/ExchangeMgr.h:253` at `6170af84`) — the whole node's exchanges,
+not one peer's; a bound per unauthenticated peer was not looked for there
+(unverified). The reasoning the fix chose it with: a handshake, PASE or CASE,
+runs on one exchange of its source, and 4 leaves room for a handshake retried
+on a new exchange while the earlier reply still awaits its acknowledgement. 4
+is also the value of this package's caps per session
+(`maxChunkWaitsPerSession` in `bridge/chunk_waits.go`,
+`maxChunkedWritesPerSession` in `bridge/exchange_routing.go`), which is the
+number's shape, not its source.
+
+Who reaches the bound: a source node id — the sender's unauthenticated choice,
+as the exchange id is — whose new message names a fifth exchange while four
+are bound: four that hold handshake state, or exchanges named while another
+message of the source is still in dispatch. What a legitimate commissioner
+sees at it: nothing while the exchange of its handshake is one of the four,
+and one handshake needs one exchange. A handshake on a fifth exchange is
+served too, but the window does not stay for it: once none of the four holds
+handshake state and no message of the source is in dispatch the window goes, a
+retransmission of that handshake arriving afterwards is no duplicate at the
+window and reaches the handshake handler, and the handler's own state-replay
+guard is then what stands against it (`bridge/securechannel.go`, the rule past
+`maxUnsecuredWindows` as well); the exchange's next new message binds it once
+the set has room. That path was read in the code, not run: no test drives a
+handshake on an exchange left unbound, and how the guard answers each
+handshake message there was not traced (unverified). Whether a commissioner in
+the field holds more than four handshake exchanges under one source node id at
+a time was not measured (unverified). Reason: the set is state a peer makes
+the device hold, and read with every message of that source, before it has
+authenticated; the bound on the windows (`maxUnsecuredWindows`) bounds that
+state only when a window's own set is bounded too. Review II, R2-P2-rr-dev-02.
+Pinned by `bridge:TestUnsecuredWindowExchangesAreBounded`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds the exchanges an unsecured session holds.
+
 ### BD-Matter-UnauthenticatedIntervalsClamped — the MRP intervals an unauthenticated peer states time a handshake with at most one hour each, on the controller and on the device
 
 matter.js bounds the intervals it advertises at one hour and says of the
@@ -8376,7 +8444,7 @@ hands an index out again only once its counter has wrapped past 254
 connectedhomeip. No test pins the kept index after a removal (none was found;
 unverified).
 
-### BD-Matter-SessionRolloverClose — a secure session is closed 100 000 messages before its counter runs out, on the device after a flush of its subscriptions, and on the controller
+### BD-Matter-SessionRolloverClose — a secure session is closed 100 000 messages before its counter runs out, on the device after a flush of its subscriptions, and on the controller once its exchanges in flight have ended
 
 matter.js winds a secure session down before its message counter rolls over:
 the counter calls the session's handler when it reaches its maximum less
@@ -8396,19 +8464,42 @@ that constant (`rolloverInfoDifference`, `secure/channel/session.go`):
 session's subscriptions owe (`subscription.Manager.FlushSession`), tells the
 peer with a CloseSession and closes the session through the registry, on a
 goroutine of its own (`endSessionAtRollover`, `bridge/reply.go`). The client
-stack asks `RolloverDue` when it seals a message and closes its session with a
-CloseSession on a goroutine of its manager, so the next interaction
-establishes a new one (`endSessionAtRollover`, `client/exchange/manager.go`).
-The two differences this entry recorded at `114dee6d` — no flush before the
-close, and the device side only — are closed (review II, R2-P2-dr-req-07,
-R2-P2-ctr-08). What is left is form, not a decision: a goroutine where
-matter.js starts a timer, and no flush in the client stack's close — whether a
-peer can hold a subscription on a session of the client stack was not traced
-(unverified). connectedhomeip was not read (unverified). Review II,
+stack asks `RolloverDue` when it seals a message and winds its session down as
+matter.js does: the session turns closing (`Session.IsClosing` in
+`client/exchange/session.go`; matter.js `Session.ts:190-191`), so an exchange
+the peer opens on it is declined (`ExchangeManager.ts:441-444`) and the peer
+set gives it no new interaction — the next one establishes a new session — and
+the close waits for the exchanges in flight, the one whose send consumed the
+counter included. When the last of them has ended the CloseSession goes out,
+on a goroutine of the manager, and the session closes (`endSessionAtRollover`
+in `client/exchange/manager.go`, `deferClose` and `closeIfDeferred` in
+`client/exchange/session.go`). That is matter.js's deferral: `initiateClose`
+sets `deferredClose` while the session has active exchanges
+(`NodeSession.ts:367-376`) and returns without closing (`Session.ts:315-317`),
+and the close runs when the last exchange has closed
+(`NodeSession.ts:384-391`); no timer bounds the wait at these lines, and none
+does here — an exchange ends by its MRP retransmission limit, its receive
+timeout or its caller's context. The two roles differ in this. matter.js has
+one class for a secure session in either role (`NodeSession.create` takes
+`isInitiator`, `NodeSession.ts:73-74`, `:88-89`), so its deferral holds on a
+device as well; this module's device closes at once after its flush and its
+CloseSession and does not wait for the session's exchanges in flight
+(`bridge/reply.go`). What that costs was not traced: whether a reliable reply
+that still waits for its acknowledgement is lost with the session, and whether
+another exchange in flight on it ends unanswered (unverified). The difference
+is recorded, not decided (review II, R2-P2-rr-ctl-02). The two differences
+this entry recorded at `114dee6d` — no flush before the close, and the device
+side only — are closed (review II, R2-P2-dr-req-07, R2-P2-ctr-08), and the
+controller's close no longer ends its exchanges in flight (R2-P2-rr-ctl-02).
+What is left besides the device's close is form, not a decision: a goroutine
+where matter.js starts a timer, and no flush in the client stack's close —
+whether a peer can hold a subscription on a session of the client stack was
+not traced (unverified). connectedhomeip was not read (unverified). Review II,
 R2-P2-ctr-08. Pinned by
 `bridge:TestSecureSessionClosedWhenItsCounterNearsExhaustion`,
 `TestRolloverCloseFlushesTheSessionsSubscriptions`,
-`client/exchange:TestSessionClosedWhenItsCounterNearsExhaustion` and
+`client/exchange:TestSessionClosedWhenItsCounterNearsExhaustion`,
+`TestRolloverCloseWaitsForTheExchangesInFlight` and
 `secure/channel:TestRolloverDueOnceNearExhaustion`. Phase 4 of review II
 decides whether the entry leaves the list of divergences.
 
