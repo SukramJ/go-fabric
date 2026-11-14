@@ -296,10 +296,19 @@ func (c *connection) launch(q queued) {
 		case c.abortCtx.Err() == nil && dev.ctx.Err() == nil:
 			c.classify(q, dev, err)
 		}
+		// The attempt is decided: it holds the responder no longer, and the
+		// next address may start.
+		st.settled = true
+		if holds {
+			c.holding--
+		}
+		c.schedule() //nolint:contextcheck // every attempt derives its context from abortCtx
 		if loser != nil {
-			// The losing session is given up before the attempt settles,
-			// so a run without a winner, which waits for every attempt,
-			// returns only once its devices are free (review II).
+			// The losing session is given up beside the next address — its
+			// device was dropped, so that address is another device's —
+			// and before the attempt stops counting as pending, so a run
+			// without a winner, which waits for every attempt, returns only
+			// once its devices are free (review II).
 			c.mu.Unlock()
 			if c.cfg.giveUp != nil {
 				c.cfg.giveUp(loser, loserCause)
@@ -309,11 +318,6 @@ func (c *connection) launch(q queued) {
 			c.mu.Lock()
 		}
 		c.pending--
-		st.settled = true
-		if holds {
-			c.holding--
-		}
-		c.schedule() //nolint:contextcheck // every attempt derives its context from abortCtx
 		c.mu.Unlock()
 		select {
 		case c.changed <- struct{}{}:
