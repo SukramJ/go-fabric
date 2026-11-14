@@ -911,14 +911,18 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		}
 		slices.Sort(out)
 		return out, true
+	// The two command lists read in ascending id order, whatever order the
+	// server lists them in; the server's own slice stays as it is. Mirrors
+	// matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:135-136
+	// at db021da0 (acceptedIds.sort, [...generatedIds].sort, ascending).
 	case cluster.AttrGlobalAcceptedCommandList:
 		if lister, ok := srv.(contract.ClusterCommandLister); ok {
-			return lister.MatterAcceptedCommands(), true
+			return ascending(lister.MatterAcceptedCommands()), true
 		}
 		return []uint32{}, true
 	case cluster.AttrGlobalGeneratedCommandList:
 		if lister, ok := srv.(contract.ClusterCommandLister); ok {
-			return lister.MatterGeneratedCommands(), true
+			return ascending(lister.MatterGeneratedCommands()), true
 		}
 		return []uint32{}, true
 	case cluster.AttrGlobalEventList:
@@ -935,6 +939,14 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		return nil, false
 	}
 	return nil, false
+}
+
+// ascending returns a copy of ids in ascending order — an empty list stays
+// an empty list, not nil.
+func ascending(ids []uint32) []uint32 {
+	out := append(make([]uint32, 0, len(ids)), ids...)
+	slices.Sort(out)
+	return out
 }
 
 // attributeListed reports whether attrID is one of the attributes srv

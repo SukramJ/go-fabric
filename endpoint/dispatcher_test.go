@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -1527,5 +1528,37 @@ func TestInvokeUnsupportedCommandMapsTo0x81(t *testing.T) {
 		if r.Status != im.StatusUnsupportedCommand {
 			t.Errorf("%s: status = %v, want StatusUnsupportedCommand (0x81)", name, r.Status)
 		}
+	}
+}
+
+// unsortedCommands is a host's own server that lists its commands out of
+// id order.
+type unsortedCommands struct{ dtServer }
+
+func (unsortedCommands) MatterGeneratedCommands() []uint32 { return []uint32{0x0B, 0x01, 0x05} }
+
+// TestCommandListsReadAscending: AcceptedCommandList and
+// GeneratedCommandList read in ascending id order whatever order the
+// server lists them in, and the server's own slice is left as it is.
+// Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:135-136 at
+// db021da0 (acceptedIds.sort, [...generatedIds].sort, ascending).
+func TestCommandListsReadAscending(t *testing.T) {
+	t.Parallel()
+	own := []uint32{0x40, 0x00, 0x02}
+	srv := unsortedCommands{dtServer{id: 0x0008, cmds: own}}
+	for attr, want := range map[uint32][]uint32{
+		cluster.AttrGlobalAcceptedCommandList:  {0x00, 0x02, 0x40},
+		cluster.AttrGlobalGeneratedCommandList: {0x01, 0x05, 0x0B},
+	} {
+		if got, ok := synthesizeGlobalRead(srv, attr); !ok || !slices.Equal(got.([]uint32), want) {
+			t.Errorf("0x%04X reads %v, want %v", attr, got, want)
+		}
+		if got := GlobalList(srv, attr); !slices.Equal(got, want) {
+			t.Errorf("GlobalList 0x%04X = %v, want %v", attr, got, want)
+		}
+	}
+	if !slices.Equal(own, []uint32{0x40, 0x00, 0x02}) {
+		t.Errorf("the server's own list was reordered: %v", own)
 	}
 }
