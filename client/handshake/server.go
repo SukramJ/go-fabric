@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -196,6 +197,39 @@ func (c *CASEServer) remember(random [sigma.RandomSize]byte) {
 		c.seenOrder = append(c.seenOrder, random)
 	}
 	c.seen[random] = now
+}
+
+// forget drops random from the remembered randoms: its handshake ended
+// before its first answer reached the wire ([CASEServer.sendAnswer]), so
+// the initiator's retransmission of the Sigma1 is not a copy but the only
+// way that handshake can go on (review II, R2-P3-dr-ctl-06).
+func (c *CASEServer) forget(random [sigma.RandomSize]byte) {
+	c.seenMu.Lock()
+	defer c.seenMu.Unlock()
+	if _, ok := c.seen[random]; !ok {
+		return
+	}
+	delete(c.seen, random)
+	if i := slices.Index(c.seenOrder, random); i >= 0 {
+		c.seenOrder = slices.Delete(c.seenOrder, i, i+1)
+	}
+}
+
+// sendAnswer sends the handshake's first answer to the Sigma1 with random,
+// Sigma2 or Sigma2_Resume. A send whose first transmission the socket
+// refused put nothing on the wire — the exchange returns
+// [exchange.ErrNetwork] for that transmission only and logs a refused
+// retransmission (client/exchange/exchange.go Send, transmitLocked and
+// retransmit) — so the Sigma1 is forgotten: the initiator's MRP
+// retransmission of it, on a new unsecured session once this one closed,
+// starts the handshake again. A Sigma2 that left and was not
+// acknowledged keeps the Sigma1 remembered, as a copy of it would.
+func (c *CASEServer) sendAnswer(ctx context.Context, x *exchange.Exchange, random [sigma.RandomSize]byte, opcode uint8, payload []byte) error {
+	err := x.Send(ctx, opcode, payload, exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime})
+	if errors.Is(err, exchange.ErrNetwork) {
+		c.forget(random)
+	}
+	return err
 }
 
 // Register installs the responder as the manager's Secure Channel handler,
@@ -413,7 +447,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		return fmt.Errorf("%w: resumption record of an unknown fabric", ErrUnexpectedData)
 	}
 	fabric := fabrics.chosen
-	if err := x.Send(ctx, mrp.SCOpcodeSigma2Resume, sigma.MarshalSigma2Resume(*result.Sigma2Resume), exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime}); err != nil {
+	if err := c.sendAnswer(ctx, x, sigma1.InitiatorRandom, mrp.SCOpcodeSigma2Resume, sigma.MarshalSigma2Resume(*result.Sigma2Resume)); err != nil {
 		return err
 	}
 	keys := result.ResumeKeys
@@ -457,7 +491,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 // session: matter.js keeps it (:316-332), a divergence the report names.
 func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *sigma.Responder, fabrics *responderFabrics, sigma1 sigma.Sigma1, result sigma.Sigma1ProcessResult) error {
 	fabric := fabrics.chosen
-	if err := x.Send(ctx, mrp.SCOpcodeSigma2, result.Sigma2.Marshal(), exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime}); err != nil {
+	if err := c.sendAnswer(ctx, x, sigma1.InitiatorRandom, mrp.SCOpcodeSigma2, result.Sigma2.Marshal()); err != nil {
 		return err
 	}
 	msg, err := nextMessage(ctx, x, mrp.SCOpcodeSigma3, ExpectedCryptoProcessingTime)

@@ -105,3 +105,26 @@ func TestCASEServerRemembersAtMostTheLimit(t *testing.T) {
 		t.Fatal("the latest random was accepted")
 	}
 }
+
+// TestCASEServerForgetKeepsTheMemoryInOrder: a random forgotten because
+// its handshake's first answer never left is accepted again at once, and
+// the order the bounds evict by keeps one entry per remembered random.
+func TestCASEServerForgetKeepsTheMemoryInOrder(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_000_000, 0))
+	c := newSigma1Memory(t, clk)
+	for i := range 3 {
+		started(t, c, randomOf(i))
+	}
+	c.forget(randomOf(1))
+	if seen, order := c.sigma1Remembered(); seen != 2 || order != 2 {
+		t.Fatalf("after one of 3 randoms was forgotten the memory holds %d (%d in order), want 2", seen, order)
+	}
+	started(t, c, randomOf(1))
+	if seen, order := c.sigma1Remembered(); seen != 3 || order != 3 {
+		t.Fatalf("after the forgotten random started again the memory holds %d (%d in order), want 3", seen, order)
+	}
+	if c.claim(randomOf(0)) || c.claim(randomOf(2)) {
+		t.Fatal("a random that was not forgotten was accepted")
+	}
+}

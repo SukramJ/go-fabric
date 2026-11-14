@@ -5,7 +5,9 @@ package handshake_test
 
 import (
 	"context"
+	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -146,5 +148,30 @@ func TestCASEServerCompletesAHandshakeWhileASigma1IsRepeated(t *testing.T) {
 	defer cancel()
 	if _, _, err := handshake.CASE(ctx, r.nodeMgr, relay.LocalAddr().(*net.UDPAddr), r.nodeFabric, controllerNodeID, handshake.CASEOptions{}); err != nil {
 		t.Fatalf("the node's CASE to the controller failed while a Sigma1 was repeated: %v", err)
+	}
+}
+
+// TestCASEServerAnswersASigma1WhoseAnswerNeverLeft: a Sigma1 whose Sigma2
+// the socket refused left nothing on the wire, so the node's retransmission
+// of that Sigma1 — which arrives on a new unsecured session once the
+// responder closed the one the handshake ran on — starts the handshake
+// again, and the node's CASE completes.
+func TestCASEServerAnswersASigma1WhoseAnswerNeverLeft(t *testing.T) {
+	t.Parallel()
+	r := newResponderRig(t)
+	var refused atomic.Bool
+	r.serverRec.setRefuse(func(d []byte) error {
+		if op, _, ok := unsecuredMessage(d); ok && op == mrp.SCOpcodeSigma2 && refused.CompareAndSwap(false, true) {
+			return errors.New("send refused by the socket")
+		}
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	if _, _, err := r.open(ctx, r.nodeFabric); err != nil {
+		t.Fatalf("the node's CASE after the controller's first Sigma2 was refused by its socket: %v", err)
+	}
+	if !refused.Load() {
+		t.Fatal("no Sigma2 was refused: the test did not run the path it names")
 	}
 }
