@@ -204,12 +204,12 @@ func TestBasicInfo_OptionalAttributesAbsentWhenUnset(t *testing.T) {
 	// Config field is empty/zero — except SerialNumber, which
 	// always returns a value (when no SerialNumber is configured,
 	// the UniqueID-derived fallback is served so Apple's HAP-mapper
-	// cache is pre-populated).
+	// cache is pre-populated), and ProductLabel, which defaults to the
+	// ProductName as matter.js's (TestParityMatterJS_BasicInfoServer_InitializeDefaults).
 	optionalIDs := []uint32{
 		0x000B, // ManufacturingDate
 		0x000C, // PartNumber
 		0x000D, // ProductURL
-		0x000E, // ProductLabel
 		0x0014, // ProductAppearance
 	}
 	b := newValidBasicInfo(t) // helper builds Config with none of the optional fields set

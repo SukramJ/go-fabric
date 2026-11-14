@@ -306,15 +306,19 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// SoftwareVersionString carry `constraint: "1 to 64"` — empty
 	// strings violate the spec's lower bound. Apple Home's HAP service
 	// mapper enforces the constraint silently and aborts pair after
-	// Subscribe-Initial. Fall back to printable defaults derived from
-	// the numeric versions so the wire output always honours `min 1`.
+	// Subscribe-Initial. The default is the decimal rendering of the
+	// numeric version, one byte even for 0. Mirrors matter.js
+	// packages/node/src/behaviors/basic-information/BasicInformationServer.ts:70
+	// at db021da0 — setDefault("hardwareVersionString",
+	// state.hardwareVersion.toString()).
 	hwStr := cfg.HardwareVersionStr
 	if hwStr == "" {
-		hwStr = fmt.Sprintf("%d.0", cfg.HardwareVersion)
-		if cfg.HardwareVersion == 0 {
-			hwStr = "1.0"
-		}
+		hwStr = strconv.FormatUint(uint64(cfg.HardwareVersion), 10)
 	}
+	// ProductLabel defaults to the ProductName, and is then served. Mirrors
+	// matter.js BasicInformationServer.ts:67 at db021da0 —
+	// setDefault("productLabel", state.productName).
+	productLabel := cmp.Or(cfg.ProductLabel, cfg.ProductName)
 	// SoftwareVersion (0x0009) and SoftwareVersionString (0x000A) must
 	// describe the same release. matter.js holds that invariant by
 	// deriving the string from the numeric value —
@@ -348,7 +352,7 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		vendorID:             cfg.VendorID,
 		productName:          cfg.ProductName,
 		productID:            cfg.ProductID,
-		productLabel:         cfg.ProductLabel,
+		productLabel:         productLabel,
 		productURL:           cfg.ProductURL,
 		productAppearance:    cfg.ProductAppearance,
 		hardwareVersion:      cfg.HardwareVersion,
@@ -374,10 +378,11 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 // instanceOptions declares the optional elements this instance serves:
 // the revision-gated attributes, Reachable (Apple's HMAccessory.Reachable signal depends on it),
 // SerialNumber (served with a UniqueID-derived fallback), the four
-// optional strings and ProductAppearance when the host set them, and the
-// ShutDown, Leave and ReachableChanged events the server emits.
-// LocalConfigDisabled is not listed — matter.js's bridge sample does not
-// emit it — though a write to it is accepted.
+// optional strings and ProductAppearance when the host set them (ProductLabel
+// defaulted to the ProductName), and the ShutDown, Leave and
+// ReachableChanged events the server emits. LocalConfigDisabled is not
+// listed — matter.js's bridge sample does not emit it — though a write to
+// it is accepted.
 func (b *BasicInformation) instanceOptions() spec.Options {
 	opts := spec.Options{
 		// UniqueID ("Rev >= v4, O"), SpecificationVersion and
