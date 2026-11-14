@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -114,7 +115,9 @@ func (p *primingSource) result() (im.ReadResult, bool) {
 		if !ok {
 			return im.ReadResult{}, false
 		}
-		if !p.allow(rr) {
+		// A path naming another node is refused before any access check
+		// (AttributeReadResponse.ts:205-208 at db021da0).
+		if rr.Status != im.StatusUnsupportedNode && !p.allow(rr) {
 			continue
 		}
 		if rr.Status == im.StatusSuccess {
@@ -354,7 +357,13 @@ func (b *Bridge) registerSubscription(
 			MinIntervalFloor:   req.MinIntervalFloor,
 			MaxIntervalCeiling: req.MaxIntervalCeiling,
 			KeepSubscriptions:  req.KeepSubscriptions,
-			AttributePaths:     req.AttributeRequests,
+			// A path naming this node is kept as one naming no node: a
+			// change notification names none, and the subscription
+			// reports this node's changes for it as its priming report
+			// did (review II, R2-P2-alloc-07). A path naming another
+			// node matches no change, as it selects nothing in the
+			// priming report.
+			AttributePaths: pathsForThisNode(req.AttributeRequests, b.localNodeIDFor(requestHdr.SessionID, fabricIndex)),
 			// EventPaths wiring was missing — without this every
 			// cluster-emitted event (GenericSwitch press, BDBI
 			// ReachableChanged, OperationalCredentials NOCsChanged,
@@ -402,6 +411,26 @@ func (b *Bridge) registerSubscription(
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
 	}
 	return subID, nil
+}
+
+// pathsForThisNode returns paths with the node cleared from each path
+// that names localNodeID — this node on the session's fabric, which is
+// what a path naming no node selects. Returns paths when none does.
+func pathsForThisNode(paths []im.ConcreteAttributePath, localNodeID uint64) []im.ConcreteAttributePath {
+	var out []im.ConcreteAttributePath
+	for i, p := range paths {
+		if !p.HasNode || p.Node != localNodeID {
+			continue
+		}
+		if out == nil {
+			out = slices.Clone(paths)
+		}
+		out[i].HasNode, out[i].Node = false, 0
+	}
+	if out == nil {
+		return paths
+	}
+	return out
 }
 
 // latestEventNumber is the highest number of the events reports carries

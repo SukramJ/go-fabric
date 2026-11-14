@@ -213,6 +213,10 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	readSubjectNodeID, readSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	readCtx := im.WithFabricFilter(ctx, req.FabricFiltered, readFabricIndex)
 	readCtx = im.WithSubject(readCtx, readSubjectNodeID, readSubjectCATs)
+	// A path naming a node is answered for this node's id on the
+	// session's fabric only (review II, R2-P2-alloc-07).
+	readLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, readFabricIndex)
+	readCtx = im.WithLocalNodeID(readCtx, readLocalNodeID)
 	readPASE := b.resolveSessionPASE(requestHdr.SessionID)
 	if readPASE {
 		readCtx = im.WithAuthModePASE(readCtx)
@@ -256,7 +260,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 			// One EventFilterIB applies: the first for this node (matter.js
 			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
 			eventReq := req
-			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
+			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, readLocalNodeID)
 			evs := append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
 				im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
 			if len(evs) > 0 {

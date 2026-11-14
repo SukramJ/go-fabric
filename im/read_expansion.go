@@ -35,7 +35,9 @@ type EndpointExpander interface {
 // calls of [AttributeExpansion.Next] is the deduplicated path list, where
 // it is in it, and the results of the current endpoint (or, without an
 // [EndpointExpander], of the current path) not yet taken. A path's
-// WildcardPathFlags are applied as [ApplyWildcardPathFlags] does.
+// WildcardPathFlags are applied as [ApplyWildcardPathFlags] does. When ctx
+// carries this node's id ([WithLocalNodeID]), a path naming another node
+// selects nothing, or, a concrete one, yields one UnsupportedNode result.
 //
 // Mirrors matter.js packages/protocol/src/action/server/
 // AttributeReadResponse.ts at db021da0: *process (:64) registers one
@@ -51,6 +53,9 @@ type AttributeExpansion struct {
 	paths     []ConcreteAttributePath
 	nextPath  int
 	ascending bool
+
+	localNodeID    uint64
+	hasLocalNodeID bool
 
 	path         ConcreteAttributePath
 	flags        uint32
@@ -71,6 +76,7 @@ func NewAttributeExpansion(ctx context.Context, d Dispatcher, paths []ConcreteAt
 		qualities: elementQualitiesFrom(ctx),
 	}
 	e.expander, _ = d.(EndpointExpander)
+	e.localNodeID, e.hasLocalNodeID = LocalNodeIDFromContext(ctx)
 	return e
 }
 
@@ -120,6 +126,19 @@ func (e *AttributeExpansion) fill() bool {
 		}
 		e.path = e.paths[e.nextPath]
 		e.nextPath++
+		if e.path.HasNode && e.hasLocalNodeID && e.path.Node != e.localNodeID {
+			// A path naming another node: a concrete one is answered
+			// UnsupportedNode before any access check, a wildcard one
+			// selects nothing here. Mirrors matter.js
+			// AttributeReadResponse.ts:205-208 (addConcrete) and
+			// :160-162 (addWildcard) at db021da0.
+			if e.path.HasEndpoint && e.path.HasCluster && e.path.HasAttribute {
+				e.flags = 0
+				e.setBatch([]ReadResult{{Path: e.path, Status: StatusUnsupportedNode}})
+				return true
+			}
+			continue
+		}
 		e.flags = effectiveWildcardPathFlags(e.ctx, e.d, e.path)
 		if !e.path.HasEndpoint && e.expander != nil {
 			// No endpoint to visit: Read answers the path whole (an
@@ -230,6 +249,13 @@ func (r *ReadReports) report(path ConcreteAttributePath, res ReadResult) (rep At
 	// authorized paths). Mirrors matter.js AttributeReadResponse.ts
 	// addConcrete (error status) vs readAttributeForWildcard (omit).
 	concretePath := path.HasEndpoint && path.HasCluster && path.HasAttribute
+
+	// A path naming another node is refused before any access check
+	// (AttributeReadResponse.ts:205-208); only the expansion answers
+	// UnsupportedNode, no dispatcher does.
+	if res.Status == StatusUnsupportedNode {
+		return AttributeReport{Path: res.Path, IsStatus: true, Status: StatusIB{Status: res.Status}}, true
+	}
 
 	// Per-RESULT ACL check at the RESOLVED concrete (endpoint, cluster)
 	// using the resolved attribute's read privilege — run for EVERY

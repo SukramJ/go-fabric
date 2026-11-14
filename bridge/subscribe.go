@@ -1440,6 +1440,10 @@ func (b *Bridge) subscribeWith(
 	subSubjectNodeID, subSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	subCtx := im.WithFabricFilter(ctx, req.FabricFiltered, subFabricIndex)
 	subCtx = im.WithSubject(subCtx, subSubjectNodeID, subSubjectCATs)
+	// A path naming a node is answered for this node's id on the
+	// session's fabric only (review II, R2-P2-alloc-07).
+	subLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, subFabricIndex)
+	subCtx = im.WithLocalNodeID(subCtx, subLocalNodeID)
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
@@ -1500,7 +1504,7 @@ func (b *Bridge) subscribeWith(
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
 	primingReq := req
-	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, subFabricIndex))
+	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, subLocalNodeID)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
