@@ -44,7 +44,7 @@ func TestGencomm_PASESessionIsCoveredOrClosed(t *testing.T) {
 		release := make(chan struct{})
 		gc.SetOnFailSafeRolledBack(func(context.Context) {
 			mu.Lock()
-			var ids []int
+			ids := make([]int, 0, len(open))
 			for id := range open {
 				ids = append(ids, id)
 			}
