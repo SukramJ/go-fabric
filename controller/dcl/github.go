@@ -25,7 +25,10 @@ type GitHubConfig struct {
 	// CertPath is the directory of the PAA .der files, CDSignerCertPath
 	// that of the CD signers.
 	CertPath, CDSignerCertPath string
-	// Timeout bounds each request; 0 is none, as matter.js's GitHub client
+	// Timeout bounds each request; 0 is [DefaultTimeout], the ledger's
+	// bound, so a server that never answers cannot hold an update — or
+	// [OpenCertificateStore], which runs the first one (review II,
+	// R2-P3-net-07); a negative value is none, as matter.js's GitHub client
 	// without a timeout option (packages/general/src/util/Github.ts:131-133).
 	Timeout time.Duration
 }
@@ -179,9 +182,12 @@ func (d *githubDir) find(ctx context.Context, name string) (githubEntry, error) 
 // fetch is Directory.doFetch (Github.ts:120-141): Accept
 // application/vnd.github.raw, any status but 200 an HTTP error.
 func (d *githubDir) fetch(ctx context.Context, url string) ([]byte, error) {
-	if d.g.cfg.Timeout > 0 {
+	if timeout := d.g.cfg.Timeout; timeout >= 0 {
+		if timeout == 0 {
+			timeout = DefaultTimeout
+		}
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, d.g.cfg.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
