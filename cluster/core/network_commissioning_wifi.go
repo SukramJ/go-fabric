@@ -319,7 +319,9 @@ const (
 // wifiRejoinMaxDelay) until one succeeds or ctx ends, each attempt
 // recorded as the first — as is the rejoin a fail-safe expiry or a
 // CommissioningComplete starts when the link is on no committed network.
-// An attempt waits while a fail-safe is armed or a command runs. chip
+// An attempt waits while a fail-safe is armed or a command runs, and holds
+// the driver alone while it runs, the first at Start included: a command
+// answers Busy then, and a fail-safe expiry does not release it. chip
 // leaves the reconnect to wpa_supplicant, which holds the network it
 // saved (CommitConfig, :1118-1135 of
 // ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp); this
@@ -334,11 +336,11 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 		return
 	}
 	target := w.committed[0]
-	w.rejoining = true
+	w.busy, w.rejoining = true, true
 	w.mu.Unlock()
 	ok := w.joinCommitted(ctx, target)
 	w.mu.Lock()
-	w.rejoining = false
+	w.busy, w.rejoining = false, false
 	if !ok {
 		w.backoffLocked()
 	}
@@ -1070,7 +1072,12 @@ func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.stored = nil
 	w.networks = slices.Clone(w.committed)
 	w.markConnectedLocked()
-	w.busy = false
+	if !w.rejoining {
+		// A command's join the expiry abandons (its result is dropped,
+		// connect) frees the driver's turn; a rejoin attempt still holds the
+		// driver and keeps it until it ends (review II, R2-P3-dr-net-05).
+		w.busy = false
+	}
 	if len(w.networks) == 0 {
 		w.lastNetworkID, w.lastConnectErr, w.lastStatus = nil, nil, nil
 	}
