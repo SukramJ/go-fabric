@@ -503,7 +503,7 @@ func (n *Names) evictOverflow() {
 		evicted++
 	}
 	if evicted > 0 {
-		n.logger.Warn("matter.discovery.cache_records_evicted", slog.Int("evicted", evicted),
+		n.logger.Warn("matter.discovery.cache_records_evicted", slog.Int("dropped", evicted),
 			slog.String("reason", "the cache holds at most "+strconv.Itoa(maxCachedRecords)+" records"))
 	}
 }
