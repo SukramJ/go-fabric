@@ -135,8 +135,24 @@ func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad t
 func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	b.mu.Lock()
 	b.subManager = m
+	started, run := b.started, b.runGen
 	b.mu.Unlock()
-	b.rewireMeasurementListeners()
+	// The host's value listeners are rewired onto m only while a run is
+	// live: Stop detached them and keeps the topology, so a rewire on a
+	// stopped bridge would register it with the host's notifiers again;
+	// the next Start's assembly wires them (review II, R2-P2-sess-09,
+	// N-bridge2-4). A Stop that sets in after the wiring detaches what it
+	// finds; one that set in before the wiring was installed missed it,
+	// so it goes again here — as in Reassemble.
+	if started {
+		generation := b.rewireMeasurementListeners()
+		b.mu.RLock()
+		ended := b.runEndedLocked(&run)
+		b.mu.RUnlock()
+		if ended {
+			b.detachListenersOfGeneration(generation)
+		}
+	}
 	if m != nil {
 		// The manager owns subscription lifetime; the bridge owns the
 		// routing state keyed by subscription ID. Without this hook the

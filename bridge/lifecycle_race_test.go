@@ -273,3 +273,39 @@ func TestReassembleStraddlingARestartKeepsTheNewRunsListeners(t *testing.T) {
 		t.Fatalf("%d listeners once the Reassemble of the stopped run returned, want 0", got)
 	}
 }
+
+// TestAttachSubscriptionManagerAfterStopWiresNoHostListeners (review II,
+// R2-P2-sess-09, N-bridge2-4): a subscription manager attached to a
+// stopped bridge is stored and nothing else — the host's notifiers, whose
+// listeners Stop detached, are not wired to the stopped bridge again.
+// Attached to a running bridge, it is wired.
+func TestAttachSubscriptionManagerAfterStopWiresNoHostListeners(t *testing.T) {
+	t.Parallel()
+	snap := newHeldSnapshotter(t, 0)
+	b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+	if got := snap.src.live.Load(); got == 0 {
+		t.Fatal("a manager attached to the running bridge wired no host listener")
+	}
+	if err := b.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := snap.src.live.Load(); got != 0 {
+		t.Fatalf("%d host listeners registered after Stop, want 0", got)
+	}
+
+	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(m)
+	if got := snap.src.live.Load(); got != 0 {
+		t.Fatalf("%d host listeners registered by an attach after Stop, want 0", got)
+	}
+	if b.subscriptionManagerLocked() != m {
+		t.Fatal("the attached manager was not stored")
+	}
+}
