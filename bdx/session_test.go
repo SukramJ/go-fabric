@@ -341,6 +341,27 @@ func TestReceive_LengthMismatch(t *testing.T) {
 	}
 }
 
+// TestReceive_OverrunNotWritten: a block that would take a transfer past
+// its definite length is refused with LengthTooLarge before it reaches
+// the sink (review II, R2-P2-alloc-06).
+func TestReceive_OverrunNotWritten(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	a, b := newPipe(1178)
+	s := newSender(t, b, receiverAccept(u64(2000)), testData(3000))
+	go s.serve(ctx)
+	sink := &memSink{}
+	_, err := bdx.Receive(ctx, bdx.NewMessenger(a, 0), bdx.ReceiveOptions{TransferFileDesignator: bdx.FileDesignator("f"), Sink: sink})
+	expectBdxError(t, err, bdx.StatusLengthTooLarge)
+	if n := sink.buf.Len(); n > 2000 {
+		t.Fatalf("the sink took %d bytes of a 2000-byte transfer", n)
+	}
+	if sink.committed {
+		t.Fatal("the overrun transfer was committed")
+	}
+}
+
 // TestReceive_EmptyBlock mirrors BdxMessenger.readBlock (:198-205).
 func TestReceive_EmptyBlock(t *testing.T) {
 	t.Parallel()

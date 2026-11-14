@@ -286,8 +286,15 @@ func (f *inboundFlow) followingNext(ctx context.Context) (bool, error) {
 
 // write is InboundFlow.writeDataChunk (InboundFlow.ts:72-100): the data
 // goes to the sink, and BlockEof ends the transfer — refused when a definite
-// length was not met exactly.
+// length was not met exactly. A block that would pass a definite length is
+// refused before it reaches the sink: matter.js enqueues it and refuses
+// the transfer only at BlockEof (InboundFlow.ts:78-94 at db021da0), so a
+// sender that never sends BlockEof could fill the sink past the length it
+// announced (review II, R2-P2-alloc-06; ahead of matter.js).
 func (f *inboundFlow) write(data []byte, t MessageType) (bool, error) {
+	if f.bytesLeft != nil && int64(len(data)) > *f.bytesLeft {
+		return false, newError(StatusLengthTooLarge, "Received a block of %dbytes with %dbytes left", len(data), *f.bytesLeft)
+	}
 	if _, err := f.sink.Write(data); err != nil {
 		return false, err
 	}
