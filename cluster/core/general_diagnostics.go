@@ -130,7 +130,7 @@ type GeneralDiagnostics struct {
 	// opSession is the operational time this process counted up to the
 	// checkpoint opLast, both guarded by opMu (taken after mu). Mirrors
 	// matter.js GeneralDiagnosticsServer.ts totalOperationalHoursCounter and
-	// lastTotalOperationalHoursCounterUpdateTime (:384-392, :460): what was
+	// lastTotalOperationalHoursCounterUpdateTime (:459-467 at db021da0): what was
 	// counted stays counted when the clock steps back.
 	opMu      sync.Mutex
 	opSession time.Duration
@@ -463,7 +463,7 @@ func (g *GeneralDiagnostics) def() *spec.Instance {
 // §11.12.4.1); with it a limit of one logs that the feature could be
 // dropped. The owner of both servers calls it when the node comes online.
 // Mirrors matter.js GeneralDiagnosticsServer.ts #assertDataModelTest
-// (:125-143), which #online runs (:352).
+// (:186-204 at db021da0), which #online runs (:414-415).
 func (g *GeneralDiagnostics) CheckDataModelTest(maxPathsPerInvoke uint16, logger *slog.Logger) error {
 	if g.noDataModelTest {
 		if maxPathsPerInvoke > 1 {
@@ -482,7 +482,7 @@ func (g *GeneralDiagnostics) CheckDataModelTest(maxPathsPerInvoke uint16, logger
 // clock step would otherwise lower the operational time below what was
 // persisted (and wrap the uint32 TotalOperationalHours and the uint64
 // SystemTimeMs). Mirrors matter.js GeneralDiagnosticsServer.ts elapsedSince
-// (:60-68).
+// (:87-95 at db021da0).
 func elapsedSince(start, end time.Time) time.Duration {
 	return max(end.Sub(start), 0)
 }
@@ -490,7 +490,7 @@ func elapsedSince(start, end time.Time) time.Duration {
 // operationalSession folds the time elapsed since the last checkpoint into
 // this process's operational time and returns it; call it with mu held.
 // Mirrors matter.js GeneralDiagnosticsServer.ts
-// #updateTotalOperationalHoursCounter (:384-392).
+// #updateTotalOperationalHoursCounter (:459-467 at db021da0).
 func (g *GeneralDiagnostics) operationalSession() time.Duration {
 	g.opMu.Lock()
 	defer g.opMu.Unlock()

@@ -674,7 +674,7 @@ func buildCoreSignedCertForSubject(t *testing.T, pub []byte, isRoot bool, signer
 // whatever AddNOC/UpdateNOC currently holds as the pending key. That
 // makes this fixture correct for exactly one purpose: exercising the
 // NOCStatusInvalidPublicKey rejection path (chip
-// FabricTable.cpp:890 / matter.js Fabric.ts:557-559). Tests that need
+// FabricTable.cpp:890 / matter.js Fabric.ts:614-616 at db021da0). Tests that need
 // a NOC that actually installs must mint over the cluster's real
 // pending key instead — see [commissionTestFabric],
 // [issueCSRPendingPubKey], and [buildCoreSignedCertForPubKey].

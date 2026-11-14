@@ -85,7 +85,7 @@ type OperationalCredentials struct {
 	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
 	// enforce the matter.js csrSessionId !== session.id guard per
 	// Matter §11.18.7.5.5.
-	// Mirrors matter.js OperationalCredentialsServer.ts:243-248.
+	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0.
 	pendingCSRSessionID uint16
 
 	// pendingCSRForUpdate captures `IsForUpdateNOC` from the CSRRequest
@@ -230,7 +230,8 @@ func (o *OperationalCredentials) SetOnAdminEntryInstalled(hook func(entry store.
 // stamps WithInvokeSessionID(ctx, requestHdr.SessionID) on the invoke
 // context before calling the IM dispatcher, so handleCSRRequest and
 // handleAddNOC can enforce the csrSessionId !== session.id binding per
-// Matter §11.18.7.5.5 and matter.js OperationalCredentialsServer.ts:243-248.
+// Matter §11.18.7.5.5 and matter.js OperationalCredentialsServer.ts:240-245
+// at db021da0.
 type invokeSessionCtxKey struct{}
 
 // WithInvokeSessionID returns a derived context carrying the operational
@@ -1156,7 +1157,7 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		// Matter §11.18.5.13: list<octet_string<400>> where each entry is
 		// the full Matter Certificate TLV envelope (the RCAC bytes the
 		// commissioner sent via AddTrustedRootCertificate). Mirrors
-		// matter.js OperationalCredentialsServer.ts:470-472. Apple Home
+		// matter.js OperationalCredentialsServer.ts:471-473 at db021da0. Apple Home
 		// validates every entry as a Matter Certificate TLV and silently
 		// drops the entire Subscribe-Initial ReportData stream on schema
 		// mismatch — see Bug-I memory.
@@ -1171,7 +1172,7 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		// between AddTrustedRootCertificate and AddNOC sees the same view as
 		// matter.js: the installed fabrics' roots, then the pending one.
 		// Mirrors matter.js db021da0 packages/node/src/behaviors/
-		// operational-credentials/OperationalCredentialsServer.ts:470-472
+		// operational-credentials/OperationalCredentialsServer.ts:471-473
 		// (`fabrics.map(fabric => fabric.rootCert)`, then
 		// `push(rootCaCertificate)`).
 		fabrics, err := o.store.ListFabrics(ctx)
@@ -1798,9 +1799,11 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// A CSRRequest requires an armed FailSafe window — the generated CSR is a
 	// FailSafe-scoped ephemeral, so issuing one outside the window leaves
 	// dangling pending state. Mirrors matter.js
-	// OperationalCredentialsServer.ts:118-119 (the `commissioner.failsafeContext`
-	// getter calls assertFailsafeArmed → Status::FailsafeRequired, 0xCA) and
-	// chip operational-credentials-server.cpp CSRRequest failsafe assertion.
+	// OperationalCredentialsServer.ts:131-132 at db021da0 (the
+	// `commissioner.failsafeContext` getter, packages/protocol/src/protocol/
+	// DeviceCommissioner.ts:97-100, calls assertFailsafeArmed →
+	// Status::FailsafeRequired, 0xCA) and chip 6170af84
+	// OperationalCredentialsCluster.cpp:341 (CSRRequest's fail-safe assertion).
 	// A nil accessor is a disarmed fail-safe, as in handleAddNOC /
 	// handleAddTrustedRootCertificate. A window armed for another fabric
 	// is not armed for this one (chip :341, failSafeRequired).
@@ -1852,7 +1855,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 
 	// Store the session ID of this CSRRequest so handleAddNOC can enforce
 	// that AddNOC is issued from the same session per Matter §11.18.7.5.5
-	// (matter.js OperationalCredentialsServer.ts:243-248; chip
+	// (matter.js OperationalCredentialsServer.ts:240-245 at db021da0; chip
 	// operational-credentials-server.cpp CSR failsafe binding).
 	csrSessionID := InvokeSessionIDFromContext(ctx)
 
@@ -2035,7 +2038,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// branch covers below.
 	// Enforce CSR session-ID binding per Matter §11.18.7.5.5 — reject
 	// AddNOC from a session that did not issue the pending CSRRequest.
-	// Mirrors matter.js OperationalCredentialsServer.ts:243-248:
+	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0:
 	//   if (failsafeContext.csrSessionId !== this.context.session.id)
 	//       return { statusCode: MissingCsr, debugText: "CSR not found in failsafe context" }
 	//
@@ -2045,7 +2048,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// a rig without WithInvokeSessionID) binds to none; a CSR issued on a
 	// named session is consumed by that session alone — matter.js compares
 	// the ids strictly (OperationalCredentialsServer.ts:240-245 at
-	// 862ad75f), and a request that names no session does not match one
+	// db021da0), and a request that names no session does not match one
 	// that did (review 2026-11 W3-clusec-04).
 	addNOCSessionID := InvokeSessionIDFromContext(ctx)
 
@@ -2102,7 +2105,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	}
 	// Validate CaseAdminSubject BEFORE anything is persisted, and before
 	// the certificates (matter.js FailsafeContext.ts:236-240, buildFabric).
-	// Mirrors chip OperationalCredentialsCluster.cpp:452-454:
+	// Mirrors chip OperationalCredentialsCluster.cpp:486-487 at 6170af84:
 	//   VerifyOrExit(IsOperationalNodeId(caseAdminSubject) || IsCASEAuthTag(caseAdminSubject),
 	//                nocResponse = kInvalidAdminSubject)
 	// Operational Node IDs: 0x0000_0000_0000_0001 .. 0xFFFF_FFEF_FFFF_FFFF.
@@ -2222,11 +2225,14 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	}
 
 	// Install the IPK as epoch key in GroupKeyManagement KeySetID=0 per
-	// Matter §11.18.6.8.6. chip operational-credentials-server.cpp:484-496
+	// Matter §11.18.6.8.6. chip 6170af84 OperationalCredentialsCluster.cpp:517-529
 	// writes via groupDataProvider.SetKeySet(newFabricIndex, compressed_fabric_id,
 	// keyset{id=0, policy=TrustFirst, num_keys=1, epoch_keys[0].start=0, key=ipk}).
-	// matter.js notes this as a TODO (OperationalCredentialsServer.ts:306-307)
-	// but embeds the IPK in Fabric.create for operational HKDF derivation;
+	// matter.js db021da0 keeps the IPK on the fabric (FailsafeContext.ts:253,
+	// setIdentityProtectionKey) and no key set 0 in its GroupKeyManagement
+	// state, which holds every key set "beside the fabric specific entries of
+	// the groupKeyset 0" (GroupKeyManagementServer.ts:606-610;
+	// keySetReadAllIndices prepends 0, :453);
 	// we match the chip behaviour to populate the GroupKeyManagement table so
 	// KeySetReadAllIndices correctly advertises the IPK slot.
 	ipkRec := store.GroupKeySet{
@@ -2669,8 +2675,9 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 // command fires, in its order — the fabric-removed hook, the mDNS
 // withdraw of the fabric's operational instance, the re-announce of the
 // remaining set. matter.js reaches the same path from the host through
-// Fabric.leave() (packages/protocol/src/fabric/Fabric.ts:423-433), the
-// call the command itself makes (OperationalCredentialsServer.ts:425):
+// Fabric.leave() (packages/protocol/src/fabric/Fabric.ts:447-457 at
+// db021da0), the call the command itself makes
+// (OperationalCredentialsServer.ts:425):
 // the fabric's sessions close with their subscriptions, and the
 // FabricManager's deleting / deleted events fan out to every
 // fabric-scoped holder. A fabric the store does not hold is

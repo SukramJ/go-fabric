@@ -498,7 +498,8 @@ func TestICDManagementInstructionServedOnlyWhenSet(t *testing.T) {
 // at db021da0); the refusal comes when the entry enters the
 // RegisteredClients state (IcdManagementServer.ts:572-583,
 // ListManager.ts:379-386 and :428-432, the enum validator
-// ValueValidator.ts:167-179: Status.ConstraintError).
+// packages/node/src/behavior/state/validation/ValueValidator.ts:167-179:
+// Status.ConstraintError).
 func TestICDRegisterClientHoldsClientTypeToItsEnum(t *testing.T) {
 	t.Parallel()
 	s := newICDServer(t, core.ICDManagementConfig{

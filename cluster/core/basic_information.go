@@ -1108,7 +1108,7 @@ func (b *BasicInformation) EmitStartUp() {
 // EmitShutDown fires the Matter §11.1.8.2 ShutDown event (id 0x0001,
 // priority Critical, no fields). No-op when the emitter has not been
 // wired yet — the daemon calls this in its shutdown hook. Mirrors
-// matter.js basic-information.element.ts:91-95.
+// matter.js basic-information.element.ts:111 at db021da0.
 func (b *BasicInformation) EmitShutDown() {
 	b.mu.RLock()
 	emitter := b.emitter

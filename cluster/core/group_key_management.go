@@ -119,7 +119,7 @@ func (groupKeyExhaustedErr) MatterStatusCode() im.StatusCode { return im.StatusR
 var _ im.StatusCodeError = groupKeyExhaustedErr{}
 
 // GroupKeyMgmtConfig drives [NewGroupKeyManagement]. Defaults mirror
-// matter.js GroupKeyManagementServer.ts:609-610 at 862ad75f
+// matter.js GroupKeyManagementServer.ts:613-614 at db021da0
 // (maxGroupKeysPerFabric = 20, maxGroupsPerFabric = 22). Spec floors
 // per Matter §11.2.4 are maxGroupKeysPerFabric ≥ 3 and
 // maxGroupsPerFabric ≥ 4.
@@ -136,7 +136,7 @@ type GroupKeyMgmtConfig struct {
 	Logger *slog.Logger
 }
 
-// matter.js defaults — see GroupKeyManagementServer.ts:615-616 (the
+// matter.js defaults — see GroupKeyManagementServer.ts:613-614 at db021da0 (the
 // server overrides the schema minimums: maxGroupKeysPerFabric = 20,
 // maxGroupsPerFabric = 22, "aligned with Groupcast quota=floor(44/2)").
 const (
@@ -569,9 +569,9 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// way AccessControl.MatterWrite stamps ACL entries. matter.js injects
 	// the session's fabric into every fabric-scoped struct before the
 	// behaviour sees it (packages/protocol/src/action/server/
-	// AttributeWriteResponse.ts:461-467, overwriting via
-	// packages/types/src/tlv/TlvObject.ts:306-310), and
-	// GroupKeyManagementServer.ts:181-236 #validateGroupKeyMap never
+	// AttributeWriteResponse.ts:466-472, overwriting via
+	// packages/types/src/tlv/TlvObject.ts:309-313), and
+	// GroupKeyManagementServer.ts:170-226 at db021da0 #validateGroupKeyMap never
 	// compares an entry's fabricIndex with the session — so a controller
 	// that omits the field (decoded as 0) or echoes a stale value gets
 	// its write applied, not refused.
@@ -834,7 +834,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	gks := req.GroupKeySet
 
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
-	// GroupKeyManagementServer.ts:280-352. Five validation classes,
+	// GroupKeyManagementServer.ts:291-357 at db021da0. Five validation classes,
 	// every failure is reported as InvalidCommand (a typed
 	// spec.Errorf(im.StatusInvalidCommand, …)):
 	//
@@ -997,7 +997,7 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 		return nil, fmt.Errorf("%w: KeySetRemoveRequest expected, got %T", errGroupKeyMgmtInvalidArg, fields)
 	}
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
-	// GroupKeyManagementServer.ts:405-408 — GroupKeySet 0 is the IPK
+	// GroupKeyManagementServer.ts:414-417 at db021da0 — GroupKeySet 0 is the IPK
 	// (Identity Protection Key) that the bridge needs for CASE; the
 	// spec forbids deleting it via KeySetRemove. matter.js throws a
 	// StatusResponseError with InvalidCommand; we surface the same

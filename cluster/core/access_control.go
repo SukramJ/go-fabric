@@ -808,7 +808,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				}
 				// Cluster / Endpoint / DeviceType ID validity, in the same
 				// order matter.js checks them. Mirrors matter.js
-				// packages/node/src/behaviors/access-control/AccessControlServer.ts:266-278
+				// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at db021da0
 				// (ClusterId.isValid / EndpointNumber.isValid / DeviceTypeId.isValid,
 				// each throwing ConstraintError). Cross-check chip
 				// AccessControl.cpp:746-748 IsValidClusterId / IsValidEndpointId /
@@ -1108,9 +1108,9 @@ func aclIsValidCASESubject(id uint64) bool {
 	// CASE Auth Tag: upper 32 bits == 0xFFFF_FFFD. The low 16 bits carry
 	// the CAT version, which MUST NOT be 0 — a version-0 CAT is rejected
 	// with ConstraintError. Mirrors matter.js
-	// packages/node/src/behaviors/access-control/AccessControlServer.ts:211-220
+	// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at db021da0
 	// (CaseAuthenticatedTag.getVersion(cat) === 0 → ConstraintError) and
-	// packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33
+	// packages/types/src/datatype/CaseAuthenticatedTag.ts:76
 	// (getVersion = tag & 0xffff). Matter §6.6.2.1.2.
 	return (id>>32) == 0xFFFF_FFFD && (id&0xFFFF) != 0
 }

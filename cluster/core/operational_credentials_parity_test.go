@@ -449,7 +449,7 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 // The pending root is the last entry, after the installed fabrics' roots.
 //
 // Mirrors matter.js db021da0 packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts:470-472 —
+// operational-credentials/OperationalCredentialsServer.ts:471-473 —
 // `fabrics.map(fabric => fabric.rootCert)`, then
 // `trustedRootCertificates.push(rootCaCertificate)`. Mirrors chip
 // operational-credentials-server.cpp PendingFabric::mPendingRootCert

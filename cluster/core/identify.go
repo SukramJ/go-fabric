@@ -193,9 +193,12 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // cannot hold Close.
 //
 // Mirrors matter.js
-// packages/node/src/behaviors/identify/IdentifyServer.ts
-// [Symbol.asyncDispose], which stops the identify timer when the
-// behavior — and with it the endpoint — is destroyed.
+// packages/node/src/behaviors/identify/IdentifyServer.ts:116-119 at
+// db021da0 ([Symbol.asyncDispose] → #stopIdentifying, :100-106), which
+// stops the identify timer when the behavior — and with it the endpoint —
+// is destroyed. There it also clears isIdentifying and emits
+// stopIdentifying, which Close does not (F-db021da0-9,
+// notes/parity/matter_behaviour_findings.md).
 func (i *Identify) Close() {
 	i.timerMu.Lock()
 	if !i.closed {

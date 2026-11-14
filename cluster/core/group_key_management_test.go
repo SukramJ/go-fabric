@@ -60,7 +60,7 @@ func TestGKM_NewGroupKeyManagement_NilStore(t *testing.T) {
 func TestGKM_MaxGroupsPerFabric_Default(t *testing.T) {
 	t.Parallel()
 	// cfg value 0 → matter.js default 22
-	// (GroupKeyManagementServer.ts:616 override maxGroupsPerFabric = 22).
+	// (GroupKeyManagementServer.ts:614 at db021da0, override maxGroupsPerFabric = 22).
 	gkm, err := core.NewGroupKeyManagement(newFakeStore(), core.GroupKeyMgmtConfig{MaxGroupsPerFabric: 0})
 	if err != nil {
 		t.Fatalf("NewGroupKeyManagement: %v", err)
@@ -347,10 +347,10 @@ func TestGKM_WriteGroupKeyMap(t *testing.T) {
 //
 // matter.js injects the accessing fabric into every fabric-scoped struct
 // before the behaviour sees it
-// (packages/protocol/src/action/server/AttributeWriteResponse.ts:461-467
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:466-472
 // "We always inject the current fabricIndex for writes", overwriting via
-// packages/types/src/tlv/TlvObject.ts:306-310), and
-// GroupKeyManagementServer.ts:181-236 #validateGroupKeyMap never
+// packages/types/src/tlv/TlvObject.ts:309-313), and
+// GroupKeyManagementServer.ts:170-226 at db021da0 #validateGroupKeyMap never
 // compares an entry's fabricIndex with the session. AccessControl in this
 // package stamps the writer's fabric for the same reason
 // (access_control.go MatterWrite). A chip-derived controller omits the

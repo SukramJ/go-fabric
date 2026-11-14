@@ -94,7 +94,7 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 // schema before the invoker runs (packages/protocol/src/action/server/
 // CommandInvokeResponse.ts:484-487 at db021da0), so a request that also
 // names a reserved AdminVendorId (the handler's first check,
-// OperationalCredentialsServer.ts:216-221) or arrives without an armed
+// OperationalCredentialsServer.ts:217-222) or arrives without an armed
 // fail-safe answers CONSTRAINT_ERROR.
 func TestAddNOCRequestLengthsAreJudgedBeforeTheHandler(t *testing.T) {
 	t.Parallel()

@@ -386,7 +386,7 @@ func TestGKMKeySetWriteDisablesASlotOnTheSentinelStartTime(t *testing.T) {
 }
 
 // TestGKMKeySetWriteEpochSlotOrdering pins the ordering rules matter.js
-// GroupKeyManagementServer.ts:280-352 enforces between the three epoch
+// GroupKeyManagementServer.ts:291-357 at db021da0 enforces between the three epoch
 // slots. Each case names one broken relationship; a bridge that accepted
 // them would rotate onto a key at a time no controller agreed on.
 func TestGKMKeySetWriteEpochSlotOrdering(t *testing.T) {

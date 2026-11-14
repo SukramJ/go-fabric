@@ -331,7 +331,7 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 // TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession: a CSR
 // issued on a named session is consumed by that session alone, as
 // matter.js compares csrSessionId with the request's session strictly
-// (OperationalCredentialsServer.ts:240-245 at 862ad75f); the server used to
+// (OperationalCredentialsServer.ts:240-245 at db021da0); the server used to
 // skip the comparison when the AddNOC context named no session
 // (W3-clusec-04).
 func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T) {
@@ -487,10 +487,10 @@ func TestOpcreds_AddNOC_NeedsRootThenCSR(t *testing.T) {
 // as a Matter Certificate TLV — it isn't one, so Apple silently
 // discarded the entire Subscribe-Initial ReportData stream.
 //
-// matter.js HEAD reference: OperationalCredentialsServer.ts:470-472
+// matter.js reference at db021da0: OperationalCredentialsServer.ts:471-473
 // (`fabrics.map(fabric => fabric.rootCert)`) — each entry is the full
 // Matter Certificate TLV envelope received via AddTrustedRootCertificate
-// (Fabric.ts:68 `readonly rootCert: Bytes`).
+// (Fabric.ts:70 `readonly rootCert: Bytes`).
 //
 // The test pokes a fabric with a known `RootCert` into the store and
 // asserts MatterRead(0x0004) returns exactly those bytes, NOT
@@ -572,7 +572,7 @@ func TestAddNOC_InstallsIPKInGroupKeyManagement(t *testing.T) {
 // TestAddNOC_RejectsMismatchedCSRSession verifies that AddNOC from a
 // different session than the one that issued CSRRequest is rejected with
 // MissingCsr per Matter §11.18.7.5.5 and matter.js
-// OperationalCredentialsServer.ts:243-248.
+// OperationalCredentialsServer.ts:240-245 at db021da0.
 func TestAddNOC_RejectsMismatchedCSRSession(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -1323,8 +1323,9 @@ func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
 // TestOpcreds_CSRRequestRequiresArmedFailSafe pins that CSRRequest is rejected
 // with Status::FailsafeRequired (0xCA) when no FailSafe window is armed — the
 // generated CSR is FailSafe-scoped ephemeral state. Mirrors matter.js
-// OperationalCredentialsServer.ts:118-119 (`commissioner.failsafeContext`
-// getter → assertFailsafeArmed → Status.FailsafeRequired).
+// OperationalCredentialsServer.ts:131-132 at db021da0
+// (`commissioner.failsafeContext` getter → assertFailsafeArmed →
+// Status.FailsafeRequired).
 func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 	t.Parallel()
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{

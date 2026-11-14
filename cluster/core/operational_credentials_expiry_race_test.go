@@ -145,7 +145,7 @@ func (c *drawnKeyCtx) Value(key any) any {
 // recording its CSR leaves no key pair behind — the end waits for the
 // command, as for AddNOC and UpdateNOC (nocMu), and clears what it
 // recorded. The fail-safe context and its key pair end together (matter.js
-// db021da0 packages/protocol/src/common/FailsafeContext.ts:60, the
+// db021da0 packages/protocol/src/common/FailsafeContext.ts:61, the
 // FabricBuilder created once per context, and :176-185, which builds the
 // CSR and records its session and for-update flag in one step).
 func TestOpcreds_ExpiryDuringCSRRequest_LeavesNoPendingKey(t *testing.T) {

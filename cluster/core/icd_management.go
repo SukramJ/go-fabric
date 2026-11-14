@@ -1092,7 +1092,8 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 	// The entry enters RegisteredClients only with a ClientType its enum
 	// defines: matter.js validates the entry as it enters the list state
 	// (IcdManagementServer.ts:572-583 at db021da0, ListManager.ts:379-386 and
-	// :428-432, the enum validator ValueValidator.ts:167-179 —
+	// :428-432, the enum validator packages/node/src/behavior/state/validation/
+	// ValueValidator.ts:167-179 —
 	// Status.ConstraintError); its request schema holds the field to its
 	// type only (packages/types/src/tlv/TlvOfModel.ts:221-223).
 	if !s.inst.EnumSupported(icddef.ClientTypeEnumDef, uint64(req.ClientType)) {
