@@ -134,7 +134,7 @@ func TestAuthorizeEventReports_PlainEventReturnedToAuthorized(t *testing.T) {
 // TestAuthorizeEventReports_PASEBypass verifies that a PASE session before
 // AddNOC passes the ACL gate — the plain event is disclosed — but reads no
 // fabric-sensitive record of another fabric: its accessing fabric is 0
-// (matter.js EventReadResponse.ts:79, :341-350; review II, R2-P4-imread-01).
+// (matter.js EventReadResponse.ts:79, :344-352; review II, R2-P4-imread-01).
 // Fabric 0 alone is no grant (review 2026-11 W2-sec-03; matter.js
 // FabricAccessControl.ts:189-191 keys the implicit grant on the PASE auth
 // mode).
@@ -220,7 +220,7 @@ func TestEventPayloadFabricIndex(t *testing.T) {
 // and the plain event are disclosed although the ACL grants nothing on
 // fabric 2. The AccessControl event of fabric 1 is not: the fabric-sensitive
 // filter compares with the adopted fabric (matter.js EventReadResponse.ts:79,
-// :341-350; review II, R2-P4-imread-01). The CASE negative control (same
+// :344-352; review II, R2-P4-imread-01). The CASE negative control (same
 // fabric, no PASE marker) is denied.
 func TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister(t *testing.T) {
 	t.Parallel()

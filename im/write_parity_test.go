@@ -202,7 +202,7 @@ func TestWriteParity_SuppressResponse(t *testing.T) {
 // field (Matter §10.6.5 tag 3): a WriteRequestMessage that sets tag 3
 // true MUST decode with MoreChunkedMessages==true so the dispatch
 // layer can enforce the chunked-write InvalidAction rules
-// (InteractionServer.ts:397-402, :408-413).
+// (InteractionServer.ts:410-415, :419-424 at db021da0).
 func TestWriteParity_MoreChunkedMessages_Preserved(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
@@ -352,7 +352,7 @@ func (d *clusterStatusDispatcher) Invoke(_ context.Context, p ConcreteCommandPat
 var _ Dispatcher = (*clusterStatusDispatcher)(nil)
 
 // TestWriteParity_ClusterStatus_NonSuccess_ClampedToFailure mirrors
-// matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:32
+// matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:387-390 at db021da0
 // (#3988, Matter §7.10.7): when a WriteResult carries HasClusterStatus=true
 // alongside a non-Success global status, HandleWriteRequest MUST clamp the
 // outer Status to StatusFailure while preserving both HasClusterStatus and

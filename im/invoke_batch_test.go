@@ -18,7 +18,7 @@ func concretePath(endpoint uint16, cluster, command uint32) ConcreteCommandPath 
 }
 
 // TestValidateInvokeBatch mirrors the batch-invoke guards in matter.js
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:64-92,171-185
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:68-99, :196-212 at db021da0
 // (process/#processConcrete): a wildcard-endpoint path in a batch, a concrete
 // path missing its CommandRef in a batch, a duplicate CommandRef, and a
 // duplicate concrete path all abort the whole invoke with InvalidAction, while
@@ -114,7 +114,7 @@ func batchOfN(n int) InvokeRequest {
 }
 
 // TestValidateInvokeBatch_MaxPathsPerInvoke pins the batch-size ceiling
-// mirroring matter.js InteractionServer.ts:950-955
+// mirroring matter.js InteractionServer.ts:1017-1022 at db021da0
 // (`if (invokeRequests.length > this.#maxPathsPerInvoke) throw new
 // StatusResponseError(..., Status.InvalidAction)`), evaluated before any
 // command in the batch is dispatched. A batch at exactly the ceiling
@@ -132,7 +132,7 @@ func TestValidateInvokeBatch_MaxPathsPerInvoke(t *testing.T) {
 
 // TestInvokeResponse_HasCommandData verifies the CommandDataIB detection that
 // gates the SuppressResponse "send nothing" decision (Matter §8.8.3.2.1;
-// matter.js InteractionServer.ts:1043-1074): a response is "command data"
+// matter.js InteractionServer.ts:1168-1199 at db021da0): a response is "command data"
 // bearing iff at least one entry is a CommandDataIB (IsStatus=false).
 func TestInvokeResponse_HasCommandData(t *testing.T) {
 	t.Parallel()
@@ -157,7 +157,7 @@ func TestInvokeResponse_HasCommandData(t *testing.T) {
 // TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse pins that the
 // InvokeResponseMessage the bridge marshals never carries SuppressResponse=true
 // even when the request set it: matter.js always emits the deprecated field as
-// false (InteractionServer.ts:987-988 `emptyInvokeResponse.suppressResponse:
+// false (InteractionServer.ts:1111-1112 at db021da0 `emptyInvokeResponse.suppressResponse:
 // false`) and lets the send/no-send decision live at the dispatch layer.
 func TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse(t *testing.T) {
 	t.Parallel()

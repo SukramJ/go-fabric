@@ -412,7 +412,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// to be ≤ the subscriber's requested MaxInterval. chip (non-ICD path,
 	// `src/app/ReadHandler.cpp:769-809`) accepts the subscriber's MaxInterval
 	// directly and bounds it only by `kSubscriptionMaxIntervalPublisherLimit`
-	// (3600 s). matter.js (`packages/node/src/node/server/ServerSubscription.ts:269-282`)
+	// (3600 s). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
 	// further clamps to min(subscriptionMaxInterval, maxIntervalCeiling) and
 	// also lifts by minIntervalFloor. go-fabric clamps maxCeil down to
 	// cfg.MaxIntervalCeilingSeconds (default 3600 s, matching chip) and

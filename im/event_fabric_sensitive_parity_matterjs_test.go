@@ -7,11 +7,11 @@ package im
 // it, whatever the session's auth mode: the filter compares the record's
 // FabricIndex with the accessing fabric (0 on a session without one), and a
 // PASE session's implicit Administer grant lifts only the ACL gate. matter.js
-// packages/protocol/src/action/server/EventReadResponse.ts:79 and :341-350
+// packages/protocol/src/action/server/EventReadResponse.ts:79 and :344-352
 // at db021da0 (#readAllowedEvents); the cases port
 // packages/node/test/node/EventReadResponseTest.ts:142-168 ("filters
 // fabric-sensitive concrete event not owned by the accessing fabric") and
-// :172-218 ("reads fabric-sensitive concrete event owned by the accessing
+// :172-219 ("reads fabric-sensitive concrete event owned by the accessing
 // fabric"). matter.js runs both for FabricFiltered true and false;
 // AuthorizeEventReports takes no FabricFiltered input, so the drop is
 // independent of it by construction. Review II, R2-P4-imread-01.
@@ -66,7 +66,7 @@ func TestEventReadParity_FabricSensitiveFilteredToAccessingFabric(t *testing.T) 
 		{"PASE without a fabric: the record of fabric 5 is not disclosed", context.Background(), EventReadAuthorizer{Checker: checker, PASE: true}, 0},
 		{"PASE marked in ctx only, without a fabric", WithAuthModePASE(context.Background()), EventReadAuthorizer{Checker: checker}, 0},
 		{"PASE adopted onto fabric 2: the record of fabric 5 is not disclosed", context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 2, PASE: true}, 0},
-		// EventReadResponseTest.ts:172-218: the accessing fabric owns the record.
+		// EventReadResponseTest.ts:172-219: the accessing fabric owns the record.
 		{"PASE adopted onto fabric 5: its own record", context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 5, PASE: true}, 1},
 		{"CASE on fabric 5: its own record", context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 5}, 1},
 	}

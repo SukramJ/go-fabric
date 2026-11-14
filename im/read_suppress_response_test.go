@@ -12,9 +12,9 @@ import (
 // SuppressResponse contract: a non-subscribe Read's ReportData carries
 // SuppressResponse=true, so the controller answers the terminal chunk with
 // only a Standalone MRP-Ack rather than an IM StatusResponse. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:346-350,371-374
+// packages/node/src/node/server/InteractionServer.ts:358-363, :383-389 at db021da0
 // (handleReadRequest returns `dataReport: { suppressResponse: true }`) and chip
-// src/app/ReadHandler.cpp:340 (`responseExpected = IsType(Subscribe) ||
+// src/app/ReadHandler.cpp:333 at 6170af84 (`responseExpected = IsType(Subscribe) ||
 // aMoreChunks` → false on a read's final chunk). Subscribe priming builds its
 // own report and is unaffected — HandleReadRequest is only reached on the plain
 // read path.

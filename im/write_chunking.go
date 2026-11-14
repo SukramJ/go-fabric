@@ -7,7 +7,7 @@ package im
 // Mirrors matter.js packages/protocol/src/action/request/Write.ts:24-27 at
 // db021da0 (isAclOrExtensionPath: AccessControl 0x001F, Acl 0x0000,
 // Extension 0x0001 — model/src/standard/elements/access-control.element.ts:20,
-// :31, :35), the connectedhomeip #38263 exemption of :155-166.
+// :31, :35), the connectedhomeip #38263 exemption of Write.ts:155-166.
 const (
 	accessControlCluster   uint32 = 0x001F
 	accessControlACL       uint32 = 0x0000

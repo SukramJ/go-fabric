@@ -203,13 +203,13 @@ func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 // Caller must hold s.mu.
 //
 // Mirrors matter.js's `#determineSendingIntervals` formula in
-// `packages/node/src/node/server/ServerSubscription.ts:259-300`
+// `packages/node/src/node/server/ServerSubscription.ts:270-292` at db021da0
 //
 //	sendInterval = maxInterval / 2           // ideally half
 //	if sendInterval < 60 s:
 //	    sendInterval = max(MinIntervalFloor, maxInterval × 0.8)
-//	if sendInterval < MinIntervalFloor:
-//	    sendInterval = MinIntervalFloor
+//	if sendInterval < subscriptionMinInterval:   // the publisher's, 2 s by default
+//	    sendInterval = subscriptionMinInterval
 //
 // The previous 5 s hard cap was an empirical workaround for a
 // chip-tool `ExchangeContext` timeout observed at ~10.45 s — the
@@ -223,8 +223,9 @@ func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 //
 // Randomisation window (by-design):
 // matter.js adds `subscriptionRandomizationWindow * Math.random()` to
-// the send interval
-// (`packages/node/src/node/server/ServerSubscription.ts:282`) to
+// the max interval the send interval is taken from
+// (`packages/node/src/node/server/ServerSubscription.ts:326-343` at
+// db021da0, the term at :338; the send interval at :278) to
 // distribute heartbeat traffic across a fleet of subscriptions that
 // share the same JS event loop. chip (`src/app/ReadHandler.cpp:769`)
 // does NOT apply any randomisation — it uses the negotiated

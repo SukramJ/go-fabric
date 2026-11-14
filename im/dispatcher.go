@@ -41,7 +41,8 @@ type DataVersionReader interface {
 // (permissive default — preserves v1.0 behaviour for callers that have not
 // wired an ACL store).
 //
-// Mirrors connectedhomeip/src/access/AccessControl.cpp:415-560 and the
+// Mirrors connectedhomeip src/access/AccessControl.cpp:359-554 at 6170af84
+// (Check, CheckACL) and the
 // access passes of matter.js at db021da0 — a write's
 // packages/protocol/src/action/server/AttributeWriteResponse.ts:215-218 and
 // :236-241, an invoke's CommandInvokeResponse.ts:257-260 and :273-279. chip

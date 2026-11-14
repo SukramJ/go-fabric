@@ -15,9 +15,9 @@ func wildcardPaths(n int) []ConcreteAttributePath {
 
 // TestValidateReadPaths_PathsExhaustedAboveCeiling pins the hard
 // acceptance ceiling on paths in one read / subscribe interaction:
-// matter.js InteractionServer.ts:79-80 MAX_READ_PATHS /
+// matter.js InteractionServer.ts:93-94 MAX_READ_PATHS /
 // MAX_SUBSCRIBE_PATHS = 10 000, rejected with PathsExhausted at
-// :366-369 and :600-604. Attribute and event paths count together.
+// :375-381 and :635-641 at db021da0. Attribute and event paths count together.
 func TestValidateReadPaths_PathsExhaustedAboveCeiling(t *testing.T) {
 	t.Parallel()
 	if got := ValidateReadPaths(wildcardPaths(MaxReadPaths), nil); got != StatusSuccess {

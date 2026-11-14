@@ -63,8 +63,8 @@ func encodeTwoCommandInvoke(t *testing.T) []byte {
 // [CommandFieldsReader] reject carrying a status marks only that command,
 // leaves the batch decodable, and makes [HandleInvokeRequest] answer the
 // command with the status without invoking it — matter.js
-// CommandInvokeResponse.ts:446-448 (validate before invoke) and
-// :472-496 (validation failure → CommandStatusIB).
+// CommandInvokeResponse.ts:484-487 (validate before invoke) and
+// :509-546 (validation failure → CommandStatusIB) at db021da0.
 func TestInvokeRequest_TypedFieldsRejectBecomesPerCommandStatus(t *testing.T) {
 	t.Parallel()
 	reader := func(path ConcreteCommandPath, dec *tlv.Decoder, _ tlv.Element) (any, error) {

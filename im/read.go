@@ -507,9 +507,9 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	// A plain (non-subscribe) Read's ReportData carries SuppressResponse=true:
 	// the controller answers the final chunk with only a Standalone MRP-Ack, not
 	// an IM StatusResponse. Mirrors matter.js
-	// packages/node/src/node/server/InteractionServer.ts:346-350,371-374
+	// packages/node/src/node/server/InteractionServer.ts:358-363, :383-389 at db021da0
 	// (handleReadRequest returns `dataReport: { suppressResponse: true }`) and
-	// chip src/app/ReadHandler.cpp:340 (`responseExpected = IsType(Subscribe) ||
+	// chip src/app/ReadHandler.cpp:333 at 6170af84 (`responseExpected = IsType(Subscribe) ||
 	// aMoreChunks` → false on a read's final chunk). The chunker propagates this
 	// to the terminal chunk only; intermediate chunks keep SuppressResponse=false
 	// so the per-chunk StatusResponse handshake still runs. Subscribe priming
@@ -662,7 +662,7 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 // paths ([ConcreteEventPath.Matches] does not look at the node), and the
 // request's own paths to [DeniedEventPathStatuses], which answers a
 // concrete path naming another node. Mirrors matter.js
-// packages/protocol/src/action/server/EventReadResponse.ts:131-133 and
+// packages/protocol/src/action/server/EventReadResponse.ts:138-140 and
 // :159-162 at db021da0 (#addWildcard / #addConcrete: a path naming
 // another node registers nothing), the node id per DataResponse.ts:57-62;
 // the attribute paths' twin is [AttributeExpansion] (review II,
@@ -802,7 +802,7 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //	session before AddNOC, the adopted fabric after it. Fails closed — a
 //	record whose fabric cannot be positively matched to the accessing fabric
 //	is never disclosed. Mirrors matter.js
-//	packages/protocol/src/action/server/EventReadResponse.ts:79 and :341-350
+//	packages/protocol/src/action/server/EventReadResponse.ts:79 and :344-352
 //	at db021da0 — #accessingFabricIndex = session.fabric ?? NO_FABRIC,
 //	#readAllowedEvents skips a record whose payload.fabricIndex differs; the
 //	file has no auth-mode exception.
@@ -906,10 +906,10 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 // MaxReadPaths is the hard acceptance ceiling for paths (attribute and
 // event paths counted together) in a single Read or Subscribe
 // interaction. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:79-80
+// packages/node/src/node/server/InteractionServer.ts:90-94 at db021da0
 // (MAX_READ_PATHS / MAX_SUBSCRIBE_PATHS = 10 000, the upper bound of the
 // CapabilityMinimaStruct field constraints); a request beyond it is
-// answered with PathsExhausted (:366-369, :600-604).
+// answered with PathsExhausted (:375-381, :635-641).
 const MaxReadPaths = 10_000
 
 // isGlobalAttributeID reports whether attrID is a universal global attribute

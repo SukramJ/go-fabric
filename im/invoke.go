@@ -899,7 +899,7 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 // wildcardTarget is the [CommandAuthorizer] of a wildcard path's
 // endpoints: the command's privilege, its Large Message, fabric-scope and
 // timed qualities at the endpoint (#wildcardTargetOf,
-// CommandInvokeResponse.ts:367-412 at 862ad75f).
+// CommandInvokeResponse.ts:367-398 at db021da0).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
 	if g.hasACL && !g.pase {

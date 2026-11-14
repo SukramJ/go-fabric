@@ -14,7 +14,7 @@ import (
 // matter.js packages/protocol/src/action/server/EventReadResponse.ts at
 // db021da0: a concrete path naming another node answers UnsupportedNode
 // before any access check (#addConcrete :159-162), a wildcard path naming
-// another node selects nothing (#addWildcard :131-133); the node's id is
+// another node selects nothing (#addWildcard :138-140); the node's id is
 // its id on the session's fabric, UNSPECIFIED without one
 // (DataResponse.ts:57-62). matter.js has no test case for it; this test
 // states those lines.
