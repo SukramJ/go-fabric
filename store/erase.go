@@ -5,6 +5,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -32,8 +34,32 @@ var erasedTables = []string{
 	"matter_icd_registrations",
 }
 
+// ErrScrubIncomplete is the error of an [Store.Erase] whose deletes
+// committed — every row is gone — and of a [Scrub], when the scrub that
+// follows did not finish: a VACUUM that failed (a full disk) or a
+// checkpoint another connection's reader blocked. The erased rows' bytes
+// may then remain in the database's free pages or its -wal until a later
+// [Scrub] of the same file succeeds. A caller tells it apart from a failed
+// erase with errors.Is.
+var ErrScrubIncomplete = errors.New("store: erased, but the scrub did not finish: the erased bytes may remain in the file")
+
 // Erase empties every matter_* table in one transaction and seeds the
-// next fabric index as the schema does ([Eraser]).
+// next fabric index as the schema does ([Eraser]), then scrubs the file:
+// a DELETE only unlinks rows, and their bytes — and those of every row a
+// plain delete removed earlier, RemoveFabric's among them — stay in the
+// database's free pages and in the write-ahead log. VACUUM rebuilds the
+// database without its free pages, and wal_checkpoint(TRUNCATE) copies the
+// rebuilt pages into the file and truncates the -wal to zero bytes, so
+// none of the erased bytes remain in the database file, its -wal or its
+// -shm (TestStoreEraseLeavesNoResidue) — [Scrub]. It runs on the store's own handle,
+// whoever opened it. secure_delete is not used: it zeroes only the rows
+// its own connection deletes, so it misses the earlier deletes, and in WAL
+// mode the log keeps them until a checkpoint anyway. A scrub that does not
+// finish after the deletes committed is [ErrScrubIncomplete]: the store is
+// erased, and a later [Scrub] can remove the bytes. Going beyond matter.js,
+// whose SQLite driver erases with plain DELETE
+// (packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts:201, :207,
+// :305 at db021da0; by_design BD-Matter-StoreEraseScrub).
 func (s *Store) Erase(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -50,6 +76,30 @@ func (s *Store) Erase(ctx context.Context) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store: erase: %w", err)
+	}
+	return Scrub(ctx, s.db)
+}
+
+// Scrub is Erase's last step on its own, for a database whose rows another
+// store deleted — the endpoint records node.Node.FactoryReset erases from a
+// file whose credential store is a host override, or erases after this
+// store's Erase: it rewrites the database without its free pages and
+// empties the write-ahead log, so the deleted rows' bytes remain in none of
+// the database file, its -wal or its -shm. In rollback-journal mode the
+// checkpoint is a no-op that reports busy 0. A checkpoint a reader blocks
+// reports busy 1: the -wal may then still hold erased bytes, and Scrub
+// says so. Every error it returns is [ErrScrubIncomplete]; running it
+// again once the reader is gone finishes the scrub.
+func Scrub(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, `VACUUM`); err != nil {
+		return fmt.Errorf("%w: vacuum: %w", ErrScrubIncomplete, err)
+	}
+	var busy, logFrames, checkpointed int
+	if err := db.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &checkpointed); err != nil {
+		return fmt.Errorf("%w: wal checkpoint: %w", ErrScrubIncomplete, err)
+	}
+	if busy != 0 {
+		return fmt.Errorf("%w: the wal checkpoint was blocked by a reader, so the -wal may still hold erased data", ErrScrubIncomplete)
 	}
 	return nil
 }

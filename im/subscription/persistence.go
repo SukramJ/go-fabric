@@ -77,6 +77,15 @@ func (s *Subscription) PeerSubscription(isFabricFiltered bool) PeerSubscription 
 // `useAsSendInterval`. As there, the caller sends the priming report next
 // and unwinds with [Manager.Release] if it fails.
 //
+// The subscription is restored priming, as [SubscribeArgs.Priming] admits
+// one: the engine reports nothing for it until the caller has sent the
+// priming report and calls [Subscription.EndPriming] — after
+// [Subscription.PrimedEvents] with the report's last event number, when
+// it carried events. matter.js activates the re-established subscription
+// only after its initial report (InteractionServer.ts:906
+// sendInitialReport, then :911 subscription.activate(), at db021da0);
+// review II, R2-P1-dr-req-06.
+//
 // Restore enforces the per-fabric quota and refuses an id that already
 // names a live subscription ([ErrIDInUse]).
 func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, error) {
@@ -112,6 +121,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		// As in Subscribe: the priming report is the first report, so the
 		// engine must not fire a keep-alive into it.
 		lastReport: m.cfg.Clock.Now(),
+		priming:    true,
 	}
 	m.byID[sub.ID] = sub
 	m.perFabric[sub.FabricIndex]++

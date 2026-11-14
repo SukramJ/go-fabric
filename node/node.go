@@ -64,11 +64,18 @@ type Node struct {
 	// across the stop a FactoryReset makes, which erases it afterwards.
 	ownedDB     *sql.DB
 	keepOwnedDB bool
-	groups      *groups.Manager
-	assembler   *endpoint.Assembler
-	br          *bridge.Bridge
-	root        *RootClusters
-	agg         *Aggregator
+	// builtCredentials and builtEndpoints are set when New built the
+	// credential or the endpoint store on Store.DB or Store.Path itself,
+	// not taken from a host override: a FactoryReset after Stop rebuilds
+	// exactly those on the reopened file and erases the overrides as they
+	// are.
+	builtCredentials, builtEndpoints bool
+
+	groups    *groups.Manager
+	assembler *endpoint.Assembler
+	br        *bridge.Bridge
+	root      *RootClusters
+	agg       *Aggregator
 	// aggServers are the Aggregator endpoint's servers ([Node.Surface]);
 	// surfaceDigest is Config.Surface's digest, computed once.
 	aggServers    []contract.ClusterServer
@@ -157,6 +164,24 @@ type Node struct {
 	commissioned atomic.Bool
 	cancel       context.CancelFunc
 	keeperWG     sync.WaitGroup
+	// keeperMu orders the keepers a handler starts (goKeeper:
+	// reopenWhenIdle's, leaveRadioWhenCommissioned's) against Stop:
+	// stopLocked sets stopping under it before the teardown, and a keeper
+	// is added to keeperWG — and a reopen opens the window — only under
+	// it while stopping is clear. So no Add races keeperWG.Wait (a handler
+	// can outlive br.Stop's bounded wait), no keeper starts once Stop
+	// began, and no window opens after br.Stop stopped the window's timer.
+	keeperMu sync.Mutex
+	stopping bool
+	// windowLife bounds the commissioning window's transitions — the
+	// announce and the BLE advertisement of the transition hook — and a
+	// reopen's (wireCommissioningWindow, reopenUnlessStopping). Stop
+	// cancels it first, before it takes keeperMu, which a reopen holds
+	// across the window's open: a reopen waiting on its context ends, and
+	// Stop does not wait on the lock for a lifetime only it ends (review
+	// II, R2-P1-dr-req-04). No transition is announced once Stop began.
+	windowLife   context.Context //nolint:containedctx // a child of life that Stop cancels first
+	cancelWindow context.CancelFunc
 
 	// mu serialises Start and Stop, the lifecycle; it is held across
 	// them, host callbacks included (the host's Snapshotter), and
@@ -165,6 +190,10 @@ type Node struct {
 	mu      sync.Mutex
 	started atomic.Bool
 	stopped bool
+	// stopBegun: a Stop took the node's own parts down; stopped is set
+	// only once the bridge stopped too, so a Stop whose bridge stop gave
+	// up is resumed by the next one (review II, R2-P1-dr-req-01).
+	stopBegun bool
 }
 
 // New builds the node: everything the reference daemon builds before
@@ -209,6 +238,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		attestationErr: attestationErr,
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	n.windowLife, n.cancelWindow = context.WithCancel(n.life)
 	n.surfaceDigest = cfg.Surface.Digest()
 	n.rootDecisions, n.rootCandidates = rootDecisions, rootCandidates
 	ok := false
@@ -383,7 +413,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
-	wireCommissioningWindow(n.life, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: n.life, not New's ctx
+	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
@@ -460,9 +490,11 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 		if n.st == nil {
 			n.st = store.New(sc.DB)
+			n.builtCredentials = true
 		}
 		if sc.Endpoints == nil {
 			n.cfg.Store.Endpoints = sqlitestore.New(sc.DB)
+			n.builtEndpoints = true
 		}
 	}
 	return nil
@@ -637,16 +669,14 @@ func (n *Node) reopenWhenIdle() {
 	if !n.reopenPending.CompareAndSwap(false, true) {
 		return
 	}
-	n.keeperWG.Add(1)
-	go func() {
-		defer n.keeperWG.Done()
+	started := n.goKeeper(func() {
 		defer n.reopenPending.Store(false)
 		tick := n.cfg.Clock.NewTicker(reopenPollInterval)
 		defer tick.Stop()
 		for {
 			armed := n.root.GeneralCommissioning != nil && n.root.GeneralCommissioning.FailSafeArmed()
 			if !armed && n.sec.sessions.Active() == 0 {
-				n.window.reopenIfDecommissioned(n.life, n.st)
+				n.reopenUnlessStopping()
 				return
 			}
 			select {
@@ -655,7 +685,41 @@ func (n *Node) reopenWhenIdle() {
 			case <-tick.C():
 			}
 		}
+	})
+	if !started {
+		n.reopenPending.Store(false)
+	}
+}
+
+// reopenUnlessStopping is reopenWhenIdle's reopen, which a Stop that began
+// cancels: under keeperMu, so it either opens the window before stopLocked
+// set stopping — and br.Stop then stops the window's timer — or not at all
+// (TestReopenPendingAtStopArmsNoWindow). It runs on windowLife, which Stop
+// cancels before it waits for keeperMu (TestStopEndsAReopenWaitingOnTheLifetime).
+func (n *Node) reopenUnlessStopping() {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	if n.stopping {
+		return
+	}
+	n.window.reopenIfDecommissioned(n.windowLife, n.st)
+}
+
+// goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
+// began; it reports whether it started one. A handler that outlives
+// br.Stop's bounded wait starts nothing (TestLateHandlerKeeperDoesNotRaceStop).
+func (n *Node) goKeeper(fn func()) bool {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	if n.stopping {
+		return false
+	}
+	n.keeperWG.Add(1)
+	go func() {
+		defer n.keeperWG.Done()
+		fn()
 	}()
+	return true
 }
 
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
@@ -774,15 +838,13 @@ func (n *Node) leaveRadioWhenCommissioned() {
 	if n.cfg.Network.BLE == nil {
 		return
 	}
-	n.keeperWG.Add(1)
-	go func() {
-		defer n.keeperWG.Done()
+	n.goKeeper(func() {
 		ctx, cancel := clock.WithTimeout(n.life, clock.Or(n.cfg.Clock), bleStopTimeout)
 		defer cancel()
 		if err := n.br.StopBLE(ctx); err != nil {
 			n.logger.Warn("commissioning.ble.stop", slog.Any("err", err))
 		}
-	}()
+	})
 }
 
 // notifyFabricUpdated runs every OnFabricUpdated with the fabric as the
@@ -824,7 +886,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	switch {
-	case n.stopped:
+	case n.stopped || n.stopBegun:
 		return ErrStopped
 	case n.started.Load():
 		return nil
@@ -911,6 +973,13 @@ func (n *Node) startLocked(ctx context.Context) error {
 		n.logger.Warn("fabrics.list_failed", slog.Any("err", err))
 	}
 	stored := len(fabrics)
+	// A node with stored fabrics starts commissioned — marked from this
+	// read, before the CASE identities load: from then on an
+	// administrator can remove the last fabric while Start still runs,
+	// and that removal reopens the window (reopenIfDecommissionedWhenIdle)
+	// only on a node already marked commissioned; marking it at the end
+	// would mark it again from this stale count.
+	n.commissioned.Store(err == nil && stored > 0)
 	loaded := make([]store.FabricRecord, 0, stored)
 	for _, fabric := range fabrics {
 		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
@@ -949,8 +1018,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// commissioned node, not a new one: advertising it as commissionable
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
-	// A node with stored fabrics starts commissioned.
-	n.commissioned.Store(err == nil && stored > 0)
 	switch {
 	case err != nil:
 	case stored == 0:
@@ -972,23 +1039,63 @@ func (n *Node) startLocked(ctx context.Context) error {
 // table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
 // bridge, the advertiser and the store the node opened for Store.Path.
 // Stop is idempotent
-// (matter.js Node.stop, Node.ts:193) and safe without Start.
+// (matter.js Node.stop, Node.ts:193) and safe without Start. A context
+// already done cuts short only Stop's waits; Stop returns an error only
+// when the bridge did not stop (a bridge Start or Stop the host runs
+// itself held it until ctx ended), and then the node is not stopped yet:
+// it keeps its store and the next Stop finishes the work. Start is refused
+// from the first Stop on.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.stopLocked(ctx)
 }
 
-// stopLocked is Stop's work; n.mu is held.
+// stopLocked is Stop's work; n.mu is held. When the bridge does not
+// stop (its Stop waited for a bridge Start or Stop in progress until ctx
+// ended), the node is not stopped: the advertiser, the lifetime context
+// and the store stay, and the next Stop resumes at the bridge (review II,
+// R2-P1-dr-req-01).
 func (n *Node) stopLocked(ctx context.Context) error {
 	if n.stopped {
 		return nil
 	}
-	n.stopped = true
 	// The stop is work in hand of the node's in-flight group but for the
 	// client stack's close, which waits on its peers (see Start).
 	work := countWork(n.cfg.Clock, inflight.NodeStop)
 	defer work.pause()
+	if !n.stopBegun {
+		n.stopBegun = true
+		n.stopParts(ctx, work)
+	}
+	if err := n.br.Stop(ctx); err != nil {
+		return fmt.Errorf("node: bridge stop: %w", err)
+	}
+	n.stopped = true
+	// The devices are unbound once no controller reaches them: each
+	// device's queue drains before Stop returns.
+	if n.agg != nil {
+		n.agg.detachAll()
+	}
+	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
+	n.callbacks.Stop()
+	_ = n.advertiser.Close()
+	n.cancel()
+	n.keeperWG.Wait()
+	n.closeOwnedDB()
+	return nil
+}
+
+// stopParts is the part of Stop before the bridge's, run once; work is
+// stopLocked's count.
+func (n *Node) stopParts(ctx context.Context, work *countedWork) {
+	// No keeper starts and no reopen opens the window from here on
+	// (keeperMu); a reopen in progress, which holds it, has its waits
+	// ended first (windowLife).
+	n.cancelWindow()
+	n.keeperMu.Lock()
+	n.stopping = true
+	n.keeperMu.Unlock()
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
@@ -1032,22 +1139,6 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	if srv := n.root.ICDManagement; srv != nil {
 		srv.Stop()
 	}
-	err := n.br.Stop(ctx)
-	// The devices are unbound once no controller reaches them: each
-	// device's queue drains before Stop returns.
-	if n.agg != nil {
-		n.agg.detachAll()
-	}
-	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
-	n.callbacks.Stop()
-	_ = n.advertiser.Close()
-	n.cancel()
-	n.keeperWG.Wait()
-	n.closeOwnedDB()
-	if err != nil {
-		return fmt.Errorf("node: bridge stop: %w", err)
-	}
-	return nil
 }
 
 // countedWork is one unit of a node's work in hand on the in-flight group

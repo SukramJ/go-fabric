@@ -6,11 +6,12 @@ package mattercert
 import (
 	"bytes"
 	"encoding/asn1"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,7 +29,9 @@ const MaxOperationalCertDERBytes = 600
 // 600 bytes before parsing, the signature algorithm must be the same
 // inside and outside the TBSCertificate (RFC 5280 §4.1.1.2), the DN
 // attributes come back in their arrival order with the Matter ids parsed
-// from their hex strings, a recognised extension (basicConstraints,
+// from their hex strings (by the stricter rule of the db021da0 pin, see
+// derMatterAttribute; the rest of this path is cited at 862ad75f and not
+// yet re-read at db021da0), a recognised extension (basicConstraints,
 // keyUsage, extendedKeyUsage, subjectKeyIdentifier,
 // authorityKeyIdentifier) without its value OCTET STRING is refused and an
 // extension of any other OID is not read — whatever its value holds.
@@ -243,13 +246,19 @@ func derDN(name asn1.RawValue) (DistinguishedName, error) {
 // into dn: the 64-bit ids and a CAT as hex strings, each single-valued id
 // refused when it repeats (once). It reports false for an OID that is not
 // a Matter attribute.
+//
+// The hex is read as parseMatterRdnHex reads it (Certificate.ts:242-249 at
+// db021da0): exactly 16 uppercase hex digits for a 64-bit id (:331-339,
+// octets 8), exactly 8 for a CAT (:354-358, octets 4), which must also be
+// a valid CASE Authenticated Tag (CaseAuthenticatedTag.isValid: a version
+// other than 0).
 func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value string, once func(asn1.ObjectIdentifier) error) (bool, error) {
 	id := func(bits int) (uint64, error) {
-		v, err := strconv.ParseUint(value, 16, bits)
-		if err != nil {
-			return 0, fmt.Errorf("%w: matter id %q is not hex", ErrMalformed, value)
+		digits := bits / 4
+		if len(value) != digits || strings.IndexFunc(value, func(r rune) bool { return (r < '0' || r > '9') && (r < 'A' || r > 'F') }) >= 0 {
+			return 0, fmt.Errorf("%w: invalid matter id %q: expected exactly %d uppercase hexadecimal digits", ErrMalformed, value, digits)
 		}
-		return v, nil
+		return strconv.ParseUint(value, 16, bits)
 	}
 	var (
 		field *uint64
@@ -274,10 +283,10 @@ func (dn *DistinguishedName) derMatterAttribute(oid asn1.ObjectIdentifier, value
 		if err != nil {
 			return true, err
 		}
-		if v > math.MaxUint32 {
-			return true, errors.New("mattercert: CASE authenticated tag exceeds 32 bits")
+		if v&0xFFFF == 0 {
+			return true, fmt.Errorf("%w: invalid CASE Authenticated Tag %q", ErrMalformed, value)
 		}
-		dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
+		dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v)) //nolint:gosec // id(32) parsed it with bitSize 32
 		dn.Order = append(dn.Order, dnTagMatterCASEAuth)
 		return true, nil
 	default:
@@ -333,6 +342,11 @@ func derDate(v asn1.RawValue) (uint64, error) {
 	secs := t.Unix() - matterEpochUTCSeconds
 	if secs < 0 {
 		return 0, fmt.Errorf("%w: date %v before the Matter epoch", ErrMalformed, t)
+	}
+	// The TLV form carries notBefore/notAfter as TlvUInt32
+	// (operational.ts:138-139 at db021da0).
+	if secs > math.MaxUint32 {
+		return 0, fmt.Errorf("%w: date %v exceeds 32 bits of Matter epoch seconds", ErrMalformed, t)
 	}
 	return uint64(secs), nil
 }
@@ -429,15 +443,28 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 	switch tag {
 	case extTagBasicConstraints:
 		var bc struct {
-			IsCA    bool `asn1:"optional"`
-			PathLen int  `asn1:"optional,default:-1"`
+			IsCA    bool          `asn1:"optional"`
+			PathLen asn1.RawValue `asn1:"optional"`
 		}
 		if _, err := asn1.Unmarshal(value, &bc); err != nil {
 			return fmt.Errorf("%w: basic-constraints: %w", ErrMalformed, err)
 		}
 		ext.HasBasicConstraints, ext.BasicConstraintsIsCA = true, bc.IsCA
-		if bc.PathLen >= 0 {
-			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(bc.PathLen) //nolint:gosec // Matter caps the path length at 1
+		// The pathLenConstraint is an element only when it is an INTEGER,
+		// read as its content bytes taken unsigned (derUnsignedInteger,
+		// Certificate.ts:400-406, called at :505-509 at db021da0): a
+		// negative INTEGER is its two's-complement bytes, never absent.
+		// The TLV form carries pathLen as TlvUInt8 (operational.ts:42 at
+		// db021da0); a wider one is refused, not cut to its low byte.
+		if len(bc.PathLen.FullBytes) > 0 && bc.PathLen.Class == asn1.ClassUniversal && bc.PathLen.Tag == asn1.TagInteger {
+			if len(bc.PathLen.Bytes) == 0 {
+				return fmt.Errorf("%w: basic-constraints: pathLenConstraint is an INTEGER without content", ErrMalformed)
+			}
+			pathLen := new(big.Int).SetBytes(bc.PathLen.Bytes)
+			if !pathLen.IsUint64() || pathLen.Uint64() > math.MaxUint8 {
+				return fmt.Errorf("%w: basic-constraints: pathLenConstraint %s exceeds 255", ErrMalformed, pathLen)
+			}
+			ext.BasicConstraintsHasPathLen, ext.BasicConstraintsPathLen = true, uint8(pathLen.Uint64()) //nolint:gosec // 0..255, checked above
 		}
 	case extTagKeyUsage:
 		var bits asn1.BitString
@@ -498,17 +525,45 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 
 // derECDSASignature reads the certificate's signature BIT STRING, a DER
 // ECDSA-Sig-Value, as the 64-byte r‖s the TLV carries.
+//
+// Mirrors matter.js EcdsaSignature (EcdsaSignature.ts:28-29 at db021da0):
+// r and s each through DerCodec.decodeBigUint(…, 32) (DerCodec.ts:288-318),
+// which takes the INTEGER's content bytes as they are — 32 of them, 33 with
+// a leading zero, fewer padded to 32 — and refuses anything wider ("Encoded
+// integer contains too many bytes"). The certificate arrives before it is
+// trusted, so a wide value is ErrMalformed, never a panic.
 func derECDSASignature(v asn1.RawValue) ([]byte, error) {
 	var bits asn1.BitString
 	if _, err := asn1.Unmarshal(v.FullBytes, &bits); err != nil {
 		return nil, fmt.Errorf("%w: signature: %w", ErrMalformed, err)
 	}
-	var sig ecdsaSignature
+	var sig struct{ R, S asn1.RawValue }
 	if _, err := asn1.Unmarshal(bits.Bytes, &sig); err != nil {
 		return nil, fmt.Errorf("%w: signature is not an ECDSA-Sig-Value: %w", ErrMalformed, err)
 	}
-	out := make([]byte, 64)
-	sig.R.FillBytes(out[:32])
-	sig.S.FillBytes(out[32:])
-	return out, nil
+	r, err := derSignatureInteger(sig.R, "r")
+	if err != nil {
+		return nil, err
+	}
+	s, err := derSignatureInteger(sig.S, "s")
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(r, s), nil
+}
+
+// derSignatureInteger is DerCodec.decodeBigUint(value, 32) (DerCodec.ts:
+// 288-318 at db021da0) for one ECDSA-Sig-Value component.
+func derSignatureInteger(v asn1.RawValue, name string) ([]byte, error) {
+	if v.Class != asn1.ClassUniversal || v.Tag != asn1.TagInteger || v.IsCompound {
+		return nil, fmt.Errorf("%w: signature is not an ECDSA-Sig-Value: %s is not an INTEGER", ErrMalformed, name)
+	}
+	b := v.Bytes
+	switch {
+	case len(b) == 33 && b[0] == 0:
+		b = b[1:]
+	case len(b) > 32:
+		return nil, fmt.Errorf("%w: signature %s: encoded integer contains too many bytes", ErrMalformed, name)
+	}
+	return append(make([]byte, 32-len(b), 32), b...), nil
 }

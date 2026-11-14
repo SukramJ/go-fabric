@@ -218,11 +218,16 @@ func (r *Registry) reserveID(id string) {
 	}
 }
 
-// allocateIDLocked is ClientNodeStores.allocateId (:77-81).
+// allocateIDLocked is ClientNodeStores.allocateId (:77-81), past any id
+// a node already holds (review II, R2-P1-ctl-01). The caller holds mu.
 func (r *Registry) allocateIDLocked() string {
-	id := idPrefix + strconv.Itoa(r.nextID)
-	r.nextID++
-	return id
+	for {
+		id := idPrefix + strconv.Itoa(r.nextID)
+		r.nextID++
+		if !slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
+			return id
+		}
+	}
 }
 
 // nodeConfig is the template with the registry's fields.
@@ -439,19 +444,27 @@ func (r *Registry) add(n *Node) {
 	r.manageExpiration()
 }
 
-// remove drops n and manages the expiry timer (Peers.ts:107).
+// remove drops n and manages the expiry timer (Peers.ts:112 at db021da0),
+// then runs n's Deleted hook — once, for a node the registry held (review
+// II, R2-P1-ctl-05).
 func (r *Registry) remove(n *Node) {
 	r.mu.Lock()
+	held := len(r.nodes)
 	r.nodes = slices.DeleteFunc(r.nodes, func(x *Node) bool { return x == n })
+	removed := len(r.nodes) < held
 	r.mu.Unlock()
 	r.manageExpiration()
+	if h := n.cfg.Hooks.Deleted; removed && h != nil {
+		h()
+	}
 }
 
 // Forget drops n from the registry and the database without reaching it:
 // its subscriptions close, its rows and its peer go. For a node that no
 // longer exists — the controller's former own node (phase 37) — not for a
 // node still on the fabric, which [Node.Decommission] removes from both
-// sides.
+// sides. A store that fails to erase the rows is returned and the node,
+// closed, stays in the registry, so a Forget again retries the erase.
 func (r *Registry) Forget(ctx context.Context, n *Node) error { return r.deleteNode(ctx, n, nil) }
 
 // deleteNode deletes a node — ClientNode.delete (node/ClientNode.ts:213-225):
@@ -677,11 +690,12 @@ func (r *Registry) fabricByIndex(index uint8) *commissioner.Fabric {
 }
 
 // ForAddress is the node of peer address addr, created when there is none
-// — Peers.forAddress (Peers.ts:445-486): the address must be on one of
-// our fabrics (:446-448); the creation is serialized (:455-462); a new
-// node takes id when given (:464-470) and an allocated one otherwise,
-// joins the registry and takes the address, bound to its peer but neither
-// started nor auto-subscribed (:472-484).
+// — Peers.forAddress (Peers.ts:458-499 at db021da0): the address must be
+// on one of our fabrics (:459-461); the creation is serialized (:468-471);
+// a new node takes id when given (:477-483, :960; reserved, so no
+// allocation hands it out again) and an allocated one otherwise, joins
+// the registry and takes the address, bound to its peer but neither
+// started nor auto-subscribed (:487-495).
 func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 	if r.fabricByIndex(addr.FabricIndex) == nil {
 		return nil, ErrForeignFabric
@@ -704,6 +718,14 @@ func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 	} else if slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
 		r.mu.Unlock()
 		return nil, fmt.Errorf("%w: id %q is taken", ErrConfig, id)
+	} else {
+		// A caller-chosen id is reserved as a stored one is, so the
+		// counter never hands it to a second node (review II,
+		// R2-P1-ctl-01; ahead of matter.js, whose Peers.ts:960 takes
+		// options.id and whose ClientNodeStores.ts:77-81 allocateId
+		// reserves no preassigned id, at db021da0; by_design
+		// BD-Matter-ReservedLocalIDs).
+		r.reserveID(id)
 	}
 	r.mu.Unlock()
 	p, err := r.cfg.Peers.For(addr)

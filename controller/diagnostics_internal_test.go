@@ -127,7 +127,7 @@ func TestDiagHooksChain(t *testing.T) {
 	t.Parallel()
 	c, _ := traced()
 	var states []client.ConnectionState
-	var commissioned, decommissioned int
+	var commissioned, decommissioned, deleted int
 	h := c.diagHooks(func(id string) client.Hooks {
 		return client.Hooks{
 			ConnectionStateChanged: func(s client.ConnectionState) {
@@ -138,6 +138,7 @@ func TestDiagHooksChain(t *testing.T) {
 			},
 			Commissioned:   func() { commissioned++ },
 			Decommissioned: func() { decommissioned++ },
+			Deleted:        func() { deleted++ },
 		}
 	})("peer1")
 	for _, tc := range []struct {
@@ -159,13 +160,15 @@ func TestDiagHooksChain(t *testing.T) {
 	}
 	h.Commissioned()
 	h.Decommissioned()
-	if len(states) != 5 || commissioned != 1 || decommissioned != 1 {
-		t.Fatalf("host states %v, commissioned %d, decommissioned %d", states, commissioned, decommissioned)
+	h.Deleted()
+	if len(states) != 5 || commissioned != 1 || decommissioned != 1 || deleted != 1 {
+		t.Fatalf("host states %v, commissioned %d, decommissioned %d, deleted %d", states, commissioned, decommissioned, deleted)
 	}
 	bare := c.diagHooks(func(string) client.Hooks { return client.Hooks{} })("peer2")
 	bare.ConnectionStateChanged(client.Connected)
 	bare.Commissioned()
 	bare.Decommissioned()
+	bare.Deleted()
 }
 
 // TestTraceOTAStatus: a status enters the trace — Cancelled as a warning

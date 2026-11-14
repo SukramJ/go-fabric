@@ -94,6 +94,18 @@ func parseAttCert(der []byte, kind certKind, acceptProfileViolation bool) (*attC
 		}
 		return nil, err
 	}
+	// The issuer's and the subject's vendor and product id are read as
+	// the DER parse reads them, issuer first, before the required
+	// extensions and the traditional size limit (Certificate.ts:729, :740,
+	// :792, :812 at db021da0) and before the ML-DSA check of
+	// parseAttestationCertificate (AttestationCertificates.ts:56-61).
+	if _, _, err := IssuerMatterIDs(c); err != nil {
+		return nil, err
+	}
+	vid, pid, err := MatterIDs(c)
+	if err != nil {
+		return nil, err
+	}
 	switch {
 	case usesMLDSA(c) && !forward.Enabled(forward.PQCPhase1):
 		return nil, fmt.Errorf("%w: this certificate uses %v", ErrMLDSAAttestationDisabled, c.SignatureAlgorithm)
@@ -114,10 +126,7 @@ func parseAttCert(der []byte, kind certKind, acceptProfileViolation bool) (*attC
 	if (kind == kindPAA || kind == kindCDSigner) && !enc.isV3() {
 		return nil, fmt.Errorf("attestation: %s version field must be 2 (v3), not %s", kind, enc.version)
 	}
-	a := &attCert{x509: c, notBefore: matterTime(c.NotBefore), notAfter: matterTime(c.NotAfter)}
-	if a.vendorID, a.productID, err = MatterIDs(c); err != nil {
-		return nil, err
-	}
+	a := &attCert{x509: c, vendorID: vid, productID: pid, notBefore: matterTime(c.NotBefore), notAfter: matterTime(c.NotAfter)}
 	switch kind {
 	case kindDAC:
 		if _, err := P256Key(c); err != nil {
@@ -147,78 +156,121 @@ func matterTime(t time.Time) int64 {
 	return t.Unix() - matterEpochOffset
 }
 
-// MatterIDs reads the vendor and product id of the subject DN —
-// Certificate.ts:345-352 (the OID attributes, hex strings parsed with
-// parseInt(_, 16)) and :379-392 (the Mvid:/Mpid: commonName fallback,
-// only when the DN carries neither OID).
+// MatterIDs reads the vendor and product id of the subject DN by
+// matter.js's rule for a parse without acceptMalformedVidPid (db021da0;
+// the rule is [matterIDsOf]'s).
 func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	return matterIDsOf(c.Subject)
 }
 
 // IssuerMatterIDs reads the vendor and product id of the issuer DN the
 // same way — matter.js parses the issuer with parseSubjectOrIssuer too
-// (Certificate.ts:667-669 at 862ad75f), so a DAC whose PAI carries its
-// vendor id only in a `Mvid:` commonName still names its issuer's vendor
+// (Certificate.ts:729 at db021da0), so a DAC whose PAI carries its vendor
+// id only in a `Mvid:` commonName still names its issuer's vendor
 // (CertificatesTest.ts:319-324, the Nuki DAC).
 func IssuerMatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	return matterIDsOf(c.Issuer)
 }
 
-// matterIDsOf is the vendor and product id of one DN.
+// oidCommonName is X.520 commonName (2.5.4.3).
+var oidCommonName = asn1.ObjectIdentifier{2, 5, 4, 3}
+
+// matterIDsOf is the vendor and product id of one DN, as
+// parseSubjectOrIssuer and decodeDistinguishedName read them without
+// acceptMalformedVidPid (Certificate.ts:302-382, DistinguishedName.ts
+// :252-328 at db021da0):
+//
+//   - a matter-oid-vid or matter-oid-pid attribute must be exactly 4
+//     uppercase hex digits (parseMatterRdnHex, Certificate.ts:242-249,
+//     :341-349) and occur once (DistinguishedName.ts:261-270, :277-281);
+//     either violation is a [*profileError], CertificateProfileError;
+//   - the commonName fallback is read only when the DN carries neither
+//     attribute, a malformed one counting (Certificate.ts:343, :377-381):
+//     the first commonName, in DN order, that carries a VendorID or
+//     ProductID supplies both, searched in its first 64 bytes
+//     (DistinguishedName.ts:345-374).
 func matterIDsOf(name pkix.Name) (vid, pid *uint16, err error) {
+	hasAttribute := false
+	var commonNames []string
 	for _, n := range name.Names {
-		s, ok := n.Value.(string)
+		var field string
+		var out **uint16
 		switch {
-		case !ok:
-			continue
 		case n.Type.Equal(oidMatterVendorID):
-			vid = parseHexID(s)
+			field, out = "vendorId", &vid
 		case n.Type.Equal(oidMatterProductID):
-			pid = parseHexID(s)
+			field, out = "productId", &pid
+		case n.Type.Equal(oidCommonName):
+			if s, ok := n.Value.(string); ok {
+				commonNames = append(commonNames, s)
+			}
+			continue
+		default:
+			continue
 		}
+		hasAttribute = true
+		s, _ := n.Value.(string)
+		id, ok := parseHexID(s)
+		if !ok {
+			return nil, nil, profileErrorf("Invalid %s %q: expected exactly 4 uppercase hexadecimal digits", field, s)
+		}
+		if *out != nil {
+			return nil, nil, profileErrorf("Distinguished name contains %s more than once", field)
+		}
+		*out = &id
 	}
-	if vid != nil || pid != nil {
+	if hasAttribute {
 		return vid, pid, nil
 	}
-	cn := name.CommonName
-	if vid, err = fallbackID(cn, "Mvid:"); err != nil {
-		return nil, nil, err
-	}
-	if pid, err = fallbackID(cn, "Mpid:"); err != nil {
-		return nil, nil, err
-	}
-	return vid, pid, nil
+	return fallbackIDs(commonNames)
 }
 
-// parseHexID is parseInt(hexString, 16) as matter.js applies it to a
-// vendor or product id attribute (Certificate.ts:345-352): the leading
-// hex digits; a value without one is absent. A value above 16 bits is
-// absent here too — matter.js keeps the number, which then matches no
-// 16-bit id either.
-func parseHexID(s string) *uint16 {
-	end := 0
-	for end < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[end])) {
-		end++
+// maxFallbackCommonNameBytes is MAX_FALLBACK_COMMON_NAME_BYTES
+// (DistinguishedName.ts:345-346 at db021da0).
+const maxFallbackCommonNameBytes = 64
+
+// fallbackIDs is fallbackVidPid (DistinguishedName.ts:354-374 at
+// db021da0): the first commonName whose first 64 bytes carry a VendorID
+// or ProductID supplies both; a later one is not read, an earlier one with
+// a malformed prefix refuses the DN.
+func fallbackIDs(commonNames []string) (vid, pid *uint16, err error) {
+	for _, cn := range commonNames {
+		if len(cn) > maxFallbackCommonNameBytes {
+			cn = cn[:maxFallbackCommonNameBytes]
+		}
+		if vid, err = fallbackID(cn, "Mvid:"); err != nil {
+			return nil, nil, err
+		}
+		if pid, err = fallbackID(cn, "Mpid:"); err != nil {
+			return nil, nil, err
+		}
+		if vid != nil || pid != nil {
+			return vid, pid, nil
+		}
 	}
-	if end == 0 {
-		return nil
-	}
-	v, err := strconv.ParseUint(s[:end], 16, 16)
-	if err != nil {
-		return nil
-	}
-	id := uint16(v)
-	return &id
+	return nil, nil, nil
 }
+
+// parseHexID is parseMatterRdnHex(field, text, 2) (Certificate.ts:242-249
+// at db021da0): exactly 4 uppercase hex digits, nothing else.
+func parseHexID(s string) (uint16, bool) {
+	if !hexIDPattern.MatchString(s) {
+		return 0, false
+	}
+	v, _ := strconv.ParseUint(s, 16, 16)
+	return uint16(v), true
+}
+
+var hexIDPattern = regexp.MustCompile(`^[0-9A-F]{4}$`)
 
 var fallbackPatterns = map[string]*regexp.Regexp{
 	"Mvid:": regexp.MustCompile(`Mvid:([0-9A-F]{4})`),
 	"Mpid:": regexp.MustCompile(`Mpid:([0-9A-F]{4})`),
 }
 
-// fallbackID is parseMatterFallbackVidPid (Certificate.ts:249-258): the
-// leftmost prefix followed by 4 uppercase hex digits; the prefix without
-// them is an error.
+// fallbackID is parseMatterFallbackVidPid (DistinguishedName.ts:63-72 at
+// db021da0): the leftmost prefix followed by 4 uppercase hex digits; the
+// prefix without them is an error.
 func fallbackID(cn, prefix string) (*uint16, error) {
 	if m := fallbackPatterns[prefix].FindStringSubmatch(cn); m != nil {
 		v, _ := strconv.ParseUint(m[1], 16, 16)

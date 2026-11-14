@@ -5,6 +5,7 @@ package sensing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -103,16 +104,45 @@ type Occupancy struct {
 	clock clock.Clock
 	event bool // OCCEVENT
 
-	// mu guards endpoint, hold, limits, holdTime, timer, started and gen.
-	mu       sync.Mutex
-	endpoint uint16
-	hold     bool      // HoldTime served: chip's IsHoldTimeEnabled
-	limits   [3]uint16 // min, max, default
-	holdTime uint16
-	timer    clock.Timer
-	started  time.Duration // the monotonic reading the timer started at
-	gen      uint64
+	// mu guards endpoint, hold, limits, holdTime, timer, started, gen,
+	// pending and publishing.
+	//
+	// Every decision about Occupancy and HoldTime is taken under mu and
+	// queues its store in pending: the hold timer's check that it is
+	// still current and its unoccupied, a host report's stop of the timer
+	// and its value, setHoldTime's new hold time and its clear of an
+	// elapsed hold. The stores are made outside mu, one goroutine at a
+	// time, in the order decided ([Occupancy.publish]): a host's occupied
+	// report decided after the timer's check is stored after the timer's
+	// unoccupied (review II, R2-P1-clu-03), and a controller's HoldTime
+	// write and the host's Set leave the attribute at the hold time the
+	// timer uses (R2-P1-clu-04). No lock is held across a store, whose
+	// change notification reaches the host: a listener that sets this
+	// server again returns (R2-P1-dr-rest-01).
+	mu         sync.Mutex
+	endpoint   uint16
+	hold       bool      // HoldTime served: chip's IsHoldTimeEnabled
+	limits     [3]uint16 // min, max, default
+	holdTime   uint16
+	timer      clock.Timer
+	started    time.Duration // the monotonic reading the timer started at
+	gen        uint64
+	pending    []occStore // decided under mu, not yet stored, in order
+	publishing bool       // a goroutine is making the pending stores
 }
+
+// occStore is one store a decision queued: values stored from origin, or
+// the deprecated delay attributes reported changed.
+type occStore struct {
+	origin  contract.Origin
+	values  map[uint32]any
+	changed []uint32
+}
+
+// errHoldTimeQueued tells MatterWrite that the Sink queued the HoldTime
+// store itself, in decision order, so the generated server does not
+// store the write a second time, out of that order.
+var errHoldTimeQueued = errors.New("sensing: OccupancySensing: HoldTime store queued")
 
 // Compile-time assertions.
 var (
@@ -270,20 +300,27 @@ func (s occSource) MatterAttribute(attrID uint32) (any, bool) {
 // definition's checks; the generated server stores it and reports it.
 type occSink struct{ o *Occupancy }
 
-// MatterWriteAttribute implements [spec.Sink].
+// MatterWriteAttribute implements [spec.Sink]: the hold time is changed
+// and its store queued with the decision, so the write answers
+// errHoldTimeQueued for the generated server not to store it again.
 func (k occSink) MatterWriteAttribute(_ context.Context, attrID uint32, value any) error {
 	if attrID != occdef.AttrHoldTime {
 		return nil
 	}
 	h, _ := value.(uint16)
-	return k.o.setHoldTime(h)
+	if err := k.o.setHoldTime(h, contract.OriginControllerWrite); err != nil {
+		return err
+	}
+	return errHoldTimeQueued
 }
 
-// setHoldTime is chip's SetHoldTime (OccupancySensingCluster.cpp:206-275)
-// without the store, which its caller does: the limits, the aliases'
-// change report, and a running timer re-armed for what remains of the new
-// hold time — or Occupancy cleared at once when that has elapsed.
-func (o *Occupancy) setHoldTime(h uint16) error {
+// setHoldTime is chip's SetHoldTime (OccupancySensingCluster.cpp:206-275):
+// the limits, the aliases' change report, a running timer re-armed for
+// what remains of the new hold time — or Occupancy cleared at once when
+// that has elapsed — and the store of HoldTime from origin, queued in that
+// order and made before it returns unless another goroutine is making
+// them ([Occupancy.publish]).
+func (o *Occupancy) setHoldTime(h uint16, origin contract.Origin) error {
 	o.mu.Lock()
 	if !o.hold { // :208
 		o.mu.Unlock()
@@ -315,13 +352,15 @@ func (o *Occupancy) setHoldTime(h uint16) error {
 			aliases = append(aliases, id)
 		}
 	}
-	o.mu.Unlock()
 	if len(aliases) > 0 { // :217-232
-		_ = o.srv.MarkChanged(aliases...)
+		o.pending = append(o.pending, occStore{changed: aliases})
 	}
 	if elapsedAll {
-		o.doSetOccupancy(false)
+		o.queueOccupancyLocked(false)
 	}
+	o.pending = append(o.pending, occStore{origin: origin, values: map[uint32]any{occdef.AttrHoldTime: h}})
+	o.mu.Unlock()
+	o.publish()
 	return nil
 }
 
@@ -353,8 +392,9 @@ func (o *Occupancy) timerFired(gen uint64) {
 		return
 	}
 	o.timer = nil
+	o.queueOccupancyLocked(false)
 	o.mu.Unlock()
-	o.doSetOccupancy(false)
+	o.publish()
 }
 
 // setOccupancy is chip's SetOccupancy (OccupancySensingCluster.cpp:277-297):
@@ -372,19 +412,58 @@ func (o *Occupancy) setOccupancy(occupied bool) {
 			return
 		}
 	}
+	o.queueOccupancyLocked(occupied)
 	o.mu.Unlock()
-	o.doSetOccupancy(occupied)
+	o.publish()
 }
 
-// doSetOccupancy is chip's DoSetOccupancy (OccupancySensingCluster.cpp:304-321):
-// the store reports a change and the OCCEVENT reaction emits the event;
-// an equal value changes nothing.
-func (o *Occupancy) doSetOccupancy(occupied bool) {
+// queueOccupancyLocked queues chip's DoSetOccupancy
+// (OccupancySensingCluster.cpp:304-321): the store reports a change and
+// the OCCEVENT reaction emits the event; an equal value changes nothing.
+func (o *Occupancy) queueOccupancyLocked(occupied bool) {
 	var bitmap occdef.OccupancyBitmap
 	if occupied {
 		bitmap = occdef.OccupancyOccupied
 	}
-	_ = o.srv.SetAttributes(map[uint32]any{occdef.AttrOccupancy: bitmap})
+	o.pending = append(o.pending, occStore{origin: contract.OriginHostSet, values: map[uint32]any{occdef.AttrOccupancy: bitmap}})
+}
+
+// publish makes the queued stores in the order they were decided, outside
+// mu, so their change notification may set this server again. One
+// goroutine makes them at a time: a caller that finds another making them
+// leaves its own to that one and returns — a listener's set made from
+// within a store's notification among them, which is stored when that
+// notification has returned. A caller nobody races stores before it
+// returns.
+func (o *Occupancy) publish() {
+	o.mu.Lock()
+	if o.publishing {
+		o.mu.Unlock()
+		return
+	}
+	o.publishing = true
+	locked := true
+	defer func() { // a listener's panic leaves the next caller to publish
+		if !locked {
+			o.mu.Lock()
+		}
+		o.publishing = false
+		o.mu.Unlock()
+	}()
+	for len(o.pending) > 0 {
+		next := o.pending[0]
+		o.pending[0] = occStore{}
+		o.pending = o.pending[1:]
+		locked = false
+		o.mu.Unlock()
+		if next.values != nil {
+			_ = o.srv.SetAttributesFrom(next.origin, next.values)
+		} else {
+			_ = o.srv.MarkChanged(next.changed...)
+		}
+		o.mu.Lock()
+		locked = true
+	}
 }
 
 // SetAttributes implements [spec.AttributeSetter], the typed Set: the
@@ -393,6 +472,12 @@ func (o *Occupancy) doSetOccupancy(occupied bool) {
 // HoldTime is served (chip SetOccupancy) and HoldTime through its limits
 // and the running timer (chip SetHoldTime); a deprecated delay attribute
 // sets HoldTime.
+//
+// Occupancy and HoldTime are stored in the order they were decided, with
+// no lock held across the store, so a change listener may set the server
+// again. A set that finds another goroutine storing — the listener's own
+// among them — leaves its store to that goroutine and returns before it
+// is made.
 func (o *Occupancy) SetAttributes(values map[uint32]any) error {
 	rest := maps.Clone(values)
 	var occ *bool
@@ -430,10 +515,9 @@ func (o *Occupancy) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	if hold != nil {
-		if err := o.setHoldTime(*hold); err != nil {
+		if err := o.setHoldTime(*hold, contract.OriginHostSet); err != nil {
 			return fmt.Errorf("%w: %w", spec.ErrInvalidValue, err)
 		}
-		_ = o.srv.SetAttributes(map[uint32]any{occdef.AttrHoldTime: *hold})
 	}
 	if occ != nil {
 		o.setOccupancy(*occ)
@@ -485,9 +569,14 @@ func (o *Occupancy) MatterRead(attrID uint32) (any, bool) { return o.srv.MatterR
 // delay attribute as HoldTime (OccupancySensingCluster.cpp:170-181).
 func (o *Occupancy) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if slices.Contains(holdTimeAliases, attrID) && o.Serves(attrID) {
-		return o.srv.MatterWrite(ctx, occdef.AttrHoldTime, value)
+		attrID = occdef.AttrHoldTime
 	}
-	return o.srv.MatterWrite(ctx, attrID, value)
+	// The Sink queues the HoldTime store with its decision
+	// (errHoldTimeQueued); the generated server's checks run before it.
+	if err := o.srv.MatterWrite(ctx, attrID, value); err != nil && !errors.Is(err, errHoldTimeQueued) {
+		return err
+	}
+	return nil
 }
 
 // MatterInvoke answers every command: the cluster has none.

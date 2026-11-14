@@ -96,7 +96,10 @@ type sessionWatch struct {
 	nodesSwept   map[uint64]bool
 	establishing map[watchKey]int
 	failed       map[watchKey]*failedSweeps
-	work         sync.WaitGroup
+	// stopped refuses new sweeps once the Service closed; work is added
+	// under mu, so every Add precedes stop's Wait.
+	stopped bool
+	work    sync.WaitGroup
 }
 
 func newSessionWatch(ctx context.Context, io watchIO, clk clock.Clock, log *slog.Logger) *sessionWatch {
@@ -314,7 +317,13 @@ func (w *sessionWatch) sweep(nodeID uint64, ep uint16, ours map[uint16]bool) {
 		return
 	}
 	slices.Sort(leftovers)
+	w.mu.Lock()
+	if w.stopped {
+		w.mu.Unlock()
+		return
+	}
 	w.work.Add(1)
+	w.mu.Unlock()
 	go func() {
 		defer w.work.Done()
 		failed := false
@@ -373,3 +382,13 @@ func (w *sessionWatch) endLeftover(nodeID uint64, ep, id uint16) error {
 
 // wait waits for the sweeps in flight.
 func (w *sessionWatch) wait() { w.work.Wait() }
+
+// stop waits for the sweeps in flight; a sweep asked for afterwards — a
+// report hook already running when the Service closed — starts nothing,
+// so no Add follows the Wait (review II, R2-P1-cam-b-05).
+func (w *sessionWatch) stop() {
+	w.mu.Lock()
+	w.stopped = true
+	w.mu.Unlock()
+	w.work.Wait()
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -73,6 +74,10 @@ type bleRuntime struct {
 	adv       bleAdvert
 	// central is the one connected central, nil without one.
 	central contract.BLEConnection
+	// receivers holds the receiver of every BTP connection until its
+	// handlers returned, so [Bridge.Stop] waits for them
+	// (waitBLEHandlers) as it waits for the UDP and TCP listeners' ones.
+	receivers map[*connReceiver]struct{}
 }
 
 // bleAdvert is what the BLE advertisement carries of a
@@ -111,6 +116,11 @@ func (b *Bridge) setBLERunning(on bool) {
 // BLE announces a basic window only: adv.CommissioningMode must be 1
 // (matter.js BleAdvertiser.getAdvertisement, BleAdvertiser.ts:37-45).
 //
+// A service the platform refuses or withdraws ends the advertisement as
+// well — StartBLE cannot report it, Serve fails on its own goroutine
+// (logged as matter.ble.serve) — and the next StartBLE registers the
+// service again.
+//
 // A service or advertisement still ending after a [Bridge.StopBLE] that
 // gave up waiting is waited for first, until ctx ends. The bridge must be
 // started; [Bridge.Stop] ends what StartBLE started.
@@ -145,20 +155,7 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 		done := make(chan struct{})
 		b.ble.serveCancel, b.ble.serveDone = cancel, done
-		go func() {
-			defer close(done)
-			if err := p.Serve(serveCtx, nil, b.acceptBLE); err != nil {
-				b.logger.Warn("matter.ble.serve", slog.Any("err", err))
-			}
-			// The service ended — asked to, or on its own (refused,
-			// withdrawn): the next StartBLE registers it again.
-			b.ble.mu.Lock()
-			if b.ble.serveDone == done {
-				b.ble.serveCancel, b.ble.serveDone = nil, nil
-			}
-			b.ble.mu.Unlock()
-			cancel()
-		}()
+		go b.serveBLE(serveCtx, cancel, done, p)
 		b.logger.Info("matter.ble.serving")
 	}
 	if b.ble.advCancel != nil && b.ble.adv == want {
@@ -195,6 +192,35 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		b.advertiseBLE(advCtx, p, want)
 	}()
 	return nil
+}
+
+// serveBLE runs the GATT service of one StartBLE until it ends, then
+// closes done.
+func (b *Bridge) serveBLE(serveCtx context.Context, cancel context.CancelFunc, done chan struct{}, p contract.BLEPeripheral) {
+	defer close(done)
+	err := p.Serve(serveCtx, nil, b.acceptBLE)
+	if err != nil {
+		b.logger.Warn("matter.ble.serve", slog.Any("err", err))
+	}
+	// The service ended — asked to, or on its own (refused, withdrawn):
+	// the next StartBLE registers it again. A service that failed on its
+	// own also ends the advertisement: the node does not announce itself
+	// as commissionable over BLE with no service behind it (review II,
+	// R2-P1-req-06).
+	var advCancel context.CancelFunc
+	b.ble.mu.Lock()
+	if b.ble.serveDone == done {
+		b.ble.serveCancel, b.ble.serveDone = nil, nil
+		if err != nil && serveCtx.Err() == nil {
+			advCancel = b.ble.advCancel
+			b.ble.advCancel = nil
+		}
+	}
+	b.ble.mu.Unlock()
+	if advCancel != nil {
+		advCancel()
+	}
+	cancel()
 }
 
 // WithdrawBLE ends the BLE advertisement and leaves the GATT service and a
@@ -321,6 +347,54 @@ func (b *Bridge) stopBLEForShutdown(ctx context.Context) {
 	}
 }
 
+// trackBLEReceiver records r until its handlers returned.
+func (b *Bridge) trackBLEReceiver(r *connReceiver) {
+	b.ble.mu.Lock()
+	defer b.ble.mu.Unlock()
+	if b.ble.receivers == nil {
+		b.ble.receivers = make(map[*connReceiver]struct{})
+	}
+	b.ble.receivers[r] = struct{}{}
+}
+
+// untrackBLEReceiver forgets r once its handlers returned.
+func (b *Bridge) untrackBLEReceiver(r *connReceiver) {
+	b.ble.mu.Lock()
+	delete(b.ble.receivers, r)
+	b.ble.mu.Unlock()
+}
+
+// waitBLEHandlers is [Bridge.Stop]'s wait for the handlers of messages
+// delivered over BLE, bounded by ctx: every receiver stops delivering and
+// its handlers in flight are waited for, so none of them writes into a
+// store the host closes or erases after Stop. Stop calls it after the
+// handler context was cancelled, so a handler that honours it ends
+// promptly.
+func (b *Bridge) waitBLEHandlers(ctx context.Context) {
+	b.ble.mu.Lock()
+	rs := make([]*connReceiver, 0, len(b.ble.receivers))
+	for r := range b.ble.receivers {
+		rs = append(rs, r)
+	}
+	b.ble.mu.Unlock()
+	if len(rs) == 0 {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, r := range rs {
+			r.close() // no delivery after this, so wait cannot race an Add
+			r.wait()
+		}
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		b.logger.Warn("matter.bridge.stop.ble_handlers_timeout", slog.Any("err", ctx.Err()))
+	}
+}
+
 // acceptBLE is the GATT service's accept: one central at a time, its BTP
 // session served through the receive path.
 func (b *Bridge) acceptBLE(c contract.BLEConnection) {
@@ -345,12 +419,15 @@ func (b *Bridge) acceptBLE(c contract.BLEConnection) {
 	}()
 	err := btp.Accept(c, func(conn *btp.Conn) func([]byte) {
 		r := b.newConnReceiver(conn)
+		b.trackBLEReceiver(r)
 		go func() {
 			select {
 			case <-conn.Closed():
 			case <-c.Disconnected():
 			}
 			r.close()
+			r.wait()
+			b.untrackBLEReceiver(r)
 		}()
 		return r.deliver
 	}, btp.Options{TimeSource: b.clk(), Logger: b.logger})
@@ -431,12 +508,31 @@ func (r *connReceiver) deliver(msg []byte) {
 		var once sync.Once
 		release := func() { once.Do(func() { close(turn) }) }
 		defer release()
+		defer r.recoverHandler(len(msg))
 		<-prev
 		// As handleTCPMessage: the dispatch context carries the release of
 		// the connection's turn.
 		ctx := context.WithValue(r.b.handlerContext(), sessionTurnKey{}, release)
 		_ = r.b.receive(ctx, msg, r.conn)
 	}()
+}
+
+// recoverHandler recovers a panic of a delivered message's handler, so a
+// message over BLE cannot end the process: logged and counted as the UDP
+// listener's safeDispatch and the TCP connection's safeHandle do (review
+// II, R2-P1-dr-req-08). deliver's other defers give back the turn and the
+// place in flight.
+func (r *connReceiver) recoverHandler(msgLen int) {
+	p := recover()
+	if p == nil {
+		return
+	}
+	r.b.panicRecovered()
+	r.b.logger.Error("matter.ble.dispatch_panic",
+		slog.Any("panic", p),
+		slog.String("peer", r.conn.Remote().String()),
+		slog.Int("message_bytes", msgLen),
+		slog.String("stack", string(debug.Stack())))
 }
 
 // close stops delivering and evicts every session bound to the

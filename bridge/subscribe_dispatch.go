@@ -193,8 +193,8 @@ func (b *Bridge) buildInitialReport(
 // not: no report ever arrives, and the device goes stale with nothing on the
 // wire to explain it.
 //
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:549-566
-// for the KeepSubscriptions teardown, and
+// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:647-665
+// at db021da0 for the KeepSubscriptions teardown, and
 // packages/protocol/src/action/server/EventReadResponse.ts for the
 // EventPaths wiring.
 func (b *Bridge) registerSubscription(
@@ -220,9 +220,13 @@ func (b *Bridge) registerSubscription(
 		// before admitting the new one.
 		//
 		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:549-566 which matches on same-session
-		// for pre-fabric (PASE) subscriptions and on (fabric, peerNodeID)
-		// for operational (CASE) subscriptions. The previous guard
+		// InteractionServer.ts:647-665 at db021da0 for a session with a
+		// fabric: it matches on the peer address, (fabric, peerNodeID).
+		// On a session without one (PASE) matter.js tears nothing down
+		// (`fabric !== undefined`, :647); the same-session teardown
+		// below is this module's own
+		// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
+		// previous guard
 		// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
 		// silently skipped PASE re-subscriptions (fabricIndex=0) so a
 		// PASE subscriber that re-subscribes with KeepSubscriptions=false
@@ -230,8 +234,8 @@ func (b *Bridge) registerSubscription(
 		if !req.KeepSubscriptions {
 			if fabricIndex != 0 && peerNodeID != 0 {
 				// CASE session — tear down by (fabric, peer) tuple. The
-				// peer is the session's subject: a secure unicast header
-				// carries no source node id (Matter §4.4.1.4), and
+				// peer is the session's subject, whatever source node id
+				// the frame's header claims (subscriptionPeerNodeID), as
 				// matter.js matches on session.peerAddress.
 				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
 					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
@@ -244,8 +248,9 @@ func (b *Bridge) registerSubscription(
 				// PASE session (fabricIndex=0) — tear down by SessionID so
 				// a re-subscribe on the same PASE exchange replaces, rather
 				// than accumulates, the prior subscription.
-				// Mirrors matter.js InteractionServer.ts:549-566 same-session
-				// match for the pre-fabric path.
+				// This module's own: matter.js tears nothing down on a
+				// session without a fabric (InteractionServer.ts:647 at
+				// db021da0; findings F-db021da0-12).
 				m.CloseSession(requestHdr.SessionID)
 			}
 		}
@@ -274,10 +279,10 @@ func (b *Bridge) registerSubscription(
 			// SubscribeRequests on the same session can only arise when
 			// the peer's first attempt is racing a reconnect; keeping
 			// the older entry drains quota and causes duplicate reports.
-			// Applied only for CASE sessions (fabricIndex != 0 and a
-			// real SourceNodeID) because PASE re-subscribe cleanup is
-			// handled by the KeepSubscriptions=false / CloseSession
-			// path above.
+			// Applied only for CASE sessions (fabricIndex != 0) because
+			// PASE re-subscribe cleanup is handled by the
+			// KeepSubscriptions=false / CloseSession path above; the
+			// header's source node id has no say (R2-P1-req2-02).
 			//
 			// Gated on !req.KeepSubscriptions: a peer that sets
 			// KeepSubscriptions=true is explicitly asking for its existing
@@ -288,9 +293,9 @@ func (b *Bridge) registerSubscription(
 			// gate every second SubscribeRequest on a session silently
 			// tore down the first one regardless of the flag, contradicting
 			// the KeepSubscriptions=false teardown matter.js performs at
-			// packages/node/src/node/server/InteractionServer.ts:611
+			// packages/node/src/node/server/InteractionServer.ts:647 at db021da0
 			// (`if (fabric !== undefined && !keepSubscriptions)`).
-			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0 && requestHdr.HasSourceNodeID,
+			ReplaceSessionDuplicate: !req.KeepSubscriptions && fabricIndex != 0,
 		})
 		if err != nil {
 			b.logger.Warn("matter.rx.im.subscribe.manager",
@@ -306,11 +311,30 @@ func (b *Bridge) registerSubscription(
 	return subID, nil
 }
 
-// subscriptionPeerNodeID names the peer a subscribe came from: the source
-// node id of the request header when it carries one (unsecured / PASE
-// traffic), else the subject node id of the secure session it rode on.
+// latestEventNumber is the highest number of the events reports carries
+// with their data; false when it carries none.
+func latestEventNumber(reports []im.EventReport) (uint64, bool) {
+	var latest uint64
+	found := false
+	for _, r := range reports {
+		if !r.IsStatus && (!found || r.Number > latest) {
+			latest, found = r.Number, true
+		}
+	}
+	return latest, found
+}
+
+// subscriptionPeerNodeID names the peer a subscribe came from: the
+// subject node id of the secure session it rode on. The source node id a
+// secure frame's header may carry is chosen by the sender and not bound to
+// the session (the nonce is built from the session's peer), so it never
+// names the peer there; only a frame of the unsecured session, which has
+// no subject, is attributed to its header's source node id. matter.js
+// takes the session's identity, never the header: InteractionServer.ts:647,
+// :651 (PeerAddress.is(sess.peerAddress, session.peerAddress)) and :723 at
+// db021da0. Review II, R2-P1-req2-02.
 func subscriptionPeerNodeID(requestHdr *message.Header, subjectNodeID uint64) uint64 {
-	if requestHdr.HasSourceNodeID && requestHdr.SourceNodeID != 0 {
+	if requestHdr.SessionID == 0 && requestHdr.HasSourceNodeID {
 		return requestHdr.SourceNodeID
 	}
 	return subjectNodeID
@@ -352,6 +376,8 @@ func subscribeRejectStatus(err error) im.StatusCode {
 // inbound ReportData and stays in the per-chunk read state until
 // that response is on the wire.
 func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack synchronisation loop mirrors matter.js sendDataReportMessage; splitting would obscure the atomic arm→send→wait sequence
+	ctx context.Context,
+	abort <-chan struct{},
 	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
@@ -439,7 +465,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// peer is not consuming the priming report, and matter.js's
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
 		// MessageExchange.ts:855-863).
-		if err := b.awaitChunkStatusResponse(waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+		if err := b.awaitChunkStatusResponse(ctx, abort, waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
 			return err
 		}
 
@@ -569,6 +595,11 @@ func (b *Bridge) sendSubscribeResponse(
 	// primer above.
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
 		if sub, err := m.Get(subID); err == nil {
+			// The events the priming report carried are not owed again
+			// (review II, R2-P1-req2-03).
+			if latest, ok := latestEventNumber(initialReport.EventReports); ok {
+				sub.PrimedEvents(latest)
+			}
 			sub.EndPriming(b.clk().Now())
 		}
 	}

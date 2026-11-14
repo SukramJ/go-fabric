@@ -211,7 +211,9 @@ func (n *Node) announceSurface(ctx context.Context) {
 			c.IncreaseEndpointConfigurationVersion(id)
 		}
 	})
-	n.persisted.storeConfigVersions(ctx, topo, versions)
+	if err := n.persisted.storeConfigVersions(ctx, topo, versions); err != nil {
+		n.logger.Warn("configuration_version.persist", slog.Any("err", err))
+	}
 	at := n.cfg.Clock.Now()
 	announced := make([]surface.SurfaceChange, 0, len(drifts))
 	for i := range drifts {

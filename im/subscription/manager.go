@@ -389,8 +389,9 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// the quota check so that the new one fits even when the old entry still
 	// holds a slot.
 	if req.ReplaceSessionDuplicate && req.SessionID != 0 {
-		// The peer replaced these — terminated, not merely closed.
-		m.closeSession(req.SessionID, true)
+		// The peer replaced these — terminated, not merely closed. One
+		// still priming is not the peer's yet (ClosePeer).
+		m.closeSessionEstablished(req.SessionID)
 	}
 
 	m.mu.Lock()
@@ -538,6 +539,26 @@ func (m *Manager) CloseSession(sessionID uint16) {
 	m.closeSession(sessionID, false)
 }
 
+// closeSessionEstablished terminates the subscriptions of sessionID that
+// are no longer priming — the replacement [SubscribeArgs.ReplaceSessionDuplicate]
+// asks for, which leaves one still priming as [Manager.ClosePeer] does.
+func (m *Manager) closeSessionEstablished(sessionID uint16) {
+	m.mu.Lock()
+	victims := make([]*Subscription, 0)
+	for id, sub := range m.byID {
+		if sub.SessionID == sessionID && !sub.isPriming() {
+			victims = append(victims, sub)
+			delete(m.byID, id)
+			m.perFabric[sub.FabricIndex]--
+			if m.perFabric[sub.FabricIndex] <= 0 {
+				delete(m.perFabric, sub.FabricIndex)
+			}
+		}
+	}
+	m.mu.Unlock()
+	m.finishClose(victims, true)
+}
+
 func (m *Manager) closeSession(sessionID uint16, terminated bool) {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)
@@ -560,15 +581,23 @@ func (m *Manager) closeSession(sessionID uint16, terminated bool) {
 // log a meaningful diagnostic.
 //
 // Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:
-// 549-566 — when a SubscribeRequest carries `KeepSubscriptions=false`,
-// every existing subscription from the same peer (matched on
-// PeerAddress = (fabric, peerNodeId)) is cancelled before the new
-// subscription is admitted.
+// 647-665 at db021da0 — when a SubscribeRequest on a session with a
+// fabric carries `KeepSubscriptions=false`, every existing subscription
+// from the same peer (matched on PeerAddress = (fabric, peerNodeId)) is
+// cancelled before the new subscription is admitted.
+//
+// A subscription still priming is left alone: it is not the peer's yet.
+// matter.js adds a subscription to its session only when it activates,
+// after its SubscribeResponse (ServerSubscription.ts:411-421 at db021da0),
+// and the teardown walks the sessions' subscriptions
+// (InteractionServer.ts:647-662), so a controller that subscribes twice
+// at once keeps the first; closing it here ended its priming report
+// under it (review II, R2-P1-req2-01 follow-on).
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)
 	for id, sub := range m.byID {
-		if sub.FabricIndex == fabricIndex && sub.PeerNodeID == peerNodeID {
+		if sub.FabricIndex == fabricIndex && sub.PeerNodeID == peerNodeID && !sub.isPriming() {
 			victims = append(victims, sub)
 			delete(m.byID, id)
 			m.perFabric[fabricIndex]--
@@ -602,8 +631,9 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // events and the dirty attributes, together in one report per
 // subscription — now, the min interval and a deferral notwithstanding,
 // and returns once the reports are handed to the wire and answered or
-// given up; the subscriptions of exceptSessionID, the session carrying
-// the command, are left for after its response (0 excepts none). It is
+// given up; the subscriptions of exceptSessionID are left out (0 excepts
+// none — what the bridge passes, the session carrying RemoveFabric
+// included, R2-P1-req2-04). It is
 // the flush of matter.js's Fabric.leave before the fabric goes
 // (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0): every
 // session of the fabric runs `closeSubscriptions(true)`

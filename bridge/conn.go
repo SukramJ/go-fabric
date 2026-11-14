@@ -165,9 +165,12 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 }
 
 // bindSessionRoute records dst as the route of secure session sid,
-// called for every message that authenticated under it. The UDP path
-// keeps its rule — the newest authenticated source address wins
-// (matter.js ExchangeManager.ts:425-431). A session is never moved
+// called for every message with a new counter that authenticated under
+// it. The UDP path keeps its rule — the source address of the newest such
+// message wins, connectedhomeip's rule; matter.js adopts the address only
+// of a message that opens a new exchange (ExchangeManager.ts:480-486 at
+// db021da0; by_design BD-chip-SessionRouteByNewCounter). A session is
+// never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
 // (MessageChannel.ts:140-148), so a session first seen on a TCP
@@ -429,11 +432,18 @@ func (b *Bridge) closeConnRoute(r *connRoute) {
 // that also cascades into the subscription manager
 // (operational.Manager.SetOnSessionClose) — so every close path reaches
 // it: CloseSession, fabric removal, NOC rotation, the idle reaper, a
-// peer-loss eviction. The bridge forgets the session's route and closes
-// a TCP connection whose last session this was (unbindSessionRoute;
+// peer-loss eviction. The bridge ends the session's chunk waits and its
+// open chunked writes, forgets the session's route and closes a TCP
+// connection whose last session this was (unbindSessionRoute;
 // matter.js ExchangeManager.ts:674-681). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
+	// A handler waiting for the session's answer to a chunk stops now,
+	// not at its timer (review II, R2-P1-req2-01).
+	b.endSessionChunkWaits(sessionID)
+	// Its open chunked writes end and release their holds (review II,
+	// R2-P1-dr-req-02).
+	b.routing.dropSessionWriteTxs(sessionID)
 	b.unbindSessionRoute(sessionID)
 	b.recordSessionsOpen()
 }
@@ -540,12 +550,7 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	// dead connection is released now rather than at its timeout, and
 	// the per-exchange reply routes and timed deadlines go with the
 	// session.
-	b.routing.statusResponseWaits.Range(func(k, _ any) bool {
-		if key, ok := k.(mrp.ExchangeKey); ok && key.SessionID == sid {
-			b.disarmStatusResponseWait(key.SessionID, key.ExchangeID, key.Initiator)
-		}
-		return true
-	})
+	b.endSessionChunkWaits(sid)
 	b.routing.exchangeSrcs.Range(func(k, _ any) bool {
 		if key, ok := k.(mrp.ExchangeKey); ok && key.SessionID == sid {
 			b.routing.exchangeSrcs.Delete(k)
@@ -553,6 +558,7 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 		return true
 	})
 	b.routing.dropSessionTimedDeadlines(sid)
+	b.routing.dropSessionWriteTxs(sid)
 	b.sessionPeerAddrs.Delete(sid)
 	b.sessionRouteOwners.Delete(sid)
 

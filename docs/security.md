@@ -25,8 +25,8 @@ Two facts govern everything below:
 | --- | --- | --- |
 | Guessing the setup passcode | 20 failed PASE attempts close the window; the lockout lasts 15 minutes and doubles up to 4 hours; opening a new window resets the budget. ~10^8 passcodes against 80 guesses an hour. The budget and the lockout are the bridge's, not a transport's: attempts over UDP, TCP and BLE count against the same 20, and the lockout refuses PASE on all three — a party in radio range can spend the budget of IP commissioning | `bridge/securechannel.go` (`paseMaxErrors`, `paseLockoutCooldown`; one counter `:623` in `recordPaseFailure`, one refusal ahead of every PASE opcode `:331-332`), `bridge/conn.go:444-462` (`receive`), `bridge/ble.go:438` (`connReceiver.deliver` hands a BLE message to the same `receive`) |
 | Two commissioners racing | one PASE handshake at a time; a second is ignored until the first ends or 60 s pass | `bridge/securechannel.go` (`claimPaseInFlight`) |
-| Anyone in Bluetooth range of a BLE node (`node.Network.BLE`) | the node is on the radio only while it has no fabric, and advertises only while its own window is open; what the radio reaches is PASE under the same attempt limit — the link is neither paired nor encrypted by the platform, and nothing relies on it. One central at a time, and a BTP handshake that must complete within 15 s of its request. A central that connects and never starts the handshake holds the one slot until it disconnects, as in matter.js and connectedhomeip | `node/commissioning.go` (`followOnBLE`), `bridge/ble.go`, `transport/btp/accept.go`; [ADR 0031](adr/0031-ble-and-wifi-provisioning-on-the-device-side.md) |
-| An abandoned commissioning | the fail-safe expires and rolls back what it covered: the pending key, trust root and CSR state and, if AddNOC completed, the new fabric with its ACL entries and group keys | `cluster/core/general_commissioning.go` |
+| Anyone in Bluetooth range of a BLE node (`node.Network.BLE`) | the node is on the radio only while it has no fabric, and advertises only while its own window is open; what the radio reaches is PASE under the same attempt limit — the link is neither paired nor encrypted by the platform, and nothing relies on it. One central at a time, and a BTP handshake that must complete within 15 s of the connection or of its latest request. A central that connects and never starts the handshake is disconnected after 15 s; matter.js starts the timer only at the handshake request | `node/commissioning.go` (`followOnBLE`), `bridge/ble.go`, `transport/btp/accept.go`; [ADR 0031](adr/0031-ble-and-wifi-provisioning-on-the-device-side.md) |
+| An abandoned commissioning | the fail-safe expires and rolls back what it covered: the pending key, trust root and CSR state and, if AddNOC completed, the new fabric with its ACL entries and group keys; a node that goes down inside the window (after AddNOC or UpdateNOC, before CommissioningComplete) rolls the same back when it starts again, from a marker AddNOC and UpdateNOC persist ahead of their first store write; a rollback the store did not let land in full keeps that marker and is tried again at the next expiry, arm or CommissioningComplete and at the next start; CommissioningComplete answers success only once that marker is cleared, and an arm made while an expired fail-safe rolls back waits for the rollback; an arm that finds the fail-safe past its deadline runs that rollback itself, and an arm made during a rollback waits for it; either way, when the rollback ends the arming session — a PASE session, or a CASE session of the fabric the expired window's AddNOC added — the arm answers FAILURE and arms nothing | `cluster/core/general_commissioning.go`, `cluster/core/operational_credentials_pending.go` |
 | A commissioning channel left open | the PASE sessions — the one AddNOC moved onto the new fabric included — are closed once the CommissioningComplete response is out (plus 100 ms), when the fail-safe expires and when the commissioning window is revoked; the bridge does all three itself, with or without the node facade, for a host that mounts `core.GeneralCommissioning` and attaches its window | `bridge/pase_close.go`, `bridge/commissioning_window.go` |
 | One fabric reading another's data | fabric-scoped attributes filter by the accessing fabric; fabric-sensitive events (AccessControl, Groupcast, CommissionerControl) are filtered and need Administer or Manage | `im/read.go`, `endpoint/dispatcher.go` |
 | Writing fabric-scoped state before a fabric exists | a write to a fabric-scoped attribute (AccessControl's ACL and Extension, Binding, GroupKeyMap, DefaultOTAProviders) on a session with no accessing fabric — the commissioning channel before AddNOC included — is answered UnsupportedAccess before a cluster server sees it; the servers refuse it again on their own | `im/write.go`, `schema/fabric_scoped.go` |
@@ -53,6 +53,7 @@ its own:
 | the group key sets, up to three epoch keys each | `matter_group_keys` |
 | the CASE resumption records: one shared secret per fabric and peer, which lets a returning peer skip the full CASE handshake | `matter_resumption`, column `shared_secret` |
 | on a Wi-Fi node (`node.Network.WiFi`): the committed networks, each SSID with its credentials — a secret of the home network, not only of this node | `matter_settings`, key `netcomm.wifi.networks`, as JSON |
+| while an UpdateNOC waits for CommissioningComplete: the operational private key and IPK it replaced, so a restart inside the fail-safe window can restore them | `matter_settings`, key `operational_credentials.pending_noc_update`, as JSON; cleared at CommissioningComplete or when the fail-safe rolls the update back |
 
 Whoever can read the database file, or a copy of it — a backup, a support
 bundle — reads all four, as does the host process. `store.OpenSQLite`
@@ -67,12 +68,27 @@ The node keeps both sealing keys as settings of the same database
 those secrets out of a read of one table, not from a reader of the whole
 file.
 
+The factory reset (`node.Node.FactoryReset`, `controller.Controller.Erase`)
+empties every `matter_*` table — the node's endpoint records among them,
+when the node keeps them in the same file — and then rewrites the SQLite file
+(`VACUUM`) and empties its write-ahead log (`wal_checkpoint(TRUNCATE)`):
+afterwards none of the erased bytes — nor those of rows deleted before the
+reset — are in the database file, its `-wal` or its `-shm`, measured in both
+the rollback-journal and the WAL mode. When that scrub cannot finish —
+another connection's reader holds the `-wal`, a full disk fails the
+`VACUUM` — the reset still completes (the rows are gone; a node pins its
+fresh UniqueID) and its error wraps `store.ErrScrubIncomplete`: the erased
+bytes may remain in the file until `store.Scrub` of it succeeds, which the
+host can run again once the reader is gone. Copies the module does not see — the
+flash controller's wear-levelled blocks, file-system snapshots, the free
+blocks of a deleted journal, backups — are outside what it can promise.
+
 Whether the module should seal every secret at rest, uniformly and under a
 key that is not beside the data, is an open architecture question of the
 2026-11 review. Nothing on this page promises it; protect the file as the
 keys it holds.
 
-*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
+*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side
 

@@ -75,6 +75,29 @@ func TestNewCentralNeedsTheAdapter(t *testing.T) {
 	}
 }
 
+// TestNewCentralIsBounded: the construction read of BlueZ's objects is
+// bounded by objectsTimeout, as newPeripheral's is by peripheralTimeout
+// (review II, R2-P1-drv-07, core2 item 5).
+func TestNewCentralIsBounded(t *testing.T) {
+	b := newFakeBus()
+	b.failWith(methodGetManaged, errHang)
+	done := make(chan error, 1)
+	go func() {
+		_, err := newCentral(b, testAdapter)
+		done <- err
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*objectsTimeout)
+	defer cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("newCentral over a silent bluetoothd = %v, want its bound", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("newCentral over a silent bluetoothd is unbounded")
+	}
+}
+
 func TestDBusFailuresNameTheDBusError(t *testing.T) {
 	b := newFakeBus()
 	b.failWith(methodGetManaged, dbus.Error{Name: "org.freedesktop.DBus.Error.AccessDenied", Body: []any{"Rejected send message"}})

@@ -35,6 +35,17 @@ is the row. IDs are the 2026-11 register's or `R2-…`.
 | 26 | W2-wire-13, a device name (DN) longer than 32 bytes | **Refused at `node.Config` validation**, in the phase 5 bundle with its migration line |
 | 27 | How the phase 0 pull request merges | **Squash, auto-merge on green CI**; the single commits stay retrievable through the pull request's reference, and the dispositions table says so |
 
+## 2026-11-13/14, phase 1
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 28 | Phase 1 runs as a workflow of ten review units with batched verification (about 16 agents) | **Approved at that size**; a second pass re-reads the request-path files the first pass left unread (`node/`, the `bridge` and `im` leftovers), the other unread files wait for phase 6 |
+| 29 | How the phase 1 findings are fixed | **One bundled pull request**, started at once; the second pass's findings join it |
+| 30 | R2-P1-req-03, the hold of a chunked write is taken before the ACL check, as matter.js does | **matter.js's order stays; the holds are bounded per session** (an Ahead row) |
+| 31 | R2-P1-req-07, no timer runs between accepting a BLE connection and the BTP handshake | **A timer from the accept** (ahead of matter.js; an Ahead row) |
+| 32 | R2-P1-net-03, mDNS queries from a source port other than 5353 | **As matter.js: no special case**; a `by_design` row records the parity |
+| 33 | R2-P1-sec-02, vendor and product ids in an attestation certificate are parsed more leniently than matter.js does | **Lifted to matter.js's rule**, with its tests ported |
+
 Not re-asked: TC-WASHERCTRL-2.2 keeps the owner's 2026-11-02 decision (no
 `by_design` row; struck). Applied from CLAUDE.md without a question: FIXED
 texts leave the live findings register; `by_design` rows for confirmed

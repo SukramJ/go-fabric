@@ -45,6 +45,13 @@ var ErrNoConnection = errors.New("btp: nil GATT connection or open function")
 // db021da0), with the platform cut away. It registers its handlers on c
 // and returns at once:
 //
+//   - The accept starts the handshake timer of [ConnRspTimeout]: a central
+//     that has not completed the handshake — its C2 subscription has not
+//     started the session — when it ends is disconnected, a silent one
+//     included. Ahead of matter.js, whose accept handler starts no timer
+//     (BlenoBleServer.ts:189-193 at db021da0; its timer starts at the
+//     handshake request, :258), so a central that never writes holds the
+//     connection; review II, R2-P1-req-07, owner decision 31.
 //   - A C1 write of a handshake request (a 9-byte value starting 0x65 0x6C)
 //     is kept, and [ConnRspTimeout] starts: the central must subscribe C2
 //     before it ends, or the connection is dropped (:251-264, :148-150,
@@ -81,6 +88,12 @@ func Accept(c GATTConnection, open func(conn *Conn) (handle func(msg []byte)), o
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &gattServer{c: c, open: open, opts: opts, clock: clock.Or(opts.TimeSource), log: opts.Logger, ctx: ctx, cancel: cancel}
+	// The handshake timer runs from the accept; the subscription that
+	// starts the session stops it, and its generation keeps a callback
+	// that raced the stop out of the session (startTimerLocked).
+	s.mu.Lock()
+	s.startTimerLocked()
+	s.mu.Unlock()
 	c.OnWrite(s.handleC1Write)
 	c.OnSubscribe(s.handleC2Subscribe)
 	c.OnUnsubscribe(s.handleC2Unsubscribe)
@@ -150,24 +163,32 @@ func (s *gattServer) handleC1Write(data []byte) {
 	}
 }
 
-// handleC2Subscribe is handleC2SubscribeRequest (:288-327).
+// handleC2Subscribe is handleC2SubscribeRequest (:288-327). A kept
+// handshake request that opens no session drops the connection.
 func (s *gattServer) handleC2Subscribe(attMTU int) {
+	if !s.subscribe(attMTU) {
+		s.close()
+	}
+}
+
+// subscribe is handleC2Subscribe under s.mu; false when the handshake
+// opened no session and the connection is to be dropped.
+func (s *gattServer) subscribe(attMTU int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
-		return
+		return true
 	}
 	if s.handshake == nil {
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received before handshake Request"}))
-		return
+		return true
 	}
 	if s.session != nil {
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received but BTP session already initialized. Cannot handle two sessions!"}))
-		return
+		return true
 	}
-	s.stopTimerLocked()
 	// matter.js takes min(Bleno.mtu - 3, maxValueSize) (:300): the ATT_MTU
 	// less the ATT header is both.
 	session, err := NewPeripheral(attMTU-3, s.handshake, Callbacks{
@@ -176,9 +197,21 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 		Message:    s.deliver,
 	}, s.opts)
 	if err != nil {
+		// No session: the connection goes, and the accept timer with it
+		// (review II, R2-P1-dr-req-03). matter.js stops its timer before
+		// the session is created (BlenoBleServer.ts:297, :299 at
+		// db021da0). A request that names no supported version is
+		// disconnected there too (BtpSessionHandler.ts:106-108); one
+		// whose version nibbles are all zero fails in the decode before
+		// that (BtpCodec.ts:219-222, called at BtpSessionHandler.ts:95),
+		// is only logged (BlenoBleServer.ts:76-78) and keeps the
+		// connection with no timer left.
 		s.log.Warn("matter.btp.session_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
-		return
+		return false
 	}
+	// The timer stops once the session exists; one that fired meanwhile
+	// waits for s.mu and finds its generation gone.
+	s.stopTimerLocked()
 	s.handshake = nil
 	s.session = session
 	conn := NewConn(session, Addr{Peripheral: s.c.Remote()})
@@ -186,6 +219,7 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 	// A close the session starts itself (the acknowledgement timeout, a
 	// protocol violation) drops the connection through its Disconnect
 	// callback (:313, :326).
+	return true
 }
 
 // handleC2Unsubscribe is the C2 unsubscribe: the server closes (:81-84).
@@ -269,8 +303,9 @@ func (s *gattServer) watch() {
 	}
 }
 
-// startTimerLocked (re)starts the handshake timer (:258): when it fires
-// before the subscription, the connection is dropped (:413-416).
+// startTimerLocked (re)starts the handshake timer (:258; and at the
+// accept, [Accept]): when it fires before the subscription, the
+// connection is dropped (:413-416).
 func (s *gattServer) startTimerLocked() {
 	s.stopTimerLocked()
 	gen := s.timerGen

@@ -1277,7 +1277,11 @@ func (c *demoCamera) zoneTick() {
 	kept := c.triggers[:0]
 	for _, t := range c.triggers {
 		if t.blind {
-			t.remainingBlind--
+			// A BlindDuration of 0, which the schema allows, ends the blind
+			// period at its first tick rather than wrapping to 2^32-1 s.
+			if t.remainingBlind > 0 {
+				t.remainingBlind--
+			}
 			if t.remainingBlind > 0 {
 				kept = append(kept, t)
 			}

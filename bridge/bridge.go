@@ -708,6 +708,26 @@ type Bridge struct {
 	// b.mu across that, concurrent reads (Topology, Dispatcher)
 	// would block on the listener's bind latency.
 	startClaim atomic.Bool
+	// lifecycle runs Start and Stop one at a time: a Stop that arrives
+	// while a Start is running waits for it and then stops the run,
+	// instead of finding nothing started and letting the bridge come up
+	// after it, or tearing down a run Start goes on to finish — an ACK
+	// pump nobody cancels, the radio marked running (review II,
+	// R2-P1-req2-05; matter.js runs start and stop on the lifecycle's
+	// mutex, BD-Matter-Bridge-StartDuringStopRefused). Start takes it after
+	// its claim, so a Start during a Stop is still refused at once. A
+	// one-slot semaphore, so that the wait for it ends with the caller's
+	// context ([Bridge.lifecycleSlot]); guarded by mu until made.
+	lifecycle chan struct{}
+	// runGen counts the runs Stop ended; guarded by mu. A Reassemble that
+	// started in one run installs nothing once it is over
+	// ([Bridge.Reassemble]).
+	runGen uint64
+	// servedTopology is the topology whose servers run: the one the last
+	// swap installed, nil once Stop ended the run; servedGen counts its
+	// changes. Both guarded by mu ([Bridge.reconcileQuiescers]).
+	servedTopology *endpoint.Topology
+	servedGen      uint64
 
 	// openUDP, when set (internal/bridgeseam UseListener), opens the
 	// UDP listener Start serves instead of binding a socket: fabrictest's
@@ -737,13 +757,14 @@ type Bridge struct {
 
 	// sessionPeerAddrs remembers the last authenticated UDP source
 	// address per secure session (sessionID → *net.UDPAddr), fed by
-	// the receive pipeline for every datagram that decrypts under the
-	// session. The outbound CloseSession sender and the ongoing
-	// subscription reporters route on it; matter.js keeps the
-	// equivalent association on the session itself via its
+	// the receive pipeline for every datagram with a new message counter
+	// that decrypts under the session. The outbound CloseSession sender
+	// and the ongoing subscription reporters route on it; matter.js keeps
+	// the equivalent association on the session itself via its
 	// MessageChannel (packages/protocol/src/session/Session.ts,
-	// `get channel()`) and refreshes it from inbound traffic
-	// (ExchangeManager.ts:425-431).
+	// `get channel()`) and refreshes it from a non-duplicate initiator
+	// message that opens a new exchange (ExchangeManager.ts:480-486 at
+	// db021da0; by_design BD-chip-SessionRouteByNewCounter).
 	// Entries are dropped on an inbound CloseSession and on every
 	// graceful close the operational manager notifies. Teardown paths
 	// that skip that notifier (fabric removal, NOC rotation, manager
@@ -881,12 +902,19 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// can't both pass the check + race ahead to bind the same UDP
 	// port. If any downstream step fails, the deferred reset gives
 	// the caller a chance to retry without a stale flag blocking it.
-	if !b.startClaim.CompareAndSwap(false, true) {
-		return ErrAlreadyStarted
+	release, err := b.claimStart(ctx)
+	if err != nil {
+		return err
 	}
+	defer release()
 	committed := false
 	defer func() {
 		if !committed {
+			// The initial assembly may have wired the host's listeners;
+			// a Start that failed after it leaves none behind (review II,
+			// R2-P1-req2-06) — Stop on a bridge that never started does
+			// not detach them.
+			b.detachHostListeners()
 			b.startClaim.Store(false)
 		}
 	}()
@@ -901,7 +929,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// denies that instead of reading it as commissioning traffic.
 
 	// --- Topology assembly ---
-	if err := b.reassembleLocked(ctx); err != nil {
+	if err := b.reassembleLocked(ctx, nil); err != nil {
 		return fmt.Errorf("bridge: initial topology: %w", err)
 	}
 
@@ -974,16 +1002,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.mu.Unlock()
 	b.setBLERunning(true)
 	if pumpTracker != nil {
-		pumpCtx, pumpCancel := context.WithCancel(context.Background())
-		pumpDone := make(chan struct{})
-		go func() {
-			defer close(pumpDone)
-			b.runAckPump(pumpCtx)
-		}()
-		b.mu.Lock()
-		b.pumpCancel = pumpCancel
-		b.pumpDone = pumpDone
-		b.mu.Unlock()
+		b.startAckPump()
 	}
 
 	// Join the multicast group of every group with a member endpoint, and
@@ -1022,14 +1041,83 @@ func (b *Bridge) Start(ctx context.Context) error {
 // consistent view at every point.
 //
 // Returns [ErrNotStarted] when the bridge has not been [Start]ed.
+//
+// A Reassemble that overlaps a [Bridge.Stop] — it passed this check
+// before the Stop ran — swaps nothing in and leaves no host listener
+// registered once the run it began in is over; it returns
+// [ErrNotStarted] (review II, R2-P1-req2-06).
 func (b *Bridge) Reassemble(ctx context.Context) error {
 	b.mu.RLock()
-	started := b.started
+	started, run := b.started, b.runGen
 	b.mu.RUnlock()
 	if !started {
 		return ErrNotStarted
 	}
-	return b.reassembleLocked(ctx)
+	return b.reassembleLocked(ctx, &run)
+}
+
+// claimStart takes the start claim — [ErrAlreadyStarted] when a run or
+// a Stop holds it — and then the lifecycle slot; the claim is given back
+// when the slot cannot be had.
+func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
+	if !b.startClaim.CompareAndSwap(false, true) {
+		return nil, ErrAlreadyStarted
+	}
+	release, err = b.enterLifecycle(ctx)
+	if err != nil {
+		b.startClaim.Store(false)
+		return nil, err
+	}
+	return release, nil
+}
+
+// startAckPump runs the ACK pump of the run Start is bringing up until
+// Stop cancels it.
+//
+//nolint:contextcheck // the pump runs in a fresh context torn down explicitly via the stored pumpCancel (Stop)
+func (b *Bridge) startAckPump() {
+	pumpCtx, pumpCancel := context.WithCancel(context.Background())
+	pumpDone := make(chan struct{})
+	go func() {
+		defer close(pumpDone)
+		b.runAckPump(pumpCtx)
+	}()
+	b.mu.Lock()
+	b.pumpCancel = pumpCancel
+	b.pumpDone = pumpDone
+	b.mu.Unlock()
+}
+
+// enterLifecycle waits for the lifecycle slot ([Bridge.lifecycle]) until
+// ctx ends and returns its release. A free slot is always taken, whatever
+// ctx's state: only the wait for a Start or Stop in progress is bounded by
+// ctx, so a Stop with a context already done still tears the run down
+// (review II, R2-P1-dr-req-01) — a select over both would pick ctx.Done()
+// at random.
+func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error) {
+	b.mu.Lock()
+	if b.lifecycle == nil {
+		b.lifecycle = make(chan struct{}, 1)
+	}
+	slot := b.lifecycle
+	b.mu.Unlock()
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	default:
+	}
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("bridge: waiting for a start or stop in progress: %w", ctx.Err())
+	}
+}
+
+// runEndedLocked reports whether the run a Reassemble began in (run, nil
+// for Start's own assembly) is over. Caller holds b.mu.
+func (b *Bridge) runEndedLocked(run *uint64) bool {
+	return run != nil && (!b.started || b.runGen != *run)
 }
 
 // reassembleLocked is the shared implementation behind initial
@@ -1038,8 +1126,10 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 // and only the swap into b.topology / b.dispatcher takes the write
 // lock. Concurrent Reassembles serialise harmlessly: each finishes
 // independently, and the last writer wins (subsequent reads see one
-// of the two assembled topologies, never a torn intermediate).
-func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
+// of the two assembled topologies, never a torn intermediate). run is
+// the run a Reassemble began in ([Bridge.runEndedLocked]); nil for
+// Start's assembly.
+func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
 	topology, err := b.snapshotter(ctx)
 	if err != nil {
 		return fmt.Errorf("bridge: assemble: %w", err)
@@ -1155,8 +1245,21 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	}
 
 	b.mu.Lock()
+	if b.runEndedLocked(run) {
+		// Stop ran while this was assembled: nothing is swapped into the
+		// stopped bridge, and the switch hooks wired for it go again. The
+		// SetEndpoint above re-armed a server a quiesce had stopped; the
+		// reconcile quiesces it again unless a later run serves it
+		// (review II, R2-P1-rw-04).
+		b.mu.Unlock()
+		runUnsubscribers(switchUnsubs)
+		b.reconcileQuiescers(topology)
+		return ErrNotStarted
+	}
 	prevTopology := b.topology
 	b.topology = topology
+	b.servedTopology = topology
+	b.servedGen++
 	// The sources once more, under the lock of the swap: an Attach… that
 	// ran since they were read above applied to the dispatcher this one
 	// replaces.
@@ -1171,7 +1274,20 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// The value listeners follow the swap, outside the lock: the host's
 	// notifiers are called to unregister and to register, and their
 	// callbacks re-enter the bridge (review II, W2-conc-07).
-	b.rewireMeasurementListeners()
+	generation := b.rewireMeasurementListeners()
+	// A Stop that set in after the swap detaches what it finds; one that
+	// set in before this wiring was installed missed it, so the wiring
+	// goes again here — this wiring only: a Stop and the next Start that
+	// ran meanwhile wired the new run's listeners, which stay (review II,
+	// R2-P1-dr-req-05). The switch hooks need nothing here: the swap
+	// installed them under the lock, so a Stop after it finds them and one
+	// before it was refused above.
+	b.mu.RLock()
+	ended := b.runEndedLocked(run)
+	b.mu.RUnlock()
+	if ended {
+		b.detachListenersOfGeneration(generation)
+	}
 
 	// Drain the swapped-out press-DP hooks now that the new topology
 	// is live. Doing this after the swap (instead of before wiring)
@@ -1186,14 +1302,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 
 	// A server the new topology no longer carries stops whatever it runs
 	// on its own (a transition), as matter.js closes a removed endpoint's
-	// behaviors.
-	if prevTopology != nil {
-		keep := map[contract.ClusterQuiescer]bool{}
-		for _, q := range quiescers(topology) {
-			keep[q] = true
-		}
-		quiesceServers(prevTopology, keep)
-	}
+	// behaviors. Judged against the topology served when it runs, not this
+	// one: a concurrent Reassemble may have swapped in after this one
+	// (review II, R2-P1-rw-04).
+	b.reconcileQuiescers(prevTopology, topology)
 
 	// Reap subscriptions for endpoints that no longer exist in the new
 	// topology. Mirrors matter.js packages/node/src/node/ServerNode.ts
@@ -1223,7 +1335,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	}
 
 	// Notify active subscribers that Descriptor.PartsList has changed
-	// on both the Root (EP 0) and Aggregator (EP 1) endpoints. Mirrors
+	// on the endpoints that list the parts that moved. Mirrors
 	// matter.js packages/node/src/behaviors/descriptor/
 	// DescriptorServer.ts:27 — `this.reactTo(this.agent.get(IndexBehavior)
 	// .events.change, this.#updatePartsList)` which writes
@@ -1241,8 +1353,12 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// chip equivalent: src/app/clusters/descriptor/descriptor.cpp +
 	// emberAfSetDynamicEndpoint which calls
 	// MatterReportingAttributeChangeCallback for Descriptor.PartsList.
+	//
+	// The endpoints marked are the root, the Aggregator by its role — not
+	// endpoint 1 — and every endpoint whose own parts changed, with its
+	// ancestors (review II, R2-P1-req2-13).
 	if m := b.subscriptionManagerLocked(); m != nil {
-		for _, epID := range []uint16{0, 1} {
+		for _, epID := range partsListOwnersChanged(prevTopology, topology) {
 			m.OnAttributeChanged(im.ConcreteAttributePath{
 				Endpoint:     epID,
 				Cluster:      0x001D, // Descriptor
@@ -1280,6 +1396,69 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		hook(count)
 	}
 	return nil
+}
+
+// partsListOwnersChanged names the endpoints whose Descriptor.PartsList a
+// reassembly from prev to next may have moved: the root and the
+// Aggregator always, and every endpoint whose direct parts — the
+// endpoints that name it as their parent — differ, with its ancestors in
+// next, whose PartsList lists descendants. prev may be nil.
+func partsListOwnersChanged(prev, next *endpoint.Topology) []uint16 {
+	out := []uint16{0}
+	if agg := next.Aggregator(); agg != nil && agg.ID != 0 {
+		out = append(out, agg.ID)
+	}
+	directParts := func(t *endpoint.Topology) map[uint16][]uint16 {
+		parts := map[uint16][]uint16{}
+		if t == nil {
+			return parts
+		}
+		for _, ep := range t.Endpoints {
+			if ep != nil && ep.HasParentEndpointID && ep.ParentEndpointID != ep.ID {
+				parts[ep.ParentEndpointID] = append(parts[ep.ParentEndpointID], ep.ID)
+			}
+		}
+		for id := range parts {
+			slices.Sort(parts[id])
+		}
+		return parts
+	}
+	before, after := directParts(prev), directParts(next)
+	parentOf := map[uint16]uint16{}
+	for _, ep := range next.Endpoints {
+		if ep != nil && ep.HasParentEndpointID {
+			parentOf[ep.ID] = ep.ParentEndpointID
+		}
+	}
+	seen := map[uint16]bool{}
+	for _, id := range out {
+		seen[id] = true
+	}
+	mark := func(id uint16) {
+		for !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+			parent, ok := parentOf[id]
+			if !ok {
+				return
+			}
+			id = parent
+		}
+	}
+	owners := make([]uint16, 0, len(before)+len(after))
+	for id := range before {
+		owners = append(owners, id)
+	}
+	for id := range after {
+		owners = append(owners, id)
+	}
+	slices.Sort(owners)
+	for _, id := range slices.Compact(owners) {
+		if !slices.Equal(before[id], after[id]) && next.FindByID(id) != nil {
+			mark(id)
+		}
+	}
+	return out
 }
 
 // announceAddedEndpoints marks every attribute of each endpoint in next
@@ -1426,9 +1605,14 @@ type fabricSessionExceptCloser interface {
 // EmitFabricLeavingContext flushes the subscriptions of a fabric that is
 // about to be removed — what they owe goes to the wire now, before the
 // fabric's rows and with them its ACL go — so the Leave event the node
-// emits first still reaches its subscribers; a session carrying the
-// RemoveFabric command (ctx is the command's context) keeps its
-// subscriptions for after the response. Mirrors matter.js
+// emits first still reaches its subscribers, those of the session
+// carrying the RemoveFabric command (ctx is the command's context)
+// included: the command hands that session's turn on first, so the
+// peer's answer to the flushed report is not queued behind it (review
+// II, R2-P1-req2-04; matter.js's leave closes the fabric's sessions one
+// after another and excepts none, the invoking one included —
+// Fabric.ts:450-454, each one's shutdown logic awaited at
+// packages/protocol/src/session/Session.ts:313). Mirrors matter.js
 // packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0 `leave`: the
 // leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
 // :186-188), then every session of the fabric runs closeSubscriptions
@@ -1445,7 +1629,10 @@ func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8
 	if m == nil {
 		return
 	}
-	m.FlushFabric(ctx, fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+	if invoking := mattercore.InvokeSessionIDFromContext(ctx); invoking != 0 && m.CountBySession()[invoking] > 0 {
+		leaveSessionOrder(ctx)
+	}
+	m.FlushFabric(ctx, fabricIndex, 0)
 }
 
 // EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal
@@ -1863,7 +2050,21 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // the serve goroutine to exit. Idempotent — a second call is a
 // no-op. Safe to call after a failed [Start]. The bridge counts as
 // started until Stop returns: a [Bridge.Start] before that is refused.
+// A Stop that overlaps a Start waits for it, until ctx ends, and then
+// stops its run; only that wait can make Stop return an error, and then
+// it has torn nothing down. A Stop with a context already done when no
+// Start or Stop is running tears the run down all the same and cuts
+// short only the waits ctx bounds.
+//
+//nolint:funlen // one teardown sequence; its order is the contract, and split up it is no longer visible in one place
 func (b *Bridge) Stop(ctx context.Context) error {
+	// A Start still running finishes first; Stop then stops its run
+	// (review II, R2-P1-req2-05).
+	release, err := b.enterLifecycle(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
 	// CASE sessions and show the bridge unresponsive for minutes after
@@ -1905,6 +2106,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false
+	b.runGen++
+	b.servedTopology = nil
+	b.servedGen++
 	b.mu.Unlock()
 	// The start claim is given back when this Stop has finished, not
 	// here: what follows — the wait for the handlers in flight, the
@@ -1934,6 +2138,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		_ = tcpListener.Close()
 	}
 	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
+	b.waitBLEHandlers(ctx)
 	b.waitPumpStopped(pumpDone)
 
 	// The host's notifiers are detached once nothing is served: a value
@@ -1979,7 +2184,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// more; stop it, as matter.js closes a behavior's transitions when the
 	// node goes offline (LevelControlServer / ColorControlServer
 	// [Symbol.asyncDispose]).
-	quiesceServers(b.Topology(), nil)
+	b.reconcileQuiescers(b.Topology())
 
 	// The commissioning window's expiry timer goes with the bridge: no
 	// timer stays armed on its clock after Stop (ADR 0026 P5).
@@ -2023,13 +2228,64 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, t
 	}
 }
 
-// quiesceServers calls [contract.ClusterQuiescer.MatterQuiesce] on every
-// server of topo that implements it, except the ones in keep — the
-// servers that stay in use.
-func quiesceServers(topo *endpoint.Topology, keep map[contract.ClusterQuiescer]bool) {
-	for _, q := range quiescers(topo) {
-		if !keep[q] {
-			q.MatterQuiesce()
+// reconcileQuiescers brings the quiescing servers of the topologies in
+// touched in line with the topology the bridge serves now — none once
+// Stop ended the run: a server it does not carry is quiesced, and one it
+// carries that takes events is given its endpoint again (SetEndpoint),
+// which re-arms a server a quiesce stopped (cluster/energy EvseServer,
+// cluster/thermo ThermostatServer) and stamps the number it serves at.
+//
+// Reassembles are not serialised and each SetEndpoints the servers of its
+// topology before it swaps it in, so a quiesce or a re-arm decided from
+// one Reassemble's own topology goes wrong when another swaps in after it
+// or a Stop ends the run meanwhile (review II, R2-P1-rw-04). This decides
+// from the topology served when it runs, acts without a lock — a server
+// may call back into the bridge — and decides again when the served
+// topology changed while it acted: whichever swap or Stop changed it last
+// leaves each server it touched as that topology serves it.
+func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
+	for {
+		b.mu.RLock()
+		served, gen := b.servedTopology, b.servedGen
+		b.mu.RUnlock()
+		at := map[contract.ClusterQuiescer]uint16{}
+		if served != nil {
+			for _, ep := range served.Endpoints {
+				if ep == nil {
+					continue
+				}
+				for _, srv := range endpoint.ClusterServers(ep) {
+					if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
+						at[q] = ep.ID
+					}
+				}
+			}
+		}
+		done := map[contract.ClusterQuiescer]bool{}
+		for _, topo := range touched {
+			for _, q := range quiescers(topo) {
+				if done[q] {
+					continue
+				}
+				done[q] = true
+				id, serves := at[q]
+				if !serves {
+					q.MatterQuiesce()
+					continue
+				}
+				if _, ok := q.(contract.EventReceiver); !ok {
+					continue
+				}
+				if r, ok := q.(matterEndpointReceiver); ok {
+					r.SetEndpoint(id)
+				}
+			}
+		}
+		b.mu.RLock()
+		moved := b.servedGen != gen
+		b.mu.RUnlock()
+		if !moved {
+			return
 		}
 	}
 }

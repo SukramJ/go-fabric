@@ -90,6 +90,9 @@ type suggestions struct {
 	// time before it was scheduled, so it leaves the scheduled timer armed
 	// instead of replacing it (armSuggestionTimerLocked).
 	pending bool
+	// quiesced marks the timer MatterQuiesce stopped: the SetEndpoint of
+	// a reassembly that puts the server back re-evaluates and arms it.
+	quiesced bool
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
@@ -527,6 +530,14 @@ func (s *ThermostatServer) armSuggestionTimerLocked(now, wake uint32) {
 func (s *ThermostatServer) suggestionTimerFired() {
 	s.op.Lock()
 	defer s.op.Unlock()
+	s.mu.Lock()
+	stopped := s.suggest.timer == nil && !s.suggest.pending
+	s.mu.Unlock()
+	if stopped {
+		// Stopped after it fired, before it got the queue: MatterQuiesce, or
+		// a re-evaluation that found nothing due.
+		return
+	}
 	s.reevaluateSuggestions(contract.WithOrigin(context.Background(), contract.OriginCommand))
 }
 

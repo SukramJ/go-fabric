@@ -48,6 +48,11 @@ type fakeWire struct {
 	// turn lets the clock's due timers run — the announcement of this
 	// turn — before take reads the wire (newWiredResponder sets it).
 	turn func()
+	// nets are the prefixes of an interface's addresses, the on-link
+	// check's (setNets). An interface without an entry is on the link of
+	// every source, so a test that does not exercise the check needs no
+	// prefixes for its querier.
+	nets map[int][]*net.IPNet
 }
 
 func newFakeWire(addrsByLink map[int][]string) *fakeWire {
@@ -84,7 +89,33 @@ func (w *fakeWire) link(ifIndex int) link {
 func (w *fakeWire) linkLocked(ifIndex int) link {
 	addrs, listed := w.addrsByLink[ifIndex]
 	l := link{index: ifIndex, name: "fake" + strconv.Itoa(ifIndex), addrs: addrs, listed: listed, has4: true, has6: true}
+	if nets, ok := w.nets[ifIndex]; ok {
+		l.nets = nets
+	} else {
+		_, all4, _ := net.ParseCIDR("0.0.0.0/0")
+		_, all6, _ := net.ParseCIDR("::/0")
+		l.nets = []*net.IPNet{all4, all6}
+	}
 	return l
+}
+
+// setNets sets the prefixes of an interface's addresses, as CIDRs.
+func (w *fakeWire) setNets(ifIndex int, cidrs ...string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.nets == nil {
+		w.nets = map[int][]*net.IPNet{}
+	}
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, c := range cidrs {
+		ip, n, err := net.ParseCIDR(c)
+		if err != nil {
+			panic(err)
+		}
+		n.IP = ip
+		nets = append(nets, n)
+	}
+	w.nets[ifIndex] = nets
 }
 
 func (w *fakeWire) record(pkt []byte, ifIndex int, dst *net.UDPAddr, fail func(*dns.Msg) reach) (reach, error) {

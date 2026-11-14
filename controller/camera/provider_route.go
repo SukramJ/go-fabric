@@ -41,9 +41,14 @@ func (s *Service) Provider(node *client.Node, endpoint uint16) (*Provider, error
 // its session registered with the requestor. The result is the
 // generated response (wpdef.ProvideOfferResponse, wpdef.SolicitOfferResponse)
 // or nil; notices are what the boundary forwarded unchanged that the
-// camera may ignore. Mirrors matterjs-server's send_webrtc_provider_command
+// camera may ignore. After the service's Close it is [ErrClosed] and sends
+// nothing: a session it opened then is one nothing would end (review II,
+// R2-P1-cam-b-04). Mirrors matterjs-server's send_webrtc_provider_command
 // (docs/websockets_api.md:1868-1900 of matterjs-server at 0bd06f2).
 func (p *Provider) Send(ctx context.Context, command string, payload json.RawMessage) (result any, notices []string, err error) {
+	if p.s.isClosed() {
+		return nil, nil, ErrClosed
+	}
 	if !isProviderCommandName(command) {
 		return nil, nil, invalidArguments("command_name must be one of ProvideOffer, SolicitOffer, ProvideAnswer, ProvideIceCandidates")
 	}
@@ -78,10 +83,14 @@ func (p *Provider) send(ctx context.Context, name providerCommandName, req spec.
 // generic device command): it is sent as given, its error passed on, and
 // the controller's records for the session go with it, the end announced
 // as [Service.StopSession] announces one. requestedBy is the owner
-// asking. Mirrors matterjs-server
+// asking. After the service's Close it is [ErrClosed], as
+// [Service.StopSession] is. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2303-2321 at
 // 0bd06f2.
 func (p *Provider) EndSession(ctx context.Context, req wpdef.EndSessionRequest, requestedBy string) error {
+	if p.s.isClosed() {
+		return ErrClosed
+	}
 	return p.s.m.endSessionForClient(ctx, p.t, req.WebRtcSessionId, requestedBy, func(ctx context.Context) error {
 		_, err := p.s.io.invoke(ctx, deviceCall{target: p.t, cluster: clusterProvider, command: callEndSession, fields: req})
 		return err

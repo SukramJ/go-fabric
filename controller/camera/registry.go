@@ -252,6 +252,9 @@ type sessionRegistry struct {
 	pendingOrder []*pendingSession
 	queue        []func()
 	delivering   bool
+	// closed: the Service's Close claimed every session; a start that
+	// registers later is refused (review II, R2-P1-cam-b-04).
+	closed bool
 }
 
 // newSessionRegistry is a registry calling announce for every end and
@@ -314,13 +317,43 @@ func (r *sessionRegistry) deleteTracked(k sessionKey) {
 
 // begin registers a session being established. Every exit of the
 // establishing call must finish the returned registration; the caller makes
-// sure clientSessionKey is not clientSessionKeyInUse. Mirrors
-// matterjs-server packages/ws-controller/src/camera/sessionRegistry.ts:124-146
-// at 0bd06f2.
+// sure clientSessionKey is not clientSessionKeyInUse, or calls beginKeyed.
+// Mirrors matterjs-server
+// packages/ws-controller/src/camera/sessionRegistry.ts:124-146 at 0bd06f2.
 func (r *sessionRegistry) begin(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) *pendingSession {
-	p := &pendingSession{scope: sessionScope{nodeID: nodeID, endpointID: endpointID, connectionID: connectionID, clientSessionKey: clientSessionKey}}
 	r.mu.Lock()
 	defer r.unlock()
+	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey)
+}
+
+// beginKeyed is the key check and begin as one step under the lock, so two
+// concurrent starts of a connection cannot both register one key
+// (review II, R2-P1-cam-a-01, R2-P1-cam-b-03). It refuses a key
+// (non-empty) that already names a session of the connection, and every
+// start once the registry is closed.
+func (r *sessionRegistry) beginKeyed(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) (*pendingSession, error) {
+	r.mu.Lock()
+	defer r.unlock()
+	if r.closed {
+		return nil, ErrClosed
+	}
+	if clientSessionKey != "" && r.clientSessionKeyInUseLocked(connectionID, clientSessionKey) {
+		return nil, invalidArguments("client_session_key %q already names a session of this connection that is starting or open", clientSessionKey)
+	}
+	return r.beginLocked(nodeID, endpointID, connectionID, clientSessionKey), nil
+}
+
+// closeStarts refuses every start from now on; the claim that follows sees
+// every start registered before.
+func (r *sessionRegistry) closeStarts() {
+	r.mu.Lock()
+	r.closed = true
+	r.unlock()
+}
+
+// beginLocked is begin; the caller holds mu.
+func (r *sessionRegistry) beginLocked(nodeID uint64, endpointID uint16, connectionID, clientSessionKey string) *pendingSession {
+	p := &pendingSession{scope: sessionScope{nodeID: nodeID, endpointID: endpointID, connectionID: connectionID, clientSessionKey: clientSessionKey}}
 	r.pending[p] = &pendingRecord{
 		settled: make(chan struct{}),
 		life:    &lifecycle{nodeID: nodeID, endpointID: endpointID},
@@ -336,6 +369,11 @@ func (r *sessionRegistry) begin(nodeID uint64, endpointID uint16, connectionID, 
 func (r *sessionRegistry) clientSessionKeyInUse(connectionID, clientSessionKey string) bool {
 	r.mu.Lock()
 	defer r.unlock()
+	return r.clientSessionKeyInUseLocked(connectionID, clientSessionKey)
+}
+
+// clientSessionKeyInUseLocked is clientSessionKeyInUse; the caller holds mu.
+func (r *sessionRegistry) clientSessionKeyInUseLocked(connectionID, clientSessionKey string) bool {
 	owns := func(s sessionScope) bool {
 		return s.connectionID == connectionID && s.clientSessionKey == clientSessionKey
 	}
@@ -446,13 +484,15 @@ func (r *sessionRegistry) claimRefusalLocked(p *pendingSession) trackRefusal {
 // camera lost (it numbers sessions from 0 again after a reboot), handled as
 // issued does. Mirrors matterjs-server
 // packages/ws-controller/src/camera/sessionRegistry.ts:203-212 at 0bd06f2.
-func (r *sessionRegistry) establishing(p *pendingSession, sessionID uint16) {
+func (r *sessionRegistry) establishing(p *pendingSession, sessionID uint16) *lifecycle {
 	r.mu.Lock()
 	defer r.unlock()
 	r.issuedLocked(p.scope.nodeID, p.scope.endpointID, sessionID, p)
 	if record, ok := r.pending[p]; ok {
 		record.life.sessionID, record.life.hasID = sessionID, true
+		return record.life
 	}
+	return nil
 }
 
 // issued records that the camera handed the id to a session another route
@@ -507,6 +547,14 @@ func (r *sessionRegistry) named(nodeID uint64, endpointID, sessionID uint16) *li
 	return nil
 }
 
+// names reports whether the id names life: the session it tracks or the
+// registration holding it.
+func (r *sessionRegistry) names(life *lifecycle, nodeID uint64, endpointID, sessionID uint16) bool {
+	r.mu.Lock()
+	defer r.unlock()
+	return life != nil && r.named(nodeID, endpointID, sessionID) == life
+}
+
 // track turns a registration into a tracked session, or says why not:
 // superseded wins over a claim, because ending the id would end another
 // session. Mirrors matterjs-server
@@ -529,6 +577,7 @@ func (r *sessionRegistry) track(p *pendingSession, session managedSession) track
 		return refusalAlreadyEnded
 	}
 	life.sessionID, life.hasID = session.webRTCSessionID, true
+	session.life = life
 	life.session = &session
 	r.setTracked(sessionKey{session.nodeID, session.endpointID, session.webRTCSessionID}, life)
 	return trackAccepted
@@ -595,6 +644,26 @@ func (r *sessionRegistry) stop(ctx context.Context, nodeID uint64, endpointID, s
 		r.unlock()
 		return endedOnDevice(r.end(ctx, nil, sessionKey{nodeID, endpointID, sessionID}, end, send))
 	}
+	return r.stopLocked(ctx, life, nodeID, endpointID, sessionID, end, send)
+}
+
+// stopOf is stop for the session life is, by identity: when the id no
+// longer names life — the camera ended it and handed the id to a newer
+// session — it sends nothing and reports named false, so the newer
+// session is not ended in its place (review II, R2-P1-dr-rest-05).
+func (r *sessionRegistry) stopOf(ctx context.Context, life *lifecycle, nodeID uint64, endpointID, sessionID uint16, end sessionEnd, send func(context.Context) error) (named, ended bool, err error) {
+	r.mu.Lock()
+	if life == nil || r.named(nodeID, endpointID, sessionID) != life {
+		r.unlock()
+		return false, false, nil
+	}
+	ended, err = r.stopLocked(ctx, life, nodeID, endpointID, sessionID, end, send)
+	return true, ended, err
+}
+
+// stopLocked is stop's shared EndSession for life, which sessionID names;
+// it is called with r.mu held and releases it.
+func (r *sessionRegistry) stopLocked(ctx context.Context, life *lifecycle, nodeID uint64, endpointID, sessionID uint16, end sessionEnd, send func(context.Context) error) (bool, error) {
 	if shared := life.stopping; shared != nil {
 		r.unlock()
 		return shared.wait(ctx)
@@ -632,7 +701,7 @@ func (r *sessionRegistry) end(ctx context.Context, life *lifecycle, k sessionKey
 		return invokeEndSession(ctx, send, func(deviceHeldSession bool) {
 			if deviceHeldSession {
 				r.mu.Lock()
-				r.announceEnd(k, end, nil)
+				r.announceEnd(k, end, nil, nil)
 				r.unlock()
 			}
 		})
@@ -672,7 +741,7 @@ func (r *sessionRegistry) endSessionAnswered(life *lifecycle, k sessionKey, end 
 	}
 	life.over = true
 	if deviceHeldSession && end.cause != endReleased {
-		r.announceEnd(k, end, nil)
+		r.announceEnd(k, end, nil, life)
 	}
 }
 
@@ -752,6 +821,20 @@ func (r *sessionRegistry) forgetNode(nodeID uint64) {
 	}
 }
 
+// abandon ends a session here whose EndSession failed: a tracked one is
+// closed and announced with end, one still being established is marked
+// ended, so its start gives it up. A session that already ended stays as
+// it is (review II, R2-P1-cam-b-06).
+func (r *sessionRegistry) abandon(life *lifecycle, end sessionEnd) {
+	r.mu.Lock()
+	defer r.unlock()
+	if life.session != nil {
+		r.close(life, end)
+		return
+	}
+	life.over = true
+}
+
 // claim takes responsibility for every session in scope, established or
 // being established; a claimed registration ends itself instead of being
 // tracked. Mirrors matterjs-server
@@ -804,14 +887,14 @@ func (r *sessionRegistry) close(life *lifecycle, end sessionEnd) {
 	if r.tracked[k] == life {
 		r.deleteTracked(k)
 	}
-	r.announceEnd(k, end, session)
+	r.announceEnd(k, end, session, life)
 }
 
 // announceEnd queues the announcement of an end; without an owner the
 // route tells every camera-aware connection. Mirrors matterjs-server
 // packages/ws-controller/src/camera/sessionRegistry.ts:480-496 at 0bd06f2.
-func (r *sessionRegistry) announceEnd(k sessionKey, end sessionEnd, owner *managedSession) {
-	ended := cameraSessionEnded{sessionEnd: end, nodeID: k.nodeID, endpointID: k.endpointID, webRTCSessionID: k.sessionID}
+func (r *sessionRegistry) announceEnd(k sessionKey, end sessionEnd, owner *managedSession, life *lifecycle) {
+	ended := cameraSessionEnded{sessionEnd: end, life: life, nodeID: k.nodeID, endpointID: k.endpointID, webRTCSessionID: k.sessionID}
 	if owner != nil {
 		ended.ownerID, ended.clientSessionKey = owner.connectionID, owner.clientSessionKey
 	}

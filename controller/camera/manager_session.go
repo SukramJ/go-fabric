@@ -44,9 +44,11 @@ type startArgs struct {
 	icePolicy    *string
 	metadata     bool
 	// allowEviction defaults to true in the request; here it is stated.
-	allowEviction    bool
-	talkback         bool
-	establishing     func(sessionID uint16)
+	allowEviction bool
+	talkback      bool
+	// establishing hears the id and the identity of the session the
+	// registry knows under it.
+	establishing     func(sessionID uint16, life *lifecycle)
 	clientSessionKey string
 }
 
@@ -146,12 +148,13 @@ func (m *manager) startStream(ctx context.Context, args startArgs) (*startResult
 			offer = &rewritten
 		}
 	}
-	if args.clientSessionKey != "" && m.sessions.clientSessionKeyInUse(args.connectionID, args.clientSessionKey) {
-		return nil, invalidArguments("client_session_key %q already names a session of this connection that is starting or open", args.clientSessionKey)
-	}
 	// Before the first wait, so a release from here on claims this
-	// registration.
-	pending := m.sessions.begin(args.t.nodeID, args.t.endpointID, args.connectionID, args.clientSessionKey)
+	// registration. The key check is part of it: two concurrent starts of
+	// the connection cannot both register one key.
+	pending, err := m.sessions.beginKeyed(args.t.nodeID, args.t.endpointID, args.connectionID, args.clientSessionKey)
+	if err != nil {
+		return nil, err
+	}
 	defer m.sessions.finish(pending)
 	return withEndpointLock(ctx, m, args.t, func() (*startResult, error) {
 		if err := m.throwIfClaimed(pending); err != nil {
@@ -311,11 +314,12 @@ func (m *manager) invokeEstablishingOffer(ctx context.Context, pending *pendingS
 	if audio != nil {
 		audioStreams = &[]uint16{audio.streamID}
 	}
-	call := deviceCall{target: args.t, cluster: clusterProvider, establishing: func(id uint16) {
-		m.sessions.establishing(pending, id)
+	call := deviceCall{target: args.t, cluster: clusterProvider, establishing: func(id uint16) *lifecycle {
+		life := m.sessions.establishing(pending, id)
 		if args.establishing != nil {
-			args.establishing(id)
+			args.establishing(id, life)
 		}
+		return life
 	}}
 	if offer == nil {
 		call.command = callSolicitOffer
@@ -403,6 +407,17 @@ func (m *manager) releaseConnection(ctx context.Context, owner string) {
 // at 0bd06f2.
 func (m *manager) stopAll(ctx context.Context) {
 	m.releaseSessions(ctx, func(sessionScope) bool { return true })
+}
+
+// shutdown is the Service's Close: every start that registers from now on
+// is refused with ErrClosed — one that passed StartStream's closed check
+// just before Close would otherwise open a session nothing ends — and
+// stopAll ends the rest (review II, R2-P1-cam-b-04). stopAll itself keeps
+// the manager usable, as a ported case starts again after it
+// (manager_slice_d_parity_matterjsserver_test.go).
+func (m *manager) shutdown(ctx context.Context) {
+	m.sessions.closeStarts()
+	m.stopAll(ctx)
 }
 
 // releaseSessions ends every session in scope, including ones still being

@@ -719,7 +719,10 @@ func (n *Node) Disabled() bool {
 }
 
 // Erase stops the node and forgets its image, its store included —
-// ClientNode.erase (ClientNode.ts:227-229, :266-271).
+// ClientNode.erase (ClientNode.ts:230-232, :269-274 at db021da0). A store
+// that fails to erase the node's rows is returned: the image is gone, the
+// rows stay,
+// and an Erase again retries them (review II).
 func (n *Node) Erase(ctx context.Context) error {
 	if err := n.Stop(ctx); err != nil {
 		return err
@@ -742,7 +745,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	// erased with the node's lock released (ADR 0026 P6).
 	n.events.clear()
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
-		n.log.Warn("matter.controller.client.store_erase_failed", slog.Any("err", err))
+		return fmt.Errorf("client: erase node %s from the store: %w", n.cfg.ID, err)
 	}
 	return nil
 }

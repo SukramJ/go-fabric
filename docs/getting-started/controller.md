@@ -456,7 +456,10 @@ What the validator refuses follows matter.js and chip. The DAC and the
 PAI must meet their certificate profile (Matter Core §6.2.2.3,
 §6.2.2.4): version 3, basic constraints and key usage present and
 critical, a PAI a CA with pathLen 0 and key usage keyCertSign and
-cRLSign, a DAC no CA with digitalSignature alone. A violation is
+cRLSign, a DAC no CA with digitalSignature alone; a VendorID or ProductID
+attribute in the subject or issuer is exactly four uppercase hex digits
+and appears once (the `Mvid:`/`Mpid:` commonName is read only when
+neither attribute is present). A violation is
 `PaiFormatInvalid` or `DacFormatInvalid`. The Certification Declaration
 must meet its CMS envelope, `format_version` 1 and a defined
 certification type (`CertificationDeclarationFormatInvalid`), and its

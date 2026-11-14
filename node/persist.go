@@ -118,11 +118,13 @@ func (p persisted) configVersion(ctx context.Context, key device.SourceKey) uint
 }
 
 // storeConfigVersions persists what bridge.IncreaseConfigurationVersion
-// raised: a version never decreases, so it outlives a restart.
-func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topology, v bridge.ConfigurationVersions) {
+// raised: a version never decreases, so it outlives a restart. Every
+// version is written; the writes that failed are returned, joined.
+func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topology, v bridge.ConfigurationVersions) error {
+	var errs []error
 	set := func(k string, n uint32) {
 		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
-			p.logger.Warn("configuration_version.persist", slog.Any("err", err))
+			errs = append(errs, fmt.Errorf("node: persist configuration version %s: %w", k, err))
 		}
 	}
 	if v.Node != 0 {
@@ -135,6 +137,7 @@ func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topol
 			}
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // OnNodeLabelWritten implements [EndpointPersistence]: it is the

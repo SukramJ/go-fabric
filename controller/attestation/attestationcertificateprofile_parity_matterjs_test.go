@@ -411,3 +411,253 @@ func TestProfileDeviceAttestationFindings(t *testing.T) {
 		}
 	})
 }
+
+// The DN attribute OIDs and TBSCertificate positions the DN cases edit
+// (:126-130 at db021da0).
+const (
+	vendorIDOID    = "2b0601040182a27c0201"
+	productIDOID   = "2b0601040182a27c0202"
+	commonNameOID  = "550403"
+	issuerElement  = 3
+	subjectElement = 5
+)
+
+// dnAttributeOf is attributeOf (:132-139 at db021da0): the first attribute
+// of name whose type is oidHex.
+func dnAttributeOf(t *testing.T, name *derNode, oidHex string) *derNode {
+	t.Helper()
+	for i := range name.elements {
+		for j := range name.elements[i].elements {
+			a := &name.elements[i].elements[j]
+			if len(a.elements) == 2 && hex.EncodeToString(a.elements[0].bytes) == oidHex {
+				return a
+			}
+		}
+	}
+	t.Fatalf("name has no attribute %s", oidHex)
+	return nil
+}
+
+// dnRDNIndexOf is rdnIndexOf (:177-181 at db021da0).
+func dnRDNIndexOf(t *testing.T, name *derNode, oidHex string) int {
+	t.Helper()
+	for i, rdn := range name.elements {
+		for _, a := range rdn.elements {
+			if len(a.elements) == 2 && hex.EncodeToString(a.elements[0].bytes) == oidHex {
+				return i
+			}
+		}
+	}
+	t.Fatalf("name has no attribute %s", oidHex)
+	return -1
+}
+
+// editName is editSubject (:141-144 at db021da0) for the TBSCertificate
+// element at (the issuer or the subject).
+func editName(t *testing.T, der []byte, at int, edit func(name *derNode)) []byte {
+	t.Helper()
+	return editTBS(t, der, func(tbs *[]derNode) { edit(&(*tbs)[at]) })
+}
+
+// withNameText is withIssuerText / withSubjectText (:146-158 at
+// db021da0): the text of the name's attribute oidHex replaced.
+func withNameText(t *testing.T, der []byte, at int, oidHex, text string) []byte {
+	t.Helper()
+	return editName(t, der, at, func(name *derNode) { dnAttributeOf(t, name, oidHex).elements[1].bytes = []byte(text) })
+}
+
+// withRepeatedSubjectAttribute is :160-168 at db021da0: a copy of the RDN
+// that carries oidHex appended to the subject.
+func withRepeatedSubjectAttribute(t *testing.T, der []byte, oidHex string) []byte {
+	t.Helper()
+	return editName(t, der, subjectElement, func(name *derNode) {
+		name.elements = append(name.elements, name.elements[dnRDNIndexOf(t, name, oidHex)])
+	})
+}
+
+// asCommonName is :170-175 at db021da0: the subject's attribute oidHex
+// turned into a commonName with text.
+func asCommonName(t *testing.T, name *derNode, oidHex, text string) {
+	t.Helper()
+	a := dnAttributeOf(t, name, oidHex)
+	a.elements[0].bytes = unhex(t, commonNameOID)
+	a.elements[1].bytes = []byte(text)
+}
+
+// TestProfileVendorProductIDInTheDN: describe "VendorID and ProductID in
+// the distinguished name" (:427-644 at db021da0), the cases that parse
+// without acceptMalformedVidPid — every caller in this package does. The
+// cases with acceptMalformedVidPid are the device's read of its own chain,
+// secure/attestation's TestProductIDsAcceptMalformed (DeviceCertification.ts
+// :116-120 at db021da0); "cuts a commonName with invalid UTF-8 at byte 64"
+// is not ported: crypto/x509 refuses a UTF8String DN value that is not
+// UTF-8, so that DAC does not parse here.
+func TestProfileVendorProductIDInTheDN(t *testing.T) {
+	t.Parallel()
+	validDAC, validPAI := validProfilePair(t)
+	violations := map[string][]byte{
+		"lowercase VendorID":           withNameText(t, validDAC, subjectElement, vendorIDOID, "fff1"),
+		"VendorID of the wrong length": withNameText(t, validDAC, subjectElement, vendorIDOID, "FFF"),
+		"non-hexadecimal ProductID":    withNameText(t, validDAC, subjectElement, productIDOID, "80G0"),
+		"repeated VendorID":            withRepeatedSubjectAttribute(t, validDAC, vendorIDOID),
+		"repeated ProductID":           withRepeatedSubjectAttribute(t, validDAC, productIDOID),
+	}
+	for name, dac := range violations {
+		t.Run("reports a DAC with a "+name+" as a profile violation", func(t *testing.T) {
+			t.Parallel()
+			if _, err := parseAttCert(dac, kindDAC, false); !isProfileError(err) {
+				t.Fatalf("parse = %v, want a profile violation", err)
+			}
+		})
+	}
+	t.Run("still reports a malformed VendorID when only accepting a profile violation", func(t *testing.T) {
+		t.Parallel()
+		if _, err := parseAttCert(violations["lowercase VendorID"], kindDAC, true); !isProfileError(err) {
+			t.Fatalf("parse = %v, want a profile violation", err)
+		}
+	})
+	t.Run("reports a malformed VendorID in the issuer of a DAC like one in the subject", func(t *testing.T) {
+		t.Parallel()
+		dac := withNameText(t, validDAC, issuerElement, vendorIDOID, "fff1")
+		if _, err := parseAttCert(dac, kindDAC, false); !isProfileError(err) {
+			t.Fatalf("parse = %v, want a profile violation", err)
+		}
+	})
+	t.Run("reports a PAI with a malformed VendorID as a profile violation", func(t *testing.T) {
+		t.Parallel()
+		pai := withNameText(t, validPAI, subjectElement, vendorIDOID, "fff1")
+		if _, err := parseAttCert(pai, kindPAI, false); !isProfileError(err) {
+			t.Fatalf("parse = %v, want a profile violation", err)
+		}
+	})
+
+	// describe "in the commonName" (:489-608): the DAC subject is
+	// commonName "Matter Test DAC", then VendorID, then ProductID.
+	dacWithFallback := func(t *testing.T, edit func(subject *derNode)) []byte {
+		t.Helper()
+		return editName(t, validDAC, subjectElement, edit)
+	}
+	dropProductID := func(t *testing.T, subject *derNode) {
+		t.Helper()
+		i := dnRDNIndexOf(t, subject, productIDOID)
+		subject.elements = slices.Delete(subject.elements, i, i+1)
+	}
+	type ids struct{ vid, pid int } // -1 for absent
+	read := func(t *testing.T, dac []byte) ids {
+		t.Helper()
+		c, err := parseAttCert(dac, kindDAC, false)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		got := ids{-1, -1}
+		if c.vendorID != nil {
+			got.vid = int(*c.vendorID)
+		}
+		if c.productID != nil {
+			got.pid = int(*c.productID)
+		}
+		return got
+	}
+	refused := func(t *testing.T, dac []byte, rule string) {
+		t.Helper()
+		_, err := parseAttCert(dac, kindDAC, false)
+		if err == nil || isProfileError(err) || !regexp.MustCompile(rule).MatchString(err.Error()) {
+			t.Fatalf("parse = %v, want a parse refusal /%s/", err, rule)
+		}
+	}
+	x := func(n int) string { return strings.Repeat("x", n) }
+	cases := []struct {
+		name string
+		edit func(t *testing.T, subject *derNode)
+		want ids
+	}{
+		{"reads only the first commonName that carries a VendorID or ProductID", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF1")
+			asCommonName(t, s, productIDOID, "Mvid:FFF2 Mpid:8000")
+		}, ids{0xFFF1, -1}},
+		{"ignores a malformed prefix in a later commonName", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF1 Mpid:8000")
+			asCommonName(t, s, productIDOID, "Mvid:")
+		}, ids{0xFFF1, 0x8000}},
+		{"does not read a value beyond the first 64 bytes of a commonName", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, x(60)+"Mvid:FFF1")
+			dropProductID(t, s)
+		}, ids{-1, -1}},
+		{"reads VendorID 0xFFF5", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF5 Mpid:8000")
+			dropProductID(t, s)
+		}, ids{0xFFF5, 0x8000}},
+		{"reads VendorID 0xFFFF", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFFF Mpid:8000")
+			dropProductID(t, s)
+		}, ids{0xFFFF, 0x8000}},
+		{"reads a value that ends at byte 64 of a commonName", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, x(55)+"Mvid:FFF1")
+			dropProductID(t, s)
+		}, ids{0xFFF1, -1}},
+		{"does not read a prefix that starts after byte 64 of a commonName", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, x(64)+"Mvid:FFF1")
+			dropProductID(t, s)
+		}, ids{-1, -1}},
+		{"reads the values from a later commonName and keeps the first commonName", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF1 Mpid:8000")
+			dropProductID(t, s)
+		}, ids{0xFFF1, 0x8000}},
+		{"reads the values from the first commonName when a later one carries none", func(t *testing.T, s *derNode) {
+			t.Helper()
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF1 Mpid:8000")
+			dropProductID(t, s)
+			s.elements = append(s.elements[1:], s.elements[0])
+		}, ids{0xFFF1, 0x8000}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := read(t, dacWithFallback(t, func(s *derNode) { tc.edit(t, s) })); got != tc.want {
+				t.Fatalf("ids %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+	t.Run("is not read when the DN has a VendorID attribute", func(t *testing.T) {
+		t.Parallel()
+		if got := read(t, withNameText(t, validDAC, subjectElement, commonNameOID, "Matter Test DAC Mvid:FFF2")); got.vid != 0xFFF1 {
+			t.Fatalf("ids %+v, want VendorID 0xFFF1", got)
+		}
+	})
+	t.Run("refuses a malformed prefix in an earlier commonName", func(t *testing.T) {
+		t.Parallel()
+		refused(t, dacWithFallback(t, func(s *derNode) {
+			dnAttributeOf(t, s, commonNameOID).elements[1].bytes = []byte("Matter Mpid:")
+			asCommonName(t, s, vendorIDOID, "Mvid:FFF1 Mpid:8000")
+			dropProductID(t, s)
+		}), `Mpid: not followed by 4 uppercase hex digits`)
+	})
+	t.Run("refuses a value that byte 64 of a commonName cuts", func(t *testing.T) {
+		t.Parallel()
+		refused(t, dacWithFallback(t, func(s *derNode) {
+			asCommonName(t, s, vendorIDOID, x(56)+"Mvid:FFF1")
+			dropProductID(t, s)
+		}), `Mvid: not followed by 4 uppercase hex digits`)
+	})
+
+	t.Run("reports a DAC with a malformed VendorID as DacFormatInvalid", func(t *testing.T) {
+		t.Parallel()
+		if ae := profileValidate(t, violations["lowercase VendorID"], validPAI); ae.Check != DacFormatInvalid {
+			t.Fatalf("%s %q", ae.Check, ae.Message)
+		}
+	})
+	t.Run("reports a PAI with a repeated VendorID as PaiFormatInvalid", func(t *testing.T) {
+		t.Parallel()
+		if ae := profileValidate(t, validDAC, withRepeatedSubjectAttribute(t, validPAI, vendorIDOID)); ae.Check != PaiFormatInvalid {
+			t.Fatalf("%s %q", ae.Check, ae.Message)
+		}
+	})
+}

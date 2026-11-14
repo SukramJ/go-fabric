@@ -8,6 +8,9 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -93,8 +96,16 @@ func buildTestCert(t *testing.T, opts certOptions) []byte {
 		e.PutOctets(tlv.ContextTag(9), pubKey)
 	}
 
-	// tag 10: Extensions (empty list)
+	// tag 10: Extensions (empty list unless a pathLen is asked for)
 	e.StartList(tlv.ContextTag(10))
+	if opts.bcPathLen != nil {
+		e.StartStruct(tlv.ContextTag(1))
+		e.PutBool(tlv.ContextTag(1), true)
+		e.PutUint(tlv.ContextTag(2), *opts.bcPathLen)
+		if err := e.EndContainer(); err != nil {
+			t.Fatalf("EndContainer basic-constraints: %v", err)
+		}
+	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer extensions: %v", err)
 	}
@@ -140,6 +151,9 @@ type certOptions struct {
 	omitPublicKey      bool
 	signature          []byte
 	omitSignature      bool
+	// bcPathLen, when set, adds a basic-constraints extension whose
+	// pathLen element carries this value.
+	bcPathLen *uint64
 }
 
 // makeValidPubKey returns a fresh P-256 public key in the 65-byte
@@ -470,5 +484,62 @@ func TestDecode_PublicKeyAbsentOrEmptyRejected(t *testing.T) {
 				t.Fatalf("Decode: expected ErrMalformed, got %v", err)
 			}
 		})
+	}
+}
+
+// A validity time beyond 32 bits is refused: the TLV schema carries
+// notBefore and notAfter as TlvUInt32 (operational.ts:138-139 at
+// db021da0), which matter.js's Schema.decode validates (review II,
+// R2-P1-sec-04).
+func TestDecode_ValidityBeyond32BitsRejected(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		mod  func(*certOptions)
+	}{
+		{"notBefore", func(o *certOptions) { o.notBefore = 1 << 32 }},
+		{"notAfter", func(o *certOptions) { o.notAfter = 6311433600 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			opts := makeRootCertOpts()
+			tc.mod(&opts)
+			if _, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 32 bits") {
+				t.Fatalf("Decode = %v, want ErrMalformed (exceeds 32 bits)", err)
+			}
+		})
+	}
+	opts := makeRootCertOpts()
+	opts.notAfter = math.MaxUint32
+	if _, err := Decode(buildTestCert(t, opts)); err != nil {
+		t.Fatalf("Decode(notAfter = MaxUint32) = %v", err)
+	}
+}
+
+// A basic-constraints pathLen that does not fit its TlvUInt8 is refused,
+// not cut to its low byte (operational.ts:42 at db021da0, as
+// TestDecode_ValidityBeyond32BitsRejected; review II, core2 item 3).
+func TestDecode_PathLenBeyond8BitsRejected(t *testing.T) {
+	t.Parallel()
+	for _, v := range []uint64{256, 0x101, math.MaxUint64} {
+		opts := makeRootCertOpts()
+		opts.bcPathLen = &v
+		if c, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 255") {
+			got := "<no certificate>"
+			if c != nil {
+				got = fmt.Sprintf("pathLen %d (has %v)", c.Extensions.BasicConstraintsPathLen, c.Extensions.BasicConstraintsHasPathLen)
+			}
+			t.Fatalf("Decode(pathLen %d) = %v, %s; want ErrMalformed (exceeds 255)", v, err, got)
+		}
+	}
+	v := uint64(math.MaxUint8)
+	opts := makeRootCertOpts()
+	opts.bcPathLen = &v
+	c, err := Decode(buildTestCert(t, opts))
+	if err != nil {
+		t.Fatalf("Decode(pathLen 255) = %v", err)
+	}
+	if !c.Extensions.BasicConstraintsHasPathLen || c.Extensions.BasicConstraintsPathLen != math.MaxUint8 {
+		t.Fatalf("pathLen = %d (has %v), want 255", c.Extensions.BasicConstraintsPathLen, c.Extensions.BasicConstraintsHasPathLen)
 	}
 }

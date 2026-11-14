@@ -169,6 +169,11 @@ func (b *fakeBus) lastArgs(method string) []any {
 // errHang, given to failWith, makes the call block until its context ends.
 var errHang = errors.New("fakebus: hang")
 
+// errLateReply, given to failWith, makes bluetoothd carry the call out and
+// withhold its reply until the call's context ends: a registration that
+// completes after its caller stopped waiting.
+var errLateReply = errors.New("fakebus: late reply")
+
 func (b *fakeBus) failWith(key string, err error) {
 	b.mu.Lock()
 	b.errs[key] = err
@@ -198,6 +203,11 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	if ok {
 		if errors.Is(err, errHang) {
 			<-ctx.Done() // a call the daemon never answers
+			return nil, ctx.Err()
+		}
+		if errors.Is(err, errLateReply) {
+			_, _ = b.bluetoothd(path, method, args)
+			<-ctx.Done()
 			return nil, ctx.Err()
 		}
 		return nil, err

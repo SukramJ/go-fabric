@@ -174,7 +174,7 @@ func (k *connection) do(ctx context.Context, o *op, m wire.Message, d time.Durat
 	case <-t.C():
 		unpend()
 		k.log.Info("ble.esphome.gatt_timeout", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.String("op", o.name))
-		k.markGone()
+		k.endLocally()
 		return reply{}, fmt.Errorf("esphome: %s %s: %w: %w", o.name, k.address, ErrTimeout, btp.ErrDisconnected)
 	case <-ctx.Done():
 		// The request is in flight and the API carries no request id: its
@@ -184,7 +184,7 @@ func (k *connection) do(ctx context.Context, o *op, m wire.Message, d time.Durat
 		// matches replies by address and handle alone (client.py:1215-1244).
 		unpend()
 		k.log.Info("ble.esphome.gatt_cancelled", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.String("op", o.name))
-		k.markGone()
+		k.endLocally()
 		return reply{}, ctx.Err()
 	}
 }
@@ -360,6 +360,19 @@ func (k *connection) isGone() bool {
 	default:
 		return false
 	}
+}
+
+// endLocally ends a connection this side gave up on (an operation
+// cancelled or overrun): the proxy is told to drop the link, as connect
+// does on its own timeout and cancel (proxy.go, client.py:1377-1420), so
+// its connection slot and the peripheral are free for the next attempt;
+// then the connection is gone here, and Disconnect has nothing to send.
+func (k *connection) endLocally() {
+	if k.isGone() {
+		return
+	}
+	_ = k.p.send(&wire.BluetoothDeviceRequest{Address: k.addr, RequestType: wire.DeviceRequestDisconnect})
+	k.markGone()
 }
 
 // markGone ends the connection: Disconnected closes, the operation in

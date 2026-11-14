@@ -146,6 +146,12 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-OTAImage-DownloadBound | `DclOtaUpdateService.ts:690-693` at `db021da0` fetches the image with a timeout as its only limit and hands the response body to `store` (`:703`), which streams it to storage (`:571`) before anything is verified (`:573-574`) (presence: the hand-over) | `packages/protocol/src/dcl/DclOtaUpdateService.ts` | `"return await this.store(response.body, updateInfo, mode);"` | this module: `dcl.OTAVersions.MaxImageSize`, default 256 MiB — owner decision 11 of review II, a judgement without measured image sizes; connectedhomeip has no DCL image download to follow | no |
 | BD-Matter-BTP-InFlightBound | `BlenoBleServer.ts:268` at `db021da0`: the peripheral starts `handleIncomingBleData` for every write and does not wait for it, and the session's message callback calls the listener without waiting (`:316-322`); no count limits the messages handed on and not yet handled at this layer (presence) | `packages/nodejs-ble/src/BlenoBleServer.ts` | `"this.btpSession.handleIncomingBleData(new Uint8Array(data)).catch(error => {"` | this module: the bound of its TCP connection (`transport/tcp/conn.go`, `maxInFlightPerConn` = 64) | no |
 | BD-chip-TimedRequestsBounded | `MessageExchange.ts:1066-1084` at `db021da0`: a timed interaction is a timer on its exchange (`#timedInteractionTimer`, `:272`), started by `startTimedInteraction` with no count over a session's exchanges (presence) | `packages/protocol/src/protocol/MessageExchange.ts` | `"    startTimedInteraction(timeout: Duration) {"` | connectedhomeip at `6170af84`: `CHIP_IM_MAX_NUM_TIMED_HANDLER` 8 (`src/lib/core/CHIPConfig.h:1010-1011`), the pool of `src/app/InteractionModelEngine.h:669`, Busy when it is exhausted (`src/app/InteractionModelEngine.cpp:963-973`); per session here | no |
+| BD-chip-ChunkedWritesBounded | `InteractionServer.ts:538-543` at `db021da0`: the hold of a chunked write's attribute is taken "before any await" — before the batch that checks access runs (`:548`) — and nothing counts the chunked writes a session holds open (presence: the hold's comment) | `packages/node/src/node/server/InteractionServer.ts` | `"// Taken before any await, so no other exchange passes the BUSY check for this path meanwhile"` | connectedhomeip at `6170af84`: `CHIP_IM_MAX_NUM_WRITE_HANDLER` 4 (`src/lib/core/CHIPConfig.h:991-992`), Busy when no write handler is free (`src/app/InteractionModelEngine.cpp:951-960`); per session here. The order of hold and ACL check is matter.js's, kept (review II, owner decision 30) | no |
+| BD-Matter-BTP-HandshakeTimerFromAccept | `BlenoBleServer.ts:189-193` at `db021da0`: the `accept` handler records the client address and updates the RSSI, and starts no timer (presence: the handler's last two statements and its close); the timer starts at the handshake request (`:258`), as `BleConsts.ts:56` says (presence) | `packages/nodejs-ble/src/BlenoBleServer.ts`<br>`packages/protocol/src/ble/BleConsts.ts` | `"            this.clientAddress = clientAddress;\n            Bleno.updateRssi();\n        });"`<br>`"timer starts when receives handshake request & waits for a subscription request on c2"` | this module's own rule (review II, owner decision 31): the handshake timer runs from the accept and stops only once a session exists; a kept handshake request that opens no session drops the connection. connectedhomeip's peripheral was not read (unverified) | no |
+| BD-Matter-ChunkWaitsBounded | `InteractionMessenger.ts:839-844` at `db021da0`: a report chunk is sent and the interaction waits for the peer's StatusResponse (`waitForSuccess`, `:221-227`), with no count over a session's waiting interactions at these lines (presence: the wait) | `packages/protocol/src/interaction/InteractionMessenger.ts` | `"await this.waitForSuccess(\"DataReport\", { timeout: waitForAck ? undefined : Millis(500) });"` | this module's own rule (review II, R2-P1-req2-01): a session holds at most 4 interactions waiting for a chunk's StatusResponse, the request beyond is answered Busy, and a wait ends with its session, the bridge's Stop and its priming subscription. connectedhomeip at `6170af84` is the comparison for the number, not the source: its node-wide pools of command and write handlers are 4 each (`src/lib/core/CHIPConfig.h:922`, `:992`) | no |
+| BD-Matter-MdnsTruncatedQueryBounds | `MdnsServer.ts:61` at `db021da0`: `#truncatedQueryCache` is a map without a size limit (presence); `#prepareMessage` spreads the held queries, answers and additional records with the new ones (`:519-527`) and starts a new 400–500 ms timer for every continuation that still carries TC (`:538-545`) | `packages/protocol/src/mdns/MdnsServer.ts` | `"    readonly #truncatedQueryCache = new Map<string, { message: MdnsSocket.Message; timer: Timer }>();"` | this module's own rule (review II, R2-P1-net-01): the wait runs from the first packet, 32 packets, 64 questions, only the known answers that suppress an own record, 64 held queries; at every bound the query is answered with what arrived. connectedhomeip was not read for truncated queries (unverified) | no |
+| BD-Matter-StoreEraseScrub | `SqliteStorageDriver.ts:206-209` at `db021da0`: the driver clears a context with a plain `DELETE` (presence; one key at `:200-204`, everything at `clearOnInit`, `:305`); a search for `VACUUM` and `secure_delete` under `packages/nodejs/src/storage` finds no line | `packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts` | `"      DELETE FROM ${this.tableName} WHERE\n        context=$context OR context GLOB $contextGlob"` | this module's own mechanism (review II, R2-P1-misc-01, R2-P1-dr-rest-02): after the deletes a `VACUUM` and a truncating checkpoint, so none of the erased bytes stay in the database, its `-wal` or its `-shm`; `ErrScrubIncomplete` when the scrub does not finish. connectedhomeip's stores were not read (unverified) | no |
+| BD-Matter-ReservedLocalIDs | `Peers.ts:960` at `db021da0`: a client node takes the caller's `options.id` or an allocated one (presence), and `allocateId` returns the counter's next value (`ClientNodeStores.ts:77-81`), a counter kept ahead of the persisted `peerN` ids only (`:47-54`) | `packages/node/src/node/client/Peers.ts` | `"id: options.id ?? this.#owner.owner.env.get(ServerNodeStore).clientStores.allocateId(),"` | this module's own rule (review II, R2-P1-ctl-01): a caller-chosen id is reserved as a stored one is, and an allocation skips an id a node holds | no |
 
 ---
 
@@ -909,7 +915,7 @@ matter.js deletes an address when discovery drops it and aborts the attempt in f
 
 ### BD-Matter-PeerBusyDeadline — a Busy answer's delay is held for the peer, not for the attempt
 
-matter.js waits the delay of a Busy status report — `busyDelay` plus a random part of `delayAfterNetworkError` (`PeerConnection.ts:700-701` at db021da0) — inside the attempt that received it, so an abort of that attempt, or an attempt at another address, sends the next Sigma1 at once. This module records the deadline on the peer when the answer arrives, after the host's error handler had its say on the delay: no Sigma1 goes to any address of that peer before it, and a session clears it. Reason: issue 507 — the node answered Busy with the 16-bit maximum (65.5 s), the waiting attempt was aborted by the next change of its SRV set, and the node's return sent a fresh Sigma1 into the window the node had asked to be left alone in. The node, not the path, is busy. Retires when matter.js holds the delay per peer.
+matter.js waits the delay of a Busy status report — `busyDelay` plus a random part of `delayAfterNetworkError` (`PeerConnection.ts:700-701` at db021da0) — inside the attempt that received it, so an abort of that attempt, or an attempt at another address, sends the next Sigma1 at once. This module records the deadline on the peer when the answer arrives at a proven address of the peer — an address of its operational host (`Descriptor.OperationalHost`) or its operational address — after the host's error handler had its say on the delay: no Sigma1 goes to any address of that peer before it, and a session clears it. A Busy from any other address is unauthenticated and need not be the node's (a foreign SRV target's, issue 507): it holds only the attempt that received it, as matter.js waits it (review II, R2-P1-net-05; pinned by `client/peer:TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt`). Reason: issue 507 — the node answered Busy with the 16-bit maximum (65.5 s), the waiting attempt was aborted by the next change of its SRV set, and the node's return sent a fresh Sigma1 into the window the node had asked to be left alone in. The node, not the path, is busy. Retires when matter.js holds the delay per peer.
 
 ### BD-Matter-Commissioner-ReconnectProbe — during Reconnect the commissioner asks the device for its network state and connects to the addresses it reports
 
@@ -4221,9 +4227,42 @@ as `missing` under this entry.
 
 DAC, PAI and PAA are parsed with `crypto/x509` from the DER as received
 and never re-encoded; matter.js decodes them into its own structure, reads
-the issuer DN for the Mvid/Mpid fallback (`certificate/kinds/Certificate.ts:379-392`)
-and re-encodes. The recode and round-trip cases of CertificatesTest are
-`missing` under this entry. Report BH (phase 16, 2026-10-18).
+the issuer DN as it reads the subject (`certificate/kinds/Certificate.ts:729`,
+`:740` at `db021da0`) and re-encodes. The recode and round-trip cases of
+CertificatesTest are `missing` under this entry. Report BH (phase 16,
+2026-10-18).
+
+The vendor and product id are read from the parsed name by matter.js's rule
+at `db021da0` since review II (owner decision 33, R2-P1-sec-02); until
+`0a1d4e6d` they were read more leniently — hex digits in either case and of
+any length, the commonName fallback whenever both attributes read as absent
+— a difference no row or finding had recorded. The rule
+(`certificate/kinds/Certificate.ts` and `kinds/DistinguishedName.ts`): a
+matter-oid-vid or matter-oid-pid attribute is exactly 4 uppercase hex
+digits (`parseMatterRdnHex`, `Certificate.ts:242-249`, `:341-345`) and
+occurs once (`DistinguishedName.ts:261-270`), else
+`CertificateProfileError` (`Certificate.ts:346-349`); the `Mvid:`/`Mpid:`
+commonName fallback is read only when the DN carries neither attribute, a
+malformed one counting (`:343`, `:377-381`), from the first commonName that
+carries a value, in its first 64 bytes (`DistinguishedName.ts:345-346`,
+`:364-374`); a prefix without 4 uppercase hex digits is a
+`CertificateError` (`:63-72`). `controller/attestation` (`matterIDsOf`)
+reads it strictly, issuer before subject, and the validator answers
+`DacFormatInvalid` or `PaiFormatInvalid` as matter.js's does
+(`DeviceAttestationValidator.ts:181-188`, `:263-264`). `secure/attestation`
+(`productIDsOf`, behind `ValidateProduct`) reads a malformed or repeated
+attribute as absent, as the device's read of its own DAC and PAI does with
+`acceptMalformedVidPid` (`DeviceCertification.ts:116-120`,
+`Certificate.ts:350-351`, `DistinguishedName.ts:318-320`): an id the
+certificate does not state readably is not judged against the product —
+matter.js's behaviour, pinned there by "starts a device whose own DAC has
+a malformed VendorID" (`AttestationCertificateProfileTest.ts:610-624`),
+not a gap. Two copies of one rule, one per layer; what `crypto/x509` makes
+of a DN value before either reads it is in
+`BD-Matter-Attestation-ProfileOnCryptoX509`. Ported:
+`controller/attestation:TestProfileVendorProductIDInTheDN`,
+`secure/attestation:TestProductIDsAcceptMalformed` and
+`TestValidateProductOverAMalformedVendorID`.
 
 By design. A re-encoded attestation certificate has no consumer here; the
 vendor-id read happens on the parsed name. The operational-certificate
@@ -4247,6 +4286,22 @@ DAC key after a policy accepted a failed attestation is read by
 `crypto/x509` too (`controller/commissioner/flow.go` `dacKeyOf`), the
 `acceptProfileViolation` read of `ControllerCommissioningFlow.ts`. Pin
 lift wave P2 (#431).
+
+`crypto/x509` also decides what a DN value is before the vendor and
+product id are read from it (review II, owner decision 33): matter.js
+reads an attribute's value bytes as they are (`Certificate.ts:326`,
+`:362-364` at `db021da0`) and cuts a commonName at 64 received bytes
+before it decodes the text (`DistinguishedName.ts:366`). `crypto/x509`
+refuses a DN value that is not valid for its string type — the fix
+measured "x509: invalid RDNSequence: invalid attribute value: invalid
+UTF-8 string" for a UTF8String that is not UTF-8 — so
+AttestationCertificateProfileTest.ts's "cuts a commonName with invalid
+UTF-8 at byte 64 of the received bytes" (`:555-563`) cannot be ported:
+that DAC does not parse here, and the case stays `missing` in the
+test-parity register under this entry. A BMPString or T61String value
+reaches the rule decoded to UTF-8, where matter.js searches the raw
+bytes; which certificates that reads differently was not exercised
+(unverified).
 
 By design. RFC 5280 §4.2 forbids every duplicate and DER every other
 BOOLEAN encoding, so the stricter refusal names no certificate a CSA
@@ -6000,6 +6055,19 @@ maps `camera_*` onto this package (its #40). Reconciliation: when matter.js
 grows a camera controller behaviour, its allocation and SDP rules are
 compared with these, and the register row closes as caught up.
 
+Review II, phase 1, added bounds of this module's own. matterjs-server at
+`0bd06f2` is not among the sources exported at the review's pins, so what
+it does in their place was not read (not performable: not exported). A
+session's `Signals` hold at most 1024 signals and 1 MiB unread; a camera
+that signals past either bound ends the session with `EndSignalOverflow`
+and an EndSession, by identity — a newer session that reused the id is
+left alone (R2-P1-cam-b-06, R2-P1-dr-rest-05; pinned by
+`controller/camera:TestSignalMailboxIsBounded` and
+`TestOverflowEndSparesTheSessionThatReusedItsID`). A node removed from the
+fabric takes this controller's stream leases along (R2-P1-cam-a-02), and
+a start, a raw offer, a snapshot or a stop after the service's `Close` is
+refused with `ErrClosed` (R2-P1-cam-b-04).
+
 ### BD-chip-JointFabricDatastore-RulesInServer — the datastore's tables, refresh and sync follow connectedhomeip behind the `DatastoreSync` port
 
 matter.js's `JointFabricDatastoreServer.ts:14` at `862ad75f` is the empty
@@ -6056,6 +6124,18 @@ chip's deferred-completion cases (`TestRemoveBindingIteratorUseAfterFree`,
 `TestAddBindingBackReferenceMarksWrongEntry` in `datastore_chip_test.go`)
 run their adds beside the held push, where chip's adds return before the
 delegate completes. Pinned by `datastore_endpoint_sync_test.go`.
+
+A binding push and the node's refresh are serialised per node, and a push
+whose node list already holds a matching entry writes nothing (review II,
+R2-P1-clu-05, R2-P1-dr-rest-04): a push that waited behind a `RefreshNode`
+of the same node, which had delivered the Pending entry with the whole
+list, would otherwise write the binding a second time. This module's own
+rule. The entry above cites jf-admin-app's delegate as appending the entry
+(`JFADatastoreSync.cpp:1744` at `6170af84`); `examples/jf-admin-app` is not
+among the sources exported at the review's pin, so that line and what the
+delegate does for an entry the node already holds were not re-read (not
+performable: not exported). Pinned by
+`cluster/jointfabric:TestBindingPushAfterARefreshThatDeliveredIt`.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
@@ -7358,3 +7438,298 @@ a bridge a second time (not re-checked here) — phase 5 of review II.
 Pinned by
 `bridge:TestStartDuringStopIsRefused`. Retire with the answer to the
 restart question.
+
+### BD-chip-ChunkedWritesBounded — a session may hold at most four chunked writes open; the hold stays before the ACL check
+
+matter.js takes the hold of a chunked write's attribute "before any await"
+(`packages/node/src/node/server/InteractionServer.ts:538-543` at
+`db021da0`) — before the batch that checks access runs (`:548`) — releases
+all but the last accepted path when more chunks follow (`:555-561`) and the
+rest when `handleWriteRequest` leaves its scope (`:460-469`); nothing at
+these lines counts the chunked writes a session holds open. Whether
+matter.js bounds a session's exchanges elsewhere was not read (unverified).
+This module keeps matter.js's order (owner decision 30 of review II):
+`im/write.go` takes the hold before the ACL gate, so a write the ACL
+refuses still holds its last attribute until its final chunk or
+`writeTxTTL`. It bounds what that order costs: a session has at most
+`maxChunkedWritesPerSession` = 4 chunked writes open, the chunk that would
+open a fifth is answered Busy before anything is held
+(`bridge/exchange_routing.go`, `Bridge.dispatchWriteRequest`), and a closed
+session's open writes end with it and release their holds
+(`dropSessionWriteTxs`). The number and the answer are connectedhomeip's:
+`CHIP_IM_MAX_NUM_WRITE_HANDLER` 4 (`src/lib/core/CHIPConfig.h:991-992` at
+`6170af84`) and `Status::Busy` when no write handler is free
+(`src/app/InteractionModelEngine.cpp:951-960`). Its pool is the engine's
+one pool; the bound here is per session, so one session cannot use up
+another's, as in `BD-chip-TimedRequestsBounded`. Where connectedhomeip
+checks access relative to its write handler was not read (unverified).
+Review II, R2-P1-req-03 and R2-P1-dr-req-02. Pinned by
+`bridge:TestChunkedWritesOfOneSessionAreBounded` and
+`TestClosedSessionReleasesItsChunkedWrites`. Register row above; the row
+closes when matter.js bounds the chunked writes a session may hold open.
+
+### BD-Matter-BTP-HandshakeTimerFromAccept — the BTP handshake timer runs from the accept, and a handshake that opens no session drops the connection
+
+matter.js's peripheral starts no timer when a central connects: its
+`accept` handler records the client address and updates the RSSI
+(`packages/nodejs-ble/src/BlenoBleServer.ts:189-193` at `db021da0`). It
+starts `btpHandshakeTimeout` at the handshake request (`:258`;
+`BTP_CONN_RSP_TIMEOUT`, 15 s, "timer starts when receives handshake request
+& waits for a subscription request on c2",
+`packages/protocol/src/ble/BleConsts.ts:56`), so a central that connects
+and never writes holds the connection. It stops the timer at the C2
+subscription, before the session is created (`BlenoBleServer.ts:297`,
+`:299`): a request that names no supported version is disconnected
+(`packages/protocol/src/ble/BtpSessionHandler.ts:106-108`); one whose
+version nibbles are all zero fails in the decode before that
+(`packages/protocol/src/codec/BtpCodec.ts:219-222`, called at
+`BtpSessionHandler.ts:95`), the rejection is logged
+(`BlenoBleServer.ts:76-78`) and the connection stays with no timer left.
+In this module the accept starts the timer of `ConnRspTimeout`
+(`transport/btp/accept.go`): a central that has not completed the
+handshake when it ends is disconnected, a silent one included; the timer
+stops only once a session exists; and a kept handshake request that opens
+no session drops the connection at once. Both are this module's own rule
+(owner decision 31 of review II): a central that holds the connection
+keeps a commissioner out. connectedhomeip's peripheral was not read for
+either (unverified). Review II, R2-P1-req-07 and R2-P1-dr-req-03. Pinned
+by `transport/btp:TestAcceptSilentCentralIsDisconnected`,
+`TestAcceptHandshakeInTimeIsUntouched` and
+`TestAcceptRefusedHandshakeIsDisconnected`. Register row above; the row
+closes when matter.js starts its handshake timer at the accept.
+
+### BD-Matter-ChunkWaitsBounded — a session may leave at most four interactions waiting for a chunk's StatusResponse
+
+matter.js sends a report chunk and waits for the peer's StatusResponse
+inside the interaction
+(`packages/protocol/src/interaction/InteractionMessenger.ts:839-844` at
+`db021da0`; `waitForSuccess`, `:221-227`); nothing at these lines counts
+the interactions of a session that wait. Whether matter.js bounds a
+session's exchanges elsewhere, and what ends such a wait when the session
+closes, were not read (unverified). In this module the wait is bounded
+twice (`bridge/chunk_waits.go`): it ends with its session, with the
+bridge's `Stop` and with its priming subscription, and one session holds
+at most `maxChunkWaitsPerSession` = 4 of them — the request beyond is
+answered Busy, an InvokeRequest before any command runs, a ReadRequest
+after it was read and chunked. The number is this module's own choice;
+connectedhomeip's node-wide pools of command and write handlers are 4 each
+(`src/lib/core/CHIPConfig.h:922`, `:992` at `6170af84`) and are the
+comparison, not the source. With it, a `KeepSubscriptions=false` teardown
+leaves a subscription that is still priming, as matter.js adds a
+subscription to its session only when it activates
+(`packages/node/src/node/server/ServerSubscription.ts:411-421`) and the
+teardown walks the sessions' subscriptions
+(`packages/node/src/node/server/InteractionServer.ts:647-665`). Review II,
+R2-P1-req2-01. Pinned by `bridge:TestChunkWaitsOfOneSessionAreBounded`,
+`TestStopEndsPendingChunkWaits`, `TestSessionCloseEndsItsChunkWaits` and
+`TestSubscriptionCloseEndsItsPrimingWait`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds the interactions of a session that wait for a chunk's
+StatusResponse.
+
+### BD-Matter-MdnsTruncatedQueryBounds — a truncated mDNS query and its continuations are bounded
+
+matter.js merges a truncated query with its continuations without a
+bound: `#prepareMessage` spreads the held queries, answers and additional
+records with the new ones
+(`packages/protocol/src/mdns/MdnsServer.ts:519-527` at `db021da0`), starts
+a new 400–500 ms timer for every continuation that still carries TC
+(`:538-545`), and keeps the held queries in `#truncatedQueryCache`, a map
+without a size limit (`:61`). This module's responder (`mdns/answer.go`)
+counts the wait from the first packet — a continuation does not move it —
+completes a query at `maxTruncatedPackets` = 32 packets or at more than
+`maxTruncatedQuestions` = 64 questions, keeps of the known answers only
+those that suppress one of the interface's own records and none of the
+additional records, and holds at most `maxTruncatedQueries` = 64 truncated
+queries, answering the one beyond at once. At every bound the query is
+answered with what has arrived; nothing that arrived is dropped. The
+numbers are this module's own; connectedhomeip was not read for truncated
+queries (unverified). Reason: every dimension of the merge is the
+sender's, and the sender is unauthenticated — before `8c19b9d4` one that
+kept the TC bit set held one ever-growing query alive (review II,
+R2-P1-net-01). Pinned by `mdns:TestTruncatedQueryBounds`; the limits are
+in `docs/guides/limits.md`. Register row above; the row closes when
+matter.js bounds a truncated query.
+
+### BD-Matter-StoreEraseScrub — the factory reset's erase leaves none of the erased bytes in the database file
+
+matter.js's SQLite driver erases with plain `DELETE` — one key
+(`packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts:200-204` at
+`db021da0`), a context and its children (`:206-209`), everything at
+`clearOnInit` (`:305`) — and a search for `VACUUM` and `secure_delete`
+under `packages/nodejs/src/storage` finds no line. `store.Store.Erase`
+deletes and then scrubs (`store/erase.go`, `Scrub`): the database is
+rebuilt without its free pages and the `-wal` is truncated, so none of the
+erased bytes remain in the database file, its `-wal` or its `-shm`. A
+scrub that does not finish after the deletes committed answers
+`ErrScrubIncomplete` — the store is erased, a later `Scrub` removes the
+bytes — and the node's factory reset still pins its fresh UniqueID then.
+`node.FactoryReset` erases the endpoint records before the scrub and
+scrubs the file when its credential store is an override. The mechanism
+is this module's own (review II, R2-P1-misc-01, R2-P1-dr-rest-02);
+connectedhomeip's stores were not read (unverified). Pinned by
+`store:TestStoreEraseLeavesNoResidue`,
+`TestStoreEraseWhoseCheckpointAReaderBlocks` and
+`node:TestFactoryResetWhoseScrubAReaderBlocksStillPins`. Register row
+above; the row closes when matter.js's erase removes the deleted bytes.
+
+### BD-Matter-ReservedLocalIDs — a caller-chosen local node id is reserved, and an allocation skips an id a node holds
+
+matter.js creates a client node under the id the caller gives or under an
+allocated one (`packages/node/src/node/client/Peers.ts:960` at `db021da0`:
+`options.id ?? …clientStores.allocateId()`), and `allocateId` returns the
+counter's next value
+(`packages/node/src/storage/client/ClientNodeStores.ts:77-81`). The
+counter is kept "ahead of any persisted "peerN" id" when the stores are
+constructed (`:47-54`); nothing at these lines moves it past an id a
+caller chose at run time. What matter.js does when an allocation then
+reaches such an id was not traced (unverified). `client.Registry` reserves
+a caller-chosen id as it reserves a stored one, and `allocateIDLocked`
+skips any id a node holds (`controller/client/registry.go`,
+`addresses.go`), so no two nodes share an id and with it their store rows.
+This module's own rule. Review II, R2-P1-ctl-01. Pinned by
+`controller/client:TestCallerChosenIDIsReserved`. Register row above; the
+row closes when matter.js reserves a preassigned id.
+
+### BD-chip-SessionRouteByNewCounter — a secure session's route moves with every message that carries a new counter
+
+connectedhomeip sets a session's peer address only for a message that is
+not a duplicate, on any exchange — "Only a message with a new message
+counter may change the peer address" (`src/transport/SessionManager.cpp:1054-1068`
+at `6170af84`, the comment at `:1058`). matter.js adopts the address only
+when a non-duplicate initiator message opens a new exchange — "the new
+message wins" (`packages/protocol/src/protocol/ExchangeManager.ts:462-486`
+at `db021da0`, the comment at `:480`) and "We ignore "inter exchange"
+address changes for now" (`:482`). This module follows connectedhomeip
+(`bridge/receive.go`, `bindSessionRoute` in `bridge/conn.go`): every
+authenticated datagram with a new message counter moves the route its
+session's reports, BDX and OTA exchanges and the CloseSession farewell
+take, on any exchange; a duplicate moves nothing and is still
+acknowledged. Reason: a peer whose address changed is reached again by
+its next message of any kind, where matter.js's rule waits for it to open
+an exchange. Neither rule lets a replayed datagram move the route; before
+`8c0fa135` this module's did — it bound the route on every datagram that
+decrypted, duplicates included, under a comment that cited
+`ExchangeManager.ts:425-431` for "the new message wins", lines that are
+the acknowledge-and-close of a closing exchange at the pin (review II,
+R2-P1-req-01). Pinned by
+`bridge:TestReceive_ReplayDoesNotMoveSessionRoute` and
+`TestReceive_NewMessageFromNewAddressMovesSessionRoute`. Retire when
+matter.js moves a session's address on every new message.
+
+### BD-Matter-MdnsLegacyQuerierNoSpecialCase — an mDNS query from a source port other than 5353 gets no special case
+
+Parity with matter.js, recorded because connectedhomeip differs (owner
+decision 32 of review II, R2-P1-net-03). matter.js does not tell a legacy
+(one-shot) querier apart: "A legacy resolver, which we cannot distinguish
+because the source port does not reach us"
+(`packages/protocol/src/mdns/InterfaceResponder.ts:938-939` at
+`db021da0`); its multicast server hands a listener the message, the peer
+address and the interface and drops the port
+(`packages/general/src/net/udp/UdpMulticastServer.ts:142-156`). This
+module's responder reads the source port nowhere on its answer path
+(`mdns/answer.go`, `mdns/hold.go`): where an answer goes is decided by the
+QU bit, whatever port the query came from, and no answer repeats the
+question. connectedhomeip answers a query from another port by unicast
+and with the question section
+(`src/lib/dnssd/minimal_mdns/ResponseSender.cpp:45-53` at `6170af84`:
+`SendUnicast()` is the query's unicast request or
+`SrcPort != kMdnsStandardPort`, `IncludeQuery()` is
+`SrcPort != kMdnsStandardPort`), and its own resolver may query from an
+ephemeral port, such queries "being considered LEGACY by mdns"
+(`src/lib/dnssd/minimal_mdns/Server.cpp:233-237`,
+`CHIP_MINMDNS_USE_EPHEMERAL_UNICAST_PORT`). Cost: a one-shot querier that
+sends from an ephemeral port without the QU bit (RFC 6762 §6.7) is
+answered by multicast to port 5353 and does not receive it. Not pinned by
+a test. Retire when matter.js answers a legacy querier by unicast, or the
+owner reopens the decision.
+
+### BD-Matter-MdnsOnLinkSource — an mDNS query is answered only from a source on the link of the interface it arrived on
+
+matter.js gets this filter from how it finds a packet's interface when
+its socket has none configured
+(`packages/nodejs/src/net/NodeJsUdpSocket.ts:227` at `db021da0`): the
+source's zone, else the interface one of whose addresses contains the
+source under its netmask (`packages/nodejs/src/net/NodeJsNetwork.ts:144-166`;
+`onSameNetwork`, `packages/general/src/util/Ip.ts:108-130`), else `""` for
+an IPv6 source that starts with `fd` and `undefined` otherwise. A packet
+without an interface is dropped
+(`packages/general/src/net/udp/UdpMulticastServer.ts:142-156`), and the
+`""` interface has no details (`NodeJsNetwork.ts:207-209`;
+`packages/protocol/src/mdns/InterfaceResponder.ts:206-213`), so its query
+is not answered (`InterfaceResponder.ts:254-259`, `:796-800`). This
+module's responder applies the same filter (`mdns/answer.go`, `onLink`):
+a source is on the link when it is IPv6 link-local or inside one of the
+prefixes of the interface the query arrived on; any other is answered
+neither by multicast nor by unicast and is not held as a truncated query.
+An IPv4 link-local source (169.254/16) is on the link only when the
+interface holds a 169.254 address, as matter.js's netmask test has it
+(R2-P1-dr-rest-07; `docs/guides/operations.md` names the sources a real
+network has that the check refuses). One difference: matter.js matches
+the source against every interface of the host and answers on the one
+that contains it; this responder answers on the interface the query
+arrived on (the control message's, `mdns/socket.go`) and checks that
+interface's prefixes. Reason: the sockets bind the wildcard address, so a
+datagram sent by unicast to the host's port 5353 reaches the responder
+from anywhere (RFC 6762 §11; review II, R2-P1-net-02). Pinned by
+`mdns:TestResponder_AnswersOnlyOnLinkSources`. Retire when the responder
+matches a source as matter.js does, or matter.js checks the arrival
+interface.
+
+### BD-Matter-PendingNOCMarker — what an AddNOC or UpdateNOC wrote is marked pending in the store until CommissioningComplete
+
+Both references come back from a restart inside a fail-safe window
+without the uncommitted fabric: matter.js persists a new fabric only in
+`completeCommission` (`packages/protocol/src/common/FailsafeContext.ts:141-143`
+at `db021da0`, after the fail-safe timer is completed at `:139`), and
+connectedhomeip adds it as a pending fabric
+(`AddNewPendingFabricWithOperationalKeystore`,
+`src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:507`
+at `6170af84`; where it commits was not read, unverified). This module
+reaches that outcome by another mechanism
+(`cluster/core/operational_credentials_pending.go`,
+`general_commissioning_rollback.go`): AddNOC and UpdateNOC write the
+fabric, its identity, its key set and its ACL entry to the store as they
+run, and record what they wrote in a durable marker beside them — the
+settings keys `operational_credentials.pending_noc` (AddNOC: the fabric
+index the store assigned, written before the identity) and
+`operational_credentials.pending_noc_update` (UpdateNOC: what to
+restore). The marker is cleared as the last fallible step of
+CommissioningComplete, before the fail-safe is disarmed, and a clear that
+fails answers the command with a failure; a start that finds a marker
+rolls back what it names before the node reads its fabrics; a rollback
+whose read or write failed keeps its marker and is retried at the next
+expiry, arm, CommissioningComplete and start. A store without settings
+keeps the pending state in memory only, as before. Reason, from the fix's
+design note: the writes stay immediate, so no store signature and no
+column of a committed fabric changes. Review II, R2-P1-core-01,
+R2-P1-core-03, R2-P1-dr-sec-01, -02 and -04. Pinned by
+`cluster/core:TestOpcreds_RestartBeforeCommissioningComplete_RevertsAddNOC`,
+`TestOpcreds_RestartBeforeCommissioningComplete_RevertsUpdateNOC`,
+`TestOpcreds_RestartAfterCommissioningComplete_KeepsFabric`,
+`TestOpcreds_RefusedAddNOCMarkerNeverRemovesACommittedFabric`,
+`TestOpcreds_RestartAfterFailedUpdateNOCAndAddNOC_RevertsBoth`,
+`TestOpcreds_FailedUpdateRevertKeepsTheMarker` and
+`TestGencomm_CommissioningCompleteCommitsThePendingNOCOrFails`; the keys
+are in `docs/guides/persistence.md`. Retire when the store port offers a
+transaction that spans the fail-safe window.
+
+### BD-Matter-ArmOverDueWindowEndedSession — an arm that rolls back a due fail-safe itself arms nothing when that rollback ended its own session
+
+This module's own rule; no reference was read for it (matter.js and
+connectedhomeip: unverified). A fail-safe window past its deadline whose
+expiry has not run yet is expired by the ArmFailSafe that finds it: the
+arm runs that rollback, or waits for one in flight, before it judges the
+fail-safe fresh (`cluster/core/general_commissioning_rollback.go`; review
+II, the residuals of R2-P1-core-01). When the rollback ended the session
+the arm came on — a PASE session the PASE close ends, or a CASE session
+of the fabric the window's AddNOC added — the arm arms nothing and the
+command answers FAILURE; an arm from a session the rollback left standing
+arms a fresh fail-safe (R2-P1-dr-sec-03). Reason: a fail-safe armed for a
+session that no longer exists could only run out. Pinned by
+`cluster/core:TestGencomm_ArmOverADueWindowArmsNothingForAnEndedSession`,
+`TestGencomm_ArmOverADueWindowFromASurvivingSessionArms`,
+`TestGencomm_ArmOverADueWindowRollsItBack` and
+`TestGencomm_ArmInTheExpiryGapWaitsForTheRollback`. Phase 4 of review II
+reads both references for it; the entry then becomes parity, a divergence
+with its lines, or a finding.

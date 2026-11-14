@@ -555,3 +555,90 @@ func TestBLERearmInterval(t *testing.T) {
 	clock.Advance(16 * time.Minute)
 	eventually(t, "the timer stops", func() bool { return !f.armIntervalRunning() })
 }
+
+// TestDecodeNetworksReadsAReportedValueByShape: a reported Networks value is
+// decoded by its shape, its constraints unchecked, as matter.js decodes a
+// data report. The entry is the one a chip Linux app reports when it finds
+// no Ethernet interface: an empty NetworkID, connected
+// (connectedhomeip src/platform/Linux/NetworkCommissioningDriver.h:210-232
+// at 6170af84). A value of the wrong shape is still refused.
+func TestDecodeNetworksReadsAReportedValueByShape(t *testing.T) {
+	t.Parallel()
+	node := func(t *testing.T, build func(enc *tlv.Encoder)) spec.Node {
+		t.Helper()
+		enc := tlv.NewEncoder()
+		build(enc)
+		b, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, err := spec.ReadElement(tlv.NewDecoder(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	t.Run("an empty NetworkID", func(t *testing.T) {
+		t.Parallel()
+		nets, err := decodeNetworks(node(t, func(enc *tlv.Encoder) {
+			enc.StartArray(tlv.AnonymousTag())
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutOctets(tlv.ContextTag(0), nil)
+			enc.PutBool(tlv.ContextTag(1), true)
+			_ = enc.EndContainer()
+			_ = enc.EndContainer()
+		}))
+		if err != nil {
+			t.Fatalf("decodeNetworks: %v", err)
+		}
+		if len(nets) != 1 || len(nets[0].NetworkId) != 0 || !nets[0].Connected {
+			t.Fatalf("networks = %+v, want one connected entry with an empty NetworkID", nets)
+		}
+	})
+	t.Run("a NetworkID longer than 32 bytes and an unknown field", func(t *testing.T) {
+		t.Parallel()
+		id := bytes.Repeat([]byte{0xA5}, 40)
+		nets, err := decodeNetworks(node(t, func(enc *tlv.Encoder) {
+			enc.StartArray(tlv.AnonymousTag())
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutOctets(tlv.ContextTag(0), id)
+			enc.PutUint(tlv.ContextTag(9), 7)
+			_ = enc.EndContainer()
+			_ = enc.EndContainer()
+		}))
+		if err != nil {
+			t.Fatalf("decodeNetworks: %v", err)
+		}
+		if len(nets) != 1 || !bytes.Equal(nets[0].NetworkId, id) || nets[0].Connected {
+			t.Fatalf("networks = %+v, want one unconnected entry with the 40-byte NetworkID", nets)
+		}
+	})
+	t.Run("the wrong shape", func(t *testing.T) {
+		t.Parallel()
+		for name, build := range map[string]func(enc *tlv.Encoder){
+			"not a list": func(enc *tlv.Encoder) { enc.PutUint(tlv.AnonymousTag(), 1) },
+			"an entry that is not a struct": func(enc *tlv.Encoder) {
+				enc.StartArray(tlv.AnonymousTag())
+				enc.PutUint(tlv.AnonymousTag(), 1)
+				_ = enc.EndContainer()
+			},
+			"a null list": func(enc *tlv.Encoder) { enc.PutNull(tlv.AnonymousTag()) },
+			"a null entry": func(enc *tlv.Encoder) {
+				enc.StartArray(tlv.AnonymousTag())
+				enc.PutNull(tlv.AnonymousTag())
+				_ = enc.EndContainer()
+			},
+			"a NetworkID that is not an octet string": func(enc *tlv.Encoder) {
+				enc.StartArray(tlv.AnonymousTag())
+				enc.StartStruct(tlv.AnonymousTag())
+				enc.PutUint(tlv.ContextTag(0), 1)
+				_ = enc.EndContainer()
+				_ = enc.EndContainer()
+			},
+		} {
+			if nets, err := decodeNetworks(node(t, build)); err == nil {
+				t.Errorf("%s: decoded %+v, want an error", name, nets)
+			}
+		}
+	})
+}

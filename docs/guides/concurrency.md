@@ -167,8 +167,8 @@ on every `Reassemble`, and its result is never cached.
 | `Node.Stop(ctx)` | bounds the bridge's wait for its read loop. It closes the sessions with a CloseSession each, stops the engine and reapers, withdraws the mDNS records and closes the advertiser |
 
 `Stop` waits for the read loop and the datagram handlers it dispatched,
-the TCP loop with its connection readers and their handler calls, the ACK
-pump, the session re-announce, the BDX responders, the reapers and the
+the TCP loop with its connection readers and their handler calls, the
+handler calls of messages delivered over BLE, the ACK pump, the session re-announce, the BDX responders, the reapers and the
 operational-time keeper. The waits for handlers and responders are bounded
 by `ctx`: their context is cancelled first, and one that does not return
 — host code that ignores its context — is waited for only until `ctx`

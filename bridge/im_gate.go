@@ -44,10 +44,10 @@ const (
 // the MRP standalone ack. Mirrors matter.js
 // packages/node/src/node/server/InteractionServer.ts:161
 // (`requiresSecureSession = true`) and
-// packages/protocol/src/protocol/ExchangeManager.ts:391-412, which logs
-// "Ignore … not matching the security requirements" and opens no
-// exchange for a handler whose requiresSecureSession differs from
-// session.isSecure.
+// packages/protocol/src/protocol/ExchangeManager.ts at db021da0, which
+// logs "Ignore … not matching the security requirements" for a handler
+// whose requiresSecureSession differs from session.isSecure (:448-457)
+// and opens no exchange for it (:462-467).
 func classifyIMOpcode(opcode uint8, sessionType message.SessionType, sessionID uint16) imGateAction {
 	if sessionType == message.SessionUnsecured && sessionID == 0 {
 		return imGateDropUnsecured

@@ -704,6 +704,121 @@ with a port of the named case.
   that test, and `contract/identify.go` says so; whether that call gets a
   context `Close` ends is the open question beside it. Found in review II,
   phase 0 (the rework of R2-P0-rv-B04).
+- **F-db021da0-10: a ConnectNetwork whose result outlives its fail-safe
+  is still answered with the driver's result.** matter.js has no logic
+  here (`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+  at `db021da0` is the empty subclass; `BD-chip-WiFiNetworkCommissioningServer`),
+  so connectedhomeip decides. Its fail-safe expiry releases the pending
+  command handle (`mAsyncCommandHandle.Release()`,
+  `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1002`
+  at `6170af84`): the release ends the command's pending work
+  (`src/app/CommandHandler.cpp:40-47`) and, with none left, finalizes the
+  response message and closes the handler
+  (`src/app/CommandHandlerImpl.cpp:461-489`) — nothing was added for the
+  ConnectNetwork path at that point. The driver's late result finds the
+  handle gone and returns before it builds a ConnectNetworkResponse
+  (`NetworkCommissioningCluster.cpp:845-857`, under
+  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`). What the finalized
+  message carries for a path nothing was added to was not traced
+  (unverified). Since `3b77e4e8` this module's late result touches neither
+  the reverted networks nor the Breadcrumb, but the command still answers
+  a ConnectNetworkResponse with the driver's status, after the expiry
+  (`cluster/core/network_commissioning_wifi.go`, `connect`). Fix: decide
+  what the invoke answers once its fail-safe has expired — the handler here
+  returns only when the driver does, so ending the interaction at the
+  expiry needs the expiry to end the handler's wait — and pin it with
+  `TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped`. Found in
+  review II, phase 1 (the fix of R2-P1-core-06).
+- **F-db021da0-11: RemoveFabric answers InvalidFabricIndex for every
+  failure.** matter.js answers `InvalidFabricIndex` when the fabric is
+  unknown (`packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:412-419`
+  at `db021da0`) and awaits `fabric.leave` without a catch (`:425`), so an
+  error of the removal leaves the handler; what the interaction answers
+  then was not traced (unverified). connectedhomeip sends the NOCResponse
+  `kInvalidFabricIndex` for `CHIP_ERROR_NOT_FOUND` only
+  (`src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:869-874`
+  at `6170af84`) and returns any other error as the command's status
+  (`:876-880`, "We have no idea what happened; just report failure").
+  `handleRemoveFabric` maps every error of `RemoveFabric` — a store error
+  after the Leave event went out included — to a NOCResponse with
+  `InvalidFabricIndex` (`cluster/core/operational_credentials.go`); since
+  `7b819233` that store failure is logged at error level, and the Leave
+  cannot be taken back. Fix: `InvalidFabricIndex` for the fabric the store
+  does not know, a failure status for anything else, with a test over a
+  store that fails. Found in review II, phase 1 (the fix of
+  R2-P1-core-11).
+- **F-db021da0-12: a SubscribeRequest with KeepSubscriptions=false on a
+  session without a fabric tears down that session's subscriptions.**
+  matter.js runs the teardown only for a session with a fabric
+  (`if (fabric !== undefined && !keepSubscriptions)`,
+  `packages/node/src/node/server/InteractionServer.ts:647` at `db021da0`;
+  the walk over the peer's sessions, `:649-659`); on a PASE session it
+  cancels nothing. `registerSubscription` closes the subscriptions of the
+  same session there (`m.CloseSession`, `bridge/subscribe_dispatch.go`),
+  one that is still priming included (noticed by the fix of
+  R2-P1-req2-01). Until `5b12fb30` the comment gave
+  `InteractionServer.ts:549-566` as matching "on same-session for
+  pre-fabric (PASE) subscriptions"; the pin has no such branch.
+  connectedhomeip was not read for a PASE session (unverified). Fix: no
+  teardown without a fabric, with the parity case in
+  `im/subscription/handler_parity_test.go` — or a `by_design` row if
+  connectedhomeip's handling is the reason to keep it. Found in review II,
+  phase 1 (the citation pass).
+- **F-db021da0-13: the chunk StatusResponse bound keeps the peer on one
+  interval.** matter.js's maximum peer response time sums the peer's
+  retransmission schedule and switches it from the active to the idle
+  interval once the wait passes the peer's active threshold
+  (`maxResponseTimeOf`, `packages/protocol/src/protocol/MRP.ts:198-224` at
+  `db021da0`, the switch at `:206-210`; called for the peer at `:102`).
+  `chunkStatusResponseTimeout` sums the peer's schedule on the one base
+  interval the session lookup resolves for it (`bridge/subscribe.go`);
+  since `e931c2d7` it adds this node's own schedule, with that switch, as
+  matter.js does (`:103-106`). Not a decision: the session port
+  (`SessionRetransmitIntervalResolver`) names one interval, not the
+  peer's idle interval, active interval and threshold. Fix: the port
+  hands all three and the peer term uses `maxScheduleTime` as the local
+  one does; `TestChunkStatusResponseTimeoutSumsBothDirections` gains the
+  case. Found in review II, phase 1 (the fix of R2-P1-req2-12).
+- **F-db021da0-14: a refused SubscribeRequest leaves the peer's
+  subscriptions standing where matter.js has cleared them.** matter.js
+  checks the path count (`InteractionServer.ts:635-641` at `db021da0`),
+  then runs the KeepSubscriptions=false teardown (`:647-665`), then
+  refuses a request that names no path (`:667-672`) and, further down,
+  one with an illegal path (`validateReadPaths`, `:699`; the checks
+  between `:672` and `:699` were not read). `handleSubscribeRequest`
+  validates the paths and refuses the empty request first
+  (`bridge/subscribe.go`, `im.ValidateReadPaths`, then the "empty"
+  refusal) and tears down only when it registers the subscription
+  (`registerSubscription`). So a KeepSubscriptions=false request refused
+  for an illegal path or for naming none has cancelled the peer's
+  subscriptions in matter.js and none here. Read, not exercised
+  (unverified by a test on either side); which of the two a controller
+  relies on is not known. Fix: the teardown before the two refusals, as
+  the lines have it, with a parity case — or a `by_design` row. Found in
+  review II, phase 1 (the citation pass).
+- **F-db021da0-15: the controller holds reported values to their
+  constraints, and fails on a malformed one, where matter.js decodes by
+  shape and skips.** matter.js decodes each attribute of a data report
+  with `decodeTlv` (`InputChunk.ts:299-303` at `db021da0`), which does
+  not validate (`TlvSchema.ts:64-66`): an octet string is read at any
+  length (`TlvString.ts:57-71`), a missing mandatory field is left unset
+  (`TlvObject.ts:236-250`); an entry that does not decode is logged and
+  skipped, and the read goes on (`InputChunk.ts:312-320`). The
+  commissioner decodes reported values with the generated decoders, which
+  check constraints, and returns `errUnexpectedResponse` for one that
+  fails: BasicCommissioningInfo (`controller/commissioner/flow.go:750`),
+  the JCM reads of Fabrics, NOCs and TrustedRootCertificates
+  (`jcm.go:162`, `:186`, `:217`), and — until `224a9495` — Networks,
+  which failed the commissioning of a chip Linux app that reports an
+  empty NetworkID (R2-P1-ci-01, fixed for Networks alone, where a value
+  of the wrong shape is still an error rather than a skipped entry). How
+  matter.js decodes a command response was not read (unverified), and no
+  device is known that reports the other values outside their
+  constraints. Fix: one decoder for a reported value in the controller —
+  `spec.DecodeValue`, which checks no constraint, or a shape-only mode of
+  the generated decoders — and the skip-and-continue rule, each with a
+  parity case; phase 4. Found by CAMERA-GO-1.1 on a CI runner of pull
+  request 525.
 
 ## Tier 3 — LOW
 

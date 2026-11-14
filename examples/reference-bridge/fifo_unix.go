@@ -22,13 +22,23 @@ import (
 // group needs the group's write bit.
 const fifoMode = 0o660
 
-// makeFIFO creates the named pipe at path unless one is already there.
+// makeFIFO creates the named pipe at path unless one is already there. A
+// pipe already there is taken only when it is the daemon's own: a symbolic
+// link or another user's pipe is refused, and the daemon's own pipe is
+// set to fifoMode, so one an earlier build left world-writable is not
+// (review II, R2-P1-misc-06).
 func makeFIFO(path string) error {
-	if st, err := os.Stat(path); err == nil {
+	if st, err := os.Lstat(path); err == nil {
 		if st.Mode()&fs.ModeNamedPipe == 0 {
 			return fmt.Errorf("--app-pipe %s exists and is not a named pipe", path)
 		}
-		return nil
+		if sys, ok := st.Sys().(*syscall.Stat_t); !ok || int(sys.Uid) != os.Geteuid() {
+			return fmt.Errorf("--app-pipe %s is not the daemon's own named pipe", path)
+		}
+		if st.Mode().Perm() == fifoMode {
+			return nil
+		}
+		return os.Chmod(path, fifoMode)
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}

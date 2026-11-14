@@ -152,7 +152,8 @@ func (r *Registry) cull(ctx context.Context) error {
 // id a newly discovered node takes, matter.js Discovery.InstanceOptions.id,
 // packages/node/src/behavior/system/controller/discovery/Discovery.ts:269,
 // :355-357, :505-513 at 862ad75f — a found node keeps its own; an id
-// another node holds is [ErrConfig]). The host runs discovery.Scanner and hands
+// another node holds is [ErrConfig]; a given id is reserved, so no
+// allocation hands it out again). The host runs discovery.Scanner and hands
 // the device over; Commission commissions the node. A device known by its
 // address alone — no DNS-SD answer, no instance id, its Addresses only
 // (controller.DeviceAt) — is a supported input: it matches no node and a
@@ -202,6 +203,14 @@ func (r *Registry) findOrCreate(d Device, id string) (*Node, *fabricOp, error) {
 	} else if slices.ContainsFunc(r.nodes, func(n *Node) bool { return n.ID() == id }) {
 		r.mu.Unlock()
 		return nil, nil, fmt.Errorf("%w: id %q is taken", ErrConfig, id)
+	} else {
+		// A caller-chosen id is reserved as a stored one is, so the
+		// counter never hands it to a second node (review II,
+		// R2-P1-ctl-01; ahead of matter.js, whose Peers.ts:960 takes
+		// options.id and whose ClientNodeStores.ts:77-81 allocateId
+		// reserves no preassigned id, at db021da0; by_design
+		// BD-Matter-ReservedLocalIDs).
+		r.reserveID(id)
 	}
 	r.mu.Unlock()
 	n, err := r.build(id, nil)

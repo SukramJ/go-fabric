@@ -526,3 +526,45 @@ func TestGencommTerms_ArmFailSafeForZeroReverts(t *testing.T) {
 		t.Fatalf("TcAcceptedVersion = %d, want 0", got)
 	}
 }
+
+// TestGencommTerms_FailedImmediateCommitLeavesNoAcceptance pins
+// R2-P1-core-04: a SetTCAcknowledgements outside a fail-safe whose store
+// write fails answers the error and leaves the acceptance as it was — not
+// in force unpersisted, which would pass CommissioningComplete's gate, be
+// lost at the next restart, and turn a retry into a no-op that never
+// writes it.
+func TestGencommTerms_FailedImmediateCommitLeavesNoAcceptance(t *testing.T) {
+	t.Parallel()
+	st := newSettingsFake()
+	gc := newTermsGencomm(t, st, nil)
+	v0 := gc.MatterDataVersion()
+	st.mu.Lock()
+	st.fail = errors.New("disk")
+	st.mu.Unlock()
+	req := gencommdef.SetTcAcknowledgementsRequest{TcVersion: 1, TcUserResponse: 1}
+	// commitTermsLocked's store error: the IM layer's Failure.
+	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, req); spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("a failing store: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
+	}
+	if !readBool(t, gc, gencommdef.AttrTcAcknowledgementsRequired) {
+		t.Fatal("TCAcknowledgementsRequired = false after the failed commit, want true")
+	}
+	if got := readUint16(t, gc, gencommdef.AttrTcAcceptedVersion); got != 0 {
+		t.Fatalf("TCAcceptedVersion = %d after the failed commit, want 0", got)
+	}
+	if v := gc.MatterDataVersion(); v != v0 {
+		t.Fatalf("DataVersion %d -> %d with nothing changed", v0, v)
+	}
+	st.mu.Lock()
+	st.fail = nil
+	st.mu.Unlock()
+	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, req); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	st.mu.Lock()
+	stored := st.kv[store.SettingTermsAcceptance]
+	st.mu.Unlock()
+	if stored != "1:1" {
+		t.Fatalf("the retry stored %q, want \"1:1\"", stored)
+	}
+}

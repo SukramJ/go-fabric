@@ -240,6 +240,10 @@ func TestCancelledWriteEndsTheConnection(t *testing.T) {
 		if err := conn.WriteC1(context.Background(), []byte{1}); !errors.Is(err, btp.ErrDisconnected) {
 			t.Fatalf("write after the cancel: %v", err)
 		}
+		// The proxy is told to drop the link too, although the central
+		// still scans: its slot is free for the next attempt (review II,
+		// R2-P1-drv-01).
+		eventually(t, "the proxy to drop the cancelled connection", func() bool { return f.Connections() == 0 })
 		_ = conn.Disconnect()
 		return
 	}

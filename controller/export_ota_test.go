@@ -44,3 +44,18 @@ func HoldBDXReceive(c *Controller, fn func(context.Context, bdx.Message)) {
 	}
 	c.otaProvider.receiveHook.Store(&fn)
 }
+
+// OTAProviderDone is closed once c's OTA provider stopped (its transfers'
+// context ended); nil without a provider. Read it before Close, which
+// drops the provider.
+func OTAProviderDone(c *Controller) <-chan struct{} {
+	if c.otaProvider == nil {
+		return nil
+	}
+	return c.otaProvider.ctx.Done()
+}
+
+// ServedRequestsBlocked reports whether c's client stack no longer
+// dispatches requests for the endpoints c serves. Take it before Close,
+// which drops the subscriptions.
+func ServedRequestsBlocked(c *Controller) func() bool { return c.subs.IsBlocked }

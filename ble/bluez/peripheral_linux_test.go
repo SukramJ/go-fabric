@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -763,4 +764,126 @@ func TestPeripheralAcquiredSignalsInOrder(t *testing.T) {
 	}
 	wg.Wait()
 	settledAcquired(t, b, p, true)
+}
+
+// TestPeripheralRegistrationWithoutAReply: a RegisterAdvertisement or
+// RegisterApplication whose reply the caller stopped waiting for leaves
+// its outcome unknown — bluetoothd may complete it. The peripheral then
+// unregisters before it unexports, so it does not believe nothing is
+// registered while BlueZ holds the path, and the next registration starts
+// clean (review II, R2-P1-drv-03; whether bluetoothd does complete such a
+// registration is not verified).
+func TestPeripheralRegistrationWithoutAReply(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	b.failWith(ifaceAdvertising+".RegisterAdvertisement", errLateReply)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err == nil {
+		t.Fatal("Advertise without a reply succeeded")
+	}
+	if _, adv := b.registered(); adv != nil || b.exported(p.advPath()) {
+		t.Fatalf("after a registration without a reply: registered %v, exported %v", adv != nil, b.exported(p.advPath()))
+	}
+	b.mu.Lock()
+	delete(b.errs, ifaceAdvertising+".RegisterAdvertisement")
+	b.mu.Unlock()
+	if err := p.Advertise(t.Context(), contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatalf("Advertise after it: %v", err)
+	}
+	if _, adv := b.registered(); adv == nil {
+		t.Fatal("the next advertisement is not registered")
+	}
+
+	b.failWith(ifaceGattManager+".RegisterApplication", errLateReply)
+	sctx, scancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer scancel()
+	if err := p.Serve(sctx, nil, func(contract.BLEConnection) {}); err == nil {
+		t.Fatal("Serve without a registration reply succeeded")
+	}
+	if app, _ := b.registered(); app != nil || b.exported(p.root) {
+		t.Fatalf("after an application registration without a reply: registered %v, exported %v", app != nil, b.exported(p.root))
+	}
+}
+
+// TestNewPeripheralIsBounded: the construction read of BlueZ's objects is
+// bounded by peripheralTimeout as every call the peripheral makes on its
+// own (review II, R2-P1-drv-07).
+func TestNewPeripheralIsBounded(t *testing.T) {
+	b := newFakeBus()
+	b.failWith(methodGetManaged, errHang)
+	done := make(chan error, 1)
+	go func() {
+		_, err := newPeripheral(b, testAdapter)
+		done <- err
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*peripheralTimeout)
+	defer cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("newPeripheral over a silent bluetoothd = %v, want its bound", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("newPeripheral over a silent bluetoothd is unbounded")
+	}
+}
+
+// TestPeripheralC1ReaderEndClosesItsSocket: when C1's reader ends while
+// bluetoothd's end is still open — os.File reads a zero-length packet as
+// io.EOF — the peripheral closes its end, so bluetoothd sees the hang-up
+// instead of writing into a socket nobody reads (review II, R2-P1-drv-04;
+// whether bluetoothd forwards an empty C1 write is not verified).
+func TestPeripheralC1ReaderEndClosesItsSocket(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0D")
+	if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	fd := int(fc.write.Fd())
+	if _, err := syscall.Write(fd, nil); err != nil { // an empty packet
+		t.Fatal(err)
+	}
+	waitUntil(t, "WriteAcquired to clear", func() bool { return !acquiredFlag(t, b, p, 1, "WriteAcquired") })
+	waitUntil(t, "the peripheral's C1 end to close", func() bool {
+		_, err := syscall.Write(fd, []byte{1})
+		return err != nil
+	})
+}
+
+// TestPeripheralCentralGoneBeforeItsAcquire: a central whose
+// Connected=false was handled before its AcquireWrite reached the
+// peripheral — godbus runs method calls on goroutines of their own,
+// signals in order on its dispatch loop — is not left as the accepted
+// central: the peripheral reads Device1.Connected after it took the
+// central in and ends the connection when it is false (review II,
+// R2-P1-drv-05).
+func TestPeripheralCentralGoneBeforeItsAcquire(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, nil, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0E")
+	b.mu.Lock()
+	b.objs[fc.device][ifaceDevice]["Connected"] = dbus.MakeVariant(false) // its signal already handled
+	b.mu.Unlock()
+	_ = fc.acquireWrite(p.charPath(1), 100)
+	conn := a.conn(t)
+	waitUntil(t, "the gone central's connection to end", func() bool {
+		select {
+		case <-conn.Disconnected():
+			return true
+		default:
+			return false
+		}
+	})
+	p.mu.Lock()
+	left := len(p.conns)
+	p.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("%d connections left after the central was gone", left)
+	}
 }

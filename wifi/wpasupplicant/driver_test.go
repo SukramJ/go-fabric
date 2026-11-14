@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -802,5 +803,265 @@ func TestScanFailureLeavesNoWaiter(t *testing.T) {
 	b.mu.Unlock()
 	if status, debug, results := d.ScanNetworks(t.Context(), nil); status != statusSuccess || len(results) != 1 {
 		t.Fatalf("scan after a failed one = %d %q, %v", status, debug, results)
+	}
+}
+
+// TestCallsEndWhenTheBusConnectionDrops: the system-bus connection lost
+// (godbus closes the signal channel) ends the run loop; a scan and a join
+// started afterwards fail at once with UnknownError instead of blocking
+// on the loop that is gone, and a second scan is not refused as "in
+// progress" (review II, R2-P1-drv-02).
+func TestCallsEndWhenTheBusConnectionDrops(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	d, _ := startDriver(t, b, Options{ScanTimeout: time.Hour, ConnectTimeout: time.Hour})
+	close(b.sigs)
+	deadline, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	select {
+	case <-d.loopDone:
+	case <-deadline.Done():
+		t.Fatal("the run loop did not end when its signal channel closed")
+	}
+	type result struct {
+		status uint8
+		debug  string
+	}
+	for i := range 2 {
+		res := make(chan result, 1)
+		go func() {
+			status, debug, _ := d.ScanNetworks(deadline, nil)
+			res <- result{status, debug}
+		}()
+		select {
+		case r := <-res:
+			if r.status != statusUnknown || !strings.Contains(r.debug, "bus connection") {
+				t.Fatalf("scan %d after the bus dropped = %d %q, want UnknownError naming the bus connection", i, r.status, r.debug)
+			}
+		case <-deadline.Done():
+			t.Fatalf("scan %d still blocked after the bus dropped", i)
+		}
+	}
+	res := make(chan result, 1)
+	go func() {
+		status, debug, _ := d.ConnectNetwork(deadline, []byte("lab"), []byte(testCredential))
+		res <- result{status, debug}
+	}()
+	select {
+	case r := <-res:
+		if r.status != statusUnknown || !strings.Contains(r.debug, "bus connection") {
+			t.Fatalf("join after the bus dropped = %d %q, want UnknownError naming the bus connection", r.status, r.debug)
+		}
+	case <-deadline.Done():
+		t.Fatal("join still blocked after the bus dropped")
+	}
+}
+
+// TestScanEndsWithItsContextWhileTheLoopIsBusy: a scan whose hand-over to
+// the run loop cannot complete — the loop is held handling a signal — ends
+// with its context, and the driver scans again once the loop is free
+// (review II, R2-P1-drv-02). The loop waits on nothing of the driver's
+// since core2 item 4, so a logger that blocks on the loop's "interface
+// state" record holds it.
+func TestScanEndsWithItsContextWhileTheLoopIsBusy(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
+	release, held := make(chan struct{}), make(chan struct{})
+	logs := &syncBuffer{}
+	var once sync.Once
+	logger := slog.New(&holdingHandler{
+		Handler: slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		hold: func(r slog.Record) {
+			if r.Message == "wpasupplicant: interface state" {
+				once.Do(func() { close(held); <-release })
+			}
+		},
+	})
+	d, err := newDriver(t.Context(), b, Options{ScanTimeout: 50 * time.Millisecond, ConnectTimeout: 50 * time.Millisecond, Logger: logger})
+	if err != nil {
+		t.Fatalf("newDriver: %v", err)
+	}
+	b.mu.Lock()
+	b.scanArmed = func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return d.scan != nil
+	}
+	b.mu.Unlock()
+	t.Cleanup(func() { _ = d.Close() })
+	joined := make(chan struct{})
+	go func() {
+		defer close(joined)
+		_, _, _ = d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+	}()
+	<-held
+	deadline, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	res := make(chan string, 1)
+	go func() {
+		_, debug, _ := d.ScanNetworks(deadline, nil)
+		res <- debug
+	}()
+	select {
+	case debug := <-res:
+		if !strings.Contains(debug, "in time") {
+			t.Errorf("scan while the loop is busy = %q, want its bound's UnknownError", debug)
+		}
+	case <-deadline.Done():
+		close(release)
+		t.Fatal("scan still blocked after its context ended")
+	}
+	close(release)
+	<-joined
+	if status, debug, _ := d.ScanNetworks(deadline, nil); status != statusSuccess {
+		t.Fatalf("scan once the loop is free = %d %q, want Success", status, debug)
+	}
+	d.mu.Lock()
+	armed, scanning := d.scan != nil, d.scanning
+	d.mu.Unlock()
+	if armed || scanning {
+		t.Fatalf("after the scans: armed %v, scanning %v", armed, scanning)
+	}
+}
+
+// TestTheRunLoopKeepsReadingWhileAJoinIsInACall pins core2 item 4
+// (R2-P1-drv-06): a join's State changes are queued for it without the
+// run loop waiting on the join. Before, the loop handed each change over a
+// 16-slot channel and blocked on the 17th while the join was in a bus call
+// of its own (here the DisconnectReason read), so it read no signal and
+// took no scan until the call returned — and on the system bus godbus
+// handed every signal that found its channel full to a goroutine of its
+// own, losing the order the join's "drain by length" relies on
+// (default_handler.go:316-333 at v5.2.4).
+func TestTheRunLoopKeepsReadingWhileAJoinIsInACall(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.props["BSSs"] = dbus.MakeVariant([]dbus.ObjectPath{})
+	b.props["DisconnectReason"] = dbus.MakeVariant(int32(3))
+	b.props["AssocStatusCode"] = dbus.MakeVariant(int32(0))
+	inCall, release := make(chan struct{}), make(chan struct{})
+	var first atomic.Bool
+	b.onSelect = func(b *fakeBus, _ int) {
+		b.setStateLocked("associating")
+		b.setStateLocked(stateDisconnected)
+		// The join's next property read is its DisconnectReason: it stays
+		// in that call until release. Later reads (the scan's) pass.
+		b.beforeRead = func() {
+			if first.CompareAndSwap(false, true) {
+				close(inCall)
+				<-release
+			}
+		}
+	}
+	d, _ := startDriver(t, b, Options{})
+	joined := make(chan uint8, 1)
+	go func() {
+		status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+		joined <- status
+	}()
+	<-inCall
+	for range 40 {
+		b.setState("scanning")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	status, debug, _ := d.ScanNetworks(ctx, nil)
+	close(release)
+	if status != statusSuccess {
+		t.Errorf("a scan while the join is in a call = %d %q, want Success: the run loop waited on the join", status, debug)
+	}
+	if status := <-joined; status != statusUnknown {
+		t.Errorf("the join = %d, want UnknownError (disconnected)", status)
+	}
+}
+
+// holdingHandler runs hold on every record before its handler writes it.
+type holdingHandler struct {
+	slog.Handler
+	hold func(slog.Record)
+}
+
+func (h *holdingHandler) Handle(ctx context.Context, r slog.Record) error {
+	h.hold(r)
+	return h.Handler.Handle(ctx, r)
+}
+
+// TestAHandedOverWaitIsNotInstalledAfterItsCallerGaveUp: the run loop takes
+// a scan's waiter or a join's attempt, the caller's context ends before
+// the loop installs it, and the loop installs it afterwards: neither is
+// left registered (review II, R2-P1-drv-02). The test plays the run loop.
+func TestAHandedOverWaitIsNotInstalledAfterItsCallerGaveUp(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	d := &Driver{
+		bus: b, iface: fakeIface, scanTimeout: time.Hour, connectTimeout: time.Hour, log: slog.New(slog.DiscardHandler),
+		register: make(chan *attempt), armScan: make(chan *scanWaiter),
+		closed: make(chan struct{}), loopDone: make(chan struct{}),
+	}
+	deadline, stop := context.WithTimeout(t.Context(), 10*time.Second)
+	defer stop()
+
+	ctx, cancel := context.WithCancel(deadline)
+	scanned := make(chan string, 1)
+	go func() {
+		_, debug, _ := d.ScanNetworks(ctx, nil)
+		scanned <- debug
+	}()
+	var w *scanWaiter
+	select {
+	case w = <-d.armScan:
+	case <-deadline.Done():
+		t.Fatal("the scan handed nothing over")
+	}
+	cancel()
+	select {
+	case debug := <-scanned:
+		if !strings.Contains(debug, "in time") {
+			t.Fatalf("scan given up during the hand-over = %q", debug)
+		}
+	case <-deadline.Done():
+		t.Fatal("the scan did not end with its context")
+	}
+	d.installScan(w)
+	d.mu.Lock()
+	armed := d.scan != nil
+	d.mu.Unlock()
+	if armed {
+		t.Fatal("the abandoned scan's waiter was installed")
+	}
+
+	ctx, cancel = context.WithCancel(deadline)
+	listened := make(chan string, 1)
+	go func() {
+		_, debug := d.listen(ctx)
+		listened <- debug
+	}()
+	var a *attempt
+	select {
+	case a = <-d.register:
+	case <-deadline.Done():
+		t.Fatal("the join handed nothing over")
+	}
+	cancel()
+	select {
+	case debug := <-listened:
+		if !strings.Contains(debug, "in time") {
+			t.Fatalf("join given up during the hand-over = %q", debug)
+		}
+	case <-deadline.Done():
+		t.Fatal("the join did not end with its context")
+	}
+	d.installAttempt(a)
+	d.mu.Lock()
+	installed := d.connect != nil
+	d.mu.Unlock()
+	if installed {
+		t.Fatal("the abandoned join's attempt was installed")
+	}
+	select {
+	case <-a.done:
+	default:
+		t.Fatal("the abandoned attempt's done is open: a State change would block the loop")
 	}
 }

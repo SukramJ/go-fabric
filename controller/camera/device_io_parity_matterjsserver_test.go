@@ -236,7 +236,7 @@ func TestDeviceIORoutingParityMatterjsServer(t *testing.T) {
 			return wpdef.ProvideOfferResponse{WebRtcSessionId: 9}, nil
 		})
 		var got []uint16
-		if _, err := io.invoke(ctx, deviceCall{target: at, cluster: clusterProvider, command: callProvideOffer, fields: offer, establishing: func(id uint16) { got = append(got, id) }}); err != nil {
+		if _, err := io.invoke(ctx, deviceCall{target: at, cluster: clusterProvider, command: callProvideOffer, fields: offer, establishing: func(id uint16) *lifecycle { got = append(got, id); return nil }}); err != nil {
 			t.Fatal(err)
 		}
 		if !slices.Equal(got, []uint16{9}) {

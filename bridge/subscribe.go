@@ -51,14 +51,21 @@ const (
 
 // chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
 // Initial and Read-response) waits for the peer's IM StatusResponse on
-// one ReportData chunk before abandoning the interaction. Mirrors
-// matter.js MRP.maxPeerResponseTimeOf for a UDP/MRP session
-// (packages/protocol/src/protocol/MRP.ts:79-120): the worst-case time
-// until the peer received the last MRP retransmission — every backoff
-// interval summed with maximum jitter (:198-224 maxResponseTimeOf) —
-// plus the default expected processing time and the response buffer.
-// The base interval is the peer's advertised one when the session
-// lookup can resolve it, else the spec idle default.
+// one ReportData chunk before abandoning the interaction. Mirrors matter.js
+// MRP.maxPeerResponseTimeOf for a UDP/MRP session (MRP.ts:100-108 at
+// db021da0): the worst-case time until the peer received our last
+// retransmission and its answer came back — the peer's retransmission
+// schedule, plus this node's own schedule on its own session intervals,
+// active at first and idle once the wait passes its active threshold, with
+// its sender-side pad (maxResponseTimeOf, :198-224) — plus the default
+// expected processing time and the response buffer (review II,
+// R2-P1-req2-12).
+//
+// The peer's schedule is summed on the base interval the session lookup
+// resolves for it now (the spec idle default when it resolves none) and
+// does not switch from the peer's active to its idle interval past the
+// peer's active threshold, as matter.js's does: the session port names one
+// base interval, not the peer's three parameters.
 //
 // A test may pin the bound through chunkStatusResponseTimeoutOverride;
 // zero means derive it.
@@ -70,11 +77,38 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 	if base <= 0 {
 		base = mrp.SessionIdleIntervalDefault
 	}
-	var backoff time.Duration
-	for n := 0; n <= mrp.MaxRetransmissions; n++ {
-		backoff += mrp.BackoffDuration(base, n, func() float64 { return 1 }) + b.LocalFixedMRPBackoff()
+	peer := maxScheduleTime(base, base, 0, false, 0)
+	local := b.cfg.SessionIntervals
+	if local.Idle <= 0 {
+		local.Idle = mrp.SessionIdleIntervalDefault
 	}
-	return backoff + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+	if local.Active <= 0 {
+		local.Active = mrp.SessionActiveIntervalDefault
+	}
+	if local.ActiveThreshold <= 0 {
+		local.ActiveThreshold = mrp.SessionActiveThresholdDefault
+	}
+	own := maxScheduleTime(local.Idle, local.Active, local.ActiveThreshold, true, b.LocalFixedMRPBackoff())
+	return peer + own + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+}
+
+// maxScheduleTime is matter.js's maxResponseTimeOf (MRP.ts:198-224 at
+// db021da0): every transmission's maximum interval (full jitter) summed,
+// on the active interval while active and the wait has not passed
+// threshold, else on the idle one, each with pad added unamplified.
+func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad time.Duration) time.Duration {
+	var wait time.Duration
+	for n := 0; n <= mrp.MaxRetransmissions; n++ {
+		if isActive && wait > threshold {
+			isActive = false
+		}
+		base := idle
+		if isActive {
+			base = active
+		}
+		wait += mrp.BackoffDuration(base, n, func() float64 { return 1 }) + pad
+	}
+	return wait
 }
 
 // AttachSubscriptionManager wires the subscription manager that
@@ -142,6 +176,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 // observer, so it must not take b.mu (the manager can close a
 // subscription from within a bridge call).
 func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
+	b.closePrimingAbort(subID)
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
 	b.forgetReportExchange(subID)
@@ -367,9 +402,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// SubscribeResponse landed, and a report sent there with
 	// Initiator=false is an unsolicited message on an unknown exchange —
 	// matter.js answers it with a standalone ack and drops it
-	// (ExchangeManager.ts:441-452), which the MRP layer here would then
-	// mistake for delivery. Ongoing server reports are always fresh
-	// server-initiated exchanges (ServerSubscription.ts:823).
+	// (ExchangeManager.ts:496-507 at db021da0), which the MRP layer here
+	// would then mistake for delivery. Ongoing server reports are always
+	// fresh server-initiated exchanges (ServerSubscription.ts:900).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Owe the same events and attribute changes again, so the next
@@ -830,9 +865,11 @@ type reportExchangeOrigin struct {
 // because the peer answered that report with the error status given.
 // A report exchange nobody remembers (an initial-report chunk, a
 // timed-request reply, a subscription already reaped) is ignored.
-// Mirrors matter.js ServerSubscription.ts:866-876: InvalidSubscription
-// and Failure mark the subscription terminated, and #closeFromUpdate
-// cancels it for any error status.
+// Mirrors matter.js ServerSubscription.ts:938-950 at db021da0: every
+// error status the peer answers a report with marks the subscription
+// terminated (:947; InvalidSubscription and Failure differ from the
+// others only in the log line, :939-944), and #closeFromUpdate cancels
+// it (:950).
 func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, status im.StatusCode) {
 	raw, ok := b.reportExchangeOwner.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
 	if !ok {
@@ -1032,7 +1069,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+			if err := b.awaitChunkStatusResponseWithin(timeout, nil, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
 				return counters, nil, err
 			}
 		}
@@ -1044,7 +1081,8 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // exchange** instead of reusing the commissioner's Subscribe exchange.
 // Use this for ongoing subscribe reports (matter.js's
 // ServerSubscription.#sendUpdateMessage pattern,
-// packages/node/src/node/server/ServerSubscription.ts:764). Every
+// packages/node/src/node/server/ServerSubscription.ts:893-900 at
+// db021da0). Every
 // chunk of one report rides the same exchange — a chunk sequence is a
 // single IM transaction. Returns the allocated exchange ID so the
 // caller can correlate the signalStatusResponseRX call back into the
@@ -1090,9 +1128,10 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 	// chunked report waits for the peer's StatusResponse to its first
 	// chunk, and the first chunk going unacknowledged there is peer loss
 	// like any first message of an exchange this node opened — matter.js
-	// MessageExchange.ts:605-624 `send` reports `peerLost` on a failed
-	// send when `#reportsPeerLoss` (:626-633: nothing received on the
-	// exchange yet, `#messageReceivedCounter === 0`). Later chunks are
+	// MessageExchange.ts:643-654 at db021da0, `send` reports `peerLost`
+	// on a failed send when `#reportsPeerLoss` (:661-668: nothing received
+	// on the exchange yet, `#messageReceivedCounter === 0`). Later chunks
+	// are
 	// registered by the caller once the report is out, as before.
 	var firstCounter uint32
 	counters, wait, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
@@ -1183,12 +1222,16 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	sessions := b.sessions
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
-	// Route to the address the peer most recently used on this session,
-	// not the one frozen into the target at Subscribe time: a controller
-	// whose source address rotates mid-session keeps authenticating from
-	// the new one, and matter.js adopts it ("the new message wins",
-	// ExchangeManager.ts:425-431) before routing reports through the
-	// session's current channel (ServerSubscription.ts:823).
+	// Route to the address the peer most recently used on this session
+	// with a new message counter, not the one frozen into the target at
+	// Subscribe time: a controller whose source address rotates
+	// mid-session keeps authenticating from the new one. matter.js adopts
+	// the address of a non-duplicate initiator message that opens a new
+	// exchange ("the new message wins", ExchangeManager.ts:480-486 at
+	// db021da0) and opens each report's exchange for the subscription's
+	// peer address (ServerSubscription.ts:900); this module moves the
+	// route on every new counter, connectedhomeip's rule (the route
+	// comment in receive.go; by_design BD-chip-SessionRouteByNewCounter).
 	dest := b.currentPeerAddr(target.sessionID, target.src)
 	if listener == nil && !isConnRoute(dest) {
 		return 0, ErrUnsolicitedListenerMissing
@@ -1345,14 +1388,16 @@ func (b *Bridge) handleSubscribeRequest(
 	// wildcard cluster + concrete event), and a request beyond the path
 	// ceiling with PathsExhausted, before building any report. Mirrors
 	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
-	// §8.4.3.2), which gates Read and Subscribe through the same check,
-	// and the MAX_SUBSCRIBE_PATHS check that follows it (:600-604).
+	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
+	// gates Read and Subscribe through the same check, and the
+	// MAX_SUBSCRIBE_PATHS check (:635-641), which matter.js runs before
+	// it.
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
 	}
 
 	// A Subscribe naming no attribute and no event paths at all is
-	// InvalidAction — matter.js InteractionServer.ts:628-633 ("No
+	// InvalidAction — matter.js InteractionServer.ts:667-672 at db021da0 ("No
 	// attributes or events requested").
 	if len(req.AttributeRequests) == 0 && len(req.EventRequests) == 0 {
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "empty")
@@ -1372,6 +1417,16 @@ func (b *Bridge) handleSubscribeRequest(
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
+
+	// The priming report waits for the peer's answer to each chunk; a
+	// session already holding [maxChunkWaitsPerSession] such waits is
+	// answered Busy before anything is registered or torn down (review
+	// II, R2-P1-req2-01).
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	if !claimed {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
+	}
+	defer release()
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.
@@ -1401,6 +1456,20 @@ func (b *Bridge) handleSubscribeRequest(
 		// reports the bridge never sends.
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
+	// No path leaves the subscription priming: unless its
+	// SubscribeResponse went out, it is closed on the way out — a panic
+	// the transport recovers above this handler included; the returns
+	// below close it before they answer, a second close is a no-op. A priming
+	// subscription is skipped by the KeepSubscriptions=false teardown and
+	// the session replacement, so one left behind would hold its place in
+	// the fabric's quota until its session closed (review II,
+	// R2-P1-dr-req-07).
+	established := false
+	defer func() {
+		if !established {
+			b.abandonPrimingSubscription(subID)
+		}
+	}()
 	// One EventFilterIB applies to the priming report: the first for this
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
@@ -1419,9 +1488,13 @@ func (b *Bridge) handleSubscribeRequest(
 	}
 	initialReport.HasSubscription, initialReport.SubscriptionID = stamp.HasSubscription, stamp.SubscriptionID
 	// The priming report waits for the peer's StatusResponse per chunk,
-	// which arrives on this session: hand its turn on.
+	// which arrives on this session: hand its turn on. The wait ends with
+	// the subscription too — a KeepSubscriptions=false request that
+	// replaces it, its session's close.
+	abort := b.primingAbort(subID)
+	defer b.forgetPrimingAbort(subID)
 	leaveSessionOrder(ctx)
-	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
+	if err := b.streamInitialReportChunks(ctx, abort, src, requestHdr, proto, subID, initialReport); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
@@ -1429,6 +1502,7 @@ func (b *Bridge) handleSubscribeRequest(
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
+	established = true
 	// The subscription is active: record it for re-establishment after a
 	// restart (matter.js SubscriptionsServer.#addSubscription, fired when
 	// InteractionServer activates the subscription after its
@@ -1622,18 +1696,19 @@ func (l *listenerSet) add(unsub func()) {
 // Before, both ran under b.mu held for writing and such a notifier
 // stopped the bridge (review II, W2-conc-07). b.mu guards the list and
 // the generation only: a wiring a later one overtook while it registered
-// is detached again instead of installed, so the last one wins.
-func (b *Bridge) rewireMeasurementListeners() {
+// is detached again instead of installed, so the last one wins. It
+// returns the generation it wired under.
+func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	b.mu.Lock()
 	stale := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
 	b.listenerGeneration++
-	generation := b.listenerGeneration
+	generation = b.listenerGeneration
 	mgr, topology := b.subManager, b.topology
 	b.mu.Unlock()
 	runUnsubscribers(stale)
 	if mgr == nil || topology == nil {
-		return
+		return generation
 	}
 	unsubs := b.wireMeasurementListeners(mgr, topology)
 	b.mu.Lock()
@@ -1645,6 +1720,24 @@ func (b *Bridge) rewireMeasurementListeners() {
 	if overtaken {
 		runUnsubscribers(unsubs)
 	}
+	return generation
+}
+
+// detachListenersOfGeneration detaches the value listeners while they are
+// still the ones [Bridge.rewireMeasurementListeners] installed under
+// generation: a later wiring or detach moved the generation on and owns
+// what is installed now.
+func (b *Bridge) detachListenersOfGeneration(generation uint64) {
+	b.mu.Lock()
+	if b.listenerGeneration != generation {
+		b.mu.Unlock()
+		return
+	}
+	unsubs := b.measurementUnsubscribers
+	b.measurementUnsubscribers = nil
+	b.listenerGeneration++
+	b.mu.Unlock()
+	runUnsubscribers(unsubs)
 }
 
 // detachHostListeners unregisters the bridge from every host notifier —
@@ -1986,7 +2079,7 @@ func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 type booleanStateEvents struct {
 	b  *Bridge
 	ep *endpointpkg.Endpoint
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu   sync.Mutex
 	last *bool
 }
@@ -2024,18 +2117,21 @@ func (e *booleanStateEvents) read() (value, ok bool) {
 	return false, false
 }
 
+// check reads, compares, remembers and emits under e.mu: two
+// notifications that overlap store the latest reading last and emit in
+// the order they read (review II, R2-P1-req2-10).
 func (e *booleanStateEvents) check() {
 	if e == nil {
 		return
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	v, ok := e.read()
 	if !ok {
 		return
 	}
-	e.mu.Lock()
 	changed := e.last == nil || *e.last != v
 	e.last = &v
-	e.mu.Unlock()
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
 			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
@@ -2055,7 +2151,7 @@ func (e *booleanStateEvents) check() {
 type occupancyEvents struct {
 	b  *Bridge
 	ep *endpointpkg.Endpoint
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu   sync.Mutex
 	last *uint8
 }
@@ -2101,18 +2197,20 @@ func (e *occupancyEvents) read() (uint8, bool) {
 	return bitmap, ok && isU8
 }
 
+// check is [booleanStateEvents.check] for Occupancy: read, compare,
+// remember and emit under e.mu (review II, R2-P1-req2-10).
 func (e *occupancyEvents) check() {
 	if e == nil {
 		return
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	v, ok := e.read()
 	if !ok {
 		return
 	}
-	e.mu.Lock()
 	changed := e.last == nil || *e.last != v
 	e.last = &v
-	e.mu.Unlock()
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterOccupancySensing, measurement.OccupancyEventChanged,
 			measurement.OccupancyChangedEvent{Occupancy: occdef.OccupancyBitmap(v)}, contract.EventPriorityInfo)
@@ -2122,7 +2220,7 @@ func (e *occupancyEvents) check() {
 // pathValues remembers the last value of each path a change notifier
 // covers, so a notification reports only the paths that moved.
 type pathValues struct {
-	// mu guards last.
+	// mu guards last and orders the readings (check, changed).
 	mu    sync.Mutex
 	ep    *endpointpkg.Endpoint
 	paths []im.ConcreteAttributePath
@@ -2161,11 +2259,13 @@ func (v *pathValues) read() map[im.ConcreteAttributePath]attributeReading {
 
 // changed returns the paths whose value differs from the last
 // notification's, compared by value ([attributeReading]), and remembers
-// the new values.
+// the new values. The values are read under v.mu, so of two
+// notifications that overlap the later reading is remembered last
+// (review II, R2-P1-req2-10).
 func (v *pathValues) changed() []im.ConcreteAttributePath {
-	now := v.read()
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	now := v.read()
 	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
 	for _, p := range v.paths {
 		cur, ok := now[p]

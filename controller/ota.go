@@ -34,7 +34,7 @@ import (
 // downloads on the controller's own exchanges (ota_provider.go). Until
 // phase 37 the provider ran on a second node the controller commissioned
 // into its fabric; a database of that time is migrated on its next start
-// (retireOwnNode). The provider is one implementation, the device-side
+// (retireOwnNode), with or without OTAConfig. The provider is one implementation, the device-side
 // one.
 type OTAConfig struct {
 	// Images is the image store and the ledger lookups; nil is an

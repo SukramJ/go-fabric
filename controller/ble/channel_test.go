@@ -296,3 +296,36 @@ func TestCloseDetachesTheC2Handler(t *testing.T) {
 		t.Fatalf("C2 data after Close reached the session: %v", msgs)
 	}
 }
+
+// TestSessionCloseEndsTheChannelBeforeTheGATTRelease: a BTP session that
+// closes on its own (its ack or idle timer, a peripheral gone silent)
+// ends the channel at once, while the C2 unsubscribe still waits on the
+// dead link — matter.js's disconnect callback starts the unsubscribe and
+// the disconnect without awaiting them
+// (packages/nodejs-ble/src/NobleBleChannel.ts:788-805 at db021da0), so
+// the channel reports its loss and a send in that window reads as
+// channel loss, not as a bare BTP flow error (review II, R2-P1-sec-05).
+func TestSessionCloseEndsTheChannelBeforeTheGATTRelease(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		clock := clocktest.New(time.Unix(0, 0))
+		peer := newStallPeer(btp.MinimumATTMTU)
+		peer.p.Faults.HangUnsubscribeC2From = 1
+		ch := peer.dial(t, clock)
+		closed := make(chan error, 1)
+		go func() { closed <- ch.Conn().Session().Close() }()
+		synctest.Wait() // the session's close is in the unsubscribe
+		if !slices.Contains(clock.Armed(), ble.DisconnectTimeout) {
+			t.Fatalf("no %v unsubscribe bound armed (armed %v)", ble.DisconnectTimeout, clock.Armed())
+		}
+		if !isClosed(ch.Closed()) {
+			t.Fatal("the channel is still open while the GATT release waits")
+		}
+		if err := ch.Send(nil, []byte{0x01}); !errors.Is(err, ble.ErrChannelClosed) {
+			t.Fatalf("Send during the GATT release = %v, want ErrChannelClosed", err)
+		}
+		clock.Advance(ble.DisconnectTimeout)
+		if err := <-closed; err != nil {
+			t.Fatalf("session Close = %v", err)
+		}
+	})
+}

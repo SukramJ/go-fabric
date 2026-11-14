@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/netip"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -94,6 +95,27 @@ func (p *Peer) holdBusy(d time.Duration) {
 	if until.After(p.busyUntil) {
 		p.busyUntil = until
 	}
+}
+
+// provenAddress reports whether a is an address a session proved to be
+// the node's: one of its operational host's (Descriptor.OperationalHost)
+// or, zone aside, its operational address. A Busy status report arrives
+// before CASE, unauthenticated, so only one received at such an address is
+// the node's and holds the peer (holdBusy); one from another address — a
+// foreign SRV target's (issue 507) — holds only its attempt (review II,
+// R2-P1-net-05).
+func (p *Peer) provenAddress(a discovery.Address) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if h := p.desc.OperationalHost; h != "" && a.Host == h {
+		return true
+	}
+	op := p.desc.OperationalAddress
+	if op == nil {
+		return false
+	}
+	ap := addressOf(op).AddrPort()
+	return netip.AddrPortFrom(ap.Addr().WithZone(""), ap.Port()) == netip.AddrPortFrom(a.IP.WithZone(""), a.Port)
 }
 
 // busyRemaining is how long the peer's Busy deadline still holds, zero or

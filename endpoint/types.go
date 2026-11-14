@@ -683,7 +683,7 @@ type Topology struct {
 // the cost is negligible.
 func (t *Topology) FindByID(id uint16) *Endpoint {
 	for _, ep := range t.Endpoints {
-		if ep.ID == id {
+		if ep != nil && ep.ID == id {
 			return ep
 		}
 	}
@@ -694,7 +694,7 @@ func (t *Topology) FindByID(id uint16) *Endpoint {
 // nil when the topology has none.
 func (t *Topology) Aggregator() *Endpoint {
 	for _, ep := range t.Endpoints {
-		if ep.Aggregator {
+		if ep != nil && ep.Aggregator {
 			return ep
 		}
 	}
@@ -706,14 +706,13 @@ func (t *Topology) Aggregator() *Endpoint {
 // are components of it rather than bridged devices. Apple's HAP service
 // mapper iterates this set when it builds the per-device list; the
 // aggregator itself is structural scaffolding and never surfaces as a
-// HomeKit accessory.
+// HomeKit accessory. The Aggregator is a role ([Endpoint.Aggregator]),
+// not endpoint 1: a topology of the root and one device has that device
+// (review II, R2-P1-req2-08). A nil entry is skipped.
 func (t *Topology) Bridged() []*Endpoint {
-	if len(t.Endpoints) <= 2 {
-		return nil
-	}
-	out := make([]*Endpoint, 0, len(t.Endpoints)-2)
+	var out []*Endpoint
 	for _, ep := range t.Endpoints {
-		if ep.IsRoot() || ep.IsAggregator() || ep.Part {
+		if ep == nil || ep.IsRoot() || ep.IsAggregator() || ep.Part {
 			continue
 		}
 		out = append(out, ep)

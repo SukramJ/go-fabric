@@ -512,6 +512,21 @@ func (m *manager) dropLeaseLocked(t target, kind StreamKind, id uint16) {
 	m.leases[t] = remaining
 }
 
+// forgetNode drops every lease of a node that left the fabric: they are
+// dead state, which a camera commissioned later under the same node id
+// would inherit as this controller's allocations (review II,
+// R2-P1-cam-a-02). Whether matterjs-server drops them was not read; this
+// is the module's own rule.
+func (m *manager) forgetNode(nodeID uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for t := range m.leases {
+		if t.nodeID == nodeID {
+			delete(m.leases, t)
+		}
+	}
+}
+
 // dropLeaseIfCurrent drops this lease unless the id was re-leased since: a
 // give-back abandoned by the cleanup budget can land after the reissued id
 // went to a later request. Mirrors matterjs-server

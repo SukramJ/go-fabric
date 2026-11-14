@@ -83,7 +83,10 @@ identity. What a host changes:
 | `controller.OwnNodeSpec`, `controller.OwnNode`, `Controller.OwnNode()` | `Controller.Fabric().RootNodeID` is the provider's node id, `controller.OTAProviderEndpoint` its endpoint, `Controller.BDX()` its transfers |
 | a `node.Node` reached through `controllernode.Node(own)` for group sending | `Controller.Groups()` and `Controller.SetGroupKey(ctx, keySet, groupID)` |
 
-The database migrates itself at the first start (CHANGELOG "Changed").
+The database migrates itself at the first start (CHANGELOG "Changed"); a
+start whose erase of the former own node fails in the database logs
+`controller.ota.own_node.forget`, keeps the record and migrates at the
+next start.
 
 ## Removed or changed in the next release: the facade review
 

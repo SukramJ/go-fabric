@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,5 +107,66 @@ func TestHandleSubscribeRequest_ChangeDuringPrimingReadIsReported(t *testing.T) 
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("the change made during the priming read was not reported: the subscription was admitted after the read")
+	}
+}
+
+// panickingOnRead is a root cluster server whose read of attribute 0
+// panics once armed.
+type panickingOnRead struct{ armed atomic.Bool }
+
+func (*panickingOnRead) MatterClusterID() uint32 { return 0x0006 }
+
+func (p *panickingOnRead) MatterRead(attrID uint32) (any, bool) {
+	if attrID != 0 {
+		return nil, false
+	}
+	if p.armed.Load() {
+		panic("test: a cluster server's read panics")
+	}
+	return false, true
+}
+
+func (*panickingOnRead) MatterReportable() []uint32                             { return []uint32{0} }
+func (*panickingOnRead) MatterWrite(context.Context, uint32, any) error         { return nil }
+func (*panickingOnRead) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+
+// TestHandleSubscribeRequest_PanicLeavesNoPrimingSubscription (review II,
+// R2-P1-dr-req-07): a Subscribe whose handler ends in a panic between the
+// admission and the SubscribeResponse — a cluster server's read in the
+// priming report, recovered by the transport above the handler — leaves
+// no subscription behind. A priming subscription is skipped by the
+// KeepSubscriptions=false teardown and by the session replacement, so one
+// left there sent nothing and held its place in the fabric's quota until
+// its session closed.
+func TestHandleSubscribeRequest_PanicLeavesNoPrimingSubscription(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	srv := &panickingOnRead{}
+	b.AttachRootClusters([]contract.ClusterServer{srv})
+	if err := b.Reassemble(context.Background()); err != nil {
+		t.Fatalf("Reassemble: %v", err)
+	}
+	srv.armed.Store(true)
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(mgr)
+	attachPASETestPeer(t, b)
+
+	_, peerAddr := newSubscribeTestPeer(t)
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 104}
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 2}
+	req := im.SubscribeRequest{
+		AttributeRequests:  []im.ConcreteAttributePath{changingPath()},
+		MaxIntervalCeiling: 60,
+	}
+	recovered := func() (p any) {
+		defer func() { p = recover() }()
+		_ = b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req)
+		return nil
+	}()
+	if recovered == nil {
+		t.Fatal("the read did not panic: the test checks nothing")
+	}
+	if n := mgr.Active(); n != 0 {
+		t.Fatalf("%d subscriptions left after the handler panicked, want 0", n)
 	}
 }

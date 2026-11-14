@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -245,9 +244,10 @@ func (invalidCommand) MatterStatusCode() im.StatusCode { return im.StatusInvalid
 const ownNodeKey = "controller.ownnode"
 
 // retireOwnNode is the migration of a database that ran the OTA provider
-// on an own node: the node's record goes, and the registry forgets the
-// node, which no longer exists — the controller is the provider now, and
-// the next announcement round rewrites every node's DefaultOTAProviders
+// on an own node, run at every start with or without OTA: the node's
+// record goes, and the registry forgets the node, which no longer exists
+// — the controller is the provider now, and the next announcement round
+// rewrites every node's DefaultOTAProviders
 // (softwareupdate/announcements.go announceDefaultProvider, which writes
 // our record unless the node holds the same one).
 func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *slog.Logger) error {
@@ -264,8 +264,11 @@ func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *sl
 	if rec.NodeID != 0 {
 		addr := c.fabric.AddressOf(rec.NodeID)
 		if n := c.reg.GetByAddress(addr); n != nil {
-			if err := c.reg.Forget(ctx, n); err != nil && !errors.Is(err, context.Canceled) {
+			if err := c.reg.Forget(ctx, n); err != nil {
+				// The record stays, so the next start retires the node
+				// again; the start goes on unless ctx ended (review II).
 				log.Warn("controller.ota.own_node.forget", slog.Any("err", err))
+				return ctx.Err()
 			}
 		}
 	}

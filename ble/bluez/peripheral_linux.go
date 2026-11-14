@@ -121,7 +121,9 @@ var _ contract.BLEPeripheral = (*peripheral)(nil)
 
 // newPeripheral is the peripheral over b: the adapter must exist.
 func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {
-	objs, err := getManagedObjects(context.Background(), b)
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	objs, err := getManagedObjects(ctx, b)
 	if err != nil {
 		return nil, err
 	}
@@ -298,6 +300,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		return err
 	}
 	if _, err := call(ctx, p.bus, p.adapter, ifaceAdvertising+".RegisterAdvertisement", p.advPath(), map[string]dbus.Variant{}); err != nil {
+		p.releaseUnanswered(ctx, err, ifaceAdvertising+".UnregisterAdvertisement", p.advPath())
 		p.unexportAdvertisement()
 		return err
 	}
@@ -325,6 +328,25 @@ func (p *peripheral) StopAdvertising(ctx context.Context) error {
 		return nil // released by BlueZ meanwhile
 	}
 	return err
+}
+
+// releaseUnanswered undoes a Register call that failed without BlueZ's
+// answer — its context ended, the bus daemon gave up waiting, the
+// connection broke — before the caller unexports the objects: bluetoothd
+// may still carry such a call out, and the peripheral would believe
+// nothing registered while BlueZ held the path. The matching Unregister
+// runs on a fresh bounded context, its error (DoesNotExist when nothing
+// was registered) ignored. A refusal BlueZ answered (an error with a
+// D-Bus name other than NoReply) registered nothing and needs no undo.
+// Whether bluetoothd completes a registration whose caller stopped
+// waiting is not verified (review II, R2-P1-drv-03).
+func (p *peripheral) releaseUnanswered(ctx context.Context, err error, unregister string, path dbus.ObjectPath) {
+	if name := dbusName(err); name != "" && name != "org.freedesktop.DBus.Error.NoReply" {
+		return
+	}
+	uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), peripheralTimeout)
+	defer cancel()
+	_, _ = call(uctx, p.bus, p.adapter, unregister, path)
 }
 
 func (p *peripheral) exportAdvertisement() error {
@@ -411,6 +433,7 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 	_, err := call(regCtx, p.bus, p.adapter, ifaceGattManager+".RegisterApplication", p.root, map[string]dbus.Variant{})
 	cancel()
 	if err != nil {
+		p.releaseUnanswered(ctx, err, ifaceGattManager+".UnregisterApplication", p.root)
 		p.unexportApplication()
 		return err
 	}
@@ -593,6 +616,7 @@ func (p *peripheral) connFor(device dbus.ObjectPath) (*pconn, *dbus.Error) {
 	p.mu.Unlock()
 	accept(c)
 	c.startEvents()
+	go c.checkConnected()
 	return c, nil
 }
 
@@ -847,12 +871,16 @@ func (c *pconn) setWrite(f *os.File) bool {
 		defer func() {
 			// The socket ended — the central closed it, the link went, or
 			// the connection was dropped; a newer AcquireWrite may have
-			// replaced it.
+			// replaced it. os.File also reads a zero-length packet as
+			// io.EOF while bluetoothd's end is open: closing this end lets
+			// bluetoothd see the hang-up instead of writing into a socket
+			// nobody reads, as setNotify's reader closes its own.
 			c.mu.Lock()
 			if c.write == f {
 				c.write = nil
 			}
 			c.mu.Unlock()
+			_ = f.Close()
 			c.p.refreshAcquired(1)
 		}()
 		for {
@@ -1051,6 +1079,27 @@ func (c *pconn) Disconnect() error {
 
 // Disconnected implements contract.BLEConnection.
 func (c *pconn) Disconnected() <-chan struct{} { return c.gone }
+
+// checkConnected ends a connection whose device was gone before it was
+// admitted: godbus runs a method call such as AcquireWrite on a goroutine
+// of its own but handles signals in order on its dispatch loop, so the
+// device's Connected=false can be handled before connFor inserted the
+// connection and find nothing to end. Device1.Connected is read once the
+// connection is in, as the central does after its registration
+// (central_linux.go), on a bounded context and off the method call, whose
+// reply bluetoothd waits for. A failed read leaves the connection to the
+// signals (review II, R2-P1-drv-05).
+func (c *pconn) checkConnected() {
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	v, err := getProperty(ctx, c.p.bus, c.device, ifaceDevice, "Connected")
+	if err != nil {
+		return
+	}
+	if connected, ok := variantAs[bool](v, true); ok && !connected {
+		c.markGone()
+	}
+}
 
 // markGone ends the connection: the sockets closed, Disconnected closed.
 func (c *pconn) markGone() {

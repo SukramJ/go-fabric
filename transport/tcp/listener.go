@@ -132,12 +132,12 @@ func (l *Listener) Addr() *net.TCPAddr {
 	return addr
 }
 
-// RecoveredPanics reports how many handler panics the listener's
-// connections recovered.
+// RecoveredPanics reports how many handler and reader panics the
+// listener's connections recovered.
 func (l *Listener) RecoveredPanics() uint64 { return l.recoveredPanics.n.Load() }
 
-// OnPanicRecovered sets fn to run once per handler panic a connection of
-// the listener recovers, after it is counted and logged — the hook a
+// OnPanicRecovered sets fn to run once per handler or reader panic a
+// connection of the listener recovers, after it is counted and logged — the hook a
 // metrics port counts with. nil removes it. Safe while the listener
 // serves; fn runs on the connection's reader goroutine and must not block.
 func (l *Listener) OnPanicRecovered(fn func()) { l.recoveredPanics.set(fn) }

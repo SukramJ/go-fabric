@@ -38,6 +38,11 @@ const (
 	disconnectTimeout = 5 * time.Second
 )
 
+// objectsTimeout bounds the construction's read of BlueZ's objects, a call
+// the central makes on its own, as peripheralTimeout bounds the
+// peripheral's (peripheral_linux.go).
+const objectsTimeout = 5 * time.Second
+
 // defaultLEATTMTU is the ATT_MTU of an LE link before an exchange,
 // BT_ATT_DEFAULT_LE_MTU (src/shared/att-types.h:28 at BlueZ 5.88).
 const defaultLEATTMTU = 23
@@ -114,7 +119,9 @@ func newCentral(b bus, adapter dbus.ObjectPath) (*central, error) {
 		conns: map[dbus.ObjectPath]*connection{}, notifying: map[dbus.ObjectPath]*connection{},
 		watchers: map[dbus.ObjectPath]map[chan struct{}]struct{}{},
 	}
-	objs, err := getManagedObjects(context.Background(), b)
+	ctx, cancel := context.WithTimeout(context.Background(), objectsTimeout)
+	defer cancel()
+	objs, err := getManagedObjects(ctx, b)
 	if err != nil {
 		return nil, err
 	}

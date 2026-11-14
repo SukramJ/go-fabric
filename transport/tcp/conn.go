@@ -217,6 +217,19 @@ func (c *Conn) serve(handler Handler) {
 	c.serveMu.Unlock()
 	var handlers sync.WaitGroup
 	defer func() {
+		// Defence in depth: the read loop frames untrusted bytes, and
+		// nothing above this goroutine recovers. A panic here closes this
+		// connection and is logged and counted like a handler panic
+		// (safeHandle) instead of ending the process.
+		if r := recover(); r != nil {
+			total := c.recoveredPanics.add()
+			c.logger.Error("matter.tcp.read_panic",
+				slog.Any("panic", r),
+				slog.String("conn", c.String()),
+				slog.Uint64("recovered_total", total),
+				slog.String("stack", string(debug.Stack())))
+			c.close(fmt.Errorf("tcp: reader panic: %v", r))
+		}
 		c.close(nil)
 		handlers.Wait()
 		c.markServed()

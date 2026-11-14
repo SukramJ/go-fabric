@@ -173,9 +173,11 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 // InvalidAction, a TimedRequest flag mismatches, a group write without
 // SuppressResponse is InvalidAction; the writes then run in order, each
 // on every member endpoint that hosts the attribute, where the attribute
-// is writable and the Group subject holds its write privilege; a concrete
-// path ends the interaction with InvalidAction ("Group writes can not be
-// concrete paths") — after the writes before it have run, as in matter.js.
+// is writable, the Group subject holds its write privilege and the
+// attribute has no timed quality (a group session is never timed); a path
+// with WildcardPathFlags or a concrete path ends the interaction with
+// InvalidAction ("Group writes can not be concrete paths") — after the
+// writes before it have run, as in matter.js.
 func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) StatusCode {
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return StatusInvalidAction
@@ -191,10 +193,22 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 	if !ok || !canWrite {
 		return StatusSuccess
 	}
+	// A group session is never timed: the dispatcher skips an attribute
+	// with the timed quality, as matter.js
+	// packages/protocol/src/action/server/AttributeWriteResponse.ts:343-345
+	// at db021da0 does on the wildcard path a group write takes.
+	ctx = WithTimedInteraction(ctx, false)
 	authorize := groupAuthorizer(ctx, d, subject)
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	tx := writeTransactionFromContext(ctx)
 	for _, w := range req.Writes {
+		// WildcardPathFlags belong to Read and Subscribe: the element
+		// ends the interaction with InvalidAction, after the writes
+		// before it (AttributeWriteResponse.ts:59-66, the check every
+		// element of process() runs first).
+		if w.Path.WildcardPathFlags != 0 {
+			return StatusInvalidAction
+		}
 		if w.Path.HasEndpoint {
 			return StatusInvalidAction
 		}

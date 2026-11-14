@@ -561,6 +561,14 @@ func (s *ServerSession) LastActivity() time.Time {
 }
 
 // OnProgress registers fn for progressInfo (BdxSession.ts:94-96).
+//
+// fn may run on the exchange's receive goroutine: over an exchange that
+// is a [ReceiveNotifier], the final progress of a sending transfer goes
+// out as the peer's BlockAckEof arrives, on the receive path. fn must
+// therefore not block — in particular not wait for a message or an
+// acknowledgement of the same exchange manager, which that goroutine
+// delivers — and must not call back into the exchange; work that waits
+// belongs on a goroutine of fn's own.
 func (s *ServerSession) OnProgress(fn func(transferred uint64, total *uint64)) {
 	s.mu.Lock()
 	s.onProgress = append(s.onProgress, fn)
@@ -568,6 +576,11 @@ func (s *ServerSession) OnProgress(fn func(transferred uint64, total *uint64)) {
 }
 
 // OnFinished registers fn for progressFinished (BdxSession.ts:145-147).
+//
+// fn may run on the exchange's receive goroutine, as the peer's final
+// BlockAckEof arrives over a [ReceiveNotifier] exchange, under the same
+// constraint as a [ServerSession.OnProgress] observer: it must not block
+// or call back into the exchange.
 func (s *ServerSession) OnFinished(fn func(total uint64)) {
 	s.mu.Lock()
 	s.onFinished = append(s.onFinished, fn)

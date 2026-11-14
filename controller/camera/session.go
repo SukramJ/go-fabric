@@ -177,9 +177,18 @@ type Session struct {
 	svc *Service
 	t   target
 	box *mailbox
+	// life is the session's identity in the manager's registry: an end
+	// announced for another session that had the same id leaves this one
+	// alone (review II, R2-P1-cam-b-02).
+	life *lifecycle
 }
 
-// Signals is the camera's signalling of the session.
+// Signals is the camera's signalling of the session. The service holds
+// what the host has not read yet up to 1024 signals and 1 MiB of SDP,
+// candidate and ICE server text; a camera that signals past either bound
+// while the host does not read ends the session: Signals closes at once,
+// without the signals it held, and the end is announced as
+// [EndSignalOverflow] after an EndSession to the camera.
 func (s *Session) Signals() <-chan Signal { return s.box.out }
 
 // ProvideAnswer sends the host's SDP answer to a camera's Offer
@@ -270,30 +279,118 @@ func candidateBytes(c wpdef.ICECandidateStruct) int {
 	return n
 }
 
-// mailbox holds a session's signals until the host reads them: unbounded,
-// so the serving goroutine that delivers a camera's signal never waits for
-// the host.
+// signalMailboxLimit and signalMailboxBytes bound what a session's
+// mailbox holds for a host that has not read it yet: signals, and their
+// SDP, candidate and ICE server bytes (signalBytes). The module's own
+// choice; neither reference bounds the queue. A legitimate session sends
+// one Offer or Answer, one End and its ICE candidates; trickled one per
+// ICECandidates command, a camera that gathers one server-reflexive or
+// relayed candidate per ICE server URL and address family sends about
+// 200 for the most a start can hand it, 10 servers of 10 URLs each (the
+// IceServers and Urls bounds of ProvideOffer in the generated definition,
+// iceServerLimits). 1024 is that with fourfold headroom. In bytes such a
+// session holds one SDP of at most one TCP message (64000 bytes,
+// transport/tcp DefaultMaxPayloadSize) and a few hundred candidates of
+// some hundred bytes; 1 MiB is that with ample headroom, and bounds what
+// a flood of maximum-size messages can hold, where the count alone would
+// let it hold 64 MB.
+const (
+	signalMailboxLimit = 1024
+	signalMailboxBytes = 1 << 20
+)
+
+// signalBytes is a signal's size against signalMailboxBytes: its SDP, its
+// candidates as a send counts them, and the ICE servers an Offer carries.
+func signalBytes(sig Signal) int {
+	n := len(sig.SDP)
+	for _, c := range sig.Candidates {
+		n += iceCandidateFramingBytes + len(c.Candidate)
+		if !c.SdpMid.Null {
+			n += len(c.SdpMid.Value)
+		}
+	}
+	if servers := sig.Offer.IceServers; servers != nil {
+		for _, srv := range *servers {
+			for _, u := range srv.Urls {
+				n += len(u)
+			}
+			if srv.Username != nil {
+				n += len(*srv.Username)
+			}
+			if srv.Credential != nil {
+				n += len(*srv.Credential)
+			}
+		}
+	}
+	if sig.Offer.IceTransportPolicy != nil {
+		n += len(*sig.Offer.IceTransportPolicy)
+	}
+	return n
+}
+
+// mailbox holds a session's signals until the host reads them, so the
+// serving goroutine that delivers a camera's signal never waits for the
+// host — up to signalMailboxLimit signals and signalMailboxBytes bytes
+// held. A signal past either bound overflows the box: it drops what it
+// holds, closes out and refuses everything after; the Service ends the
+// session (review II, R2-P1-cam-b-06).
 type mailbox struct {
 	mu     sync.Mutex
 	queue  []Signal
 	closed bool
-	wake   chan struct{}
-	out    chan Signal
+	// held and heldBytes count the signals put and not yet handed to the
+	// host: the queue's and the ones the pump took and still offers.
+	held, heldBytes int
+	overflowed      bool
+	wake            chan struct{}
+	out             chan Signal
+	// done closes when the pump has ended.
+	done chan struct{}
+	// abandoned closes when no one will ever read out: the pump drops
+	// what it holds and ends.
+	abandoned chan struct{}
+	abandon   sync.Once
 }
 
 func newMailbox(life context.Context) *mailbox {
-	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal)}
+	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal), done: make(chan struct{}), abandoned: make(chan struct{})}
 	go b.pump(life)
 	return b
 }
 
-func (b *mailbox) put(sig Signal) {
+// put queues sig. It reports true once, for the signal that took the box
+// past a bound: the box has then dropped its signals and closed, and the
+// caller ends the session. A closed box drops sig.
+func (b *mailbox) put(sig Signal) (overflowed bool) {
+	n := signalBytes(sig)
 	b.mu.Lock()
-	if !b.closed {
+	switch {
+	case b.closed:
+	case b.held >= signalMailboxLimit || b.heldBytes+n > signalMailboxBytes:
+		b.closed, b.overflowed, overflowed = true, true, true
+		b.queue, b.held, b.heldBytes = nil, 0, 0
+	default:
 		b.queue = append(b.queue, sig)
+		b.held++
+		b.heldBytes += n
 	}
 	b.mu.Unlock()
+	if overflowed {
+		b.abandon.Do(func() { close(b.abandoned) })
+		return true
+	}
 	b.notify()
+	return false
+}
+
+// handed counts a signal the host took off the box.
+func (b *mailbox) handed(sig Signal) {
+	b.mu.Lock()
+	if b.held > 0 {
+		b.held--
+		b.heldBytes = max(b.heldBytes-signalBytes(sig), 0)
+	}
+	b.mu.Unlock()
 }
 
 func (b *mailbox) close() {
@@ -301,6 +398,17 @@ func (b *mailbox) close() {
 	b.closed = true
 	b.mu.Unlock()
 	b.notify()
+}
+
+// discard ends a mailbox whose Session never reached the host: the queued
+// signals go and the pump ends at once, where close would have it wait for
+// a reader of out that never comes (review II, R2-P1-cam-b-01).
+func (b *mailbox) discard() {
+	b.mu.Lock()
+	b.closed = true
+	b.queue, b.held, b.heldBytes = nil, 0, 0
+	b.mu.Unlock()
+	b.abandon.Do(func() { close(b.abandoned) })
 }
 
 func (b *mailbox) notify() {
@@ -311,8 +419,9 @@ func (b *mailbox) notify() {
 }
 
 // pump hands the queued signals on in order and closes out once the box
-// is closed and drained, or the service's life ended.
+// is closed and drained, discarded, or the service's life ended.
 func (b *mailbox) pump(life context.Context) {
+	defer close(b.done)
 	defer close(b.out)
 	for {
 		b.mu.Lock()
@@ -323,7 +432,10 @@ func (b *mailbox) pump(life context.Context) {
 		for i := range queue {
 			select {
 			case b.out <- queue[i]:
+				b.handed(queue[i])
 			case <-life.Done():
+				return
+			case <-b.abandoned:
 				return
 			}
 		}
@@ -336,6 +448,8 @@ func (b *mailbox) pump(life context.Context) {
 		select {
 		case <-b.wake:
 		case <-life.Done():
+			return
+		case <-b.abandoned:
 			return
 		}
 	}
@@ -358,17 +472,19 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 	}
 	sess := &Session{Node: req.Node, Endpoint: req.Endpoint, Owner: req.Owner, Key: req.Key, svc: s, t: args.t, box: newMailbox(s.life)} //nolint:contextcheck // the mailbox lives as long as the service, not the call
 	var registered *sessionKey
-	args.establishing = func(id uint16) {
+	args.establishing = func(id uint16, life *lifecycle) {
 		k := sessionKey{args.t.nodeID, args.t.endpointID, id}
 		registered = &k
 		sess.ID = id
 		s.mu.Lock()
+		sess.life = life
 		s.sessions[k] = sess
 		s.mu.Unlock()
 	}
 	res, err := s.m.startStream(ctx, args)
 	if err != nil {
-		// The host never learned the session's id: its held signals go.
+		// The host never learned the session's id: its held signals go,
+		// and with them the pump that would wait for a reader.
 		if registered != nil {
 			s.mu.Lock()
 			if s.sessions[*registered] == sess {
@@ -376,7 +492,7 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 			}
 			s.mu.Unlock()
 		}
-		sess.box.close()
+		sess.box.discard()
 		return nil, err
 	}
 	sess.ID, sess.Mode, sess.Talkback = res.sessionID, res.mode, res.talkback
@@ -614,9 +730,14 @@ type Snapshot struct {
 
 // Snapshot captures one still frame from a snapshot stream the camera
 // keeps, adopting one within the request's bounds or allocating one.
-// Mirrors matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:2389-2649
-// at 0bd06f2.
+// After Close it is [ErrClosed] and allocates nothing (review II,
+// R2-P1-cam-b-04). Mirrors matterjs-server
+// packages/ws-controller/src/camera/CameraStreamManager.ts:2389-2649 at
+// 0bd06f2.
 func (s *Service) Snapshot(ctx context.Context, req SnapshotRequest) (*Snapshot, error) {
+	if s.isClosed() {
+		return nil, ErrClosed
+	}
 	t, err := targetOf(req.Node, req.Endpoint)
 	if err != nil {
 		return nil, err

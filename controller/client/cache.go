@@ -36,6 +36,9 @@ type cache struct {
 	dirty        map[uint32]struct{}
 	versionDirty bool
 	erased       bool
+	// forgets counts the forgetVersion calls, so a write collected before
+	// one stores no version (saveJob.forgets).
+	forgets uint64
 }
 
 // newCache is a cache seeded with stored values (DatasourceCache.ts:38-49).
@@ -103,6 +106,7 @@ func (c *cache) forgetVersion() error {
 		return nil
 	}
 	c.hasVersion, c.versionDirty = false, false
+	c.forgets++
 	return c.p.store.Save(c.p.nodeID, c.ep, c.cluster, map[uint32][]byte{}, nil)
 }
 
@@ -182,10 +186,12 @@ type persister struct {
 }
 
 // saveJob is one unbuffered write, encoded under the node's lock.
+// forgets is its cache's forgetVersion count when it was collected.
 type saveJob struct {
-	c      *cache
-	values map[uint32][]byte
-	ver    *uint32
+	c       *cache
+	values  map[uint32][]byte
+	ver     *uint32
+	forgets uint64
 }
 
 // save writes keys of c and its version now — or, while collect is set (a
@@ -199,7 +205,7 @@ func (p *persister) save(c *cache, keys []uint32) {
 		p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
 		return
 	}
-	j := saveJob{c: c, values: values, ver: c.versionPtr()}
+	j := saveJob{c: c, values: values, ver: c.versionPtr(), forgets: c.forgets}
 	if p.collect != nil {
 		*p.collect = append(*p.collect, j)
 		return
@@ -219,13 +225,26 @@ func (p *persister) write(jobs []saveJob) {
 	p.writeLocked(jobs)
 }
 
-// writeLocked is write; the caller holds the node's lock.
+// writeLocked is write; the caller holds the node's lock. A write whose
+// cache forgot its version after the write was collected — an adoption of
+// the other fabric filter between a subscription report's apply and its
+// queued write — stores its values without the version: the version is the
+// old filter's, which the store must not hold under the new one, and
+// memory holds none either (review II, R2-P1-ctl-04). matter.js decides
+// the version when its deferred job runs, not when the report arrived: the
+// job sets it UNKNOWN when the epoch changed since the interaction began
+// (ClientStructure.ts:672-678 at db021da0) and applies values and version
+// through the cache's externalSet (:699).
 func (p *persister) writeLocked(jobs []saveJob) {
 	for _, j := range jobs {
 		if j.c.erased {
 			continue
 		}
-		if err := p.store.Save(p.nodeID, j.c.ep, j.c.cluster, j.values, j.ver); err != nil {
+		ver := j.ver
+		if j.forgets != j.c.forgets {
+			ver = nil
+		}
+		if err := p.store.Save(p.nodeID, j.c.ep, j.c.cluster, j.values, ver); err != nil {
 			p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(j.c.ep)), slog.Uint64("cluster", uint64(j.c.cluster)), slog.Any("err", err))
 		}
 	}

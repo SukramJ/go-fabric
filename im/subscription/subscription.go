@@ -98,6 +98,9 @@ type Subscription struct {
 	// event before it fans it out — and is not owed again.
 	eventsReported     uint64
 	eventsHaveReported bool
+	// primingEventsMax is the highest event number queued while the
+	// subscription was priming ([Subscription.PrimedEvents]).
+	primingEventsMax uint64
 	// duePaths are the dirty attribute paths the engine drained together
 	// with the events it is handing to the [EventReporter], until the
 	// reporter takes them ([Subscription.TakeDuePaths]).
@@ -323,6 +326,34 @@ func (s *Subscription) EndPriming(now time.Time) {
 	s.mu.Unlock()
 }
 
+// PrimedEvents records latest, the highest event number the priming
+// report carried; called before [Subscription.EndPriming]. An event that
+// fired while the subscription was priming and was read into that report
+// is not owed again: what is owed starts after latest, and nothing is
+// owed when no later event fired. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:431-437 at db021da0
+// (activate: the outstanding number corrected to the latest seeded one
+// plus one, or cleared — "We already sent out the latest event number").
+// A priming report that carried no event does not call it. Review II,
+// R2-P1-req2-03.
+func (s *Subscription) PrimedEvents(latest uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.eventsHaveReported || latest > s.eventsReported {
+		s.eventsReported = latest
+		s.eventsHaveReported = true
+	}
+	if !s.eventsPending || s.eventsMin > latest {
+		return
+	}
+	if s.primingEventsMax > latest {
+		s.eventsMin = latest + 1
+		return
+	}
+	s.eventsPending = false
+	s.eventsUrgent = false
+}
+
 // isPriming reports whether the subscription is still being established.
 func (s *Subscription) isPriming() bool {
 	s.mu.Lock()
@@ -453,6 +484,9 @@ func (s *Subscription) queueEvent(number uint64, urgent bool) {
 	}
 	if !s.eventsPending || number < s.eventsMin {
 		s.eventsMin = number
+	}
+	if s.priming && number > s.primingEventsMax {
+		s.primingEventsMax = number
 	}
 	s.eventsPending = true
 	if urgent {

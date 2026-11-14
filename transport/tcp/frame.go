@@ -81,12 +81,9 @@ func (a *assembler) push(chunk []byte) ([][]byte, error) {
 	a.buf = append(a.buf, chunk...)
 	var out [][]byte
 	for len(a.buf) >= FramingHeaderSize {
-		n := int(binary.LittleEndian.Uint32(a.buf))
-		if n == 0 {
-			return out, ErrZeroLengthFrame
-		}
-		if n > a.maxPayloadSize {
-			return out, fmt.Errorf("%w: %d > %d", ErrFrameTooLarge, n, a.maxPayloadSize)
+		n, err := frameLength(binary.LittleEndian.Uint32(a.buf), a.maxPayloadSize)
+		if err != nil {
+			return out, err
 		}
 		total := FramingHeaderSize + n
 		if len(a.buf) < total {
@@ -101,4 +98,21 @@ func (a *assembler) push(chunk []byte) ([][]byte, error) {
 		a.buf = nil
 	}
 	return out, nil
+}
+
+// frameLength bounds a frame's announced length and returns it as T. The
+// bound is taken on the unsigned value from the wire, before the
+// conversion: where int is 32 bits wide (linux/arm, linux/386) a length
+// of 0x80000000 or more converted first is negative, passes a signed
+// comparison and reaches make with a negative length. T is int in
+// production; the type parameter lets the test run the 32-bit width on
+// any platform.
+func frameLength[T int | int32](announced uint32, maxPayloadSize T) (T, error) {
+	if announced == 0 {
+		return 0, ErrZeroLengthFrame
+	}
+	if maxPayloadSize < 0 || uint64(announced) > uint64(maxPayloadSize) {
+		return 0, fmt.Errorf("%w: %d > %d", ErrFrameTooLarge, announced, maxPayloadSize)
+	}
+	return T(announced), nil //nolint:gosec // announced <= maxPayloadSize, which fits T
 }

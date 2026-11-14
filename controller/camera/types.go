@@ -198,6 +198,11 @@ type managedSession struct {
 	// and audio stream ids, which the stream manager (phase 37 wave C)
 	// keeps.
 	clientSessionKey string
+	// life is the session's identity: the registration that tracks it.
+	// The camera can hand its id to a newer session, so a callback
+	// delivered late acts on the session it names, not on the id (review
+	// II, R2-P1-cam-b-02).
+	life *lifecycle
 }
 
 // sessionEndCause says why a tracked session ended. Mirrors matterjs-server
@@ -206,7 +211,8 @@ type managedSession struct {
 // matterjs-server at 0bd06f2.
 type sessionEndCause string
 
-// The causes: the five a client hears, and released, which it never does.
+// The causes: the five a client hears, released, which it never does, and
+// signalOverflow, the module's own.
 const (
 	// endPeer: the camera sent End.
 	endPeer sessionEndCause = "peer"
@@ -223,6 +229,10 @@ const (
 	// endReleased: this controller ended it for its closing owner or at
 	// shutdown.
 	endReleased sessionEndCause = "released"
+	// endSignalOverflow: this controller ended it because its host let the
+	// session's signals pile up past the mailbox's bounds (review II,
+	// R2-P1-cam-b-06); the module's own, matterjs-server has no such end.
+	endSignalOverflow sessionEndCause = "signal_overflow"
 )
 
 // sessionEnd is how a tracked session ended. Mirrors matterjs-server
@@ -243,6 +253,9 @@ type sessionEnd struct {
 // at 0bd06f2.
 type cameraSessionEnded struct {
 	sessionEnd
+	// life is the ended session's identity (managedSession.life); nil for
+	// an id no registration named.
+	life            *lifecycle
 	nodeID          uint64
 	endpointID      uint16
 	webRTCSessionID uint16

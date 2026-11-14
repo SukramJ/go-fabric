@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"errors"
+	"math/big"
 	"slices"
 	"strings"
 	"testing"
@@ -151,6 +152,7 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 	validity := func(a, b string) []byte { return derSeq(t, derUTC(t, a), derUTC(t, b)) }
 	keyAlg := func(key, curve []byte) []byte { return derSeq(t, derSeq(t, key, curve), spki[1]) }
 	exts := func(entries ...[]byte) []byte { return derCtx3(t, derSeq(t, entries...)) }
+	one, wide := big.NewInt(1), new(big.Int).Lsh(big.NewInt(1), 256)
 
 	cases := []struct {
 		name string
@@ -189,6 +191,19 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 		{"a required extension missing", p.with(6, exts(p.extensionsByOID(t)[oidExtBasicConstraints.String()])).cert(t), "missing required extensions", ErrMalformed},
 		{"signature not a bit string", derSeq(t, p.tbs(t), p.alg, derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1})), "signature: ", ErrMalformed},
 		{"signature not an ECDSA-Sig-Value", derSeq(t, p.tbs(t), p.alg, derMust(t, asn1.BitString{Bytes: []byte{0xff}, BitLength: 8})), "not an ECDSA-Sig-Value", ErrMalformed},
+		// r or s wider than 32 bytes: a certificate arrives before it is
+		// trusted, so this is an error and never a panic (review II,
+		// R2-P1-sec-01).
+		{"signature r wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, wide, one)), "too many bytes", ErrMalformed},
+		{"signature s wider than 32 bytes", derSeq(t, p.tbs(t), p.alg, derSigValue(t, one, wide)), "too many bytes", ErrMalformed},
+		{"signature r of 300 bits", derSeq(t, p.tbs(t), p.alg, derSigValue(t, new(big.Int).Lsh(big.NewInt(1), 300), one)), "too many bytes", ErrMalformed},
+		// Values the TLV form cannot carry: pathLen is a TlvUInt8, the
+		// validity times TlvUInt32 (operational.ts:42, :138-139 at
+		// db021da0; review II, R2-P1-sec-04).
+		{"pathLen 256", p.with(6, exts(derExt(t, oidExtBasicConstraints, derSeq(t, derMust(t, true), derMust(t, 256))))).cert(t), "pathLenConstraint 256", ErrMalformed},
+		{"notAfter beyond 32 bits", p.with(3, derSeq(t, derUTC(t, "210101000000Z"), derRaw(t, asn1.ClassUniversal, asn1.TagGeneralizedTime, false, []byte("22000101000000Z")))).cert(t), "exceeds 32 bits", ErrMalformed},
+		{"notBefore beyond 32 bits", p.with(3, derSeq(t, derRaw(t, asn1.ClassUniversal, asn1.TagGeneralizedTime, false, []byte("21370101000000Z")), derUTC(t, "301230000000Z"))).cert(t), "exceeds 32 bits", ErrMalformed},
+		{"signature r not an INTEGER", derSeq(t, p.tbs(t), p.alg, derSigBits(t, derSeq(t, derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1}), derMust(t, one)))), "not an ECDSA-Sig-Value", ErrMalformed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -196,6 +211,111 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 			_, err := DecodeDER(tc.der)
 			if err == nil || !errors.Is(err, tc.is) || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("DecodeDER = %v, want %v containing %q", err, tc.is, tc.want)
+			}
+		})
+	}
+}
+
+// derSigBits wraps a DER ECDSA-Sig-Value in the certificate's signature
+// BIT STRING.
+func derSigBits(t *testing.T, sigValue []byte) []byte {
+	t.Helper()
+	return derMust(t, asn1.BitString{Bytes: sigValue, BitLength: 8 * len(sigValue)})
+}
+
+// derSigValue is the signature BIT STRING of SEQUENCE { r, s }.
+func derSigValue(t *testing.T, r, s *big.Int) []byte {
+	t.Helper()
+	return derSigBits(t, derMust(t, ecdsaSignature{R: r, S: s}))
+}
+
+// The signature's r and s are read as matter.js reads them: the
+// INTEGER's content bytes, 32 of them, 33 with a leading zero, fewer
+// padded to 32 (EcdsaSignature.ts:28-29, DerCodec.ts:303-318 at
+// db021da0) — so a negative INTEGER is its two's-complement bytes, not
+// its magnitude (review II, R2-P1-sec-01).
+func TestDecodeDERReadsSignatureIntegersAsTheirBytes(t *testing.T) {
+	t.Parallel()
+	p := derPartsOf(t, certificatesExternalDER(t, "RCAC"))
+	max256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	pad := func(b ...byte) []byte { return append(make([]byte, 32-len(b)), b...) }
+	cases := []struct {
+		name string
+		r, s *big.Int
+		want []byte
+	}{
+		{"short values padded", big.NewInt(1), big.NewInt(0x0203), slices.Concat(pad(1), pad(2, 3))},
+		{"33 bytes with a leading zero", max256, big.NewInt(0), slices.Concat(bytes.Repeat([]byte{0xff}, 32), pad(0))},
+		{"negative as its bytes", big.NewInt(-5), big.NewInt(1), slices.Concat(pad(0xfb), pad(1))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := DecodeDER(derSeq(t, p.tbs(t), p.alg, derSigValue(t, tc.r, tc.s)))
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if !bytes.Equal(c.Signature, tc.want) {
+				t.Fatalf("Signature = %x, want %x", c.Signature, tc.want)
+			}
+		})
+	}
+}
+
+// The basic-constraints pathLenConstraint is read as matter.js reads it:
+// the INTEGER's content bytes as an unsigned number (derUnsignedInteger,
+// Certificate.ts:400-406, called at :505-509 at db021da0) — so a negative
+// INTEGER is its two's-complement bytes, never "absent" — and a value
+// that does not fit the TLV form's TlvUInt8 is refused (review II, core2
+// item 3).
+func TestDecodeDERReadsPathLenAsItsBytes(t *testing.T) {
+	t.Parallel()
+	p := derPartsOf(t, certificatesExternalDER(t, "RCAC"))
+	byOID := p.extensionsByOID(t)
+	withBC := func(bc []byte) []byte {
+		return p.with(6, derCtx3(t, derSeq(t,
+			derExt(t, oidExtBasicConstraints, bc), byOID[oidExtKeyUsage.String()],
+			byOID[oidExtSubjectKeyID.String()], byOID[oidExtAuthorityKeyID.String()],
+		))).cert(t)
+	}
+	read := []struct {
+		name    string
+		bc      []byte
+		has     bool
+		pathLen uint8
+	}{
+		{"absent", derSeq(t, derMust(t, true)), false, 0},
+		{"zero", derSeq(t, derMust(t, true), derMust(t, 0)), true, 0},
+		{"255 with its leading zero", derSeq(t, derMust(t, true), derMust(t, 255)), true, 255},
+		{"-1 as 0xff", derSeq(t, derMust(t, true), derMust(t, -1)), true, 255},
+		{"-5 as 0xfb", derSeq(t, derMust(t, true), derMust(t, -5)), true, 251},
+		{"without cA", derSeq(t, derMust(t, -5)), true, 251},
+	}
+	for _, tc := range read {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := DecodeDER(withBC(tc.bc))
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if got := c.Extensions; got.BasicConstraintsHasPathLen != tc.has || got.BasicConstraintsPathLen != tc.pathLen {
+				t.Fatalf("pathLen = %d (has %v), want %d (has %v)", got.BasicConstraintsPathLen, got.BasicConstraintsHasPathLen, tc.pathLen, tc.has)
+			}
+		})
+	}
+	refused := []struct {
+		name string
+		bc   []byte
+		want string
+	}{
+		{"-129 as 0xff7f", derSeq(t, derMust(t, true), derMust(t, -129)), "pathLenConstraint 65407 exceeds 255"},
+		{"an INTEGER without content", derSeq(t, derMust(t, true), derRaw(t, asn1.ClassUniversal, asn1.TagInteger, false, nil)), "pathLenConstraint is an INTEGER without content"},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeDER(withBC(tc.bc)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("DecodeDER = %v, want ErrMalformed containing %q", err, tc.want)
 			}
 		})
 	}
@@ -263,10 +383,27 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 		}
 		return v
 	}
-	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterCASEAuthTag} {
-		if _, err := derDN(name(attr(oid, asn1.TagUTF8String, "zz"))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "not hex") {
-			t.Fatalf("derDN(%v = zz) = %v, want the not-hex refusal", oid, err)
+	// The Matter ids are exactly 16 uppercase hex digits, a CAT exactly 8
+	// with a version other than 0 — parseMatterRdnHex and
+	// CaseAuthenticatedTag.isValid (Certificate.ts:242-249, :331-339,
+	// :354-358 at db021da0; review II, R2-P1-sec-03).
+	for _, oid := range []asn1.ObjectIdentifier{oidMatterNodeID, oidMatterICACID, oidMatterRCACID, oidMatterFabricID, oidMatterVVSID, oidMatterFirmwareSigningID} {
+		for _, v := range []string{"zz", "ab", "AB", "00000000000000ab", "000000000000000AB", "0x000000000000AB", "+00000000000000A"} {
+			if _, err := derDN(name(attr(oid, asn1.TagUTF8String, v))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "expected exactly 16 uppercase hexadecimal digits") {
+				t.Fatalf("derDN(%v = %q) = %v, want the 16-digit refusal", oid, v, err)
+			}
 		}
+	}
+	for _, v := range []string{"zz", "0001", "0001000a", "000100001", "+0010001"} {
+		if _, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, v))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "expected exactly 8 uppercase hexadecimal digits") {
+			t.Fatalf("derDN(CAT = %q) = %v, want the 8-digit refusal", v, err)
+		}
+	}
+	if _, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, "ABCD0000"))); err == nil || !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "invalid CASE Authenticated Tag") {
+		t.Fatalf("derDN(CAT version 0) = %v, want the invalid-CAT refusal", err)
+	}
+	if cat, err := derDN(name(attr(oidMatterCASEAuthTag, asn1.TagUTF8String, "ABCD0001"))); err != nil || !slices.Equal(cat.CASEAuthTags, []uint32{0xABCD0001}) {
+		t.Fatalf("derDN(CAT ABCD0001) = %+v, %v", cat, err)
 	}
 	if _, err := derDN(asn1.RawValue{Bytes: []byte{0xff}}); err == nil || !strings.Contains(err.Error(), "invalid subject/issuer structure") {
 		t.Fatalf("derDN(unreadable) = %v", err)

@@ -8,6 +8,7 @@ import (
 	"crypto/elliptic"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -342,10 +343,17 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			return fmt.Errorf("issuer: %w", err)
 		}
 		cert.Issuer = dn
-	case tagNotBefore:
-		cert.NotBefore = el.Uint
-	case tagNotAfter:
-		cert.NotAfter = el.Uint
+	case tagNotBefore, tagNotAfter:
+		// notBefore/notAfter are TlvUInt32 (operational.ts:138-139 at
+		// db021da0), and matter.js's Schema.decode validates the bounds.
+		if el.Uint > math.MaxUint32 {
+			return fmt.Errorf("%w: validity time %d exceeds 32 bits", ErrMalformed, el.Uint)
+		}
+		if tag == tagNotBefore {
+			cert.NotBefore = el.Uint
+		} else {
+			cert.NotAfter = el.Uint
+		}
 	case tagSubject:
 		if !el.IsContainer || el.Type != tlv.TypeList {
 			// A DN is a TLV list; a structure (TC-JFADMIN-1.2 step 16
@@ -646,7 +654,12 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 		case extBCInnerTagIsCa:
 			ext.BasicConstraintsIsCA = el.Type == tlv.TypeBoolTrue
 		case extBCInnerTagPathLen:
-			ext.BasicConstraintsPathLen = uint8(el.Uint & 0xFF)
+			// pathLen is TlvUInt8 (operational.ts:42 at db021da0): a wider
+			// value is refused, not cut to its low byte.
+			if el.Uint > math.MaxUint8 {
+				return fmt.Errorf("%w: basic-constraints: pathLen %d exceeds 255", ErrMalformed, el.Uint)
+			}
+			ext.BasicConstraintsPathLen = uint8(el.Uint)
 			ext.BasicConstraintsHasPathLen = true
 		default:
 			if el.IsContainer {

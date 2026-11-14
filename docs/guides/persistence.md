@@ -29,7 +29,7 @@ module's consumers call:
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
 | `store.ICD` | the ICD Management server's registered Check-In clients with their keys, and the ICDCounter | ICD Management (`node.Config.ICD`) |
-| `store.Eraser` | `Erase`: every row of every area, the next fabric index back at 1 | the factory reset (`node.Node.FactoryReset`, `controller.Controller.Erase`) |
+| `store.Eraser` | `Erase`: every row of every area, the next fabric index back at 1; the SQLite store then rewrites the file and empties its `-wal`, so the erased bytes remain in none of the store's files (flash wear-levelling, file-system snapshots and backups are beyond the module's reach) | the factory reset (`node.Node.FactoryReset`, `controller.Controller.Erase`) |
 
 A consumer names the areas it uses, never the whole port; the node, which
 wires every consumer, holds a `store.Port`.
@@ -37,7 +37,9 @@ wires every consumer, holds a `store.Port`.
 **Two implementations.**
 
 - `store.New(db)`, SQLite. `Config.Store.Path` and `Config.Store.DB` build
-  it; `Config.Store.Credentials` takes one you built.
+  it; `Config.Store.Credentials` takes one you built. The factory reset
+  erases the stores the node used — an override as it is, whether the node
+  still runs or was stopped before.
 - `memstore.New()` (`store/memstore`), in memory, for tests and for a small
   daemon that accepts losing its state on restart: a process that exits
   forgets every fabric, and each controller has to commission the node
@@ -187,6 +189,7 @@ facade's own state.
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
 | `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
+| `operational_credentials.pending_noc`, `operational_credentials.pending_noc_update` | `cluster/core` | what an AddNOC (the first key: the new fabric's id and root key, then the index the store assigned it, written before its identity) or an UpdateNOC (the second key: the replaced credentials, private key included) wrote that CommissioningComplete has not committed, as JSON; written ahead of the command's first store write, cleared at CommissioningComplete or once the fail-safe's rollback has landed in full — a rollback with a failed read or write keeps it and is retried at the next expiry, arm, CommissioningComplete (which writes it back if it cleared it), AddNOC or UpdateNOC (before either reads the fabric table) and at the next start; an UpdateNOC's rollback whose fabric was removed meanwhile has nothing left to restore and is settled without a write. Each key holds one marker, so an AddNOC admitted after a failed UpdateNOC in the same fail-safe keeps the update's. GeneralCommissioning clears both through its `Settings` before CommissioningComplete answers — it reads both before it clears either, and clears the AddNOC's first: when a read or a clear fails, it writes back what it had cleared, CommissioningComplete answers FAILURE and the fail-safe stays armed. The settings port has no call that writes two keys at once, so a node that goes down between the two clears, before it answers, comes back with the AddNOC committed and the UpdateNOC rolled back. A node that finds it at start rolls back what it names before it reads its fabrics — an AddNOC's fabric by that index, or, when the index was never written, the fabric with that id and root key only if it has no identity yet, so a marker an AddNOC refused by the store left never removes a committed fabric; empty when no fail-safe window is open |
 | `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion |
 | `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |

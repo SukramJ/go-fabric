@@ -123,3 +123,25 @@ func TestAssemblerNoReceiveBufferCap(t *testing.T) {
 		t.Fatalf("eight maximum frames in one chunk: msgs=%d err=%v", len(msgs), err)
 	}
 }
+
+// TestFrameLengthBoundsTheUnsignedLength: the announced length is bounded
+// as the unsigned value on the wire before it becomes an int. Run with
+// int32 as well, the width of int on linux/arm and linux/386, where a
+// length of 0x80000000 or more converted first turned negative, passed
+// both checks and reached make([]byte, n) in the connection's reader.
+func TestFrameLengthBoundsTheUnsignedLength(t *testing.T) {
+	for _, announced := range []uint32{DefaultMaxPayloadSize + 1, 0x7FFF_FFFF, 0x8000_0000, 0xFFFF_FFFF} {
+		if n, err := frameLength[int32](announced, DefaultMaxPayloadSize); !errors.Is(err, ErrFrameTooLarge) {
+			t.Errorf("int32: frameLength(%#x) = %d, %v, want ErrFrameTooLarge", announced, n, err)
+		}
+		if n, err := frameLength[int](announced, DefaultMaxPayloadSize); !errors.Is(err, ErrFrameTooLarge) {
+			t.Errorf("int: frameLength(%#x) = %d, %v, want ErrFrameTooLarge", announced, n, err)
+		}
+	}
+	if _, err := frameLength[int32](0, DefaultMaxPayloadSize); !errors.Is(err, ErrZeroLengthFrame) {
+		t.Errorf("int32: frameLength(0) err = %v, want ErrZeroLengthFrame", err)
+	}
+	if n, err := frameLength[int32](DefaultMaxPayloadSize, DefaultMaxPayloadSize); err != nil || n != DefaultMaxPayloadSize {
+		t.Errorf("int32: frameLength(max) = %d, %v, want %d, nil", n, err, DefaultMaxPayloadSize)
+	}
+}

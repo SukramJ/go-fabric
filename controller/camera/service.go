@@ -109,6 +109,12 @@ const (
 	// EndReleased: this controller ended it for a released owner or at
 	// Close.
 	EndReleased EndCause = EndCause(endReleased)
+	// EndSignalOverflow: this controller ended it because the host did not
+	// read the session's Signals while the camera kept signalling, past
+	// the bounds [Session.Signals] states; the signals not yet read were
+	// dropped. The module's own cause, which matterjs-server does not
+	// spell.
+	EndSignalOverflow EndCause = EndCause(endSignalOverflow)
 )
 
 // SessionEnd is the end of a session. Owner and Key are the session's
@@ -158,6 +164,9 @@ type Service struct {
 	closed   bool
 	sessions map[sessionKey]*Session
 	lastSeen map[watchKey][]sessionPeer
+	// ending counts the ends of overflowed sessions in flight; Close waits
+	// for them. Added to under mu while not closed only.
+	ending sync.WaitGroup
 }
 
 // New starts a service over ctrl, attaching to its requestor
@@ -206,7 +215,7 @@ func (s *Service) wire() {
 		}
 	}
 	s.m.onVanished = func(ms managedSession, _ sessionEndCause) {
-		s.ps.removeTracked(target{ms.nodeID, ms.endpointID}, ms.webRTCSessionID)
+		s.ps.removeTrackedOf(target{ms.nodeID, ms.endpointID}, ms.webRTCSessionID, ms.life)
 	}
 }
 
@@ -225,14 +234,15 @@ func (s *Service) Close(ctx context.Context) error {
 	}
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
-	s.m.stopAll(ctx)
+	s.m.shutdown(ctx)
+	s.ending.Wait()
 	if s.unsub != nil {
 		s.unsub()
 	}
 	if s.cancel != nil {
 		s.cancel()
 	}
-	s.w.wait()
+	s.w.stop()
 	s.mu.Lock()
 	open := s.sessions
 	s.sessions = map[sessionKey]*Session{}
@@ -296,10 +306,15 @@ func (s *Service) ReleaseStream(ctx context.Context, node *client.Node, endpoint
 
 // StopSession ends a session by its id, whoever opened it: false when the
 // camera answered NOT_FOUND. requestedBy is the owner asking ("" for
-// none); the end is announced to the session's owner naming it. Mirrors
-// matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:2243-2269
-// at 0bd06f2.
+// none); the end is announced to the session's owner naming it. After
+// Close, which ended the service's sessions, it is [ErrClosed] and sends
+// nothing (review II, R2-P1-cam-b-04). Mirrors matterjs-server
+// packages/ws-controller/src/camera/CameraStreamManager.ts:2243-2269 at
+// 0bd06f2.
 func (s *Service) StopSession(ctx context.Context, node *client.Node, endpoint, id uint16, requestedBy string) (bool, error) {
+	if s.isClosed() {
+		return false, ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return false, err
@@ -323,7 +338,9 @@ func (s *Service) StopByKey(ctx context.Context, node *client.Node, endpoint uin
 
 // Release ends every session owner holds or is starting, as a host does
 // when the owner goes away; only EndSession lowers a stream's
-// ReferenceCount. Mirrors matterjs-server
+// ReferenceCount. After Close it stays callable: Close claimed every
+// session, so it finds none, or retries the EndSession of one whose end
+// failed at Close. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2327-2331 at
 // 0bd06f2.
 func (s *Service) Release(ctx context.Context, owner string) {
@@ -331,13 +348,21 @@ func (s *Service) Release(ctx context.Context, owner string) {
 }
 
 // sessionEnded announces an end: to the session's Signals, closed after
-// the signals before it, and to the observer.
+// the signals before it, and to the observer. The registry can deliver an
+// end late, after the camera handed the id to a newer session: the end
+// acts on the session it names (e.life) and leaves a newer session under
+// the id — its Signals, its recorded offer — alone (review II,
+// R2-P1-cam-b-02).
 func (s *Service) sessionEnded(e cameraSessionEnded) {
 	k := sessionKey{e.nodeID, e.endpointID, e.webRTCSessionID}
-	s.ps.sessionEnded(s.ps.key(target{e.nodeID, e.endpointID}, e.webRTCSessionID))
+	s.ps.sessionEndedOf(s.ps.key(target{e.nodeID, e.endpointID}, e.webRTCSessionID), e.life)
 	s.mu.Lock()
 	sess := s.sessions[k]
-	delete(s.sessions, k)
+	if sess != nil && sess.life == e.life {
+		delete(s.sessions, k)
+	} else {
+		sess = nil
+	}
 	s.mu.Unlock()
 	if sess != nil {
 		sess.box.close()
@@ -376,7 +401,9 @@ func (s *Service) onSignal(sig Signal) {
 	s.mu.Unlock()
 	switch _, owned := s.m.sessions.signallingOwner(t.nodeID, t.endpointID, sig.Session.Id); {
 	case sess != nil:
-		sess.box.put(sig)
+		if sess.box.put(sig) {
+			s.signalsOverflowed(sess, t, sig.Session.Id)
+		}
 	case owned:
 		// A start the host never learned the id of: its signals go with it.
 	case s.cfg.Observer.Signal != nil:
@@ -388,10 +415,56 @@ func (s *Service) onSignal(sig Signal) {
 	}
 }
 
-// nodeRemoved forgets a node that left the fabric.
+// signalsOverflowed ends a session whose host let its Signals fill past the
+// mailbox's bounds: an EndSession to the camera, as any stop of this
+// controller sends it, announced as EndSignalOverflow. An EndSession that
+// fails ends the session here all the same and hands it to the leftover
+// sweep, as a start that gives a session up does: a session whose signals
+// were dropped is never left open (review II, R2-P1-cam-b-06). The end acts
+// on the session that overflowed, by identity: once the camera ended it and
+// handed its id to a newer session, it does nothing, and the leftover sweep
+// is pointed at the id only while the id still names it (review II,
+// R2-P1-dr-rest-05). After Close it does nothing: Close's own stop ends the
+// session.
+func (s *Service) signalsOverflowed(sess *Session, t target, id uint16) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return
+	}
+	life := sess.life
+	s.ending.Add(1)
+	s.mu.Unlock()
+	s.log.Warn("camera.session.signals_overflow", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(id)), slog.Int("max", signalMailboxLimit), slog.Int("max_bytes", signalMailboxBytes))
+	go func() {
+		defer s.ending.Done()
+		end := sessionEnd{cause: endSignalOverflow}
+		ctx, cancel := s.m.cleanupContext(s.life)
+		defer cancel()
+		named, _, err := s.m.sessions.stopOf(ctx, life, t.nodeID, t.endpointID, id, end, s.m.sendEndSession(t, id))
+		if !named || err == nil {
+			return
+		}
+		s.log.Warn("camera.session.overflow_end_failed", slog.Uint64("node_id", t.nodeID), slog.Int("webrtc_session_id", int(id)), slog.Any("err", err))
+		// The sweep is pointed at the id while it still names the
+		// session; a newer session under the id keeps its entry.
+		still := s.m.sessions.names(life, t.nodeID, t.endpointID, id)
+		s.m.sessions.abandon(life, end)
+		if !still {
+			return
+		}
+		if aerr := s.m.io.abandonSession(ctx, t, id); aerr != nil {
+			s.log.Warn("camera.session.abandon_failed", slog.Int("webrtc_session_id", int(id)), slog.Any("err", aerr))
+		}
+	}()
+}
+
+// nodeRemoved forgets a node that left the fabric: its sessions, provider
+// records, leases and last reports.
 func (s *Service) nodeRemoved(nodeID uint64) {
 	s.ps.nodeRemoved(nodeID)
 	s.m.sessions.forgetNode(nodeID)
+	s.m.forgetNode(nodeID)
 	s.mu.Lock()
 	for k := range s.lastSeen {
 		if k.nodeID == nodeID {

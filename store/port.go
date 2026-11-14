@@ -203,7 +203,9 @@ type ICD interface {
 // (packages/node/src/node/ServerNode.ts:242-256), which clears the fabrics,
 // the sessions, the occurrences and the credentials and erases the node's
 // store: Matter requires a factory reset to remove "all security- and
-// privacy-related data and key material" (Core §13.4).
+// privacy-related data and key material" (Core §13.4). The SQLite [Store]
+// also scrubs the file, so the erased bytes are not left in its free pages
+// or its write-ahead log ([Store.Erase]).
 // fabric:reachable:reason="the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself"
 type Eraser interface {
 	Erase(ctx context.Context) error

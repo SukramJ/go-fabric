@@ -36,7 +36,10 @@ store and endpoint records (`endpoint.Store.EraseEndpoints`, which restarts
 the numbering); the host then builds a new node on the same store, which
 starts uncommissioned and numbers its bridged endpoints from 2, as a
 fresh install does. A controller's counterpart is `Controller.Erase`,
-which drops its paired nodes, its fabric and its CA key material.
+which drops its paired nodes, its fabric and its CA key material. While
+a host hook still holds a node's report queue past the context, it erases
+nothing and returns the context's error; called again once the hook
+returned, it completes the reset.
 
 So the operator's rules are the persistence guide's
 [backup rules](persistence.md#backup):
@@ -166,7 +169,10 @@ succeed removes the network it added, so wpa_supplicant does not keep
 trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
 timeout when the network is out of range. The driver resolves the
 interface once, at `New`: after a wpa_supplicant restart the host builds a
-new driver.
+new driver. When the system-bus connection itself is lost, every later scan
+and join fails at once with UnknownError and the debug text "the driver's
+bus connection is gone" — the same signal to build a new driver. A scan or
+join also ends with its caller's context while it waits for the driver.
 
 *Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
@@ -194,6 +200,28 @@ one `mdns.responder.multicast_not_sent` or
 `mdns.responder.multicast_some_families` line at Info per outage; the
 following misses log at Debug until a multicast reaches every family
 again.
+
+The responder answers a query only from a source on the link of the
+interface the query arrived on: an IPv6 link-local address (`fe80::/10`),
+or an address inside one of the prefixes of that interface's own
+addresses. Its socket binds the wildcard address, so a unicast query from
+anywhere reaches port 5353; one from off the link gets no answer, by
+multicast or unicast, and is not held as a truncated query. matter.js drops
+the same queries: it serves a packet on the interface whose address and
+netmask contain the source, or the IPv6 zone the source carries, and
+answers none it finds no interface for. The sources a real network has that
+the check refuses:
+
+- an IPv4 link-local querier (`169.254.0.0/16`, RFC 3927 — a host whose
+  DHCP failed) while the node's interface holds no `169.254` address of its
+  own; the IPv6 queries it sends from its `fe80::` address are answered;
+- a querier of another IPv4 subnet or IPv6 prefix that shares the layer-2
+  segment (overlayed subnets, a second prefix the node holds no address
+  in), an IPv6 ULA among them;
+- every other querier when the interface's only address of that family is
+  a single host (`/32`, `/128`): its prefix contains no one else;
+- a unicast query from across a router. A query an mDNS reflector re-sends
+  from its own address on the link is answered.
 
 A host that already runs avahi-daemon keeps it: this project's own
 chip-tool harness runs the node on hosts with a running avahi-daemon. A
@@ -235,6 +263,7 @@ interface; the allow-list is this module's (*Ahead of matter.js*,
 
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
 [`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
+[`mdns/answer.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/answer.go) (`onLink`; `TestResponder_AnswersOnlyOnLinkSources`),
 [`node/mdns.go`](https://github.com/SukramJ/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
 [`mdns/interface_filter.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/interface_filter.go) (`DefaultInterfaceFilter`),
 [`mdns/diagnose_interfaces.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/diagnose_interfaces.go) (`DiagnoseInterfaces`),

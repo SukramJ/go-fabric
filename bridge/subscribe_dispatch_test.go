@@ -260,7 +260,7 @@ func TestStreamInitialReportChunks_EmptyReport_NoSend(t *testing.T) {
 	report := im.ReportData{}
 	// The call may return an error from sendReplyReliable (no real peer);
 	// but it must not panic.
-	_ = b.streamInitialReportChunks(src, hdr, proto, 0, report)
+	_ = b.streamInitialReportChunks(context.Background(), nil, src, hdr, proto, 0, report)
 }
 
 // TestStreamInitialReportChunks_ChunkBudgetSplit verifies that a report large

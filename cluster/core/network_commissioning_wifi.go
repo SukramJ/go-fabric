@@ -68,6 +68,10 @@ type WiFiNetworkCommissioning struct {
 	// is derived from it, as chip's Linux driver reports the network the
 	// link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
 	link []byte
+	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
+	// ConnectNetwork whose driver call outlives the window that admitted it
+	// sees it moved and drops its result.
+	expiries uint64
 
 	lastStatus     *uint8
 	lastNetworkID  []byte // empty reads as null (ReadAttribute :1087-1092)
@@ -597,7 +601,6 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommd
 		return nil, netcommStatus(im.StatusConstraintError, "core: AddOrUpdateWiFiNetwork credentials of %d bytes", len(req.Credentials))
 	}
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	status := netcommdef.NetworkCommissioningStatusSuccess
 	i := w.indexLocked(req.Ssid)
 	switch {
@@ -611,10 +614,16 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommd
 		w.networks = append(w.networks, wifiNetwork{ssid: bytes.Clone(req.Ssid), credentials: bytes.Clone(req.Credentials)})
 		i = len(w.networks) - 1
 	}
+	var crumb *uint64
 	if statusOK(status) {
 		w.dataVersion.Bump()
-		w.breadcrumb(req.Breadcrumb)
+		crumb = req.Breadcrumb
 	}
+	w.mu.Unlock()
+	// The Breadcrumb's write reaches GeneralCommissioning's listeners and
+	// the host's hook; it runs without this cluster's lock (review II,
+	// R2-P1-core-07), as scanNetworks' does.
+	w.breadcrumb(crumb)
 	return configResponse(status, i), nil
 }
 
@@ -627,17 +636,18 @@ func (w *WiFiNetworkCommissioning) remove(ctx context.Context, req netcommdef.Re
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	i := w.indexLocked(req.NetworkId)
 	if i < 0 {
+		w.mu.Unlock()
 		return configResponse(netcommdef.NetworkCommissioningStatusNetworkIdNotFound, 0), nil
 	}
 	w.networks = slices.Delete(w.networks, i, i+1)
 	w.dataVersion.Bump()
-	w.breadcrumb(req.Breadcrumb)
 	if len(w.networks) == 0 {
 		w.lastNetworkID, w.lastConnectErr, w.lastStatus = nil, nil, nil
 	}
+	w.mu.Unlock()
+	w.breadcrumb(req.Breadcrumb) // without the lock (R2-P1-core-07)
 	return configResponse(netcommdef.NetworkCommissioningStatusSuccess, i), nil
 }
 
@@ -646,18 +656,20 @@ func (w *WiFiNetworkCommissioning) remove(ctx context.Context, req netcommdef.Re
 // index past the list OutOfRange. chip asks for no failsafe here.
 func (w *WiFiNetworkCommissioning) reorder(req netcommdef.ReorderNetworkRequest) (any, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	i := w.indexLocked(req.NetworkId)
 	switch {
 	case i < 0:
+		w.mu.Unlock()
 		return configResponse(netcommdef.NetworkCommissioningStatusNetworkIdNotFound, 0), nil
 	case int(req.NetworkIndex) >= len(w.networks):
+		w.mu.Unlock()
 		return configResponse(netcommdef.NetworkCommissioningStatusOutOfRange, 0), nil
 	}
 	n := w.networks[i]
 	w.networks = slices.Insert(slices.Delete(w.networks, i, i+1), int(req.NetworkIndex), n)
 	w.dataVersion.Bump()
-	w.breadcrumb(req.Breadcrumb)
+	w.mu.Unlock()
+	w.breadcrumb(req.Breadcrumb) // without the lock (R2-P1-core-07)
 	return configResponse(netcommdef.NetworkCommissioningStatusSuccess, int(req.NetworkIndex)), nil
 }
 
@@ -676,6 +688,7 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
+	window := w.expiries
 	i := w.indexLocked(req.NetworkId)
 	var target wifiNetwork
 	if i >= 0 {
@@ -692,9 +705,22 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
 	}
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.busy = false
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, DebugText: debugText(text), ErrorValue: spec.Nullable[int32]{Null: true}}
+	if w.expiries != window {
+		// The fail-safe that admitted the command expired while the driver
+		// ran, and OnFailSafeExpired reverted the networks: the result
+		// touches neither the reverted state nor the Breadcrumb.
+		// connectedhomeip releases the pending command on the expiry
+		// (NetworkCommissioningCluster.cpp:1002 at 6170af84) and its
+		// OnResult returns on the released handle (:850-857) (review II,
+		// R2-P1-core-06).
+		w.mu.Unlock()
+		if !statusOK(status) {
+			resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
+		}
+		return resp, nil
+	}
+	w.busy = false
 	if statusOK(status) {
 		w.lastConnectErr = nil
 		w.link = bytes.Clone(req.NetworkId)
@@ -709,8 +735,9 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	w.lastNetworkID = bytes.Clone(req.NetworkId)
 	w.setStatusLocked(status)
 	w.dataVersion.Bump()
+	w.mu.Unlock()
 	if statusOK(status) {
-		w.breadcrumb(req.Breadcrumb)
+		w.breadcrumb(req.Breadcrumb) // without the lock (R2-P1-core-07)
 	}
 	return resp, nil
 }
@@ -732,6 +759,7 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 // reported ([WiFiNetworkCommissioning.OnAttributeChange]).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
+	w.expiries++
 	w.networks = slices.Clone(w.committed)
 	for j := range w.networks {
 		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)

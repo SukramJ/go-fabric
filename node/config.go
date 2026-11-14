@@ -537,6 +537,9 @@ type Attestation struct {
 	BlockCommissioningOnError bool
 	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
 	// host with a chain of its own (an HSM-held key, say) sets it here.
+	// Its DAC and PAI must name the ProductDescription's vendor and
+	// product, as a chain Files loads must: another product's fails New
+	// with attestation.ErrProductMismatch.
 	Chain *AttestationChain
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
@@ -545,7 +548,8 @@ type Attestation struct {
 	// asks for them — the first AttestationRequest, CertificateChainRequest
 	// or CSRRequest — never at [New] or [Node.Start]; a nil chain or CD it
 	// returns is the CSA test material, as above. A failed call fails that
-	// request and is retried on the next. It excludes Files, Chain and
+	// request and is retried on the next; so does a chain of another
+	// product than ProductDescription's (attestation.ErrProductMismatch). It excludes Files, Chain and
 	// CertificationDeclaration. Mirrors matter.js
 	// OperationalCredentialsServer.State.certification, which takes an
 	// async provider (packages/protocol/src/certificate/

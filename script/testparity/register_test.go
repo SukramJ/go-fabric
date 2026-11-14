@@ -143,9 +143,12 @@ const testparityPlannedRatchet = 2
 // ported, no scanner change: 161 ported.
 // Wave W8 (#461): BorderRouterRegistryTest.ts ported by thread/brdiscovery,
 // merged with wave W7: 162 ported.
+// Review II (core2): AttestationCertificateProfileTest.ts's "VendorID and
+// ProductID in the distinguished name" ported but for its invalid-UTF-8
+// case: 941 missing.
 const (
 	testparityPortedRatchet  = 162
-	testparityMissingRatchet = 963
+	testparityMissingRatchet = 941
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

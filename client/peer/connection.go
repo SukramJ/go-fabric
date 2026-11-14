@@ -1597,8 +1597,9 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
 // it (PeerConnection.ts:653-752): a Busy status
-// waits the peer's delay plus up to DelayAfterNetworkError of jitter — and
-// holds every attempt of the peer for as long (Peer.holdBusy); a
+// waits the peer's delay plus up to DelayAfterNetworkError of jitter — and,
+// received at a proven address of the peer (Peer.provenAddress), holds
+// every attempt of the peer for as long (Peer.holdBusy); a
 // NoSharedTrustRoots status whose resumption record could be deleted
 // retries at once; any other status waits DelayAfterPeerError; a transient
 // error DelayAfterNetworkError; anything else DelayAfterUnhandledError. A
@@ -1643,8 +1644,11 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 			delay = d
 		}
 	}
-	if category == "busy" {
-		// The final delay, the error handler's replacement included.
+	if category == "busy" && p.provenAddress(att.addr) {
+		// The final delay, the error handler's replacement included. A
+		// Busy from an address no session proved to be the node's holds
+		// only the attempt that received it, which waits it out below as
+		// matter.js does (review II, R2-P1-net-05).
 		p.holdBusy(delay)
 	}
 	switch category {

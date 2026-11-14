@@ -211,6 +211,7 @@ type EvseServer struct {
 	importedAtTransfer int64
 	exportedAtTransfer int64
 	enabledTimer       clock.Timer
+	quiesced           bool // MatterQuiesce stopped the timer; SetEndpoint arms it again
 	targets            []ChargingTargetSchedule
 	vehicleID          *string
 }
@@ -1129,6 +1130,11 @@ func (s *EvseServer) enabledStateExpirationLocked(now uint32) {
 func (s *EvseServer) enabledTimerExpired() {
 	s.lock()
 	defer s.unlock()
+	if s.enabledTimer == nil {
+		// Stopped after it fired, before it got the lock (MatterQuiesce,
+		// Close): it neither checks nor arms again.
+		return
+	}
 	s.enabledTimer = nil
 	s.scheduleEnabledCheckLocked()
 }
@@ -1367,11 +1373,20 @@ func (s *EvseServer) MatterWriteAttribute(_ context.Context, attrID uint32, valu
 // --- plumbing ---------------------------------------------------------------
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
-// calls it at reassembly.
+// calls it at reassembly, for every server of the new topology. A server
+// [EvseServer.MatterQuiesce] stopped comes back here — a reassembly that
+// puts the same object back — and the enabled-until check runs again from
+// the state: a deadline still ahead re-arms the timer, one that passed
+// while the server was out disables at once (review II,
+// R2-P1-dr-rest-03).
 func (s *EvseServer) SetEndpoint(endpoint uint16) {
 	s.lock()
+	defer s.unlock()
 	s.endpoint = endpoint
-	s.unlock()
+	if s.quiesced {
+		s.quiesced = false
+		s.scheduleEnabledCheckLocked()
+	}
 }
 
 // Close stops the enabled-until timer.
@@ -1379,7 +1394,17 @@ func (s *EvseServer) Close() {
 	s.lock()
 	defer s.unlock()
 	s.stopEnabledTimerLocked()
+	s.quiesced = true
 }
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. It stops the enabled-until
+// timer — the deadline and the 30-s re-check of a node without a time —
+// so the server neither disables the supply nor tells its host or emits
+// an event afterwards. The server stays usable: the next EnableCharging or
+// EnableDischarging arms the timer again, and so does the
+// [EvseServer.SetEndpoint] of a reassembly that puts the server back.
+func (s *EvseServer) MatterQuiesce() { s.Close() }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *EvseServer) SetMatterEventEmitter(emitter contract.EventEmitter) {

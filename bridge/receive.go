@@ -157,13 +157,23 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if err != nil {
 		return err
 	}
-	// Remember where the peer of this secure session speaks from. The
-	// datagram authenticated under the session key, so src is the peer's
-	// current address; ongoing subscription reports and the CloseSession
-	// farewell route on it. matter.js adopts the newest inbound address
-	// on the session's channel — "the new message wins"
-	// (packages/protocol/src/protocol/ExchangeManager.ts:425-431).
-	if hdr.SessionID != 0 && !isNilRoute(src) {
+	// Remember where the peer of this secure session speaks from:
+	// subscription reports, BDX and OTA exchanges and the CloseSession
+	// farewell route on it. Only a message with a new counter may move
+	// it. Authentication alone does not make src the peer's address — a
+	// captured datagram decrypts again from anywhere and is reported as
+	// a duplicate for the session's lifetime, so binding a duplicate
+	// would let a third party choose where this session's traffic goes.
+	// connectedhomeip src/transport/SessionManager.cpp:1054-1068 at
+	// 6170af84 sets the peer address only inside `if (isDuplicate ==
+	// SessionMessageDelegate::DuplicateMessage::No)`; matter.js
+	// packages/protocol/src/protocol/ExchangeManager.ts:462-486 at
+	// db021da0 adopts the address ("the new message wins") only for a
+	// non-duplicate initiator message that opens a new exchange. This
+	// follows connectedhomeip's rule — every new message — so a peer
+	// whose address changed is reached again by its next message on any
+	// exchange (by_design BD-chip-SessionRouteByNewCounter).
+	if !duplicate && hdr.SessionID != 0 && !isNilRoute(src) {
 		b.bindSessionRoute(hdr.SessionID, src)
 	}
 	if len(plain) == 0 {

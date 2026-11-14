@@ -316,9 +316,13 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 		// Identify command argument is a struct {IdentifyTime: uint16}
 		// per Matter §1.2.6.1. The IM cluster-fields decoder may pass
 		// either the decoded struct or a raw value depending on the
-		// commissioner's encoding; coerceUint16 handles both with a
-		// best-effort fallback to 0 (= clear identify).
-		t, _ := coerceUint16(fields)
+		// commissioner's encoding; coerceUint16 handles both and refuses
+		// what the attribute write refuses, with the same status — an
+		// absent payload (nil) is IdentifyTime 0 (review II, R2-P1-core-08).
+		t, err := coerceUint16(fields)
+		if err != nil {
+			return nil, err
+		}
 		if err := i.setIdentifyTime(ctx, t); err != nil {
 			return nil, err
 		}
@@ -501,9 +505,9 @@ const identifyFieldIdentifyTime uint8 = 0
 // tag-keyed map of the generic salvage path (bridge/fields_reader.go
 // decodeGenericTagMap) with IdentifyTime under tag 0 and a bare uint64 /
 // uint32 / uint16 are what a host that decoded the payload itself hands
-// over. Unrecognised shapes coerce to 0,
-// which is the spec's "clear identify" semantic — safer than rejecting
-// the command outright.
+// over. nil is 0, the spec's "clear identify"; a value out of range or of
+// another type is refused with the status below, for the attribute write
+// and the Identify command alike.
 func coerceUint16(v any) (uint16, error) {
 	switch x := v.(type) {
 	case identifydef.IdentifyRequest:
