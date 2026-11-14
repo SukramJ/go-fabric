@@ -261,7 +261,7 @@ func TestConnect(t *testing.T) {
 	}
 	want := []string{
 		ifaceRoot + ".GetInterface", ifaceInterface + ".AutoScan",
-		ifaceInterface + ".RemoveNetwork", ifaceInterface + ".AddNetwork", ifaceInterface + ".Disconnect", ifaceInterface + ".SelectNetwork",
+		ifaceInterface + ".AddNetwork", ifaceInterface + ".Disconnect", ifaceInterface + ".SelectNetwork", ifaceInterface + ".RemoveNetwork",
 	}
 	if got := b.called(); !slices.Equal(got, want) {
 		t.Errorf("calls %v, want %v", got, want)
@@ -1064,4 +1064,78 @@ func TestAHandedOverWaitIsNotInstalledAfterItsCallerGaveUp(t *testing.T) {
 	default:
 		t.Fatal("the abandoned attempt's done is open: a State change would block the loop")
 	}
+}
+
+// TestAFailedJoinKeepsTheNetworkItWasOn: a join that does not end in
+// Success leaves wpa_supplicant on the network that was current before
+// it — kept, not removed, while the join runs, and selected again after
+// the network the join added is removed — and a join that succeeds
+// removes the network that was current only then (review II,
+// R2-P3-net-01).
+func TestAFailedJoinKeepsTheNetworkItWasOn(t *testing.T) {
+	t.Parallel()
+	const working = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/7")
+	newBus := func() *fakeBus {
+		b := newFakeBus()
+		b.props["State"] = dbus.MakeVariant(stateCompleted)
+		b.props["CurrentNetwork"] = dbus.MakeVariant(working)
+		b.props["DisconnectReason"] = dbus.MakeVariant(int32(15))
+		b.props["AssocStatusCode"] = dbus.MakeVariant(int32(1))
+		return b
+	}
+	// held is the networks wpa_supplicant holds after the calls the
+	// driver made.
+	held := func(b *fakeBus) map[dbus.ObjectPath]bool {
+		out := map[dbus.ObjectPath]bool{working: true}
+		for _, c := range b.callsCopy() {
+			switch c.method {
+			case ifaceInterface + ".AddNetwork":
+				out[fakeNetwork] = true
+			case ifaceInterface + ".RemoveNetwork":
+				if p, ok := c.args[0].(dbus.ObjectPath); ok {
+					delete(out, p)
+				}
+			}
+		}
+		return out
+	}
+
+	t.Run("failure", func(t *testing.T) {
+		t.Parallel()
+		b := newBus()
+		b.onSelect = func(b *fakeBus, n int) {
+			if n == 1 { // the join of the new network fails
+				b.setStateLocked("associating")
+				b.setStateLocked(stateDisconnected)
+			}
+		}
+		d, _ := startDriver(t, b, Options{})
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("new"), []byte(testCredential)); status == statusSuccess {
+			t.Fatalf("the join succeeded: %q", debug)
+		}
+		if h := held(b); len(h) != 1 || !h[working] {
+			t.Fatalf("after the failed join wpa_supplicant holds %v, want only the network it was on (%s); calls: %v", h, working, b.called())
+		}
+		var selected []dbus.ObjectPath
+		for _, c := range b.callsCopy() {
+			if c.method == ifaceInterface+".SelectNetwork" {
+				selected = append(selected, c.args[0].(dbus.ObjectPath))
+			}
+		}
+		if !slices.Equal(selected, []dbus.ObjectPath{fakeNetwork, working}) {
+			t.Errorf("SelectNetwork %v, want the new network and then the one it was on again", selected)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+		b := newBus()
+		d, _ := startDriver(t, b, Options{})
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("new"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q", status, debug)
+		}
+		if h := held(b); len(h) != 1 || !h[fakeNetwork] {
+			t.Errorf("after the join wpa_supplicant holds %v, want only the joined network; calls: %v", h, b.called())
+		}
+	})
 }

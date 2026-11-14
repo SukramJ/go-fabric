@@ -18,9 +18,13 @@
 // the interface's State. The network list, its rules, the fail-safe
 // revert and the store stay in the cluster (cluster/core).
 //
+// A join keeps the network that was current until it has ended: a join
+// that fails removes the network it added and selects the one it was on
+// again, a join that succeeds removes the one it was on.
+//
 // What it does not do, on purpose: it saves nothing into wpa_supplicant's
-// configuration (the node's store holds the committed network and rejoins
-// it at start, so the credential lives in one place); it runs no DHCP
+// configuration (the node's store holds the committed network and the
+// cluster rejoins it, so the credential lives in one place); it runs no DHCP
 // client (addressing is the host's network stack's; Matter needs the IPv6
 // link-local address the kernel configures); no per-device credentials
 // (PDC), no access-point mode, no Wi-Fi PAF.

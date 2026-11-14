@@ -200,8 +200,10 @@ func (a *attempt) next() (string, bool) {
 // the host builds a new Driver.
 const debugBusGone = "the driver's bus connection is gone"
 
-// removeTimeout bounds the RemoveNetwork of a failed join's network, which
-// runs after the join's own context may have ended.
+// removeTimeout bounds each call that ends a join — the RemoveNetwork of
+// a failed join's network, the SelectNetwork of the network it was on
+// before, the RemoveNetwork of that one after a join that succeeded —
+// which run after the join's own context may have ended.
 const removeTimeout = 2 * time.Second
 
 // newDriver brings the interface up over b and starts following its
@@ -525,9 +527,8 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 // at 6170af84: ConnectWiFiNetworkAsync (:914-943; one join at a time,
 // :932; the network {ssid, psk, key_mgmt "SAE WPA-PSK"}, :936-940) and
 // _ConnectWiFiNetworkAsync (:852-911): a disabled interface fails
-// (WpaSupplicantClient.cpp:209-214), a CurrentNetwork other than "/" is
-// removed first (:861-877), then AddNetwork, Disconnect with its errors
-// ignored (:892-895) and SelectNetwork (:897-904). The verdict follows the
+// (WpaSupplicantClient.cpp:209-214), then AddNetwork, Disconnect with its
+// errors ignored (:892-895) and SelectNetwork (:897-904). The verdict follows the
 // interface's State (_OnWpaPropertiesChanged, :287-418): "associating"
 // starts the attempt (:297-300); "completed" after it is Success
 // (:402-416); "disconnected" after it fails with UnknownError and the
@@ -537,11 +538,16 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 // it with UnknownError and errorValue 0.
 //
 // The attempt follows the State changes from SelectNetwork on only
-// ([Driver.listen]). A join that does not end in Success removes the
-// network it added ([Driver.removeAdded]); connectedhomeip keeps it. The
-// network's arguments are [networkArgs]'s. The committed network is not
-// saved into wpa_supplicant's configuration (no SaveConfig): the node's
-// store keeps it and the cluster rejoins it at start.
+// ([Driver.listen]). connectedhomeip removes a CurrentNetwork other than
+// "/" before it adds the new one (:861-877); here that network is kept
+// until the join has ended: a join that ends in Success removes it then,
+// and a join that does not removes the network it added
+// ([Driver.removeAdded]; connectedhomeip keeps it) and selects the kept
+// one again ([Driver.restore]), so a failed join leaves wpa_supplicant on
+// the network it was on (review II, R2-P3-net-01). The network's
+// arguments are [networkArgs]'s. The committed network is not saved into
+// wpa_supplicant's configuration (no SaveConfig): the node's store keeps
+// it and the cluster rejoins it.
 func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (status uint8, debugText string, errorValue int32) {
 	d.mu.Lock()
 	switch {
@@ -569,7 +575,7 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 	defer cancel()
 
 	ssidAttr := slog.String("ssid", fmt.Sprintf("%q", ssid))
-	network, debugText := d.addNetwork(ctx, ssid, credentials, ssidAttr)
+	network, prev, debugText := d.addNetwork(ctx, ssid, credentials, ssidAttr)
 	if debugText != "" {
 		return statusUnknown, debugText, 0
 	}
@@ -577,17 +583,22 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 	a, debugText := d.listen(ctx)
 	if a == nil {
 		d.removeAdded(ctx, network)
+		d.restore(ctx, prev)
 		return statusUnknown, debugText, 0
 	}
 	defer close(a.done)
 	if err := d.selectNetwork(ctx, network); err != nil {
 		d.removeAdded(ctx, network)
+		d.restore(ctx, prev)
 		return statusUnknown, "select network: " + errName(err), 0
 	}
 	status, debugText, errorValue = d.await(ctx, a, network, ssidAttr)
 	if status != statusSuccess {
 		d.removeAdded(ctx, network)
+		d.restore(ctx, prev)
+		return status, debugText, errorValue
 	}
+	d.removePrevious(ctx, prev)
 	return status, debugText, errorValue
 }
 
@@ -647,28 +658,60 @@ func (d *Driver) removeAdded(ctx context.Context, network dbus.ObjectPath) {
 	d.log.Debug("wpasupplicant: removed the network of a failed join", slog.String("path", string(network)))
 }
 
+// restore selects prev — the network that was current before a join that
+// did not end in Success — again, so wpa_supplicant goes back to it; ""
+// when there was none. It runs after the added network was removed, on a
+// context of its own as [Driver.removeAdded] does; a failure is logged by
+// its D-Bus error name.
+func (d *Driver) restore(ctx context.Context, prev dbus.ObjectPath) {
+	if prev == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	if err := d.selectNetwork(ctx, prev); err != nil {
+		d.log.Warn("wpasupplicant: failed to select the network of before a failed join", slog.String("path", string(prev)), slog.String("reason", errName(err)))
+		return
+	}
+	d.log.Info("wpasupplicant: selected the network of before a failed join again", slog.String("path", string(prev)))
+}
+
+// removePrevious removes prev — the network that was current before a
+// join that ended in Success — so wpa_supplicant holds the joined network
+// only, as connectedhomeip's removal of the current network before a join
+// leaves it (:861-877); "" when there was none. A failure is logged.
+func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
+	if prev == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", prev); err != nil {
+		d.log.Warn("wpasupplicant: failed to remove the network of before the join", slog.String("path", string(prev)), slog.String("reason", errName(err)))
+		return
+	}
+	d.log.Debug("wpasupplicant: removed network", slog.String("path", string(prev)))
+}
+
 // addNetwork hands the network to wpa_supplicant: the part of
-// ConnectNetwork before the State walk. A non-empty debugText is the
-// failure; then nothing was added.
-func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network dbus.ObjectPath, debugText string) {
+// ConnectNetwork before the State walk. prev is the interface's
+// CurrentNetwork, kept until the join has ended ("" when none). A
+// non-empty debugText is the failure; then nothing was added.
+func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network, prev dbus.ObjectPath, debugText string) {
 	args, refusal := networkArgs(ssid, credentials)
 	if refusal != "" {
 		d.log.Warn("wpasupplicant: network refused", slog.String("reason", refusal))
-		return "", refusal
+		return "", "", refusal
 	}
 	if v, err := d.property(ctx, "State"); err == nil {
 		if s, _ := v.Value().(string); s == stateInterfaceDisabled {
 			d.log.Warn("wpasupplicant: the Wi-Fi interface is disabled (blocked)")
-			return "", "the Wi-Fi interface is disabled"
+			return "", "", "the Wi-Fi interface is disabled"
 		}
 	}
 	if v, err := d.property(ctx, "CurrentNetwork"); err == nil {
 		if cur, _ := v.Value().(dbus.ObjectPath); cur != "" && cur != "/" {
-			if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", cur); err != nil {
-				d.log.Warn("wpasupplicant: failed to remove the current network", slog.Any("err", err))
-				return "", "remove network: " + errName(err)
-			}
-			d.log.Debug("wpasupplicant: removed network", slog.String("path", string(cur)))
+			prev = cur
 		}
 	}
 	// The one call that carries the credential: neither its arguments nor
@@ -680,10 +723,10 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 	}
 	if err != nil {
 		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("reason", errName(err)))
-		return "", "add network: " + errName(err)
+		return "", "", "add network: " + errName(err)
 	}
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
-	return network, ""
+	return network, prev, ""
 }
 
 // await follows the interface's State to the join's verdict.

@@ -194,7 +194,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	case ifaceInterface + ".AddNetwork":
 		return []any{fakeNetwork}, nil
 	case ifaceInterface + ".RemoveNetwork":
-		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		if cur, _ := b.props["CurrentNetwork"].Value().(dbus.ObjectPath); cur == args[0] {
+			b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		}
 	case ifaceInterface + ".Disconnect":
 		if b.onDisconnect != nil {
 			b.onDisconnect(b)
