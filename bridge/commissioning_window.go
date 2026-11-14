@@ -33,14 +33,12 @@ type FailSafeChecker interface {
 }
 
 // FailSafeArmer was the hook CommissioningWindow armed the fail-safe
-// through when a window opened.
-//
-// Deprecated: a window arms no fail-safe (owner decision 47; matter.js
-// AdministratorCommissioningServer.ts openCommissioningWindow starts the
-// window only, at db021da0) — the commissioner's ArmFailSafe or the 60 s
-// arm of its PASE session does. Wire a [FailSafeExpirer] with
-// [CommissioningWindow.SetFailSafeExpirer]; the window never calls
-// ArmFailSafeFor.
+// through when a window opened. A window arms no fail-safe any more (owner
+// decision 47; matter.js AdministratorCommissioningServer.ts
+// openCommissioningWindow starts the window only, at db021da0) — the
+// commissioner's ArmFailSafe or the 60 s arm of its PASE session does — so
+// the window never calls ArmFailSafeFor; [CommissioningWindow.SetFailSafeArmer]
+// keeps wiring an armer that is a [FailSafeExpirer] as one.
 type FailSafeArmer interface {
 	ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error
 }
@@ -234,10 +232,9 @@ func (w *CommissioningWindow) SetFailSafeChecker(c FailSafeChecker) {
 }
 
 // SetFailSafeArmer wires a as the window's [FailSafeExpirer] when it is
-// one (core.GeneralCommissioning is), and clears it otherwise.
-//
-// Deprecated: the window arms no fail-safe (owner decision 47); use
-// [CommissioningWindow.SetFailSafeExpirer].
+// one (core.GeneralCommissioning is), and clears it otherwise; the window
+// arms no fail-safe (owner decision 47). [CommissioningWindow.SetFailSafeExpirer]
+// is the direct wiring.
 func (w *CommissioningWindow) SetFailSafeArmer(a FailSafeArmer) {
 	e, _ := a.(FailSafeExpirer)
 	w.SetFailSafeExpirer(e)

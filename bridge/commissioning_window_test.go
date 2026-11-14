@@ -287,12 +287,12 @@ func TestCommissioningWindowOpener_SecondOpen_ReturnsAlreadyOpen(t *testing.T) {
 
 // TestCommissioningWindow_FailSafeArmer_CalledOnOpen pins owner decision
 // 47: a successful window open arms no fail-safe — the armer a host still
-// wires through the deprecated SetFailSafeArmer is never called.
+// wires through SetFailSafeArmer is never called.
 func TestCommissioningWindow_FailSafeArmer_CalledOnOpen(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{}
-	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
+	w.SetFailSafeArmer(armer)
 
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
@@ -310,7 +310,7 @@ func TestCommissioningWindow_FailSafeArmer_NotCalledWhenWindowRejected(t *testin
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{}
-	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
+	w.SetFailSafeArmer(armer)
 
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
@@ -333,7 +333,7 @@ func TestCommissioningWindow_FailSafeArmer_ArmErrorDoesNotAbortWindow(t *testing
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{err: errors.New("fail-safe arm failed")}
-	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
+	w.SetFailSafeArmer(armer)
 
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
@@ -779,13 +779,13 @@ func (a *expiringArmer) ExpireFailSafeArmedOverPASE(context.Context) { a.expired
 
 // TestCommissioningWindow_RevokeExpiresTheFailSafe pins Matter §11.19.8.3
 // step 1: RevokeWindow expires the PASE-armed fail-safe with its cleanup
-// through the deprecated SetFailSafeArmer wiring too, when the armer is an
+// through the SetFailSafeArmer wiring too, when the armer is an
 // expirer (TC-CGEN-2.4).
 func TestCommissioningWindow_RevokeExpiresTheFailSafe(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	a := &expiringArmer{}
-	w.SetFailSafeArmer(a) //nolint:staticcheck // the deprecated wiring keeps wiring the expirer
+	w.SetFailSafeArmer(a)
 	_ = w.RevokeWindow(context.Background())
 	if a.expired.Load() != 1 || a.armed.Load() != 0 {
 		t.Fatalf("expired %d, disarmed %d; want one expiry", a.expired.Load(), a.armed.Load())

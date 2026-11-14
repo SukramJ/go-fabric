@@ -22,7 +22,7 @@ func windowOverGC(t *testing.T) (*bridge.CommissioningWindow, *core.GeneralCommi
 		t.Fatal(err)
 	}
 	w := bridge.NewCommissioningWindow()
-	w.SetFailSafeArmer(gc) //nolint:staticcheck // the node's wiring at the time of the test
+	w.SetFailSafeArmer(gc)
 	return w, gc
 }
 
