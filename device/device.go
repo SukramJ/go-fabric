@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -354,7 +355,8 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// The default selection is the device type's mandated features and the
 	// features the cluster itself marks mandatory ("M"), which
 	// spec.CheckFeatures demands of every selection — EnergyEvse's PREF
-	// (owner's decision, 2026-10-11).
+	// (owner's decision, 2026-10-11) — and the ones matter.js's default
+	// server enables ([serverEnabledFeatures]).
 	features, err := selection(t, r, s)
 	if err != nil {
 		return nil, err
@@ -453,7 +455,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 // selection, which must hold the type's — without the bits the surface
 // policies removed (compose).
 func selection(t *Type, r *ClusterRequirement, s *settings) (uint32, error) {
-	features := r.Features | clusterMandatedFeatures(r.Definition)
+	features := defaultSelection(r)
 	if sel, ok := s.features[r.ID]; ok {
 		if missing := r.Features &^ sel; missing != 0 {
 			return 0, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
@@ -539,6 +541,26 @@ func (o ownEndpointList) MatterAttribute(attrID uint32) (any, bool) {
 		return []uint16{n}, true
 	}
 	return []uint16{}, true
+}
+
+// serverEnabledFeatures are the features matter.js's default server of a
+// cluster enables as its own implementation decision, beyond the ones the
+// conformance mandates: BooleanStateServer enables ChangeEvent, so
+// StateChange is served and emitted as it was before Matter 1.6 gated it
+// behind the feature (packages/node/src/behaviors/boolean-state/
+// BooleanStateServer.ts:11-13 at db021da0; the INTENTIONALLY_ENABLED
+// table of packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts:27-37).
+// They join the default selection only: a host's selection replaces it.
+var serverEnabledFeatures = map[uint32]uint32{
+	booleanstatedef.ClusterID: uint32(booleanstatedef.FeatureChangeEvent),
+}
+
+// defaultSelection is the feature selection of r's default server when
+// the host selects none: the device type's mandated features, the
+// cluster's own "M" ones and the ones matter.js's default server enables
+// ([serverEnabledFeatures]).
+func defaultSelection(r *ClusterRequirement) uint32 {
+	return r.Features | clusterMandatedFeatures(r.Definition) | serverEnabledFeatures[r.ID]
 }
 
 // clusterMandatedFeatures is the FeatureMap of the features whose own

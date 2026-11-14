@@ -308,7 +308,7 @@ cluster is declared with `<cluster>def.Declare` of its generated package
 | `Declare` field | Effect |
 | --- | --- |
 | `Initial` | initial state over the device type's defaults; an optional attribute with a value is served |
-| `Features` | the cluster's feature selection (zero is the device type's) |
+| `Features` | the cluster's feature selection (zero is the default: the device type's mandated features and the ones matter.js's default server enables — ChangeEvent on BooleanState) |
 | `OnWrite` | a veto on a controller's write |
 | `Handle<Command>` | your handler in place of the server's own (an optional command is then accepted) |
 | a host port (`Sink`, `LevelSource`, `Mover`, …) | the device the kit's server drives |

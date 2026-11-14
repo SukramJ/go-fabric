@@ -192,7 +192,8 @@ func aheadRows() []string {
 
 // defaultCandidates are the feature and element candidates of the default
 // server [defaultServer] builds for r: the bits of its feature selection —
-// the device type's and the cluster's mandated features, or the host's
+// the device type's and the cluster's mandated features and the ones
+// matter.js's default server enables ([defaultSelection]), or the host's
 // selection — and the elements the device type mandates and the
 // declarations add. A feature is mandatory when the device type mandates
 // it or the selection without it fails spec.CheckFeatures; an element when
@@ -202,8 +203,9 @@ func aheadRows() []string {
 func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface.Element {
 	def := r.Definition
 	mandated := clusterMandatedFeatures(def)
-	features := r.Features | mandated
-	if sel, ok := s.features[r.ID]; ok {
+	features := defaultSelection(r)
+	sel, selected := s.features[r.ID]
+	if selected {
 		features = sel
 	}
 	ahead := aheadByCluster[r.ID]
@@ -219,6 +221,8 @@ func defaultCandidates(r *ClusterRequirement, s *settings, key string) []surface
 			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
 		case mandated&bit != 0:
 			el.Provenance, el.Mandatory = surface.ProvenanceClusterMandatory, true
+		case !selected && serverEnabledFeatures[r.ID]&bit != 0:
+			el.Provenance = surface.ProvenanceKitDefault
 		default:
 			el.Mandatory = spec.CheckFeatures(def, features&^bit) != nil
 		}

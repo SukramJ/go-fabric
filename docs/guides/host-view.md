@@ -191,7 +191,10 @@ or a server of the host's own — and declaring an optional cluster mounts
 it.
 
 `device.NewContactSensor` mounts BooleanState, whose `StateValue` the host
-owns: `true` is closed. The declaration states the value at start.
+owns: `true` is closed. The declaration states the value at start. The
+server selects ChangeEvent unless the declaration selects otherwise, as
+matter.js's BooleanStateServer does, so every change of `StateValue` emits
+StateChange.
 
 `light.OnOff().OnChanged` sees every change of the light's OnOff, with the
 new state and a `contract.Change` — the same for every kit server, a
