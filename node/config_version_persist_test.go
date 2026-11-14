@@ -54,8 +54,8 @@ func TestIncreaseConfigurationVersionsPersistsUnderACancelledContext(t *testing.
 	}
 }
 
-// failingSettings is a credential store whose SetSetting fails once fail
-// is set.
+// failingSettings is a credential store whose SetSetting and SetSettings
+// fail once fail is set.
 type failingSettings struct {
 	store.Port
 	fail atomic.Bool
@@ -68,6 +68,13 @@ func (s *failingSettings) SetSetting(ctx context.Context, key, value string) err
 		return errSettingRefused
 	}
 	return s.Port.SetSetting(ctx, key, value)
+}
+
+func (s *failingSettings) SetSettings(ctx context.Context, values map[string]string) error {
+	if s.fail.Load() {
+		return errSettingRefused
+	}
+	return s.Port.SetSettings(ctx, values)
 }
 
 // TestIncreaseConfigurationVersionsReturnsAFailedWrite: a raised version

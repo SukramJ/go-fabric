@@ -52,6 +52,20 @@ func (c *countingStore) SetSetting(ctx context.Context, key, value string) error
 	return c.Port.SetSetting(ctx, key, value)
 }
 
+func (c *countingStore) SetSettings(ctx context.Context, values map[string]string) error {
+	for key := range values {
+		for _, p := range announcementKeys {
+			if strings.HasPrefix(key, p) {
+				c.mu.Lock()
+				c.writes = append(c.writes, key)
+				c.mu.Unlock()
+				break
+			}
+		}
+	}
+	return c.Port.SetSettings(ctx, values)
+}
+
 func (c *countingStore) take() []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
