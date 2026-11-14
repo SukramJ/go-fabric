@@ -65,6 +65,31 @@ type Parameters struct {
 	MaxTCPMessageSize uint32 // [9]
 }
 
+// MaxUnauthenticatedInterval is the largest SessionIdleInterval and
+// SessionActiveInterval, in milliseconds, a node adopts from a peer that
+// has not authenticated: one hour, the bound this module already puts on
+// the intervals it advertises (mdns/service.go:726, maxAdvertisedInterval).
+// The active threshold needs no bound: its field is 16 bits wide.
+//
+// Neither reference bounds what an unauthenticated peer states (review II,
+// owner decision 45; this module's own rule): a stated 0xFFFFFFFF ms
+// would otherwise pace a handshake's retransmissions — and the wait for
+// their acknowledgement — over weeks.
+const MaxUnauthenticatedInterval uint32 = 3_600_000
+
+// ClampUnauthenticated returns p with SessionIdleInterval and
+// SessionActiveInterval reduced to [MaxUnauthenticatedInterval]; every
+// other field, and an interval within the bound or not stated, is kept.
+// It is for the parameters of a peer that has not authenticated, at the
+// point a node adopts them for the handshake's own session; the
+// parameters a secure session is established with are the peer's as
+// stated.
+func ClampUnauthenticated(p Parameters) Parameters {
+	p.SessionIdleInterval = min(p.SessionIdleInterval, MaxUnauthenticatedInterval)
+	p.SessionActiveInterval = min(p.SessionActiveInterval, MaxUnauthenticatedInterval)
+	return p
+}
+
 // IsEmpty reports whether no field is stated. An empty structure is
 // omitted on the wire so the peer behaves as if none was supplied.
 func (p Parameters) IsEmpty() bool {

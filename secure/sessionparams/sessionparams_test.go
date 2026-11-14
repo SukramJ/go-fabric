@@ -180,3 +180,30 @@ func TestDecodeIgnoresNonContextTagsAndDeepNesting(t *testing.T) {
 		t.Fatal("truncated nested container decoded without error")
 	}
 }
+
+// TestClampUnauthenticated: an unauthenticated peer's intervals above one
+// hour are reduced to one hour; values within the bound, a field not
+// stated and every other field are kept (review II, owner decision 45).
+func TestClampUnauthenticated(t *testing.T) {
+	t.Parallel()
+	in := sessionparams.Parameters{
+		SessionIdleInterval:    0xFFFFFFFF,
+		SessionActiveInterval:  sessionparams.MaxUnauthenticatedInterval + 1,
+		SessionActiveThreshold: 0xFFFF,
+		SpecificationVersion:   0x01060100,
+	}
+	got := sessionparams.ClampUnauthenticated(in)
+	want := in
+	want.SessionIdleInterval = sessionparams.MaxUnauthenticatedInterval
+	want.SessionActiveInterval = sessionparams.MaxUnauthenticatedInterval
+	if got != want {
+		t.Fatalf("clamped %+v, want %+v", got, want)
+	}
+	within := sessionparams.Parameters{SessionIdleInterval: 500, SessionActiveInterval: sessionparams.MaxUnauthenticatedInterval}
+	if got := sessionparams.ClampUnauthenticated(within); got != within {
+		t.Fatalf("within the bound %+v, want %+v", got, within)
+	}
+	if got := sessionparams.ClampUnauthenticated(sessionparams.Parameters{}); !got.IsEmpty() {
+		t.Fatalf("not stated %+v", got)
+	}
+}

@@ -55,6 +55,9 @@ type Session struct {
 	// created (ExchangeManager.ts:261-264): nodeID is the peer's, and our
 	// messages name it as their destination.
 	inbound bool
+	// lifetime closes an inbound session [inboundUnsecuredLifetime] after
+	// it was opened; guarded by the manager's mu.
+	lifetime Timer
 
 	// mu guards the session's mutable state: every field below it (address,
 	// parameters, timestamps, the open exchanges, closed, peerLost and
@@ -218,8 +221,13 @@ func (s *Session) ReportedParameters() *sessionparams.Parameters {
 // states, the fallback for each one it does not — matter.js
 // Session.ts:249-254 (set timingParameters), which the handshakes call
 // when the responder's parameters arrive (PaseClient.ts:163-165,
-// CaseClient.ts:245-247).
+// CaseClient.ts:245-247). The peer has not authenticated when it states
+// them, so each interval is clamped to
+// [sessionparams.MaxUnauthenticatedInterval] — ahead of matter.js (review
+// II, owner decision 45); the secure session the handshake establishes
+// takes the parameters as stated.
 func (s *Session) SetTimingParameters(p sessionparams.Parameters) {
+	p = sessionparams.ClampUnauthenticated(p)
 	i := sessionparams.Parameters{
 		SessionIdleInterval:    orU32(p.SessionIdleInterval, FallbackIdleInterval),
 		SessionActiveInterval:  orU32(p.SessionActiveInterval, FallbackActiveInterval),

@@ -140,7 +140,13 @@ type Manager struct {
 	checkIn   CheckInReceiver
 	sessions  map[uint16]*Session
 	unsecured map[uint64]*Session
-	exchanges map[uint32]*Exchange
+	// inboundOrder is the inbound unsecured sessions, oldest first
+	// ([maxInboundUnsecuredSessions]); ackWaits the messages sent on them
+	// that wait for an acknowledgement, oldest first
+	// ([inboundUnsecuredAckWaitLimit]).
+	inboundOrder []*Session
+	ackWaits     []ackWait
+	exchanges    map[uint32]*Exchange
 	// channels and channelAddrs are the attached channels by the address
 	// that names them and back (channel.go).
 	channels       map[*net.UDPAddr]Channel
@@ -303,10 +309,16 @@ func (m *Manager) handler(protocol uint16) ProtocolHandler {
 // session draws a random ephemeral node id, sends with the global
 // unencrypted counter and counts the peer as idle until it answers —
 // matter.js SessionManager.ts:418-458 (createUnsecuredSession) and
-// UnsecuredSession.ts:26-34.
+// UnsecuredSession.ts:26-34. The peer's intervals are clamped to
+// [sessionparams.MaxUnauthenticatedInterval]: nothing has authenticated
+// them (review II, owner decision 45).
 func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Parameters) (*Session, error) {
 	if addr == nil {
 		return nil, errors.New("exchange: nil peer address")
+	}
+	if peer != nil {
+		clamped := sessionparams.ClampUnauthenticated(*peer)
+		peer = &clamped
 	}
 	s := &Session{
 		m:         m,
@@ -495,6 +507,12 @@ func (m *Manager) forget(s *Session) {
 	if s.secure == nil {
 		if m.unsecured[s.nodeID] == s {
 			delete(m.unsecured, s.nodeID)
+		}
+		if s.inbound {
+			m.inboundOrder = slices.DeleteFunc(m.inboundOrder, func(o *Session) bool { return o == s })
+			if s.lifetime != nil {
+				s.lifetime.Stop()
+			}
 		}
 		return
 	}
@@ -784,15 +802,97 @@ func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Sess
 	s.timestamp = m.clock.Now()
 	s.createdAt = s.timestamp
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.closed {
+		m.mu.Unlock()
 		return nil
 	}
 	if _, taken := m.unsecured[s.nodeID]; taken {
+		m.mu.Unlock()
 		return nil
 	}
+	var evicted *Session
+	if len(m.inboundOrder) >= maxInboundUnsecuredSessions {
+		evicted = m.inboundOrder[0]
+		m.inboundOrder = slices.Delete(m.inboundOrder, 0, 1)
+	}
 	m.unsecured[s.nodeID] = s
+	m.inboundOrder = append(m.inboundOrder, s)
+	s.lifetime = m.clock.AfterFunc(inboundUnsecuredLifetime, s.Close)
+	m.mu.Unlock()
+	if evicted != nil {
+		m.log.Warn("matter.controller.unsecured_session_evicted", slog.Uint64("node_id", evicted.nodeID),
+			slog.String("reason", "too many sessions opened by unauthenticated peers"))
+		evicted.Close()
+	}
 	return s
+}
+
+// The bounds on what peers that have not authenticated can make the
+// controller hold — the sessions their initiating messages open, the
+// messages sent on those that wait for an acknowledgement, and how long
+// such a session lives. Neither reference bounds them (review II,
+// R2-P2-alloc-02, owner decision 45: the controller takes the device
+// side's policy, this module's own rule). Each bound evicts the oldest
+// entry and never touches a secure session or an unsecured session this
+// node opened.
+const (
+	// maxInboundUnsecuredSessions is how many inbound unsecured sessions
+	// are held; the next one closes the oldest. The number is the device
+	// side's bound on per-source state of unauthenticated traffic
+	// (bridge/securechannel.go:518, maxUnsecuredWindows). A flood that
+	// fills it within one handshake's round trips closes that handshake;
+	// one that fills it more slowly costs a legitimate peer nothing.
+	maxInboundUnsecuredSessions = 256
+	// inboundUnsecuredAckWaitLimit is how many messages on inbound
+	// unsecured sessions wait for their acknowledgement; the next one ends
+	// the oldest wait — the message went out, it loses its retransmissions
+	// and nothing else, and its send returns as if acknowledged. The
+	// number and the rule are the device side's unsecured retransmit
+	// table (bridge/outbound_reliable.go:296, unsecuredEntryLimit). A
+	// flood that ends a legitimate handshake's wait costs it a lost
+	// datagram's retransmission only.
+	inboundUnsecuredAckWaitLimit = 16
+	// inboundUnsecuredLifetime is how long an inbound unsecured session
+	// lives, whatever its handshake waits for: the device side's lifetime
+	// of a message on the unsecured session (bridge/outbound_reliable.go:312,
+	// unsecuredEntryLifetime, matter.js's PASE_PAIRING_TIMEOUT at
+	// PaseServer.ts:33 as cited there).
+	inboundUnsecuredLifetime = 60 * time.Second
+)
+
+// ackWait is a message on an inbound unsecured session that waits for its
+// acknowledgement.
+type ackWait struct {
+	x *Exchange
+	p *pending
+}
+
+// holdAckWait counts p, sent on x, against [inboundUnsecuredAckWaitLimit]
+// while its send waits for the acknowledgement, ending the oldest wait at
+// the limit; the returned func releases the place. A message on any other
+// session is not counted.
+func (m *Manager) holdAckWait(x *Exchange, p *pending) (release func()) {
+	if x.session.secure != nil || !x.session.inbound {
+		return func() {}
+	}
+	m.mu.Lock()
+	m.ackWaits = append(m.ackWaits, ackWait{x: x, p: p})
+	var evicted []ackWait
+	if over := len(m.ackWaits) - inboundUnsecuredAckWaitLimit; over > 0 {
+		evicted = slices.Clone(m.ackWaits[:over])
+		m.ackWaits = slices.Delete(m.ackWaits, 0, over)
+	}
+	m.mu.Unlock()
+	for _, e := range evicted {
+		m.log.Warn("matter.controller.unsecured_ack_wait_evicted", slog.Uint64("node_id", e.x.session.nodeID), slog.Int("exchange_id", int(e.x.id)),
+			slog.String("reason", "too many messages to unauthenticated peers wait for an acknowledgement"))
+		e.x.dropPending(e.p)
+	}
+	return func() {
+		m.mu.Lock()
+		m.ackWaits = slices.DeleteFunc(m.ackWaits, func(e ackWait) bool { return e.p == p })
+		m.mu.Unlock()
+	}
 }
 
 // releaseInbound closes an inbound session no exchange holds —

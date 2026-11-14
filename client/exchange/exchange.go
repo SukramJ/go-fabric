@@ -477,7 +477,9 @@ func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts 
 	}
 	x.mu.Unlock()
 	if err == nil && p != nil {
+		release := x.m.holdAckWait(x, p)
 		err = x.awaitAck(ctx, p, opts.ExpectAckOnly, opts.AckWaitAbort)
+		release()
 	}
 	if err != nil && x.reportsPeerLoss(opts.SuppressPeerLoss) && (errors.Is(err, ErrTransient) || errors.Is(err, ErrNetwork)) {
 		x.m.exchangePeerLost(x, err)
@@ -617,6 +619,20 @@ func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool,
 		x.mu.Unlock()
 		return ctx.Err()
 	}
+}
+
+// dropPending ends p's wait as an acknowledgement would, without one: it
+// is retransmitted no more, no longer pending for Close, and its send
+// returns nil ([Manager.holdAckWait]).
+func (x *Exchange) dropPending(p *pending) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.sentToAck == p {
+		x.stopRetransTimerLocked()
+		x.retransCount = 0
+		x.sentToAck = nil
+	}
+	p.resolve(nil, nil)
 }
 
 // endAckWaitLocked ends the ack wait of p: it stays pending for Close but
