@@ -1429,8 +1429,10 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 // non-nil — the node's own window (at Start and after the last fabric is
 // removed), [Node.OpenBasicWindow], the host's opener and both
 // AdministratorCommissioning commands of a paired controller, which
-// answer FAILURE — and revokes a window that is open; controllers already
-// paired keep working. nil lifts the block and, on a node without a
+// answer FAILURE — and ends a commissioning under way, as
+// RevokeCommissioning does: the PASE sessions close, the fail-safe armed
+// over PASE expires and an open window is revoked, whether or not a window
+// is still open; controllers already paired keep working. nil lifts the block and, on a node without a
 // fabric, reopens its own window at once. A host that cannot serve the
 // attestation chain it was configured with calls it before [Node.Start].
 // See [bridge.CommissioningWindow.SetBlocked]; matter.js has no
