@@ -799,15 +799,16 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 }
 
 // CloseEndpoint terminates every subscription that contains at least
-// one AttributePath or EventPath targeting endpointID. Called after a
-// topology Reassemble removes an endpoint so that the engine stops
-// ticking subscriptions that can never match a live cluster again.
+// one AttributePath or EventPath targeting endpointID and returns how
+// many it closed.
 //
-// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
-// lifecycle: when a BridgedNode endpoint is
-// removed from the Aggregator the outer bridge calls
-// `endpoint.lifecycle.remove()` which causes any subscription targeting
-// that endpoint to be closed by the InteractionServer.
+// Deprecated: nothing in this module calls it any more. A Reassemble
+// that removes an endpoint ends no subscription — the paths naming the
+// endpoint select nothing from then on — as matter.js drops a removed
+// endpoint from its protocol collections only
+// (packages/node/src/node/integration/ProtocolService.ts:216-220 at
+// db021da0). Close a subscription with [Manager.Close]; CloseEndpoint is
+// removable in v0.23.0.
 func (m *Manager) CloseEndpoint(endpointID uint16) int {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)

@@ -68,7 +68,7 @@ func TestSubscriptionCloseReleasesBridgeRouting(t *testing.T) {
 		{"ClosePeer", func(m *subscription.Manager, _ uint32) { m.ClosePeer(1, 0xBEEF) }},
 		{"CloseFabric", func(m *subscription.Manager, _ uint32) { m.CloseFabric(1) }},
 		{"CloseFabricExcept", func(m *subscription.Manager, _ uint32) { m.CloseFabricExcept(1, 0) }},
-		{"CloseEndpoint", func(m *subscription.Manager, _ uint32) { m.CloseEndpoint(4) }},
+		{"CloseEndpoint", func(m *subscription.Manager, _ uint32) { m.CloseEndpoint(4) }}, //nolint:staticcheck // deprecated, still a close path while it exists
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

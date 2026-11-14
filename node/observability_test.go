@@ -93,10 +93,14 @@ func TestMetricsSubscriptionsActive(t *testing.T) {
 		t.Errorf("subscriptions.active = %d after a subscribe, want 1", v)
 	}
 	defer sub.Close()
-	// The device ends it (its endpoint's subscriptions close, as on a
-	// removal): the close hook sets the gauge back.
-	if n := pair.Device.Node().Subscriptions().CloseEndpoint(ep); n != 1 {
-		t.Fatalf("closed %d subscriptions", n)
+	// The device ends it: the close hook sets the gauge back.
+	subs := pair.Device.Node().Subscriptions()
+	open := subs.Snapshot()
+	if len(open) != 1 {
+		t.Fatalf("%d subscriptions open, want 1", len(open))
+	}
+	if err := subs.Close(open[0].ID); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 	if v, _ := m.GaugeValue(node.MetricSubscriptionsActive); v != 0 {
 		t.Errorf("subscriptions.active = %d after the close, want 0", v)

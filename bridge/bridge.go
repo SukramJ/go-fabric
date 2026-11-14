@@ -1401,32 +1401,12 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// (review II, R2-P1-rw-04).
 	b.reconcileQuiescers(prevTopology, topology)
 
-	// Reap subscriptions for endpoints that no longer exist in the new
-	// topology. Mirrors matter.js packages/node/src/node/ServerNode.ts
-	// / BridgedDeviceBasicInformation lifecycle where removing an endpoint
-	// tears down its active subscriptions via
-	// `endpoint.lifecycle.remove()` →
-	// packages/node/src/node/server/ServerSubscription.ts close().
-	if prevTopology != nil {
-		newIDs := make(map[uint16]bool, len(topology.Endpoints))
-		for _, ep := range topology.Endpoints {
-			if ep != nil {
-				newIDs[ep.ID] = true
-			}
-		}
-		if m := b.subscriptionManagerLocked(); m != nil {
-			for _, ep := range prevTopology.Endpoints {
-				if ep == nil || newIDs[ep.ID] {
-					continue
-				}
-				if reaped := m.CloseEndpoint(ep.ID); reaped > 0 {
-					b.logger.Info("matter.bridge.reassemble.endpoint_removed",
-						slog.Int("endpoint", int(ep.ID)),
-						slog.Int("subscriptions_reaped", reaped))
-				}
-			}
-		}
-	}
+	// A removed endpoint ends no subscription: the paths that name it
+	// select nothing from then on, and the subscription's other paths go
+	// on being reported. Mirrors matter.js
+	// packages/node/src/node/integration/ProtocolService.ts:216-220 at
+	// db021da0 (deleteEndpoint drops the endpoint from the protocol
+	// collections and nothing else; called at :314).
 
 	// Notify active subscribers that Descriptor.PartsList has changed
 	// on the endpoints that list the parts that moved. Mirrors
