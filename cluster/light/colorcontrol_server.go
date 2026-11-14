@@ -66,6 +66,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -166,6 +167,23 @@ type ColorControlServerConfig struct {
 	Clock clock.Clock
 	// Logger receives the server's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
+	// StartUpColorTemperatureMireds is the StartUpColorTemperatureMireds
+	// the server starts with — the host's persisted value (quality N); nil
+	// is null. With CT it is applied at start-up unless the server is
+	// Bridged or BootReason reports SoftwareUpdateCompleted: cropped to
+	// the physical range, a value other than the current colour
+	// temperature becomes ColorTemperatureMireds and switches the colour
+	// mode to it (matter.js ColorControlServer.ts:376-393
+	// initializeColorTemperature).
+	StartUpColorTemperatureMireds *uint16
+	// BootReason optionally returns the node's GeneralDiagnostics
+	// BootReason; StartUpColorTemperatureMireds is not applied after a
+	// software update (ColorControlServer.ts:379). nil applies it.
+	BootReason func() uint8
+	// Bridged marks a server on an endpoint under the Aggregator: matter.js
+	// does not apply StartUpColorTemperatureMireds there
+	// (ColorControlServer.ts:380, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+	Bridged bool
 }
 
 // CIEPoint is a point in the CIE 1931 colour space, X and Y in the
@@ -461,6 +479,13 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 	}
 	s.st.enhancedMode = mode
 	s.st.mode = colorModeOf(mode)
+	if cfg.StartUpColorTemperatureMireds != nil {
+		m := *cfg.StartUpColorTemperatureMireds
+		s.startUpMireds = &m
+	}
+	if s.has(ColorFeatureColorTemperature) {
+		s.initializeColorTemperature()
+	}
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
@@ -493,6 +518,37 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 	})
 	return s, nil
 }
+
+// initializeColorTemperature applies StartUpColorTemperatureMireds at
+// construction. Mirrors matter.js
+// packages/node/src/behaviors/color-control/ColorControlServer.ts:376-393
+// at db021da0 (initializeColorTemperature, run with the CT feature,
+// :364-366): not after a software update, not on an endpoint an
+// Aggregator owns; a non-null value, cropped to the physical range
+// (#cropColorTemperature), that differs from the cropped current value sets
+// ColorMode and EnhancedColorMode to ColorTemperatureMireds and
+// ColorTemperatureMireds to it. The server is being built: nothing is
+// reported.
+func (s *ColorControlServer) initializeColorTemperature() {
+	if s.cfg.Bridged || s.startUpMireds == nil {
+		return
+	}
+	if s.cfg.BootReason != nil && s.cfg.BootReason() == bootReasonSoftwareUpdateCompleted {
+		return
+	}
+	current := s.cropMireds(float64(s.st.mireds))
+	target := s.cropMireds(float64(*s.startUpMireds))
+	if target == current {
+		return
+	}
+	s.st.enhancedMode = ColorModeColorTemperature
+	s.st.mode = colorModeOf(ColorModeColorTemperature)
+	s.st.mireds = uint16(target) //nolint:gosec // cropped to the physical range, at most 0xFEFF
+}
+
+// bootReasonSoftwareUpdateCompleted is GeneralDiagnostics
+// BootReasonEnum.SoftwareUpdateCompleted.
+const bootReasonSoftwareUpdateCompleted = uint8(gddef.BootReasonSoftwareUpdateCompleted)
 
 // initialMode resolves cfg.InitialColorMode against the features.
 func (s *ColorControlServer) initialMode() (ColorMode, error) {
@@ -665,10 +721,11 @@ func (s *ColorControlServer) readColorPoint(attrID uint32) (any, bool) {
 // (UNSUPPORTED_ATTRIBUTE, UNSUPPORTED_WRITE, CONSTRAINT_ERROR — an Options
 // value with an undefined bit included, TC-CC-6.5 step 0a).
 //
-// StartUpColorTemperatureMireds is reported, never applied: a bridged
-// endpoint has no start-up of its own, the same reason matter.js gives for
-// skipping it on an Aggregator-owned endpoint (ColorControlServer.ts
-// initializeColorTemperature: `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+// A written StartUpColorTemperatureMireds takes effect at the next
+// start-up, where [ColorControlServerConfig.StartUpColorTemperatureMireds]
+// carries it back — not on a Bridged endpoint, where matter.js does not
+// apply it (ColorControlServer.ts:376-393 initializeColorTemperature:
+// `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
