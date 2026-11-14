@@ -305,7 +305,7 @@ func TestBridge_PaseInFlightSlotReleasedOnPake1Failure(t *testing.T) {
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePake1, firstExchange, false, 0), badPake1)
 
 	// The commissioner retries on a fresh exchange id.
-	if !b.claimPaseInFlight(firstExchange + 1) {
+	if !b.claimPaseInFlight(onExchange(firstExchange + 1)) {
 		t.Fatal("single-active-PASE slot still held after a failed Pake1; a retry would be refused as pase_busy")
 	}
 }
@@ -407,7 +407,7 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	const exchange = uint16(21)
-	if !b.claimPaseInFlight(exchange) {
+	if !b.claimPaseInFlight(scKey(exchange)) {
 		t.Fatal("claim failed")
 	}
 	failure := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
@@ -415,7 +415,7 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange+1, false, 0), failure)
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange, false, 0), success)
-	if b.claimPaseInFlight(exchange + 2) {
+	if b.claimPaseInFlight(onExchange(exchange + 2)) {
 		t.Fatal("a report on another exchange, or a success report, released the handshake")
 	}
 	if got := b.paseFailures.Load(); got != 0 {
@@ -425,7 +425,7 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 	if got := b.paseFailures.Load(); got != 1 {
 		t.Errorf("paseFailures = %d after the peer's failure report, want 1", got)
 	}
-	if !b.claimPaseInFlight(exchange + 2) {
+	if !b.claimPaseInFlight(onExchange(exchange + 2)) {
 		t.Fatal("the slot is still held after the commissioner aborted the handshake; its retry would be dropped as busy")
 	}
 }
@@ -479,7 +479,7 @@ func TestBridge_PaseInFlightSlotReleasedBeforePake3Reply(t *testing.T) {
 		t.Fatalf("no Pake3 reply: %v", err)
 	}
 	// The reply is read: the slot must already be free.
-	if !b.claimPaseInFlight(xid + 1) {
+	if !b.claimPaseInFlight(onExchange(xid + 1)) {
 		t.Fatal("single-active-PASE slot still held when the Pake3 reply arrived; the next PASE would be refused as pase_busy")
 	}
 	if err := <-done; err != nil {

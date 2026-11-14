@@ -164,7 +164,7 @@ func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
 	// waits for its acknowledgement, so the handshake's exchange is live.
 	_ = sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil)
 	failures := r.b.paseFailures.Load()
-	if !r.b.unsecuredExchangeLive(exchange) {
+	if !r.b.unsecuredExchangeLive(HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange}) {
 		t.Fatal("the handshake's exchange holds no state after its failure report")
 	}
 

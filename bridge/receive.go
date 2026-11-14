@@ -436,12 +436,13 @@ func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
 	}
 }
 
-// liveUnsecuredExchanges returns those of exchanges that hold handshake
-// state. The caller must not hold the window table's lock.
-func (b *Bridge) liveUnsecuredExchanges(exchanges []uint16) []uint16 {
+// liveUnsecuredExchanges returns those of source id's exchanges that hold
+// handshake state of that source. The caller must not hold the window
+// table's lock.
+func (b *Bridge) liveUnsecuredExchanges(id uint64, exchanges []uint16) []uint16 {
 	var live []uint16
 	for _, exchange := range exchanges {
-		if b.unsecuredExchangeLive(exchange) {
+		if b.unsecuredExchangeLive(HandshakeKey{InitiatorNodeID: id, ExchangeID: exchange}) {
 			live = append(live, exchange)
 		}
 	}
@@ -473,7 +474,7 @@ func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 	if !idle {
 		return
 	}
-	live := b.liveUnsecuredExchanges(exchanges)
+	live := b.liveUnsecuredExchanges(id, exchanges)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if cur, ok := t.entries[id]; !ok || cur != e || e.inUse != 0 || !slices.Equal(e.exchanges, exchanges) {
@@ -493,11 +494,11 @@ func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 func (b *Bridge) sweepUnsecuredWindows() {
 	t := &b.unsecuredWindows
 	t.mu.Lock()
-	idle := make(map[uint16]bool)
-	for _, e := range t.entries {
+	idle := make(map[HandshakeKey]bool)
+	for id, e := range t.entries {
 		if e.inUse == 0 {
 			for _, exchange := range e.exchanges {
-				idle[exchange] = false
+				idle[HandshakeKey{InitiatorNodeID: id, ExchangeID: exchange}] = false
 			}
 		}
 	}
@@ -505,8 +506,8 @@ func (b *Bridge) sweepUnsecuredWindows() {
 	if len(idle) == 0 {
 		return
 	}
-	for exchange := range idle {
-		idle[exchange] = b.unsecuredExchangeLive(exchange)
+	for key := range idle {
+		idle[key] = b.unsecuredExchangeLive(key)
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -516,7 +517,7 @@ func (b *Bridge) sweepUnsecuredWindows() {
 		}
 		held := false
 		for _, exchange := range e.exchanges {
-			if live, seen := idle[exchange]; !seen || live {
+			if live, seen := idle[HandshakeKey{InitiatorNodeID: id, ExchangeID: exchange}]; !seen || live {
 				held = true
 				break
 			}
@@ -527,22 +528,23 @@ func (b *Bridge) sweepUnsecuredWindows() {
 	}
 }
 
-// unsecuredExchangeLive reports whether the bridge still holds state of a
-// handshake on the unsecured session's exchangeID: a reply that waits for
-// its acknowledgement, the single-active-PASE claim within
-// [pasePairingTimeout], or the CASE responder's Sigma1 record that ends
-// with Sigma3 or the host's reaper ([Bridge.ForgetSigma1Replied]).
-func (b *Bridge) unsecuredExchangeLive(exchangeID uint16) bool {
+// unsecuredExchangeLive reports whether the bridge still holds state of the
+// handshake key names on the unsecured session — that initiator's, on that
+// exchange: a reply that waits for its acknowledgement, the
+// single-active-PASE claim within [pasePairingTimeout], or the CASE
+// responder's Sigma1 record that ends with Sigma3 or the host's reaper
+// ([Bridge.ForgetSigma1Replied]).
+func (b *Bridge) unsecuredExchangeLive(key HandshakeKey) bool {
 	b.mu.RLock()
 	tracker := b.outboundReliable
-	_, sigma1 := b.sigma1Replied[exchangeID]
-	pase := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange == exchangeID &&
+	_, sigma1 := b.sigma1Replied[key]
+	pase := !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
 		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
 	b.mu.RUnlock()
 	if sigma1 || pase {
 		return true
 	}
-	return tracker != nil && tracker.holdsUnsecuredExchange(exchangeID)
+	return tracker != nil && tracker.holdsUnsecuredExchange(key)
 }
 
 // inboundAckRoute is the route the acknowledgement of an inbound message

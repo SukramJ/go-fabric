@@ -167,7 +167,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 	b.holdHandshake(route, 2, false)
 	b.settleHandshake(route, 2, nil, 0, nil, errors.New("decode"))
 	b.holdHandshake(route, 3, false)
-	b.ForgetSigma1Replied(3)
+	b.ForgetSigma1Replied(onExchange(3))
 	if n := held(); n != 0 {
 		t.Fatalf("%d holds after failures and an eviction, want 0", n)
 	}

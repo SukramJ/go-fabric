@@ -254,10 +254,13 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	// side ([Bridge.sendHandshakeFailureReport]): it is sent after the
 	// handshake dropped the rest and stays tracked until it is
 	// acknowledged, its retries are spent or [unsecuredEntryLifetime] is
-	// over. The unsecured session's entries only: exchange ids are per
-	// initiator, and a secure session's peer may have picked the same one.
+	// over. The unsecured session's entries of this handshake only:
+	// exchange ids are per initiator, and a secure session's peer or
+	// another initiator may have picked the same one. ephemeral is set
+	// below, before anything is sent.
 	reported := false
-	abandon := func() { b.abandonHandshakeReplies(exchangeID) }
+	var ephemeral uint64
+	abandon := func() { b.abandonHandshakeReplies(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}) }
 	defer func() {
 		if !reported {
 			abandon()
@@ -267,10 +270,11 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	// The unsecured session of the initiator is identified by an
 	// ephemeral source node id (Matter §4.13.2.1 / chip
 	// UnauthenticatedSession); the responder addresses its replies to it.
-	ephemeral, err := randomEphemeralNodeID()
+	eph, err := randomEphemeralNodeID()
 	if err != nil {
 		return 0, err
 	}
+	ephemeral = eph
 	sigma1, err := init.Initiator.GenerateSigma1()
 	if err != nil {
 		return 0, err
@@ -429,7 +433,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 	// Tracked before it is sent, so an ack handled before Send returns is
 	// not lost (bridge/reply.go sendReplyReliable).
 	if tracker != nil {
-		tracker.trackUnsecured(hdr.MessageCounter, exchangeID, datagram, addr, b.clk().Now(), nil)
+		tracker.trackUnsecured(hdr.MessageCounter, HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, datagram, addr, b.clk().Now(), nil)
 	}
 	if err := listener.Send(addr, datagram); err != nil {
 		if tracker != nil {

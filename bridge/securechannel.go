@@ -147,7 +147,7 @@ func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	b.resetPaseFailures()
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.paseInFlightExchange = 0
+	b.paseInFlight = HandshakeKey{}
 	b.paseInFlightSince = time.Time{}
 	if h == nil {
 		b.paseHandler = noopPaseHandler{}
@@ -156,17 +156,51 @@ func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	b.paseHandler = h
 }
 
+// HandshakeKey names one handshake on the unsecured session: the node id of
+// its initiator and the exchange id that initiator chose. Exchange ids are
+// the initiator's choice and only unique per initiator, so a handshake's
+// state is found by both — a message from another initiator naming the same
+// exchange id belongs to another handshake. Mirrors matter.js, which finds
+// the unsecured session by the initiator's node id and the exchange inside
+// that session (packages/protocol/src/protocol/ExchangeManager.ts:308-312 and
+// :401 at db021da0).
+type HandshakeKey struct {
+	// InitiatorNodeID is the initiator's (ephemeral) node id: the message's
+	// destination node id when it carries one — a responder's message names
+	// the initiator there — else its source node id
+	// (ExchangeManager.ts:308, `packet.header.destNodeId ??
+	// packet.header.sourceNodeId`). Zero for a message that carries neither.
+	InitiatorNodeID uint64
+	// ExchangeID is the exchange the initiator opened the handshake on.
+	ExchangeID uint16
+}
+
+// handshakeKeyOf is the [HandshakeKey] of an unsecured message on
+// exchangeID.
+func handshakeKeyOf(hdr *message.Header, exchangeID uint16) HandshakeKey {
+	key := HandshakeKey{ExchangeID: exchangeID}
+	switch {
+	case hdr.DestSize == message.DestNodeID:
+		key.InitiatorNodeID = hdr.DestNodeID
+	case hdr.HasSourceNodeID:
+		key.InitiatorNodeID = hdr.SourceNodeID
+	}
+	return key
+}
+
 // PaseHandlerProvider returns a [PaseHandler] scoped to a single
-// PASE exchange. The bridge's SecureChannel router calls the
-// provider once per inbound PASE opcode (PBKDFParamRequest, Pake1,
-// Pake3) and dispatches to the returned handler. Returning the same
-// handler instance for the same exchangeID across the three opcode
-// arrivals lets the underlying [PaseAdapter] track verifier state
-// across Pake1 → Pake3.
+// PASE handshake — one initiator's exchange ([HandshakeKey]). The
+// bridge's SecureChannel router calls the provider once per inbound
+// PASE opcode (PBKDFParamRequest, Pake1, Pake3) and dispatches to the
+// returned handler. Returning the same handler instance for the same
+// key across the three opcode arrivals lets the underlying
+// [PaseAdapter] track verifier state across Pake1 → Pake3; a message
+// of another initiator on the same exchange id has another key and
+// must not reach it.
 //
 // Returning nil drops the datagram with a debug log — the
 // commissioner retries.
-type PaseHandlerProvider func(exchangeID uint16) PaseHandler
+type PaseHandlerProvider func(key HandshakeKey) PaseHandler
 
 // AttachPaseHandlerProvider wires a per-exchange PASE provider. When
 // set, the provider takes precedence over [Bridge.AttachPaseHandler]
@@ -179,23 +213,23 @@ func (b *Bridge) AttachPaseHandlerProvider(p PaseHandlerProvider) {
 	b.resetPaseFailures()
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.paseInFlightExchange = 0
+	b.paseInFlight = HandshakeKey{}
 	b.paseInFlightSince = time.Time{}
 	b.paseProvider = p
 }
 
 // resolvePaseHandler picks the right PaseHandler for an inbound
-// exchange: the provider wins when set; otherwise the singleton.
+// handshake: the provider wins when set; otherwise the singleton.
 // Returns nil only when both the provider returned nil AND no
 // singleton was wired — the caller drops the datagram with a debug
 // log.
-func (b *Bridge) resolvePaseHandler(exchangeID uint16) PaseHandler {
+func (b *Bridge) resolvePaseHandler(key HandshakeKey) PaseHandler {
 	b.mu.RLock()
 	provider := b.paseProvider
 	singleton := b.paseHandler
 	b.mu.RUnlock()
 	if provider != nil {
-		if h := provider(exchangeID); h != nil {
+		if h := provider(key); h != nil {
 			return h
 		}
 	}
@@ -203,18 +237,20 @@ func (b *Bridge) resolvePaseHandler(exchangeID uint16) PaseHandler {
 }
 
 // CaseHandlerProvider returns a [CaseHandler] scoped to a single
-// CASE exchange. The bridge's SecureChannel router calls the
-// provider once per inbound CASE opcode (Sigma1, Sigma3,
-// Sigma2Resume) and dispatches to the returned handler. Returning a
-// fresh handler per exchange-id is required because Apple Home
-// opens parallel CASE sessions from different IPs (iPhone over
-// IPv6, HomePod over IPv4) — a singleton CaseAdapter gets stuck in
-// `Finished` after the first successful Sigma3 and rejects every
-// subsequent Sigma1 with `ProcessSigma1 already called`.
+// CASE handshake — one initiator's exchange ([HandshakeKey]). The
+// bridge's SecureChannel router calls the provider once per inbound
+// CASE opcode (Sigma1, Sigma3, Sigma2Resume) and dispatches to the
+// returned handler. Returning a fresh handler per key is required
+// because Apple Home opens parallel CASE sessions from different IPs
+// (iPhone over IPv6, HomePod over IPv4) — a singleton CaseAdapter gets
+// stuck in `Finished` after the first successful Sigma3 and rejects
+// every subsequent Sigma1 with `ProcessSigma1 already called` — and a
+// message of another initiator on the same exchange id has another key
+// and must not reach it.
 //
 // Returning nil drops the datagram with a debug log — the
 // commissioner retries.
-type CaseHandlerProvider func(exchangeID uint16) CaseHandler
+type CaseHandlerProvider func(key HandshakeKey) CaseHandler
 
 // AttachCaseHandlerProvider wires a per-exchange CASE provider. When
 // set, the provider takes precedence over [Bridge.AttachCaseHandler]
@@ -227,16 +263,16 @@ func (b *Bridge) AttachCaseHandlerProvider(p CaseHandlerProvider) {
 }
 
 // resolveCaseHandler picks the right CaseHandler for an inbound
-// exchange: the provider wins when set; otherwise the singleton.
+// handshake: the provider wins when set; otherwise the singleton.
 // Returns the noop handler when both the provider returned nil AND
 // no singleton was wired — the caller surfaces a debug log.
-func (b *Bridge) resolveCaseHandler(exchangeID uint16) CaseHandler {
+func (b *Bridge) resolveCaseHandler(key HandshakeKey) CaseHandler {
 	b.mu.RLock()
 	provider := b.caseProvider
 	singleton := b.caseHandler
 	b.mu.RUnlock()
 	if provider != nil {
-		if h := provider(exchangeID); h != nil {
+		if h := provider(key); h != nil {
 			return h
 		}
 	}
@@ -361,8 +397,9 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// (exchangeID, sigma1Hash) tuple. Mirrors matter.js's
 		// `CaseServer.ts::onSigma1` which discards duplicate Sigma1
 		// arrivals on the same exchange via `fabric.locked`.
+		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		h := sha256.Sum256(payload)
-		if b.markSigma1Replied(proto.ExchangeID, h) {
+		if b.markSigma1Replied(key, h) {
 			b.logger.Debug("matter.rx.sc.sigma1.replay_dropped",
 				slog.String("src", srcString(src)),
 				slog.Int("exchange_id", int(proto.ExchangeID)))
@@ -372,7 +409,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
 		// session on the channel).
 		b.holdHandshake(src, proto.ExchangeID, false)
-		ch := b.resolveCaseHandler(proto.ExchangeID)
+		ch := b.resolveCaseHandler(key)
 		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
 			ch.ProcessSigma1, ch)
 	case mrp.SCOpcodeSigma3:
@@ -394,8 +431,9 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// Dropped after the handler, the report went out once: lost, it
 		// left the initiator waiting out its timeout for a session this
 		// node had already installed.
-		b.abandonHandshakeReplies(proto.ExchangeID)
-		ch := b.resolveCaseHandler(proto.ExchangeID)
+		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
+		b.abandonHandshakeReplies(key)
+		ch := b.resolveCaseHandler(key)
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
 			ch.ProcessSigma3, ch); err != nil {
 			return err
@@ -403,7 +441,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// Sigma3 closes the CASE handshake on the wire — forget the
 		// per-exchange Sigma1 dedupe entry so a later exchange-id
 		// rollover starts clean.
-		b.forgetSigma1Replied(proto.ExchangeID)
+		b.forgetSigma1Replied(key)
 		// A completed Sigma3 is the moment a secure session exists. An
 		// operator reading the trace after a controller went quiet needs
 		// the open as much as the close: "it never came back after 14:02"
@@ -416,7 +454,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		})
 		return nil
 	case mrp.SCOpcodeSigma2Resume:
-		ch := b.resolveCaseHandler(proto.ExchangeID)
+		ch := b.resolveCaseHandler(handshakeKeyOf(requestHdr, proto.ExchangeID))
 		return b.handleCase(src, requestHdr, proto, payload, "sigma2_resume",
 			ch.ProcessSigma2Resume, ch)
 
@@ -452,9 +490,10 @@ func (b *Bridge) dispatchPase(
 	proto message.ProtocolHeader,
 	payload []byte,
 ) error {
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	switch proto.Opcode {
 	case mrp.SCOpcodePBKDFParamRequest:
-		if !b.claimPaseInFlight(proto.ExchangeID) {
+		if !b.claimPaseInFlight(key) {
 			// Single-active-PASE (Matter §4.13.1): a second
 			// commissioner's PBKDFParamRequest while a handshake is in
 			// progress is IGNORED — matter.js PaseServer.ts:80-86
@@ -475,19 +514,19 @@ func (b *Bridge) dispatchPase(
 			return nil
 		}
 		b.holdHandshake(src, proto.ExchangeID, true)
-		h := b.resolvePaseHandler(proto.ExchangeID)
+		h := b.resolvePaseHandler(key)
 		return b.handlePase(src, requestHdr, proto, payload, "pbkdf_param_req",
 			h.ProcessPBKDFParamRequest, h)
 	case mrp.SCOpcodePake1:
-		h := b.resolvePaseHandler(proto.ExchangeID)
+		h := b.resolvePaseHandler(key)
 		return b.handlePase(src, requestHdr, proto, payload, "pake1",
 			h.ProcessPake1, h)
 	case mrp.SCOpcodePake3:
 		// The commissioner has moved past Pake2: whatever of the
 		// handshake still waits for an acknowledgement is done. Before
 		// the handler runs, so the reply to Pake3 itself stays tracked.
-		b.abandonHandshakeReplies(proto.ExchangeID)
-		h := b.resolvePaseHandler(proto.ExchangeID)
+		b.abandonHandshakeReplies(key)
+		h := b.resolvePaseHandler(key)
 		err := b.handlePase(src, requestHdr, proto, payload, "pake3",
 			h.ProcessPake3, h)
 		// Pake3 terminates the handshake either way (success installs
@@ -495,7 +534,7 @@ func (b *Bridge) dispatchPase(
 		// single-active-PASE claim so the next commissioner can start.
 		// matter.js clears #pairingMessenger in the finally block of
 		// onNewExchange (PaseServer.ts:112-118).
-		b.releasePaseInFlight(proto.ExchangeID)
+		b.releasePaseInFlight(key)
 		return err
 	}
 	return nil
@@ -551,19 +590,20 @@ const (
 )
 
 // claimPaseInFlight attempts to claim the single-active-PASE slot for
-// exchangeID. Returns true when the claim succeeds: the slot was idle,
-// expired, or already owned by the SAME exchange (PBKDFParamRequest
-// retransmit). Mirrors matter.js PaseServer.ts:80-86 onNewExchange.
-func (b *Bridge) claimPaseInFlight(exchangeID uint16) bool {
+// the handshake key. Returns true when the claim succeeds: the slot was
+// idle, expired, or already owned by the SAME handshake
+// (PBKDFParamRequest retransmit). Mirrors matter.js PaseServer.ts:80-86
+// onNewExchange.
+func (b *Bridge) claimPaseInFlight(key HandshakeKey) bool {
 	b.mu.Lock()
 	now := b.clk().Now()
 	idle := b.paseInFlightSince.IsZero() || now.Sub(b.paseInFlightSince) > pasePairingTimeout
-	if !idle && b.paseInFlightExchange != exchangeID {
+	if !idle && b.paseInFlight != key {
 		b.mu.Unlock()
 		return false
 	}
-	timedOut, expired := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange != exchangeID, b.paseInFlightExchange
-	b.paseInFlightExchange = exchangeID
+	timedOut, expired := !b.paseInFlightSince.IsZero() && b.paseInFlight != key, b.paseInFlight
+	b.paseInFlight = key
 	b.paseInFlightSince = now
 	b.mu.Unlock()
 	if timedOut {
@@ -575,33 +615,35 @@ func (b *Bridge) claimPaseInFlight(exchangeID uint16) bool {
 	return true
 }
 
-// abandonHandshakeReplies drops the replies of the handshake on exchangeID
+// abandonHandshakeReplies drops the replies of the handshake key names
 // that still wait for their acknowledgement on the unsecured session: the
 // handshake ended, or moved past them
 // ([outboundReliableTracker.AbandonUnsecuredExchange]). A caller that goes
 // on to send the StatusReport ending the handshake calls it first — the
-// report is the one message that has to outlive the handshake.
-func (b *Bridge) abandonHandshakeReplies(exchangeID uint16) {
+// report is the one message that has to outlive the handshake. The replies
+// of another initiator's handshake on the same exchange id stay.
+func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
 	b.mu.RLock()
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
 	if tracker == nil {
 		return
 	}
-	if cleared := tracker.AbandonUnsecuredExchange(exchangeID); cleared > 0 {
+	if cleared := tracker.AbandonUnsecuredExchange(key); cleared > 0 {
 		b.logger.Debug("matter.sc.handshake.abandon_replies",
-			slog.Int("exchange_id", int(exchangeID)),
+			slog.Int("exchange_id", int(key.ExchangeID)),
 			slog.Int("cleared", cleared))
 	}
 }
 
-// releasePaseInFlight clears the single-active-PASE claim held by
-// exchangeID. A claim held by a DIFFERENT exchange stays untouched.
-func (b *Bridge) releasePaseInFlight(exchangeID uint16) {
+// releasePaseInFlight clears the single-active-PASE claim held by the
+// handshake key. A claim held by a DIFFERENT handshake — another exchange,
+// or another initiator on the same exchange id — stays untouched.
+func (b *Bridge) releasePaseInFlight(key HandshakeKey) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.paseInFlightExchange == exchangeID {
-		b.paseInFlightExchange = 0
+	if b.paseInFlight == key {
+		b.paseInFlight = HandshakeKey{}
 		b.paseInFlightSince = time.Time{}
 	}
 }
@@ -766,7 +808,7 @@ func (b *Bridge) handlePase(
 		// timeout. matter.js clears #pairingMessenger when the pairing
 		// completes (PaseServer.ts:112-118), before its event loop handles
 		// the next exchange.
-		b.releasePaseInFlight(proto.ExchangeID)
+		b.releasePaseInFlight(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	}
 	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
 	if err != nil {
@@ -827,13 +869,14 @@ func (b *Bridge) handlePase(
 		// where the finally block clears #pairingMessenger on every
 		// termination, not only on success.
 		if !isStateReplay {
-			b.releasePaseInFlight(proto.ExchangeID)
+			key := handshakeKeyOf(requestHdr, proto.ExchangeID)
+			b.releasePaseInFlight(key)
 			// And its replies stop waiting for an acknowledgement — all
 			// but the StatusReport above, which was sent after them
 			// ([Bridge.sendHandshakeFailureReport]); a failure that sent
 			// none (no handler wired) drops them here.
 			if isMissing {
-				b.abandonHandshakeReplies(proto.ExchangeID)
+				b.abandonHandshakeReplies(key)
 			}
 		}
 		return err
@@ -965,7 +1008,7 @@ func (b *Bridge) sendHandshakeFailureReport(
 	body []byte,
 	peer *handshakePeerTiming,
 ) error {
-	b.abandonHandshakeReplies(proto.ExchangeID)
+	b.abandonHandshakeReplies(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer); err != nil {
 		return err
 	}
@@ -1009,32 +1052,33 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 }
 
 // markSigma1Replied records that we have produced a Sigma2 reply for
-// `(exchangeID, hash)`. Returns true when an earlier Sigma1 arrival on
-// the same exchange with the SAME hash was already replied to —
-// caller drops the duplicate. Returns false when the entry is fresh or
-// the previous hash for the exchange differs (new Sigma1 round).
+// `(key, hash)`. Returns true when an earlier Sigma1 arrival of the
+// same handshake (initiator and exchange) with the SAME hash was
+// already replied to — caller drops the duplicate. Returns false when
+// the entry is fresh or the previous hash for the handshake differs
+// (new Sigma1 round).
 //
 // Hash comparison ensures a Sigma1 retry after a state reset (e.g.
 // Apple cancelled the first attempt and started a new one with a
 // fresh ephemeral) is not mistaken for a replay.
-func (b *Bridge) markSigma1Replied(exchangeID uint16, hash [32]byte) bool {
+func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if existing, ok := b.sigma1Replied[exchangeID]; ok && existing == hash {
+	if existing, ok := b.sigma1Replied[key]; ok && existing == hash {
 		return true
 	}
-	b.sigma1Replied[exchangeID] = hash
+	b.sigma1Replied[key] = hash
 	return false
 }
 
-// forgetSigma1Replied removes the dedupe entry for an exchange. Called
-// from the Sigma3 receive path: the CASE handshake on this exchange is
-// done, and a later exchange-id rollover (uint16 wraps in long-lived
-// daemons) must not see a stale hash.
-func (b *Bridge) forgetSigma1Replied(exchangeID uint16) {
+// forgetSigma1Replied removes the dedupe entry for a handshake. Called
+// from the Sigma3 receive path: the CASE handshake is done, and a later
+// exchange-id rollover (uint16 wraps in long-lived daemons) must not see
+// a stale hash.
+func (b *Bridge) forgetSigma1Replied(key HandshakeKey) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	delete(b.sigma1Replied, exchangeID)
+	delete(b.sigma1Replied, key)
 }
 
 // ForgetSigma1Replied is the exported entry point the daemon wires into
@@ -1048,12 +1092,12 @@ func (b *Bridge) forgetSigma1Replied(exchangeID uint16) {
 //
 // The eviction also ends the handshake's hold on a TCP connection it ran
 // on ([Bridge.holdHandshake]): the handshake can no longer complete.
-func (b *Bridge) ForgetSigma1Replied(exchangeID uint16) {
-	b.forgetSigma1Replied(exchangeID)
-	b.releaseCASEHandshakeEverywhere(exchangeID)
+func (b *Bridge) ForgetSigma1Replied(key HandshakeKey) {
+	b.forgetSigma1Replied(key)
+	b.releaseCASEHandshakeEverywhere(key.ExchangeID)
 	// A Sigma2 or StatusReport still waiting for its acknowledgement
 	// goes with the responder it came from.
-	b.abandonHandshakeReplies(exchangeID)
+	b.abandonHandshakeReplies(key)
 }
 
 // ---------------------------------------------------------------------------
@@ -1172,8 +1216,9 @@ func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Heade
 	if !ok || generalCode == mrp.SCStatusGeneralSuccess {
 		return false
 	}
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	b.mu.Lock()
-	ours := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange == proto.ExchangeID
+	ours := !b.paseInFlightSince.IsZero() && b.paseInFlight == key
 	b.mu.Unlock()
 	if !ours {
 		return false
@@ -1184,8 +1229,8 @@ func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Heade
 		slog.Int("general_code", int(generalCode)),
 		slog.Int("protocol_code", int(protocolCode)))
 	b.recordPaseFailure()
-	b.releasePaseInFlight(proto.ExchangeID)
-	b.abandonHandshakeReplies(proto.ExchangeID)
+	b.releasePaseInFlight(key)
+	b.abandonHandshakeReplies(key)
 	// The report itself is acked by the pump, like any reliable message
 	// that elicits no reply.
 	return true

@@ -114,6 +114,11 @@ func scHdr() *message.Header {
 	return &message.Header{SessionID: 0, MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 }
 
+// scKey is the [HandshakeKey] of an [scHdr] message on exchangeID.
+func scKey(exchangeID uint16) HandshakeKey {
+	return HandshakeKey{InitiatorNodeID: 0x5A5A, ExchangeID: exchangeID}
+}
+
 // ─── Default-noop cases (4) ───────────────────────────────────────────────────
 
 // TestDispatchSC_Pake1MissingHandler verifies that Pake1 on a fresh bridge
@@ -470,7 +475,7 @@ func TestDispatchSC_UnhandledOpcodeDrops(t *testing.T) {
 func TestResolvePaseHandler_NoneFallsBackToNoop(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
-	h := b.resolvePaseHandler(1)
+	h := b.resolvePaseHandler(onExchange(1))
 	_, _, err := h.ProcessPake1(nil)
 	if !errors.Is(err, ErrPaseHandlerMissing) {
 		t.Errorf("want ErrPaseHandlerMissing from noop, got %v", err)
@@ -484,7 +489,7 @@ func TestResolvePaseHandler_SingletonOnly(t *testing.T) {
 	b := newStartedBridge(t)
 	singleton := &recordingPaseHandler{}
 	b.AttachPaseHandler(singleton)
-	h := b.resolvePaseHandler(42)
+	h := b.resolvePaseHandler(onExchange(42))
 	if h != singleton {
 		t.Errorf("expected singleton handler, got %T", h)
 	}
@@ -498,8 +503,8 @@ func TestResolvePaseHandler_ProviderOverridesSingleton(t *testing.T) {
 	singleton := &recordingPaseHandler{}
 	b.AttachPaseHandler(singleton)
 	fromProvider := &recordingPaseHandler{}
-	b.AttachPaseHandlerProvider(func(_ uint16) PaseHandler { return fromProvider })
-	h := b.resolvePaseHandler(7)
+	b.AttachPaseHandlerProvider(func(_ HandshakeKey) PaseHandler { return fromProvider })
+	h := b.resolvePaseHandler(onExchange(7))
 	if h != fromProvider {
 		t.Errorf("expected provider handler, got %T", h)
 	}
@@ -512,8 +517,8 @@ func TestResolvePaseHandler_ProviderReturningNilFallsBack(t *testing.T) {
 	b := newStartedBridge(t)
 	singleton := &recordingPaseHandler{}
 	b.AttachPaseHandler(singleton)
-	b.AttachPaseHandlerProvider(func(_ uint16) PaseHandler { return nil })
-	h := b.resolvePaseHandler(7)
+	b.AttachPaseHandlerProvider(func(_ HandshakeKey) PaseHandler { return nil })
+	h := b.resolvePaseHandler(onExchange(7))
 	if h != singleton {
 		t.Errorf("expected singleton after provider returned nil, got %T", h)
 	}
@@ -528,13 +533,13 @@ func TestAttachPaseHandlerProvider_NilClears(t *testing.T) {
 	singleton := &recordingPaseHandler{}
 	b.AttachPaseHandler(singleton)
 	fromProvider := &recordingPaseHandler{}
-	b.AttachPaseHandlerProvider(func(_ uint16) PaseHandler { return fromProvider })
+	b.AttachPaseHandlerProvider(func(_ HandshakeKey) PaseHandler { return fromProvider })
 	// Confirm provider is active before clearing.
-	if h := b.resolvePaseHandler(1); h != fromProvider {
+	if h := b.resolvePaseHandler(onExchange(1)); h != fromProvider {
 		t.Fatalf("precondition: expected provider handler, got %T", h)
 	}
 	b.AttachPaseHandlerProvider(nil)
-	h := b.resolvePaseHandler(1)
+	h := b.resolvePaseHandler(onExchange(1))
 	if h != singleton {
 		t.Errorf("after nil clear expected singleton, got %T", h)
 	}
@@ -551,8 +556,8 @@ func TestDispatchSC_PerExchangeProviderRouting(t *testing.T) {
 		10: {},
 		20: {},
 	}
-	b.AttachPaseHandlerProvider(func(exchangeID uint16) PaseHandler {
-		if h, ok := handlers[exchangeID]; ok {
+	b.AttachPaseHandlerProvider(func(key HandshakeKey) PaseHandler {
+		if h, ok := handlers[key.ExchangeID]; ok {
 			return h
 		}
 		return nil
@@ -582,7 +587,7 @@ func TestPaseHandlerProvider_ProviderInvokedPerOpcode(t *testing.T) {
 
 	var calls atomic.Int32
 	inner := &recordingPaseHandler{}
-	b.AttachPaseHandlerProvider(func(_ uint16) PaseHandler {
+	b.AttachPaseHandlerProvider(func(_ HandshakeKey) PaseHandler {
 		calls.Add(1)
 		return inner
 	})
@@ -623,10 +628,10 @@ func TestSigma1Replied_PrunedOnSigma3(t *testing.T) {
 		t.Fatalf("sigma1: %v", err)
 	}
 	b.mu.RLock()
-	_, present := b.sigma1Replied[exch]
+	_, present := b.sigma1Replied[scKey(exch)]
 	b.mu.RUnlock()
 	if !present {
-		t.Fatal("sigma1Replied[77] should be populated after Sigma1 dispatch")
+		t.Fatal("sigma1Replied[onExchange(77)] should be populated after Sigma1 dispatch")
 	}
 
 	// Sigma3 fires — must prune the entry.
@@ -634,10 +639,10 @@ func TestSigma1Replied_PrunedOnSigma3(t *testing.T) {
 		t.Fatalf("sigma3: %v", err)
 	}
 	b.mu.RLock()
-	_, stillPresent := b.sigma1Replied[exch]
+	_, stillPresent := b.sigma1Replied[scKey(exch)]
 	b.mu.RUnlock()
 	if stillPresent {
-		t.Error("sigma1Replied[77] should be absent after Sigma3 — forgetSigma1Replied was not called")
+		t.Error("sigma1Replied[onExchange(77)] should be absent after Sigma3 — forgetSigma1Replied was not called")
 	}
 }
 
@@ -661,12 +666,12 @@ func TestPerExchangeCaseProvider_OnEvictPrunesSigma1Replied(t *testing.T) {
 	const exch = uint16(88)
 	// Simulate: Sigma1 arrived, populating sigma1Replied.
 	b.mu.Lock()
-	b.sigma1Replied[exch] = [32]byte{0xAB}
+	b.sigma1Replied[onExchange(exch)] = [32]byte{0xAB}
 	b.mu.Unlock()
 	// Also simulate a stale caseEntry in the provider (as if Sigma1 triggered
 	// Resolve but Sigma3 never came).
 	provider.mu.Lock()
-	provider.entries[exch] = &caseEntry{adapter: nil, lastTouched: time.Now().Add(-10 * time.Minute)}
+	provider.entries[onExchange(exch)] = &caseEntry{adapter: nil, lastTouched: time.Now().Add(-10 * time.Minute)}
 	provider.mu.Unlock()
 
 	// Trigger the reaper with an immediate TTL (1 ms).
@@ -674,10 +679,10 @@ func TestPerExchangeCaseProvider_OnEvictPrunesSigma1Replied(t *testing.T) {
 
 	// The onEvict callback must have been called → sigma1Replied pruned.
 	b.mu.RLock()
-	_, present := b.sigma1Replied[exch]
+	_, present := b.sigma1Replied[onExchange(exch)]
 	b.mu.RUnlock()
 	if present {
-		t.Error("sigma1Replied[88] should be absent after TTL-reap eviction — SetOnEvict callback not fired")
+		t.Error("sigma1Replied[onExchange(88)] should be absent after TTL-reap eviction — SetOnEvict callback not fired")
 	}
 }
 

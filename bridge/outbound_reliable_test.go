@@ -158,7 +158,7 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 		// settles.
 		synctest.Wait()
 
-		cleared := tr.AbandonUnsecuredExchange(targetExchange)
+		cleared := tr.AbandonUnsecuredExchange(onExchange(targetExchange))
 		if cleared != 3 {
 			t.Errorf("AbandonUnsecuredExchange: cleared %d, want 3", cleared)
 		}
@@ -189,7 +189,7 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 		}
 
 		// Abandoning an unknown exchange is a no-op.
-		if got := tr.AbandonUnsecuredExchange(0xBEEF); got != 0 {
+		if got := tr.AbandonUnsecuredExchange(onExchange(0xBEEF)); got != 0 {
 			t.Errorf("AbandonUnsecuredExchange on unknown exchange: cleared %d, want 0", got)
 		}
 	})

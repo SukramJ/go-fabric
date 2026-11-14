@@ -102,6 +102,11 @@ type outboundEntry struct {
 	counter    uint32
 	sessionID  uint16
 	exchangeID uint16
+	// initiator is, on the unsecured session, the node id of the
+	// handshake's initiator ([HandshakeKey]): exchange ids are the
+	// initiator's choice, so a handshake's entries are those of its
+	// initiator and its exchange. Zero on a secure session.
+	initiator  uint64
 	datagram   []byte
 	dest       net.Addr
 	retries    int
@@ -233,7 +238,7 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
-	t.track(counter, sessionID, exchangeID, datagram, dest, now, margin, nil)
+	t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil)
 }
 
 // trackUnsecured tracks a reliable message on session 0: a responder's
@@ -244,8 +249,8 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 // It always tracks. At a full table the entry tracked first loses its place
 // ([unsecuredEntryLimit]) and the tracker reports it through its evicted
 // hook.
-func (t *outboundReliableTracker) trackUnsecured(counter uint32, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
-	t.track(counter, 0, exchangeID, datagram, dest, now, 0, peer)
+func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
+	t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer)
 }
 
 // unsecuredEntryLimit is how many reliable messages the unsecured session
@@ -323,7 +328,7 @@ var (
 	errUnsecuredEntryExpired = errors.New("bridge: outbound retransmit: the handshake's time is over")
 )
 
-func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) {
+func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
@@ -357,6 +362,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 		counter:    counter,
 		sessionID:  sessionID,
 		exchangeID: exchangeID,
+		initiator:  initiator,
 		datagram:   cp,
 		dest:       dest,
 		nextSendAt: now.Add(delay),
@@ -393,13 +399,13 @@ func (t *outboundReliableTracker) dropLocked(key outboundKey) {
 	}
 }
 
-// holdsUnsecuredExchange reports whether a message of the unsecured
-// session's exchangeID still waits for its acknowledgement.
-func (t *outboundReliableTracker) holdsUnsecuredExchange(exchangeID uint16) bool {
+// holdsUnsecuredExchange reports whether a message of the handshake hk
+// on the unsecured session still waits for its acknowledgement.
+func (t *outboundReliableTracker) holdsUnsecuredExchange(hk HandshakeKey) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, key := range t.unsecured {
-		if e, ok := t.pending[key]; ok && e.exchangeID == exchangeID {
+		if e, ok := t.pending[key]; ok && e.exchangeID == hk.ExchangeID && e.initiator == hk.InitiatorNodeID {
 			return true
 		}
 	}
@@ -414,9 +420,9 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 	t.dropLocked(outboundKey{sessionID, counter})
 }
 
-// AbandonUnsecuredExchange drops every entry of the unsecured session whose
-// exchange is exchangeID — the messages of the handshake on that exchange
-// that still wait for their acknowledgement — and wakes any [WaitForAck]
+// AbandonUnsecuredExchange drops every entry of the unsecured session of the
+// handshake hk — its initiator and its exchange — that still waits for its
+// acknowledgement, and wakes any [WaitForAck]
 // caller blocked on them with [ErrAckWaitTimeout]. It returns the number
 // of entries cleared.
 //
@@ -437,14 +443,18 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 // being closed (packages/protocol/src/protocol/MessageExchange.ts:1165-1190
 // at db021da0).
 //
-// Session 0 only: exchange ids are the initiator's choice, and an entry of
-// a secure session whose peer happened to pick the same id stays.
-func (t *outboundReliableTracker) AbandonUnsecuredExchange(exchangeID uint16) int {
+// Session 0 only, and that initiator's only: exchange ids are the
+// initiator's choice, so an entry of a secure session whose peer happened
+// to pick the same id stays, and so does one of another initiator's
+// handshake on the same exchange id (matter.js keeps each initiator's
+// exchanges in its own unsecured session, ExchangeManager.ts:308-312 and
+// :401 at db021da0).
+func (t *outboundReliableTracker) AbandonUnsecuredExchange(hk HandshakeKey) int {
 	t.mu.Lock()
 	cleared := 0
 	wakers := make([]chan error, 0)
 	for _, key := range slices.Clone(t.unsecured) {
-		if t.pending[key].exchangeID != exchangeID {
+		if e := t.pending[key]; e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
 			continue
 		}
 		t.dropLocked(key)

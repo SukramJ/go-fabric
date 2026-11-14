@@ -551,7 +551,8 @@ type Bridge struct {
 	icd icdPorts
 
 	// sigma1Replied tracks the SHA-256 hash of the Sigma1 payload we
-	// already produced a Sigma2 reply for, keyed by exchangeID. Apple
+	// already produced a Sigma2 reply for, keyed by the handshake
+	// (initiator node id and exchange id, [HandshakeKey]). Apple
 	// iOS multicasts the same Sigma1 onto IPv4 + IPv6-LL + IPv6-Global
 	// simultaneously, so the same exchange receives 5 identical Sigma1
 	// datagrams in rapid succession. Bug A (sigma.Responder mutex +
@@ -570,7 +571,7 @@ type Bridge struct {
 	// re-use under the same exchange-id-after-rollover stays correct.
 	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
 	// short-circuits replays via `fabric.locked` + per-exchange state.
-	sigma1Replied map[uint16][32]byte
+	sigma1Replied map[HandshakeKey][32]byte
 
 	// reportCounterOwner maps an outbound-reliable MessageCounter to
 	// the subscription ID that owns it. Populated by
@@ -641,19 +642,21 @@ type Bridge struct {
 	// leaves the flag clear and still starts with a clean budget.
 	preserveLockoutOnReset atomic.Bool
 
-	// paseInFlightExchange / paseInFlightSince implement the
+	// paseInFlight / paseInFlightSince implement the
 	// single-active-PASE invariant (Matter §4.13.1): while one PASE
 	// handshake is in progress the bridge SHALL NOT accept another —
 	// otherwise a second commissioner's PBKDFParamRequest silently
 	// replaces the first one's in-flight verifier state. Guarded by
-	// b.mu; zero exchange + zero time = idle. An abandoned handshake
+	// b.mu; zero key + zero time = idle. The claim names the handshake
+	// — initiator and exchange — so a message of another initiator on the
+	// same exchange id is not the claimed handshake. An abandoned handshake
 	// self-expires after [pasePairingTimeout] so a crashed
 	// commissioner cannot lock pairing out for the whole window.
 	// Mirrors matter.js PaseServer.ts:80-86 onNewExchange (reject
 	// while a pairing messenger / timer is active) + :127 the 60 s
 	// pairing timer.
-	paseInFlightExchange uint16
-	paseInFlightSince    time.Time
+	paseInFlight      HandshakeKey
+	paseInFlightSince time.Time
 
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
 	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
@@ -890,7 +893,7 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		ackHandler:     noopAckHandler{},
 		groupMessaging: noopGroupMessaging{},
 		eventLog:       im.NewEventLog(),
-		sigma1Replied:  make(map[uint16][32]byte),
+		sigma1Replied:  make(map[HandshakeKey][32]byte),
 	}
 	br.eventLog.SetClock(br.clock)
 	if err := br.seedCounters(); err != nil {

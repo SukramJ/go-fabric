@@ -225,16 +225,16 @@ func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 	// Simulate a Sigma1-replied entry for an exchange whose Sigma3 never
 	// arrived (aborted handshake).
 	b.mu.Lock()
-	b.sigma1Replied[42] = [32]byte{0xAB}
+	b.sigma1Replied[onExchange(42)] = [32]byte{0xAB}
 	b.mu.Unlock()
 
-	b.ForgetSigma1Replied(42)
+	b.ForgetSigma1Replied(onExchange(42))
 
 	b.mu.Lock()
-	_, present := b.sigma1Replied[42]
+	_, present := b.sigma1Replied[onExchange(42)]
 	b.mu.Unlock()
 	if present {
-		t.Error("sigma1Replied[42] still present after ForgetSigma1Replied")
+		t.Error("sigma1Replied[onExchange(42)] still present after ForgetSigma1Replied")
 	}
 }
 
@@ -254,7 +254,7 @@ func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	b.mu.Lock()
-	b.sigma1Replied[99] = [32]byte{0xCD}
+	b.sigma1Replied[onExchange(99)] = [32]byte{0xCD}
 	b.mu.Unlock()
 
 	provider := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })
@@ -262,13 +262,13 @@ func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 	// Allocate an entry for exchange 99, then Reset evicts every entry and
 	// fires the onEvict hook for each — exercising the same path the TTL
 	// reaper drives.
-	_ = provider.Resolve(99)
+	_ = provider.Resolve(onExchange(99))
 	provider.Reset()
 
 	b.mu.Lock()
-	_, present := b.sigma1Replied[99]
+	_, present := b.sigma1Replied[onExchange(99)]
 	b.mu.Unlock()
 	if present {
-		t.Error("sigma1Replied[99] still present after evict hook fired")
+		t.Error("sigma1Replied[onExchange(99)] still present after evict hook fired")
 	}
 }

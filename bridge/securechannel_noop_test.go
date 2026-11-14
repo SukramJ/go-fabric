@@ -76,7 +76,7 @@ func TestResolveCaseHandler_NoProvider_ReturnsSingleton(t *testing.T) {
 	b := newStartedBridge(t)
 	singleton := &recordingCaseHandler{}
 	b.AttachCaseHandler(singleton)
-	h := b.resolveCaseHandler(1)
+	h := b.resolveCaseHandler(onExchange(1))
 	if h != singleton {
 		t.Errorf("expected singleton, got %T", h)
 	}
@@ -88,8 +88,8 @@ func TestResolveCaseHandler_ProviderOverridesSingleton(t *testing.T) {
 	singleton := &recordingCaseHandler{}
 	b.AttachCaseHandler(singleton)
 	fromProvider := &recordingCaseHandler{}
-	b.AttachCaseHandlerProvider(func(_ uint16) CaseHandler { return fromProvider })
-	h := b.resolveCaseHandler(1)
+	b.AttachCaseHandlerProvider(func(_ HandshakeKey) CaseHandler { return fromProvider })
+	h := b.resolveCaseHandler(onExchange(1))
 	if h != fromProvider {
 		t.Errorf("expected provider result, got %T", h)
 	}
@@ -100,8 +100,8 @@ func TestResolveCaseHandler_ProviderReturningNilFallsBack(t *testing.T) {
 	b := newStartedBridge(t)
 	singleton := &recordingCaseHandler{}
 	b.AttachCaseHandler(singleton)
-	b.AttachCaseHandlerProvider(func(_ uint16) CaseHandler { return nil })
-	h := b.resolveCaseHandler(1)
+	b.AttachCaseHandlerProvider(func(_ HandshakeKey) CaseHandler { return nil })
+	h := b.resolveCaseHandler(onExchange(1))
 	if h != singleton {
 		t.Errorf("nil provider result: expected singleton fallback, got %T", h)
 	}
