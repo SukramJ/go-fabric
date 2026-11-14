@@ -111,6 +111,9 @@ type nvKey struct {
 	// writing: a controller's write is between PersistWrite and done;
 	// dirty: a change was reported meanwhile, which done stores.
 	writing, dirty bool
+	// restoring: restore sets the server's stored values; moved: a change
+	// was reported meanwhile, which restore stores once all are set.
+	restoring, moved bool
 	// stored is what the store holds for the key, when known; owed: the
 	// store refused the held value, written again at the next change
 	// and when the node stops.
@@ -258,6 +261,12 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		dirty := k.dirty
 		k.writing, k.dirty = false, false
 		if !k.label && (applied || dirty) {
+			if k.restoring {
+				// A server restore sets in the key's place since: it
+				// stores the held value once all of its are set.
+				k.moved = true
+				return
+			}
 			v.storeHeld(ctx, k, key)
 			return
 		}
@@ -357,9 +366,12 @@ func (v *nonVolatile) changed(ctx context.Context, keys map[uint32]nvAttr, c con
 			continue
 		}
 		a.k.store.Lock()
-		if a.k.writing {
+		switch {
+		case a.k.restoring:
+			a.k.moved = true
+		case a.k.writing:
 			a.k.dirty = true
-		} else {
+		default:
 			v.storeHeld(ctx, a.k, a.key)
 		}
 		a.k.store.Unlock()
@@ -455,6 +467,7 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 		raw, found, err := v.n.persisted.st.GetSetting(ctx, a.key)
 		a.k.store.Lock()
 		a.k.srv, a.k.attrID = srv, id
+		a.k.restoring = true
 		if err == nil {
 			a.k.stored, a.k.known = raw, true
 		}
@@ -473,8 +486,10 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 		}
 		restored[id] = val
 	}
-	// Subscribed before the values are set: a companion the restore moves
-	// is stored as well.
+	// Subscribed before the values are set, so a companion the restore
+	// moves is stored as well — once every value is set: a value set on
+	// the way, a companion moved before its own stored value is restored,
+	// is never stored over that value (R2-P2-rr-ctl-04).
 	unsubscribe := spec.ChangesOf(srv, func(c contract.Change) { v.changed(ctx, keys, c) })
 	v.mu.Lock()
 	stopped := v.stopped
@@ -482,10 +497,16 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 		rec.unsubscribe = unsubscribe
 	}
 	v.mu.Unlock()
+	defer v.restored(ctx, keys, stopped)
 	if stopped {
 		unsubscribe()
 		return
 	}
+	v.setRestored(srv, keys, restored)
+}
+
+// setRestored sets each of restored on srv, in attribute id order.
+func (v *nonVolatile) setRestored(srv contract.ClusterServer, keys map[uint32]nvAttr, restored map[uint32]any) {
 	setter, ok := srv.(spec.AttributeSetter)
 	if !ok {
 		return
@@ -494,6 +515,22 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 		if err := setter.SetAttributes(map[uint32]any{id: restored[id]}); err != nil {
 			v.n.logger.Warn("nonvolatile.restore", slog.String("key", keys[id].key), slog.Any("err", err))
 		}
+	}
+}
+
+// restored ends restore's setting of keys: each one a change was reported
+// for meanwhile stores the value its server now holds, unless the node
+// stopped.
+func (v *nonVolatile) restored(ctx context.Context, keys map[uint32]nvAttr, stopped bool) {
+	for _, id := range slices.Sorted(maps.Keys(keys)) {
+		a := keys[id]
+		a.k.store.Lock()
+		moved := a.k.moved
+		a.k.restoring, a.k.moved = false, false
+		if moved && !stopped {
+			v.storeHeld(ctx, a.k, a.key)
+		}
+		a.k.store.Unlock()
 	}
 }
 

@@ -6,6 +6,9 @@ package node_test
 import (
 	"context"
 	"encoding/hex"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/store/memstore"
 )
 
@@ -348,5 +352,64 @@ func TestNonVolatileWriteToAReplacedServerIsNotStored(t *testing.T) {
 	again, ep := nvRun(t, cfg, nvHeat)
 	if got := dispatchRead(t, again, path(ep)); got != served {
 		t.Errorf("after the restart %s, served %s before it", got, served)
+	}
+}
+
+// recordingSettings records the settings written under its prefix.
+type recordingSettings struct {
+	store.Port
+	prefix string
+	mu     sync.Mutex
+	writes []string
+}
+
+func (s *recordingSettings) SetSetting(ctx context.Context, key, value string) error {
+	if strings.HasPrefix(key, s.prefix) {
+		s.mu.Lock()
+		s.writes = append(s.writes, key+"="+value)
+		s.mu.Unlock()
+	}
+	return s.Port.SetSetting(ctx, key, value)
+}
+
+// TestNonVolatileRestoreStoresNoValueNobodyChose: restoring a Thermostat
+// whose stored cooling setpoint is below the Initial heating setpoint plus
+// the deadband stores no heating setpoint but the one stored — a companion
+// the restore moves on the way is not written over its own stored value
+// (R2-P2-rr-ctl-04).
+func TestNonVolatileRestoreStoresNoValueNobodyChose(t *testing.T) {
+	t.Parallel()
+	st := &recordingSettings{Port: memstore.New(), prefix: "nonvolatile."}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	auto := nvCase{key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeatureAutoMode})}
+	heat := func(ep uint16) im.ConcreteAttributePath {
+		return attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	}
+	cool := func(ep uint16) im.ConcreteAttributePath {
+		return attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedCoolingSetpoint)
+	}
+	n, ep := nvRun(t, cfg, auto)
+	if s := dispatchWrite(t, n, heat(ep), int64(1600)); s != im.StatusSuccess {
+		t.Fatalf("write heat: %v", s)
+	}
+	if s := dispatchWrite(t, n, cool(ep), int64(1900)); s != im.StatusSuccess {
+		t.Fatalf("write cool: %v", s)
+	}
+	served := []string{dispatchRead(t, n, heat(ep)), dispatchRead(t, n, cool(ep))}
+	if err := n.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	st.mu.Lock()
+	st.writes = nil
+	st.mu.Unlock()
+	again, ep := nvRun(t, cfg, auto)
+	if got := []string{dispatchRead(t, again, heat(ep)), dispatchRead(t, again, cool(ep))}; !slices.Equal(got, served) {
+		t.Errorf("heat, cool after the restart %v, served %v before it", got, served)
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if len(st.writes) != 0 {
+		t.Errorf("the restore wrote %v", st.writes)
 	}
 }
