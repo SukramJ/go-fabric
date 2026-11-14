@@ -4691,7 +4691,7 @@ not serve the device type's selection — a filter monitor with
 ResetCondition, LaundryWasherControls with Rinse
 (WindowCovering with Lift alone was one until v0.12.1, brief CJ 1.22:
 the self-held server serves it now, `BD-Matter-WindowCovering-LiftAlone`) — the kit keeps the
-generated `spec.Server` for that endpoint (`errSelectionNotServed`), and
+generated `spec.Server` for that endpoint (`ErrSelectionNotServed`), and
 a host that needs the self-held server there selects its features or
 mounts it with `device.HostServer`. Reasoning: a self-held server that advertises
 elements it cannot serve is worse than the generated stub, which answers
@@ -4703,8 +4703,8 @@ ports, `TestDoorLockDefaultTakesTheDeclaration`).
 ### BD-Matter-AsyncCallbacks-OnlyWhileAdded — the `…Async` callbacks run on the device's own queue and only while the device is added to a running node
 
 matter.js has no queued observer: every `$Changed` observer runs inline in
-the transaction's post-commit (`packages/node/src/behavior/state/managed/Datasource.ts:1473-1476`
-at `862ad75f` pushes the notification with the change's session; the
+the transaction's post-commit (`packages/node/src/behavior/state/managed/Datasource.ts:1488-1491`
+at `db021da0` pushes the notification with the change's session; the
 commit delivers it), and the facade's inline callbacks mirror that
 (`BD-Matter-Node-ObserversSynchronous`). The asynchronous option ADR 0025
 principle 8 asks for (`OnChangedAsync`, typed and on `device.Device`) is
@@ -4723,7 +4723,8 @@ matter.js knows a change's origin from the transaction that commits it:
 a command runs under an `ActionContext` that carries the transaction
 every state change needs (`packages/node/src/behavior/context/ActionContext.ts:25`
 at `862ad75f`), and the `$Changed` notification is pushed with that
-transaction's session (`behavior/state/managed/Datasource.ts:1473-1476`),
+transaction's session (`behavior/state/managed/Datasource.ts:1488-1491`
+at `db021da0`),
 so a host's handler override writes state as the command, and a write
 from elsewhere commits in its own transaction with its own session. The
 module's setter path has no ambient context: a self-held server marks
@@ -4761,7 +4762,8 @@ becoming a silent report gap (brief BY-1).
 
 matter.js has no hand-off path: a LevelControl behavior holds its state
 and every change commits in a transaction whose session is the origin
-(`packages/node/src/behavior/state/managed/Datasource.ts:1473-1476`). The
+(`packages/node/src/behavior/state/managed/Datasource.ts:1488-1491` at
+`db021da0`). The
 module's `LevelSource` hand-off form keeps the level in the host's port
 and learns of a change through the port's `ChangeNotifier`, which carries
 no session; the server labels such a change `contract.OriginCommand`
@@ -4776,8 +4778,8 @@ BD-Matter-CommandOrigin-PerServerFlag names (brief BY-1).
 matter.js's commissioning flow takes an `onAttestationFailure` policy:
 `true` proceeds, `false` rejects, a function decides per finding, and
 **`undefined` — the default — is "backward-compatible accept with
-logging"** (`packages/protocol/src/certificate/DeviceAttestationValidator.ts:146`
-at `862ad75f`; wired through `ControllerCommissioner.ts:64`, `:668` and
+logging"** (`packages/protocol/src/certificate/DeviceAttestationValidator.ts:234`
+at `db021da0`; wired through `ControllerCommissioner.ts:64`, `:668` and
 `CommissioningClient.ts:293`). The module's composition root
 `controller.New` makes `Config.Attestation` required and
 `controller.Pair`'s zero `OnAttestationFailure` rejects (`controller/controller.go`, `attestation.Reject()` as the default):
@@ -4806,8 +4808,8 @@ if a consumer asks for it (brief BV-a).
 
 matter.js persists every change of a non-volatile attribute whoever made
 it: the datasource's commit stores the `storeFields` of the changed
-values (`packages/node/src/behavior/state/managed/Datasource.ts:1427-1438`
-at `862ad75f`) and the next start layers the stored values over the
+values (`packages/node/src/behavior/state/managed/Datasource.ts:1442-1454`
+at `db021da0`) and the next start layers the stored values over the
 defaults (`:580-583`), so a bridge that sets its own `nodeLabel` has it
 written to storage like a controller's write. The module separates the
 two: `Device.Update(ctx, func(*HostStatement))` (`device/lifecycle.go`)
@@ -4879,7 +4881,7 @@ reboot a controller may take the whole interval to notice, and chip-tool
 does not choose its own; a host that wants the specification's hour sets
 `subscriptionOptions.maxInterval`. The module grants up to
 `subscription.DefaultMaxIntervalCeilingSeconds = 3600`
-(`im/subscription/manager.go:70`, the chip value) and a host lowers it
+(`im/subscription/manager.go:106`, the chip value) and a host lowers it
 through `node.Config.Limits.SubscriptionMaxInterval` (brief CC).
 Reasoning: the ceiling is the specification's, a shorter default is a
 product choice the host makes per deployment (a battery device wants
