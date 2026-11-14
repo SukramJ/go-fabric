@@ -381,8 +381,8 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 // optional strings and ProductAppearance when the host set them (ProductLabel
 // defaulted to the ProductName), and the ShutDown, Leave and
 // ReachableChanged events the server emits. LocalConfigDisabled is not
-// listed — matter.js's bridge sample does not emit it — though a write to
-// it is accepted.
+// listed — matter.js's bridge sample does not emit it — so a write to it is
+// refused with the definition's status, UNSUPPORTED_ATTRIBUTE.
 func (b *BasicInformation) instanceOptions() spec.Options {
 	opts := spec.Options{
 		// UniqueID ("Rev >= v4, O"), SpecificationVersion and
