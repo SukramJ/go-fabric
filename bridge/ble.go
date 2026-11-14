@@ -254,6 +254,76 @@ func (b *Bridge) WithdrawBLE(ctx context.Context) error {
 	return waitBLE(ctx, done)
 }
 
+// watchBLEPASE bounds how long central c holds the one BLE place on its
+// BTP connection conn without PASE: btp.ConnRspTimeout after the BTP
+// handshake — the bound btp.Accept gives that handshake from the accept —
+// and every btp.ConnRspTimeout after, a connection with neither a secure
+// session bound nor a PASE handshake in flight is disconnected. A window
+// need not be open: a central that connects after one ended, or idles
+// once its PASE attempt failed, gives the place up the same way (review
+// II, R2-P3-dr-net-03). The watch ends with the first secure session or
+// the disconnect.
+func (b *Bridge) watchBLEPASE(c contract.BLEConnection, conn *btp.Conn) {
+	clk := b.clk()
+	var mu sync.Mutex
+	var timer clock.Timer
+	var check func()
+	check = func() {
+		select {
+		case <-c.Disconnected():
+			return
+		default:
+		}
+		session, pase := b.connPASEState(conn)
+		switch {
+		case session:
+			return
+		case pase:
+			mu.Lock()
+			timer = clk.AfterFunc(btp.ConnRspTimeout, check)
+			mu.Unlock()
+			return
+		}
+		b.logger.Info("matter.ble.central_dropped", slog.String("peer", c.Remote()),
+			slog.String("reason", "no PASE within the handshake bound"))
+		_ = c.Disconnect()
+	}
+	mu.Lock()
+	timer = clk.AfterFunc(btp.ConnRspTimeout, check)
+	mu.Unlock()
+	go func() {
+		<-c.Disconnected()
+		mu.Lock()
+		timer.Stop()
+		mu.Unlock()
+	}()
+}
+
+// connPASEState reports whether a secure session is bound to c and
+// whether a PASE handshake is in flight on it (nil: neither).
+func (b *Bridge) connPASEState(c transport.Conn) (session, pase bool) {
+	if c == nil {
+		return false, false
+	}
+	raw, ok := b.connRoutes.Load(c)
+	if !ok {
+		return false, false
+	}
+	r, _ := raw.(*connRoute)
+	if r == nil {
+		return false, false
+	}
+	b.routeBindMu.Lock()
+	defer b.routeBindMu.Unlock()
+	for _, h := range r.handshakes {
+		if h.pase {
+			pase = true
+			break
+		}
+	}
+	return r.sessions > 0, pase
+}
+
 // connHasSecureSession reports whether a secure session is bound to c
 // (nil: none).
 func (b *Bridge) connHasSecureSession(c transport.Conn) bool {
@@ -451,6 +521,7 @@ func (b *Bridge) acceptBLE(c contract.BLEConnection) {
 		b.logger.Info("matter.ble.central_disconnected", slog.String("peer", c.Remote()))
 	}()
 	err := btp.Accept(c, func(conn *btp.Conn) func([]byte) {
+		b.watchBLEPASE(c, conn)
 		b.ble.mu.Lock()
 		if b.ble.central == c {
 			b.ble.centralConn = conn

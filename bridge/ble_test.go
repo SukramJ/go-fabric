@@ -49,6 +49,13 @@ type bleCentral struct {
 
 func dialRadio(t *testing.T, p *bletest.Peripheral) *bleCentral {
 	t.Helper()
+	return dialRadioWith(t, p, btp.Options{})
+}
+
+// dialRadioWith is dialRadio with the central session's options — its
+// clock, so its acknowledgements keep pace with a fake bridge clock.
+func dialRadioWith(t *testing.T, p *bletest.Peripheral, opts btp.Options) *bleCentral {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	conn, err := bletest.NewCentral(p).Connect(ctx, ble.Peripheral{Address: p.Address})
@@ -84,7 +91,7 @@ func dialRadio(t *testing.T, p *bletest.Peripheral) *bleCentral {
 		Write:      func(b []byte) error { return conn.WriteC1(context.Background(), b) },
 		Disconnect: conn.Disconnect,
 		Message:    func(m []byte) error { c.replies <- m; return nil },
-	}, 244, btp.Options{})
+	}, 244, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,4 +552,108 @@ func TestWithdrawBLEDisconnectsCentralWithoutSecureSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitReply(t, next.replies)
+}
+
+// TestBLECentralWithoutPASEIsDroppedAfterTheHandshakeBound: a central that
+// completed the BTP handshake — whether or not a window is open — and has
+// neither a secure session nor a PASE handshake in flight on its
+// connection btp.ConnRspTimeout later is disconnected, so it does not hold
+// the one BLE place; one whose connection carries a secure session stays
+// (review II, R2-P3-dr-net-03).
+func TestBLECentralWithoutPASEIsDroppedAfterTheHandshakeBound(t *testing.T) {
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	h, p := newBLEHarness(t, clk)
+	if err := h.bridge.WithdrawBLE(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	opened := func() bool {
+		h.bridge.ble.mu.Lock()
+		defer h.bridge.ble.mu.Unlock()
+		return h.bridge.ble.centralConn != nil
+	}
+
+	// The centrals acknowledge on the bridge's clock, as a real one does
+	// within its own send-ack timer, so only the bound can end them.
+	central := btp.Options{TimeSource: clk}
+	idle := dialRadioWith(t, p, central) // after the window: the BTP handshake only
+	waitFor(t, "the BTP connection opened", opened)
+	advanceBy(clk, btp.ConnRspTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-idle.conn.Disconnected():
+	case <-ctx.Done():
+		t.Fatal("a central without a secure session or a PASE handshake still holds the BLE place")
+	}
+	waitFor(t, "the slot freed", func() bool {
+		h.bridge.ble.mu.Lock()
+		defer h.bridge.ble.mu.Unlock()
+		return h.bridge.ble.central == nil
+	})
+
+	if err := h.bridge.StartBLE(t.Context(), bleWindow); err != nil {
+		t.Fatal(err)
+	}
+	c := dialRadioWith(t, p, central)
+	waitFor(t, "the BTP connection opened", opened)
+	if err := c.s.Send(h.sealedInvoke(0x315)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, c.replies)
+	advanceBy(clk, 2*btp.ConnRspTimeout)
+	if err := c.s.Send(h.sealedInvoke(0x316)); err != nil {
+		t.Fatalf("a central whose connection carries a secure session was disconnected: %v", err)
+	}
+	waitReply(t, c.replies)
+	if c.disconnected() {
+		t.Fatal("a central whose connection carries a secure session was disconnected")
+	}
+}
+
+// advanceBy moves clk by d one second at a time, yielding after each step,
+// so the BTP sessions' acknowledgements on either side go out and arrive
+// between the steps.
+func advanceBy(clk *clocktest.Fake, d time.Duration) {
+	for range int(d / time.Second) {
+		clk.Advance(time.Second)
+		clk.Yield()
+	}
+}
+
+// TestBLECentralKeepsItsPlaceWhilePASERuns: a PASE handshake in flight on
+// the central's connection keeps it connected past the bound; once the
+// handshake is gone without a secure session, the next bound drops it
+// (review II, R2-P3-dr-net-03).
+func TestBLECentralKeepsItsPlaceWhilePASERuns(t *testing.T) {
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	h, p := newBLEHarness(t, clk)
+	c := dialRadioWith(t, p, btp.Options{TimeSource: clk})
+	var conn *btp.Conn
+	waitFor(t, "the BTP connection opened", func() bool {
+		h.bridge.ble.mu.Lock()
+		defer h.bridge.ble.mu.Unlock()
+		conn, _ = h.bridge.ble.centralConn.(*btp.Conn)
+		return conn != nil
+	})
+	r, _ := h.bridge.routeFor(conn).(*connRoute)
+	h.bridge.routeBindMu.Lock()
+	r.handshakes = map[uint16]handshakeHold{0x40: {pase: true, since: clk.Now()}}
+	h.bridge.routeBindMu.Unlock()
+
+	advanceBy(clk, 2*btp.ConnRspTimeout)
+	if c.disconnected() {
+		t.Fatal("a central with a PASE handshake in flight was disconnected")
+	}
+
+	h.bridge.routeBindMu.Lock()
+	r.handshakes = nil
+	h.bridge.routeBindMu.Unlock()
+	advanceBy(clk, btp.ConnRspTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-c.conn.Disconnected():
+	case <-ctx.Done():
+		t.Fatal("a central whose PASE handshake ended without a secure session still holds the BLE place")
+	}
 }

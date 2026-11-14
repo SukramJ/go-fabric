@@ -108,7 +108,12 @@ cfg.Network.BLE = radio
 The QR code of `Node.SetupPayload` names BLE discovery beside the IP
 network only with `Network.BLE` set; the manual code carries no discovery
 bits. BTP is reliable, so MRP does not run over it; a lost BLE connection
-closes the sessions it carried.
+closes the sessions it carried. Whether a window is open or not, a
+central that has neither a secure session nor a PASE handshake in flight
+on its connection 15 s after the BTP handshake (`btp.ConnRspTimeout`), or
+at any 15 s step after, is disconnected (log event `matter.ble.central_dropped`),
+so a central that never starts PASE, or idles after a failed attempt,
+does not hold the one place.
 
 `ble/bluez` speaks BlueZ's D-Bus API and shares the adapter with
 bluetoothd. It needs the system-bus rights its central needs (the
