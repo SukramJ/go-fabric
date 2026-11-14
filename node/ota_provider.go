@@ -52,6 +52,14 @@ type OTAProviderConfig struct {
 	// grants the access, or the host returns true here for the fabrics it
 	// opens the provider to. The node asks at Start and after each
 	// CommissioningComplete, on the calling goroutine.
+	//
+	// A grant only ever adds the entry. Withdrawing it — false for a fabric
+	// granted before, or GrantFabric left nil — removes nothing: the entry
+	// a granting start wrote, like the one a version before GrantFabric
+	// wrote into every fabric's ACL, stays in that fabric's ACL, because the
+	// node cannot tell an entry it wrote from one the fabric's administrator
+	// wrote. The fabric's administrator removes it by writing the fabric's
+	// ACL without it.
 	GrantFabric func(fabric FabricInfo) bool
 }
 
@@ -212,6 +220,8 @@ func (n *Node) otaProviderEndpointID() (uint16, bool) {
 // fabricAuthority.fabrics[0]; FabricAuthority.ts:112-114, :126-128: the
 // fabrics whose root certificate is its CA's), which a [Node] does not
 // have. The facade calls it at Start and after each CommissioningComplete.
+// It never removes an entry, from a fabric it no longer grants either
+// (see GrantFabric).
 func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 	if n.otaProvider == nil || n.cfg.OTAProvider == nil || n.cfg.OTAProvider.GrantFabric == nil {
 		return
