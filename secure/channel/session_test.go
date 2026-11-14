@@ -301,3 +301,40 @@ func TestCloseDropsCipherReferences(t *testing.T) {
 		t.Fatalf("Decrypt after Close: err = %v, want ErrSessionInactive", err)
 	}
 }
+
+// TestDecryptAcceptsCounterOvertakenAtSessionStart — the first two
+// messages of a session arrive out of order: the overtaken one is new,
+// not a duplicate, because the reception window starts at counter 0 as
+// both references start it (matter.js
+// packages/protocol/src/session/NodeSession.ts:124; connectedhomeip
+// src/protocols/secure_channel/PairingSession.cpp:50).
+func TestDecryptAcceptsCounterOvertakenAtSessionStart(t *testing.T) {
+	aCfg, bCfg := aliceBobConfigs()
+	aCfg.InitialCounter = 5000
+	alice, err := New(aCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := New(bCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var h1, h2 message.Header
+	first, err := alice.Encrypt(&h1, 0, []byte("first"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := alice.Encrypt(&h2, 0, []byte("second"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, dup, err := bob.Decrypt(&h2, 0, second.Ciphertext); err != nil || dup {
+		t.Fatalf("second message first: err=%v dup=%v (want nil, false)", err, dup)
+	}
+	if _, dup, err := bob.Decrypt(&h1, 0, first.Ciphertext); err != nil || dup {
+		t.Fatalf("overtaken first message: err=%v dup=%v (want nil, false)", err, dup)
+	}
+	if _, dup, err := bob.Decrypt(&h1, 0, first.Ciphertext); err != nil || !dup {
+		t.Fatalf("first message again: err=%v dup=%v (want nil, true)", err, dup)
+	}
+}

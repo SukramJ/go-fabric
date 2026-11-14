@@ -148,9 +148,13 @@ func New(cfg Config) (*Session, error) {
 		out:           counter,
 		// Secure sessions use a no-rollover reception window: a counter
 		// that appears to wrap is a duplicate, not a fresh value — the
-		// session re-establishes before the counter rolls over. Mirrors
-		// matter.js NodeSession.ts:122 (MessageReceptionStateEncryptedWithoutRollover).
-		in: mrp.NewWindowNoRollover(),
+		// session re-establishes before the counter rolls over. The
+		// window starts anchored at counter 0, so the counters below the
+		// peer's first one stay acceptable within the 32-window. Mirrors
+		// matter.js packages/protocol/src/session/NodeSession.ts:124
+		// `messageReceptionState: new MessageReceptionStateEncryptedWithoutRollover(0)`
+		// and connectedhomeip src/protocols/secure_channel/PairingSession.cpp:50.
+		in: mrp.NewWindowNoRolloverAt(0),
 	}
 	sess.encCipher.Store(enc)
 	sess.decCipher.Store(dec)
