@@ -1438,7 +1438,7 @@ type serviceRetransmitter interface {
 // waits for it before the advertiser closes. No-op once the bridge
 // stopped — matter.js shuts the advertiser down before removing
 // sessions to prevent exactly this re-announce
-// (ServerNetworkRuntime.ts:427).
+// (ServerNetworkRuntime.ts:450-453 at db021da0).
 func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 	if fabricIndex == 0 {
 		return

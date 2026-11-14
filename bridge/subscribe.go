@@ -1953,7 +1953,7 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				// A controller's write is one commit with one advance:
 				// the dispatcher's (endpoint/dispatcher.go WriteAuthorized),
 				// so the change the write itself reports does not advance
-				// it again (matter.js Datasource.ts:1440-1448,
+				// it again (matter.js Datasource.ts:1446-1457 at db021da0,
 				// advanceVersion once per commit).
 				if change.Origin != contract.OriginControllerWrite {
 					ep.BumpDataVersionOf(clusterID)
@@ -1976,7 +1976,9 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // advances the touched clusters' endpoint-hosted DataVersion BEFORE dirty-
 // marking (so the shipped report carries the post-change version and a
 // controller's DataVersionFilter misses on the next read — mirrors matter.js
-// Datasource.ts:1035), then marks every path dirty on the Subscribe manager. The
+// Datasource.ts:1456-1457 at db021da0, where a commit advances the version in
+// its first phase, ahead of the change notifications of postCommit,
+// :1286-1326), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
 func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID

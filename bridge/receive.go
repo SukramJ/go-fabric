@@ -960,7 +960,8 @@ func (b *Bridge) notifyReachable(ep *endpoint.Endpoint, reachable bool) {
 		contract.EventPriorityInfo)
 	// Advance the endpoint-hosted BDBI DataVersion — the reachability
 	// flip is a cluster state change, so DataVersionFilters must miss
-	// afterwards (matter.js Datasource.ts:1035).
+	// afterwards (matter.js Datasource.ts:1456-1457 at db021da0: a
+	// commit that changed a property advances the version).
 	ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
 	// Also dirty the Reachable ATTRIBUTE (BDBI 0x0039 / 0x0011), not
 	// just fire the event: a controller subscribed to the attribute
