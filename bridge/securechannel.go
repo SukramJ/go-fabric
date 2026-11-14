@@ -517,14 +517,26 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		b.abandonHandshakeReplies(key)
 		ch := b.resolveCaseContinuation(key)
+		// A refusal comes back as a failure StatusReport reply, not as an
+		// error ([CaseAdapter.ProcessSigma3]): what the reply says decides
+		// whether a session was established.
+		established := false
+		processSigma3 := func(p []byte) (uint8, []byte, error) {
+			op, reply, err := ch.ProcessSigma3(p)
+			established = err == nil && establishedBy(op, reply)
+			return op, reply, err
+		}
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
-			ch.ProcessSigma3, ch); err != nil {
+			processSigma3, ch); err != nil {
 			return err
 		}
 		// Sigma3 closes the CASE handshake on the wire — forget the
 		// per-exchange Sigma1 dedupe entry so a later exchange-id
 		// rollover starts clean.
 		b.forgetSigma1Replied(key)
+		if !established {
+			return nil
+		}
 		// A completed Sigma3 is the moment a secure session exists. An
 		// operator reading the trace after a controller went quiet needs
 		// the open as much as the close: "it never came back after 14:02"
