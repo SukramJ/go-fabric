@@ -217,6 +217,18 @@ func (s *WasherServer) MatterRead(attrID uint32) (any, bool) { return s.srv.Matt
 // write: the definition's checks, then chip's, then the listener hears of
 // a change (LaundryWasherControlsCluster.cpp:49-67, :83-113).
 func (s *WasherServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	// NumberOfRinses' enum membership is this server's to judge, not the
+	// definition's: a value of the enum's width that SupportedRinses does
+	// not list — defined or not — is INVALID_IN_STATE, as chip answers it
+	// (LaundryWasherControlsCluster.cpp:132-145 at 6170af84) and
+	// TC-WASHERCTRL-2.2 step 6 expects (owner decision 69).
+	if attrID == lwc.AttrNumberOfRinses && s.Serves(attrID) {
+		if n, ok := uintValue(value); ok && n <= 0xFF {
+			if err := s.checkRinses(NumberOfRinses(n)); err != nil {
+				return err
+			}
+		}
+	}
 	before, _ := s.srv.Value(attrID)
 	if err := s.srv.MatterWrite(ctx, attrID, value); err != nil {
 		return err
@@ -387,4 +399,16 @@ func nullable(p *uint8) any {
 		return nil
 	}
 	return *p
+}
+
+// uintValue is v as an unsigned integer when v is one, a named type
+// included.
+func uintValue(v any) (uint64, bool) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() { //nolint:exhaustive // only the unsigned kinds carry a rinse count
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return rv.Uint(), true
+	default:
+		return 0, false
+	}
 }

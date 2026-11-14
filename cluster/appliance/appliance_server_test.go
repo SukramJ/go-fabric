@@ -491,3 +491,31 @@ func TestMicrowaveHostStatusPassesThrough(t *testing.T) {
 		t.Errorf("AddMoreTime refused without a status answered %v, want FAILURE", err)
 	}
 }
+
+// TestLaundryWasherControlsCertificationStep holds the answer
+// TC-WASHERCTRL-2.2 step 6 expects (Test_TC_WASHERCTRL_2_2.yaml:86-95 at
+// 6170af84): NumberOfRinses 4, a value NumberOfRinsesEnum does not define,
+// is INVALID_IN_STATE — chip judges it as a rinse count the device does
+// not support (LaundryWasherControlsCluster.cpp:132-145), where the
+// model's enum answered CONSTRAINT_ERROR first (owner decision 69). A value
+// past the enum's width stays CONSTRAINT_ERROR.
+func TestLaundryWasherControlsCertificationStep(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv, err := appliance.NewLaundryWasherControls(appliance.WasherConfig{
+		Features:        appliance.WasherFeatureRinse,
+		SupportedRinses: []appliance.NumberOfRinses{lwc.NumberOfRinsesNormal}, NumberOfRinses: lwc.NumberOfRinsesNormal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.MatterWrite(ctx, lwc.AttrNumberOfRinses, uint64(4)); status(t, err) != im.StatusInvalidInState {
+		t.Errorf("NumberOfRinses 4: %v, want INVALID_IN_STATE", err)
+	}
+	if err := srv.MatterWrite(ctx, lwc.AttrNumberOfRinses, uint64(256)); status(t, err) != im.StatusConstraintError {
+		t.Errorf("NumberOfRinses 256: %v, want CONSTRAINT_ERROR", err)
+	}
+	if got := srv.NumberOfRinses(); got != lwc.NumberOfRinsesNormal {
+		t.Errorf("NumberOfRinses after the refusals = %d, want Normal", got)
+	}
+}
