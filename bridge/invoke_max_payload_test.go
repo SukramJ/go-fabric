@@ -103,3 +103,39 @@ func TestInvokeMaxPayloadSizeFollowsThePeerBound(t *testing.T) {
 		t.Fatalf("a peer bound below the UDP bound: %d, want 1178", got)
 	}
 }
+
+// TestInitiatedExchangeMaxPayloadSizeFollowsThePeerBound: an exchange over
+// a connection carries at most the smaller of the connection's frame and
+// the MaxTcpMessageSize the session's peer stated, less the 54-byte
+// message overhead, never below the UDP bound — the bound a reply on the
+// same session keeps ([Bridge.chunkLimitsFor]). matter.js
+// MessageChannel.maxPayloadSize caps a TCP channel at
+// Session.peerMaxTcpMessageSize
+// (packages/protocol/src/protocol/MessageChannel.ts:86-92,
+// packages/protocol/src/session/Session.ts:237-239 at db021da0), and
+// MessageExchange.maxPayloadSize subtracts the overhead
+// (MessageExchange.ts:465-469).
+func TestInitiatedExchangeMaxPayloadSizeFollowsThePeerBound(t *testing.T) {
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	if got := (&initiatedSecureExchange{b: b, sessionID: 1, addr: &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}}).MaxPayloadSize(); got != 1178 {
+		t.Fatalf("UDP route: %d, want 1178", got)
+	}
+	var c transport.Conn = &sizedConn{size: 64_000}
+	ex := &initiatedSecureExchange{b: b, sessionID: 1, addr: b.routeFor(c)}
+	if got := ex.MaxPayloadSize(); got != 64_000-54 {
+		t.Fatalf("connection without a peer bound: %d, want %d", got, 64_000-54)
+	}
+	b.mu.Lock()
+	prev := b.sessions
+	b.sessions = stubTransports{SessionLookup: prev, sid: 1, trans: 1 << 2, max: 8192}
+	b.mu.Unlock()
+	if got := ex.MaxPayloadSize(); got != 8192-54 {
+		t.Fatalf("peer bound 8192: %d, want %d", got, 8192-54)
+	}
+	b.mu.Lock()
+	b.sessions = stubTransports{SessionLookup: prev, sid: 1, trans: 1 << 2, max: 1000}
+	b.mu.Unlock()
+	if got := ex.MaxPayloadSize(); got != 1178 {
+		t.Fatalf("a peer bound below the UDP bound: %d, want 1178", got)
+	}
+}

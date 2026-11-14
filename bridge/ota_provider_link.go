@@ -58,7 +58,9 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 
 // ErrPayloadTooLarge is an Invoke whose request does not fit one message
 // of the session it would go over: over UDP [exchangeMaxPayloadSize], over
-// a TCP connection the connection's largest message. connectedhomeip's
+// a TCP connection the connection's largest message, bounded by the
+// MaxTcpMessageSize the session's peer stated
+// ([initiatedSecureExchange.MaxPayloadSize]). connectedhomeip's
 // camera sends its WebRTC signals with TransportPayloadCapability::
 // kLargePayload, which establishes the session over TCP
 // (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
@@ -568,12 +570,17 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 
 // MaxPayloadSize implements [bdx.Exchange]: the channel's maximum less the
 // message overhead, as matter.js MessageExchange.maxPayloadSize computes
-// it (MessageExchange.ts:465-469) — over UDP [exchangeMaxPayloadSize],
-// over a TCP connection the connection's largest message
-// (tcp.Conn.MaxMessageSize, MAX_TCP_MESSAGE_SIZE without the length
-// prefix, TcpChannel.ts:37-41 at db021da0) less the same overhead.
+// it (packages/protocol/src/protocol/MessageExchange.ts:465-469 at
+// db021da0) — over UDP [exchangeMaxPayloadSize], over a TCP connection the
+// connection's largest message (tcp.Conn.MaxMessageSize,
+// MAX_TCP_MESSAGE_SIZE without the length prefix, TcpChannel.ts:37-41)
+// capped at the MaxTcpMessageSize the session's peer stated, less the same
+// overhead: matter.js's MessageChannel.maxPayloadSize caps a TCP channel at
+// Session.peerMaxTcpMessageSize (MessageChannel.ts:86-92), never below the
+// UDP size (Session.ts:237-239). [Bridge.invokeMaxPayloadSize] computes
+// it, the bound a reply on the session keeps too ([Bridge.chunkLimitsFor]).
 func (e *initiatedSecureExchange) MaxPayloadSize() int {
-	return routeMaxPayloadSize(e.route())
+	return e.b.invokeMaxPayloadSize(e.route(), e.sessionID)
 }
 
 // routeMaxPayloadSize is the largest payload one message on route carries:
@@ -593,7 +600,9 @@ func routeMaxPayloadSize(route net.Addr) int {
 }
 
 // invokeMaxPayloadSize is the largest payload one message of a request's
-// exchange carries, for the invoke context ([im.WithMaxPayloadSize]): as
+// exchange carries, for the invoke context ([im.WithMaxPayloadSize]) and
+// for an exchange of the session this node opens or answers on
+// ([initiatedSecureExchange.MaxPayloadSize]): as
 // [routeMaxPayloadSize], over TCP also bounded by the MaxTcpMessageSize the
 // session's peer stated — matter.js MessageChannel.maxPayloadSize, the
 // channel's maximum and over TCP `Math.min(channelMax,
