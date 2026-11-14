@@ -576,23 +576,76 @@ func TestStoredNumbersSurviveAbsence(t *testing.T) {
 	}
 }
 
-// TestBootReason: the node reports the BootReason its GeneralDiagnostics
-// emits — PowerOnReboot (1) for a node the facade builds.
+// TestBootReason: the node reports the configured BootReason, Unspecified
+// when unset as matter.js's (GeneralDiagnosticsServer.ts:417-420 at
+// db021da0); a start into the version the node's OTA requestor recorded as
+// the update in progress is SoftwareUpdateCompleted, which keeps a lighting
+// OnOff server from applying StartUpOnOff (OnOffServer.ts:33-37, :324-329).
 func TestBootReason(t *testing.T) {
 	t.Parallel()
-	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
-	if got := n.BootReason(); got != mattercore.BootReasonPowerOnReboot {
-		t.Errorf("BootReason %d, want %d", got, mattercore.BootReasonPowerOnReboot)
+	startUpApplied := func(t *testing.T, n *node.Node) bool {
+		t.Helper()
+		srv, err := onoff.New(onoff.Config{
+			Features: onoff.FeatureLT, BootReason: n.BootReason,
+			Initial: map[uint32]any{onoff.AttrStartUpOnOff: onoff.StartUpOn},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return srv.OnOff()
 	}
-	srv, err := onoff.New(onoff.Config{
-		Features: onoff.FeatureLT, BootReason: n.BootReason,
-		Initial: map[uint32]any{onoff.AttrStartUpOnOff: onoff.StartUpOn},
+	t.Run("unset is Unspecified", func(t *testing.T) {
+		t.Parallel()
+		n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+		if got := n.BootReason(); got != mattercore.BootReasonUnspecified {
+			t.Errorf("BootReason %d, want Unspecified", got)
+		}
+		if !startUpApplied(t, n) {
+			t.Error("StartUpOnOff not applied")
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !srv.OnOff() {
-		t.Error("StartUpOnOff not applied after a power-on reboot")
+	t.Run("the host's value", func(t *testing.T) {
+		t.Parallel()
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		cfg.BootReason = mattercore.BootReasonSoftwareReset
+		if got := newNode(t, cfg).BootReason(); got != mattercore.BootReasonSoftwareReset {
+			t.Errorf("BootReason %d, want SoftwareReset", got)
+		}
+		cfg.BootReason = mattercore.BootReasonSoftwareReset + 1
+		if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
+			t.Errorf("BootReason 7 passed Validate: %v", err)
+		}
+	})
+	for name, tc := range map[string]struct {
+		recorded uint32
+		want     uint8
+	}{
+		"a start into the recorded update": {1, mattercore.BootReasonSoftwareUpdate},
+		"a start that did not reach it":    {2, mattercore.BootReasonPowerOnReboot},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "node.db")
+			cfg := minimalConfig(openDB(t, path))
+			cfg.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+			cfg.BootReason = mattercore.BootReasonPowerOnReboot
+			n := newNode(t, cfg)
+			state := fmt.Sprintf(`{"activeOtaProviders":[],"updateInProgressDetails":{"newSoftwareVersion":%d}}`, tc.recorded)
+			if err := n.Store().SaveOTARequestorState(t.Context(), []byte(state)); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.Stop(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			cfg.Store.DB = openDB(t, path)
+			m := newNode(t, cfg) // SoftwareVersion 1 runs
+			if got := m.BootReason(); got != tc.want {
+				t.Errorf("BootReason %d, want %d", got, tc.want)
+			}
+			if got, want := startUpApplied(t, m), tc.want != mattercore.BootReasonSoftwareUpdate; got != want {
+				t.Errorf("StartUpOnOff applied %v, want %v", got, want)
+			}
+		})
 	}
 }
 

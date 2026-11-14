@@ -77,6 +77,17 @@ type Config struct {
 	// OTA mounts the OTA Software Update Requestor on the root when set;
 	// nil leaves it out (and the OtaRequestor device type with it).
 	OTA *OTAConfig
+	// BootReason is the GeneralDiagnostics BootReason this start reports
+	// (the BootReason event [Node.Start] emits, [Node.BootReason]): a
+	// BootReasonEnum value of cluster/core (mattercore.BootReasonUnspecified
+	// … BootReasonSoftwareReset). The zero value is Unspecified, matter.js's
+	// default (GeneralDiagnosticsServer.ts:417-420 at db021da0, `bootReason
+	// ?? BootReason.Unspecified`). A start into the version an update of
+	// the node's own OTA requestor installed is SoftwareUpdateCompleted
+	// whatever this states: the requestor's record of the update in
+	// progress names the version that now runs, the record the requestor
+	// reports VersionApplied on (OtaSoftwareUpdateRequestorServer.ts:255-283).
+	BootReason uint8
 	// ICD makes the node an intermittently connected device: ICD
 	// Management on the root, Check-Ins to its registered clients, the
 	// ICD advertisement ([ICDConfig], [Node.ICD]). nil, the default, is a
@@ -680,6 +691,9 @@ func (c *Config) Validate() error {
 	case endpoint.DeviceTypeValidationWarn, endpoint.DeviceTypeValidationStrict, endpoint.DeviceTypeValidationOff:
 	default:
 		errs = append(errs, fmt.Errorf("node: DeviceTypeValidation %d is not a mode; it must be one of warn, strict, off", int(c.DeviceTypeValidation)))
+	}
+	if c.BootReason > mattercore.BootReasonSoftwareReset {
+		errs = append(errs, fmt.Errorf("node: BootReason %d is not a BootReasonEnum value", c.BootReason))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))

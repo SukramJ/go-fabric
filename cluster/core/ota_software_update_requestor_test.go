@@ -1337,3 +1337,29 @@ func TestOTARequestor_BDXDownloadIsCapped(t *testing.T) {
 		t.Fatal("partial file left")
 	}
 }
+
+// TestOTAUpdateApplied: the persisted record of an update in progress names
+// the version that now runs — #handlePreviousUpdateOnStart's condition for
+// VersionApplied (OtaSoftwareUpdateRequestorServer.ts:258, :280 at
+// db021da0); no record, another version or an unreadable record is not.
+func TestOTAUpdateApplied(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		state   []byte
+		applied bool
+		err     bool
+	}{
+		"no record":          {nil, false, false},
+		"no update":          {[]byte(`{"activeOtaProviders":[]}`), false, false},
+		"the running update": {[]byte(`{"updateInProgressDetails":{"newSoftwareVersion":3}}`), true, false},
+		"another version":    {[]byte(`{"updateInProgressDetails":{"newSoftwareVersion":4}}`), false, false},
+		"unreadable":         {[]byte(`{`), false, true},
+	} {
+		st := newMemOtaStore()
+		st.state = tc.state
+		applied, err := OTAUpdateApplied(t.Context(), st, 3)
+		if applied != tc.applied || (err != nil) != tc.err {
+			t.Errorf("%s: (%v, %v), want applied %v, error %v", name, applied, err, tc.applied, tc.err)
+		}
+	}
+}

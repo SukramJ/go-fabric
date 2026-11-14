@@ -252,7 +252,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: cfg.BootReason,
 		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -395,6 +395,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
 	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	n.bootReason = n.root.bootReason
 	n.setNetworkInterfaceRules()
 	// DiagnosticLogs hands logs over BDX on the requesting session
 	// (ADR 0021).
@@ -1493,9 +1494,11 @@ func (n *Node) setNetworkInterfaceRules() {
 }
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built
-// with — the value [Node.Start]'s EmitBootReason reports. The device layer
-// passes it to the default OnOff servers (onoff.Config.BootReason), which
-// skip StartUpOnOff after a software update (OnOffServer.ts:36, :326-331).
+// with — the value [Node.Start]'s EmitBootReason reports: [Config].BootReason,
+// or SoftwareUpdateCompleted for a start into the update the node's OTA
+// requestor recorded. A host passes it to a lighting OnOff server it builds
+// (onoff.Config.BootReason), which skips StartUpOnOff after a software
+// update (OnOffServer.ts:33-37, :324-329 at db021da0).
 func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.

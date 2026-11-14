@@ -951,6 +951,31 @@ func (r *OTASoftwareUpdateRequestor) goRun(fn func(ctx context.Context)) {
 	}()
 }
 
+// OTAUpdateApplied reports whether the requestor state in st records an
+// update in progress to running, the version that now runs: the update the
+// requestor's [OTASoftwareUpdateRequestor.Start] reports as applied
+// (VersionApplied). Mirrors the condition of matter.js
+// OtaSoftwareUpdateRequestorServer.ts #handlePreviousUpdateOnStart
+// (:255-283 at db021da0, newSoftwareVersion equal to the running
+// softwareVersion). A node reads it before the requestor starts, to state
+// GeneralDiagnostics BootReason SoftwareUpdateCompleted for the start the
+// update brought about. No record is false.
+func OTAUpdateApplied(ctx context.Context, st OtaRequestorStore, running uint32) (bool, error) {
+	raw, ok, err := st.LoadOTARequestorState(ctx)
+	if err != nil {
+		return false, fmt.Errorf("core: OTA requestor: %w", err)
+	}
+	if !ok {
+		return false, nil
+	}
+	var ps persistedState
+	if err := json.Unmarshal(raw, &ps); err != nil {
+		return false, fmt.Errorf("core: OTA requestor state: %w", err)
+	}
+	d := ps.UpdateInProgressDetails
+	return d != nil && d.NewSoftwareVersion == running, nil
+}
+
 // persistedState is the requestor state kept beside the attributes.
 type persistedState struct {
 	ActiveOtaProviders      []persistedActive    `json:"activeOtaProviders"`
