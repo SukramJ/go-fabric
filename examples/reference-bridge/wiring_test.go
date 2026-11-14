@@ -81,7 +81,9 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	// does: the node's SetOnFailSafeStarting hook (PrepareFreshFailSafe)
 	// runs before the arm is recorded and drops what an earlier attempt
 	// left pending.
-	root.GeneralCommissioning.AutoArmOnPaseEstablished(ctx)
+	if err := root.GeneralCommissioning.ArmOnPaseEstablished(ctx); err != nil {
+		t.Fatalf("the PASE arm: %v", err)
+	}
 
 	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})
 	if err != nil {

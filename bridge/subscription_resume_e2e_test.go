@@ -645,12 +645,12 @@ func (r staticResolver) ResolveOperational(_ context.Context, cfid [8]byte, _ ui
 
 func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) CaseInitiatorProvider {
 	return func(_ context.Context, fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error) {
-		sid, err := sessions.AllocateID()
+		stake, err := sessions.AllocateStake()
 		if err != nil {
 			return nil, err
 		}
 		ini, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
-			Identity: fab.device, Verifier: fab.verifier, SessionID: sid,
+			Identity: fab.device, Verifier: fab.verifier, SessionID: stake.ID,
 			PeerNodeID: peerNodeID, RootPublicKey: fab.root,
 		})
 		if err != nil {
@@ -660,10 +660,10 @@ func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) Ca
 			Initiator:          ini,
 			CompressedFabricID: fab.cfid,
 			OnEstablished: func(_ context.Context, res sigma.InitiatorResult) error {
-				_, err := sessions.OpenFromSigmaAsInitiatorWithID(sid, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				_, err := sessions.OpenFromSigmaAsInitiatorWithID(stake.ID, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				return err
 			},
-			OnAbandoned: func() { sessions.ReleaseID(sid) },
+			OnAbandoned: func() { sessions.ReleaseStake(stake) },
 		}, nil
 	}
 }
