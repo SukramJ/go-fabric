@@ -233,7 +233,11 @@ func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struc
 // RockSetting, WindSetting, AirflowDirection), and ApplyFanSettings
 // applies what a controller's write or a Step resolved to — the
 // fields the coupling rules determine, the others nil
-// (cluster/fan).
+// (cluster/fan). A controller's write reaches ApplyFanSettings (or
+// a setter) only when the written value differs from the one
+// FanState reads; the held value reaches no setter. A write that
+// reaches one counts as a change whether or not FanState shows it
+// when the setter returns.
 type StateSource interface {
 	FanState() State
 	ApplyFanSettings(ctx context.Context, p Patch) error
