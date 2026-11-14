@@ -117,14 +117,14 @@ func TestDecodeSetRegulatoryConfigRequest(t *testing.T) {
 	}
 }
 
-// ─── decodeCommissioningCompleteRequest ─────────────────────────────────────
+// ─── CommissioningComplete ──────────────────────────────────────────────────
 
 func TestDecodeCommissioningCompleteRequest(t *testing.T) {
 	t.Parallel()
 	dec := buildDecoderAfterStructOpen(func(_ *tlv.Encoder) {}) // empty struct
-	v, err := decodeCommissioningCompleteRequest(dec)
-	if err != nil {
-		t.Fatalf("decodeCommissioningCompleteRequest: %v", err)
+	v, ok, err := generalCommissioningFieldsReader(cmdPath(0x0030, 0x04), dec)
+	if err != nil || !ok {
+		t.Fatalf("CommissioningComplete: %v %v", ok, err)
 	}
 	if v != nil {
 		t.Errorf("expected nil fields, got %v", v)
@@ -597,8 +597,10 @@ func TestCommandFieldsReader_AddNOC(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
-	enc.PutOctets(tlv.ContextTag(0), []byte{0xAA}) // NOCValue
-	enc.PutUint(tlv.ContextTag(4), 0xFFF1)         // AdminVendorID
+	enc.PutOctets(tlv.ContextTag(0), []byte{0xAA})        // NOCValue
+	enc.PutOctets(tlv.ContextTag(2), make([]byte, 16))    // IPKValue
+	enc.PutUint(tlv.ContextTag(3), 0x0001_0203_0405_0607) // CaseAdminSubject
+	enc.PutUint(tlv.ContextTag(4), 0xFFF1)                // AdminVendorID
 	_ = enc.EndContainer()
 	raw, _ := enc.Bytes()
 	dec := tlv.NewDecoder(raw)
@@ -1334,7 +1336,11 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 	// AdministratorCommissioningServer.ts:42, :92-97 at db021da0).
 	enc = tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutUint(tlv.ContextTag(0), 600)
+	enc.PutOctets(tlv.ContextTag(1), verifier)
 	enc.PutUint(tlv.ContextTag(2), 4096)
+	enc.PutUint(tlv.ContextTag(3), 10000)
+	enc.PutOctets(tlv.ContextTag(4), salt)
 	_ = enc.EndContainer()
 	raw, _ = enc.Bytes()
 	dec = tlv.NewDecoder(raw)

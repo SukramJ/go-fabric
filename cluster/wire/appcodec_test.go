@@ -271,11 +271,20 @@ func TestAppCodecCommandFieldsReader(t *testing.T) {
 		t.Fatalf("AddGroup fields = %+v", fields)
 	}
 
-	// A group id of 0 is below the request's constraint.
+	// AddGroup's group id is the server's to judge (the relaxation of
+	// matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at
+	// db021da0, which the definition carries); ViewGroup's keeps its
+	// "min 1".
 	b = encodeTop(t, func(e *tlv.Encoder) { groups.AddGroupRequest{GroupName: "x"}.EncodeTLV(e, tlv.AnonymousTag()) })
 	dec, el = openFirst(t, b)
-	if _, err := wire.CommandFieldsReader(addGroup, dec, el); err == nil {
-		t.Fatal("AddGroup with group id 0: want an error")
+	if _, err := wire.CommandFieldsReader(addGroup, dec, el); err != nil {
+		t.Fatalf("AddGroup with group id 0: %v, want it decoded for the server", err)
+	}
+	b = encodeTop(t, func(e *tlv.Encoder) { groups.ViewGroupRequest{}.EncodeTLV(e, tlv.AnonymousTag()) })
+	dec, el = openFirst(t, b)
+	viewGroup := im.ConcreteCommandPath{Endpoint: 1, Cluster: groups.ClusterID, Command: groups.CmdViewGroup}
+	if _, err := wire.CommandFieldsReader(viewGroup, dec, el); err == nil {
+		t.Fatal("ViewGroup with group id 0: want an error")
 	}
 
 	// A command no definition decodes takes the generic map.

@@ -68,6 +68,34 @@ var serverRelaxations = []struct {
 		{kind: relaxRequestField, key: "OperationalCredentials.AttestationRequest.AttestationNonce", ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
 		{kind: relaxRequestField, key: "OperationalCredentials.CsrRequest.CsrNonce", ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
 	}},
+	{"cluster/wire AdministratorCommissioning", []relaxation{
+		// "relax constraints on OpenCommissioningWindow fields … so the
+		// behavior can validate and return PakeParameterError or
+		// INVALID_COMMAND" (BD-Matter-AdminCommissioning-OpenWindowParams).
+		{kind: relaxRequestField, key: "AdministratorCommissioning.OpenCommissioningWindow.PakePasscodeVerifier", ref: adminCommRelaxed},
+		{kind: relaxRequestField, key: "AdministratorCommissioning.OpenCommissioningWindow.Iterations", ref: adminCommRelaxed},
+		{kind: relaxRequestField, key: "AdministratorCommissioning.OpenCommissioningWindow.Salt", ref: adminCommRelaxed},
+		{kind: relaxRequestField, key: "AdministratorCommissioning.OpenCommissioningWindow.Discriminator", ref: adminCommRelaxed},
+	}},
+	{"cluster/core Groups", []relaxation{
+		// "relax constraints on command request fields … so the behavior
+		// can validate and return proper Status responses".
+		{kind: relaxRequestField, key: "Groups.AddGroup.GroupId", ref: groupsRelaxed},
+		{kind: relaxRequestField, key: "Groups.AddGroup.GroupName", ref: groupsRelaxed},
+		{kind: relaxRequestField, key: "Groups.AddGroupIfIdentifying.GroupId", ref: groupsRelaxed},
+		{kind: relaxRequestField, key: "Groups.AddGroupIfIdentifying.GroupName", ref: groupsRelaxed},
+	}},
+	{"cluster/core ScenesManagement", []relaxation{
+		// The same relaxation for the scene commands.
+		{kind: relaxRequestField, key: "ScenesManagement.AddScene.SceneId", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.AddScene.TransitionTime", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.AddScene.SceneName", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.ViewScene.SceneId", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.RemoveScene.SceneId", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.StoreScene.SceneId", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.CopyScene.SceneIdentifierFrom", ref: scenesRelaxed},
+		{kind: relaxRequestField, key: "ScenesManagement.CopyScene.SceneIdentifierTo", ref: scenesRelaxed},
+	}},
 	{"cluster/lock DoorLockServer", []relaxation{
 		// A cluster with a Supervision-configured command skips the request
 		// schema's validation for every command (ProtocolService.ts:343-348);
@@ -119,8 +147,11 @@ var serverRelaxations = []struct {
 }
 
 const (
-	doorLockRefusal = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"
-	pavstEmptyLists = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"
+	adminCommRelaxed = "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"
+	groupsRelaxed    = "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"
+	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:126-159 at db021da0"
+	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"
+	pavstEmptyLists  = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"
 )
 
 // relaxationsOf returns the table's entries for cluster.

@@ -100,15 +100,26 @@ func TestGroupsServerSchemaRelaxation(t *testing.T) {
 	t.Parallel()
 
 	// :65-77 — the base AddGroup keeps GroupId min 1 and GroupName max 16;
-	// the server's request path does not (the two cases below).
+	// the server's request path does not (the two cases below). The
+	// definition is the server's: it keeps the base's constraints verbatim
+	// and carries the relaxation beside them (spec.Field.Relaxed, written
+	// from script/clustergen's relaxation table), so its decoder admits
+	// both.
 	t.Run("relaxes AddGroup GroupId/GroupName constraints relative to the base cluster", func(t *testing.T) {
 		t.Parallel()
-		var req groupsdef.AddGroupRequest
-		if err := req.DecodeTLV(encodeNode(t, groupsdef.AddGroupRequest{GroupId: 0, GroupName: "grp"})); err == nil {
-			t.Error("the base AddGroup accepted GroupId 0, want its min 1")
+		cmd := groupsdef.Definition.Command(groupsdef.CmdAddGroup, spec.Request)
+		for _, f := range cmd.Fields {
+			want := map[string]string{"GroupId": "min 1", "GroupName": "max 16"}[f.Name]
+			if want == "" {
+				continue
+			}
+			if f.Constraint.Text != want || f.Relaxed == "" {
+				t.Errorf("AddGroup.%s: constraint %q relaxed %q, want the base's %q with its relaxation", f.Name, f.Constraint.Text, f.Relaxed, want)
+			}
 		}
-		if err := req.DecodeTLV(encodeNode(t, groupsdef.AddGroupRequest{GroupId: 1, GroupName: anOverlongName})); err == nil {
-			t.Error("the base AddGroup accepted a 17-character GroupName, want its max 16")
+		var req groupsdef.AddGroupRequest
+		if err := req.DecodeTLV(encodeNode(t, groupsdef.AddGroupRequest{GroupId: 0, GroupName: anOverlongName})); err != nil {
+			t.Errorf("the server's AddGroup refused GroupId 0 with a 17-character GroupName: %v", err)
 		}
 	})
 

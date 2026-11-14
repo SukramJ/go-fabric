@@ -4,10 +4,18 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	admincommdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
+	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -19,64 +27,18 @@ import (
 // ([decodeByDefinition]) into the generated request struct
 // (<cluster>def.<Command>Request) every self-held server takes as its
 // primary form — one decoder, from one source (ADR 0026 principle 3).
-// Ahead of it run only the hand-written readers of the commissioning,
-// group and scene requests, whose servers are written against their
-// cluster/core request structs (notes/parity/by_design.md
-// BD-Matter-Commissioning-HandDecoders, BD-Matter-AdminCommissioning-OpenWindowParams);
-// a command no definition decodes is salvaged as a tag map.
+// The commissioning, group and scene requests keep their hand-written
+// readers, whose servers are written against their cluster/core request
+// structs (notes/parity/by_design.md BD-Matter-Commissioning-HandDecoders,
+// BD-Matter-AdminCommissioning-OpenWindowParams); each is first held to
+// its definition's request check ([heldByDefinition]), as every other
+// request is. A command no definition decodes is salvaged as a tag map.
 //
 // Decode failures wrap with the cluster / command identifier so operator
 // triage stays specific.
-func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) { //nolint:gocyclo,funlen // a dispatch table: one case per typed command decoder
-	switch path.Cluster {
-	case 0x0030: // GeneralCommissioning
-		switch path.Command {
-		case 0x00:
-			return decodeArmFailSafeRequest(dec)
-		case 0x02:
-			return decodeSetRegulatoryConfigRequest(dec)
-		case 0x04:
-			return decodeCommissioningCompleteRequest(dec)
-		}
-	case 0x003E: // OperationalCredentials
-		switch path.Command {
-		case 0x00:
-			return decodeAttestationRequest(dec)
-		case 0x02:
-			return decodeCertificateChainRequest(dec)
-		case 0x04:
-			return decodeCSRRequest(dec)
-		case 0x06:
-			return decodeAddNOCRequest(dec)
-		case 0x07:
-			return decodeUpdateNOCRequest(dec)
-		case 0x09:
-			return decodeUpdateFabricLabelRequest(dec)
-		case 0x0A:
-			return decodeRemoveFabricRequest(dec)
-		case 0x0B:
-			return decodeAddTrustedRootCertificateRequest(dec)
-		case 0x0C:
-			return decodeSetVidVerificationStatementRequest(dec)
-		case 0x0D:
-			return decodeSignVidVerificationRequest(dec)
-		}
-	case administratorCommissioningClusterID:
-		if path.Command == 0x00 { // OpenCommissioningWindow
-			return decodeOpenCommissioningWindowRequest(dec)
-		}
-	case mattercore.GroupsClusterID, 0x003F: // Groups, GroupKeyManagement
-		if fields, ok, err := groupCommandFieldsReader(path, dec); ok {
-			return fields, err
-		}
-	case mattercore.GroupcastClusterID:
-		if fields, ok, err := groupcastFieldsReader(path, dec); ok {
-			return fields, err
-		}
-	case mattercore.ScenesManagementClusterID:
-		if fields, ok, err := scenesFieldsReader(path, dec); ok {
-			return fields, err
-		}
+func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+	if def, read := handReader(path); read != nil {
+		return heldByDefinition(def, path, dec, el, read)
 	}
 	// Every other cluster with a generated definition (cluster/spec/...)
 	// decodes its request payloads through it, with the statuses
@@ -92,6 +54,175 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 	// blinds (WindowCovering.GoToLiftPercentage), color (ColorControl.*),
 	// thermostat setpoint, and lock-with-PIN commands.
 	return decodeGenericTagMap(dec)
+}
+
+// handRead is a hand-written request reader: ok is false for a command it
+// does not decode.
+type handRead func(path im.ConcreteCommandPath, dec *tlv.Decoder) (fields any, ok bool, err error)
+
+// handReader is the hand-written reader of path's cluster and the
+// definition its requests are held to; nil for a cluster without one.
+func handReader(path im.ConcreteCommandPath) (*spec.Cluster, handRead) {
+	switch path.Cluster {
+	case gencommdef.ClusterID:
+		return gencommdef.Definition, generalCommissioningFieldsReader
+	case opcredsdef.ClusterID:
+		return opcredsdef.Definition, operationalCredentialsFieldsReader
+	case administratorCommissioningClusterID:
+		return admincommdef.Definition, func(path im.ConcreteCommandPath, dec *tlv.Decoder) (any, bool, error) {
+			if path.Command != 0x00 { // OpenCommissioningWindow
+				return nil, false, nil
+			}
+			fields, err := decodeOpenCommissioningWindowRequest(dec)
+			return fields, true, err
+		}
+	case mattercore.GroupsClusterID:
+		return groupsdef.Definition, groupCommandFieldsReader
+	case gkmdef.ClusterID:
+		return gkmdef.Definition, groupCommandFieldsReader
+	case mattercore.GroupcastClusterID:
+		return groupcastdef.Definition, groupcastFieldsReader
+	case mattercore.ScenesManagementClusterID:
+		return scenesdef.Definition, scenesFieldsReader
+	}
+	return nil, nil
+}
+
+// heldByDefinition reads a request the bridge decodes by hand into a node,
+// holds it to its definition's request check — the request schema matter.js
+// validates every request against before the server runs, with the
+// server's relaxations the definition carries
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487 at
+// db021da0; [spec.Command.DecodeRequest]) — and hands the same fields to
+// the hand-written reader. A command the reader does not decode goes on to
+// the definition's decoder, else is salvaged as a tag map, as before. The
+// fields container is consumed, so every refusal says so
+// ([im.FieldsContainerConsumed]).
+func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element, read handRead) (any, error) {
+	n, err := spec.ReadContainer(dec, el)
+	if err != nil {
+		return nil, fmt.Errorf("%s command 0x%02X: %w", def.Name, path.Command, err)
+	}
+	if cmd := def.Command(path.Command, spec.Request); cmd != nil && cmd.Decode != nil {
+		if _, err := cmd.DecodeRequest(n); err != nil {
+			return nil, err
+		}
+	}
+	sub, _, err := reopen(n)
+	if err != nil {
+		return nil, err
+	}
+	fields, ok, err := read(path, sub)
+	if ok {
+		return fields, consumed(err)
+	}
+	if err != nil {
+		return nil, consumed(err)
+	}
+	sub, open, err := reopen(n)
+	if err != nil {
+		return nil, err
+	}
+	if fields, ok, err := decodeByDefinition(path, sub, open); ok {
+		return fields, consumed(err)
+	}
+	if sub, _, err = reopen(n); err != nil {
+		return nil, err
+	}
+	fields, err = decodeGenericTagMap(sub)
+	return fields, consumed(err)
+}
+
+// reopen is a decoder over n's encoding, positioned inside its container
+// as a [im.CommandFieldsReader] receives it, and the container's opening
+// element.
+func reopen(n spec.Node) (*tlv.Decoder, tlv.Element, error) {
+	enc := tlv.NewEncoder()
+	n.EncodeTLV(enc, n.El.Tag)
+	raw, err := enc.Bytes()
+	if err != nil {
+		return nil, tlv.Element{}, fmt.Errorf("fields: %w", err)
+	}
+	d := tlv.NewDecoder(raw)
+	open, err := d.Next()
+	if err != nil {
+		return nil, tlv.Element{}, fmt.Errorf("fields: %w", err)
+	}
+	return d, open, nil
+}
+
+// consumedReject is a reader's typed reject after [heldByDefinition] read
+// the fields container through its end.
+type consumedReject struct{ error }
+
+// MatterStatusCode implements [im.StatusCodeError].
+func (e consumedReject) MatterStatusCode() im.StatusCode {
+	if sce, ok := errors.AsType[im.StatusCodeError](e.error); ok {
+		return sce.MatterStatusCode()
+	}
+	return im.StatusSuccess
+}
+
+// FieldsContainerConsumed implements [im.FieldsContainerConsumed].
+func (consumedReject) FieldsContainerConsumed() bool { return true }
+
+// Unwrap returns the reader's error.
+func (e consumedReject) Unwrap() error { return e.error }
+
+// consumed marks a typed reject as one that consumed the container; nil
+// and an error without a status (a malformed request) pass as they are.
+func consumed(err error) error {
+	if _, ok := errors.AsType[im.StatusCodeError](err); !ok {
+		return err
+	}
+	return consumedReject{err}
+}
+
+// generalCommissioningFieldsReader is the hand-written reader of the
+// GeneralCommissioning requests.
+func generalCommissioningFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (fields any, ok bool, err error) {
+	switch path.Command {
+	case 0x00:
+		fields, err = decodeArmFailSafeRequest(dec)
+	case 0x02:
+		fields, err = decodeSetRegulatoryConfigRequest(dec)
+	case 0x04:
+		// CommissioningComplete carries no field: path-only Invoke.
+		err = drainContainer(dec)
+	default:
+		return nil, false, nil
+	}
+	return fields, true, err
+}
+
+// operationalCredentialsFieldsReader is the hand-written reader of the
+// OperationalCredentials requests.
+func operationalCredentialsFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (f any, ok bool, err error) { //nolint:gocyclo // a dispatch table: one case per command
+	switch path.Command {
+	case 0x00:
+		f, err = decodeAttestationRequest(dec)
+	case 0x02:
+		f, err = decodeCertificateChainRequest(dec)
+	case 0x04:
+		f, err = decodeCSRRequest(dec)
+	case 0x06:
+		f, err = decodeAddNOCRequest(dec)
+	case 0x07:
+		f, err = decodeUpdateNOCRequest(dec)
+	case 0x09:
+		f, err = decodeUpdateFabricLabelRequest(dec)
+	case 0x0A:
+		f, err = decodeRemoveFabricRequest(dec)
+	case 0x0B:
+		f, err = decodeAddTrustedRootCertificateRequest(dec)
+	case 0x0C:
+		f, err = decodeSetVidVerificationStatementRequest(dec)
+	case 0x0D:
+		f, err = decodeSignVidVerificationRequest(dec)
+	default:
+		return nil, false, nil
+	}
+	return f, true, err
 }
 
 // fieldConstraintError is the typed reject for a command field whose
@@ -242,16 +373,6 @@ func decodeSetRegulatoryConfigRequest(dec *tlv.Decoder) (mattercore.SetRegulator
 			req.Breadcrumb = el.Uint
 		}
 	}
-}
-
-// decodeCommissioningCompleteRequest reads the CommissioningComplete
-// fields. v1.5.1 spec defines no fields for the command — the
-// container is empty. This decoder still consumes the EndContainer
-// so the surrounding loop continues correctly. Returns nil for the
-// fields struct (path-only Invoke is the contract for empty-fields
-// commands).
-func decodeCommissioningCompleteRequest(dec *tlv.Decoder) (any, error) {
-	return nil, drainContainer(dec)
 }
 
 // decodeAttestationRequest reads OperationalCredentials AttestationRequest
