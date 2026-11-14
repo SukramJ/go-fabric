@@ -438,9 +438,10 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 // PerExchangeCaseProvider and through the singleton handler alike (review
 // II, R2-P4-rr-sec-04; l1 item 3). In matter.js a message on the
 // handshake's live exchange that does not acknowledge the pending report
-// fails before the retransmission timer is touched, sends nothing and
-// changes nothing (packages/protocol/src/protocol/MessageExchange.ts:521-534
-// at db021da0).
+// fails before the retransmission timer is touched
+// (packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0),
+// and nothing is sent for it: the exchange manager catches the error and
+// logs it (ExchangeManager.ts:435-438, :538-549).
 func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

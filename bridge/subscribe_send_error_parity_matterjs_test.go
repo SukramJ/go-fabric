@@ -279,10 +279,13 @@ func TestUndeliveredReportIsOneFailedUpdateParity(t *testing.T) {
 }
 
 // TestDeliveredReportRestartsTheFailedUpdateCount: an acknowledged report
-// is a delivered update, and the count of failed ones starts again —
+// is a delivered update, and the count of failed ones starts again.
 // matter.js ServerSubscription.ts:554-557 at db021da0 resets
 // #sendUpdateErrorCounter when #sendUpdateMessage returns, which is after
-// the report's acknowledgement (InteractionMessenger sendDataReport).
+// the peer's StatusResponse to the report
+// (packages/protocol/src/interaction/InteractionMessenger.ts:838-845,
+// waitForSuccess at :844); this module counts the update as delivered at
+// the report's acknowledgement (F-db021da0-36).
 func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 	t.Parallel()
 	r := newUndeliveredReportRig(t, 0x1501)

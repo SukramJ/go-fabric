@@ -2359,8 +2359,8 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // wireRootNotifiers already and is skipped here. A server that is a
 // [contract.AttributeReportNotifier] has its attributes marked dirty
 // through its report view — a quieter attribute by its throttle, as
-// matter.js's ServerBehaviorBacking subscribes a QuietEvent's `online`
-// observable (ServerBehaviorBacking.ts:251-259) — and the version
+// matter.js's ServerBehaviorBacking subscribes a QuietEvent's `quiet`
+// observable (ServerBehaviorBacking.ts:253-261 at db021da0) — and the version
 // advanced through OnAttributeChange, which tells of every change at once
 // ([quieterVersion]); any other server is subscribed through
 // OnAttributeChange alone. Caller holds b.mu.

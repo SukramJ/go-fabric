@@ -40,7 +40,8 @@ func (*colourServer) MatterReportable() []uint32                             { r
 // included (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
 // at db021da0), and at a quiet emit only for a dynamic property
 // (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261,
-// Datasource.ts:679-688) — ColorControl's remainingTime alone
+// Datasource.ts:679-688) — of the two clusters here, ColorControl's
+// remainingTime
 // (packages/node/src/behaviors/color-control/ColorControlServer.ts:1967-1984).
 // A change a controller's write made keeps the dispatcher's advance, and
 // a change while a command runs against the cluster advances at its report

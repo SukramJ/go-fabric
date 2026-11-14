@@ -1434,8 +1434,10 @@ func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeK
 // packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0: on
 // the handshake's live exchange a message that does not acknowledge the
 // pending report throws a flow error before it reaches the CASE server,
-// and nothing answers it. matter.js throws before it takes up the
-// message's acknowledgement (:553-561); this module acknowledges it, as it
+// and nothing answers it — the exchange manager catches the error and
+// logs it (ExchangeManager.ts:435-438, :538-549). matter.js throws before
+// it takes up the message's acknowledgement
+// (MessageExchange.ts:553-561); this module acknowledges it, as it
 // acknowledges a Sigma3 or Sigma2_Resume no handshake takes (owner
 // decision 70).
 func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overCompleted bool) error {

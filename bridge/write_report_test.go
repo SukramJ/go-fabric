@@ -68,8 +68,10 @@ func (s labelSource) MatterClusterServers() []contract.ClusterServer {
 // TestUnchangedWrittenAttributeIsNotReported: a write whose server says it
 // changed nothing (contract.ChangeReportingWriter) is not reported to a
 // subscriber; a write that changed the value is. matter.js broadcasts only
-// the properties a commit changed (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
-// an equal value no change at :1479, at db021da0).
+// the properties a commit changed
+// (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
+// db021da0, onChange with the change list :1484 fills; an equal value no
+// change at :1479).
 func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
 	t.Parallel()
 	labels, err := core.NewUserLabel(core.UserLabelConfig{})

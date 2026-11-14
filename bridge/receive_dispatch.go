@@ -920,9 +920,11 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 // An attribute changes records as unchanged — every write of it in the
 // interaction left the cluster as it was, by its server's verdict
 // (contract.ChangeReportingWriter) — is not marked: matter.js broadcasts
-// only the properties a commit changed and advances no version for an
-// equal value (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
-// :1479 at db021da0), and the dispatcher left the version as it was.
+// only the properties a commit changed
+// (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
+// db021da0, onChange with the change list :1484 fills) and advances no
+// version for an equal value (:1456-1457, :1479), and the dispatcher left
+// the version as it was.
 func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse, changes *endpointpkg.WriteChanges) {
 	mgr := b.subscriptionManagerLocked()
 	for _, r := range resp.Responses {
