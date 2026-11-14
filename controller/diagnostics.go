@@ -42,8 +42,12 @@ import (
 // matter.js exposes the same state as live sets — PeerSet.peers
 // (packages/protocol/src/peer/PeerSet.ts:218 at db021da0) and
 // SessionManager.sessions (session/SessionManager.ts:376) — and serves a
-// host no snapshot of it (BD-Matter-ControllerDiagnostics).
+// host no snapshot of it (BD-Matter-ControllerDiagnostics). Once Close has
+// begun it is the zero value.
 func (c *Controller) SessionDiagnostics() diag.SessionDiagnostics {
+	if _, ok := c.open(); !ok {
+		return diag.SessionDiagnostics{}
+	}
 	now := c.clock.Now()
 	out := diag.SessionDiagnostics{AsOf: now}
 	set := c.peerSet.Load()
@@ -136,8 +140,12 @@ func ageAt(now, t time.Time) time.Duration {
 // closed, connection-state transitions, operational records and border
 // routers appearing, reachability probes, ICD Check-Ins, software-update
 // statuses and refused camera signals — each with an operator sentence
-// (diagevent.Kind…). Its size is [Config].Diagnostics.
+// (diagevent.Kind…). Its size is [Config].Diagnostics. None once Close has
+// begun.
 func (c *Controller) DiagnosticEvents() []diag.Event {
+	if _, ok := c.open(); !ok {
+		return nil
+	}
 	return c.diagRing.Snapshot()
 }
 
@@ -150,9 +158,9 @@ func (c *Controller) DiagnosticEvents() []diag.Event {
 // wait for the DNS-SD cache that records the discovery events. There is
 // no queued variant: the controller keeps no ordered callback queue (the
 // node's OnDiagnosticEventAsync runs on one). It returns the unsubscribe
-// function.
+// function; once Close has begun it registers nothing.
 func (c *Controller) OnDiagnosticEvent(fn func(diag.Event)) (unsubscribe func()) {
-	if fn == nil {
+	if _, ok := c.open(); !ok || fn == nil {
 		return func() {}
 	}
 	return c.diagRing.Observe(fn)

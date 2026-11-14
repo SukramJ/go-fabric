@@ -318,9 +318,10 @@ func (s *served) emit(sig CameraSignal) {
 }
 
 // CameraRequestor is the WebRtcTransportRequestor the controller serves
-// at [CameraControllerEndpoint], nil without [Config.Camera].
+// at [CameraControllerEndpoint], nil without [Config.Camera] and once
+// Close has begun.
 func (c *Controller) CameraRequestor() *camera.Requestor {
-	if c.served == nil {
+	if _, ok := c.open(); !ok || c.served == nil {
 		return nil
 	}
 	return c.served.requestor
@@ -328,11 +329,11 @@ func (c *Controller) CameraRequestor() *camera.Requestor {
 
 // OnCameraSignal calls fn for every command a camera invokes on the
 // requestor, on the serving goroutine; the camera service subscribes
-// here. The returned function unsubscribes. Without [Config.Camera] fn is
-// never called.
+// here. The returned function unsubscribes. Without [Config.Camera], and
+// once Close has begun, fn is never called.
 func (c *Controller) OnCameraSignal(fn func(CameraSignal)) (unsubscribe func()) {
 	s := c.served
-	if s == nil || fn == nil {
+	if _, ok := c.open(); !ok || s == nil || fn == nil {
 		return func() {}
 	}
 	s.mu.Lock()

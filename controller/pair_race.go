@@ -38,11 +38,11 @@ const (
 // The transports are matter.js's selection (Discovery.ts:272-273): the IP
 // network always, BLE where a QR code's capabilities name it or the code
 // names none (a manual code).
-func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identity discovery.Identity, opts PairOptions, searchTimeout time.Duration) (*client.Node, error) {
+func (c *Controller) pairDiscovered(ctx context.Context, st stack, pc PairingCode, identity discovery.Identity, opts PairOptions, searchTimeout time.Duration) (*client.Node, error) {
 	r := &pairRace{progress: opts.Progress}
 	var transports []discovery.Transport
-	if c.names != nil {
-		sc := discovery.NewScanner(c.names)
+	if st.names != nil {
+		sc := discovery.NewScanner(st.names)
 		defer sc.Close()
 		transports = append(transports, r.observe(discovery.IPTransport(sc), PairingStepDiscoveryIP))
 	}
@@ -62,7 +62,7 @@ func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identit
 	s := discovery.CommissioningRace(ctx, transports, discovery.SessionOptions{
 		Identifier: pc.Identifier(), Capabilities: caps, Timeout: searchTimeout, Clock: c.clock, Logger: c.log,
 	}, identity, func(actx context.Context, cand discovery.Candidate, win func() bool) (*client.Node, error) {
-		return c.pairAttempt(actx, ctx, cand, win, bsc, pc.Passcode, opts, r)
+		return c.pairAttempt(actx, ctx, st.reg, cand, win, bsc, pc.Passcode, opts, r)
 	})
 	n, err := s.Wait(context.WithoutCancel(ctx))
 	if err == nil {
@@ -85,7 +85,7 @@ func (c *Controller) pairDiscovered(ctx context.Context, pc PairingCode, identit
 // ClaimNodeIDAfterPASE is the race's gate (matter.js's
 // continueCommissioningAfterPase, CommissioningDiscovery.ts:66-74). The
 // attempt ends with Pair's ctx as well as with the race.
-func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.Candidate, win func() bool, bsc *ble.Scanner, passcode uint32, opts PairOptions, r *pairRace) (*client.Node, error) {
+func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Registry, cand discovery.Candidate, win func() bool, bsc *ble.Scanner, passcode uint32, opts PairOptions, r *pairRace) (*client.Node, error) {
 	actx, stop := bothContexts(actx, pairCtx)
 	defer stop()
 	r.attemptStarted()
@@ -103,7 +103,7 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.C
 		defer func() { _ = ch.Close() }()
 		channel = ch
 	}
-	n, err := c.reg.ForDevice(actx, dev, "")
+	n, err := reg.ForDevice(actx, dev, "")
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, cand discovery.C
 		}
 		return nodeID, true
 	}
-	return n, c.reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
+	return n, reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
 }
 
 // bothContexts is a context that ends with a or b.

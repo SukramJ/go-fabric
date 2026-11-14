@@ -37,10 +37,15 @@ type DCLConfig struct {
 // the node's offline switch: seeded from the DCL snapshot embedded in the
 // module (controller/dcl/snapshot), refreshed from the ledger unless
 // offline. The first call waits for the first refresh; a failed refresh is
-// logged and leaves the seeded and static vendors. Close closes it.
+// logged and leaves the seeded and static vendors. Close closes it; once
+// Close has begun it builds none and returns an error wrapping
+// [ErrConfiguration].
 func (c *Controller) VendorInfo(ctx context.Context) (*dcl.VendorInfoService, error) {
 	c.vendorMu.Lock()
 	defer c.vendorMu.Unlock()
+	if _, ok := c.open(); !ok {
+		return nil, errClosed
+	}
 	if c.vendorInfo != nil {
 		return c.vendorInfo, nil
 	}
@@ -56,6 +61,12 @@ func (c *Controller) VendorInfo(ctx context.Context) (*dcl.VendorInfoService, er
 	svc, err := dcl.NewVendorInfoService(ctx, opts)
 	if err != nil {
 		return nil, err
+	}
+	// Close sets closed before it takes vendorMu to close the service:
+	// one built while Close began is closed here, not kept.
+	if _, ok := c.open(); !ok {
+		svc.Close()
+		return nil, errClosed
 	}
 	c.vendorInfo = svc
 	return svc, nil

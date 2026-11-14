@@ -27,7 +27,12 @@ the reference controller's `openStack` builds them:
 | Registry | `controller/client` | one image per remote node, persisted |
 
 `Controller.Close` tears the stack down in reverse; the database stays
-the host's. `Config` takes:
+the host's. Once `Close` has begun, the controller's methods answer
+closed: `Pair`, `Discover`, `VendorInfo` and `SetGroupKey` return an
+error wrapping `ErrConfiguration`, the accessors (`Registry`, `Nodes`,
+`Peers`, `Commissioner`, …) their zero result; `Fabric`, `Clock`, `TCP`,
+`Addr` and `TCPAddr` keep their values, and a second `Close` waits for
+the first. `Config` takes:
 
 - `DB` (required): `controller.OpenDB(path)` opens a SQLite file with the
   module's own pure-Go driver (foreign keys on, a 5 s busy timeout, the

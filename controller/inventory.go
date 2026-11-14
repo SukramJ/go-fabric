@@ -75,9 +75,14 @@ func (e InventoryEntry) LogValue() slog.Value { return slog.StringValue(e.String
 // (client.Node.SetOnboardingCode); a code cannot be read from a
 // commissioned device, which holds a verifier and not the passcode. A
 // stored code that no longer decodes is listed as none; a node
-// decommissioned while the list is built is left out.
+// decommissioned while the list is built is left out. None once Close has
+// begun.
 func (c *Controller) Inventory() []InventoryEntry {
-	nodes := c.reg.Commissioned()
+	st, ok := c.open()
+	if !ok {
+		return nil
+	}
+	nodes := st.reg.Commissioned()
 	out := make([]InventoryEntry, 0, len(nodes))
 	for _, n := range nodes {
 		addr, ok := n.PeerAddress()

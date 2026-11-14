@@ -124,16 +124,19 @@ func (c *Controller) fabricIndex() uint8 { return c.fabric.AddressOf(0).FabricIn
 // SoftwareUpdates is the update manager — matter.js's SoftwareUpdateManager
 // (docs/OTA.md "Triggering an Update", "Monitoring Update Progress" at
 // 862ad75f): AddUpdateConsent, ForceUpdate, RemoveConsent, QueryUpdates,
-// QueuedUpdates; nil without [Config].OTA.
-func (c *Controller) SoftwareUpdates() *softwareupdate.Manager { return c.ota.Load() }
-
-// BDX is the provider's BDX responder, the transfers a node downloads an
-// image through; nil without [Config.OTA].
-func (c *Controller) BDX() *bdx.Responder {
-	if c.otaProvider == nil {
+// QueuedUpdates; nil without [Config].OTA and once Close has begun.
+func (c *Controller) SoftwareUpdates() *softwareupdate.Manager {
+	if _, ok := c.open(); !ok {
 		return nil
 	}
-	return c.otaProvider.bdx
+	return c.ota.Load()
+}
+
+// BDX is the provider's BDX responder, the transfers a node downloads an
+// image through; nil without [Config.OTA] and once Close has begun.
+func (c *Controller) BDX() *bdx.Responder {
+	st, _ := c.open()
+	return st.bdx
 }
 
 // armerContext is the reboot armer's view of the stack — matter.js's

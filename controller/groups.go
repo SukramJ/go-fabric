@@ -80,7 +80,11 @@ func (c *Controller) ensureFabricRow(ctx context.Context, st *store.Store) error
 
 // Groups is the controller's group manager: the key sets it holds for the
 // groups it created and the senders over them ([groups.Manager.Sender]).
-func (c *Controller) Groups() *groups.Manager { return c.groups }
+// Nil once Close has begun.
+func (c *Controller) Groups() *groups.Manager {
+	st, _ := c.open()
+	return st.groups
+}
 
 // SetGroupKey keeps a key set in the controller's own tables and maps
 // groupID to it — what KeySetWrite and a GroupKeyMap write do on a
@@ -93,7 +97,7 @@ func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, 
 	c.closeMu.RLock()
 	defer c.closeMu.RUnlock()
 	if c.closed || c.groups == nil {
-		return fmt.Errorf("%w: the controller is closed", ErrConfiguration)
+		return errClosed
 	}
 	st := store.New(c.db)
 	keySet.FabricIndex = c.fabricIndex()
