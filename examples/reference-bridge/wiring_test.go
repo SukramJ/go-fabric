@@ -76,8 +76,11 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 		t.Fatalf("CommissioningComplete = %#v, want ErrorCode OK", raw)
 	}
 
-	// The window a later Pake3 arms on its own — the path that fires no
-	// OnFailSafeArmed and so clears nothing by itself.
+	// The arm a later Pake3 makes on its own (the PASE auto-arm). From the
+	// disarmed state it starts a new fail-safe context as an ArmFailSafe
+	// does: the node's SetOnFailSafeStarting hook (PrepareFreshFailSafe)
+	// runs before the arm is recorded and drops what an earlier attempt
+	// left pending.
 	root.GeneralCommissioning.AutoArmOnPaseEstablished(ctx)
 
 	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})

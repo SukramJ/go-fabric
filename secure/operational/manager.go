@@ -1104,8 +1104,8 @@ func (m *Manager) Close(sessionID uint16) error {
 // initiateForceClose, which marks the peer lost, NodeSession.ts:379-382,
 // so close() skips gracefulClose, :414-425). The flush is mirrored: the
 // bridge's Stop reports what the subscriptions owe before it calls this.
-// The CloseSession stays until the module decides against the pin
-// (review II, R2-P2-sess-03).
+// The CloseSession is kept by decision (review II, owner decision 49;
+// notes/parity/by_design.md, BD-Matter-Shutdown-CloseSessionKept).
 func (m *Manager) CloseAllGraceful(deadline time.Time) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0, len(m.sessions))

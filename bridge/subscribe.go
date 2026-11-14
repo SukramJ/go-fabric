@@ -1845,11 +1845,14 @@ func runUnsubscribers(unsubs []func()) {
 // wireRootNotifiers subscribes every root cluster server that
 // implements [contract.ChangeNotifier] — today the Groupcast server, whose
 // Membership and counts move with the group state — to its own reportable
-// attributes on endpoint 0: a fire marks them dirty so subscribers get a
-// report. A root server keeps its own DataVersion (it bumps it before it
-// fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
-// reactive state matter.js keeps for root behaviors. The caller holds no
-// bridge lock.
+// attributes on endpoint 0: a fire advances the cluster's DataVersion
+// through [endpointpkg.Endpoint.BumpDataVersionOf] — the endpoint-held one
+// of a server that keeps none of its own; a server with a tracker of its
+// own advances that itself, so nothing is advanced twice — and then marks
+// the attributes dirty so subscribers get a report. A fire while a command
+// runs against the cluster does neither: the command advances the version
+// once when it ends (invokeCommitTable). Mirrors the reactive state
+// matter.js keeps for root behaviors. The caller holds no bridge lock.
 func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	root := topology.FindByID(0)
 	if root == nil {
