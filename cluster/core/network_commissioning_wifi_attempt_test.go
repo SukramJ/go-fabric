@@ -253,3 +253,91 @@ func TestADisabledInterfaceStopsTheRejoin(t *testing.T) {
 		t.Errorf("the radio is on %q, want home", d.on())
 	}
 }
+
+// scanHeldDriver is a heldDriver whose scans wait until the test releases
+// them.
+type scanHeldDriver struct {
+	*heldDriver
+	scanStarted chan struct{}
+	scanRelease chan struct{}
+}
+
+func (d *scanHeldDriver) ScanNetworks(context.Context, []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
+	d.scanStarted <- struct{}{}
+	<-d.scanRelease
+	return 0, "", nil
+}
+
+// TestAScanEndingLeavesARejoinStartedMeanwhileTheDriver: a rejoin attempt
+// that a fail-safe expiry started while a ScanNetworks ran keeps the
+// driver when the scan ends — a command that follows cancels the attempt
+// and waits for it, no two joins run at once (review II, R2-P3-rr-dev-05).
+func TestAScanEndingLeavesARejoinStartedMeanwhileTheDriver(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	var armed atomic.Bool
+	d := &scanHeldDriver{heldDriver: newHeldDriver(), scanStarted: make(chan struct{}, 1), scanRelease: make(chan struct{})}
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, IsFailSafeArmed: armed.Load, Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// "home" committed and not joined; its rejoin armed, not yet run.
+	armed.Store(true)
+	if _, err := w.MatterInvoke(t.Context(), netcommdef.CmdAddOrUpdateWiFiNetwork, netcommdef.AddOrUpdateWiFiNetworkRequest{Ssid: []byte("home"), Credentials: []byte("secret12")}); err != nil {
+		t.Fatal(err)
+	}
+	w.OnCommissioningComplete(t.Context())
+	armed.Store(false)
+
+	scanned := make(chan error, 1)
+	go func() {
+		_, err := w.MatterInvoke(t.Context(), netcommdef.CmdScanNetworks, netcommdef.ScanNetworksRequest{})
+		scanned <- err
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-d.scanStarted:
+	case <-ctx.Done():
+		t.Fatal("the scan did not reach the driver")
+	}
+
+	w.OnFailSafeExpired() // a fail-safe expires while the scan runs
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		clk.Advance(0)
+	}()
+	if got := awaitStarted(t, d.heldDriver); got != "home" {
+		t.Fatalf("the rejoin joined %q, want home", got)
+	}
+	close(d.scanRelease)
+	select {
+	case err := <-scanned:
+		if err != nil {
+			t.Fatalf("ScanNetworks: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("the scan did not end")
+	}
+
+	armed.Store(true) // a commissioner's fail-safe
+	answered := make(chan error, 1)
+	go func() {
+		_, err := w.MatterInvoke(t.Context(), netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("home")})
+		answered <- err
+	}()
+	if got := awaitStarted(t, d.heldDriver); got != "home" {
+		t.Fatalf("the command joined %q, want home", got)
+	}
+	if most, cancelled := d.stats(); most > 1 || cancelled != 1 {
+		t.Fatalf("%d joins ran at once, %d cancelled; want the rejoin attempt cancelled before the command's join", most, cancelled)
+	}
+	close(d.release)
+	awaitClosed(t, advanced, "the end of the rejoin attempt")
+	select {
+	case <-answered:
+	case <-ctx.Done():
+		t.Fatal("the command was not answered")
+	}
+}

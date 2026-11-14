@@ -871,7 +871,13 @@ func (w *WiFiNetworkCommissioning) scanNetworks(ctx context.Context, req netcomm
 		status = netcommdef.NetworkCommissioningStatusNetworkNotFound
 	}
 	w.mu.Lock()
-	w.busy = false
+	if !w.rejoining {
+		// A rejoin attempt a fail-safe expiry started while the scan ran
+		// (OnFailSafeExpired frees the turn of a command, not of an
+		// attempt) holds the driver until it ends (review II,
+		// R2-P3-rr-dev-05).
+		w.busy = false
+	}
 	w.setStatusLocked(status)
 	w.dataVersion.Bump()
 	w.mu.Unlock()
