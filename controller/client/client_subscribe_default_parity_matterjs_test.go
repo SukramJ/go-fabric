@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // A port of matter.js packages/node/test/node/ClientSubscribeTest.ts at
@@ -763,9 +764,17 @@ func TestClientSubscribeDefaultSubscriptionParity(t *testing.T) {
 		}
 	})
 
-	failing := func(t *testing.T, updated func(*interaction.Report) error) {
+	failing := func(t *testing.T, changed bool, updated func(*interaction.Report) error) {
 		t.Helper()
 		cp, log := newCancelPair(t)
+		if changed {
+			// The client holds a DataVersion for every cluster, so an
+			// unchanged device primes with no data; a value changed on
+			// the device since makes the priming report carry it.
+			if err := cp.pair.Device.Act(func(n *node.Node) error { return n.SetNodeLabel(t.Context(), "changed") }); err != nil {
+				t.Fatal(err)
+			}
+		}
 		before := cp.pair.Device.Node().Subscriptions().Active()
 		req := interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, Updated: updated}
 		var err error
@@ -782,12 +791,12 @@ func TestClientSubscribeDefaultSubscriptionParity(t *testing.T) {
 
 	t.Run("answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it", func(t *testing.T) {
 		t.Parallel()
-		failing(t, func(*interaction.Report) error { return errSubscribeRefused })
+		failing(t, false, func(*interaction.Report) error { return errSubscribeRefused })
 	})
 
 	t.Run("answers the priming report with INVALID_SUBSCRIPTION when processing it fails", func(t *testing.T) {
 		t.Parallel()
-		failing(t, func(r *interaction.Report) error {
+		failing(t, true, func(r *interaction.Report) error {
 			if len(r.Attributes) > 0 {
 				return errSubscribeRefused
 			}
