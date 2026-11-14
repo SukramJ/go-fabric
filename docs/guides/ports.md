@@ -39,6 +39,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList, and which event paths exist on the cluster; an event the server emits is recorded as emitted, so it emits only events it lists | EventList is empty and no event path exists on the cluster: a read of an event on it is answered `UNSUPPORTED_EVENT`, and an event path on it selects nothing for a subscription (`endpoint/dispatcher.go`, `EventPathStatus`) |
 | `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | the endpoint keeps the cluster's DataVersion, on the root and the Aggregator too, and advances it on every change the stack sees; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
+| `ChangeReportingWriter` | a server | `MatterWriteChanged` applies a controller's write as `MatterWrite` does and says whether it changed any attribute of the cluster, the written one or another the write moves with it; the dispatcher calls it instead of `MatterWrite`. A write that changed nothing advances no DataVersion and is reported to no subscriber. Unchanged means the write stored nothing and the host heard nothing of it; a write that stored, or one the server cannot judge, answers changed. Every server of the module implements it, except OperationalCredentials, which refuses every write. A type that embeds a server implementing it and declares its own `MatterWrite` declares `MatterWriteChanged` as well: the promoted method would apply the write without the type's `MatterWrite` | every successful write counts as a change: the cluster's DataVersion advances and the written attribute is reported (`endpoint/dispatcher.go`, `writeOne`; `bridge/receive_dispatch.go`, `reportWrittenAttributes`) |
 | `ClusterAttributeReadPrivilege` | a server | a read privilege above the data model's; it can only raise it | the data model's read privilege (`schema.AttributeReadPrivilege`, from parity/schema.json) |
 | `ClusterAttributeWritePrivilege` | a server | a write privilege above the data model's; it can only raise it | the data model's write privilege (`schema.AttributeWritePrivilege`, from parity/schema.json) |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |
@@ -53,7 +54,7 @@ these interfaces does not drag the host's dependencies into the module.
 | --- | --- | --- | --- |
 | `AttributeChangeNotifier` | a server that holds its state | names exactly the attributes that changed; the bridge advances the DataVersion and reports only those | see `ChangeNotifier` |
 | `SelfReportedAttributeLister` | an `AttributeChangeNotifier` | attributes it reports only itself (quieter "Q" attributes) | the before/after comparison after a command includes them |
-| `ChangeNotifier` | a host source | "something changed": every reportable attribute of the cluster is marked dirty | **silent**: subscriptions carry only empty keep-alives, and Apple Home shows the sensor as not responding |
+| `ChangeNotifier` | a host source, or a cluster server that forwards its port's notifier | "something changed", without naming what: the bridge reads the reportable attributes of the notifier's own clusters on the endpoint again and compares each with the value it read last. Only the attributes whose value moved are reported, and each of their clusters advances its DataVersion once per notification; a quieter ("Q") attribute's change advances the version at once and its report goes through its throttle; a notification that moved nothing advances and reports nothing. A notification that arrives while a command runs against the cluster, or while a controller's write is applied to the endpoint, is held and counted with that command or write. A root server's notifier is not compared, and is held for a command only: its fire advances the cluster's version and marks every attribute the server lists as reportable (`bridge/subscribe.go`, `wireMeasurementNotifier`, `wireRootNotifiers`; `bridge/write_hold.go`) | **silent**: subscriptions carry only empty keep-alives, and Apple Home shows the sensor as not responding |
 
 ### Measurements and classification
 
@@ -316,6 +317,27 @@ by type assertion.
 | `threadbr.BorderRouter` (`threadborderroutermanagementdef.BorderRouter`) | `threadborderroutermanagementdef.Declare{BorderRouter: …}`, `threadbr.ManagementConfig.BorderRouter` | the Thread Border Router the ThreadBorderRouterManagement and ThreadNetworkDiagnostics servers manage and read: its name, agent id, Thread version and interface, the datasets, the activation that returns once attached, its commit and revert, the pending dataset, the diagnostics; `otbr.BorderRouter` adapts an OTBR's REST API ([Thread Border Router](thread-border-router.md)) | both clusters keep the generated server |
 | `netinfra.ThreadNetworkStore` (`threadnetworkdirectorydef.ThreadNetworkStore`) | `threadnetworkdirectorydef.Declare{ThreadNetworkStore: …}`, `netinfra.ThreadDirectoryConfig.Store` | persists the ThreadNetworkDirectory's operational datasets and its PreferredExtendedPanID: its capacity, the stored datasets, a save after AddNetwork and a removal after RemoveNetwork passed chip's checks, the preferred network loaded at start and saved on every change; an error answers FAILURE ([Network infrastructure](network-infrastructure.md#threadnetworkdirectory-the-datasets)) | datasets and the preferred network live in memory, 32 networks |
 | `thermo.Sink` (`thermostatdef.Sink`) | `thermostatdef.Declare{Sink: …}`, `thermo.ThermostatConfig.Sink` | consents to every SystemMode, setpoint and — when the hold is served — TemperatureSetpointHold change a controller asks for, before it is stored; an error answers with its status, FAILURE without one ([Thermostat](thermostat.md)) | changes are stored without asking |
+
+### What a port hears of a controller's write
+
+A controller's write reaches the host only when it changes the value. The
+setters of a FanControl, PumpConfigurationAndControl and SmokeCoAlarm
+(SmokeSensitivityLevel) port and LevelControl's `SetOptions` and
+`SetOnLevel` are called only for a value that differs from the one the
+host's state reads (`FanState`, `PumpState`, `SmokeCOState`, `Options`,
+`OnLevel`); a generated server's `Sink` (`spec.Sink`) only for a value that
+differs from the one the server holds; BridgedDeviceBasicInformation's
+`OnNodeLabelWrite` only for a label that differs from the held one, in the
+order the labels are stored. A write of the held value is answered SUCCESS:
+it calls nothing, the server stores nothing, no DataVersion advances and
+no subscriber is told (`contract.ChangeReportingWriter`, above). A write
+that reaches a setter counts as a change whether or not the host's state
+shows the value when the setter returns, so a host that applies a write
+later is judged by what was written. A generated server's write veto
+(`spec.ServerConfig.BeforeWrite`, the typed server's `OnWrite`) runs before
+the comparison, for a write of the held value as well.
+
+*Source: `contract/matter.go` (`ChangeReportingWriter`), `cluster/spec/server.go` (`MatterWriteChanged`, `holds`), `cluster/fan/fancontrol_server.go`, `cluster/pump/pump_server.go` and `cluster/alarm/smokecoalarm_server.go` (`MatterWriteChanged`), `cluster/levelcontrol/levelcontrol_server.go` (`writeOptions`, `writeOnLevel`), `cluster/core/bridged_device_basic_information.go` (`MatterWriteChanged`).*
 
 Host ports of the root servers, reached through `node.Config` or
 `Node.Root()`:
