@@ -305,6 +305,12 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		n.bindSync.topo = t
 		running := n.bindSync.running
 		n.bindSync.mu.Unlock()
+		// Once more, now that a removal's fan-out walks t: a fabric
+		// removed after the reconcile above read the table had its
+		// fan-out walk the topology before t, and only this second read
+		// of the table finds it gone (review II, R2-P2-dr-node-03). A
+		// removal whose row goes after this read fans out over t.
+		n.reconcileFabricState(ctx, t)
 		if running {
 			n.syncBindings(t)
 		}
