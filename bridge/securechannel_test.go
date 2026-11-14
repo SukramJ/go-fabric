@@ -547,7 +547,10 @@ func TestAttachPaseHandlerProvider_NilClears(t *testing.T) {
 
 // TestDispatchSC_PerExchangeProviderRouting verifies that a provider returning
 // per-ExchangeID handlers routes each Pake1 datagram to the correct handler.
-// Two exchanges (10 and 20) each receive exactly one Pake1 call.
+// Two exchanges (10 and 20) each receive exactly one Pake1 call. Each runs a
+// handshake of its own, one after the other: a Pake1 reaches the provider
+// only for the handshake a PBKDFParamRequest began (review II,
+// R2-P3-lan-dev-02).
 func TestDispatchSC_PerExchangeProviderRouting(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
@@ -564,11 +567,12 @@ func TestDispatchSC_PerExchangeProviderRouting(t *testing.T) {
 	})
 
 	for _, exID := range []uint16{10, 20} {
-		proto := scProto(mrp.SCOpcodePake1, exID, false, 0)
-		// Errors are expected (noop body returns ErrPaseHandlerMissing
-		// only when the handler is noop — recording handler returns nil
-		// error), so we ignore return value intentionally.
-		_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, []byte{0x01})
+		for _, op := range []uint8{mrp.SCOpcodePBKDFParamRequest, mrp.SCOpcodePake1, mrp.SCOpcodePake3} {
+			proto := scProto(op, exID, false, 0)
+			// The recording handler returns nil errors; the return
+			// value is ignored intentionally.
+			_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, []byte{0x01})
+		}
 	}
 
 	for exID, h := range handlers {

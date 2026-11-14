@@ -89,6 +89,9 @@ type PaseAdapter struct {
 	// established is set once Pake3 verified and the pickup callback
 	// registered the session under responderSessionID.
 	established bool
+	// onUnfinished and releasedStaked: see [PaseAdapter.SetOnUnfinished].
+	onUnfinished   func(sessionID uint16)
+	releasedStaked bool
 	// randomSource feeds ResponderRandom in ProcessPBKDFParamRequest.
 	// Nil means crypto/rand. In-package tests assign a deterministic
 	// source directly, before the handshake starts (no concurrent
@@ -194,6 +197,36 @@ func (a *PaseAdapter) SetOnSessionEstablished(cb PaseSessionEstablished) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.onEstablished = cb
+}
+
+// SetOnUnfinished installs fn, called once with the responder session id
+// the adapter announces when its provider drops the adapter
+// ([PerExchangePaseProvider]: the 60 s exchange timeout, the reaper,
+// Forget, Reset) without a session established under that id, so the host
+// returns the id it staked for the handshake (operational
+// Manager.ReleaseID). matter.js reserves no id ahead of the session
+// (packages/protocol/src/session/SessionManager.ts:581-598 at db021da0);
+// an id staked for the PBKDFParamResponse goes back as soon as the
+// handshake can no longer finish. Pass nil to clear.
+func (a *PaseAdapter) SetOnUnfinished(fn func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onUnfinished = fn
+}
+
+// releaseStakedID calls the [PaseAdapter.SetOnUnfinished] hook with the
+// announced session id, unless a session was established under it or the
+// id was returned already.
+func (a *PaseAdapter) releaseStakedID() {
+	a.mu.Lock()
+	fn, id := a.onUnfinished, a.responderSessionID
+	if fn == nil || a.established || a.releasedStaked {
+		a.mu.Unlock()
+		return
+	}
+	a.releasedStaked = true
+	a.mu.Unlock()
+	fn(id)
 }
 
 // SetPBKDFParams configures the PBKDF salt + iteration count the
@@ -530,6 +563,71 @@ type CaseAdapter struct {
 	// a Sigma1 that yields the same bytes is recognised as the
 	// responder's idempotent replay rather than a restart.
 	lastSigma2 []byte
+	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
+	onUnfinished   func(sessionID uint16)
+	releasedStaked bool
+	// detach, set by the [PerExchangeCaseProvider] that built the adapter,
+	// drops the adapter from the provider once its handshake failed.
+	detach func()
+}
+
+// SetOnUnfinished installs fn, called once with the session id the
+// adapter's responder announces when the adapter's handshake ends without
+// a session established under that id — a failed Sigma1 or Sigma3 on an
+// adapter a [PerExchangeCaseProvider] manages, or the provider dropping
+// the adapter (the reaper, Forget, Reset) — so the host returns the id it
+// staked for the handshake (operational Manager.ReleaseID). matter.js
+// reserves no id ahead of the session (packages/protocol/src/session/SessionManager.ts:581-598
+// at db021da0). A failed adapter leaves its provider at once, so the id
+// it returned is never announced again. Pass nil to clear.
+func (a *CaseAdapter) SetOnUnfinished(fn func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onUnfinished = fn
+}
+
+// setDetach is the provider's hook that drops the adapter
+// ([PerExchangeCaseProvider.Resolve]).
+func (a *CaseAdapter) setDetach(fn func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.detach = fn
+}
+
+// releaseStakedID calls the [CaseAdapter.SetOnUnfinished] hook with the
+// session id the responder announces, unless a session was established
+// under it or the id was returned already.
+func (a *CaseAdapter) releaseStakedID() {
+	r := a.snapshotResponder()
+	if r == nil {
+		return
+	}
+	id := r.SessionID()
+	a.mu.Lock()
+	fn := a.onUnfinished
+	if fn == nil || a.releasedStaked || (a.established && a.establishedSessionID == id) {
+		a.mu.Unlock()
+		return
+	}
+	a.releasedStaked = true
+	a.mu.Unlock()
+	fn(id)
+}
+
+// handshakeFailed ends a failed handshake on an adapter its provider
+// manages: the adapter leaves the provider (a later message of the same
+// initiator and exchange meets a fresh one) and returns its staked id. An
+// adapter without a provider's detach hook keeps its id: whoever holds it
+// may run the next handshake on it, under that id.
+func (a *CaseAdapter) handshakeFailed() {
+	a.mu.RLock()
+	detach := a.detach
+	a.mu.RUnlock()
+	if detach == nil {
+		return
+	}
+	a.releaseStakedID()
+	detach()
 }
 
 // CaseSessionEstablished fires after a successful Sigma3 verification.
@@ -699,6 +797,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			caseFailureProtocolCode(err),
 			nil,
 		)
+		a.handshakeFailed()
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 
@@ -791,6 +890,7 @@ func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload [
 			mrp.SCStatusProtocolInvalidParameter,
 			nil,
 		)
+		a.handshakeFailed()
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 	// onEstablished must fire EXACTLY ONCE per CASE handshake. Apple's

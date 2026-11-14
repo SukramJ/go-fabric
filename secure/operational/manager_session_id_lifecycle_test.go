@@ -170,7 +170,15 @@ func TestAllocateID_EvictsOldestPlaceholderWhenExhausted(t *testing.T) {
 		if id == 7 {
 			age = base.Add(-time.Hour)
 		}
-		m.sessions[id] = &Entry{SessionID: id, allocatedAt: age}
+		e := &Entry{SessionID: id, allocatedAt: age}
+		m.sessions[id] = e
+		// AllocateID queues each placeholder in allocation order
+		// (Manager.placeholders): the oldest first.
+		if id == 7 {
+			m.placeholders = append([]placeholderRef{{id: id, e: e}}, m.placeholders...)
+		} else {
+			m.placeholders = append(m.placeholders, placeholderRef{id: id, e: e})
+		}
 	}
 	m.mu.Unlock()
 

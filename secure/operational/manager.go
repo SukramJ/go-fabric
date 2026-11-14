@@ -49,6 +49,13 @@ type Manager struct {
 	sessions       map[uint16]*Entry
 	nextID         uint16
 	onSessionClose func(sessionID uint16)
+	// placeholders are the ids [Manager.AllocateID] staked, oldest first,
+	// each with the entry it staked: at a full table the allocator takes
+	// the oldest that still stakes its id from the front instead of
+	// walking the table ([Manager.allocateIDLocked]). An id that left the
+	// table, or holds another entry now, is skipped there and dropped by
+	// [Manager.compactPlaceholdersLocked].
+	placeholders []placeholderRef
 	// onPaseSessionClose fires after onSessionClose for a session
 	// established via PASE (SetOnPaseSessionClose).
 	onPaseSessionClose func(sessionID uint16)
@@ -725,9 +732,43 @@ func (m *Manager) AllocateID() (uint16, error) {
 	// same id out twice; OpenFromSigmaWithID overwrites it. The stamp
 	// is what lets the reaper tell an in-flight handshake from one
 	// that was abandoned — see [PlaceholderIDTTL].
-	m.sessions[id] = &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
+	e := &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
+	m.sessions[id] = e
+	m.placeholders = append(m.placeholders, placeholderRef{id: id, e: e})
+	m.compactPlaceholdersLocked()
 	return id, nil
 }
+
+// placeholderRef is one id [Manager.AllocateID] staked and the entry it
+// staked it with.
+type placeholderRef struct {
+	id uint16
+	e  *Entry
+}
+
+// stakes reports whether ref's id still holds the placeholder ref staked.
+// Caller holds m.mu.
+func (m *Manager) stakes(ref placeholderRef) bool {
+	cur, ok := m.sessions[ref.id]
+	return ok && cur == ref.e && cur.Session == nil
+}
+
+// compactPlaceholdersLocked drops the queue's references to ids that no
+// longer hold their placeholder once they outnumber the table twice over,
+// so the queue stays within a constant factor of the table and each
+// reference is dropped once (amortised constant time per allocation).
+// Caller holds m.mu in write mode.
+func (m *Manager) compactPlaceholdersLocked() {
+	if len(m.placeholders) <= 2*len(m.sessions)+placeholderQueueSlack {
+		return
+	}
+	m.placeholders = slices.DeleteFunc(m.placeholders, func(ref placeholderRef) bool { return !m.stakes(ref) })
+}
+
+// placeholderQueueSlack keeps a small table from compacting its placeholder
+// queue on every allocation; any constant does, the bound is the factor
+// two in [Manager.compactPlaceholdersLocked].
+const placeholderQueueSlack = 64
 
 // ReleaseID frees a previously allocated id when the handshake that
 // reserved it never reached OpenFromSigmaWithID.
@@ -1589,30 +1630,33 @@ func GenerateResumptionID() ([]byte, error) {
 // BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly.
 func (m *Manager) allocateIDLocked() (uint16, error) {
 	const maxID = uint16(SessionIDSpace)
-	for range maxID {
-		id := m.nextID
-		m.nextID++
-		if m.nextID == 0 || m.nextID > maxID {
-			m.nextID = 1
-		}
-		if _, in := m.sessions[id]; !in && id != 0 {
-			return id, nil
-		}
-	}
-	var oldest *Entry
-	for _, e := range m.sessions {
-		if e.Session != nil || e.allocatedAt.IsZero() {
-			continue
-		}
-		if oldest == nil || e.allocatedAt.Before(oldest.allocatedAt) {
-			oldest = e
+	// The table holds ids 1..maxID only, so below that size an id is free
+	// and the walk finds it; at that size there is none to find, and the
+	// walk is skipped (review II, R2-P3-lan-dev-02).
+	if len(m.sessions) < int(maxID) {
+		for range maxID {
+			id := m.nextID
+			m.nextID++
+			if m.nextID == 0 || m.nextID > maxID {
+				m.nextID = 1
+			}
+			if _, in := m.sessions[id]; !in && id != 0 {
+				return id, nil
+			}
 		}
 	}
-	if oldest == nil {
-		return 0, ErrSessionExhausted
+	// The oldest placeholder, from the front of the queue AllocateID
+	// appends to in allocation order: references that no longer stake
+	// their id are dropped on the way, each once.
+	for len(m.placeholders) > 0 {
+		ref := m.placeholders[0]
+		m.placeholders = m.placeholders[1:]
+		if m.stakes(ref) {
+			delete(m.sessions, ref.id)
+			return ref.id, nil
+		}
 	}
-	delete(m.sessions, oldest.SessionID)
-	return oldest.SessionID, nil
+	return 0, ErrSessionExhausted
 }
 
 // SessionInfo is a read-only view of one secure session, for operator

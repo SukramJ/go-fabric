@@ -279,6 +279,89 @@ func (b *Bridge) resolveCaseHandler(key HandshakeKey) CaseHandler {
 	return singleton
 }
 
+// errHandshakeNotBegun is the failure of a CASE or PASE message whose
+// handshake no Sigma1 / PBKDFParamRequest began: the router answers it as
+// the handler of a fresh exchange did, without building one.
+var errHandshakeNotBegun = errors.New("bridge: no Sigma1 or PBKDFParamRequest began this handshake")
+
+// unbegunCaseHandler stands in for a provider's handler for a Sigma3 or
+// Sigma2_Resume of a handshake no Sigma1 began: it answers with the
+// failure StatusReport a fresh [CaseAdapter] gave (InvalidParameter),
+// without building an adapter — and staking a session id for it.
+type unbegunCaseHandler struct{}
+
+func (unbegunCaseHandler) ProcessSigma1([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errHandshakeNotBegun
+}
+
+func (unbegunCaseHandler) ProcessSigma3([]byte) (opcode uint8, payload []byte, err error) {
+	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(
+		mrp.SCStatusGeneralFailure,
+		uint32(mrp.SecureChannelProtocolID),
+		mrp.SCStatusProtocolInvalidParameter,
+		nil,
+	), nil
+}
+
+func (unbegunCaseHandler) ProcessSigma2Resume([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errHandshakeNotBegun
+}
+
+// unbegunPaseHandler stands in for a provider's handler for a Pake1 or
+// Pake3 of a handshake no PBKDFParamRequest began: the message fails as it
+// failed on a fresh [PaseAdapter] — answered and counted by the router —
+// without building an adapter (a PBKDF2 of the passcode and a staked
+// session id).
+type unbegunPaseHandler struct{}
+
+func (unbegunPaseHandler) ProcessPBKDFParamRequest([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errHandshakeNotBegun
+}
+
+func (unbegunPaseHandler) ProcessPake1([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errHandshakeNotBegun
+}
+
+func (unbegunPaseHandler) ProcessPake3([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errHandshakeNotBegun
+}
+
+// resolveCaseContinuation is [Bridge.resolveCaseHandler] for a Sigma3 or
+// Sigma2_Resume: with a provider wired, a handshake no Sigma1 began
+// ([Bridge.markSigma1Replied]) gets [unbegunCaseHandler] and the provider
+// is not asked — it would build an adapter for a handshake that cannot
+// start. matter.js routes only a Sigma1 that opens an exchange to its CASE
+// server (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146
+// at db021da0).
+func (b *Bridge) resolveCaseContinuation(key HandshakeKey) CaseHandler {
+	b.mu.RLock()
+	_, begun := b.sigma1Replied[key]
+	provider := b.caseProvider
+	b.mu.RUnlock()
+	if provider != nil && !begun {
+		return unbegunCaseHandler{}
+	}
+	return b.resolveCaseHandler(key)
+}
+
+// resolvePaseContinuation is [Bridge.resolvePaseHandler] for a Pake1 or
+// Pake3: with a provider wired, a handshake that does not hold the
+// single-active-PASE claim — no PBKDFParamRequest began it — gets
+// [unbegunPaseHandler] and the provider is not asked. matter.js routes
+// only a PbkdfParamRequest that opens an exchange to its PASE server
+// (SecureChannelProtocol.ts:129 at db021da0).
+func (b *Bridge) resolvePaseContinuation(key HandshakeKey) PaseHandler {
+	b.mu.RLock()
+	begun := !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
+		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
+	provider := b.paseProvider
+	b.mu.RUnlock()
+	if provider != nil && !begun {
+		return unbegunPaseHandler{}
+	}
+	return b.resolvePaseHandler(key)
+}
+
 // AttachCaseHandler wires the CASE port. Pass nil to revert to noop.
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
 	b.mu.Lock()
@@ -433,7 +516,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// node had already installed.
 		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		b.abandonHandshakeReplies(key)
-		ch := b.resolveCaseHandler(key)
+		ch := b.resolveCaseContinuation(key)
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
 			ch.ProcessSigma3, ch); err != nil {
 			return err
@@ -454,7 +537,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		})
 		return nil
 	case mrp.SCOpcodeSigma2Resume:
-		ch := b.resolveCaseHandler(handshakeKeyOf(requestHdr, proto.ExchangeID))
+		ch := b.resolveCaseContinuation(handshakeKeyOf(requestHdr, proto.ExchangeID))
 		return b.handleCase(src, requestHdr, proto, payload, "sigma2_resume",
 			ch.ProcessSigma2Resume, ch)
 
@@ -546,7 +629,7 @@ func (b *Bridge) dispatchPase(
 		return b.handlePase(src, requestHdr, proto, payload, "pbkdf_param_req",
 			h.ProcessPBKDFParamRequest, h)
 	case mrp.SCOpcodePake1:
-		h := b.resolvePaseHandler(key)
+		h := b.resolvePaseContinuation(key)
 		return b.handlePase(src, requestHdr, proto, payload, "pake1",
 			h.ProcessPake1, h)
 	case mrp.SCOpcodePake3:
@@ -554,7 +637,7 @@ func (b *Bridge) dispatchPase(
 		// handshake still waits for an acknowledgement is done. Before
 		// the handler runs, so the reply to Pake3 itself stays tracked.
 		b.abandonHandshakeReplies(key)
-		h := b.resolvePaseHandler(key)
+		h := b.resolvePaseContinuation(key)
 		err := b.handlePase(src, requestHdr, proto, payload, "pake3",
 			h.ProcessPake3, h)
 		// Pake3 terminates the handshake either way (success installs

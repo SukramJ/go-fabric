@@ -89,8 +89,36 @@ func (p *PerExchangeCaseProvider) Resolve(key HandshakeKey) CaseHandler {
 	if a == nil {
 		return nil
 	}
+	a.setDetach(func() { p.drop(key, a) })
 	p.entries[key] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
 	return a
+}
+
+// drop removes key's entry when it still holds a — the adapter's handshake
+// failed ([CaseAdapter.SetOnUnfinished]) — and reports the eviction.
+func (p *PerExchangeCaseProvider) drop(key HandshakeKey, a *CaseAdapter) {
+	p.mu.Lock()
+	e, ok := p.entries[key]
+	if !ok || e.adapter != a {
+		p.mu.Unlock()
+		return
+	}
+	delete(p.entries, key)
+	onEvict := p.onEvict
+	p.mu.Unlock()
+	if onEvict != nil {
+		onEvict(key)
+	}
+}
+
+// dropped returns the staked session id of each adapter the provider let
+// go ([CaseAdapter.SetOnUnfinished]). Called without p.mu.
+func dropped(entries []*caseEntry) {
+	for _, e := range entries {
+		if e != nil && e.adapter != nil {
+			e.adapter.releaseStakedID()
+		}
+	}
 }
 
 // SetOnEvict wires the TTL-eviction callback. The bridge sets this to
@@ -114,8 +142,10 @@ func (p *PerExchangeCaseProvider) SetOnEvict(fn func(key HandshakeKey)) {
 // the TTL reaper instead.
 func (p *PerExchangeCaseProvider) Forget(key HandshakeKey) {
 	p.mu.Lock()
+	e := p.entries[key]
 	delete(p.entries, key)
 	p.mu.Unlock()
+	dropped([]*caseEntry{e})
 }
 
 // Reset drops every per-exchange adapter. Operators call this when
@@ -126,12 +156,15 @@ func (p *PerExchangeCaseProvider) Forget(key HandshakeKey) {
 func (p *PerExchangeCaseProvider) Reset() {
 	p.mu.Lock()
 	evicted := make([]HandshakeKey, 0, len(p.entries))
-	for k := range p.entries {
+	gone := make([]*caseEntry, 0, len(p.entries))
+	for k, e := range p.entries {
 		delete(p.entries, k)
 		evicted = append(evicted, k)
+		gone = append(gone, e)
 	}
 	onEvict := p.onEvict
 	p.mu.Unlock()
+	dropped(gone)
 	if onEvict != nil {
 		for _, id := range evicted {
 			onEvict(id)
@@ -191,15 +224,20 @@ func (p *PerExchangeCaseProvider) StopReaper() {
 func (p *PerExchangeCaseProvider) reapLocked(ttl time.Duration) {
 	cutoff := p.clock.Load().Now().Add(-ttl)
 	p.mu.Lock()
-	var evicted []HandshakeKey
+	var (
+		evicted []HandshakeKey
+		gone    []*caseEntry
+	)
 	for k, e := range p.entries {
 		if e.lastTouched.Before(cutoff) {
 			delete(p.entries, k)
 			evicted = append(evicted, k)
+			gone = append(gone, e)
 		}
 	}
 	onEvict := p.onEvict
 	p.mu.Unlock()
+	dropped(gone)
 	// Call onEvict outside the lock; the callback (forgetSigma1Replied)
 	// acquires the bridge's write lock and must not nest inside our mutex.
 	if onEvict != nil {

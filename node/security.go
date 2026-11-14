@@ -670,6 +670,9 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		return spake2.NewVerifier(vc, nil, nil, transcript)
 	})
 	adapter.SetPBKDFParams(uint32(iterations), salt, sessionID) //nolint:gosec // NewVerifierContext / the window's command validation bound the iteration count
+	// The staked id goes back when the handshake can no longer finish
+	// (review II, R2-P3-lan-dev-02); ReleaseID leaves a live session alone.
+	adapter.SetOnUnfinished(sessions.ReleaseID)
 	// Our session parameters, the TCP roles included (PaseServer.ts:151
 	// responderSessionParams = sessions.sessionParameters); nil keeps the
 	// adapter's defaults.
@@ -775,6 +778,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	responder.SetResumptionStore(resumptionLookup{sessions})
 
 	adapter := bridge.NewCaseAdapter(responder)
+	// The staked id goes back when the handshake fails or its adapter is
+	// dropped unfinished (review II, R2-P3-lan-dev-02); ReleaseID leaves a
+	// live session alone.
+	adapter.SetOnUnfinished(sessions.ReleaseID)
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
 		// factory time: the destination resolver may have landed on a

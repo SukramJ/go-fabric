@@ -120,6 +120,9 @@ func (p *PerExchangePaseProvider) Forget(key HandshakeKey) {
 	if e != nil && e.expireTimer != nil {
 		e.expireTimer.Stop()
 	}
+	if e != nil && e.adapter != nil {
+		e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
+	}
 }
 
 // Reset drops every per-exchange adapter. Operators call this when
@@ -134,6 +137,9 @@ func (p *PerExchangePaseProvider) Reset() {
 	for _, e := range old {
 		if e.expireTimer != nil {
 			e.expireTimer.Stop()
+		}
+		if e.adapter != nil {
+			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
 		}
 	}
 }
@@ -213,6 +219,9 @@ func (p *PerExchangePaseProvider) reapBefore(cutoff time.Time) {
 	for _, e := range reaped {
 		if e.expireTimer != nil {
 			e.expireTimer.Stop()
+		}
+		if e.adapter != nil {
+			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
 		}
 	}
 }
