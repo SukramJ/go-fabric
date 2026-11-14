@@ -40,7 +40,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `ClusterEventLister` | a server | EventList | EventList is empty |
 | `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | the endpoint keeps the cluster's DataVersion, on the root and the Aggregator too, and advances it on every change the stack sees; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
 | `ClusterAttributeReadPrivilege` | a server | a read privilege above the data model's; it can only raise it | the data model's read privilege (`schema.AttributeReadPrivilege`, from parity/schema.json) |
-| `ClusterAttributeWritePrivilege` | a server | a write privilege above Operate | Operate |
+| `ClusterAttributeWritePrivilege` | a server | a write privilege above the data model's; it can only raise it | the data model's write privilege (`schema.AttributeWritePrivilege`, from parity/schema.json) |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |
 | `TimedCommander` | a server | which commands need a timed interaction | the generated table (`schema.IsTimedInvoke`) decides |
 | `ClusterQuiescer` | a server with its own timers | stops the timers when the server leaves the topology or the bridge stops | timers outlive the server's use |
