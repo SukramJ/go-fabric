@@ -202,7 +202,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 	b.closePrimingAbort(subID)
 	b.routing.subTargets.Delete(subID)
-	b.subSendErrorCount.Delete(subID)
+	b.resetFailedUpdates(subID)
 	b.subAccess.Delete(subID)
 	b.forgetReportExchange(subID)
 	// reportCounterOwner is keyed by (session, counter), so the owning
@@ -677,7 +677,7 @@ func (b *Bridge) endIfSubjectReadsNothing(ctx context.Context, dispatcher im.Dis
 		return false
 	}
 	b.routing.subTargets.Delete(sub.ID)
-	b.subSendErrorCount.Delete(sub.ID)
+	b.resetFailedUpdates(sub.ID)
 	b.subAccess.Delete(sub.ID)
 	b.forgetReportExchange(sub.ID)
 	if m := b.subscriptionManagerLocked(); m != nil {
@@ -983,7 +983,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	// The flushed chunks are untracked, so no counter comes back and no
 	// counter→subscription entry is owed: nothing retransmits them, and
 	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
-	b.subSendErrorCount.Delete(sub.ID)
+	b.resetFailedUpdates(sub.ID)
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.flush",
@@ -1021,6 +1021,7 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 		// count against.
 		return
 	}
+	b.subUpdateMu.Lock()
 	var failures int
 	if raw, ok := b.subSendErrorCount.Load(subID); ok {
 		if n, ok := raw.(int); ok {
@@ -1030,6 +1031,11 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 	failures++
 	if failures <= sendErrorRetryLimit {
 		b.subSendErrorCount.Store(subID, failures)
+	} else {
+		b.subSendErrorCount.Delete(subID)
+	}
+	b.subUpdateMu.Unlock()
+	if failures <= sendErrorRetryLimit {
 		if b.logger != nil {
 			b.logger.Debug("matter.tx.subscribe."+op,
 				slog.Int("subscription_id", int(subID)),
@@ -1042,7 +1048,6 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 	// Cap reached — drop the routing target and evict the subscription
 	// from the manager so the engine stops ticking a dead subscription.
 	b.routing.subTargets.Delete(subID)
-	b.subSendErrorCount.Delete(subID)
 	b.forgetReportExchange(subID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(subID) // ErrNotFound is fine — racing with peer or ACK-pump Close
@@ -1054,6 +1059,17 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 			slog.String("op", op),
 			slog.String("hint", "consecutive send-error cap reached; subscription reaped"))
 	}
+}
+
+// resetFailedUpdates starts subID's count of failed updates again: a
+// delivered update, or the subscription's end. Every change of the count
+// is taken under subUpdateMu, so a reset is never overwritten by a failed
+// update counted from another goroutine at the same moment — the
+// reporter, the ACK pump and the inbound acknowledgement each change it.
+func (b *Bridge) resetFailedUpdates(subID uint32) {
+	b.subUpdateMu.Lock()
+	b.subSendErrorCount.Delete(subID)
+	b.subUpdateMu.Unlock()
 }
 
 // owedReport is what an ongoing report owes its subscription until the
@@ -1082,7 +1098,7 @@ type owedReport struct {
 // db021da0; review II, R2-P4-nv-07).
 func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uint16, counters []uint32, owed owedReport) {
 	if len(counters) == 0 {
-		b.subSendErrorCount.Delete(subID)
+		b.resetFailedUpdates(subID)
 		return
 	}
 	last := counters[len(counters)-1]
@@ -1211,7 +1227,7 @@ func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, statu
 		return
 	}
 	b.routing.subTargets.Delete(subID)
-	b.subSendErrorCount.Delete(subID)
+	b.resetFailedUpdates(subID)
 	b.forgetReportExchange(subID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(subID) // ErrNotFound is fine — racing with peer Close
@@ -1241,7 +1257,7 @@ func (b *Bridge) releaseReportCounter(sessionID uint16, counter uint32) {
 		return
 	}
 	if owed, ok := raw.(*owedReport); ok {
-		b.subSendErrorCount.Delete(owed.subID)
+		b.resetFailedUpdates(owed.subID)
 	}
 }
 
