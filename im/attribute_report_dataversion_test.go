@@ -33,9 +33,8 @@ func TestAttributeReport_DataVersionPresent(t *testing.T) {
 	t.Parallel()
 
 	// Build a single data-bearing AttributeReport (not a status report).
-	// DataVersion=0 is passed deliberately — marshal must default it to 1
-	// per the comment in AttributeReport.marshal. The test asserts presence
-	// only; the concrete value (1) is secondary.
+	// DataVersion=0 is passed deliberately — an ordinary version, which
+	// marshal encodes as it is. The test asserts presence only.
 	rep := AttributeReport{
 		Path: ConcreteAttributePath{
 			Endpoint:     1,
@@ -47,7 +46,7 @@ func TestAttributeReport_DataVersionPresent(t *testing.T) {
 		},
 		Value:       AttributeValue{Value: true},
 		IsStatus:    false,
-		DataVersion: 0, // triggers the default-to-1 path in marshal
+		DataVersion: 0, // an ordinary version: still encoded
 	}
 
 	// Encode via ReportData.MarshalTLV using a trivial valueWriter.

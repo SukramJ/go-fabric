@@ -107,8 +107,19 @@ func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatch
 		// read (AttributeReadResponse.ts:149-197).
 		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
 		allow:   allow,
-		filters: req.DataVersionFilters,
+		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
 	}
+}
+
+// primingDataVersionFilters returns the DataVersionFilters that apply to
+// this node: a filter addressed to another node is ignored
+// ([im.DataVersionFiltersFor]; matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts:73-77).
+func primingDataVersionFilters(subCtx context.Context, filters []im.DataVersionFilter) []im.DataVersionFilter {
+	if localNodeID, ok := im.LocalNodeIDFromContext(subCtx); ok {
+		return im.DataVersionFiltersFor(filters, localNodeID)
+	}
+	return filters
 }
 
 // result returns the next result the subject may read.
@@ -159,25 +170,17 @@ func (p *primingSource) next() (im.AttributeReport, bool) {
 		// cached" from the absence of reports for that cluster.
 		// Mirrors matter.js AttributeReadResponse.ts:69-85 at db021da0
 		// (the filters indexed) and :276-281, :366-385 (a cluster at its
-		// filter's version skipped).
-		//
-		// Sentinel guard: clusters without per-instance tracking
-		// return rr.DataVersion=0 and the wire encoder substitutes
-		// the §10.6.1.4 floor of 1. A controller that cached the
-		// sentinel-1 and replays it on re-pair must NOT cause the
-		// entire cluster to be omitted from the Subscribe-Initial —
-		// the bridged-endpoint clusters would silently disappear
-		// from Apple's MTRDevice ClusterStateCache and
-		// `endpointDeviceTypes` would collapse to `{0=(22)}`.
-		// Guard at >1 keeps the sentinel from ever matching.
-		if len(p.filters) > 0 && rr.Status == im.StatusSuccess {
+		// filter's version skipped). Only a result that has a version is
+		// compared (ReadResult.HasDataVersion); every value, 0 and 1
+		// included, is an ordinary version (review II, decision 46).
+		if len(p.filters) > 0 && rr.Status == im.StatusSuccess && rr.HasDataVersion {
 			if cached, ok := im.MatchDataVersionFilter(p.filters, rr.Path.Endpoint, rr.Path.Cluster); ok {
-				if cached == rr.DataVersion && rr.DataVersion > 1 {
+				if cached == rr.DataVersion {
 					continue
 				}
 			}
 		}
-		rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
+		rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, HasDataVersion: rr.HasDataVersion}
 		if rr.Status != im.StatusSuccess {
 			if p.suppressStatuses {
 				continue

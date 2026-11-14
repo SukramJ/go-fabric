@@ -3,13 +3,28 @@
 
 package im
 
-import "github.com/SukramJ/go-fabric/tlv"
+import (
+	"context"
+	"math"
+
+	"github.com/SukramJ/go-fabric/tlv"
+)
 
 // matchDataVersionFilter searches filters for a matching (endpoint, cluster)
 // pair and returns (cachedVersion, true) on hit.
 // Returns (0, false) when no filter covers the (endpoint, cluster).
 func matchDataVersionFilter(filters []DataVersionFilter, endpoint uint16, cluster uint32) (uint32, bool) {
 	return MatchDataVersionFilter(filters, endpoint, cluster)
+}
+
+// dataVersionFiltersForContext is [DataVersionFiltersFor] for the local
+// node id ctx carries ([WithLocalNodeID]); without one a filter's node is
+// not looked at.
+func dataVersionFiltersForContext(ctx context.Context, filters []DataVersionFilter) []DataVersionFilter {
+	if localNodeID, ok := LocalNodeIDFromContext(ctx); ok {
+		return DataVersionFiltersFor(filters, localNodeID)
+	}
+	return filters
 }
 
 // MatchDataVersionFilter is the exported form of [matchDataVersionFilter]
@@ -90,7 +105,7 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 			if !el.IsContainer || el.Type != tlv.TypeList {
 				return DataVersionFilter{}, &FieldError{Status: StatusInvalidAction, Tag: 0, Reason: "ClusterPathIB not a list"}
 			}
-			if f.Endpoint, f.Cluster, err = readClusterPathFields(dec); err != nil {
+			if f.NodeID, f.HasNodeID, f.Endpoint, f.Cluster, err = readClusterPathFields(dec); err != nil {
 				return DataVersionFilter{}, err
 			}
 			hasPath = true
@@ -113,30 +128,34 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 // been consumed: endpoint (tag 1) and cluster (tag 2) are mandatory and
 // type- and range-checked (matter.js
 // packages/types/src/protocol/types/TlvClusterPath.ts:16-17; review
-// 2026-11 W2-wire-03, W2-wire-04). Other fields are skipped.
-func readClusterPathFields(dec *tlv.Decoder) (endpoint uint16, cluster uint32, err error) {
+// 2026-11 W2-wire-03, W2-wire-04); the optional node (tag 0) is returned
+// with hasNode. Other fields are skipped.
+func readClusterPathFields(dec *tlv.Decoder) (node uint64, hasNode bool, endpoint uint16, cluster uint32, err error) {
 	var hasEndpoint, hasCluster bool
 	for {
 		inner, nextErr := dec.Next()
 		if nextErr != nil {
-			return 0, 0, nextErr
+			return 0, false, 0, 0, nextErr
 		}
 		if inner.IsEndContainer {
 			if !hasEndpoint {
-				return 0, 0, missingField(1, "ClusterPathIB.Endpoint")
+				return 0, false, 0, 0, missingField(1, "ClusterPathIB.Endpoint")
 			}
 			if !hasCluster {
-				return 0, 0, missingField(2, "ClusterPathIB.Cluster")
+				return 0, false, 0, 0, missingField(2, "ClusterPathIB.Cluster")
 			}
-			return endpoint, cluster, nil
+			return node, hasNode, endpoint, cluster, nil
 		}
 		if inner.Tag.Kind != tlv.TagKindContext {
 			if skipErr := skipField(dec, inner); skipErr != nil {
-				return 0, 0, skipErr
+				return 0, false, 0, 0, skipErr
 			}
 			continue
 		}
 		switch uint8(inner.Tag.Number & 0xFF) {
+		case 0: // NodeID
+			node, err = uintField(inner, math.MaxUint64)
+			hasNode = true
 		case 1: // EndpointID
 			endpoint, err = uint16Field(inner)
 			hasEndpoint = true
@@ -147,7 +166,7 @@ func readClusterPathFields(dec *tlv.Decoder) (endpoint uint16, cluster uint32, e
 			err = skipField(dec, inner)
 		}
 		if err != nil {
-			return 0, 0, err
+			return 0, false, 0, 0, err
 		}
 	}
 }

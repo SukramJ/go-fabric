@@ -19,8 +19,7 @@ import (
 
 // clusterDataVersion returns the current DataVersion for srv by
 // type-asserting to [contract.ClusterDataVersion]. Falls back
-// to 0 when the cluster does not implement the capability — the IM
-// layer then encodes 1 (the spec-minimum) per AttributeDataIB rules.
+// to 0 when the cluster does not implement the capability.
 func clusterDataVersion(srv contract.ClusterServer) uint32 {
 	if dv, ok := srv.(contract.ClusterDataVersion); ok {
 		return dv.MatterDataVersion()
@@ -28,19 +27,38 @@ func clusterDataVersion(srv contract.ClusterServer) uint32 {
 	return 0
 }
 
-// clusterDataVersionFor resolves the DataVersion for srv on ep. Root
-// and Aggregator servers are persistent instances, so their embedded
-// tracker is authoritative. Bridged endpoints materialise their
-// cluster servers fresh on every dispatch ([ClusterServers]) — an
-// instance-embedded tracker would report a new random initial version
-// on every read, so their version identity lives on the persistent
-// [Endpoint] keyed by cluster id instead. Mirrors matter.js
-// Datasource.ts:410 (version set once per lifetime, not per access).
-func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
-	if ep == nil || ep.IsRoot() || ep.IsAggregator() {
-		return clusterDataVersion(srv)
+// ownDataVersion returns srv's own version tracker when it is the one the
+// dispatcher reports for srv on ep: a root or Aggregator server is a
+// persistent instance, so a tracker it keeps itself
+// ([contract.ClusterDataVersion]) is authoritative. Bridged endpoints
+// materialise their cluster servers fresh on every dispatch
+// ([ClusterServers]) — an instance-embedded tracker would report a new
+// random initial version on every read — so their servers' own trackers
+// are never consulted.
+func ownDataVersion(ep *Endpoint, srv contract.ClusterServer) (contract.ClusterDataVersion, bool) {
+	if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+		return nil, false
 	}
-	return ep.ClusterDataVersion(srv.MatterClusterID())
+	dv, ok := srv.(contract.ClusterDataVersion)
+	return dv, ok
+}
+
+// clusterDataVersionFor resolves the DataVersion for srv on ep: the
+// server's own tracker where [ownDataVersion] names one, the tracker the
+// persistent [Endpoint] keeps for the cluster otherwise — every cluster
+// instance has a version, the root's and the Aggregator's included
+// (review II, decision 46). Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:597 (every
+// Datasource samples a version once per lifetime). ok is false only
+// without an endpoint to keep one.
+func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) (version uint32, ok bool) {
+	if own, has := ownDataVersion(ep, srv); has {
+		return own.MatterDataVersion(), true
+	}
+	if ep == nil {
+		return 0, false
+	}
+	return ep.ClusterDataVersion(srv.MatterClusterID()), true
 }
 
 // TopologyDispatcher bridges the assembled [Topology] to the
@@ -478,9 +496,9 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
-				// Datasource.ts:1035). Root/Aggregator servers bump their
-				// own persistent trackers inside the write handler.
-				if res.Status == im.StatusSuccess && !ep.IsRoot() && !ep.IsAggregator() {
+				// Datasource.ts:1035). A root or Aggregator server with a
+				// tracker of its own bumps it inside the write handler.
+				if _, own := ownDataVersion(ep, srv); res.Status == im.StatusSuccess && !own {
 					ep.BumpClusterDataVersion(cPath.Cluster)
 				}
 				results = append(results, res)
@@ -780,21 +798,21 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
 // (:306-326 at 862ad75f).
 //
-// DataVersion: when srv implements [contract.ClusterDataVersion]
-// its current DataVersion is stamped on the ReadResult. The IM layer
-// uses this in HandleReadRequest for DataVersionFilter evaluation.
+// DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
+// is stamped on the ReadResult with HasDataVersion. The IM layer uses
+// this in HandleReadRequest for DataVersionFilter evaluation.
 // Mirrors matter.js InteractionServer.ts attributeReportPayload building.
 func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath) im.ReadResult {
-	dv := clusterDataVersionFor(ep, srv)
+	dv, hasDV := clusterDataVersionFor(ep, srv)
 	// Fabric-scoped attributes: prefer MatterReadFiltered when the
 	// cluster server opts in by implementing FabricScopedReader.
 	if fsr, ok := srv.(contract.FabricScopedReader); ok {
 		v, ok := fsr.MatterReadFiltered(ctx, path.Attribute)
 		if ok {
 			if v == nil {
-				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv}
+				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 			}
-			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
 		// FabricScopedReader returned (nil, false) — fall through to
 		// the universal MatterRead path so non-fabric attributes on
@@ -803,9 +821,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
 		if v == nil {
-			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
@@ -814,7 +832,7 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	// wins when it returns a value (so clusters that want a richer
 	// AcceptedCommandList can override).
 	if synth, synthOK := synthesizeGlobalRead(srv, path.Attribute); synthOK {
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
 }
@@ -1498,12 +1516,12 @@ func privilegeRank(p uint8) int {
 
 // CurrentDataVersion implements [im.DataVersionReader]. It looks up the
 // cluster server for (endpoint, clusterID) and returns its current
-// DataVersion when the server implements [contract.ClusterDataVersion].
+// DataVersion ([clusterDataVersionFor]): every cluster that exists has
+// one, and 0 is an ordinary version.
 //
 // Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// DataVersion check before write dispatch. Returns (0, false) when the
-// cluster is not found or does not implement version tracking — callers
-// treat (0, false) as "version not constrained, proceed with the write".
+// DataVersion check before write dispatch. Returns (0, false) only when
+// the cluster is not found.
 func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint16, clusterID uint32) (uint32, bool) {
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
@@ -1513,23 +1531,7 @@ func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		// Bridged endpoints host the version on the Endpoint (their
-		// server instances are rebuilt per dispatch) — see
-		// clusterDataVersionFor.
-		if !ep.IsRoot() && !ep.IsAggregator() {
-			return ep.ClusterDataVersion(clusterID), true
-		}
-		dv, ok := srv.(contract.ClusterDataVersion)
-		if !ok {
-			return 0, false
-		}
-		v := dv.MatterDataVersion()
-		if v == 0 {
-			// Cluster implements the interface but version is 0 (initial /
-			// untracked). Return (0, false) — callers treat 0 as "unconstrained".
-			return 0, false
-		}
-		return v, true
+		return clusterDataVersionFor(ep, srv)
 	}
 	return 0, false
 }

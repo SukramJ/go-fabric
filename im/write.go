@@ -52,9 +52,9 @@ type WriteRequest struct {
 type AttributeWrite struct {
 	Path  ConcreteAttributePath
 	Value AttributeValue
-	// DataVersion is optional per spec; when non-zero the device
-	// MUST surface DataVersionMismatch if its current version
-	// differs.
+	// DataVersion is optional per spec; when present (HasDataVersion,
+	// 0 included) the device MUST surface DataVersionMismatch if its
+	// current version differs.
 	DataVersion    uint32
 	HasDataVersion bool
 }
@@ -236,7 +236,7 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // packages/node/src/node/server/InteractionServer.ts DataVersion check
 // before write dispatch, and chip src/app/WriteHandler.cpp
 // AttributeAccessInterface DataVersion verification. When the caller
-// supplies a non-zero DataVersion in an AttributeDataIB and d implements
+// supplies a DataVersion in an AttributeDataIB (0 included) and d implements
 // [DataVersionReader], the cluster's current version is queried; a mismatch
 // returns StatusDataVersionMismatch (0x92) instead of dispatching the write.
 //
@@ -404,8 +404,8 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		//
 		// DataVersion mismatch check on a concrete endpoint. Mirrors
 		// matter.js AttributeWriteResponse.ts:254-257 and chip
-		// WriteHandler.cpp DataVersion guard. A zero DataVersion in the
-		// request means "caller does not constrain the version" — skip.
+		// WriteHandler.cpp DataVersion guard: a DataVersion that is present
+		// is compared, 0 included.
 		if namesStaleDataVersion(ctx, d, dvReader, hasDV, w) {
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   w.Path,
@@ -477,12 +477,16 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 // whose comment at the call gives its sources: a write to a concrete
 // endpoint that names a DataVersion other than the cluster's current one
 // is refused with DataVersionMismatch — when the dispatcher reads versions
-// (hasDV, dvReader), the write constrains the version (a non-zero
-// DataVersion), the cluster's current version is known and non-zero, and
-// the write reaches the gate at all ([reachesWriteGates], asked last).
+// (hasDV, dvReader), the write carries a DataVersion (HasDataVersion; 0 is
+// an ordinary version), the cluster has a version, and the write reaches
+// the gate at all ([reachesWriteGates], asked last). Mirrors matter.js
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:254-257
+// (`if (version !== undefined && version !== cluster.version)`) and
+// connectedhomeip src/app/WriteHandler.cpp:818-825
+// (`if (aPath.mDataVersion.HasValue())`).
 func namesStaleDataVersion(ctx context.Context, d Dispatcher, dvReader DataVersionReader, hasDV bool, w AttributeWrite) bool {
-	if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
-		if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
+	if hasDV && w.HasDataVersion && w.Path.HasEndpoint {
+		if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok {
 			if current != w.DataVersion && reachesWriteGates(ctx, d, w.Path) {
 				return true
 			}

@@ -255,9 +255,10 @@ type Endpoint struct {
 	// endpoint itself bumps it. Mirrors matter.js
 	// packages/node/src/behavior/state/managed/Datasource.ts:410 (version
 	// sampled once per behavior lifetime, bound to the endpoint's own
-	// lifecycle) / :949 (increment per committed change). nil for the
-	// root + aggregator endpoints (they keep their reattached
-	// instance-hosted servers and trackers) and for bare
+	// lifecycle) / :949 (increment per committed change). The root and
+	// the Aggregator an [Assembler] builds carry its own root and
+	// Aggregator state, for the clusters whose reattached instance-hosted
+	// servers keep no tracker of their own. nil for bare
 	// test-constructed endpoints — [Endpoint.endpointState] then lazily
 	// installs a private state so the endpoint still behaves correctly
 	// in isolation.
@@ -568,6 +569,28 @@ func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 // Datasource.ts:1035.
 func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()
+}
+
+// BumpDataVersionOf advances the DataVersion the dispatcher reports for
+// clusterID on e after a change of its state: the endpoint-held one
+// ([Endpoint.BumpClusterDataVersion]), unless the cluster's server on the
+// root or the Aggregator keeps a tracker of its own
+// ([contract.ClusterDataVersion]) — that server advances it itself, so
+// nothing is advanced twice and no cluster's version stays behind its
+// data (review II, decision 46).
+func (e *Endpoint) BumpDataVersionOf(clusterID uint32) {
+	if e.IsRoot() || e.IsAggregator() {
+		for _, srv := range ClusterServers(e) {
+			if srv.MatterClusterID() != clusterID {
+				continue
+			}
+			if _, own := ownDataVersion(e, srv); own {
+				return
+			}
+			break
+		}
+	}
+	e.BumpClusterDataVersion(clusterID)
 }
 
 // NodeLabel returns the endpoint's BridgedDeviceBasicInformation

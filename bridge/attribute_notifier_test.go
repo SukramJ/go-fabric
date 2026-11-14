@@ -118,8 +118,11 @@ func TestAttributeChangeNotifierOnRootIsReported(t *testing.T) {
 	before := root.ClusterDataVersion(srv.MatterClusterID())
 
 	srv.fire(2)
-	if root.ClusterDataVersion(srv.MatterClusterID()) != before {
-		t.Error("a root fire advanced the endpoint-hosted DataVersion; the root server's own tracker is authoritative")
+	// The server keeps no tracker of its own, so the root's endpoint-held
+	// version is its version and advances with the change (review II,
+	// decision 46).
+	if after := root.ClusterDataVersion(srv.MatterClusterID()); after == before {
+		t.Error("a root fire left the endpoint-held DataVersion of a server without a tracker of its own unchanged")
 	}
 	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
 	spy.mu.Lock()

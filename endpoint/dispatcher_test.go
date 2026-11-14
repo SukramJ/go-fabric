@@ -1257,8 +1257,10 @@ func TestCurrentDataVersion_BridgedIgnoresInstanceTracker(t *testing.T) {
 }
 
 // TestCurrentDataVersion_RootUsesInstanceTracker verifies root-endpoint
-// servers (persistent instances) keep their instance-hosted semantics:
-// no interface / version 0 → (0, false); non-zero → (ver, true).
+// servers (persistent instances) keep their instance-hosted semantics
+// where they have a tracker of their own — its value, 0 included, is the
+// version — and that a server without one has the endpoint-held version
+// (review II, decision 46).
 func TestCurrentDataVersion_RootUsesInstanceTracker(t *testing.T) {
 	t.Parallel()
 	noIface := &fakeServerFull{id: 0x0006}
@@ -1272,11 +1274,12 @@ func TestCurrentDataVersion_RootUsesInstanceTracker(t *testing.T) {
 		VendorID: 0xFFF1, ProductID: 0x8000,
 	}
 	d := NewTopologyDispatcher(top)
-	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0006); ok || v != 0 {
-		t.Errorf("no-interface root server: expected (0, false), got (%d, %v)", v, ok)
+	held := top.Endpoints[0].ClusterDataVersion(0x0006)
+	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0006); !ok || v != held {
+		t.Errorf("no-interface root server: expected the endpoint-held (%d, true), got (%d, %v)", held, v, ok)
 	}
-	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0007); ok || v != 0 {
-		t.Errorf("zero-version root server: expected (0, false), got (%d, %v)", v, ok)
+	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0007); !ok || v != 0 {
+		t.Errorf("zero-version root server: expected (0, true), got (%d, %v)", v, ok)
 	}
 	if v, ok := d.CurrentDataVersion(context.Background(), 0, 0x0008); !ok || v != 7 {
 		t.Errorf("root server: expected (7, true), got (%d, %v)", v, ok)

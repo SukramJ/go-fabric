@@ -901,8 +901,8 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 				continue
 			}
 			if !bumped && topo != nil {
-				if ep := topo.FindByID(key.endpoint); ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
-					ep.BumpClusterDataVersion(key.cluster)
+				if ep := topo.FindByID(key.endpoint); ep != nil {
+					ep.BumpDataVersionOf(key.cluster)
 				}
 				bumped = true
 			}

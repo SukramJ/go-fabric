@@ -200,7 +200,7 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 	r := &ReadReports{
 		exp:     NewAttributeExpansion(ctx, d, req.AttributeRequests),
 		ctx:     ctx,
-		filters: req.DataVersionFilters,
+		filters: dataVersionFiltersForContext(ctx, req.DataVersionFilters),
 		// A PASE session keeps its implicit Administer grant after AddNOC
 		// adopted it onto the new fabric, so the gate is keyed on the auth
 		// mode, not on the fabric: fabric 0 without PASE is checked, and
@@ -284,23 +284,18 @@ func (r *ReadReports) report(path ConcreteAttributePath, res ReadResult) (rep At
 	}
 
 	// Check if the controller's cached DataVersion matches the cluster's
-	// current DataVersion — if so, skip this cluster.
-	//
-	// Sentinel guard (>1, not !=0): clusters without per-instance
-	// tracking report DataVersion=0 and the wire encoder substitutes the
-	// §10.6.1.4 floor of 1. A controller that cached the sentinel-1 and
-	// replays it MUST NOT cause the whole cluster to be omitted — that
-	// collapses the bridged-endpoint topology in Apple's cache. Mirrors
-	// the Subscribe-initial guard in bridge/subscribe.go.
-	if len(r.filters) > 0 && res.Status == StatusSuccess {
+	// current DataVersion — if so, skip this cluster. Only a result that
+	// has a version is compared (ReadResult.HasDataVersion); every value,
+	// 0 and 1 included, is an ordinary version (review II, decision 46).
+	if len(r.filters) > 0 && res.Status == StatusSuccess && res.HasDataVersion {
 		if cached, ok := matchDataVersionFilter(r.filters, res.Path.Endpoint, res.Path.Cluster); ok {
-			if cached == res.DataVersion && res.DataVersion > 1 {
+			if cached == res.DataVersion {
 				// Controller cache is fresh — omit this cluster.
 				return AttributeReport{}, false
 			}
 		}
 	}
-	rep = AttributeReport{Path: res.Path, DataVersion: res.DataVersion}
+	rep = AttributeReport{Path: res.Path, DataVersion: res.DataVersion, HasDataVersion: res.HasDataVersion}
 	if res.Status != StatusSuccess {
 		rep.IsStatus = true
 		rep.Status = StatusIB{Status: res.Status}

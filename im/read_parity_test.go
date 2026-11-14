@@ -390,7 +390,7 @@ type dispatcherWithVersion struct {
 }
 
 func (d *dispatcherWithVersion) Read(_ context.Context, p ConcreteAttributePath) []ReadResult {
-	return []ReadResult{{Path: p, Value: d.readVal, Status: d.readStat, DataVersion: d.dataVersion}}
+	return []ReadResult{{Path: p, Value: d.readVal, Status: d.readStat, DataVersion: d.dataVersion, HasDataVersion: true}}
 }
 
 func (d *dispatcherWithVersion) Write(_ context.Context, p ConcreteAttributePath, _ AttributeValue) []WriteResult {

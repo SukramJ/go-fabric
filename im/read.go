@@ -59,6 +59,11 @@ type DataVersionFilter struct {
 	Endpoint    uint16
 	Cluster     uint32
 	DataVersion uint32
+	// NodeID is the node the filter's ClusterPathIB names (tag 0) when
+	// HasNodeID is set; a filter for another node is ignored
+	// ([DataVersionFiltersFor]).
+	NodeID    uint64
+	HasNodeID bool
 }
 
 // ReadRequest is the in-memory form of a ReadRequestMessage.
@@ -345,9 +350,7 @@ type AttributeReport struct {
 	// Value ignored) from a data entry (Value meaningful, Status zero).
 	IsStatus bool
 	// DataVersion is the per-cluster version tag chip emits in
-	// AttributeDataIB.DataVersion (Matter §10.6.1.4). 0 means "let
-	// the marshaller default to 1" — controllers tolerate any
-	// non-zero version on first read.
+	// AttributeDataIB.DataVersion (Matter §10.6.1.4), encoded as it is.
 	DataVersion uint32
 	// HasDataVersion reports that a received AttributeDataIB carried a
 	// DataVersion — it is optional on the wire (TlvAttributeReportData.ts).
@@ -442,17 +445,10 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 		// DataVersion is mandatory in AttributeDataIB per Matter
 		// §10.6.1.4. chip-tool's ClusterStateCache expects to find
 		// it at context tag 0 — without it the controller surfaces
-		// CHIP_ERROR_KEY_NOT_FOUND on every read. A report without a
-		// version (0: the dispatcher reported none — in
-		// endpoint.TopologyDispatcher a root or Aggregator server
-		// without contract.ClusterDataVersion; a bridged endpoint
-		// always has the endpoint-held one) goes out as 1. Such a
-		// cluster is never left out for a DataVersionFilter:
-		// HandleReadRequest honours a filter only above 1.
+		// CHIP_ERROR_KEY_NOT_FOUND on every read. Every cluster
+		// instance has a version (endpoint.TopologyDispatcher, review
+		// II decision 46), and it goes out as it is, 0 included.
 		dataVersion := rep.DataVersion
-		if dataVersion == 0 {
-			dataVersion = 1
-		}
 		// DataVersion is `TlvUInt32` per Matter §10.6.1.4. Apple Home's
 		// MTRDevice IM-decoder rejects the whole AttributeDataIB when
 		// DataVersion arrives as TypeUnsignedInt1 — and the v1.x
@@ -521,6 +517,22 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	// from the plain-read path.
 	rd.SuppressResponse = true
 	return rd
+}
+
+// DataVersionFiltersFor returns the DataVersionFilters that apply to the
+// node whose operational node id on the accessing fabric is localNodeID:
+// every filter without a NodeID or with NodeID == localNodeID. A filter
+// addressed to another node is ignored. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts:73-77
+// (`if (filterNodeId !== undefined && filterNodeId !== nodeId) continue;`).
+func DataVersionFiltersFor(filters []DataVersionFilter, localNodeID uint64) []DataVersionFilter {
+	out := filters[:0:0]
+	for _, f := range filters {
+		if !f.HasNodeID || f.NodeID == localNodeID {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // EventFiltersFor returns the one EventFilterIB that applies to the node

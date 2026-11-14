@@ -38,7 +38,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `ClusterAttributeLister` | a server | the attribute set, for wildcard reads and AttributeList | a wildcard read returns only the global attributes |
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList | EventList is empty |
-| `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | on the root and the Aggregator the IM layer stamps a constant 1; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
+| `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | the endpoint keeps the cluster's DataVersion, on the root and the Aggregator too, and advances it on every change the stack sees; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
 | `ClusterAttributeReadPrivilege` | a server | a read privilege above View | View |
 | `ClusterAttributeWritePrivilege` | a server | a write privilege above Operate | Operate |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |

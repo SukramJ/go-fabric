@@ -30,8 +30,8 @@ type AttributeValue struct {
 // src/app/WriteHandler.cpp AttributeAccessInterface DataVersion verification.
 type DataVersionReader interface {
 	// CurrentDataVersion returns the current DataVersion for the cluster at
-	// (endpoint, clusterID). Returns (0, false) when the cluster is not
-	// tracked or does not implement version tracking.
+	// (endpoint, clusterID). Returns (0, false) when it has no version
+	// for the cluster; 0 with true is an ordinary version.
 	CurrentDataVersion(ctx context.Context, endpoint uint16, clusterID uint32) (uint32, bool)
 }
 
@@ -224,9 +224,16 @@ type ReadResult struct {
 	Value  AttributeValue
 	Status StatusCode
 	// DataVersion carries the per-cluster DataVersion that the cluster
-	// server reported at read time. 0 means "not provided" and the IM
-	// layer defaults to 1 in the wire encoding (Matter §10.6.1.4).
+	// reported at read time when HasDataVersion is set; 0 is then an
+	// ordinary version, as every value is in matter.js
+	// (packages/node/src/behavior/state/managed/Datasource.ts:597,
+	// :695-697). endpoint.TopologyDispatcher reports one for every
+	// cluster instance.
 	DataVersion uint32
+	// HasDataVersion reports that DataVersion is the cluster's version.
+	// Without it the result has no version: it is never left out for a
+	// DataVersionFilter, and its AttributeDataIB carries 0.
+	HasDataVersion bool
 }
 
 // WriteResult is one (path, status) pair produced by a Write.

@@ -91,6 +91,9 @@ func marshalDataVersionFilters(enc *tlv.Encoder, tag uint8, filters []DataVersio
 func marshalDataVersionFilter(enc *tlv.Encoder, f DataVersionFilter) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.StartList(tlv.ContextTag(0))
+	if f.HasNodeID {
+		enc.PutUint(tlv.ContextTag(0), f.NodeID)
+	}
 	enc.PutUint(tlv.ContextTag(1), uint64(f.Endpoint))
 	enc.PutUint(tlv.ContextTag(2), uint64(f.Cluster))
 	_ = enc.EndContainer()

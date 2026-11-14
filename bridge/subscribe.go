@@ -1857,7 +1857,12 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 				HasEndpoint: true, HasCluster: true, HasAttribute: true,
 			})
 		}
+		clusterID := srv.MatterClusterID()
 		set.add(notifier.OnMatterValueChanged(func() {
+			// The version first, so the report carries the post-change
+			// one: the endpoint-held tracker of a server that keeps none
+			// of its own (review II, decision 46).
+			root.BumpDataVersionOf(clusterID)
 			for _, p := range paths {
 				mgr.OnAttributeChanged(p)
 			}
@@ -1876,10 +1881,13 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // advanceVersion, then broadcastChanges for the changed properties only)
 // — but for a change from a controller's write, whose version the
 // dispatcher advanced already: one write, one advance.
-// A root or aggregator server is a persistent instance whose own tracker
-// is the DataVersion the dispatcher reports (endpoint/dispatcher.go
+// A root or aggregator server with a tracker of its own
+// (contract.ClusterDataVersion) is a persistent instance whose tracker is
+// the DataVersion the dispatcher reports (endpoint/dispatcher.go
 // clusterDataVersionFor), so it bumps that itself before it fires and
-// nothing is bumped here. matter.js reports a state change of every
+// nothing is bumped here; one without has the endpoint-held version
+// advanced as a bridged endpoint's is ([endpointpkg.Endpoint.BumpDataVersionOf]).
+// matter.js reports a state change of every
 // behavior on every endpoint the same way, the root's included — the OTA
 // requestor's UpdateState is plain behavior state
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
@@ -1896,7 +1904,6 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 		if ep == nil {
 			continue
 		}
-		persistent := ep.IsRoot() || ep.IsAggregator()
 		for _, srv := range endpointpkg.ClusterServers(ep) {
 			notifier, ok := srv.(contract.AttributeChangeNotifier)
 			if !ok {
@@ -1920,8 +1927,8 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				// so the change the write itself reports does not advance
 				// it again (matter.js Datasource.ts:1440-1448,
 				// advanceVersion once per commit).
-				if !persistent && change.Origin != contract.OriginControllerWrite {
-					ep.BumpClusterDataVersion(clusterID)
+				if change.Origin != contract.OriginControllerWrite {
+					ep.BumpDataVersionOf(clusterID)
 				}
 				for _, attr := range attrIDs {
 					mgr.OnAttributeChanged(im.ConcreteAttributePath{
