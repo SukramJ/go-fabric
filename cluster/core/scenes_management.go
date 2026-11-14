@@ -660,6 +660,9 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 	if fabric == 0 {
 		return nil, scenesStatusError{im.StatusUnsupportedAccess, "command requires an accessing fabric"}
 	}
+	if err := groupZeroInGroupMessage(ctx, fields); err != nil {
+		return nil, err
+	}
 	defer s.cfg.State.reportIfChanged(s.cfg.State.snapshot())
 	bad := func() (any, error) {
 		return nil, scenesStatusError{im.StatusInvalidCommand, fmt.Sprintf("command 0x%02X: unexpected fields %T", cmdID, fields)}
@@ -715,6 +718,43 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return s.copyScene(ctx, fabric, req), nil
 	}
 	return nil, im.UnsupportedCommandf("core: ScenesManagement command 0x%02X not supported", cmdID)
+}
+
+// groupZeroInGroupMessage refuses a scene command that arrived as a group
+// message with a GroupID of 0. Mirrors matter.js
+// packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:229-234
+// at db021da0 (#assertSceneCommandParameter, which every scene command
+// calls, CopyScene for both of its groups, :491-499): `if (isGroupSession
+// && groupIdToValidate === 0) throw new StatusResponse.InvalidCommandError`.
+// The check runs before the command's own, on the request of any of the
+// eight commands (a payload of another shape is left to the command's
+// decoding); matter.js runs some of those
+// first (AddScene's and RecallScene's range checks, :283-285, :435-440),
+// which a group message, answered by no response, cannot tell apart —
+// either way nothing changes.
+func groupZeroInGroupMessage(ctx context.Context, fields any) error {
+	if _, group := im.GroupSubjectFromContext(ctx); !group {
+		return nil
+	}
+	var groupIDs []uint16
+	switch req := fields.(type) {
+	case AddSceneRequest:
+		groupIDs = []uint16{req.GroupID}
+	case SceneRef:
+		groupIDs = []uint16{req.GroupID}
+	case RecallSceneRequest:
+		groupIDs = []uint16{req.GroupID}
+	case SceneGroupRequest:
+		groupIDs = []uint16{req.GroupID}
+	case CopySceneRequest:
+		groupIDs = []uint16{req.GroupFrom, req.GroupTo}
+	}
+	for _, id := range groupIDs {
+		if id == 0 {
+			return scenesStatusError{im.StatusInvalidCommand, "GroupID cannot be 0 in a group message"}
+		}
+	}
+	return nil
 }
 
 // groupValid is matter.js #assertSceneCommandParameter's group check.

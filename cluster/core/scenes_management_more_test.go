@@ -303,3 +303,56 @@ func TestScenesRecallThroughTheServersApplier(t *testing.T) {
 		t.Fatalf("applied %v over %d ms", color.values, color.ms)
 	}
 }
+
+// TestScenesGroupZeroIsRefusedInAGroupSession holds every scene command to
+// matter.js packages/node/src/behaviors/scenes-management/
+// ScenesManagementServer.ts:225-234 at db021da0
+// (#assertSceneCommandParameter, which all eight commands call): a group
+// message whose GroupID is 0 fails with INVALID_COMMAND and changes
+// nothing — CopyScene for either of its groups (:491-499); a unicast
+// command on group 0 and a group message on a known group run.
+func TestScenesGroupZeroIsRefusedInAGroupSession(t *testing.T) {
+	t.Parallel()
+	light := &sceneOnOff{on: true}
+	s, _ := scenesWith(t, light)
+	unicast := im.WithFabricFilter(context.Background(), true, 1)
+	group := im.WithGroupSubject(unicast, im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{1}})
+	if r, err := s.MatterInvoke(unicast, 0x04, core.SceneRef{SceneID: 1}); err != nil || r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Fatalf("StoreScene on group 0 over unicast: %+v, %v", r, err)
+	}
+	light.on = false
+	for _, c := range []struct {
+		name   string
+		cmd    uint32
+		fields any
+	}{
+		{"AddScene", 0x00, core.AddSceneRequest{SceneID: 2}},
+		{"ViewScene", 0x01, core.SceneRef{SceneID: 1}},
+		{"RemoveScene", 0x02, core.SceneRef{SceneID: 1}},
+		{"RemoveAllScenes", 0x03, core.SceneGroupRequest{}},
+		{"StoreScene", 0x04, core.SceneRef{SceneID: 3}},
+		{"RecallScene", 0x05, core.RecallSceneRequest{SceneID: 1}},
+		{"GetSceneMembership", 0x06, core.SceneGroupRequest{}},
+		{"CopyScene from group 0", 0x40, core.CopySceneRequest{GroupFrom: 0, SceneFrom: 1, GroupTo: 0x0101, SceneTo: 1}},
+		{"CopyScene to group 0", 0x40, core.CopySceneRequest{GroupFrom: 0x0101, SceneFrom: 1, GroupTo: 0, SceneTo: 4}},
+	} {
+		_, err := s.MatterInvoke(group, c.cmd, c.fields)
+		if err == nil {
+			t.Errorf("%s with GroupID 0 in a group message succeeded", c.name)
+			continue
+		}
+		if got := scenesStatus(t, err); got != im.StatusInvalidCommand {
+			t.Errorf("%s with GroupID 0 in a group message: status 0x%02X, want INVALID_COMMAND", c.name, uint8(got))
+		}
+	}
+	if light.on {
+		t.Error("a refused RecallScene applied the scene")
+	}
+	r, _ := s.MatterInvoke(unicast, 0x06, core.SceneGroupRequest{})
+	if m := r.(core.GetSceneMembershipResponse); len(m.SceneList) != 1 || m.SceneList[0] != 1 {
+		t.Errorf("group 0 holds scenes %v after the refused commands, want [1]", m.SceneList)
+	}
+	if r, err := s.MatterInvoke(group, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 5}); err != nil || r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Errorf("StoreScene on a known group in a group message: %+v, %v", r, err)
+	}
+}
