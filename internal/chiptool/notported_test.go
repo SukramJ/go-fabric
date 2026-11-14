@@ -237,7 +237,7 @@ func TestNotPortedYetRowsAreHeld(t *testing.T) {
 		want string
 	}{
 		{"a case matter.js does not have", func(_ *docGolden, st *statusTables) {
-			st.notRun["XX/9.9"] = portableNow("TC-XX-9.9.test.ts:1", "nothing")
+			st.notRun["XX/9.9"] = portableNow("TC-XX-9.9.test.ts"+":1", "nothing")
 		}, "XX/9.9 is not ported yet, but matter.js has no such case"},
 		{"a case a registered port runs", func(_ *docGolden, st *statusTables) {
 			st.notRun[ported] = portableNow(ports[ported]+":1", "nothing")
