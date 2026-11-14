@@ -105,9 +105,7 @@ func (b *Bridge) endSessionAtRollover(localSessionID uint16, sess *channel.Sessi
 	}
 	go func() {
 		defer b.rolloverCloses.Done()
-		if m := b.subscriptionManagerLocked(); m != nil {
-			m.FlushSession(b.handlerContext(), localSessionID)
-		}
+		b.flushSessionAtRollover(localSessionID)
 		b.sendCloseSessionReport(localSessionID, sess)
 		if reg == nil {
 			sess.Close()
@@ -119,6 +117,19 @@ func (b *Bridge) endSessionAtRollover(localSessionID uint16, sess *channel.Sessi
 				slog.Any("err", err))
 		}
 	}()
+}
+
+// flushSessionAtRollover reports what the subscriptions of the session
+// [Bridge.endSessionAtRollover] ends owe, under the run's handler
+// context: the close runs on its own goroutine, after the send that
+// noticed the rollover returned, so no caller's context bounds it; Stop
+// cancels the handler context before it waits for the rollover closes.
+//
+//nolint:contextcheck // detached by design: the send that noticed the rollover has returned; the run's handler context bounds the flush
+func (b *Bridge) flushSessionAtRollover(localSessionID uint16) {
+	if m := b.subscriptionManagerLocked(); m != nil {
+		m.FlushSession(b.handlerContext(), localSessionID)
+	}
 }
 
 // sendReply is a thin wrapper around [Bridge.sendReplyOpts] that
