@@ -605,6 +605,75 @@ func TestRow_FreshArmDoesNotArmForTheFabricItRollsBack(t *testing.T) {
 	r.armOver(ctx, t, idx+1, 0)
 }
 
+// TestRow_FreshArmRefusesTheFabricWhoseRowItCouldNotSettle is
+// R2-P2-rr-dev-01: an AddNOC's fabric whose rollback failed at the
+// fail-safe's end, and fails again at the fresh start, keeps its row
+// pending — its administrator's ArmFailSafe arms nothing, and its
+// CommissioningComplete does not answer OK, so no commissioner is told the
+// fabric is committed that the next start removes.
+func TestRow_FreshArmRefusesTheFabricWhoseRowItCouldNotSettle(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newRowStore(memstore.New())
+	r := newRowRig(t, st, nil)
+	if resp, err := r.gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+		t.Fatalf("ArmFailSafe: %+v, %v", resp, err)
+	}
+	_, _, idx := commissionTestFabric(ctx, t, r.oc)
+	st.setFault(failOn("RemoveFabric", "RollbackFabric"))
+	r.armOver(ctx, t, idx, 0) // the fail-safe ends; its rollback fails
+	resp, err := r.gc.MatterInvoke(im.WithFabricFilter(ctx, true, idx), 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 300})
+	if err == nil && resp.(core.ArmFailSafeResponse).ErrorCode == core.CommissioningErrorOK {
+		t.Errorf("ArmFailSafe over fabric %d answered OK although its row stays pending", idx)
+	}
+	if fabric, armed := r.gc.FailSafeFabric(); armed {
+		t.Errorf("fail-safe armed for fabric %d over the pending row of fabric %d", fabric, idx)
+	}
+	if r.commissioningComplete(ctx, t, idx) {
+		t.Errorf("CommissioningComplete over fabric %d answered OK while its row stays pending", idx)
+	}
+	st.setFault(nil)
+	fabrics, _ := st.ListFabrics(ctx)
+	if len(fabrics) != 1 || fabrics[0].Pending == mstore.FabricCommitted {
+		t.Fatalf("fabrics = %+v, want fabric %d still pending", fabrics, idx)
+	}
+}
+
+// TestRow_CommissioningCompleteCommitsTheRowOfItsFabric is
+// R2-P2-rr-dev-01's other half: a fail-safe armed for a fabric whose row
+// stays pending outside the arm's judgement (ArmFailSafeFor, the host's
+// arm for a session to come, does not refuse it) is completed only with
+// that row: CommissioningComplete commits the row it finds pending for its
+// fabric, or answers FAILURE.
+func TestRow_CommissioningCompleteCommitsTheRowOfItsFabric(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newRowStore(memstore.New())
+	r := newRowRig(t, st, nil)
+	if resp, err := r.gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+		t.Fatalf("ArmFailSafe: %+v, %v", resp, err)
+	}
+	_, _, idx := commissionTestFabric(ctx, t, r.oc)
+	st.setFault(failOn("RemoveFabric", "RollbackFabric", "CommitFabric"))
+	r.armOver(ctx, t, idx, 0) // the fail-safe ends; its rollback fails
+	if err := r.gc.ArmFailSafeFor(ctx, 60, idx); err != nil {
+		t.Fatalf("ArmFailSafeFor(%d): %v", idx, err)
+	}
+	if r.commissioningComplete(ctx, t, idx) {
+		t.Fatalf("CommissioningComplete over fabric %d answered OK although the commit of its pending row failed", idx)
+	}
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 1 || fabrics[0].Pending == mstore.FabricCommitted {
+		t.Fatalf("fabrics = %+v after the failed CommissioningComplete, want fabric %d pending", fabrics, idx)
+	}
+	st.setFault(nil)
+	if !r.commissioningComplete(ctx, t, idx) {
+		t.Fatalf("CommissioningComplete over fabric %d failed over a healthy store", idx)
+	}
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 1 || fabrics[0].Pending != mstore.FabricCommitted {
+		t.Fatalf("fabrics = %+v after CommissioningComplete answered OK, want fabric %d committed", fabrics, idx)
+	}
+}
+
 // TestRow_TermsAcceptanceIsNotCommittedWithoutTheFabric is R2-P2-comm-07:
 // a CommissioningComplete whose fabric commit fails leaves the terms
 // acceptance of the window uncommitted — in the store too — so the

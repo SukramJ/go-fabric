@@ -728,21 +728,25 @@ func (o *OperationalCredentials) ClearPendingState() {
 
 // PrepareFreshFailSafe is [OperationalCredentials.ClearPendingState] for
 // [GeneralCommissioning.SetOnFailSafeStarting]: it runs before a fresh arm
-// is recorded and returns the fabrics whose pending AddNOC it rolled back —
-// the fabrics it removed — so the arm of a removed fabric's administrator
-// arms nothing (review II, R2-P2-dr-noc-04).
+// is recorded and returns the fabrics a fail-safe must not be armed for —
+// those whose pending AddNOC it rolled back, which it removed (review II,
+// R2-P2-dr-noc-04), and those whose pending row it could not roll back,
+// which stay pending: an arm for one would arm a fail-safe over a row no
+// NOC command of it wrote, which its CommissioningComplete could not
+// truthfully complete (review II, R2-P2-rr-dev-01). The arm of such a
+// fabric's administrator arms nothing.
 func (o *OperationalCredentials) PrepareFreshFailSafe(ctx context.Context) (removedFabrics []uint8) {
 	o.nocMu.Lock()
 	o.mu.Lock()
 	o.clearPendingState()
 	o.mu.Unlock()
-	added, updated := o.rollbackPendingLocked(ctx)
+	added, updated, unsettled := o.rollbackPendingLocked(ctx)
 	o.nocMu.Unlock()
 	o.reportRolledBack(ctx, added, updated)
 	for i := range added {
 		removedFabrics = append(removedFabrics, added[i].FabricIndex)
 	}
-	return removedFabrics
+	return append(removedFabrics, unsettled...)
 }
 
 // CommitFailSafe is the durable commit of CommissioningComplete
@@ -772,13 +776,35 @@ func (o *OperationalCredentials) CommitFailSafe(ctx context.Context, complete fu
 
 // commitLocked is CommitFailSafe's commit; nocMu is held. It returns the
 // other rows it rolled back, for reportRolledBack.
+//
+// It commits pendingFabric's row and, when that is not the accessing
+// fabric's, the accessing fabric's row it finds pending: a fail-safe can be
+// armed for a fabric whose row an earlier end left pending without any
+// arm judging that row (ArmFailSafeFor arms for a session to come), and
+// CommissioningComplete must not answer success while the row of its
+// fabric stays pending — the next start would remove a fabric its
+// commissioner was told is committed (review II, R2-P2-rr-dev-01). A row
+// that cannot be read or committed fails the commit.
 func (o *OperationalCredentials) commitLocked(ctx context.Context) (added, updated []store.FabricRecord, err error) {
 	o.mu.RLock()
 	idx := o.pendingFabric
 	o.mu.RUnlock()
+	commit := make([]uint8, 0, 2)
 	if idx != 0 {
-		if err := o.store.CommitFabric(ctx, idx); err != nil {
-			return nil, nil, fmt.Errorf("core: OperationalCredentials: commit fabric %d: %w", idx, err)
+		commit = append(commit, idx)
+	}
+	if _, accessing := im.FabricFilterFromContext(ctx); accessing != 0 && accessing != idx {
+		f, err := o.store.GetFabric(ctx, accessing)
+		switch {
+		case err == nil && f.Pending != store.FabricCommitted:
+			commit = append(commit, accessing)
+		case err != nil && !errors.Is(err, store.ErrFabricNotFound):
+			return nil, nil, fmt.Errorf("core: OperationalCredentials: read fabric %d: %w", accessing, err)
+		}
+	}
+	for _, i := range commit {
+		if err := o.store.CommitFabric(ctx, i); err != nil {
+			return nil, nil, fmt.Errorf("core: OperationalCredentials: commit fabric %d: %w", i, err)
 		}
 	}
 	o.mu.Lock()
@@ -786,7 +812,7 @@ func (o *OperationalCredentials) commitLocked(ctx context.Context) (added, updat
 	o.mu.Unlock()
 	// What the commit did not name is not this commissioning's: no NOC
 	// command in this fail-safe answered success for it.
-	added, updated = o.rollbackPendingLocked(ctx)
+	added, updated, _ = o.rollbackPendingLocked(ctx)
 	return added, updated, nil
 }
 
@@ -810,7 +836,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	o.mu.Lock()
 	o.clearPendingState()
 	o.mu.Unlock()
-	added, updated := o.rollbackPendingLocked(ctx)
+	added, updated, _ := o.rollbackPendingLocked(ctx)
 	o.nocMu.Unlock()
 	o.reportRolledBack(ctx, added, updated)
 }
@@ -852,14 +878,15 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 // pending but the fail-safe context's own (pendingFabric) — the row is the record of what a fail-safe left uncommitted,
 // so a rollback an earlier end could not land is retried here by
 // construction. It returns the rows whose rollback landed, as they stood
-// before it, by the state each was in. A failed list or rollback is
-// logged and leaves the row pending. nocMu is held.
-func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (added, updated []store.FabricRecord) {
+// before it, by the state each was in, and the fabrics whose rollback did
+// not land (unsettled). A failed list or rollback is logged and leaves the
+// row pending. nocMu is held.
+func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (added, updated []store.FabricRecord, unsettled []uint8) {
 	ctx = context.WithoutCancel(ctx)
 	fabrics, err := o.store.ListFabrics(ctx)
 	if err != nil {
 		o.logger().Error("matter.opcreds.pending_fabric.list_failed", slog.Any("err", err))
-		return nil, nil
+		return nil, nil, nil
 	}
 	o.mu.RLock()
 	own := o.pendingFabric
@@ -873,6 +900,7 @@ func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (add
 		if err != nil {
 			if !errors.Is(err, store.ErrFabricNotFound) {
 				o.logger().Error("matter.opcreds.pending_fabric.rollback_failed", slog.Int("fabric_index", int(f.FabricIndex)), slog.Any("err", err))
+				unsettled = append(unsettled, f.FabricIndex)
 			}
 			continue
 		}
@@ -885,7 +913,7 @@ func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (add
 			// Committed meanwhile: nothing was rolled back.
 		}
 	}
-	return added, updated
+	return added, updated, unsettled
 }
 
 // reportUpdateRolledBack lets the node follow a rolled-back UpdateNOC:
@@ -1924,7 +1952,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// succeeded in it): an earlier rollback could not land. It goes first,
 	// so the TableFull guard and the conflict check below see the table as
 	// it is once it landed (review II, R2-P1-rw-01).
-	settledAdded, settledUpdated := o.rollbackPendingLocked(ctx)
+	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
 	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
 	// IPKValue is "octstr, M, 16" (matter.js
 	// operational-credentials.element.ts:98 at 862ad75f), so a wrong
@@ -2336,7 +2364,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// As AddNOC: a row an earlier rollback could not land goes first, so
 	// the fabric this update reads is the restored one (review II,
 	// R2-P1-rw-01).
-	settledAdded, settledUpdated := o.rollbackPendingLocked(ctx)
+	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
 	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil

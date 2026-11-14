@@ -79,7 +79,8 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context
 // arm was recorded, outside this accounting: an arm from a fabric whose
 // earlier rollback had not landed removed that fabric and left the
 // fail-safe armed for it (review II, R2-P2-dr-noc-04). With forSession, an
-// arm from sessFabric's session that the rollback removed is
+// arm from sessFabric's session that the rollback removed, or whose row it
+// could not roll back and left pending (review II, R2-P2-rr-dev-01), is
 // errGencommArmRolledBack. Nothing runs when the fail-safe is armed or no
 // hook is wired. Caller holds g.mu; it is held again on return, and
 // released in between.
@@ -97,7 +98,8 @@ func (g *GeneralCommissioning) startFailSafeLocked(ctx context.Context, sessFabr
 }
 
 // runFailSafeStartingLocked runs hook outside g.mu as a rollback in flight
-// and accounts what it removed. Caller holds g.mu; it is held again on
+// and accounts the fabrics it returns — those it removed and those whose
+// pending row it left — as rollbackFabricRemovals. Caller holds g.mu; it is held again on
 // return — on a panic of the hook too.
 func (g *GeneralCommissioning) runFailSafeStartingLocked(ctx context.Context, hook func(ctx context.Context) []uint8) {
 	if g.expiryRollbacksDone == nil {

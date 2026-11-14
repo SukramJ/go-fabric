@@ -86,7 +86,8 @@ type GeneralCommissioning struct {
 	expiryRollbacksDone chan struct{}
 	// rollbackPaseCloses and rollbackFabricRemovals count the finished
 	// expiry hooks by what they ended: every PASE session (the hook ran
-	// onFailSafeRolledBack), or the fabric the window's AddNOC added. An
+	// onFailSafeRolledBack), or the fabric the window's AddNOC added — and
+	// a fresh start's by the fabrics it removed or left pending. An
 	// arm compares them across its settle to learn whether a rollback it
 	// waited for ended its own session (review II, R2-P1-rw-05).
 	rollbackPaseCloses     uint64
@@ -351,10 +352,11 @@ func (g *GeneralCommissioning) SetOnFailSafeArmed(fn func(ctx context.Context, f
 // SetOnFailSafeStarting wires what runs when an arm finds the fail-safe
 // disarmed, before the arm is judged and recorded: the start of a new fail-safe context, which rolls
 // back what an earlier fail-safe left pending and returns the fabrics that
-// rollback removed. It runs as a fail-safe's rollback does — another arm
-// waits for it — and an arm from the session of a fabric it removed arms
-// nothing and fails, as an arm whose session an expired fail-safe's
-// rollback ended does (review II, R2-P2-dr-noc-04). The node wires
+// rollback removed and those whose pending row it could not roll back. It
+// runs as a fail-safe's rollback does — another arm waits for it — and an
+// arm from the session of a fabric it returns arms nothing and fails, as
+// an arm whose session an expired fail-safe's rollback ended does (review
+// II, R2-P2-dr-noc-04, R2-P2-rr-dev-01). The node wires
 // [OperationalCredentials.PrepareFreshFailSafe]. Pass nil to detach.
 func (g *GeneralCommissioning) SetOnFailSafeStarting(fn func(ctx context.Context) (removedFabrics []uint8)) {
 	g.mu.Lock()
