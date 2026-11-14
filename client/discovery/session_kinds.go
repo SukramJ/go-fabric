@@ -96,7 +96,7 @@ func (k *continuousKind) onStop(*Session[[]Candidate]) {}
 
 // CrossDeviceStagger is the delay between the race's attempts on
 // different devices — matter.js CROSS_DEVICE_STAGGER_DELAY
-// (ParallelPaseDiscovery.ts:30 at 862ad75f): the first starts at once,
+// (ParallelPaseDiscovery.ts:30 at db021da0): the first starts at once,
 // each next one a slot after the one before while that one still runs.
 // matter.js counts the slot from every attempt found before, ended or not
 // (ParallelPaseDiscovery.ts:102-103 at db021da0); here an attempt that has
@@ -169,11 +169,12 @@ func AttemptAnswered(ctx context.Context) {
 // candidate whose wait is up while they do takes the place of the oldest
 // attempt that has not called [AttemptAnswered] — matter.js has neither
 // bound (docs/guides/limits.md). Otherwise it is
-// matter.js ParallelPaseDiscovery (ParallelPaseDiscovery.ts:45-216):
+// matter.js ParallelPaseDiscovery (ParallelPaseDiscovery.ts:45-217 at
+// db021da0):
 //
 //   - the race is decided on a win, an interruption before one, or the
 //     end of the search without one; from then no attempt starts and win
-//     refuses every attempt (:81-109, :157-174);
+//     refuses every attempt (:81-116, :157-174);
 //   - the winner stops the search, the others' contexts end (:88-100);
 //   - the outcome is the winner's result or the winner's own error; with
 //     no winner it is [ErrDeviceNotDiscovered] with no attempt,
@@ -404,7 +405,8 @@ func (k *raceKind[W]) ended(s *Session[W], a *raceAttempt) {
 	k.releaseLocked(s)
 }
 
-// run is one registered attempt (registerAttempt, :81-147).
+// run is one registered attempt (registerAttempt,
+// ParallelPaseDiscovery.ts:81-151 at db021da0).
 func (k *raceKind[W]) run(s *Session[W], c Candidate, a *raceAttempt) {
 	select {
 	case <-a.release:
