@@ -464,8 +464,10 @@ phase 5, 13 phase 6, 4 held back.
 Unread: 13 units, phase 6, and 3 held-back rows.
 
 Rows written in `by_design.md` (`git diff a9134e81..540cb0eb`): 13 Ahead
-rows with their entries, 7 `by_design` entries, 6 entries or rows amended.
-Findings: 1 closed (`F-db021da0-14`), 1 opened (`F-db021da0-16`).
+rows with their entries, 7 `by_design` entries, 6 entries or rows amended;
+after `540cb0eb` one more Ahead row (`BD-Matter-UnsecuredWindowExchangesBounded`)
+and `BD-Matter-SessionRolloverClose` amended again. Findings: 1 closed
+(`F-db021da0-14`), 2 opened (`F-db021da0-16`, `-17`).
 
 **Held back: 8 rows** — 1 finding (R2-P2-rr-dev-08), 4 noticed items and 3
 unread parts; all in phase 3. Of the 12 rows phase 1 held back, 5 are public
