@@ -372,8 +372,8 @@ calls:
   and reported to subscribers, and the sink is not called. An attribute
   Matter marks quieter — LevelControl's `CurrentLevel`, ColorControl's
   current colour — is reported at most once a second with its latest
-  value, at once from or to null, as matter.js throttles it; a read and
-  `OnChanged` see every change at once. `Set` is safe from any goroutine,
+  value, at once from or to null, as matter.js throttles it; a read, the
+  cluster's DataVersion and `OnChanged` see every change at once. `Set` is safe from any goroutine,
   including from inside the sink.
 
 *Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/measurement.go` (`Measurement`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*

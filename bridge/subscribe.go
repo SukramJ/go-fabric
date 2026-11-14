@@ -2352,12 +2352,13 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
 // server that is also a [contract.ChangeNotifier] is wired by
 // wireRootNotifiers already and is skipped here. A server that is a
-// [contract.AttributeReportNotifier] is subscribed through its report view
-// — a quieter attribute by its throttle, as matter.js's
-// ServerBehaviorBacking subscribes a QuietEvent's `online` observable
-// (ServerBehaviorBacking.ts:251-259) — and through OnAttributeChange,
-// which tells the host of every change at once, otherwise. Caller holds
-// b.mu.
+// [contract.AttributeReportNotifier] has its attributes marked dirty
+// through its report view — a quieter attribute by its throttle, as
+// matter.js's ServerBehaviorBacking subscribes a QuietEvent's `online`
+// observable (ServerBehaviorBacking.ts:251-259) — and the version
+// advanced through OnAttributeChange, which tells of every change at once
+// ([quieterVersion]); any other server is subscribed through
+// OnAttributeChange alone. Caller holds b.mu.
 func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	for _, ep := range topology.Endpoints {
 		if ep == nil {
@@ -2372,44 +2373,124 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				continue
 			}
 			clusterID := srv.MatterClusterID()
-			subscribe := notifier.OnAttributeChange
-			if r, reports := srv.(contract.AttributeReportNotifier); reports {
-				subscribe = r.OnAttributeReport
+			r, reports := srv.(contract.AttributeReportNotifier)
+			if !reports {
+				set.add(notifier.OnAttributeChange(func(change contract.Change) {
+					b.reportServerChange(mgr, ep, clusterID, change, true)
+				}))
+				continue
 			}
-			set.add(subscribe(func(change contract.Change) {
-				attrIDs := change.Attributes
-				if len(attrIDs) == 0 {
-					return
-				}
-				// A command running against the cluster advances the
-				// version once when it ends (invokeCommitTable); a
-				// controller's write keeps its own commit.
-				if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
-					if hook := b.onAttributeChange.Load(); hook != nil {
-						(*hook)(ep.ID, clusterID, change)
-					}
-					return
-				}
-				// A controller's write is one commit with one advance:
-				// the dispatcher's (endpoint/dispatcher.go WriteAuthorized),
-				// so the change the write itself reports does not advance
-				// it again (matter.js Datasource.ts:1446-1457 at db021da0,
-				// advanceVersion once per commit).
-				if change.Origin != contract.OriginControllerWrite {
-					ep.BumpDataVersionOf(clusterID)
-				}
-				for _, attr := range attrIDs {
-					mgr.OnAttributeChanged(im.ConcreteAttributePath{
-						Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
-						HasEndpoint: true, HasCluster: true, HasAttribute: true,
-					})
-				}
-				if hook := b.onAttributeChange.Load(); hook != nil {
-					(*hook)(ep.ID, clusterID, change)
-				}
+			v := &quieterVersion{}
+			// The change listener first: a change told to both views at
+			// once advances the version before its report marks it dirty.
+			set.add(notifier.OnAttributeChange(func(change contract.Change) {
+				v.changed(b, ep, clusterID, change)
+			}))
+			set.add(r.OnAttributeReport(func(change contract.Change) {
+				b.reportServerChange(mgr, ep, clusterID, change, v.take(change.Attributes))
 			}))
 		}
 	}
+}
+
+// reportServerChange marks the attributes of a server's change dirty,
+// advancing the cluster's DataVersion before when advance holds, and tells
+// the host's hook. A command running against the cluster advances the
+// version once when it ends (invokeCommitTable): its servers' changes are
+// held there. A controller's write is one commit with one advance, the
+// dispatcher's (endpoint/dispatcher.go WriteAuthorized), so the change the
+// write itself reports does not advance it again (matter.js
+// Datasource.ts:1446-1457 at db021da0, advanceVersion once per commit).
+func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change, advance bool) {
+	attrIDs := change.Attributes
+	if len(attrIDs) == 0 {
+		return
+	}
+	if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
+		if hook := b.onAttributeChange.Load(); hook != nil {
+			(*hook)(ep.ID, clusterID, change)
+		}
+		return
+	}
+	if advance && change.Origin != contract.OriginControllerWrite {
+		ep.BumpDataVersionOf(clusterID)
+	}
+	for _, attr := range attrIDs {
+		mgr.OnAttributeChanged(im.ConcreteAttributePath{
+			Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+		})
+	}
+	if hook := b.onAttributeChange.Load(); hook != nil {
+		(*hook)(ep.ID, clusterID, change)
+	}
+}
+
+// quieterVersion advances the DataVersion of a cluster whose server
+// reports a quieter attribute later than it changes it
+// ([contract.AttributeReportNotifier]) when the change happens, not when
+// its report goes out: one advance per change, for a quieter and a plain
+// attribute changed together too, and none at the throttle's report.
+// matter.js advances the version at the commit that changed a value, a
+// quieter property's included
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), and at a quiet emit only for a dynamic property
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261
+// calls advanceVersionFor, Datasource.ts:679-688) — of the reporting
+// servers here, LevelControl's and ColorControl's remainingTime
+// (LevelControlServer.ts:806-822, ColorControlServer.ts:1967-1984), which
+// those servers report with their change. A change made while a command
+// runs against the cluster is left to the command's commit; when the
+// commit did not report it, its report advances the version.
+type quieterVersion struct {
+	mu sync.Mutex
+	// owed holds the attributes changed while a command's commit was
+	// open whose advance is still owed.
+	owed map[uint32]struct{}
+}
+
+// changed advances the version for change, or owes the advance to its
+// report while a command's commit of the cluster is open. A controller's
+// write advanced it already.
+func (v *quieterVersion) changed(b *Bridge, ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change) {
+	if len(change.Attributes) == 0 || change.Origin == contract.OriginControllerWrite {
+		return
+	}
+	if b.invokeCommits.isOpen(ep.ID, clusterID) {
+		v.mu.Lock()
+		if v.owed == nil {
+			v.owed = make(map[uint32]struct{}, len(change.Attributes))
+		}
+		for _, attr := range change.Attributes {
+			v.owed[attr] = struct{}{}
+		}
+		v.mu.Unlock()
+		return
+	}
+	ep.BumpDataVersionOf(clusterID)
+}
+
+// take reports whether the report of attrs owes an advance and forgets it.
+func (v *quieterVersion) take(attrs []uint32) bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	owed := false
+	for _, attr := range attrs {
+		if _, ok := v.owed[attr]; ok {
+			owed = true
+			delete(v.owed, attr)
+		}
+	}
+	return owed
+}
+
+// isOpen reports whether a command's commit of (endpoint, cluster) is
+// open, recording nothing in it ([invokeCommitTable.hold] records).
+func (t *invokeCommitTable) isOpen(endpoint uint16, cluster uint32) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, ok := t.open[invokedCluster{endpoint, cluster}]
+	return ok
 }
 
 // wireMeasurementNotifier subscribes notifier to pathSet: on each fire it

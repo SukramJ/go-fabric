@@ -848,9 +848,10 @@ type AttributeChangeNotifier interface {
 // the host of every change at once. OnAttributeReport delivers the
 // changes that go on the wire: every change of the server's other
 // attributes as it happens, a quieter attribute's when its throttle
-// emits. The bridge subscribes here in place of
-// [AttributeChangeNotifier.OnAttributeChange] when a server implements
-// it. Mirrors matter.js's OnlineEvent.online — the observable "that emits
+// emits. The bridge marks a server's attributes dirty from here when a
+// server implements it, and advances the cluster's DataVersion from
+// [AttributeChangeNotifier.OnAttributeChange], when the change happens, as
+// matter.js advances it at the commit. Mirrors matter.js's OnlineEvent.online — the observable "that emits
 // only those events conveyed between nodes", the event itself normally
 // and its QuietObservable for a server-side quieter element
 // (packages/node/src/behavior/Events.ts:228-236, :267-297;

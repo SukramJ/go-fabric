@@ -664,11 +664,16 @@ func (s *Server) changed(attrs ...uint32) {
 }
 
 // reported is the wire report of a quieter attribute when its throttle
-// emits: the DataVersion advances and the report listeners are told; the
-// change listeners saw the change when it happened
-// ([Server.SetCountdownTime]).
+// emits: the report listeners are told. The DataVersion advanced, and the
+// change listeners were told, when the change happened
+// ([Server.SetCountdownTime]): CountdownTime is ordinary state in
+// matter.js, whose commit advances the version
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), and the quiet emit adds an advance only for a dynamic
+// property (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261
+// calls advanceVersionFor, Datasource.ts:679-688), which
+// OperationalStateServer declares none of.
 func (s *Server) reported(attrs ...uint32) {
-	s.tracker().Bump()
 	s.ReportFrom(s.origin(), attrs...)
 }
 
@@ -947,8 +952,9 @@ func equalPhase(a, b *uint8) bool {
 }
 
 // SetCountdownTime sets CountdownTime (nil is null). The value is read
-// back at once and the change listeners (the host's OnChanged) see it at
-// once, but on the wire a change is reported as matter.js reports its "Q"
+// back at once, the DataVersion advances at once and the change listeners
+// (the host's OnChanged) see it at once, but on the wire a change is
+// reported as matter.js reports its "Q"
 // quality: at once from or to null, otherwise at most once a second, with
 // the latest value (see [cluster.Quieter]; the throttle is the
 // QuietEvent's `online` view only, Events.ts:269-296 at db021da0). The server applies matter.js's
@@ -972,6 +978,7 @@ func (s *Server) SetCountdownTime(seconds *uint32) error {
 		s.countdown = &v
 	}
 	s.mu.Unlock()
+	s.tracker().Bump()
 	s.ChangedFrom(s.origin(), AttrCountdownTime)
 	s.quiet.Changed(old == nil, seconds == nil)
 	return nil
