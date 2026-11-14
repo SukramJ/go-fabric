@@ -423,3 +423,50 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 	}
 	c.expectAcknowledgedOnly(t, pending, "the retransmission after the handler was replaced")
 }
+
+// TestSigma1ThatBeginsNothingKeepsACompletedHandshake: once a CASE handshake
+// completed, a Sigma1 under its initiator node id and exchange that begins
+// no handshake — other bytes, from another address — leaves the completed
+// handshake as it was: its record answers the retransmission of the
+// completing Sigma3 over its route with the success report again, and the
+// success report waiting for the initiator's acknowledgement stays in
+// retransmission, through a PerExchangeCaseProvider and through the
+// singleton handler alike (review II, R2-P4-rr-sec-04). In matter.js a
+// message on the handshake's live exchange that does not acknowledge the
+// pending report fails before the retransmission timer is touched and
+// changes nothing (packages/protocol/src/protocol/MessageExchange.ts:521-534
+// at db021da0).
+func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		viaProvider bool
+	}{
+		{"through a provider", true},
+		{"through the singleton handler", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
+			want := c.controller.conn.LocalAddr().String()
+			other := c.otherPeer(t)
+			if err := other.send(mrp.SCOpcodeSigma1, completedCaseExchange, []byte{0x15, 0x18}, nil); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+				t.Fatal("a Sigma1 that began nothing ended the completed handshake's record")
+			}
+			if !c.successReportPending() {
+				t.Fatalf("a Sigma1 that began nothing took the success report from the retransmission; the replies waiting go to %v, want the report to %s",
+					pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange), want)
+			}
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+				t.Fatal(err)
+			}
+			c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the retransmission of the completing Sigma3 over its route")
+			if got := c.sessions.Load(); got != 1 {
+				t.Fatalf("the handshake installed %d sessions, want 1", got)
+			}
+		})
+	}
+}

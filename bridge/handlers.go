@@ -806,7 +806,16 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			caseFailureProtocolCode(err),
 			nil,
 		)
-		a.handshakeFailed()
+		// A Sigma1 that fails on an adapter whose handshake established
+		// its session began nothing and ends nothing: the adapter stays
+		// with its provider, and the record of the completed handshake
+		// with it (review II, R2-P4-rr-sec-04).
+		a.mu.RLock()
+		established := a.established
+		a.mu.RUnlock()
+		if !established {
+			a.handshakeFailed()
+		}
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 
