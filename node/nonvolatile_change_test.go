@@ -6,6 +6,7 @@ package node_test
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -183,8 +185,113 @@ func TestNonVolatileForgottenDeviceIsReleased(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := "nonvolatile.thermo.0201.0012"
-	if v, _, err := mem.GetSetting(ctx, key); err != nil || v != nvStoredTLV(t, int64(2100)) {
-		t.Errorf("stored %q (%v) after the forgotten device's change, want 2100's TLV %q", v, err, nvStoredTLV(t, int64(2100)))
+	if v, _, err := mem.GetSetting(ctx, key); err != nil || v != "" {
+		t.Errorf("stored %q (%v) after the forgotten device's change, want none", v, err)
+	}
+}
+
+// nvLabelled is the kit Thermostat of nvHeat with UserLabel.
+var nvLabelled = nvCase{key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating}, userlabeldef.Declare{})}
+
+// nvForgetCase writes the heating setpoint and the UserLabel list of
+// nvLabelled's device on ep, and returns what the device served before.
+func nvForgetCase(t *testing.T, n *node.Node, ep uint16) (heat, labels string) {
+	t.Helper()
+	heatPath := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	labelPath := attrPath(ep, userlabeldef.ClusterID, userlabeldef.AttrLabelList)
+	heat, labels = dispatchRead(t, n, heatPath), dispatchRead(t, n, labelPath)
+	if s := dispatchWrite(t, n, heatPath, int64(2100)); s != im.StatusSuccess {
+		t.Fatalf("write heat: %v", s)
+	}
+	if s := dispatchWrite(t, n, labelPath, spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "attic"}}); s != im.StatusSuccess {
+		t.Fatalf("write labels: %v", s)
+	}
+	return heat, labels
+}
+
+// nvServedAsNew checks that the device Added under nvLabelled's key on n
+// serves heat and labels, and that the store holds neither key.
+func nvServedAsNew(t *testing.T, n *node.Node, st store.Settings, heat, labels string) {
+	t.Helper()
+	ep, ok := endpointOf(t, n, nvLabelled.key)
+	if !ok {
+		t.Fatal("the device is not served after the Add")
+	}
+	if got := dispatchRead(t, n, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)); got != heat {
+		t.Errorf("heating setpoint %s after Forget and Add, want the new device's %s", got, heat)
+	}
+	if got := dispatchRead(t, n, attrPath(ep, userlabeldef.ClusterID, userlabeldef.AttrLabelList)); got != labels {
+		t.Errorf("LabelList %s after Forget and Add, want the new device's %s", got, labels)
+	}
+	for _, key := range []string{"nonvolatile.thermo.0201.0012", "bridged_user_label.thermo"} {
+		if v, _, err := st.GetSetting(t.Context(), key); err != nil || v != "" {
+			t.Errorf("%s holds %q (%v) after Forget and Add", key, v, err)
+		}
+	}
+}
+
+// TestNonVolatileForgetErasesTheStoredValues: a key the host forgets
+// (Aggregator.Forget) is Added afterwards as a new device would be: the
+// forgotten device's stored nonvolatile values and its UserLabel list are
+// erased, not restored to the device Added under the key.
+func TestNonVolatileForgetErasesTheStoredValues(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	mem := memstore.New()
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: mem, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvLabelled)
+	heat, labels := nvForgetCase(t, n, ep)
+	if err := n.Aggregator().Forget(ctx, endpoint.StringKey(nvLabelled.key)); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Aggregator().Add(ctx, nvLabelled.build(t, nvLabelled.key)); err != nil {
+		t.Fatal(err)
+	}
+	nvServedAsNew(t, n, mem, heat, labels)
+}
+
+// TestNonVolatileForgetBeforeStartErasesTheStoredValues: a key forgotten
+// before the node starts — a device that left while the node was down,
+// whose servers this run never met — is erased as well.
+func TestNonVolatileForgetBeforeStartErasesTheStoredValues(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	mem := memstore.New()
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: mem, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvLabelled)
+	heat, labels := nvForgetCase(t, n, ep)
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	again := newNode(t, cfg)
+	if err := again.Aggregator().Forget(ctx, endpoint.StringKey(nvLabelled.key)); err != nil {
+		t.Fatal(err)
+	}
+	if err := again.Aggregator().Add(ctx, nvLabelled.build(t, nvLabelled.key)); err != nil {
+		t.Fatal(err)
+	}
+	if err := again.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	nvServedAsNew(t, again, mem, heat, labels)
+}
+
+// TestNonVolatileForgetReportsAStoreError: a store that refuses the
+// erasure fails Forget.
+func TestNonVolatileForgetReportsAStoreError(t *testing.T) {
+	t.Parallel()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"nonvolatile."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	if s := dispatchWrite(t, n, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint), int64(2100)); s != im.StatusSuccess {
+		t.Fatalf("write: %v", s)
+	}
+	st.refuse.Store(true)
+	if err := n.Aggregator().Forget(t.Context(), endpoint.StringKey(nvHeat.key)); !errors.Is(err, errKeyRefused) {
+		t.Errorf("Forget with the store refusing the erasure: %v, want %v", err, errKeyRefused)
 	}
 }
 

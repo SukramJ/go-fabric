@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -28,6 +29,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -210,6 +212,12 @@ func nonVolatileSlot(ep *endpoint.Endpoint, clusterID uint32) string {
 	if !ok {
 		at = "@" + strconv.FormatUint(uint64(ep.ID), 10)
 	}
+	return nonVolatileSlotAt(at, clusterID)
+}
+
+// nonVolatileSlotAt is clusterID's slot at at, an endpoint's stable key
+// (or "@" and its number).
+func nonVolatileSlotAt(at string, clusterID uint32) string {
 	return fmt.Sprintf("%s%s.%04x", nonVolatileKeyRoot, at, clusterID)
 }
 
@@ -235,8 +243,9 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	// nil once forgotten): a write that reaches a server released since —
 	// a Device the host replaced or forgot, answering on the topology the
 	// write was resolved on — is not stored, and the key stays with the
-	// server that holds it (R2-P2-rr-ctl-01).
-	if !k.label && k.srv != srv {
+	// server that holds it (R2-P2-rr-ctl-01). A label key is the server's
+	// whose list persistUserLabels keeps.
+	if k.label && !v.n.userLabels.tracks(srv) || !k.label && k.srv != srv {
 		k.store.Unlock()
 		k.write.Unlock()
 		return nil, nil
@@ -337,10 +346,7 @@ func (v *nonVolatile) storeLabel(ctx context.Context, k *nvKey, key string) {
 	if srv == nil {
 		return
 	}
-	v.n.userLabels.mu.Lock()
-	_, kept := v.n.userLabels.persisted[srv]
-	v.n.userLabels.mu.Unlock()
-	if !kept {
+	if !v.n.userLabels.tracks(srv) {
 		k.owed, k.labelSrv = false, nil
 		return
 	}
@@ -535,19 +541,27 @@ func (v *nonVolatile) restored(ctx context.Context, keys map[uint32]nvAttr, stop
 }
 
 // forget lets go of the servers met at the endpoint keys of a forgotten
-// endpoint ([Aggregator.Forget]), which has left for good: their change
-// subscriptions end, a key the store refused a change of is written once
-// more, and the persister references them no longer. A server met at
-// such a key later is restored as a new one. A removed endpoint
-// ([Aggregator.Remove]) is not forgotten: its servers keep their state
-// and subscription for the Add that brings it back.
-func (v *nonVolatile) forget(ctx context.Context, endpointKeys []string) {
+// endpoint ([Aggregator.Forget]), which has left for good, and erases
+// what the store keeps for those keys: the servers' change subscriptions
+// and their UserLabel lists' end, the persister references them no
+// longer, and every nonvolatile value and UserLabel list stored under
+// the keys is erased, so a device Added under such a key afterwards starts
+// as a new one would — from its declaration's Initial and list. A write
+// that reaches a released server is not stored. A removed endpoint
+// ([Aggregator.Remove]) is not forgotten: its servers keep their state,
+// subscription and stored values for the Add that brings it back. The
+// error is the store's; a refused erasure leaves every value stored.
+func (v *nonVolatile) forget(ctx context.Context, endpointKeys []string) error {
 	ctx = context.WithoutCancel(ctx)
+	labelKeys := make([]string, 0, len(endpointKeys))
+	for _, key := range endpointKeys {
+		labelKeys = append(labelKeys, bridgedUserLabelKeyRoot+key)
+	}
+	// Released before the keys are read: a label write that finds its
+	// key's state only after this is not stored (PersistWrite).
+	v.n.userLabels.release(labelKeys)
 	v.mu.Lock()
-	var (
-		released     []contract.ClusterServer
-		unsubscribes []func()
-	)
+	var unsubscribes []func()
 	for slot, srv := range v.slots {
 		if !slotOfAny(slot, endpointKeys) {
 			continue
@@ -557,26 +571,89 @@ func (v *nonVolatile) forget(ctx context.Context, endpointKeys []string) {
 		}
 		delete(v.servers, srv)
 		delete(v.slots, slot)
-		released = append(released, srv)
 	}
-	var keys map[string]*nvKey
-	if len(released) > 0 {
-		keys = maps.Clone(v.keys)
+	known := map[string]*nvKey{}
+	for key, k := range v.keys {
+		if k.label && slices.Contains(labelKeys, key) || !k.label && keyOfAny(key, endpointKeys) {
+			known[key] = k
+		}
 	}
 	v.mu.Unlock()
 	for _, unsubscribe := range unsubscribes {
 		unsubscribe()
 	}
-	for key, k := range keys {
+	return v.erase(ctx, slices.Concat(nonVolatileCandidates(endpointKeys), labelKeys), known)
+}
+
+// erase writes every key of candidates and of known the store holds a
+// value for as none, in one store write. known are the states of the
+// forgotten keys the persister holds: each is held, and its server let go
+// of, so no write or change stores it meanwhile.
+func (v *nonVolatile) erase(ctx context.Context, candidates []string, known map[string]*nvKey) error {
+	held := slices.Sorted(maps.Keys(known))
+	for _, key := range held {
+		k := known[key]
 		k.store.Lock()
-		if k.srv != nil && slices.Contains(released, k.srv) {
-			if k.owed {
-				v.storeHeld(ctx, k, key)
-			}
-			k.srv = nil
-		}
-		k.store.Unlock()
+		k.srv, k.labelSrv, k.owed = nil, nil, false
 	}
+	defer func() {
+		for _, key := range held {
+			known[key].store.Unlock()
+		}
+	}()
+	st := v.n.persisted.st
+	values := map[string]string{}
+	var errs []error
+	for _, key := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(candidates, held)))) {
+		val, found, err := st.GetSetting(ctx, key)
+		switch {
+		case err != nil:
+			errs = append(errs, err)
+		case found && val != "":
+			values[key] = ""
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	if err := st.SetSettings(ctx, values); err != nil {
+		v.n.logger.Warn("nonvolatile.forget", slog.Int("keys", len(values)), slog.Any("err", err))
+		return err
+	}
+	for _, key := range held {
+		known[key].stored, known[key].known = "", true
+	}
+	return nil
+}
+
+// nonVolatileCandidates are the settings keys the persister keeps a value
+// under at endpointKeys: every attribute it keeps of every cluster this
+// build defines (schema.ClusterNames with a registered definition). The
+// store lists no keys by prefix, so these are the keys an erasure reads.
+func nonVolatileCandidates(endpointKeys []string) []string {
+	var keys []string
+	for _, clusterID := range slices.Sorted(maps.Keys(schema.ClusterNames)) {
+		def := spec.Lookup(clusterID)
+		if def == nil {
+			continue
+		}
+		for i := range def.Attributes {
+			if !nonVolatileWritable(clusterID, def.Attributes[i].ID) {
+				continue
+			}
+			for _, at := range endpointKeys {
+				keys = append(keys, fmt.Sprintf("%s.%04x", nonVolatileSlotAt(at, clusterID), def.Attributes[i].ID))
+			}
+		}
+	}
+	return keys
+}
+
+// keyOfAny reports whether key ([nonVolatileKey]) is an attribute's key
+// in a cluster's slot at one of endpointKeys ([slotOfAny]).
+func keyOfAny(key string, endpointKeys []string) bool {
+	i := strings.LastIndexByte(key, '.')
+	return i > 0 && slotOfAny(key[:i], endpointKeys)
 }
 
 // slotOfAny reports whether slot ([nonVolatileSlot]) is a cluster's slot

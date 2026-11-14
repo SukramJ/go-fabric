@@ -137,15 +137,16 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 
 // erase frees every stored number of a forgotten key: its reservation's
 // tree, the tree it had in the set, and the key itself. The nonvolatile
-// persister lets go of the servers it met at those keys.
+// persister lets go of the servers it met at those keys and erases the
+// nonvolatile values and UserLabel lists stored for them.
 func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
 	tree, err := a.n.persisted.release(ctx, op.key)
 	keys := slices.Concat([]string{op.key}, op.tree, tree)
-	a.n.nonVolatile.forget(ctx, keys)
+	forgetErr := a.n.nonVolatile.forget(ctx, keys)
 	if err != nil {
-		return err
+		return errors.Join(err, forgetErr)
 	}
-	return a.removeRecords(ctx, "", keys)
+	return errors.Join(forgetErr, a.removeRecords(ctx, "", keys))
 }
 
 // removeRecords deletes the endpoint store's records of scope ("" is
@@ -198,7 +199,9 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // Forget removes the endpoint with key from the default partition if it
 // holds it, and frees the endpoint numbers stored for key and for the
 // parts it had: a later Add of key gets a fresh number, as a new device
-// would. It is the counterpart of [Aggregator.Remove], which keeps them —
+// would. It erases what the node stored for those keys' servers too — the
+// nonvolatile attribute values the module holds and the UserLabel lists —
+// so the later Add starts from its declaration. It is the counterpart of [Aggregator.Remove], which keeps them —
 // matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
 // :1024-1032 at 862ad75f; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is

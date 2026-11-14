@@ -409,7 +409,10 @@ the set but reserves its number, and its parts' numbers, for the key's
 return, across restarts too: an `Add` of the same key gets them back, and
 no other device is given them, as a closed matter.js endpoint keeps its
 number. `Forget(ctx, key)` frees them — the device is gone for good, and
-an `Add` of the key later is numbered like a new device.
+an `Add` of the key later is numbered like a new device. It erases the
+values the node stored for the key too (the nonvolatile attributes the
+module holds, the UserLabel list), so that `Add` starts from the
+device's declaration; `Remove` keeps them.
 
 A device a previous run served and this run has not added yet keeps its
 stored number too, however long the host's model takes to load: the node
