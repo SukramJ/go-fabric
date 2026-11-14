@@ -4015,8 +4015,8 @@ TPM or a KMS; the device side (the node's NOC key) is a later item.
 ### BD-Controller-DclSnapshotLayered — the embedded DCL snapshot is a trust layer, and the CD signers are named
 
 matter.js feeds an offline seed into its `DclCertificateService`
-(`DclCertificateService.ts:336-340`, `#consumeCertSeed` :1352-1410 at
-`0ceb202d`) and has no query for the ledger's CD-signer set. This module
+(`DclCertificateService.ts:344-349`, `#consumeCertSeed` :1466-1537 at
+`db021da0`) and has no query for the ledger's CD-signer set. This module
 keeps the snapshot (`controller/dcl/snapshot`: 74 production PAAs and 5 CD
 signers from `on.dcl.csa-iot.org`, `SOURCE` manifest, refreshed only by
 `make update-dcl-snapshot` as a review step) a separate `attestation.PAAStore`
@@ -4050,9 +4050,9 @@ the graph; the named signer set is chip's own.
 
 matter.js registers the NetworkCommissioning steps of the commissioning
 flow only on a BLE channel (`ControllerCommissioningFlow.ts:595-620` at
-`0ceb202d`: "Care about Network commissioning only when we are on BLE,
+`db021da0`: "Care about Network commissioning only when we are on BLE,
 because else we are already on IP network"). This module runs the same
-steps (:1527-1998; Wi-Fi :1677, Thread :1874) over any channel when, and
+steps (:1555-2008; Wi-Fi :1595, Thread :1776) over any channel when, and
 only when, the operator passes credentials (`commissioner.Options`,
 `pair --wifi-ssid/--wifi-credentials`, `--thread-dataset`); without them
 the IP flow is matter.js's. Report BA §3 (phase 12, 2026-10-17).
@@ -4099,7 +4099,8 @@ By design. A real Wi-Fi driver is roadmap milestone 7.
 ### BD-Controller-BleReliableExchange — one reliable exchange manager per BLE channel
 
 matter.js marks a BLE channel reliable (`Ble.ts:38` `isReliable = true`)
-and a session then does not use MRP (`Session.ts:355-356` `usesMrp`). This
+and a session then does not use MRP (`Session.ts:368-370` `usesMrp`, at
+`db021da0`). This
 module expresses the same as `exchange.Config.Reliable` on an exchange
 manager created per BTP channel with a synthetic peer address, since the
 UDP/TCP managers key their peers by network address. Report BA §2.
@@ -4230,8 +4231,9 @@ run; the kernel filter would never see a Matter advertisement.
 `secure/sessionparams/sessionparams.go:44-48`: a zero field is omitted on
 the wire and read as the spec default. matter.js checks a stated value at
 run time — a zero, fractional or untyped maxPathsPerInvoke takes the
-fallback (`session/SessionParameters.ts:65-80`), a local one is refused
-(`session/SessionManager.ts:368-374`). Those inputs cannot reach the Go
+fallback (`session/SessionParameters.ts:75-87`), a local one is refused
+(`session/SessionManager.ts:75-81`, called at `:296-298` and `:412-414`;
+all at `db021da0`). Those inputs cannot reach the Go
 type, so the cases that feed them are `missing` with this entry as the
 reason. Report BH (phase 16, 2026-10-18).
 
@@ -4242,8 +4244,8 @@ register.
 ### BD-Matter-MonotonicClockTests — session and peer-loss time runs on the monotonic clock
 
 matter.js stamps a session's creation and a peer-loss `asOf` on
-`Time.nowUs`, "not a wall-clock time" (`session/Session.ts:58-59`,
-`session/SessionManager.ts:627-628`, `:696`), and its tests step the wall
+`Time.nowUs`, "not a wall-clock time" (`session/Session.ts:59-60`,
+`session/SessionManager.ts:671-672`, `:678`, at `db021da0`), and its tests step the wall
 clock apart from it to prove that. Go's `time.Time` comparisons use the
 monotonic reading, and `clocktest.Fake` has one reading, so a wall-clock
 step is not expressible; the step cases of SessionManagerTest,
@@ -4462,7 +4464,7 @@ By design. Test roots enter through `attestation.Trust`'s own option
 matter.js's `BasicInformationServer` serves SerialNumber only when the
 host sets it; its MockServerNode has none and AttributeReadResponseTest.ts
 (at `862ad75f`) reads it as UNSUPPORTED_ATTRIBUTE.
-`cluster/core/basic_information.go:69` serves it always, falling back to a
+`cluster/core/basic_information.go:675-689` serves it always, falling back to a
 value derived from UniqueID (`TestParityMatterJS_BasicInfoServer_SerialNumberFallback`),
 because Apple Home's HAP build asks for it. The full-wildcard read cases
 assert the Go composition as it is. Report BI (phase 16, 2026-10-19).
@@ -4499,7 +4501,7 @@ IdentifyServerTest "is unsupported on a device type that does not
 require it" and three more cases, `missing` under this entry). The
 bridged endpoint's Identify of `endpoint/materialize.go` (`core.Identify`)
 accepts the command on every device type and answers Success without an
-effect (`cluster/core/identify.go:49-52`), because Apple Home's HAP
+effect (`cluster/core/identify.go:50-54`), because Apple Home's HAP
 rebuild step invokes it and treats UnsupportedCommand as a failed pair.
 Report BJ (phase 17a, 2026-10-19).
 
@@ -4632,7 +4634,7 @@ salts Sigma2 and Sigma3 with the fabric's fixed
 `operationalIdentityProtectionKey`, the IPK of AddNOC (`CaseServer.ts:240-284`;
 `Fabric.ts:72`, `:114`), and as initiator takes the second-newest key of
 key set 0 for the destination identifier and the fixed key for the salts
-(`CaseClient.ts:121-138`). After a KeySetWrite of key set 0 an initiator
+(`CaseClient.ts:122`, `:139` at `db021da0`). After a KeySetWrite of key set 0 an initiator
 that salts on the rotated key cannot finish a handshake with it. The Go
 node (`node/security.go` `ResolveSigma1Destination`, `ipkCandidates`)
 keys the salts on the key that matched, as chip caches the matched epoch
@@ -4645,16 +4647,17 @@ the current-key rule are matter.js's.
 ### BD-Matter-Groupcast-RootFeatureSet — the Groupcast server carries Listener, Sender and PerGroup
 
 matter.js builds `GroupcastServer` with any feature subset and its tests
-run a Listener-only and an IANA-only root (`GroupcastServerTest.ts:38-51`);
+run a Listener-only and an IANA-only root (`GroupcastServerTest.ts:48-61`
+at `db021da0`);
 its own RootEndpoint installs Listener, Sender and PerGroup
-(`GroupcastServer.ts:81-83`: Listener and Sender meet the Root Node
+(`GroupcastServer.ts:82-84`: Listener and Sender meet the Root Node
 GroupcastListenerCond and GroupcastSenderCond of Matter 1.6.1, PerGroup
 keeps the groups the Groups cluster created on their per-group address).
 The Go `cluster/core` Groupcast server has that one feature set: the
 module serves root nodes, where the conditions make Listener and Sender
 mandatory together, so a Listener-only server is a test configuration
 without a device. The matter.js case "removes a group a wildcard request
-empties without the Sender feature" (`GroupcastServerTest.ts:358-405`,
+empties without the Sender feature" (`GroupcastServerTest.ts:368-414`,
 the loop's second title) stays `missing` in the register with this entry
 as its reason. A host-selectable feature set is milestone 4's node
 options, with the other feature selections.
