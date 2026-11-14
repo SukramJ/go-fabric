@@ -92,6 +92,77 @@ func TestSubscriptionNamingThisNodeReportsChanges(t *testing.T) {
 	}
 }
 
+// TestSubscriptionNamingAnotherNodeReportsNoChange (review II,
+// R2-P2-dr-req-06): a subscription path naming another node — node id 0
+// among them, the node a change notification leaves unnamed — selects
+// nothing in the change reports, as it selects nothing in the priming
+// report. Only the path naming this node reports.
+func TestSubscriptionNamingAnotherNodeReportsNoChange(t *testing.T) {
+	t.Parallel()
+	const (
+		sessionID   uint16 = 0x0A08
+		localNodeID uint64 = 0xAAAA0808
+	)
+	sess, err := channel.New(channel.Config{
+		EncryptKey: bytes.Repeat([]byte{0x11}, 16), DecryptKey: bytes.Repeat([]byte{0x22}, 16),
+		LocalNodeID: localNodeID, PeerNodeID: 0xBBBB0808, InitialCounter: 10,
+	})
+	if err != nil {
+		t.Fatalf("channel.New: %v", err)
+	}
+	b := newStartedBridge(t)
+	b.AttachSessionLookup(fabricSessionLookup{id: sessionID, sess: sess})
+	reported := make(chan []im.ConcreteAttributePath, 4)
+	mgr := subscription.NewManager(subscription.Config{}, func(_ context.Context, _ *subscription.Subscription, paths []im.ConcreteAttributePath) {
+		reported <- paths
+	}, nil)
+	b.AttachSubscriptionManager(mgr)
+
+	_, peerAddr := newSubscribeTestPeer(t)
+	hdr := &message.Header{SessionID: sessionID, MessageCounter: 7}
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 8}
+	req := im.SubscribeRequest{
+		AttributeRequests: []im.ConcreteAttributePath{
+			{Node: localNodeID, Endpoint: 2, Cluster: 0x0008, HasNode: true, HasEndpoint: true, HasCluster: true},
+			{Node: 0, HasNode: true},
+			{Node: localNodeID + 1, HasNode: true},
+		},
+		MaxIntervalCeiling: 60,
+	}
+	var stamp im.ReportData
+	subID, err := b.registerSubscription(peerAddr, hdr, proto, req, &stamp)
+	if err != nil {
+		t.Fatalf("registerSubscription: %v", err)
+	}
+	sub, err := mgr.Get(subID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	now := time.Now()
+	sub.EndPriming(now)
+
+	other := im.ConcreteAttributePath{Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	mgr.OnAttributeChanged(other)
+	mgr.Tick(t.Context(), now.Add(2*time.Second))
+	select {
+	case paths := <-reported:
+		t.Fatalf("reported %+v: a path naming another node matched a change of this node", paths)
+	default:
+	}
+
+	mine := im.ConcreteAttributePath{Endpoint: 2, Cluster: 0x0008, Attribute: 0x0000, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	mgr.OnAttributeChanged(mine)
+	mgr.Tick(t.Context(), now.Add(4*time.Second))
+	select {
+	case paths := <-reported:
+		if len(paths) != 1 || paths[0] != mine {
+			t.Errorf("reported paths = %+v, want [%+v]", paths, mine)
+		}
+	default:
+		t.Fatal("the change the path naming this node selects was never reported")
+	}
+}
+
 // TestReadPathNamingAnotherNode: a concrete path naming another node is
 // answered UnsupportedNode, a wildcard naming another node selects nothing,
 // and a path naming this node reads as one naming no node (matter.js

@@ -328,8 +328,8 @@ func (b *Bridge) registerSubscription(
 			// change notification names none, and the subscription
 			// reports this node's changes for it as its priming report
 			// did (review II, R2-P2-alloc-07). A path naming another
-			// node matches no change, as it selects nothing in the
-			// priming report.
+			// node is left out: it selects nothing in the priming
+			// report and matches no change (R2-P2-dr-req-06).
 			AttributePaths: pathsForThisNode(req.AttributeRequests, b.localNodeIDFor(requestHdr.SessionID, fabricIndex)),
 			// EventPaths wiring was missing — without this every
 			// cluster-emitted event (GenericSwitch press, BDBI
@@ -455,20 +455,24 @@ func (b *Bridge) teardownForSubscribe(src net.Addr, requestHdr *message.Header, 
 
 // pathsForThisNode returns paths with the node cleared from each path
 // that names localNodeID — this node on the session's fabric, which is
-// what a path naming no node selects. Returns paths when none does.
+// what a path naming no node selects — and without each path that names
+// another node, which selects nothing ([im.AttributeExpansion], whose
+// context carries localNodeID): a change notification names no node, so
+// a kept path naming node 0 would match every change (review II,
+// R2-P2-dr-req-06). Returns paths when none names a node.
 func pathsForThisNode(paths []im.ConcreteAttributePath, localNodeID uint64) []im.ConcreteAttributePath {
-	var out []im.ConcreteAttributePath
-	for i, p := range paths {
-		if !p.HasNode || p.Node != localNodeID {
-			continue
-		}
-		if out == nil {
-			out = slices.Clone(paths)
-		}
-		out[i].HasNode, out[i].Node = false, 0
-	}
-	if out == nil {
+	if !slices.ContainsFunc(paths, func(p im.ConcreteAttributePath) bool { return p.HasNode }) {
 		return paths
+	}
+	out := make([]im.ConcreteAttributePath, 0, len(paths))
+	for _, p := range paths {
+		if p.HasNode {
+			if p.Node != localNodeID {
+				continue
+			}
+			p.HasNode, p.Node = false, 0
+		}
+		out = append(out, p)
 	}
 	return out
 }
