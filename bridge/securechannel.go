@@ -1053,7 +1053,7 @@ func (b *Bridge) handlePase(
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
 }
 
@@ -1134,7 +1134,7 @@ func (b *Bridge) handleCase(
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
 }
 
@@ -1169,7 +1169,7 @@ func (b *Bridge) sendHandshakeFailureReport(
 		return err
 	}
 	// The report carried the acknowledgement of the request.
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
 }
 

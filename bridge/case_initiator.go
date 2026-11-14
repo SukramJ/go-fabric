@@ -442,7 +442,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 		return err
 	}
 	if ackCounter != nil {
-		b.dischargeOwedAck(0, exchangeID, true)
+		b.dischargeOwedHandshakeAck(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, true)
 	}
 	return nil
 }
@@ -475,7 +475,7 @@ func (b *Bridge) sendInitiatedAck(addr *net.UDPAddr, exchangeID uint16, ephemera
 	if err := listener.Send(addr, datagram); err != nil {
 		b.logger.Debug("matter.case.initiator.ack_send", slog.Any("err", err))
 	}
-	b.dischargeOwedAck(0, exchangeID, true)
+	b.dischargeOwedHandshakeAck(HandshakeKey{InitiatorNodeID: ephemeral, ExchangeID: exchangeID}, true)
 }
 
 // randomEphemeralNodeID draws the initiator's ephemeral node id for the
