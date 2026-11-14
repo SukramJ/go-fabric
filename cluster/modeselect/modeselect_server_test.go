@@ -319,6 +319,33 @@ func (n *notifyingSource) OnMatterValueChanged(cb func()) func() {
 	return func() { n.unsub++ }
 }
 
+// TestChangeToModeOfTheCurrentModeLeavesTheDataVersion: a ChangeToMode
+// to the mode the device is in changes no attribute and leaves the
+// DataVersion; one to another mode advances it once. Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode writes state.currentMode) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1480 (#noteIfChanged returns for an equal value; the version
+// advances only when the commit changed something).
+func TestChangeToModeOfTheCurrentModeLeavesTheDataVersion(t *testing.T) {
+	t.Parallel()
+	src := coffeeSource()
+	srv := modeselect.NewServer(modeselect.Config{Source: src})
+	before := srv.MatterDataVersion()
+	if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: src.current}); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before {
+		t.Errorf("ChangeToMode to the current mode moved the DataVersion %d -> %d", before, got)
+	}
+	if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before+1 {
+		t.Errorf("ChangeToMode to another mode moved the DataVersion %d -> %d, want +1", before, got)
+	}
+}
+
 // TestDeviceSideChangeReachesSubscribers pins the change hop: a mode the
 // device changed on its own reaches a subscriber. CurrentMode is
 // quality N and is listed as reportable, so without a push path from

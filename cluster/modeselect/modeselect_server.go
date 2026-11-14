@@ -347,12 +347,20 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (re
 			fmt.Sprintf("modeselect: mode %d provided in NewMode is not supported", req.NewMode),
 		}
 	}
+	before := s.src.CurrentMode()
 	if err := s.src.ChangeToMode(ctx, req.NewMode); err != nil {
 		// Deliberately no version bump: the device refused, so nothing
 		// a subscriber caches has changed.
 		return nil, fmt.Errorf("modeselect: ChangeToMode: %w", err)
 	}
-	s.tracker().Bump()
+	// The version advances only when CurrentMode changed. Mirrors matter.js
+	// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+	// db021da0 (changeToMode writes state.currentMode) under
+	// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+	// :1476-1480 (#noteIfChanged returns for an equal value).
+	if s.src.CurrentMode() != before {
+		s.tracker().Bump()
+	}
 	return nil, nil
 }
 
