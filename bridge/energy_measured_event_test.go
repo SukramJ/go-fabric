@@ -22,21 +22,28 @@ type fakeMeter struct {
 	cbs      []func()
 	energy   float64
 	observed bool
+	power    float64
+	powered  bool
 }
 
 func (*fakeMeter) MatterMeasurementClass() contract.MeasurementClass {
 	return contract.MeasurementElectrical
 }
-func (*fakeMeter) ActivePower() (float64, bool) { return 0, false }
-func (*fakeMeter) Voltage() (float64, bool)     { return 0, false }
-func (*fakeMeter) Current() (float64, bool)     { return 0, false }
-func (*fakeMeter) Frequency() (float64, bool)   { return 0, false }
-func (*fakeMeter) HasEnergy() bool              { return true }
+func (*fakeMeter) Voltage() (float64, bool)   { return 0, false }
+func (*fakeMeter) Current() (float64, bool)   { return 0, false }
+func (*fakeMeter) Frequency() (float64, bool) { return 0, false }
+func (*fakeMeter) HasEnergy() bool            { return true }
 
 func (m *fakeMeter) Energy() (float64, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.energy, m.observed
+}
+
+func (m *fakeMeter) ActivePower() (float64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.power, m.powered
 }
 
 func (m *fakeMeter) MatterFloatValue() (float64, bool) { return m.ActivePower() }
@@ -51,6 +58,19 @@ func (m *fakeMeter) OnMatterValueChanged(cb func()) func() {
 func (m *fakeMeter) set(wh float64) {
 	m.mu.Lock()
 	m.energy, m.observed = wh, true
+	m.mu.Unlock()
+	m.notify()
+}
+
+func (m *fakeMeter) setPower(w float64) {
+	m.mu.Lock()
+	m.power, m.powered = w, true
+	m.mu.Unlock()
+	m.notify()
+}
+
+func (m *fakeMeter) notify() {
+	m.mu.Lock()
 	cbs := append([]func(){}, m.cbs...)
 	m.mu.Unlock()
 	for _, cb := range cbs {

@@ -16,9 +16,12 @@ import (
 	"sync"
 	"time"
 
+	clusterpkg "github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -2044,7 +2047,12 @@ func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *e
 
 // listenerSet collects the unsubscribe closures of one wiring of the
 // host's notifiers.
-type listenerSet struct{ unsubs []func() }
+type listenerSet struct {
+	unsubs []func()
+	// quiet holds the throttle of each quieter path of the wiring
+	// ([listenerSet.quietPathFor]).
+	quiet map[im.ConcreteAttributePath]*quietPath
+}
 
 // add keeps unsub; a notifier that returns none has nothing to detach.
 func (l *listenerSet) add(unsub func()) {
@@ -2273,12 +2281,28 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // its first phase, ahead of the change notifications of postCommit,
 // :1286-1326), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
+//
+// A path whose attribute has the quieter quality ("Q" in its definition)
+// is reported through its throttle instead ([quietPath]); its version
+// advances when the throttle reports it, as matter.js advances a quieter
+// property's version and broadcasts it only when its QuietEvent emits
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:224-263 at
+// db021da0; review II, R2-P4-nv-05b).
 func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
 	occupancy := newOccupancyEvents(b, ep, pathSet)
 	energy := newElectricalEnergyEvents(b, ep, notifier)
-	values := newPathValues(ep, pathSet)
+	var quiet []*quietPath
+	direct := make([]im.ConcreteAttributePath, 0, len(pathSet))
+	for _, p := range pathSet {
+		if quieterAttribute(p.Cluster, p.Attribute) {
+			quiet = append(quiet, set.quietPathFor(b, mgr, ep, p))
+			continue
+		}
+		direct = append(direct, p)
+	}
+	values := newPathValues(ep, direct)
 	set.add(notifier.OnMatterValueChanged(func() {
 		defer energy.check()
 		defer occupancy.check()
@@ -2312,7 +2336,117 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 		for _, p := range changed {
 			mgr.OnAttributeChanged(p)
 		}
+		for _, qp := range quiet {
+			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) {
+				qp.check()
+			}
+		}
 	}))
+}
+
+// quieterAttribute reports whether the attribute's definition gives it the
+// quieter quality ("Q", matter.js effectiveQuality.quieter); a cluster no
+// definition is registered for has none.
+func quieterAttribute(clusterID, attrID uint32) bool {
+	def := spec.Lookup(clusterID)
+	if def == nil {
+		return false
+	}
+	a := def.Attribute(attrID)
+	return a != nil && a.Quality.Quieter
+}
+
+// powerSourceBatteryQuietInterval is the throttle interval matter.js gives
+// PowerSource's BatPercentRemaining, BatTimeRemaining and
+// BatTimeToFullCharge: "According to specs changes to these attributes
+// should not occur more often than every 10 seconds"
+// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at
+// db021da0, minimumEmitInterval = Seconds(10)).
+const powerSourceBatteryQuietInterval = 10 * time.Second
+
+// quietIntervalOf is the throttle interval of a quieter attribute:
+// [powerSourceBatteryQuietInterval] for PowerSource's three battery
+// estimates, [clusterpkg.QuietMinimumInterval] for every other.
+func quietIntervalOf(clusterID, attrID uint32) time.Duration {
+	if clusterID == psdef.ClusterID {
+		switch attrID {
+		case psdef.AttrBatPercentRemaining, psdef.AttrBatTimeRemaining, psdef.AttrBatTimeToFullCharge:
+			return powerSourceBatteryQuietInterval
+		}
+	}
+	return clusterpkg.QuietMinimumInterval
+}
+
+// quietPath reports one measurement-projected path of quality Q through a
+// [clusterpkg.Quieter]: a change of its value goes to the throttle, and the
+// throttle's report advances the cluster's DataVersion and marks the path
+// dirty. One quietPath serves the path for every notifier that covers it
+// in one wiring ([listenerSet.quietPathFor]) — an endpoint's source and the
+// cluster server that forwards its notifier both do — so a change is
+// told to the throttle once.
+type quietPath struct {
+	ep   *endpointpkg.Endpoint
+	path im.ConcreteAttributePath
+	q    *clusterpkg.Quieter
+	// mu guards last and orders the readings and the throttle's calls.
+	mu   sync.Mutex
+	last attributeReading
+	had  bool // last holds a reading
+}
+
+// quietPathFor returns the set's quietPath of p, made on first use; the
+// set's teardown stops its throttle, dropping a held report.
+func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *endpointpkg.Endpoint, p im.ConcreteAttributePath) *quietPath {
+	if qp, ok := l.quiet[p]; ok {
+		return qp
+	}
+	qp := &quietPath{ep: ep, path: p}
+	qp.q = &clusterpkg.Quieter{
+		Clock:    b.clk(),
+		Interval: quietIntervalOf(p.Cluster, p.Attribute),
+		Report: func() {
+			ep.BumpClusterDataVersion(p.Cluster)
+			mgr.OnAttributeChanged(p)
+		},
+	}
+	qp.last, qp.had = qp.read()
+	if l.quiet == nil {
+		l.quiet = make(map[im.ConcreteAttributePath]*quietPath)
+	}
+	l.quiet[p] = qp
+	l.add(qp.q.Stop)
+	return qp
+}
+
+// read is the path's current value; false when no server answers it.
+func (qp *quietPath) read() (attributeReading, bool) {
+	for _, srv := range endpointpkg.ClusterServers(qp.ep) {
+		if srv == nil || srv.MatterClusterID() != qp.path.Cluster {
+			continue
+		}
+		v, ok := srv.MatterRead(qp.path.Attribute)
+		if !ok {
+			return attributeReading{}, false
+		}
+		return readingOf(im.AttributeValue{Value: v}), true
+	}
+	return attributeReading{}, false
+}
+
+// check reads the value and tells the throttle of a change, with the
+// nullness of the old and the new value; a value no server answers counts
+// as null.
+func (qp *quietPath) check() {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+	cur, ok := qp.read()
+	wasNull := !qp.had || qp.last.raw == nil
+	isNull := !ok || cur.raw == nil
+	if (wasNull && isNull) || (ok && qp.had && qp.last.equal(cur)) {
+		return
+	}
+	qp.last, qp.had = cur, ok
+	qp.q.Changed(wasNull, isNull)
 }
 
 // sameNotifier reports whether a and b are the same notifier — the

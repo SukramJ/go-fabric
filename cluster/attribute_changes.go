@@ -149,9 +149,10 @@ const QuietMinimumInterval = time.Second
 //
 //   - at once when the value changes from null, or to null from a
 //     non-null value (QuietEvent's shouldEmit returns "now");
-//   - otherwise at once when the last report is older than
-//     [QuietMinimumInterval], and else once, with the latest value, when
-//     that interval has passed since the last report.
+//   - otherwise at once when the last report is older than its interval
+//     ([Quieter.Interval], [QuietMinimumInterval] by default), and else
+//     once, with the latest value, when that interval has passed since the
+//     last report.
 //
 // A change the throttle holds back is still the attribute's value — a
 // read sees it — but neither advances the DataVersion nor marks the
@@ -174,6 +175,13 @@ type Quieter struct {
 	Report func()
 	// Clock is the throttle's time source; nil is [clock.System].
 	Clock clock.Clock
+	// Interval is the minimum time between two reports; zero is
+	// [QuietMinimumInterval]. matter.js sets it per event through
+	// QuietObservable's minimumEmitInterval — ten seconds for PowerSource's
+	// BatPercentRemaining, BatTimeRemaining and BatTimeToFullCharge
+	// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34
+	// at db021da0). Set before the first change.
+	Interval time.Duration
 
 	// mu guards gen, lastEmit, pending and timer.
 	mu       sync.Mutex
@@ -190,7 +198,8 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	q.mu.Lock()
 	now := q.now()
 	immediate := wasNull || isNull
-	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(QuietMinimumInterval).Before(now) || now.Before(q.lastEmit) {
+	interval := q.interval()
+	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(interval).Before(now) || now.Before(q.lastEmit) {
 		q.emitLocked(now)
 		q.mu.Unlock()
 		q.Report()
@@ -200,7 +209,7 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	if q.timer == nil {
 		q.gen++
 		gen := q.gen
-		q.timer = q.afterFunc(q.lastEmit.Add(QuietMinimumInterval).Sub(now), func() { q.flush(gen) })
+		q.timer = q.afterFunc(q.lastEmit.Add(interval).Sub(now), func() { q.flush(gen) })
 	}
 	q.mu.Unlock()
 }
@@ -263,6 +272,14 @@ func (q *Quieter) emitLocked(now time.Time) {
 }
 
 func (q *Quieter) now() time.Time { return clock.Or(q.Clock).Now() }
+
+// interval is [Quieter.Interval], [QuietMinimumInterval] when unset.
+func (q *Quieter) interval() time.Duration {
+	if q.Interval > 0 {
+		return q.Interval
+	}
+	return QuietMinimumInterval
+}
 
 // afterFunc arms f after d on the throttle's clock and returns its stop.
 func (q *Quieter) afterFunc(d time.Duration, f func()) func() bool {

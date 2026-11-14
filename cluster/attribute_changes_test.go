@@ -82,6 +82,34 @@ func TestQuieterMirrorsMatterJSQuietEvent(t *testing.T) {
 	}
 }
 
+// TestQuieterTakesItsInterval: a throttle given an interval holds a change
+// for that interval instead of [cluster.QuietMinimumInterval] — matter.js
+// sets minimumEmitInterval to Seconds(10) on PowerSource's
+// BatPercentRemaining, BatTimeRemaining and BatTimeToFullCharge
+// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at
+// db021da0; review II, R2-P4-nv-05b).
+func TestQuieterTakesItsInterval(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1000, 0))
+	reports := 0
+	q := &cluster.Quieter{Report: func() { reports++ }, Clock: clk, Interval: 10 * time.Second}
+	q.Changed(false, false) // the first report: now
+	clk.Advance(2 * time.Second)
+	q.Changed(false, false) // within ten seconds: held, though past one
+	if armed := clk.Armed(); reports != 1 || len(armed) != 1 || armed[0] != 8*time.Second {
+		t.Fatalf("held change: %d reports, timers %v, want 1 and one at 8s", reports, armed)
+	}
+	clk.Advance(8 * time.Second)
+	if reports != 2 {
+		t.Fatalf("after the interval: %d reports, want 2", reports)
+	}
+	clk.Advance(10*time.Second + time.Millisecond)
+	q.Changed(false, false) // more than ten seconds later: now
+	if reports != 3 {
+		t.Fatalf("after a quiet interval: %d reports, want 3", reports)
+	}
+}
+
 // TestQuieterDefaultsToTheWallClock lets the real timer deliver a held
 // report.
 func TestQuieterDefaultsToTheWallClock(t *testing.T) {
