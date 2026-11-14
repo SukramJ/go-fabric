@@ -57,7 +57,7 @@ func TestNOCsReadSkipsAFabricWhoseIdentityIsNotStoredYet(t *testing.T) {
 	var stored uint8
 	for i, withIdentity := range []bool{true, false} {
 		idx, err := fs.AddFabric(ctx, mstore.FabricRecord{
-			FabricID:      uint64(0xAAAA0001 + i),
+			FabricID:      0xAAAA0001 + uint64(i),
 			NodeID:        0xBBBB0001,
 			RootPublicKey: []byte{0x04, byte(i + 1)},
 			VendorID:      0x1234,
