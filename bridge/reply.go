@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -60,10 +61,57 @@ func (b *Bridge) nextUnsecuredCounter() uint32 {
 func (b *Bridge) encryptSecureOutbound(sess *channel.Session, localSessionID uint16, hdr *message.Header, body []byte) (*channel.EncryptResult, error) {
 	enc, err := sess.Encrypt(hdr, securityFlagsByte(hdr), body)
 	if err != nil {
+		if errors.Is(err, mrp.ErrCounterExhausted) && sess.RolloverDue() {
+			b.endSessionAtRollover(localSessionID, sess)
+		}
 		return nil, err
 	}
 	b.notifySessionActivity(localSessionID, false)
+	if sess.RolloverDue() {
+		b.endSessionAtRollover(localSessionID, sess)
+	}
 	return enc, nil
+}
+
+// endSessionAtRollover ends the secure session localSessionID whose
+// outbound counter nears exhaustion ([channel.Session.RolloverDue]): the
+// peer is told with a CloseSession while the keys still seal, then the
+// registry closes the session and runs its close hooks (the subscription
+// cascade). Mirrors matter.js packages/protocol/src/session/NodeSession.ts:398-412
+// #scheduleRolloverClose — initiateClose with closeSubscriptions — which
+// runs on a timer rather than on the stack of the send that consumed the
+// counter; here it runs on its own goroutine for the same reason (the
+// sender may hold locks the close hooks take). Without a registry the
+// session is closed locally.
+func (b *Bridge) endSessionAtRollover(localSessionID uint16, sess *channel.Session) {
+	b.mu.RLock()
+	run := b.started
+	reg := b.sessionRegistry
+	if run {
+		// Added under mu while started: Stop's Wait follows its
+		// started=false under the write lock, so no Add races it.
+		b.rolloverCloses.Add(1)
+	}
+	b.mu.RUnlock()
+	b.logger.Info("matter.session.rollover_close",
+		slog.Int("session_id", int(localSessionID)))
+	if !run {
+		sess.Close()
+		return
+	}
+	go func() {
+		defer b.rolloverCloses.Done()
+		b.sendCloseSessionReport(localSessionID, sess)
+		if reg == nil {
+			sess.Close()
+			return
+		}
+		if err := reg.Close(localSessionID); err != nil {
+			b.logger.Debug("matter.session.rollover_close",
+				slog.Int("session_id", int(localSessionID)),
+				slog.Any("err", err))
+		}
+	}()
 }
 
 // sendReply is a thin wrapper around [Bridge.sendReplyOpts] that

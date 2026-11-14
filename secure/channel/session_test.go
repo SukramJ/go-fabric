@@ -338,3 +338,33 @@ func TestDecryptAcceptsCounterOvertakenAtSessionStart(t *testing.T) {
 		t.Fatalf("first message again: err=%v dup=%v (want nil, true)", err, dup)
 	}
 }
+
+// TestRolloverDueOnceNearExhaustion — the session reports, once, that its
+// outbound counter has come within 100 000 messages of the 32-bit maximum,
+// the point at which matter.js winds the session down
+// (packages/protocol/src/protocol/MessageCounter.ts:13 ROLLOVER_INFO_DIFFERENCE,
+// :71-76; packages/protocol/src/session/NodeSession.ts:398-412).
+func TestRolloverDueOnceNearExhaustion(t *testing.T) {
+	aCfg, _ := aliceBobConfigs()
+	aCfg.InitialCounter = 0xFFFFFFFF - 100_001
+	alice, err := New(aCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var h message.Header
+	if _, err := alice.Encrypt(&h, 0, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if alice.RolloverDue() {
+		t.Fatalf("RolloverDue after counter %#x, want false (one short of the margin)", h.MessageCounter)
+	}
+	if _, err := alice.Encrypt(&h, 0, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if !alice.RolloverDue() {
+		t.Fatalf("RolloverDue after counter %#x, want true", h.MessageCounter)
+	}
+	if alice.RolloverDue() {
+		t.Fatal("RolloverDue a second time, want false: the notice is given once")
+	}
+}

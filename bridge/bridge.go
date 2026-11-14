@@ -523,6 +523,10 @@ type Bridge struct {
 	// (triggerSessionReannounce), added under mu while started and waited
 	// for by Stop before the advertiser closes.
 	reannounces sync.WaitGroup
+	// rolloverCloses is the goroutines that end a secure session whose
+	// outbound counter nears exhaustion (endSessionAtRollover), added
+	// under mu while started and waited for by Stop.
+	rolloverCloses sync.WaitGroup
 
 	// routing bundles the exchange-src / timed-deadline / sub-target /
 	// status-response-wait tables the receive, ack-pump, and subscribe
@@ -2190,6 +2194,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// the serve context's cancel above ends it, and it is gone before the
 	// advertiser closes.
 	b.reannounces.Wait()
+	b.rolloverCloses.Wait()
 	// A BDX responder (an OTA image transfer) runs under the handler
 	// context the cancel above ended; it is gone before Stop returns.
 	if !b.waitBDXResponders(ctx) {
