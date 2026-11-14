@@ -78,6 +78,20 @@ type AttributeExpansion struct {
 	nextEndpoint int
 	batch        []ReadResult
 	pos          int
+
+	// isStatus, early, earlyPos, held and prepared serve
+	// [AttributeExpansion.StatusesFirst].
+	isStatus func(requested ConcreteAttributePath, result ReadResult) bool
+	early    []expandedResult
+	earlyPos int
+	held     map[int][]ReadResult
+	prepared bool
+}
+
+// expandedResult is a result with the request path it was expanded from.
+type expandedResult struct {
+	requested ConcreteAttributePath
+	result    ReadResult
 }
 
 // NewAttributeExpansion returns the expansion of paths against d under
@@ -104,9 +118,78 @@ func (e *AttributeExpansion) Ascending() *AttributeExpansion {
 	return e
 }
 
+// StatusesFirst makes the expansion hand out, before any other result,
+// every result of a fully concrete path that isStatus — the consumer's own
+// gate, which may also turn a result into a status (an access denial) —
+// reports as a status, the paths in request order; such a result is not
+// handed out again at its path's place. The other results keep their
+// order. Each concrete path is read once up front for it; one without a
+// status is read again at its place, so that its value is as current as
+// the rest of the report. Call it before the first
+// [AttributeExpansion.Next].
+//
+// Mirrors matter.js packages/protocol/src/action/server/
+// AttributeReadResponse.ts at db021da0: process registers every request
+// path first (:88-94); addConcrete adds a failing path's status to the
+// chunk at once (:202-274, addStatus :489-501) while a resolving path only
+// installs a producer (:283-308); the producers run afterwards (:96-100),
+// so every status of the request precedes every value (review II,
+// R2-P4-imread-06).
+func (e *AttributeExpansion) StatusesFirst(isStatus func(requested ConcreteAttributePath, result ReadResult) bool) *AttributeExpansion {
+	e.isStatus = isStatus
+	return e
+}
+
+// prepare reads every concrete path once and sets aside the results
+// isStatus reports as statuses, in request order; a path with such a
+// result keeps its other results for its place.
+func (e *AttributeExpansion) prepare() {
+	e.prepared = true
+	for i, p := range e.paths {
+		if !isConcreteAttributePath(p) {
+			continue
+		}
+		var rest []ReadResult
+		statuses := false
+		for _, r := range e.concreteResults(p) {
+			if e.isStatus(p, r) {
+				e.early = append(e.early, expandedResult{requested: p, result: r})
+				statuses = true
+				continue
+			}
+			rest = append(rest, r)
+		}
+		if statuses {
+			if e.held == nil {
+				e.held = make(map[int][]ReadResult)
+			}
+			e.held[i] = rest
+		}
+	}
+}
+
+// concreteResults returns what a fully concrete path reads: one
+// UnsupportedNode result for a path naming another node, else the
+// dispatcher's answer.
+func (e *AttributeExpansion) concreteResults(p ConcreteAttributePath) []ReadResult {
+	if p.HasNode && e.hasLocalNodeID && p.Node != e.localNodeID {
+		return []ReadResult{{Path: p, Status: StatusUnsupportedNode}}
+	}
+	return e.d.Read(e.ctx, p)
+}
+
 // Next returns the next result and the request path it was expanded
 // from; ok is false once every path is expanded.
 func (e *AttributeExpansion) Next() (requested ConcreteAttributePath, result ReadResult, ok bool) {
+	if e.isStatus != nil && !e.prepared {
+		e.prepare()
+	}
+	if e.earlyPos < len(e.early) {
+		x := e.early[e.earlyPos]
+		e.early[e.earlyPos] = expandedResult{}
+		e.earlyPos++
+		return x.requested, x.result, true
+	}
 	for {
 		for e.pos < len(e.batch) {
 			// The batch stays the dispatcher's: nothing is written into
@@ -144,6 +227,14 @@ func (e *AttributeExpansion) fill() bool {
 		}
 		e.path = e.paths[e.nextPath]
 		e.nextPath++
+		if rest, held := e.held[e.nextPath-1]; held {
+			// A concrete path whose status went first: what is left of
+			// its results, unread again.
+			delete(e.held, e.nextPath-1)
+			e.flags = 0
+			e.setBatch(rest)
+			return true
+		}
 		if e.path.HasNode && e.hasLocalNodeID && e.path.Node != e.localNodeID {
 			// A path naming another node: a concrete one is answered
 			// UnsupportedNode before any access check, a wildcard one
@@ -243,6 +334,12 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 	r.subjectNodeID, r.subjectCATs = SubjectFromContext(ctx)
 	r.aclChecker, r.hasACL = d.(ACLChecker)
 	r.privProvider, r.hasPriv = d.(AttributeReadPrivilegeProvider)
+	// Every status of a concrete path precedes the first value
+	// ([AttributeExpansion.StatusesFirst]).
+	r.exp.StatusesFirst(func(path ConcreteAttributePath, res ReadResult) bool {
+		rep, keep := r.report(path, res)
+		return keep && rep.IsStatus
+	})
 	return r
 }
 

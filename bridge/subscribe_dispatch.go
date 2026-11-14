@@ -52,7 +52,8 @@ func (b *Bridge) buildInitialReport(
 // reports); each cluster the controller holds at its current DataVersion
 // left out.
 //
-// Reports go out in ascending (endpoint, cluster, attribute) order per
+// The statuses of the concrete paths go out first, in request order; the
+// values follow in ascending (endpoint, cluster, attribute) order per
 // path. Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
 // stream order and the HAP-Service-Mapper's topology builder needs
 // Descriptor (0x001D) cached BEFORE the cluster surfaces it references —
@@ -101,7 +102,7 @@ func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatch
 	if allow == nil {
 		allow = func(im.ReadResult) bool { return true }
 	}
-	return &primingSource{
+	p := &primingSource{
 		b: b,
 		// A wildcard path's WildcardPathFlags skip their paths as in a
 		// read (AttributeReadResponse.ts:149-197).
@@ -109,6 +110,17 @@ func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatch
 		allow:   allow,
 		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
 	}
+	// Every status of a concrete path precedes the first value, as in a
+	// read: matter.js ServerSubscription.ts:643-671 at db021da0 emits
+	// AttributeReadResponse's reports, statuses first, and holds them back
+	// until the first value (review II, R2-P4-imread-06).
+	p.exp.StatusesFirst(func(_ im.ConcreteAttributePath, rr im.ReadResult) bool {
+		if rr.Status == im.StatusSuccess || p.suppressStatuses {
+			return false
+		}
+		return rr.Status == im.StatusUnsupportedNode || p.allow(rr)
+	})
+	return p
 }
 
 // primingDataVersionFilters returns the DataVersionFilters that apply to
