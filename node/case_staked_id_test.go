@@ -9,6 +9,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // TestCASEHandshakesThatDoNotFinishLeaveNoSessionIDReserved: the production
@@ -50,26 +52,46 @@ func TestCASEHandshakesThatDoNotFinishLeaveNoSessionIDReserved(t *testing.T) {
 // TestAFailedCASEHandshakeReleasesOnlyItsOwnStake: at a full id space an
 // allocation takes the oldest staked id for a new handshake
 // (BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly); the handshake that
-// had staked it, failing afterwards, gives back its own stake and nothing
-// else — the id stays staked for the handshake that holds it now (review
-// II, R2-P3-dr-dev-07).
+// had staked it, dropped unfinished afterwards, gives back its own stake
+// and nothing else — the id stays staked for the handshake that holds it
+// now (review II, R2-P3-dr-dev-07).
 func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
 	t.Parallel()
+	fx := newCaseFabricFixture(t)
 	sessions := operational.NewManager(testStore(t))
-	ids := newCaseIdentities(slog.New(slog.DiscardHandler), nil)
 	provider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter {
-		adapter, err := buildCaseAdapter(sessions, ids, nil, slog.New(slog.DiscardHandler), nil)
+		adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), nil)
 		if err != nil {
 			return nil
 		}
 		return adapter
 	})
-	first := bridge.HandshakeKey{InitiatorNodeID: 0xC0DE, ExchangeID: 1}
-	h1, ok := provider.Resolve(first).(*bridge.CaseAdapter)
-	if !ok {
-		t.Fatal("no adapter for the first handshake")
+	// begin answers a Sigma1 addressed to the fixture's fabric on key and
+	// returns the session id the handshake announced.
+	begin := func(key bridge.HandshakeKey) uint16 {
+		t.Helper()
+		initiator, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+			Identity: fx.peer, Verifier: fx.verifier, SessionID: 0x1001,
+			PeerNodeID: fx.local.NodeID, RootPublicKey: fx.root,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		sigma1, err := initiator.GenerateSigma1()
+		if err != nil {
+			t.Fatal(err)
+		}
+		h, ok := provider.Resolve(key).(*bridge.CaseAdapter)
+		if !ok {
+			t.Fatal("no adapter")
+		}
+		if op, _, err := h.ProcessSigma1(sigma1); err != nil || op != mrp.SCOpcodeSigma2 {
+			t.Fatalf("Sigma1 answered with opcode %#x, %v; want Sigma2", op, err)
+		}
+		return h.SnapshotResponder().SessionID()
 	}
-	staked := h1.SnapshotResponder().SessionID()
+	first := bridge.HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: 1}
+	staked := begin(first)
 	// Every other id staked too: the table is full of stakes.
 	for range operational.SessionIDSpace - 1 {
 		if _, err := sessions.AllocateID(); err != nil {
@@ -79,11 +101,7 @@ func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
 	if occ := sessions.Occupancy(); occ.Reserved != operational.SessionIDSpace {
 		t.Fatalf("occupancy %+v, want every id staked", occ)
 	}
-	h2, ok := provider.Resolve(bridge.HandshakeKey{InitiatorNodeID: 0xC0DE, ExchangeID: 2}).(*bridge.CaseAdapter)
-	if !ok {
-		t.Fatal("no adapter for the second handshake")
-	}
-	if got := h2.SnapshotResponder().SessionID(); got != staked {
+	if got := begin(bridge.HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: 2}); got != staked {
 		t.Fatalf("the second handshake staked id %d, want the oldest staked id %d", got, staked)
 	}
 	provider.Forget(first) // the first handshake is dropped unfinished

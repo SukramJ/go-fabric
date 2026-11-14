@@ -734,9 +734,10 @@ type handshakeStake struct {
 	stake    operational.Stake
 }
 
-// renew stakes a fresh id for a handshake that starts over on the
-// responder and releases the stake it held: the responder's
-// [sigma.Responder.SetSessionIDRenewer] source.
+// renew stakes an id for a handshake whose Sigma1 the responder accepted —
+// its first, or one that starts over — and releases the stake it held
+// before, if any: the responder's [sigma.Responder.SetSessionIDRenewer]
+// source.
 func (h *handshakeStake) renew(uint16) (uint16, bool) {
 	next, err := h.sessions.AllocateStake()
 	if err != nil {
@@ -770,12 +771,12 @@ func (h *handshakeStake) release(id uint16) {
 // (the node's OnSessionOpened).
 func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger, onOpened func(sessionID uint16)) (*bridge.CaseAdapter, error) {
 	current := ids.current()
-	stake, err := sessions.AllocateStake()
-	if err != nil {
-		return nil, fmt.Errorf("allocate CASE session id: %w", err)
-	}
-	sessionID := stake.ID
-	held := &handshakeStake{sessions: sessions, stake: stake}
+	// The handshake stakes its session id once its Sigma1 is accepted, not
+	// here: a Sigma1 that starts no handshake stakes nothing, so it cannot
+	// close the least recently active session at a full table (review II,
+	// R2-P3-dr-dev-08). The responder is built without an id and takes it
+	// from the renewer ([sigma.Responder.SetSessionIDRenewer]).
+	held := &handshakeStake{sessions: sessions}
 
 	identity := (*sigma.Identity)(nil)
 	var verifier sigma.PeerVerifier
@@ -793,7 +794,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		verifier = rejectingVerifier{}
 	}
 
-	responder := sigma.NewResponder(identity, verifier, sessionID)
+	responder := sigma.NewResponder(identity, verifier, 0)
 	responder.SetIdentityResolver(ids)
 	// Our session parameters ride in Sigma2 (CaseServer.ts:272
 	// responderSessionParams: sessions.sessionParameters); nil leaves
@@ -802,8 +803,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		p := *responderParams
 		responder.SetSessionParameters(&p)
 	}
-	// A second Sigma1 on the same exchange — Apple grafts its iCloud
-	// companion fabric onto one — must not reuse the first session's slot.
+	// The handshake's id, staked when its Sigma1 is accepted; a second
+	// Sigma1 on the same exchange — Apple grafts its iCloud companion
+	// fabric onto one — must not reuse the first session's slot.
 	responder.SetSessionIDRenewer(held.renew)
 
 	// Session resumption as the responder (Matter §4.13.2.4): a Sigma1
@@ -827,7 +829,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		fabricIndex := identity.FabricIndex
 		localNodeID := identity.NodeID
 		peerNodeID := uint64(0)
-		effectiveID := sessionID
+		var effectiveID uint16
 		var peerCATs []uint32
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			peerNodeID = resp.PeerNodeID()

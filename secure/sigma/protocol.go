@@ -193,6 +193,11 @@ type Responder struct {
 	// every time the responder resets for a NEW Sigma1 — see
 	// [Responder.SetSessionIDRenewer].
 	sessionIDRenewer func(previous uint16) (uint16, bool)
+	// idPending: the handshake has no local session id of its own yet —
+	// the responder was built without one, or starts over after a
+	// handshake — and takes one from sessionIDRenewer once its Sigma1 is
+	// accepted ([Responder.takeSessionIDLocked]).
+	idPending bool
 	// sessionParams, when non-nil and non-empty, is emitted as Sigma2
 	// context-tag 5 (responderSessionParams).
 	sessionParams *SessionParameters
@@ -366,9 +371,12 @@ const (
 	responderStateFailed
 )
 
-// NewResponder returns a Responder ready to consume Sigma1.
+// NewResponder returns a Responder ready to consume Sigma1. A sessionID
+// of 0 — no secure session's id — leaves the id to the renewer
+// ([Responder.SetSessionIDRenewer]), which supplies it once a Sigma1 is
+// accepted.
 func NewResponder(identity *Identity, verifier PeerVerifier, sessionID uint16) *Responder {
-	return &Responder{identity: identity, verifier: verifier, sessionID: sessionID}
+	return &Responder{identity: identity, verifier: verifier, sessionID: sessionID, idPending: sessionID == 0}
 }
 
 // SetResumptionStore wires the optional resumption-record lookup. When
@@ -393,9 +401,17 @@ func (r *Responder) SessionID() uint16 {
 }
 
 // SetSessionIDRenewer wires the local session-id source used when a
-// NEW Sigma1 arrives on a responder that already served one. It is
-// called with the id currently announced and returns the replacement;
-// ok==false keeps the current id.
+// NEW Sigma1 arrives on a responder that already served one, and for the
+// first Sigma1 of a responder built with session id 0. It is called with
+// the id currently announced and returns the replacement; ok==false keeps
+// the current id, and fails the handshake of a responder that has none.
+// It is called only once the Sigma1 is accepted — it parsed, addressed a
+// fabric this node holds (or presented a resumption record whose MIC
+// verified) and carried a valid ephemeral key — so a Sigma1 that starts
+// no handshake stakes nothing (review II, R2-P3-dr-dev-08): matter.js
+// takes the id after the destination check and the key agreement
+// (packages/protocol/src/session/case/CaseServer.ts:239, :266 at
+// db021da0) and, resuming, after the resume MIC decrypted (:161-173).
 //
 // matter.js takes the responder session id inside each Sigma1
 // handling (packages/protocol/src/session/case/CaseServer.ts:266
@@ -413,6 +429,31 @@ func (r *Responder) SetSessionIDRenewer(fn func(previous uint16) (uint16, bool))
 	r.mu.Lock()
 	r.sessionIDRenewer = fn
 	r.mu.Unlock()
+}
+
+// errNoSessionID fails the handshake of a responder that has no local
+// session id and whose renewer supplied none.
+var errNoSessionID = errors.New("sigma: no local session id for the handshake")
+
+// takeSessionIDLocked gives the handshake of an accepted Sigma1 a local
+// session id of its own when it has none yet ([Responder.idPending]),
+// from the renewer: a responder without a renewer keeps the id it was
+// built with. Caller holds r.mu.
+func (r *Responder) takeSessionIDLocked() error {
+	if !r.idPending || r.sessionIDRenewer == nil {
+		r.idPending = false
+		return nil
+	}
+	next, ok := r.sessionIDRenewer(r.sessionID)
+	if !ok {
+		if r.sessionID == 0 {
+			return errNoSessionID
+		}
+		r.idPending = false
+		return nil
+	}
+	r.sessionID, r.idPending = next, false
+	return nil
 }
 
 // SetSessionParameters wires the responder's preferred MRP tuning
@@ -491,10 +532,8 @@ func (r *Responder) ProcessSigma1WithResume(sigma1Bytes []byte) (Sigma1ProcessRe
 		// slot whose keys are the old ones. Take a fresh id first, as
 		// the full path does for its second handshake and as matter.js
 		// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
-		if r.state == responderStateFinished && r.sessionIDRenewer != nil {
-			if next, ok := r.sessionIDRenewer(r.sessionID); ok {
-				r.sessionID = next
-			}
+		if r.state == responderStateFinished {
+			r.idPending = true
 		}
 		result, ok, resumeErr := r.tryResume(sigma1)
 		if resumeErr != nil {
@@ -587,6 +626,10 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 			r.identity = id
 			r.verifier = ver
 		}
+	}
+	// The resumption is accepted: its session takes its id now.
+	if err := r.takeSessionIDLocked(); err != nil {
+		return Sigma1ProcessResult{}, false, err
 	}
 
 	// Generate a fresh 16-byte local resumption id for the response.
@@ -776,15 +819,12 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 		// span of the new handshake, not just from its Sigma3 onwards.
 		r.peerCATs = nil
 		r.peerSessionParams = nil
-		// Take a fresh local session id for the new handshake: the one
-		// already announced may be occupied by the session the first
-		// handshake established, and registering the second peer under
-		// it would displace the first without tearing it down.
-		if r.sessionIDRenewer != nil {
-			if next, ok := r.sessionIDRenewer(r.sessionID); ok {
-				r.sessionID = next
-			}
-		}
+		// The new handshake takes a fresh local session id once its
+		// Sigma1 is accepted: the one already announced may be occupied
+		// by the session the first handshake established, and
+		// registering the second peer under it would displace the first
+		// without tearing it down.
+		r.idPending = true
 		r.sigma2 = Sigma2{}
 		r.sigma2Bytes = nil
 		// The previous handshake's shared secret and session keys end
@@ -843,6 +883,10 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	initECDH, err := ecdh.P256().NewPublicKey(initEphBytes)
 	if err != nil {
 		return Sigma2{}, fmt.Errorf("%w: %v", ErrInvalidPoint, err) //nolint:errorlint // intentional double-wrap
+	}
+	// The Sigma1 is accepted: its handshake takes its id now.
+	if err := r.takeSessionIDLocked(); err != nil {
+		return Sigma2{}, err
 	}
 
 	if _, err := rand.Read(r.random[:]); err != nil {

@@ -4,6 +4,7 @@
 package sigma
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -141,5 +142,66 @@ func TestResponderSigma1Replay_KeepsSessionID(t *testing.T) {
 	}
 	if renewCalls != 0 {
 		t.Fatalf("renewer called %d times on a Sigma1 replay, want 0", renewCalls)
+	}
+}
+
+// missingFabric is an identity resolver for which no Sigma1 addresses a
+// fabric the node holds.
+type missingFabric struct{}
+
+func (missingFabric) ResolveSigma1Destination([32]byte, [RandomSize]byte) (*Identity, PeerVerifier, bool) {
+	return nil, nil, false
+}
+
+// TestResponderTakesItsSessionIDForAnAcceptedSigma1Only: a responder built
+// without a session id takes one from its renewer once a Sigma1 is
+// accepted, and a Sigma1 that is not — it does not parse, or addresses no
+// fabric the node holds — takes none, on a fresh responder and on one
+// that completed a handshake (review II, R2-P3-dr-dev-08).
+func TestResponderTakesItsSessionIDForAnAcceptedSigma1Only(t *testing.T) {
+	t.Parallel()
+	ipk := fabricIPK()
+	const fabricID = uint64(0x2A)
+	var renewed []uint16
+	renewer := func(previous uint16) (uint16, bool) {
+		renewed = append(renewed, previous)
+		return 0x3000 + uint16(len(renewed)), true
+	}
+
+	refusing := NewResponder(newTestIdentity(t, 0xBBBB, fabricID, ipk), testVerifier{}, 0)
+	refusing.SetSessionIDRenewer(renewer)
+	refusing.SetIdentityResolver(missingFabric{})
+	initiator := NewInitiator(newTestIdentity(t, 0xAAAA, fabricID, ipk), testVerifier{}, 0x1001, [32]byte{0xAA})
+	sigma1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatalf("GenerateSigma1: %v", err)
+	}
+	if _, err := refusing.ProcessSigma1(sigma1); !errors.Is(err, ErrNoSharedTrustRoots) {
+		t.Fatalf("a Sigma1 addressing no fabric of the node: %v, want ErrNoSharedTrustRoots", err)
+	}
+
+	responder := NewResponder(newTestIdentity(t, 0xBBBB, fabricID, ipk), testVerifier{}, 0)
+	responder.SetSessionIDRenewer(renewer)
+	if _, err := responder.ProcessSigma1([]byte{0x15, 0x18}); err == nil {
+		t.Fatal("a Sigma1 that does not parse was accepted")
+	}
+	if len(renewed) != 0 || responder.SessionID() != 0 {
+		t.Fatalf("after Sigma1s that start no handshake: renewer called with %v, SessionID %#x; want no call and no id", renewed, responder.SessionID())
+	}
+
+	if s2 := runHandshakeAgainst(t, responder, ipk, fabricID, 0xAAAA); s2.ResponderSessionID != 0x3001 {
+		t.Fatalf("Sigma2.ResponderSessionID = %#x, want the renewer's 0x3001", s2.ResponderSessionID)
+	}
+	if _, err := responder.ProcessSigma1([]byte{0x15, 0x18}); err == nil {
+		t.Fatal("a Sigma1 that does not parse was accepted")
+	}
+	if len(renewed) != 1 {
+		t.Fatalf("a Sigma1 that does not parse, after a completed handshake, called the renewer: %v", renewed)
+	}
+	if s2 := runHandshakeAgainst(t, responder, ipk, fabricID, 0xCCCC); s2.ResponderSessionID != 0x3002 {
+		t.Fatalf("the next handshake's Sigma2.ResponderSessionID = %#x, want 0x3002", s2.ResponderSessionID)
+	}
+	if len(renewed) != 2 || renewed[1] != 0x3001 {
+		t.Fatalf("renewer called with %v, want [0 0x3001]", renewed)
 	}
 }
