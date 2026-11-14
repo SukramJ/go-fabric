@@ -316,3 +316,32 @@ func TestCASEServerClose(t *testing.T) {
 		t.Fatal("NewCASEServer without Fabrics accepted")
 	}
 }
+
+// TestCASEServerHoldsAtMostFiveSessionsPerPeer: the sessions one peer
+// establishes with the responder are capped at five, the least recently
+// used closed without a CloseSession on the wire — matter.js
+// SessionManager.ts:205 MAX_SESSIONS_PER_PEER and :697-725
+// #evictExcessSessionsFor at db021da0. The newest session survives.
+func TestCASEServerHoldsAtMostFiveSessionsPerPeer(t *testing.T) {
+	t.Parallel()
+	r := newResponderRig(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+	const opened = 12
+	accepted := make([]*exchange.Session, 0, opened)
+	for i := range opened {
+		if _, _, err := r.open(ctx, r.nodeFabric); err != nil {
+			t.Fatalf("CASE %d to the controller: %v", i, err)
+		}
+		accepted = append(accepted, r.accepted(t))
+	}
+	held := r.serverMgr.SessionsFor(exchange.PeerAddress{FabricIndex: 1, NodeID: testNodeID})
+	if len(held) != 5 {
+		t.Fatalf("the node holds %d sessions on the controller after opening %d; want 5", len(held), opened)
+	}
+	for i, s := range accepted {
+		if want := i < opened-5; s.IsClosed() != want {
+			t.Errorf("session %d of %d: closed %v, want %v", i, opened, s.IsClosed(), want)
+		}
+	}
+}

@@ -332,6 +332,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		AttestationChallenge:  keys.AttestationChallenge[:],
 		Resumed:               true,
 		FabricIndex:           fabric.Identity.FabricIndex,
+		Responder:             true,
 	})
 	if err != nil {
 		return err
@@ -383,6 +384,7 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 		CaseAuthenticatedTags: cats,
 		AttestationChallenge:  keys.AttestationChallenge[:],
 		FabricIndex:           fabric.Identity.FabricIndex,
+		Responder:             true,
 	})
 	if err != nil {
 		return err

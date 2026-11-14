@@ -35,6 +35,7 @@ type Session struct {
 	attestationChallenge []byte
 	suppressPeerLoss     bool
 	resumed              bool
+	responder            bool
 	fabricIndex          uint8
 	createdAt            time.Time
 	closing              chan struct{}
