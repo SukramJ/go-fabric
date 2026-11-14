@@ -728,11 +728,24 @@ func configResponse(status netcommdef.NetworkCommissioningStatusEnum, index int)
 	return r
 }
 
+// maxNetworksInScanResponse bounds the results of a ScanNetworksResponse:
+// connectedhomeip's kMaxNetworksInScanResponse
+// (src/app/clusters/network-commissioning/constants.h:26-28 at 6170af84,
+// "each item will cost ~60 bytes in TLV, thus 15 is a safe upper bound of
+// scan results"), at which WifiScanResponseToTLV::EncodeTo stops
+// (WifiScanResponse.cpp:64-68), so the response fits its message whatever
+// the number of access points in range (review II, R2-P3-net-04).
+const maxNetworksInScanResponse = 15
+
 // scanNetworks is HandleScanNetworks (:309-371) and OnFinished (:930-961):
 // an SSID longer than 32 bytes is a ConstraintError (and UnknownError the
 // last status); an empty one is a scan of every network; a directed scan
 // without results is NetworkNotFound; the status is the last networking
-// status; success commits the breadcrumb.
+// status; success commits the breadcrumb. The response carries at most
+// maxNetworksInScanResponse results: chip's Wi-Fi response keeps the
+// first ones in the driver's order, here the strongest are kept, those
+// without a known RSSI last — as chip's Thread response keeps its
+// strongest (ThreadScanResponse.cpp:49-88).
 func (w *WiFiNetworkCommissioning) scanNetworks(ctx context.Context, req netcommdef.ScanNetworksRequest) (any, error) {
 	var ssid []byte
 	if req.Ssid != nil && !req.Ssid.Null {
@@ -758,6 +771,22 @@ func (w *WiFiNetworkCommissioning) scanNetworks(ctx context.Context, req netcomm
 	w.dataVersion.Bump()
 	w.mu.Unlock()
 	resp := netcommdef.ScanNetworksResponse{NetworkingStatus: status, DebugText: debugText(text)}
+	if len(results) > maxNetworksInScanResponse {
+		results = slices.Clone(results)
+		slices.SortStableFunc(results, func(a, b contract.WiFiScanResult) int {
+			switch {
+			case a.HasRSSI != b.HasRSSI:
+				if a.HasRSSI {
+					return -1
+				}
+				return 1
+			case !a.HasRSSI:
+				return 0
+			}
+			return int(b.RSSI) - int(a.RSSI)
+		})
+		results = results[:maxNetworksInScanResponse]
+	}
 	list := make([]netcommdef.WiFiInterfaceScanResultStruct, 0, len(results))
 	for _, r := range results {
 		e := netcommdef.WiFiInterfaceScanResultStruct{Security: netcommdef.WiFiSecurityBitmap(r.Security), Ssid: bytes.Clone(r.SSID), Bssid: bytes.Clone(r.BSSID), Channel: r.Channel}
