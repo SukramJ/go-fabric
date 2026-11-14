@@ -857,7 +857,8 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 	if a == nil || value == nil {
 		return nil
 	}
-	_, err := i.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers, nameScope{peers: peers, conformance: true, enums: true})
+	t, c := held(a.Type, a.Constraint, a.Relaxed)
+	_, err := i.checkValueIn(a.Name, t, a.Quality.Nullable, c, underlying(value), peers, nameScope{peers: peers, conformance: true, enums: true})
 	return err
 }
 

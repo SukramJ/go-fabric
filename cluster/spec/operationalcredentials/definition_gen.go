@@ -216,7 +216,8 @@ func (v AttestationRequestRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *AttestationRequestRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AttestationRequest",
-		spec.Bind(0, "AttestationNonce", true, &v.AttestationNonce, spec.DecodeBytesIn(32, 32)),
+		// AttestationNonce: the constraint "32" is the server's to judge (matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0).
+		spec.Bind(0, "AttestationNonce", true, &v.AttestationNonce, spec.DecodeBytes),
 	)
 }
 
@@ -307,7 +308,8 @@ func (v CsrRequestRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *CsrRequestRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CsrRequest",
-		spec.Bind(0, "CsrNonce", true, &v.CsrNonce, spec.DecodeBytesIn(32, 32)),
+		// CsrNonce: the constraint "32" is the server's to judge (matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0).
+		spec.Bind(0, "CsrNonce", true, &v.CsrNonce, spec.DecodeBytes),
 		spec.Bind(1, "IsForUpdateNoc", false, &v.IsForUpdateNoc, spec.DecodeOptional(spec.DecodeBool)),
 	)
 }
@@ -675,7 +677,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "AttestationNonce", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}},
+				{ID: 0, Name: "AttestationNonce", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}, Relaxed: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
 			},
 			Decode: decodeAttestationRequestRequest,
 		},
@@ -714,7 +716,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "CsrNonce", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}},
+				{ID: 0, Name: "CsrNonce", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}, Relaxed: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
 				{ID: 1, Name: "IsForUpdateNoc", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Default: false},
 			},
 			Decode: decodeCsrRequestRequest,

@@ -7,8 +7,6 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -20,9 +18,11 @@ import (
 // field a controller in the field omits is given its fallback
 // ([requestFallbacks]), and the definition's decoder returns the
 // generated request struct or the status matter.js's request schema
-// answers the payload with — DoorLock's with the validation rules its
-// server installs ([refineDoorLockRequest]). ok is false, and nothing is
-// read, for a cluster or command no registered definition decodes.
+// answers the payload with, the server's relaxations included — the
+// definition carries them ([spec.Command.DecodeRequest], the relaxation
+// table of script/clustergen: DoorLock's request rules, ICD's
+// VerificationKey). ok is false, and nothing is read, for a cluster or
+// command no registered definition decodes.
 func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (fields any, ok bool, err error) {
 	if handWrittenServers[path.Cluster] {
 		return nil, false, nil
@@ -39,15 +39,7 @@ func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.El
 	if err != nil {
 		return nil, true, fmt.Errorf("%s.%s: %w", def.Name, cmd.Name, err)
 	}
-	n = withFallbacks(path, n)
-	if path.Cluster == icddef.ClusterID {
-		fields, err = decodeICDRequest(path, n, cmd.Decode)
-	} else {
-		fields, err = cmd.Decode(n)
-	}
-	if err != nil && path.Cluster == lockdef.ClusterID {
-		fields, err = refineDoorLockRequest(path.Command, n, err)
-	}
+	fields, err = cmd.DecodeRequest(withFallbacks(path, n))
 	return fields, true, err
 }
 

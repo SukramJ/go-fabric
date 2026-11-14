@@ -3,7 +3,12 @@
 
 package spec
 
-import "strings"
+import (
+	"errors"
+	"strings"
+
+	"github.com/SukramJ/go-fabric/im"
+)
 
 // Privilege is an access level, numbered as matter.js's AccessLevel
 // (packages/model/src/aspects/Access.ts): View 1, ProxyView 2, Operate 3,
@@ -170,6 +175,29 @@ type Field struct {
 	// empty list, [UnresolvedDefault] for a stated default the runtime
 	// does not resolve, nil when none is stated.
 	Default any
+	// Relaxed is the reference line of a relaxation: the server of this
+	// module that serves the cluster judges the field's value itself, so
+	// the definition's checks hold it to its type's width only — not to
+	// its constraint, nor an enum to its values. matter.js relaxes a field
+	// by extending its server's schema (constraint "none",
+	// packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
+	// at db021da0); empty for a field held to the model. Written by
+	// script/clustergen from its relaxation table (relaxed.go).
+	Relaxed string
+}
+
+// held is the type and constraint the definition's checks hold a value of
+// t under c to: t and c themselves, or — for a relaxed element — t's
+// width alone (an enum read as an unsigned integer of its bits, no
+// constraint).
+func held(t Type, c Constraint, relaxed string) (Type, Constraint) {
+	if relaxed == "" {
+		return t, c
+	}
+	if t.Kind == KindEnum {
+		t.Kind, t.Enum = KindUint, nil
+	}
+	return t, Constraint{}
 }
 
 // UnresolvedDefault marks a stated default that is a field value the
@@ -271,6 +299,10 @@ type Attribute struct {
 	Quality     Quality
 	Constraint  Constraint
 	Default     any
+	// Relaxed is the reference line of a relaxation of the attribute's
+	// written value, as [Field.Relaxed] for a field: the server judges it,
+	// the definition holds it to its type's width only.
+	Relaxed string
 	// Decode decodes a value of the attribute into the generated type —
 	// for an attribute whose value is a struct (the struct) or a list of
 	// structs (a [List]), TLV null nil for a nullable one; nil for any
@@ -302,8 +334,44 @@ type Command struct {
 	Conformance Conformance
 	Access      Access
 	Fields      []Field
+	// Check is how a request's fields are held to the model before the
+	// server runs; the zero value holds them as matter.js's request schema
+	// does.
+	Check RequestCheck
 	// Decode decodes the payload into the generated payload type.
 	Decode func(Node) (any, error)
+}
+
+// RequestCheck is a server's departure from the request check matter.js
+// applies before the server runs (requestTlv.validate,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487 at
+// db021da0). Written by script/clustergen from its relaxation table.
+type RequestCheck struct {
+	// Unchecked: no request field is held to its constraint — matter.js's
+	// skipCommandValidation (packages/node/src/node/integration/
+	// ProtocolService.ts:343-348 at db021da0); the type's width still is.
+	Unchecked bool
+	// Refusal is the status a request the definition refuses answers in
+	// place of the schema's own; zero keeps the schema's. matter.js's
+	// Supervision onValidationError (ProtocolService.ts:662-679).
+	Refusal im.StatusCode
+	// Ref is the reference line of the departure.
+	Ref string
+}
+
+// DecodeRequest decodes a request payload through the command's decoder
+// and answers a refused payload with [RequestCheck.Refusal] where the
+// command states one. Every request of a cluster with a generated
+// definition is decoded through it, before the server runs.
+func (c *Command) DecodeRequest(n Node) (any, error) {
+	fields, err := c.Decode(n)
+	if err == nil || c.Check.Refusal == 0 {
+		return fields, err
+	}
+	if fe, ok := errors.AsType[*FieldError](err); ok {
+		return nil, &FieldError{Status: c.Check.Refusal, Msg: fe.Msg}
+	}
+	return fields, err
 }
 
 // Priority is an event priority.
