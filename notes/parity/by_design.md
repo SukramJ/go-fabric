@@ -152,6 +152,16 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-MdnsTruncatedQueryBounds | `MdnsServer.ts:61` at `db021da0`: `#truncatedQueryCache` is a map without a size limit (presence); `#prepareMessage` spreads the held queries, answers and additional records with the new ones (`:519-527`) and starts a new 400–500 ms timer for every continuation that still carries TC (`:538-545`) | `packages/protocol/src/mdns/MdnsServer.ts` | `"    readonly #truncatedQueryCache = new Map<string, { message: MdnsSocket.Message; timer: Timer }>();"` | this module's own rule (review II, R2-P1-net-01): the wait runs from the first packet, 32 packets, 64 questions, only the known answers that suppress an own record, 64 held queries; at every bound the query is answered with what arrived. connectedhomeip was not read for truncated queries (unverified) | no |
 | BD-Matter-StoreEraseScrub | `SqliteStorageDriver.ts:206-209` at `db021da0`: the driver clears a context with a plain `DELETE` (presence; one key at `:200-204`, everything at `clearOnInit`, `:305`); a search for `VACUUM` and `secure_delete` under `packages/nodejs/src/storage` finds no line | `packages/nodejs/src/storage/sqlite/SqliteStorageDriver.ts` | `"      DELETE FROM ${this.tableName} WHERE\n        context=$context OR context GLOB $contextGlob"` | this module's own mechanism (review II, R2-P1-misc-01, R2-P1-dr-rest-02): after the deletes a `VACUUM` and a truncating checkpoint, so none of the erased bytes stay in the database, its `-wal` or its `-shm`; `ErrScrubIncomplete` when the scrub does not finish. connectedhomeip's stores were not read (unverified) | no |
 | BD-Matter-ReservedLocalIDs | `Peers.ts:960` at `db021da0`: a client node takes the caller's `options.id` or an allocated one (presence), and `allocateId` returns the counter's next value (`ClientNodeStores.ts:77-81`), a counter kept ahead of the persisted `peerN` ids only (`:47-54`) | `packages/node/src/node/client/Peers.ts` | `"id: options.id ?? this.#owner.owner.env.get(ServerNodeStore).clientStores.allocateId(),"` | this module's own rule (review II, R2-P1-ctl-01): a caller-chosen id is reserved as a stored one is, and an allocation skips an id a node holds | no |
+| BD-Matter-Controller-UnsecuredSessionsBounded | `SessionManager.ts:257` at `db021da0`: the unsecured sessions are a map with no count over it (presence), one session for every unsecured request that names a new initiator node id (`ExchangeManager.ts:312-328`); a session an inbound message created is closed after that message unless an exchange holds it (`ExchangeManager.ts:245-257`) | `packages/protocol/src/session/SessionManager.ts` | `"    readonly #unsecuredSessions = new Map<NodeId, UnsecuredSession>();"` | this module's device-side bound on the controller (review II, R2-P2-alloc-02, owner decision 45): 256 sessions that unauthenticated peers opened, the number of the bridge's `maxUnsecuredWindows`; the next one closes the oldest. connectedhomeip at `6170af84` is the comparison, not the source: a pool of 4 rotated by least recent use (`src/lib/core/CHIPConfig.h:768-777`, `src/transport/UnauthenticatedSessionTable.h:341-355`) | no |
+| BD-Matter-Controller-UnsecuredAckWaitsBounded | `MessageExchange.ts:285` and `:293` at `db021da0`: the message awaiting its acknowledgement and its retransmission timer are fields of the exchange, with no table and no count over them (presence) — the marker of `BD-Matter-UnsecuredRetransmitEviction` | `packages/protocol/src/protocol/MessageExchange.ts` | `"    #sentMessageToAck?: Message;"` | `BD-Matter-UnsecuredRetransmitEviction`'s rule on the controller (review II, R2-P2-alloc-02, owner decision 45): of the messages sent on sessions that unauthenticated peers opened at most 16 wait for an acknowledgement, and the next one ends the oldest wait, which loses its retransmissions and nothing else | no |
+| BD-Matter-Controller-UnsecuredSessionLifetime | `ExchangeManager.ts:252` at `db021da0`: an unsecured session that an inbound message created is closed after that message only when no exchange holds it, with no timer on the session at these lines (presence); the PASE responder ends a pairing after 60 s (`PaseServer.ts:33`, `:127`), and a search of `CaseServer.ts` for `Timer` and `timeout` finds no line | `packages/protocol/src/protocol/ExchangeManager.ts` | `"            if (session !== undefined && !session.isClosed && !session.isClosing && !session.hasActiveExchanges) {"` | this module's device-side lifetime on the controller (review II, R2-P2-alloc-02, owner decision 45): a session an unauthenticated peer opened closes 60 s after it opened, the value of the bridge's `unsecuredEntryLifetime`, which is matter.js's `PASE_PAIRING_TIMEOUT`. connectedhomeip was not read for a lifetime (unverified) | no |
+| BD-Matter-UnauthenticatedIntervalsClamped | `SessionIntervals.ts:52-53` at `db021da0`: the one-hour bound on SII and SAI "is a property of the advertisement encoding only; SII/SAI in the CASE/PASE session-parameter struct are uint32 and accepted unbounded" (presence) | `packages/protocol/src/session/SessionIntervals.ts` | `"SII/SAI in the CASE/PASE session-parameter struct are uint32 and accepted unbounded."` | this module's own rule (review II, R2-P2-alloc-02, owner decision 45): the idle and active interval an unauthenticated peer states time the controller's handshake session with at most one hour each, the bound on the intervals the module advertises. connectedhomeip at `6170af84` takes the struct's intervals as stated (`src/protocols/secure_channel/PairingSession.cpp:175-189`) and reads a DNS-SD interval over one hour as not stated (`src/lib/dnssd/TxtFields.cpp:210-218`, `src/lib/dnssd/TxtFields.h:38`) | no |
+| BD-Matter-Controller-DnssdCacheBounded | `DnssdNames.ts:43` at `db021da0`: the collected names are a map with no size limit (presence); only the address records staged for hosts without a name are bounded, at 250 hosts (`:21`, `:141-143`) | `packages/general/src/net/dns-sd/DnssdNames.ts` | `"    readonly #names = new Map<string, DnssdName>();"` | this module's own rule (review II, R2-P2-alloc-03, owner decision 45): 8192 records, a number chosen without a source; past it the record installed or refreshed longest ago is deleted as an expiry deletes it. connectedhomeip was not read (unverified) | no |
+| BD-Matter-Controller-DnssdTTLCeiling | `DnssdName.ts:152` at `db021da0`: a record expires at its TTL times the grace factor (presence); a TTL below the minimum of 15 s is raised (`DnssdNames.ts:196-197`, `:551`) and nothing at these lines lowers one | `packages/general/src/net/dns-sd/DnssdName.ts` | `"expiresAt: at + Millis(Math.round(record.ttl * this.#context.ttlGraceFactor)),"` | this module's own rule (review II, R2-P2-alloc-03, owner decision 45): a record is cached for at most 4500 s, RFC 6762 §10's recommended TTL for records other than a host's (the RFC was not re-read: unverified). connectedhomeip was not read (unverified) | no |
+| BD-Matter-Controller-ReportAssemblyBounded | `InteractionMessenger.ts:1224` and `:1233` at `db021da0`: the chunks of an invoke response are collected in one array until the chunk without MoreChunkedMessages, with no count or size over it (presence); a read's reports are handed on chunk by chunk instead (`readDataReports`, `:1012-1053`) | `packages/protocol/src/interaction/InteractionMessenger.ts` | `"                allInvokeResponses.push(...response.invokeResponses);"` | this module's own rule (review II, R2-P2-alloc-05, owner decision 45): the report chunks the interactions of one session hold are bounded at 2 MiB of message payload, a number chosen without a source; the chunk beyond is answered ResourceExhausted. connectedhomeip was not read (unverified) | no |
+| BD-Matter-Controller-DclListingBounded | `DclClient.ts:70-86` at `db021da0`: `#fetchPaginatedJson` appends every page's items to one array for as long as the answer names a next key, with no count of pages and no size over the items (presence) | `packages/protocol/src/dcl/DclClient.ts` | `"                allItems.push(...items);"` | this module's own rule (review II, R2-P2-alloc-08): the items of one listing are bounded at 64 MiB, a number chosen without a source, beside the bounds on one answer and on the pages. connectedhomeip was not read (unverified) | no |
+| BD-Matter-BDX-BlockPastLengthRefusedBeforeWrite | `InboundFlow.ts:78-93` at `db021da0`: `writeDataChunk` enqueues the block (`:78`) before it counts it against the bytes left (`:80-82`), and compares the two only at BlockEof (`:87-93`) (presence) | `packages/protocol/src/bdx/flow/InboundFlow.ts` | `"        // Enqueue the received data chunk into the writing stream\n        writeController.enqueue(data);"` | this module's own rule (review II, R2-P2-alloc-06): a block longer than the bytes left of a definite length is refused with LengthTooLarge before the sink sees it. connectedhomeip was not read (unverified) | no |
+| BD-Matter-CASE-RemovedFabricRefusedAtCompletion | `CaseServer.ts:239` at `db021da0` resolves the fabric while it answers Sigma1 — a fabric being deleted is refused there (`FabricManager.ts:331-333`) — and `:316-328` creates the session with that fabric after Sigma3's checks, with no look at the fabric's state in between (presence: the signature check followed by the session's creation, `:309-311`) | `packages/protocol/src/session/case/CaseServer.ts` | `"        await crypto.verifyEcdsa(PublicKey(peerPublicKey), peerSignatureData, new EcdsaSignature(peerSignature));\n\n        // All good! Create a secure session"` | this module's own rule (review II, R2-P2-sess-05, R2-P2-fabric-09): the session of a CASE handshake whose fabric was removed while it ran is not opened, as responder or initiator. connectedhomeip was not read (unverified) | no |
 
 ---
 
@@ -988,7 +998,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-TouchLastReport-Timing | matter.js sets the subscription's `lastReport` timestamp in the SubscribeResponse handler after the final Initial-Chunk has been pushed | `im/subscription/subscription.go:192-197` calls `TouchLastReport()` immediately after the Initial-Report flush sequence completes from the bridge's perspective | Audit drift L10-D04 is a timing-shape difference, not a correctness drift: the chunked Initial-Report sequence is owned by the bridge, which only signals "done" to the subscription after every chunk has been ack'd. The two stacks therefore land on the same effective `lastReport` instant; the only observable difference would be if a peer raced a Report into the gap before the final ack, which the bridge's ack-walk prevents. |
 | BD-Matter-CloseSession-PeerAddrHeuristic | matter.js binds every session to its MessageChannel (`packages/protocol/src/session/Session.ts` `get channel()`), so an outbound CloseSession StatusReport can always be routed | go-fabric's UDP listener is connectionless and sessions do not own a channel object; the bridge resolves the peer address at send time from (1) the last authenticated Secure-Channel datagram per session (`Bridge.sessionPeerAddrs`), (2) the per-subscription routing target, (3) the owed-ack exchange table | A session whose peer address was never observed (no SC datagram, no subscription, no pending reliable exchange) skips the farewell with a debug log — acceptable because the notification is best-effort in matter.js too (try/catch-and-warn around `ExchangeManager.ts:663-671` `#sendCloseSession`) and the dominant controllers (Apple Home, chip-tool) always match at least one source. |
 | BD-Matter-CloseSession-FabricTeardownSilent | matter.js emits gracefulClose (and therefore a CloseSession StatusReport) on every non-peer-lost session close, including fabric removal | go-fabric deliberately keeps CloseFabric / CloseFabricExcept / ClosePASESessions notification-free | The daemon defers the operational teardown after RemoveFabric so the NOCResponse can ride out on the closing session, and injecting a CloseSession farewell into that window would race the in-flight IM reply; the peer initiated the fabric operation and drops its sessions per protocol anyway. The graceful farewell is scoped to idle reap, same-peer stale-CASE eviction, on-demand ClosePeer invalidation, and daemon shutdown. |
-| BD-Matter-IdleSessionReaper | matter.js keeps established operational sessions indefinitely — reclaim happens only on same-peer replacement, explicit close, or session-id exhaustion (`packages/protocol/src/session/SessionManager.ts:564-572` `findOldestInactiveSession`, called when every session id is taken, `:591-598`, at `db021da0`) | go-fabric additionally runs a periodic idle reaper on the operational session manager (`node/security.go:515` starts it: `operational.SessionIdleTimeout`, 5 min, `secure/operational/manager.go:287`, swept every minute by `reapIdle`, `:1392`; until 2026-11-13 this cell named the reference host's daemon file, review II R2-P0-doc-A04); activity semantics mirror `packages/protocol/src/session/Session.ts:142-148` `notifyActivity` (at `db021da0`) exactly (refreshed on every authenticated receive including duplicates, and on every secure send), and reaped sessions ship the graceful CloseSession farewell | Headless long-running bridges accumulate dead CASE sessions from controllers that vanish without CloseSession. The TTL sits far above the subscription publisher heartbeat cadence, which `im/subscription/subscription.go` caps at `maxSendInterval` = 2 min (a deliberate divergence from matter.js, which needs no cap because it never reaps idle sessions; pinned by `TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout`), so live subscriptions are never evicted, and a dead controller stops earning send-side activity once the report retransmit cap reaps its subscription. A session that never carried a message is reaped one idle timeout after its creation: for an unset `LastActivity()` `reapIdle` takes `CreatedAt()` (`secure/operational/manager.go:1413-1421`), so a commissioning still in flight is inside the timeout. Until `d9a5ca68` such a session was exempt for good (review II, W1-sec-06). Pinned by `secure/operational:TestReapIdleTakesANeverUsedSessionAfterTheTimeout`. |
+| BD-Matter-IdleSessionReaper | matter.js keeps established operational sessions indefinitely — reclaim happens only on same-peer replacement, explicit close, or session-id exhaustion (`packages/protocol/src/session/SessionManager.ts:564-572` `findOldestInactiveSession`, called when every session id is taken, `:591-598`, at `db021da0`) | go-fabric additionally runs a periodic idle reaper on the operational session manager (`node/security.go:550` starts it: `operational.SessionIdleTimeout`, 5 min, `secure/operational/manager.go:307`, swept every minute by `reapIdle`, `:1448`; until 2026-11-13 this cell named the reference host's daemon file, review II R2-P0-doc-A04); activity semantics mirror `packages/protocol/src/session/Session.ts:142-148` `notifyActivity` (at `db021da0`) exactly (refreshed on every authenticated receive including duplicates, and on every secure send), and reaped sessions ship the graceful CloseSession farewell | Headless long-running bridges accumulate dead CASE sessions from controllers that vanish without CloseSession. The TTL sits far above the subscription publisher heartbeat cadence, which `im/subscription/subscription.go` caps at `maxSendInterval` = 2 min (a deliberate divergence from matter.js, which needs no cap because it never reaps idle sessions; pinned by `TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout`). The idle reaper spares a session that carries a live subscription (`Manager.SetReapExemption`, wired by `bridge.AttachSessionRegistry` to the subscription manager; owner decision 43): a subscriber's MinIntervalFloor can hold back every report beyond the 5-minute timeout, and the floor is its rate limit, not shortened. The heartbeat cap keeps other subscribed sessions active anyway; a dead controller's session is reaped once the report retransmit cap has closed its last subscription. Pinned by `bridge:TestIdleReaperSparesASessionWithASubscription`. A session that never carried a message is reaped one idle timeout after its creation: for an unset `LastActivity()` `reapIdle` takes `CreatedAt()` (`idleSince`, `secure/operational/manager.go:1510-1519`), so a commissioning still in flight is inside the timeout. Until `d9a5ca68` such a session was exempt for good (review II, W1-sec-06). Pinned by `secure/operational:TestReapIdleTakesANeverUsedSessionAfterTheTimeout`. |
 | BD-mDNS-Goodbye-NoGap | matter.js `MdnsServer.ts:243-275` (`expireAnnouncements`) at `862ad75f` — the TTL-0 responses of several services go out 20–120 ms apart, as the announcements do (`:216-241`) | `mdns/announce.go::goodbyeLocked` sends the goodbyes of the services back to back; the announcements keep the gap (`broadcastAllLocked`) | A goodbye runs inside `Withdraw` and `Close`, which return once it is sent; a sleep under the responder's mutex would hold every other send. RFC 6762 §6 asks for the gap on multicast responses to queries, not on unsolicited goodbyes. |
 | L8-D03 | matter.js `AdministratorCommissioningServer.ts:283-290` — 48-h extended window when `FabricCount == 0`; chip `CommissioningWindowManager.cpp:313-325` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. |
 | L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). Revised 2026-10-06: the read path no longer falls back — a request from a session without a fabric (PASE before AddNOC) reads no fabric's entries, and `currentFabric` scopes only a read with no request behind it (`im.LookupFabricFilter`); the two commands keep the fallback, which a fabric-less request never reaches (`im.HandleInvokeRequest` refuses a fabric-scoped command without an accessing fabric). |
@@ -6828,25 +6838,33 @@ Retire when matter.js's central sends the ATT_MTU.
 matter.js's server registers one data producer per requested path, in
 request order and with no check for a repeat
 (`packages/protocol/src/action/server/AttributeReadResponse.ts:88-94`,
-`:442-448` at `db021da0`), so a path sent twice is answered twice
-(inferred from those lines; not run); only its client-side request
-builder dedupes (`packages/protocol/src/action/request/Read.ts:338-352`).
-`im.DedupAttributePaths` (`im/read.go:967-985`) drops every repeat of an
-earlier path, first occurrence first, before the read handler
-(`im/read.go:508`) and the subscribe priming
-(`bridge/subscribe_dispatch.go:48`) expand it. Deliberate: a repeat
-expands to the results the first occurrence gave, and dropping it bounds
-the materialised report by the node's attribute count instead of by how
-many copies of a path fit one request (`im.MaxReadPaths`).
-connectedhomeip prunes its path list too, by another rule: a concrete
-path that a wildcard of the same request covers is removed
-(`src/app/ReadHandler.cpp:530`,
+`:442-448` at `db021da0`), and runs the producers one after the other
+(`:96-100`), so a path sent twice is answered twice (inferred from those
+lines; not run); only its client-side request builder dedupes
+(`packages/protocol/src/action/request/Read.ts:338-352`).
+`im.DedupAttributePaths` (`im/read.go`) drops every byte-identical repeat
+of an earlier path, first occurrence first, when the expansion of a read,
+a priming report or a re-established subscription's report is built
+(`im.NewAttributeExpansion`, `im/read_expansion.go`). What is deliberate
+in it is small: a repeat would be expanded and sent a second time, and the
+drop saves that work and those bytes. It is this module's own saving and
+no bound: paths that differ in a field the expansion ignores, and
+wildcards that overlap, are each expanded, as matter.js expands them. Until
+review II, R2-P2-alloc-04 this entry gave a bound on the materialised
+report as its reason; that did not hold for such paths, and what bounds a
+response since is that it is generated chunk by chunk (owner decision 44),
+as matter.js generates it
+(`AttributeReadResponse.ts:96-100`, `:311-332`). connectedhomeip prunes
+its path list too, by another rule: a concrete path that a wildcard of the
+same request covers is removed (`src/app/ReadHandler.cpp:530`,
 `src/app/InteractionModelEngine.cpp:1669-1716` at `6170af84`); that
 function leaves identical repeats alone. Pinned by
 `im:TestHandleReadRequest_IdenticalPathsAreReadOnce` and
 `im:TestDedupAttributePaths_KeepsOrderAndDistinctPaths` (review II,
-W2-wire-15). Retire when the report is bounded without it and matter.js
-still answers each occurrence.
+W2-wire-15). The first half of the condition this entry named for its
+retirement — the report bounded without the drop — holds since
+R2-P2-alloc-04, whose fix kept the drop. Retire when a repeat is answered
+as matter.js answers it.
 
 ### BD-Matter-Peer-ConnectAfterDisconnectRetries — a connection process started after `Set.Disconnect` retries an attempt that cannot succeed
 
@@ -7404,40 +7422,38 @@ matter.js's order in the code is R2-P0-rv-C03's (`a0a0d818`). Pinned by
 `controller/client:TestStartReturnsWithItsContextWhileAHookBlocks`. Retire
 when matter.js's start takes an abort signal, or adopts before it binds.
 
-### BD-Matter-Bridge-StartDuringStopRefused — a `Start` that arrives while `Stop` is still running is refused with `ErrAlreadyStarted`
+### BD-Matter-Bridge-StartDuringStopRefused — a `Bridge` is single-run: a `Start` during or after `Stop` is refused with `ErrStopped`
 
-matter.js's `Node.start()` returns at once, without an error and without
-starting, while `lifecycle.isOnline` holds
-(`packages/node/src/node/Node.ts:114-117` at `db021da0`), and `isOnline`
-holds until the `offline` event has cleared it
+matter.js's node is restarted: "Once the node is offline you may use
+{@link start} to bring the node online again"
+(`packages/node/src/node/Node.ts:191` at `db021da0`), `start` and `stop`
+running one after the other on the lifecycle's mutex (`:123`, `:195`). Its
+`start()` returns at once, without an error and without starting, while
+`lifecycle.isOnline` holds or another start is in progress (`:114-117`),
+and `isOnline` holds until the `offline` event has cleared it
 (`packages/node/src/node/NodeLifecycle.ts:35-37`, `:52-54`), which the
 network runtime emits at the end of its own stop
-(`packages/node/src/behavior/system/network/NetworkRuntime.ts:69-77`).
-Otherwise `start` and `stop` run one after the other on the lifecycle's
-mutex (`Node.ts:123`, `:195`), and "Once the node is offline you may use
-{@link start} to bring the node online again" (`:191`). So, by these
-lines, a `start()` during a `stop()` that has not yet emitted `offline`
-resolves as if the node were online and the node ends offline; one that
-arrives after it waits for the stop and starts the node. Read, not run:
-the pinned export has no build, and which awaits of `cancelWithMutex`
-(`:215-235`) that window spans was not traced (unverified).
-`bridge.Bridge.Stop` keeps the start claim until it has finished
-(`bridge/bridge.go`), so `Bridge.Start` returns `ErrAlreadyStarted` for as
-long as a `Stop` of the run before has not returned — "the bridge has not
-stopped until then" — and `node.Node.Start` wraps what `Bridge.Start`
-returns (`node/node.go`). Reason:
-the caller is told that nothing was started, where matter.js's early
-return tells it nothing; and before `e11c5552` a `Start` let in at that
-moment had the run it had just wired taken apart by the rest of `Stop` —
-it served without its value and switch listeners (review II,
-R2-P0-rv-A06). A `Start` after `Stop` has returned is not refused; whether
-such a restart is supported is open: the package doc states the lifecycle
-as "[New] → [Start] → (optional) [Reassemble] → [Stop]" and says nothing
-of a second run, and the rework of R2-P0-rv-A06 found no test that starts
-a bridge a second time (not re-checked here) — phase 5 of review II.
-Pinned by
-`bridge:TestStartDuringStopIsRefused`. Retire with the answer to the
-restart question.
+(`packages/node/src/behavior/system/network/NetworkRuntime.ts:69-77`). So,
+by these lines, a `start()` during a `stop()` that has not yet emitted
+`offline` resolves as if the node were online and the node ends offline;
+one that arrives after it waits for the stop and starts the node. Read,
+not run: the pinned export has no build, and which awaits of
+`cancelWithMutex` that window spans was not traced (unverified).
+`bridge.Bridge` is single-run (review II, R2-P2-stop-05, owner decision
+40, which answers the restart question this entry left open): from the
+first `Stop` on, `Bridge.Start` returns `ErrStopped` (`bridge/bridge.go`,
+`claimStart`) — also for a `Start` that arrives while the `Stop` still
+runs, which until `91172715` was refused with `ErrAlreadyStarted` — and a
+host that comes back builds a new bridge, as it builds a new `node.Node`
+(`node.ErrStopped`, `BD-Matter-FactoryResetEndsTheNode`). Reason: `Stop`
+closes what the bridge holds, the advertiser among it, and a second run on
+those parts published no operational record; one object with one run has
+no state of an ended run to carry into the next, and the caller is told
+that nothing was started, where matter.js's early return tells it nothing.
+A `Start` that failed leaves the bridge startable. Pinned by
+`bridge:TestStartAfterStopIsRefused` and
+`bridge:TestStartDuringStopIsRefused`. Retire when the owner reopens a
+bridge's restart.
 
 ### BD-chip-ChunkedWritesBounded — a session may hold at most four chunked writes open; the hold stays before the ACL check
 
@@ -7733,3 +7749,267 @@ session that no longer exists could only run out. Pinned by
 `TestGencomm_ArmInTheExpiryGapWaitsForTheRollback`. Phase 4 of review II
 reads both references for it; the entry then becomes parity, a divergence
 with its lines, or a finding.
+
+### BD-Matter-Controller-UnsecuredSessionsBounded — the controller holds at most 256 sessions that unauthenticated peers opened
+
+matter.js keeps its unsecured sessions in a map with no count over it
+(`packages/protocol/src/session/SessionManager.ts:257` at `db021da0`;
+`createUnsecuredSession`, `:469-508`), one for every unsecured request
+that names a new initiator node id
+(`packages/protocol/src/protocol/ExchangeManager.ts:312-328`); a session
+an inbound message created is closed once that message is handled unless
+an exchange holds it — "otherwise any peer can grow the session table
+without authenticating" (`:245-257`). The controller's exchange manager
+holds at most `maxInboundUnsecuredSessions` = 256 sessions that a peer's
+Sigma1 or PBKDFParamRequest opened (`client/exchange/manager.go`); the
+next one closes the oldest, with the warning
+`matter.controller.unsecured_session_evicted`, and neither a secure
+session nor the unsecured session of a handshake the controller opened is
+ever taken. The number is the device side's `maxUnsecuredWindows`
+(`bridge/securechannel.go`) — owner decision 45 of review II puts the
+device side's policy on the controller — and no reference's.
+connectedhomeip is the comparison: its pool of unauthenticated sessions
+holds `CHIP_CONFIG_UNAUTHENTICATED_CONNECTION_POOL_SIZE` = 4 and rotates
+by least recent use (`src/lib/core/CHIPConfig.h:768-777`,
+`src/transport/UnauthenticatedSessionTable.h:341-355` at `6170af84`); a
+build whose pools are on the heap has no rotation and fails only when the
+heap does (`:337-339`). Reason: a session per datagram, each with its
+exchange, is state a sender that has not authenticated must not be able
+to grow without end. Review II, R2-P2-alloc-02. Pinned by
+`client/exchange:TestInboundUnsecuredSessionsAreBounded`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds its unsecured sessions.
+
+### BD-Matter-Controller-UnsecuredAckWaitsBounded — at most 16 messages to unauthenticated peers wait for an acknowledgement on the controller
+
+The marker is `BD-Matter-UnsecuredRetransmitEviction`'s: matter.js keeps
+the message awaiting its acknowledgement and its retransmission timer on
+the exchange (`packages/protocol/src/protocol/MessageExchange.ts:285`,
+`:293` at `db021da0`), with no table and no count over them. That entry's
+rule, set for the device side by owner decision 23 of review II, is the
+controller's too by owner decision 45: of the messages sent on sessions
+that unauthenticated peers opened, at most `inboundUnsecuredAckWaitLimit`
+= 16 wait for their acknowledgement (`client/exchange/manager.go`; the
+number of `unsecuredEntryLimit` in `bridge/outbound_reliable.go`), and the
+next one ends the oldest wait — that message went out, it loses its
+retransmissions and nothing else, and its send returns as if acknowledged
+(warning `matter.controller.unsecured_ack_wait_evicted`). connectedhomeip's
+table is described in that entry and was not re-read for this one. Reason:
+a reply is never refused for a full table, and handshakes that are opened
+and not ended free the table themselves. Review II, R2-P2-alloc-02. Pinned
+by `client/exchange:TestInboundUnsecuredAckWaitsAreBounded`; the limit is
+in `docs/guides/limits.md`. Register row above; the row closes with
+`BD-Matter-UnsecuredRetransmitEviction`'s.
+
+### BD-Matter-Controller-UnsecuredSessionLifetime — a session an unauthenticated peer opened on the controller lives at most 60 s
+
+matter.js closes an unsecured session that an inbound message created
+after that message only when no exchange holds it
+(`packages/protocol/src/protocol/ExchangeManager.ts:252` at `db021da0`),
+and sets no timer on the session at these lines. Its PASE responder ends a
+pairing after `PASE_PAIRING_TIMEOUT`, 60 s
+(`packages/protocol/src/session/pase/PaseServer.ts:33`, `:127`); a search
+of `packages/protocol/src/session/case/CaseServer.ts` for `Timer` and
+`timeout` finds no line. What else ends the exchange that holds such a
+session was not traced (unverified). On the controller a session that an
+unauthenticated peer opened is closed, its exchanges with it,
+`inboundUnsecuredLifetime` = 60 s after it opened, whatever its handshake
+waits for (`client/exchange/manager.go`): the value of the device side's
+`unsecuredEntryLifetime` (`bridge/outbound_reliable.go`), which is that
+PASE timeout — owner decision 45 of review II. Reason: beside the count,
+the lifetime is what gives a place in the table back without a newer
+session having to take it, and a handshake takes seconds. Review II,
+R2-P2-alloc-02. Pinned by
+`client/exchange:TestInboundUnsecuredSessionLifetime`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds how long an unsecured session a peer opened lives.
+
+### BD-Matter-UnauthenticatedIntervalsClamped — the MRP intervals an unauthenticated peer states time the controller's handshake session with at most one hour each
+
+matter.js bounds the intervals it advertises at one hour and says of the
+ones it receives: "This bound is a property of the advertisement encoding
+only; SII/SAI in the CASE/PASE session-parameter struct are uint32 and
+accepted unbounded"
+(`packages/protocol/src/session/SessionIntervals.ts:52-53`, `:57` at
+`db021da0`). Whether it bounds the intervals it reads from a peer's DNS-SD
+record was not read (unverified). connectedhomeip takes the struct's
+intervals as stated
+(`src/protocols/secure_channel/PairingSession.cpp:175-189` at `6170af84`)
+and reads a DNS-SD interval over one hour as not stated
+(`src/lib/dnssd/TxtFields.cpp:210-218`, `kMaxRetryInterval` in
+`src/lib/dnssd/TxtFields.h:38`). `sessionparams.ClampUnauthenticated`
+(`secure/sessionparams/sessionparams.go`) reduces the idle and the active
+interval to `MaxUnauthenticatedInterval`, 3 600 000 ms — the bound on the
+intervals this module advertises (`mdns/service.go`) — and the controller
+applies it where it adopts a peer's parameters for a handshake's unsecured
+session, from the DNS-SD record, PBKDFParamResponse, Sigma1 or Sigma2
+(`client/exchange/session.go`, `client/exchange/manager.go`). The secure
+session the handshake establishes takes the parameters as stated, and at
+`edfbe40c` the clamp has no caller on the device side. Owner decision 45
+of review II; for the struct's intervals it is ahead of both references.
+Reason: nothing has authenticated the value that paces the handshake's
+retransmissions and the wait for their acknowledgement. Review II,
+R2-P2-alloc-02. Pinned by
+`client/exchange:TestUnauthenticatedTimingIsClamped`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds the session-parameter intervals it accepts.
+
+### BD-Matter-Controller-DnssdCacheBounded — the controller's DNS-SD cache holds at most 8192 records
+
+matter.js keeps the names it collected in a map with no size limit
+(`packages/general/src/net/dns-sd/DnssdNames.ts:43` at `db021da0`); what
+it bounds is the address records staged for hosts that have no name yet,
+at 250 hosts (`:21`, `:141-143`). The controller's cache holds at most
+`maxCachedRecords` = 8192 records (`client/discovery/names.go`); past
+that, the record installed or refreshed longest ago is deleted as an
+expiry deletes it, with the warning
+`matter.discovery.cache_records_evicted`, and the browser asks again for a
+name it still needs. The number is chosen, with no source: the fix's
+estimate of some ten records per operational device and about 1 KiB per
+cached name gives room for several hundred devices on a link at some
+8 MiB — an estimate, not measured in this entry. connectedhomeip's
+resolver cache was not read (unverified). Reason: any host on the link can
+send records the cache admits. Review II, R2-P2-alloc-03, owner decision
+45. Pinned by `client/discovery:TestNames_CachedRecordsAreBounded`; the
+limit is in `docs/guides/limits.md`. Register row above; the row closes
+when matter.js bounds the names it collects.
+
+### BD-Matter-Controller-DnssdTTLCeiling — the controller caches a DNS-SD record for at most 75 minutes
+
+matter.js lets a record expire at its TTL times a grace factor
+(`packages/general/src/net/dns-sd/DnssdName.ts:152` at `db021da0`) and
+raises a TTL below its minimum of 15 s
+(`packages/general/src/net/dns-sd/DnssdNames.ts:196-197`, `:551`); nothing
+at these lines lowers one. The controller caches a record for at most
+`maxRecordTTL` = 4500 s, whatever TTL it states
+(`client/discovery/names.go`). The number is RFC 6762 §10's recommended
+TTL for records other than a host's; the RFC was not re-read for this
+entry (unverified), and connectedhomeip was not read (unverified). Reason:
+a TTL is the sender's word for how long its record keeps a place in the
+cache, and a responder announces again well inside 75 minutes. Review II,
+R2-P2-alloc-03, owner decision 45. Pinned by
+`client/discovery:TestNames_TTLHasACeiling`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+puts a ceiling on a record's TTL.
+
+### BD-Matter-Controller-ReportAssemblyBounded — the report chunks a session's interactions hold are bounded at 2 MiB
+
+matter.js collects the chunks of an invoke response in one array until the
+chunk without MoreChunkedMessages, with no count or size over it
+(`packages/protocol/src/interaction/InteractionMessenger.ts:1224`,
+`:1233`, `:1246` at `db021da0`). A read's reports it does not collect
+there: `readDataReports` hands each chunk on as it arrives (`:1012-1053`);
+what its consumers keep of them was not read (unverified). This module's
+client merges the chunks of a read, a subscription report and an invoke
+response before it hands them over, and bounds what the interactions of
+one session hold meanwhile at `maxAssemblyBytesPerSession` = 2 MiB of
+message payload, the three kinds together
+(`client/interaction/report.go`): the chunk that would pass it is answered
+ResourceExhausted, the partial report is dropped and the call returns
+`interaction.ErrReportTooLarge`. The number is chosen, with no source: the
+fix's estimate of about 1.2 KB of a wildcard read per bridged endpoint, so
+some 1700 endpoints, is not measured, and the bound counts payload bytes,
+not the larger decoded form. It is a constant at `edfbe40c`.
+connectedhomeip's read client was not read (unverified). Reason: a peer
+that keeps MoreChunkedMessages set would otherwise grow the merge without
+end. Review II, R2-P2-alloc-05, owner decision 45. Pinned by
+`client/interaction:TestReportAssemblyIsBounded` and
+`TestInvokeResponseAssemblyIsBounded`; the limit is in
+`docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds the chunks of a response it collects.
+
+### BD-Matter-Controller-DclListingBounded — the items of one paginated DCL listing are bounded at 64 MiB
+
+matter.js appends every page's items to one array for as long as the
+answer names a next key, with no count of pages and no size over the items
+(`packages/protocol/src/dcl/DclClient.ts:70-86` at `db021da0`,
+`#fetchPaginatedJson`). `controller/dcl` reads at most `maxPages` = 1000
+pages of at most `maxResponseBody` = 16 MiB each and holds at most
+`maxListingBytes` = 64 MiB of items for one listing
+(`controller/dcl/client.go`); a listing that passes a bound fails with an
+error. The 64 MiB are chosen, with no source: four answers' worth of the
+bound on one answer. connectedhomeip was not read (unverified). Reason:
+the bound on the pages alone left one listing a thousand times the bound
+on an answer. Review II, R2-P2-alloc-08. Pinned by
+`controller/dcl:TestListingBound`. Register row above; the row closes when
+matter.js bounds a paginated listing.
+
+### BD-Matter-BDX-BlockPastLengthRefusedBeforeWrite — a BDX block that would pass the transfer's definite length is refused before it is written
+
+matter.js's receiver enqueues a block into the write stream
+(`packages/protocol/src/bdx/flow/InboundFlow.ts:78` at `db021da0`), then
+counts it against the bytes left (`:80-82`), and compares the two only at
+BlockEof, where bytes left over or an overrun end the transfer with
+LengthTooShort or LengthTooLarge (`:87-93`). `bdx/session.go` refuses a
+block longer than the bytes left of a definite length with LengthTooLarge
+before the sink sees it. connectedhomeip's receiver was not read
+(unverified). Reason: the length a sender announced is what the receiver
+sized its sink for, and a sender that sends no BlockEof would otherwise
+write past it. Review II, R2-P2-alloc-06. Pinned by
+`bdx:TestReceive_OverrunNotWritten`. Register row above; the row closes
+when matter.js checks a block against the bytes left before it enqueues
+it.
+
+### BD-Matter-CASE-RemovedFabricRefusedAtCompletion — a CASE handshake that completes after its fabric was removed opens no session
+
+matter.js's CASE responder resolves the fabric while it answers Sigma1
+(`packages/protocol/src/session/case/CaseServer.ts:239` at `db021da0`) —
+`findFabricFromDestinationId` refuses there a fabric that is being deleted
+(`packages/protocol/src/fabric/FabricManager.ts:331-333`) — and, after
+Sigma3's checks, creates the session with that fabric
+(`CaseServer.ts:309-328`) without a look at its state in between. Whether
+anything else closes a session created on a fabric whose deletion has run
+was not traced, and the initiator
+(`packages/protocol/src/session/case/CaseClient.ts`) was not read for it
+(unverified); connectedhomeip was not read (unverified). In this module
+`caseIdentities.admitSession` (`node/security.go`) checks that the
+fabric's identity is still there before the session of a completed
+handshake opens and again after it, as responder and as initiator: a
+removal that ran while the handshake did leaves no session, and one that
+lands between the two checks either finds the session and closes it or
+leaves that to the second check. Reason: the removal closes the fabric's
+sessions before this one exists, so it would live on the removed index
+with nothing to end it, and could keep the node's own window from
+reopening after the last fabric's removal. Review II, R2-P2-sess-05,
+R2-P2-fabric-09. Pinned by
+`node:TestCASEResponderRefusesASessionOfARemovedFabric`,
+`TestCASEInitiatorRefusesASessionOfARemovedFabric` and
+`TestAdmitSessionClosesASessionWhoseFabricWentWhileItOpened`. Register row
+above; the row closes when matter.js checks the fabric before it creates
+the session.
+
+### BD-Matter-NonVolatileWrite-StoredBeforeApplied — a nonvolatile attribute's write is stored before the server takes it, and undone when the server refuses it
+
+matter.js commits state and storage together: commit phase one hands a
+transaction's changed values to the store
+(`packages/node/src/behavior/state/managed/Datasource.ts:1227-1262` at
+`db021da0`), a failure there rolls every participant back
+(`packages/general/src/transaction/Tx.ts:933-974`), only phase two makes
+the working values canonical (`Datasource.ts:1267-1281`), and a rollback
+puts the canonical values back (`:1331-1332`). Where in that sequence a
+value the behaviour refuses is stopped was not traced (unverified). What
+it stores is every nonvolatile member and every writable or fabric-scoped
+attribute
+(`packages/node/src/behavior/supervision/RootSupervisor.ts:160-173`). This
+module has no transaction over a server's state: a server checks and
+commits a write inside one `MatterWrite`. The node's persister
+(`node/nonvolatile.go`, through `endpoint.WritePersister`) therefore
+stores the written value after the dispatcher's gates and before the
+server sees it, and puts the previous stored value back when the server
+refuses the write; a store that refuses answers FAILURE, and the server
+never sees the write. It keeps the attributes whose generated definition
+carries the N quality and write access, not fabric-scoped, of a server
+the module holds (owner decision 38 of review II) — not every writable
+attribute, and none a host port carries. Two things follow from the
+order: a crash between the store's write and the undo of a refused value
+leaves the refused value stored — the restore hands it to the server's
+checks, which refuse it again, logged as `nonvolatile.restore` — and the
+stored form is the written value, not the committed one where a server
+changes it on the way (WindowCovering's Mode). Reason: the value is never
+in effect without being stored, through one seam at the dispatcher instead
+of a pre-commit step in every server. Review II, R2-P2-store-04,
+R2-P2-store-07. Pinned by `node:TestNonVolatileWriteSurvivesARestart`,
+`TestNonVolatileWriteRefusedByTheStore` and
+`TestNonVolatileWriteRefusedByTheServer`. Retire when a server's write can
+be checked without being committed, so that the store sees only a value
+the server took.

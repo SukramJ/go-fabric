@@ -779,23 +779,6 @@ with a port of the named case.
   hands all three and the peer term uses `maxScheduleTime` as the local
   one does; `TestChunkStatusResponseTimeoutSumsBothDirections` gains the
   case. Found in review II, phase 1 (the fix of R2-P1-req2-12).
-- **F-db021da0-14: a refused SubscribeRequest leaves the peer's
-  subscriptions standing where matter.js has cleared them.** matter.js
-  checks the path count (`InteractionServer.ts:635-641` at `db021da0`),
-  then runs the KeepSubscriptions=false teardown (`:647-665`), then
-  refuses a request that names no path (`:667-672`) and, further down,
-  one with an illegal path (`validateReadPaths`, `:699`; the checks
-  between `:672` and `:699` were not read). `handleSubscribeRequest`
-  validates the paths and refuses the empty request first
-  (`bridge/subscribe.go`, `im.ValidateReadPaths`, then the "empty"
-  refusal) and tears down only when it registers the subscription
-  (`registerSubscription`). So a KeepSubscriptions=false request refused
-  for an illegal path or for naming none has cancelled the peer's
-  subscriptions in matter.js and none here. Read, not exercised
-  (unverified by a test on either side); which of the two a controller
-  relies on is not known. Fix: the teardown before the two refusals, as
-  the lines have it, with a parity case — or a `by_design` row. Found in
-  review II, phase 1 (the citation pass).
 - **F-db021da0-15: the controller holds reported values to their
   constraints, and fails on a malformed one, where matter.js decodes by
   shape and skips.** matter.js decodes each attribute of a data report
