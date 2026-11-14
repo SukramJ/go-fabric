@@ -5,6 +5,7 @@ package client
 
 import (
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
@@ -207,4 +208,23 @@ func StoredDefaultSubscription(st Store, id string) (*SubscribeOptions, error) {
 		}
 	}
 	return nil, nil
+}
+
+// NewWithImageQuota is New with the node's image quota set to quota, as
+// [RegistryConfig].MaxImageBytesPerNode sets it for the registry's nodes.
+func NewWithImageQuota(cfg Config, quota int) (*Node, error) {
+	cfg.maxImageBytes = quota
+	return New(cfg)
+}
+
+// ApplyBridge hands n a wildcard report of a bridge of plugs plugs: the
+// root, an aggregator on endpoint 1, plugs 2 to plugs+1 below it.
+func ApplyBridge(n *Node, plugs int) { n.apply(wildcard, &bridge(plugs).r, true) }
+
+// ApplyAsked hands n attribute 0 of ep/cluster holding v, from a read
+// whose request names that endpoint and cluster.
+func ApplyAsked(n *Node, ep uint16, cluster uint32, v spec.Node) {
+	b := &report{}
+	b.attr(ep, cluster, 0, v, 1)
+	n.apply(askedFor(ep, cluster), &b.r, true)
 }

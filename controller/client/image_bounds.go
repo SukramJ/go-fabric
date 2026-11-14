@@ -234,11 +234,15 @@ func (s *structure) cutBackStored(stored []StoredEndpoint) []StoredEndpoint {
 			}
 		}
 		dropped += len(cut)
-		if len(keep.Clusters) == 0 {
-			s.eraseStored(se.Number, nil)
+		// Only what is cut is erased. An endpoint whose every stored
+		// cluster is cut goes whole; endpoint 0, always named, never does:
+		// the store keeps the node's record, ICD and onboarding entries
+		// there, which New took out of stored before (node.go).
+		whole := len(keep.Clusters) == 0 && len(cut) > 0 && se.Number != 0
+		s.eraseStored(se.Number, cut, whole)
+		if whole {
 			continue
 		}
-		s.eraseStored(se.Number, cut)
 		out = append(out, keep)
 	}
 	s.log.Warn("matter.controller.client.image_cut_at_load", slog.Int("bytes", total), slog.Int("trimmed_bytes", total-storedImageBytes(out)),
@@ -247,10 +251,10 @@ func (s *structure) cutBackStored(stored []StoredEndpoint) []StoredEndpoint {
 	return out
 }
 
-// eraseStored erases endpoint ep from the store, or with clusters only
-// those clusters of it; a failure is logged.
-func (s *structure) eraseStored(ep uint16, clusters []uint32) {
-	if clusters == nil {
+// eraseStored erases clusters of endpoint ep from the store, or with whole
+// the endpoint; a failure is logged.
+func (s *structure) eraseStored(ep uint16, clusters []uint32, whole bool) {
+	if whole {
 		if err := s.p.store.EraseEndpoint(s.p.nodeID, ep); err != nil {
 			s.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(ep)), slog.Any("err", err))
 		}
