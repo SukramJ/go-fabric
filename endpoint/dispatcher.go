@@ -584,7 +584,11 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // not list (a server without an event lister answers for itself), Success
 // otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
-// 862ad75f (#addConcrete), in their order.
+// 862ad75f (#addConcrete), in their order. A path that names no event is
+// UNSUPPORTED_EVENT when the server's lister lists none: matter.js
+// registers a wildcard event path per event of the cluster
+// (EventReadResponse.ts:262-273 at db021da0), so such a cluster selects
+// nothing (review II, R2-P4-imread-08).
 func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
 	ep := d.topology.FindByID(path.Endpoint)
 	if ep == nil {
@@ -594,7 +598,12 @@ func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.Statu
 		if srv == nil || srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		if lister, ok := srv.(contract.ClusterEventLister); ok && !slices.Contains(lister.MatterEvents(), path.Event) {
+		lister, ok := srv.(contract.ClusterEventLister)
+		switch {
+		case !ok:
+		case !path.HasEvent && len(lister.MatterEvents()) == 0:
+			return im.StatusUnsupportedEvent
+		case path.HasEvent && !slices.Contains(lister.MatterEvents(), path.Event):
 			return im.StatusUnsupportedEvent
 		}
 		return im.StatusSuccess
