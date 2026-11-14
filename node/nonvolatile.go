@@ -72,8 +72,8 @@ type attributeHolder interface {
 // stored before the server takes it ([endpoint.WritePersister]); the
 // stored value is restored before the bridge serves the endpoint, over
 // the declaration's Initial. matter.js persists every nonvolatile
-// attribute and every writable one (RootSupervisor.ts:160-173 at
-// db021da0, persistentKeys).
+// attribute and every writable or fabric-scoped one
+// (RootSupervisor.ts:160-175 at db021da0, persistentKeys).
 type nonVolatile struct {
 	n *Node
 	// mu serialises a stored write: the store write, the server's write
