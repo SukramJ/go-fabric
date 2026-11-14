@@ -2295,16 +2295,6 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
 }
 
-// nocCertifiesPendingKey reports whether the NOC's subject public key
-// equals the pending CSR key pair's public key. A certificate for any
-// other key is unusable for CASE signing. Mirrors matter.js
-// Fabric.ts:557-559 (PublicKeyError → InvalidPublicKey) and chip
-// FabricTable.cpp:890 `existingOpKey->Pubkey().Matches(nocPubKey)` →
-// CHIP_ERROR_INVALID_PUBLIC_KEY.
-func nocCertifiesPendingKey(nocPub *ecdsa.PublicKey, priv *ecdsa.PrivateKey) bool {
-	return nocPub != nil && nocPub.Equal(&priv.PublicKey)
-}
-
 // nocKeyIsPendingKey reports whether the NOC's subject public key is the
 // fail-safe's pending key pair's, compared as the raw uncompressed point
 // matter.js compares (Fabric.ts:614, Bytes.areEqual).
@@ -2343,37 +2333,48 @@ func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 
 // validateUpdateNOCCert verifies an UpdateNOC certificate against the
 // fabric's stored trust root and the pending CSR key pair. Returns the
-// decoded NOC on success, or a non-nil rejection NOCResponse.
+// decoded NOC on success, or a non-nil rejection NOCResponse. The checks
+// run in matter.js's order, as AddNOC's: decode, the public key, the
+// chain, the fabric id — a request that fails more than one gets the
+// status of the first. Mirrors matter.js db021da0
+// packages/protocol/src/common/FailsafeContext.ts:216-222
+// (buildUpdatedFabric) → packages/protocol/src/fabric/Fabric.ts:579-585
+// (updateOperationalCert: #verifyOperationalCert, then the fabric id):
 //
-//   - Chain verification runs against the fabric's STORED root — there
-//     is no AddTrustedRootCertificate on the update path. Mirrors
-//     matter.js FailsafeContext.ts:216-223 buildUpdatedFabric →
-//     Fabric.ts:541-579 setOperationalCert and chip
-//     FabricTable.cpp:854-882 (fabricIdToValidate from the existing
-//     fabric fed into ValidateIncomingNOCChain).
+//   - The NOC is decoded (Fabric.ts:602-605, Noc.fromTlv); one that does
+//     not decode, or is no NOC, is InvalidNOC.
 //   - The NOC must certify the public key of the pending CSR key pair
-//     — anything else is a certificate for a key we do not hold.
-//     Mirrors matter.js Fabric.ts:557-559 (PublicKeyError →
-//     InvalidPublicKey) and chip FabricTable.cpp:890
-//     `existingOpKey->Pubkey().Matches(nocPubKey)`.
+//     — anything else is a certificate for a key we do not hold, whatever
+//     its chain. Fabric.ts:614-616 (`Bytes.areEqual(ellipticCurvePublicKey,
+//     this.#keyPair.publicKey)` → PublicKeyError → InvalidPublicKey);
+//     chip compares it after the chain (FabricTable.cpp:880, :890), and
+//     matter.js decides.
+//   - Chain verification runs against the fabric's STORED root — there
+//     is no AddTrustedRootCertificate on the update path (Fabric.ts:618-624,
+//     icaCert.verify, nocCert.verify; chip FabricTable.cpp:854-882,
+//     fabricIdToValidate from the existing fabric fed into
+//     ValidateIncomingNOCChain). A non-operational node id is
+//     InvalidNodeOpId, every other failure InvalidNOC.
 //   - UpdateNOC SHALL NOT move the fabric to a different FabricID
-//     (Matter §11.18.6.9); chip pins the existing FabricId.
+//     (Matter §11.18.6.9; Fabric.ts:581-585, CertificateError → InvalidNOC).
 func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocValue, icacValue []byte) (*mattercert.Certificate, *NOCResponse) {
+	noc, derr := mattercert.Decode(nocValue)
+	if derr != nil {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: derr.Error()}
+	}
+	if !noc.IsNOC() {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "not a NOC"}
+	}
+	if !nocKeyIsPendingKey(noc, priv) {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
+	}
 	verifier, verr := nocVerifier(fab.RootCert, fab.RootPublicKey)
 	if verr != nil {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "stored trust root invalid: " + verr.Error()}
 	}
-	nocPub, verr := verifier.VerifyAndExtractPubKey(nocValue, icacValue)
-	if verr != nil {
+	if _, verr := verifier.VerifyAndExtractPubKey(nocValue, icacValue); verr != nil {
 		resp := nocVerificationFailure(verr)
 		return nil, &resp
-	}
-	if !nocCertifiesPendingKey(nocPub, priv) {
-		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
-	}
-	noc, derr := mattercert.Decode(nocValue)
-	if derr != nil {
-		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: derr.Error()}
 	}
 	if noc.Subject.MatterFabricID != fab.FabricID {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC FabricID does not match fabric"}
