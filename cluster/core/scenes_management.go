@@ -493,14 +493,21 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		return st.tableSize, true
 	case scenesAttrFabricSceneInfo:
 		filtered, fabric := im.FabricFilterFromContext(ctx)
+		// Every fabric of the node has an entry, created on read
+		// (infoFor), also one that never stored a scene. matter.js holds
+		// one for each fabric known when the server initialises and adds
+		// one only when a fabric's scene count is updated
+		// (ScenesManagementServer.ts:978-999 #initializeFabricSceneInfo,
+		// :1003-1023 #updateFabricSceneInfoCountsForFabric at db021da0;
+		// a read creates none), so a fabric commissioned after start
+		// reads an empty list until its first scene or a restart. This
+		// module serves the entry from the start, on purpose (the
+		// by_design entry for FabricSceneInfo). Without the fabric list
+		// the accessing fabric still sees its own entry (W3-clucore-14).
 		var fabrics []uint8
 		if s.cfg.Fabrics != nil {
 			fabrics = s.cfg.Fabrics(ctx)
 		} else if fabric != 0 {
-			// Without the fabric list the accessing fabric still sees
-			// its own entry, as matter.js's fabric-scoped
-			// fabricSceneInfo holds one for every fabric that reads it
-			// (W3-clucore-14).
 			fabrics = []uint8{fabric}
 		}
 		st.mu.Lock()

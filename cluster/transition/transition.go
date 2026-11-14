@@ -44,6 +44,15 @@
 // when the attribute did not change, and a value changed by someone else
 // is not noticed until the next step overwrites it.
 //
+// A third is deliberate too: a cyclic property without a target (a hue
+// moved by MoveHue or a colour loop) starts at its bound and wraps.
+// matter.js does not start it there: Transitions.ts:152-169 at db021da0
+// takes a cyclic transition without a target into the bounded branch,
+// whose check (:166) returns at the minimum moving down and at the
+// maximum moving up; on a wheel that check leaves a hue at 254 unmoved by
+// MoveHue Up. This module keeps the wheel turning (the by_design entry
+// for the transition engine's cyclic bound).
+//
 // Concurrency: an idle engine owns no goroutine and no timer. A running
 // transition owns one [time.AfterFunc] timer, re-armed per step and
 // stopped when the last transition ends, so everything runs on the clock
@@ -284,6 +293,10 @@ func (e *Engine) startLocked(t Transition) (Change, bool) {
 			}
 		}
 	} else if (t.Rate < 0 && current == prop.Min) || (t.Rate > 0 && current == prop.Max) {
+		// A bounded property at its bound in the direction of travel does
+		// not move (Transitions.ts:165-169 at db021da0). matter.js applies
+		// the check to a cyclic property without a target as well; this
+		// engine does not — the wheel wraps (see the package doc).
 		return Change{}, false
 	}
 
