@@ -462,6 +462,36 @@ func checkDNLimits(c *Certificate, kind string) error {
 	return nil
 }
 
+// CheckCASEAuthTags reports whether the subject's CASE Authenticated Tags
+// meet the NOC's rules: at most three, none of version 0, no identifier
+// (the upper 16 bits) twice. A violation wraps [ErrMalformed]. The chain
+// verification of a NOC runs it too; a caller that judges a NOC before
+// its chain — AddNOC and UpdateNOC, before the public key — runs it
+// right after [Decode]. Mirrors matter.js
+// packages/protocol/src/fabric/Fabric.ts:610-612 at db021da0
+// (#verifyOperationalCert: CaseAuthenticatedTag.validateNocTagList,
+// packages/types/src/datatype/CaseAuthenticatedTag.ts:96-105, after
+// Noc.fromTlv, whose decode already refuses a fourth tag and a tag of
+// version 0: packages/protocol/src/certificate/kinds/definitions/
+// operational.ts:168, CaseAuthenticatedTag.ts:118-124).
+func (c *Certificate) CheckCASEAuthTags() error {
+	if len(c.Subject.CASEAuthTags) > maxCASEAuthTags {
+		return fmt.Errorf("%w: NOC carries %d CATs, at most %d allowed", ErrMalformed, len(c.Subject.CASEAuthTags), maxCASEAuthTags)
+	}
+	seen := make(map[uint32]struct{}, len(c.Subject.CASEAuthTags))
+	for _, cat := range c.Subject.CASEAuthTags {
+		if cat&0xFFFF == 0 {
+			return fmt.Errorf("%w: CAT 0x%08X has version 0", ErrMalformed, cat)
+		}
+		id := cat >> 16
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("%w: CAT identifier 0x%04X appears twice", ErrMalformed, id)
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
+}
+
 // checkNOCShape applies the structural predicates a NOC must satisfy
 // beyond carrying a node id and a fabric id. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/Noc.ts (validateFields + verify):
@@ -484,19 +514,8 @@ func checkNOCShape(c *Certificate) error {
 	if c.Subject.MatterFabricID == 0 {
 		return fmt.Errorf("%w: NOC fabric id must not be 0", ErrMalformed)
 	}
-	if len(c.Subject.CASEAuthTags) > maxCASEAuthTags {
-		return fmt.Errorf("%w: NOC carries %d CATs, at most %d allowed", ErrMalformed, len(c.Subject.CASEAuthTags), maxCASEAuthTags)
-	}
-	seen := make(map[uint32]struct{}, len(c.Subject.CASEAuthTags))
-	for _, cat := range c.Subject.CASEAuthTags {
-		if cat&0xFFFF == 0 {
-			return fmt.Errorf("%w: CAT 0x%08X has version 0", ErrMalformed, cat)
-		}
-		id := cat >> 16
-		if _, dup := seen[id]; dup {
-			return fmt.Errorf("%w: CAT identifier 0x%04X appears twice", ErrMalformed, id)
-		}
-		seen[id] = struct{}{}
+	if err := c.CheckCASEAuthTags(); err != nil {
+		return err
 	}
 	// The DN limits after the CAT rules: a NOC with four CATs is "too many
 	// CATs" (matter.js validateFields at decode, Noc.ts), not "too many

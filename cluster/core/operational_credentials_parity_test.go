@@ -20,6 +20,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/mattercert"
 	mstore "github.com/SukramJ/go-fabric/store"
 )
 
@@ -826,15 +827,16 @@ func TestParityOpcreds_CSRRequestKeepsTheFailSafeKeyPair(t *testing.T) {
 // the first: no trusted root (InvalidNOC), the CSR of another session or
 // none (MissingCsr), a CSR for UpdateNOC (ConstraintError), a full table
 // (TableFull), then building the fabric — CaseAdminSubject
-// (InvalidAdminSubject), the NOC's public key (InvalidPublicKey), the
-// chain (InvalidNOC).
+// (InvalidAdminSubject), the NOC's CASE Authenticated Tags (InvalidNOC),
+// the NOC's public key (InvalidPublicKey), the chain (InvalidNOC).
 //
 // Mirrors matter.js db021da0 packages/node/src/behaviors/
 // operational-credentials/OperationalCredentialsServer.ts:233-260 (addNoc),
 // packages/protocol/src/common/FailsafeContext.ts:236-240 (buildFabric's
 // CaseAdminSubject check before setOperationalCert) and
-// packages/protocol/src/fabric/Fabric.ts:614-624 (#verifyOperationalCert
-// compares the public key before it verifies the chain).
+// packages/protocol/src/fabric/Fabric.ts:602-624 (#verifyOperationalCert
+// judges the CATs at the decode and with validateNocTagList, :610-612,
+// then compares the public key, :614-616, before it verifies the chain).
 func TestParityOpcreds_AddNOCChecksInMatterJSOrder(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -926,6 +928,55 @@ func TestParityOpcreds_AddNOCChecksInMatterJSOrder(t *testing.T) {
 			t.Fatalf("AddNOC for another key under another root: StatusCode %d (%s), want InvalidPublicKey", got.StatusCode, got.DebugText)
 		}
 	})
+
+	t.Run("the CASE Authenticated Tags before the public key", func(t *testing.T) {
+		t.Parallel()
+		for name, cats := range badNOCCATs {
+			oc, _ := opcredsWithFakeStore(t)
+			rootPriv := addRoot(t, oc)
+			issueCSRPendingPubKey(ctx, t, oc, false)
+			otherKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			noc := withCATs(t, buildCoreSignedCertForPubKey(t, marshalTestPub(otherKey), false, rootPriv, testDefaultFabricID, testDefaultNodeID), cats)
+			if got := addNOC(t, oc, noc, 0xABCD); got.StatusCode != core.NOCStatusInvalidNOC {
+				t.Errorf("AddNOC for another key with %s: StatusCode %d (%s), want InvalidNOC", name, got.StatusCode, got.DebugText)
+			}
+		}
+	})
+}
+
+// badNOCCATs are the CASE Authenticated Tag lists a NOC may not carry:
+// matter.js refuses a fourth tag and a tag of version 0 at the decode
+// (packages/protocol/src/certificate/kinds/definitions/operational.ts:168,
+// `maxLength: 3`; packages/types/src/datatype/CaseAuthenticatedTag.ts:118-124;
+// both enforced by packages/types/src/tlv/TlvObject.ts:253-292, the
+// validate Schema.decode runs) and an identifier twice in
+// CaseAuthenticatedTag.validateNocTagList (:96-105), each a
+// ValidationError, which #mapNocErrors answers InvalidNOC
+// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:184-192).
+var badNOCCATs = map[string][]uint32{
+	"an identifier twice": {0x0001_0001, 0x0001_0002},
+	"four tags":           {0x0001_0001, 0x0002_0001, 0x0003_0001, 0x0004_0001},
+	"a tag of version 0":  {0x0001_0000},
+}
+
+// withCATs is noc with cats as its subject's CASE Authenticated Tags,
+// re-encoded (its signature no longer verifies).
+func withCATs(t *testing.T, noc []byte, cats []uint32) []byte {
+	t.Helper()
+	c, err := mattercert.Decode(noc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Subject.CASEAuthTags = cats
+	c.Subject.Order = nil
+	out, err := mattercert.Encode(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // TestParityOpcreds_UpdateNOCChecksInMatterJSOrder pins the order of
@@ -933,12 +984,14 @@ func TestParityOpcreds_AddNOCChecksInMatterJSOrder(t *testing.T) {
 // InvalidPublicKey whatever else is wrong with it — a chain that does not
 // verify under the fabric's root, or a node id that is not operational —
 // and a NOC for the pending key is then judged by its chain and its
-// fabric id.
+// fabric id. A NOC whose CASE Authenticated Tags break the NOC rules is
+// InvalidNOC before its key is compared.
 //
 // Mirrors matter.js db021da0 packages/protocol/src/fabric/Fabric.ts:579-585
 // (updateOperationalCert: #verifyOperationalCert, then the fabric id) and
-// :614-624 (#verifyOperationalCert compares the public key before it
-// verifies the chain; the node id is checked inside Noc.verify).
+// :602-624 (#verifyOperationalCert judges the CATs, :610-612, compares the
+// public key, :614-616, before it verifies the chain; the node id is
+// checked inside Noc.verify).
 func TestParityOpcreds_UpdateNOCChecksInMatterJSOrder(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -949,14 +1002,18 @@ func TestParityOpcreds_UpdateNOCChecksInMatterJSOrder(t *testing.T) {
 		ownRoot  bool   // the fabric's root signs it
 		fabricID uint64 // its subject's fabric id
 		nodeID   uint64 // its subject's node id
+		cats     []uint32
 		want     uint8
 	}{
-		{"another key under another root", true, false, testDefaultFabricID, testDefaultNodeID, core.NOCStatusInvalidPublicKey},
-		{"another key with a non-operational node id", true, true, testDefaultFabricID, nonOperational, core.NOCStatusInvalidPublicKey},
-		{"another key for another fabric", true, true, testDefaultFabricID + 1, testDefaultNodeID, core.NOCStatusInvalidPublicKey},
-		{"the pending key under another root", false, false, testDefaultFabricID, testDefaultNodeID, core.NOCStatusInvalidNOC},
-		{"the pending key with a non-operational node id", false, true, testDefaultFabricID, nonOperational, core.NOCStatusInvalidNodeOpID},
-		{"the pending key for another fabric", false, true, testDefaultFabricID + 1, testDefaultNodeID, core.NOCStatusInvalidNOC},
+		{"another key under another root", true, false, testDefaultFabricID, testDefaultNodeID, nil, core.NOCStatusInvalidPublicKey},
+		{"another key with a non-operational node id", true, true, testDefaultFabricID, nonOperational, nil, core.NOCStatusInvalidPublicKey},
+		{"another key for another fabric", true, true, testDefaultFabricID + 1, testDefaultNodeID, nil, core.NOCStatusInvalidPublicKey},
+		{"another key with a CAT identifier twice", true, true, testDefaultFabricID, testDefaultNodeID, badNOCCATs["an identifier twice"], core.NOCStatusInvalidNOC},
+		{"another key with four CATs", true, true, testDefaultFabricID, testDefaultNodeID, badNOCCATs["four tags"], core.NOCStatusInvalidNOC},
+		{"another key with a CAT of version 0", true, true, testDefaultFabricID, testDefaultNodeID, badNOCCATs["a tag of version 0"], core.NOCStatusInvalidNOC},
+		{"the pending key under another root", false, false, testDefaultFabricID, testDefaultNodeID, nil, core.NOCStatusInvalidNOC},
+		{"the pending key with a non-operational node id", false, true, testDefaultFabricID, nonOperational, nil, core.NOCStatusInvalidNodeOpID},
+		{"the pending key for another fabric", false, true, testDefaultFabricID + 1, testDefaultNodeID, nil, core.NOCStatusInvalidNOC},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -983,6 +1040,9 @@ func TestParityOpcreds_UpdateNOCChecksInMatterJSOrder(t *testing.T) {
 				}
 			}
 			noc := buildCoreSignedCertForPubKey(t, pub, false, signer, c.fabricID, c.nodeID)
+			if c.cats != nil {
+				noc = withCATs(t, noc, c.cats)
+			}
 			resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: noc})
 			if err != nil {
 				t.Fatalf("UpdateNOC: IM error %v, want an in-band NOCResponse", err)

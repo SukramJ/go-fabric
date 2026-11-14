@@ -2116,19 +2116,25 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		return NOCResponse{StatusCode: NOCStatusInvalidAdminSubject, DebugText: "CaseAdminSubject is not a valid operational node ID or CASE auth tag"}, nil
 	}
 
-	// The NOC is decoded and its public key compared with the fail-safe's
-	// key pair before the chain is verified: a NOC for another key is
-	// InvalidPublicKey whatever its chain. Mirrors matter.js db021da0
-	// packages/protocol/src/fabric/Fabric.ts:614-616 (#verifyOperationalCert,
-	// `Bytes.areEqual(ellipticCurvePublicKey, this.#keyPair.publicKey)` →
-	// PublicKeyError) before :618-624 (the chain), after Noc.fromTlv
-	// (:602-605) — a NOC that does not decode is InvalidNOC.
+	// The NOC is decoded, its CASE Authenticated Tags judged, and its
+	// public key compared with the fail-safe's key pair before the chain
+	// is verified: a NOC for another key is InvalidPublicKey whatever its
+	// chain, unless its CATs already make it InvalidNOC. Mirrors matter.js
+	// db021da0 packages/protocol/src/fabric/Fabric.ts:614-616
+	// (#verifyOperationalCert, `Bytes.areEqual(ellipticCurvePublicKey,
+	// this.#keyPair.publicKey)` → PublicKeyError) before :618-624 (the
+	// chain), after Noc.fromTlv (:602-605) — a NOC that does not decode is
+	// InvalidNOC — and CaseAuthenticatedTag.validateNocTagList (:610-612, a
+	// ValidationError → InvalidNOC, OperationalCredentialsServer.ts:184-192).
 	noc, err := mattercert.Decode(req.NOCValue)
 	if err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	if !noc.IsNOC() {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "not a NOC"}, nil
+	}
+	if err := noc.CheckCASEAuthTags(); err != nil {
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	if !nocKeyIsPendingKey(noc, priv) {
 		return NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}, nil
@@ -2339,6 +2345,9 @@ func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 //
 //   - The NOC is decoded (Fabric.ts:602-605, Noc.fromTlv); one that does
 //     not decode, or is no NOC, is InvalidNOC.
+//   - Its CASE Authenticated Tags meet the NOC rules
+//     ([mattercert.Certificate.CheckCASEAuthTags]; Fabric.ts:610-612,
+//     validateNocTagList → ValidationError → InvalidNOC); else InvalidNOC.
 //   - The NOC must certify the public key of the pending CSR key pair
 //     — anything else is a certificate for a key we do not hold, whatever
 //     its chain. Fabric.ts:614-616 (`Bytes.areEqual(ellipticCurvePublicKey,
@@ -2360,6 +2369,9 @@ func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocVa
 	}
 	if !noc.IsNOC() {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "not a NOC"}
+	}
+	if err := noc.CheckCASEAuthTags(); err != nil {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}
 	}
 	if !nocKeyIsPendingKey(noc, priv) {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
