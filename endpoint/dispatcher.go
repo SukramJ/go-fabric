@@ -799,7 +799,10 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 		seen[id] = struct{}{}
 		out = append(out, id)
 	}
-	slices.Sort(out)
+	// The cluster's attribute order is the one every report uses
+	// (im.CompareAttributeIDs).
+	clusterID := srv.MatterClusterID()
+	slices.SortFunc(out, func(a, b uint32) int { return im.CompareAttributeIDs(clusterID, a, b) })
 	return out
 }
 

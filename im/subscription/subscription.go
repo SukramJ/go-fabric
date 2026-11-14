@@ -4,6 +4,8 @@
 package subscription
 
 import (
+	"cmp"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -449,8 +451,18 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	return work, true
 }
 
-// takeDirtyLocked hands out the dirty attribute paths. Caller must hold
-// s.mu.
+// takeDirtyLocked hands out the dirty attribute paths in the priming
+// report's order: by the first of the subscription's request paths that
+// selects them, then ascending endpoint and cluster, then the cluster's
+// attribute order ([im.CompareAttributeIDs]). Caller must hold s.mu.
+//
+// matter.js builds every update by running the subscription's request
+// through AttributeSubscriptionResponse with the changed paths as a filter
+// (packages/node/src/node/server/ServerSubscription.ts:860-868 at
+// db021da0): the request's paths in order
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:88-100),
+// each walked as the priming report walks it — a deterministic order, the
+// priming report's (review II, R2-P4-imread-10).
 func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 	if len(s.pendingDirty) == 0 {
 		return nil
@@ -460,7 +472,30 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 		out = append(out, p)
 	}
 	s.pendingDirty = nil
+	slices.SortFunc(out, func(a, b im.ConcreteAttributePath) int {
+		if c := cmp.Compare(s.requestPathIndex(a), s.requestPathIndex(b)); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Endpoint, b.Endpoint); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Cluster, b.Cluster); c != 0 {
+			return c
+		}
+		return im.CompareAttributeIDs(a.Cluster, a.Attribute, b.Attribute)
+	})
 	return out
+}
+
+// requestPathIndex returns the index of the first of the subscription's
+// request paths that selects p, or their count when none does.
+func (s *Subscription) requestPathIndex(p im.ConcreteAttributePath) int {
+	for i, sp := range s.AttributePaths {
+		if pathMatches(sp, p) {
+			return i
+		}
+	}
+	return len(s.AttributePaths)
 }
 
 // offerDuePaths holds paths for the [EventReporter] the engine is about

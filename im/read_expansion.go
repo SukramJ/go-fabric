@@ -109,9 +109,9 @@ func NewAttributeExpansion(ctx context.Context, d Dispatcher, paths []ConcreteAt
 }
 
 // Ascending makes the expansion visit each path's results in ascending
-// (endpoint, cluster, attribute) order — the endpoints of a wildcard path
-// in ascending id order, each endpoint's results sorted — instead of the
-// dispatcher's order. The paths themselves keep the request's order. Call
+// (endpoint, cluster) order, a cluster's attributes in [CompareAttributeIDs]
+// order — the endpoints of a wildcard path in ascending id order, each
+// endpoint's results sorted — instead of the dispatcher's order. The paths themselves keep the request's order. Call
 // it before the first [AttributeExpansion.Next].
 func (e *AttributeExpansion) Ascending() *AttributeExpansion {
 	e.ascending = true
@@ -284,7 +284,8 @@ func (e *AttributeExpansion) setBatch(results []ReadResult) {
 	e.batch, e.pos = results, 0
 }
 
-// compareReadResultPaths orders results by (endpoint, cluster, attribute).
+// compareReadResultPaths orders results by endpoint, cluster and then the
+// cluster's attribute order ([CompareAttributeIDs]).
 func compareReadResultPaths(a, b ReadResult) int {
 	if c := cmp.Compare(a.Path.Endpoint, b.Path.Endpoint); c != 0 {
 		return c
@@ -292,7 +293,17 @@ func compareReadResultPaths(a, b ReadResult) int {
 	if c := cmp.Compare(a.Path.Cluster, b.Path.Cluster); c != 0 {
 		return c
 	}
-	return cmp.Compare(a.Path.Attribute, b.Path.Attribute)
+	return CompareAttributeIDs(a.Path.Cluster, a.Path.Attribute, b.Path.Attribute)
+}
+
+// CompareAttributeIDs orders two attributes of cluster as every report of
+// this module lists a cluster's attributes — a Read's wildcard expansion,
+// a priming report and a subscription's change report alike: by ascending
+// id. It is the one place that order is decided. matter.js lists them in
+// its model's member order instead (review II, R2-P4-imread-12, open).
+func CompareAttributeIDs(cluster, a, b uint32) int {
+	_ = cluster
+	return cmp.Compare(a, b)
 }
 
 // ReadReports is the attribute half of a Read's response, generated one
