@@ -3638,10 +3638,12 @@ model; the lifecycle has no reference and is the host's.
 matter.js's `DclCertificateService` (`packages/protocol/src/dcl/DclCertificateService.ts`
 at `0ceb202d`) is constructed by the controller with the production
 ledger, fetches GitHub's development certificates whenever test
-certificates are enabled unless explicitly disabled (`:995-1001`),
+certificates are enabled unless explicitly disabled (`:1103-1119` at
+`db021da0`),
 stores PAAs and CD signers as per-certificate entries, and sweeps its
-CRL cache with an hourly timer after an hour of disuse (`:302-326`,
-`:1434-1747`). `controller/dcl` mirrors the GETs, the 5 s timeout
+CRL cache with an hourly timer after an hour of disuse (the cache at
+`:362-367`, its timer and sweep at `packages/general/src/util/Cache.ts:36-40`
+and `:153-156`, all at `db021da0`). `controller/dcl` mirrors the GETs, the 5 s timeout
 (`DclClient.ts:39`), the daily refresh and the §6.2.6.1 checks, with four
 surface differences: a `CertificateStore` without a `Client` is offline
 and fetches nothing; the GitHub fallback is an option that defaults to
@@ -3660,8 +3662,11 @@ chip's CommissionerControl server (`src/app/clusters/commissioner-control-server
 at the harness pin) delegates the window's parameters, and the only
 delegate — `examples/fabric-sync/bridge/CommissionerControlDelegate.cpp:33-36`
 — uses the fixed passcode 20202021 and discriminator 3840 with 1000
-iterations; `CommissionNode` compares the client's node id and carries a
-TODO to include the fabric; an approval has no timeout. `core.CommissionerControl`
+iterations; `CommissionNode` hands the client's node id and the request id
+to the delegate to compare (`CommissionerControlCluster.cpp:207`,
+`Delegate.h:67-78` at `6170af84`), and a TODO to include the fabric stands at
+no line of the cluster's directory — the delegate under `examples/fabric-sync`
+was not read (unverified); an approval has no timeout. `core.CommissionerControl`
 mints passcode, discriminator and salt from `crypto/rand` per request,
 compares node id *and* accessing fabric index, and takes
 `ApprovalTimeout`/`ApprovalValidity` (0 = chip's wait-forever and
@@ -3678,11 +3683,11 @@ what chip's TODO asks for.
 
 ### BD-Matter-ControllerFabric-OneRecord — the controller keeps one fabric per database, with its key and NOC, and resumes sessions from memory only
 
-matter.js's `FabricManager.ts:41-114` at `0ceb202d` persists a list of
+matter.js's `FabricManager.ts:187-200` at `db021da0` persists a list of
 `Fabric.Config` records under `"fabrics"` with a `nextFabricIndex`
-counter; each record carries the fabric id, root node id, IPK, operational
-certificate and key pair (`Fabric.ts:53-74`), and `FabricAuthority.ts:134-139`
-mints a random root node id, a random IPK and vendor 0xFFF1 on first use.
+counter (read back at `:68-73`); each record carries the fabric id, root node id, IPK, operational
+certificate and key pair (`Fabric.ts:714-733`), and `FabricAuthority.ts:136-141`
+mints a random root node id, a random IPK and vendor 0xFFF1 (`:47`) on first use.
 `controller/ca`'s `SettingStore` and `commissioner.FabricConfig.Store`
 keep one record of the same fields in the host's settings table — no list,
 no counter — so a second run of the reference controller is the same
@@ -3696,7 +3701,7 @@ returns when a second is wanted.
 
 chip-tool's argument parser at the harness pin
 (`examples/chip-tool/commands/clusters/JsonParser.h`, `CustomArgument.h`,
-`CustomStringPrefix.h`) takes numbers, `hex:`/`base64:`/`str:` strings,
+`examples/chip-tool/commands/common/CustomStringPrefix.h`) takes numbers, `hex:`/`base64:`/`str:` strings,
 `null`, nested objects by field name and arrays. `spec.EncodeJSON`/`DecodeJSON`
 (`cluster/spec/json.go`) take the same and also an enum by its value name,
 a bitmap as an object of member names, struct keys without regard to
@@ -3722,7 +3727,7 @@ ServerList and, without Groupcast (0x0065), follows chip's
 `src/app/tests/suites/TestGroupMessaging.yaml` at the pin — KeySetWrite
 TrustFirst (`:84-102`), a GroupKeyMap entry (`:122-132`), Groups AddGroup
 per endpoint (`:134-168`), an ACL entry for the group subject (the bare
-16-bit group id, which `cluster/core/access_control.go:1122` accepts as
+16-bit group id, which `cluster/core/access_control.go:1168-1170` accepts as
 matter.js does; chip stores its 64-bit group node id in that form,
 `src/app/server/AclStorage.cpp:162-171`) granting Operate on those
 endpoints where the YAML's own entry (`:188-211`) grants any group Manage.
@@ -3764,7 +3769,7 @@ latest when the ramp is due to end, reported or not (v0.5.2, v0.5.3,
 RemainingTime 0 and couples no colour temperature (the engine's
 `Transitions.ColorTemperature` has no hand-off counterpart). The plain
 Stop is gated by ExecuteIfOff and StopWithOnOff is not
-(`LevelControlServer.ts:481-496`). Report AV (#120).
+(`LevelControlServer.ts:481-500` at `db021da0`). Report AV (#120).
 
 By design. A device that ramps natively reports its level when it gets
 there; the server cannot step what it does not drive.
@@ -3788,7 +3793,8 @@ persisted cursor for a case that needs 65 533 allocations to occur.
 
 matter.js couples On/Off and the level transition in one transaction
 against local state (`LevelControlServer.ts:529-550`, `couple` →
-`#turnOnForLevel` → the transition; the switch-off on commit, `:624-627`),
+`#turnOnForLevel` → the transition; the switch-off on commit, `:624-633`
+at `db021da0`),
 so a device sees one consistent change. A bridged device that takes
 "start at level X" and "stop" as one write each would see two writes —
 on at the old level, then the new level — and an audible or visible
@@ -3809,7 +3815,8 @@ transaction matter.js runs locally.
 matter.js opens a commissioning window whenever its rules allow one —
 the node's own window while uncommissioned, AdministratorCommissioning
 for an administrator (`AdministratorCommissioningServer.ts`: Busy only
-for a window already open, `:196`) — and has no policy refusal. A bridge
+for an armed fail-safe or a window already open, `:213-221` at
+`db021da0`) — and has no policy refusal. A bridge
 host that was configured with a vendor attestation chain it cannot load
 must not let a new controller pair against the CSA test chain, yet must
 keep serving the controllers already paired.
@@ -3828,7 +3835,7 @@ only removes ways to commission, never adds one.
 ### BD-Matter-AttestationPolicy-ZeroProceeds — the zero attestation policy lets commissioning proceed with a warning
 
 matter.js's `ControllerCommissioningFlow.#resolveAttestationFindings`
-(`ControllerCommissioningFlow.ts:1341-1368` at `0ceb202d`) logs each
+(`ControllerCommissioningFlow.ts:1359-1386` at `db021da0`) logs each
 attestation finding as a warning and proceeds when the controller set no
 policy; only `false` or a deciding function rejects. `attestation.Policy`'s
 zero value is that undefined policy (`controller/attestation/policy.go`),
@@ -3842,8 +3849,8 @@ controller asks on a terminal and rejects otherwise.
 
 ### BD-Matter-LastFabricReopenWithoutErase — after the last fabric goes the node reopens its window when idle, without a factory reset
 
-matter.js `CommissioningServer #resetWhenIdle` (`CommissioningServer.ts:174-199`
-at `0ceb202d`) waits until no fail-safe is armed and no session remains,
+matter.js `CommissioningServer #resetWhenIdle` (`CommissioningServer.ts:179-202`
+at `db021da0`) waits until no fail-safe is armed and no session remains,
 cancels if a fabric exists by then, and erases the node
 (`ServerNode.erase()`), which restarts it commissionable. The facade waits
 the same way (`Node.reopenWhenIdle`) and then reopens its own window, but
@@ -3907,9 +3914,9 @@ narrow access (Operate, the provider's cluster on its endpoint) per fabric.
 
 ### BD-Matter-OTA-MirroredQuirks — consent reset, userConsentNeeded and TC-SU-2.7 follow matter.js
 
-Mirrored as matter.js has them at `0ceb202d`: the provider's
+Mirrored as matter.js has them at `db021da0`: the provider's
 `directConsentObtained` defaults to false on every state change
-(`OtaSoftwareUpdateProviderServer.ts:570-574`, `:598`); `userConsentNeeded`
+(`OtaSoftwareUpdateProviderServer.ts:596-603`, `:627`); `userConsentNeeded`
 is set from `consentRequired` also after the provider obtained consent
 (`:399`); the requestor treats a failed provider connection as "no update"
 with reason Success (`OtaSoftwareUpdateRequestorServer.ts:630-641`) and a
@@ -3921,7 +3928,7 @@ module changes when matter.js does.
 
 ### BD-Matter-DCL-MirroredScope — an expired CRL still revokes; the unported DCL parts; context-less seams
 
-`DclCertificateService.ts:1867-1890` (at `862ad75f`) parses a CRL's `nextUpdate` and never
+`DclCertificateService.ts:1964-1989` (at `db021da0`) parses a CRL's `nextUpdate` and never
 reads it, so an expired CRL still revokes — mirrored, pinned by a test.
 Not ported: out-of-band revocation sets and seed data, the on-demand PAA
 fetch by subject key id, the compliance endpoint, OTA image storage,
@@ -3938,7 +3945,7 @@ By design until a host needs one of them.
 `KeySets.ts:83`, `:126-133` read `epochStartTime` (Matter epoch, µs since
 2000) through `Timestamp.fromMicroseconds` and compare it with Unix ms; a key
 whose start is in the past in either reading counts as started.
-`groups/sender.go:132-170` mirrors it. Report AX §6.
+`groups/sender.go:132-173` mirrors it. Report AX §6.
 
 By design. Controllers write current values, which read as started either
 way; a fix belongs upstream.
@@ -3979,7 +3986,8 @@ disagree; the harness classifies the cases accordingly.
 ### BD-chip-RvcRunMode-InvalidInMode — RvcRunMode without DIRECTMODECH refuses a change between two running modes
 
 matter.js's RvcRunModeServer accepts any supported mode. chip's RVC example
-and TC_RVCRUNM_2_2 steps 6-7 expect InvalidInMode for a change between two
+and TC_RVCRUNM_2_2 step 6b (`src/python_testing/TC_RVCRUNM_2_2.py:228-232`
+at `6170af84`) expect InvalidInMode for a change between two
 non-Idle modes when DIRECTMODECH is not set; the server answers it itself.
 RvcCleanMode's companion rule needs RvcRunMode's state and stays with the
 host. Report AY §4.
