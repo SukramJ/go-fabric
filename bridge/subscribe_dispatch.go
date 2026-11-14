@@ -913,7 +913,7 @@ func (b *Bridge) allowedEventPaths(ctx context.Context, dispatcher im.Dispatcher
 // #addConcrete answers UnsupportedEvent before it registers the path
 // (:216-218, :235), a wildcard endpoint or cluster registers a named event
 // only where the cluster has it (:286-291) and a wildcard event one path
-// per event of the cluster (:262-273), and only a registered path counts
+// per event of the cluster (:277-284), and only a registered path counts
 // as existent (:104-110) for ServerSubscription.ts:707-711 (review II,
 // R2-P4-imread-08).
 func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.EventReadAuthorizer, p im.ConcreteEventPath) bool {

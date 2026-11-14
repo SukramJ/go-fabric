@@ -88,9 +88,12 @@ func TestBuildInitialReport_SortOrder(t *testing.T) {
 // TestBuildInitialReport_EventOnlyEmptyLog_Establishes is the regression
 // guard for the "matched counts REQUESTED event paths, not priming-log
 // records" fix in buildInitialReport: an event-only Subscribe (no
-// AttributeRequests) naming a real Switch (0x003B) InitialPress
-// (0x01) event path must report matched > 0 even when the event log has
-// no matching entries yet.
+// AttributeRequests) naming an event path the topology has — here
+// BridgedDeviceBasicInformation's ReachableChanged (0x03), mandatory and
+// listed on every bridged endpoint, standing in for a Switch (0x003B)
+// InitialPress (0x01) — must report matched > 0 even when the event log
+// has no matching entries yet. An event no server lists is no existent
+// path (review II, R2-P4-nw-05).
 //
 // This reproduces a GenericSwitch momentary button: the commissioner
 // places the Subscribe BEFORE the physical press, so the event log is
@@ -122,7 +125,7 @@ func TestBuildInitialReport_EventOnlyEmptyLog_Establishes(t *testing.T) {
 			// clusters the test topology has. A concrete path to a cluster
 			// the topology lacks is not existent and is rejected, as in
 			// matter.js (TestSubscribeRejectsEventPathsTheSubjectMayNotRead).
-			{HasEvent: true, Event: 0x01},
+			{HasEvent: true, Event: 0x03},
 		},
 	}
 	// A PASE subscriber: the PASE auth mode, not fabric 0, grants (W2-sec-03).

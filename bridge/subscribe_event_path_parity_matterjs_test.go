@@ -66,7 +66,7 @@ func TestAllowedEventPathsCountsExistingEvents(t *testing.T) {
 		{"non-existent event, wildcard endpoint", im.ConcreteEventPath{Cluster: 0x0028, Event: 0x03, HasCluster: true, HasEvent: true}, 0},
 		{"event, wildcard endpoint", im.ConcreteEventPath{Cluster: 0x0028, Event: 0x00, HasCluster: true, HasEvent: true}, 1},
 		// The wildcard-event half (review II, R2-P4-imread-08): a cluster
-		// without events selects no event (EventReadResponse.ts:262-273,
+		// without events selects no event (EventReadResponse.ts:277-284,
 		// `for (const event of cluster.type.events)`).
 		{"wildcard event, cluster with events", im.ConcreteEventPath{Endpoint: 0, Cluster: 0x0028, HasEndpoint: true, HasCluster: true}, 1},
 		{"wildcard event, cluster without events", im.ConcreteEventPath{Endpoint: 1, Cluster: 0x0006, HasEndpoint: true, HasCluster: true}, 0},

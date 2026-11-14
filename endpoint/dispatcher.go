@@ -592,14 +592,15 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // EventPathStatus implements [im.EventPathChecker]: UNSUPPORTED_ENDPOINT for
 // an endpoint the topology lacks, UNSUPPORTED_CLUSTER for a cluster the
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
-// not list (a server without an event lister answers for itself), Success
-// otherwise — the existence checks of matter.js
+// not list, Success otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
 // 862ad75f (#addConcrete), in their order. A path that names no event is
-// UNSUPPORTED_EVENT when the server's lister lists none: matter.js
-// registers a wildcard event path per event of the cluster
-// (EventReadResponse.ts:262-273 at db021da0), so such a cluster selects
-// nothing (review II, R2-P4-imread-08).
+// UNSUPPORTED_EVENT when the server lists none: matter.js registers a
+// wildcard event path per event of the cluster (EventReadResponse.ts:277-284
+// at db021da0), so such a cluster selects nothing (review II,
+// R2-P4-imread-08). A server without a [contract.ClusterEventLister] lists
+// no event, as the contract states, so neither shape of path exists on it
+// (EventReadResponse.ts:216-218 for a named one; review II, R2-P4-nw-05).
 func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
 	ep := d.topology.FindByID(path.Endpoint)
 	if ep == nil {
@@ -609,12 +610,14 @@ func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.Statu
 		if srv == nil || srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		lister, ok := srv.(contract.ClusterEventLister)
+		var events []uint32
+		if lister, ok := srv.(contract.ClusterEventLister); ok {
+			events = lister.MatterEvents()
+		}
 		switch {
-		case !ok:
-		case !path.HasEvent && len(lister.MatterEvents()) == 0:
+		case !path.HasEvent && len(events) == 0:
 			return im.StatusUnsupportedEvent
-		case path.HasEvent && !slices.Contains(lister.MatterEvents(), path.Event):
+		case path.HasEvent && !slices.Contains(events, path.Event):
 			return im.StatusUnsupportedEvent
 		}
 		return im.StatusSuccess

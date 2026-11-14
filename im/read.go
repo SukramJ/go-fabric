@@ -753,7 +753,7 @@ type EventReadAuthorizer struct {
 // false) asks whether the cluster has an event a wildcard event path
 // selects: UNSUPPORTED_EVENT when it has none, as matter.js registers a
 // wildcard event path per event of the cluster
-// (packages/protocol/src/action/server/EventReadResponse.ts:262-273 at
+// (packages/protocol/src/action/server/EventReadResponse.ts:277-284 at
 // db021da0).
 type EventPathChecker interface {
 	EventPathStatus(path ConcreteEventPath) StatusCode

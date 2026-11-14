@@ -21,11 +21,13 @@ func (s *eventListingServer) MatterEvents() []uint32 { return s.events }
 // TestEventPathStatusWithoutEvent: a path that names no event exists where
 // the cluster has an event a wildcard event path selects. matter.js
 // registers a wildcard event path per event of the cluster type
-// (packages/protocol/src/action/server/EventReadResponse.ts:262-273 at
-// db021da0, `for (const event of cluster.type.events)`), so a cluster
-// without events registers nothing and counts as no existent path
-// (:104-110). A server without an event lister answers for itself, as for
-// a path naming its event.
+// (packages/protocol/src/action/server/EventReadResponse.ts:277-284 at
+// db021da0, `for (const event of cluster.type.events)` at :279), so a
+// cluster without events registers nothing and counts as no existent path
+// (:104-110). A server without an event lister lists no event
+// ([contract.ClusterEventLister]): neither shape of path exists on it, as a
+// concrete event the cluster type lacks is UnsupportedEvent (:216-218;
+// review II, R2-P4-nw-05).
 func TestEventPathStatusWithoutEvent(t *testing.T) {
 	t.Parallel()
 	withEvents := &eventListingServer{gateServer: gateServer{id: 0x0028}, events: []uint32{0x01}} // an event other than 0, the id a path without one carries
@@ -42,7 +44,8 @@ func TestEventPathStatusWithoutEvent(t *testing.T) {
 	}{
 		{"cluster with an event", at(2, 0x0028), im.StatusSuccess},
 		{"cluster listing no event", at(2, 0x0006), im.StatusUnsupportedEvent},
-		{"cluster without an event lister", at(2, 0x0008), im.StatusSuccess},
+		{"cluster without an event lister", at(2, 0x0008), im.StatusUnsupportedEvent},
+		{"event of a cluster without an event lister", im.ConcreteEventPath{Endpoint: 2, Cluster: 0x0008, Event: 0x00, HasEndpoint: true, HasCluster: true, HasEvent: true}, im.StatusUnsupportedEvent},
 		{"cluster the endpoint lacks", at(2, 0x0300), im.StatusUnsupportedCluster},
 		{"endpoint the node lacks", at(9, 0x0028), im.StatusUnsupportedEndpoint},
 	} {

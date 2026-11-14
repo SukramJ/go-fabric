@@ -1049,6 +1049,21 @@ func (s *ElectricalPowerServer) MatterAttributes() []uint32 {
 	return electricalPowerInst.MatterAttributes()
 }
 
+// Compile-time assertion: ElectricalPowerServer lists its events.
+var _ contract.ClusterEventLister = (*ElectricalPowerServer)(nil)
+
+// MatterEvents implements [contract.ClusterEventLister]: none.
+// MeasurementPeriodRanges is mandatory with the optional Ranges attribute
+// (matter.js
+// packages/model/src/standard/elements/electrical-power-measurement.element.ts:124,
+// :47 at db021da0), which the server does not serve, the server emits no
+// event, and matter.js ElectricalPowerMeasurementServer emits none either
+// (packages/node/src/behaviors/electrical-power-measurement/ElectricalPowerMeasurementServer.ts:18),
+// so its cluster type carries no event
+// (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
+// path on the cluster selects nothing (review II, R2-P4-nw-05).
+func (s *ElectricalPowerServer) MatterEvents() []uint32 { return electricalPowerInst.MatterEvents() }
+
 // The constraints of the readings ElectricalPowerMeasurement serves:
 // "-2^62 to 2^62" for Voltage, ActiveCurrent and ActivePower, "0 to
 // 1000000" for Frequency (matter.js packages/model/src/standard/elements/
@@ -1742,6 +1757,21 @@ func (s *PowerSourceServer) MatterReportable() []uint32 {
 // instance genuinely does not implement it rather than reporting null
 // forever.
 func (s *PowerSourceServer) MatterAttributes() []uint32 { return s.inst().MatterAttributes() }
+
+// Compile-time assertion: PowerSourceServer lists its events.
+var _ contract.ClusterEventLister = (*PowerSourceServer)(nil)
+
+// MatterEvents implements [contract.ClusterEventLister]: none. The three
+// PowerSource events are optional under every feature ("[WIRED]", "[BAT]",
+// "[RECHG]", matter.js
+// packages/model/src/standard/elements/power-source-cluster.element.ts:135,
+// :147, :159 at db021da0), the server emits none, and matter.js
+// PowerSourceServer emits none either
+// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63), so
+// its cluster type carries no event
+// (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
+// path on the cluster selects nothing (review II, R2-P4-nw-05).
+func (s *PowerSourceServer) MatterEvents() []uint32 { return s.inst().MatterEvents() }
 
 // percentToHalfPercent converts a 0-100 battery percentage to Matter's
 // BatPercentRemaining wire encoding — half-percent units, uint8
