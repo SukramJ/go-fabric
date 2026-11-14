@@ -607,18 +607,24 @@ func (b *Bridge) releasePaseInFlight(exchangeID uint16) {
 }
 
 // recordPaseFailure increments the PASE failure counter and, when it
-// reaches [paseMaxErrors], revokes the open commissioning window and
+// reaches [paseMaxErrors], closes the open commissioning window and
 // engages a timed PASE lockout. Mirrors matter.js PaseServer.ts:95-110
-// (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:70-72
-// (tooManyPaseErrors → endCommissioning). Called from the handlePase
-// error path for genuine pairing failures only (not missing-handler or
-// state-replay retransmits).
+// (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:78-82
+// at db021da0 (tooManyPaseErrors → endCommissioning). The window closes
+// as the end of commissioning closes it ([CommissioningWindow.EndCommissioning]),
+// not as RevokeCommissioning does: matter.js's endCommissioning →
+// #closeWindow (DeviceCommissioner.ts:319-324, :283-299) stops the timer,
+// removes the PASE commissioner and leaves commissioning mode, and touches
+// neither the fail-safe nor a PASE session — a commissioning already past
+// PASE keeps its fail-safe and its pending fabric. Called from the
+// handlePase error path for genuine pairing failures only (not
+// missing-handler or state-replay retransmits).
 func (b *Bridge) recordPaseFailure() {
 	b.count(contract.MetricPASEFailures)
 	if b.paseFailures.Add(1) != paseMaxErrors {
 		// Below the cap, or a straggler arriving between the cap and the
 		// lockout taking effect. Only the transition to exactly
-		// paseMaxErrors engages the lockout, so the revoke + diagnostic
+		// paseMaxErrors engages the lockout, so the close + diagnostic
 		// fire once per batch.
 		return
 	}
@@ -628,7 +634,7 @@ func (b *Bridge) recordPaseFailure() {
 	b.logger.Warn("matter.rx.sc.pase_bruteforce",
 		slog.Int("max_errors", paseMaxErrors),
 		slog.Duration("lockout", cooldown),
-		slog.String("hint", "too many PASE pairing failures; revoking commissioning window and refusing PASE for the lockout period"))
+		slog.String("hint", "too many PASE pairing failures; closing the commissioning window and refusing PASE for the lockout period"))
 	b.diagRing().Record(diagevent.Event{
 		Kind:     diagevent.KindPairing,
 		Severity: diagevent.SeverityError,
@@ -641,7 +647,7 @@ func (b *Bridge) recordPaseFailure() {
 		},
 	})
 	if win != nil {
-		// RevokeWindow runs the window's restore closure synchronously, and
+		// EndCommissioning runs the window's restore closure synchronously, and
 		// every production restore closure re-attaches the configured PASE
 		// acceptor via AttachPaseHandler / AttachPaseHandlerProvider — each of
 		// which calls resetPaseFailures(). Without this guard that reset
@@ -651,7 +657,7 @@ func (b *Bridge) recordPaseFailure() {
 		// restore; a genuine operator-initiated window open takes a different
 		// path and still starts clean.
 		b.preserveLockoutOnReset.Store(true)
-		_ = win.RevokeWindow(context.Background())
+		win.EndCommissioning()
 		b.preserveLockoutOnReset.Store(false)
 	}
 }
