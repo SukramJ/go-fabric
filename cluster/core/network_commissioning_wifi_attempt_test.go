@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/store/memstore"
 )
 
 // heldDriver is a contract.WiFiDriver whose joins wait until the test
@@ -194,4 +195,61 @@ func TestACommandCancelsARunningRejoinAndTakesItsTurn(t *testing.T) {
 		t.Errorf("armed %v after the cancelled attempt, want the next one in %v", got, wifiRejoinFirstDelay)
 	}
 	close(d.release)
+}
+
+// TestADisabledInterfaceStopsTheRejoin: while InterfaceEnabled is false
+// no rejoin attempt is armed or runs — a fail-safe expiry arms none
+// either — and writing it true again starts the rejoin at once.
+func TestADisabledInterfaceStopsTheRejoin(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	st := memstore.New()
+	var armed atomic.Bool
+	d := newLinkDriver("home")
+	seed, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, IsFailSafeArmed: armed.Load, Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commissionHome(t, seed, d, &armed)
+	d.mu.Lock()
+	d.link = nil
+	d.mu.Unlock()
+	d.setReachable("home", false)
+
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{Driver: d, IsFailSafeArmed: armed.Load, Store: st, Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	life, stop := context.WithCancel(t.Context())
+	defer stop()
+	w.Start(life)
+	awaitJoin(t, d)
+	if got := clk.Armed(); len(got) != 1 {
+		t.Fatalf("armed %v after the failed join at Start, want the next attempt", got)
+	}
+
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := clk.Armed(); len(got) != 0 {
+		t.Fatalf("armed %v with the interface disabled, want no attempt", got)
+	}
+	w.OnFailSafeExpired()
+	before := d.joinCount()
+	clk.Advance(time.Hour)
+	if n := d.joinCount() - before; n != 0 {
+		t.Fatalf("%d joins with the interface disabled", n)
+	}
+
+	d.setReachable("home", true)
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, true); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(0)
+	if got := awaitJoin(t, d); got != "home" {
+		t.Fatalf("the rejoin after the interface was enabled joined %q, want home", got)
+	}
+	if d.on() != "home" {
+		t.Errorf("the radio is on %q, want home", d.on())
+	}
 }

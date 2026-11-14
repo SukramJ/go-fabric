@@ -182,7 +182,9 @@ NetworkCommissioning command runs, and each one sets
 `LastNetworkingStatus`; a NetworkCommissioning command that arrives while
 an attempt runs cancels it and runs once it ended, so a commissioner's
 network step is not answered `Busy`, and the cancelled attempt sets
-nothing but the link. After a join that failed, the node asks a
+nothing but the link. While a controller has written `InterfaceEnabled`
+false no attempt runs, the start's included; writing it true again starts
+the rejoin at once. After a join that failed, the node asks a
 driver that reports its link (`contract.WiFiLinkReporter`, which this
 driver implements) where the radio is: `Networks` reads that network
 connected — the one the failed join went back to — and a fail-safe expiry

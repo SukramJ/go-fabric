@@ -306,7 +306,8 @@ const (
 	wifiRejoinMaxDelay   = 5 * time.Minute
 )
 
-// Start reconnects to the first committed network when the node starts.
+// Start reconnects to the first committed network when the node starts,
+// unless InterfaceEnabled is false: while it is, no rejoin runs.
 // chip's Linux driver loads its network at Init (:77-128) and the link,
 // which the committed configuration brings back up (CommitConfig, :164),
 // reports itself through OnNetworkingStatusChange
@@ -334,7 +335,7 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 	w.mu.Lock()
 	w.life = ctx
 	context.AfterFunc(ctx, w.stopRejoin)
-	if len(w.committed) == 0 {
+	if len(w.committed) == 0 || !w.interfaceEnabled {
 		w.mu.Unlock()
 		return
 	}
@@ -475,9 +476,10 @@ func (w *WiFiNetworkCommissioning) backoffLocked() {
 }
 
 // armRejoinLocked arms an attempt after d on the clock, replacing an
-// armed one. w.mu is held.
+// armed one; none once the lifetime ended or while the interface is
+// disabled. w.mu is held.
 func (w *WiFiNetworkCommissioning) armRejoinLocked(d time.Duration) {
-	if w.life.Err() != nil {
+	if w.life.Err() != nil || !w.interfaceEnabled {
 		return
 	}
 	if w.rejoinTimer != nil {
@@ -490,15 +492,41 @@ func (w *WiFiNetworkCommissioning) armRejoinLocked(d time.Duration) {
 func (w *WiFiNetworkCommissioning) stopRejoin() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.disarmRejoinLocked()
+}
+
+// disarmRejoinLocked stops the armed retry. w.mu is held.
+func (w *WiFiNetworkCommissioning) disarmRejoinLocked() {
 	if w.rejoinTimer != nil {
 		w.rejoinTimer.Stop()
 		w.rejoinTimer = nil
 	}
 }
 
+// setInterfaceEnabledLocked sets InterfaceEnabled. The rejoin of the
+// committed network runs only while it is true: false disarms the armed
+// attempt and cancels a running one, true again starts the rejoin at once
+// when the link is on no committed network (review II, R2-P3-dr-net-07).
+// w.mu is held.
+func (w *WiFiNetworkCommissioning) setInterfaceEnabledLocked(v bool) {
+	was := w.interfaceEnabled
+	w.interfaceEnabled = v
+	w.dataVersion.Bump()
+	switch {
+	case was && !v:
+		w.disarmRejoinLocked()
+		w.rejoinDelay = 0
+		if w.rejoinCancel != nil {
+			w.rejoinCancel()
+		}
+	case !was && v:
+		w.rejoinNowLocked()
+	}
+}
+
 // rejoin is one attempt to bring the link back onto the first committed
-// network: none once the link is on a committed network or the lifetime
-// ended, or another attempt runs; while a fail-safe is armed or a command
+// network: none once the link is on a committed network, the lifetime
+// ended or the interface is disabled, or another attempt runs; while a fail-safe is armed or a command
 // runs, the attempt is armed again after the same wait — the administrator's
 // network change decides then, and its fail-safe's expiry starts a rejoin
 // of its own. A failed attempt arms the next with the backoff.
@@ -508,7 +536,7 @@ func (w *WiFiNetworkCommissioning) rejoin() {
 	w.rejoinTimer = nil
 	life := w.life
 	switch {
-	case life.Err() != nil || !w.offCommittedLocked():
+	case life.Err() != nil || !w.offCommittedLocked() || !w.interfaceEnabled:
 		w.rejoinDelay = 0
 		w.mu.Unlock()
 		return
@@ -670,8 +698,7 @@ func (w *WiFiNetworkCommissioning) MatterWrite(_ context.Context, attrID uint32,
 		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
 	w.mu.Lock()
-	w.interfaceEnabled = v
-	w.dataVersion.Bump()
+	w.setInterfaceEnabledLocked(v)
 	w.mu.Unlock()
 	return nil
 }
@@ -685,8 +712,7 @@ func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
 		return err
 	}
 	w.mu.Lock()
-	w.interfaceEnabled = enabled
-	w.dataVersion.Bump()
+	w.setInterfaceEnabledLocked(enabled)
 	w.mu.Unlock()
 	return nil
 }
