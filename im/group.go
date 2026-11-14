@@ -178,6 +178,22 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 // with WildcardPathFlags or a concrete path ends the interaction with
 // InvalidAction ("Group writes can not be concrete paths") — after the
 // writes before it have run, as in matter.js.
+//
+// A path with a null ListIndex (ADD) is applied on every member endpoint
+// as an append, as connectedhomeip applies a group write's list operation
+// per mapped endpoint with no rule about the attribute before it
+// (src/app/WriteHandler.cpp:434 ProcessGroupAttributeDataIBs, :559
+// WriteClusterData at 6170af84; its Busy rule for an ADD that does not
+// follow its attribute is in the unicast loop only, :364-371). matter.js
+// does not write it: its ADD rule accepts an ADD only after a concrete
+// path to the same attribute
+// (packages/node/src/node/server/InteractionServer.ts:511-531 at
+// db021da0, the marker set for concrete paths only, :536-537), a group
+// path is never concrete, so a group ADD is answered Busy, which a group
+// session never sends (:550-553), and nothing is written. This follows
+// connectedhomeip (owner decision 63): a list a controller chunks into a
+// REPLACE and ADDs, as matter.js's own client does by default, would
+// otherwise be left empty.
 func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) StatusCode {
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return StatusInvalidAction
