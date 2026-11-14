@@ -525,8 +525,18 @@ func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 // the received message header — an ACK is only valid within its own
 // session (see the outboundKey rationale).
 func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
-	key := outboundKey{sessionID, acked}
+	return t.ack(outboundKey{sessionID, acked}, nil)
+}
+
+// ack is [outboundReliableTracker.Ack] for key; belongs, when set, must
+// accept the pending entry, or the acknowledgement is not its and leaves
+// it (and any waiter on it) in place.
+func (t *outboundReliableTracker) ack(key outboundKey, belongs func(*outboundEntry) bool) bool {
 	t.mu.Lock()
+	if e, ok := t.pending[key]; ok && belongs != nil && (e == nil || !belongs(e)) {
+		t.mu.Unlock()
+		return false
+	}
 	if _, ok := t.pending[key]; !ok {
 		// A stray ACK: the duplicate ack of a retransmission after the
 		// entry was cleared. [WaitForAck] installs a waiter only after
@@ -562,6 +572,22 @@ func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
 		close(ch)
 	}
 	return true
+}
+
+// AckUnsecured is [outboundReliableTracker.Ack] on the unsecured session:
+// the acknowledgement of acked clears it only for the handshake hk it
+// arrived on — its initiator and its exchange. Message counters on the
+// unsecured session are one sequence for every handshake
+// ([Bridge.nextUnsecuredCounter]), so the counter alone names no
+// handshake. matter.js acts on an acknowledgement inside the exchange of
+// the unsecured session the message names
+// (packages/protocol/src/protocol/ExchangeManager.ts:306-308 and :398-401,
+// MessageExchange.ts:521-537 at db021da0); an acknowledgement of another
+// handshake's counter is stray there and is here.
+func (t *outboundReliableTracker) AckUnsecured(hk HandshakeKey, acked uint32) bool {
+	return t.ack(outboundKey{0, acked}, func(e *outboundEntry) bool {
+		return e.exchangeID == hk.ExchangeID && e.initiator == hk.InitiatorNodeID
+	})
 }
 
 // RTTStats summarises the recent first-try round-trips to Matter controllers.

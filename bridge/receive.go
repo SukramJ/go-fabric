@@ -242,7 +242,13 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		b.mu.RLock()
 		outbound := b.outboundReliable
 		b.mu.RUnlock()
-		if outbound != nil && outbound.Ack(hdr.SessionID, proto.AckCounter) {
+		switch {
+		case outbound == nil:
+		case hdr.SessionID == 0:
+			// On the unsecured session an acknowledgement is its
+			// handshake's: the initiator and the exchange it names.
+			outbound.AckUnsecured(handshakeKeyOf(&hdr, proto.ExchangeID), proto.AckCounter)
+		case outbound.Ack(hdr.SessionID, proto.AckCounter):
 			b.releaseReportCounter(hdr.SessionID, proto.AckCounter)
 		}
 	}
