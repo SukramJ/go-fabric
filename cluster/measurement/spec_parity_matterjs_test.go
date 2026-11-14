@@ -228,10 +228,11 @@ func TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows(t *testing.T) {
 
 // TestElectricalPowerReportsItsServedReadings: every reading the projected
 // ElectricalPowerMeasurement serves is change-reported. matter.js
-// broadcasts a change of every conformant property of a behavior's state,
-// a quieter one when its QuietEvent emits
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:230-262 at
-// db021da0); Voltage, ActiveCurrent, ActivePower and Frequency are all of
+// broadcasts the changes of a behavior's state, a quieter property's when
+// its QuietEvent emits and a changes-omitted one's never
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:163-168,
+// :230-262 at db021da0); Voltage, ActiveCurrent, ActivePower and
+// Frequency are all of
 // the quieter quality (packages/model/src/standard/elements/
 // electrical-power-measurement.element.ts:54-55, :58-59, :70-71, :94-95).
 // Review II, phase 4.

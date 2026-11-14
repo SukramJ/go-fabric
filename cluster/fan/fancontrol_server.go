@@ -24,9 +24,9 @@
 // records the addition and its sources. The Percent Rules (§4.4.6.3.1)
 // and Speed Rules (§4.4.6.6.1) the resource refers to are not in the
 // matter.js tree; the two formulas used for them are the ones
-// connectedhomeip's fan-control-server applies, and are flagged as such
-// in notes/parity/matter_behaviour_findings.md until they are checked
-// against a connectedhomeip checkout.
+// connectedhomeip's FanControlCluster applies
+// (src/app/clusters/fan-control-server/FanControlCluster.cpp:197, :224
+// at 6170af84).
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // fancontrol, ADR 0013): ids, revision, the enums and bitmaps, the
@@ -524,7 +524,7 @@ func (s *Server) supports(m FanMode) bool {
 // values the way connectedhomeip does: On becomes High, Smart becomes
 // Auto where the sequence offers Auto and High otherwise. Mirrors
 // connectedhomeip src/app/clusters/fan-control-server/
-// FanControlCluster.cpp:400-410 (SetFanMode) at the harness pin
+// FanControlCluster.cpp:401-411 (SetFanMode) at the harness pin
 // 6170af8461b10b1766044122ac83332c6d00ab20; matter.js's FanControlServer
 // adds no behaviour to the model (packages/node/src/behaviors/fan-control/
 // FanControlServer.ts). A value outside the enum, or one the sequence
@@ -577,7 +577,7 @@ func (s *Server) fanModeSettings(m FanMode) settings {
 
 // percentSettings is what a PercentSetting p resolves to: with
 // MultiSpeed, SpeedSetting = ceil(SpeedMax × p / 100); FanMode Off at 0.
-// Mirrors connectedhomeip FanControlCluster.cpp:180-201
+// Mirrors connectedhomeip FanControlCluster.cpp:179-202
 // (ApplyPercentSettingChanged: `(mSpeedMax * percent + 99) / 100`, Off at
 // 0) at the harness pin; the FanMode of a non-zero percentage stays the
 // device's (:136-166 is connectedhomeip's own 33/66 split).
@@ -596,7 +596,7 @@ func (s *Server) percentSettings(p uint8) settings {
 
 // speedSettings is what a SpeedSetting v resolves to: PercentSetting =
 // floor(v × 100 / SpeedMax); FanMode Off at 0. Mirrors connectedhomeip
-// FanControlCluster.cpp:203-228 (ApplySpeedSettingChanged:
+// FanControlCluster.cpp:204-228 (ApplySpeedSettingChanged:
 // `(speedSetting * 100) / mSpeedMax`, Off at 0) at the harness pin.
 func (s *Server) speedSettings(v uint8) settings {
 	percent := uint8(uint16(v) * 100 / uint16(s.cfg.SpeedMax)) //nolint:gosec // v ≤ SpeedMax: at most 100

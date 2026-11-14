@@ -951,7 +951,7 @@ func equalPhase(a, b *uint8) bool {
 // once, but on the wire a change is reported as matter.js reports its "Q"
 // quality: at once from or to null, otherwise at most once a second, with
 // the latest value (see [cluster.Quieter]; the throttle is the
-// QuietEvent's `online` view only, Events.ts:267-297). The server applies matter.js's
+// QuietEvent's `online` view only, Events.ts:269-296 at db021da0). The server applies matter.js's
 // throttle, not the specification's fuller list of when a countdown change
 // is reportable — matter.js's RvcOperationalStateServer notes the same
 // gap.

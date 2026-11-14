@@ -811,10 +811,10 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		// Occupancy is a map8 with conformance M and no quality X
 		// (matter.js packages/model/src/standard/elements/
 		// occupancy-sensing.element.ts:36 at db021da0), so an unobserved
-		// source reads 0, unoccupied — the default matter.js gives a
-		// non-nullable bitmap (packages/model/src/logic/
-		// SelectDefaultValue.ts:155-171), as BooleanStateServer.MatterRead
-		// answers false.
+		// source reads 0, unoccupied — matter.js's default of a
+		// non-nullable bitmap, `{}` with no bit set (packages/model/src/
+		// logic/SelectDefaultValue.ts:155-171) — as
+		// BooleanStateServer.MatterRead answers false.
 		v, _ := s.ObservedOccupancy()
 		return v, true
 	case attrOccupancySensorType:
@@ -1544,11 +1544,11 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 // A mains-powered device's source states [contract.PowerSourceSelection]
 // Wired ([NewWiredPowerSourceServer]): the Wired feature in place of
 // Battery, as the model's "O.a" admits one of the two per cluster
-// (power-source-cluster.element.ts:24-25 at 862ad75f). It serves no
+// (power-source-cluster.element.ts:24-25 at db021da0). It serves no
 // battery reading; its current type and its Description "Mains power" are
 // matter.js PowerSourceServer.initialize's defaults for WIRED
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:40-46,
-// :57-61 at 862ad75f).
+// :57-61 at db021da0).
 //
 // PowerSourceServer embeds [cluster.DataVersionTracker] and implements
 // [contract.ClusterDataVersion]. See TemperatureServer for the

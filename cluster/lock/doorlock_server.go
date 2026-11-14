@@ -836,7 +836,7 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 		// The PINCode is authorized whatever the features, although its
 		// conformance is "[COTA & PIN]": matter.js passes request.pinCode
 		// to #actuate and #authorize identifies it without a feature test
-		// (DoorLockServer.ts:197-200, :1049-1080 at db021da0).
+		// (DoorLockServer.ts:198-201, :1049-1080 at db021da0).
 		s.op.Lock()
 		defer s.op.Unlock()
 		if err := s.actuate(ctx, actuation, pinCode); err != nil {

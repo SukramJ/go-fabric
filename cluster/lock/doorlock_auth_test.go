@@ -160,7 +160,7 @@ func (stubSourceFull) LockInvoke(context.Context, uint32) error { return nil }
 // command is authorized whatever the features: on a USR|PIN lock without
 // COTA a wrong PIN is refused and counted, a right one names its user.
 // Mirrors matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts
-// at db021da0: unlockDoor passes request.pinCode to #actuate (:197-200),
+// at db021da0: unlockDoor passes request.pinCode to #actuate (:198-201),
 // #authorize identifies it without a feature test (:1049-1080), an unknown
 // PIN is #refuseWrongCode (:1175-1190), a known one runs #authorizeUser.
 // matter.js's base fixture carries no COTA either (DoorLockServerTest.ts:62).

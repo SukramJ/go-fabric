@@ -151,7 +151,7 @@ type WindowStatusSnapshot struct {
 // AdminFabricIndex / AdminVendorID are populated by the cluster server
 // from the IM dispatcher's fabric context so the bridge can reflect
 // them back via [AdministratorCommissioning.MatterRead]. Mirrors
-// matter.js AdministratorCommissioningServer.ts:176-180
+// matter.js AdministratorCommissioningServer.ts:200 at db021da0
 // `this.state.adminFabricIndex = adminFabric.fabricIndex`.
 type OpenWindowParams struct {
 	CommissioningTimeoutSeconds uint16
@@ -223,7 +223,7 @@ type AdministratorCommissioningConfig struct {
 // VendorIDResolver returns the rootVendorId of a fabric. The daemon
 // wires this to the fabric store so a Multi-Admin OpenCommissioningWindow
 // over CASE reflects the calling admin's VendorID in AdminVendorId per
-// matter.js AdministratorCommissioningServer.ts:176-180
+// matter.js AdministratorCommissioningServer.ts:201 at db021da0
 // (`adminFabric.rootVendorId`). Return 0 if the fabric is unknown.
 type VendorIDResolver func(ctx context.Context, fabricIndex uint8) uint16
 
@@ -454,7 +454,7 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		}
 		// Populate AdminFabricIndex from IM dispatcher context per
 		// Matter §11.19.5.2 and matter.js
-		// AdministratorCommissioningServer.ts:176-180
+		// AdministratorCommissioningServer.ts:200 at db021da0
 		// `this.state.adminFabricIndex = adminFabric.fabricIndex`.
 		// AdminVendorID comes from the daemon-wired VendorIDResolver
 		// (fabric store lookup); fabricIndex==0 (PASE) keeps the
