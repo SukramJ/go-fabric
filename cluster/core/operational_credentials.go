@@ -1841,7 +1841,9 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	//
 	// The attestation material is asked for before that lock: the host's
 	// provider runs with nothing of this cluster held but attestationMu, and
-	// may call back into it. Its error is answered after the fail-safe and
+	// may call back into it — except into a command that resolves the
+	// attestation itself (AttestationRequest, CertificateChainRequest,
+	// CSRRequest), which blocks on attestationMu. Its error is answered after the fail-safe and
 	// NOC checks, where matter.js asks for the certification
 	// (OperationalCredentialsServer.ts:132-140 at db021da0: the fail-safe
 	// context, then getCertification).

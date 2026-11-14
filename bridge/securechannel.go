@@ -507,9 +507,16 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// 2507: CHIP Error 0x0000002A: Invalid message type` (state 3
 		// no longer accepts Sigma2). Dedupe at the router by hashing
 		// the Sigma1 payload and short-circuiting replays on the same
-		// (exchangeID, sigma1Hash) tuple. Mirrors matter.js's
-		// `CaseServer.ts::onSigma1` which discards duplicate Sigma1
-		// arrivals on the same exchange via `fabric.locked`.
+		// (exchangeID, sigma1Hash) tuple. The dedupe is this module's
+		// own: matter.js's CASE server has no such step (its entry
+		// points are onNewExchange and #handleSigma1,
+		// packages/protocol/src/session/case/CaseServer.ts:61-63,
+		// :102-133 at db021da0); a retransmission meets its exchange
+		// layer, where a duplicate is acknowledged or the pending
+		// message's retransmission kicked
+		// (packages/protocol/src/protocol/MessageExchange.ts:501-511),
+		// and a message whose id the pending reply acknowledges gets
+		// that reply again (:512-520).
 		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		h := sha256.Sum256(payload)
 		replay, overRecord := b.markSigma1Replied(key, h)

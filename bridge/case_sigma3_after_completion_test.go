@@ -700,7 +700,7 @@ func expectNoHandshakeState(t *testing.T, b *Bridge, when string) {
 // (packages/protocol/src/protocol/MessageExchange.ts:501-511, :521-534 at
 // db021da0); once the exchange is gone (CaseServer.ts:95-98) the CASE
 // server begins afresh with a new random and key pair (CaseServer.ts:61-63,
-// :100-125, :236, :241).
+// :102-133, :236, :241).
 func TestSigma1AgainAfterCompletionBeginsAfresh(t *testing.T) {
 	t.Parallel()
 	key := HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}

@@ -765,10 +765,15 @@ func sealResumeMIC(key []byte, nonceStr string) ([]byte, error) {
 // last-generated Responder state then fails to AES-CCM-decrypt the
 // Sigma3 payload (`encrypted payload authentication failed`) and
 // Apple logs `still not subscribed, marking the device as
-// unreachable` ~16 s later. Mirrors matter.js
-// `packages/protocol/src/session/case/CaseServer.ts:onSigma1` which
-// caches the prior Sigma2 and replays it byte-for-byte on a
-// duplicate Sigma1 instead of re-deriving.
+// unreachable` ~16 s later. The cache holds while the handshake is in
+// progress ([Responder.processSigma1Locked]) and is this module's own:
+// matter.js's CASE server keeps no Sigma2 to send again
+// (packages/protocol/src/session/case/CaseServer.ts:102-133 at
+// db021da0); its exchange layer acknowledges a duplicate or kicks the
+// pending message's retransmission
+// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and
+// answers a message whose id the pending reply acknowledges with that
+// reply again (:512-520).
 func (r *Responder) ProcessSigma1(sigma1Bytes []byte) (Sigma2, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -809,7 +814,7 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 		// that exchange is gone (CaseServer.ts:95-98) the CASE server
 		// begins afresh with a new random and key pair
 		// (packages/protocol/src/session/case/CaseServer.ts:61-63,
-		// :100-125, :236, :241). Apple Home opens new CASE sessions
+		// :102-133, :236, :241). Apple Home opens new CASE sessions
 		// on the SAME ExchangeID after CommissioningComplete (the
 		// iCloud Hub Companion fabric grafts onto the existing
 		// exchange). Reset the responder and proceed as a clean
@@ -990,9 +995,14 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 // drops the StatusReport reply and Apple's pair times out 9 s later
 // with `HMMTRErrorDomain Code=9`. Treat a retransmit of the same
 // Sigma3 bytes as success — the caller (CaseAdapter.ProcessSigma3)
-// then re-emits the cached StatusReport(Success). Mirrors matter.js
-// `CaseServer.ts:onSigma3` which converges the responder on the
-// finished state and re-acks duplicates.
+// then re-emits the cached StatusReport(Success). The convergence is
+// this module's own: matter.js's CASE server reads Sigma3 once
+// (packages/protocol/src/session/case/CaseServer.ts:279 at db021da0),
+// and a retransmission meets its exchange layer, where a duplicate is
+// acknowledged or the pending message's retransmission kicked
+// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and a
+// message whose id the pending reply acknowledges gets that reply again
+// (:512-520).
 //
 // A Sigma3 that does not authenticate is terminal for this handshake:
 // the responder accepts no further Sigma3 until a new Sigma1 restarts
