@@ -37,6 +37,16 @@ type GroupKeyManagement struct {
 	// leaves the cluster a pure store facade with an empty GroupTable.
 	groups *groups.Manager
 
+	// writeMu serialises a controller's GroupKeyMap writes: one write's
+	// read of the fabric's bindings, its comparison and its store are one
+	// step, so a write that answers unchanged has stored nothing, a
+	// concurrent write's change is never undone under it, and two writes
+	// never leave a mixture of both lists (matter.js holds the datasource
+	// across a write's change and the commit's comparison,
+	// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+	// db021da0). It is taken before mu, never under it, and the store is
+	// called under it.
+	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric, the limits and
 	// the cached key-set state.
 	mu                    sync.RWMutex
@@ -558,11 +568,13 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
-// write of [GroupKeyManagement.MatterWrite], changed when the fabric's
-// bindings after it differ from the ones it held — the comparison that
-// advances the server's own version (matter.js Datasource.ts:1456-1457,
-// :1479 at db021da0: an equal value is no change). The bindings are kept
-// per group, so the order of the written entries does not count.
+// write of [GroupKeyManagement.MatterWrite], changed when it stored the
+// list — the fabric's bindings differed from the written ones. Bindings
+// equal to the held ones are not stored and leave the server's own
+// version (matter.js Datasource.ts:1456-1457, :1476-1492 at db021da0: an
+// equal value is no change); the read, the comparison and the store hold
+// writeMu. The bindings are kept per group, so the order of the written
+// entries does not count.
 func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
 		return false, spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
@@ -595,11 +607,15 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	if err := g.validateGroupKeyMap(list); err != nil {
 		return false, err
 	}
+	g.writeMu.Lock()
+	defer g.writeMu.Unlock()
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
 		return false, fmt.Errorf("core: GroupKeyMap write: list current bindings: %w", err)
 	}
-	changed := !sameGroupKeyMap(existing, list)
+	if sameGroupKeyMap(existing, list) {
+		return false, nil
+	}
 	for _, m := range list {
 		if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{
 			FabricIndex:   fabric,
@@ -619,11 +635,9 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	}
 	// A GroupKeyMap that changed advances DataVersion so DataVersionFilter
 	// evaluation detects the cluster changed; one written as it was held
-	// leaves it.
-	if changed {
-		g.dataVersion.Bump()
-	}
-	return changed, g.syncGroups(ctx, fabric)
+	// returned above.
+	g.dataVersion.Bump()
+	return true, g.syncGroups(ctx, fabric)
 }
 
 // sameGroupKeyMap reports whether the written list binds the groups the

@@ -43,6 +43,15 @@ type AccessControl struct {
 	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
 	log atomic.Pointer[slog.Logger]
 
+	// writeMu serialises a controller's writes of Acl and Extension: one
+	// write's read of the held list, its comparison and its store are one
+	// step, so a write that answers unchanged has stored nothing and a
+	// concurrent write's change is never undone under it (matter.js holds
+	// the datasource across a write's change and the commit's comparison,
+	// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+	// db021da0). It is taken before mu, never under it, and the store is
+	// called under it.
+	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric and the cached
 	// ACL state the handlers read; the store is not called under it.
 	mu            sync.RWMutex
@@ -696,10 +705,12 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
-// write of [AccessControl.MatterWrite], changed when the accessing
-// fabric's ACL or Extension list after it differs from the one it held —
-// the comparison that decides the change event and advances the server's
-// own version (matter.js Datasource.ts:1456-1457, :1479 at db021da0).
+// write of [AccessControl.MatterWrite], changed when it stored a list —
+// the accessing fabric's ACL or Extension list differed from the one it
+// held. A list equal to the held one is not stored, fires no change event
+// and leaves the server's own version (matter.js Datasource.ts:1456-1457,
+// :1476-1492 at db021da0); the read, the comparison and the store hold
+// writeMu, so a concurrent write is never undone under an unchanged verdict.
 func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)
@@ -861,16 +872,25 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 			}
 			out = append(out, rec)
 		}
+		// The read of the held list, the comparison and the store are one
+		// step under writeMu: a write that answers unchanged has stored
+		// nothing, so it cannot undo a change another write made.
+		a.writeMu.Lock()
+		defer a.writeMu.Unlock()
 		// Snapshot old ACL before the replace so we can classify the
 		// change type for the spec-mandated AccessControlEntryChanged event
 		// (§9.10.7.1). We read before write; a store error here is
 		// non-fatal for the write itself — we fall back to ChangeType=Changed
 		// if the snapshot fails.
 		oldEntries, listErr := a.store.ListACL(ctx, fabric)
-		// A write of the list the fabric holds changes nothing (matter.js
-		// Datasource.ts:1479 at db021da0); without the old list the write
-		// counts as a change.
-		changed := listErr != nil || !aclEntriesEqual(oldEntries, out)
+		// A write of the list the fabric holds changes nothing: it is not
+		// stored, advances no version and fires no event, as matter.js
+		// notes no change and queues no $Changed for an equal value
+		// (Datasource.ts:1476-1492 at db021da0, #noteIfChanged). Without
+		// the old list the write is stored and counts as a change.
+		if listErr == nil && aclEntriesEqual(oldEntries, out) {
+			return false, nil
+		}
 
 		if err := a.store.ReplaceACL(ctx, fabric, out); err != nil {
 			return false, fmt.Errorf("core: AccessControl.ACL write: %w", err)
@@ -878,9 +898,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// Bump DataVersion after a successful mutation so DataVersionFilter
 		// evaluation correctly detects the cluster changed. Must happen
 		// AFTER the store write succeeds per DataVersionTracker contract.
-		if changed {
-			a.dataVersion.Bump()
-		}
+		a.dataVersion.Bump()
 
 		// Emit AccessControlEntryChanged per Matter §9.10.7.1, one event per
 		// entry of the writing fabric, the way matter.js
@@ -896,8 +914,10 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		a.mu.RUnlock()
 		// matter.js reports an ACL change on acl$Changed, which a write of
 		// the list it already holds does not fire — the replace-with-empty
-		// a chunked list write opens with included (TC-ACL-2.5).
-		if emitter != nil && !aclEntriesEqual(oldEntries, out) {
+		// a chunked list write opens with included (TC-ACL-2.5); that write
+		// returned above. A list the store could not read is compared as
+		// empty.
+		if emitter != nil {
 			nodeID, passcodeID := aclAdminFromContext(ctx)
 			emit := func(changeType uint8, latest store.ACLEntry) {
 				v := aclEntryStruct(latest)
@@ -933,7 +953,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				emit(AccessControlChangeTypeRemoved, oldEntries[j])
 			}
 		}
-		return changed, nil
+		return true, nil
 	}
 	if attrID == accessControlAttrExtension {
 		// Extension (0x0001) write path: replace the per-fabric extension
@@ -978,6 +998,18 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				FabricIndex: fabric,
 			}
 		}
+		// The read of the held entries, the comparison and the store are
+		// one step under writeMu, as for Acl above: entries equal to the
+		// held ones are neither persisted nor stored, advance no version
+		// and fire no event (Datasource.ts:1476-1492 at db021da0).
+		a.writeMu.Lock()
+		defer a.writeMu.Unlock()
+		a.mu.RLock()
+		oldExtensions := a.extensions[fabric]
+		a.mu.RUnlock()
+		if extensionsEqual(oldExtensions, stamped) {
+			return false, nil
+		}
 		if err := a.persistExtension(ctx, fabric, stamped); err != nil {
 			return false, fmt.Errorf("core: AccessControl.Extension write: persist: %w", err)
 		}
@@ -985,15 +1017,11 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		if a.extensions == nil {
 			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
 		}
-		oldExtensions := a.extensions[fabric]
 		a.extensions[fabric] = stamped
 		emitter := a.emitter
 		endpoint := a.endpoint
 		a.mu.Unlock()
-		changed := !extensionsEqual(oldExtensions, stamped)
-		if changed {
-			a.dataVersion.Bump()
-		}
+		a.dataVersion.Bump()
 
 		// Emit AccessControlExtensionChanged per Matter §9.10.7.2, the
 		// same way the ACL write emits AccessControlEntryChanged above:
@@ -1001,7 +1029,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// list-length delta, LatestValue=nil for a bulk-replace (spec
 		// quality X — permitted to omit) unless exactly one entry is
 		// involved on either side of the change.
-		if emitter != nil && !extensionsEqual(oldExtensions, stamped) {
+		if emitter != nil {
 			changeType := AccessControlChangeTypeChanged
 			switch {
 			case len(stamped) > len(oldExtensions):
@@ -1033,7 +1061,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				contract.EventPriorityInfo,
 			)
 		}
-		return changed, nil
+		return true, nil
 	}
 	return false, fmt.Errorf("core: AccessControl attribute 0x%04X not writable", attrID)
 }
