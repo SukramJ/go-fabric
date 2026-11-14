@@ -640,7 +640,8 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 		return nil, fmt.Errorf("core: AccessControl: list fabrics: %w", err)
 	}
 	out := make([]uint8, 0, len(recs)+1)
-	for _, r := range recs {
+	for i := range recs {
+		r := &recs[i]
 		out = append(out, r.FabricIndex)
 	}
 	a.mu.RLock()

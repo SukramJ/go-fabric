@@ -48,7 +48,8 @@ func addNOCLabel(t *testing.T, cfg core.OpcredsConfig) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range fabrics {
+	for i := range fabrics {
+		f := &fabrics[i]
 		if f.FabricIndex == noc.FabricIndex {
 			return f.Label
 		}

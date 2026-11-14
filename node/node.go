@@ -1055,12 +1055,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// would mark it again from this stale count.
 	n.commissioned.Store(err == nil && stored > 0)
 	loaded := make([]store.FabricRecord, 0, stored)
-	for _, fabric := range fabrics {
-		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
+	for i := range fabrics {
+		if err := n.caseIDs.load(ctx, n.st, fabrics[i].FabricIndex); err != nil {
 			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
 			continue
 		}
-		loaded = append(loaded, fabric)
+		loaded = append(loaded, fabrics[i])
 	}
 	work.pause()
 	n.br.ReestablishFormerSubscriptions(ctx)
@@ -1376,8 +1376,8 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 		return nil, err
 	}
 	out := make([]FabricInfo, 0, len(recs))
-	for _, rec := range recs {
-		out = append(out, fabricInfoOf(rec))
+	for i := range recs {
+		out = append(out, fabricInfoOf(recs[i]))
 	}
 	return out, nil
 }

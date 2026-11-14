@@ -216,8 +216,8 @@ func (f *fakeStore) ListFabrics(_ context.Context) ([]mstore.FabricRecord, error
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	out := make([]mstore.FabricRecord, 0, len(f.fabrics))
-	for _, rec := range f.fabrics {
-		out = append(out, rec)
+	for idx := range f.fabrics {
+		out = append(out, f.fabrics[idx])
 	}
 	return out, nil
 }

@@ -1029,7 +1029,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			return nil, false
 		}
 		out := make([]NOCStruct, 0, len(fabrics))
-		for _, f := range fabrics {
+		for i := range fabrics {
+			f := &fabrics[i]
 			id, err := o.store.GetIdentity(ctx, f.FabricIndex)
 			if err != nil {
 				continue
@@ -1048,7 +1049,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			return nil, false
 		}
 		out := make([]FabricDescriptorStruct, 0, len(fabrics))
-		for _, f := range fabrics {
+		for i := range fabrics {
+			f := &fabrics[i]
 			out = append(out, FabricDescriptorStruct{
 				RootPublicKey: f.RootPublicKey,
 				VendorID:      f.VendorID,
@@ -1107,7 +1109,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		if len(pending) > 0 {
 			out = append(out, append([]byte(nil), pending...))
 		}
-		for _, f := range fabrics {
+		for i := range fabrics {
+			f := &fabrics[i]
 			if len(f.RootCert) == 0 {
 				continue
 			}
@@ -1238,7 +1241,8 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 			return nil, false
 		}
 		out := make([]FabricDescriptorStruct, 0, 1)
-		for _, f := range fabrics {
+		for i := range fabrics {
+			f := &fabrics[i]
 			if f.FabricIndex != fabricIndex {
 				continue // filter to requesting fabric per Matter §11.18.6.5
 			}
@@ -1260,7 +1264,8 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 			return nil, false
 		}
 		out := make([]NOCStruct, 0, 1)
-		for _, f := range fabrics {
+		for i := range fabrics {
+			f := &fabrics[i]
 			if f.FabricIndex != fabricIndex {
 				continue
 			}
@@ -2474,7 +2479,8 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if req.Label != "" {
 		fabrics, err := o.store.ListFabrics(ctx)
 		if err == nil {
-			for _, f := range fabrics {
+			for i := range fabrics {
+				f := &fabrics[i]
 				if f.FabricIndex != idx && f.Label == req.Label {
 					return NOCResponse{
 						StatusCode: NOCStatusLabelConflict,
