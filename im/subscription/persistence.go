@@ -125,8 +125,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		lastReport: m.cfg.Clock.Now(),
 		priming:    true,
 	}
-	m.byID[sub.ID] = sub
-	m.perFabric[sub.FabricIndex]++
+	m.admitLocked(sub)
 	changed := m.onSessionChanged
 	m.mu.Unlock()
 	// The session carries a subscription now, as after Subscribe (review

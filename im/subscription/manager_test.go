@@ -272,6 +272,56 @@ func TestSubscribe_FabricQuotaExceeded(t *testing.T) {
 	}
 }
 
+// TestSubscribe_EvictAtQuotaEndsTheFabricsOldest: a subscription admitted
+// with EvictAtQuota at its fabric's quota ends the fabric's oldest
+// subscription, terminated, whichever peer holds it, and leaves every other
+// fabric's alone — connectedhomeip's eviction from the requesting fabric
+// (src/app/InteractionModelEngine.cpp:1341-1350, the oldest :1223-1230 at
+// 6170af84); review II, R2-P3-admin-03, owner decision 53.
+func TestSubscribe_EvictAtQuotaEndsTheFabricsOldest(t *testing.T) {
+	t.Parallel()
+	m := newManager(subscription.Config{MaxSubscriptionsPerFabric: 3}, nil)
+	var terminated []uint32
+	m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { terminated = append(terminated, id) })
+	subscribe := func(fabric uint8, peer uint64, session uint16, evict bool) (*subscription.Subscription, error) {
+		args := defaultArgs()
+		args.FabricIndex, args.PeerNodeID, args.SessionID, args.EvictAtQuota = fabric, peer, session, evict
+		return m.Subscribe(args)
+	}
+	other, err := subscribe(2, 0xB001, 50, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	taken := make([]*subscription.Subscription, 0, 3)
+	for i := range 3 {
+		sub, err := subscribe(1, 0xA0BB, uint16(10+i), false) //nolint:gosec // G115: i bounded by loop constant
+		if err != nil {
+			t.Fatalf("peer X subscription %d: %v", i+1, err)
+		}
+		taken = append(taken, sub)
+	}
+	if _, err := subscribe(1, 0xA001, 99, false); !errors.Is(err, subscription.ErrFabricQuotaExceeded) {
+		t.Fatalf("at the quota without EvictAtQuota: %v, want ErrFabricQuotaExceeded", err)
+	}
+	if _, err := subscribe(1, 0xA001, 99, true); err != nil {
+		t.Fatalf("peer Y with EvictAtQuota at its fabric's quota: %v", err)
+	}
+	if _, err := m.Get(taken[0].ID); !errors.Is(err, subscription.ErrNotFound) {
+		t.Errorf("the fabric's oldest subscription is still held (%v)", err)
+	}
+	for _, sub := range append(taken[1:], other) {
+		if _, err := m.Get(sub.ID); err != nil {
+			t.Errorf("subscription %d of fabric %d ended: %v", sub.ID, sub.FabricIndex, err)
+		}
+	}
+	if len(terminated) != 1 || terminated[0] != taken[0].ID {
+		t.Errorf("terminated %v, want only the oldest %d", terminated, taken[0].ID)
+	}
+	if got := m.Active(); got != 4 {
+		t.Errorf("Active = %d, want 4", got)
+	}
+}
+
 // ---- Get ----
 
 func TestGet_Hit(t *testing.T) {

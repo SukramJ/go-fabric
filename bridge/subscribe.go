@@ -380,6 +380,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if !ok {
 		return
 	}
+	if dispatcher := b.Dispatcher(); dispatcher != nil && b.endIfSubjectReadsNothing(ctx, dispatcher, target, sub) {
+		return
+	}
 	// The attribute changes due in this report are this reporter's from
 	// here on: sent below, or marked dirty again when the send fails.
 	paths := sub.TakeDuePaths()
@@ -612,6 +615,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	if !ok {
 		return
 	}
+	if b.endIfSubjectReadsNothing(ctx, dispatcher, target, sub) {
+		return
+	}
 
 	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
 	target.abort = ctx.Done()
@@ -662,6 +668,97 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		slog.Int("paths", len(paths)),
 		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
+}
+
+// endIfSubjectReadsNothing ends sub, terminated, when the subject it was
+// established for may read none of its paths any more
+// ([Bridge.subjectReadsNothing]) and reports whether it did: a report finds
+// the subject without a readable path after an ACL change, and the
+// subscription gives its place in the fabric's quota back instead of
+// living on on keep-alives (review II, R2-P3-admin-03, owner decision 53).
+// The rule is the module's own, beside its own quota; it mirrors no
+// reference line.
+func (b *Bridge) endIfSubjectReadsNothing(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
+	if !b.subjectReadsNothing(ctx, dispatcher, target, sub) {
+		return false
+	}
+	b.routing.subTargets.Delete(sub.ID)
+	b.subSendErrorCount.Delete(sub.ID)
+	b.forgetReportExchange(sub.ID)
+	if m := b.subscriptionManagerLocked(); m != nil {
+		_ = m.Close(sub.ID) // ErrNotFound is fine — racing with peer Close
+	}
+	if b.logger != nil {
+		b.logger.Info("matter.subscribe.subject_reads_nothing",
+			slog.Int("subscription_id", int(sub.ID)),
+			slog.Int("fabric_index", int(target.fabricIndex)))
+	}
+	return true
+}
+
+// subjectReadsNothing reports whether the ACL refuses the subscription's
+// subject every attribute and every event cluster its paths resolve to,
+// and at least one is refused. Only a plain refusal by an ACL that could
+// be read counts: a PASE subscription, a dispatcher without an ACL, a
+// session without an accessing fabric, an ACL source that is missing or
+// fails to list the fabric's entries, and any answer of the access check
+// other than UNSUPPORTED_ACCESS leave the subscription alone, as does a
+// subscription whose paths resolve to nothing at all. The walk stops at
+// the first path the subject may read.
+func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
+	checker, hasACL := dispatcher.(im.ACLChecker)
+	if target.pase || !hasACL || !im.HasAccessingFabric(target.fabricIndex) {
+		return false
+	}
+	b.mu.RLock()
+	lister := b.aclLister
+	b.mu.RUnlock()
+	if lister == nil {
+		return false
+	}
+	if _, err := lister.ListACL(ctx, target.fabricIndex); err != nil {
+		return false
+	}
+	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
+	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
+	refused := false
+	exp := im.NewAttributeExpansion(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
+	for {
+		_, rr, ok := exp.Next()
+		if !ok {
+			break
+		}
+		if rr.Status == im.StatusUnsupportedNode {
+			continue
+		}
+		var priv uint8 = 1 // View default
+		if hasPriv {
+			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
+		}
+		if checker.CheckACL(readCtx, target.fabricIndex, target.subjectNodeID, target.subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv) != im.StatusUnsupportedAccess {
+			return false
+		}
+		refused = true
+	}
+	auth := b.eventReadAuthorizer(dispatcher, target.fabricIndex, false, target.subjectNodeID, target.subjectCATs)
+	for _, p := range sub.EventPaths {
+		probe := im.ConcreteAttributePath{
+			Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
+			Cluster: p.Cluster, HasCluster: p.HasCluster,
+			Attribute: clusterRevisionAttributeID, HasAttribute: true,
+		}
+		for _, rr := range dispatcher.Read(readCtx, probe) {
+			if rr.Status != im.StatusSuccess {
+				continue
+			}
+			if auth.Allows(readCtx, rr.Path.Endpoint, rr.Path.Cluster) {
+				return false
+			}
+			refused = true
+		}
+	}
+	return refused
 }
 
 // subscriptionAttributeReports reads paths for sub — the changed ones its
@@ -1514,6 +1611,21 @@ func (b *Bridge) subscribeWith(
 	// (subscription_reestablish.go) already admits first.
 	var stamp im.ReportData
 	subID, regErr := b.registerSubscription(src, requestHdr, proto, req, &stamp)
+	if errors.Is(regErr, subscription.ErrFabricQuotaExceeded) {
+		// The fabric holds its quota. connectedhomeip's rule: the access
+		// check first — a request whose paths the subject may read none of
+		// is InvalidAction (src/app/InteractionModelEngine.cpp:861-868 at
+		// 6170af84), as it is here with room (no_match below) — then the
+		// eviction that makes room, so the request is admitted in the
+		// place of the fabric's oldest subscription (:871-875,
+		// :1341-1350). A subject that may read nothing takes nobody's
+		// place (review II, R2-P3-admin-03, owner decision 53).
+		if !b.primingMatches(subCtx, dispatcher, primingRequest(req, subLocalNodeID)) {
+			return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
+		}
+		stamp = im.ReportData{}
+		subID, regErr = b.registerSubscriptionAt(src, requestHdr, proto, req, &stamp, true)
+	}
 	if regErr != nil {
 		// The manager refused the subscription (per-fabric quota, cadence
 		// out of range, cadence inverted after clamp). The controller must
@@ -1539,8 +1651,7 @@ func (b *Bridge) subscribeWith(
 	// One EventFilterIB applies to the priming report: the first for this
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
-	primingReq := req
-	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, subLocalNodeID)
+	primingReq := primingRequest(req, subLocalNodeID)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
@@ -1590,6 +1701,14 @@ func (b *Bridge) subscribeWith(
 	// SubscribeResponse).
 	b.persistSubscription(ctx, subID)
 	return nil
+}
+
+// primingRequest is req as its priming report reads it: one EventFilterIB
+// applies, the first for this node (matter.js EventReadResponse.ts:68-77;
+// review 2026-11 W2-wire-05).
+func primingRequest(req im.SubscribeRequest, localNodeID uint64) im.SubscribeRequest {
+	req.EventFilters = im.EventFiltersFor(req.EventFilters, localNodeID)
+	return req
 }
 
 // rejectSubscribeInvalidAction ships a top-level

@@ -162,7 +162,10 @@ type Manager struct {
 	byID      map[uint32]*Subscription
 	perFabric map[uint8]int
 	nextID    uint32
-	onClosed  func(subID uint32)
+	// admissions counts the subscriptions admitted, the source of
+	// [Subscription.admitted].
+	admissions uint64
+	onClosed   func(subID uint32)
 	// onSessionChanged observes a change of one session's subscription
 	// set: a subscription added to it or closed on it.
 	onSessionChanged func(sessionID uint16)
@@ -395,9 +398,13 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	}
 
 	m.mu.Lock()
+	var evicted []*Subscription
 	if m.perFabric[req.FabricIndex] >= m.cfg.MaxSubscriptionsPerFabric {
-		m.mu.Unlock()
-		return nil, fmt.Errorf("%w: fabric=%d quota=%d", ErrFabricQuotaExceeded, req.FabricIndex, m.cfg.MaxSubscriptionsPerFabric)
+		if !req.EvictAtQuota {
+			m.mu.Unlock()
+			return nil, fmt.Errorf("%w: fabric=%d quota=%d", ErrFabricQuotaExceeded, req.FabricIndex, m.cfg.MaxSubscriptionsPerFabric)
+		}
+		evicted = m.evictOldestLocked(req.FabricIndex)
 	}
 	id := m.allocateIDLocked()
 	// MaxInterval publisher selection semantics (chip alignment):
@@ -466,10 +473,10 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 		lastReport: m.cfg.Clock.Now(),
 		priming:    req.Priming,
 	}
-	m.byID[id] = sub
-	m.perFabric[req.FabricIndex]++
+	m.admitLocked(sub)
 	changed := m.onSessionChanged
 	m.mu.Unlock()
+	m.finishClose(evicted, true)
 	if changed != nil {
 		changed(req.SessionID)
 	}
@@ -483,6 +490,49 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 		slog.Int("paths", len(req.AttributePaths)),
 	)
 	return sub, nil
+}
+
+// admitLocked enters sub in the tables as the latest admitted. Callers
+// hold m.mu.
+func (m *Manager) admitLocked(sub *Subscription) {
+	m.admissions++
+	sub.admitted = m.admissions
+	m.byID[sub.ID] = sub
+	m.perFabric[sub.FabricIndex]++
+}
+
+// evictOldestLocked removes the oldest subscription of fabricIndex from
+// the tables and returns it for [Manager.finishClose] — connectedhomeip's
+// eviction of the requesting fabric's subscription when its own share is
+// what the new one needs (src/app/InteractionModelEngine.cpp:1341-1350 at
+// 6170af84, TrimFabricForSubscriptions with aForceEvict, :1173-1247): the
+// candidate is the fabric's oldest (:1223-1230), one using more than the
+// fabric's share of the path pool first (:1215-1222) — a pool this module
+// does not keep, so no subscription here is over it. A subscription still
+// priming is a candidate as there: connectedhomeip walks every
+// subscribe-type handler of the fabric (:1198-1202). Callers hold m.mu.
+func (m *Manager) evictOldestLocked(fabricIndex uint8) []*Subscription {
+	var oldest *Subscription
+	for _, sub := range m.byID {
+		if sub.FabricIndex != fabricIndex {
+			continue
+		}
+		if oldest == nil || sub.admitted < oldest.admitted {
+			oldest = sub
+		}
+	}
+	if oldest == nil {
+		return nil
+	}
+	delete(m.byID, oldest.ID)
+	m.perFabric[fabricIndex]--
+	if m.perFabric[fabricIndex] <= 0 {
+		delete(m.perFabric, fabricIndex)
+	}
+	m.logger.Debug("im.subscription.evicted",
+		slog.Uint64("subscription_id", uint64(oldest.ID)),
+		slog.Int("fabric_index", int(fabricIndex)))
+	return []*Subscription{oldest}
 }
 
 // Get returns the subscription for id.
@@ -908,6 +958,19 @@ type SubscribeArgs struct {
 	// a peer that genuinely intends to hold multiple simultaneous
 	// subscriptions with different path sets.
 	ReplaceSessionDuplicate bool
+	// EvictAtQuota admits the subscription when its fabric holds
+	// [Config.MaxSubscriptionsPerFabric] subscriptions already, by ending
+	// the fabric's oldest — terminated, as [Manager.Close] ends one —
+	// instead of refusing it with [ErrFabricQuotaExceeded]. It is
+	// connectedhomeip's rule for a SubscribeRequest at the limit
+	// (src/app/InteractionModelEngine.cpp:1249-1360 at 6170af84,
+	// EnsureResourceForSubscription): a request is not refused for want of
+	// room, the requesting fabric's own subscriptions make it
+	// (:1341-1350). connectedhomeip applies it only to a subject that may
+	// read one of the paths it asks for — the access check precedes the
+	// resource check (:861-875) — so the caller sets it only for such a
+	// request.
+	EvictAtQuota bool
 }
 
 // EventFiring is the payload of an [Manager.OnEventFired] call. The

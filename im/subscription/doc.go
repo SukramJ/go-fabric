@@ -21,7 +21,8 @@
 //     its priority does not matter. Events and attribute changes that are
 //     due together leave in one ReportData.
 //   - Each subscription is fabric-scoped and counts against the
-//     per-fabric MaxSubscriptions quota.
+//     per-fabric MaxSubscriptions quota; a request admitted at the quota
+//     with [SubscribeArgs.EvictAtQuota] ends the fabric's oldest.
 //
 // go-fabric v1.1 ships a baseline implementation: subscriptions
 // live in RAM, reports are produced by a single Tick goroutine that
