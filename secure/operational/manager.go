@@ -1187,6 +1187,24 @@ func (m *Manager) ClosePASESessions() int {
 	return len(victims)
 }
 
+// PASESessionIDs returns the ids of the established PASE sessions in the
+// table, the ones AddNOC adopted onto a fabric included. The bridge accepts
+// no new PASE exchange while one of them is not closing, as matter.js
+// ignores a new PASE exchange while `getPaseSession()` finds a PASE session
+// that is not closing (packages/protocol/src/session/SessionManager.ts:614-618,
+// packages/protocol/src/session/pase/PaseServer.ts:80-82 at db021da0).
+func (m *Manager) PASESessionIDs() []uint16 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var ids []uint16
+	for id, entry := range m.sessions {
+		if entry.isPase && entry.Session != nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // ClosePeer tears down every live session matching the
 // (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
 // first. Returns the number of sessions closed. A peer that stopped

@@ -658,6 +658,12 @@ type Bridge struct {
 	paseInFlight      HandshakeKey
 	paseInFlightSince time.Time
 
+	// paseClosing names the PASE sessions whose close the bridge has
+	// scheduled and not yet run ([Bridge.paseSessionsCloser]): they are
+	// closing, and do not keep a new PASE exchange out
+	// ([Bridge.paseSessionExists]). Guarded by b.mu.
+	paseClosing map[uint16]struct{}
+
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
 	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
 	// retransmitted handshake message is acked without re-invoking the

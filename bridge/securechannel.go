@@ -490,6 +490,21 @@ func (b *Bridge) dispatchPase(
 	proto message.ProtocolHeader,
 	payload []byte,
 ) error {
+	if b.paseSessionExists() {
+		// An established PASE session that is not closing: no new PASE
+		// exchange is accepted until it ends. matter.js ignores the
+		// exchange ("Pairing already in progress (PASE session exists)",
+		// PaseServer.ts:80-82 at db021da0); connectedhomeip unregisters the
+		// PBKDFParamRequest handler once the PASE session is established
+		// (src/app/server/CommissioningWindowManager.cpp:211, :224 and
+		// :560-561 at 6170af84). Nothing is resolved or counted; the MRP
+		// layer has already acknowledged the datagram.
+		b.logger.Info("matter.rx.sc.pase_session_exists",
+			slog.String("src", srcString(src)),
+			slog.Int("opcode", int(proto.Opcode)),
+			slog.Int("exchange_id", int(proto.ExchangeID)))
+		return nil
+	}
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	if proto.Opcode != mrp.SCOpcodePBKDFParamRequest && b.paseHandshakeOfAnother(key) {
 		// A pairing is in progress and this Pake1 / Pake3 is not of it:
@@ -626,6 +641,42 @@ func (b *Bridge) claimPaseInFlight(key HandshakeKey) bool {
 		b.abandonHandshakeReplies(expired)
 	}
 	return true
+}
+
+// paseSessionIDLister is the optional capability of a [SessionRegistry] to
+// name its established PASE sessions (secure/operational
+// Manager.PASESessionIDs).
+type paseSessionIDLister interface {
+	PASESessionIDs() []uint16
+}
+
+// paseSessionExists reports whether the attached session registry holds an
+// established PASE session that is not closing. A session whose close the
+// bridge has scheduled ([Bridge.paseSessionsCloser]) is closing from that
+// moment, as a matter.js session is from initiateClose on
+// (packages/protocol/src/session/Session.ts:190-192 `isClosing`, :304-309
+// at db021da0), though it stays in the table for its grace. A registry
+// without the capability reports none.
+func (b *Bridge) paseSessionExists() bool {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	r, ok := reg.(paseSessionIDLister)
+	if !ok {
+		return false
+	}
+	ids := r.PASESessionIDs()
+	if len(ids) == 0 {
+		return false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for _, id := range ids {
+		if _, closing := b.paseClosing[id]; !closing {
+			return true
+		}
+	}
+	return false
 }
 
 // paseHandshakeOfAnother reports whether the single-active-PASE slot is
