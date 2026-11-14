@@ -580,22 +580,17 @@ func (c *Controller) traceOTAStatus(host func(softwareupdate.Peer, softwareupdat
 // node.Node.DiagnoseMDNS. It asks the DNS-SD cache: it must not be called
 // from a callback the cache runs.
 func (c *Controller) DiagnoseMDNS() []mdns.Finding {
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
+	out, names, ok := c.diagnoseAdvertised()
+	if !ok {
 		return nil
 	}
-	var out []mdns.Finding
-	if c.adv != nil {
-		for _, f := range mdns.Diagnose(c.adv.Active()) {
-			if f.Code == "no_commissionable_service" { // the node's: a controller advertises no _matterc record
-				continue
-			}
-			out = append(out, f)
-		}
-	}
-	if reg := c.registry.Load(); reg != nil && c.names != nil {
-		out = append(out, c.diagnoseBrowse(reg.Commissioned())...)
+	// The browse waits for the DNS-SD cache's goroutine, whose observers
+	// may call a gated accessor: it runs after the gate is released, or a
+	// Close waiting for the write lock would hold their read locks behind
+	// this one (review II, R2-P2-dr-ctl-01). A cache that Close closed
+	// meanwhile answers with no names.
+	if reg := c.registry.Load(); reg != nil && names != nil {
+		out = append(out, c.diagnoseBrowse(names, reg.Commissioned())...)
 	}
 	slices.SortStableFunc(out, func(a, b mdns.Finding) int {
 		switch {
@@ -611,11 +606,31 @@ func (c *Controller) DiagnoseMDNS() []mdns.Finding {
 	return out
 }
 
+// diagnoseAdvertised is DiagnoseMDNS's part under the closed gate: the
+// findings of the advertised records and the DNS-SD cache, read while the
+// controller was open; false once Close has begun.
+func (c *Controller) diagnoseAdvertised() (out []mdns.Finding, names *discovery.Names, ok bool) {
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		return nil, nil, false
+	}
+	if c.adv != nil {
+		for _, f := range mdns.Diagnose(c.adv.Active()) {
+			if f.Code == "no_commissionable_service" { // the node's: a controller advertises no _matterc record
+				continue
+			}
+			out = append(out, f)
+		}
+	}
+	return out, c.names, true
+}
+
 // diagnoseBrowse counts the waiting nodes and those whose operational
-// record is in the cache, for mdns.DiagnoseOperationalBrowse.
-func (c *Controller) diagnoseBrowse(nodes []*client.Node) []mdns.Finding {
+// record is in names, for mdns.DiagnoseOperationalBrowse.
+func (c *Controller) diagnoseBrowse(names *discovery.Names, nodes []*client.Node) []mdns.Finding {
 	cached := map[string]bool{}
-	for _, name := range c.names.DiscoveredNames() {
+	for _, name := range names.DiscoveredNames() {
 		cached[strings.ToLower(name.QName())] = true
 	}
 	cfid := c.fabric.Identity.CompressedFabricID
