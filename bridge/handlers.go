@@ -790,27 +790,6 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	if r == nil {
 		return 0, nil, errors.New("bridge: CaseAdapter without responder")
 	}
-	if _, err := sigma.UnmarshalSigma1(payload); err != nil {
-		// A Sigma1 that does not decode touches no responder state —
-		// [sigma.Responder.ProcessSigma1WithResume] decodes it before it
-		// changes anything — so it ends no handshake of this adapter: it
-		// is refused with the report below, and an adapter that runs or
-		// ran a handshake stays with its provider (review II,
-		// R2-P4-fr-sec-03). An adapter without one was made for this
-		// Sigma1 and goes, as after any failed Sigma1.
-		a.mu.RLock()
-		begun := a.established || a.lastSigma2 != nil
-		a.mu.RUnlock()
-		if !begun {
-			a.handshakeFailed()
-		}
-		return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(
-			mrp.SCStatusGeneralFailure,
-			uint32(mrp.SecureChannelProtocolID),
-			caseFailureProtocolCode(err),
-			nil,
-		), nil
-	}
 	result, err := r.ProcessSigma1WithResume(payload)
 	if err != nil {
 		// chip CASESession.cpp sends a SecureChannel StatusReport on every
@@ -827,14 +806,17 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			caseFailureProtocolCode(err),
 			nil,
 		)
-		// A Sigma1 that fails on an adapter whose handshake established
-		// its session began nothing and ends nothing: the adapter stays
-		// with its provider, and the record of the completed handshake
-		// with it (review II, R2-P4-rr-sec-04).
+		// A refused Sigma1 changes nothing of the responder
+		// ([sigma.Responder.ProcessSigma1WithResume] commits only a
+		// Sigma1 it accepts), so it ends no handshake of this adapter:
+		// an adapter whose handshake is in progress or established its
+		// session stays with its provider, and the handshake's record
+		// with it (review II, R2-P4-rr-sec-04, R2-P4-fr-sec-03). An
+		// adapter without a handshake was made for this Sigma1 and goes.
 		a.mu.RLock()
-		established := a.established
+		begun := a.established || a.lastSigma2 != nil
 		a.mu.RUnlock()
-		if !established {
+		if !begun {
 			a.handshakeFailed()
 		}
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design

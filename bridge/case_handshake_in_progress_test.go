@@ -4,17 +4,23 @@
 package bridge
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // TestMessagesUnderAHandshakeInProgressChangeNothing: between the Sigma2 and
 // the Sigma3 of a CASE handshake, a Sigma1 under its initiator node id and
-// exchange that begins nothing, or a Sigma2_Resume under them, from another
-// sender, is acknowledged and not answered: the handshake's record stays,
+// exchange that begins nothing — one that does not decode, or a well-formed
+// one whose destination id names no fabric of the node — or a
+// Sigma2_Resume under them, from another sender, is acknowledged and not
+// answered: the handshake's record stays,
 // its Sigma2 stays in retransmission to the controller, and the
 // controller's Sigma3 completes the handshake — through a
 // PerExchangeCaseProvider and through the singleton handler alike (review
@@ -28,18 +34,25 @@ func TestMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
 		name        string
 		viaProvider bool
 		opcode      uint8
+		foreign     bool
 	}{
-		{"a Sigma1 that begins nothing, through a provider", true, mrp.SCOpcodeSigma1},
-		{"a Sigma1 that begins nothing, through the singleton handler", false, mrp.SCOpcodeSigma1},
-		{"a Sigma2_Resume, through a provider", true, mrp.SCOpcodeSigma2Resume},
-		{"a Sigma2_Resume, through the singleton handler", false, mrp.SCOpcodeSigma2Resume},
+		{"a Sigma1 that does not decode, through a provider", true, mrp.SCOpcodeSigma1, false},
+		{"a Sigma1 that does not decode, through the singleton handler", false, mrp.SCOpcodeSigma1, false},
+		{"a Sigma1 for no fabric of the node, through a provider", true, mrp.SCOpcodeSigma1, true},
+		{"a Sigma1 for no fabric of the node, through the singleton handler", false, mrp.SCOpcodeSigma1, true},
+		{"a Sigma2_Resume, through a provider", true, mrp.SCOpcodeSigma2Resume, false},
+		{"a Sigma2_Resume, through the singleton handler", false, mrp.SCOpcodeSigma2Resume, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := beginCASE(t, newUnsecuredRig(t), clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
 			want := c.controller.conn.LocalAddr().String()
 			other := c.otherPeer(t)
-			if err := other.send(tc.opcode, completedCaseExchange, []byte{0x15, 0x18}, nil); err != nil {
+			payload := []byte{0x15, 0x18}
+			if tc.foreign {
+				payload = foreignSigma1(t)
+			}
+			if err := other.send(tc.opcode, completedCaseExchange, payload, nil); err != nil {
 				t.Fatal(err)
 			}
 			if got := pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange); len(got) != 1 || got[0] != want {
@@ -97,4 +110,27 @@ func TestSigma1OverARecordIsJudgedOnce(t *testing.T) {
 	if replay, over := b.markSigma1Replied(key, other); replay || !over {
 		t.Fatalf("the same other bytes again: replay %v over a record %v, want judged again", replay, over)
 	}
+}
+
+// foreignSigma1 is a well-formed Sigma1 whose destination id names a fabric
+// under a root of its own, which no node of the tests holds.
+func foreignSigma1(t *testing.T) []byte {
+	t.Helper()
+	root, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ini, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+		Identity: newCaseTestIdentity(t, 0xAAAA, 1, newCaseTestIPK(t)), Verifier: caseTestVerifier{},
+		SessionID: 0x1003, PeerNodeID: 0xBBBB,
+		RootPublicKey: elliptic.Marshal(elliptic.P256(), root.X, root.Y), //nolint:staticcheck // the uncompressed point the CASE destination id hashes
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s1, err := ini.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s1
 }

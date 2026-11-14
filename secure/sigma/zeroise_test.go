@@ -113,7 +113,9 @@ func TestCASESecretsOverwrittenAfterSuccess(t *testing.T) {
 	if n := count(*seen, "sharedSecret"); n != 0 {
 		t.Fatalf("the shared secret of a finished handshake was overwritten %d times; it is the resumption record", n)
 	}
-	if responder.ephPriv != nil || initiator.ephPriv != nil {
+	// The responder keeps no ephemeral private key: it lives in the
+	// Sigma1 step's locals only.
+	if initiator.ephPriv != nil {
 		t.Error("an ephemeral private key is still referenced after the shared secret was derived")
 	}
 	res, ok := initiator.Result()
@@ -222,8 +224,8 @@ func TestResponderOverwritesSharedSecretWhenSigma1StepFails(t *testing.T) {
 		t.Fatal("Sigma1 succeeded with a signer that refuses")
 	}
 	wantOverwritten(t, *seen, 1, "sharedSecret")
-	if responder.shared != nil || responder.ephPriv != nil {
-		t.Error("the responder still references the shared secret or its ephemeral key")
+	if responder.shared != nil {
+		t.Error("the responder still references the shared secret")
 	}
 }
 

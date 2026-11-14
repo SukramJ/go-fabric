@@ -196,13 +196,14 @@ type Responder struct {
 	// idPending: the handshake has no local session id of its own yet —
 	// the responder was built without one, or starts over after a
 	// handshake — and takes one from sessionIDRenewer once its Sigma1 is
-	// accepted ([Responder.takeSessionIDLocked]).
+	// accepted ([Responder.nextSessionIDLocked]).
 	idPending bool
 	// sessionParams, when non-nil and non-empty, is emitted as Sigma2
 	// context-tag 5 (responderSessionParams).
 	sessionParams *SessionParameters
 
-	ephPriv     *ecdh.PrivateKey
+	// ephPubBytes is the handshake's ephemeral public key; its private
+	// key never leaves the Sigma1 step's locals.
 	ephPubBytes []byte
 
 	random       [RandomSize]byte
@@ -224,6 +225,10 @@ type Responder struct {
 	sigma2            Sigma2
 	sigma2Bytes       []byte // full Sigma2 wire bytes; reused for S3K + final salts
 	shared            []byte
+	// sigma3Digest is the SHA-256 of the Sigma3 that finished the
+	// handshake, nil before and for a handshake a resumption finished:
+	// only that Sigma3 is accepted again ([Responder.ProcessSigma3]).
+	sigma3Digest *[32]byte
 
 	keys  SessionKeys
 	state responderState
@@ -435,25 +440,24 @@ func (r *Responder) SetSessionIDRenewer(fn func(previous uint16) (uint16, bool))
 // session id and whose renewer supplied none.
 var errNoSessionID = errors.New("sigma: no local session id for the handshake")
 
-// takeSessionIDLocked gives the handshake of an accepted Sigma1 a local
-// session id of its own when it has none yet ([Responder.idPending]),
-// from the renewer: a responder without a renewer keeps the id it was
-// built with. Caller holds r.mu.
-func (r *Responder) takeSessionIDLocked() error {
-	if !r.idPending || r.sessionIDRenewer == nil {
-		r.idPending = false
-		return nil
+// nextSessionIDLocked is the local session id the handshake of an accepted
+// Sigma1 takes: a fresh one from the renewer when pending — the handshake
+// has none of its own yet ([Responder.idPending]) — else the one the
+// responder holds; a responder without a renewer keeps the id it was
+// built with. It changes nothing of the responder: the caller commits the
+// id. Caller holds r.mu.
+func (r *Responder) nextSessionIDLocked(pending bool) (uint16, error) {
+	if !pending || r.sessionIDRenewer == nil {
+		return r.sessionID, nil
 	}
 	next, ok := r.sessionIDRenewer(r.sessionID)
 	if !ok {
 		if r.sessionID == 0 {
-			return errNoSessionID
+			return 0, errNoSessionID
 		}
-		r.idPending = false
-		return nil
+		return r.sessionID, nil
 	}
-	r.sessionID, r.idPending = next, false
-	return nil
+	return next, nil
 }
 
 // SetSessionParameters wires the responder's preferred MRP tuning
@@ -512,12 +516,15 @@ func (r *Responder) ProcessSigma1WithResume(sigma1Bytes []byte) (Sigma1ProcessRe
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Parse the incoming Sigma1 so we can inspect the optional resume fields.
+	// Parse the incoming Sigma1 so we can inspect the optional resume
+	// fields. Like the full path ([Responder.processSigma1Locked]), the
+	// resume path judges the Sigma1 on locals and commits only a
+	// resumption it accepts: a miss falls through to the full path, a
+	// refusal leaves the responder as it was.
 	sigma1, err := UnmarshalSigma1(sigma1Bytes)
 	if err != nil {
 		return Sigma1ProcessResult{}, err
 	}
-	r.peerSessionParams = sigma1.InitiatorSessionParams
 
 	// Attempt resume path only when Sigma1 carries both optional fields
 	// AND a store is wired. Mirrors matter.js CaseServer.ts:#handleSigma1:
@@ -525,16 +532,6 @@ func (r *Responder) ProcessSigma1WithResume(sigma1Bytes []byte) (Sigma1ProcessRe
 	if r.resumptionStore != nil &&
 		len(sigma1.ResumptionID) == ResumptionIDSize &&
 		len(sigma1.InitiatorResumeMIC) == ResumptionIDSize {
-		// A resume that lands on a responder which already completed a
-		// handshake is a second session on this exchange: the id it
-		// announced is occupied by the session the first handshake
-		// established, and announcing it again would hand the peer a
-		// slot whose keys are the old ones. Take a fresh id first, as
-		// the full path does for its second handshake and as matter.js
-		// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
-		if r.state == responderStateFinished {
-			r.idPending = true
-		}
 		result, ok, resumeErr := r.tryResume(sigma1)
 		if resumeErr != nil {
 			// Crypto / KDF failure on an otherwise matching resumption
@@ -567,7 +564,7 @@ func (r *Responder) ProcessSigma1WithResume(sigma1Bytes []byte) (Sigma1ProcessRe
 // hard failure.
 //
 // KDF / MIC logic mirrors matter.js CaseServer.ts::#resume lines 139-213.
-func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) {
+func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) { //nolint:funlen // single-purpose resumption: judge on locals, then commit
 	// Captured before anything can change it so [ResumeInfo] can report
 	// what the fast path did with the session id rather than only what
 	// it ended up being.
@@ -617,19 +614,15 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// = cx.resumptionRecord`. A resolver miss means the fabric was
 	// removed after the record was written; treat like an unknown id
 	// and fall through to Full Sigma.
+	identity, verifier := r.identity, r.verifier
 	if r.identityResolver != nil {
 		if fir, ok := r.identityResolver.(FabricIndexResolver); ok {
 			id, ver, found := fir.ResolveFabricIndex(rec.FabricIndex)
 			if !found {
 				return Sigma1ProcessResult{}, false, nil
 			}
-			r.identity = id
-			r.verifier = ver
+			identity, verifier = id, ver
 		}
-	}
-	// The resumption is accepted: its session takes its id now.
-	if err := r.takeSessionIDLocked(); err != nil {
-		return Sigma1ProcessResult{}, false, err
 	}
 
 	// Generate a fresh 16-byte local resumption id for the response.
@@ -674,6 +667,23 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	copy(keys.I2RKey[:], finalMat[0:SessionKeySize])
 	copy(keys.R2IKey[:], finalMat[SessionKeySize:2*SessionKeySize])
 	copy(keys.AttestationChallenge[:], finalMat[2*SessionKeySize:3*SessionKeySize])
+
+	// The resumption is accepted: its session takes its id now, the last
+	// step that can refuse it. A resume that lands on a responder which
+	// already completed a handshake is a second session on this
+	// exchange: the id it announced is occupied by the session the first
+	// handshake established, and announcing it again would hand the peer
+	// a slot whose keys are the old ones. It takes a fresh id, as the
+	// full path does for its second handshake and as matter.js
+	// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
+	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state == responderStateFinished)
+	if err != nil {
+		return Sigma1ProcessResult{}, false, err
+	}
+	r.sessionID, r.idPending = sessionID, false
+	r.identity, r.verifier = identity, verifier
+	r.peerSessionParams = sigma1.InitiatorSessionParams
+	r.sigma3Digest = nil
 
 	// Adopt the resumed session's identity so the post-resume accessors
 	// (PeerSessionID / PeerNodeID / PeerCATs / SessionIdentity /
@@ -784,11 +794,21 @@ func (r *Responder) ProcessSigma1(sigma1Bytes []byte) (Sigma2, error) {
 // ProcessSigma1 (which acquires the mutex) and ProcessSigma1WithResume
 // (which holds it across the resume probe + Full-Sigma fallback so the
 // state transition stays atomic against parallel Sigma1 datagrams).
+//
+// A Sigma1 is judged completely on locals — decode, destination id,
+// ephemeral point, the whole Sigma2 and, last, the local session id —
+// and the responder's state is committed only once nothing can refuse
+// it any more: a Sigma1 that is refused, or whose step fails, leaves
+// the responder exactly as it was, the state, the cached Sigma2 and the
+// keys of a handshake in progress or finished included (review II,
+// R2-P4-fr-sec-03). matter.js changes nothing about a handshake in
+// progress for such a message: it never reaches the CASE server on the
+// handshake's live exchange
+// (packages/protocol/src/protocol/MessageExchange.ts:521-534 at
+// db021da0), and a Sigma1 that opens an exchange runs a CASE server of
+// its own (packages/protocol/src/session/case/CaseServer.ts:61-63).
 func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error) { //nolint:funlen // single-purpose SIGMA-1 processing with many crypto/validation branches
-	switch {
-	case r.state == responderStateInit:
-		// fresh responder — fall through to the standard processing.
-	case r.state == responderStateSigma2Sent && bytes.Equal(r.sigma1Bytes, sigma1Bytes) && r.sigma2Bytes != nil:
+	if r.state == responderStateSigma2Sent && bytes.Equal(r.sigma1Bytes, sigma1Bytes) && r.sigma2Bytes != nil {
 		// Idempotent replay while the handshake is in progress: Apple
 		// Home retransmits Sigma1 over MRP when its layer hasn't yet
 		// observed our Sigma2 ACK. Same Sigma1 bytes → same Sigma2 wire
@@ -802,73 +822,38 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 		// db021da0), and a message whose id the pending reply
 		// acknowledges gets that reply again (:512-520).
 		return r.sigma2, nil
-	default:
-		// Different Sigma1, or any Sigma1 once the handshake finished
-		// or failed, on the same Responder slot. A finished
-		// handshake's Sigma1 again is taken as any other: its Sigma2
-		// is not sent again, since its Sigma3 can complete nothing any
-		// more (review II, R2-P4-fr-sec-01). matter.js never sends the
-		// first Sigma2 again: on the handshake's live exchange the
-		// message is a duplicate or a flow error
-		// (MessageExchange.ts:501-511, :521-534 at db021da0), and once
-		// that exchange is gone (CaseServer.ts:95-98) the CASE server
-		// begins afresh with a new random and key pair
-		// (packages/protocol/src/session/case/CaseServer.ts:61-63,
-		// :102-133, :236, :241). Apple Home opens new CASE sessions
-		// on the SAME ExchangeID after CommissioningComplete (the
-		// iCloud Hub Companion fabric grafts onto the existing
-		// exchange). Reset the responder and proceed as a clean
-		// init. Mirrors matter.js's per-exchange CaseServer which
-		// allocates a fresh handler instance for every new Sigma1.
-		r.ephPriv = nil
-		r.ephPubBytes = nil
-		r.random = [RandomSize]byte{}
-		r.resumptionID = nil
-		// The resume record describes the session the responder holds
-		// now. Apple Home grafts a full handshake onto an exchange that
-		// already carried a resumed session; keeping the old record
-		// would report that session as resumed too.
-		r.resume = ResumeInfo{}
-		r.sigma1Bytes = nil
-		r.initEphPub = nil
-		r.peerSessionID = 0
-		r.peerNodeID = 0
-		// CASE Authenticated Tags and the MRP hints are peer-supplied
-		// state and describe the peer this responder served before.
-		// Clearing them here keeps every accessor honest for the whole
-		// span of the new handshake, not just from its Sigma3 onwards.
-		r.peerCATs = nil
-		r.peerSessionParams = nil
-		// The new handshake takes a fresh local session id once its
-		// Sigma1 is accepted: the one already announced may be occupied
-		// by the session the first handshake established, and
-		// registering the second peer under it would displace the first
-		// without tearing it down.
-		r.idPending = true
-		r.sigma2 = Sigma2{}
-		r.sigma2Bytes = nil
-		// The previous handshake's shared secret and session keys end
-		// here ([zero]); whoever needed them took a copy when it
-		// finished.
-		r.dropSharedLocked()
-		r.keys = SessionKeys{}
-		r.state = responderStateInit
 	}
-	// S2K and its salt, which carries the IPK, end with this step; a step
-	// that fails takes the shared secret with it.
-	var sc scrub
+	// Any other Sigma1 — a different one, or any once the handshake
+	// finished or failed — is taken as a new handshake on this slot. A
+	// finished handshake's Sigma1 again is taken as any other: its
+	// Sigma2 is not sent again, since its Sigma3 can complete nothing
+	// any more (review II, R2-P4-fr-sec-01). matter.js never sends the
+	// first Sigma2 again: on the handshake's live exchange the message
+	// is a duplicate or a flow error (MessageExchange.ts:501-511,
+	// :521-534 at db021da0), and once that exchange is gone
+	// (CaseServer.ts:95-98) the CASE server begins afresh with a new
+	// random and key pair (packages/protocol/src/session/case/CaseServer.ts:61-63,
+	// :102-133, :236, :241). Apple Home opens new CASE sessions on the
+	// SAME ExchangeID after CommissioningComplete (the iCloud Hub
+	// Companion fabric grafts onto the existing exchange).
+	//
+	// S2K and its salt, which carries the IPK, end with this step; so
+	// does the new shared secret when the step fails.
+	var (
+		sc     scrub
+		shared []byte
+	)
 	defer func() {
 		sc.wipe()
-		if err != nil {
-			r.dropSharedLocked()
-			r.ephPriv = nil
+		if err != nil && shared != nil {
+			secretHook("sharedSecret", shared)
+			zero(shared)
 		}
 	}()
 	sigma1, err := UnmarshalSigma1(sigma1Bytes)
 	if err != nil {
 		return Sigma2{}, err
 	}
-	r.peerSessionParams = sigma1.InitiatorSessionParams
 	// Multi-fabric identity resolution. Apple Home Multi-Admin keeps
 	// two fabrics live concurrently; Sigma1's DestinationID =
 	// HMAC(opIPK, random||rootPub||fabricID||nodeID) tells us which
@@ -883,18 +868,14 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	// throws before any key generation) and :88-90 (StatusReport
 	// NoSharedTrustRoots). A responder without a resolver keeps its
 	// single constructor-time identity (single-fabric / test path).
+	identity, verifier := r.identity, r.verifier
 	if r.identityResolver != nil {
 		id, ver, ok := r.identityResolver.ResolveSigma1Destination(sigma1.DestinationID, sigma1.InitiatorRandom)
 		if !ok {
-			r.state = responderStateFailed
 			return Sigma2{}, ErrNoSharedTrustRoots
 		}
-		r.identity = id
-		r.verifier = ver
+		identity, verifier = id, ver
 	}
-	r.sigma1Bytes = append([]byte(nil), sigma1Bytes...)
-	r.initEphPub = append([]byte(nil), sigma1.InitiatorEphPubKey...)
-	r.peerSessionID = sigma1.InitiatorSessionID
 
 	initEphBytes := sigma1.InitiatorEphPubKey
 	if err := validatePoint(initEphBytes); err != nil {
@@ -904,59 +885,51 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	if err != nil {
 		return Sigma2{}, fmt.Errorf("%w: %v", ErrInvalidPoint, err) //nolint:errorlint // intentional double-wrap
 	}
-	// The Sigma1 is accepted: its handshake takes its id now.
-	if err := r.takeSessionIDLocked(); err != nil {
-		return Sigma2{}, err
-	}
 
-	if _, err := rand.Read(r.random[:]); err != nil {
+	var random [RandomSize]byte
+	if _, err := rand.Read(random[:]); err != nil {
 		return Sigma2{}, fmt.Errorf("sigma: random: %w", err)
 	}
 	priv, err := ecdh.P256().GenerateKey(rand.Reader)
 	if err != nil {
 		return Sigma2{}, fmt.Errorf("sigma: ephemeral keygen: %w", err)
 	}
-	r.ephPriv = priv
-	r.ephPubBytes = priv.PublicKey().Bytes()
-
-	r.shared, err = ecdhSharedSecret(priv, initECDH)
+	ephPubBytes := priv.PublicKey().Bytes()
+	shared, err = ecdhSharedSecret(priv, initECDH)
 	if err != nil {
 		return Sigma2{}, err
 	}
 	// The ephemeral private key has served: nothing after the shared
-	// secret reads it, and dropping the reference is all Go allows
-	// ([zero]).
-	r.ephPriv = nil
+	// secret reads it, and it is never kept past this step ([zero]).
 
 	// Per Matter §4.14.2.3 the responder signs over a TLV-encoded
 	// `signed_data` carrying (responderNOC, responderICAC?,
 	// responderEph, initiatorEph). The initiator's Sigma3 signature
 	// later flips the eph order to (initiatorEph, responderEph) —
 	// asymmetry intentional, locks each party's signature to its role.
-	mySig, err := signTranscript(r.identity.signingKey(), r.identity.NOC, r.identity.ICAC, r.ephPubBytes, initEphBytes)
+	mySig, err := signTranscript(identity.signingKey(), identity.NOC, identity.ICAC, ephPubBytes, initEphBytes)
 	if err != nil {
 		return Sigma2{}, err
 	}
 
 	// Generate a 16-byte resumptionID for the optional
 	// session-resumption surface.
-	r.resumptionID = make([]byte, 16)
-	if _, err := rand.Read(r.resumptionID); err != nil {
+	resumptionID := make([]byte, 16)
+	if _, err := rand.Read(resumptionID); err != nil {
 		return Sigma2{}, err
 	}
 
-	tbe2 := TBE2Plaintext{
-		ResponderNOC:  r.identity.NOC,
-		ResponderICAC: r.identity.ICAC,
+	tbe2Bytes := marshalTBE2(TBE2Plaintext{
+		ResponderNOC:  identity.NOC,
+		ResponderICAC: identity.ICAC,
 		Signature:     mySig,
-		ResumptionID:  r.resumptionID,
-	}
-	tbe2Bytes := marshalTBE2(tbe2)
+		ResumptionID:  resumptionID,
+	})
 
 	// S2K derivation per Matter §4.14.2.3:
 	// salt = IPK || responderRandom || responderEphPubKey || SHA256(sigma1).
-	salt2 := sc.add("sigma2.salt", sigma2Salt(r.identity.IPK[:], r.random[:], r.ephPubBytes, r.sigma1Bytes))
-	s2k, err := hkdfDerive(r.shared, salt2, HKDFInfoSigma2, SessionKeySize)
+	salt2 := sc.add("sigma2.salt", sigma2Salt(identity.IPK[:], random[:], ephPubBytes, sigma1Bytes))
+	s2k, err := hkdfDerive(shared, salt2, HKDFInfoSigma2, SessionKeySize)
 	if err != nil {
 		return Sigma2{}, err
 	}
@@ -971,17 +944,49 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 		return Sigma2{}, err
 	}
 
+	// The Sigma1 is accepted: its handshake takes its id now, the last
+	// step that can refuse it. A handshake that replaces another on
+	// this slot takes a fresh one: the id already announced may be
+	// occupied by the session the first handshake established, and
+	// registering the second peer under it would displace the first
+	// without tearing it down.
+	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state != responderStateInit)
+	if err != nil {
+		return Sigma2{}, err
+	}
+
+	// Commit. The previous handshake's shared secret and session keys
+	// end here ([zero]); whoever needed them took a copy when it
+	// finished. The resume record, the CASE Authenticated Tags, the
+	// peer's node id and the MRP hints describe the peer this responder
+	// served before: they are replaced or cleared for the whole span of
+	// the new handshake, not just from its Sigma3 onwards.
+	r.dropSharedLocked()
+	r.keys = SessionKeys{}
+	r.resume = ResumeInfo{}
+	r.peerNodeID = 0
+	r.peerCATs = nil
+	r.sigma3Digest = nil
+	r.identity, r.verifier = identity, verifier
+	r.peerSessionParams = sigma1.InitiatorSessionParams
+	r.sigma1Bytes = append([]byte(nil), sigma1Bytes...)
+	r.initEphPub = append([]byte(nil), initEphBytes...)
+	r.peerSessionID = sigma1.InitiatorSessionID
+	r.random = random
+	r.ephPubBytes = ephPubBytes
+	r.shared, shared = shared, nil
+	r.resumptionID = resumptionID
+	r.sessionID, r.idPending = sessionID, false
 	r.sigma2 = Sigma2{
-		ResponderRandom:    r.random,
-		ResponderSessionID: r.sessionID,
-		ResponderEphPubKey: r.ephPubBytes,
+		ResponderRandom:    random,
+		ResponderSessionID: sessionID,
+		ResponderEphPubKey: ephPubBytes,
 		Encrypted2:         enc2,
 		SessionParams:      r.sessionParams,
 	}
 	// Pre-compute the full Sigma2 wire bytes once for both the S3K
 	// salt (next step) and the secure-session salt (after Sigma3).
 	r.sigma2Bytes = r.sigma2.Marshal()
-
 	r.state = responderStateSigma2Sent
 	return r.sigma2, nil
 }
@@ -1004,6 +1009,11 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 // message whose id the pending reply acknowledges gets that reply again
 // (:512-520).
 //
+// Once the handshake finished, only the bytes of the Sigma3 that finished
+// it are accepted again; any other Sigma3 — and every Sigma3 after a
+// resumption, which had none — is refused with [ErrSessionState] and
+// changes nothing (review II, phase 4 fr-sec).
+//
 // A Sigma3 that does not authenticate is terminal for this handshake:
 // the responder accepts no further Sigma3 until a new Sigma1 restarts
 // it, and commits nothing out of the rejected message.
@@ -1011,9 +1021,11 @@ func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.state == responderStateFinished {
-		// Already verified this exchange — re-ack via cached state.
-		// Matched on Finished because Sigma3 transitions the state
-		// there on the first success.
+		// Already verified this exchange — re-ack via cached state, for
+		// the retransmission of the finishing Sigma3 only.
+		if r.sigma3Digest == nil || *r.sigma3Digest != sha256.Sum256(sigma3Bytes) {
+			return fmt.Errorf("%w: a Sigma3 other than the one that finished the handshake", ErrSessionState)
+		}
 		return nil
 	}
 	if r.state != responderStateSigma2Sent {
@@ -1034,6 +1046,8 @@ func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
 		r.state = responderStateFailed
 		return err
 	}
+	digest := sha256.Sum256(sigma3Bytes)
+	r.sigma3Digest = &digest
 	r.state = responderStateFinished
 	return nil
 }
