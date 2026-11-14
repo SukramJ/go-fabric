@@ -191,18 +191,15 @@ func fabricsUpdateCommit(ctx context.Context, t *testing.T, p store.Port) {
 
 // fabricsUpdateWritesWhatItChanges: an update writes the identity and the
 // node id only. The vendor id and VID verification data stay as the row
-// holds them when the update lands — a value written after the caller read
-// the row is not overwritten with the one it read — while their prior
-// values are kept, so a rollback still drops what the fail-safe wrote.
+// holds them when the update lands, while their prior values are kept, so
+// a rollback still drops what the fail-safe wrote.
 func fabricsUpdateWritesWhatItChanges(ctx context.Context, t *testing.T, p store.Port) {
 	idx := installedFabric(ctx, t, p, 1, store.FabricCommitted)
 	before := stateOf(ctx, t, p, idx)
 	c := newCredentials(1)
-	//nolint:staticcheck // the case shows UpdateFabricCredentials ignores the deprecated fields
-	c.VendorID, c.VIDVerificationStatement, c.VVSC = 0x1234, []byte{0xEE}, []byte{0xEF}
 	must(t, p.UpdateFabricCredentials(ctx, idx, c))
 	want := applied(before, c, store.FabricPendingUpdate)
-	wantEqual(t, "the fabric after an update carrying a vendor id and VID data", stateOf(ctx, t, p, idx), want)
+	wantEqual(t, "the fabric after the update", stateOf(ctx, t, p, idx), want)
 	must(t, p.CommitFabric(ctx, idx))
 	want.fabric.Pending = store.FabricCommitted
 	wantEqual(t, "the fabric after its commit", stateOf(ctx, t, p, idx), want)

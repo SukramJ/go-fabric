@@ -70,7 +70,9 @@ type FabricRecord struct {
 // stand after the update ([Fabrics.UpdateFabricCredentials]): the
 // operational identity's NOC, ICAC and private key and the node id the new
 // NOC carries. The IPK, the root, the fabric id, the vendor id and the VID
-// verification data are not part of it: an UpdateNOC keeps them.
+// verification data are not part of it: an UpdateNOC keeps them, and
+// [Fabrics.UpdateFabricVendorID] and [Fabrics.UpdateFabricVIDVerification]
+// write them.
 type FabricCredentials struct {
 	// NOC is the new Node Operational Certificate; it must not be empty.
 	NOC []byte
@@ -81,17 +83,6 @@ type FabricCredentials struct {
 	PrivateKey []byte
 	// NodeID is the node id of the new NOC.
 	NodeID uint64
-	// VendorID, VIDVerificationStatement and VVSC are ignored.
-	//
-	// Deprecated: [Fabrics.UpdateFabricCredentials] does not write the
-	// vendor id or the VID verification data, which an UpdateNOC does not
-	// change: writing back the values the caller had read lost a
-	// SetVIDVerificationStatement that landed in between (review II,
-	// R2-P2-dr-noc-02). [Fabrics.UpdateFabricVendorID] and
-	// [Fabrics.UpdateFabricVIDVerification] write them.
-	VendorID                 uint16
-	VIDVerificationStatement []byte
-	VVSC                     []byte
 }
 
 // FabricPending is a fabric row's commit state: whether a fail-safe's

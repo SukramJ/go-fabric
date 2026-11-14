@@ -85,8 +85,7 @@ type Fabrics interface {
 	// the identity's NOC, ICAC and private key and the row's node id, in
 	// one atomic write. It writes nothing else: the IPK, the vendor id and
 	// the VID verification data stay as the row holds them when the write
-	// lands — never values the caller read before it (review II,
-	// R2-P2-dr-noc-02). On a [FabricCommitted] row it first keeps the
+	// lands. On a [FabricCommitted] row it first keeps the
 	// current value of every field the update's fail-safe can change — the
 	// identity and node id it writes, and the vendor id and VID
 	// verification data — as the prior value and marks the row

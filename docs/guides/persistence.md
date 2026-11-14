@@ -80,8 +80,7 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   data stay as the row holds them when it lands — and, on a committed row,
   first keeps those values and the vendor id and VID data as the prior and
   marks the row; a second update before the commit keeps the first prior.
-  The deprecated `FabricCredentials` fields `VendorID`,
-  `VIDVerificationStatement` and `VVSC` are ignored. `CommitFabric` commits and erases the prior values;
+  `CommitFabric` commits and erases the prior values;
   `RollbackFabric` deletes a pending add with everything it owns, or moves
   a pending update's prior values back, and returns the state it found.
   While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
