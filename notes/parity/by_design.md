@@ -3181,7 +3181,7 @@ commissioning.
 ### BD-Matter-Attestation-RevocationsOptional — a trust store without a revocation check revokes nothing
 
 matter.js's `DclCertificateService` always answers `isRevoked` for the
-DAC and the PAI (`DeviceAttestationValidator.ts:342-363` at `0ceb202d`):
+DAC and the PAI (`DeviceAttestationValidator.ts:430-451` at `db021da0`):
 with the DCL present the revocation check runs. `attestation.PAAStore` is
 the trust store the validator consults; `attestation.Revocations` is the
 optional second interface a store implements when it has revocation data,
@@ -3237,8 +3237,8 @@ not reward with a second session.
 ### BD-Matter-Controller-EmptyListsNotEncoded — client requests omit an optional list that is empty
 
 matter.js writes an optional list whenever the field is set, an empty
-array included: `#encodeReadingRequest` (`InteractionMessenger.ts:1143-1168` at `862ad75f`
-at `0ceb202d`) that dropped every DataVersionFilter still sends
+array included: `#encodeReadingRequest` (`InteractionMessenger.ts:1143-1168` at
+`db021da0`) that dropped every DataVersionFilter still sends
 `dataVersionFilters: []`. `im.ReadRequest.MarshalTLV`,
 `SubscribeRequest.MarshalTLV` and `WriteRequest.MarshalTLV` write a list
 only when it has members; the request's space budget still counts the
@@ -3294,7 +3294,7 @@ equivalent surface; the order of acknowledgement is matter.js's.
 
 matter.js's `Invoke()` defaults the request's revision to
 `SessionParameters.fallbacks.interactionModelRevision`, 11 (`Invoke.ts:102`,
-`SessionParameters.ts:131` at `862ad75f`), the value assumed for a peer
+`SessionParameters.ts:160` at `db021da0`), the value assumed for a peer
 whose revision is unknown; its Read and Subscribe stamp
 `Specification.INTERACTION_MODEL_REVISION`, 12
 (`action/request/Read.ts:40`, `Specification.ts:124`).
@@ -3326,9 +3326,9 @@ class per shape.
 ### BD-Matter-ClientNode-UnknownEventsDelivered — every event reaches the host
 
 matter.js drops an event of a cluster or event its model does not know,
-with a one-time notice (`ClientEventEmitter.ts:38`, `:141-153` at `862ad75f`),
+with a one-time notice (`ClientEventEmitter.ts:38`, `:143-161` at `db021da0`),
 because it has no generated observable to emit on; the notice's set is
-module-wide (`:39`). `controller/client` delivers every event through
+module-wide (`:38`). `controller/client` delivers every event through
 `Hooks.Event` with its path and its decoded value, or the raw node when no
 definition decodes it; the one-time notice stays as an `Info` line,
 remembered per node. Nothing a host could observe in matter.js is lost;
@@ -3364,7 +3364,7 @@ matter.js's controller hands out node ids from a stored counter by default
 "sequential"`, `nextNodeId` from 1, skipping an id in use and never
 handing one out twice
 (`packages/node/src/behavior/system/controller/ControllerBehavior.ts:139-181`,
-`:285-290` at `862ad75f`) — and draws a random operational id only with
+`:285-295` at `db021da0`) — and draws a random operational id only with
 `nodeIdAssignment: "random"` or in `ControllerCommissioner.#determineAddress`
 (`packages/protocol/src/peer/ControllerCommissioner.ts:569-582`).
 `controller/commissioner.Commissioner.determineAddress` always draws a
@@ -3398,10 +3398,10 @@ By design. One typed hook per fact; a host that wants the clusters reads
 ### BD-Matter-ClientNode-SettingsInStore — the node's settings are stored beside its image
 
 matter.js persists a client node's settings (`autoSubscribe`,
-`defaultSubscription`, `disabled`, the event cursor) as the state of its
+`defaultSubscription`, `isDisabled`, the event cursor) as the state of its
 `NetworkClient` behaviour through the node's own storage: the state
 fields of quality "N", the event cursor `maxEventNumber` among them
-(`NetworkClient.ts:501-526` at `862ad75f`; at `0ceb202d` the cursor was
+(`NetworkClient.ts:501-529` at `db021da0`; at `0ceb202d` the cursor was
 `ClientEventEmitter`'s). `controller/client` keeps them in the same `Store` as the
 image, as endpoint 0's cluster `0xFFFF_FFFF`, an id no Matter cluster can
 take. One store interface, one erase. Report AK.
@@ -3415,7 +3415,7 @@ to implement for every backend.
 
 matter.js's `Peers.initialize` creates every stored node and adds it;
 one whose construction fails stays in the container as unavailable, its
-error logged (`Peers.ts:134-151` at `0ceb202d`). `client.NewRegistry`
+error logged (`Peers.ts:133-160` at `db021da0`). `client.NewRegistry`
 logs the failure with the node's id and does not add the node; its
 stored data stays for the next start. Report AL.
 
@@ -3506,7 +3506,7 @@ names one of these IDs is stale.
 | BD-Matter-ClientUndefinedClusters | 2026-11-02 (review 2026-11 W6) | Closed: `controller/client` links a generated definition for every cluster of `parity/schema.json` (`controller/client/known.go`, 135 `cluster/spec` packages). |
 | BD-Matter-DefaultOTAProviders-CompareWithoutFabricIndex | 2026-11-02 (review 2026-11 W6) | Closed: the announcement builds the provider record with its FabricIndex and compares the whole record (`controller/softwareupdate/announcements.go`), as matter.js `OtaAnnouncements.ts` does. |
 | BD-Controller-ThreadDatasetNameOnly | 2026-11-02 (review 2026-11 W6) | Closed: the commissioner decodes the whole operational dataset through `thread.DecodeDataset` (`controller/commissioner/network.go`); `controller/thread` moved to `thread/`. |
-| BD-Matter-ExchangeOnClosing-OnDestroy | 2026-11-02 (review 2026-11 W6) | Not a divergence at the pin: matter.js releases the network-profile slot on both `closing` and `closed`, "an exchange that is destroyed rather than closed emits only \"closed\", so both paths must release" (`packages/protocol/src/peer/PeerExchangeProvider.ts:137-142` at `862ad75f`); `client/exchange` `notifyClosing` on close and destroy is that behaviour. `Peer.ts:168-170`, which the entry cited, is the session-removal hook. |
+| BD-Matter-ExchangeOnClosing-OnDestroy | 2026-11-02 (review 2026-11 W6) | Not a divergence at the pin: matter.js releases the network-profile slot on both `closing` and `closed`, "an exchange that is destroyed rather than closed emits only \"closed\", so both paths must release" (`packages/protocol/src/peer/PeerExchangeProvider.ts:133-138` at `db021da0`); `client/exchange` `notifyClosing` on close and destroy is that behaviour. `Peer.ts:168-170`, which the entry cited, is the session-removal hook. |
 | BD-Matter-BDXInitiatorOverExchange | 2026-11-02 (review 2026-11 W6) | The premise does not hold at the pin: matter.js `bdxSessionInitiator(messenger: BdxMessenger, config)` (`packages/protocol/src/bdx/bdx-session-initiator.ts:33` at `862ad75f`) runs on a messenger its caller built, the shape of Go's `bdx.Send(ctx, m *Messenger, …)` and `bdx.Receive`. |
 
 ### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
@@ -3519,8 +3519,8 @@ TransitionTime (MoveToLevel, Step and their WithOnOff forms) and Rate
 (Move, MoveWithOnOff) as null, OptionsMask and OptionsOverride (all eight)
 as 0 (`bridge/fields_definition.go` `requestFallbacks`). matter.js has the
 mechanism — a mandatory `TlvField` may carry a fallback that populates the
-field "when devices omit" it (`packages/types/src/tlv/TlvObject.ts:233-245`,
-`:393-398`) — but declares none for LevelControl, so it validates the
+field "when devices omit" it (`packages/types/src/tlv/TlvObject.ts:236-249`,
+`:398-404` at `db021da0`) — but declares none for LevelControl, so it validates the
 request and answers a missing mandatory field with INVALID_COMMAND
 (`CommandInvokeResponse.ts`, `ValidationMandatoryFieldMissingError`).
 Google Home omits the mandatory-but-nullable TransitionTime entirely (the
