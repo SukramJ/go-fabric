@@ -268,11 +268,13 @@ const (
 
 	// payloadTestMaxCount is PayloadTestRequest.Count's constraint "max 2048".
 	payloadTestMaxCount = 2048
-	// payloadTestMaxResponse bounds the Payload a response can carry in
-	// one unsegmented message: matter.js answers ResourceExhausted when the
-	// encoded response exceeds the exchange's maximum payload
-	// (GeneralDiagnosticsServer.ts payloadTestRequest), which for UDP is
-	// 1280 minus the message and security overhead.
+	// payloadTestMaxResponse bounds the Payload a response can carry when
+	// the invoke context names no exchange bound ([im.MaxPayloadSizeFromContext]):
+	// one unsegmented UDP message, 1280 minus the message and security
+	// overhead, rounded down. With the bound stamped, the encoded response
+	// is compared with it, as matter.js compares it with
+	// `exchange.maxPayloadSize` (GeneralDiagnosticsServer.ts:262-292 at
+	// db021da0).
 	payloadTestMaxResponse = 1100
 
 	// BootReason is event 0x03; the lower three (HardwareFaultChange,
@@ -668,7 +670,7 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		if g.noDataModelTest {
 			return nil, im.UnsupportedCommandf("core: GeneralDiagnostics PayloadTestRequest needs the DataModelTest feature")
 		}
-		return g.payloadTestRequest(fields)
+		return g.payloadTestRequest(ctx, fields)
 	case gendiagCmdTestEventTrigger:
 		return nil, g.testEventTrigger(ctx, fields)
 	}
@@ -849,9 +851,10 @@ type PayloadTestResponse = gendiagdef.PayloadTestResponse
 // GeneralDiagnosticsServer.ts payloadTestRequest (:253-298 at db021da0):
 // Count's constraint is checked as the schema checks it, the enable key
 // passes the gate TestEventTrigger passes (assertEnableKey), and a payload
-// too large for one message is ResourceExhausted. Fields: [0] EnableKey
-// octets, [1] Value uint8, [2] Count uint16 (max 2048).
-func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
+// too large for one message of the request's exchange is ResourceExhausted
+// ([payloadTestResponseFits]). Fields: [0] EnableKey octets, [1] Value
+// uint8, [2] Count uint16 (max 2048).
+func (g *GeneralDiagnostics) payloadTestRequest(ctx context.Context, fields any) (any, error) {
 	key, value, count, ok := decodePayloadTestRequest(fields)
 	if !ok {
 		return nil, gendiagStatusErr{im.StatusInvalidCommand, "PayloadTestRequest: malformed fields"}
@@ -862,10 +865,44 @@ func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
 	if err := g.assertEnableKey("PayloadTestRequest", key); err != nil {
 		return nil, err
 	}
-	if count > payloadTestMaxResponse {
+	resp := PayloadTestResponse{Payload: bytes.Repeat([]byte{value}, int(count))}
+	if !payloadTestResponseFits(ctx, resp) {
 		return nil, gendiagStatusErr{im.StatusResourceExhausted, "PayloadTestRequest: response too large"}
 	}
-	return PayloadTestResponse{Payload: bytes.Repeat([]byte{value}, int(count))}, nil
+	return resp, nil
+}
+
+// payloadTestResponseFits reports whether resp fits one message of the
+// request's exchange. With the exchange's bound stamped
+// ([im.MaxPayloadSizeFromContext]) it encodes the InvokeResponse that
+// would carry resp alone — not suppressed, MoreChunkedMessages set, the
+// command's path with the response command id 0x04 and CommandRef 0 — and
+// compares its size, as matter.js does (GeneralDiagnosticsServer.ts:262-292
+// at db021da0: the dummy TlvInvokeResponse, then `responseSize >
+// exchange.maxPayloadSize`). The path is the dispatched command's
+// ([im.CommandPathFromContext]), the root endpoint without one. Without the
+// stamp the Payload is held to [payloadTestMaxResponse].
+func payloadTestResponseFits(ctx context.Context, resp PayloadTestResponse) bool {
+	limit, ok := im.MaxPayloadSizeFromContext(ctx)
+	if !ok {
+		return len(resp.Payload) <= payloadTestMaxResponse
+	}
+	path := im.ConcreteCommandPath{Cluster: gendiagdef.ClusterID, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	if p, ok := im.CommandPathFromContext(ctx); ok {
+		path.Endpoint = p.Endpoint
+	}
+	path.Command = gendiagCmdPayloadTestResponse
+	enc := tlv.NewEncoder()
+	im.InvokeResponse{
+		MoreChunkedMessages: true,
+		Responses:           []im.InvokeResponseEntry{{Path: path, Response: resp, HasResponse: true, HasCommandRef: true}},
+	}.MarshalTLV(enc, func(enc *tlv.Encoder, tag tlv.Tag, v any) {
+		if r, ok := v.(PayloadTestResponse); ok {
+			r.EncodeTLV(enc, tag)
+		}
+	})
+	encoded, err := enc.Bytes()
+	return err == nil && len(encoded) <= limit
 }
 
 // TestEventTriggerRequest is the decoded TestEventTrigger command, the

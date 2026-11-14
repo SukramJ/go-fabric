@@ -634,7 +634,16 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 // (tcp.Conn.MaxMessageSize, MAX_TCP_MESSAGE_SIZE without the length
 // prefix, TcpChannel.ts:37-41 at db021da0) less the same overhead.
 func (e *initiatedSecureExchange) MaxPayloadSize() int {
-	if r, ok := e.route().(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
+	return routeMaxPayloadSize(e.route())
+}
+
+// routeMaxPayloadSize is the largest payload one message on route carries:
+// over a TCP connection the connection's largest message less the message
+// overhead, otherwise [exchangeMaxPayloadSize] — matter.js
+// MessageExchange.maxPayloadSize (packages/protocol/src/protocol/MessageExchange.ts:465-469
+// at db021da0).
+func routeMaxPayloadSize(route net.Addr) int {
+	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
 		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
 			if n := m.MaxMessageSize() - matterMessageOverhead; n > exchangeMaxPayloadSize {
 				return n
@@ -642,6 +651,31 @@ func (e *initiatedSecureExchange) MaxPayloadSize() int {
 		}
 	}
 	return exchangeMaxPayloadSize
+}
+
+// invokeMaxPayloadSize is the largest payload one message of a request's
+// exchange carries, for the invoke context ([im.WithMaxPayloadSize]): as
+// [routeMaxPayloadSize], over TCP also bounded by the MaxTcpMessageSize the
+// session's peer stated — matter.js MessageChannel.maxPayloadSize, the
+// channel's maximum and over TCP `Math.min(channelMax,
+// this.session.peerMaxTcpMessageSize)`
+// (packages/protocol/src/protocol/MessageChannel.ts:86-92 at db021da0),
+// less MATTER_MESSAGE_OVERHEAD (MessageExchange.ts:465-469); never below
+// the UDP bound, as [Bridge.chunkLimitsFor].
+func (b *Bridge) invokeMaxPayloadSize(route net.Addr, sessionID uint16) int {
+	n := routeMaxPayloadSize(route)
+	if n == exchangeMaxPayloadSize {
+		return n
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if res, ok := lookup.(SessionTransportResolver); ok {
+		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && int(peerMax)-matterMessageOverhead < n {
+			n = max(int(peerMax)-matterMessageOverhead, exchangeMaxPayloadSize)
+		}
+	}
+	return n
 }
 
 // Close implements [bdx.Exchange]: the exchange stops receiving, and an

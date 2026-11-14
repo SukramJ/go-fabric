@@ -720,6 +720,10 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// A command with the Large Message quality runs only over a transport
 	// that carries large messages ([routeCarriesLargeMessages]).
 	invokeCtx = im.WithLargeMessageSession(invokeCtx, routeCarriesLargeMessages(src))
+	// A server that sizes its response by the exchange (GeneralDiagnostics
+	// PayloadTestRequest) reads the largest payload one message of it
+	// carries ([Bridge.invokeMaxPayloadSize]).
+	invokeCtx = im.WithMaxPayloadSize(invokeCtx, b.invokeMaxPayloadSize(src, requestHdr.SessionID))
 	// Work a command defers until its response is out — the PASE session
 	// a RevokeCommissioning over PASE closes — runs when this returns,
 	// whichever way: the reply sent, suppressed, or failed.

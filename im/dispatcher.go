@@ -290,3 +290,27 @@ func LargeMessageSessionFromContext(ctx context.Context) (large, known bool) {
 	large, known = ctx.Value(largeMessageCtxKey{}).(bool)
 	return large, known
 }
+
+// maxPayloadCtxKey carries the largest payload one message of the
+// request's exchange carries.
+type maxPayloadCtxKey struct{}
+
+// WithMaxPayloadSize stamps the largest payload one message of the
+// request's exchange carries: its channel's largest message less the
+// message overhead — matter.js MessageExchange.maxPayloadSize
+// (packages/protocol/src/protocol/MessageExchange.ts:465-469 at db021da0,
+// MATTER_MESSAGE_OVERHEAD :182), 1232 - 54 over UDP and BLE, the
+// connection's largest message less 54 over TCP. A server that sizes a
+// response by its exchange reads it with [MaxPayloadSizeFromContext], as
+// matter.js's GeneralDiagnostics payloadTestRequest reads
+// `exchange.maxPayloadSize`.
+func WithMaxPayloadSize(ctx context.Context, n int) context.Context {
+	return context.WithValue(ctx, maxPayloadCtxKey{}, n)
+}
+
+// MaxPayloadSizeFromContext reports the stamp of [WithMaxPayloadSize];
+// ok is false when the caller stamped nothing.
+func MaxPayloadSizeFromContext(ctx context.Context) (n int, ok bool) {
+	n, ok = ctx.Value(maxPayloadCtxKey{}).(int)
+	return n, ok
+}
