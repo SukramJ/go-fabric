@@ -66,6 +66,20 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   subscriptions, presets, lock records, settings and counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
   fabric the store does not hold is refused.
+- **The fabric row carries its commit state.** `FabricRecord.Pending`
+  is `FabricCommitted`, `FabricPendingAdd` (an AddNOC that
+  CommissioningComplete has not committed; `AddFabric` takes it) or
+  `FabricPendingUpdate`. `UpdateFabricCredentials` writes an UpdateNOC's
+  NOC, ICAC, private key, node id, vendor id and VID data in one write and,
+  on a committed row, first keeps every one of those values as the prior
+  and marks the row; a second update before the commit keeps the first
+  prior. `CommitFabric` commits and erases the prior values;
+  `RollbackFabric` deletes a pending add with everything it owns, or moves
+  a pending update's prior values back, and returns the state it found.
+  While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
+  and `UpdateFabricVIDVerification` change the live values only. Each of
+  these is one atomic write, and the state is on disk with the row, so a
+  restart finds it. Readers see a pending row like any other.
 - **Monotonic counters.** The fabric index comes from a counter that only
   moves forward, wraps after 254 and skips occupied indexes, so a removed
   index is not reissued at once (matter.js FabricManager
@@ -104,7 +118,7 @@ fabric is deleted (`FabricManager.ts:262-271`). go-fabric types the port by
 area instead of by key-value context, so a backend stores records, not
 opaque values.
 
-*Source: `store/port.go:8-41`, `store/port.go:49-198`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
+*Source: `store/port.go:8-45`, `store/port.go:53-258`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
 
 ## Opening the database
 

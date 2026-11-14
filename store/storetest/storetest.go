@@ -63,6 +63,15 @@ var cases = []testCase{
 	{"fabrics/duplicate-root-and-id", fabricsDuplicate},
 	{"fabrics/pending-add", fabricsPendingAdd},
 	{"fabrics/vid-verification", fabricsVIDVerification},
+	{"fabrics/commit", fabricsCommit},
+	{"fabrics/rollback-pending-add", fabricsRollbackPendingAdd},
+	{"fabrics/update-rollback", fabricsUpdateRollback},
+	{"fabrics/update-commit", fabricsUpdateCommit},
+	{"fabrics/update-twice", fabricsUpdateTwice},
+	{"fabrics/update-pending-add", fabricsUpdatePendingAdd},
+	{"fabrics/update-refused", fabricsUpdateRefused},
+	{"fabrics/pending-not-found", fabricsPendingNotFound},
+	{"fabrics/concurrent-updates", fabricsConcurrentUpdates},
 	{"identity", identityCase},
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
@@ -81,6 +90,7 @@ var cases = []testCase{
 	{"fabric-cascade", fabricCascade},
 	{"copies", copiesCase},
 	{"copies/vid", copiesVIDCase},
+	{"copies/credentials", copiesCredentials},
 	{"concurrent", concurrentCase},
 	{"erase", eraseCase},
 }
@@ -856,6 +866,63 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, p.ReplaceICDRegistrations(ctx, missing, nil))
 }
 
+// seedFabricRows writes one row of every fabric-owned kind the cascade
+// removes (store/port.go): identity, ACL, key set, key map, group table,
+// groupcast, resumption, default OTA provider, ICD registration.
+func seedFabricRows(ctx context.Context, t *testing.T, p store.Port, f uint8) {
+	t.Helper()
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
+	must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
+	must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
+	must(t, p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: f, GroupID: 1, Endpoints: []uint16{1}}))
+	must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: f, GroupID: 1}))
+	must(t, p.UpsertResumption(ctx, resumptionRec(f, 7, f)))
+	must(t, p.ReplaceDefaultOTAProviders(ctx, f, []store.OTAProviderLocation{{ProviderNodeID: uint64(f)}}))
+	must(t, p.ReplaceICDRegistrations(ctx, f, []store.ICDRegistration{{CheckInNodeID: uint64(f), Key: make([]byte, 16)}}))
+}
+
+// allFabricRows and noFabricRows are what [fabricRows] counts for a fabric
+// [seedFabricRows] seeded, and for one whose rows are gone.
+var (
+	allFabricRows = map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1, "icd": 1}
+	noFabricRows  = map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0, "icd": 0}
+)
+
+// fabricRows counts the fabric's rows of each kind seedFabricRows writes.
+func fabricRows(ctx context.Context, p store.Port, f uint8) map[string]int {
+	n := map[string]int{"identity": 0, "resumption": 0, "ota": 0, "icd": 0}
+	if _, err := p.GetIdentity(ctx, f); err == nil {
+		n["identity"]++
+	}
+	acl, _ := p.ListACL(ctx, f)
+	n["acl"] = len(acl)
+	sets, _ := p.ListGroupKeySets(ctx, f)
+	n["key sets"] = len(sets)
+	maps, _ := p.ListGroupKeyMappings(ctx, f)
+	n["key map"] = len(maps)
+	table, _ := p.ListGroupTable(ctx, f)
+	n["group table"] = len(table)
+	gc, _ := p.ListGroupcastGroups(ctx, f)
+	n["groupcast"] = len(gc)
+	if _, err := p.GetResumptionByPeer(ctx, f, 7); err == nil {
+		n["resumption"]++
+	}
+	ota, _ := p.ListDefaultOTAProviders(ctx)
+	for _, o := range ota {
+		if o.FabricIndex == f {
+			n["ota"]++
+		}
+	}
+	regs, _ := p.ListICDRegistrations(ctx)
+	for _, r := range regs {
+		if r.FabricIndex == f {
+			n["icd"]++
+		}
+	}
+	return n
+}
+
 // fabricCascade is the removal of a fabric: everything it owns goes, the
 // other fabric's rows and the rows no fabric owns stay. matter.js runs the
 // fabric storage's clearAll (FabricManager.ts:262-271).
@@ -863,15 +930,7 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 	one := addFabric(ctx, t, p, 1)
 	two := addFabric(ctx, t, p, 2)
 	for _, f := range []uint8{one, two} {
-		must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
-		must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
-		must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
-		must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
-		must(t, p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: f, GroupID: 1, Endpoints: []uint16{1}}))
-		must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: f, GroupID: 1}))
-		must(t, p.UpsertResumption(ctx, resumptionRec(f, 7, f)))
-		must(t, p.ReplaceDefaultOTAProviders(ctx, f, []store.OTAProviderLocation{{ProviderNodeID: uint64(f)}}))
-		must(t, p.ReplaceICDRegistrations(ctx, f, []store.ICDRegistration{{CheckInNodeID: uint64(f), Key: make([]byte, 16)}}))
+		seedFabricRows(ctx, t, p, f)
 		must(t, p.SaveServerSubscription(ctx, uint32(f), f, 7, []byte{f}))
 	}
 	must(t, p.SaveThermostatPresets(ctx, "t", []byte{1}, nil))
@@ -880,42 +939,8 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 
 	must(t, p.RemoveFabric(ctx, one))
 
-	count := func(f uint8) map[string]int {
-		n := map[string]int{"identity": 0, "resumption": 0, "ota": 0, "icd": 0}
-		if _, err := p.GetIdentity(ctx, f); err == nil {
-			n["identity"]++
-		}
-		acl, _ := p.ListACL(ctx, f)
-		n["acl"] = len(acl)
-		sets, _ := p.ListGroupKeySets(ctx, f)
-		n["key sets"] = len(sets)
-		maps, _ := p.ListGroupKeyMappings(ctx, f)
-		n["key map"] = len(maps)
-		table, _ := p.ListGroupTable(ctx, f)
-		n["group table"] = len(table)
-		gc, _ := p.ListGroupcastGroups(ctx, f)
-		n["groupcast"] = len(gc)
-		if _, err := p.GetResumptionByPeer(ctx, f, 7); err == nil {
-			n["resumption"]++
-		}
-		ota, _ := p.ListDefaultOTAProviders(ctx)
-		for _, o := range ota {
-			if o.FabricIndex == f {
-				n["ota"]++
-			}
-		}
-		regs, _ := p.ListICDRegistrations(ctx)
-		for _, r := range regs {
-			if r.FabricIndex == f {
-				n["icd"]++
-			}
-		}
-		return n
-	}
-	all := map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1, "icd": 1}
-	none := map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0, "icd": 0}
-	wantEqual(t, "the removed fabric's rows", count(one), none)
-	wantEqual(t, "the other fabric's rows", count(two), all)
+	wantEqual(t, "the removed fabric's rows", fabricRows(ctx, p, one), noFabricRows)
+	wantEqual(t, "the other fabric's rows", fabricRows(ctx, p, two), allFabricRows)
 	if _, err := p.GetResumptionByID(ctx, resumptionRec(one, 7, one).ResumptionID); !errors.Is(err, store.ErrResumptionNotFound) {
 		t.Errorf("the removed fabric's resumption id still resolves: %v", err)
 	}

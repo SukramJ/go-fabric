@@ -29,6 +29,10 @@ import "context"
 //     fabric-owned rows and stay (the bridge deletes a fabric's
 //     subscriptions itself).
 //   - A row that names a fabric the store does not hold is refused.
+//   - A fabric row carries its commit state ([FabricPending]) and, while an
+//     UpdateNOC is pending, the values it replaced: UpdateFabricCredentials,
+//     CommitFabric and RollbackFabric each move it in one atomic write, so
+//     the state survives a restart with the row and leaves with it.
 //   - The fabric index is allocated from a counter that only moves forward
 //     and wraps after 254, skipping occupied indexes (matter.js
 //     FabricManager #nextFabricIndex).
@@ -77,6 +81,38 @@ type Fabrics interface {
 	// RemoveFabric removes the fabric and every row it owns; see the
 	// cascade above. A pending row is removed like any other.
 	RemoveFabric(ctx context.Context, fabricIndex uint8) error
+	// UpdateFabricCredentials writes what an UpdateNOC changes ([FabricCredentials]):
+	// the identity's NOC, ICAC and private key and the row's node id,
+	// vendor id and VID verification data, in one atomic write. The IPK
+	// stays. On a [FabricCommitted] row it first keeps the current value of
+	// every one of those fields as the prior value — whether this call
+	// changes it or not — and marks the row [FabricPendingUpdate]; on a
+	// FabricPendingUpdate row it keeps the prior values it already holds,
+	// so a second UpdateNOC in the same fail-safe rolls back to the state
+	// before the first; on a [FabricPendingAdd] row it only writes, since
+	// that row's rollback deletes it. While the row is FabricPendingUpdate,
+	// UpdateFabricVendorID, UpdateFabricNodeID and
+	// UpdateFabricVIDVerification change the live values only: what they
+	// write belongs to the pending update and is dropped by its rollback.
+	// A crash at any point leaves the row as it was before the call or as
+	// it is after it. Returns [ErrFabricNotFound] for an index the table
+	// does not hold, [ErrIdentityNotFound] for a fabric without an identity,
+	// and an error for an empty NOC or private key; each changes nothing.
+	UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c FabricCredentials) error
+	// CommitFabric commits a pending row in one atomic write: the row
+	// becomes [FabricCommitted] and every prior value is erased, so no later
+	// rollback can reach them. A committed row is left as it is (nil).
+	// Returns [ErrFabricNotFound] for an index the table does not hold.
+	CommitFabric(ctx context.Context, fabricIndex uint8) error
+	// RollbackFabric undoes a pending row in one atomic write and returns
+	// the state it found: [FabricPendingAdd] — the row is deleted with
+	// every row it owns, as RemoveFabric deletes it; [FabricPendingUpdate] —
+	// every prior value moves back (identity and row), the prior values are
+	// erased and the row is committed; [FabricCommitted] — nothing changes.
+	// A crash at any point leaves the pending row or its rollback whole.
+	// Returns [ErrFabricNotFound] (and FabricCommitted) for an index the
+	// table does not hold.
+	RollbackFabric(ctx context.Context, fabricIndex uint8) (FabricPending, error)
 }
 
 // Identity is the node's operational identity on each fabric: NOC, ICAC,

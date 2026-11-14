@@ -66,6 +66,29 @@ type FabricRecord struct {
 	VVSC                     []byte
 }
 
+// FabricCredentials is what an UpdateNOC changes on a fabric, as it shall
+// stand after the update ([Fabrics.UpdateFabricCredentials]): the
+// operational identity's NOC, ICAC and private key, the node id the new NOC
+// carries, and the fabric's vendor id and VID verification data. The IPK,
+// the root and the fabric id are not part of it: an UpdateNOC keeps them
+// (cluster/core handleUpdateNOC copies the IPK from the existing identity).
+type FabricCredentials struct {
+	// NOC is the new Node Operational Certificate; it must not be empty.
+	NOC []byte
+	// ICAC is the new intermediate certificate; nil means none.
+	ICAC []byte
+	// PrivateKey is the operational key matching the NOC, stored as
+	// [IdentityRecord.PrivateKey] is; it must not be empty.
+	PrivateKey []byte
+	// NodeID is the node id of the new NOC.
+	NodeID uint64
+	// VendorID, VIDVerificationStatement and VVSC are the fabric's vendor
+	// id and VID verification data after the update (nil or empty: none).
+	VendorID                 uint16
+	VIDVerificationStatement []byte
+	VVSC                     []byte
+}
+
 // FabricPending is a fabric row's commit state: whether a fail-safe's
 // AddNOC or UpdateNOC wrote it and CommissioningComplete has not yet
 // committed it. The row carries the state, so it leaves with the row and
@@ -308,6 +331,176 @@ WHERE fabric_index = ?`, noneIfEmpty(statement), noneIfEmpty(vvsc), fabricIndex)
 		return ErrFabricNotFound
 	}
 	return nil
+}
+
+// UpdateFabricCredentials implements [Fabrics] in one transaction. Its
+// first statement is the write that marks a committed row and keeps its
+// prior values, so the transaction takes SQLite's write lock before it
+// reads anything and a racing call waits for it (the busy timeout) and then
+// finds the row marked. With a read first, the racing call failed with
+// SQLITE_BUSY_SNAPSHOT instead (storetest's fabrics/concurrent-updates).
+// CommitFabric and RollbackFabric open with their write for the same
+// reason.
+func (s *Store) UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c FabricCredentials) error {
+	if len(c.NOC) == 0 || len(c.PrivateKey) == 0 {
+		return errors.New("store: update fabric credentials: a NOC and a private key are required")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: update fabric credentials: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, `
+UPDATE matter_fabrics
+SET pending = ?, prior_node_id = node_id, prior_vendor_id = vendor_id,
+    prior_vid_statement = vid_statement, prior_vvsc = vvsc
+WHERE fabric_index = ? AND pending = ?`, FabricPendingUpdate, fabricIndex, FabricCommitted)
+	if err != nil {
+		return fmt.Errorf("store: update fabric credentials: mark: %w", err)
+	}
+	marked, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: update fabric credentials: mark: %w", err)
+	}
+	if marked == 0 {
+		var one int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex).Scan(&one)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrFabricNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("store: update fabric credentials: %w", err)
+		}
+	} else if _, err := tx.ExecContext(ctx, `
+UPDATE matter_node_identities
+SET prior_noc = noc, prior_icac = icac, prior_private_key = private_key
+WHERE fabric_index = ?`, fabricIndex); err != nil {
+		return fmt.Errorf("store: update fabric credentials: keep the prior identity: %w", err)
+	}
+	res, err = tx.ExecContext(ctx, `
+UPDATE matter_node_identities SET noc = ?, icac = ?, private_key = ?
+WHERE fabric_index = ?`, c.NOC, nullableBytes(c.ICAC), c.PrivateKey, fabricIndex)
+	if err != nil {
+		return fmt.Errorf("store: update fabric credentials: identity: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("store: update fabric credentials: identity: %w", err)
+	} else if n == 0 {
+		return ErrIdentityNotFound
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE matter_fabrics
+SET node_id = ?, vendor_id = ?, vid_statement = ?, vvsc = ?, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ?`, uint64ToBE(c.NodeID), c.VendorID, noneIfEmpty(c.VIDVerificationStatement), noneIfEmpty(c.VVSC), fabricIndex); err != nil {
+		return fmt.Errorf("store: update fabric credentials: fabric: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: update fabric credentials: commit: %w", err)
+	}
+	return nil
+}
+
+// CommitFabric implements [Fabrics] in one transaction, the write first.
+func (s *Store) CommitFabric(ctx context.Context, fabricIndex uint8) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: commit fabric: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, `
+UPDATE matter_fabrics
+SET pending = ?, prior_node_id = NULL, prior_vendor_id = NULL,
+    prior_vid_statement = NULL, prior_vvsc = NULL, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ? AND pending <> ?`, FabricCommitted, fabricIndex, FabricCommitted)
+	if err != nil {
+		return fmt.Errorf("store: commit fabric: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: commit fabric: %w", err)
+	}
+	if n == 0 {
+		var one int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex).Scan(&one)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrFabricNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("store: commit fabric: %w", err)
+		}
+		return nil // committed already
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE matter_node_identities SET prior_noc = NULL, prior_icac = NULL, prior_private_key = NULL
+WHERE fabric_index = ?`, fabricIndex); err != nil {
+		return fmt.Errorf("store: commit fabric: identity: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: commit fabric: commit: %w", err)
+	}
+	return nil
+}
+
+// RollbackFabric implements [Fabrics] in one transaction, the write first:
+// a pending add's row is deleted (the foreign keys' ON DELETE CASCADE takes
+// its rows, as in RemoveFabric); a pending update's identity is restored
+// while the row still says so, then the row. A prior node id or vendor id
+// that is not there (a row no UpdateFabricCredentials marked) keeps the
+// live one rather than failing the NOT NULL column; an identity without a
+// prior NOC keeps its credentials.
+func (s *Store) RollbackFabric(ctx context.Context, fabricIndex uint8) (FabricPending, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, `DELETE FROM matter_fabrics WHERE fabric_index = ? AND pending = ?`, fabricIndex, FabricPendingAdd)
+	if err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: delete: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: delete: %w", err)
+	} else if n > 0 {
+		if err := tx.Commit(); err != nil {
+			return FabricCommitted, fmt.Errorf("store: rollback fabric: commit: %w", err)
+		}
+		return FabricPendingAdd, nil
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE matter_node_identities
+SET noc = prior_noc, icac = prior_icac, private_key = prior_private_key,
+    prior_noc = NULL, prior_icac = NULL, prior_private_key = NULL
+WHERE fabric_index = ? AND prior_noc IS NOT NULL
+  AND EXISTS (SELECT 1 FROM matter_fabrics WHERE fabric_index = ? AND pending = ?)`, fabricIndex, fabricIndex, FabricPendingUpdate); err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: identity: %w", err)
+	}
+	res, err = tx.ExecContext(ctx, `
+UPDATE matter_fabrics
+SET node_id = COALESCE(prior_node_id, node_id), vendor_id = COALESCE(prior_vendor_id, vendor_id),
+    vid_statement = prior_vid_statement, vvsc = prior_vvsc,
+    prior_node_id = NULL, prior_vendor_id = NULL, prior_vid_statement = NULL, prior_vvsc = NULL,
+    pending = ?, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ? AND pending = ?`, FabricCommitted, fabricIndex, FabricPendingUpdate)
+	if err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: restore: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: restore: %w", err)
+	} else if n > 0 {
+		if err := tx.Commit(); err != nil {
+			return FabricCommitted, fmt.Errorf("store: rollback fabric: commit: %w", err)
+		}
+		return FabricPendingUpdate, nil
+	}
+	var one int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return FabricCommitted, ErrFabricNotFound
+	}
+	if err != nil {
+		return FabricCommitted, fmt.Errorf("store: rollback fabric: %w", err)
+	}
+	return FabricCommitted, nil
 }
 
 // RemoveFabric deletes the fabric and (via FK CASCADE) its

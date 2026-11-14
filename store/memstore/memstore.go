@@ -64,6 +64,9 @@ type Store struct {
 
 	fabrics    map[uint8]store.FabricRecord
 	identities map[uint8]store.IdentityRecord
+	// priors are the values an uncommitted UpdateNOC replaced, by fabric:
+	// SQLite's prior_* columns, held while the row is FabricPendingUpdate.
+	priors     map[uint8]fabricPrior
 	acl        map[uint8][]store.ACLEntry
 	aclNextID  int64
 	keySets    map[uint8]map[uint16]store.GroupKeySet
@@ -79,6 +82,15 @@ type Store struct {
 	metadata   map[string]uint64
 	presets    map[string]presetRow
 	locks      map[string]store.DoorLockAuth
+}
+
+// fabricPrior is what UpdateFabricCredentials keeps of a committed fabric:
+// every field it may change, the row's and the identity's.
+type fabricPrior struct {
+	nodeID                uint64
+	vendorID              uint16
+	statement, vvsc       []byte
+	noc, icac, privateKey []byte
 }
 
 type resumptionKey struct {
@@ -104,6 +116,7 @@ func New() *Store {
 	return &Store{
 		fabrics:    map[uint8]store.FabricRecord{},
 		identities: map[uint8]store.IdentityRecord{},
+		priors:     map[uint8]fabricPrior{},
 		acl:        map[uint8][]store.ACLEntry{},
 		aclNextID:  1,
 		keySets:    map[uint8]map[uint16]store.GroupKeySet{},
@@ -127,6 +140,7 @@ func (s *Store) Erase(context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.fabrics, s.identities, s.acl, s.aclNextID = fresh.fabrics, fresh.identities, fresh.acl, fresh.aclNextID
+	s.priors = fresh.priors
 	s.keySets, s.keyMap, s.groupTable, s.groupcast = fresh.keySets, fresh.keyMap, fresh.groupTable, fresh.groupcast
 	s.resumption, s.otaDefault, s.icd = fresh.resumption, fresh.otaDefault, fresh.icd
 	s.subs, s.subsSeq, s.settings, s.metadata = fresh.subs, 0, fresh.settings, fresh.metadata
@@ -270,6 +284,83 @@ func (s *Store) UpdateFabricVIDVerification(_ context.Context, fabricIndex uint8
 	})
 }
 
+// UpdateFabricCredentials implements [store.Fabrics]: under the one mutex,
+// a committed fabric's current values are kept as its prior and the row
+// marked, then the new values written.
+func (s *Store) UpdateFabricCredentials(_ context.Context, fabricIndex uint8, c store.FabricCredentials) error {
+	if len(c.NOC) == 0 || len(c.PrivateKey) == 0 {
+		return errors.New("memstore: update fabric credentials: a NOC and a private key are required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.fabrics[fabricIndex]
+	if !ok {
+		return store.ErrFabricNotFound
+	}
+	id, ok := s.identities[fabricIndex]
+	if !ok {
+		return store.ErrIdentityNotFound
+	}
+	if f.Pending == store.FabricCommitted {
+		s.priors[fabricIndex] = fabricPrior{
+			nodeID: f.NodeID, vendorID: f.VendorID,
+			statement: f.VIDVerificationStatement, vvsc: f.VVSC,
+			noc: id.NOC, icac: id.ICAC, privateKey: id.PrivateKey,
+		}
+		f.Pending = store.FabricPendingUpdate
+	}
+	f.NodeID, f.VendorID = c.NodeID, c.VendorID
+	f.VIDVerificationStatement, f.VVSC = cloneNoneIfEmpty(c.VIDVerificationStatement), cloneNoneIfEmpty(c.VVSC)
+	id.NOC, id.ICAC, id.PrivateKey = bytes.Clone(c.NOC), bytes.Clone(c.ICAC), bytes.Clone(c.PrivateKey)
+	s.fabrics[fabricIndex], s.identities[fabricIndex] = f, id
+	return nil
+}
+
+// CommitFabric implements [store.Fabrics].
+func (s *Store) CommitFabric(_ context.Context, fabricIndex uint8) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.fabrics[fabricIndex]
+	if !ok {
+		return store.ErrFabricNotFound
+	}
+	f.Pending = store.FabricCommitted
+	s.fabrics[fabricIndex] = f
+	delete(s.priors, fabricIndex)
+	return nil
+}
+
+// RollbackFabric implements [store.Fabrics]: a pending add goes as
+// RemoveFabric removes it; a pending update gets its prior values back.
+func (s *Store) RollbackFabric(_ context.Context, fabricIndex uint8) (store.FabricPending, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.fabrics[fabricIndex]
+	if !ok {
+		return store.FabricCommitted, store.ErrFabricNotFound
+	}
+	found := f.Pending
+	switch found {
+	case store.FabricCommitted:
+		// nothing to undo
+	case store.FabricPendingAdd:
+		s.removeFabric(fabricIndex)
+	case store.FabricPendingUpdate:
+		if p, ok := s.priors[fabricIndex]; ok {
+			f.NodeID, f.VendorID = p.nodeID, p.vendorID
+			f.VIDVerificationStatement, f.VVSC = p.statement, p.vvsc
+			if id, ok := s.identities[fabricIndex]; ok {
+				id.NOC, id.ICAC, id.PrivateKey = p.noc, p.icac, p.privateKey
+				s.identities[fabricIndex] = id
+			}
+		}
+		f.Pending = store.FabricCommitted
+		s.fabrics[fabricIndex] = f
+		delete(s.priors, fabricIndex)
+	}
+	return found, nil
+}
+
 func (s *Store) updateFabric(fabricIndex uint8, change func(*store.FabricRecord)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -293,7 +384,14 @@ func (s *Store) RemoveFabric(_ context.Context, fabricIndex uint8) error {
 	if !s.hasFabric(fabricIndex) {
 		return store.ErrFabricNotFound
 	}
+	s.removeFabric(fabricIndex)
+	return nil
+}
+
+// removeFabric deletes the fabric and the rows it owns; the caller holds mu.
+func (s *Store) removeFabric(fabricIndex uint8) {
 	delete(s.fabrics, fabricIndex)
+	delete(s.priors, fabricIndex)
 	delete(s.identities, fabricIndex)
 	delete(s.keySets, fabricIndex)
 	delete(s.keyMap, fabricIndex)
@@ -307,7 +405,6 @@ func (s *Store) RemoveFabric(_ context.Context, fabricIndex uint8) error {
 			delete(s.resumption, k)
 		}
 	}
-	return nil
 }
 
 // --- Identity ---

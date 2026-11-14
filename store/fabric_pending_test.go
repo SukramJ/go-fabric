@@ -8,6 +8,9 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
+	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -127,5 +130,81 @@ func TestUpgradeMovesVIDSettingsIntoFabrics(t *testing.T) {
 	}
 	if again, _ := s.GetFabric(ctx, 1); again.VVSC != nil || !bytes.Equal(again.VIDVerificationStatement, statement) {
 		t.Errorf("a later empty vvsc key did not clear the column: statement %x, VVSC %x", again.VIDVerificationStatement, again.VVSC)
+	}
+}
+
+// TestPendingFabricsSurviveReopen: every commit state, and an update's
+// prior values, are on disk: after closing the database and opening it
+// again (Apply included, as at a node's start) the rows read as before, the
+// update's rollback brings the prior credentials back and the add's
+// rollback deletes its row.
+func TestPendingFabricsSurviveReopen(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "matter.db")
+	open := func() (*sql.DB, *store.Store) {
+		t.Helper()
+		db, err := store.OpenSQLite(path, walMode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Apply(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+		return db, store.New(db)
+	}
+	identity := func(f uint8) store.IdentityRecord {
+		return store.IdentityRecord{FabricIndex: f, NOC: []byte{1, f}, ICAC: []byte{2, f}, PrivateKey: bytes.Repeat([]byte{f}, 32), IPK: bytes.Repeat([]byte{3}, 16)}
+	}
+
+	db, s := open()
+	add := func(seed byte, state store.FabricPending) uint8 {
+		rec := newFabricRecord(0, seed)
+		rec.Pending = state
+		rec.VIDVerificationStatement = []byte{seed}
+		idx, err := s.AddFabric(ctx, rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.UpsertIdentity(ctx, identity(idx)); err != nil {
+			t.Fatal(err)
+		}
+		return idx
+	}
+	committed := add(1, store.FabricCommitted)
+	pendingAdd := add(2, store.FabricPendingAdd)
+	updated := add(3, store.FabricCommitted)
+	beforeFabric, err := s.GetFabric(ctx, updated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateFabricCredentials(ctx, updated, store.FabricCredentials{NOC: []byte{9}, PrivateKey: []byte{9}, NodeID: 9, VendorID: 9}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, s = open()
+	t.Cleanup(func() { _ = db.Close() })
+	for idx, want := range map[uint8]store.FabricPending{committed: store.FabricCommitted, pendingAdd: store.FabricPendingAdd, updated: store.FabricPendingUpdate} {
+		if got, err := s.GetFabric(ctx, idx); err != nil || got.Pending != want {
+			t.Errorf("fabric %d after reopening: %v, %v; want %v", idx, got.Pending, err, want)
+		}
+	}
+	if state, err := s.RollbackFabric(ctx, updated); err != nil || state != store.FabricPendingUpdate {
+		t.Fatalf("RollbackFabric of the update after reopening = %v, %v", state, err)
+	}
+	if got, err := s.GetFabric(ctx, updated); err != nil || !reflect.DeepEqual(got, beforeFabric) {
+		t.Errorf("the updated fabric after its rollback = %+v, %v; want %+v", got, err, beforeFabric)
+	}
+	if got, err := s.GetIdentity(ctx, updated); err != nil || !reflect.DeepEqual(got, identity(updated)) {
+		t.Errorf("the updated identity after its rollback = %+v, %v; want %+v", got, err, identity(updated))
+	}
+	if state, err := s.RollbackFabric(ctx, pendingAdd); err != nil || state != store.FabricPendingAdd {
+		t.Fatalf("RollbackFabric of the add after reopening = %v, %v", state, err)
+	}
+	if _, err := s.GetFabric(ctx, pendingAdd); !errors.Is(err, store.ErrFabricNotFound) {
+		t.Errorf("the rolled-back add after reopening: %v, want ErrFabricNotFound", err)
 	}
 }
