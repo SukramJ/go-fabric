@@ -84,8 +84,8 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 
 | Entry | matter.js marker | marker file | marker text | Behaviour source | surface |
 | --- | --- | --- | --- | --- | --- |
-| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only (absence: the whole body of `SmokeCoAlarmBaseServer`, :18-42) | `packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts` | `class SmokeCoAlarmBaseServer` | specification text in `smoke-co-alarm-cluster.resource.ts` | no |
-| BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only (absence: the whole class body) | `packages/node/src/behaviors/fan-control/FanControlServer.ts` | `"export class FanControlServer extends FanControlBehavior {\n    override initialize() {\n        if (this.state.fanMode === undefined) {\n            this.state.fanMode = FanControl.FanMode.Off;\n        }\n    }\n}"` | `fan-control.resource.ts`, connectedhomeip `fan-control-server.cpp` | no |
+| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:18-42` at `db021da0` seeds the initial state only (absence: the whole body of `SmokeCoAlarmBaseServer`, :18-42) | `packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts` | `class SmokeCoAlarmBaseServer` | specification text in `smoke-co-alarm-cluster.resource.ts` | no |
+| BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only (absence: the whole class body) | `packages/node/src/behaviors/fan-control/FanControlServer.ts` | `"export class FanControlServer extends FanControlBehavior {\n    override initialize() {\n        if (this.state.fanMode === undefined) {\n            this.state.fanMode = FanControl.FanMode.Off;\n        }\n    }\n}"` | `fan-control.resource.ts`, connectedhomeip `src/app/clusters/fan-control-server/FanControlCluster.cpp` at `6170af84` | no |
 | BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command (absence: the whole body of each class, `OperationalStateServer.ts:17-89`, `RvcOperationalStateServer.ts:26-98`) | `packages/node/src/behaviors/operational-state/OperationalStateServer.ts`<br>`packages/node/src/behaviors/rvc-operational-state/RvcOperationalStateServer.ts` | `class OperationalStateServer`<br>`class RvcOperationalStateServer` | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` | no |
 | BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode (presence: each of the four servers the entry cites sets CurrentMode on ModeUtils' Success, `RvcRunModeServer.ts:71-77`, `RvcCleanModeServer.ts:53-59`, `LaundryWasherModeServer.ts:51-57`, `DishwasherModeServer.ts:51-57`) | `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts`<br>`packages/node/src/behaviors/rvc-clean-mode/RvcCleanModeServer.ts`<br>`packages/node/src/behaviors/laundry-washer-mode/LaundryWasherModeServer.ts`<br>`packages/node/src/behaviors/dishwasher-mode/DishwasherModeServer.ts` | `"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"` | `mode-base.resource.ts` | no |
 | BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (18 lines at the pin; absence: the empty class body) | `packages/node/src/behaviors/temperature-control/TemperatureControlServer.ts` | `"export class TemperatureControlServer extends TemperatureControlBehavior {}"` | connectedhomeip `TemperatureControlCluster.cpp` | no |
@@ -184,7 +184,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 ### BD-Matter-SmokeCoAlarmRulesInServer — ExpressedState, the self-test gate and the events are derived by the server
 
 matter.js `SmokeCoAlarmServer`
-(`packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts:19-43`)
+(`packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts:18-42` at `db021da0`)
 seeds the initial state and nothing else: which condition ExpressedState
 shows, refusing SelfTestRequest while alarming, and emitting the eleven
 events are left to the application that subclasses it.
@@ -231,11 +231,12 @@ speed-oriented write into one `fan.Settings` before the host sees it:
   → PercentSetting floor(s × 100 / SpeedMax); either at 0 → FanMode Off.
   The resource refers to "Percent Rules" (§4.4.6.3.1) and "Speed Rules"
   (§4.4.6.6.1) without carrying them; the formulas are connectedhomeip's
-  `fan-control-server.cpp`, recalled rather than read (findings register).
+  `src/app/clusters/fan-control-server/FanControlCluster.cpp:197` and `:224`
+  at `6170af84`.
 - A null PercentSetting / SpeedSetting write succeeds and changes nothing
   (:86-87, :126); a FanMode the FanModeSequence does not offer is
   CONSTRAINT_ERROR (:48-51, :62-63); the deprecated On maps to High and
-  Smart to Auto or High, as connectedhomeip does.
+  Smart to Auto or High, as connectedhomeip does (`FanControlCluster.cpp:401-411`).
 - Step goes to a host `Stepper` when there is one; otherwise the server
   steps one unit of SpeedSetting (MultiSpeed) or one rung of the
   sequence's speed modes, honouring Wrap and LowestOff. The resource calls
@@ -364,7 +365,7 @@ Guards: `TestTemperatureControlSetTemperature`,
 ### BD-Matter-ClosureWithoutTagList — the Closure endpoint omits the TAGLIST feature its device type marks mandatory
 
 A garage drive projects as the Closure device type (0x0230) carrying
-ClosureControl (0x0104). matter.js's `closure-device.element.ts:16-17`
+ClosureControl (0x0104). matter.js's `closure-device.element.ts:17` (at `db021da0`)
 marks the Descriptor's `TAGLIST` feature conformance `M` for that device
 type; our Descriptor advertises `FeatureMap=0` and reports TagList as
 unsupported by default (`cluster/core/descriptor.go`, `descriptorAttrTagList`).
@@ -406,7 +407,7 @@ by the device-type judge — a strict validator refuses it, the default warn
 mode reports it (`device:TestStandardDeviceTypeCorpusParityMatterJS`);
 with `Options.Tags` (phase 30) it conforms. The Duplicate condition's
 TagList requirement of Base is judged as matter.js judges it
-(`DeviceTypeConformance.ts:1189-1215`, the Aggregator waiver), so the
+(`DeviceTypeConformance.ts:1189-1214` at `db021da0`, the Aggregator waiver), so the
 kit's default bridge composition — bridged siblings below the Aggregator
 — owes none; composed siblings without Tags are warned of the same way.
 The same Apple reason holds for both.
@@ -461,7 +462,10 @@ device.
 connectedhomeip enforces container/tag strictness on every element via the
 always-on `VerifyElement` (`src/lib/core/TLVReader.cpp`) and rejects
 unordered Sigma/PASE optional fields, trailing bytes after the top-level
-container, and missing-mandatory post-decrypt fields. go-fabric's live
+container, and missing-mandatory post-decrypt fields (`VerifyElement` is
+`TLVReader.cpp:847` and `:850` at `6170af84`; the three rejections were not
+established from `src/protocols/secure_channel/CASESession.cpp` at that
+commit: unverified). go-fabric's live
 `Decoder.Next()` (`tlv/`) enforces these only via the
 opt-in `Validate()`, which the Sigma/PASE decoders do not call.
 
@@ -477,7 +481,7 @@ and `cluster/wire/levelcontrol.go` `DecodeMoveToLevel` / `DecodeStep` keep
 decoding that shape to `TransitionTime == nil`. matter.js HEAD itself decodes an absent struct
 member leniently (`packages/types/src/tlv/TlvObject.ts:205`
 `decodeTlvInternalValue` leaves it unset); the strict mandatory-field
-rejection (`ValidationMandatoryFieldMissingError`, `TlvObject.ts:258`)
+rejection (`ValidationMandatoryFieldMissingError`, `TlvObject.ts:261`)
 lives only in the separate `validate()` step, invoked at command-invoke
 time by `packages/protocol/src/action/server/CommandInvokeResponse.ts:486`
 — so stock matter.js HEAD would reject Google Home's field-absent shape at
@@ -508,10 +512,11 @@ value (`cluster/wire/field_bounds.go`, W3-clucore-08).
 ### BD-Matter-TLVSchemaLayer — the generated codecs are the TLV schema layer; tlv/ has no TlvObject
 
 matter.js's TLV package is a schema layer: `TlvObject` / `TlvTaggedList`
-encode a JavaScript record in tag order, inject and remove a field
-(`injectField` / `removeField`, `packages/types/src/tlv/TlvObject.ts:296-333`
-at `862ad75f`), refuse an unknown property or a non-context tag unless
-`allowProtocolSpecificTags` (`:205-213`), hold the length limits of a
+encode a JavaScript record in the order of its field definitions
+(`packages/types/src/tlv/TlvObject.ts:147-154`, `:182-184` at `db021da0`),
+inject and remove a field (`injectField` / `removeField`, `:299-339`),
+refuse an unknown property of a tagged list (`:161-169`) or a non-context
+tag unless `allowProtocolSpecificTags` (`:212-213`), hold the length limits of a
 repeated field, and `TlvArray` encodes and assembles chunked lists. In this
 module `tlv/` is the raw element codec and the schema layer is the
 generated code: `script/clustergen` writes each struct's `EncodeTLV` in tag
@@ -544,10 +549,10 @@ that consumes it.
 
 matter.js's pairing-code codecs can skip validation on decode
 (`Schema.decode(encoded, validate = true)`,
-`packages/types/src/schema/Schema.ts:18` at `862ad75f`), take a
+`packages/types/src/schema/Schema.ts:18` at `db021da0`), take a
 commissioning flow on a manual-code encode and refuse a non-standard one
 without VID/PID (`packages/types/src/schema/PairingCodeSchema.ts:430-437`),
-and build a QR code's TLV data from a record (`encodeTlvData`, `:386-392`,
+and build a QR code's TLV data from a record (`encodeTlvData`, `:386-404`,
 refusing PBKDF iterations without salt and a reserved tag). `secure/setup`
 decodes with validation always on (`DecodeQRCode`, `DecodeManualCode`,
 `DecodeExtra`), offers `ManualCode` as the standard-flow code and
@@ -580,10 +585,10 @@ mirror.
 
 matter.js's `UdpMulticastServer.create` tolerates a missing IPv4 (the
 socket or its group join fails: logged, the server runs IPv6-only,
-`packages/general/src/net/udp/UdpMulticastServer.ts:52-67` at `862ad75f`)
-but not a missing IPv6: that failure is rethrown with "required by Matter"
-and both sockets are closed (`:69-82`, `:95-105`;
-`UdpMulticastServerTest.ts:202-206`, "closes the IPv4 socket when the IPv6
+`packages/general/src/net/udp/UdpMulticastServer.ts:52-68` at `db021da0`)
+but not a missing IPv6: that failure is logged as "required my Matter"
+(sic) and rethrown, and both sockets are closed (`:70-83`, `:95-106`;
+`UdpMulticastServerTest.ts:354-360`, "closes the IPv4 socket when the IPv6
 socket cannot be created", "closes both sockets when the IPv6 socket cannot
 join the multicast group"). `mdns/socket.go` `openSockets` keeps whichever
 family bound and fails only when neither did, each failure logged
@@ -658,12 +663,12 @@ service records at all (`mdns/answer.go` `recordsForLocked`). matter.js's
 generator yields PTR, SRV and TXT for details with no addresses
 (`packages/protocol/src/advertisement/mdns/MdnsAdvertisement.ts:154-177` at
 `db021da0`), but its details are every address of the interface
-(`packages/nodejs/src/net/NodeJsNetwork.ts:188-205`), so that case is an
+(`packages/nodejs/src/net/NodeJsNetwork.ts:207-213` at `db021da0`), so that case is an
 interface that has none. Here the advertise policy can leave an interface
 with addresses it does not publish — a carrier-less container bridge, say —
 and a multicast sent there loops back to the host, so a controller on the
 same host receives an SRV with no A or AAAA; connectedhomeip's resolver
-keeps the lookup per interface and gives up with `CHIP_ERROR_TIMEOUT` once
+keeps the lookup per interface (not read: unverified) and gives up with `CHIP_ERROR_TIMEOUT` once
 no address arrived (`src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:115-125`
 at `6170af84`). Observed 2026-11-07 against the chip harness on a host with
 Docker bridges: the review fix of PR #437 answered the service records on
@@ -678,7 +683,10 @@ records too, where matter.js's names the addresses alone.
 
 The commissionable `DT` TXT key + `_T<id>` subtype advertise RootNode
 (0x0016) rather than the Aggregator application device-type (0x000E) that
-connectedhomeip's `Dnssd.cpp` would emit (`cmd/openccu-loom/daemon.go`).
+connectedhomeip's `Dnssd.cpp` would emit (`cmd/openccu-loom/daemon.go`):
+`src/app/server/Dnssd.cpp:303-306` at `6170af84` advertises the device type
+id its platform configuration returns, when the commissionable device type
+is enabled; that a bridge's is the Aggregator's was not read (unverified).
 
 **Rationale:** empirical Apple-pairing observation — recorded here so the
 audit does not re-flag it (parity audit 2026-05-30 CHIP-mDNS F2). The wire
@@ -738,8 +746,9 @@ endpoint ([ADR 0014](../../docs/adr/0014-transitions-optional-per-endpoint.md)):
   once, as matter.js does by default.
 
 Null and zero transition times take the instant path either way, matching
-`moveToLevelLogic`'s truthy-only rate derivation and the `changePerS`
-contract "0 or nullish means transition instantly".
+`moveToLevelLogic`'s truthy-only rate derivation
+(`LevelControlServer.ts:335-338` at `db021da0`) and the falsy `changePerS`
+that takes the immediate path (`packages/node/src/behavior/Transitions.ts:133`).
 
 On the native-ramp path (`levelcontrol.NewNativeSource`, and since v0.10.2
 `levelcontroldef.Declare.Ramp`, #228) the source holds Options and OnLevel
@@ -822,8 +831,8 @@ there. Retire this entry when matter.js does.
 matter.js keeps the primaries as plain state and leaves NumberOfPrimaries to
 the application: its test "accepts a primary a light supplies without
 stating the number of primaries"
-(`packages/node/test/behaviors/color-control/ColorControlServerTest.ts:72-87`
-at `862ad75f`) serves `primary1X` beside `numberOfPrimaries: null`. Here
+(`packages/node/test/behaviors/color-control/ColorControlServerTest.ts:74-86`
+at `db021da0`) serves `primary1X` beside `numberOfPrimaries: null`. Here
 `light.ColorControlServerConfig.Primaries` (and the kit's
 `colorcontroldef.Patch` Primary1X … Primary6Intensity) supplies them, and
 NumberOfPrimaries reads their count, null without any. connectedhomeip
@@ -1636,7 +1645,7 @@ implementation wave.
 
 **Go path:** `bridge/commissioning_window.go` — `commissioningWindowMaxSecUncommissioned = 172800`.
 
-**Rationale:** The constant and the `IsUncommissioned` flag are implemented and wired correctly (see the `L8-D03` row of the audit table). A dedicated parity test asserting the 172800-second (48-hour) constant against matter.js's `AdministratorCommissioning.element.ts` is listed as a follow-up item but does not block commissioning correctness — the external chip-tool validation suite passes on this path (62 PASS / 0 FAIL). Adding the test is a hardening step for the next parity-test sweep.
+**Rationale:** The constant and the `IsUncommissioned` flag are implemented and wired correctly (see the `L8-D03` row of the audit table). A dedicated parity test asserting the 172800-second (48-hour) constant against matter.js's `MAXIMUM_COMMISSIONING_TIMEOUT` (`packages/types/src/commissioning/CommissioningConstants.ts:11` at `db021da0`, `Days(2)`; the entry named `AdministratorCommissioning.element.ts`, which no file at the pin is called — `administrator-commissioning.element.ts` carries no such value) is listed as a follow-up item but does not block commissioning correctness — the external chip-tool validation suite passes on this path (62 PASS / 0 FAIL). Adding the test is a hardening step for the next parity-test sweep.
 
 ---
 
@@ -1698,7 +1707,7 @@ implementation wave.
 
 **Rationale:** Matter §4.3.1.6 lists SAT as a mandatory TXT key on the commissionable `_matterc._udp` record. The parity test `TestParityMdnsServer_CommissionableTXTSchemaLock` enforces this. Always emitting SAT (even at the spec-default 4000 ms) is the correct, spec-conformant behaviour; a conditional gate would violate §4.3.1.6 and break chip-tool and Apple Home commissioning flows that depend on SAT being present. The audit suggestion to gate it as "only if non-default" would constitute a spec regression and is intentionally not applied.
 
-The same reasoning covers the sibling MRP keys **SII and SAI** on both the operational and commissionable records: matter.js `MdnsAdvertisement.ts:183-197` omits each key when its value equals `SessionIntervals.defaults`, but chip — the certified reference stack — emits SII/SAI/SAT whenever a value is configured (it only skips when the MRP config is entirely unset / ICD-LIT), matching go-fabric's always-emit. Because chip (the interop-tested stack) sides with always-emitting-when-configured over matter.js's default-equality optimisation, the always-emit choice is the more conservative, interop-safe one and is applied uniformly to SII, SAI and SAT.
+The same reasoning covers the sibling MRP keys **SII and SAI** on both the operational and commissionable records: matter.js `MdnsAdvertisement.ts:191-200` (at `db021da0`) omits each key when its value equals `SessionIntervals.defaults`, but chip — the certified reference stack — emits SII/SAI/SAT whenever a value is configured (it only skips when the MRP config is entirely unset / ICD-LIT, `src/lib/dnssd/Advertiser_ImplMinimalMdns.cpp:228-244` at `6170af84`), matching go-fabric's always-emit. Because chip (the interop-tested stack) sides with always-emitting-when-configured over matter.js's default-equality optimisation, the always-emit choice is the more conservative, interop-safe one and is applied uniformly to SII, SAI and SAT.
 
 ---
 
@@ -1711,7 +1720,7 @@ mounts on the root endpoint only when the host sets `node.Config.ICD`; the
 reference daemon sets none and still serves no ICD Management. The text below
 is kept as the record of the former decision.
 
-**chip reference:** `src/app/clusters/icd-management-server/ICDManagementServer.cpp` — implements `RegisteredClients` (0x0003), `ICDCounter` (0x0004), `ClientsSupportedPerFabric` (0x0005).
+**chip reference:** `src/app/clusters/icd-management-server/ICDManagementCluster.cpp:286-290` at `6170af84` (the entry named `ICDManagementServer.cpp`, which that commit does not have) — implements `RegisteredClients` (0x0003), `ICDCounter` (0x0004), `ClientsSupportedPerFabric` (0x0005).
 
 **Go path:** `cluster/core/icd_management.go:34-100` — implements `IdleModeDuration` (0x0000), `ActiveModeDuration` (0x0001), `ActiveModeThreshold` (0x0002) only. Parity test comment marks this as intentional.
 
@@ -1721,7 +1730,7 @@ is kept as the record of the former decision.
 
 ### BD-Matter-InteractionModelRevision — go-fabric emits interactionModelRevision on every IM response
 
-matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-41`, `MatterInteractionModelRevision = 12`, matter.js `Specification.INTERACTION_MODEL_REVISION`).
+matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-45`, `MatterInteractionModelRevision = 12`, matter.js `Specification.INTERACTION_MODEL_REVISION`).
 
 This is by design: matter.js' own send-path (`TlvDataReportForSend`, `TlvInvokeResponseForSend`) continues to emit the field. Apple Home fails silently when expected fields are absent. Emitting the field unconditionally matches both the prior spec requirement and the actual matter.js wire output; removing it would risk silent Apple Home pairing regressions. No code change is planned.
 
@@ -1836,7 +1845,7 @@ as the record of the earlier difference.
 
 matter.js sends a group message through the one UDP interface
 `transports.interfaceFor(ChannelType.UDP, multicastAddress)` returns
-(`GroupSession.ts:143-153` at `0ceb202d`). `udp.Listener.SendMulticast`
+(`GroupSession.ts:186-195` at `db021da0`). `udp.Listener.SendMulticast`
 sends the datagram on every interface the listener holds multicast
 memberships on. Report AN.
 
@@ -1847,7 +1856,7 @@ of them would reach only that link.
 ### BD-Matter-GroupSendFromEphemeralPort — group messages leave from the node's own send socket
 
 matter.js originates group messages on the operational socket, port
-5540 (`GroupSession.ts:150-153` at `0ceb202d`). `node.Node` opens a
+5540 (`GroupSession.ts:186-195` at `db021da0`). `node.Node` opens a
 `[::]:0` send socket at `Start` for `groups.Manager.Sender` because the
 bridge does not expose its listener; receivers do not key on the source
 port. Report AN.
@@ -1857,7 +1866,7 @@ By design, until the bridge exposes its listener (findings register).
 ### BD-Matter-NodeClientStack-SecondSocket — the node's client role runs on its own UDP socket
 
 matter.js's node initiates CASE to a bound peer on the same operational
-socket it answers on (`BindingManager.ts:585-627` at `0ceb202d`,
+socket it answers on (`BindingManager.ts:571-585` at `db021da0`,
 `PeerSet.for(addr).connect()`). `node.Config.Client` opens a second
 `udp.Listener` with a `client/exchange.Manager` and a `peer.Set`
 built from the node's own fabric identities (`node/security.go`): the
@@ -1872,9 +1881,9 @@ role live in memory (the store's row is the responder's — findings).
 
 matter.js's `BindingManager` runs each resolution as an async task and
 parks entries per endpoint until the endpoint's `established` observable
-has an observer (`BindingManager.ts:391-438` at `0ceb202d`); a
+has an observer (`BindingManager.ts:369-422` at `db021da0`); a
 `BindingResolution` carries a materialised endpoint with the client
-behaviours installed (`:338-340`). `binding.Manager` serializes
+behaviours installed (`:322-324`). `binding.Manager` serializes
 resolutions and handler calls on one worker goroutine, is dormant until
 its first `OnEstablished` handler (manager-wide), and a `Resolution`
 names the target endpoint and the declared client cluster ids beside the
@@ -1961,9 +1970,9 @@ held in memory alone.
 ### BD-Matter-OTAProvider-HostPorts — the OTA provider decides images, consent and apply through host ports, not a software-update manager
 
 matter.js's `OtaSoftwareUpdateProviderServer` (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts`
-at `0ceb202d`) is welded to a `SoftwareUpdateManager` that validates the
+at `db021da0`) is welded to a `SoftwareUpdateManager` that validates the
 requestor's BasicInformation, consults the DCL and queues consent
-(`:66-71` the four consent states, `:248-273`, `:504-509`).
+(`:66-71` the four consent states, `:245-278`, `:506-516`).
 `core.OTAProvider` keeps the server's statuses, timers and responses
 (the 32-byte token, the 86 400 s DelayedActionTime cap, Busy with the
 2-minute retry, the 15-minute stale entry, `BdxSynchronous` with the
@@ -1972,7 +1981,7 @@ ports — `OTAImageSource`, `OTAConsent`, `OTAApplyPolicy` — for what the
 manager decides; the apply policy may also answer AwaitNextAction or
 Discontinue, which matter.js never does once consent holds. The provider
 sits on its own OtaProvider endpoint beside the Aggregator
-(`endpoints/ota-provider.ts:57-64` defines the type, not its place).
+(`packages/node/src/endpoints/ota-provider.ts:57-64` defines the type, not its place).
 Report AQ.
 
 By design (ADR 0021). A bridge host owns its images and its consent
@@ -2059,7 +2068,7 @@ subject of the request that changed the auxiliary entries
 AccessControlEntryChanged.AdminNodeID names the same CASE subject
 (`core.aclAdminFromContext`; null with AdminPasscodeID 0 over PASE, as
 matter.js's `#adminDataFromSession` answers a PASE session,
-`AccessControlServer.ts:274-282` at `862ad75f`). go-fabric does not persist
+`AccessControlServer.ts:275-284` at `db021da0`). go-fabric does not persist
 the CaseAdminSubject per fabric, so for a second administrator node of the
 same fabric the two differ: matter.js names the fabric's root node, this
 module the node that sent the request. For the usual single administrator
@@ -2143,7 +2152,7 @@ matter.js's `EnergyPreferenceServer` adds no rule; the generated
 constraint bounds the index type only. connectedhomeip refuses an index
 `>= correspondingArraySize` with CONSTRAINT_ERROR before telling the
 delegate (`EnergyPreferenceCluster.cpp:108-116`, `:118-125`; `.h:57-58,
-:69-70`). `cluster/energy/preference.go:82-86, :144` does the same.
+:69-70`). `cluster/energy/preference.go:82-86, :175-176` does the same.
 Family EPREF passes (#45).
 
 ### BD-chip-AlarmBase-RulesInServer — Reset, ModifyEnabledAlarms and Notify follow connectedhomeip; TemperatureAlarm's thresholds have no source
@@ -2169,7 +2178,7 @@ pin, cited per rule. One model-versus-chip difference is recorded in
 provisional in the model ("P, WATTS"), so the definition keeps them
 optional even with the WATTS feature; the server serves both with the
 feature as chip does (`MicrowaveOvenControlCluster.cpp:153-154`).
-`cluster/opstate`'s oven variant (`opstate_server.go:4-23, :346-358`)
+`cluster/opstate`'s oven variant (`opstate_server.go:4-23, :350-360`)
 takes Pause and Resume as "X" from the model and the PhaseList rule from
 matter.js `OvenCavityOperationalStateServer.ts:35-46`. The reference
 daemon's cavity additionally follows chip's all-clusters oven, which the
