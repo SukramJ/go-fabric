@@ -769,8 +769,14 @@ and the simulated driver knows only the `--wifi-sim-ssid` networks. Cases
 that need a real driver, a second access point, a BLE-commissioning TH or
 per-device credentials stay classified in the table above. TC-EEVSE-2.3
 runs too: its eleventh ChargingTarget is the server's RESOURCE_EXHAUSTED,
-as chip answers (`BD-chip-EVSE-TargetsServerHeld`). No class (a) case is
-left.
+as chip answers (`BD-chip-EVSE-TargetsServerHeld`). Seven cases are class
+(a) in the table above: TC-TLSCERT-2.2 and 2.9, and TC-PAVST-2.3, 2.4, 2.6,
+2.11 and TC-WASHERCTRL-2.2. For the last five the servers answer as
+connectedhomeip does since owner decision 69 — PushAvStreamTransport and
+LaundryWasherControls judge the fields concerned themselves
+(`script/clustergen/relaxed.go`) — which unit tests hold. No certification
+run has measured the five cases since, so their rows stay as they are until
+one has.
 
 CGEN runs twice as well (phase 38). The `CGEN` row is the default
 composition, which serves no terms and conditions, so TC-CGEN-2.5 to 2.11
@@ -918,6 +924,6 @@ product and is out of this module's reach:
 ## Open findings
 
 Class (a) gaps that are not fixed yet are listed by TC id in
-[`notes/parity/matter_behaviour_findings.md`](../notes/parity/matter_behaviour_findings.md)
+[`notes/parity/matter_behaviour_findings.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matter_behaviour_findings.md)
 under *Certification harness — open certifiability findings*; each excluded
 case in the status block names its finding.

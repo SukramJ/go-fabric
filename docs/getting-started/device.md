@@ -197,6 +197,9 @@ Defaults worth knowing:
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
+| `BootReason` | Unspecified, matter.js's default; a start into the version the node's own OTA requestor recorded as its update in progress reports SoftwareUpdateCompleted whatever this states |
+| `Commissioning.LocationCapability` | IndoorOutdoor, matter.js's default; `Commissioning.IndoorOnly` states Indoor |
+| `OTAProvider.GrantFabric` | with `OTAProvider` set: the provider's ACL entry is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics it opens the provider to |
 | `BasicInformation.NodeLabel` | `BasicInformation.ProductName` |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
 | `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
