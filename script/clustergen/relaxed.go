@@ -159,7 +159,7 @@ var serverRelaxations = []struct {
 const (
 	adminCommRelaxed = "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"
 	groupsRelaxed    = "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"
-	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:126-159 at db021da0"
+	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"
 	thermostatAtomic = "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0"
 	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"
 	pavstEmptyLists  = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"

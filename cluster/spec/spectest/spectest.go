@@ -442,7 +442,7 @@ func checkWrites(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, a
 // the server through the dispatcher's schema gate
 // (schema.AttributeWritable, endpoint/dispatcher.go), which answers a
 // read-only attribute UNSUPPORTED_WRITE before the server sees it — as
-// matter.js's AttributeWriteResponse.ts:229-231 answers it.
+// matter.js's AttributeWriteResponse.ts:231-234 at db021da0 answers it.
 func CheckHandWrittenServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster) {
 	tb.Helper()
 	v, _ := srv.MatterRead(spec.AttrFeatureMap)

@@ -16,8 +16,8 @@ import (
 // The check of a controller's written value against the definition, which
 // the dispatcher makes before any server runs (owner decision 64): what
 // matter.js validates when the written value enters the behavior's state
-// (packages/node/src/behavior/state/managed/Datasource.ts:667-676 at
-// db021da0, the model's ValueValidator), for every server whose cluster has
+// (packages/node/src/behavior/state/managed/values/StructManager.ts:279-298
+// at db021da0, the model's ValueValidator), for every server whose cluster has
 // a generated definition, the hand-written ones included.
 
 // FieldMap names, for a hand-written Go type that carries a definition
