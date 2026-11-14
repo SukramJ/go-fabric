@@ -491,7 +491,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// The handshake holds a TCP connection it runs on open until it
 		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
 		// session on the channel).
-		b.holdHandshake(src, proto.ExchangeID, false)
+		b.holdHandshake(src, key, false)
 		ch := b.resolveCaseHandler(key)
 		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
 			ch.ProcessSigma1, ch)
@@ -636,7 +636,7 @@ func (b *Bridge) dispatchPase(
 			})
 			return nil
 		}
-		b.holdHandshake(src, proto.ExchangeID, true)
+		b.holdHandshake(src, key, true)
 		h := b.resolvePaseHandler(key)
 		return b.handlePase(src, requestHdr, proto, payload, "pbkdf_param_req",
 			h.ProcessPBKDFParamRequest, h)
@@ -1262,7 +1262,7 @@ func (b *Bridge) forgetSigma1Replied(key HandshakeKey) {
 // on ([Bridge.holdHandshake]): the handshake can no longer complete.
 func (b *Bridge) ForgetSigma1Replied(key HandshakeKey) {
 	b.forgetSigma1Replied(key)
-	b.releaseCASEHandshakeEverywhere(key.ExchangeID)
+	b.releaseCASEHandshakeEverywhere(key)
 	// A Sigma2 or StatusReport still waiting for its acknowledgement
 	// goes with the responder it came from.
 	b.abandonHandshakeReplies(key)
