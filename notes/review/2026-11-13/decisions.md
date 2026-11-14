@@ -50,3 +50,10 @@ Not re-asked: TC-WASHERCTRL-2.2 keeps the owner's 2026-11-02 decision (no
 `by_design` row; struck). Applied from CLAUDE.md without a question: FIXED
 texts leave the live findings register; `by_design` rows for confirmed
 parity; Ahead rows for bounds matter.js lacks and chip has.
+
+## 2026-11-14, phase 2
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 34 | The cut of phase 2's review | **Seven flows, ten agents**: one reviewer per flow of the plan — Fable for commissioning and fail-safe (the pending-NOC marker read as a whole), the fabric life cycle, sessions and subscriptions, counters and replay; Opus for persistence and crash consistency, shutdown and goroutine leaks, wire-driven allocations — and three Fable verifiers for every finding of high or medium severity |
+| 35 | The data volume of the Mac holds 44 GiB free after the build cache was emptied (local Time Machine snapshots keep the blocks) | **Left to expire**; the fix round starts only when the space is free; a job with many distinct builds keeps its cache on a RAM disk |
