@@ -71,3 +71,9 @@ parity; Ahead rows for bounds matter.js lacks and chip has.
 | 47 | R2-P2-comm-08: opening a commissioning window arms the fail-safe for the window's whole duration, a divergence no `by_design` row records; an administrator gets Busy on ArmFailSafe while a window is open | **Removed, as matter.js**: opening a window arms nothing; the fail-safe comes with the commissioner's ArmFailSafe |
 | 48 | R2-P2-alloc-05: the bound on the report chunks the controller assembles per session — 2 MiB of wire bytes, chosen by the fix agent without a source | **Configurable, default 2 MiB**: `controller.Config.MaxReportBytesPerSession` |
 | 49 | R2-P2-sess-03, the second half: matter.js ends the sessions at shutdown without a CloseSession, under a TODO of its own that questions it (`SessionManager.ts:1110-1112` at `db021da0`); with a silent close the module's own controller fails six restart tests after about 49 s | **CloseSession stays, a `by_design` divergence; the controller is hardened** to drop a session whose peer went away without a farewell and to establish CASE again |
+
+## 2026-11-14, phase 3
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 50 | The cut of phase 3's review | **Seven attacker roles, ten agents, Fable**: the plan's six — an unauthenticated host on the device's link, a holder of the passcode, another fabric's administrator, a hostile device against the controller, a hostile BLE peer, a hostile Wi-Fi, DCL or OTA peer — and a seventh, an unauthenticated host on the controller's link; seven reviewers and three verifiers on Fable; a unit whose agent the provider's safeguards stop goes to Opus, and the report says so |
