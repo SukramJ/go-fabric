@@ -51,6 +51,12 @@ a peer with no address); no topology service appeared, the row stays and
 its marker is re-read at the new pin. Every other marker holds. Also
 caught up outside the register: `BD-Matter-CaseInitiatorPeerCATs` (#4884,
 the initiator takes the responder's CATs from its NOC, `CaseClient.ts:282-290`).
+Found by the re-read of review II's phase 4 (2026-11-14), also outside the
+register: `BD-Matter-Controller-InboundWithoutSourceNodeIDDropped` (#4843,
+the header row under Security below: the packet decoder refuses an
+unsecured unicast message with neither node id, `MessageCodec.ts:234-238`,
+which this module's exchange manager already dropped); the entry is retired
+in `by_design.md`.
 
 Citations that resolve at the pin — the bare `path:line` form without an
 `at <sha>` — now resolve at db021da0: 18 pointed beyond the end of a

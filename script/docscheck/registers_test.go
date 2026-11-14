@@ -29,7 +29,7 @@ var registerPath = regexp.MustCompile("`((?:[\\w.-]+/)+[\\w.-]+\\.(?:go|md|json|
 // today, or the sentence reworded so that it no longer points into the
 // tree — and the number lowered in the same commit.
 var registerPathsLeft = map[string]int{
-	"notes/parity/by_design.md":                        21,
+	"notes/parity/by_design.md":                        20,
 	"notes/parity/matter_behaviour_findings_closed.md": 10,
 	"notes/parity/pin-lifts.md":                        4,
 }
