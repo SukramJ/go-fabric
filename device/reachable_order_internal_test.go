@@ -112,7 +112,9 @@ func TestSetReachableFromTheNotificationReturns(t *testing.T) {
 	defer detach()
 	done := make(chan struct{})
 	go func() { lamp.SetReachable(ctx, false); close(done) }()
-	wait, cancel := context.WithTimeout(t.Context(), time.Second)
+	// Ten seconds: no loaded machine takes that long for a call that
+	// returns, so only a deadlock trips it (review II, R2-P1-rw-08).
+	wait, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	select {
 	case <-done:

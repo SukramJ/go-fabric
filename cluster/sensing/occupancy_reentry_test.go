@@ -14,9 +14,10 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 )
 
-// returns runs f and fails the test when it has not returned within a
-// second: a change listener that sets the server again must not block
-// the call that notified it.
+// returns runs f and fails the test when it has not returned within ten
+// seconds — a bound no loaded machine reaches for a call that returns, so
+// only a deadlock trips it (review II, R2-P1-rw-08): a change listener
+// that sets the server again must not block the call that notified it.
 func returns(t *testing.T, what string, f func()) {
 	t.Helper()
 	done := make(chan struct{})
@@ -24,7 +25,7 @@ func returns(t *testing.T, what string, f func()) {
 		defer close(done)
 		f()
 	}()
-	wait, cancel := context.WithTimeout(t.Context(), time.Second)
+	wait, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	select {
 	case <-done:
