@@ -857,12 +857,14 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	// Full Sigma path — reset established so the Sigma3 completion
 	// fires onEstablished correctly even if a prior handshake or resume
 	// on this adapter had already set it to true. Only a Sigma1 that
-	// restarted the handshake counts: the responder answers an MRP
-	// retransmit of the same Sigma1 with its cached Sigma2
-	// (secure/sigma/protocol.go processSigma1Locked, mirroring matter.js
-	// CaseServer.ts onSigma1), and reopening the gate there would let
+	// restarted the handshake counts: while the handshake is in progress
+	// the responder answers an MRP retransmit of the same Sigma1 with its
+	// cached Sigma2 (secure/sigma/protocol.go processSigma1Locked; the
+	// cache is this module's own), and reopening the gate there would let
 	// the Sigma3 retransmit that follows re-register the session and
-	// displace the live one.
+	// displace the live one. Once the handshake finished, the same Sigma1
+	// gets a fresh Sigma2 and reopens the gate; the finished handshake's
+	// Sigma3 then fails against it (review II, R2-P4-fr-sec-01).
 	out := result.Sigma2.Marshal()
 	a.mu.Lock()
 	if !bytes.Equal(out, a.lastSigma2) {

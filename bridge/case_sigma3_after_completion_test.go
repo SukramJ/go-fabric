@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -16,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -36,6 +38,7 @@ type completedCase struct {
 	provider   *PerExchangeCaseProvider // nil for the singleton handler
 	controller *pipelinePeer
 	sigma1     []byte
+	sigma2     []byte
 	sigma3     []byte
 	// report is the message counter of the success report that answered
 	// the completing Sigma3.
@@ -92,6 +95,7 @@ func completeCASE(t *testing.T, clk clock.Clock, viaProvider bool) *completedCas
 		t.Fatal(err)
 	}
 	sigma2, counter, _ := c.controller.recv(mrp.SCOpcodeSigma2, "Sigma2")
+	c.sigma2 = sigma2
 	if c.sigma3, err = initiator.ProcessSigma2Bytes(sigma2); err != nil {
 		t.Fatal(err)
 	}
@@ -195,49 +199,23 @@ func (c *completedCase) successReportPending() bool {
 // the session that handshake established as it was: its route, the
 // diagnostic that records its establishment, its installation — and is
 // acknowledged and not answered. That holds through a
-// PerExchangeCaseProvider, through the singleton handler, and when the
-// handshake's record lost its place and the same Sigma1 began it again on
-// the finished adapter (review II, R2-P3-rr-dev-01, R2-P4-nw-01).
+// PerExchangeCaseProvider and through the singleton handler (review II,
+// R2-P3-rr-dev-01, R2-P4-nw-01); the same Sigma1 again once the record is
+// gone is TestSigma1AgainAfterCompletionBeginsAfresh's.
 func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name        string
 		viaProvider bool
-		rebegin     bool
 	}{
-		{"through a provider", true, false},
-		{"through the singleton handler", false, false},
-		// The success report is no longer pending here, and the Sigma2
-		// the same Sigma1 sent again is: a Sigma3 of the handshake drops
-		// a Sigma2 waiting for its acknowledgement before its handler
-		// runs (dispatchSigma3), so only "no reply sent" is checked.
-		{"the record begun again by the same Sigma1", true, true},
+		{"through a provider", true},
+		{"through the singleton handler", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
 			controllerRoute := c.route(t)
-			if tc.rebegin {
-				// The record loses its place at the bound, as the oldest,
-				// to handshakes begun since.
-				for i := range maxCaseHandshakes {
-					begun := HandshakeKey{InitiatorNodeID: uint64(0x7000 + i), ExchangeID: 1}
-					c.r.b.markSigma1Replied(begun, [32]byte{1})
-					c.r.b.boundSigma1Records(begun)
-				}
-				c.r.b.mu.RLock()
-				_, held := c.r.b.sigma1Replied[HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}]
-				c.r.b.mu.RUnlock()
-				if held {
-					t.Fatal("the completed handshake's record kept its place at the bound")
-				}
-				other := c.otherPeer(t)
-				if err := other.send(mrp.SCOpcodeSigma1, completedCaseExchange, c.sigma1, nil); err != nil {
-					t.Fatal(err)
-				}
-				other.recv(mrp.SCOpcodeSigma2, "the cached Sigma2")
-			}
-			if !tc.rebegin && !c.successReportPending() {
+			if !c.successReportPending() {
 				t.Fatal("the success report is not waiting for the controller's acknowledgement")
 			}
 			for _, payload := range [][]byte{{0x15, 0x18}, c.sigma3} {
@@ -246,13 +224,9 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 				if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, payload, nil); err != nil {
 					t.Fatal(err)
 				}
-				if tc.rebegin {
-					c.expectNoReply(t, pending, "a Sigma3 from another sender")
-				} else {
-					c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
-					if !c.successReportPending() {
-						t.Fatalf("a Sigma3 of %d bytes from another sender took the success report from the retransmission", len(payload))
-					}
+				c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
+				if !c.successReportPending() {
+					t.Fatalf("a Sigma3 of %d bytes from another sender took the success report from the retransmission", len(payload))
 				}
 				if got := c.route(t); got != controllerRoute {
 					t.Fatalf("a Sigma3 of %d bytes after completion moved the session's route from %s to %s", len(payload), controllerRoute, got)
@@ -682,4 +656,135 @@ func TestAttachCaseHandlerEndsTheReplacedHandlersHandshakes(t *testing.T) {
 	if !r.b.ackTracker.Owes(0, completedCaseExchange, false) {
 		t.Fatal("the Sigma3 was answered: no acknowledgement owed")
 	}
+}
+
+// handshakeState is what the bridge holds of the unsecured session's
+// handshakes: its Sigma1 records, its duplicate windows and the replies
+// that wait for an acknowledgement.
+func handshakeState(b *Bridge) (records, windows, pending int) {
+	b.mu.RLock()
+	records = len(b.sigma1Replied)
+	b.mu.RUnlock()
+	return records, b.unsecuredWindows.len(), b.outboundReliable.Pending()
+}
+
+// expectNoHandshakeState fails t unless the bridge holds no Sigma1 record,
+// no unsecured window and no reply waiting for an acknowledgement.
+func expectNoHandshakeState(t *testing.T, b *Bridge, when string) {
+	t.Helper()
+	if records, windows, pending := handshakeState(b); records != 0 || windows != 0 || pending != 0 {
+		t.Fatalf("%s: %d Sigma1 records, %d unsecured windows and %d replies waiting for an acknowledgement held, want none", when, records, windows, pending)
+	}
+}
+
+// TestSigma1AgainAfterCompletionBeginsAfresh: once a CASE handshake
+// completed and its record is gone — the success report was acknowledged
+// (singleton handler), or the record lost its place at the bound while the
+// provider still holds the finished adapter — the same Sigma1 again is
+// taken as any other Sigma1: it is answered with a fresh Sigma2, not the
+// finished handshake's, and the finished handshake's Sigma3 fails against
+// it with a failure report, which ends the handshake. The established
+// session stays as it was, and once the failure report is acknowledged the
+// bridge holds no record, window, reply or (over TCP) connection hold of
+// the handshake (review II, R2-P4-fr-sec-01). matter.js never sends the
+// first Sigma2 again: on the handshake's live exchange the message is a
+// duplicate or a flow error
+// (packages/protocol/src/protocol/MessageExchange.ts:501-511, :521-534 at
+// db021da0); once the exchange is gone (CaseServer.ts:95-98) the CASE
+// server begins afresh with a new random and key pair (CaseServer.ts:61-63,
+// :100-125, :236, :241).
+func TestSigma1AgainAfterCompletionBeginsAfresh(t *testing.T) {
+	t.Parallel()
+	key := HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}
+	for _, tc := range []struct {
+		name        string
+		viaProvider bool
+	}{
+		{"through a provider", true},
+		{"through the singleton handler", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
+			controllerRoute := c.route(t)
+			if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.report); err != nil {
+				t.Fatal(err)
+			}
+			if tc.viaProvider {
+				// The record loses its place at the bound
+				// ([Bridge.boundSigma1Records]); the adapter stays.
+				c.r.b.forgetSigma1Replied(key)
+			}
+			if c.recordHeld() {
+				t.Fatal("the completed handshake's record is still held")
+			}
+			if err := c.controller.send(mrp.SCOpcodeSigma1, completedCaseExchange, c.sigma1, nil); err != nil {
+				t.Fatal(err)
+			}
+			sigma2, counter, _ := c.controller.recv(mrp.SCOpcodeSigma2, "the same Sigma1 again")
+			if bytes.Equal(sigma2, c.sigma2) {
+				t.Fatal("the same Sigma1 again was answered with the finished handshake's Sigma2, want a fresh one")
+			}
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &counter); err != nil {
+				t.Fatal(err)
+			}
+			failure := c.expectReport(t, c.controller, mrp.SCStatusGeneralFailure, "the finished handshake's Sigma3 after the fresh Sigma2")
+			if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &failure); err != nil {
+				t.Fatal(err)
+			}
+			if got := c.route(t); got != controllerRoute {
+				t.Fatalf("the established session's route moved from %s to %s", controllerRoute, got)
+			}
+			if got := c.completedEvents(); got != 1 {
+				t.Fatalf("the completed-handshake diagnostic was recorded %d times, want once", got)
+			}
+			if got := c.sessions.Load(); got != 1 {
+				t.Fatalf("%d sessions installed, want 1", got)
+			}
+			if c.provider != nil && c.provider.Active() != 0 {
+				t.Fatalf("the provider holds %d adapters after the handshake failed, want 0", c.provider.Active())
+			}
+			expectNoHandshakeState(t, c.r.b, "after the failure report was acknowledged")
+		})
+	}
+	t.Run("over TCP, through the singleton handler", func(t *testing.T) {
+		t.Parallel()
+		c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
+		if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.report); err != nil {
+			t.Fatal(err)
+		}
+		conn := &fakeConn{}
+		route := c.r.b.routeFor(conn)
+		r, ok := route.(*connRoute)
+		if !ok {
+			t.Fatalf("route %T", route)
+		}
+		holds := func() int {
+			c.r.b.routeBindMu.Lock()
+			defer c.r.b.routeBindMu.Unlock()
+			return len(r.handshakes)
+		}
+		for i, step := range []struct {
+			opcode  uint8
+			payload []byte
+		}{{mrp.SCOpcodeSigma1, c.sigma1}, {mrp.SCOpcodeSigma3, c.sigma3}} {
+			hdr := &message.Header{MessageCounter: uint32(0x7000 + i), HasSourceNodeID: true, SourceNodeID: completedCaseInitiator}
+			proto := message.ProtocolHeader{Initiator: true, Opcode: step.opcode, ExchangeID: completedCaseExchange, ProtocolID: mrp.SecureChannelProtocolID}
+			if err := c.r.b.dispatchSecureChannel(route, hdr, proto, step.payload); err != nil {
+				t.Fatal(err)
+			}
+			if i == 0 && holds() != 1 {
+				t.Fatalf("%d connection holds after the same Sigma1 again, want 1", holds())
+			}
+		}
+		if n := holds(); n != 0 {
+			t.Fatalf("%d connection holds after the finished handshake's Sigma3, want 0", n)
+		}
+		if c.recordHeld() {
+			t.Fatal("the handshake's record outlived its failed Sigma3")
+		}
+		if got := c.sessions.Load(); got != 1 {
+			t.Fatalf("%d sessions installed, want 1", got)
+		}
+	})
 }

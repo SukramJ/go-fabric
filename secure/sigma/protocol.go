@@ -783,18 +783,33 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	switch {
 	case r.state == responderStateInit:
 		// fresh responder — fall through to the standard processing.
-	case r.state != responderStateFailed && bytes.Equal(r.sigma1Bytes, sigma1Bytes) && r.sigma2Bytes != nil:
-		// Idempotent replay: Apple Home retransmits Sigma1 over MRP
-		// when its layer hasn't yet observed our Sigma2 ACK. Same
-		// Sigma1 bytes → same Sigma2 wire reply (matter.js
-		// `CaseServer.ts:onSigma1` caches and replays). Returning a
-		// freshly-derived Sigma2 here would hand the initiator new
-		// ephemerals; its first-received Sigma2 wins so the Sigma3
-		// would AES-CCM-fail against our last-derived keys.
+	case r.state == responderStateSigma2Sent && bytes.Equal(r.sigma1Bytes, sigma1Bytes) && r.sigma2Bytes != nil:
+		// Idempotent replay while the handshake is in progress: Apple
+		// Home retransmits Sigma1 over MRP when its layer hasn't yet
+		// observed our Sigma2 ACK. Same Sigma1 bytes → same Sigma2 wire
+		// reply. Returning a freshly-derived Sigma2 here would hand the
+		// initiator new ephemerals; its first-received Sigma2 wins so
+		// the Sigma3 would AES-CCM-fail against our last-derived keys.
+		// The cache is this module's own: matter.js answers the
+		// retransmission on the exchange layer — a duplicate is
+		// acknowledged, or the pending message's retransmission kicked
+		// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at
+		// db021da0), and a message whose id the pending reply
+		// acknowledges gets that reply again (:512-520).
 		return r.sigma2, nil
 	default:
-		// Different Sigma1 (or post-Sigma3 Finished state) on the
-		// same Responder slot. Apple Home opens new CASE sessions
+		// Different Sigma1, or any Sigma1 once the handshake finished
+		// or failed, on the same Responder slot. A finished
+		// handshake's Sigma1 again is taken as any other: its Sigma2
+		// is not sent again, since its Sigma3 can complete nothing any
+		// more (review II, R2-P4-fr-sec-01). matter.js never sends the
+		// first Sigma2 again: on the handshake's live exchange the
+		// message is a duplicate or a flow error
+		// (MessageExchange.ts:501-511, :521-534 at db021da0), and once
+		// that exchange is gone (CaseServer.ts:95-98) the CASE server
+		// begins afresh with a new random and key pair
+		// (packages/protocol/src/session/case/CaseServer.ts:61-63,
+		// :100-125, :236, :241). Apple Home opens new CASE sessions
 		// on the SAME ExchangeID after CommissioningComplete (the
 		// iCloud Hub Companion fabric grafts onto the existing
 		// exchange). Reset the responder and proceed as a clean

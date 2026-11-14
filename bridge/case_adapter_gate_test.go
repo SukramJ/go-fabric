@@ -135,11 +135,13 @@ func TestHandleCase_ErrorMapsToSecureChannelStatusCode(t *testing.T) {
 }
 
 // TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate pins that
-// the idempotent Sigma1 replay (the responder returns its cached Sigma2,
-// secure/sigma/protocol.go processSigma1Locked) leaves the established
-// gate closed: a Sigma3 retransmit that follows must not fire
-// onEstablished a second time, which would re-register the session and
-// displace the live one.
+// a Sigma1 replay never lets a Sigma3 retransmit fire onEstablished a
+// second time, which would re-register the session and displace the live
+// one: while the handshake is in progress the responder answers the same
+// Sigma1 with its cached Sigma2 (secure/sigma/protocol.go
+// processSigma1Locked); once it finished, the same Sigma1 begins afresh
+// with a fresh Sigma2, and the finished handshake's Sigma3 fails against
+// it (review II, R2-P4-fr-sec-01).
 func TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate(t *testing.T) {
 	t.Parallel()
 	a, initiator, responder := pairedCaseAdapter(t)
@@ -158,6 +160,9 @@ func TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("responder.ProcessSigma1 replay: %v", err)
 	}
+	if !bytes.Equal(sigma2Struct.Marshal(), sigma2First) {
+		t.Fatal("the Sigma1 replay while the handshake is in progress produced a different Sigma2, want the cached one")
+	}
 	sigma3Bytes, err := initiator.ProcessSigma2(sigma2Struct)
 	if err != nil {
 		t.Fatalf("initiator.ProcessSigma2: %v", err)
@@ -174,11 +179,15 @@ func TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate(t *testing.T) {
 	if err != nil || op2 != mrp.SCOpcodeSigma2 {
 		t.Fatalf("ProcessSigma1 replay: op=%#x err=%v", op2, err)
 	}
-	if !bytes.Equal(sigma2First, sigma2Again) {
-		t.Fatal("the Sigma1 replay produced a different Sigma2; the responder's idempotent replay is the premise of this test")
+	if bytes.Equal(sigma2First, sigma2Again) {
+		t.Fatal("the Sigma1 replay after the handshake finished produced the finished handshake's Sigma2, want a fresh one")
 	}
-	if _, _, err := a.ProcessSigma3(sigma3Bytes); err != nil {
+	op3, report, err := a.ProcessSigma3(sigma3Bytes)
+	if err != nil {
 		t.Fatalf("ProcessSigma3 retransmit: %v", err)
+	}
+	if general, _, _, ok := decodeStatusReport(report); op3 != mrp.SCOpcodeStatusReport || !ok || general != mrp.SCStatusGeneralFailure {
+		t.Errorf("the finished handshake's Sigma3 after the fresh Sigma2 answered opcode %#x general %d, want a failure StatusReport", op3, general)
 	}
 	if calls != 1 {
 		t.Errorf("onEstablished calls = %d after a Sigma1 + Sigma3 retransmit, want 1 (a replayed Sigma1 restarts no handshake)", calls)
