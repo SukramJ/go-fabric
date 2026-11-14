@@ -31,9 +31,10 @@ const (
 	// MaxPayloadSize is the largest message payload an exchange sends over
 	// UDP: the 1232-byte UDP payload of an IPv6 minimum MTU less the Matter
 	// message overhead (26 + 12 + 16). Mirrors matter.js
-	// packages/protocol/src/protocol/MessageExchange.ts:156
-	// (MATTER_MESSAGE_OVERHEAD), :435-439 (maxPayloadSize) and
-	// packages/general/src/net/udp/UdpSocket.ts:12 (MAX_UDP_MESSAGE_SIZE).
+	// packages/protocol/src/protocol/MessageExchange.ts:182
+	// (MATTER_MESSAGE_OVERHEAD), :465-469 (maxPayloadSize) and
+	// packages/general/src/net/udp/UdpSocket.ts:12 (MAX_UDP_MESSAGE_SIZE) at
+	// db021da0.
 	MaxPayloadSize = 1232 - (26 + 12 + 16)
 
 	// peerResponseTimeBuffer is the margin added to the peer's worst-case

@@ -53,7 +53,7 @@ type Session struct {
 	nodeID uint64
 	window *mrp.Window
 	// inbound marks the unsecured session a peer's initiating message
-	// created (ExchangeManager.ts:261-264): nodeID is the peer's, and our
+	// created (ExchangeManager.ts:325-328 at db021da0): nodeID is the peer's, and our
 	// messages name it as their destination.
 	inbound bool
 	// lifetime closes an inbound session [inboundUnsecuredLifetime] after
@@ -190,7 +190,7 @@ func (s *Session) NodeID() uint64 {
 
 // IsInbound reports whether the session is an unsecured session the peer
 // opened with an initiating message — the session a CASE responder runs
-// on (matter.js ExchangeManager.ts:261-264).
+// on (matter.js ExchangeManager.ts:325-328 at db021da0).
 func (s *Session) IsInbound() bool { return s.inbound }
 
 // PeerNodeID is the peer's operational node id: 0 on the unsecured and on

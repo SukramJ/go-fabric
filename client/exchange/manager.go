@@ -597,10 +597,10 @@ func (m *Manager) forget(s *Session) {
 }
 
 // CloseSession ends a session: a secure session whose peer is not lost
-// (NodeSession.ts:389-395) first sends CloseSession
+// (NodeSession.ts:419-425 at db021da0) first sends CloseSession
 // on a fresh exchange — a StatusReport (Success, CloseSession) without an
 // acknowledgement request — then is dropped. Mirrors matter.js
-// ExchangeManager.ts:716-726 (#sendCloseSession) and
+// ExchangeManager.ts:781-791 (#sendCloseSession) and
 // SecureChannelMessenger.ts:193-195 (sendCloseSession, suppressAck). A
 // failure to send is logged, never returned: the session is gone either
 // way.
@@ -877,8 +877,8 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 
 // newInboundSession creates the unsecured session of a peer's initiating
 // message, keyed by the peer's source node id — matter.js
-// ExchangeManager.ts:261-264 (createUnsecuredSession with the initiator's
-// node id). A request without a source node id is dropped: the session
+// ExchangeManager.ts:308-312, :325-328 at db021da0
+// (createUnsecuredSession with the initiator's node id). A request without a source node id is dropped: the session
 // could not be told apart from another peer's.
 func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Session {
 	if !hdr.HasSourceNodeID {
@@ -1047,7 +1047,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		return
 	}
 	// A new exchange on a closing session is declined
-	// (ExchangeManager.ts:386-389; :441-444 at db021da0).
+	// (ExchangeManager.ts:441-444 at db021da0).
 	if s.IsClosing() {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session_id", int(s.id)))
 		return

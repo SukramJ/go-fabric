@@ -192,8 +192,8 @@ func (s *Session) Channel() Channel { return s.channel }
 // MaxPayloadSize is the largest message payload an exchange of the
 // session sends: [MaxPayloadSize] over UDP, over TCP the largest message
 // the session sends ([Session.PeerMaxTCPMessageSize] under the channel's
-// own limit) less the Matter message overhead (MessageExchange.ts:435-439,
-// :156).
+// own limit) less the Matter message overhead (MessageExchange.ts:465-469,
+// :182 at db021da0).
 func (s *Session) MaxPayloadSize() int {
 	if s.channel != nil {
 		return s.maxTCPMessageSize() - (26 + 12 + 16)
