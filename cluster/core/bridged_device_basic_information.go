@@ -47,6 +47,12 @@ type BridgedDeviceBasicInformation struct {
 	dataVersion cluster.DataVersionTracker
 
 	onNodeLabelWrite func(string)
+	// writeMu serialises controller NodeLabel writes: the comparison, the
+	// store and the OnNodeLabelWrite call are one step, so the hook hears
+	// the labels in the order they are stored. It is never held with mu
+	// taken first; the hook runs under writeMu, not mu, so it may read the
+	// server.
+	writeMu sync.Mutex
 
 	vendorName        string
 	vendorID          uint16
@@ -167,9 +173,11 @@ type BridgedConfig struct {
 	// (BridgedDeviceBasicInformationServer.ts / BasicInformationServer.ts
 	// setDefault("configurationVersion", 1)).
 	ConfigurationVersion uint32
-	// OnNodeLabelWrite, when set, receives every NodeLabel a controller
-	// writes, after validation — where the owner of the endpoint keeps it
-	// (a server rebuilt per dispatch cannot keep it itself).
+	// OnNodeLabelWrite, when set, receives a NodeLabel a controller
+	// writes, after validation, when it differs from the one the server
+	// holds, in the order the server stores them — where the owner of the
+	// endpoint keeps it (a server rebuilt per dispatch cannot keep it
+	// itself). The held label reaches no hook.
 	OnNodeLabelWrite func(label string)
 	// Logger receives the cluster's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
@@ -457,7 +465,10 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(ctx context.Context, attrID 
 // NodeLabel differs from the one held — the comparison, made under the
 // lock that stores it, that advances the server's own version (matter.js
 // Datasource.ts:1456-1457, :1479 at db021da0). OnNodeLabelWrite receives
-// every accepted NodeLabel, an unchanged one too.
+// a NodeLabel that differs from the one held, in the order the labels are
+// stored; the held label reaches no hook (matter.js observes no equal
+// field, Datasource.ts:1406-1407 and :1479). A hook that writes NodeLabel
+// to this server again deadlocks.
 func (b *BridgedDeviceBasicInformation) MatterWriteChanged(_ context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bridgedBasicInfoAttrNodeLabel {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
@@ -480,20 +491,23 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(_ context.Context, at
 	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
 		return false, refusedWrite{sentinel: fmt.Errorf("core: BridgedDeviceBasicInformation NodeLabel write of %d bytes", len(s)), status: err}
 	}
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
 	b.mu.Lock()
 	changed := b.nodeLabel != s
 	b.nodeLabel = s
 	hook := b.onNodeLabelWrite
 	b.mu.Unlock()
+	if !changed {
+		return false, nil
+	}
 	if hook != nil {
 		hook(s)
 	}
 	// A changed NodeLabel advances DataVersion so DataVersionFilter
 	// evaluation detects the cluster changed.
-	if changed {
-		b.dataVersion.Bump()
-	}
-	return changed, nil
+	b.dataVersion.Bump()
+	return true, nil
 }
 
 // MatterInvoke always rejects — BridgedDeviceBasicInformation has no

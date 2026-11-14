@@ -336,3 +336,40 @@ func TestOTADefaultProvidersWritesAreSerialised(t *testing.T) {
 		t.Errorf("DefaultOTAProviders after both writes holds providers %#x; want both fabrics' [0xaa 0xbb]", nodes)
 	}
 }
+
+// TestBridgedNodeLabelHookHearsTheStoredChangesInOrder pins that
+// OnNodeLabelWrite hears a controller's NodeLabel write only when the label
+// differs from the one held (matter.js observes no equal field,
+// Datasource.ts:1406-1407 and :1479 at db021da0), and hears the labels in
+// the order the server stores them: a write that stores after another
+// reaches the hook after it, so the host keeps the label the server holds.
+func TestBridgedNodeLabelHookHearsTheStoredChangesInOrder(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var mu sync.Mutex
+	var heard []string
+	gate := newStoreGate()
+	b, err := core.NewBridgedDeviceBasicInformation(core.BridgedConfig{UniqueID: "u-1", NodeLabel: "lamp", OnNodeLabelWrite: func(label string) {
+		if label == "desk" {
+			gate.hold(context.WithValue(ctx, gateKey{}, true))
+		}
+		mu.Lock()
+		heard = append(heard, label)
+		mu.Unlock()
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const nodeLabel = 0x0005
+	if changed, err := b.MatterWriteChanged(ctx, nodeLabel, "lamp"); changed || err != nil || len(heard) != 0 {
+		t.Errorf("the held label: changed %v, %v, hook heard %q; want unchanged and nothing heard", changed, err, heard)
+	}
+	interleave(t, gate,
+		func() (bool, error) { return b.MatterWriteChanged(ctx, nodeLabel, "desk") },
+		func() (bool, error) { return b.MatterWriteChanged(ctx, nodeLabel, "hall") },
+	)
+	held, _ := b.MatterRead(nodeLabel)
+	if want := []string{"desk", "hall"}; !slices.Equal(heard, want) || held != "hall" {
+		t.Errorf("hook heard %q, the server holds %v; want %q and the last one held", heard, held, want)
+	}
+}
