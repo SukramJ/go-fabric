@@ -4,6 +4,7 @@
 package measurement
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -222,5 +223,29 @@ func TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestElectricalPowerReportsItsServedReadings: every reading the projected
+// ElectricalPowerMeasurement serves is change-reported. matter.js
+// broadcasts a change of every conformant property of a behavior's state,
+// a quieter one when its QuietEvent emits
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:230-262 at
+// db021da0); Voltage, ActiveCurrent, ActivePower and Frequency are all of
+// the quieter quality (packages/model/src/standard/elements/
+// electrical-power-measurement.element.ts:54-55, :58-59, :70-71, :94-95).
+// Review II, phase 4.
+func TestElectricalPowerReportsItsServedReadings(t *testing.T) {
+	t.Parallel()
+	srv := NewElectricalPowerServerFromReadings(specReadings{})
+	reportable := srv.MatterReportable()
+	for _, id := range srv.MatterAttributes() {
+		a := epmdef.Definition.Attribute(id)
+		if a == nil || !a.Quality.Quieter {
+			continue
+		}
+		if !slices.Contains(reportable, id) {
+			t.Errorf("%s (0x%04X) is served and of the quieter quality, but not change-reported", a.Name, id)
+		}
 	}
 }

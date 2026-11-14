@@ -1030,8 +1030,16 @@ func (s *ElectricalPowerServer) MatterInvoke(_ context.Context, cmdID uint32, _ 
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
 }
 
-// MatterReportable returns the attribute IDs that the Matter Electrical Power Measurement cluster reports on change.
-func (s *ElectricalPowerServer) MatterReportable() []uint32 { return []uint32{attrElPwrActivePower} }
+// MatterReportable returns the attribute IDs that the Matter Electrical
+// Power Measurement cluster reports on change: every reading it serves —
+// Voltage, ActiveCurrent, ActivePower and Frequency, each of the quieter
+// quality (packages/model/src/standard/elements/electrical-power-measurement.element.ts:54-55,
+// :58-59, :70-71, :94-95 at db021da0), which the bridge reports through
+// its throttle. A reading the source does not carry reads null and never
+// changes.
+func (s *ElectricalPowerServer) MatterReportable() []uint32 {
+	return []uint32{attrElPwrVoltage, attrElPwrActiveCurrnt, attrElPwrActivePower, attrElPwrFrequency}
+}
 
 // MatterAttributes lists every ElectricalPowerMeasurement (0x0090)
 // attribute the server implements via MatterRead. Apple Home's HAP

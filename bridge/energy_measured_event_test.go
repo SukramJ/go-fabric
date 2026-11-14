@@ -24,15 +24,22 @@ type fakeMeter struct {
 	observed bool
 	power    float64
 	powered  bool
+	voltage  float64
+	volted   bool
 }
 
 func (*fakeMeter) MatterMeasurementClass() contract.MeasurementClass {
 	return contract.MeasurementElectrical
 }
-func (*fakeMeter) Voltage() (float64, bool)   { return 0, false }
 func (*fakeMeter) Current() (float64, bool)   { return 0, false }
 func (*fakeMeter) Frequency() (float64, bool) { return 0, false }
 func (*fakeMeter) HasEnergy() bool            { return true }
+
+func (m *fakeMeter) Voltage() (float64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.voltage, m.volted
+}
 
 func (m *fakeMeter) Energy() (float64, bool) {
 	m.mu.Lock()
@@ -65,6 +72,13 @@ func (m *fakeMeter) set(wh float64) {
 func (m *fakeMeter) setPower(w float64) {
 	m.mu.Lock()
 	m.power, m.powered = w, true
+	m.mu.Unlock()
+	m.notify()
+}
+
+func (m *fakeMeter) setVoltage(v float64) {
+	m.mu.Lock()
+	m.voltage, m.volted = v, true
 	m.mu.Unlock()
 	m.notify()
 }
