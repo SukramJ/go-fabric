@@ -225,7 +225,7 @@ func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 	// Simulate a Sigma1-replied entry for an exchange whose Sigma3 never
 	// arrived (aborted handshake).
 	b.mu.Lock()
-	b.sigma1Replied[onExchange(42)] = [32]byte{0xAB}
+	b.sigma1Replied[onExchange(42)] = sigma1Record{hash: [32]byte{0xAB}}
 	b.mu.Unlock()
 
 	b.ForgetSigma1Replied(onExchange(42))
@@ -254,7 +254,7 @@ func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	b.mu.Lock()
-	b.sigma1Replied[onExchange(99)] = [32]byte{0xCD}
+	b.sigma1Replied[onExchange(99)] = sigma1Record{hash: [32]byte{0xCD}}
 	b.mu.Unlock()
 
 	provider := NewPerExchangeCaseProvider(func() *CaseAdapter { return &CaseAdapter{} })

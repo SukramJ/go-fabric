@@ -573,7 +573,11 @@ type Bridge struct {
 	// adapter go ([Bridge.sigma3Handled]).
 	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
 	// short-circuits replays via `fabric.locked` + per-exchange state.
-	sigma1Replied map[HandshakeKey][32]byte
+	sigma1Replied map[HandshakeKey]sigma1Record
+	// sigma1Seq numbers the Sigma1 records in the order they were made,
+	// for the oldest to lose its place past [maxCaseHandshakes]; guarded
+	// by mu.
+	sigma1Seq uint64
 
 	// reportCounterOwner maps an outbound-reliable MessageCounter to
 	// the subscription ID that owns it. Populated by
@@ -909,7 +913,7 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		ackHandler:     noopAckHandler{},
 		groupMessaging: noopGroupMessaging{},
 		eventLog:       im.NewEventLog(),
-		sigma1Replied:  make(map[HandshakeKey][32]byte),
+		sigma1Replied:  make(map[HandshakeKey]sigma1Record),
 	}
 	br.eventLog.SetClock(br.clock)
 	if err := br.seedCounters(); err != nil {

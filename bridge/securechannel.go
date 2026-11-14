@@ -492,9 +492,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
 		// session on the channel).
 		b.holdHandshake(src, key, false)
-		ch := b.resolveCaseHandler(key)
-		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
-			ch.ProcessSigma1, ch)
+		return b.handleSigma1(src, requestHdr, proto, payload, key)
 	case mrp.SCOpcodeSigma3:
 		// The initiator has moved past Sigma2: a Sigma2 still waiting for
 		// its acknowledgement is done — its retransmissions are wasted
@@ -676,6 +674,18 @@ const paseMaxErrors = 20
 // new source is treated as fresh — the PASE handshake handler's own
 // state-replay guard still rejects a genuine replay.
 const maxUnsecuredWindows = 256
+
+// maxCaseHandshakes caps the CASE handshakes the responder holds state
+// for at one time: the Sigma1 records of the router
+// ([Bridge.markSigma1Replied]) and the adapters of a
+// [PerExchangeCaseProvider]. Both are keyed by the initiator's
+// unauthenticated node id and exchange id, so the key no longer bounds
+// them (review II, R2-P3-dr-dev-03). Each handshake holds one unsecured
+// duplicate window as long as it holds its record, so the bound is the
+// windows' own, [maxUnsecuredWindows]; past it the oldest record and the
+// least recently used adapter lose their place, as the unsecured session's
+// oldest reliable message does ([unsecuredEntryLimit]).
+const maxCaseHandshakes = maxUnsecuredWindows
 
 // pasePairingTimeout bounds how long a single PASE handshake may hold
 // the single-active-PASE claim. Mirrors matter.js PaseServer.ts:33
@@ -1226,14 +1236,87 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 // Hash comparison ensures a Sigma1 retry after a state reset (e.g.
 // Apple cancelled the first attempt and started a new one with a
 // fresh ephemeral) is not mistaken for a replay.
+//
+// Past [maxCaseHandshakes] records the oldest one loses its place, and its
+// handshake ends as an evicted one does ([Bridge.ForgetSigma1Replied]).
 func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) bool {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	if existing, ok := b.sigma1Replied[key]; ok && existing == hash {
+	existing, ok := b.sigma1Replied[key]
+	if ok && existing.hash == hash {
+		b.mu.Unlock()
 		return true
 	}
-	b.sigma1Replied[key] = hash
+	var (
+		evicted    HandshakeKey
+		hasEvicted bool
+	)
+	if !ok && len(b.sigma1Replied) >= maxCaseHandshakes {
+		evicted, hasEvicted = oldestSigma1Record(b.sigma1Replied)
+		delete(b.sigma1Replied, evicted)
+	}
+	b.sigma1Seq++
+	b.sigma1Replied[key] = sigma1Record{hash: hash, seq: b.sigma1Seq}
+	b.mu.Unlock()
+	if hasEvicted {
+		b.releaseCASEHandshakeEverywhere(evicted)
+		b.abandonHandshakeReplies(evicted)
+	}
 	return false
+}
+
+// sigma1Record is the router's record of a Sigma1 it answered: the
+// payload's hash, and its place in the order the records were made.
+type sigma1Record struct {
+	hash [32]byte
+	seq  uint64
+}
+
+// oldestSigma1Record returns the key of the record made first.
+func oldestSigma1Record(records map[HandshakeKey]sigma1Record) (HandshakeKey, bool) {
+	var (
+		oldest HandshakeKey
+		seq    uint64
+		found  bool
+	)
+	for k, r := range records {
+		if !found || r.seq < seq {
+			oldest, seq, found = k, r.seq, true
+		}
+	}
+	return oldest, found
+}
+
+// handleSigma1 runs a Sigma1 the router recorded through the handler of
+// its handshake; a Sigma1 that left no handshake state leaves no record
+// either (review II, R2-P3-dr-dev-03).
+func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey) error {
+	ch := b.resolveCaseHandler(key)
+	begun := true
+	processSigma1 := func(p []byte) (uint8, []byte, error) {
+		op, reply, err := ch.ProcessSigma1(p)
+		begun = sigma1Began(op, reply, err)
+		return op, reply, err
+	}
+	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, ch)
+	if !begun {
+		b.forgetSigma1Replied(key)
+	}
+	return err
+}
+
+// sigma1Began reports whether a Sigma1's handling left a handshake in
+// progress: not when the handler failed it — unless its state refused a
+// repeated Sigma1, which leaves the handshake it already runs — nor when
+// it answered with a failure report.
+func sigma1Began(respOpcode uint8, respPayload []byte, err error) bool {
+	if err != nil {
+		return errors.Is(err, sigma.ErrSessionState)
+	}
+	if respOpcode == mrp.SCOpcodeStatusReport {
+		general, _, _, ok := decodeStatusReport(respPayload)
+		return ok && general == mrp.SCStatusGeneralSuccess
+	}
+	return true
 }
 
 // sigma3Handled ends the Sigma1 record of the handshake key names once its

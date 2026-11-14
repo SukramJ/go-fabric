@@ -74,24 +74,60 @@ func NewPerExchangeCaseProvider(factory func() *CaseAdapter) *PerExchangeCasePro
 // adapter for key, allocating a fresh one via the factory on first
 // sighting. Returns nil when the factory is nil or returned nil;
 // callers (the SC router) drop the datagram on nil. Every successful
-// Resolve refreshes the entry's `lastTouched`.
+// Resolve refreshes the entry's `lastTouched`. The provider holds at most
+// [maxCaseHandshakes] adapters: a new one takes the place of the least
+// recently used, which goes as a reaped one goes (review II,
+// R2-P3-dr-dev-03).
 func (p *PerExchangeCaseProvider) Resolve(key HandshakeKey) CaseHandler {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if e, ok := p.entries[key]; ok {
 		e.lastTouched = p.clock.Load().Now()
+		p.mu.Unlock()
 		return e.adapter
 	}
 	if p.factory == nil {
+		p.mu.Unlock()
 		return nil
 	}
 	a := p.factory()
 	if a == nil {
+		p.mu.Unlock()
 		return nil
 	}
 	a.setDetach(func() { p.drop(key, a) })
+	var (
+		evictedKey HandshakeKey
+		evicted    *caseEntry
+	)
+	if len(p.entries) >= maxCaseHandshakes {
+		evictedKey, evicted = p.leastRecentlyUsedLocked()
+		delete(p.entries, evictedKey)
+	}
 	p.entries[key] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
+	onEvict := p.onEvict
+	p.mu.Unlock()
+	if evicted != nil {
+		dropped([]*caseEntry{evicted})
+		if onEvict != nil {
+			onEvict(evictedKey)
+		}
+	}
 	return a
+}
+
+// leastRecentlyUsedLocked returns the entry touched longest ago and its
+// key. The caller holds p.mu and has at least one entry.
+func (p *PerExchangeCaseProvider) leastRecentlyUsedLocked() (HandshakeKey, *caseEntry) {
+	var (
+		oldestKey HandshakeKey
+		oldest    *caseEntry
+	)
+	for k, e := range p.entries {
+		if oldest == nil || e.lastTouched.Before(oldest.lastTouched) {
+			oldestKey, oldest = k, e
+		}
+	}
+	return oldestKey, oldest
 }
 
 // drop removes key's entry when it still holds a — the adapter's handshake

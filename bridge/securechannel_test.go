@@ -670,7 +670,7 @@ func TestPerExchangeCaseProvider_OnEvictPrunesSigma1Replied(t *testing.T) {
 	const exch = uint16(88)
 	// Simulate: Sigma1 arrived, populating sigma1Replied.
 	b.mu.Lock()
-	b.sigma1Replied[onExchange(exch)] = [32]byte{0xAB}
+	b.sigma1Replied[onExchange(exch)] = sigma1Record{hash: [32]byte{0xAB}}
 	b.mu.Unlock()
 	// Also simulate a stale caseEntry in the provider (as if Sigma1 triggered
 	// Resolve but Sigma3 never came).
