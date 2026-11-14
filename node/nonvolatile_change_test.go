@@ -307,3 +307,46 @@ func TestNonVolatileWriteNotHeldBehindAnotherAttributesVeto(t *testing.T) {
 		t.Errorf("the vetoed write: %v", s)
 	}
 }
+
+// TestNonVolatileWriteToAReplacedServerIsNotStored: a controller's write
+// that reaches a Device's server after the host replaced the Device under
+// the same key (a dispatcher of the topology before the replace) does not
+// take the key from the new Device's server: the new server's later
+// changes are stored, and the restart serves what it served
+// (R2-P2-rr-ctl-01).
+func TestNonVolatileWriteToAReplacedServerIsNotStored(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	old := endpoint.NewTopologyDispatcher(n.Bridge().Topology())
+	if err := n.Aggregator().Remove(ctx, endpoint.StringKey(nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Aggregator().Add(ctx, nvHeat.build(t, nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	// The write a controller sent before the replace, answered by the old
+	// Device's server on the topology it was resolved on.
+	old.Write(ctx, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint), im.AttributeValue{Value: int64(2100)})
+	ep, ok := endpointOf(t, n, nvHeat.key)
+	if !ok {
+		t.Fatal("the new Device is not served")
+	}
+	srv := n.Bridge().Topology().FindByID(ep).Source.(*device.Device).Server(thermostatdef.ClusterID)
+	if err := srv.(spec.AttributeSetter).SetAttributes(map[uint32]any{thermostatdef.AttrOccupiedHeatingSetpoint: int16(2250)}); err != nil {
+		t.Fatal(err)
+	}
+	path := func(ep uint16) im.ConcreteAttributePath {
+		return attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	}
+	served := dispatchRead(t, n, path(ep))
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	again, ep := nvRun(t, cfg, nvHeat)
+	if got := dispatchRead(t, again, path(ep)); got != served {
+		t.Errorf("after the restart %s, served %s before it", got, served)
+	}
+}

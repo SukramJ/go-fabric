@@ -116,7 +116,9 @@ type nvKey struct {
 	// and when the node stops.
 	stored      string
 	known, owed bool
-	// srv and attrID are where the held value is read.
+	// srv and attrID are where the held value is read: the server restore
+	// met last in the key's place, nil once forgotten; only restore and
+	// forget set them.
 	srv    contract.ClusterServer
 	attrID uint32
 	// label: a bridged LabelList, kept in persistUserLabels' form.
@@ -211,7 +213,8 @@ func nonVolatileSlot(ep *endpoint.Endpoint, clusterID uint32) string {
 // the same attribute wait for one another. After the server applied the
 // write, done stores the value the server holds when it differs (a server
 // may commit a normalised form: WindowCovering clears CalibrationMode
-// under MaintenanceMode), or one a change reported meanwhile.
+// under MaintenanceMode), or one a change reported meanwhile. A write
+// that reaches a server no longer in the key's place is not stored.
 func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (func(applied bool), error) {
 	key, stored, ok := v.storedForm(ep, srv, attrID, value)
 	if !ok {
@@ -222,6 +225,16 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	k := v.keyState(key)
 	k.write.Lock()
 	k.store.Lock()
+	// The key is the server's that restore met last in its place (k.srv,
+	// nil once forgotten): a write that reaches a server released since —
+	// a Device the host replaced or forgot, answering on the topology the
+	// write was resolved on — is not stored, and the key stays with the
+	// server that holds it (R2-P2-rr-ctl-01).
+	if !k.label && k.srv != srv {
+		k.store.Unlock()
+		k.write.Unlock()
+		return nil, nil
+	}
 	prev, had, err := st.GetSetting(ctx, key)
 	if err == nil {
 		err = st.SetSetting(ctx, key, stored)
@@ -233,7 +246,6 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		return nil, fmt.Errorf("node: persist %s: %w", key, err)
 	}
 	k.stored, k.known, k.owed = stored, true, false
-	k.srv, k.attrID = srv, attrID
 	k.writing, k.dirty = true, false
 	k.store.Unlock()
 	return func(applied bool) {
