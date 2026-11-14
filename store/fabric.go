@@ -68,10 +68,9 @@ type FabricRecord struct {
 
 // FabricCredentials is what an UpdateNOC changes on a fabric, as it shall
 // stand after the update ([Fabrics.UpdateFabricCredentials]): the
-// operational identity's NOC, ICAC and private key, the node id the new NOC
-// carries, and the fabric's vendor id and VID verification data. The IPK,
-// the root and the fabric id are not part of it: an UpdateNOC keeps them
-// (cluster/core handleUpdateNOC copies the IPK from the existing identity).
+// operational identity's NOC, ICAC and private key and the node id the new
+// NOC carries. The IPK, the root, the fabric id, the vendor id and the VID
+// verification data are not part of it: an UpdateNOC keeps them.
 type FabricCredentials struct {
 	// NOC is the new Node Operational Certificate; it must not be empty.
 	NOC []byte
@@ -82,8 +81,14 @@ type FabricCredentials struct {
 	PrivateKey []byte
 	// NodeID is the node id of the new NOC.
 	NodeID uint64
-	// VendorID, VIDVerificationStatement and VVSC are the fabric's vendor
-	// id and VID verification data after the update (nil or empty: none).
+	// VendorID, VIDVerificationStatement and VVSC are ignored.
+	//
+	// Deprecated: [Fabrics.UpdateFabricCredentials] does not write the
+	// vendor id or the VID verification data, which an UpdateNOC does not
+	// change: writing back the values the caller had read lost a
+	// SetVIDVerificationStatement that landed in between (review II,
+	// R2-P2-dr-noc-02). [Fabrics.UpdateFabricVendorID] and
+	// [Fabrics.UpdateFabricVIDVerification] write them.
 	VendorID                 uint16
 	VIDVerificationStatement []byte
 	VVSC                     []byte
@@ -390,8 +395,8 @@ WHERE fabric_index = ?`, c.NOC, nullableBytes(c.ICAC), c.PrivateKey, fabricIndex
 	}
 	if _, err := tx.ExecContext(ctx, `
 UPDATE matter_fabrics
-SET node_id = ?, vendor_id = ?, vid_statement = ?, vvsc = ?, updated_at = CURRENT_TIMESTAMP
-WHERE fabric_index = ?`, uint64ToBE(c.NodeID), c.VendorID, noneIfEmpty(c.VIDVerificationStatement), noneIfEmpty(c.VVSC), fabricIndex); err != nil {
+SET node_id = ?, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ?`, uint64ToBE(c.NodeID), fabricIndex); err != nil {
 		return fmt.Errorf("store: update fabric credentials: fabric: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

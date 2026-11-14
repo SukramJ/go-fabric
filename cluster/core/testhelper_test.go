@@ -132,8 +132,7 @@ func (f *fakeStore) UpdateFabricCredentials(_ context.Context, fabricIndex uint8
 		r.Pending = mstore.FabricPendingUpdate
 	}
 	id.NOC, id.ICAC, id.PrivateKey = c.NOC, c.ICAC, c.PrivateKey
-	r.NodeID, r.VendorID = c.NodeID, c.VendorID
-	r.VIDVerificationStatement, r.VVSC = noneIfEmpty(c.VIDVerificationStatement), noneIfEmpty(c.VVSC)
+	r.NodeID = c.NodeID
 	f.identity[fabricIndex] = id
 	f.fabrics[fabricIndex] = r
 	return nil

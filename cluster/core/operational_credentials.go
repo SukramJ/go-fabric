@@ -2389,20 +2389,19 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// can exist — the fail-safe's end or a start rolls the whole update
 	// back, CommissioningComplete commits the whole of it (owner decision
 	// 36; review II, R2-P2-comm-04, R2-P2-comm-06). The vendor id and VID
-	// verification data stay as the row holds them; what a
-	// SetVIDVerificationStatement writes inside this fail-safe belongs to
-	// the pending update and leaves with its rollback (TC-OPCREDS-3.8 step
-	// 24). matter.js restores the old fabric when a step after the replace
-	// throws (OperationalCredentialsServer.ts:362-387 at db021da0); here no
-	// step follows the one write.
+	// verification data are not part of the write — the store keeps them
+	// as the row holds them when it lands, so a SetVIDVerificationStatement
+	// between the read above and this write is not overwritten with the
+	// values read (review II, R2-P2-dr-noc-02); what one writes inside this
+	// fail-safe belongs to the pending update and leaves with its rollback
+	// (TC-OPCREDS-3.8 step 24). matter.js restores the old fabric when a
+	// step after the replace throws (OperationalCredentialsServer.ts:362-387
+	// at db021da0); here no step follows the one write.
 	if err := o.store.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{
-		NOC:                      append([]byte(nil), req.NOCValue...),
-		ICAC:                     append([]byte(nil), req.ICACValue...),
-		PrivateKey:               encodePrivateKey(priv),
-		NodeID:                   noc.Subject.MatterNodeID,
-		VendorID:                 fab.VendorID,
-		VIDVerificationStatement: fab.VIDVerificationStatement,
-		VVSC:                     fab.VVSC,
+		NOC:        append([]byte(nil), req.NOCValue...),
+		ICAC:       append([]byte(nil), req.ICACValue...),
+		PrivateKey: encodePrivateKey(priv),
+		NodeID:     noc.Subject.MatterNodeID,
 	}); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}

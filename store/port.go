@@ -82,11 +82,15 @@ type Fabrics interface {
 	// cascade above. A pending row is removed like any other.
 	RemoveFabric(ctx context.Context, fabricIndex uint8) error
 	// UpdateFabricCredentials writes what an UpdateNOC changes ([FabricCredentials]):
-	// the identity's NOC, ICAC and private key and the row's node id,
-	// vendor id and VID verification data, in one atomic write. The IPK
-	// stays. On a [FabricCommitted] row it first keeps the current value of
-	// every one of those fields as the prior value — whether this call
-	// changes it or not — and marks the row [FabricPendingUpdate]; on a
+	// the identity's NOC, ICAC and private key and the row's node id, in
+	// one atomic write. It writes nothing else: the IPK, the vendor id and
+	// the VID verification data stay as the row holds them when the write
+	// lands — never values the caller read before it (review II,
+	// R2-P2-dr-noc-02). On a [FabricCommitted] row it first keeps the
+	// current value of every field the update's fail-safe can change — the
+	// identity and node id it writes, and the vendor id and VID
+	// verification data — as the prior value and marks the row
+	// [FabricPendingUpdate]; on a
 	// FabricPendingUpdate row it keeps the prior values it already holds,
 	// so a second UpdateNOC in the same fail-safe rolls back to the state
 	// before the first; on a [FabricPendingAdd] row it only writes, since

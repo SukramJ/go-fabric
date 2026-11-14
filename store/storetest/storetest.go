@@ -67,6 +67,7 @@ var cases = []testCase{
 	{"fabrics/rollback-pending-add", fabricsRollbackPendingAdd},
 	{"fabrics/update-rollback", fabricsUpdateRollback},
 	{"fabrics/update-commit", fabricsUpdateCommit},
+	{"fabrics/update-writes-what-it-changes", fabricsUpdateWritesWhatItChanges},
 	{"fabrics/update-twice", fabricsUpdateTwice},
 	{"fabrics/update-pending-add", fabricsUpdatePendingAdd},
 	{"fabrics/update-refused", fabricsUpdateRefused},

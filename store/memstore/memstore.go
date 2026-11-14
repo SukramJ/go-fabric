@@ -286,7 +286,8 @@ func (s *Store) UpdateFabricVIDVerification(_ context.Context, fabricIndex uint8
 
 // UpdateFabricCredentials implements [store.Fabrics]: under the one mutex,
 // a committed fabric's current values are kept as its prior and the row
-// marked, then the new values written.
+// marked, then the new identity and node id written; the vendor id and VID
+// verification data stay.
 func (s *Store) UpdateFabricCredentials(_ context.Context, fabricIndex uint8, c store.FabricCredentials) error {
 	if len(c.NOC) == 0 || len(c.PrivateKey) == 0 {
 		return errors.New("memstore: update fabric credentials: a NOC and a private key are required")
@@ -309,8 +310,7 @@ func (s *Store) UpdateFabricCredentials(_ context.Context, fabricIndex uint8, c 
 		}
 		f.Pending = store.FabricPendingUpdate
 	}
-	f.NodeID, f.VendorID = c.NodeID, c.VendorID
-	f.VIDVerificationStatement, f.VVSC = cloneNoneIfEmpty(c.VIDVerificationStatement), cloneNoneIfEmpty(c.VVSC)
+	f.NodeID = c.NodeID
 	id.NOC, id.ICAC, id.PrivateKey = bytes.Clone(c.NOC), bytes.Clone(c.ICAC), bytes.Clone(c.PrivateKey)
 	s.fabrics[fabricIndex], s.identities[fabricIndex] = f, id
 	return nil

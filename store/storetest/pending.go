@@ -44,15 +44,14 @@ func installedFabric(ctx context.Context, t *testing.T, p store.Port, n byte, st
 	return idx
 }
 
-// newCredentials differs from what installedFabric wrote in every field;
-// it has no ICAC and no VID data, so a rollback must bring back values
-// where the update left none.
+// newCredentials differs from what installedFabric wrote in every field
+// an UpdateNOC changes; it has no ICAC, so a rollback must bring back a
+// value where the update left none.
 func newCredentials(n byte) store.FabricCredentials {
 	return store.FabricCredentials{
 		NOC:        []byte{0x15, 0xA0, n},
 		PrivateKey: bytes.Repeat([]byte{0xA0 + n}, 32),
 		NodeID:     0xBEEF00 + uint64(n),
-		VendorID:   0x1234,
 	}
 }
 
@@ -79,12 +78,12 @@ func wantState(t *testing.T, what string, p, want store.FabricPending, err error
 }
 
 // applied is what a reader sees after UpdateFabricCredentials(c) on before:
-// the new credentials, the IPK, label and root kept.
+// the new credentials and node id; the IPK, label, root, vendor id and VID
+// verification data kept.
 func applied(before fabricState, c store.FabricCredentials, state store.FabricPending) fabricState {
 	after := before
 	after.fabric.Pending = state
-	after.fabric.NodeID, after.fabric.VendorID = c.NodeID, c.VendorID
-	after.fabric.VIDVerificationStatement, after.fabric.VVSC = c.VIDVerificationStatement, c.VVSC
+	after.fabric.NodeID = c.NodeID
 	after.identity.NOC, after.identity.ICAC, after.identity.PrivateKey = c.NOC, c.ICAC, c.PrivateKey
 	return after
 }
@@ -159,9 +158,11 @@ func fabricsUpdateRollback(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, err)
 	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: plain, NOC: []byte{1}, PrivateKey: []byte{2}, IPK: []byte{3}}))
 	before = stateOf(ctx, t, p, plain)
-	c = store.FabricCredentials{NOC: []byte{4}, ICAC: []byte{5}, PrivateKey: []byte{6}, NodeID: 7, VendorID: 8, VIDVerificationStatement: []byte{9}, VVSC: []byte{10}}
+	c = store.FabricCredentials{NOC: []byte{4}, ICAC: []byte{5}, PrivateKey: []byte{6}, NodeID: 7}
 	must(t, p.UpdateFabricCredentials(ctx, plain, c))
 	wantEqual(t, "the plain fabric after the update", stateOf(ctx, t, p, plain), applied(before, c, store.FabricPendingUpdate))
+	must(t, p.UpdateFabricVendorID(ctx, plain, 8))
+	must(t, p.UpdateFabricVIDVerification(ctx, plain, []byte{9}, []byte{10}))
 	state, err = p.RollbackFabric(ctx, plain)
 	wantState(t, "RollbackFabric of the plain fabric's update", state, store.FabricPendingUpdate, err)
 	wantEqual(t, "the plain fabric after the rollback", stateOf(ctx, t, p, plain), before)
@@ -186,6 +187,34 @@ func fabricsUpdateCommit(ctx context.Context, t *testing.T, p store.Port) {
 	state, err = p.RollbackFabric(ctx, idx)
 	wantState(t, "RollbackFabric of the next update", state, store.FabricPendingUpdate, err)
 	wantEqual(t, "the fabric after the next update's rollback", stateOf(ctx, t, p, idx), want)
+}
+
+// fabricsUpdateWritesWhatItChanges: an update writes the identity and the
+// node id only. The vendor id and VID verification data stay as the row
+// holds them when the update lands — a value written after the caller read
+// the row is not overwritten with the one it read — while their prior
+// values are kept, so a rollback still drops what the fail-safe wrote.
+func fabricsUpdateWritesWhatItChanges(ctx context.Context, t *testing.T, p store.Port) {
+	idx := installedFabric(ctx, t, p, 1, store.FabricCommitted)
+	before := stateOf(ctx, t, p, idx)
+	c := newCredentials(1)
+	//nolint:staticcheck // the case shows UpdateFabricCredentials ignores the deprecated fields
+	c.VendorID, c.VIDVerificationStatement, c.VVSC = 0x1234, []byte{0xEE}, []byte{0xEF}
+	must(t, p.UpdateFabricCredentials(ctx, idx, c))
+	want := applied(before, c, store.FabricPendingUpdate)
+	wantEqual(t, "the fabric after an update carrying a vendor id and VID data", stateOf(ctx, t, p, idx), want)
+	must(t, p.CommitFabric(ctx, idx))
+	want.fabric.Pending = store.FabricCommitted
+	wantEqual(t, "the fabric after its commit", stateOf(ctx, t, p, idx), want)
+
+	// A vendor id and VID data written inside the update's fail-safe stay
+	// with its commit and leave with its rollback.
+	must(t, p.UpdateFabricCredentials(ctx, idx, newCredentials(2)))
+	must(t, p.UpdateFabricVendorID(ctx, idx, 0x1357))
+	must(t, p.UpdateFabricVIDVerification(ctx, idx, []byte{0xAB}, nil))
+	state, err := p.RollbackFabric(ctx, idx)
+	wantState(t, "RollbackFabric of the second update", state, store.FabricPendingUpdate, err)
+	wantEqual(t, "the fabric after the second update's rollback", stateOf(ctx, t, p, idx), want)
 }
 
 // fabricsUpdateTwice: a second update before the commit keeps the first
@@ -272,12 +301,11 @@ func fabricsPendingNotFound(ctx context.Context, t *testing.T, p store.Port) {
 func copiesCredentials(ctx context.Context, t *testing.T, p store.Port) {
 	idx := installedFabric(ctx, t, p, 1, store.FabricCommitted)
 	before := stateOf(ctx, t, p, idx)
-	c := store.FabricCredentials{NOC: []byte{1}, ICAC: []byte{2}, PrivateKey: []byte{3}, VIDVerificationStatement: []byte{4}, VVSC: []byte{5}}
+	c := store.FabricCredentials{NOC: []byte{1}, ICAC: []byte{2}, PrivateKey: []byte{3}}
 	must(t, p.UpdateFabricCredentials(ctx, idx, c))
-	c.NOC[0], c.ICAC[0], c.PrivateKey[0], c.VIDVerificationStatement[0], c.VVSC[0] = 0xEE, 0xEE, 0xEE, 0xEE, 0xEE
+	c.NOC[0], c.ICAC[0], c.PrivateKey[0] = 0xEE, 0xEE, 0xEE
 	got := stateOf(ctx, t, p, idx)
-	if !bytes.Equal(got.identity.NOC, []byte{1}) || !bytes.Equal(got.identity.ICAC, []byte{2}) || !bytes.Equal(got.identity.PrivateKey, []byte{3}) ||
-		!bytes.Equal(got.fabric.VIDVerificationStatement, []byte{4}) || !bytes.Equal(got.fabric.VVSC, []byte{5}) {
+	if !bytes.Equal(got.identity.NOC, []byte{1}) || !bytes.Equal(got.identity.ICAC, []byte{2}) || !bytes.Equal(got.identity.PrivateKey, []byte{3}) {
 		t.Fatal("mutating the written FabricCredentials changed the store")
 	}
 	_, err := p.RollbackFabric(ctx, idx)

@@ -178,7 +178,7 @@ func TestPendingFabricsSurviveReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateFabricCredentials(ctx, updated, store.FabricCredentials{NOC: []byte{9}, PrivateKey: []byte{9}, NodeID: 9, VendorID: 9}); err != nil {
+	if err := s.UpdateFabricCredentials(ctx, updated, store.FabricCredentials{NOC: []byte{9}, PrivateKey: []byte{9}, NodeID: 9}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
