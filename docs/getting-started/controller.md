@@ -372,8 +372,12 @@ new PASE, so without the disarm the next `Pair` would be refused until
 the fail-safe ran out. matter.js disarms only after an ArmFailSafe of
 its own was answered and only for a commissioning or status error;
 connectedhomeip disarms after any failure before its network setup.
+A PASE session the commissioner does not keep is disarmed before it is
+closed as well: one established on a candidate after another candidate
+won the connection (an aborted connection returns only once those are
+disarmed), and one that `EstablishPASE`'s `ContinueAfterPASE` refuses.
 
-*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`, `disarmAfterFailure`), `controller/commissioner/commissioner.go` (`disarmPASE`).*
+*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`, `disarmAfterFailure`), `controller/commissioner/commissioner.go` (`disarmPASE`, `giveUpPASE`, `EstablishPASE`), `controller/commissioner/connection.go` (`launch`).*
 
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is

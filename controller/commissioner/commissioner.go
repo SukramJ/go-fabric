@@ -218,7 +218,9 @@ type PASEOptions struct {
 	Passcode      uint32
 	Timeout       time.Duration
 	// ContinueAfterPASE, when set, decides whether the session is kept
-	// (:197-206).
+	// (:197-206). A session not kept has the fail-safe its device armed
+	// with it expired before it is closed, so the device accepts the next
+	// PASE at once.
 	ContinueAfterPASE func() bool
 }
 
@@ -351,7 +353,9 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 
 // disarmPASE expires the fail-safe the device armed when the PASE session
 // s was established, for a commissioning that gives up after PASE and
-// before its flow runs: the device's rollback ends the PASE session
+// before its flow runs, a PASE session that lost the connection's race
+// (establishFromCandidates) and one [Commissioner.EstablishPASE]'s
+// ContinueAfterPASE refuses: the device's rollback ends the PASE session
 // (matter.js packages/protocol/src/common/FailsafeContext.ts:277-279 at
 // db021da0), and until it ends the device accepts no new PASE exchange
 // (PaseServer.ts:80-82 at db021da0). The flow's own failures disarm
@@ -379,6 +383,15 @@ func (c *Commissioner) disarmPASE(ctx context.Context, s *exchange.Session, ch C
 	path := im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafe}
 	if _, err := c.sessionInteraction(mgr, s).Invoke(ctx, path, gencomm.ArmFailSafeRequest{Breadcrumb: initialBreadcrumb}, interaction.InvokeOptions{}); err != nil {
 		c.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.Any("err", err))
+	}
+}
+
+// giveUpPASE is the connection's end of a PASE session that lost its race
+// (connectionConfig.giveUp): disarmed with ctx, then force-closed.
+func (c *Commissioner) giveUpPASE(ctx context.Context) func(*exchange.Session, error) {
+	return func(s *exchange.Session, cause error) {
+		c.disarmPASE(ctx, s, nil)
+		s.HandlePeerLoss(cause)
 	}
 }
 
@@ -430,7 +443,9 @@ func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, tim
 
 // EstablishPASE establishes a PASE session without running the flow.
 // Mirrors matter.js ControllerCommissioner.establishPase (:352-376): the
-// candidates, the connection, then ContinueAfterPASE's decision.
+// candidates, the connection, then ContinueAfterPASE's decision; a session
+// it refuses is disarmed (disarmPASE) before it is closed, ahead of
+// matter.js, which only force-closes it (:368-373 at db021da0).
 func (c *Commissioner) EstablishPASE(ctx context.Context, opts PASEOptions) (*exchange.Session, *discovery.Device, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = DefaultPASETimeout
@@ -440,6 +455,7 @@ func (c *Commissioner) EstablishPASE(ctx context.Context, opts PASEOptions) (*ex
 		return nil, nil, err
 	}
 	if opts.ContinueAfterPASE != nil && !opts.ContinueAfterPASE() {
+		c.disarmPASE(ctx, res.session, nil)
 		res.session.HandlePeerLoss(newError(ErrCommissioning, "PASE established but another candidate already won", nil))
 		return nil, nil, newError(ErrCommissioning, "PASE cancelled: another candidate was already selected", nil)
 	}
@@ -450,13 +466,19 @@ func (c *Commissioner) EstablishPASE(ctx context.Context, opts PASEOptions) (*ex
 // connection, a PairRetransmissionLimitReachedError becoming
 // PeerCommunicationError("Could not connect to device"). A
 // PBKDFParamResponse marks a discovery race's attempt that runs with ctx
-// as answered (discovery.AttemptAnswered, owner decision 55).
+// as answered (discovery.AttemptAnswered, owner decision 55). A session
+// established after the connection was decided is disarmed before it is
+// force-closed (disarmPASE), as every PASE session this commissioner
+// gives up is. A device that follows matter.js's PaseServer accepts no
+// second PASE while one is being established or exists (PaseServer.ts:76-86
+// at db021da0), so a losing session is not one to the winner's device.
 func (c *Commissioner) establishFromCandidates(ctx context.Context, devices []*candidate, timeout time.Duration, passcode uint32, suppressPeerLoss bool) (connectionResult, error) {
 	res, err := connectPASE(ctx, connectionConfig{
 		devices: devices,
 		timeout: timeout,
 		clock:   c.ctx.Clock,
 		log:     c.log,
+		giveUp:  c.giveUpPASE(ctx),
 		establish: func(actx context.Context, addr *net.UDPAddr, cand *candidate, onPBKDF func()) (*exchange.Session, error) {
 			return c.establishEphemeralNodeSession(actx, addr, passcode, cand, suppressPeerLoss, func() {
 				onPBKDF()
