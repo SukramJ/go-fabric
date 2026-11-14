@@ -46,6 +46,12 @@ import (
 // reports every endpoint again. A host's own
 // [Config].EndpointPersistence is the host's to erase.
 //
+// A reset whose stop does not complete — its context ends while a bridge
+// Start or Stop the host runs holds the bridge's lifecycle — erases and
+// closes nothing and returns the stop's error: the fabrics are removed,
+// the node is not stopped and keeps its store, and a later FactoryReset
+// finishes the reset.
+//
 // FactoryReset is serialised with Start and Stop. Mirrors matter.js
 // ServerNode.erase / eraseWithMutex (packages/node/src/node/ServerNode.ts:
 // 159-200: go offline, reset, erase the storage, come back online if the
@@ -70,7 +76,11 @@ func (n *Node) FactoryReset(ctx context.Context) error {
 		err = n.stopLocked(ctx)
 		n.keepOwnedDB = false
 		if err != nil {
-			errs = append(errs, err)
+			// The bridge did not stop: it still serves on the store, so
+			// nothing is erased or closed under it. The node stays
+			// stoppable; a later FactoryReset or Stop finishes the work
+			// (review II, R2-P1-rw-03).
+			return errors.Join(append(errs, err)...)
 		}
 	}
 	errs = append(errs, n.eraseStores(ctx))
