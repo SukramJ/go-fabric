@@ -428,10 +428,18 @@ type Commissioning struct {
 	Salt []byte
 	// LocationCapability is GeneralCommissioning's LocationCapability
 	// (Matter §11.10.5.3), the regulatory locations the node supports and
-	// SetRegulatoryConfig admits (GeneralCommissioningServer.ts:172-191):
-	// mattercore.RegulatoryIndoor (the zero value, the facade's default),
-	// RegulatoryOutdoor or RegulatoryIndoorOutdoor.
+	// SetRegulatoryConfig admits (GeneralCommissioningServer.ts:172-191),
+	// and the RegulatoryConfig the node starts with: [RegulatoryOutdoor] or
+	// [RegulatoryIndoorOutdoor]. The zero value is IndoorOutdoor, matter.js's
+	// default (packages/model/src/standard/elements/
+	// general-commissioning.element.ts:31-38 at db021da0, LocationCapability
+	// `default: 2`, RegulatoryConfig defaulting to it) — so
+	// [RegulatoryIndoor], which is 0, reads as the default here; a node
+	// that supports indoor operation alone sets [Commissioning].IndoorOnly.
 	LocationCapability uint8
+	// IndoorOnly states LocationCapability Indoor: SetRegulatoryConfig then
+	// admits Indoor alone. It excludes a non-zero LocationCapability.
+	IndoorOnly bool
 	// BasicCommissioning serves AdministratorCommissioning's Basic feature
 	// (BC): an administrator's OpenBasicCommissioningWindow opens a
 	// commissioning window against this Passcode under this Discriminator,
@@ -452,6 +460,20 @@ type Commissioning struct {
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
 	TermsAndConditions *TermsAndConditions
+}
+
+// locationCapability is the LocationCapability the root's
+// GeneralCommissioning serves: Indoor with IndoorOnly, IndoorOutdoor for the
+// zero value (matter.js's model default,
+// general-commissioning.element.ts:35-38 at db021da0), else the value set.
+func (c Commissioning) locationCapability() uint8 {
+	switch {
+	case c.IndoorOnly:
+		return mattercore.RegulatoryIndoor
+	case c.LocationCapability == mattercore.RegulatoryIndoor:
+		return mattercore.RegulatoryIndoorOutdoor
+	}
+	return c.LocationCapability
 }
 
 // TermsAndConditions is the requirement [Commissioning].TermsAndConditions
@@ -697,6 +719,9 @@ func (c *Config) Validate() error {
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
+	}
+	if cm.IndoorOnly && cm.LocationCapability != mattercore.RegulatoryIndoor {
+		errs = append(errs, fmt.Errorf("node: Commissioning.IndoorOnly excludes LocationCapability %d", cm.LocationCapability))
 	}
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))

@@ -16,8 +16,9 @@ import (
 // trivially-guessable list), a random 12-bit discriminator
 // (bridge.RandomDiscriminator), a random salt of [PBKDFSaltMax] bytes
 // (bridge.RandomSalt) and [PBKDFIterationsMin] PBKDF iterations — values
-// [Config.Validate] accepts. LocationCapability is left at its zero value
-// ([RegulatoryIndoor]). A host that has no configured secret uses it for
+// [Config.Validate] accepts. LocationCapability is left at its zero value,
+// IndoorOutdoor ([Commissioning].LocationCapability). A host that has no
+// configured secret uses it for
 // [Config].Commissioning, or copies its fields into the
 // [WindowCredentials] of one [Node.OpenBasicWindow]; it persists the
 // result itself when the node's own window must keep its pairing code

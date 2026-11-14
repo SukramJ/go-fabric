@@ -739,7 +739,7 @@ func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.Gener
 	cfg := d.cfg
 	gc, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		Logger:                       d.logger,
-		LocationCapability:           cfg.Commissioning.LocationCapability,
+		LocationCapability:           cfg.Commissioning.locationCapability(),
 		SupportsConcurrentConnection: true,
 		TermsAndConditions:           cfg.Commissioning.TermsAndConditions.core(),
 		Settings:                     d.st,

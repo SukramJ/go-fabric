@@ -165,7 +165,8 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
-- `LocationCapability` is a valid regulatory location;
+- `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
+  matter.js's default), and `IndoorOnly` comes with no other value;
 - `Network.WiFi` comes with its `Reporter`;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is;
