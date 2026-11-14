@@ -79,8 +79,8 @@ type attributeHolder interface {
 // serves the endpoint, over the declaration's Initial, once per server.
 // matter.js persists every nonvolatile attribute and every writable or
 // fabric-scoped one (RootSupervisor.ts:160-175 at db021da0,
-// persistentKeys), each change whoever made it (Datasource.ts:1442-1453,
-// handed to store.set at :1262).
+// persistentKeys), each change whoever made it (Datasource.ts:1442-1454,
+// handed to store.set at :1261).
 type nonVolatile struct {
 	n *Node
 	// mu guards the maps and stopped; it is never held across a store

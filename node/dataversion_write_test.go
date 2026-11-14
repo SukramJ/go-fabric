@@ -34,7 +34,8 @@ func (v uint8Value) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag)  { enc.PutUint(tag,
 // bridge's change listener does not advance it again for the change the
 // write itself reports (OriginControllerWrite). matter.js advances the
 // version once per commit (packages/node/src/behavior/state/managed/
-// Datasource.ts:1440-1448, advanceVersion), and a write is one commit.
+// Datasource.ts:1446-1457 at db021da0, advanceVersion), and a write is one
+// commit.
 // Checked for a spec.Server store (OnOff's OnTime), a self-held server
 // (LevelControl's OnLevel) and a write that moves companions with it (the
 // thermostat's heating setpoint).
