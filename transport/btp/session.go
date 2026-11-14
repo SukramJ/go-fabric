@@ -388,9 +388,16 @@ func (s *Session) handleIncomingLocked(data []byte) error {
 	if h.HasAckNumber && p.AckNumber != nil {
 		// A valid ack lies in the outstanding interval
 		// (prevIncomingAck, seq], as a wrap-safe distance (:287-304).
+		// The interval is open at prevIncomingAck: an ack number already
+		// received acknowledges nothing and is refused, as is any ack
+		// while nothing is outstanding — connectedhomeip
+		// src/ble/BtpEngine.cpp:142-162 (IsValidAck) and :169
+		// (BLE_ERROR_INVALID_ACK) at 6170af84, where matter.js accepts
+		// the repeated one (BtpSessionHandler.ts:287-304 at db021da0;
+		// review II, R2-P3-ble-03).
 		ack := int(*p.AckNumber)
 		outstanding := modularDistance(s.prevIncomingAck, s.seq)
-		if modularDistance(s.prevIncomingAck, ack) > outstanding {
+		if d := modularDistance(s.prevIncomingAck, ack); d == 0 || d > outstanding {
 			return protocolError(fmt.Sprintf("Invalid Ack Number, Ack Number: %d, Sequence Number: %d, Previous AckNumber: %d", ack, s.seq, s.prevIncomingAck))
 		}
 		s.ackReceiveTimer.stop()
