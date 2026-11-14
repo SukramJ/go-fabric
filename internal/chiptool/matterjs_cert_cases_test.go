@@ -326,9 +326,9 @@ func notPorted(class gapClass, at, why string) gap {
 		"so the module is unmeasured here — " + why}
 }
 
-// portableNow is a case whose clusters and harness support exist: the
-// missing port is the harness's gap (class (c)).
-func portableNow(at, how string) gap { return notPorted(classHarness, at, "portable now: "+how) }
+// portableNow is a case whose clusters and harness support exist: status
+// "not ported yet" (owner decision 82), held by checkNotPortedYet.
+func portableNow(at, how string) gap { return notPorted(classNotPortedYet, at, "portable now: "+how) }
 
 // tvClient is a media client case against the daemon's `--media` pair.
 func tvClient(at, commands, where, pics string) gap {

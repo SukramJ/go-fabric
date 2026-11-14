@@ -446,10 +446,12 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 				goldenMu.Lock()
 				envUpdates[c.ID] = manualReason(c.ID)
 				goldenMu.Unlock()
-				t.Skipf("skipped, %s: %s (%s)", classHarness, manualReason(c.ID), c.Path)
+				t.Skipf("skipped, %s: %s (%s)", manualClass(c.ID), manualReason(c.ID), c.Path)
 			}
+			// A run-pending row (status not ported yet) runs: its run is
+			// what it waits for (pendingRunPassed).
 			g, excluded := fam.gapFor(c.Name)
-			if excluded && !g.selfSkip {
+			if excluded && !g.selfSkip && g.class != classNotPortedYet {
 				t.Skipf("excluded, %s: %s", g.class, g.reason)
 			}
 			if fam.multicast[c.Name] {
@@ -704,6 +706,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		t.Fatalf("%s passed, but it carries the recorded gap %q, which no longer occurs: "+
 			"remove it from the family table (and its record) now that it is fixed", id, known.reason)
 	}
+	pendingRunPassed(t, fam, c.Name, id)
 	checkCounts(t, h, id, counts)
 	t.Logf("%s: %d tests (%d skipped), %d steps (%d skipped)", id, counts.Tests, counts.TestsSkipped, counts.Steps, counts.StepsSkipped)
 }
@@ -755,6 +758,7 @@ func runYamlCase(ctx context.Context, t *testing.T, h *harness, fam family, c ch
 	run, _ := strconv.Atoi(m[1])
 	skipped, _ := strconv.Atoi(m[2])
 	counts := caseCounts{Steps: run, StepsSkipped: skipped}
+	pendingRunPassed(t, fam, c.Name, c.ID)
 	checkCounts(t, h, c.ID, counts)
 	t.Logf("%s: %d steps run, %d skipped", c.ID, run, skipped)
 }
@@ -931,6 +935,36 @@ func (f family) deviceTypeOf(name string) uint32 {
 
 // matterPort is the IANA Matter port (transport/udp.MatterPort).
 const matterPort = 5540
+
+// pendingRunPassed ends a passed case whose row is run pending (status not
+// ported yet, runPendingEvidence): its run has come. Under
+// -update-chip-cases its counts are recorded, and TestCertifiabilityDocument
+// then names the row that leaves the family's exclude; otherwise the run
+// fails, naming it.
+func pendingRunPassed(t *testing.T, fam family, name, id string) {
+	t.Helper()
+	g, ok := fam.gapFor(name)
+	if !ok || g.class != classNotPortedYet {
+		return
+	}
+	msg := fmt.Sprintf("%s passed: its run is no longer pending — remove its row (%s) from the family's exclude "+
+		"in families_table_test.go and its runPendingEvidence entry, and record its counts with -update-chip-cases", id, g.reason)
+	if *updateChipCases {
+		t.Log(msg)
+		return
+	}
+	t.Fatal(msg)
+}
+
+// manualClass is the status page's class for a manual case: that of a
+// case matter.js automates (matterJSCasesNotRun), (c) otherwise — as
+// renderCertifiability files it.
+func manualClass(id string) gapClass {
+	if g, ok := matterJSCasesNotRun[id]; ok {
+		return g.class
+	}
+	return classHarness
+}
 
 // manualReason is the status page's reason for a manual case: a
 // controller-role case's own (controllerRoleCases), that of a case matter.js

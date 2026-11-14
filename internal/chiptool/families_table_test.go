@@ -31,6 +31,14 @@ const (
 	// reason names the scope decision. Bluetooth and Wi-Fi commissioning
 	// of the node left it with ADR 0031 (milestone 7).
 	classOutOfScope gapClass = "(d) out of scope"
+	// classNotPortedYet is no gap class but the page's fifth status beside
+	// passed and the four classes (owner decision 82): a case the module is
+	// unmeasured against that a port or a run can measure now. Either a
+	// matter.js certification case at the snapshot's pin that no registered
+	// Go-TH port runs (matterJSCasesNotRun), or a family case whose fix is
+	// in the tree and whose certification run is pending (an exclude row
+	// with runPendingEvidence). checkNotPortedYet holds both.
+	classNotPortedYet gapClass = "not ported yet"
 )
 
 // controllerRoleCases are matter.js's certification cases with its
@@ -880,7 +888,7 @@ var chipFamilies = []family{
 	{
 		name: "WASHERCTRL", deviceType: dtLaundryWasher,
 		exclude: map[string]gap{
-			"2.2": {classDefect, "TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at db021da0), and this module answers as matter.js does — the module's answer, not the case, fails the step", false},
+			"2.2": runPending("WASHERCTRL/2.2", "TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE (Test_TC_WASHERCTRL_2_2.yaml:86-95 at 6170af84), chip's answer for a rinse count the device does not support (LaundryWasherControlsCluster.cpp:132-145); the server judges NumberOfRinses itself and answers so (owner decision 69, script/clustergen/relaxed.go)"),
 		},
 	},
 	{name: "DRYERCTRL", deviceType: dtLaundryDryer},
@@ -1116,11 +1124,11 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
-			"2.3":  {classDefect, "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects INVALID_COMMAND (TC_PAVST_2_3.py:435-443), as connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), answers (PushAVStreamTransportLogic.cpp:573-574 at 6170af84); the module validates the request's fields against the model first, as matter.js validates a request, and answers CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at db021da0) — the module's answer, not the case, fails the step", false},
-			"2.6":  {classDefect, "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294); the module checks the fields' model constraint first (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at db021da0) and answers CONSTRAINT_ERROR, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step", false},
-			"2.11": {classDefect, "TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479); the module checks the field's model constraint first (\"1 to 16\", matter.js push-av-stream-transport.element.ts:270 at db021da0) and answers CONSTRAINT_ERROR before the stream check the case is after, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step", false},
+			"2.3":  runPending("PAVST/2.3", "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects INVALID_COMMAND (TC_PAVST_2_3.py:435-443), connectedhomeip's answer (PushAVStreamTransportLogic.cpp:573-574 at 6170af84); the server judges MotionSensitivity itself and answers so (owner decision 69, script/clustergen/relaxed.go)"),
+			"2.6":  runPending("PAVST/2.6", "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists and expects SUCCESS (TC_PAVST_2_6.py:283-297); connectedhomeip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84), and the server takes it as no stream field (owner decision 69, script/clustergen/relaxed.go)"),
+			"2.11": runPending("PAVST/2.11", "TC-PAVST-2.11 step 21a allocates with VideoStreamID and a VideoStreams list naming the same stream beside an empty AudioStreams list and expects INVALID_COMMAND (TC_PAVST_2_11.py:468-479); connectedhomeip's server treats the empty list as absent and refuses the old and new stream fields together (PushAVStreamTransportLogic.cpp:671-682 at 6170af84), and the server answers so (owner decision 69, script/clustergen/relaxed.go)"),
 			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
-			"2.4":  {classDefect, "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204); the module checks the fields' model constraint first (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at db021da0), as matter.js validates a request, and answers CONSTRAINT_ERROR, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step", false},
+			"2.4":  runPending("PAVST/2.4", "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists and expects SUCCESS (TC_PAVST_2_4.py:203-213); connectedhomeip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84), and the server takes it as no stream field (owner decision 69, script/clustergen/relaxed.go)"),
 		},
 	},
 	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},
