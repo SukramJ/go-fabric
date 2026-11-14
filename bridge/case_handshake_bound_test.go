@@ -111,3 +111,43 @@ func TestSigma1WithoutHandshakeStateLeavesNoRecord(t *testing.T) {
 		})
 	}
 }
+
+// TestSigma1ThatBeginsNothingTakesNoRecordsPlace: at the bound of the
+// Sigma1 records, a Sigma1 that leaves no handshake behind takes no
+// record's place — the oldest handshake keeps its record; one that begins
+// a handshake takes the oldest's (review II, R2-P3-rr-dev-04).
+func TestSigma1ThatBeginsNothingTakesNoRecordsPlace(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	begins := &recordingCaseHandler{sigma1RespCode: mrp.SCOpcodeSigma2, sigma1Resp: []byte{0xDD}}
+	b.AttachCaseHandler(begins)
+	for i := range maxCaseHandshakes {
+		if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(uint64(0x1000+i)), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x01}); err != nil {
+			t.Fatalf("Sigma1 %d: %v", i, err)
+		}
+	}
+	oldest := HandshakeKey{InitiatorNodeID: 0x1000, ExchangeID: 1}
+	held := func() bool {
+		b.mu.RLock()
+		defer b.mu.RUnlock()
+		_, ok := b.sigma1Replied[oldest]
+		return ok
+	}
+
+	b.AttachCaseHandler(&recordingCaseHandler{sigma1Err: errors.New("test: refused")})
+	_ = b.dispatchSecureChannel(loopbackSrc(), sigma1From(0x9000), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x02})
+	if !held() {
+		t.Fatal("a refused Sigma1 at the bound took the oldest handshake's record")
+	}
+
+	b.AttachCaseHandler(begins)
+	if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(0x9001), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x03}); err != nil {
+		t.Fatal(err)
+	}
+	b.mu.RLock()
+	n := len(b.sigma1Replied)
+	b.mu.RUnlock()
+	if held() || n > maxCaseHandshakes {
+		t.Fatalf("a Sigma1 that began a handshake at the bound: the oldest record held %v, %d records, want it gone and at most %d", held(), n, maxCaseHandshakes)
+	}
+}

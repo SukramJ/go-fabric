@@ -1243,31 +1243,44 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 // Apple cancelled the first attempt and started a new one with a
 // fresh ephemeral) is not mistaken for a replay.
 //
-// Past [maxCaseHandshakes] records the oldest one loses its place, and its
-// handshake ends as an evicted one does ([Bridge.ForgetSigma1Replied]).
+// The record is made before the Sigma1 is judged, so concurrent copies of
+// it are dropped; past [maxCaseHandshakes] records the oldest one loses
+// its place only once the Sigma1 began a handshake
+// ([Bridge.boundSigma1Records]), so a Sigma1 that begins nothing takes no
+// handshake's place (review II, R2-P3-rr-dev-04). Until then the records
+// exceed the bound by at most the Sigma1s being judged.
 func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) bool {
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	existing, ok := b.sigma1Replied[key]
 	if ok && existing.hash == hash {
-		b.mu.Unlock()
 		return true
-	}
-	var (
-		evicted    HandshakeKey
-		hasEvicted bool
-	)
-	if !ok && len(b.sigma1Replied) >= maxCaseHandshakes {
-		evicted, hasEvicted = oldestSigma1Record(b.sigma1Replied)
-		delete(b.sigma1Replied, evicted)
 	}
 	b.sigma1Seq++
 	b.sigma1Replied[key] = sigma1Record{hash: hash, seq: b.sigma1Seq}
-	b.mu.Unlock()
-	if hasEvicted {
-		b.releaseCASEHandshakeEverywhere(evicted)
-		b.abandonHandshakeReplies(evicted)
-	}
 	return false
+}
+
+// boundSigma1Records takes their place from the oldest records past
+// [maxCaseHandshakes], never key's — the handshake a Sigma1 just began —
+// and ends their handshakes as evicted ones end
+// ([Bridge.ForgetSigma1Replied]).
+func (b *Bridge) boundSigma1Records(key HandshakeKey) {
+	var evicted []HandshakeKey
+	b.mu.Lock()
+	for len(b.sigma1Replied) > maxCaseHandshakes {
+		oldest, found := oldestSigma1Record(b.sigma1Replied, key)
+		if !found {
+			break
+		}
+		delete(b.sigma1Replied, oldest)
+		evicted = append(evicted, oldest)
+	}
+	b.mu.Unlock()
+	for _, k := range evicted {
+		b.releaseCASEHandshakeEverywhere(k)
+		b.abandonHandshakeReplies(k)
+	}
 }
 
 // sigma1Record is the router's record of a Sigma1 it answered: the
@@ -1280,14 +1293,18 @@ type sigma1Record struct {
 	completed *completedSigma3
 }
 
-// oldestSigma1Record returns the key of the record made first.
-func oldestSigma1Record(records map[HandshakeKey]sigma1Record) (HandshakeKey, bool) {
+// oldestSigma1Record returns the key of the record made first, other than
+// except's.
+func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeKey) (HandshakeKey, bool) {
 	var (
 		oldest HandshakeKey
 		seq    uint64
 		found  bool
 	)
 	for k, r := range records {
+		if k == except {
+			continue
+		}
 		if !found || r.seq < seq {
 			oldest, seq, found = k, r.seq, true
 		}
@@ -1309,7 +1326,9 @@ func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto me
 	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, ch)
 	if !begun {
 		b.forgetSigma1Replied(key)
+		return err
 	}
+	b.boundSigma1Records(key)
 	return err
 }
 

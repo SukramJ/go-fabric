@@ -169,9 +169,12 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
 			controllerRoute := c.route(t)
 			if tc.rebegin {
-				// The record loses its place at the bound, as the oldest.
+				// The record loses its place at the bound, as the oldest,
+				// to handshakes begun since.
 				for i := range maxCaseHandshakes {
-					c.r.b.markSigma1Replied(HandshakeKey{InitiatorNodeID: uint64(0x7000 + i), ExchangeID: 1}, [32]byte{1})
+					begun := HandshakeKey{InitiatorNodeID: uint64(0x7000 + i), ExchangeID: 1}
+					c.r.b.markSigma1Replied(begun, [32]byte{1})
+					c.r.b.boundSigma1Records(begun)
 				}
 				c.r.b.mu.RLock()
 				_, held := c.r.b.sigma1Replied[HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}]
