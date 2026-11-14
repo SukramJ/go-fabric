@@ -699,9 +699,11 @@ const matterCommissionerControlClusterID uint32 = 0x0751
 // grant is keyed on that auth mode
 // (matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191),
 // never on the FabricIndex: a zero FabricIndex without PASE is no grant and
-// is refused (checkSubjectACL). A nil Checker disables enforcement
+// is refused (checkSubjectACL). A nil Checker disables the ACL gate
 // (fail-open, matching the attribute path's "dispatcher without ACLChecker"
-// fallback).
+// fallback). Neither lifts the fabric-sensitive drop of
+// [AuthorizeEventReports], which compares a record's fabric with
+// FabricIndex for every session.
 type EventReadAuthorizer struct {
 	Checker       ACLChecker
 	FabricIndex   uint8
@@ -747,8 +749,9 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
 // session (PASE / [IsPASEFromContext], also once AddNOC adopted it onto a
-// fabric) or a nil Checker returns every event unchanged; a session
-// without an accessing fabric that is not PASE reads none.
+// fabric) or a nil Checker passes the ACL gate (a) for every event; a
+// session without an accessing fabric that is not PASE reads none. The
+// fabric-sensitive drop (b) applies to every session.
 //
 // (a) ACL gate: each event is gated at its read privilege — View by default,
 //
@@ -758,19 +761,24 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //
 // (b) Fabric-sensitive drop: a fabric-sensitive record is disclosed only to the
 //
-//	fabric that owns it, independent of the read's FabricFiltered flag. Fails
-//	closed — a record whose fabric cannot be positively matched to the
-//	accessing fabric is never disclosed. Mirrors EventReadResponse.ts
-//	#readAllowedEvents (payload.fabricIndex !== accessingFabricIndex → skip).
+//	fabric that owns it, independent of the read's FabricFiltered flag and of
+//	the auth mode: the accessing fabric is auth.FabricIndex — 0 for a PASE
+//	session before AddNOC, the adopted fabric after it. Fails closed — a
+//	record whose fabric cannot be positively matched to the accessing fabric
+//	is never disclosed. Mirrors matter.js
+//	packages/protocol/src/action/server/EventReadResponse.ts:79 and :341-350
+//	at db021da0 — #accessingFabricIndex = session.fabric ?? NO_FABRIC,
+//	#readAllowedEvents skips a record whose payload.fabricIndex differs; the
+//	file has no auth-mode exception.
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	if auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
-		return append([]EventReport(nil), events...)
-	}
+	aclBypass := auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
-		priv := eventReadPrivilege(ev.Path.Cluster)
-		if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
-			continue // subject not permitted to read this event — omit
+		if !aclBypass {
+			priv := eventReadPrivilege(ev.Path.Cluster)
+			if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
+				continue // subject not permitted to read this event — omit
+			}
 		}
 		if isFabricSensitiveEventCluster(ev.Path.Cluster) {
 			recFabric, ok := eventPayloadFabricIndex(ev.Data.Value)

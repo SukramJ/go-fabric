@@ -79,9 +79,12 @@ func TestAuthorizedEventReports_NonAdministerDenied(t *testing.T) {
 	}
 }
 
-// TestAuthorizedEventReports_PASEBypass verifies that a PASE session
-// (fabricIndex==0) receives the event unchanged — ACL/fabric filtering does not
-// apply before commissioning.
+// TestAuthorizedEventReports_PASEBypass verifies that a PASE session passes
+// the ACL gate — an empty ACL grants it nothing — while the fabric-sensitive
+// record stays with its fabric: before AddNOC (fabricIndex==0) the record of
+// fabric 1 is not disclosed, once AddNOC adopted the session onto fabric 1
+// it is (matter.js EventReadResponse.ts:79, :341-350; review II,
+// R2-P4-imread-01).
 func TestAuthorizedEventReports_PASEBypass(t *testing.T) {
 	t.Parallel()
 	fake := &aclStoreFake{}
@@ -93,8 +96,12 @@ func TestAuthorizedEventReports_PASEBypass(t *testing.T) {
 		t.Fatalf("fabric 0 without PASE: want no event, got %d (review 2026-11 W2-sec-03)", len(got))
 	}
 	target.pase = true
+	if got := b.authorizedEventReports(context.Background(), target, []im.EventReport{rec}); len(got) != 0 {
+		t.Fatalf("PASE before AddNOC: want no event of fabric 1, got %d", len(got))
+	}
+	target.fabricIndex = 1
 	if got := b.authorizedEventReports(context.Background(), target, []im.EventReport{rec}); len(got) != 1 {
-		t.Fatalf("PASE bypass: want 1 event, got %d", len(got))
+		t.Fatalf("PASE adopted onto fabric 1: want its own event, got %d", len(got))
 	}
 }
 
