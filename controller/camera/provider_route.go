@@ -46,9 +46,13 @@ func (s *Service) Provider(node *client.Node, endpoint uint16) (*Provider, error
 // R2-P1-cam-b-04). Mirrors matterjs-server's send_webrtc_provider_command
 // (docs/websockets_api.md:1868-1900 of matterjs-server at 0bd06f2).
 func (p *Provider) Send(ctx context.Context, command string, payload json.RawMessage) (result any, notices []string, err error) {
-	if p.s.isClosed() {
+	// Close waits for a command that passed this check: an offer it
+	// answers after Close began ends its session (review II,
+	// R2-P2-stop-03).
+	if !p.s.enter() {
 		return nil, nil, ErrClosed
 	}
+	defer p.s.ending.Done()
 	if !isProviderCommandName(command) {
 		return nil, nil, invalidArguments("command_name must be one of ProvideOffer, SolicitOffer, ProvideAnswer, ProvideIceCandidates")
 	}
