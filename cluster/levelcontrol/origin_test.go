@@ -21,8 +21,8 @@ import (
 // and 2, brief BY-1 §1): every path that changes CurrentLevel reaches the
 // change listeners — the host's OnChanged — at once, with its origin, as
 // every observer of matter.js's currentLevel$Changed sees each committed
-// change (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476);
-// a controller's write reaches them as the written attribute.
+// change (packages/node/src/behavior/state/managed/Datasource.ts:1486-1492
+// at db021da0); a controller's write reaches them as the written attribute.
 
 func moveTo(level uint8) spectest.OriginCase {
 	return spectest.OriginCase{
@@ -126,8 +126,8 @@ func TestEngineLevelControlOrigins(t *testing.T) {
 // the wire (contract.AttributeReportNotifier) reports the first at once
 // and the last once the quieter's interval has passed — matter.js's
 // QuietEvent throttles only its `online` view
-// (packages/node/src/behavior/Events.ts:267-297, ServerBehaviorBacking.ts
-// :251-259).
+// (packages/node/src/behavior/Events.ts:269-296, ServerBehaviorBacking.ts
+// :253-261 at db021da0).
 func TestHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

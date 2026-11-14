@@ -108,7 +108,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 		Apply: s.applyLevel,
 		// Each report of RemainingTime advances the DataVersion once.
 		// Mirrors matter.js
-		// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-259
+		// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261
 		// at db021da0 (the quiet observer runs advanceVersionFor before it
 		// broadcasts), Datasource.ts:679-688 (advanceVersionFor advances
 		// for a dynamic property) and
@@ -176,11 +176,12 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // host's Set, the OnOff coupling, the device's own change through the
 // host's notifier, and on the hand-off path what the host's port moved.
 // The change listeners see it at once, from origin, as every observer of
-// matter.js's currentLevel$Changed does (Datasource.ts:1473-1476 emits it
-// on the commit of each state write; Events.ts:267-297 QuietEvent is an
+// matter.js's currentLevel$Changed does (the commit of a state write that
+// changed the value queues it, Datasource.ts:1486-1492, and postCommit
+// emits it, :1302-1317, at db021da0; Events.ts:269-296 QuietEvent is an
 // OnlineEvent whose own observers are not throttled). Under the engine
 // the wire report follows the quieter rules of the "Q" quality (matter.js
-// QuietEvent's QuietObservable, ServerBehaviorBacking.ts:251-259): at
+// QuietEvent's QuietObservable, ServerBehaviorBacking.ts:253-261): at
 // once from or to null and otherwise at most once a second, the end of a
 // transition flushing the last value — a report the quieter defers
 // carries the origin of the last change before it. Under the engine each
@@ -430,8 +431,9 @@ func (s *Server) runStop(req wire.StopRequest, withOnOff bool) error {
 // ExecuteIfOff gate, which then ends the current scene. matter.js
 // invalidates before the logic runs (LevelControlServer.ts:276, :293,
 // :359, :373, :426, :442 at db021da0), inside the command's transaction,
-// which a failing command rolls back: the scene ends when the command
-// succeeds.
+// which a failing command rolls back
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:509-516):
+// the scene ends when the command succeeds.
 func (s *Server) transitionAndInvalidate(ctx context.Context, target, rate float64, rateFrom func(current float64) float64, withOnOff bool, options uint8) error {
 	if err := s.transition(ctx, target, rate, rateFrom, withOnOff, options); err != nil {
 		return err

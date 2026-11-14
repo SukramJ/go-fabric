@@ -43,7 +43,7 @@ func (p *scenesPort) take() int {
 // the ExecuteIfOff gate (moveToLevel :269-276, move :354-359, step
 // :421-426, stop :482-487), the "with On/Off" ones always (:293, :373,
 // :442, :498); a command that fails changes nothing, its transaction
-// rolled back.
+// rolled back (packages/protocol/src/action/server/CommandInvokeResponse.ts:509-516).
 func TestCommandsInvalidateTheSceneAfterTheGate(t *testing.T) {
 	d := newDevice(100, false)
 	srv := engineServer(d, nil)

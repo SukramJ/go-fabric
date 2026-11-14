@@ -592,7 +592,8 @@ func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, v
 	s.mu.Unlock()
 	// The written Mode and the ConfigStatus it moves reach the listeners
 	// from the write, as matter.js emits each $Changed on the commit
-	// (Datasource.ts:1473-1476).
+	// (queued with the write's session, Datasource.ts:1486-1492, emitted
+	// by postCommit, :1302-1317, at db021da0).
 	var changed []uint32 // ascending: ConfigStatus 0x0007, Mode 0x0017
 	if moved {
 		changed = append(changed, wire.WindowCoveringAttrConfigStatus)

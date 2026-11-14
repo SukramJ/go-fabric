@@ -322,7 +322,7 @@ func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
 // alone — at the start of a transition that has not moved CurrentLevel
 // yet, and at the Stop that cancels it — advances the server's
 // DataVersion once per report. Mirrors matter.js
-// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-259 at
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261 at
 // db021da0 (the quiet observer of a "Q" attribute runs advanceVersionFor
 // before it broadcasts), Datasource.ts:679-688 (advanceVersionFor advances
 // for a dynamic property) and LevelControlServer.ts:806-822 (remainingTime

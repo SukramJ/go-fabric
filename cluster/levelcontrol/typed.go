@@ -140,8 +140,9 @@ func setUint8(v any) *uint8 {
 // not accept is refused with [spec.ErrNotAccepted]. A command fn accepts
 // ends the current scene, as one the server runs past its gate does
 // ([Server.MatterInvoke]). A matter.js host overrides the command's logic
-// method instead (moveToLevelLogic, LevelControlServer.ts:256-261),
-// keeping the checks and the command method's scene invalidation.
+// method instead (moveToLevelLogic, LevelControlServer.ts:257-262 at
+// db021da0), keeping the checks and the command method's scene
+// invalidation.
 func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.inst, cmdID, fn)
 }

@@ -207,11 +207,12 @@ func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWrite
 // attributes that differ between prev and next, from origin. The change
 // listeners see all of them at once, as matter.js's change observers do
 // — the Datasource queues each committed change's notification with its
-// session (Datasource.ts:1473-1476), and a QuietEvent's own observers are
-// not throttled (Events.ts:267-297); on the wire the "Q"
-// attributes follow their quieter rules (ServerBehaviorBacking.ts:251-259)
-// — a quieter report it defers carries the origin of the last change
-// before it — and the rest go at once.
+// session (Datasource.ts:1486-1492 at db021da0), and a QuietEvent's own
+// observers are not throttled (Events.ts:269-296, the throttle is its
+// `online` view); on the wire the "Q" attributes follow their quieter
+// rules (ServerBehaviorBacking.ts:253-261) — a quieter report it defers
+// carries the origin of the last change before it — and the rest go at
+// once.
 func (s *ColorControlServer) report(origin contract.Origin, prev, next colorState) {
 	s.cause.Store(uint32(origin))
 	var all, quiet, plain []uint32

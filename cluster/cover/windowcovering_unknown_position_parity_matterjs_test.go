@@ -9,7 +9,8 @@
 //   - the model's defaults: CurrentPositionLiftPercentage and
 //     CurrentPositionLiftPercent100ths are "X N", default null
 //     (packages/model/src/standard/elements/window-covering-cluster.element.ts:47-48,
-//     :71-72), as are the tilt pair and both targets (:51-52, :59-64, :75-76);
+//     :71-72), as is the tilt pair (:51-52, :75-76); both targets are "X",
+//     default null (:59-64);
 //   - the deprecated percentage follows the 100ths value with null passed
 //     through (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:237-240,
 //     :255-258);

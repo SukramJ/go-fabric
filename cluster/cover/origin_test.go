@@ -15,7 +15,7 @@ import (
 // TestWindowCoveringWriteOrigins is the controller-write row of the
 // WindowCovering server's origin audit (brief BY-1 §2): a write of Mode
 // reaches the change listeners — the host's OnChanged — as Mode, from the
-// write (Datasource.ts:1473-1476).
+// write (Datasource.ts:1486-1492 at db021da0).
 func TestWindowCoveringWriteOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {

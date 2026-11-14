@@ -776,7 +776,9 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 	}
 	s.mu.Unlock()
 	// A change is reported to the server's listeners, as matter.js emits
-	// <attribute>$Changed when the write commits (Datasource.ts:1473-1476).
+	// <attribute>$Changed when the write commits (#noteIfChanged queues it,
+	// Datasource.ts:1486-1492, and postCommit emits it, :1302-1317, at
+	// db021da0).
 	if changed {
 		s.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 	}

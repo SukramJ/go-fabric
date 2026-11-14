@@ -121,7 +121,8 @@ type Config struct {
 	Initial map[uint32]any
 	// BootReason optionally returns the node's GeneralDiagnostics
 	// BootReason; StartUpOnOff is not applied after a software update
-	// (OnOffServer.ts:36, :326-331). nil applies it.
+	// (OnOffServer.ts:36, #getBootReason :324-329, at db021da0). nil
+	// applies it.
 	BootReason func() uint8
 	// TimeSource paces the OnTime / OffWaitTime countdown and the scene
 	// transitions; nil is [clock.System].
@@ -154,7 +155,7 @@ var ErrInvalidConfig = errors.New("onoff: configuration outside the cluster's mo
 // GlobalSceneControl is true (:159-165), OnWithRecallGlobalScene recalls
 // it (:175-184), and a scene's OnOff value is applied by the server itself
 // — at once without a transition time, after it otherwise
-// ([Server.MatterApplySceneValues], :268-310).
+// ([Server.MatterApplySceneValues], :267-308 at db021da0).
 //
 // Two locks. Every operation the server starts itself — a command, a
 // write, a timer tick, a scene apply — runs in one queue (op), as
@@ -522,13 +523,13 @@ type inCommand struct {
 }
 
 // MatterApplySceneValues implements cluster/core's SceneValuesApplier:
-// matter.js #applySceneValues (OnOffServer.ts:267-289), registered with
+// matter.js #applySceneValues (OnOffServer.ts:267-289 at db021da0), registered with
 // ScenesManagementServer.implementScenes (:60-63). A pending delayed apply
 // is dropped; a value that is not a boolean (0 / 1) or equals OnOff is
 // ignored; with transition time 0 the server turns on or off at once,
 // otherwise after transitionMs on the server's clock
-// (#applyDelayedSceneOnOffValue, :299-310). A change of OnOff in between
-// drops the pending value (:62, :291-297).
+// (#applyDelayedSceneOnOffValue, :297-308). A change of OnOff in between
+// drops the pending value (:62, :291-295).
 func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32) {
 	if ic, ok := ctx.Value(inCommandKey{}).(*inCommand); ok && ic.srv == s {
 		s.applySceneValues(ctx, ic.st, values, transitionMs)
@@ -576,7 +577,7 @@ func (s *Server) applySceneValues(ctx context.Context, st *state, values map[uin
 	return false
 }
 
-// clearSceneApply is #clearDelayedSceneApplyData (:291-297). The caller
+// clearSceneApply is #clearDelayedSceneApplyData (:291-295 at db021da0). The caller
 // holds s.mu.
 func (s *Server) clearSceneApply() {
 	if !s.sceneApply.pending {
@@ -590,7 +591,7 @@ func (s *Server) clearSceneApply() {
 	}
 }
 
-// applyDelayedSceneOnOffValue is #applyDelayedSceneOnOffValue (:299-310):
+// applyDelayedSceneOnOffValue is #applyDelayedSceneOnOffValue (:297-308 at db021da0):
 // the pending value, if still pending, turns the server on or off.
 func (s *Server) applyDelayedSceneOnOffValue(gen uint64) {
 	s.op.Lock()
