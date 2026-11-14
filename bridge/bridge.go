@@ -723,6 +723,11 @@ type Bridge struct {
 	// started in one run installs nothing once it is over
 	// ([Bridge.Reassemble]).
 	runGen uint64
+	// servedTopology is the topology whose servers run: the one the last
+	// swap installed, nil once Stop ended the run; servedGen counts its
+	// changes. Both guarded by mu ([Bridge.reconcileQuiescers]).
+	servedTopology *endpoint.Topology
+	servedGen      uint64
 
 	// openUDP, when set (internal/bridgeseam UseListener), opens the
 	// UDP listener Start serves instead of binding a socket: fabrictest's
@@ -1242,13 +1247,19 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	b.mu.Lock()
 	if b.runEndedLocked(run) {
 		// Stop ran while this was assembled: nothing is swapped into the
-		// stopped bridge, and the switch hooks wired for it go again.
+		// stopped bridge, and the switch hooks wired for it go again. The
+		// SetEndpoint above re-armed a server a quiesce had stopped; the
+		// reconcile quiesces it again unless a later run serves it
+		// (review II, R2-P1-rw-04).
 		b.mu.Unlock()
 		runUnsubscribers(switchUnsubs)
+		b.reconcileQuiescers(topology)
 		return ErrNotStarted
 	}
 	prevTopology := b.topology
 	b.topology = topology
+	b.servedTopology = topology
+	b.servedGen++
 	// The sources once more, under the lock of the swap: an Attach… that
 	// ran since they were read above applied to the dispatcher this one
 	// replaces.
@@ -1291,14 +1302,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 
 	// A server the new topology no longer carries stops whatever it runs
 	// on its own (a transition), as matter.js closes a removed endpoint's
-	// behaviors.
-	if prevTopology != nil {
-		keep := map[contract.ClusterQuiescer]bool{}
-		for _, q := range quiescers(topology) {
-			keep[q] = true
-		}
-		quiesceServers(prevTopology, keep)
-	}
+	// behaviors. Judged against the topology served when it runs, not this
+	// one: a concurrent Reassemble may have swapped in after this one
+	// (review II, R2-P1-rw-04).
+	b.reconcileQuiescers(prevTopology, topology)
 
 	// Reap subscriptions for endpoints that no longer exist in the new
 	// topology. Mirrors matter.js packages/node/src/node/ServerNode.ts
@@ -2100,6 +2107,8 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.pumpDone = nil
 	b.started = false
 	b.runGen++
+	b.servedTopology = nil
+	b.servedGen++
 	b.mu.Unlock()
 	// The start claim is given back when this Stop has finished, not
 	// here: what follows — the wait for the handlers in flight, the
@@ -2175,7 +2184,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// more; stop it, as matter.js closes a behavior's transitions when the
 	// node goes offline (LevelControlServer / ColorControlServer
 	// [Symbol.asyncDispose]).
-	quiesceServers(b.Topology(), nil)
+	b.reconcileQuiescers(b.Topology())
 
 	// The commissioning window's expiry timer goes with the bridge: no
 	// timer stays armed on its clock after Stop (ADR 0026 P5).
@@ -2219,13 +2228,64 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, t
 	}
 }
 
-// quiesceServers calls [contract.ClusterQuiescer.MatterQuiesce] on every
-// server of topo that implements it, except the ones in keep — the
-// servers that stay in use.
-func quiesceServers(topo *endpoint.Topology, keep map[contract.ClusterQuiescer]bool) {
-	for _, q := range quiescers(topo) {
-		if !keep[q] {
-			q.MatterQuiesce()
+// reconcileQuiescers brings the quiescing servers of the topologies in
+// touched in line with the topology the bridge serves now — none once
+// Stop ended the run: a server it does not carry is quiesced, and one it
+// carries that takes events is given its endpoint again (SetEndpoint),
+// which re-arms a server a quiesce stopped (cluster/energy EvseServer,
+// cluster/thermo ThermostatServer) and stamps the number it serves at.
+//
+// Reassembles are not serialised and each SetEndpoints the servers of its
+// topology before it swaps it in, so a quiesce or a re-arm decided from
+// one Reassemble's own topology goes wrong when another swaps in after it
+// or a Stop ends the run meanwhile (review II, R2-P1-rw-04). This decides
+// from the topology served when it runs, acts without a lock — a server
+// may call back into the bridge — and decides again when the served
+// topology changed while it acted: whichever swap or Stop changed it last
+// leaves each server it touched as that topology serves it.
+func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
+	for {
+		b.mu.RLock()
+		served, gen := b.servedTopology, b.servedGen
+		b.mu.RUnlock()
+		at := map[contract.ClusterQuiescer]uint16{}
+		if served != nil {
+			for _, ep := range served.Endpoints {
+				if ep == nil {
+					continue
+				}
+				for _, srv := range endpoint.ClusterServers(ep) {
+					if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
+						at[q] = ep.ID
+					}
+				}
+			}
+		}
+		done := map[contract.ClusterQuiescer]bool{}
+		for _, topo := range touched {
+			for _, q := range quiescers(topo) {
+				if done[q] {
+					continue
+				}
+				done[q] = true
+				id, serves := at[q]
+				if !serves {
+					q.MatterQuiesce()
+					continue
+				}
+				if _, ok := q.(contract.EventReceiver); !ok {
+					continue
+				}
+				if r, ok := q.(matterEndpointReceiver); ok {
+					r.SetEndpoint(id)
+				}
+			}
+		}
+		b.mu.RLock()
+		moved := b.servedGen != gen
+		b.mu.RUnlock()
+		if !moved {
+			return
 		}
 	}
 }
