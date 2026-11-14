@@ -182,7 +182,7 @@ func (o *OperationalCredentials) clearSettledPendingNOC(ctx context.Context) {
 }
 
 // retryOwedReverts runs again the rollbacks an earlier expiry could not
-// land. One that lands clears its marker; one that does not keeps it,
+// land. One that lands — or whose fabric is gone — clears its marker; one that does not keeps it,
 // written again when CommissioningComplete cleared it in between
 // (GeneralCommissioning.commitPendingNOCLocked clears every marker key).
 // A landed AddNOC rollback fires no hook: the expiry that owed it already
@@ -192,7 +192,12 @@ func (o *OperationalCredentials) retryOwedReverts(ctx context.Context) {
 	update, add := o.owedUpdateRevert, o.owedAddRevert
 	o.mu.Unlock()
 	if update != nil {
-		if o.revertUpdateNOC(ctx, *update) {
+		// A fabric removed since the update has nothing left to restore:
+		// its owed revert is settled, not retried — a retry would write an
+		// identity for the removed index and fail on the fabric's row
+		// forever (review II, R2-P1-rw-02). A failed read keeps it owed.
+		_, gerr := o.store.GetFabric(ctx, update.fabricIndex)
+		if errors.Is(gerr, store.ErrFabricNotFound) || (gerr == nil && o.revertUpdateNOC(ctx, *update)) {
 			o.mu.Lock()
 			o.owedUpdateRevert = nil
 			o.mu.Unlock()

@@ -124,3 +124,52 @@ func TestOpcreds_AddNOCSettlesTheOwedRevertBeforeItsChecks(t *testing.T) {
 		})
 	}
 }
+
+// TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled pins review II
+// R2-P1-rw-02: an UpdateNOC revert the expiry could not land is owed;
+// the administrator then removes that fabric. With the store healthy
+// again, the revert has nothing left to restore: the next retry settles
+// it — the marker goes, no identity is written for the removed index —
+// and an UpdateNOC on another fabric is no longer refused for it.
+func TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled(t *testing.T) {
+	t.Parallel()
+	for name, open := range restartStores {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			inner := open(t)
+			st := &identityFailingStore{restartStore: inner}
+			oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, rootPriv, idx := commissionTestFabric(ctx, t, oc)
+			oc.ClearPendingState() // CommissioningComplete
+			_, otherRootPriv, other := commissionTestFabric(ctx, t, oc)
+			oc.ClearPendingState() // CommissioningComplete
+			fabCtx := im.WithFabricFilter(ctx, true, idx)
+			nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
+			if resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw}); err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+				t.Fatalf("UpdateNOC: %+v, %v", resp, err)
+			}
+			st.fail.Store(true)
+			oc.OnFailSafeExpiry(ctx, idx) // the revert fails: owed
+			st.fail.Store(false)
+			if err := oc.RemoveFabric(ctx, idx); err != nil {
+				t.Fatalf("RemoveFabric: %v", err)
+			}
+			oc.ClearPendingState() // the next fresh arm, over a healthy store
+			if v, _, _ := inner.GetSetting(ctx, pendingNOCUpdateKey); v != "" {
+				t.Fatal("the owed revert of a removed fabric was not settled: its marker stands over a healthy store")
+			}
+			if _, err := inner.GetIdentity(ctx, idx); err == nil {
+				t.Fatalf("the retry wrote an identity for the removed fabric %d", idx)
+			}
+			otherCtx := im.WithFabricFilter(ctx, true, other)
+			nocOther := mintUpdateNOC(otherCtx, t, oc, otherRootPriv, testDefaultFabricID, testDefaultNodeID+9)
+			if resp, err := oc.MatterInvoke(otherCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocOther}); err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+				t.Fatalf("UpdateNOC on fabric %d after the removed fabric's revert: %+v, %v; want OK", other, resp, err)
+			}
+		})
+	}
+}
