@@ -4,8 +4,10 @@
 package bridge
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -217,6 +219,75 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 		b.logger.Warn("matter.subscription.persist.save",
 			slog.Int("subscription_id", int(subID)),
 			slog.Any("err", err))
+	}
+}
+
+// restoreCreationOrder puts the store's rows back into the order of
+// former — the creation order the previous run's store held — with the
+// subscriptions saved since this run began after them, in the order they
+// were saved. Re-establishment re-saves a peer's subscriptions newest
+// first, and the store orders by save time, so without it every restart
+// would reverse a peer's subscriptions and the next one's newest-first
+// walk would try the oldest first. Nothing is written when the order
+// already holds. Mirrors matter.js SubscriptionsServer.#restoreCreationOrder
+// (SubscriptionsServer.ts:193-204, called at :371, at db021da0); review
+// II, R2-P2-sess-01.
+//
+// ctx is the caller's; the store calls outlive its cancellation, as
+// persistSubscription's do, bounded by subscriptionStoreTimeout. It runs
+// under resumption.mu, which persistSubscription and the
+// terminated hook take too: no row is saved or deleted between the load
+// and the re-saves, so a subscription terminated meanwhile is deleted
+// after them, not written back.
+func (b *Bridge) restoreCreationOrder(ctx context.Context, former []subscription.PeerSubscription) {
+	formerIndex := make(map[uint32]int, len(former))
+	for i, rec := range former {
+		formerIndex[rec.SubscriptionID] = i
+	}
+	orderOf := func(rec subscription.PeerSubscription) int {
+		if i, ok := formerIndex[rec.SubscriptionID]; ok {
+			return i
+		}
+		return len(former)
+	}
+
+	b.resumption.mu.Lock()
+	defer b.resumption.mu.Unlock()
+	if b.resumption.disabled {
+		return
+	}
+	st := b.resumption.storeLocked()
+	ctx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), b.clk(), subscriptionStoreTimeout)
+	defer cancel()
+	rows, err := st.LoadServerSubscriptions(ctx)
+	if err != nil {
+		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
+		return
+	}
+	type savedRow struct {
+		rec     subscription.PeerSubscription
+		payload []byte
+	}
+	saved := make([]savedRow, 0, len(rows))
+	for _, row := range rows {
+		rec, err := subscription.UnmarshalPeerSubscription(row)
+		if err != nil {
+			b.logger.Warn("matter.subscription.persist.decode", slog.Any("err", err))
+			continue
+		}
+		saved = append(saved, savedRow{rec: rec, payload: row})
+	}
+	ordered := slices.Clone(saved)
+	slices.SortStableFunc(ordered, func(x, y savedRow) int { return cmp.Compare(orderOf(x.rec), orderOf(y.rec)) })
+	if slices.EqualFunc(ordered, saved, func(x, y savedRow) bool { return x.rec.SubscriptionID == y.rec.SubscriptionID }) {
+		return
+	}
+	for _, row := range ordered {
+		if err := st.SaveServerSubscription(ctx, row.rec.SubscriptionID, row.rec.FabricIndex, row.rec.PeerNodeID, row.payload); err != nil {
+			b.logger.Warn("matter.subscription.persist.save",
+				slog.Int("subscription_id", int(row.rec.SubscriptionID)),
+				slog.Any("err", err))
+		}
 	}
 }
 

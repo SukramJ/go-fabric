@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,8 +85,9 @@ var errPeerGone = errors.New("bridge: peer unreachable while re-establishing")
 // (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts):
 // peers are handled in parallel, a peer that begins a normal subscribe
 // meanwhile is skipped, a peer that cannot be reached is skipped
-// entirely, and a peer's loop stops at a transport failure or an
-// InvalidSubscription answer. A subscription that does not come back is
+// entirely, a peer's subscriptions are tried newest first and its loop
+// stops at a transport failure or an InvalidSubscription answer; the
+// store is put back into creation order afterwards. A subscription that does not come back is
 // not recorded again — it is dropped. The former set is consumed: a
 // second call does nothing.
 //
@@ -144,6 +146,7 @@ func (b *Bridge) ReestablishFormerSubscriptions(ctx context.Context) Reestablish
 		})
 	}
 	wg.Wait()
+	b.restoreCreationOrder(ctx, former)
 
 	idStrs := make([]string, 0, len(done))
 	for _, id := range done {
@@ -175,7 +178,12 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 	}
 
 	var ok []uint32
-	for _, rec := range recs {
+	// Newest first: an older record is likelier the one the peer dropped,
+	// and InvalidSubscription ends this peer's loop. recs is in the
+	// store's order, least recently saved first. Mirrors matter.js
+	// SubscriptionsServer.ts:323-325 at db021da0
+	// (`peerSubscriptions.reverse()`); review II, R2-P2-sess-01.
+	for _, rec := range slices.Backward(recs) {
 		if block.has(k) {
 			b.logger.Debug("matter.subscription.reestablish.skip",
 				slog.Int("subscription_id", int(rec.SubscriptionID)))
