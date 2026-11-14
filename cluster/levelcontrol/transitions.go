@@ -329,12 +329,12 @@ func (s *Server) runMoveToLevel(ctx context.Context, req wire.MoveToLevelRequest
 		return nil
 	}
 	level := float64(min(max(req.Level, s.minLevel()), lvldef.LevelMax))
-	var rate func(current float64) float64
+	var rateFrom func(current float64) float64
 	if tt := req.TransitionTime; tt != nil && *tt != 0 {
 		tenths := float64(*tt)
-		rate = func(current float64) float64 { return (level - current) / tenths * 10 }
+		rateFrom = func(current float64) float64 { return (level - current) / tenths * 10 }
 	}
-	return s.transition(ctx, level, rate, withOnOff, options)
+	return s.transition(ctx, level, 0, rateFrom, withOnOff, options)
 }
 
 // runMove is matter.js move / moveWithOnOff and moveLogic: towards the
@@ -352,12 +352,12 @@ func (s *Server) runMove(ctx context.Context, req wire.MoveRequest, withOnOff bo
 	if req.MoveMode == MoveModeDown {
 		target, sign = math.Inf(-1), -1
 	}
-	var rate func(float64) float64
+	// A null Rate is the rate 0, which the engine applies at once.
+	var rate float64
 	if req.Rate != nil {
-		r := float64(*req.Rate) * sign
-		rate = func(float64) float64 { return r }
+		rate = float64(*req.Rate) * sign
 	}
-	return s.transition(ctx, target, rate, withOnOff, options)
+	return s.transition(ctx, target, rate, nil, withOnOff, options)
 }
 
 // runStep is matter.js step / stepWithOnOff and stepLogic: StepSize from
@@ -378,12 +378,11 @@ func (s *Server) runStep(ctx context.Context, req wire.StepRequest, withOnOff bo
 	if err != nil {
 		return err
 	}
-	var rate func(float64) float64
+	var rate float64
 	if tt := req.TransitionTime; tt != nil {
-		r := float64(req.StepSize) / float64(*tt) * 10 * sign
-		rate = func(float64) float64 { return r }
+		rate = float64(req.StepSize) / float64(*tt) * 10 * sign
 	}
-	return s.transition(ctx, float64(current)+float64(req.StepSize)*sign, rate, withOnOff, options)
+	return s.transition(ctx, float64(current)+float64(req.StepSize)*sign, rate, nil, withOnOff, options)
 }
 
 // runStop is matter.js stop / stopWithOnOff and stopLogic: the transition
@@ -403,17 +402,27 @@ func (s *Server) runStop(req wire.StopRequest, withOnOff bool) error {
 // a "with On/Off" command towards a level above the minimum switches the
 // device on, which may move the level to OnLevel — then derive the rate
 // from the level that leaves, start the engine, and couple what the level
-// arrived at. Every step of the transition couples again.
-func (s *Server) transition(ctx context.Context, target float64, rate func(current float64) float64, withOnOff bool, options uint8) error {
+// arrived at. Every step of the transition couples again. rate is a
+// constant rate (Move, Step; 0 applies at once); rateFrom, when set,
+// derives it from the current level (MoveToLevel).
+func (s *Server) transition(ctx context.Context, target, rate float64, rateFrom func(current float64) float64, withOnOff bool, options uint8) error {
 	c, err := s.couple(ctx, withOnOff, options, target)
 	if err != nil {
 		return err
 	}
-	if rate != nil {
-		// The level is read here only for its error; the rate itself is
-		// computed from the value the engine reads under its lock
-		// (transition.Transition.RateFrom), as matter.js's moveToLevelLogic
-		// reads and starts in one synchronous handler.
+	if rateFrom != nil {
+		// The level is read for its error only where the rate is derived
+		// from it. Mirrors matter.js
+		// packages/node/src/behaviors/level-control/LevelControlServer.ts:536-538
+		// at db021da0 (transition: `if (typeof changePerS === "function")
+		// changePerS = changePerS(this.currentLevel)`, the getter that
+		// fails a null level, :103-111) — a function only moveToLevelLogic
+		// passes (:336-338); moveLogic hands a number (:388-404), so a
+		// rated Move at a null level is not refused, as the native path
+		// does not refuse it (native.go). The rate itself is computed from
+		// the value the engine reads under its lock
+		// (transition.Transition.RateFrom), as matter.js reads and starts
+		// in one synchronous handler.
 		if _, err := s.currentLevel(); err != nil {
 			return err
 		}
@@ -422,7 +431,7 @@ func (s *Server) transition(ctx context.Context, target float64, rate func(curre
 	// context's values but not its cancellation.
 	stepCtx := context.WithoutCancel(ctx)
 	if err := s.engine.Start(transition.Transition{
-		Name: propCurrentLevel, RateFrom: rate, Target: target,
+		Name: propCurrentLevel, Rate: rate, RateFrom: rateFrom, Target: target,
 		OnStep: func(float64) { _, _ = s.couple(stepCtx, withOnOff, options, target) },
 	}); err != nil {
 		return err

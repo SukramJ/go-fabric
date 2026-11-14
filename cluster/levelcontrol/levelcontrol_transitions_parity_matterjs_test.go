@@ -733,3 +733,48 @@ func TestQuiesceAndRefusal(t *testing.T) {
 		}
 	})
 }
+
+// TestRatedMoveAtANullLevel holds the engine path to matter.js
+// LevelControlServer.ts:388-404 at db021da0 (moveLogic hands transition()
+// the rate as a number) and :535-538 (transition() reads the currentLevel
+// getter, which fails a null level, only for a rate function — the one
+// moveToLevelLogic passes): a Move with a Rate at a null CurrentLevel
+// answers SUCCESS. Without managed transitions the bound in the direction
+// of travel is applied at once (Transitions.ts:133-147); with them the
+// transition ends at its first step and the level stays null
+// (Transitions.ts:461-464). A Step and a MoveToLevel with a TransitionTime
+// keep their FAILURE: both read the level (:478, :336-338).
+func TestRatedMoveAtANullLevel(t *testing.T) {
+	for _, tc := range []struct {
+		managed bool
+		mode    lvldef.MoveModeEnum
+		want    any
+	}{
+		{false, lvldef.MoveModeUp, uint8(254)},
+		{false, lvldef.MoveModeDown, uint8(1)},
+		{true, lvldef.MoveModeUp, nil},
+	} {
+		srv, err := levelcontrol.New(levelcontrol.HeldConfig{Features: levelcontrol.FeatureLighting, ManageTransitions: tc.managed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := invoke(t, srv, lvldef.CmdMove, lvldef.MoveRequest{MoveMode: tc.mode, Rate: spec.ValueOf(uint8(10))}); err != nil {
+			t.Errorf("managed=%v mode %d: Move with Rate 10 at a null level = %v, want SUCCESS", tc.managed, tc.mode, err)
+		}
+		if got, _ := srv.MatterRead(lvldef.AttrCurrentLevel); got != tc.want {
+			t.Errorf("managed=%v mode %d: CurrentLevel = %v, want %v", tc.managed, tc.mode, got, tc.want)
+		}
+		srv.MatterQuiesce()
+	}
+	srv, err := levelcontrol.New(levelcontrol.HeldConfig{Features: levelcontrol.FeatureLighting})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st im.StatusCodeError
+	if err := invoke(t, srv, lvldef.CmdStep, lvldef.StepRequest{StepMode: lvldef.StepModeUp, StepSize: 10, TransitionTime: spec.ValueOf(uint16(10))}); !errors.As(err, &st) || st.MatterStatusCode() != im.StatusFailure {
+		t.Errorf("Step at a null level = %v, want FAILURE", err)
+	}
+	if err := invoke(t, srv, lvldef.CmdMoveToLevel, lvldef.MoveToLevelRequest{Level: 100, TransitionTime: spec.ValueOf(uint16(10))}); !errors.As(err, &st) || st.MatterStatusCode() != im.StatusFailure {
+		t.Errorf("MoveToLevel over a TransitionTime at a null level = %v, want FAILURE", err)
+	}
+}
