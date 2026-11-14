@@ -176,9 +176,10 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // host's Set, the OnOff coupling, the device's own change through the
 // host's notifier, and on the hand-off path what the host's port moved.
 // The change listeners see it at once, from origin, as every observer of
-// matter.js's currentLevel$Changed does (the commit of a state write that
-// changed the value queues it, Datasource.ts:1486-1492, and postCommit
-// emits it, :1302-1317, at db021da0; Events.ts:269-296 QuietEvent is an
+// matter.js's currentLevel$Changed does (#noteIfChanged queues it for a
+// state write that changed the value, Datasource.ts:1486-1492, and
+// postCommit emits it, :1302-1317, at db021da0; Events.ts:269-296
+// QuietEvent is an
 // OnlineEvent whose own observers are not throttled). Under the engine
 // the wire report follows the quieter rules of the "Q" quality (matter.js
 // QuietEvent's QuietObservable, ServerBehaviorBacking.ts:253-261): at
