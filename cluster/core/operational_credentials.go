@@ -1347,9 +1347,16 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 			if f.FabricIndex != fabricIndex {
 				continue
 			}
+			// The requester's own entry is the list: an identity the
+			// store cannot give fails the read, as the fabric list's
+			// failure does above, instead of answering SUCCESS without
+			// it. matter.js derives every fabric's NOCStruct from the
+			// fabric it holds
+			// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:540-545
+			// at db021da0, #updateFabrics), so its list always carries it.
 			id, err := o.store.GetIdentity(ctx, f.FabricIndex)
 			if err != nil {
-				continue
+				return nil, false
 			}
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,
