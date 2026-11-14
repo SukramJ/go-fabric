@@ -97,7 +97,10 @@ type SubscribeOptions struct {
 // Node.Stop or Node.Close, which drain that queue, nor Node.Start on a
 // stopped node or Node.SetDefaultSubscription, which wait for it before
 // the cache adopts a fabric filter — all within their context: a hook
-// still blocked when it ends makes them return its error.
+// still blocked when it ends makes them return its error. The hooks of a
+// read's result run on the caller's goroutine before the read returns
+// when no report's hooks are pending; with some pending they take their
+// place behind them on the queue, and the read returns before they run.
 type Hooks struct {
 	// EndpointInstalled: an endpoint joined the image under its owner. Its
 	// clusters come with it; no ClusterInstalled follows for them
