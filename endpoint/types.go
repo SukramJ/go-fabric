@@ -676,6 +676,12 @@ type Topology struct {
 	// NetworkCommissioning ([ValidateDeviceTypes]). The bridge sets it from
 	// its Config.BLE before it validates a topology.
 	CommissionsOverBLE bool
+	// Persister, when set, stores a controller's write of an attribute
+	// whose value outlives a restart before the server takes it
+	// ([WritePersister], [TopologyDispatcher.WriteAuthorized]); nil
+	// dispatches every write straight to its server. The node sets it on
+	// every topology it serves.
+	Persister WritePersister
 }
 
 // FindByID returns the endpoint with id ID, or nil when no such

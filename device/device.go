@@ -74,6 +74,12 @@ type Device struct {
 	reachPending    []bool
 	reachPublishing bool
 
+	// hosted are the clusters whose server the host supplied (a declared
+	// HostServer); ports the host ports each declaration carries, by
+	// cluster ([Device.HoldsAttribute]). Both are set once, at New.
+	hosted map[uint32]bool
+	ports  map[uint32]any
+
 	// mu guards parts, host and the host statements of opts (Name,
 	// DeviceAddress, ChannelAddress: Rename, Update).
 	mu    sync.Mutex
@@ -215,6 +221,11 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
 	}
+	d.hosted = make(map[uint32]bool, len(s.servers))
+	for id := range s.servers {
+		d.hosted[id] = true
+	}
+	d.ports = maps.Clone(s.ports)
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}

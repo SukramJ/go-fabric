@@ -309,6 +309,23 @@ func (d *TopologyDispatcher) Write(ctx context.Context, path im.ConcreteAttribut
 	return d.WriteAuthorized(ctx, path, value, nil)
 }
 
+// WritePersister stores a controller's write of an attribute whose value
+// outlives a restart — a nonvolatile attribute the module holds — before
+// the cluster server takes it, so a store that refuses the value refuses
+// the write: the value is never in effect without being stored, the rule
+// BasicInformation's NodeLabel follows (mattercore.BasicInformation
+// SetOnPersistentWrite).
+type WritePersister interface {
+	// PersistWrite runs for a write every gate of the dispatcher passed,
+	// before srv sees it. It returns a nil done for an attribute it does
+	// not keep. Otherwise it has stored value and returns done, which the
+	// dispatcher calls with whether srv applied the write: false puts the
+	// stored value back as it stood. An error refuses the write with
+	// FAILURE; srv never sees it. Between PersistWrite and done no other
+	// write of the same attribute is stored.
+	PersistWrite(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (done func(applied bool), err error)
+}
+
 // WriteAuthorized implements [im.AuthorizingWriter]. It is
 // [TopologyDispatcher.Write] with an access-control gate evaluated at
 // every RESOLVED (endpoint, cluster, attribute) — the only place a
@@ -457,7 +474,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
 				}
-				res := writeOne(writeCtx, srv, aPath, value)
+				res := d.writeStored(writeCtx, ep, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
@@ -903,6 +920,36 @@ func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
 		return true
 	}
 	return slices.Contains(ids, attrID)
+}
+
+// writeStored is [writeOne] behind the topology's [WritePersister]: a
+// nonvolatile attribute the module holds is stored before the server
+// takes it; a refused store write answers FAILURE and the server never
+// sees the value, a write the server refuses puts the store back.
+func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+	p := d.topology.Persister
+	if p == nil {
+		return writeOne(ctx, srv, path, value)
+	}
+	done, err := p.PersistWrite(ctx, ep, srv, path.Attribute, value)
+	if err != nil {
+		return im.WriteResult{Path: path, Status: im.StatusFailure}
+	}
+	return persistedWrite(ctx, srv, path, value, done)
+}
+
+// persistedWrite is [writeOne] followed by done, the [WritePersister]'s
+// settlement, with whether srv applied the write — also when srv panics,
+// so the persister is never left waiting. A nil done is writeOne alone.
+func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) im.WriteResult {
+	if done == nil {
+		return writeOne(ctx, srv, path, value)
+	}
+	applied := false
+	defer func() { done(applied) }()
+	res := writeOne(ctx, srv, path, value)
+	applied = res.Status == im.StatusSuccess
+	return res
 }
 
 // writeOne dispatches a single Write against srv. Errors are mapped

@@ -142,6 +142,9 @@ type Node struct {
 	// userLabels keeps the bridged endpoints' UserLabel lists in the
 	// store (user_labels.go).
 	userLabels userLabelSync
+	// nonVolatile stores and restores the nonvolatile attributes the
+	// module holds (nonvolatile.go).
+	nonVolatile *nonVolatile
 	// bdx serves the BDX transfers peers open (the provider's images) and
 	// otaProvider is the OTA Software Update Provider; both nil without
 	// Config.OTAProvider (ota_provider.go).
@@ -266,6 +269,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.cfg.Store.Credentials = n.st
 	n.persisted = persisted{st: n.st, logger: n.logger}
+	n.nonVolatile = &nonVolatile{n: n}
 	n.endpoints = cfg.EndpointPersistence
 	if n.endpoints == nil {
 		n.endpoints = n.persisted

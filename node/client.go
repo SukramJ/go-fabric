@@ -248,6 +248,7 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		}
 		n.persistBindings(ctx, t)
 		n.persistUserLabels(ctx, t)
+		n.persistNonVolatile(ctx, t)
 		n.attachFailSafe(ctx, t)
 		n.attachTLS(t)
 		n.attachNodeServices(t)

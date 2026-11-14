@@ -236,10 +236,11 @@ var variableKeySites = map[string][]string{
 	"controller/ca/persist.go:SettingStore.save": {"controller.ca", "controller.ca.fabric"},
 	// SettingStore.Key: the host's
 	"controller/dcl/store.go:SettingStore.Save": nil,
-	// rootConfigVersionKey and endpointConfigVersionKey + key
-	"node/persist.go:persisted.storeConfigVersions": {"basic_information.configuration_version", "bridged_configuration_version.<key>"},
-	// rootNodeLabelKey and rootLocationKey, the keys of the map it ranges over
-	"node/persist.go:persisted.restoreRoot": {"basic_information.node_label", "basic_information.location"},
+	// nonVolatileKey: nonVolatileKeyRoot + key or "@" + the endpoint
+	// number, the cluster and the attribute; or bridgedUserLabelKeyRoot + key
+	"node/nonvolatile.go:nonVolatile.PersistWrite": {
+		"nonvolatile.<key>.<cluster>.<attribute>", "nonvolatile.@<endpoint>.<cluster>.<attribute>", "bridged_user_label.<key>",
+	},
 	// bindingKeyRoot + key, or + "@" + the endpoint number
 	"node/persist.go:persisted.bindingConfig": {"binding.<key>", "binding.@<endpoint>"},
 	// rootUserLabelsKey and aggregatorUserLabelsKey, from its two callers

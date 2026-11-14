@@ -195,7 +195,8 @@ facade's own state.
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |
 | `binding.<key>`, `binding.@<endpoint>` | the facade | an endpoint's Binding list; `@` and the number for an endpoint without a stable key |
 | `user_label.root`, `user_label.aggregator` | the facade | the UserLabel lists of the root and the Aggregator |
-| `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster |
+| `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster; a controller's write is stored before it answers, and a refused store write answers FAILURE |
+| `nonvolatile.<key>.<cluster>.<attribute>`, `nonvolatile.@<endpoint>.<cluster>.<attribute>` | the facade | a nonvolatile attribute a controller wrote, the cluster and attribute id in hex: every attribute whose generated definition carries the N quality and write access, not fabric-scoped and not kept under a key of its own above, of a server the module holds — the root's (ActiveLocale, HourFormat, ActiveCalendarType, TemperatureUnit, …) and, on a bridged endpoint, one its `device.Device` built itself where no declared host port takes the attribute (`Device.HoldsAttribute`: StartUpOnOff, StartUpCurrentLevel, StartUpColorTemperatureMireds, WindowCovering's Mode, the Thermostat's limits, …). The value is the written value's TLV, hex. It is stored before the server takes the write: a refused store write answers FAILURE and the value is not in effect, a write the server refuses puts the stored value back. It is restored before the endpoint is served and overrides the declaration's `Initial`. Under the Aggregator a restored StartUp attribute is read back, not applied |
 | `gendiag.reboot_count` | the facade | RebootCount: 0 on a database's first boot, then one more per boot |
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |
@@ -224,7 +225,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/nonvolatile.go`, `device/held.go`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
 
 `script/docscheck` (`TestSettingsKeysDocumented`) holds the table to the
 code: a `SetSetting` call that states its key as a constant fails the
@@ -236,7 +237,7 @@ build while the key is not in a table of this page.
 | --- | --- |
 | fabrics, NOCs, keys, ACL | live PASE and CASE sessions (controllers reconnect, with resumption) |
 | group keys, group table, Groupcast properties | the event log's events (their numbers continue past the stored ceiling) |
-| endpoint numbers, labels, ConfigurationVersions, scene tables, bindings | an open commissioning window (an uncommissioned node opens its own again at `Start`) |
+| endpoint numbers, labels, ConfigurationVersions, scene tables, bindings, the nonvolatile attributes a controller wrote (`nonvolatile.` keys) | an open commissioning window (an uncommissioned node opens its own again at `Start`) |
 | CASE resumption records | the diagnostic event ring behind DiagnosticLogs |
 | the subscriptions of active CASE sessions, re-established under their old ids (not on an ICD node, whose controllers re-subscribe on a Check-In) | |
 | UniqueID, RebootCount, operational time, OTA default providers | |
