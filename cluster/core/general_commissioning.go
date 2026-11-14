@@ -990,9 +990,20 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	// NOC commands, RemoveFabric, the fail-safe's rollback — before this
 	// cluster's lock is taken, so the lock order is the commit's, then
 	// g.mu (OperationalCredentials.CommitFailSafe).
-	g.mu.RLock()
+	//
+	// A window past its deadline whose watcher has not run yet is expired
+	// first, its rollback run by this command, as an arm does
+	// (settleExpiryLocked): CommissioningComplete judges the fail-safe as
+	// FailSafeFabric reports it, armed and not due (review II,
+	// R2-P2-comm-09). The settle runs before the commit's hold, which the
+	// rollback takes itself.
+	g.mu.Lock()
+	if _, err := g.settleExpiryLocked(ctx); err != nil {
+		g.mu.Unlock()
+		return nil, err
+	}
 	commitFn := g.failSafeCommit
-	g.mu.RUnlock()
+	g.mu.Unlock()
 	var (
 		resp  any
 		err   error
@@ -1055,7 +1066,9 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 			DebugText: "Command must be executed over CASE session.",
 		}, nil, nil
 	}
-	if !g.failSafeArmed {
+	// Armed and not due: a deadline that passed between the settle and
+	// this hold is not committed either; the watcher rolls it back.
+	if !g.failSafeArmed || !g.failSafeExpiresAt.After(g.clock.Now()) {
 		g.mu.Unlock()
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorNoFailSafe,

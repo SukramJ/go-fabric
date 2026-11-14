@@ -107,3 +107,28 @@ func TestGencomm_ArmOverADueWindowFromASurvivingSessionArms(t *testing.T) {
 		t.Fatalf("FailSafeFabric = %d, %v; want %d, armed", fabric, armed, idx)
 	}
 }
+
+// TestGencomm_CommissioningCompleteOnADueWindowCommitsNothing is
+// R2-P2-comm-09 = N-core2-1: a CommissioningComplete that arrives once the
+// window is past its deadline, before the watcher ran, answers
+// NoFailSafe and the window's AddNOC is rolled back.
+func TestGencomm_CommissioningCompleteOnADueWindowCommitsNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	clk := clocktest.New(time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC))
+	st := memstore.New()
+	r := newFailSafeRig(t, st, st, clk, nil)
+	idx := r.armAndAddNOC(ctx, t)
+	defer func() { _ = r.gc.ArmFailSafeFor(ctx, 0, 0) }()
+	clk.StepWall(61 * time.Second)
+	resp, err := r.gc.MatterInvoke(im.WithFabricFilter(ctx, true, idx), 0x04, nil)
+	if err != nil {
+		t.Fatalf("CommissioningComplete: %v", err)
+	}
+	if code := resp.(core.CommissioningCompleteResponse).ErrorCode; code != core.CommissioningErrorNoFailSafe {
+		t.Fatalf("CommissioningComplete on a due window: ErrorCode %d, want NoFailSafe (%d)", code, core.CommissioningErrorNoFailSafe)
+	}
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 0 {
+		t.Fatalf("%d fabric(s) after a CommissioningComplete on a due window, want the AddNOC rolled back", len(fabrics))
+	}
+}
