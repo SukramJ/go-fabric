@@ -123,7 +123,7 @@ func isStartUp(endpoint uint16, cluster, event uint32) bool {
 }
 
 func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
-	event, alive, installed, decommissioned := h.Event, h.SubscriptionAlive, h.EndpointInstalled, h.Decommissioned
+	event, alive, installed, decommissioned, deleted := h.Event, h.SubscriptionAlive, h.EndpointInstalled, h.Decommissioned, h.Deleted
 	h.Event = func(endpoint uint16, cluster, ev uint32, e client.EventData, value any) {
 		if event != nil {
 			event(endpoint, cluster, ev, e, value)
@@ -147,6 +147,16 @@ func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
 	h.Decommissioned = func() {
 		if decommissioned != nil {
 			decommissioned()
+		}
+		r.with(id, func(s *Service, nodeID uint64) { s.nodeRemoved(nodeID) })
+	}
+	// A node that leaves the registry without a decommission (Forget,
+	// Erase, the cull) fires Deleted only; it is forgotten all the same.
+	// After a decommission this runs a second time and finds nothing left
+	// (review II, R2-P2-fabric-08).
+	h.Deleted = func() {
+		if deleted != nil {
+			deleted()
 		}
 		r.with(id, func(s *Service, nodeID uint64) { s.nodeRemoved(nodeID) })
 	}
