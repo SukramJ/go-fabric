@@ -273,7 +273,7 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 // Neither reference answers it: in matter.js it is a duplicate on the
 // handshake's live exchange, an error that is only logged, or an opening
 // message SecureChannel does not take (packages/protocol/src/protocol/
-// MessageExchange.ts:501-511 and :522-534, ExchangeManager.ts:436-444 and
+// MessageExchange.ts:501-511 and :522-534, ExchangeManager.ts:435-437 and
 // :491-494, packages/protocol/src/securechannel/
 // SecureChannelProtocol.ts:152-153 at db021da0); connectedhomeip takes only
 // Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54 at

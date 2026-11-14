@@ -7,7 +7,7 @@ package bridge
 // goes over a TCP session only: matter.js's client requires the TCP
 // transport for it (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
 // :1235 at db021da0) and takes only a session of that transport, never
-// falling back (packages/protocol/src/peer/Peer.ts:374-375, :439-448).
+// falling back (packages/protocol/src/peer/Peer.ts:374-375, :440-448).
 
 import (
 	"context"

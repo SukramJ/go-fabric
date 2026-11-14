@@ -149,10 +149,11 @@ func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
 // quieter attribute the throttle holds back is reported when its interval
 // is up though the bridge re-wired its listeners meanwhile: the throttle
 // of a path outlives a wiring that serves the path again, as matter.js's
-// QuietEvent lives with its behavior, which a change of the node's
-// topology elsewhere does not re-create
+// QuietEvent lives with its behavior
 // (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
-// db021da0). The re-wiring restarts no interval: the change after it is
+// db021da0, the backing's quiet observers); that a change of the node's
+// topology elsewhere does not re-create the behavior was not read at the
+// pin (unverified). The re-wiring restarts no interval: the change after it is
 // still held. Review II, R2-P4-dr-sub-01.
 func TestHeldQuieterChangeSurvivesReassemble(t *testing.T) {
 	t.Parallel()

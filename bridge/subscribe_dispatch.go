@@ -21,7 +21,7 @@ import (
 // [Bridge.primingEvents]. Returns the assembled report with
 // HasSubscription=false plus the count of matched attribute/event paths —
 // taken BEFORE DataVersionFilter suppression, so a caller can reject a
-// zero-matching Subscribe (ServerSubscription.ts:610-614) without
+// zero-matching Subscribe (ServerSubscription.ts:707-711 at db021da0) without
 // misfiring on an all-cached re-subscribe. The Subscribe and the
 // re-establishment stream the same reports chunk by chunk instead
 // (review II, decision 44).
@@ -312,7 +312,7 @@ func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatc
 // eventPathsForThisNode is [im.EventPathsForNode] for the node id ctx
 // carries ([im.WithLocalNodeID]); without one the paths' node is not
 // looked at. matter.js registers no path naming another node
-// (packages/protocol/src/action/server/EventReadResponse.ts:131-133,
+// (packages/protocol/src/action/server/EventReadResponse.ts:138-140,
 // :159-162 at db021da0), so it selects no event and counts as no existent
 // path (:104-110; review II, R2-P4-imread-07).
 func eventPathsForThisNode(ctx context.Context, paths []im.ConcreteEventPath) []im.ConcreteEventPath {
@@ -603,7 +603,7 @@ func subscriptionPeerNodeID(requestHdr *message.Header, subjectNodeID uint64) ui
 // status the controller gets back.
 //
 // Cadence violations are InvalidAction: matter.js
-// packages/node/src/node/server/InteractionServer.ts:665-682 raises
+// packages/node/src/node/server/InteractionServer.ts:701-718 at db021da0 raises
 // StatusResponseError(..., Status.InvalidAction) for every
 // minIntervalFloor / maxIntervalCeiling constraint it checks. A quota
 // rejection is ResourceExhausted — the request is well-formed, the

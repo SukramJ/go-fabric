@@ -438,9 +438,11 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 // chunkers, for one route: the UDP constants, or over a reliable
 // connection the connection's frame size bounded by the peer's stated
 // MaxTcpMessageSize — matter.js keeps `maxTcpMessageSize` on the Session
-// (Session.ts:86, :118) and the TCP channel refuses a larger message
-// (TcpChannel.ts:125-126). The 200-byte margin is the headers' and the
-// AES-CCM tag's, as for [reportChunkHardCap].
+// (Session.ts:87, :119), bounds a message over TCP by it
+// (MessageChannel.ts:86-92) and refuses a larger one (:106-112; the TCP
+// channel its own limit, TcpChannel.ts:116-120) at db021da0. The 200-byte
+// margin is the headers' and the AES-CCM tag's, as for
+// [reportChunkHardCap].
 type chunkLimits struct {
 	budget, hardCap int
 }

@@ -606,9 +606,10 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 		}
 	}
 	// Derive window status from the mode the window was opened in.
-	// matter.js AdministratorCommissioningServer.ts:114-119 sets
-	// state.windowStatus = BasicWindowOpen (2) for basic windows and
-	// EnhancedWindowOpen (1) for enhanced.
+	// matter.js AdministratorCommissioningServer.ts:199 at db021da0
+	// (#windowOpened) sets state.windowStatus to what its caller passes:
+	// BasicWindowOpen (2) for a basic window (:126) and EnhancedWindowOpen
+	// (1) for an enhanced one (:108-112).
 	status := wire.WindowStatusEnhanced
 	if w.isBasicWindow {
 		status = wire.WindowStatusBasic

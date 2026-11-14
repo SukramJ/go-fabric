@@ -230,7 +230,7 @@ func operationalCredentialsFieldsReader(path im.ConcreteCommandPath, dec *tlv.De
 // ConstraintError so [im.HandleInvokeRequest] answers the command with
 // a CommandStatusIB instead of executing a truncated value — matter.js
 // validates every request against its TlvSchema before the invoker runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448)
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487 at db021da0)
 // and TlvNumber.ts:151-156 validateBoundaries throws a ValidationError,
 // whose default code is Status.ConstraintError
 // (packages/types/src/common/ValidationError.ts:16-22).

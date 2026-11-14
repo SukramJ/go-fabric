@@ -18,7 +18,7 @@ import (
 // is one failed update all the same — its data is owed again and the
 // failure is counted, as for a report abandoned after the store. matter.js
 // awaits the report's delivery inside the update and requeues on failure
-// (packages/node/src/node/server/ServerSubscription.ts:563-603 at
+// (packages/node/src/node/server/ServerSubscription.ts:553-603 at
 // db021da0), so the order of the two steps is no question there (review
 // II, R2-P4-nv-07).
 func TestReportAbandonedBeforeItsRecordIsAFailedUpdate(t *testing.T) {

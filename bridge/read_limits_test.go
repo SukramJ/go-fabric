@@ -30,8 +30,8 @@ func decodeStatusResponsePayload(t *testing.T, payload []byte) im.StatusCode {
 
 // TestReadRequestAbovePathCeilingIsRejectedWithPathsExhausted pins the
 // hard acceptance ceiling on read paths: matter.js
-// InteractionServer.ts:79 MAX_READ_PATHS = 10 000, rejected at
-// :366-369 with a top-level StatusResponse(PathsExhausted) before any
+// InteractionServer.ts:93 MAX_READ_PATHS = 10 000, rejected at
+// :375-381 at db021da0 with a top-level StatusResponse(PathsExhausted) before any
 // path is expanded.
 func TestReadRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing.T) {
 	t.Parallel()
@@ -64,8 +64,8 @@ func TestReadRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing.T) {
 }
 
 // TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted is
-// the Subscribe twin (InteractionServer.ts:80 MAX_SUBSCRIBE_PATHS,
-// :600-604).
+// the Subscribe twin (InteractionServer.ts:94 MAX_SUBSCRIBE_PATHS,
+// :635-641 at db021da0).
 func TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 80
@@ -103,7 +103,7 @@ func TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing
 // peer never answers ends the interaction instead of releasing the
 // next chunk: matter.js's per-chunk waitForSuccess runs under the
 // exchange timeout and a missing answer throws PeerMessageMissingError
-// (MessageExchange.ts:834-863), abandoning the read. Falling through
+// (MessageExchange.ts:872-898 at db021da0), abandoning the read. Falling through
 // instead lets a silent peer hold one dispatch slot for every chunk of
 // the whole report.
 func TestReadChunkLoopAbortsWhenThePeerNeverAnswers(t *testing.T) {

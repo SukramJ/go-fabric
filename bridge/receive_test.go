@@ -512,7 +512,7 @@ func assertUnsupportedOpcodeAnswered(t *testing.T, opcode uint8, sessionID uint1
 // request (no AttributeRequests, no EventRequests), which the
 // matched-path gate in handleSubscribeRequest (subscribe.go) rejects
 // with a top-level StatusResponse(InvalidAction) rather than
-// establishing — matter.js InteractionServer.ts:628-633 ("No
+// establishing — matter.js InteractionServer.ts:667-672 at db021da0 ("No
 // attributes or events requested"). A Subscribe naming a real matching
 // path establishes normally instead; see
 // TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies
@@ -613,7 +613,7 @@ func TestCheckTimedGate_UntimedRequestNoPriorProceeds(t *testing.T) {
 // (0xC9) — the request's own flag disagrees with the preceding
 // TimedRequest, which the spec forbids in both directions. The stale
 // deadline is consumed on rejection.
-// Mirrors chip src/app/WriteHandler.cpp:669-673.
+// Mirrors chip src/app/WriteHandler.cpp:659-665 at 6170af84.
 func TestCheckTimedGate_UntimedRequestWithPriorRejects(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
@@ -633,7 +633,7 @@ func TestCheckTimedGate_UntimedRequestWithPriorRejects(t *testing.T) {
 // TestCheckTimedGate_TimedFlagWithoutPriorRejects verifies that a
 // timed Write/Invoke without a preceding TimedRequest rejects with
 // TIMED_REQUEST_MISMATCH (0xC9) — the flag claims a timed interaction the
-// exchange never opened (matter.js InteractionServer.ts:409-412, :945-948).
+// exchange never opened (matter.js InteractionServer.ts:431-436, :999-1004 at db021da0).
 func TestCheckTimedGate_TimedFlagWithoutPriorRejects(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}

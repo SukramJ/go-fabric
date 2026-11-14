@@ -1176,7 +1176,7 @@ type owedReport struct {
 // taken here, and so is an exhaustion: a message the tracker abandoned
 // before the record existed is a failed update all the same, as matter.js
 // awaits the report's delivery inside the update and requeues on its
-// failure (packages/node/src/node/server/ServerSubscription.ts:563-603 at
+// failure (packages/node/src/node/server/ServerSubscription.ts:553-603 at
 // db021da0; review II, R2-P4-nv-07).
 func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uint16, counters []uint32, owed owedReport) {
 	if len(counters) == 0 {
@@ -1925,7 +1925,7 @@ func (b *Bridge) subscribeWith(
 	primingReq := primingRequest(req, subLocalNodeID)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
-	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
+	// ServerSubscription.ts:707-711 at db021da0 rejects it with InvalidAction, after
 	// the admission above as there. The match is taken BEFORE
 	// DataVersionFilter suppression, so a legitimately quiet re-subscribe
 	// (all clusters cached) still establishes. It is decided before the
@@ -2520,10 +2520,11 @@ func quietIntervalOf(clusterID, attrID uint32) time.Duration {
 // parks it ([Bridge.parkQuietPath]) and the next wiring takes it up with
 // its last value, its throttle's last report and a report the throttle
 // holds back, so a re-wiring neither drops a held change nor restarts the
-// interval. matter.js's QuietEvent lives with its behavior, which a change
-// of the node's topology elsewhere does not re-create
+// interval. matter.js's QuietEvent lives with its behavior
 // (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
-// db021da0). Parked, it reads nothing and reports nothing: a notification
+// db021da0, the backing's quiet observers); that a change of the node's
+// topology elsewhere does not re-create the behavior was not read at the
+// pin (unverified). Parked, it reads nothing and reports nothing: a notification
 // that still reaches it is left to the next wiring, which sees the change
 // against the last value, and a report its throttle sends is owed to that
 // wiring (review II, R2-P4-dr-sub-01, R2-P4-dr-sub-05).

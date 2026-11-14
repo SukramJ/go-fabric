@@ -30,12 +30,12 @@ import (
 // errChunkRejected is returned by a chunk loop when the peer answered a
 // ReportData chunk with an error StatusResponse; the interaction is
 // abandoned, exactly as matter.js's waitForSuccess throws
-// (packages/protocol/src/interaction/InteractionMessenger.ts:183-196).
+// (packages/protocol/src/interaction/InteractionMessenger.ts:221-227 at db021da0).
 var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 
 // errChunkUnanswered is returned by a chunk loop when the peer never
 // answered a ReportData chunk within the exchange timeout. matter.js
-// aborts the interaction on that timeout (MessageExchange.ts:834-863
+// aborts the interaction on that timeout (MessageExchange.ts:872-898 at db021da0,
 // PeerMessageMissingError); continuing would stream every remaining
 // chunk to a peer that is not listening, holding the dispatch slot for
 // the whole report.
@@ -193,7 +193,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// InvalidAction StatusResponse, and a request beyond the path ceiling
 	// with PathsExhausted. Mirrors matter.js InteractionServer.ts
 	// validateReadPaths (#3926, Matter §8.4.3.2) and the MAX_READ_PATHS
-	// check that follows it (:366-369).
+	// check that follows it (:373, :375-381 at db021da0).
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 		if err != nil {
@@ -405,7 +405,7 @@ func readWaitsForChunks(chunks []im.ReportData) bool {
 // awaitChunkStatusResponse blocks until the peer answers the chunk just
 // sent on (session, exchange) with an IM StatusResponse, then decides
 // whether the chunk loop may go on. Mirrors matter.js
-// InteractionMessenger.ts:719-721 sendDataReportMessage →
+// InteractionMessenger.ts:839-844 at db021da0, sendDataReportMessage →
 // waitForSuccess: a non-Success status or a missing answer aborts the
 // interaction — the caller returns the error and sends nothing more on
 // the exchange. op names the loop for the log line ("read" /
@@ -483,12 +483,12 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	txKey := mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
 	// A chunk that continues a chunked write is not judged as a new
 	// request: of it matter.js reads only its writes, MoreChunkedMessages
-	// and SuppressResponse (packages/node/src/node/server/InteractionServer.ts:578-582
+	// and SuppressResponse (packages/node/src/node/server/InteractionServer.ts:582-584
 	// at db021da0) — its Timed flag is not looked at, the timed checks ran
 	// for the first chunk, and a chunked write is never timed (:417-424).
 	// A SuppressResponse on it ends the interaction with InvalidAction,
-	// the chunk not applied and the status itself suppressed (:592-597;
-	// InteractionMessenger.ts sends no status for a suppressed request).
+	// the chunk not applied and the status itself suppressed (:594-599;
+	// InteractionMessenger.ts:317-322 sends no status for a suppressed request).
 	if b.writeContinues(txKey) {
 		if req.SuppressResponse {
 			b.endWriteInteraction(txKey)
@@ -886,7 +886,8 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	// db021da0 (startTimedInteraction stops the running timer and throws
 	// "Timed interaction already running for this exchange"); connectedhomeip
 	// src/app/TimedHandler.cpp:91-96 at 6170af84 answers anything but the
-	// timed action InvalidAction. A window that expired is replaced.
+	// Invoke or Write the window waits for InvalidAction. A window that
+	// expired is replaced.
 	if b.timedWindowRunning(requestHdr.SessionID, proto.ExchangeID) {
 		b.routing.timedDeadlines.Delete(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID})
 		return b.replyTimedStatus(src, requestHdr, proto, "already_running", im.StatusInvalidAction)

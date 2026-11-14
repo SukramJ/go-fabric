@@ -45,12 +45,13 @@ const peerConnectTimeout = 90 * time.Second
 // exchangeMaxPayloadSize is what one message on a UDP session carries:
 // matter.js MAX_UDP_MESSAGE_SIZE (packages/general/src/net/udp/
 // UdpSocket.ts:12, 1280 - 48) minus MATTER_MESSAGE_OVERHEAD
-// (packages/protocol/src/protocol/MessageExchange.ts:156, 26 + 12 + the
-// 16-byte MIC), as MessageExchange.maxPayloadSize computes it (:435-439).
+// (packages/protocol/src/protocol/MessageExchange.ts:182, 26 + 12 + the
+// 16-byte MIC), as MessageExchange.maxPayloadSize computes it (:465-469),
+// at db021da0.
 const exchangeMaxPayloadSize = (1280 - 48) - matterMessageOverhead
 
 // matterMessageOverhead is matter.js MATTER_MESSAGE_OVERHEAD
-// (MessageExchange.ts:156, 26 + 12 + the 16-byte MIC).
+// (MessageExchange.ts:182 at db021da0, 26 + 12 + the 16-byte MIC).
 const matterMessageOverhead = 26 + 12 + 16
 
 // ErrExchangeClosed is a send or receive on an exchange already closed.
@@ -74,7 +75,7 @@ var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
 // not sent: matter.js's client requires the TCP transport for such a
 // command (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
 // :1235 at db021da0) and takes only a session of that transport
-// (packages/protocol/src/peer/Peer.ts:374-375, :439-448), never one over
+// (packages/protocol/src/peer/Peer.ts:374-375, :440-448), never one over
 // UDP; this node opens no TCP connection of its own, so it can use one
 // only when the peer connected to it over TCP.
 var ErrLargeMessageTransport = errors.New("bridge: a command with the Large Message quality needs a TCP session with the peer, and none is open")
@@ -128,14 +129,15 @@ type PeerSession struct {
 // otherwise the live session of the peer with the highest id whose route
 // does. Mirrors matter.js Peer.connect with a required transport
 // (packages/protocol/src/peer/Peer.ts:374-375 at db021da0, "transport
-// explicitly required"; :439-448, newestSession of that transport, never
+// explicitly required"; :440-448, newestSession of that transport, never
 // another), which ClientInteraction asks for when the request is a large
 // message (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
 // :1235). The pick differs: matter.js's newestSession takes the session
 // last heard from (Peer.ts:582-601, the highest activeTimestamp at :596),
 // while the highest id is the one opened last only until the session-id
-// allocator wraps. matter.js then establishes a session over TCP when none is open;
-// this node opens no TCP connection of its own, so none is
+// allocator wraps. matter.js then establishes a session over TCP when none
+// is open (Peer.ts:463, #initiateConnection with the required transport,
+// :658); this node opens no TCP connection of its own, so none is
 // [ErrLargeMessageTransport].
 func (s *PeerSession) largeMessageLink() (peerLink, error) {
 	if routeCarriesLargeMessages(s.b.currentPeerAddr(s.link.sessionID, s.link.addr)) {
@@ -181,7 +183,7 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 
 // Invoke implements [core.OtaProviderSession]: one InvokeRequest on a new
 // exchange, the InvokeResponse awaited for as long as matter.js's exchange
-// waits for a peer's response (MessageExchange.ts:839-850,
+// waits for a peer's response (MessageExchange.ts:877-886 at db021da0,
 // calculateMaximumPeerResponseTime — [Bridge.chunkStatusResponseTimeout]).
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it
@@ -440,10 +442,11 @@ type peerLossCloser interface {
 // [Bridge.ConnectOtaProvider] then runs a fresh CASE instead of reusing
 // a session the peer no longer knows (a provider restarted under the same
 // node id answers nothing on the old keys). Mirrors matter.js
-// MessageExchange.ts:620 (retransmissions exhausted → context.peerLost) →
-// ExchangeManager.ts:561-585 (a commissioned peer: SessionManager.
-// handlePeerLoss for the peer address, asOf the exchange context's
-// creation; otherwise the session alone) → SessionManager.ts:677-695.
+// MessageExchange.ts:643-651 at db021da0 (the send failed with a peer
+// communication error → context.peerLost) → ExchangeManager.ts:621-644
+// (a commissioned peer: SessionManager.handlePeerLoss for the peer
+// address, asOf the exchange context's creation; otherwise the session
+// alone) → SessionManager.ts:686-688.
 // An exhausted counter of a subscription report is no peer loss
 // ([Bridge.noteReportUndelivered]).
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
@@ -632,7 +635,7 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 
 // MaxPayloadSize implements [bdx.Exchange]: the channel's maximum less the
 // message overhead, as matter.js MessageExchange.maxPayloadSize computes
-// it (MessageExchange.ts:435-439) — over UDP [exchangeMaxPayloadSize],
+// it (MessageExchange.ts:465-469) — over UDP [exchangeMaxPayloadSize],
 // over a TCP connection the connection's largest message
 // (tcp.Conn.MaxMessageSize, MAX_TCP_MESSAGE_SIZE without the length
 // prefix, TcpChannel.ts:37-41 at db021da0) less the same overhead.

@@ -6,7 +6,8 @@ package bridge
 // A command with the Large Message quality runs only over a transport that
 // carries large messages: matter.js answers it INVALID_TRANSPORT_TYPE on any
 // other session (packages/protocol/src/action/server/CommandInvokeResponse.ts:281-285
-// at db021da0), the session's flag being its channel's — TCP true
+// at db021da0), the session's flag being its channel's
+// (packages/protocol/src/session/Session.ts:372-373) — TCP true
 // (packages/protocol/src/transport/tcp/TcpChannel.ts:45), UDP false
 // (packages/general/src/net/udp/UdpTransport.ts:69), BLE false
 // (packages/protocol/src/ble/Ble.ts:39).

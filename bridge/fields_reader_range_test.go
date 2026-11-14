@@ -20,7 +20,7 @@ import (
 // TestCommandFieldDecoders_RejectOverWideIntegers pins that every
 // narrow integer field is validated against its schema width. matter.js
 // validates each command against its TlvSchema before the invoker runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487 at db021da0
 // requestTlv.validate; TlvNumber.ts:151-156 validateBoundaries throws
 // ValidationOutOfBoundsError, a ValidationError carrying
 // Status.ConstraintError). Truncating instead executes a value the

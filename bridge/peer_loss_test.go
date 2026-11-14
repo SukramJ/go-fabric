@@ -66,8 +66,8 @@ func peerLossKeys(t *testing.T) sigma.SessionKeys {
 // on the message, every session with that peer established before the
 // exchange is force-closed without a CloseSession, a session the peer
 // established afterwards survives, and the next connect no longer finds
-// a session to reuse. Mirrors matter.js MessageExchange.ts:620 →
-// ExchangeManager.ts:561-585 → SessionManager.ts:677-695. Observed in
+// a session to reuse. Mirrors matter.js MessageExchange.ts:643-651 →
+// ExchangeManager.ts:621-644 → SessionManager.ts:686-688 at db021da0. Observed in
 // TC-SU-2.2 step 2: the provider restarted under the same node id, the
 // requestor kept invoking on the dead session and never reached it.
 func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {

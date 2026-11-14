@@ -12,7 +12,7 @@
 // count buildInitialReport returns is taken BEFORE DataVersionFilter
 // suppression specifically so this case does not misfire; see
 // subscribe_dispatch.go:26-29 and matter.js
-// ServerSubscription.ts:610-614. Companion to subscribe_reject_test.go
+// ServerSubscription.ts:707-711 at db021da0. Companion to subscribe_reject_test.go
 // (the rejection side of the same gate).
 
 package bridge
@@ -33,8 +33,8 @@ import (
 // Subscribe-Initial ReportData chunk: it answers with an IM
 // StatusResponse(Success). Since the chunk loop abandons the
 // interaction when a chunk goes unanswered (matter.js
-// InteractionMessenger.ts:719-721 waitForSuccess →
-// MessageExchange.ts:834-863), a peer that only reads never reaches the
+// InteractionMessenger.ts:839-844 waitForSuccess →
+// MessageExchange.ts:872-898 at db021da0), a peer that only reads never reaches the
 // SubscribeResponse — so the reader and the request must run
 // concurrently. The returned channel carries the opcodes the peer saw,
 // in order, and closes when the peer's read deadline expires.
@@ -210,7 +210,7 @@ func TestHandleSubscribeRequest_PrimingReportRefused_EstablishesNothing(t *testi
 // equals the cluster's current version, so the attribute is omitted
 // from the initial report) must still establish — an all-cached
 // re-subscribe is legitimate, not a "matches nothing" Subscribe.
-// Mirrors matter.js ServerSubscription.ts:610-614: the matched-path
+// Mirrors matter.js ServerSubscription.ts:707-711 at db021da0: the matched-path
 // count that gates rejection is computed from path resolution, not from
 // what survives DataVersionFilter filtering.
 //

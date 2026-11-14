@@ -9,7 +9,7 @@ package bridge
 // db021da0: a concrete path naming another node answers UnsupportedNode
 // before any access check (#addConcrete :159-162) and registers nothing, a
 // wildcard path naming another node selects nothing (#addWildcard
-// :131-133); only a registered path counts as existent (:104-110) for
+// :138-140); only a registered path counts as existent (:104-110) for
 // ServerSubscription.ts:707-711. The node's id is its id on the session's
 // fabric, UNSPECIFIED (0) without one (DataResponse.ts:57-62).
 

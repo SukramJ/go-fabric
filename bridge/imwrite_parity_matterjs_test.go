@@ -283,7 +283,8 @@ func timedRequestBytes(t *testing.T, ms uint16) []byte {
 // window still runs is answered INVALID_ACTION and ends the window
 // (packages/protocol/src/protocol/MessageExchange.ts:1066-1070 at db021da0;
 // connectedhomeip src/app/TimedHandler.cpp:91-96 at 6170af84 answers anything but
-// the timed action InvalidAction), so a following timed Invoke mismatches.
+// the Invoke or Write the window waits for InvalidAction), so a following
+// timed Invoke mismatches.
 func TestSecondTimedRequestParity(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
@@ -352,9 +353,9 @@ func TestChunkedWriteInTimedWindowParity(t *testing.T) {
 
 // TestWriteContinuationChunkParity: of a chunk that continues a chunked
 // write only its writes, MoreChunkedMessages and SuppressResponse are read
-// (InteractionServer.ts:578-582 at db021da0): its Timed flag is not judged
+// (InteractionServer.ts:582-584 at db021da0): its Timed flag is not judged
 // again, and a SuppressResponse on it ends the interaction with
-// INVALID_ACTION, itself suppressed, the chunk not applied (:592-597).
+// INVALID_ACTION, itself suppressed, the chunk not applied (:594-599).
 func TestWriteContinuationChunkParity(t *testing.T) {
 	t.Parallel()
 	chunk := func(v uint16, more, suppress, timed bool) im.WriteRequest {

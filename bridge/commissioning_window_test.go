@@ -480,7 +480,7 @@ func TestCommissioningWindow_PaseSessionCloser_ErrorDoesNotAbortRevoke(t *testin
 
 // TestCommissioningWindow_IsBasicWindow_StatusBasic verifies that a
 // window opened with IsBasicWindow=true returns WindowStatusBasic (2).
-// Mirrors matter.js AdministratorCommissioningServer.ts:114-119.
+// Mirrors matter.js AdministratorCommissioningServer.ts:126, :199 at db021da0.
 func TestCommissioningWindow_IsBasicWindow_StatusBasic(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
@@ -498,7 +498,7 @@ func TestCommissioningWindow_IsBasicWindow_StatusBasic(t *testing.T) {
 
 // TestCommissioningWindow_IsBasicWindowFalse_StatusEnhanced verifies that
 // a window opened with IsBasicWindow=false returns WindowStatusEnhanced (1).
-// Mirrors matter.js AdministratorCommissioningServer.ts:114-119.
+// Mirrors matter.js AdministratorCommissioningServer.ts:108-112, :199 at db021da0.
 func TestCommissioningWindow_IsBasicWindowFalse_StatusEnhanced(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
