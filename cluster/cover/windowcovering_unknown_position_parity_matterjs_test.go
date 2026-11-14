@@ -30,10 +30,10 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
-
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestParityMatterJS_WindowCoveringSetNullPosition: the host's null for a
@@ -191,8 +191,10 @@ func TestParityMatterJS_WindowCoveringUnknownPosition(t *testing.T) {
 		t.Parallel()
 		m := &recordingMover{err: errors.New("unreachable")}
 		srv := unknownCovering(t, cover.Config{Mover: m})
-		if _, err := srv.MatterInvoke(ctx, wcdef.CmdUpOrOpen, nil); err == nil {
-			t.Fatal("UpOrOpen with a failing Mover succeeded")
+		_, err := srv.MatterInvoke(ctx, wcdef.CmdUpOrOpen, nil)
+		var sc im.StatusCodeError
+		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusFailure {
+			t.Fatalf("UpOrOpen with a failing Mover: error %v, want FAILURE", err)
 		}
 		for _, tilt := range []bool{false, true} {
 			if _, _, g := readPositions(srv, tilt); g != nil {
