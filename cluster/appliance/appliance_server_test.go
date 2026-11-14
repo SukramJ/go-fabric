@@ -498,7 +498,9 @@ func TestMicrowaveHostStatusPassesThrough(t *testing.T) {
 // is INVALID_IN_STATE — chip judges it as a rinse count the device does
 // not support (LaundryWasherControlsCluster.cpp:132-145), where the
 // model's enum answered CONSTRAINT_ERROR first (owner decision 69). A value
-// past the enum's width stays CONSTRAINT_ERROR.
+// past the enum's width stays CONSTRAINT_ERROR. A supported value other
+// than None is stored and None, unsupported, refused, so the check reads
+// the written value rather than a None it fell back to.
 func TestLaundryWasherControlsCertificationStep(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -517,5 +519,25 @@ func TestLaundryWasherControlsCertificationStep(t *testing.T) {
 	}
 	if got := srv.NumberOfRinses(); got != lwc.NumberOfRinsesNormal {
 		t.Errorf("NumberOfRinses after the refusals = %d, want Normal", got)
+	}
+
+	srv, err = appliance.NewLaundryWasherControls(appliance.WasherConfig{
+		Features:        appliance.WasherFeatureRinse,
+		SupportedRinses: []appliance.NumberOfRinses{lwc.NumberOfRinsesNormal, lwc.NumberOfRinsesExtra}, NumberOfRinses: lwc.NumberOfRinsesNormal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.MatterWrite(ctx, lwc.AttrNumberOfRinses, uint64(lwc.NumberOfRinsesExtra)); err != nil {
+		t.Errorf("NumberOfRinses Extra, supported: %v, want success", err)
+	}
+	if got := srv.NumberOfRinses(); got != lwc.NumberOfRinsesExtra {
+		t.Errorf("NumberOfRinses after a write of Extra = %d, want Extra", got)
+	}
+	if err := srv.MatterWrite(ctx, lwc.AttrNumberOfRinses, uint64(lwc.NumberOfRinsesNone)); status(t, err) != im.StatusInvalidInState {
+		t.Errorf("NumberOfRinses None, unsupported: %v, want INVALID_IN_STATE", err)
+	}
+	if got := srv.NumberOfRinses(); got != lwc.NumberOfRinsesExtra {
+		t.Errorf("NumberOfRinses after a refused None = %d, want Extra", got)
 	}
 }
