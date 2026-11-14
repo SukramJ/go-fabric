@@ -1495,8 +1495,26 @@ const PaseSessionAutoArmSeconds uint16 = 60
 //
 // The daemon wires it from the PaseAdapter's onEstablished callback so the
 // arm fires exactly once per successful Pake3 completion.
+//
+// Deprecated: use [GeneralCommissioning.ArmOnPaseEstablished], which
+// returns the refusal: a session whose arm was refused must be closed.
 func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
-	_ = g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
+	_ = g.ArmOnPaseEstablished(ctx)
+}
+
+// ArmOnPaseEstablished is the arm of [GeneralCommissioning.AutoArmOnPaseEstablished]
+// and returns its refusal: the session's own end by the rollback of a
+// fail-safe the arm settled — one it ran over a due window, or one in
+// flight it waited for, whose PASE close may have named the sessions
+// before this one existed — or ctx's end while it waited. A fail-safe
+// another fabric armed is no refusal: it is left as it is, and nil is
+// returned. The caller closes the session on an error, as connectedhomeip
+// does when this arm fails ("Don't allow a PASE session to hang around
+// without a fail-safe", src/app/server/CommissioningWindowManager.cpp:240-241
+// at 6170af84): without the close the session kept its implicit
+// Administer with no fail-safe to end it (review II, R2-P3-pase-03).
+func (g *GeneralCommissioning) ArmOnPaseEstablished(ctx context.Context) error {
+	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
 }
 
 // logger is the server's logger ([GeneralCommissioningConfig.Logger]); a

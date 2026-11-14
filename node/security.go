@@ -700,8 +700,18 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
 		// Matter §11.10.5.2 floor: arm a fail-safe if the commissioner has
-		// not, so an abandoned attempt still rolls back.
-		root.GeneralCommissioning.AutoArmOnPaseEstablished(life)
+		// not, so an abandoned attempt still rolls back. A session whose
+		// arm is refused — a fail-safe rollback ended it, its PASE close
+		// possibly naming the sessions before this one existed — is
+		// closed, and the handshake fails: no PASE session stays without
+		// a fail-safe (connectedhomeip
+		// src/app/server/CommissioningWindowManager.cpp:240-242 at
+		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
+		// R2-P3-pase-03).
+		if err := root.GeneralCommissioning.ArmOnPaseEstablished(life); err != nil {
+			_ = sessions.Close(sessionID)
+			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
+		}
 		return nil
 	})
 	return adapter, nil
