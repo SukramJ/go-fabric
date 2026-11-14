@@ -4950,10 +4950,13 @@ surface silently smaller than the host asked for.
 ### BD-Matter-UnimplementedCommand-ValidatorViolation — an unimplemented mandatory command is a device-type verdict, not a construction error
 
 matter.js's `ValidatedElements.#validateRequiredCommands`
-(`ValidatedElements.ts:357-372` at `862ad75f`) records "Implementation
-missing" when a behavior initialises; strict (`ServerBehaviorBacking.ts:101`)
-throws it, warn logs it and leaves the command out of
-`AcceptedCommandList`. The module reports it as
+(`ValidatedElements.ts:357-371` at `db021da0`) records "Throws
+unimplemented exception" for a required command whose implementation is
+`Behavior.unimplemented` when a behavior initialises (`:361-368`;
+"Implementation missing", `:359-360`, is a required command with no
+implementation at all and is fatal in every mode); strict
+(`ServerBehaviorBacking.ts:101`) throws it, warn logs it and leaves the
+command out of `AcceptedCommandList`. The module reports it as
 `endpoint.ViolationUnimplemented` in the device-type verdict
 (`spec.Server.UnimplementedMandatoryCommands`), refused in strict and
 logged in warn and off (brief CT). Reasoning: the kit's `New` has no
@@ -4965,7 +4968,7 @@ names a missing cluster.
 
 The two multicast receive loops bound their blocking reads with
 `SetReadDeadline(time.Now().Add(time.Second))`
-(`mdns/subtype_responder.go:361`, `:389`). Every other deadline of paced
+(`mdns/socket.go:135`, `:144`). Every other deadline of paced
 code moved to the component's clock in brief CG (`clock.WithTimeout`), and
 a guard refuses a new wall-clock deadline there; these two are on its
 allow list. Reasoning: a socket deadline is the kernel's, not the stack's —
@@ -4974,7 +4977,7 @@ fake clock has nothing to pace on a real socket.
 
 ### BD-Matter-BridgetestWallClock — `bridge/bridgetest` keeps its own wall-clock timeouts
 
-`bridge/bridgetest` (`commissioner.go:275`, `:609`, `session.go:65`) bounds
+`bridge/bridgetest` (`commissioner.go:283`, `:617`, `session.go:65`) bounds
 its helpers with `context.WithTimeout` on the wall clock while the module's
 paced code uses `clock.WithTimeout` (brief CG). Reasoning: bridgetest is a
 test helper that drives a bridge over real sockets and paces no stack of
@@ -4985,7 +4988,7 @@ matter.js's test timeouts are Mocha's, not MockTime's.
 
 matter.js's `MockTime.resolve` moves the clock only when every ready task
 has run — JavaScript's one thread makes "nothing is ready" observable
-(`packages/testing/src/mocks/time.ts:35-75` at `862ad75f`, with the
+(`packages/testing/src/mocks/time.ts:537-633` at `db021da0`, with the
 host-async budget `MAX_HOST_ASYNC_MS`, measured on the host's clock rather than counted in yields, `:63-70`). Go has
 no such observation per test, so `fabrictest` counts the stack's work
 through `internal/inflight` (datagrams, delivered exchanges, pending
@@ -5048,7 +5051,7 @@ at `862ad75f`). Go has no behaviour state: `cluster/core/icd_management.go:253`
 reads and writes the `store.ICD` area (`store/icd.go`, table
 `matter_icd_registrations`, metadata counter `icd_management.counter`),
 as every other persisted server state does here (ADR 0029). matter.js
-keeps the keys in clear (`IcdManagementServer.ts:787-791`); since v0.12.1
+keeps the keys in clear (`IcdManagementServer.ts:788-791`); since v0.12.1
 (brief CJ 1.25, owner decision 2026-10-25) the store seals them at rest
 as it seals the DoorLock credentials (`store/icd_cipher.go`, AES-128-GCM
 under the store-held key `icd_management.key`; `store.Upgrade` re-seals
@@ -5082,7 +5085,7 @@ device awake.
 
 matter.js's MockTime can advance the wall clock apart from the monotonic
 timers, and two cases each in `IcdModeTest` and `IcdPeerWakefulnessTest`
-step them separately. `clock/clocktest/fake.go:60` has one `Now` for both,
+step them separately. `clock/clocktest/fake.go:71` has one `Now` for both,
 by ADR 0028's clock ownership rule. The four cases are listed in the
 findings register; the behaviour they check (a wall-clock jump does not
 move a timer) is held by construction here, since no timer reads the wall
@@ -5118,8 +5121,8 @@ applied differs.
 ### BD-Matter-FabricLabel-EveryNode — `Registry.SetFabricLabel` updates every connected node, where matter.js returns after the first
 
 matter.js's `CommissioningController` validates and updates the label on
-the first connected node and returns (`packages/matter.js/src/CommissioningController.ts:996-998`
-at `862ad75f`); the other nodes learn it on their next connection. Go
+the first connected node and returns (`packages/matter.js/src/CommissioningController.ts:1005-1010`
+at `db021da0`); the other nodes learn it on their next connection. Go
 (`controller/client/label.go`, brief CJ 1.8/Q8) walks every connected
 node in one call and reports the first error. Reasoning: a controller
 daemon exposes the label as one setting; a caller expects it to be
@@ -5130,8 +5133,10 @@ in both implementations.
 
 matter.js throws `CommissioningError` with a policy message, or the
 resolver's own reason wrapped around it
-(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1306-1315` at
-`862ad75f`); there is no class a caller can match. Go wraps the same
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1322-1329` at
+`db021da0`), or rethrows the error the validator threw, a
+`DeviceAttestationError` among them (`:1307-1309`, `:1329`); there is no
+one class a caller can match. Go wraps the same
 failure in `commissioner.ErrAttestationRejected` (brief CJ Q6) so a host
 can `errors.Is` it and offer the override the DCL policy allows. The
 message text and the findings carried are matter.js's.
@@ -5226,7 +5231,7 @@ matter.js's `CommissionerMdnsAdvertisement` leaves the `_V<vendor>` subtype
 and the `VP` key out when `isPrivacyMasked`, and keeps `DN` and `DT`
 (`packages/protocol/src/advertisement/mdns/CommissionerMdnsAdvertisement.ts:33-71`
 at `862ad75f`); the base class adds `SII`/`SAI`/`SAT` only when they differ
-from the MRP defaults (`MdnsAdvertisement.ts:191-193`). Go's
+from the MRP defaults (`MdnsAdvertisement.ts:191-200`). Go's
 `controller.Advertise{PrivacyMasked}` (brief CM §4, `mdns.BuildCommissionerService`)
 does the same and writes no session-interval keys, the controller
 advertising the defaults. Reasoning: the record is the commissioner's
@@ -5250,9 +5255,9 @@ and one that advertises `T` while denying it meets the post-CASE check
 ### BD-Matter-TCPParamCheck-AfterCASE — the TCP session-parameter validation runs after the CASE handshake
 
 matter.js validates the peer's session parameters inside `caseClient.pair`
-(`validateSessionParameters`, `packages/protocol/src/peer/PeerConnection.ts:596-621`
-at `862ad75f`), so a TCP attempt whose peer reports no TCP server fails
-before the session exists. `client/handshake.CASE` has no validation hook,
+(`validateSessionParameters`, `packages/protocol/src/peer/PeerConnection.ts:608-628`
+at `db021da0`), so a TCP attempt whose peer denies a TCP server while
+DNS-SD advertises none fails before the session exists. `client/handshake.CASE` has no validation hook,
 so `client/peer/connection.go` (brief CM §2) applies the same rule to the
 established session's reported parameters: the peer is marked
 (`MarkTCPUnsupported`), the session closed, `ErrTCPUnsupported` returned,
@@ -5265,9 +5270,9 @@ in `client/handshake` (an owner path) would close this entry.
 
 matter.js's subscription handler may throw while a priming report is
 processed, and the client then answers the report `INVALID_SUBSCRIPTION`
-(`packages/node/test/node/ClientSubscribeTest.ts:1275-1330` at `862ad75f`,
+(`packages/node/test/node/ClientSubscribeTest.ts:1276-1332` at `db021da0`,
 "answers the priming report with INVALID_SUBSCRIPTION when processing it
-fails" and "… before reading it"). Go's `Updated` is a callback without an
+fails" and "… when processing fails before reading it"). Go's `Updated` is a callback without an
 error return, so the host's handler cannot fail the subscription; the
 `INVALID_SUBSCRIPTION` answer is ported for the client's own failures
 (decode, cancellation; brief CM §5), and the two handler cases have no Go
@@ -5278,8 +5283,8 @@ channel that a host callback could tear down is not the facade's design.
 
 matter.js passes such a status up to the caller
 (`packages/protocol/test/action/client/ClientInteractionInvokeTest.ts:180`,
-"passes a stray CommandStatusIB up to the caller"; `ClientInteraction.ts:616-700`
-at `862ad75f`). Go's `Interaction.InvokeBatch` (brief CM §5) returns one
+"passes a stray CommandStatusIB up to the caller"; `ClientInteraction.ts:582-612`
+at `db021da0`). Go's `Interaction.InvokeBatch` (brief CM §5) returns one
 `Result` per sent command, so a status for no command has no slot and is
 logged and dropped, as a stray CommandDataIB is in both. Reasoning: a typed
 result per command is the batch's contract; the spec's "submit all status
