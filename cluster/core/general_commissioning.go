@@ -72,6 +72,8 @@ type GeneralCommissioning struct {
 	// fail-safe ends. RevokeCommissioning expires only such a fail-safe
 	// ([GeneralCommissioning.ExpireFailSafeArmedOverPASE]).
 	failSafeOverPASE bool
+	// closed: Close ran; no watcher expires the fail-safe from here on.
+	closed bool
 	// failSafeWatch is the expiry watcher of the armed window, nil when
 	// none runs: one at a time, replaced on a re-arm and stopped on a
 	// disarm ([GeneralCommissioning.startFailSafeWatchLocked]).
@@ -870,6 +872,32 @@ func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fab
 	go g.watchFailSafeExpiry(ctx, fabricIndex, w)
 }
 
+// Close ends the fail-safe's expiry watcher and waits for every expiry
+// rollback in flight — OperationalCredentials' rollback, the participants',
+// the PASE close — until it returns or ctx ends, which is the error; from
+// then on no deadline expires the fail-safe. The node calls it when it
+// stops, before its store goes (review II, R2-P2-stop-06): a rollback that
+// began before the stop no longer writes after it. What stays uncommitted
+// is rolled back by the next start. It may be called again after an error.
+func (g *GeneralCommissioning) Close(ctx context.Context) error {
+	g.mu.Lock()
+	g.closed = true
+	g.stopFailSafeWatchLocked()
+	for {
+		done := g.expiryRollbacksDone
+		g.mu.Unlock()
+		if done == nil {
+			return nil
+		}
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return fmt.Errorf("core: GeneralCommissioning: wait for the fail-safe's rollback: %w", ctx.Err())
+		}
+		g.mu.Lock()
+	}
+}
+
 // stopFailSafeWatchLocked ends the expiry watcher, if one runs: the
 // window it watched was re-armed or disarmed. Caller holds g.mu.
 func (g *GeneralCommissioning) stopFailSafeWatchLocked() {
@@ -899,7 +927,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 	if g.failSafeWatch == w {
 		g.failSafeWatch = nil
 	}
-	if !g.failSafeArmed || g.failSafeExpiresAt.After(g.clock.Now()) {
+	if g.closed || !g.failSafeArmed || g.failSafeExpiresAt.After(g.clock.Now()) {
 		g.mu.Unlock()
 		return
 	}

@@ -1160,6 +1160,12 @@ func (n *Node) stopLocked(ctx context.Context) error {
 		n.stopBegun = true
 		n.stopParts(ctx, work)
 	}
+	// A fail-safe rollback that began before the stop ends before the
+	// store goes (review II, R2-P2-stop-06); a ctx that ends first fails
+	// Stop, and the next Stop waits again.
+	if err := n.root.GeneralCommissioning.Close(ctx); err != nil {
+		return fmt.Errorf("node: %w", err)
+	}
 	if err := n.br.Stop(ctx); err != nil {
 		return fmt.Errorf("node: bridge stop: %w", err)
 	}
