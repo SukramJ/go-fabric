@@ -263,9 +263,14 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 		events = func() []im.EventReport {
 			auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
 			// One EventFilterIB applies: the first for this node (matter.js
-			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
-			eventReq := req
-			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, readLocalNodeID)
+			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05). A
+			// path naming another node reads no event; a concrete one is
+			// answered UNSUPPORTED_NODE by DeniedEventPathStatuses, which
+			// reads the request's own paths (review II, R2-P4-imread-07).
+			eventReq := im.ReadRequest{
+				EventRequests: im.EventPathsForNode(req.EventRequests, readLocalNodeID),
+				EventFilters:  im.EventFiltersFor(req.EventFilters, readLocalNodeID),
+			}
 			evs := append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
 				im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
 			if len(evs) > 0 {

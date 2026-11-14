@@ -654,6 +654,36 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 	return out
 }
 
+// EventPathsForNode returns the event paths that select this node's
+// events: a path naming another node is left out, the node of a path
+// naming this node (localNodeID, its id on the session's fabric, 0
+// without one) is cleared, a path naming no node is kept. The caller
+// hands the result to [BuildEventReports] and to a subscription's stored
+// paths ([ConcreteEventPath.Matches] does not look at the node), and the
+// request's own paths to [DeniedEventPathStatuses], which answers a
+// concrete path naming another node. Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:131-133 and
+// :159-162 at db021da0 (#addWildcard / #addConcrete: a path naming
+// another node registers nothing), the node id per DataResponse.ts:57-62;
+// the attribute paths' twin is [AttributeExpansion] (review II,
+// R2-P4-imread-07).
+func EventPathsForNode(paths []ConcreteEventPath, localNodeID uint64) []ConcreteEventPath {
+	if !slices.ContainsFunc(paths, func(p ConcreteEventPath) bool { return p.HasNode }) {
+		return paths
+	}
+	out := make([]ConcreteEventPath, 0, len(paths))
+	for _, p := range paths {
+		if p.HasNode {
+			if p.Node != localNodeID {
+				continue
+			}
+			p.HasNode, p.Node = false, 0
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 // HandleReadEventRequest evaluates the EventRequests in req against
 // log and returns a slice of EventReports suitable for embedding into a
 // ReportData.
@@ -954,8 +984,14 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // packages/protocol/src/action/server/EventReadResponse.ts:158-224 at
 // 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
 // answered with nothing.
+//
+// With this node's id stamped ([WithLocalNodeID]), a concrete path naming
+// another node answers UNSUPPORTED_NODE before any other check, as
+// matter.js's #addConcrete does (EventReadResponse.ts:159-162 at
+// db021da0); [EventPathsForNode] keeps its events out of the report.
 func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, paths []ConcreteEventPath) []EventReport {
 	const privilegeView uint8 = 1
+	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
 	var out []EventReport
 	for _, p := range paths {
 		if !p.HasEndpoint || !p.HasCluster || !p.HasEvent {
@@ -963,6 +999,8 @@ func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, path
 		}
 		status := StatusSuccess
 		switch {
+		case p.HasNode && hasLocalNodeID && p.Node != localNodeID:
+			status = StatusUnsupportedNode
 		case !auth.allowsAt(ctx, p.Endpoint, p.Cluster, privilegeView):
 			status = StatusUnsupportedAccess
 		case auth.Paths != nil && !auth.Paths.EventPathStatus(p).IsSuccess():

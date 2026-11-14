@@ -252,8 +252,23 @@ func (b *Bridge) primingEventAuthorizer(subCtx context.Context, dispatcher im.Di
 // with no_match and it could never receive the future press. matter.js
 // establishes an event subscription regardless of the priming log
 // (ServerSubscription.ts emits 0+ EventReports on Subscribe-Initial).
+//
+// A path naming another node counts for nothing ([eventPathsForThisNode]).
 func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) int {
-	return b.allowedEventPaths(subCtx, dispatcher, b.primingEventAuthorizer(subCtx, dispatcher), req.EventRequests)
+	return b.allowedEventPaths(subCtx, dispatcher, b.primingEventAuthorizer(subCtx, dispatcher), eventPathsForThisNode(subCtx, req.EventRequests))
+}
+
+// eventPathsForThisNode is [im.EventPathsForNode] for the node id ctx
+// carries ([im.WithLocalNodeID]); without one the paths' node is not
+// looked at. matter.js registers no path naming another node
+// (packages/protocol/src/action/server/EventReadResponse.ts:131-133,
+// :159-162 at db021da0), so it selects no event and counts as no existent
+// path (:104-110; review II, R2-P4-imread-07).
+func eventPathsForThisNode(ctx context.Context, paths []im.ConcreteEventPath) []im.ConcreteEventPath {
+	if localNodeID, ok := im.LocalNodeIDFromContext(ctx); ok {
+		return im.EventPathsForNode(paths, localNodeID)
+	}
+	return paths
 }
 
 // primingEvents returns the EventReports of a priming report.
@@ -279,7 +294,7 @@ func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatc
 // Mirrors matter.js EventReadResponse.ts #readAllowedEvents; subCtx
 // carries the requesting fabric + subject.
 func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) []im.EventReport {
-	raw := im.BuildEventReports(req.EventRequests, b.eventLog, req.EventFilters)
+	raw := im.BuildEventReports(eventPathsForThisNode(subCtx, req.EventRequests), b.eventLog, req.EventFilters)
 	auth := b.primingEventAuthorizer(subCtx, dispatcher)
 	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
 		im.AuthorizeEventReports(subCtx, auth, raw)...)
@@ -366,8 +381,11 @@ func (b *Bridge) registerSubscriptionAt(
 			// any active subscription and was silently dropped.
 			// matter.js
 			// packages/protocol/src/action/server/EventReadResponse.ts
-			// always passes both path arrays.
-			EventPaths: req.EventRequests,
+			// always passes both path arrays. A path naming another
+			// node is left out and the node of one naming this node
+			// cleared, as for the attribute paths (review II,
+			// R2-P4-imread-07).
+			EventPaths: im.EventPathsForNode(req.EventRequests, b.localNodeIDFor(requestHdr.SessionID, fabricIndex)),
 			// Nothing is reported on it until the priming report and the
 			// SubscribeResponse have gone out (EndPriming below).
 			Priming: true,
