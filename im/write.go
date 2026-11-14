@@ -231,6 +231,16 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 // WriteResponse is the in-memory form of a WriteResponseMessage.
 type WriteResponse struct {
 	Responses []AttributeStatus
+	// Status is not Success when the interaction ended at a data element
+	// with this status ([HandleWriteRequest]): the elements before it were
+	// handled and Responses holds their statuses, the elements after it
+	// were not, and the server answers a StatusResponse with Status in
+	// place of the WriteResponse. matter.js throws a StatusResponseError out
+	// of AttributeWriteResponse.process there
+	// (packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66
+	// at db021da0), which the messenger answers as a StatusResponse. It is
+	// not part of the wire message.
+	Status StatusCode
 }
 
 // AttributeStatus is one entry in WriteResponses.
@@ -278,7 +288,7 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // [IsPASEFromContext] after it, mirroring matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
 // keys the implicit Administer grant on the session's auth mode.
-func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,funlen // the write interaction's per-path gates in matter.js order
+func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,gocognit,funlen // the write interaction's per-path gates in matter.js order
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
@@ -341,6 +351,18 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				Status: StatusIB{Status: StatusBusy},
 			})
 			continue
+		}
+		// WildcardPathFlags belong to Read and Subscribe only: a write path
+		// that carries them ends the interaction with InvalidAction when it
+		// is reached, the elements before it written. Mirrors matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66
+		// at db021da0 ("WildcardPathFlags are not allowed in write
+		// interactions"), the first check of each element of process(),
+		// which runs after the interaction's BUSY checks
+		// (packages/node/src/node/server/InteractionServer.ts:505-531).
+		if w.Path.WildcardPathFlags != 0 {
+			wr.Status = StatusInvalidAction
+			break
 		}
 		// A write path MUST name a concrete cluster and attribute. Matter
 		// reserves wildcards for Read/Subscribe; a wildcard-attribute write
@@ -503,7 +525,9 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	// the hold of its last accepted attribute, the interaction's final
 	// message releases every hold (InteractionServer.ts:555-560
 	// releaseHeldPaths(previousProcessedAttributePath), :469 the disposal).
-	if req.MoreChunkedMessages {
+	// An interaction that ended at an element releases every hold too: the
+	// error leaves handleWriteRequest through the same disposal.
+	if req.MoreChunkedMessages && wr.Status.IsSuccess() {
 		tx.releaseHolds(tx.lastQueued)
 	} else {
 		tx.releaseHolds(nil)

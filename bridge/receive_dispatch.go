@@ -491,16 +491,6 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	if req.TimedRequest && req.MoreChunkedMessages {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
 	}
-	// WildcardPathFlags belong to Read and Subscribe only: a write path
-	// that carries them refuses the whole interaction with InvalidAction.
-	// Mirrors matter.js packages/protocol/src/action/server/
-	// AttributeWriteResponse.ts:60-66 ("WildcardPathFlags are not allowed
-	// in write interactions").
-	for _, w := range req.Writes {
-		if w.Path.WildcardPathFlags != 0 {
-			return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_wildcard_path_flags", im.StatusInvalidAction)
-		}
-	}
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
 	// same way reads do via [im.FabricFilterFromContext]. Without
@@ -543,6 +533,16 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
+	// An interaction that ended at a data element (im.WriteResponse.Status)
+	// ends the transaction: the elements before it were written and are
+	// reported, and the controller gets the StatusResponse — matter.js's
+	// handleWriteRequest leaves with the error, the messenger answers it
+	// (InteractionMessenger.ts:431-460 at db021da0).
+	if !resp.Status.IsSuccess() {
+		b.endWriteInteraction(txKey)
+		b.reportWrittenAttributes(resp)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
+	}
 	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
 	b.reportWrittenAttributes(resp)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
@@ -777,6 +777,16 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 		slog.String("req_paths", strings.Join(reqPaths, ",")),
 		slog.String("resp", strings.Join(respStatuses, ",")))
 	return nil
+}
+
+// endWriteInteraction ends the Write interaction of key: its transaction
+// leaves the exchange's table and gives back every hold, as matter.js's
+// handleWriteRequest releases its held paths whichever way it leaves
+// (packages/node/src/node/server/InteractionServer.ts:460-469 at db021da0,
+// the disposal of `_held`). A transaction no longer in the table is a
+// fresh one, whose release is a no-op.
+func (b *Bridge) endWriteInteraction(key mrp.ExchangeKey) {
+	b.routing.writeTransaction(key, false, b.clk().Now()).Release()
 }
 
 // dispatchTimedRequest handles a decoded TimedRequest.
