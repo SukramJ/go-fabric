@@ -136,6 +136,36 @@ func TestWiFiNetworkCommissioningAttributes(t *testing.T) {
 	}
 }
 
+// TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange: a write or a
+// restore of InterfaceEnabled that leaves the value as it is leaves the
+// DataVersion; one that changes it advances it once. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1480 at db021da0 (#noteIfChanged returns for an equal value; the
+// version advances only when the commit changed something), as the
+// Ethernet server does.
+func TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange(t *testing.T) {
+	t.Parallel()
+	armed := false
+	var crumbs []uint64
+	w, _ := newWiFiNC(t, &armed, &crumbs)
+	before := w.MatterDataVersion()
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetAttributes(map[uint32]any{netcommAttrInterfaceEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.MatterDataVersion(); got != before {
+		t.Errorf("an unchanged InterfaceEnabled moved the DataVersion %d -> %d", before, got)
+	}
+	if err := w.MatterWrite(t.Context(), netcommAttrInterfaceEnabled, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.MatterDataVersion(); got != before+1 {
+		t.Errorf("a changed InterfaceEnabled moved the DataVersion %d -> %d, want +1", before, got)
+	}
+}
+
 // TestWiFiNetworkCommissioningCommands follows a commissioning: add,
 // connect, the list, the breadcrumbs, and the refusals of chip's handlers.
 func TestWiFiNetworkCommissioningCommands(t *testing.T) {

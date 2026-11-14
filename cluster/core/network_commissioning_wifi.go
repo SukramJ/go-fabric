@@ -507,11 +507,16 @@ func (w *WiFiNetworkCommissioning) disarmRejoinLocked() {
 // committed network runs only while it is true: false disarms the armed
 // attempt and cancels a running one, true again starts the rejoin at once
 // when the link is on no committed network (review II, R2-P3-dr-net-07).
-// w.mu is held.
+// Only a change advances the DataVersion, as the Ethernet server's write.
+// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+// and :1476-1480 at db021da0 (#noteIfChanged returns for an equal value;
+// advanceVersion runs only when the commit changed something). w.mu is held.
 func (w *WiFiNetworkCommissioning) setInterfaceEnabledLocked(v bool) {
 	was := w.interfaceEnabled
 	w.interfaceEnabled = v
-	w.dataVersion.Bump()
+	if was != v {
+		w.dataVersion.Bump()
+	}
 	switch {
 	case was && !v:
 		w.disarmRejoinLocked()
