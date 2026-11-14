@@ -99,6 +99,45 @@ func TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing
 	}
 }
 
+// TestSubscribeCountsItsPathsBeforeValidatingThem: a Subscribe over the
+// path ceiling of which one path is illegal is PathsExhausted — matter.js
+// InteractionServer.handleSubscribeRequest at db021da0 checks the count
+// (:635-641) before it validates the paths (validateReadPaths, :699). A
+// Read validates first (:373, then :375-381) and answers the same request
+// InvalidAction (im's TestValidateReadPaths_IllegalPathWinsOverCeiling).
+func TestSubscribeCountsItsPathsBeforeValidatingThem(t *testing.T) {
+	t.Parallel()
+	const sessionID uint16 = 81
+	b := newStartedBridge(t)
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+
+	paths := make([]im.ConcreteAttributePath, im.MaxReadPaths+1)
+	// A wildcard cluster with a concrete non-global attribute: illegal.
+	paths[0] = im.ConcreteAttributePath{HasEndpoint: true, Endpoint: 0, HasAttribute: true, Attribute: 0}
+	enc := tlv.NewEncoder()
+	im.SubscribeRequest{MaxIntervalCeiling: 60, AttributeRequests: paths}.MarshalTLV(enc)
+	payload, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("SubscribeRequest.MarshalTLV: %v", err)
+	}
+	request := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: im.OpcodeSubscribeRequest, ExchangeID: 0x2103, Initiator: true,
+	}, payload)
+	if err := b.dispatch(context.Background(), request, peerAddr); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	proto, body, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second)
+	if !ok {
+		t.Fatal("no reply reached the peer")
+	}
+	if proto.Opcode != im.OpcodeStatusResponse {
+		t.Fatalf("reply opcode = %#x, want StatusResponse %#x", proto.Opcode, im.OpcodeStatusResponse)
+	}
+	if got := decodeStatusResponsePayload(t, body); got != im.StatusPathsExhausted {
+		t.Errorf("status = %v, want PathsExhausted: the count is checked before the paths", got)
+	}
+}
+
 // TestReadChunkLoopAbortsWhenThePeerNeverAnswers pins that a chunk the
 // peer never answers ends the interaction instead of releasing the
 // next chunk: matter.js's per-chunk waitForSuccess runs under the

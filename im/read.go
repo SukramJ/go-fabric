@@ -928,11 +928,15 @@ func isGlobalAttributeID(attrID uint32) bool {
 // must be rejected up front with InvalidAction rather than silently expanded.
 // Returns StatusInvalidAction on the first offending path, StatusPathsExhausted
 // when the request names more than [MaxReadPaths] paths in total, else
-// StatusSuccess. Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// validateReadAttributesPath / validateReadEventPath (#3926) followed by the
-// path-count ceiling (:362-369, :600-604) — in that order. Callers (the read
-// and subscribe dispatchers) run this before building any report and answer
-// with the returned status.
+// StatusSuccess. Mirrors a Read's order in matter.js
+// packages/node/src/node/server/InteractionServer.ts at db021da0:
+// validateReadPaths (:138-141, over validateReadAttributesPath :118-128 and
+// validateReadEventPath :130-136; #3926) at :373, then the path-count
+// ceiling (:375-381). The read dispatcher runs this before building any
+// report and answers with the returned status. A Subscribe checks in
+// another order — the count first (:635-641), the paths at :699 after the
+// KeepSubscriptions teardown and the no-paths check — so its dispatcher
+// counts before it calls this.
 func ValidateReadPaths(attrs []ConcreteAttributePath, events []ConcreteEventPath) StatusCode {
 	for _, p := range attrs {
 		if !p.HasCluster && p.HasAttribute && !isGlobalAttributeID(p.Attribute) {

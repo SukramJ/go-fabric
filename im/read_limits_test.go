@@ -33,9 +33,11 @@ func TestValidateReadPaths_PathsExhaustedAboveCeiling(t *testing.T) {
 }
 
 // TestValidateReadPaths_IllegalPathWinsOverCeiling pins the check order
-// matter.js uses: validateReadPaths runs before the path count
-// (InteractionServer.ts:362-369), so an illegal path is still
-// InvalidAction even inside an oversized request.
+// matter.js uses for a Read: validateReadPaths runs before the path count
+// (packages/node/src/node/server/InteractionServer.ts:373, then :375-381
+// at db021da0), so an illegal path is still InvalidAction even inside an
+// oversized request. A Subscribe counts first
+// (bridge's TestSubscribeCountsItsPathsBeforeValidatingThem).
 func TestValidateReadPaths_IllegalPathWinsOverCeiling(t *testing.T) {
 	t.Parallel()
 	paths := wildcardPaths(MaxReadPaths + 1)
