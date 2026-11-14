@@ -67,6 +67,21 @@ type Options struct {
 	Logger     *slog.Logger
 }
 
+// maxQueuedMessages bounds the messages waiting in a session's send queue
+// for room in the peer's window. How many wait is the peer's to decide: a
+// peer that acknowledges nothing leaves every message the node sends after
+// its window filled in the queue, and the ack-received timeout ([AckTimeout])
+// bounds that in time only — a peer that acknowledges one segment within
+// each timeout keeps the session. A message past the bound is refused
+// ([Session.Send]); the queued ones stay. The number is the largest window
+// a session may negotiate ([MaximumWindowSize]): as many messages as that
+// window has segments. Neither reference bounds the queue — matter.js
+// queues every message (packages/protocol/src/ble/BtpSessionHandler.ts:42
+// and :390 at db021da0), connectedhomeip chains each onto its send queue
+// (src/ble/BLEEndPoint.cpp:591-602 at 6170af84); the bound is this
+// module's own.
+const maxQueuedMessages = MaximumWindowSize
+
 // outgoing is one queued Matter message and how much of it is sent —
 // matter.js keeps a DataReader per message (BtpSessionHandler.ts:42).
 type outgoing struct {
@@ -464,6 +479,9 @@ func (s *Session) Send(msg []byte) error {
 	if len(msg) > 0xFFFF {
 		// The message length field is 16 bits (BtpCodec.ts:182).
 		return &FlowError{Message: fmt.Sprintf("BTP message of %d bytes exceeds the 16-bit message length", len(msg))}
+	}
+	if len(s.queue) >= maxQueuedMessages {
+		return &FlowError{Message: fmt.Sprintf("BTP send queue holds %d messages the peer has not made room for", len(s.queue))}
 	}
 	data := append([]byte(nil), msg...)
 	if s.pendingLive {
