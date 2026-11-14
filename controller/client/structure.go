@@ -762,9 +762,9 @@ func (s *structure) ownerOf(ep *Endpoint) *Endpoint {
 }
 
 // erase removes an endpoint that left the peer, and what it holds
-// (:1130-1161, Endpoint.delete closing its parts). Each endpoint is erased
-// once: the walk does not rely on the tree being acyclic (review II,
-// R2-P2-alloc-01).
+// (ClientStructure.ts:1266-1297 at db021da0, Endpoint.delete closing its
+// parts). Each endpoint is erased once: the walk does not rely on the tree
+// being acyclic (review II, R2-P2-alloc-01).
 func (s *structure) erase(ep *Endpoint) {
 	s.eraseOnce(ep, map[*Endpoint]bool{})
 }
