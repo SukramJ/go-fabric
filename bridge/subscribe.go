@@ -1071,7 +1071,11 @@ type owedReport struct {
 // sent ([Bridge.sendReportChunksNotify]). A report without a tracked
 // message (no tracker, a reliable connection) counts as delivered when it
 // is sent. An acknowledgement handled before the record was stored is
-// taken here.
+// taken here, and so is an exhaustion: a message the tracker abandoned
+// before the record existed is a failed update all the same, as matter.js
+// awaits the report's delivery inside the update and requeues on its
+// failure (packages/node/src/node/server/ServerSubscription.ts:563-603 at
+// db021da0; review II, R2-P4-nv-07).
 func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uint16, counters []uint32, owed owedReport) {
 	if len(counters) == 0 {
 		b.subSendErrorCount.Delete(subID)
@@ -1080,9 +1084,19 @@ func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uin
 	last := counters[len(counters)-1]
 	owed.subID = subID
 	b.reportCounterOwner.Store(reportCounterKey(sessionID, last), &owed)
-	if !b.awaitsAck(ctx, sessionID, last) {
-		b.releaseReportCounter(sessionID, last)
+	if b.awaitsAck(ctx, sessionID, last) {
+		return
 	}
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if tracker.Abandoned(sessionID, last) {
+		// The pump's noteReportUndelivered found no record, or took it:
+		// LoadAndDelete makes the second call a no-op.
+		b.noteReportUndelivered(sessionID, last)
+		return
+	}
+	b.releaseReportCounter(sessionID, last)
 }
 
 // awaitsAck reports whether the outbound-reliable tracker still waits for

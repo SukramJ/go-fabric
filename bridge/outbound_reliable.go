@@ -65,6 +65,14 @@ type outboundReliableTracker struct {
 	// StatusResponse(SUCCESS) → next ReportData). Closed by [Ack] /
 	// [Tick] when the entry is resolved or abandoned.
 	waiters map[outboundKey]chan error
+	// abandoned remembers, for a secure session, the messages [Tick] gave
+	// up on, each until the instant it may be forgotten: a caller that
+	// learns a message's counter only after the send — the subscription
+	// reporter, which stores the report's record then — can still tell an
+	// abandoned message from an acknowledged one ([Abandoned]). An entry
+	// is kept for as long again as its message was pending: the message's
+	// own retransmission schedule bounds the window it covers.
+	abandoned map[outboundKey]time.Time
 	// rtt holds the recent first-try round-trips for diagnostics.
 	rtt mrpRTTWindow
 	// baseIntervalFor resolves the peer-appropriate MRP base interval
@@ -141,6 +149,7 @@ func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.
 		clock:           clock.Or(clk),
 		pending:         make(map[outboundKey]*outboundEntry),
 		waiters:         make(map[outboundKey]chan error),
+		abandoned:       make(map[outboundKey]time.Time),
 		baseIntervalFor: baseIntervalFor,
 	}
 }
@@ -344,6 +353,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	t.mu.Lock()
 	// A key tracked again takes a fresh place.
 	t.dropLocked(key)
+	delete(t.abandoned, key)
 	if sessionID == 0 {
 		if len(t.unsecured) >= unsecuredEntryLimit {
 			// The table is full: the entry tracked first loses its
@@ -505,6 +515,11 @@ func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 		t.dropLocked(key)
 		dropped++
 	}
+	for key := range t.abandoned {
+		if key.sessionID == sessionID {
+			delete(t.abandoned, key)
+		}
+	}
 	for key, ch := range t.waiters {
 		if key.sessionID == sessionID {
 			delete(t.waiters, key)
@@ -645,6 +660,21 @@ func (t *outboundReliableTracker) WaitForAck(ctx context.Context, sessionID uint
 	}
 }
 
+// Abandoned reports whether [Tick] gave up on the message (sessionID,
+// counter) of a secure session: it ran out of retransmissions without an
+// acknowledgement. A message that is still pending, was acknowledged, was
+// never tracked, or was abandoned so long ago that the tracker forgot it
+// ([outboundReliableTracker.abandoned]) is not.
+func (t *outboundReliableTracker) Abandoned(sessionID uint16, counter uint32) bool {
+	if t == nil {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, ok := t.abandoned[outboundKey{sessionID, counter}]
+	return ok
+}
+
 // Pending reports the count of in-flight entries. Test helper.
 func (t *outboundReliableTracker) Pending() int {
 	t.mu.Lock()
@@ -689,6 +719,11 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		todo []resend
 	)
 	t.mu.Lock()
+	for key, forgetAt := range t.abandoned {
+		if !now.Before(forgetAt) {
+			delete(t.abandoned, key)
+		}
+	}
 	for key, p := range t.pending {
 		// A reply on the unsecured session whose handshake's time is over
 		// is dropped, due or not: [unsecuredEntryLifetime].
@@ -707,6 +742,9 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		}
 		if p.retries >= mrp.MaxRetransmissions {
 			t.dropLocked(key)
+			if key.sessionID != 0 {
+				t.abandoned[key] = now.Add(now.Sub(p.trackedAt))
+			}
 			if ch, has := t.waiters[key]; has {
 				delete(t.waiters, key)
 				ch <- mrp.ErrMaxRetransmissionsReached
