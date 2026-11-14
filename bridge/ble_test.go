@@ -346,6 +346,12 @@ func TestStartBLENewWindowRestartsSchedule(t *testing.T) {
 func TestWithdrawBLE(t *testing.T) {
 	h, p := newBLEHarness(t, nil)
 	c := dialRadio(t, p)
+	// A secure session bound to the connection: the central is
+	// commissioning, so the window's end leaves it connected.
+	if err := c.s.Send(h.sealedInvoke(0x312)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, c.replies)
 	if err := h.bridge.WithdrawBLE(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -500,4 +506,43 @@ func TestStopBLEWithIndicationPending(t *testing.T) {
 	}
 	<-conn.Disconnected()
 	close(stuck)
+}
+
+// TestWithdrawBLEDisconnectsCentralWithoutSecureSession: the window's end
+// disconnects a central that has no secure session bound to its
+// connection — one that never completed PASE — so it does not hold the
+// bridge's one BLE slot into the next window. connectedhomeip closes
+// every BLE connection when the window closes while it still listens for
+// PASE (src/app/server/CommissioningWindowManager.cpp:431-438 at
+// 6170af84) (review II, R2-P3-ble-05).
+func TestWithdrawBLEDisconnectsCentralWithoutSecureSession(t *testing.T) {
+	h, p := newBLEHarness(t, nil)
+	idle := dialRadio(t, p) // the BTP handshake only; no Matter message at all
+
+	if err := h.bridge.WithdrawBLE(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-idle.conn.Disconnected():
+	case <-ctx.Done():
+		t.Fatal("a central with no secure session is still connected after the window ended")
+	}
+
+	// The next window's commissioner gets the slot once the bridge saw
+	// the disconnect.
+	waitFor(t, "the slot freed", func() bool {
+		h.bridge.ble.mu.Lock()
+		defer h.bridge.ble.mu.Unlock()
+		return h.bridge.ble.central == nil
+	})
+	if err := h.bridge.StartBLE(t.Context(), bleWindow); err != nil {
+		t.Fatal(err)
+	}
+	next := dialRadio(t, p)
+	if err := next.s.Send(h.sealedInvoke(0x314)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, next.replies)
 }

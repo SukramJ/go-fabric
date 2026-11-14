@@ -100,7 +100,7 @@ cfg.Network.BLE = radio
 | When | On the radio |
 | --- | --- |
 | uncommissioned, its own window open (at start, after the last fabric is removed, or `Node.OpenBasicWindow`) | the GATT service is registered and the window advertised — 20 ms for 30 s, 150 ms until 15 minutes, then the extended announcement (no vendor and product id) at 1285 ms; one central at a time |
-| the window closes: its timeout, `Node.CloseWindow` | only the advertisement stops; the service and a connected central stay, so a commissioning over BLE in progress completes over the same link, and a new own window advertises again on the same service |
+| the window closes: its timeout, `Node.CloseWindow` | the advertisement stops; the service stays, and so does a connected central that completed PASE, so a commissioning over BLE in progress completes over the same link; a central that has not completed PASE is disconnected, so it does not hold the one BLE slot into the next window; a new own window advertises again on the same service |
 | commissioned: CommissioningComplete commits the fail-safe | the advertisement stops, the central is disconnected, the service unregistered — after the response, not before it |
 | commissioned | nothing: no advertisement, no service, also for a window an administrator opens |
 | `Node.Stop` | off the radio |

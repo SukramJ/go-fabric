@@ -256,22 +256,25 @@ func TestNodeBLEWindowCloseKeepsTheLink(t *testing.T) {
 }
 
 // TestNodeBLEReopenedWindowAdvertisesAgain: after the window's end the
-// service stays registered and a central stays connected; a new own window
-// advertises again on the same service.
+// service stays registered; a new own window advertises again on the same
+// service, so a central connected meanwhile stays connected. (A central
+// connected at the window's end without PASE is disconnected there —
+// bridge's TestWithdrawBLEDisconnectsCentralWithoutSecureSession, review
+// II, R2-P3-ble-05.)
 func TestNodeBLEReopenedWindowAdvertisesAgain(t *testing.T) {
 	site, dev, _ := bleSite(t, joinWiFi{})
 	r := dev.BLE().Radio()
 	radioState(t, site, r, true, "the uncommissioned node on BLE")
-	conn, err := bletest.NewCentral(dev.BLE()).Connect(bleCtx(t), ble.Peripheral{Address: dev.BLE().Address})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := dev.Act(func(n *node.Node) error { return n.CloseWindow(context.Background()) }); err != nil {
 		t.Fatal(err)
 	}
-	serving, conns := r.Serving()
-	if _, advertising := r.Advertising(); advertising || !serving || conns != 1 {
-		t.Fatalf("after the close: serving %v, connections %d, advertising %v", serving, conns, advertising)
+	serving, _ := r.Serving()
+	if _, advertising := r.Advertising(); advertising || !serving {
+		t.Fatalf("after the close: serving %v, advertising %v", serving, advertising)
+	}
+	conn, err := bletest.NewCentral(dev.BLE()).Connect(bleCtx(t), ble.Peripheral{Address: dev.BLE().Address})
+	if err != nil {
+		t.Fatal(err)
 	}
 	ads, _ := r.Advertisements()
 	if err := dev.Act(func(n *node.Node) error { return n.OpenOwnWindow(context.Background(), 3*time.Minute) }); err != nil {
