@@ -728,6 +728,22 @@ func (c *Controller) beginClose() (done chan struct{}, first bool) {
 	return c.closeDone, true
 }
 
+// closeFinished reports whether a Close began and returned.
+func (c *Controller) closeFinished() bool {
+	c.closeMu.RLock()
+	done := c.closeDone
+	c.closeMu.RUnlock()
+	if done == nil {
+		return false
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
+
 // awaitClose is a second Close: nil once the first has returned, ctx's
 // error when ctx ends first.
 func awaitClose(ctx context.Context, done <-chan struct{}) error {

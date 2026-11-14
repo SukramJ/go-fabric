@@ -19,7 +19,8 @@ import (
 // the controller keeps there. A [Config].CAKey held outside the database
 // (an HSM) is the host's to retire.
 //
-// Erase deletes nothing while a node is still stopping: a node whose
+// Erase deletes nothing while a node is still stopping, nor while another
+// Close it could not wait for within ctx is still running: a node whose
 // report queue a hook holds past ctx ([client.Node.Stop]) still writes its
 // queued values and the store's final flush, and a row deleted before
 // them would come back. Erase waits for those stops within ctx — a node's
@@ -43,6 +44,13 @@ import (
 // the node store).
 func (c *Controller) Erase(ctx context.Context) error {
 	errs := []error{c.Close(ctx)}
+	// A second Close returns on ctx while the first may still stop the
+	// nodes, before it could record them for the wait below: nothing is
+	// erased then, as for a node still stopping.
+	if !c.closeFinished() {
+		errs = append(errs, errors.New("controller: erase: the controller is still closing, nothing erased"))
+		return errors.Join(errs...)
+	}
 	c.eraseMu.Lock()
 	defer c.eraseMu.Unlock()
 	// Node.Stop's rule: Erase does nothing after a Stop that failed
