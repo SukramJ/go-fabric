@@ -466,7 +466,7 @@ func (c *Interaction) sustainGate(ctx context.Context, outer *Subscription, w *i
 	st.mu.Unlock()
 	if s := c.provider.Session(); s != nil && s.Transport() == exchange.TransportTCP {
 		// TCP evicts the session when its connection drops: no liveness
-		// probe (ClientInteraction.ts:1155-1159 at 862ad75f).
+		// probe (ClientInteraction.ts:1155-1159 at db021da0).
 		trusted = true
 	}
 	if !trusted {

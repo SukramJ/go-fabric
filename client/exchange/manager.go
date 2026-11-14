@@ -1243,7 +1243,7 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 
 // accept registers the exchange the peer opened with msg — matter.js
 // MessageExchange.fromInitialMessage and #addExchange
-// (ExchangeManager.ts:423-434, :494-508). A Sigma1 on an inbound
+// (ExchangeManager.ts:478-489, :551-566 at db021da0). A Sigma1 on an inbound
 // unsecured session that holds [maxInboundUnsecuredHandshakes] handshakes
 // already registers none and returns nil.
 func (m *Manager) accept(s *Session, msg *Message) *Exchange {
