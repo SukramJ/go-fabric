@@ -854,11 +854,18 @@ func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Sess
 // The bounds on what peers that have not authenticated can make the
 // controller hold — the sessions their initiating messages open, the
 // messages sent on those that wait for an acknowledgement, and how long
-// such a session lives. Neither reference bounds them (review II,
+// such a session lives. This module's own rule (review II,
 // R2-P2-alloc-02, owner decision 45: the controller takes the device
-// side's policy, this module's own rule). Each bound evicts the oldest
-// entry and never touches a secure session or an unsecured session this
-// node opened.
+// side's policy). Of the references, connectedhomeip bounds the sessions:
+// a pool of 4 unauthenticated sessions
+// (CHIP_CONFIG_UNAUTHENTICATED_CONNECTION_POOL_SIZE,
+// src/lib/core/CHIPConfig.h:768-777 at 6170af84) whose least recently
+// used entry makes room for a new one where its pools are static
+// (src/transport/UnauthenticatedSessionTable.h:341-355); matter.js ends
+// the unsecured session of an inbound message that no protocol handler
+// adopts (packages/protocol/src/protocol/ExchangeManager.ts:244-256 at
+// db021da0). Each bound evicts the oldest entry and never touches a
+// secure session or an unsecured session this node opened.
 const (
 	// maxInboundUnsecuredSessions is how many inbound unsecured sessions
 	// are held; the next one closes the oldest. The number is the device

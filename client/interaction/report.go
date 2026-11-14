@@ -555,8 +555,13 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // StatusResponse ResourceExhausted and [ErrReportTooLarge]; the bytes are
 // released when an interaction ends. A peer reaches it only with its own
 // interactions: a wildcard read of a node of some thousand endpoints
-// stays below it. Neither reference bounds a report's chunks (review II,
-// R2-P2-alloc-05; owner decision 45, this module's own rule). The bound
+// stays below it. This module's own rule (review II, R2-P2-alloc-05;
+// owner decision 45). matter.js's messenger does not collect a read's
+// chunks — it hands each report on as it arrives
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1012-1053 at
+// db021da0) — and accumulates only the chunks of an invoke response,
+// without a bound (:1224-1246); connectedhomeip was not read
+// (unverified). The bound
 // is configurable ([Config].MaxReportBytesPerSession,
 // [SubscriptionsConfig].MaxReportBytesPerSession; owner decision 48),
 // this its default.
