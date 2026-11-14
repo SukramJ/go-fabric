@@ -67,7 +67,7 @@ func fabricRecords(auth *memoryAuth) func(*lock.DoorLockConfig) {
 // (clearFabricFromCredentials), with kUndefinedFabricIndex 0
 // (src/lib/core/DataModelTypes.h:69); GetUser and GetCredentialStatus
 // answer the cleared index as a value (:573, :577, :969, :973). matter.js
-// keeps the index (BD-Matter-DoorLock-CreatorFabricIndexKept).
+// keeps the index (BD-Matter-DoorLock-CreatorFabricIndexCleared).
 func TestDropFabricClearsTheRemovedFabricFromUsersAndCredentials(t *testing.T) {
 	t.Parallel()
 	auth := newMemoryAuth()

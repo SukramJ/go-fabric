@@ -32,7 +32,7 @@ var _ contract.FabricScopedState = (*DoorLockServer)(nil)
 // :2198-2202) and clearFabricFromCredentials (:3296-3389; a
 // credential this server stores is occupied). matter.js
 // keeps the index: DoorLockServer.ts reacts to no fabric's deletion at
-// db021da0 (BD-Matter-DoorLock-CreatorFabricIndexKept). The error is the
+// db021da0 (BD-Matter-DoorLock-CreatorFabricIndexCleared). The error is the
 // AuthStore's; the records then keep the index until the next reconcile.
 func (s *DoorLockServer) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	if fabricIndex == undefinedFabricIndex {
