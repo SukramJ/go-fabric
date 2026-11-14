@@ -668,15 +668,22 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 		// rejection (chip CHIP Error 0x26). Default to false (not active)
 		// before the first CCU push, matching the safe-state convention used
 		// by OnOffServer for non-nullable bool attributes.
-		v, ok := s.src.MatterBoolValue()
-		if !ok {
-			return false, true
-		}
+		v, _ := s.ObservedStateValue()
 		return v, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return booleanStateInst.ReadGlobal(attrID)
 	}
 	return nil, false
+}
+
+// ObservedStateValue returns StateValue as the source reads it and whether
+// the source observes one. An unobserved source reads false on the wire
+// ([BooleanStateServer.MatterRead]) but has taken no reading: the
+// bridge's StateChange observer neither emits nor remembers it, as for
+// [OccupancySensingServer.ObservedOccupancy].
+func (s *BooleanStateServer) ObservedStateValue() (value, observed bool) {
+	v, ok := s.src.MatterBoolValue()
+	return v && ok, ok
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Boolean State cluster is read-only at the wire layer.

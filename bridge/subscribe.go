@@ -2990,8 +2990,15 @@ func newBooleanStateEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.Con
 	return nil
 }
 
+// read is the reading the source took: an unobserved source, which reads
+// false on the wire, has taken none and is neither emitted nor remembered
+// (measurement.BooleanStateServer.ObservedStateValue). A BooleanState
+// server of another type is read as it answers on the wire.
 func (e *booleanStateEvents) read() (value, ok bool) {
 	for _, srv := range endpointpkg.ClusterServers(e.ep) {
+		if s, projected := srv.(*measurement.BooleanStateServer); projected {
+			return s.ObservedStateValue()
+		}
 		if srv.MatterClusterID() == measurement.ClusterBooleanState {
 			v, ok := srv.MatterRead(0x0000)
 			bv, isBool := v.(bool)
