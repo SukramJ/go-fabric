@@ -214,3 +214,31 @@ func TestStartDropsAnExtensionWhoseFabricIsGone(t *testing.T) {
 		t.Errorf("setting %s after start = %q (found %v, err %v), want cleared", key, v, found, err)
 	}
 }
+
+// TestRemoveFabricReachesTheAggregatorsServers: the removal contract runs
+// on a server mounted on the Aggregator too, which the bridge's own
+// removal observers skip (R2-P2-fabric-04), and the start reconciles it.
+func TestRemoveFabricReachesTheAggregatorsServers(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const stale = 200
+	agg := &scopedOnOff{Server: srv, held: []uint8{stale}}
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.AggregatorServers = []contract.ClusterServer{agg}
+	n, c, _ := commissioned(t, cfg)
+	if got := agg.drops(); !slices.Equal(got, []uint8{stale}) {
+		t.Fatalf("drops at start %v, want [%d]", got, stale)
+	}
+	fi := c.FabricIndex()
+	if err := n.RemoveFabric(ctx, fi); err != nil {
+		t.Fatalf("RemoveFabric: %v", err)
+	}
+	if got := agg.drops(); !slices.Equal(got, []uint8{stale, fi}) {
+		t.Errorf("drops after RemoveFabric(%d) %v, want [%d %d]", fi, got, stale, fi)
+	}
+}

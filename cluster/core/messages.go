@@ -119,6 +119,7 @@ var (
 	_ contract.FabricScopedReader      = (*Messages)(nil)
 	_ contract.AttributeChangeNotifier = (*Messages)(nil)
 	_ contract.EventReceiver           = (*Messages)(nil)
+	_ contract.FabricScopedState       = (*Messages)(nil)
 )
 
 // NewMessages builds a Messages server over cfg.Presenter with an empty
@@ -485,6 +486,21 @@ func (m *Messages) RemoveFabric(fabricIndex uint8) {
 		return slices.ContainsFunc(gone, func(g []byte) bool { return bytes.Equal(g, id) })
 	})
 	m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]
+// ([Messages.RemoveFabric]): the queue is memory only.
+func (m *Messages) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	m.RemoveFabric(fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the queued messages.
+func (m *Messages) MatterHeldFabrics() []uint8 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return fabricsOf(m.messages, func(msg messagesdef.MessageStruct) uint8 { return msg.FabricIndex })
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
