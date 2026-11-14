@@ -213,11 +213,14 @@ func (o *OperationalCredentials) retryOwedReverts(ctx context.Context) {
 	}
 }
 
-// settleOwedRevert retries the owed rollbacks before an AddNOC (op "add")
-// or UpdateNOC (op "update") writes its own marker over the key one of
-// them holds, and fails while that one is still owed. Caller holds nocMu.
-func (o *OperationalCredentials) settleOwedRevert(ctx context.Context, op string) error {
-	o.retryOwedReverts(ctx)
+// owedRevertError fails an AddNOC (op "add") or UpdateNOC (op "update")
+// that would write its own marker over the key an owed rollback holds,
+// while that rollback is still owed. The command retried the owed
+// rollbacks at its head (retryOwedReverts), before it read anything its
+// checks and its own revert record are made of (review II, R2-P1-rw-01);
+// this is the refusal of one that did not land, where the marker is
+// written. Caller holds nocMu.
+func (o *OperationalCredentials) owedRevertError(op string) error {
 	o.mu.Lock()
 	owed := (op == pendingNOCUpdate && o.owedUpdateRevert != nil) || (op == pendingNOCAdd && o.owedAddRevert != 0)
 	o.mu.Unlock()

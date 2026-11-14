@@ -1791,6 +1791,11 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// rollback (nocMu).
 	o.nocMu.Lock()
 	defer o.nocMu.Unlock()
+	// A rollback an expired fail-safe still owes is retried first, so the
+	// TableFull guard and the conflict check see the table as it is once
+	// it landed (review II, R2-P1-rw-01). One that does not land refuses
+	// the command where its marker is written (owedRevertError).
+	o.retryOwedReverts(ctx)
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
@@ -1996,7 +2001,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// fabric without an identity or none, and a refused AddNOC's marker
 	// names no committed fabric (review II, R2-P1-dr-sec-01).
 	marker := pendingNOCMarker{Op: pendingNOCAdd, FabricID: rec.FabricID, RootPublicKey: rec.RootPublicKey}
-	if err := o.settleOwedRevert(ctx, pendingNOCAdd); err != nil {
+	if err := o.owedRevertError(pendingNOCAdd); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	if err := o.writePendingNOC(ctx, marker); err != nil {
@@ -2211,6 +2216,12 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// rollback (nocMu).
 	o.nocMu.Lock()
 	defer o.nocMu.Unlock()
+	// A rollback an expired fail-safe still owes is retried first: the
+	// fabric, identity and VID data read below for this update's revert
+	// record are then the restored ones, not the half-applied ones the
+	// retry removes (review II, R2-P1-rw-01). One that does not land
+	// refuses the command where its marker is written (owedRevertError).
+	o.retryOwedReverts(ctx)
 	// Matter §11.18.6.9 requires Status::FailsafeRequired when UpdateNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:HandleUpdateNOC FailSafe check.
@@ -2320,7 +2331,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 		// (review II, R2-P1-core-01); a failed write answers as the
 		// identity write below does, and so does a marker still owed to an
 		// earlier fail-safe's rollback (review II, R2-P1-dr-sec-02).
-		if err := o.settleOwedRevert(ctx, pendingNOCUpdate); err != nil {
+		if err := o.owedRevertError(pendingNOCUpdate); err != nil {
 			return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 		}
 		if err := o.writePendingNOC(ctx, updateMarker(fab, r)); err != nil {
