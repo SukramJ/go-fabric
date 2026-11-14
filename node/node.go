@@ -429,13 +429,24 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.wireEventsUTC()
 
 	// Event numbers continue across a reboot (main.go:416-426 at b4ea1f96^).
-	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
+	// A ceiling the store cannot read fails New, as the reboot count does:
+	// numbering from 1 would write a lower ceiling over the stored one and
+	// hand out numbers a controller has seen.
+	ceiling, found, err := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber)
+	if err != nil {
+		return nil, fmt.Errorf("node: event number ceiling: %w", err)
+	}
+	if found {
 		n.br.EventLog().SeedNumber(ceiling)
 	}
-	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
-		if err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
+	// A refused ceiling stays unwritten in the log too, which writes it
+	// again at the next event (im.EventLog.SetCeilingPersistence).
+	n.br.EventLog().SetCeilingPersistence(func(ceiling uint64) error { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
+		err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling)
+		if err != nil {
 			n.logger.Warn("eventlog.persist_ceiling", slog.Any("err", err))
 		}
+		return err
 	}, 0)
 
 	// --- the client stack and the binding manager (brief AO) -------------
