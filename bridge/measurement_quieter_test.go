@@ -20,67 +20,137 @@ import (
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
 
-// TestProjectedQuieterAttributeIsThrottled: a measurement-projected
-// attribute of quality Q — ElectricalPowerMeasurement.ActivePower
-// (packages/model/src/standard/elements/electrical-power-measurement.element.ts:70-71
-// at db021da0) — is reported as matter.js reports it: its changes leave
-// the bulk change handler, and the attribute is reported, with its
-// cluster's DataVersion advanced, only when its QuietEvent emits
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:224-263):
-// at once when the last report is older than a second, else once with the
-// latest value when the second is up (packages/general/src/util/Observable.ts:1238-1253,
-// the default interval :1383-1387). A change from or to null is reported
-// at once (packages/node/src/behavior/Events.ts:281-290). Review II,
-// R2-P4-nv-05b.
-func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
-	t.Parallel()
-	clk := clocktest.New(time.Unix(1_700_000_000, 0))
-	src := &fakeMeter{}
+// quietMeterRig is a started bridge with one metering endpoint, on a fake
+// clock, and a subscription to one of its quieter paths whose reports the
+// test takes by ticking the manager itself.
+type quietMeterRig struct {
+	b        *Bridge
+	clk      *clocktest.Fake
+	src      *fakeMeter
+	snap     func(context.Context) (*endpoint.Topology, error)
+	mgr      *subscription.Manager
+	path     im.ConcreteAttributePath
+	reported chan []im.ConcreteAttributePath
+}
+
+func newQuietMeterRig(t *testing.T, attr uint32) *quietMeterRig {
+	t.Helper()
+	r := &quietMeterRig{
+		clk:      clocktest.New(time.Unix(1_700_000_000, 0)),
+		src:      &fakeMeter{},
+		reported: make(chan []im.ConcreteAttributePath, 16),
+	}
 	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap := func(ctx context.Context) (*endpoint.Topology, error) {
+	r.snap = func(ctx context.Context) (*endpoint.Topology, error) {
 		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
 			StableKey: endpoint.StringKey("meter"), DeviceAddress: "M", DeviceType: 0x0510,
-			FriendlyName: "Meter", ChannelAddress: "M:1", Measurement: src,
+			FriendlyName: "Meter", ChannelAddress: "M:1", Measurement: r.src,
 		}}}})
 	}
-	b, err := New(snap, nil, Config{Listen: "127.0.0.1:0", Clock: clk}, nil)
+	r.b, err = New(r.snap, nil, Config{Listen: "127.0.0.1:0", Clock: r.clk}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	if err := b.Start(ctx); err != nil {
+	if err := r.b.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = b.Stop(context.WithoutCancel(ctx)) })
-	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{Clock: clk}, nil, nil))
-	ep := b.Topology().Bridged()[0]
-	version := func() uint32 { return ep.ClusterDataVersion(measurement.ClusterElectricalPower) }
+	t.Cleanup(func() { _ = r.b.Stop(context.WithoutCancel(t.Context())) })
+	r.mgr = subscription.NewManager(subscription.Config{Clock: r.clk}, func(_ context.Context, _ *subscription.Subscription, paths []im.ConcreteAttributePath) {
+		r.reported <- paths
+	}, nil)
+	r.b.AttachSubscriptionManager(r.mgr)
+	r.path = im.ConcreteAttributePath{
+		Endpoint: r.ep().ID, Cluster: measurement.ClusterElectricalPower, Attribute: attr,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+	sub, err := r.mgr.Subscribe(subscription.SubscribeArgs{
+		FabricIndex: 1, PeerNodeID: 0x10, SessionID: 1, MaxIntervalCeiling: 3600,
+		AttributePaths: []im.ConcreteAttributePath{r.path},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub.EndPriming(r.clk.Now())
+	return r
+}
 
-	v0 := version()
-	src.setPower(10) // null → value: at once
-	if got := version(); got != v0+1 {
-		t.Fatalf("a change from null: DataVersion %d, want %d (reported at once)", got, v0+1)
-	}
-	clk.Advance(100 * time.Millisecond)
-	src.setPower(20) // within the second: held
-	src.setPower(30) // still held, reported once
-	if got := version(); got != v0+1 {
-		t.Fatalf("changes within a second of the last report: DataVersion %d, want %d (held)", got, v0+1)
-	}
-	clk.Advance(900 * time.Millisecond)
-	if got := version(); got != v0+2 {
-		t.Fatalf("after the second: DataVersion %d, want %d (the held changes reported once)", got, v0+2)
-	}
-	clk.Advance(cluster.QuietMinimumInterval + time.Millisecond)
-	src.setPower(40) // more than a second later: at once
-	if got := version(); got != v0+3 {
-		t.Fatalf("a change after a quiet second: DataVersion %d, want %d", got, v0+3)
+func (r *quietMeterRig) ep() *endpoint.Endpoint { return r.b.Topology().Bridged()[0] }
+
+func (r *quietMeterRig) version() uint32 {
+	return r.ep().ClusterDataVersion(measurement.ClusterElectricalPower)
+}
+
+// reportsPath ticks the manager at the clock's now and reports whether a
+// report of the rig's path went out.
+func (r *quietMeterRig) reportsPath(t *testing.T) bool {
+	t.Helper()
+	r.mgr.Tick(t.Context(), r.clk.Now())
+	for {
+		select {
+		case paths := <-r.reported:
+			if slices.Contains(paths, r.path) {
+				return true
+			}
+		default:
+			return false
+		}
 	}
 }
+
+// step checks the DataVersion's advance since v0 and whether the path was
+// reported.
+func (r *quietMeterRig) step(t *testing.T, when string, v0, advance uint32, report bool) {
+	t.Helper()
+	if got := r.version(); got != v0+advance {
+		t.Fatalf("%s: DataVersion %d, want %d", when, got, v0+advance)
+	}
+	if got := r.reportsPath(t); got != report {
+		t.Fatalf("%s: path reported %v, want %v", when, got, report)
+	}
+}
+
+// TestProjectedQuieterAttributeIsThrottled: a measurement-projected
+// attribute of quality Q — ElectricalPowerMeasurement.ActivePower
+// (packages/model/src/standard/elements/electrical-power-measurement.element.ts:70-71
+// at db021da0) — is reported as matter.js reports it: each change advances
+// the cluster's DataVersion at once, as the commit that changed the value
+// does (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
+// #noteIfChanged :1476-1493, no exception for a quieter property), and
+// the attribute is reported only when its QuietEvent emits
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:224-263):
+// at once when the last report is older than a second, else once with the
+// latest value when the second is up (packages/general/src/util/Observable.ts:1238-1253,
+// the default interval :1383-1387). A change from or to null is reported
+// at once (packages/node/src/behavior/Events.ts:281-290). Review II,
+// R2-P4-nv-05b, R2-P4-dr-sub-03.
+func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
+	t.Parallel()
+	r := newQuietMeterRig(t, epmActivePower)
+	v0 := r.version()
+	r.src.setPower(10) // null → value: at once
+	r.step(t, "a change from null", v0, 1, true)
+	r.clk.Advance(100 * time.Millisecond)
+	r.src.setPower(20) // within the second: held
+	r.src.setPower(30) // still held, reported once
+	r.step(t, "changes within a second of the last report", v0, 3, false)
+	r.clk.Advance(900 * time.Millisecond)
+	r.step(t, "after the second", v0, 3, true)
+	r.clk.Advance(cluster.QuietMinimumInterval + time.Millisecond)
+	r.src.setPower(40) // more than a second later: at once
+	r.step(t, "a change after a quiet second", v0, 4, true)
+}
+
+// epmActivePower and epmVoltage are ElectricalPowerMeasurement's
+// ActivePower and Voltage.
+const (
+	epmActivePower = 0x0008
+	epmVoltage     = 0x0004
+)
 
 // TestPowerSourceBatteryQuietInterval: PowerSource's BatPercentRemaining,
 // BatTimeRemaining and BatTimeToFullCharge are throttled to ten seconds,
@@ -118,54 +188,23 @@ func TestPowerSourceBatteryQuietInterval(t *testing.T) {
 // cluster server that forwards its notifier both cover the path.
 func TestProjectedElectricalReadingsAreReported(t *testing.T) {
 	t.Parallel()
-	clk := clocktest.New(time.Unix(1_700_000_000, 0))
-	src := &fakeMeter{}
-	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	snap := func(ctx context.Context) (*endpoint.Topology, error) {
-		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
-			StableKey: endpoint.StringKey("meter"), DeviceAddress: "M", DeviceType: 0x0510,
-			FriendlyName: "Meter", ChannelAddress: "M:1", Measurement: src,
-		}}}})
-	}
-	b, err := New(snap, nil, Config{Listen: "127.0.0.1:0", Clock: clk}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	if err := b.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = b.Stop(context.WithoutCancel(ctx)) })
-	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{Clock: clk}, nil, nil))
-	ep := b.Topology().Bridged()[0]
+	r := newQuietMeterRig(t, epmVoltage)
 	for _, attr := range []uint32{0x0004, 0x0005, 0x000E} { // Voltage, ActiveCurrent, Frequency
-		if !slices.Contains(endpoint.ReportablePaths(ep), im.ConcreteAttributePath{
-			Endpoint: ep.ID, Cluster: measurement.ClusterElectricalPower, Attribute: attr,
+		if !slices.Contains(endpoint.ReportablePaths(r.ep()), im.ConcreteAttributePath{
+			Endpoint: r.ep().ID, Cluster: measurement.ClusterElectricalPower, Attribute: attr,
 			HasEndpoint: true, HasCluster: true, HasAttribute: true,
 		}) {
 			t.Errorf("attribute 0x%04X of ElectricalPowerMeasurement is not change-reported", attr)
 		}
 	}
-	version := func() uint32 { return ep.ClusterDataVersion(measurement.ClusterElectricalPower) }
-
-	v0 := version()
-	src.setVoltage(230) // null → value: at once
-	if got := version(); got != v0+1 {
-		t.Fatalf("Voltage from null: DataVersion %d, want %d (reported at once, one advance)", got, v0+1)
-	}
-	clk.Advance(100 * time.Millisecond)
-	src.setVoltage(231) // within the second: held
-	if got := version(); got != v0+1 {
-		t.Fatalf("Voltage within a second of the last report: DataVersion %d, want %d (held)", got, v0+1)
-	}
-	clk.Advance(900 * time.Millisecond)
-	if got := version(); got != v0+2 {
-		t.Fatalf("after the second: DataVersion %d, want %d (the held change reported once)", got, v0+2)
-	}
+	v0 := r.version()
+	r.src.setVoltage(230) // null → value: at once
+	r.step(t, "Voltage from null", v0, 1, true)
+	r.clk.Advance(100 * time.Millisecond)
+	r.src.setVoltage(231) // within the second: held, the version advanced once
+	r.step(t, "Voltage within a second of the last report", v0, 2, false)
+	r.clk.Advance(900 * time.Millisecond)
+	r.step(t, "after the second", v0, 2, true)
 }
 
 // fakeLowBat is a battery's LOWBAT reading that notifies its changes.

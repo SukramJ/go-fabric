@@ -2399,11 +2399,17 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // unsubscribe is tracked so a reassemble tears every listener down.
 //
 // A path whose attribute has the quieter quality ("Q" in its definition)
-// is reported through its throttle instead ([quietPath]); its version
-// advances when the throttle reports it, as matter.js advances a quieter
-// property's version and broadcasts it only when its QuietEvent emits
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:224-263 at
-// db021da0; review II, R2-P4-nv-05b).
+// is reported through its throttle instead ([quietPath]): its change
+// advances the cluster's version at once, with the direct paths' changes
+// of the same notification as one commit, and only the dirty-marking waits
+// for the throttle. matter.js advances the version at the commit that
+// changed a value, a quieter property's included
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0, #noteIfChanged :1476-1493), and broadcasts a quieter property
+// only when its QuietEvent emits
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262),
+// whose advanceVersionFor adds an advance for a dynamic property alone
+// (Datasource.ts:679-688). Review II, R2-P4-nv-05b, R2-P4-dr-sub-03.
 func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
@@ -2454,7 +2460,7 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 		}
 		for _, qp := range quiet {
 			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) {
-				qp.check()
+				qp.check(bumped)
 			}
 		}
 	}))
@@ -2494,9 +2500,9 @@ func quietIntervalOf(clusterID, attrID uint32) time.Duration {
 }
 
 // quietPath reports one measurement-projected path of quality Q through a
-// [clusterpkg.Quieter]: a change of its value goes to the throttle, and the
-// throttle's report advances the cluster's DataVersion and marks the path
-// dirty. One quietPath serves the path for every notifier that covers it
+// [clusterpkg.Quieter]: a change of its value advances the cluster's
+// DataVersion and goes to the throttle, and the throttle's report marks the
+// path dirty. One quietPath serves the path for every notifier that covers it
 // in one wiring ([listenerSet.quietPathFor]) — an endpoint's source and the
 // cluster server that forwards its notifier both do — so a change is
 // told to the throttle once.
@@ -2521,7 +2527,6 @@ func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *end
 		Clock:    b.clk(),
 		Interval: quietIntervalOf(p.Cluster, p.Attribute),
 		Report: func() {
-			ep.BumpClusterDataVersion(p.Cluster)
 			mgr.OnAttributeChanged(p)
 		},
 	}
@@ -2549,10 +2554,12 @@ func (qp *quietPath) read() (attributeReading, bool) {
 	return attributeReading{}, false
 }
 
-// check reads the value and tells the throttle of a change, with the
-// nullness of the old and the new value; a value no server answers counts
-// as null.
-func (qp *quietPath) check() {
+// check reads the value and, on a change, advances the cluster's
+// DataVersion — unless bumped holds the cluster, advanced by this
+// notification already, which check adds it to — and tells the throttle,
+// with the nullness of the old and the new value; a value no server
+// answers counts as null.
+func (qp *quietPath) check(bumped map[uint32]struct{}) {
 	qp.mu.Lock()
 	defer qp.mu.Unlock()
 	cur, ok := qp.read()
@@ -2562,6 +2569,10 @@ func (qp *quietPath) check() {
 		return
 	}
 	qp.last, qp.had = cur, ok
+	if _, done := bumped[qp.path.Cluster]; !done {
+		qp.ep.BumpClusterDataVersion(qp.path.Cluster)
+		bumped[qp.path.Cluster] = struct{}{}
+	}
 	qp.q.Changed(wasNull, isNull)
 }
 

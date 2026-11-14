@@ -155,10 +155,17 @@ const QuietMinimumInterval = time.Second
 //     last report.
 //
 // A change the throttle holds back is still the attribute's value — a
-// read sees it — but neither advances the DataVersion nor marks the
-// attribute dirty until the deferred report goes out
-// (ServerBehaviorBacking reports a quieter property only on its quiet
-// emit). The throttle stands in front of the wire only: the host's
+// read sees it — and is not reported until the deferred report goes out:
+// matter.js broadcasts a quieter property only on its quiet emit
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
+// db021da0). The throttle holds back the report, not the change: matter.js
+// advances the cluster's DataVersion at the commit that changed the value,
+// a quieter property's as any other's
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
+// #noteIfChanged :1476-1493), and the quiet emit adds an advance for a
+// dynamic property alone (advanceVersionFor, Datasource.ts:679-688) — so
+// the version is advanced at the change, by the throttle's user, and not
+// by Report. The throttle stands in front of the wire only: the host's
 // listeners see every change at once ([AttributeChanges.ChangedFrom]), as
 // every observer of a QuietEvent itself does (Events.ts:267-297, the
 // QuietObservable is only its `online` view); Report is the wire's
