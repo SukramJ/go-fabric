@@ -433,7 +433,12 @@ func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
 // Extension entry leaves memory and its setting
 // ([AccessControl.RemoveFabricExtension]); the error is the setting's.
 // The ACL entries are the store's rows, which its fabric cascade removes.
+// It holds writeMu, as a write of the Extension does: the entry's removal
+// from memory and from its setting is one step against such a write, so
+// none in flight leaves the removed fabric's entry behind in either.
 func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
 	a.mu.Lock()
 	_, had := a.extensions[fabricIndex]
 	if had {
