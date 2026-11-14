@@ -69,11 +69,11 @@ func sendGiveUpBudget(t *testing.T, pr *peer.Peer, s *exchange.Session) time.Dur
 // session of the peer created before the exchange — matter.js
 // MessageExchange.ts:643-650 → ExchangeManager.ts:621-644 →
 // SessionManager.ts:727-746); the next one establishes CASE again by
-// itself (PeerExchangeProvider.ts:73-81, Peer.ts:418-463), as matter.js
+// itself (PeerExchangeProvider.ts:73-85, Peer.ts:418-463), as matter.js
 // retries no failed interaction (ClientInteraction.ts:1247-1264,
 // InteractionMessenger.ts:1096-1100). A sustained subscription comes back
 // on a new session by itself (ClientInteraction.ts:1155-1159,
-// PeerAddressMonitor.ts:255-261). Owner decision 49.
+// PeerAddressMonitor.ts:258-260). Owner decision 49.
 func TestControllerRecoversFromASilentRestart(t *testing.T) {
 	t.Parallel()
 	t.Run("read", func(t *testing.T) {
