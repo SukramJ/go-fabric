@@ -395,6 +395,10 @@ type Server struct {
 	// hand-off path and the levels the engine is handing it, so a change
 	// the host's notifier reports meanwhile is the command's.
 	forwarding atomic.Int32
+	// notified counts the host notifications [Server.OnMatterValueChanged]
+	// advanced the DataVersion for: a hand-off command during which it
+	// moved adds no advance of its own ([Server.bumpIfMoved]).
+	notified atomic.Uint64
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -526,6 +530,7 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		return func() {}
 	}
 	return n.OnMatterValueChanged(func() {
+		s.notified.Add(1)
 		s.tracker().Bump()
 		if cb != nil {
 			cb()
@@ -886,10 +891,11 @@ func (s *Server) forward(name string, executes bool, before levelReading, call f
 
 // finish turns a port result into the (response, error) pair the
 // dispatcher expects. On the hand-off path the DataVersion advances when
-// the command changed CurrentLevel from before — the one attribute of
-// this cluster's state a command changes (RemainingTime is computed, as
-// matter.js's virtual remainingTime is, LevelControlServer.ts:805-822 at
-// db021da0) — and a refusal keeps it where it was. Under the engine every
+// the command changed CurrentLevel from before, once
+// ([Server.bumpIfMoved]) — the one attribute of this cluster's state a
+// command changes (RemainingTime is computed, as matter.js's virtual
+// remainingTime is, LevelControlServer.ts:805-822 at db021da0) — and a
+// refusal keeps it where it was. Under the engine every
 // change of CurrentLevel advanced it already ([Server.observeLevel]).
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
@@ -904,26 +910,34 @@ func (s *Server) finish(name string, err error, before levelReading) (any, error
 	return nil, nil
 }
 
-// levelReading is CurrentLevel as the source reports it; the level of an
-// unknown one is 0.
+// levelReading is CurrentLevel as the source reports it — the level of
+// an unknown one is 0 — and the count of host notifications that had
+// advanced the DataVersion when it was read ([Server.notified]).
 type levelReading struct {
-	level uint8
-	known bool
+	level    uint8
+	known    bool
+	notified uint64
 }
 
 // levelNow reads CurrentLevel from the source, which is not nil.
 func (s *Server) levelNow() levelReading {
+	notified := s.notified.Load()
 	level, known := s.src.CurrentLevel()
 	if !known {
 		level = 0
 	}
-	return levelReading{level, known}
+	return levelReading{level, known, notified}
 }
 
 // bumpIfMoved advances the DataVersion when CurrentLevel differs from
-// before.
+// before, once for the command: when the host's notifier reported a
+// change since before, that notification advanced the version already,
+// before its report. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (a commit advances the version once `if (changes)`).
 func (s *Server) bumpIfMoved(before levelReading) {
-	if s.levelNow() != before {
+	now := s.levelNow()
+	if (now.level != before.level || now.known != before.known) && now.notified == before.notified {
 		s.tracker().Bump()
 	}
 }

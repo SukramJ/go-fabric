@@ -346,6 +346,57 @@ func TestChangeToModeOfTheCurrentModeLeavesTheDataVersion(t *testing.T) {
 	}
 }
 
+// notifyingInCommand reports, inside ChangeToMode, the change it just
+// applied, as a host whose port notifies for every change it makes.
+type notifyingInCommand struct{ *notifyingSource }
+
+func (n notifyingInCommand) ChangeToMode(ctx context.Context, mode uint8) error {
+	if err := n.fakeSource.ChangeToMode(ctx, mode); err != nil {
+		return err
+	}
+	if n.cb != nil {
+		n.cb()
+	}
+	return nil
+}
+
+// TestChangeToModeAdvancesTheDataVersionOnceWithTheHostsNotification: a
+// ChangeToMode is one commit, one advance of the DataVersion — whether
+// the host's notifier reports the change while the command runs or not.
+// Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode assigns state.currentMode once) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 (the
+// commit advances the version once `if (changes)`).
+func TestChangeToModeAdvancesTheDataVersionOnceWithTheHostsNotification(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		src       modeselect.ModeSource
+		wantFired int
+	}{
+		{"the notifier fires inside the command", notifyingInCommand{&notifyingSource{fakeSource: coffeeSource()}}, 1},
+		{"the notifier stays silent", &notifyingSource{fakeSource: coffeeSource()}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := modeselect.NewServer(modeselect.Config{Source: tc.src})
+			fired := 0
+			defer srv.OnMatterValueChanged(func() { fired++ })()
+			before := srv.MatterDataVersion()
+			if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+				t.Fatal(err)
+			}
+			if got := srv.MatterDataVersion() - before; got != 1 {
+				t.Errorf("ChangeToMode to another mode moved the DataVersion by %d, want 1", got)
+			}
+			if fired != tc.wantFired {
+				t.Errorf("the subscriber fired %d times, want %d", fired, tc.wantFired)
+			}
+		})
+	}
+}
+
 // TestDeviceSideChangeReachesSubscribers pins the change hop: a mode the
 // device changed on its own reaches a subscriber. CurrentMode is
 // quality N and is listed as reportable, so without a push path from

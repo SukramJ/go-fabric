@@ -181,8 +181,8 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // ServerBehaviorBacking.ts:259, advances only for a dynamic property,
 // Datasource.ts:679-688). On the hand-off path the host's own notifier is
 // the wire's ([Server.OnMatterValueChanged]) and advances the version, a
-// command's change advances it in [Server.finish], so the listeners alone
-// are told.
+// command's change advances it in [Server.finish] unless that notifier
+// advanced it while the command ran, so the listeners alone are told.
 func (s *Server) observeLevel(origin contract.Origin) {
 	s.noteLevel(origin, false)
 }

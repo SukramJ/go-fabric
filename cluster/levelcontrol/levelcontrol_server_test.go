@@ -6,6 +6,7 @@ package levelcontrol_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -554,6 +555,62 @@ func TestDeviceSideChangeBumpsTheVersion(t *testing.T) {
 	unsubscribe()
 	if host.notify != nil {
 		t.Error("unsubscribe did not release the host port's notifier")
+	}
+}
+
+// movingHost is a port that moves to the level a MoveToLevel names and,
+// with notifies, reports the change through its notifier while the
+// command runs, as a host whose device pushes every change does.
+type movingHost struct {
+	*fakeHost
+	notifies bool
+}
+
+func (h movingHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	h.level, h.levelKnown = req.Level, true
+	if h.notifies && h.notify != nil {
+		h.notify()
+	}
+	return nil
+}
+
+// TestHandOffCommandAdvancesTheDataVersionOnce: on the hand-off path a
+// command — or a scene recall handed to the port — that moved
+// CurrentLevel is one commit, one advance of the DataVersion, whether the
+// host's notifier reports the move while the port runs it or not.
+// Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (the commit advances the version once `if (changes)`).
+func TestHandOffCommandAdvancesTheDataVersionOnce(t *testing.T) {
+	t.Parallel()
+	for _, notifies := range []bool{true, false} {
+		for _, scene := range []bool{false, true} {
+			t.Run(fmt.Sprintf("notifies=%v scene=%v", notifies, scene), func(t *testing.T) {
+				t.Parallel()
+				host := movingHost{observedHost(), notifies}
+				srv := levelcontrol.NewServer(levelcontrol.Config{Source: host})
+				fired := 0
+				defer srv.OnMatterValueChanged(func() { fired++ })()
+				before := srv.MatterDataVersion()
+				if scene {
+					srv.MatterApplySceneValues(context.Background(), map[uint32]uint64{levelcontrol.AttrCurrentLevel: 60}, 0)
+				} else if _, err := srv.MatterInvoke(context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60}); err != nil {
+					t.Fatal(err)
+				}
+				if lvl, _ := host.CurrentLevel(); lvl != 60 {
+					t.Fatalf("the port is at %d, want 60", lvl)
+				}
+				if got := srv.MatterDataVersion() - before; got != 1 {
+					t.Errorf("the move advanced the DataVersion by %d, want 1", got)
+				}
+				if want := map[bool]int{true: 1, false: 0}[notifies]; fired != want {
+					t.Errorf("the subscriber fired %d times, want %d", fired, want)
+				}
+			})
+		}
 	}
 }
 

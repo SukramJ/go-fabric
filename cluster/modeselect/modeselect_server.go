@@ -22,6 +22,7 @@ package modeselect
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -143,6 +144,10 @@ type Server struct {
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
+	// notified counts the host notifications [Server.OnMatterValueChanged]
+	// advanced the DataVersion for: a ChangeToMode during which it moved
+	// adds no advance of its own.
+	notified atomic.Uint64
 }
 
 // Compile-time assertions.
@@ -219,6 +224,7 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		return func() {}
 	}
 	return n.OnMatterValueChanged(func() {
+		s.notified.Add(1)
 		s.tracker().Bump()
 		if cb != nil {
 			cb()
@@ -348,6 +354,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (re
 		}
 	}
 	before := s.src.CurrentMode()
+	notified := s.notified.Load()
 	if err := s.src.ChangeToMode(ctx, req.NewMode); err != nil {
 		// Deliberately no version bump: the device refused, so nothing
 		// a subscriber caches has changed.
@@ -357,8 +364,11 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (re
 	// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
 	// db021da0 (changeToMode writes state.currentMode) under
 	// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
-	// :1476-1480 (#noteIfChanged returns for an equal value).
-	if s.src.CurrentMode() != before {
+	// :1476-1480 (#noteIfChanged returns for an equal value). The command
+	// is one commit, one advance: when the host's notifier reported a
+	// change while the port ran it, that notification advanced the
+	// version already, before its report.
+	if s.src.CurrentMode() != before && s.notified.Load() == notified {
 		s.tracker().Bump()
 	}
 	return nil, nil
