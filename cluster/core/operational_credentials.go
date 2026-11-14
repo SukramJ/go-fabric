@@ -374,7 +374,9 @@ var errOpcredsInvalidArg error = opcredsInvalidArgErr{}
 // as IM Status::ConstraintError (0x87). Mirrors matter.js
 // OperationalCredentialsServer.ts:247-252 (addNoc after CSRRequest for
 // UpdateNOC) and :329-332 (updateNoc after CSRRequest for AddNOC), both
-// StatusResponseError(..., Status.ConstraintError). Matter §11.18.6.
+// StatusResponseError(..., Status.ConstraintError). Matter §11.18.6. It
+// also answers a request field outside its model constraint, as matter.js's
+// request validation does (UpdateFabricLabel's Label).
 type opcredsConstraintErr struct{ msg string }
 
 func (e opcredsConstraintErr) Error() string { return e.msg }
@@ -2505,12 +2507,16 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 		return nil, fmt.Errorf("%w: UpdateFabricLabelRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
 	if len(req.Label) > 32 {
-		// chip OperationalCredentialsCluster.cpp:678-682 returns
-		// IM-InvalidCommand (0x85) for a label that exceeds 32 bytes,
-		// not NOCResponse{LabelConflict}. LabelConflict means the label
-		// is already in use by another fabric; an oversized label is a
-		// constraint violation that maps to InvalidCommand.
-		return nil, opcredsInvalidCommandErr{"UpdateFabricLabel: label exceeds 32 UTF-8 bytes"}
+		// Label carries "max 32" in the model and matter.js's request
+		// validation refuses a longer one with ConstraintError before the
+		// handler runs. Mirrors matter.js db021da0
+		// packages/model/src/standard/elements/operational-credentials.element.ts:124
+		// and packages/protocol/src/action/server/CommandInvokeResponse.ts:484-486
+		// (requestTlv.validate; ValidationError's status,
+		// packages/types/src/common/ValidationError.ts:16-22).
+		// connectedhomeip 6170af84 answers InvalidCommand here under a TODO
+		// that names ConstraintError (OperationalCredentialsCluster.cpp:711-717).
+		return nil, opcredsConstraintErr{"UpdateFabricLabel: label exceeds 32 UTF-8 bytes"}
 	}
 	// Fabric-scoped command (Matter §11.18.6.10): SHALL target the
 	// fabric of the session that issued the Invoke, NOT a globally

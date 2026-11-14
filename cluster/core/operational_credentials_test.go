@@ -1206,7 +1206,12 @@ func TestOpcreds_UpdateFabricLabelInvalidArgType(t *testing.T) {
 }
 
 // TestOpcreds_UpdateFabricLabelLabelTooLong verifies UpdateFabricLabel (0x09)
-// with label > 32 bytes returns IM-InvalidCommand (0x85).
+// with label > 32 bytes returns IM-ConstraintError (0x87): the field's
+// "max 32" (matter.js db021da0 packages/model/src/standard/elements/
+// operational-credentials.element.ts:124) is refused by the request
+// validation before the handler runs (packages/protocol/src/action/server/
+// CommandInvokeResponse.ts:484-486; ValidationError's status,
+// packages/types/src/common/ValidationError.ts:16-22).
 func TestOpcreds_UpdateFabricLabelLabelTooLong(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
@@ -1222,8 +1227,8 @@ func TestOpcreds_UpdateFabricLabelLabelTooLong(t *testing.T) {
 	if !ok {
 		t.Fatalf("error type = %T, want StatusCodeError", err)
 	}
-	if sce.MatterStatusCode() != im.StatusInvalidCommand {
-		t.Fatalf("MatterStatusCode() = %v, want StatusInvalidCommand (0x85)", sce.MatterStatusCode())
+	if sce.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("MatterStatusCode() = %v, want StatusConstraintError (0x87)", sce.MatterStatusCode())
 	}
 }
 
