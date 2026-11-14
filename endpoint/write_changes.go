@@ -16,8 +16,9 @@ import (
 // The transport that reports written attributes to subscribers attaches
 // one with [WithWriteChanges] and leaves out the paths it holds as
 // unchanged, as matter.js reports only the properties a commit changed
-// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
-// db021da0). [TopologyDispatcher.WriteAuthorized] records every
+// (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
+// db021da0, onChange with the change list the commit collects at
+// :1446-1454 and :1484). [TopologyDispatcher.WriteAuthorized] records every
 // successful write; a dispatcher that records nothing leaves every path
 // reported. The zero value is ready to use and safe for concurrent use.
 type WriteChanges struct {
