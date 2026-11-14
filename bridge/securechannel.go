@@ -737,7 +737,7 @@ type paseSessionIDLister interface {
 // established PASE session that is not closing. A session whose close the
 // bridge has scheduled ([Bridge.paseSessionsCloser]) is closing from that
 // moment, as a matter.js session is from initiateClose on
-// (packages/protocol/src/session/Session.ts:190-192 `isClosing`, :304-309
+// (packages/protocol/src/session/Session.ts:190-192 `isClosing`, :304-311
 // at db021da0), though it stays in the table for its grace. A registry
 // without the capability reports none.
 func (b *Bridge) paseSessionExists() bool {
