@@ -136,7 +136,7 @@ func TestNames_PruneCapsStagedHosts(t *testing.T) {
 		now := n.clock.Now()
 		for i := range stagedIPMaxHosts + 1 {
 			rec := &Record{Name: "h", Type: TypeA, TTL: time.Hour}
-			n.stagedIPs.set(string(rune('a'+i%26))+"-"+time.Duration(i).String(), []stagedIP{{record: rec, receivedAt: now}})
+			n.setStaged(string(rune('a'+i%26))+"-"+time.Duration(i).String(), []stagedIP{{record: rec, receivedAt: now}})
 		}
 		n.pruneStagedIPs()
 		if got := n.stagedIPs.len(); got != stagedIPMinHosts {

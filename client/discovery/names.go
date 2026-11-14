@@ -39,6 +39,15 @@ const (
 	stagedIPMaxHosts      = 250
 	stagedIPMinHosts      = 200
 	stagedIPPruneInterval = time.Minute
+	// maxStagedAddressesPerHost is how many addresses one host not yet in
+	// the cache stages; past it the address received longest ago goes.
+	// connectedhomeip keeps as many addresses per resolved node:
+	// src/lib/dnssd/Types.h:94 (kMaxIPAddresses =
+	// CHIP_DEVICE_CONFIG_MAX_DISCOVERED_IP_ADDRESSES) and
+	// src/platform/BUILD.gn:90 (chip_max_discovered_ip_addresses = 5) at
+	// 6170af84. matter.js bounds only the staged hosts (review II,
+	// R2-P3-ctl-lan-01).
+	maxStagedAddressesPerHost = 5
 )
 
 // Bounds on what unauthenticated senders on the link make the cache hold
@@ -94,6 +103,9 @@ type ingressFilter struct {
 type stagedIP struct {
 	record     *Record
 	receivedAt time.Time
+	// expiresAt is receivedAt plus the record's graced TTL, the moment a
+	// cached record received with it would expire.
+	expiresAt  time.Time
 	sourceIntf string
 }
 
@@ -138,10 +150,13 @@ type Names struct {
 	cancel context.CancelFunc
 
 	// Loop-owned state below.
-	names      *omap[string, *Name]
-	stagedIPs  *omap[string, []stagedIP]
-	filters    []*ingressFilter
-	discovered []*discoveredObserver
+	names     *omap[string, *Name]
+	stagedIPs *omap[string, []stagedIP]
+	// stagedCount is the number of addresses in stagedIPs; they count
+	// against [maxCachedRecords] with the cached records.
+	stagedCount int
+	filters     []*ingressFilter
+	discovered  []*discoveredObserver
 	// expiring is every cached record, each with its place in installed,
 	// the records in the order they were installed or refreshed
 	// ([maxCachedRecords]).
@@ -310,7 +325,7 @@ func (n *Names) get(qname string) *Name {
 	n.names.set(key, nm)
 
 	if staged, ok := n.stagedIPs.get(key); ok {
-		n.stagedIPs.del(key)
+		n.delStaged(key)
 		now := n.clock.Now()
 		for _, s := range staged {
 			// Keep the original receive time so expiry counts from the
@@ -490,9 +505,22 @@ func (n *Names) boundedTTL(rec *Record) *Record {
 	return &bounded
 }
 
-// evictOverflow deletes the records installed or refreshed longest ago
-// until at most [maxCachedRecords] remain.
+// evictOverflow keeps the cached records and the staged addresses
+// together within [maxCachedRecords]: past it the staged addresses go
+// first, those of the host touched longest ago, then the records installed
+// or refreshed longest ago. A staged address is unconfirmed — no SRV has
+// named its host — so it never displaces a cached record (review II,
+// R2-P3-ctl-lan-01).
 func (n *Names) evictOverflow() {
+	unstaged := 0
+	for n.stagedCount > 0 && len(n.expiring)+n.stagedCount > maxCachedRecords {
+		n.dropOldestStaged()
+		unstaged++
+	}
+	if unstaged > 0 {
+		n.logger.Warn("matter.discovery.staged_addresses_evicted", slog.Int("dropped", unstaged),
+			slog.String("reason", "the cache holds at most "+strconv.Itoa(maxCachedRecords)+" records and staged addresses"))
+	}
 	evicted := 0
 	for len(n.expiring) > maxCachedRecords {
 		rec, _ := n.installed.Front().Value.(*Record)
@@ -528,9 +556,9 @@ func (n *Names) unstageGoodbyes(records []*Record, consumed []bool) {
 			return s.record.Type == r.Type && s.record.ipString() == r.ipString()
 		})
 		if len(remaining) == 0 {
-			n.stagedIPs.del(key)
+			n.delStaged(key)
 		} else {
-			n.stagedIPs.set(key, remaining)
+			n.setStaged(key, remaining)
 		}
 	}
 }
@@ -555,19 +583,95 @@ func (n *Names) stageAddresses(records []*Record, consumed []bool, packetAt time
 				return s.record.Type == rec.Type && s.receivedAt.Before(supersededBefore)
 			})
 		}
-		entry := stagedIP{record: rec, receivedAt: packetAt, sourceIntf: sourceIntf}
+		entry := stagedIP{record: rec, receivedAt: packetAt, expiresAt: packetAt.Add(n.graced(rec.TTL)), sourceIntf: sourceIntf}
 		if idx := slices.IndexFunc(staged, func(s stagedIP) bool {
 			return s.record.Type == rec.Type && s.record.ipString() == rec.ipString()
 		}); idx >= 0 {
 			staged[idx] = entry
 		} else {
+			if len(staged) >= maxStagedAddressesPerHost {
+				i := oldestStaged(staged)
+				staged = slices.Delete(slices.Clone(staged), i, i+1)
+			}
 			staged = append(staged, entry)
 		}
-		// Delete and set moves the host to the tail, so pruning evicts
-		// the least recently touched first.
-		n.stagedIPs.del(key)
-		n.stagedIPs.set(key, staged)
+		// Delete and set moves the host to the tail, so pruning and
+		// evictOverflow evict the least recently touched first.
+		n.delStaged(key)
+		n.setStaged(key, staged)
+		if n.expiryTimer == nil || entry.expiresAt.Before(n.expiryAt) {
+			n.armExpiry(entry.expiresAt)
+		}
 	}
+}
+
+// oldestStaged is the index of the address in staged received longest ago.
+func oldestStaged(staged []stagedIP) int {
+	oldest := 0
+	for i, s := range staged {
+		if s.receivedAt.Before(staged[oldest].receivedAt) {
+			oldest = i
+		}
+	}
+	return oldest
+}
+
+// setStaged and delStaged change stagedIPs and keep stagedCount in step.
+func (n *Names) setStaged(key string, staged []stagedIP) {
+	if old, ok := n.stagedIPs.get(key); ok {
+		n.stagedCount -= len(old)
+	}
+	n.stagedCount += len(staged)
+	n.stagedIPs.set(key, staged)
+}
+
+func (n *Names) delStaged(key string) {
+	if old, ok := n.stagedIPs.get(key); ok {
+		n.stagedCount -= len(old)
+		n.stagedIPs.del(key)
+	}
+}
+
+// dropOldestStaged drops the address received longest ago of the host
+// touched longest ago, and the host with its last address.
+func (n *Names) dropOldestStaged() {
+	keys := n.stagedIPs.keys
+	if len(keys) == 0 {
+		return
+	}
+	key := keys[0]
+	staged, _ := n.stagedIPs.get(key)
+	if len(staged) <= 1 {
+		n.delStaged(key)
+		return
+	}
+	i := oldestStaged(staged)
+	n.setStaged(key, slices.Delete(slices.Clone(staged), i, i+1))
+}
+
+// expireStaged drops every staged address whose graced TTL has passed at
+// now, as expireDue deletes a cached record, and returns the earliest
+// expiry of those left (zero when none is).
+func (n *Names) expireStaged(now time.Time) time.Time {
+	var next time.Time
+	for _, key := range n.stagedIPs.snapshotKeys() {
+		staged, _ := n.stagedIPs.get(key)
+		live := slices.DeleteFunc(slices.Clone(staged), func(s stagedIP) bool {
+			return !s.expiresAt.After(now)
+		})
+		switch {
+		case len(live) == 0:
+			n.delStaged(key)
+		case len(live) != len(staged):
+			n.setStaged(key, live)
+		}
+		for _, s := range live {
+			if next.IsZero() || s.expiresAt.Before(next) {
+				next = s.expiresAt
+			}
+		}
+	}
+	return next
 }
 
 func countFalse(b []bool) int {
@@ -595,9 +699,9 @@ func (n *Names) pruneStagedIPs() {
 		})
 		switch {
 		case len(live) == 0:
-			n.stagedIPs.del(key)
+			n.delStaged(key)
 		case len(live) != len(staged):
-			n.stagedIPs.set(key, live)
+			n.setStaged(key, live)
 		}
 	}
 	if n.stagedIPs.len() > stagedIPMaxHosts {
@@ -605,7 +709,7 @@ func (n *Names) pruneStagedIPs() {
 			if n.stagedIPs.len() <= stagedIPMinHosts {
 				break
 			}
-			n.stagedIPs.del(key)
+			n.delStaged(key)
 		}
 	}
 }
@@ -678,7 +782,7 @@ func (n *Names) expireDue() {
 			nm.deleteRecord(rec)
 		}
 	}
-	var next time.Time
+	next := n.expireStaged(now)
 	for rec := range n.expiring {
 		if next.IsZero() || rec.ExpiresAt.Before(next) {
 			next = rec.ExpiresAt
@@ -700,6 +804,7 @@ func (n *Names) shutdown() {
 		n.pruneTimer.Stop()
 	}
 	n.stagedIPs.clear()
+	n.stagedCount = 0
 	n.discovered = nil
 	n.expiring = make(map[*Record]*list.Element)
 	n.installed.Init()
