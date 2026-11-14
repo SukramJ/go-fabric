@@ -195,6 +195,7 @@ becomes permissible in:
 
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
+| `secure/operational.Manager.ClosePeer` | none with the CloseSession farewell; `Manager.Close` on each id `Manager.SessionIDsForPeer` returns closes without it | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

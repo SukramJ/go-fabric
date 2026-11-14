@@ -1097,10 +1097,14 @@ func (m *Manager) Close(sessionID uint16) error {
 // removing sessions "to prevent re-announces when removing sessions"
 // (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:427).
 //
-// Mirrors the matter.js shutdown chain: each session's close emits
-// gracefulClose (Session.ts:248 initiateClose → NodeSession.ts:368)
-// and the exchange layer ships a CloseSession StatusReport per session
-// (ExchangeManager.ts:716-726 #sendCloseSession).
+// The CloseSession per session departs from matter.js at db021da0, whose
+// shutdown flushes each session's subscriptions and then force-closes the
+// session without a CloseSession (SessionManager.ts:1097-1113
+// closeAllSessions: closeSubscriptionsForShutdown, then
+// initiateForceClose, which marks the peer lost, NodeSession.ts:379-382,
+// so close() skips gracefulClose, :414-425). Which side the module takes
+// is open (review II, R2-P2-sess-03); until it is decided this keeps the
+// farewell.
 func (m *Manager) CloseAllGraceful(deadline time.Time) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0, len(m.sessions))
@@ -1184,10 +1188,15 @@ func (m *Manager) ClosePASESessions() int {
 
 // ClosePeer tears down every live session matching the
 // (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
-// first. Returns the number of sessions closed. The bridge uses it for
-// the KeepSubscriptions=false teardown (matter.js InteractionServer.ts:
-// 549-566 closes the peer's subscriptions by (fabric, node)); a peer that
-// stopped answering is closed with [Manager.ClosePeerLost] instead.
+// first. Returns the number of sessions closed. A peer that stopped
+// answering is closed with [Manager.ClosePeerLost] instead.
+//
+// Deprecated: nothing in the module calls it — the KeepSubscriptions=false
+// teardown it was written for closes the peer's subscriptions, not its
+// sessions (subscription.Manager.ClosePeer). There is no replacement
+// that sends the farewell; [Manager.Close] on each id
+// [Manager.SessionIDsForPeer] returns closes the sessions without one.
+// Removable in v0.23.0 (review II, R2-P2 design note 4).
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)
