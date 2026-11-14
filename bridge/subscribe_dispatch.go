@@ -77,9 +77,12 @@ func (b *Bridge) buildInitialReport(
 // the Subscribe path, generated as it pulls AttributeReadResponse.process
 // (:644-645).
 type primingSource struct {
-	b       *Bridge
-	exp     *im.AttributeExpansion
-	allow   func(im.ReadResult) bool
+	b     *Bridge
+	exp   *im.AttributeExpansion
+	allow func(im.ReadResult) bool
+	// denial is the status a fully concrete path answers when allow
+	// refuses its result ([readDenialStatus]).
+	denial  func(im.ReadResult) im.StatusCode
 	filters []im.DataVersionFilter
 	// suppressStatuses leaves every status report out: a re-established
 	// subscription reports no per-path error again.
@@ -110,19 +113,51 @@ func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatch
 		// read (AttributeReadResponse.ts:149-197).
 		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
 		allow:   allow,
+		denial:  func(rr im.ReadResult) im.StatusCode { return readDenialStatus(subCtx, dispatcher, rr) },
 		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
 	}
 	// Every status of a concrete path precedes the first value, as in a
 	// read: matter.js ServerSubscription.ts:643-671 at db021da0 emits
 	// AttributeReadResponse's reports, statuses first, and holds them back
-	// until the first value (review II, R2-P4-imread-06).
+	// until the first value (review II, R2-P4-imread-06). The predicate
+	// sees fully concrete paths only, so a result the subject may not read
+	// is its path's denial status (R2-P4-nv-02).
 	p.exp.StatusesFirst(func(_ im.ConcreteAttributePath, rr im.ReadResult) bool {
-		if rr.Status == im.StatusSuccess || p.suppressStatuses {
+		switch {
+		case p.suppressStatuses:
 			return false
+		case rr.Status == im.StatusUnsupportedNode, !p.allow(rr):
+			return true
 		}
-		return rr.Status == im.StatusUnsupportedNode || p.allow(rr)
+		return rr.Status != im.StatusSuccess
 	})
 	return p
+}
+
+// readDenialStatus is the status a fully concrete path answers when
+// [readResultAuthorizer] refuses its result: the access check's own
+// status, UNSUPPORTED_ACCESS without an accessing fabric or a checker.
+// Mirrors matter.js AttributeReadResponse #addConcrete, which answers a
+// denied concrete path with #authorize's status at its View pass and at
+// its read-level pass
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:250-252,
+// :272-274, :462-484 at db021da0), as [im.ReadReports] answers it on a
+// Read (review II, R2-P4-nv-02).
+func readDenialStatus(ctx context.Context, dispatcher im.Dispatcher, rr im.ReadResult) im.StatusCode {
+	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	aclChecker, ok := dispatcher.(im.ACLChecker)
+	if !ok || !im.HasAccessingFabric(fabricIndex) {
+		return im.StatusUnsupportedAccess
+	}
+	var priv uint8 = 1 // View default, as readResultAuthorizer
+	if pp, ok := dispatcher.(im.AttributeReadPrivilegeProvider); ok {
+		priv = pp.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
+	}
+	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
+	if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv); !status.IsSuccess() {
+		return status
+	}
+	return im.StatusUnsupportedAccess
 }
 
 // primingDataVersionFilters returns the DataVersionFilters that apply to
@@ -136,17 +171,24 @@ func primingDataVersionFilters(subCtx context.Context, filters []im.DataVersionF
 	return filters
 }
 
-// result returns the next result the subject may read.
+// result returns the next result the subject may read, or the denial
+// status of a fully concrete path it may not ([readDenialStatus]).
 func (p *primingSource) result() (im.ReadResult, bool) {
 	for {
-		_, rr, ok := p.exp.Next()
+		requested, rr, ok := p.exp.Next()
 		if !ok {
 			return im.ReadResult{}, false
 		}
 		// A path naming another node is refused before any access check
-		// (AttributeReadResponse.ts:205-208 at db021da0).
+		// (AttributeReadResponse.ts:205-208 at db021da0). A result the
+		// subject may not read is its concrete path's denial status, and
+		// left out of a wildcard's (AttributeReadResponse.ts:250-252,
+		// :272-274; review II, R2-P4-nv-02).
 		if rr.Status != im.StatusUnsupportedNode && !p.allow(rr) {
-			continue
+			if !requested.HasEndpoint || !requested.HasCluster || !requested.HasAttribute {
+				continue
+			}
+			return im.ReadResult{Path: rr.Path, Status: p.denial(rr)}, true
 		}
 		if rr.Status == im.StatusSuccess {
 			p.matched++
