@@ -14,7 +14,7 @@ import (
 
 // bindingTableSize is connectedhomeip's Binding::Table::kMaxBindingEntries:
 // CHIP_CONFIG_MAX_BINDING_ENTRIES_PER_FABRIC (4) times CHIP_CONFIG_MAX_FABRICS
-// (16) (src/app/clusters/bindings/binding-table.h:133-134,
+// (16) (src/app/clusters/bindings/binding-table.h:134-135,
 // src/lib/core/CHIPConfig.h:1149 and :799 at 6170af84).
 const bindingTableSize = 4 * 16
 

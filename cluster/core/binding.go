@@ -133,11 +133,11 @@ const (
 // entries together: connectedhomeip's table size
 // Binding::Table::kMaxBindingEntries, CHIP_CONFIG_MAX_BINDING_ENTRIES_PER_FABRIC
 // (4) times CHIP_CONFIG_MAX_FABRICS (16)
-// (src/app/clusters/bindings/binding-table.h:133-134,
+// (src/app/clusters/bindings/binding-table.h:134-135,
 // src/lib/core/CHIPConfig.h:1149 and :799 at 6170af84). connectedhomeip's
 // table is the node's; this bound is each endpoint's server's. The
 // definition gives the list no maximum (constraint "desc", matter.js
-// packages/model/src/standard/elements/binding.element.ts:22 at db021da0).
+// packages/model/src/standard/elements/binding.element.ts:23 at db021da0).
 const bindingMaxEntries = 4 * 16
 
 // bindingInst is the definition (cluster/spec/binding, ADR 0013, from

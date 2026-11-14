@@ -43,7 +43,7 @@ func (crowdedScanDriver) ConnectNetwork(context.Context, []byte, []byte) (status
 // most connectedhomeip's kMaxNetworksInScanResponse results
 // (src/app/clusters/network-commissioning/constants.h:26-28 at 6170af84,
 // "each item will cost ~60 bytes in TLV, thus 15 is a safe upper bound";
-// WifiScanResponse.cpp:64-68 stops encoding there), for an undirected and
+// WifiScanResponse.cpp:65-69 stops encoding there), for an undirected and
 // a directed scan alike, and keeps the strongest signals, those without a
 // known RSSI last (review II, R2-P3-net-04).
 func TestScanNetworksResponseIsBounded(t *testing.T) {

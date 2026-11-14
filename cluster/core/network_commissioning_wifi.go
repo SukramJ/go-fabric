@@ -733,7 +733,7 @@ func configResponse(status netcommdef.NetworkCommissioningStatusEnum, index int)
 // (src/app/clusters/network-commissioning/constants.h:26-28 at 6170af84,
 // "each item will cost ~60 bytes in TLV, thus 15 is a safe upper bound of
 // scan results"), at which WifiScanResponseToTLV::EncodeTo stops
-// (WifiScanResponse.cpp:64-68), so the response fits its message whatever
+// (WifiScanResponse.cpp:65-69), so the response fits its message whatever
 // the number of access points in range (review II, R2-P3-net-04).
 const maxNetworksInScanResponse = 15
 
@@ -1032,7 +1032,7 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 // at once and, while that fails, with the backoff of
 // [WiFiNetworkCommissioning.Start]. connectedhomeip's Linux driver
 // restores its record only (RevertConfiguration,
-// src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:168-172 at
+// src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:169-173 at
 // 6170af84); the Thread server here restores its dataset
 // (network_commissioning_thread.go) (review II, R2-P3-net-02).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
