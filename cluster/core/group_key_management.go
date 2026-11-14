@@ -195,6 +195,12 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 // such an entry. The node removes a removed fabric's state at start the
 // same way (node/fabric_state.go, reconcileFabricState). Best-effort: a
 // store error is logged, and the entry stays for the next start.
+//
+// The removal covers the fabrics a request-free read covers (readFabrics):
+// every fabric the store lists, or else every fabric the Groups manager
+// holds. A store that cannot list fabrics, with no Groups manager set,
+// covers none — nothing is scanned, removed or logged, and such an entry
+// is served as before. Every [store.Port] lists fabrics.
 func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 	fabrics, err := g.readFabrics(ctx)
 	if err != nil {
