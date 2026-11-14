@@ -474,6 +474,23 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 			slog.Any("attribute", w.Path.Attribute),
 			slog.String("value_type", fmt.Sprintf("%T", w.Value.Value)))
 	}
+	txKey := mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
+	// A chunk that continues a chunked write is not judged as a new
+	// request: of it matter.js reads only its writes, MoreChunkedMessages
+	// and SuppressResponse (packages/node/src/node/server/InteractionServer.ts:578-582
+	// at db021da0) — its Timed flag is not looked at, the timed checks ran
+	// for the first chunk, and a chunked write is never timed (:417-424).
+	// A SuppressResponse on it ends the interaction with InvalidAction,
+	// the chunk not applied and the status itself suppressed (:592-597;
+	// InteractionMessenger.ts sends no status for a suppressed request).
+	if b.writeContinues(txKey) {
+		if req.SuppressResponse {
+			b.endWriteInteraction(txKey)
+			return b.replyStatusUnlessSuppressed(true, src, requestHdr, proto, "write_chunk_suppress", im.StatusInvalidAction)
+		}
+		req.TimedRequest = false
+		return b.applyWrite(ctx, src, requestHdr, proto, dispatcher, req, txKey)
+	}
 	// A chunked write may not suppress the response — matter.js
 	// packages/node/src/node/server/InteractionServer.ts:410-415 at
 	// db021da0 rejects the combination with InvalidAction before any
@@ -495,6 +512,25 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write", status)
 	}
+	return b.applyWrite(ctx, src, requestHdr, proto, dispatcher, req, txKey)
+}
+
+// writeContinues reports whether key's exchange has a chunked write in
+// progress — a previous chunk announced more and the interaction has not
+// lapsed ([writeTxTTL]) — so the chunk that arrives on it continues that
+// write.
+func (b *Bridge) writeContinues(key mrp.ExchangeKey) bool {
+	v, ok := b.routing.writeTxs.Load(key)
+	if !ok {
+		return false
+	}
+	w, isTx := v.(*writeTx)
+	return isTx && b.clk().Now().Sub(time.Unix(0, w.lastChunk.Load())) <= writeTxTTL
+}
+
+// applyWrite runs a WriteRequest that passed the interaction's checks —
+// a first message, or a chunk that continues one — and answers it.
+func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.WriteRequest, txKey mrp.ExchangeKey) error {
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
 	// same way reads do via [im.FabricFilterFromContext]. Without
@@ -533,7 +569,6 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// A chunk that would open one chunked write more than the session may
 	// have is answered Busy before anything is held or written
 	// ([maxChunkedWritesPerSession]).
-	txKey := mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
 	tx := b.routing.writeTransaction(txKey, req.MoreChunkedMessages, b.clk().Now())
 	if tx == nil {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)

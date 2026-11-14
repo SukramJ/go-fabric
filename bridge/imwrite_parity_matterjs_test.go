@@ -223,6 +223,13 @@ func TestWriteOtherNodeParity(t *testing.T) {
 	}
 }
 
+// silent reports that the bridge sends no IM message within wait.
+func (p *imPeer) silent(wait time.Duration) bool {
+	p.t.Helper()
+	_, _, ok := p.next(wait)
+	return !ok
+}
+
 func timedRequestBytes(t *testing.T, ms uint16) []byte {
 	t.Helper()
 	enc := tlv.NewEncoder()
@@ -303,4 +310,52 @@ func TestChunkedWriteInTimedWindowParity(t *testing.T) {
 	if n := srv.writes(); n != 0 {
 		t.Fatalf("%d writes, want 0", n)
 	}
+}
+
+// TestWriteContinuationChunkParity: of a chunk that continues a chunked
+// write only its writes, MoreChunkedMessages and SuppressResponse are read
+// (InteractionServer.ts:578-582 at db021da0): its Timed flag is not judged
+// again, and a SuppressResponse on it ends the interaction with
+// INVALID_ACTION, itself suppressed, the chunk not applied (:592-597).
+func TestWriteContinuationChunkParity(t *testing.T) {
+	t.Parallel()
+	chunk := func(v uint16, more, suppress, timed bool) im.WriteRequest {
+		return im.WriteRequest{MoreChunkedMessages: more, SuppressResponse: suppress, TimedRequest: timed, Writes: []im.AttributeWrite{
+			{Path: onTimePath(), Value: im.AttributeValue{Value: v}},
+		}}
+	}
+	t.Run("SuppressResponse on the final chunk", func(t *testing.T) {
+		t.Parallel()
+		b, srv := onTimeBridge(t)
+		p := newIMPeer(t, b)
+		const x = 0x4203
+		p.send(x, im.OpcodeWriteRequest, writeRequestBytes(t, chunk(5, true, false, false)))
+		if proto, _, ok := p.next(2 * time.Second); !ok || proto.Opcode != im.OpcodeWriteResponse {
+			t.Fatalf("chunk 1: reply %+v (ok %t), want a WriteResponse", proto, ok)
+		}
+		p.send(x, im.OpcodeWriteRequest, writeRequestBytes(t, chunk(9, false, true, false)))
+		if !p.silent(300 * time.Millisecond) {
+			t.Error("the bridge answered a suppressed continuation chunk")
+		}
+		if v, _ := srv.MatterRead(0x4001); fmt.Sprint(v) != "5" || srv.writes() != 1 {
+			t.Fatalf("OnTime %v after %d writes, want 5 after one", v, srv.writes())
+		}
+	})
+	t.Run("Timed flag on a continuation chunk", func(t *testing.T) {
+		t.Parallel()
+		b, srv := onTimeBridge(t)
+		p := newIMPeer(t, b)
+		const x = 0x4204
+		p.send(x, im.OpcodeWriteRequest, writeRequestBytes(t, chunk(5, true, false, false)))
+		if proto, _, ok := p.next(2 * time.Second); !ok || proto.Opcode != im.OpcodeWriteResponse {
+			t.Fatalf("chunk 1: reply %+v (ok %t), want a WriteResponse", proto, ok)
+		}
+		p.send(x, im.OpcodeWriteRequest, writeRequestBytes(t, chunk(9, false, false, true)))
+		if proto, _, ok := p.next(2 * time.Second); !ok || proto.Opcode != im.OpcodeWriteResponse {
+			t.Fatalf("chunk 2: reply %+v (ok %t), want a WriteResponse", proto, ok)
+		}
+		if v, _ := srv.MatterRead(0x4001); fmt.Sprint(v) != "9" || srv.writes() != 2 {
+			t.Fatalf("OnTime %v after %d writes, want 9 after two", v, srv.writes())
+		}
+	})
 }
