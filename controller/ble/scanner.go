@@ -4,6 +4,7 @@
 package ble
 
 import (
+	"container/list"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -42,6 +43,15 @@ const (
 	// (SCAN_TRANSITION_TIMEOUT).
 	ScanTransitionTimeout = 10 * time.Second
 )
+
+// maxScannerRecords is how many records a scanner holds; past it the
+// record seen longest ago is forgotten. It follows the controller's
+// DNS-SD cache bound on what unauthenticated senders make it hold
+// (client/discovery/names.go, maxCachedRecords = 8192): any party in
+// radio range advertises from as many addresses as it likes, and while a
+// discovery runs no record ages out (ageOfLocked). matter.js has no bound
+// (review II, R2-P3-ble-02).
+const maxScannerRecords = 8192
 
 // ErrScanTransitionTimeout is a client's scan start or stop that did not
 // settle within [ScanTransitionTimeout] — matter.js's PromiseTimeoutError
@@ -88,6 +98,8 @@ type record struct {
 	lastSeen       time.Time
 	seenAt         time.Duration
 	hasSeenAt      bool
+	// place is the record's element in Scanner.seen.
+	place *list.Element
 }
 
 // waiter is one discovery waiting for an advertisement it selects (:77-82).
@@ -119,9 +131,13 @@ type Scanner struct {
 	// :160-172).
 	scans scanQueue
 
-	// mu guards activeDiscoveries, closed, lastScanEndedAt, records, scanning and waiters.
-	mu                sync.Mutex
-	records           map[string]*record
+	// mu guards activeDiscoveries, byData, closed, lastScanEndedAt, records, scanning, seen and waiters.
+	mu      sync.Mutex
+	records map[string]*record
+	// byData indexes records by their service data, and seen holds their
+	// addresses in the order last seen ([maxScannerRecords]).
+	byData            map[string]map[string]*record
+	seen              *list.List
 	waiters           map[*waiter]struct{}
 	activeDiscoveries int
 	scanning          bool
@@ -165,6 +181,7 @@ func NewScanner(client Central, opts ScannerOptions) *Scanner {
 	s := &Scanner{
 		client: client, clock: opts.Clock, log: opts.Logger,
 		records: map[string]*record{}, waiters: map[*waiter]struct{}{},
+		byData: map[string]map[string]*record{}, seen: list.New(),
 	}
 	client.SetDiscoveryCallback(s.handleDiscovered)
 	return s
@@ -201,17 +218,17 @@ func (s *Scanner) handleDiscovered(p Peripheral, serviceData []byte) {
 	defer s.mu.Unlock()
 	s.forgetAgedOutLocked(listening, hasListening)
 	dataHex := hex.EncodeToString(serviceData)
-	for addr, other := range s.records {
-		if addr == p.Address || other.serviceDataHex != dataHex {
+	for addr, other := range s.byData[dataHex] {
+		if addr == p.Address {
 			continue
 		}
 		if s.silenceOfLocked(other, listening, hasListening) <= StaleEntryAge {
 			continue
 		}
 		s.log.Debug("matter.ble.scan.rotated", slog.String("dropped", addr), slog.String("address", p.Address))
-		delete(s.records, addr)
+		s.forgetLocked(addr)
 	}
-	s.records[p.Address] = &record{device: dev, serviceDataHex: dataHex, lastSeen: s.clock.Now(), seenAt: listening, hasSeenAt: hasListening}
+	s.storeLocked(&record{device: dev, serviceDataHex: dataHex, lastSeen: s.clock.Now(), seenAt: listening, hasSeenAt: hasListening})
 	if !s.isReachable(p.Address) {
 		return
 	}
@@ -219,6 +236,47 @@ func (s *Scanner) handleDiscovered(p Peripheral, serviceData []byte) {
 	for w := range s.waiters {
 		if w.id.MatchesBLE(&dd) {
 			s.finishLocked(w, nil)
+		}
+	}
+}
+
+// storeLocked stores r as its address's record and, past
+// [maxScannerRecords], forgets the records seen longest ago.
+func (s *Scanner) storeLocked(r *record) {
+	addr := r.device.Peripheral.Address
+	s.forgetLocked(addr)
+	s.records[addr] = r
+	r.place = s.seen.PushBack(addr)
+	same := s.byData[r.serviceDataHex]
+	if same == nil {
+		same = map[string]*record{}
+		s.byData[r.serviceDataHex] = same
+	}
+	same[addr] = r
+	dropped := 0
+	for len(s.records) > maxScannerRecords {
+		oldest, _ := s.seen.Front().Value.(string)
+		s.forgetLocked(oldest)
+		dropped++
+	}
+	if dropped > 0 {
+		s.log.Debug("matter.ble.scan.records_evicted", slog.Int("dropped", dropped),
+			slog.String("reason", "the scanner holds at most "+strconv.Itoa(maxScannerRecords)+" records"))
+	}
+}
+
+// forgetLocked deletes the record of addr, if any.
+func (s *Scanner) forgetLocked(addr string) {
+	r, ok := s.records[addr]
+	if !ok {
+		return
+	}
+	delete(s.records, addr)
+	s.seen.Remove(r.place)
+	if same := s.byData[r.serviceDataHex]; same != nil {
+		delete(same, addr)
+		if len(same) == 0 {
+			delete(s.byData, r.serviceDataHex)
 		}
 	}
 }
@@ -257,10 +315,15 @@ func (s *Scanner) ageOfLocked(r *record, listening time.Duration, hasListening b
 
 // forgetAgedOutLocked is #forgetAgedOut (:289-297).
 func (s *Scanner) forgetAgedOutLocked(listening time.Duration, hasListening bool) {
+	if !hasListening && s.activeDiscoveries > 0 {
+		// ageOfLocked is 0 for every record: nothing ages out, and the
+		// walk is skipped (review II, R2-P3-ble-02).
+		return
+	}
 	for addr, r := range s.records {
 		if age := s.ageOfLocked(r, listening, hasListening); age > RecordMaxAge {
 			s.log.Debug("matter.ble.scan.forget", slog.String("address", addr), slog.Duration("age", age))
-			delete(s.records, addr)
+			s.forgetLocked(addr)
 		}
 	}
 }
@@ -478,7 +541,7 @@ func (s *Scanner) Find(ctx context.Context, id discovery.Identifier, timeout tim
 	s.mu.Lock()
 	if ignoreExisting {
 		for _, r := range s.devicesLocked(id, true) {
-			delete(s.records, r.device.Peripheral.Address)
+			s.forgetLocked(r.device.Peripheral.Address)
 		}
 	}
 	var found []*record
@@ -606,7 +669,7 @@ func (s *Scanner) ForgetCommissioned(peripheralAddresses []string, identity *Com
 	for _, addr := range peripheralAddresses {
 		if _, ok := s.records[addr]; ok {
 			s.log.Debug("matter.ble.scan.forget_commissioned", slog.String("address", addr))
-			delete(s.records, addr)
+			s.forgetLocked(addr)
 		}
 	}
 	if identity == nil {
@@ -623,7 +686,7 @@ func (s *Scanner) ForgetCommissioned(peripheralAddresses []string, identity *Com
 			continue
 		}
 		s.log.Debug("matter.ble.scan.forget_identity", slog.String("address", addr))
-		delete(s.records, addr)
+		s.forgetLocked(addr)
 	}
 }
 
