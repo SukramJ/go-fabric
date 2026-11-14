@@ -389,6 +389,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}); err != nil {
 		return nil, err
 	}
+	// The root's construction rolled back an uncommitted UpdateNOC and
+	// committed the row back: the next process finds nothing to roll back,
+	// so the store-side consequence runs here, not at Start, which a host
+	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
+	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
 	// DiagnosticLogs hands logs over BDX on the requesting session
 	// (ADR 0021).
@@ -897,21 +902,33 @@ func (n *Node) reportRolledBackFabrics(ctx context.Context) {
 	}
 	// A rolled-back UpdateNOC runs what its rollback at run time runs
 	// through the OnFabricUpdated hook (observedFabricUpdated): the
-	// fabric's resumption records made under the uncommitted identity go,
-	// with the client stack's records, and the host hears the fabric
-	// reverted (review II, R2-P2-dr-noc-05). The CASE identity and the
-	// operational record are not moved here: nothing is announced and no
-	// session exists before the bridge starts, and Start loads and
-	// announces the identity as the store holds it again.
+	// fabric's resumption records made under the uncommitted identity go —
+	// in New already (removeRolledBackUpdateResumptions) — with the client
+	// stack's records, and the host hears the fabric reverted (review II,
+	// R2-P2-dr-noc-05). The CASE identity and the operational record are
+	// not moved here: nothing is announced and no session exists before
+	// the bridge starts, and Start loads and announces the identity as the
+	// store holds it again.
 	updates := n.root.OperationalCredentials.RolledBackUpdates()
 	for i := range updates {
 		idx := updates[i].FabricIndex
 		n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
+		n.closeClientFabricSessions(ctx, idx)
+		n.notifyFabricUpdated(ctx, idx)
+	}
+}
+
+// removeRolledBackUpdateResumptions removes the resumption records of each
+// fabric whose UpdateNOC the root's construction rolled back: those made
+// under the uncommitted identity are the rollback's store-side
+// consequence, which no later process could run.
+func (n *Node) removeRolledBackUpdateResumptions(ctx context.Context) {
+	updates := n.root.OperationalCredentials.RolledBackUpdates()
+	for i := range updates {
+		idx := updates[i].FabricIndex
 		if err := n.st.RemoveResumptionsByFabric(ctx, idx); err != nil {
 			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
 		}
-		n.closeClientFabricSessions(ctx, idx)
-		n.notifyFabricUpdated(ctx, idx)
 	}
 }
 

@@ -140,6 +140,47 @@ func TestRestartRollsBackAnUncommittedUpdateWithItsConsequences(t *testing.T) {
 	}
 }
 
+// TestRestartBetweenNewAndStartKeepsTheUpdatesStoreConsequence pins review
+// II R2-P2-rr-dev-09: the node built on a database with an uncommitted
+// UpdateNOC rolls the update back in New; a process that ends before
+// Start — the host's own start-up failed — has committed the row back, so
+// the next process finds nothing to roll back. The store-side consequence
+// of the rollback, the removal of the resumption records made under the
+// uncommitted identity, has run in New already: no later process could
+// run it.
+func TestRestartBetweenNewAndStartKeepsTheUpdatesStoreConsequence(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "node.db")
+	db := openDB(t, path)
+	_, c, _ := commissioned(t, minimalConfig(db))
+	idx := c.FabricIndex()
+	st := store.New(db)
+	id, err := st.GetIdentity(ctx, idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: id.NOC, ICAC: id.ICAC, PrivateKey: id.PrivateKey, NodeID: testNodeID + 1}); err != nil {
+		t.Fatal(err)
+	}
+	const peer = 0x77
+	if err := st.UpsertResumption(ctx, store.ResumptionRecord{FabricIndex: idx, PeerNodeID: peer, ResumptionID: bytes.Repeat([]byte{1}, 16), SharedSecret: bytes.Repeat([]byte{2}, 32)}); err != nil {
+		t.Fatal(err)
+	}
+
+	newNode(t, minimalConfig(openDB(t, path))) // never started: the process ends
+	if _, err := st.GetResumptionByPeer(ctx, idx, peer); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Fatalf("the resumption record made under the update New rolled back: %v; want ErrResumptionNotFound", err)
+	}
+	again := newNode(t, minimalConfig(openDB(t, path)))
+	if err := again.Start(ctx); err != nil {
+		t.Fatalf("Start of the next process: %v", err)
+	}
+	if _, err := st.GetResumptionByPeer(ctx, idx, peer); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Fatalf("the resumption record made under the rolled-back update in the next process: %v; want ErrResumptionNotFound", err)
+	}
+}
+
 // TestWiFiNetworkListIsStoredBeforeTheFabricCommit pins review II
 // R2-P2-store-01: a Wi-Fi node stores its network list before
 // CommissioningComplete commits the fabric, and a store that refuses the
