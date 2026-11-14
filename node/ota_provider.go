@@ -40,6 +40,19 @@ type OTAProviderConfig struct {
 	// BDXMaxBlockSize (mattercore.OTAProviderConfig.TransferBlockSize);
 	// nil uses BDXMaxBlockSize.
 	TransferBlockSize func(peer OTAPeer) uint16
+	// GrantFabric decides, per fabric of the node, whether the provider
+	// writes its ACL entry into that fabric's ACL: Operate for CASE, no
+	// subject, the provider's endpoint and cluster — every node of the
+	// fabric may then invoke the provider. nil writes it into no fabric.
+	// matter.js writes it only into the first fabric its node's own
+	// controller administers, by root certificate
+	// (OtaSoftwareUpdateProviderServer.ts:116-124 at db021da0;
+	// FabricAuthority.ts:112-114, :126-128), and a [Node] has no controller
+	// of its own, so no fabric gets it unasked: the fabric's administrator
+	// grants the access, or the host returns true here for the fabrics it
+	// opens the provider to. The node asks at Start and after each
+	// CommissioningComplete, on the calling goroutine.
+	GrantFabric func(fabric FabricInfo) bool
 }
 
 // otaProviderKey is the stable key the provider endpoint's number is kept
@@ -190,18 +203,20 @@ func (n *Node) otaProviderEndpointID() (uint16, bool) {
 	return 0, false
 }
 
-// ensureOTAProviderACL lets every node of every fabric invoke the
+// ensureOTAProviderACL lets every node of a granted fabric invoke the
 // provider: an Operate entry for CASE, no subject, the provider's endpoint
-// and cluster — added once per fabric whose ACL has none. matter.js adds
-// it on the first fabric only (OP:116-158 #nodeOnline,
-// fabricAuthority.fabrics[0] at :118), so a requestor on a second fabric of
-// a multi-admin bridge could not query; this module grants it on each
-// (BD-Matter-OTAProvider-ACLEveryFabric). The facade calls it at Start and
-// after each CommissioningComplete.
+// and cluster — added once to each fabric [OTAProviderConfig].GrantFabric
+// grants whose ACL has none, and to no fabric without GrantFabric.
+// matter.js adds it to the first fabric its own controller administers
+// (OtaSoftwareUpdateProviderServer.ts:116-124 at db021da0,
+// fabricAuthority.fabrics[0]; FabricAuthority.ts:112-114, :126-128: the
+// fabrics whose root certificate is its CA's), which a [Node] does not
+// have. The facade calls it at Start and after each CommissioningComplete.
 func (n *Node) ensureOTAProviderACL(ctx context.Context) {
-	if n.otaProvider == nil {
+	if n.otaProvider == nil || n.cfg.OTAProvider == nil || n.cfg.OTAProvider.GrantFabric == nil {
 		return
 	}
+	grant := n.cfg.OTAProvider.GrantFabric
 	epID, ok := n.otaProviderEndpointID()
 	if !ok {
 		return
@@ -211,7 +226,9 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 		return
 	}
 	for i := range fabrics {
-		n.ensureOTAProviderACLOn(ctx, fabrics[i].FabricIndex, epID)
+		if grant(fabricInfoOf(fabrics[i])) {
+			n.ensureOTAProviderACLOn(ctx, fabrics[i].FabricIndex, epID)
+		}
 	}
 }
 

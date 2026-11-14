@@ -220,7 +220,13 @@ func newOTASite(t *testing.T, o otaSiteOptions) *otaSite {
 	}
 	s.c = s.site.AddController(fabrictest.ControllerOptions{})
 	s.prov = s.site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) {
-		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: s.src, Consent: s.consent}
+		cfg.OTAProvider = &node.OTAProviderConfig{
+			ImageSource: s.src, Consent: s.consent,
+			// matter.js's provider sits on the controller, whose own fabric
+			// gets the provider's ACL entry (OtaSoftwareUpdateProviderServer.ts
+			// :116-124 at db021da0); the site's one fabric stands for it.
+			GrantFabric: func(node.FabricInfo) bool { return true },
+		}
 	}})
 	s.prov.Node().OnOTAProviderStatus(s.statuses.add)
 	dir := filepath.Join(t.TempDir(), "ota")
