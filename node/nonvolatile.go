@@ -445,6 +445,67 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 	}
 }
 
+// forget lets go of the servers met at the endpoint keys of a forgotten
+// endpoint ([Aggregator.Forget]), which has left for good: their change
+// subscriptions end, a key the store refused a change of is written once
+// more, and the persister references them no longer. A server met at
+// such a key later is restored as a new one. A removed endpoint
+// ([Aggregator.Remove]) is not forgotten: its servers keep their state
+// and subscription for the Add that brings it back.
+func (v *nonVolatile) forget(ctx context.Context, endpointKeys []string) {
+	ctx = context.WithoutCancel(ctx)
+	v.mu.Lock()
+	var (
+		released     []contract.ClusterServer
+		unsubscribes []func()
+	)
+	for slot, srv := range v.slots {
+		if !slotOfAny(slot, endpointKeys) {
+			continue
+		}
+		if rec := v.servers[srv]; rec != nil {
+			unsubscribes = append(unsubscribes, rec.unsubscribe)
+		}
+		delete(v.servers, srv)
+		delete(v.slots, slot)
+		released = append(released, srv)
+	}
+	var keys map[string]*nvKey
+	if len(released) > 0 {
+		keys = maps.Clone(v.keys)
+	}
+	v.mu.Unlock()
+	for _, unsubscribe := range unsubscribes {
+		unsubscribe()
+	}
+	for key, k := range keys {
+		k.store.Lock()
+		if k.srv != nil && slices.Contains(released, k.srv) {
+			if k.owed {
+				v.storeHeld(ctx, k, key)
+			}
+			k.srv = nil
+		}
+		k.store.Unlock()
+	}
+}
+
+// slotOfAny reports whether slot ([nonVolatileSlot]) is a cluster's slot
+// at one of endpointKeys: the key, a dot and the cluster id in hex, so a
+// key that extends another by a dot is not taken for it.
+func slotOfAny(slot string, endpointKeys []string) bool {
+	for _, key := range endpointKeys {
+		rest, ok := strings.CutPrefix(slot, nonVolatileKeyRoot+key+".")
+		if !ok || rest == "" || strings.Contains(rest, ".") {
+			continue
+		}
+		if _, err := strconv.ParseUint(rest, 16, 32); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // stop ends the persister: no change is stored from here on, and every
 // key the store refused a change of is written once more.
 func (v *nonVolatile) stop(ctx context.Context) {

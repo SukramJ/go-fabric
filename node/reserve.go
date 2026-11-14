@@ -136,13 +136,15 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 }
 
 // erase frees every stored number of a forgotten key: its reservation's
-// tree, the tree it had in the set, and the key itself.
+// tree, the tree it had in the set, and the key itself. The nonvolatile
+// persister lets go of the servers it met at those keys.
 func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
 	tree, err := a.n.persisted.release(ctx, op.key)
+	keys := slices.Concat([]string{op.key}, op.tree, tree)
+	a.n.nonVolatile.forget(ctx, keys)
 	if err != nil {
 		return err
 	}
-	keys := slices.Concat([]string{op.key}, op.tree, tree)
 	return a.removeRecords(ctx, "", keys)
 }
 

@@ -154,6 +154,36 @@ func TestNonVolatileRejoinKeepsTheServedValue(t *testing.T) {
 	}
 }
 
+// TestNonVolatileForgottenDeviceIsReleased: a Device the host forgets
+// (Aggregator.Forget) has left for good; the persister lets go of its
+// servers, so a change it makes afterwards is not stored for the key.
+func TestNonVolatileForgottenDeviceIsReleased(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	mem := memstore.New()
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: mem, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	if st := dispatchWrite(t, n, path, int64(2100)); st != im.StatusSuccess {
+		t.Fatalf("write: %v", st)
+	}
+	srv := n.Bridge().Topology().FindByID(ep).Source.(*device.Device).Server(thermostatdef.ClusterID)
+	if err := n.Aggregator().Forget(ctx, endpoint.StringKey(nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := endpointOf(t, n, nvHeat.key); ok {
+		t.Fatal("the device is still served after Forget")
+	}
+	if err := srv.(spec.AttributeSetter).SetAttributes(map[uint32]any{thermostatdef.AttrOccupiedHeatingSetpoint: int16(2250)}); err != nil {
+		t.Fatal(err)
+	}
+	key := "nonvolatile.thermo.0201.0012"
+	if v, _, err := mem.GetSetting(ctx, key); err != nil || v != nvStoredTLV(t, int64(2100)) {
+		t.Errorf("stored %q (%v) after the forgotten device's change, want 2100's TLV %q", v, err, nvStoredTLV(t, int64(2100)))
+	}
+}
+
 // TestNonVolatileChangeOwedWhileTheStoreRefuses: a change the store
 // refuses is written when the node stops, so the restart serves it
 // (R2-P2-dr-node-01).
