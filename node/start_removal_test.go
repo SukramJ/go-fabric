@@ -81,3 +81,74 @@ func TestLastFabricRemovedDuringStartReopensTheWindow(t *testing.T) {
 		t.Fatalf("no own commissioning window after the last fabric was removed during Start (window %+v)", n.Window())
 	}
 }
+
+// recordingAdvertiser runs remove once, when the node publishes its first
+// operational record — before that record is out — and keeps the
+// operational records published.
+type recordingAdvertiser struct {
+	*mdns.Noop
+	once   sync.Once
+	remove func(ctx context.Context)
+	mu     sync.Mutex
+	live   map[string]bool
+}
+
+func (a *recordingAdvertiser) Publish(ctx context.Context, svc mdns.Service) error {
+	if svc.ServiceType == mdns.ServiceTypeOperational {
+		a.once.Do(func() { a.remove(ctx) })
+		a.mu.Lock()
+		a.live[svc.InstanceName] = true
+		a.mu.Unlock()
+	}
+	return a.Noop.Publish(ctx, svc)
+}
+
+func (a *recordingAdvertiser) Withdraw(ctx context.Context, instance, serviceType string) error {
+	if serviceType == mdns.ServiceTypeOperational {
+		a.mu.Lock()
+		delete(a.live, instance)
+		a.mu.Unlock()
+	}
+	return a.Noop.Withdraw(ctx, instance, serviceType)
+}
+
+// TestFabricRemovedDuringStartLeavesNoOperationalRecord: a fabric removed
+// while Start publishes its operational record — the removal's withdraw
+// runs before the record is out — is not left published
+// (review II, R2-P2-fabric-05).
+func TestFabricRemovedDuringStartLeavesNoOperationalRecord(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	path := filepath.Join(t.TempDir(), "node.db")
+	first, c, _ := commissioned(t, minimalConfig(openDB(t, path)))
+	fabricIndex := c.FabricIndex()
+	if err := first.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var n *node.Node
+	removed := make(chan error, 1)
+	adv := &recordingAdvertiser{Noop: mdns.NewNoop(), live: map[string]bool{}, remove: func(ctx context.Context) {
+		removed <- n.RemoveFabric(ctx, fabricIndex)
+	}}
+	cfg := minimalConfig(openDB(t, path))
+	cfg.Advertiser = adv
+	n = newNode(t, cfg)
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	select {
+	case err := <-removed:
+		if err != nil {
+			t.Fatalf("RemoveFabric during Start: %v", err)
+		}
+	default:
+		t.Fatal("Start published no operational record: the removal did not run during Start")
+	}
+	adv.mu.Lock()
+	defer adv.mu.Unlock()
+	if len(adv.live) != 0 {
+		t.Errorf("operational records published after the fabric's removal: %v", adv.live)
+	}
+}

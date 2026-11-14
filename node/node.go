@@ -585,12 +585,29 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
 		return
 	}
+	if !n.announceInstalled(ctx, fabricIndex) {
+		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
+	}
+}
+
+// announceInstalled publishes fabricIndex's operational record from the
+// fabric's loaded CASE identity, and reports false for a fabric without
+// one. A removal or an UpdateNOC that forgot or replaced the identity
+// while the record was being published withdrew a record that was not
+// yet out; the record is withdrawn again once it is, so a removed
+// fabric's record does not stay published (review II, R2-P2-fabric-05).
+// The withdraw and the publish of one fabric are ordered by the identity:
+// a removal forgets it before it withdraws ([Node.fabricRemoved]).
+func (n *Node) announceInstalled(ctx context.Context, fabricIndex uint8) bool {
 	compressedID, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
 	if !ok {
-		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
-		return
+		return false
 	}
 	n.br.AnnounceFabric(ctx, fabricIndex, compressedID, nodeID)
+	if c, id, still := n.caseIDs.announceIdentity(fabricIndex); !still || c != compressedID || id != nodeID {
+		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
+	}
+	return true
 }
 
 // fabricLeaving is the cluster's OnFabricLeaving hook: the Leave event,
@@ -1053,8 +1070,10 @@ func (n *Node) startLocked(ctx context.Context) error {
 			n.logger.Warn("ota.requestor_start", slog.Any("err", err))
 		}
 	}
-	for _, fabric := range loaded {
-		n.br.AnnounceFabric(ctx, fabric.FabricIndex, fabric.CompressedID, fabric.NodeID)
+	// A fabric removed since its identity loaded is not announced, and
+	// one removed while its record went out is withdrawn again.
+	for i := range loaded {
+		n.announceInstalled(ctx, loaded[i].FabricIndex)
 	}
 	// The server is ready: without a time the root's TimeSynchronization
 	// asks the trusted time source, then the default NTP server
