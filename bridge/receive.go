@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -196,7 +197,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Any("err", err))
 		return err
 	}
-	b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
+	if !duplicate {
+		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
+	}
 
 	// Reliable inbound traffic: register an ACK obligation. The
 	// pump goroutine fires a StandaloneAck if no piggyback opportunity
@@ -309,13 +312,14 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 // (packages/protocol/src/protocol/ExchangeManager.ts:244-256,
 // packages/protocol/src/session/UnsecuredSession.ts:94-102 at db021da0).
 //
-// Here a window is bound to the exchange of its source's latest message and
-// is dropped at the end of a message whose exchange holds no handshake
+// Here a window is bound to the exchanges of its source's new messages and
+// is dropped at the end of a message once none of them holds handshake
 // state ([Bridge.unsecuredExchangeLive]), and by the next new source once
-// its handshake's state is gone. So a source whose datagram starts nothing
+// its handshakes' state is gone. So a source whose datagram starts nothing
 // leaves nothing behind, and a handshake's window stays while a
 // retransmission of its last message can still arrive — until its reply is
-// acknowledged or given up.
+// acknowledged or given up — whatever exchange another datagram claiming
+// the same source node id names (review II, R2-P2-dr-req-02).
 //
 // Creation stays capped at [maxUnsecuredWindows]: past the cap a new source
 // is treated as fresh. The cap counts windows that are in use by a message
@@ -329,11 +333,13 @@ type unsecuredWindowTable struct {
 // unsecuredWindowEntry is one source's window and what holds it.
 type unsecuredWindowEntry struct {
 	window *mrp.Window
-	// exchange is the exchange id of the source's latest message; bound
-	// is false until the first message's protocol header was read (and
-	// for a window the bridgetest seam anchored).
-	exchange uint16
-	bound    bool
+	// exchanges are the exchange ids of the source's new messages whose
+	// exchange held handshake state at the end of a message, plus those of
+	// the messages in dispatch; empty until the first message's protocol
+	// header was read (and for a window the bridgetest seam anchored).
+	// A message's end prunes those that hold no state any more, so the
+	// set stays within the live handshakes and the messages in dispatch.
+	exchanges []uint16
 	// inUse counts the source's messages between their window lookup and
 	// the end of their dispatch; such a window is never swept.
 	inUse int
@@ -401,8 +407,9 @@ func unsecuredSource(hdr *message.Header) (uint64, bool) {
 	return hdr.SourceNodeID, true
 }
 
-// bindUnsecuredWindow records exchangeID as the exchange of the latest
-// message of hdr's unsecured source.
+// bindUnsecuredWindow adds exchangeID to the exchanges of hdr's unsecured
+// source; the caller binds new messages only, so a replayed datagram moves
+// nothing.
 func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
 	id, ok := unsecuredSource(hdr)
 	if !ok {
@@ -411,15 +418,28 @@ func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if e, ok := t.entries[id]; ok {
-		e.exchange, e.bound = exchangeID, true
+	if e, ok := t.entries[id]; ok && !slices.Contains(e.exchanges, exchangeID) {
+		e.exchanges = append(e.exchanges, exchangeID)
 	}
+}
+
+// liveUnsecuredExchanges returns those of exchanges that hold handshake
+// state. The caller must not hold the window table's lock.
+func (b *Bridge) liveUnsecuredExchanges(exchanges []uint16) []uint16 {
+	var live []uint16
+	for _, exchange := range exchanges {
+		if b.unsecuredExchangeLive(exchange) {
+			live = append(live, exchange)
+		}
+	}
+	return live
 }
 
 // releaseUnsecuredWindow ends one message of hdr's unsecured source in
 // dispatch and drops the window when no message of that source is in
-// dispatch and its exchange holds no handshake state — the message was not
-// adopted by a handshake, or ended it.
+// dispatch and none of its exchanges holds handshake state — the message
+// was not adopted by a handshake, or ended it. A window that stays keeps
+// only its live exchanges.
 func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 	id, ok := unsecuredSource(hdr)
 	if !ok {
@@ -435,16 +455,22 @@ func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 	if e.inUse > 0 {
 		e.inUse--
 	}
-	idle, bound, exchange := e.inUse == 0, e.bound, e.exchange
+	idle, exchanges := e.inUse == 0, slices.Clone(e.exchanges)
 	t.mu.Unlock()
-	if !idle || (bound && b.unsecuredExchangeLive(exchange)) {
+	if !idle {
 		return
 	}
+	live := b.liveUnsecuredExchanges(exchanges)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if cur, ok := t.entries[id]; ok && cur == e && e.inUse == 0 && e.bound == bound && e.exchange == exchange {
-		delete(t.entries, id)
+	if cur, ok := t.entries[id]; !ok || cur != e || e.inUse != 0 || !slices.Equal(e.exchanges, exchanges) {
+		return
 	}
+	if len(exchanges) > 0 && len(live) > 0 {
+		e.exchanges = live
+		return
+	}
+	delete(t.entries, id)
 }
 
 // sweepUnsecuredWindows drops every window that no message is in dispatch
@@ -456,8 +482,10 @@ func (b *Bridge) sweepUnsecuredWindows() {
 	t.mu.Lock()
 	idle := make(map[uint16]bool)
 	for _, e := range t.entries {
-		if e.inUse == 0 && e.bound {
-			idle[e.exchange] = false
+		if e.inUse == 0 {
+			for _, exchange := range e.exchanges {
+				idle[exchange] = false
+			}
 		}
 	}
 	t.mu.Unlock()
@@ -470,7 +498,17 @@ func (b *Bridge) sweepUnsecuredWindows() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for id, e := range t.entries {
-		if live, seen := idle[e.exchange]; seen && !live && e.inUse == 0 && e.bound {
+		if e.inUse != 0 || len(e.exchanges) == 0 {
+			continue
+		}
+		held := false
+		for _, exchange := range e.exchanges {
+			if live, seen := idle[exchange]; !seen || live {
+				held = true
+				break
+			}
+		}
+		if !held {
 			delete(t.entries, id)
 		}
 	}

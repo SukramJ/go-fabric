@@ -144,3 +144,44 @@ func TestUnsecuredWindowEndsWithItsHandshake(t *testing.T) {
 		t.Fatalf("%d unsecured windows after the handshake's last message was acknowledged, want 0", n)
 	}
 }
+
+// TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource (review II,
+// R2-P2-dr-req-02): a datagram that names a handshake's source node id —
+// clear text in every unsecured header — and another exchange leaves the
+// handshake's window in place while the handshake holds state, so the
+// handshake's retransmission stays a duplicate: acknowledged, not run
+// again, not counted towards the PASE lockout.
+func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	r.b.AttachPaseHandler(newPaseAdapterWithVerifier(t))
+	peer := newPipelinePeer(t, r.b, 0xC0FFEE)
+	const (
+		exchange     = uint16(0x0202)
+		pake1Counter = 4242
+	)
+	// A Pake1 without a PBKDFParamRequest before it: the failure report
+	// waits for its acknowledgement, so the handshake's exchange is live.
+	_ = sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil)
+	failures := r.b.paseFailures.Load()
+	if !r.b.unsecuredExchangeLive(exchange) {
+		t.Fatal("the handshake's exchange holds no state after its failure report")
+	}
+
+	// The other datagram carries the next counter: it keeps the
+	// handshake's counter inside the window, so what it can remove is the
+	// window itself. (One far from it rolls the window, which is shared
+	// by every message of the source — transport/mrp/window.go diff.)
+	other := newPipelinePeer(t, r.b, 0xC0FFEE)
+	_ = sendAtCounter(other, pake1Counter+1, mrp.StandaloneAckOpcode, 0x7777, nil, nil)
+	if n := r.b.unsecuredWindows.len(); n != 1 {
+		t.Fatalf("%d unsecured windows after a datagram of the same source on another exchange, want the handshake's 1", n)
+	}
+
+	if err := sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil); err != nil {
+		t.Fatalf("the retransmission reached the handshake handler: %v", err)
+	}
+	if n := r.b.paseFailures.Load(); n != failures {
+		t.Fatalf("the retransmission counted %d PASE failures, want %d: it was not a duplicate", n, failures)
+	}
+}
