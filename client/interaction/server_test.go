@@ -330,8 +330,9 @@ func TestServeWrite(t *testing.T) {
 // throws the StatusResponseError out of AttributeWriteResponse.process
 // (packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66 at
 // db021da0) and the messenger answers it as a StatusResponse unless the
-// request suppressed its response (InteractionMessenger.ts:457-459,
-// :317-322), as the device side does ([im.WriteResponse.Status]).
+// request suppressed its response (InteractionMessenger.ts:458-460,
+// :317-322 at db021da0), as the device side does
+// ([im.WriteResponse.Status]).
 func TestServeWriteEndedAtAnElement(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

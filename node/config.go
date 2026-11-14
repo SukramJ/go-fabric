@@ -86,7 +86,8 @@ type Config struct {
 	// the node's own OTA requestor installed is SoftwareUpdateCompleted
 	// whatever this states: the requestor's record of the update in
 	// progress names the version that now runs, the record the requestor
-	// reports VersionApplied on (OtaSoftwareUpdateRequestorServer.ts:255-283).
+	// reports VersionApplied on (OtaSoftwareUpdateRequestorServer.ts:255-280
+	// at db021da0).
 	BootReason uint8
 	// ICD makes the node an intermittently connected device: ICD
 	// Management on the root, Check-Ins to its registered clients, the
