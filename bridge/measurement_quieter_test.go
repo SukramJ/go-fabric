@@ -213,9 +213,10 @@ func TestQuieterChangeInTheRewiringGapIsReportedAtAttach(t *testing.T) {
 // paths of one cluster that changed while no wiring served them —
 // ActivePower and Voltage — advance the cluster's DataVersion once when the
 // next wiring takes them up, as one notification of both does and as one
-// matter.js commit advances a cluster's version once for every property it
-// changed (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457
-// at db021da0). Review II, R2-P4-fr-im-04.
+// matter.js commit advances a cluster's version once, for all the
+// properties it changed
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0). Review II, R2-P4-fr-im-04.
 func TestQuieterChangesInTheRewiringGapAdvanceTheirClusterOnce(t *testing.T) {
 	t.Parallel()
 	r := newQuietMeterRig(t, epmActivePower)

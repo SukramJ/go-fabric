@@ -1132,7 +1132,7 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 // attribute whose report waits for its throttle — and nothing changed
 // without it moves nothing. matter.js advances the version at the commit
 // that changed a value, a quieter one's included
-// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0).
 func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32, advance bool) {
 	if len(changed) == 0 && !advance {

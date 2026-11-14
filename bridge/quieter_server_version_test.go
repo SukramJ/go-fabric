@@ -155,7 +155,7 @@ func (p *engineLevelPort) MoveToLevel(_ context.Context, req lvldef.MoveToLevelR
 // the second change too, whose report the throttle holds back — and a
 // re-wiring before the throttle's report loses no advance. matter.js
 // advances the version at the commit that changed a value
-// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0), a quieter property's included, whenever its report goes out.
 func TestQuieterChangeDuringACommandAdvancesAtTheCommand(t *testing.T) {
 	t.Parallel()

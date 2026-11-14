@@ -27,7 +27,7 @@ import (
 // the write ends. matter.js writes each attribute data in a transaction of
 // its own (packages/protocol/src/action/server/AttributeWriteResponse.ts:426-435
 // at db021da0, openForWrite then commit), and a commit advances the
-// version once for every property it changed
+// version once for whatever it changed
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0).
 type writeHoldTable struct {

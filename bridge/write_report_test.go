@@ -134,8 +134,9 @@ func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
 // (endpoint.WithWriteChanges) carries the server's verdict from the
 // dispatcher to the report. matter.js advances the version only for a
 // commit that changed a value and broadcasts only the changed properties
-// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457, an
-// equal value no change at :1479, at db021da0).
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457, the
+// changed names noted at :1484 and handed on at :1319, an equal value no
+// change at :1479, at db021da0).
 func TestUnchangedWriteOverTheWireIsNotReported(t *testing.T) {
 	t.Parallel()
 	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, Bridged: true})
