@@ -50,3 +50,33 @@ func TestAllocateIDAtAFullTableTakesTheOldestPlaceholderWithoutAWalk(t *testing.
 		t.Fatalf("%d allocations at a full table took %v", len(order), elapsed)
 	}
 }
+
+// TestReleaseStakeFreesOnlyItsOwnStake: a stake whose id an allocation at a
+// full table gave to another handshake releases nothing, and the stake
+// that holds the id now releases it (review II, R2-P3-dr-dev-07).
+func TestReleaseStakeFreesOnlyItsOwnStake(t *testing.T) {
+	t.Parallel()
+	m := NewManager(newMinimalFakeStore())
+	first, err := m.AllocateStake()
+	if err != nil {
+		t.Fatalf("AllocateStake: %v", err)
+	}
+	for range SessionIDSpace - 1 {
+		if _, err := m.AllocateStake(); err != nil {
+			t.Fatalf("AllocateStake: %v", err)
+		}
+	}
+	taker, err := m.AllocateStake()
+	if err != nil || taker.ID != first.ID {
+		t.Fatalf("AllocateStake at a full table = (%d, %v), want the oldest stake's id %d", taker.ID, err, first.ID)
+	}
+	m.ReleaseStake(first)
+	if occ := m.Occupancy(); occ.Reserved != SessionIDSpace {
+		t.Fatalf("after the taken-over stake was released: occupancy %+v, want every id still staked", occ)
+	}
+	m.ReleaseStake(taker)
+	if occ := m.Occupancy(); occ.Reserved != SessionIDSpace-1 {
+		t.Fatalf("after the stake that holds the id was released: occupancy %+v, want one id free", occ)
+	}
+	m.ReleaseStake(Stake{})
+}

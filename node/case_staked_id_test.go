@@ -46,3 +46,49 @@ func TestCASEHandshakesThatDoNotFinishLeaveNoSessionIDReserved(t *testing.T) {
 		t.Fatalf("after %d failed and %d dropped handshakes: occupancy %+v, want nothing reserved", handshakes, handshakes, occ)
 	}
 }
+
+// TestAFailedCASEHandshakeReleasesOnlyItsOwnStake: at a full id space an
+// allocation takes the oldest staked id for a new handshake
+// (BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly); the handshake that
+// had staked it, failing afterwards, gives back its own stake and nothing
+// else — the id stays staked for the handshake that holds it now (review
+// II, R2-P3-dr-dev-07).
+func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
+	t.Parallel()
+	sessions := operational.NewManager(testStore(t))
+	ids := newCaseIdentities(slog.New(slog.DiscardHandler), nil)
+	provider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter {
+		adapter, err := buildCaseAdapter(sessions, ids, nil, slog.New(slog.DiscardHandler), nil)
+		if err != nil {
+			return nil
+		}
+		return adapter
+	})
+	first := bridge.HandshakeKey{InitiatorNodeID: 0xC0DE, ExchangeID: 1}
+	h1, ok := provider.Resolve(first).(*bridge.CaseAdapter)
+	if !ok {
+		t.Fatal("no adapter for the first handshake")
+	}
+	staked := h1.SnapshotResponder().SessionID()
+	// Every other id staked too: the table is full of stakes.
+	for range operational.SessionIDSpace - 1 {
+		if _, err := sessions.AllocateID(); err != nil {
+			t.Fatalf("AllocateID: %v", err)
+		}
+	}
+	if occ := sessions.Occupancy(); occ.Reserved != operational.SessionIDSpace {
+		t.Fatalf("occupancy %+v, want every id staked", occ)
+	}
+	h2, ok := provider.Resolve(bridge.HandshakeKey{InitiatorNodeID: 0xC0DE, ExchangeID: 2}).(*bridge.CaseAdapter)
+	if !ok {
+		t.Fatal("no adapter for the second handshake")
+	}
+	if got := h2.SnapshotResponder().SessionID(); got != staked {
+		t.Fatalf("the second handshake staked id %d, want the oldest staked id %d", got, staked)
+	}
+	provider.Forget(first) // the first handshake is dropped unfinished
+
+	if next, err := sessions.AllocateID(); err != nil || next == staked {
+		t.Fatalf("after the first handshake let go, AllocateID = (%d, %v): the id the second handshake holds was free again", next, err)
+	}
+}

@@ -721,7 +721,29 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 // Hard-coding "1" (the previous behaviour) would collide every
 // parallel CASE session into a single lookup slot and break peer →
 // bridge routing.
+//
+// The id comes back unbound to its stake: at a full table a later
+// allocation may give it to another handshake, and [Manager.ReleaseID] then
+// frees that one's stake. A caller that releases takes a [Stake] from
+// [Manager.AllocateStake] instead.
 func (m *Manager) AllocateID() (uint16, error) {
+	s, err := m.AllocateStake()
+	return s.ID, err
+}
+
+// Stake is a session id [Manager.AllocateStake] reserved for one
+// handshake, and the reservation itself: [Manager.ReleaseStake] frees the
+// id only while it still holds this reservation (review II,
+// R2-P3-dr-dev-07). The zero Stake reserves nothing.
+type Stake struct {
+	// ID is the reserved session id.
+	ID uint16
+	e  *Entry
+}
+
+// AllocateStake is [Manager.AllocateID] returning the stake it made, for
+// [Manager.ReleaseStake].
+func (m *Manager) AllocateStake() (Stake, error) {
 	m.mu.Lock()
 	id, err := m.allocateIDLocked()
 	// Every id held by a live session — one fabric's administrator can
@@ -740,7 +762,7 @@ func (m *Manager) AllocateID() (uint16, error) {
 	}
 	if err != nil {
 		m.mu.Unlock()
-		return 0, err
+		return Stake{}, err
 	}
 	defer m.closeEvicted(evicted)
 	defer m.mu.Unlock()
@@ -752,7 +774,7 @@ func (m *Manager) AllocateID() (uint16, error) {
 	m.sessions[id] = e
 	m.placeholders = append(m.placeholders, placeholderRef{id: id, e: e})
 	m.compactPlaceholdersLocked()
-	return id, nil
+	return Stake{ID: id, e: e}, nil
 }
 
 // leastRecentlyActiveLocked returns the live session with the least recent
@@ -823,10 +845,27 @@ const placeholderQueueSlack = 64
 
 // ReleaseID frees a previously allocated id when the handshake that
 // reserved it never reached OpenFromSigmaWithID.
+//
+// Deprecated: ReleaseID frees whatever placeholder holds id, also the
+// stake an allocation at a full table made for another handshake after it
+// took the caller's (review II, R2-P3-dr-dev-07). Use [Manager.AllocateStake]
+// and [Manager.ReleaseStake], which free the caller's own stake only.
 func (m *Manager) ReleaseID(id uint16) {
 	m.mu.Lock()
 	if e, ok := m.sessions[id]; ok && e.Session == nil {
 		delete(m.sessions, id)
+	}
+	m.mu.Unlock()
+}
+
+// ReleaseStake frees s's id when the handshake that staked it never
+// reached OpenFromSigmaWithID — only while the id still holds s's
+// placeholder: an id an allocation at a full table gave to another
+// handshake since, or one a session holds now, stays as it is.
+func (m *Manager) ReleaseStake(s Stake) {
+	m.mu.Lock()
+	if m.stakes(placeholderRef{id: s.ID, e: s.e}) {
+		delete(m.sessions, s.ID)
 	}
 	m.mu.Unlock()
 }
