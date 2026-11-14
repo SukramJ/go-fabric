@@ -77,3 +77,4 @@ parity; Ahead rows for bounds matter.js lacks and chip has.
 | # | Question | Decision |
 | --- | --- | --- |
 | 50 | The cut of phase 3's review | **Seven attacker roles, ten agents, Fable**: the plan's six — an unauthenticated host on the device's link, a holder of the passcode, another fabric's administrator, a hostile device against the controller, a hostile BLE peer, a hostile Wi-Fi, DCL or OTA peer — and a seventh, an unauthenticated host on the controller's link; seven reviewers and three verifiers on Fable; a unit whose agent the provider's safeguards stop goes to Opus, and the report says so |
+| 51 to 54 | Four decisions on open items of phase 3 | held back until the pull request that fixes them (decision 25) |
