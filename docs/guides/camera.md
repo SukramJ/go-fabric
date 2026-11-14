@@ -430,8 +430,10 @@ Since phase 37 the controller role streams from a Matter camera itself
 Controller endpoint (`controller.CameraControllerEndpoint`) with a
 WebRtcTransportRequestor under its one operational identity — the camera
 stores RootNodeID as the session's peer and calls the controller back over
-the session the controller opened, or over a CASE session of its own to the
-controller's operational record — and `controller/camera` manages the
+the TCP session the controller opened, or over a TCP session of its own to
+the controller's operational record (connectedhomeip's camera; a camera
+built on this module opens none, so its signals need the controller's) —
+and `controller/camera` manages the
 streams after matterjs-server (`BD-matterjs-server-CameraStreamManagement`
 in `notes/parity/by_design.md`):
 

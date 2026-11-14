@@ -6,11 +6,13 @@ package controller_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -146,31 +148,27 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 	}
 
 	// With the camera restarted — the node disabled so the registry does
-	// not reopen a session to it — the camera has no session with the
-	// controller and its next signal opens CASE to RootNodeID: the site
-	// answers the controller's operational record, the controller's CASE
-	// responder takes the session, and the Answer arrives on it — chip's
-	// camera-app fallback (OperationalSessionSetup.cpp:119,:138-142 at
-	// 6170af84). The provider keeps its session table across the restart,
-	// as the test holds the device's servers.
+	// not reopen a session to it — the camera holds no TCP session with the
+	// controller. Its signals carry the Large Message quality, which a
+	// client sends over TCP only (matter.js ClientInteraction.ts:716-719,
+	// :1235 at db021da0; chip's camera-app opens its fallback session with
+	// kLargePayload, webrtc-provider-manager.cpp:860-942 at 6170af84), and
+	// this node opens no TCP connection of its own: the Answer and the End
+	// are refused with bridge.ErrLargeMessageTransport and not sent, and
+	// End still drops the camera's session (review II, R2-P4-imwrite-01).
 	run(n.Disable)
 	run(dev.Restart)
-	run(func(ctx context.Context) error { return provider.Answer(ctx, session, "v=0 answer again") })
-	if sig := awaitSignal(t, signals, "the camera's Answer over its own CASE session did not reach the requestor"); sig.Kind != controller.CameraSignalAnswer || sig.SDP != "v=0 answer again" {
-		t.Fatalf("signal %+v", sig)
-	}
-	var inbound bool
-	for _, p := range c.Peers().Peers() {
-		for _, s := range p.Sessions() {
-			inbound = inbound || !c.Peers().Initiated(s)
+	run(func(ctx context.Context) error {
+		if err := provider.Answer(ctx, session, "v=0 answer again"); !errors.Is(err, bridge.ErrLargeMessageTransport) {
+			return fmt.Errorf("the Answer without a TCP session: %w, want bridge.ErrLargeMessageTransport", err)
 		}
-	}
-	if !inbound {
-		t.Fatal("the camera's Answer did not come over a session the camera opened")
-	}
-	run(func(ctx context.Context) error { return provider.End(ctx, session, 1) })
-	if sig := awaitSignal(t, signals, "the camera's End did not reach the controller's requestor"); sig.Kind != controller.CameraSignalEnd || sig.Reason != 1 {
-		t.Fatalf("signal %+v", sig)
+		if err := provider.End(ctx, session, 1); !errors.Is(err, bridge.ErrLargeMessageTransport) {
+			return fmt.Errorf("the End without a TCP session: %w, want bridge.ErrLargeMessageTransport", err)
+		}
+		return nil
+	})
+	if n := len(provider.Sessions()); n != 0 {
+		t.Fatalf("the camera holds %d sessions after End", n)
 	}
 }
 
