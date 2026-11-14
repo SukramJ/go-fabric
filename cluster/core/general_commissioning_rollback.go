@@ -69,6 +69,60 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context
 	}
 }
 
+// startFailSafeLocked runs onFailSafeStarting when an arm finds the
+// fail-safe disarmed, before the arm is judged and recorded (an arm
+// refused afterwards, as a CASE arm while a window is open is, has run it
+// too), counted as a rollback in flight — an arm on
+// another goroutine waits for it in settleExpiryLocked, so nothing is armed
+// while it runs — and adds the fabrics it removed to
+// rollbackFabricRemovals. Before, the new context's rollback ran after the
+// arm was recorded, outside this accounting: an arm from a fabric whose
+// earlier rollback had not landed removed that fabric and left the
+// fail-safe armed for it (review II, R2-P2-dr-noc-04). With forSession, an
+// arm from sessFabric's session that the rollback removed is
+// errGencommArmRolledBack. Nothing runs when the fail-safe is armed or no
+// hook is wired. Caller holds g.mu; it is held again on return, and
+// released in between.
+func (g *GeneralCommissioning) startFailSafeLocked(ctx context.Context, sessFabric uint8, forSession bool) error {
+	hook := g.onFailSafeStarting
+	if hook == nil || g.failSafeArmed {
+		return nil
+	}
+	removals := g.rollbackFabricRemovals[sessFabric]
+	g.runFailSafeStartingLocked(ctx, hook)
+	if forSession && sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals {
+		return errGencommArmRolledBack
+	}
+	return nil
+}
+
+// runFailSafeStartingLocked runs hook outside g.mu as a rollback in flight
+// and accounts what it removed. Caller holds g.mu; it is held again on
+// return — on a panic of the hook too.
+func (g *GeneralCommissioning) runFailSafeStartingLocked(ctx context.Context, hook func(ctx context.Context) []uint8) {
+	if g.expiryRollbacksDone == nil {
+		g.expiryRollbacksDone = make(chan struct{})
+	}
+	g.expiryRollbacks++
+	g.mu.Unlock()
+	var removed []uint8
+	defer func() {
+		g.mu.Lock()
+		for _, idx := range removed {
+			if g.rollbackFabricRemovals == nil {
+				g.rollbackFabricRemovals = map[uint8]uint64{}
+			}
+			g.rollbackFabricRemovals[idx]++
+		}
+		g.expiryRollbacks--
+		if g.expiryRollbacks == 0 {
+			close(g.expiryRollbacksDone)
+			g.expiryRollbacksDone = nil
+		}
+	}()
+	removed = hook(context.WithValue(ctx, expiryRollbackKey{}, true))
+}
+
 // settledExpiry is what settleExpiryLocked expired itself: the window the
 // arm found due, and what its rollback ends.
 type settledExpiry struct {
@@ -106,7 +160,9 @@ var errGencommArmRolledBack = errors.New("core: GeneralCommissioning: the fail-s
 // settleArmLocked is settleExpiryLocked for an arm from sessFabric's
 // session: errGencommArmRolledBack when a rollback it settled ended that
 // session — one it ran itself over a due window, or one in flight on
-// another goroutine that it waited for (review II, R2-P1-rw-05). A
+// another goroutine that it waited for (review II, R2-P1-rw-05) — or, on
+// a disarmed fail-safe, the start of the new context (startFailSafeLocked)
+// removed sessFabric. A
 // rollback that finishes while the arm waits ran its PASE close or its
 // fabric removal after the arm's session existed. Caller holds g.mu, as
 // for settleExpiryLocked.
@@ -122,7 +178,7 @@ func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric u
 	if (sessFabric == 0 && g.rollbackPaseCloses != paseCloses) || (sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals) {
 		return errGencommArmRolledBack
 	}
-	return nil
+	return g.startFailSafeLocked(ctx, sessFabric, true)
 }
 
 // settleExpiryLocked returns once no fail-safe expiry is left half done: a

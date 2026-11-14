@@ -568,6 +568,43 @@ func TestRow_ExpiryReportsARemovalWhenItLands(t *testing.T) {
 	}
 }
 
+// TestRow_FreshArmDoesNotArmForTheFabricItRollsBack is R2-P2-dr-noc-04:
+// an AddNOC's fabric whose rollback failed stays pending and serving; an
+// ArmFailSafe from that fabric's administrator rolls it back before the arm
+// is recorded, and arms nothing for the fabric it removed — another
+// administrator's ArmFailSafe is not answered BusyWithOtherAdmin.
+func TestRow_FreshArmDoesNotArmForTheFabricItRollsBack(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newRowStore(memstore.New())
+	r := newRowRig(t, st, nil)
+	if resp, err := r.gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+		t.Fatalf("ArmFailSafe: %+v, %v", resp, err)
+	}
+	_, _, idx := commissionTestFabric(ctx, t, r.oc)
+	st.setFault(failOn("RemoveFabric", "RollbackFabric"))
+	r.armOver(ctx, t, idx, 0)
+	st.setFault(nil)
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 1 {
+		t.Fatalf("%d fabrics after the failed rollback, want the 1 it could not remove", len(fabrics))
+	}
+	resp, err := r.gc.MatterInvoke(im.WithFabricFilter(ctx, true, idx), 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 300})
+	if err == nil && resp.(core.ArmFailSafeResponse).ErrorCode == core.CommissioningErrorOK {
+		t.Errorf("ArmFailSafe over fabric %d answered OK although its rollback removed that fabric", idx)
+	}
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 0 {
+		t.Fatalf("%d fabrics after the fresh arm, want the pending one rolled back", len(fabrics))
+	}
+	if fabric, armed := r.gc.FailSafeFabric(); armed {
+		t.Fatalf("fail-safe armed for fabric %d after its rollback removed fabric %d", fabric, idx)
+	}
+	if n := r.removed.Load(); n != 1 {
+		t.Fatalf("the fabric-removed hook fired %d time(s), want once", n)
+	}
+	r.armOver(ctx, t, idx+1, 60) // another administrator arms
+	r.armOver(ctx, t, idx+1, 0)
+}
+
 // TestRow_TermsAcceptanceIsNotCommittedWithoutTheFabric is R2-P2-comm-07:
 // a CommissioningComplete whose fabric commit fails leaves the terms
 // acceptance of the window uncommitted — in the store too — so the
@@ -602,7 +639,7 @@ func TestRow_TermsAcceptanceIsNotCommittedWithoutTheFabric(t *testing.T) {
 // wireFailSafeRig is node/root.go's wiring of the two clusters' fail-safe
 // hooks.
 func wireFailSafeRig(gc *core.GeneralCommissioning, oc *core.OperationalCredentials) {
-	gc.SetOnFailSafeArmed(func(context.Context, uint8) { oc.ClearPendingState() })
+	gc.SetOnFailSafeStarting(oc.PrepareFreshFailSafe)
 	gc.SetOnFailSafeExpired(oc.OnFailSafeExpiry)
 	gc.SetFailSafeCommit(oc.CommitFailSafe)
 }

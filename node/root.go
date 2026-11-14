@@ -208,7 +208,10 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	opCreds := r.OperationalCredentials
 
 	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
-	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() }) //nolint:contextcheck // ClearPendingState takes no context
+	// A fresh fail-safe context starts before its arm is recorded, so an
+	// arm from a fabric whose earlier rollback it lands arms nothing
+	// (review II, R2-P2-dr-noc-04).
+	generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
 	// CommissioningComplete commits the fabric row the fail-safe's NOC
 	// command wrote, as its last store write (owner decision 36); a Wi-Fi
 	// node stores its network list before it (below).

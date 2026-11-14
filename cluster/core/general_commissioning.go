@@ -91,6 +91,9 @@ type GeneralCommissioning struct {
 	// waited for ended its own session (review II, R2-P1-rw-05).
 	rollbackPaseCloses     uint64
 	rollbackFabricRemovals map[uint8]uint64
+	// onFailSafeStarting runs before a fresh arm is recorded
+	// ([GeneralCommissioning.SetOnFailSafeStarting]).
+	onFailSafeStarting func(ctx context.Context) (removedFabrics []uint8)
 
 	// Cumulative FailSafe tracking: once the cumulative cap is hit the
 	// bridge must refuse further ArmFailSafe calls with BusyWithOtherAdmin.
@@ -263,11 +266,13 @@ type GeneralCommissioningConfig struct {
 	// `CommissioningWindow.RevokeWindow` so a successful pair-completion
 	// auto-closes the open commissioning window.
 	OnCommissioningComplete func(ctx context.Context, fabricIndex uint8)
-	// OnFailSafeArmed fires after every successful ArmFailSafe arm /
-	// re-arm. The bridge wires this to OperationalCredentials.
-	// ClearPendingState so a fresh commissioning attempt does not see
-	// pending NOC / trust-root flags from a prior attempt. May be nil
-	// for tests that exercise the FailSafe machinery in isolation.
+	// OnFailSafeArmed fires after an arm from the disarmed state is
+	// recorded. The node starts the new fail-safe context before the arm
+	// instead ([GeneralCommissioning.SetOnFailSafeStarting] with
+	// OperationalCredentials.PrepareFreshFailSafe), so a fresh
+	// commissioning attempt does not see pending NOC / trust-root flags
+	// from a prior attempt. May be nil for tests that exercise the
+	// FailSafe machinery in isolation.
 	OnFailSafeArmed func(ctx context.Context, fabricIndex uint8)
 	// IsCommissioningWindowOpen, when non-nil, is queried by ArmFailSafe
 	// to detect CASE-steal attempts. When a commissioning window is open
@@ -340,6 +345,20 @@ func NewGeneralCommissioning(cfg GeneralCommissioningConfig) (*GeneralCommission
 func (g *GeneralCommissioning) SetOnFailSafeArmed(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onFailSafeArmed = fn
+	g.mu.Unlock()
+}
+
+// SetOnFailSafeStarting wires what runs when an arm finds the fail-safe
+// disarmed, before the arm is judged and recorded: the start of a new fail-safe context, which rolls
+// back what an earlier fail-safe left pending and returns the fabrics that
+// rollback removed. It runs as a fail-safe's rollback does — another arm
+// waits for it — and an arm from the session of a fabric it removed arms
+// nothing and fails, as an arm whose session an expired fail-safe's
+// rollback ended does (review II, R2-P2-dr-noc-04). The node wires
+// [OperationalCredentials.PrepareFreshFailSafe]. Pass nil to detach.
+func (g *GeneralCommissioning) SetOnFailSafeStarting(fn func(ctx context.Context) (removedFabrics []uint8)) {
+	g.mu.Lock()
+	g.onFailSafeStarting = fn
 	g.mu.Unlock()
 }
 
@@ -1261,8 +1280,8 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	var err error
 	if forSession {
 		err = g.settleArmLocked(ctx, fabricIndex)
-	} else {
-		_, err = g.settleExpiryLocked(ctx)
+	} else if _, err = g.settleExpiryLocked(ctx); err == nil {
+		err = g.startFailSafeLocked(ctx, fabricIndex, false)
 	}
 	if err != nil {
 		g.mu.Unlock()

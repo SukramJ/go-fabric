@@ -698,8 +698,21 @@ func (o *OperationalCredentials) clearPendingState() {
 // as it is once that landed (review II, R2-P1-rw-01) — and reported as the
 // fail-safe's end reports it. One that does not land stays pending for the
 // next end, CommissioningComplete's commit or the next start.
+//
+// The node runs it before the arm is recorded, as
+// [OperationalCredentials.PrepareFreshFailSafe]; called as the post-arm
+// hook ([GeneralCommissioning.SetOnFailSafeArmed]) its rollback can remove
+// the fabric the fail-safe was just armed for.
 func (o *OperationalCredentials) ClearPendingState() {
-	ctx := context.Background()
+	_ = o.PrepareFreshFailSafe(context.Background())
+}
+
+// PrepareFreshFailSafe is [OperationalCredentials.ClearPendingState] for
+// [GeneralCommissioning.SetOnFailSafeStarting]: it runs before a fresh arm
+// is recorded and returns the fabrics whose pending AddNOC it rolled back —
+// the fabrics it removed — so the arm of a removed fabric's administrator
+// arms nothing (review II, R2-P2-dr-noc-04).
+func (o *OperationalCredentials) PrepareFreshFailSafe(ctx context.Context) (removedFabrics []uint8) {
 	o.nocMu.Lock()
 	o.mu.Lock()
 	o.clearPendingState()
@@ -707,6 +720,10 @@ func (o *OperationalCredentials) ClearPendingState() {
 	added, updated := o.rollbackPendingLocked(ctx)
 	o.nocMu.Unlock()
 	o.reportRolledBack(ctx, added, updated)
+	for i := range added {
+		removedFabrics = append(removedFabrics, added[i].FabricIndex)
+	}
+	return removedFabrics
 }
 
 // CommitFailSafe is the durable commit of CommissioningComplete
