@@ -386,8 +386,11 @@ func (*AccessControl) MinWritePrivilege(attrID uint32) uint8 {
 	}
 }
 
-// SetCurrentFabric is called by the IM dispatcher before fabric-scoped
-// reads so the cluster filters the ACL list to the requesting fabric.
+// SetCurrentFabric sets the fabric a local write of Acl or Extension —
+// [AccessControl.MatterWrite] with no Interaction Model request behind it
+// — lands on (see writeFabric). It scopes no read: a read with no request
+// behind it sees every fabric's entries whole, and a request's read is
+// scoped by the request's own fabric. Nothing in this module calls it.
 func (a *AccessControl) SetCurrentFabric(idx uint8) {
 	a.mu.Lock()
 	a.currentFabric = idx
@@ -452,49 +455,15 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 	return out
 }
 
-// MatterRead implements [contract.ClusterServer].
+// MatterRead implements [contract.ClusterServer]. It has no request behind
+// it: Acl and Extension carry every fabric's entries whole, as
+// [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
-	case accessControlAttrACL:
-		ctx := context.Background()
-		a.mu.RLock()
-		fabric := a.currentFabric
-		a.mu.RUnlock()
-		entries, err := a.store.ListACL(ctx, fabric)
-		if err != nil {
-			return nil, false
-		}
-		out := make([]AccessControlEntryStruct, 0, len(entries))
-		for _, e := range entries {
-			ace := AccessControlEntryStruct{
-				Privilege:   uint8(e.Privilege),
-				AuthMode:    uint8(e.AuthMode),
-				Subjects:    append([]uint64(nil), e.Subjects...),
-				FabricIndex: e.FabricIndex,
-			}
-			if len(e.Targets) > 0 {
-				ace.Targets = make([]ACLTargetStruct, 0, len(e.Targets))
-				for _, t := range e.Targets {
-					ace.Targets = append(ace.Targets, ACLTargetStruct{
-						Cluster:    t.Cluster,
-						Endpoint:   t.Endpoint,
-						DeviceType: t.DeviceType,
-					})
-				}
-			}
-			out = append(out, ace)
-		}
-		return out, true
-	case accessControlAttrExtension:
-		a.mu.RLock()
-		exts := a.extensions[a.currentFabric]
-		a.mu.RUnlock()
-		if len(exts) == 0 {
-			return []AccessControlExtensionEntry{}, true
-		}
-		out := make([]AccessControlExtensionEntry, len(exts))
-		copy(out, exts)
-		return out, true
+	case accessControlAttrACL, accessControlAttrExtension:
+		// A read without an IM request behind it is a local one and
+		// sees every fabric's entries whole (localListRead).
+		return a.localListRead(context.Background(), attrID)
 	case accessControlAttrSubjectsPerAccessControl:
 		return a.subjectsPerEntry(), true
 	case accessControlAttrTargetsPerAccessControl:
@@ -528,11 +497,9 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // — every entry carries a FabricIndex and the wire MUST return only
 // entries for the requesting fabric when FabricFiltered=true. Apple
 // Home reads ACL on the CASE session immediately after Subscribe-
-// Initial; without this filter the read falls back to MatterRead's
-// `a.currentFabric` (only ever set by ACL writes — zero on a fresh
-// CASE session), ListACL returns `[]`, and Apple interprets the empty
-// list as "this subject has no Administer privilege" and tears the
-// fabric down via RemoveFabric.
+// Initial; a list without the session's own entries is "this subject
+// has no Administer privilege" to it, and it tears the fabric down via
+// RemoveFabric.
 //
 // A non-fabric-filtered read returns every fabric's entries, another
 // fabric's redacted to its FabricIndex (see unfilteredFabrics).
@@ -547,9 +514,9 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // `session.fabric` (packages/node/src/behavior/state/managed/values/
 // ListManager.ts, packages/protocol/src/action/server/AccessControl.ts).
 // A read with no request behind it ([im.LookupFabricFilter] reports no
-// filter) is a local one and keeps [AccessControl.MatterRead]; the two
-// are not allowed to stand for one another, because the local read
-// answers with the entries of the fabric the last write targeted, whole.
+// filter) is a local one: every fabric's entries, whole
+// (localListRead). The two are not allowed to stand for one another,
+// because the local read sees what a session without a fabric may not.
 //
 // Mirrors matter.js packages/node/src/behaviors/access-control/
 // AccessControlServer.ts: every read of `acl` and `extension` consults
@@ -567,9 +534,8 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	}
 	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
 	if !request {
-		// No Interaction Model request behind the read: a local caller,
-		// served by MatterRead's scope.
-		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
+		// No Interaction Model request behind the read: a local caller.
+		return a.localListRead(ctx, attrID)
 	}
 	var fabrics []uint8
 	switch {
@@ -583,12 +549,37 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 			return nil, false
 		}
 	}
+	return a.listRead(ctx, attrID, fabrics, fabricIndex, false)
+}
+
+// localListRead is the Acl or Extension read of a local actor — a read
+// with no Interaction Model request behind it (the node facade's
+// ReadAttribute, a host's MatterRead): every fabric's entries, each
+// whole. The fabric last set with [AccessControl.SetCurrentFabric] scopes
+// nothing here. Mirrors matter.js
+// packages/protocol/src/action/server/AccessControl.ts:250-253 and
+// :342-345 at db021da0 (mayRead grants a local actor every attribute and
+// every fabric-sensitive field before any fabric check) and
+// packages/node/src/behavior/state/managed/values/ListManager.ts:609-616
+// (createProxy filters a fabric-scoped list only for a remote actor).
+func (a *AccessControl) localListRead(ctx context.Context, attrID uint32) (any, bool) {
+	fabrics, err := a.unfilteredFabrics(ctx, 0)
+	if err != nil {
+		return nil, false
+	}
+	return a.listRead(ctx, attrID, fabrics, 0, true)
+}
+
+// listRead lists the Acl or Extension entries of fabrics in their order;
+// unless whole, an entry of a fabric other than accessing goes out
+// redacted to its FabricIndex.
+func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []uint8, accessing uint8, whole bool) (any, bool) {
 	if attrID == accessControlAttrExtension {
 		out := []AccessControlExtensionEntry{}
 		a.mu.RLock()
 		for _, fabric := range fabrics {
 			for _, e := range a.extensions[fabric] {
-				e.Redacted = fabric != fabricIndex
+				e.Redacted = !whole && fabric != accessing
 				if e.Redacted {
 					e.Data = nil
 				}
@@ -605,7 +596,7 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 			return nil, false
 		}
 		for _, e := range entries {
-			if fabric != fabricIndex {
+			if !whole && fabric != accessing {
 				out = append(out, AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true})
 				continue
 			}

@@ -326,7 +326,7 @@ func TestGKM_WriteGroupKeyMap(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap: %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -365,7 +365,7 @@ func TestGKM_WriteGroupKeyMap_StampsTheAccessingFabric(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap with client-supplied FabricIndex: %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 1), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -818,9 +818,8 @@ func TestGKM_MatterReadFiltered_GroupKeyMap_FabricScoped(t *testing.T) {
 }
 
 // TestGKM_MatterRead_GroupKeyMap_FabricZeroFallback verifies that
-// MatterRead (no fabric context) falls back to g.currentFabric=0 and
-// returns an empty list for fabric 0. This is acceptable for test paths
-// that do not stamp the IM context.
+// MatterRead (no request behind it) covers every fabric the store holds
+// and, with none, returns an empty list.
 func TestGKM_MatterRead_GroupKeyMap_FabricZeroFallback(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
@@ -916,7 +915,7 @@ func TestGKM_WriteGroupKeyMapRemovesDroppedBindings(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap (shortened): %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -929,7 +928,7 @@ func TestGKM_WriteGroupKeyMapRemovesDroppedBindings(t *testing.T) {
 	if err := gkm.MatterWrite(ctx, 0x0000, []core.GroupKeyMapStruct{}); err != nil {
 		t.Fatalf("MatterWrite GroupKeyMap (empty): %v", err)
 	}
-	v, _ = gkm.MatterRead(0x0000)
+	v, _ = gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if got := v.([]core.GroupKeyMapStruct); len(got) != 0 {
 		t.Fatalf("GroupKeyMap after empty write = %+v, want empty", got)
 	}

@@ -256,7 +256,7 @@ func TestGKMSurfacesStoreFailures(t *testing.T) {
 	t.Run("GroupKeyMap read fails", func(t *testing.T) {
 		t.Parallel()
 		gkm := newBrokenGKM(t, &brokenGroupStore{failListMappings: true})
-		if _, ok := gkm.MatterRead(0x0000); ok {
+		if _, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 1), 0x0000); ok {
 			t.Fatal("GroupKeyMap answered ok=true while the store was down")
 		}
 	})

@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -805,10 +806,29 @@ func (s *aclStoreWithEntries) ReplaceACL(_ context.Context, _ uint8, _ []mstore.
 	return nil
 }
 
+// listingACLStore is aclStoreWithEntries that can enumerate its fabrics,
+// as every store.Port can: the fabrics its entries carry.
+type listingACLStore struct{ aclStoreWithEntries }
+
+func (s *listingACLStore) ListFabrics(context.Context) ([]mstore.FabricRecord, error) {
+	var out []mstore.FabricRecord
+	for _, e := range s.entries {
+		if !slices.ContainsFunc(out, func(r mstore.FabricRecord) bool { return r.FabricIndex == e.FabricIndex }) {
+			out = append(out, mstore.FabricRecord{FabricIndex: e.FabricIndex})
+		}
+	}
+	return out, nil
+}
+
 // errACLStore is an ACLStoreFacade whose ListACL always returns an error.
+// It holds fabric 1, so a read that covers every fabric reaches ListACL.
 type errACLStore struct {
 	listErr    error
 	replaceErr error
+}
+
+func (s *errACLStore) ListFabrics(context.Context) ([]mstore.FabricRecord, error) {
+	return []mstore.FabricRecord{{FabricIndex: 1}}, nil
 }
 
 func (s *errACLStore) ListACL(_ context.Context, _ uint8) ([]mstore.ACLEntry, error) {
@@ -840,14 +860,14 @@ func TestNewAccessControl_NilStore(t *testing.T) {
 }
 
 // TestAccessControl_MatterRead_ACL verifies that MatterRead(0x0000) returns the
-// ACL list from the store. Exercises the fabricIndex==0 path (currentFabric not
-// set) and the Targets branch.
+// ACL list from the store: a read with no request behind it covers every
+// fabric the store holds, whole. Exercises the Targets branch.
 func TestAccessControl_MatterRead_ACL(t *testing.T) {
 	t.Parallel()
 	clusterID := uint32(0x01F4)
 	endpoint := uint16(1)
 	deviceType := uint32(0x0100)
-	store := &aclStoreWithEntries{
+	store := &listingACLStore{aclStoreWithEntries{
 		entries: []mstore.ACLEntry{
 			{
 				FabricIndex: 1,
@@ -859,12 +879,11 @@ func TestAccessControl_MatterRead_ACL(t *testing.T) {
 				},
 			},
 		},
-	}
+	}}
 	ac, err := core.NewAccessControl(store)
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
-	// MatterRead with fabricIndex=0 (currentFabric not set via SetCurrentFabric).
 	v, ok := ac.MatterRead(0x0000)
 	if !ok {
 		t.Fatal("MatterRead(ACL): ok=false, want true")
@@ -1090,19 +1109,19 @@ func TestAccessControl_MatterWrite_UnknownAttr(t *testing.T) {
 
 // TestAccessControl_MatterReadFiltered_ACL_FabricZero separates the two
 // reads a FabricIndex of 0 used to stand for. A read with no request
-// behind it (no fabric filter stamped) falls through to MatterRead; a
-// request from a session that has no fabric yet does not, and owns no
+// behind it (no fabric filter stamped) is a local actor's and sees the
+// entry whole; a request from a session that has no fabric yet owns no
 // entry — matter.js ListManager FabricFilteredListProxyHandler and
 // protocol/src/action/server/AccessControl.ts mayRead give a session
-// without `session.fabric` nothing fabric-sensitive. This store cannot
-// enumerate fabrics, so the fabric-less unfiltered read lists none.
+// without `session.fabric` nothing fabric-sensitive: its filtered read
+// is empty, its unfiltered read carries the entry redacted.
 func TestAccessControl_MatterReadFiltered_ACL_FabricZero(t *testing.T) {
 	t.Parallel()
-	store := &aclStoreWithEntries{
+	store := &listingACLStore{aclStoreWithEntries{
 		entries: []mstore.ACLEntry{
-			{FabricIndex: 0, Privilege: mstore.Privilege(5), AuthMode: mstore.AuthMode(2), Subjects: []uint64{1}},
+			{FabricIndex: 1, Privilege: mstore.Privilege(5), AuthMode: mstore.AuthMode(2), Subjects: []uint64{1}},
 		},
-	}
+	}}
 	ac, err := core.NewAccessControl(store)
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
@@ -1119,13 +1138,14 @@ func TestAccessControl_MatterReadFiltered_ACL_FabricZero(t *testing.T) {
 		}
 		return entries
 	}
-	if entries := read(context.Background()); len(entries) != 1 {
-		t.Errorf("local read: len(entries)=%d, want 1", len(entries))
+	if entries := read(context.Background()); len(entries) != 1 || entries[0].Redacted || len(entries[0].Subjects) != 1 {
+		t.Errorf("local read: %+v, want the entry whole", entries)
 	}
-	for _, filtered := range []bool{false, true} {
-		if entries := read(im.WithFabricFilter(context.Background(), filtered, 0)); len(entries) != 0 {
-			t.Errorf("fabric-less request (filtered=%v): len(entries)=%d, want 0", filtered, len(entries))
-		}
+	if entries := read(im.WithFabricFilter(context.Background(), true, 0)); len(entries) != 0 {
+		t.Errorf("fabric-less filtered request: len(entries)=%d, want 0", len(entries))
+	}
+	if entries := read(im.WithFabricFilter(context.Background(), false, 0)); len(entries) != 1 || !entries[0].Redacted || entries[0].Subjects != nil {
+		t.Errorf("fabric-less unfiltered request: %+v, want the entry redacted", entries)
 	}
 }
 

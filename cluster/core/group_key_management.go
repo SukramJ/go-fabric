@@ -288,23 +288,23 @@ const GroupKeyMulticastPolicyPerGroupID uint8 = 0
 
 // MatterRead implements [contract.ClusterServer].
 //
-// A read without an IM request behind it covers the fabric last set with
-// [GroupKeyManagement.SetCurrentFabric].
+// A read without an IM request behind it is a local one: GroupKeyMap and
+// GroupTable cover every fabric (see readFabrics).
 func (g *GroupKeyManagement) MatterRead(attrID uint32) (any, bool) {
-	return g.matterReadWithCtx(context.Background(), attrID, true)
+	return g.matterReadWithCtx(context.Background(), attrID)
 }
 
 // MatterReadFiltered is the read path for the fabric-scoped GroupKeyMap
 // and GroupTable: a fabric-filtered read sees the accessing fabric's
 // entries, an unfiltered one every fabric's (see readFabrics).
 func (g *GroupKeyManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	return g.matterReadWithCtx(ctx, attrID, false)
+	return g.matterReadWithCtx(ctx, attrID)
 }
 
-func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint32, direct bool) (any, bool) {
+func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint32) (any, bool) {
 	switch attrID {
 	case groupKeyMgmtAttrGroupKeyMap:
-		fabrics, err := g.readFabrics(ctx, direct)
+		fabrics, err := g.readFabrics(ctx)
 		if err != nil {
 			return nil, false
 		}
@@ -330,7 +330,7 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 		if g.groups == nil {
 			return []GroupInfoMapStruct{}, true
 		}
-		fabrics, err := g.readFabrics(ctx, direct)
+		fabrics, err := g.readFabrics(ctx)
 		if err != nil {
 			return nil, false
 		}
@@ -402,9 +402,9 @@ type fabricLister interface {
 }
 
 // readFabrics returns the fabrics whose entries a GroupKeyMap / GroupTable
-// read covers. A fabric-filtered read covers the accessing fabric (the
-// legacy SetCurrentFabric value when the request carries none); an
-// unfiltered read covers every fabric. Neither list has a fabric-sensitive
+// read covers. A fabric-filtered read covers the accessing fabric; an
+// unfiltered read and a read with no request behind it cover every
+// fabric. Neither list has a fabric-sensitive
 // field (group-key-management.element.ts: GroupKeyMapStruct and
 // GroupInfoMapStruct carry access "F" only), so the other fabrics' entries
 // go out whole. Mirrors matter.js ListManager createProxy, which filters a
@@ -412,20 +412,20 @@ type fabricLister interface {
 // config.fabricSensitive`, the way OperationalCredentials.Fabrics and NOCs
 // already read here.
 //
-// Only a direct read — [GroupKeyManagement.MatterRead], no request behind
-// it — falls back to the SetCurrentFabric value. A fabric-filtered request
-// from a session that has no fabric yet (PASE before AddNOC, FabricIndex
-// 0) covers no fabric at all: matter.js ListManager's
-// FabricFilteredListProxyHandler shows a fabric-filtered session only the
-// entries of `session.fabric`, and such a session has none.
-func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]uint8, error) {
+// A read with no request behind it — [GroupKeyManagement.MatterRead], or
+// the node facade's read through MatterReadFiltered — is a local actor's
+// and covers every fabric; the fabric last set with
+// [GroupKeyManagement.SetCurrentFabric] scopes nothing. Mirrors matter.js
+// packages/node/src/behavior/state/managed/values/ListManager.ts:609-616
+// at db021da0 (createProxy filters a fabric-scoped list only for a remote
+// actor). A fabric-filtered request from a session that has no fabric yet
+// (PASE before AddNOC, FabricIndex 0) covers no fabric at all: matter.js
+// ListManager's FabricFilteredListProxyHandler shows a fabric-filtered
+// session only the entries of `session.fabric`, and such a session has
+// none.
+func (g *GroupKeyManagement) readFabrics(ctx context.Context) ([]uint8, error) {
 	filtered, fabric := im.FabricFilterFromContext(ctx)
-	if direct || filtered {
-		if fabric == 0 && direct {
-			g.mu.RLock()
-			fabric = g.currentFabric
-			g.mu.RUnlock()
-		}
+	if filtered {
 		if fabric == 0 {
 			return nil, nil
 		}
@@ -743,8 +743,11 @@ func (g *GroupKeyManagement) MatterGeneratedCommands() []uint32 {
 	}
 }
 
-// SetCurrentFabric is called by the IM dispatcher before each
-// fabric-scoped invocation.
+// SetCurrentFabric sets the fabric a local call — [GroupKeyManagement.MatterInvoke]
+// or [GroupKeyManagement.MatterWrite] with no accessing fabric in its
+// context — runs against. It scopes no read: a read with no request
+// behind it covers every fabric, and a request's read is scoped by the
+// request's own fabric. Nothing in this module calls it.
 func (g *GroupKeyManagement) SetCurrentFabric(idx uint8) {
 	g.mu.Lock()
 	g.currentFabric = idx
