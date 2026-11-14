@@ -159,6 +159,60 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	}
 }
 
+// commandLevel is a host's own LevelControl server that implements no
+// [core.SceneValuesApplier]: it records the commands it receives.
+type commandLevel struct {
+	level  sceneLevel
+	cmds   []uint32
+	fields []any
+}
+
+func (s *commandLevel) MatterClusterID() uint32                        { return 0x0008 }
+func (s *commandLevel) MatterRead(a uint32) (any, bool)                { return s.level.MatterRead(a) }
+func (s *commandLevel) MatterWrite(context.Context, uint32, any) error { return nil }
+func (s *commandLevel) MatterReportable() []uint32                     { return s.level.MatterReportable() }
+
+func (s *commandLevel) MatterAttributes() []uint32 { return s.level.MatterAttributes() }
+
+func (s *commandLevel) MatterInvoke(_ context.Context, cmd uint32, fields any) (any, error) {
+	s.cmds = append(s.cmds, cmd)
+	s.fields = append(s.fields, fields)
+	return nil, nil
+}
+
+// TestScenesRecallDrivesAForeignLevelControlThroughMoveToLevel: a
+// LevelControl server that does not recall scene values itself has its
+// stored CurrentLevel recalled through MoveToLevel with ExecuteIfOff and
+// the scene's transition in tenths, as the OnOff and ColorControl
+// fallbacks drive theirs through their commands. Mirrors matter.js
+// packages/node/src/behaviors/level-control/LevelControlServer.ts:757 at
+// db021da0 (#applySceneValues recalls the level through moveToLevelLogic
+// with executeIfOff and the scene's transition in tenths).
+func TestScenesRecallDrivesAForeignLevelControlThroughMoveToLevel(t *testing.T) {
+	t.Parallel()
+	lvl := uint8(77)
+	level := &commandLevel{level: sceneLevel{level: &lvl}}
+	if _, ok := any(level).(core.SceneValuesApplier); ok {
+		t.Fatal("commandLevel must not implement SceneValuesApplier")
+	}
+	s, _ := scenesWith(t, level)
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	if r, _ := s.MatterInvoke(ctx, 0x04, core.SceneRef{SceneID: 1}); r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Fatalf("StoreScene: %+v", r)
+	}
+	tt := uint32(1500)
+	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
+		t.Fatalf("RecallScene: %v", err)
+	}
+	if len(level.cmds) != 1 || level.cmds[0] != lvldef.CmdMoveToLevel {
+		t.Fatalf("level commands %v, want one MoveToLevel", level.cmds)
+	}
+	req, ok := level.fields[0].(lvldef.MoveToLevelRequest)
+	if !ok || req.Level != 77 || req.TransitionTime.Null || req.TransitionTime.Value != 15 || req.OptionsMask != 1 || req.OptionsOverride != 1 {
+		t.Fatalf("MoveToLevel %+v, want level 77 over 15 tenths with ExecuteIfOff", level.fields[0])
+	}
+}
+
 // TestScenesRemoveAndCopy pins RemoveScene, RemoveAllScenes and both
 // CopyScene modes, the fabric removal and the invalidation of the current
 // scene.

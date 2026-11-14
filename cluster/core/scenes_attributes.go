@@ -6,7 +6,9 @@ package core
 import (
 	"context"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -307,11 +309,13 @@ func presentValues(cv SceneClusterValues) map[uint32]uint64 {
 
 // applyValues recalls a scene through the servers' own apply functions
 // ([SceneValuesApplier]), as matter.js's per-cluster #applySceneValues do
-// (OnOffServer, LevelControlServer and ColorControlServer). An OnOff or
-// ColorControl server without one is driven through its commands: OnOff
-// On/Off, ColorControl MoveToColorTemperature or MoveToHueAndSaturation
-// for the stored color mode. transitionMs is the scene's transition in
-// milliseconds; the commands take tenths of a second.
+// (OnOffServer, LevelControlServer and ColorControlServer). A scene-able
+// server without one — a host's own — is driven through its commands:
+// OnOff On/Off, LevelControl MoveToLevel with ExecuteIfOff (matter.js
+// LevelControlServer.ts:757 at db021da0, moveToLevelLogic with
+// executeIfOff), ColorControl MoveToColorTemperature or
+// MoveToHueAndSaturation for the stored color mode. transitionMs is the
+// scene's transition in milliseconds; the commands take tenths of a second.
 func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneClusterValues, transitionMs uint32) {
 	if s.cfg.Siblings == nil {
 		return
@@ -350,6 +354,12 @@ func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneCluste
 					cmd = 0x01 // On
 				}
 				_, _ = srv.MatterInvoke(ctx, cmd, nil)
+			}
+		case 0x0008:
+			if v, ok := get(cv, 0x0000); ok && !v.Null {
+				_, _ = srv.MatterInvoke(ctx, lvldef.CmdMoveToLevel, lvldef.MoveToLevelRequest{
+					Level: uint8(v.Unsigned), TransitionTime: spec.ValueOf(tenths), OptionsMask: 1, OptionsOverride: 1, //nolint:gosec // bounded by 254
+				})
 			}
 		case 0x0300:
 			mode, hasMode := get(cv, 0x4001)
