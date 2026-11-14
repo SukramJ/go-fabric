@@ -1947,8 +1947,26 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if !ok {
 		return nil, fmt.Errorf("%w: AddNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
+	// The request's length constraints come first: IpkValue "16",
+	// NocValue and IcacValue "max 400" (matter.js db021da0
+	// packages/model/src/standard/elements/operational-credentials.element.ts:96-98),
+	// which matter.js's request validation refuses with ConstraintError
+	// before addNoc runs (packages/protocol/src/action/server/
+	// CommandInvokeResponse.ts:484-487) — before the AdminVendorId and the
+	// fail-safe checks of the handler. chip answers a wrong IPK length
+	// INVALID_COMMAND (OperationalCredentialsCluster.cpp:469 at 6170af84);
+	// matter.js wins (review 2026-11 W3-clusec-07).
+	if len(req.IPKValue) != 16 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC IPKValue of %d bytes, want 16", len(req.IPKValue))}
+	}
+	if len(req.NOCValue) > 400 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC NOCValue of %d bytes, over 400", len(req.NOCValue))}
+	}
+	if len(req.ICACValue) > 400 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC ICACValue of %d bytes, over 400", len(req.ICACValue))}
+	}
 	// A reserved AdminVendorId is an IM-level InvalidCommand, checked
-	// before the fail-safe and every other guard. Mirrors matter.js
+	// before the fail-safe and every other guard of the handler. Mirrors matter.js
 	// 0ceb202d packages/node/src/behaviors/operational-credentials/
 	// OperationalCredentialsServer.ts:217-222 (`if
 	// (!VendorId.isOperational(adminVendorId)) throw new
@@ -1988,28 +2006,6 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// it is once it landed (review II, R2-P1-rw-01).
 	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
 	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
-	// IPKValue is "octstr, M, 16" (matter.js
-	// operational-credentials.element.ts:98 at 862ad75f), so a wrong
-	// length is an IM-level CONSTRAINT_ERROR there — the interaction layer
-	// refuses it before addNoc runs; chip answers INVALID_COMMAND
-	// (OperationalCredentialsCluster.cpp:469 at 6170af84). matter.js wins
-	// (review 2026-11 W3-clusec-07); it answered in-band InvalidNOC.
-	if len(req.IPKValue) != 16 {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC IPKValue of %d bytes, want 16", len(req.IPKValue))}
-	}
-	// NocValue and IcacValue carry "max 400" in the model (matter.js
-	// db021da0 packages/model/src/standard/elements/
-	// operational-credentials.element.ts:96-97), which matter.js's request
-	// validation refuses with ConstraintError before addNoc runs
-	// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-486),
-	// as it does the IPK's length; the TLV decoder never sees a longer one.
-	if len(req.NOCValue) > 400 {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC NOCValue of %d bytes, over 400", len(req.NOCValue))}
-	}
-	if len(req.ICACValue) > 400 {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC ICACValue of %d bytes, over 400", len(req.ICACValue))}
-	}
-
 	// Mirrors matter.js db021da0 packages/node/src/behaviors/
 	// operational-credentials/OperationalCredentialsServer.ts:233-260 and
 	// FailsafeContext.ts:236-240 / Fabric.ts:614-624. Guard order: trust

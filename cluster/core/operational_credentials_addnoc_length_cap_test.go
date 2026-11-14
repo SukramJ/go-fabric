@@ -56,9 +56,8 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewOperationalCredentials: %v", err)
 			}
-			// AddNOC outside an armed FailSafe window is refused before
-			// the length gate is reached (Matter §11.18.6.8), so the
-			// window must be armed for this test to measure the cap.
+			// The window is armed so the request at the cap reaches the
+			// handler's in-band answer (Matter §11.18.6.8).
 			oc.SetFailSafe(func() (uint8, bool) { return 0, true })
 
 			resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
@@ -83,6 +82,41 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 			}
 			if nocResp.StatusCode != core.NOCStatusInvalidNOC || nocResp.DebugText != "no trusted root" {
 				t.Errorf("AddNOC at the cap = %d %q, want InvalidNOC \"no trusted root\"", nocResp.StatusCode, nocResp.DebugText)
+			}
+		})
+	}
+}
+
+// TestAddNOCRequestLengthsAreJudgedBeforeTheHandler holds that AddNOC's
+// length constraints (IpkValue "16", NocValue and IcacValue "max 400",
+// operational-credentials.element.ts:96-98 at db021da0) are judged before
+// the handler's own checks: matter.js validates the request against its
+// schema before the invoker runs (packages/protocol/src/action/server/
+// CommandInvokeResponse.ts:484-487 at db021da0), so a request that also
+// names a reserved AdminVendorId (the handler's first check,
+// OperationalCredentialsServer.ts:216-221) or arrives without an armed
+// fail-safe answers CONSTRAINT_ERROR.
+func TestAddNOCRequestLengthsAreJudgedBeforeTheHandler(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		req  core.AddNOCRequest
+	}{
+		{"an IPK of 15 bytes with a reserved AdminVendorId", core.AddNOCRequest{IPKValue: make([]byte, 15), AdminVendorID: 0}},
+		{"a NOC of 401 bytes with a reserved AdminVendorId", core.AddNOCRequest{NOCValue: make([]byte, 401), IPKValue: make([]byte, 16), AdminVendorID: 0}},
+		{"an ICAC of 401 bytes with a reserved AdminVendorId", core.AddNOCRequest{ICACValue: make([]byte, 401), IPKValue: make([]byte, 16), AdminVendorID: 0}},
+		{"a NOC of 401 bytes without an armed fail-safe", core.AddNOCRequest{NOCValue: make([]byte, 401), IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+			if err != nil {
+				t.Fatalf("NewOperationalCredentials: %v", err)
+			}
+			_, err = oc.MatterInvoke(context.Background(), 0x06, tc.req)
+			if got := spec.StatusOf(err); got != im.StatusConstraintError {
+				t.Fatalf("AddNOC: status %v (err %v), want ConstraintError", got, err)
 			}
 		})
 	}
