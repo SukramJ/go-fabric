@@ -259,9 +259,22 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	}
 }
 
+// newOpcredsWithRoot is newOpcreds with a trusted root added in the
+// fail-safe: AddNOC answers a missing root before it looks at the CSR
+// (matter.js OperationalCredentialsServer.ts:233-245 at db021da0).
+func newOpcredsWithRoot(t *testing.T) *core.OperationalCredentials {
+	t.Helper()
+	oc := newOpcreds(t)
+	rootRaw, _, _ := buildTestNOCAndRoot(t)
+	if _, err := oc.MatterInvoke(context.Background(), 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+	return oc
+}
+
 func TestOpcreds_AddNOC_WithoutCSR(t *testing.T) {
 	t.Parallel()
-	oc := newOpcreds(t)
+	oc := newOpcredsWithRoot(t)
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
 		IPKValue:      make([]byte, 16),
 		AdminVendorID: 0xFFF1,
@@ -323,7 +336,7 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 // (W3-clusec-04).
 func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T) {
 	t.Parallel()
-	oc := newOpcreds(t)
+	oc := newOpcredsWithRoot(t)
 	csrCtx := core.WithInvokeSessionID(context.Background(), 7)
 	if _, err := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
@@ -423,38 +436,21 @@ func TestOpcreds_AddTrustedRoot_Accepts(t *testing.T) {
 	}
 }
 
-// TestOpcreds_AddNOC_NeedsCSRThenRoot exercises the commissioning
-// state machine — AddNOC without a prior CSRRequest fails fast with
-// NOCStatusMissingCsr; with CSR but without trusted root it fails
-// with NOCStatusInvalidNOC. Both signal via NOCResponse.StatusCode,
-// not via the error channel.
-func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
+// TestOpcreds_AddNOC_NeedsRootThenCSR exercises the commissioning
+// state machine in matter.js's order (OperationalCredentialsServer.ts:233-245
+// at db021da0) — AddNOC without a trusted root fails fast with
+// NOCStatusInvalidNOC, CSR or not; with the root but without a prior
+// CSRRequest it fails with NOCStatusMissingCsr. Both signal via
+// NOCResponse.StatusCode, not via the error channel.
+func TestOpcreds_AddNOC_NeedsRootThenCSR(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	ctx := context.Background()
 
-	_, nocRaw, _ := buildTestNOCAndRoot(t)
+	rootRaw, nocRaw, _ := buildTestNOCAndRoot(t)
 
-	// AddNOC before CSR → NOCStatusMissingCsr.
+	// AddNOC before root and CSR → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue:      nocRaw,
-		IPKValue:      make([]byte, 16),
-		AdminVendorID: 0xFFF1,
-	})
-	if err != nil {
-		t.Fatalf("AddNOC (pre-CSR): %v", err)
-	}
-	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusMissingCsr {
-		t.Fatalf("StatusCode = %d, want NOCStatusMissingCsr (%d)", got, core.NOCStatusMissingCsr)
-	}
-
-	// CSRRequest succeeds.
-	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
-		t.Fatalf("CSRRequest: %v", err)
-	}
-
-	// AddNOC with CSR but without trusted root → NOCStatusInvalidNOC.
-	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
 		NOCValue:      nocRaw,
 		IPKValue:      make([]byte, 16),
 		AdminVendorID: 0xFFF1,
@@ -464,6 +460,23 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 	}
 	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusInvalidNOC {
 		t.Fatalf("StatusCode = %d, want NOCStatusInvalidNOC (%d)", got, core.NOCStatusInvalidNOC)
+	}
+
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+
+	// AddNOC with the root but before CSR → NOCStatusMissingCsr.
+	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
+	})
+	if err != nil {
+		t.Fatalf("AddNOC (pre-CSR): %v", err)
+	}
+	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusMissingCsr {
+		t.Fatalf("StatusCode = %d, want NOCStatusMissingCsr (%d)", got, core.NOCStatusMissingCsr)
 	}
 }
 

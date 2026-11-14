@@ -8,26 +8,23 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/im"
 )
 
-// TestPin_AddNOC_LengthCap pins that AddNOC rejects NOC and ICAC payloads
-// larger than 400 bytes — chip src/credentials/CHIPCert.h
-// kMaxCHIPCertLength, enforced in
-// operational-credentials-server.cpp before the TLV decoder ever sees the
-// input. An oversized certificate is malformed by construction; accepting
-// it hands unbounded attacker-controlled input to the decoder during
-// commissioning, when the peer is not yet authenticated.
-//
-// The cap is measured behaviourally rather than by scanning the source for
-// the literal: each case drives the real MatterInvoke(AddNOC) path and
-// reads the in-band NOCResponse the spec mandates (Matter §11.18.6.7 —
-// AddNOC reports failure via NOCResponse.StatusCode, not via the IM error
-// channel).
+// TestPin_AddNOC_LengthCap pins that AddNOC refuses NOC and ICAC payloads
+// larger than 400 bytes with the IM status ConstraintError, before the TLV
+// decoder sees them: NocValue and IcacValue carry "max 400" in the model
+// (matter.js db021da0 packages/model/src/standard/elements/
+// operational-credentials.element.ts:96-97), which matter.js's request
+// validation enforces before addNoc runs
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-486).
 //
 // The 400-byte case is the negative control that ties the assertion to the
-// boundary itself: a payload exactly at the cap must pass the length gate
-// and fail later, for a different reason. Without it a broken cap (say,
-// "reject everything") would still satisfy the over-cap cases.
+// boundary itself: a payload exactly at the cap passes the length gate and
+// is answered in band, for a different reason (no trusted root, the first
+// of addNoc's checks). Without it a broken cap (say, "reject everything")
+// would still satisfy the over-cap cases.
 func TestPin_AddNOC_LengthCap(t *testing.T) {
 	t.Parallel()
 
@@ -40,33 +37,13 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 		name string
 		noc  []byte
 		icac []byte
-		// wantStatus + wantDebugText describe the exact rejection the
-		// length gate produces. NOCStatusMissingCsr is what the request
-		// reaches when it clears the gate: no CSRRequest was issued, so
-		// the very next guard rejects it.
-		wantStatus    uint8
-		wantDebugText string
+		// overCap: the request is refused with ConstraintError; otherwise
+		// it clears the gate and the next check answers in band.
+		overCap bool
 	}{
-		{
-			name:          "NOC one byte over the cap",
-			noc:           make([]byte, overCap),
-			wantStatus:    core.NOCStatusInvalidNOC,
-			wantDebugText: "NOC exceeds 400-byte limit",
-		},
-		{
-			name:          "ICAC one byte over the cap",
-			noc:           make([]byte, atCap),
-			icac:          make([]byte, overCap),
-			wantStatus:    core.NOCStatusInvalidNOC,
-			wantDebugText: "ICAC exceeds 400-byte limit",
-		},
-		{
-			name:          "NOC exactly at the cap clears the length gate",
-			noc:           make([]byte, atCap),
-			icac:          make([]byte, atCap),
-			wantStatus:    core.NOCStatusMissingCsr,
-			wantDebugText: "CSR not issued",
-		},
+		{name: "NOC one byte over the cap", noc: make([]byte, overCap), overCap: true},
+		{name: "ICAC one byte over the cap", noc: make([]byte, atCap), icac: make([]byte, overCap), overCap: true},
+		{name: "NOC exactly at the cap clears the length gate", noc: make([]byte, atCap), icac: make([]byte, atCap)},
 	}
 
 	for _, tc := range cases {
@@ -91,19 +68,21 @@ func TestPin_AddNOC_LengthCap(t *testing.T) {
 				CaseAdminSubject: 0x0001_0203_0405_0607,
 				AdminVendorID:    0x1234,
 			})
+			if tc.overCap {
+				if got := spec.StatusOf(err); got != im.StatusConstraintError {
+					t.Fatalf("AddNOC over the cap: status %v (resp %+v, err %v), want ConstraintError", got, resp, err)
+				}
+				return
+			}
 			if err != nil {
-				t.Fatalf("AddNOC: unexpected IM error: %v", err)
+				t.Fatalf("AddNOC at the cap: unexpected IM error: %v", err)
 			}
 			nocResp, ok := resp.(core.NOCResponse)
 			if !ok {
 				t.Fatalf("AddNOC response type = %T, want core.NOCResponse", resp)
 			}
-			if nocResp.StatusCode != tc.wantStatus {
-				t.Errorf("AddNOC StatusCode = %d, want %d (DebugText=%q)",
-					nocResp.StatusCode, tc.wantStatus, nocResp.DebugText)
-			}
-			if nocResp.DebugText != tc.wantDebugText {
-				t.Errorf("AddNOC DebugText = %q, want %q", nocResp.DebugText, tc.wantDebugText)
+			if nocResp.StatusCode != core.NOCStatusInvalidNOC || nocResp.DebugText != "no trusted root" {
+				t.Errorf("AddNOC at the cap = %d %q, want InvalidNOC \"no trusted root\"", nocResp.StatusCode, nocResp.DebugText)
 			}
 		})
 	}

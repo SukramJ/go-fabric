@@ -401,6 +401,17 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 	// Also stamp a non-zero session ID (100) for the CSR-session-binding guard.
 	caseCtx := im.WithFabricFilter(ctx, true, 1)
 	csrCtx := core.WithInvokeSessionID(caseCtx, 100)
+	// A trusted root first: matter.js answers its absence (InvalidNOC)
+	// before it looks at the CSR (OperationalCredentialsServer.ts:233-252).
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oc.MatterInvoke(caseCtx, 0x0B, core.AddTrustedRootCertificateRequest{
+		RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+	}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
 	// Issue CSRRequest with IsForUpdateNOC=true.
 	_, csrErr := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{
 		CSRNonce:       make([]byte, 32),
@@ -514,8 +525,9 @@ func TestParityOpcreds_AddNOCReservedAdminVendorIDIsInvalidCommand(t *testing.T)
 		if invokeErr != nil {
 			t.Fatalf("VID 0x%04X: AddNOC error %v, want the guard passed", vid, invokeErr)
 		}
-		if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusMissingCsr {
-			t.Errorf("VID 0x%04X: StatusCode = %d, want MissingCsr (the next guard)", vid, nr.StatusCode)
+		// No trusted root: the next guard, addNoc's first in-band check.
+		if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusInvalidNOC {
+			t.Errorf("VID 0x%04X: StatusCode = %d, want InvalidNOC (the next guard)", vid, nr.StatusCode)
 		}
 	}
 }
@@ -787,4 +799,111 @@ func TestParityOpcreds_CSRRequestKeepsTheFailSafeKeyPair(t *testing.T) {
 	if third := issueCSRPendingPubKey(ctx, t, oc, false); bytes.Equal(first, third) {
 		t.Fatal("a CSRRequest in a fresh fail-safe context carries the earlier context's public key")
 	}
+}
+
+// TestParityOpcreds_AddNOCChecksInMatterJSOrder pins the order of AddNOC's
+// refusals, so a request that fails more than one check gets the status of
+// the first: no trusted root (InvalidNOC), the CSR of another session or
+// none (MissingCsr), a CSR for UpdateNOC (ConstraintError), a full table
+// (TableFull), then building the fabric — CaseAdminSubject
+// (InvalidAdminSubject), the NOC's public key (InvalidPublicKey), the
+// chain (InvalidNOC).
+//
+// Mirrors matter.js db021da0 packages/node/src/behaviors/
+// operational-credentials/OperationalCredentialsServer.ts:233-260 (addNoc),
+// packages/protocol/src/common/FailsafeContext.ts:236-240 (buildFabric's
+// CaseAdminSubject check before setOperationalCert) and
+// packages/protocol/src/fabric/Fabric.ts:614-624 (#verifyOperationalCert
+// compares the public key before it verifies the chain).
+func TestParityOpcreds_AddNOCChecksInMatterJSOrder(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	addNOC := func(t *testing.T, oc *core.OperationalCredentials, noc []byte, subject uint64) core.NOCResponse {
+		t.Helper()
+		resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+			NOCValue: noc, IPKValue: make([]byte, 16), CaseAdminSubject: subject, AdminVendorID: 0xFFF1,
+		})
+		if err != nil {
+			t.Fatalf("AddNOC: IM error %v, want an in-band NOCResponse", err)
+		}
+		return resp.(core.NOCResponse)
+	}
+	addRoot := func(t *testing.T, oc *core.OperationalCredentials) *ecdsa.PrivateKey {
+		t.Helper()
+		rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
+			RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+		}); err != nil {
+			t.Fatalf("AddTrustedRootCertificate: %v", err)
+		}
+		return rootPriv
+	}
+
+	t.Run("no trusted root before a missing CSR", func(t *testing.T) {
+		t.Parallel()
+		oc, _ := opcredsWithFakeStore(t)
+		if got := addNOC(t, oc, make([]byte, 10), 0xABCD); got.StatusCode != core.NOCStatusInvalidNOC {
+			t.Fatalf("AddNOC without root and CSR: StatusCode %d (%s), want InvalidNOC", got.StatusCode, got.DebugText)
+		}
+	})
+
+	t.Run("no trusted root before a CSR for UpdateNOC", func(t *testing.T) {
+		t.Parallel()
+		oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(1)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		caseCtx := core.WithInvokeSessionID(im.WithFabricFilter(ctx, true, 1), 100)
+		issueCSRPendingPubKey(caseCtx, t, oc, true)
+		resp, err := oc.MatterInvoke(caseCtx, 0x06, core.AddNOCRequest{
+			NOCValue: make([]byte, 10), IPKValue: make([]byte, 16), CaseAdminSubject: 0xABCD, AdminVendorID: 0xFFF1,
+		})
+		if err != nil {
+			t.Fatalf("AddNOC after a CSR for UpdateNOC, no root: IM error %v, want NOCResponse InvalidNOC", err)
+		}
+		if got := resp.(core.NOCResponse); got.StatusCode != core.NOCStatusInvalidNOC {
+			t.Fatalf("AddNOC after a CSR for UpdateNOC, no root: StatusCode %d (%s), want InvalidNOC", got.StatusCode, got.DebugText)
+		}
+	})
+
+	t.Run("a full table before an invalid CaseAdminSubject", func(t *testing.T) {
+		t.Parallel()
+		s := newFakeStore()
+		if _, err := s.AddFabric(ctx, newFabricForTest(1)); err != nil {
+			t.Fatal(err)
+		}
+		oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{SupportedFabrics: 1, FailSafe: armedFailSafe(0)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootPriv := addRoot(t, oc)
+		pub := issueCSRPendingPubKey(ctx, t, oc, false)
+		noc := buildCoreSignedCertForPubKey(t, pub, false, rootPriv, testDefaultFabricID, testDefaultNodeID)
+		if got := addNOC(t, oc, noc, 0); got.StatusCode != core.NOCStatusTableFull {
+			t.Fatalf("AddNOC on a full table with CaseAdminSubject 0: StatusCode %d (%s), want TableFull", got.StatusCode, got.DebugText)
+		}
+	})
+
+	t.Run("the public key before the chain", func(t *testing.T) {
+		t.Parallel()
+		oc, _ := opcredsWithFakeStore(t)
+		addRoot(t, oc)
+		issueCSRPendingPubKey(ctx, t, oc, false)
+		otherKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		otherRoot, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Another key, signed by a root the fail-safe does not hold.
+		noc := buildCoreSignedCertForPubKey(t, marshalTestPub(otherKey), false, otherRoot, testDefaultFabricID, testDefaultNodeID)
+		if got := addNOC(t, oc, noc, 0xABCD); got.StatusCode != core.NOCStatusInvalidPublicKey {
+			t.Fatalf("AddNOC for another key under another root: StatusCode %d (%s), want InvalidPublicKey", got.StatusCode, got.DebugText)
+		}
+	})
 }
