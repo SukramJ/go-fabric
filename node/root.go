@@ -282,10 +282,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	r.AccessControl.SetLogger(d.logger)
 	r.AccessControl.SetLimits(cfg.Limits.accessControl())
-	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{
+	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{ //nolint:contextcheck // the constructor takes no context; it repairs the store once
 		MaxGroupsPerFabric:    cfg.Limits.MaxGroupsPerFabric,
 		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,
 		Groups:                d.groups,
+		Logger:                d.logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)

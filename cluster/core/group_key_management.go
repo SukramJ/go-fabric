@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 
@@ -42,6 +43,9 @@ type GroupKeyManagement struct {
 	currentFabric         uint8
 	maxGroupsPerFabric    uint16
 	maxGroupKeysPerFabric uint16
+
+	// logger receives the server's diagnostics (GroupKeyMgmtConfig.Logger).
+	logger *slog.Logger
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped at construction (non-zero sentinel) and after every
@@ -128,6 +132,8 @@ type GroupKeyMgmtConfig struct {
 	// it. A node with a Groups server must set it — without it the group
 	// table stays empty and no group message can be authenticated.
 	Groups *groups.Manager
+	// Logger receives the server's diagnostics; nil uses slog.Default().
+	Logger *slog.Logger
 }
 
 // matter.js defaults — see GroupKeyManagementServer.ts:615-616 (the
@@ -149,11 +155,16 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 	if cfg.MaxGroupKeysPerFabric == 0 {
 		cfg.MaxGroupKeysPerFabric = defaultMaxGroupKeysPerFabric
 	}
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	g := &GroupKeyManagement{
 		store:                 s,
 		groups:                cfg.Groups,
 		maxGroupsPerFabric:    cfg.MaxGroupsPerFabric,
 		maxGroupKeysPerFabric: cfg.MaxGroupKeysPerFabric,
+		logger:                logger,
 	}
 	// Seed DataVersion at a non-zero sentinel on construction so
 	// DataVersionFilter=0 does not produce a false-positive cache hit on
@@ -166,7 +177,57 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 		g.groups.SetMaxGroupsPerFabric(int(cfg.MaxGroupsPerFabric))
 		g.groups.OnGroupTableChanged(func(uint8) { g.dataVersion.Bump() })
 	}
+	g.dropMappingsToKeySet0(context.Background())
 	return g, nil
+}
+
+// dropMappingsToKeySet0 removes every stored GroupKeyMap entry that maps a
+// group to key set 0, the fabric's IPK, and logs each one. The entry's
+// GroupKeySetId is "1 to 65535" (checkMappedKeySet), and an earlier
+// version of this module stored such an entry from a write it accepted. It
+// is inert — key set 0 never authenticates a group message (groups/
+// manager.go loadFabric keeps the IPK out of the key sets a group message
+// is decoded with) — but it would
+// be served, and every list append of its fabric, judged with the
+// fabric's whole list, would fail on it. matter.js holds a behavior's
+// stored state to the model as it initialises (packages/node/src/behavior/
+// internal/ServerBehaviorBacking.ts:60-63 at db021da0) and so never serves
+// such an entry. The node removes a removed fabric's state at start the
+// same way (node/fabric_state.go, reconcileFabricState). Best-effort: a
+// store error is logged, and the entry stays for the next start.
+func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
+	fabrics, err := g.readFabrics(ctx)
+	if err != nil {
+		g.logger.Warn("matter.group_key_management.keyset0_mapping_scan_failed", slog.Any("err", err))
+		return
+	}
+	for _, fabric := range fabrics {
+		mappings, err := g.store.ListGroupKeyMappings(ctx, fabric)
+		if err != nil {
+			g.logger.Warn("matter.group_key_management.keyset0_mapping_scan_failed", slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
+			continue
+		}
+		dropped := false
+		for _, m := range mappings {
+			if checkMappedKeySet(m.GroupKeySetID) == nil {
+				continue
+			}
+			if err := g.store.RemoveGroupKeyMapping(ctx, fabric, m.GroupID); err != nil {
+				g.logger.Warn("matter.group_key_management.keyset0_mapping_drop_failed",
+					slog.Int("fabric_index", int(fabric)), slog.Int("group_id", int(m.GroupID)), slog.Any("err", err))
+				continue
+			}
+			dropped = true
+			g.logger.Warn("matter.group_key_management.keyset0_mapping_dropped",
+				slog.Int("fabric_index", int(fabric)), slog.Int("group_id", int(m.GroupID)),
+				slog.String("hint", "a GroupKeyMap entry mapped the group to key set 0, the IPK; the group has no key set mapped now"))
+		}
+		if dropped {
+			if err := g.syncGroups(ctx, fabric); err != nil {
+				g.logger.Warn("matter.group_key_management.keyset0_mapping_drop_failed", slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
+			}
+		}
+	}
 }
 
 // syncGroups applies a committed key set / GroupKeyMap change to the

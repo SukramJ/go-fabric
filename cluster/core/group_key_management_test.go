@@ -4,15 +4,20 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	mstore "github.com/SukramJ/go-fabric/store"
 )
 
 func newGKM(t *testing.T) *core.GroupKeyManagement {
@@ -931,5 +936,54 @@ func TestGKM_WriteGroupKeyMapRemovesDroppedBindings(t *testing.T) {
 	v, _ = gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if got := v.([]core.GroupKeyMapStruct); len(got) != 0 {
 		t.Fatalf("GroupKeyMap after empty write = %+v, want empty", got)
+	}
+}
+
+// TestGKM_StoredMappingToKeySet0_DroppedAtConstruction: a GroupKeyMap entry
+// that maps a group to key set 0 — the fabric's IPK, outside the entry's
+// "1 to 65535" (group-key-management.element.ts:109 at db021da0) — that
+// the store holds when the server is constructed is removed and logged:
+// it is not served, and an appended entry is judged with the fabric's
+// valid entries only. matter.js validates a behavior's state as it
+// initialises (ServerBehaviorBacking.ts:60-63 at db021da0), so it serves
+// no such entry either.
+func TestGKM_StoredMappingToKeySet0_DroppedAtConstruction(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	fabric, err := fs.AddFabric(ctx, mstore.FabricRecord{FabricID: 0x0A, NodeID: 0x0B, VendorID: 0xFFF1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []mstore.GroupKeyMapping{
+		{FabricIndex: fabric, GroupID: 0x0102, GroupKeySetID: 0},
+		{FabricIndex: fabric, GroupID: 0x0103, GroupKeySetID: 5},
+	} {
+		if err := fs.SetGroupKeyMapping(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var logs bytes.Buffer
+	gkm, err := core.NewGroupKeyManagement(fs, core.GroupKeyMgmtConfig{Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fctx := im.WithFabricFilter(ctx, true, fabric)
+	v, _ := gkm.MatterReadFiltered(fctx, 0x0000)
+	if got, want := v.([]core.GroupKeyMapStruct), []core.GroupKeyMapStruct{{GroupID: 0x0103, GroupKeySetID: 5, FabricIndex: fabric}}; !slices.Equal(got, want) {
+		t.Errorf("GroupKeyMap %+v, want %+v (the mapping to key set 0 is not served)", got, want)
+	}
+	if !strings.Contains(logs.String(), "group_id=258") || !strings.Contains(logs.String(), "fabric_index="+strconv.Itoa(int(fabric))) {
+		t.Errorf("no log line names the dropped mapping: %q", logs.String())
+	}
+	// An append: the dispatcher writes the fabric's entries as read plus
+	// the new one.
+	appended := append(v.([]core.GroupKeyMapStruct), core.GroupKeyMapStruct{GroupID: 0x0104, GroupKeySetID: 5})
+	if err := gkm.MatterWrite(fctx, 0x0000, appended); err != nil {
+		t.Fatalf("append after the restart: %v", err)
+	}
+	stored, _ := fs.ListGroupKeyMappings(ctx, fabric)
+	if slices.ContainsFunc(stored, func(m mstore.GroupKeyMapping) bool { return m.GroupKeySetID == 0 }) {
+		t.Errorf("the store still maps a group to key set 0: %+v", stored)
 	}
 }
