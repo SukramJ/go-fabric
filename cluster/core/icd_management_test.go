@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
+	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -249,14 +250,19 @@ func TestICDManagementRegistrationLifecycle(t *testing.T) {
 		}
 
 		// The fabric-filtered read lists one fabric, the unfiltered one every
-		// fabric with another fabric's entry reduced to its index.
+		// fabric with another fabric's entry reduced to its index
+		// (TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields).
 		filtered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 2), icddef.AttrRegisteredClients)
 		if l := filtered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 1 || l[0].CheckInNodeId != 0x20 {
 			t.Fatalf("filtered %+v", l)
 		}
 		unfiltered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 2), icddef.AttrRegisteredClients)
-		if l := unfiltered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 3 || l[0].CheckInNodeId != 0 || l[0].FabricIndex != 1 || l[2].CheckInNodeId != 0x20 {
+		l := unfiltered.(spec.List[spec.Encodable])
+		if len(l) != 3 || !bytes.Equal(spectest.Encode(t, l[0]), []byte{0x15, 0x24, 0xFE, 0x01, 0x18}) {
 			t.Fatalf("unfiltered %+v", l)
+		}
+		if own, ok := l[2].(icddef.MonitoringRegistrationStruct); !ok || own.CheckInNodeId != 0x20 {
+			t.Fatalf("unfiltered, fabric 2's own entry %+v", l[2])
 		}
 
 		// A wake sends one Check-In per Permanent client, post-increment.

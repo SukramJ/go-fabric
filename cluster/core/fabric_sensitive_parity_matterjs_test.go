@@ -5,12 +5,17 @@ package core_test
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -123,4 +128,31 @@ func TestParityMatterJS_FabricSceneInfoOfAnotherFabricWithoutSensitiveFields(t *
 	wantWire(t, "unfiltered read without a fabric", v, sceneInfoWire{one, true}, sceneInfoWire{two, true})
 	v, _ = s.MatterReadFiltered(msgCtx(1, true), 0x0002)
 	wantWire(t, "filtered read by fabric 1", v, sceneInfoWire{one, false})
+}
+
+// TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields:
+// CheckInNodeId, MonitoredSubject and ClientType are "S" and the entry
+// holds no Key (icd-management.element.ts:145-152,
+// IcdManagementServer.ts:572-577), so another fabric's registration reads
+// as its FabricIndex alone — not as a registration of node 0.
+func TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields(t *testing.T) {
+	t.Parallel()
+	s := newICDServer(t, core.ICDManagementConfig{
+		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
+		ClientsSupportedPerFabric: 2, Store: icdStore(t), Clock: inflight.WithGroup(clocktest.New(icdEpoch), inflight.New("icd-fs-test")),
+	})
+	for _, f := range []uint8{2, 1} {
+		if _, err := s.MatterInvoke(icdInvokeCtx(f, privAdminister), icddef.CmdRegisterClient, icddef.RegisterClientRequest{
+			CheckInNodeId: 0x10 * uint64(f), MonitoredSubject: 0x10 * uint64(f), Key: icdKey(f), ClientType: icddef.ClientTypeEphemeral,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	own := icddef.MonitoringRegistrationStruct{CheckInNodeId: 0x10, MonitoredSubject: 0x10, ClientType: icddef.ClientTypeEphemeral, FabricIndex: 1}
+	v, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 1), icddef.AttrRegisteredClients)
+	wantWire(t, "unfiltered read by fabric 1", v, fabricIndexOnly(2), own)
+	v, _ = s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 0), icddef.AttrRegisteredClients)
+	wantWire(t, "unfiltered read without a fabric", v, fabricIndexOnly(2), fabricIndexOnly(1))
+	v, _ = s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 1), icddef.AttrRegisteredClients)
+	wantWire(t, "filtered read by fabric 1", v, own)
 }

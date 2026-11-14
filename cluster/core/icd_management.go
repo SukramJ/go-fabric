@@ -913,8 +913,20 @@ func (s *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader]: a
 // fabric-filtered read lists the accessing fabric's registrations; an
-// unfiltered one lists every fabric's, another fabric's entry with its
-// fabric-sensitive fields left out (Core §7.13.6).
+// unfiltered one lists every fabric's, and an entry of another fabric than
+// the accessing one — every entry, for a session without a fabric — is
+// served without its fabric-sensitive fields (Core §7.13.6): CheckInNodeId,
+// MonitoredSubject and ClientType are "S" and Key "F"
+// (packages/model/src/standard/elements/icd-management.element.ts:145-152),
+// and matter.js's entry holds no Key
+// (packages/node/src/behaviors/icd-management/IcdManagementServer.ts:572-577
+// registerClient), so the entry is its FabricIndex alone
+// ([redactedEntry]). Mirrors matter.js at db021da0: a fabric-sensitive
+// field of another owning fabric reads undefined
+// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
+// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
+// mayRead) and the encoder leaves it out
+// (packages/types/src/tlv/TlvObject.ts:128-134).
 func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	filtered, fabric, request := im.LookupFabricFilter(ctx)
 	if attrID != icddef.AttrRegisteredClients || !request {
@@ -925,10 +937,10 @@ func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make(spec.List[icddef.MonitoringRegistrationStruct], 0, len(s.clients))
+	out := make(spec.List[spec.Encodable], 0, len(s.clients))
 	for _, c := range s.clients {
 		if c.fabricIndex != fabric {
-			out = append(out, icddef.MonitoringRegistrationStruct{FabricIndex: c.fabricIndex})
+			out = append(out, redactedEntry{fabricIndex: c.fabricIndex})
 			continue
 		}
 		out = append(out, c.wire())
