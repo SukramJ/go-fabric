@@ -28,6 +28,8 @@ type nvCase struct {
 	attr    uint32
 	write   any // the value as the bridge decodes it from the wire
 	want    string
+	// edit, when set, adjusts the node's configuration.
+	edit func(*node.Config)
 }
 
 func nvDevice[D node.Endpoint](build func(device.Options, ...device.Declaration) (D, error), decls ...device.Declaration) func(*testing.T, string) node.Endpoint {
@@ -52,13 +54,21 @@ var nvCases = map[string]nvCase{
 	"LevelControl.StartUpCurrentLevel":            {key: "dimmer", build: nvDevice(device.NewDimmableLight), cluster: 0x0008, attr: 0x4000, write: uint64(77), want: "77"},
 	"ColorControl.StartUpColorTemperatureMireds":  {key: "ct", build: nvDevice(device.NewColorTemperatureLight), cluster: 0x0300, attr: 0x4010, write: uint64(300), want: "300"},
 	"WindowCovering.Mode":                         {key: "cover", build: nvDevice(device.NewWindowCovering, wcdef.Declare{Features: wcdef.FeatureLift}), cluster: 0x0102, attr: 0x0017, write: uint64(4), want: "4"},
-	"Thermostat.MinHeatSetpointLimit":             {key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating}), cluster: 0x0201, attr: 0x0015, write: int64(1000), want: "1000"},
+	"root NetworkCommissioning.InterfaceEnabled":  {cluster: 0x0031, attr: 0x0004, write: false, want: "false"},
+	"root NetworkCommissioning.InterfaceEnabled, Wi-Fi": {
+		cluster: 0x0031, attr: 0x0004, write: false, want: "false",
+		edit: func(cfg *node.Config) { cfg.Network.WiFi = &node.WiFi{Driver: joinLab{}} },
+	},
+	"Thermostat.MinHeatSetpointLimit": {key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating}), cluster: 0x0201, attr: 0x0015, write: int64(1000), want: "1000"},
 }
 
 // nvRun is a node over st and eps with the case's device added, started.
 func nvRun(t *testing.T, cfg node.Config, tc nvCase) (n *node.Node, ep uint16) {
 	t.Helper()
 	ctx := t.Context()
+	if tc.edit != nil {
+		tc.edit(&cfg)
+	}
 	n = newNode(t, cfg)
 	if tc.key != "" {
 		if err := n.Aggregator().Add(ctx, tc.build(t, tc.key)); err != nil {

@@ -453,6 +453,21 @@ func (w *WiFiNetworkCommissioning) MatterWrite(_ context.Context, attrID uint32,
 	return nil
 }
 
+// SetAttributes implements [spec.AttributeSetter] for InterfaceEnabled,
+// as [NetworkCommissioning.SetAttributes]: the node restores a
+// controller's write of it through this after a restart.
+func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
+	enabled, set, err := netcommInterfaceEnabledOf(wifiNetcommInst, values)
+	if err != nil || !set {
+		return err
+	}
+	w.mu.Lock()
+	w.interfaceEnabled = enabled
+	w.dataVersion.Bump()
+	w.mu.Unlock()
+	return nil
+}
+
 // netcommStatusError is a command refused with an IM status.
 type netcommStatusError struct {
 	code im.StatusCode
