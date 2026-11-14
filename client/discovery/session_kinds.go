@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	fabricclock "github.com/SukramJ/go-fabric/clock"
 )
 
 // FindInstance finds one device and returns it — matter.js InstanceDiscovery
@@ -94,7 +96,11 @@ func (k *continuousKind) onStop(*Session[[]Candidate]) {}
 // CrossDeviceStagger is the delay between the race's attempts on
 // different devices — matter.js CROSS_DEVICE_STAGGER_DELAY
 // (ParallelPaseDiscovery.ts:30 at 862ad75f): the first starts at once,
-// each next one a slot later.
+// each next one a slot after the one before while that one still runs.
+// matter.js counts the slot from every attempt found before, ended or not
+// (ParallelPaseDiscovery.ts:102-103 at db021da0); here an attempt that has
+// ended holds no slot, and with none running the next starts at once
+// (review II, R2-P3-ble-01, R2-P3-ctl-lan-06).
 const CrossDeviceStagger = time.Second
 
 // The default timeouts of the two races: CommissioningDiscovery's 3
@@ -114,8 +120,10 @@ const (
 // for every attempt but the winner's once the race is decided.
 type Attempt[W any] func(ctx context.Context, c Candidate, win func() bool) (W, error)
 
-// Race runs attempt on every device found, in parallel and one
-// [CrossDeviceStagger] apart, and the first to win PASE wins the race —
+// Race runs attempt on every device found, in parallel and in the order
+// found, each next one a [CrossDeviceStagger] after the one before while
+// an attempt runs and at once when none does, and the first to win PASE
+// wins the race —
 // matter.js ParallelPaseDiscovery (ParallelPaseDiscovery.ts:45-216):
 //
 //   - the race is decided on a win, an interruption before one, or the
@@ -186,6 +194,15 @@ type raceKind[W any] struct {
 	attemptErrs  []error
 	cancels      map[int]context.CancelFunc
 	pending      sync.WaitGroup
+
+	// The stagger: waiting holds the attempts found and not yet released,
+	// in the order found; running counts those released and not yet
+	// ended; lastRelease is when the latest was released, and staggerTimer
+	// the wait for the next slot.
+	waiting      []chan struct{}
+	running      int
+	lastRelease  time.Time
+	staggerTimer fabricclock.Timer
 }
 
 // decideLocked closes the race: no attempt starts from now, win refuses,
@@ -197,6 +214,11 @@ func (k *raceKind[W]) decideLocked() {
 	}
 	k.isDecided = true
 	close(k.decided)
+	k.waiting = nil
+	if k.staggerTimer != nil {
+		k.staggerTimer.Stop()
+		k.staggerTimer = nil
+	}
 	for i, cancel := range k.cancels {
 		if !k.paseWon || i != k.winnerIndex {
 			cancel()
@@ -217,20 +239,70 @@ func (k *raceKind[W]) onDiscovered(s *Session[W], c Candidate) {
 	k.mu.Lock()
 	index := k.attemptCount
 	k.attemptCount++
+	release := make(chan struct{})
+	if !k.isDecided {
+		k.waiting = append(k.waiting, release)
+		k.releaseLocked(s)
+	}
 	k.mu.Unlock()
-	k.pending.Go(func() { k.run(s, c, index) })
+	k.pending.Go(func() { k.run(s, c, index, release) })
+}
+
+// releaseLocked releases the attempts whose slot has come: the first
+// waiting one at once when no attempt runs, else one [CrossDeviceStagger]
+// after the latest release, for which it arms the stagger timer. The
+// caller holds k.mu.
+func (k *raceKind[W]) releaseLocked(s *Session[W]) {
+	if k.isDecided || len(k.waiting) == 0 {
+		return
+	}
+	now := s.clock.Now()
+	if k.running > 0 {
+		if wait := k.lastRelease.Add(CrossDeviceStagger).Sub(now); wait > 0 {
+			if k.staggerTimer == nil {
+				var t fabricclock.Timer
+				t = s.clock.AfterFunc(wait, func() {
+					k.mu.Lock()
+					defer k.mu.Unlock()
+					if k.staggerTimer == t {
+						k.staggerTimer = nil
+					}
+					k.releaseLocked(s)
+				})
+				k.staggerTimer = t
+			}
+			return
+		}
+	}
+	if k.staggerTimer != nil {
+		k.staggerTimer.Stop()
+		k.staggerTimer = nil
+	}
+	next := k.waiting[0]
+	k.waiting = k.waiting[1:]
+	k.running++
+	k.lastRelease = now
+	close(next)
+	// The one released runs now, so the next waits for its slot.
+	k.releaseLocked(s)
+}
+
+// ended is an attempt's end: its slot is free, so the next waiting one may
+// start at once.
+func (k *raceKind[W]) ended(s *Session[W]) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.running--
+	k.releaseLocked(s)
 }
 
 // run is one registered attempt (registerAttempt, :81-147).
-func (k *raceKind[W]) run(s *Session[W], c Candidate, index int) {
-	if stagger := time.Duration(index) * CrossDeviceStagger; stagger > 0 {
-		t := s.clock.NewTimer(stagger)
-		select {
-		case <-t.C():
-		case <-k.decided:
-			t.Stop()
-			return
-		}
+func (k *raceKind[W]) run(s *Session[W], c Candidate, index int, release <-chan struct{}) {
+	select {
+	case <-release:
+		defer k.ended(s)
+	case <-k.decided:
+		return
 	}
 	s.checkCaller()
 	ctx, cancel := context.WithCancel(s.ctx)

@@ -793,9 +793,11 @@ func TestParallelPaseRaceParity(t *testing.T) {
 				}
 			}
 			waitStarted(1)
-			// The discovery's timeout and the two stagger waits.
-			if n := len(clk.Armed()); n < 3 {
-				t.Fatalf("%d timers armed, want the timeout and two stagger waits", n)
+			// The discovery's timeout and the wait for the next slot (one
+			// at a time: the slot counts from the latest start, review
+			// II, R2-P3-ble-01).
+			if n := len(clk.Armed()); n < 2 {
+				t.Fatalf("%d timers armed, want the timeout and the stagger wait", n)
 			}
 			clk.Advance(discovery.CrossDeviceStagger)
 			waitStarted(2)
