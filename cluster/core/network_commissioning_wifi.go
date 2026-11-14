@@ -755,8 +755,9 @@ func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
 // Mirrors connectedhomeip
 // src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1120-1132
 // at 6170af84 (WriteAttribute: SetInterfaceEnabled is the driver's
-// SetEnabled, CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE answers InvalidAction
-// per spec 11.9.6.5, any other error the write's status) and
+// SetEnabled, NetworkCommissioningCluster.h:134;
+// CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE answers InvalidAction per spec
+// 11.9.6.5, any other error the write's status) and
 // src/include/platform/NetworkCommissioning.h:225-234 (a driver without
 // the feature: SetEnabled unsupported, GetEnabled true). Unlike chip, a
 // write of the value held does not call the driver, and a write of true
