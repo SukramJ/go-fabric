@@ -293,8 +293,9 @@ network with that network's address, the gateway relays the other
 network's answer as well, and the controllers cache two addresses for one
 host, one of them across the router. Advertising on the controllers'
 network alone keeps the second address out. matter.js publishes on every
-interface; the allow-list is this module's (*Ahead of matter.js*,
-`BD-matterjs-mdns-interface-allowlist`).
+interface, or on the one interface it is given by name; the allow-list is
+this module's, a recorded divergence
+(`BD-matterjs-mdns-interface-allowlist`).
 
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
 [`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
