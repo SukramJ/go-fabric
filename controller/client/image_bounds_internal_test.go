@@ -5,6 +5,7 @@ package client
 
 import (
 	"log/slog"
+	"runtime"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -239,4 +240,118 @@ func (h *logRecorder) count(msg string) int {
 		}
 	}
 	return n
+}
+
+// TestStoredImageIsChargedAsTheImage: an image is charged the same in the
+// store as in memory, so the cut at load and the refusal of a report judge
+// one measure.
+func TestStoredImageIsChargedAsTheImage(t *testing.T) {
+	t.Parallel()
+	st := &MemoryStore{}
+	n, _ := quotaNode(t, st, 0)
+	n.apply(wildcard, &bridge(3).r, true)
+	ApplyAsked(n, 1000, 0xFFF1_FC00, blobList(16, 100))
+	eps, err := st.Load("n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image, stored := n.s.imageBytes(), storedImageBytes(eps); image != stored {
+		t.Errorf("the image is charged %d bytes in memory and %d in the store", image, stored)
+	}
+}
+
+// imageHeapFactor is the heap the image may hold per byte it is charged,
+// the factor DefaultMaxImageBytesPerNode's charges state.
+const imageHeapFactor = 2
+
+// rowStore counts the rows a store would hold and keeps no value, so the
+// heap a test measures is the image's.
+type rowStore struct {
+	MemoryStore
+	valueRows int
+	clusters  map[[2]uint32]bool
+}
+
+func (r *rowStore) Save(_ string, ep uint16, cluster uint32, values map[uint32][]byte, _ *uint32) error {
+	for _, v := range values {
+		if v != nil {
+			r.valueRows++
+		}
+	}
+	r.clusters[[2]uint32{uint32(ep), cluster}] = true
+	return nil
+}
+
+// heapInUse is the live heap after a collection.
+func heapInUse() int64 {
+	var m runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m)
+	return int64(m.HeapAlloc) //nolint:gosec // a heap size fits int64
+}
+
+// TestImageQuotaBoundsMemoryAndRows: what the quota charges for an image
+// bounds the heap the image holds, within imageHeapFactor, and the rows its
+// store holds — for values of one byte under fresh attribute ids, under
+// fresh cluster ids, on fresh endpoints a read asked for, and for lists of
+// one-byte elements. Each mode is offered more than the quota in reports of
+// a thousand entries. Not parallel: it measures the heap.
+func TestImageQuotaBoundsMemoryAndRows(t *testing.T) { //nolint:paralleltest // measures the heap
+	const quota, reports, perReport = 4 << 20, 40, 1000
+	for _, mode := range []string{"fresh attributes", "fresh clusters", "fresh endpoints", "lists of one-byte elements"} {
+		st := &rowStore{clusters: map[[2]uint32]bool{}}
+		n, _ := quotaNode(t, st, quota)
+		n.apply(wildcard, &bridge(1).r, true)
+		charged0, rows0, clusters0 := n.s.imageBytes(), st.valueRows, len(st.clusters)
+		heap0 := heapInUse()
+		for r := range reports {
+			b := &report{}
+			sc := wildcard
+			for i := range perReport {
+				k := uint32(r*perReport + i) //nolint:gosec // a small test count
+				switch mode {
+				case "fresh attributes":
+					b.attr(0, 0xFFF1_FC00, 0x1000+k, boolNode(true), 1)
+				case "fresh clusters":
+					b.attr(0, 0x0001_0000+k, 0, boolNode(true), 1)
+				case "fresh endpoints":
+					ep := uint16(2000 + k) //nolint:gosec // a small test count
+					b.attr(ep, 0xFFF1_FC00, 0, boolNode(true), 1)
+				case "lists of one-byte elements":
+					if i == 0 {
+						list := spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}}
+						for range perReport {
+							list.Children = append(list.Children, boolNode(true))
+						}
+						b.attr(0, 0xFFF1_FC00, 0x1000+uint32(r), list, 1) //nolint:gosec // a small test count
+					}
+				}
+			}
+			if mode == "fresh endpoints" {
+				paths := make([]im.ConcreteAttributePath, 0, perReport)
+				for _, a := range b.r.Attributes {
+					paths = append(paths, im.ConcreteAttributePath{Endpoint: a.Path.Endpoint, HasEndpoint: true})
+				}
+				sc = newScope(paths, false)
+			}
+			n.apply(sc, &b.r, true)
+		}
+		heap := heapInUse() - heap0
+		charged := n.s.imageBytes() - charged0
+		rows, versionRows := st.valueRows-rows0, len(st.clusters)-clusters0
+		t.Logf("%s: charged %d of the quota %d, heap %d bytes, %d value rows, %d version rows", mode, charged, quota, heap, rows, versionRows)
+		if charged <= 0 {
+			t.Fatalf("%s: nothing was admitted", mode)
+		}
+		if heap > imageHeapFactor*int64(charged) {
+			t.Errorf("%s: the image holds %d heap bytes for %d charged bytes (%.0f per charged byte); want at most %d per charged byte",
+				mode, heap, charged, float64(heap)/float64(charged), imageHeapFactor)
+		}
+		// A value row is charged at least one element and its attribute.
+		if maxRows := quota / (imageAttributeBytes + imageElementBytes); rows > maxRows || versionRows > quota/imageClusterBytes {
+			t.Errorf("%s: the store holds %d value rows and %d version rows; want at most %d and %d (the quota over a row's charge)",
+				mode, rows, versionRows, maxRows, quota/imageClusterBytes)
+		}
+		runtime.KeepAlive(n)
+	}
 }

@@ -5,20 +5,62 @@ package client
 
 import (
 	"log/slog"
+	"unsafe"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // DefaultMaxImageBytesPerNode is the image quota of a node when none is
-// configured ([RegistryConfig].MaxImageBytesPerNode): the bytes of the
-// attribute values one node's image holds, in their stored form. Module's
-// own (review II, R2-P3-ctl-dev-02, owner decision 54): matter.js bounds
-// neither what a peer's reports store nor their sum
+// configured ([RegistryConfig].MaxImageBytesPerNode): the bytes one node's
+// image is charged — its attribute values in their stored form and, for
+// each endpoint, cluster, attribute and TLV element, what the entry holds
+// in memory (imageEndpointBytes and its siblings) — so that it bounds the
+// image's heap and its store's rows, not only the values' bytes. Module's
+// own (review II, R2-P3-ctl-dev-02, owner decision 54; R2-P3-dr-ctl-02):
+// matter.js bounds neither what a peer's reports store nor their sum
 // (ClientStructure.ts:568-611, :1147-1193 at db021da0). The value is
-// chosen, sixteen times interaction.DefaultMaxReportBytesPerSession; a
-// node's own image is far below it.
+// chosen, sixteen times interaction.DefaultMaxReportBytesPerSession.
 const DefaultMaxImageBytesPerNode = 32 << 20
+
+// What the image charges towards a node's quota beside a value's stored
+// bytes (review II, R2-P3-dr-ctl-02): each entry costs what it holds in
+// memory, so the quota bounds the image's heap — within a factor of two,
+// measured by TestImageQuotaBoundsMemoryAndRows for one-byte values under
+// fresh attribute, cluster and endpoint ids and for lists of one-byte
+// elements — and the store's rows: an attribute is one row of the
+// store's values, a cluster one row of its versions, each charged at
+// least its entry's bytes.
+const (
+	// imageElementBytes is one TLV element of a value, the value itself
+	// and every member of a list or structure in it: one spec.Node in the
+	// image (unsafe.Sizeof, 112 bytes on a 64-bit platform).
+	imageElementBytes = int(unsafe.Sizeof(spec.Node{}))
+	// imageAttributeBytes is one attribute beside its value's elements:
+	// its slots in the cache's values map (a uint32 key and a spec.Node)
+	// and sizes map (a uint32 key and an int), unsafe.Sizeof of each, 136
+	// bytes on a 64-bit platform. The maps' spare slots are not charged.
+	imageAttributeBytes = int(unsafe.Sizeof(struct {
+		k uint32
+		v spec.Node
+	}{}) + unsafe.Sizeof(struct {
+		k uint32
+		v int
+	}{}))
+	// imageClusterBytes is one cluster beside its attributes: the Cluster
+	// (184 bytes), its cache (72) and the first slot groups of the cache's
+	// maps. Measured with TestImageQuotaBoundsMemoryAndRows before the
+	// charges (darwin/arm64, go1.27.4): a fresh cluster holding one one-byte
+	// value took 1844 heap bytes, a fresh attribute 239, so 1605; rounded
+	// up to 2 KiB.
+	imageClusterBytes = 2 << 10
+	// imageEndpointBytes is one endpoint beside its clusters: the Endpoint
+	// (112 bytes), its slot in the structure's map and its own cluster
+	// map. Measured as above: a fresh endpoint with one such cluster took
+	// 2147 heap bytes, 303 beyond the cluster's; rounded up to 512.
+	imageEndpointBytes = 512
+)
 
 // quota is the node's image quota.
 func (s *structure) quota() int {
@@ -28,18 +70,53 @@ func (s *structure) quota() int {
 	return s.maxImageBytes
 }
 
-// imageBytes is the bytes of the image's attribute values in their stored
-// form, every endpoint and cluster of the image together; the node's own
-// settings, record, ICD and onboarding entries are no cluster of the image
-// and do not count.
+// imageBytes is what the image is charged towards the quota: every
+// endpoint and cluster of it and each attribute's charge ([valueCharge]);
+// the node's own settings, record, ICD and onboarding entries are no
+// cluster of the image and do not count.
 func (s *structure) imageBytes() int {
 	total := 0
 	for _, ep := range s.endpoints {
+		total += imageEndpointBytes
 		for _, c := range ep.clusters {
-			total += c.cache.bytes
+			total += imageClusterBytes + c.cache.bytes
 		}
 	}
 	return total
+}
+
+// valueCharge is what an attribute holding n is charged: the stored bytes
+// of n, one imageElementBytes per TLV element of it and the attribute's
+// own imageAttributeBytes.
+func valueCharge(n spec.Node) int {
+	return valueSize(n) + elements(n)*imageElementBytes + imageAttributeBytes
+}
+
+// elements is the number of TLV elements of n, n among them.
+func elements(n spec.Node) int {
+	count := 1
+	for i := range n.Children {
+		count += elements(n.Children[i])
+	}
+	return count
+}
+
+// storedValueCharge is valueCharge of a stored value b: its bytes, the
+// elements its encoding holds as far as it decodes, at least one, and the
+// attribute.
+func storedValueCharge(b []byte) int {
+	count := 0
+	dec := tlv.NewDecoder(b)
+	for dec.Remaining() > 0 {
+		el, err := dec.Next()
+		if err != nil {
+			break
+		}
+		if !el.IsEndContainer {
+			count++
+		}
+	}
+	return len(b) + max(count, 1)*imageElementBytes + imageAttributeBytes
 }
 
 // descriptorList reads a Descriptor list of one endpoint.
@@ -144,18 +221,25 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 			continue
 		}
 		kept = append(kept, *a)
-		sizes[key{at, a.Path.Attribute}] = valueSize(a.Value)
+		sizes[key{at, a.Path.Attribute}] = valueCharge(a.Value)
 	}
 	before := s.imageBytes()
 	after := before
+	newEndpoints, newClusters := map[uint16]bool{}, map[place]bool{}
 	for k, size := range sizes {
-		if e := s.endpoints[k.ep]; e != nil {
-			if c := e.clusters[k.cluster]; c != nil {
-				after -= c.cache.sizes[k.attr]
-			}
+		e := s.endpoints[k.ep]
+		switch {
+		case e == nil:
+			newEndpoints[k.ep] = true
+			newClusters[k.place] = true
+		case e.clusters[k.cluster] == nil:
+			newClusters[k.place] = true
+		default:
+			after -= e.clusters[k.cluster].cache.sizes[k.attr]
 		}
 		after += size
 	}
+	after += len(newEndpoints)*imageEndpointBytes + len(newClusters)*imageClusterBytes
 	if quota := s.quota(); after > quota && after > before {
 		if !s.quotaLogged {
 			s.quotaLogged = true
@@ -174,19 +258,24 @@ func privateCluster(ep uint16, cluster uint32) bool {
 	return ep == 0 && (cluster == settingsCluster || cluster == recordCluster || cluster == icdCluster || cluster == onboardingCluster)
 }
 
-// storedImageBytes is the bytes of the image's values in stored, the
-// node's own entries aside.
+// storedImageBytes is what the image stored is charged, as
+// [structure.imageBytes] charges the image it loads into, the node's own
+// entries aside.
 func storedImageBytes(stored []StoredEndpoint) int {
 	total := 0
 	for _, se := range stored {
+		endpoint := 0
 		for _, sc := range se.Clusters {
 			if privateCluster(se.Number, sc.ID) {
 				continue
 			}
+			endpoint = imageEndpointBytes
+			total += imageClusterBytes
 			for _, b := range sc.Values {
-				total += len(b)
+				total += storedValueCharge(b)
 			}
 		}
+		total += endpoint
 	}
 	return total
 }

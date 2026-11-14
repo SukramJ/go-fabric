@@ -26,8 +26,8 @@ type cache struct {
 	cluster uint32
 
 	values map[uint32]spec.Node
-	// sizes is each value's stored size (encodeValue), bytes their sum:
-	// what the cluster counts towards the node's image quota
+	// sizes is each value's charge ([valueCharge]), bytes their sum: what
+	// the cluster's attributes count towards the node's image quota
 	// ([structure.imageBytes]).
 	sizes map[uint32]int
 	bytes int
@@ -53,7 +53,7 @@ func newCache(p *persister, ep uint16, cluster uint32, values map[uint32]spec.No
 		c.values = map[uint32]spec.Node{}
 	}
 	for k, v := range c.values {
-		c.setSize(k, valueSize(v))
+		c.setSize(k, valueCharge(v))
 	}
 	if version != nil {
 		c.version, c.hasVersion = *version, true
@@ -80,7 +80,7 @@ func (c *cache) externalSet(values map[uint32]*spec.Node, version *uint32) {
 			continue
 		}
 		c.values[k] = *v
-		c.setSize(k, valueSize(*v))
+		c.setSize(k, valueCharge(*v))
 	}
 	if c.p.interval > 0 {
 		for k := range values {
@@ -151,7 +151,7 @@ func (c *cache) erase() {
 	}
 }
 
-// setSize records value k's stored size; 0 forgets it.
+// setSize records value k's charge; 0 forgets it.
 func (c *cache) setSize(k uint32, size int) {
 	c.bytes += size - c.sizes[k]
 	if size == 0 {

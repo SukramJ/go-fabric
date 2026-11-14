@@ -61,8 +61,10 @@ type RegistryConfig struct {
 	// Clock paces the expiry of discovered addresses and nodes; nil is the
 	// system clock.
 	Clock exchange.Clock
-	// MaxImageBytesPerNode is each node's image quota: the bytes of the
-	// attribute values its image holds, in their stored form. A report
+	// MaxImageBytesPerNode is each node's image quota: the bytes its
+	// image is charged, its attribute values in their stored form and what
+	// each endpoint, cluster, attribute and TLV element of it holds in
+	// memory ([DefaultMaxImageBytesPerNode]). A report
 	// that would raise a node's image above it is not applied, and an
 	// image stored above it is cut back to what the node's structure
 	// names when it loads. Zero or less is [DefaultMaxImageBytesPerNode].

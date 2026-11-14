@@ -258,12 +258,16 @@ type Config struct {
 	// session they open, keep the default.
 	MaxReportBytesPerSession int
 	// MaxImageBytesPerNode bounds what one paired node's reports leave in
-	// the controller's image of it and in DB: the bytes of the attribute
-	// values, in their stored form. A report that would raise the image
-	// above it is not applied (the image stays as it was), and an image
-	// stored above it is cut back to what the node's own structure names
-	// when it loads. Below it, the image keeps only what the node's
-	// structure names or the interaction asked for. 0 is
+	// the controller's image of it and in DB: the image is charged the
+	// bytes of its attribute values in their stored form and, for each
+	// endpoint, cluster, attribute and TLV element, what that entry holds
+	// in memory, so the bound holds the image's heap within a factor of
+	// two and DB's rows of the node too: one row per attribute, charged at
+	// least 248 bytes, and one per cluster, charged 2048. A report that
+	// would raise the image above it is not applied (the image stays as it
+	// was), and an image stored above it is cut back to what the node's
+	// own structure names when it loads. Below it, the image keeps only
+	// what the node's structure names or the interaction asked for. 0 is
 	// client.DefaultMaxImageBytesPerNode (32 MiB); a negative bound is
 	// [ErrConfiguration].
 	MaxImageBytesPerNode int
