@@ -185,6 +185,9 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	}
 
 	s.Close()
+	// The device accepts the next PBKDFParamRequest once it has handled the
+	// CloseSession ([waitNoPASE] has why the test waits for that).
+	waitNoPASE(t, n)
 	s, err = c.Commission(ctx)
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
