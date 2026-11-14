@@ -934,7 +934,7 @@ func (f *flow) disarmAfterAbort(ctx context.Context) {
 // fail-safe (failsafeMayBeArmed — from the PASE session's establishment
 // on), the flow disarms after a failure of either kind, as connectedhomeip
 // does after a failure before its network setup stages
-// (src/controller/CHIPDeviceController.cpp:2272-2277 at 6170af84, "we
+// (src/controller/CHIPDeviceController.cpp:2272-2278 at 6170af84, "we
 // also need to force a reset on the failsafe so we can start fresh on the
 // next attempt"); matter.js's flow notes that a commissioner restarting
 // from step 2 may expire the fail-safe at once or else waits for it to

@@ -20,7 +20,7 @@ import (
 // image's heap and its store's rows, not only the values' bytes. Module's
 // own (review II, R2-P3-ctl-dev-02, owner decision 54; R2-P3-dr-ctl-02):
 // matter.js bounds neither what a peer's reports store nor their sum
-// (ClientStructure.ts:568-611, :1147-1193 at db021da0). The value is
+// (ClientStructure.ts:568-610, :1147-1193 at db021da0). The value is
 // chosen, sixteen times interaction.DefaultMaxReportBytesPerSession.
 const DefaultMaxImageBytesPerNode = 32 << 20
 
@@ -149,7 +149,7 @@ func structureNames(list descriptorList) func(ep uint16, cluster uint32) bool {
 
 // admit is the attribute data of r the image takes (review II,
 // R2-P3-ctl-dev-02, owner decision 54; module's own, matter.js stores
-// every path a report names, ClientStructure.ts:568-611 at db021da0):
+// every path a report names, ClientStructure.ts:568-610 at db021da0):
 //
 //   - a path the peer's structure names ([structureNames], judged on the
 //     report's own Descriptor lists where it carries them, else the
