@@ -318,11 +318,14 @@ const SessionIdleTimeout = 5 * time.Minute
 // reaching [Manager.OpenFromSigmaWithID]. Past it the reaper hands the
 // slot back.
 //
-// matter.js has no equivalent because it never reserves an id ahead of
-// the session: `getNextAvailableSessionId`
-// (packages/protocol/src/session/SessionManager.ts:537) is called at
-// the moment the secure session is created. Our CASE responder must
-// announce the id in Sigma2, one round-trip earlier, so an aborted
+// matter.js has no equivalent because it stakes nothing:
+// `getNextAvailableSessionId`
+// (packages/protocol/src/session/SessionManager.ts:581-599 at db021da0)
+// returns the next id no session holds and moves its cursor on
+// (#takeSessionId, :602-606); a handshake takes its id before its
+// session exists (the CASE responder for Sigma2, case/CaseServer.ts:266,
+// the session created at :316) and nothing records the id until then.
+// Our CASE responder stakes the id it announces in Sigma2, so an aborted
 // handshake leaves an id behind and something has to reclaim it —
 // otherwise a peer that opens exchanges and never answers Sigma2 walks
 // the daemon through all 65534 slots and every later CASE handshake,
@@ -660,8 +663,9 @@ func randomInitialSessionID() uint16 {
 // keeps every session it established until it holds more than
 // [MaxSessionsPerPeer], at which point the least recently active ones
 // are force-closed (no CloseSession on the wire). Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:185-189
-// (MAX_SESSIONS_PER_PEER) and :641-680 (#evictExcessSessionsFor).
+// packages/protocol/src/session/SessionManager.ts:201-205
+// (MAX_SESSIONS_PER_PEER) and :690-725 (#evictExcessSessionsFor) at
+// db021da0.
 func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint64, keys sigma.SessionKeys) (*Entry, error) {
 	sess, err := channel.New(channel.Config{
 		EncryptKey:  keys.R2IKey[:], // bridge → peer
@@ -699,9 +703,9 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
-	// Force close, no CloseSession: matter.js SessionManager.ts:676-678
-	// skips the graceful path for the cap because the eviction target
-	// is typically the peer it can no longer reach.
+	// Force close, no CloseSession: matter.js SessionManager.ts:721-723
+	// at db021da0 skips the graceful path for the cap because the
+	// eviction target is typically the peer it can no longer reach.
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return entry, nil
@@ -1445,8 +1449,8 @@ func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(
 // time. A new CASE does not close the peer's previous sessions, so a
 // peer that reconnects repeatedly accumulates them; the cap is per
 // peer rather than global so one noisy peer cannot evict another's.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:185-189
-// MAX_SESSIONS_PER_PEER.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:201-205
+// at db021da0, MAX_SESSIONS_PER_PEER.
 const MaxSessionsPerPeer = 5
 
 // evictExcessPeerSessionsLocked removes the least recently active
@@ -1720,7 +1724,7 @@ func GenerateResumptionID() ([]byte, error) {
 // staked for a handshake that never completed — rather than refusing
 // the allocation, so a burst of aborted handshakes cannot lock out
 // every later CASE exchange. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:537
+// packages/protocol/src/session/SessionManager.ts:581-599 at db021da0
 // (`getNextAvailableSessionId` falls back to `findOldestInactiveSession`
 // and reuses its id). We stop at placeholders and never evict a live
 // session here: closing one has to run its graceful-close cascade
