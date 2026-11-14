@@ -869,8 +869,10 @@ func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
 	return was
 }
 
-// reportRolledBackFabrics runs, once, the removal consequences of every
-// fabric OperationalCredentials rolled back at construction: an AddNOC
+// reportRolledBackFabrics runs, once, the consequences of every rollback
+// OperationalCredentials made at construction — for a rolled-back
+// UpdateNOC those of its rollback at run time (below), and the removal
+// consequences of every fabric it removed: an AddNOC
 // of the previous run that no CommissioningComplete committed before the
 // node went down. That run announced the fabric (OnFabricAdded) and the
 // commissioner may have written fabric-scoped state for it outside the
@@ -892,6 +894,24 @@ func (n *Node) reportRolledBackFabrics(ctx context.Context) {
 	for i := range recs {
 		n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(recs[i].FabricIndex)))
 		n.fabricRemovedWith(ctx, fabricInfoOf(recs[i]))
+	}
+	// A rolled-back UpdateNOC runs what its rollback at run time runs
+	// through the OnFabricUpdated hook (observedFabricUpdated): the
+	// fabric's resumption records made under the uncommitted identity go,
+	// with the client stack's records, and the host hears the fabric
+	// reverted (review II, R2-P2-dr-noc-05). The CASE identity and the
+	// operational record are not moved here: nothing is announced and no
+	// session exists before the bridge starts, and Start loads and
+	// announces the identity as the store holds it again.
+	updates := n.root.OperationalCredentials.RolledBackUpdates()
+	for i := range updates {
+		idx := updates[i].FabricIndex
+		n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
+		if err := n.st.RemoveResumptionsByFabric(ctx, idx); err != nil {
+			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		}
+		n.closeClientFabricSessions(ctx, idx)
+		n.notifyFabricUpdated(ctx, idx)
 	}
 }
 

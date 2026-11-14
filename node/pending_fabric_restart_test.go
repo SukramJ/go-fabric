@@ -4,13 +4,16 @@
 package node_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestRestartRollsBackAnUncommittedFabricWithItsRemoval pins review II
@@ -82,6 +85,58 @@ func TestRestartRollsBackAnUncommittedFabricWithItsRemoval(t *testing.T) {
 	defer mu.Unlock()
 	if len(removed) != 1 || removed[0].FabricID != testFabricID || removed[0].NodeID != testNodeID {
 		t.Fatalf("OnFabricRemoved after the restart: %+v; want once, for fabric 0x%X node 0x%X", removed, testFabricID, testNodeID)
+	}
+}
+
+// TestRestartRollsBackAnUncommittedUpdateWithItsConsequences pins review
+// II R2-P2-dr-noc-05: a node goes down after UpdateNOC and before
+// CommissioningComplete committed it, with a resumption record made under
+// the uncommitted identity. The node that comes back on the same database
+// rolls the update back and runs what the run-time rollback of an update
+// runs before it serves: the fabric's resumption records go, and the
+// host's OnFabricUpdated fires once, with the fabric as it stands again.
+func TestRestartRollsBackAnUncommittedUpdateWithItsConsequences(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "node.db")
+	db := openDB(t, path)
+	_, c, _ := commissioned(t, minimalConfig(db))
+	idx := c.FabricIndex()
+	// The state an UpdateNOC and a CASE session under its identity leave
+	// in the store when the node loses power before CommissioningComplete.
+	st := store.New(db)
+	id, err := st.GetIdentity(ctx, idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: id.NOC, ICAC: id.ICAC, PrivateKey: id.PrivateKey, NodeID: testNodeID + 1}); err != nil {
+		t.Fatal(err)
+	}
+	const peer = 0x77
+	if err := st.UpsertResumption(ctx, store.ResumptionRecord{FabricIndex: idx, PeerNodeID: peer, ResumptionID: bytes.Repeat([]byte{1}, 16), SharedSecret: bytes.Repeat([]byte{2}, 32)}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		mu      sync.Mutex
+		updated []node.FabricInfo
+	)
+	again := newNode(t, minimalConfig(openDB(t, path)))
+	again.Observe(node.Observers{OnFabricUpdated: func(info node.FabricInfo) {
+		mu.Lock()
+		updated = append(updated, info)
+		mu.Unlock()
+	}})
+	if err := again.Start(ctx); err != nil {
+		t.Fatalf("Start after the restart: %v", err)
+	}
+	if _, err := st.GetResumptionByPeer(ctx, idx, peer); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Errorf("the resumption record made under the rolled-back update after the restart: %v; want ErrResumptionNotFound", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(updated) != 1 || updated[0].FabricIndex != idx || updated[0].NodeID != testNodeID {
+		t.Fatalf("OnFabricUpdated after the restart: %+v; want once, for fabric %d node 0x%X", updated, idx, testNodeID)
 	}
 }
 

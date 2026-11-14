@@ -132,6 +132,10 @@ type OperationalCredentials struct {
 	// AddNOC installed that no CommissioningComplete committed before the
 	// node went down ([OperationalCredentials.RolledBackFabrics]).
 	rolledBack []store.FabricRecord
+	// rolledBackUpdates are the fabrics whose UpdateNOC construction
+	// rolled back, each row as the update left it
+	// ([OperationalCredentials.RolledBackUpdates]).
+	rolledBackUpdates []store.FabricRecord
 
 	// changeListeners receive [OperationalCredentials.OnMatterValueChanged]
 	// notifications.
@@ -575,6 +579,7 @@ func (o *OperationalCredentials) rollbackPendingAtStart(ctx context.Context) err
 			o.rolledBack = append(o.rolledBack, *f)
 			o.logger().Warn("matter.opcreds.pending_fabric.add_rolled_back", slog.Int("fabric_index", int(f.FabricIndex)))
 		case store.FabricPendingUpdate:
+			o.rolledBackUpdates = append(o.rolledBackUpdates, *f)
 			o.logger().Warn("matter.opcreds.pending_fabric.update_rolled_back", slog.Int("fabric_index", int(f.FabricIndex)))
 		case store.FabricCommitted:
 			// Gone or committed meanwhile: nothing was rolled back.
@@ -596,6 +601,20 @@ func (o *OperationalCredentials) rollbackPendingAtStart(ctx context.Context) err
 // caller's.
 func (o *OperationalCredentials) RolledBackFabrics() []store.FabricRecord {
 	return slices.Clone(o.rolledBack)
+}
+
+// RolledBackUpdates returns the fabrics whose UpdateNOC construction
+// rolled back because no CommissioningComplete committed it before the node
+// went down; the fabric holds its earlier NOC, key and node id again. Each
+// record is the row as the update left it. The update was announced in the
+// run that made it, and what that run stored under its identity — the
+// resumption records of sessions established with the new NOC — is owed
+// the consequences the run-time rollback of an update runs
+// (reportUpdateRolledBack → the OnFabricUpdated hook), so the node runs its
+// fabric-updated fan-out and the host's hook for each before it serves
+// (review II, R2-P2-dr-noc-05). The slice is the caller's.
+func (o *OperationalCredentials) RolledBackUpdates() []store.FabricRecord {
+	return slices.Clone(o.rolledBackUpdates)
 }
 
 // SetFailSafe wires the fail-safe accessor ([OpcredsConfig.FailSafe])
