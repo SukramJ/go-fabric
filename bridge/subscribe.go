@@ -972,27 +972,21 @@ func (b *Bridge) captureSubTarget(subID uint32, src net.Addr, requestHdr *messag
 	})
 }
 
-// nextOutboundExchangeID allocates a fresh 15-bit exchange identifier
-// for a server-initiated exchange. Mirrors matter.js's
-// `ExchangeManager.#getNextExchangeId` (packages/protocol/src/
-// protocol/ExchangeManager.ts). The high bit (0x8000) is reserved by
-// Matter §4.13 as the Initiator flag and is set in the protocol
-// header on the wire, not embedded in the exchange ID itself.
+// nextOutboundExchangeID allocates the exchange identifier of a
+// server-initiated exchange: the next value of a 16-bit counter that New
+// seeds at random and that wraps past 0xFFFF to 0. Mirrors matter.js
+// ExchangeCounter.getIncrementedCounter
+// (packages/protocol/src/protocol/ExchangeManager.ts:794-808) and
+// connectedhomeip src/messaging/ExchangeMgr.cpp:67, :128
+// (`mNextExchangeId++` on a uint16). The exchange id is a full 16-bit
+// field; the Initiator flag is a separate bit of the exchange flags.
 //
-// Counter wraps via modulo 0x7FFF + 1; the bridge re-uses an ID only
-// after the entire 15-bit space has been consumed, which keeps the
-// risk of an ID collision with a still-live commissioner exchange
-// negligible (the longest-running subscription is bounded by Apple's
-// MaxIntervalCeiling ~600 s, far below the wrap time at any realistic
-// outbound rate).
+// An id is re-used only after the whole 16-bit space has been consumed.
+// matter.js also skips an id an open exchange it started on the same
+// session still holds (ExchangeManager.ts:189-197, #freeExchangeIdFor);
+// the bridge keeps no table of its own initiated exchanges to consult.
 func (b *Bridge) nextOutboundExchangeID() uint16 {
-	for {
-		next := b.outboundExchangeID.Add(1)
-		exch := uint16((next & 0x7FFF) & 0xFFFF)
-		if exch != 0 {
-			return exch
-		}
-	}
+	return uint16(b.outboundExchangeID.Add(1)) //nolint:gosec // G115: the truncation to 16 bits is the wrap past 0xFFFF to 0
 }
 
 // sendReportChunks splits report into per-datagram chunks and ships

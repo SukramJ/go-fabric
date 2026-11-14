@@ -237,6 +237,8 @@ package bridge
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -694,17 +696,15 @@ type Bridge struct {
 	// SessionID==0 replies (PASE / commissioning chatter pre-CASE).
 	// Encrypted sessions get their counters from the underlying
 	// channel.Session. Atomic so the receive goroutine can fan out
-	// without blocking on the bridge's mutex.
+	// without blocking on the bridge's mutex. New seeds it with a random
+	// 28-bit value plus one — see [seedUnsecuredCounter].
 	unsecuredCounter atomic.Uint32
 
-	// outboundExchangeID allocates fresh 15-bit exchange identifiers
-	// for server-initiated exchanges (subscribe ongoing reports,
-	// future timed-write / spontaneous-event paths). The high bit
-	// (0x8000) is reserved by Matter §4.13 as the Initiator flag —
-	// our exchange IDs therefore stay inside [1, 0x7FFF]. Mirrors
-	// matter.js packages/protocol/src/protocol/MessageExchange.ts
-	// where the ExchangeManager hands out a 15-bit counter via
-	// `ExchangeManager.#getNextExchangeId`.
+	// outboundExchangeID allocates exchange identifiers for
+	// server-initiated exchanges (subscribe ongoing reports, CASE
+	// re-establishment, check-ins, the OTA provider link): the full
+	// 16-bit space, starting at a random value New seeds — see
+	// [Bridge.nextOutboundExchangeID]. Only the low 16 bits are used.
 	outboundExchangeID atomic.Uint32
 
 	// startClaim is the race-free entry guard for [Bridge.Start].
@@ -887,7 +887,34 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		sigma1Replied:  make(map[uint16][32]byte),
 	}
 	br.eventLog.SetClock(br.clock)
+	if err := br.seedCounters(); err != nil {
+		return nil, err
+	}
 	return br, nil
+}
+
+// seedCounters starts the unsecured message counter and the exchange-id
+// counter at random values, as both references start them, so a process
+// restart does not replay the same numbers from 1.
+//
+// The unsecured counter starts at a random 28-bit value plus one, the
+// first message taking the next: matter.js
+// packages/protocol/src/protocol/MessageCounter.ts:60
+// `this.messageCounter = (crypto.randomUint32 >>> 4) + 1;`, the global
+// unencrypted counter of SessionManager.ts:305; connectedhomeip
+// src/transport/MessageCounter.h:57, :65 (a random 28-bit initial value).
+// The exchange ids start at a random 16-bit value: matter.js
+// ExchangeManager.ts:794-808 (`ExchangeCounter`, seeded with
+// entropy.randomUint16); connectedhomeip src/messaging/ExchangeMgr.cpp:67
+// `mNextExchangeId = chip::Crypto::GetRandU16();`.
+func (b *Bridge) seedCounters() error {
+	var seed [6]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		return fmt.Errorf("bridge: counter seed: %w", err)
+	}
+	b.unsecuredCounter.Store(binary.BigEndian.Uint32(seed[:4])>>4 + 1)
+	b.outboundExchangeID.Store(uint32(binary.BigEndian.Uint16(seed[4:])))
+	return nil
 }
 
 // Start brings the bridge online: assembles the initial topology,

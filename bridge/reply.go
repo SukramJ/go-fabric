@@ -36,8 +36,8 @@ var (
 )
 
 // nextUnsecuredCounter returns a fresh per-bridge monotonic counter
-// for SessionID==0 (unsecured) replies. Starts at 1 so the first
-// reply ever emitted carries counter=1; wraps freely past 2^32 per
+// for SessionID==0 (unsecured) replies. New seeds it at a random 28-bit
+// value plus one (see [Bridge.seedCounters]); it wraps freely past 2^32 per
 // Matter §4.5.4.4 (the unsecured peer is a transient PASE-only
 // commissioner that never reaches counter exhaustion in practice).
 func (b *Bridge) nextUnsecuredCounter() uint32 {
