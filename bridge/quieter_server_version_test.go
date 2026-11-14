@@ -10,10 +10,13 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // colourServer is a bridged ColorControl server that reports as
@@ -44,8 +47,10 @@ func (*colourServer) MatterReportable() []uint32                             { r
 // remainingTime
 // (packages/node/src/behaviors/color-control/ColorControlServer.ts:1967-1984).
 // A change a controller's write made keeps the dispatcher's advance, and
-// a change while a command runs against the cluster advances at its report
-// when the command's commit did not report it.
+// a change while a command runs against the cluster advances at the
+// command's end, whether or not its report went out inside the command,
+// and its report after the command advances nothing (review II,
+// R2-P4-fr-im-02).
 func TestQuieterServerAttributeAdvancesAtTheChange(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +91,8 @@ func TestQuieterServerAttributeAdvancesAtTheChange(t *testing.T) {
 		t.Parallel()
 		srv := &colourServer{}
 		h := newAppHarness(t, appDevice{deviceType: 0x0073, servers: []contract.ClusterServer{srv}})
-		h.bridge.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+		mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+		h.bridge.AttachSubscriptionManager(mgr)
 		ep := h.bridge.Topology().FindByID(h.endpoints[0x0073])
 		v0 := ep.ClusterDataVersion(ccdef.ClusterID)
 		step := func(when string, advance uint32) {
@@ -112,10 +118,85 @@ func TestQuieterServerAttributeAdvancesAtTheChange(t *testing.T) {
 		h.bridge.invokeCommits.begin(key)
 		srv.ChangedFrom(contract.OriginCommand, ccdef.AttrCurrentHue)
 		step("a change while a command runs", 3)
-		if held := h.bridge.invokeCommits.end(key); len(held) != 0 {
-			t.Fatalf("the command's commit holds %v, want nothing reported", held)
+		held, advance := h.bridge.invokeCommits.end(key)
+		if len(held) != 0 || !advance {
+			t.Fatalf("the command's commit holds %v, advance %v; want nothing reported and the advance owed", held, advance)
 		}
+		reportCommandChange(h.bridge.Topology(), mgr, key, held, advance)
+		step("the command's end", 4)
 		srv.ReportFrom(contract.OriginCommand, ccdef.AttrCurrentHue)
 		step("its report after the command", 4)
 	})
+}
+
+// engineLevelPort is a dimmer whose level moves when the server hands it a
+// MoveToLevel, as the kit's transition engine drives a host.
+type engineLevelPort struct {
+	notifyingLevelPort
+	level uint8
+}
+
+func (p *engineLevelPort) CurrentLevel() (uint8, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.level, true
+}
+
+func (p *engineLevelPort) MoveToLevel(_ context.Context, req lvldef.MoveToLevelRequest) error {
+	p.mu.Lock()
+	p.level = req.Level
+	p.mu.Unlock()
+	return nil
+}
+
+// TestQuieterChangeDuringACommandAdvancesAtTheCommand: CurrentLevel of the
+// kit's engine LevelControl without LT, changed by two MoveToLevel within
+// one quiet interval, advances the cluster's DataVersion at each command —
+// the second change too, whose report the throttle holds back — and a
+// re-wiring before the throttle's report loses no advance. matter.js
+// advances the version at the commit that changed a value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), a quieter property's included, whenever its report goes out.
+func TestQuieterChangeDuringACommandAdvancesAtTheCommand(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(5000, 0))
+	port := &engineLevelPort{level: 10}
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: port, Transitions: &levelcontrol.Transitions{Clock: clk}})
+	h := newAppHarness(t, appDevice{deviceType: 0x0101, servers: []contract.ClusterServer{srv}})
+	h.bridge.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+	epID := h.endpoints[0x0101]
+	ep := h.bridge.Topology().FindByID(epID)
+	v0 := ep.ClusterDataVersion(lvldef.ClusterID)
+	step := func(when string, advance uint32) {
+		t.Helper()
+		if got := ep.ClusterDataVersion(lvldef.ClusterID); got != v0+advance {
+			t.Fatalf("%s: DataVersion %d, want %d", when, got, v0+advance)
+		}
+	}
+	moveTo := func(level uint64) {
+		t.Helper()
+		reply := h.invoke(epID, lvldef.ClusterID, lvldef.CmdMoveToLevel, func(enc *tlv.Encoder) {
+			enc.PutUint(tlv.ContextTag(0), level)
+			enc.PutUint(tlv.ContextTag(1), 0)
+			enc.PutUint(tlv.ContextTag(2), 0)
+			enc.PutUint(tlv.ContextTag(3), 0)
+		})
+		if _, _, status, _ := invokeResult(t, reply); status != 0 {
+			t.Fatalf("MoveToLevel %d: status 0x%02X", level, status)
+		}
+		if l, _ := port.CurrentLevel(); uint64(l) != level {
+			t.Fatalf("MoveToLevel %d: the port is at %d", level, l)
+		}
+	}
+	moveTo(50)
+	step("the first MoveToLevel", 1)
+	moveTo(100)
+	step("a second MoveToLevel within the quiet interval", 2)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.bridge.Reassemble(ctx); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(cluster.QuietMinimumInterval)
+	step("the throttle's report after a re-wiring", 2)
 }

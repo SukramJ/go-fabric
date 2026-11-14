@@ -999,6 +999,10 @@ type invokeCommitTable struct {
 type invokeCommit struct {
 	running int
 	held    []uint32
+	// advance: a server changed an attribute meanwhile whose report waits
+	// for its throttle ([Bridge.quieterChanged]); the commit advances the
+	// version for it without marking it dirty.
+	advance bool
 }
 
 // begin opens (or joins) the commit of key for one command.
@@ -1034,21 +1038,23 @@ func (t *invokeCommitTable) hold(endpoint uint16, cluster uint32, attrs []uint32
 }
 
 // end ends one command's part in the commit of key and returns the
-// attributes held so far; the commit closes with its last command.
-func (t *invokeCommitTable) end(key invokedCluster) []uint32 {
+// attributes held so far and whether an advance without a report is owed
+// ([invokeCommitTable.advanceAtEnd]); the commit closes with its last
+// command.
+func (t *invokeCommitTable) end(key invokedCluster) (held []uint32, advance bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	c, ok := t.open[key]
 	if !ok {
-		return nil
+		return nil, false
 	}
-	held := c.held
-	c.held = nil
+	held, advance = c.held, c.advance
+	c.held, c.advance = nil, false
 	c.running--
 	if c.running <= 0 {
 		delete(t.open, key)
 	}
-	return held
+	return held, advance
 }
 
 // reportInvokeChanges marks dirty every attribute whose value a command
@@ -1084,20 +1090,26 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 	// cluster (review II, R2-P2-rr-dev-04).
 	ended := make(map[invokedCluster]bool, len(before))
 	defer func() {
-		held := make(map[invokedCluster][]uint32)
+		type endedCommit struct {
+			held    []uint32
+			advance bool
+		}
+		left := make(map[invokedCluster]endedCommit)
 		for key := range before {
 			if !ended[key] {
 				ended[key] = true
-				held[key] = b.invokeCommits.end(key)
+				var e endedCommit
+				e.held, e.advance = b.invokeCommits.end(key)
+				left[key] = e
 			}
 		}
-		for key, changed := range held {
-			reportCommandChange(topo, mgr, key, changed)
+		for key, e := range left {
+			reportCommandChange(topo, mgr, key, e.held, e.advance)
 		}
 	}()
 	for key, old := range before {
 		now := readCluster(ctx, d, key)
-		changed := b.invokeCommits.end(key)
+		changed, advance := b.invokeCommits.end(key)
 		ended[key] = true
 		selfReported := selfReportedAttributes(topo, key)
 		for attr, v := range now {
@@ -1111,14 +1123,19 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 				changed = append(changed, attr)
 			}
 		}
-		reportCommandChange(topo, mgr, key, changed)
+		reportCommandChange(topo, mgr, key, changed, advance)
 	}
 }
 
 // reportCommandChange advances key's DataVersion once and marks changed
-// dirty; nothing changed moves nothing.
-func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32) {
-	if len(changed) == 0 {
+// dirty; advance owes the advance with nothing to mark — a quieter
+// attribute whose report waits for its throttle — and nothing changed
+// without it moves nothing. matter.js advances the version at the commit
+// that changed a value, a quieter one's included
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0).
+func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32, advance bool) {
+	if len(changed) == 0 && !advance {
 		return
 	}
 	if topo != nil {

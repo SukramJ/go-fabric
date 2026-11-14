@@ -2395,14 +2395,14 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				}))
 				continue
 			}
-			v := &quieterVersion{}
 			// The change listener first: a change told to both views at
 			// once advances the version before its report marks it dirty.
+			// The report advances nothing ([Bridge.quieterChanged]).
 			set.add(notifier.OnAttributeChange(func(change contract.Change) {
-				v.changed(b, ep, clusterID, change)
+				b.quieterChanged(ep, clusterID, change)
 			}))
 			set.add(r.OnAttributeReport(func(change contract.Change) {
-				b.reportServerChange(mgr, ep, clusterID, change, v.take(change.Attributes))
+				b.reportServerChange(mgr, ep, clusterID, change, false)
 			}))
 		}
 	}
@@ -2441,7 +2441,7 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	}
 }
 
-// quieterVersion advances the DataVersion of a cluster whose server
+// quieterChanged advances the DataVersion of a cluster whose server
 // reports a quieter attribute later than it changes it
 // ([contract.AttributeReportNotifier]) when the change happens, not when
 // its report goes out: one advance per change, for a quieter and a plain
@@ -2455,56 +2455,30 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 // servers here, LevelControl's and ColorControl's remainingTime
 // (LevelControlServer.ts:806-822, ColorControlServer.ts:1967-1984), which
 // those servers report with their change. A change made while a command
-// runs against the cluster is left to the command's commit; when the
-// commit did not report it, its report advances the version.
-type quieterVersion struct {
-	mu sync.Mutex
-	// owed holds the attributes changed while a command's commit was
-	// open whose advance is still owed.
-	owed map[uint32]struct{}
-}
-
-// changed advances the version for change, or owes the advance to its
-// report while a command's commit of the cluster is open. A controller's
-// write advanced it already.
-func (v *quieterVersion) changed(b *Bridge, ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change) {
+// runs against the cluster is the command's commit's: the commit advances
+// the version when it ends, whether or not the change's report went out
+// inside it, and the report waits for the throttle (review II,
+// R2-P4-fr-im-02). A controller's write advanced it already.
+func (b *Bridge) quieterChanged(ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change) {
 	if len(change.Attributes) == 0 || change.Origin == contract.OriginControllerWrite {
 		return
 	}
-	if b.invokeCommits.isOpen(ep.ID, clusterID) {
-		v.mu.Lock()
-		if v.owed == nil {
-			v.owed = make(map[uint32]struct{}, len(change.Attributes))
-		}
-		for _, attr := range change.Attributes {
-			v.owed[attr] = struct{}{}
-		}
-		v.mu.Unlock()
+	if b.invokeCommits.advanceAtEnd(ep.ID, clusterID) {
 		return
 	}
 	ep.BumpDataVersionOf(clusterID)
 }
 
-// take reports whether the report of attrs owes an advance and forgets it.
-func (v *quieterVersion) take(attrs []uint32) bool {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	owed := false
-	for _, attr := range attrs {
-		if _, ok := v.owed[attr]; ok {
-			owed = true
-			delete(v.owed, attr)
-		}
-	}
-	return owed
-}
-
-// isOpen reports whether a command's commit of (endpoint, cluster) is
-// open, recording nothing in it ([invokeCommitTable.hold] records).
-func (t *invokeCommitTable) isOpen(endpoint uint16, cluster uint32) bool {
+// advanceAtEnd records in the open commit of (endpoint, cluster) that it
+// advances the version when it ends, marking nothing dirty for it, and
+// reports true; false when no commit is open.
+func (t *invokeCommitTable) advanceAtEnd(endpoint uint16, cluster uint32) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	_, ok := t.open[invokedCluster{endpoint, cluster}]
+	c, ok := t.open[invokedCluster{endpoint, cluster}]
+	if ok {
+		c.advance = true
+	}
 	return ok
 }
 
