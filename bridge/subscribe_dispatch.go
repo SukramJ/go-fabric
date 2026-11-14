@@ -369,8 +369,26 @@ func (b *Bridge) registerSubscription(
 		initialReport.HasSubscription = true
 		initialReport.SubscriptionID = subID
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
+		b.releaseTargetOfClosed(m, subID)
 	}
 	return subID, nil
+}
+
+// releaseTargetOfClosed releases the routing of subID when the
+// subscription is no longer in m and reports whether it did. Called right
+// after the routing target was stored: the manager drops a subscription
+// from its tables before it runs the close hook (releaseSubscriptionRouting),
+// so a close that ran before the store is seen here and one after it finds
+// the target — the pattern of [Bridge.primingAbort]. Without it a close
+// landing between the admission and the store (the session closed by
+// another goroutine) left the target for the process lifetime (review II,
+// R2-P2-sess-07).
+func (b *Bridge) releaseTargetOfClosed(m *subscription.Manager, subID uint32) bool {
+	if _, err := m.Get(subID); err == nil {
+		return false
+	}
+	b.releaseSubscriptionRouting(subID)
+	return true
 }
 
 // teardownForSubscribe runs the KeepSubscriptions=false teardown of a

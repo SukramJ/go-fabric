@@ -261,6 +261,9 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		fabricFiltered: rec.IsFabricFiltered,
 	}
 	b.routing.subTargets.Store(sub.ID, target)
+	if b.releaseTargetOfClosed(m, sub.ID) {
+		return fmt.Errorf("bridge: former subscription %d closed while it was re-established", sub.ID)
+	}
 
 	readCtx := im.WithFabricFilter(ctx, rec.IsFabricFiltered, fabricIndex)
 	readCtx = im.WithSubject(readCtx, subjectNodeID, subjectCATs)
