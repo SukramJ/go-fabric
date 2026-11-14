@@ -243,6 +243,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if err != nil {
 		return nil, err
 	}
+	cfg.BasicInformation.defaultNodeLabel()
 	attestationErr, err := cfg.resolveAttestation()
 	if err != nil {
 		return nil, err

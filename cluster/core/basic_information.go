@@ -221,7 +221,7 @@ type Config struct {
 	ManufacturingDate  string // ISO 8601 YYYYMMDD
 	PartNumber         string
 	SerialNumber       string
-	NodeLabel          string // user-writable; supplied default
+	NodeLabel          string // user-writable; empty is the ProductName, as matter.js
 	Location           string // user-writable; "XX" for unset per spec
 	// UniqueID pins the UniqueID attribute (Matter §11.1.5.13) to a
 	// previously persisted value. Empty means "derive one"
@@ -241,8 +241,8 @@ type Config struct {
 }
 
 // NewBasicInformation constructs the cluster from cfg. Returns an
-// error when mandatory fields (VendorID, ProductID, NodeLabel) are
-// missing or zero-valued.
+// error when the mandatory fields (VendorID, ProductID) are missing or
+// zero-valued; an empty NodeLabel is the ProductName.
 func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// VendorID must be a valid device identity: non-zero and within the
 	// CSA-assignable range. Mirrors matter.js
@@ -254,9 +254,6 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	}
 	if cfg.ProductID == 0 {
 		return nil, errors.New("core: BasicInformation Config.ProductID must be non-zero")
-	}
-	if cfg.NodeLabel == "" {
-		return nil, errors.New("core: BasicInformation Config.NodeLabel must be non-empty")
 	}
 	// A pinned UniqueID goes on the wire verbatim, so it has to satisfy
 	// the attribute's own constraint: Matter §11.1.5.13 caps UniqueID at
@@ -319,6 +316,10 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// matter.js BasicInformationServer.ts:67 at db021da0 —
 	// setDefault("productLabel", state.productName).
 	productLabel := cmp.Or(cfg.ProductLabel, cfg.ProductName)
+	// NodeLabel defaults to the ProductName as well. Mirrors matter.js
+	// BasicInformationServer.ts:68 at db021da0 —
+	// setDefault("nodeLabel", state.productName).
+	nodeLabel := cmp.Or(cfg.NodeLabel, cfg.ProductName)
 	// SoftwareVersion (0x0009) and SoftwareVersionString (0x000A) must
 	// describe the same release. matter.js holds that invariant by
 	// deriving the string from the numeric value —
@@ -362,8 +363,8 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		manufacturingDate:    cfg.ManufacturingDate,
 		partNumber:           cfg.PartNumber,
 		serialNumber:         cfg.SerialNumber,
-		nodeLabel:            cfg.NodeLabel,
-		identityLabel:        cfg.NodeLabel,
+		nodeLabel:            nodeLabel,
+		identityLabel:        nodeLabel,
 		pinnedUniqueID:       cfg.UniqueID,
 		location:             loc,
 		capabilityMinima:     defaultCapabilityMinima(cfg.CapabilityMinima),

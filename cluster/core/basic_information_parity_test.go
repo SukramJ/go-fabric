@@ -575,14 +575,16 @@ func TestParityMatterJS_BasicInfoServer_UniqueIDStabilityAcrossReconstruction(t 
 }
 
 // TestParityMatterJS_BasicInfoServer_InitializeDefaults: a host that sets
-// neither HardwareVersionString nor ProductLabel is served the defaults
-// matter.js's initialize sets — the decimal rendering of HardwareVersion
-// and the ProductName, the latter listed in AttributeList.
+// neither HardwareVersionString, ProductLabel nor NodeLabel is served the
+// defaults matter.js's initialize sets — the decimal rendering of
+// HardwareVersion and the ProductName for both labels, ProductLabel listed
+// in AttributeList.
 //
 // Mirrors matter.js packages/node/src/behaviors/basic-information/
 // BasicInformationServer.ts:67 setDefault("productLabel",
-// state.productName) and :70 setDefault("hardwareVersionString",
-// state.hardwareVersion.toString()) at db021da0.
+// state.productName), :68 setDefault("nodeLabel", state.productName) and
+// :70 setDefault("hardwareVersionString", state.hardwareVersion.toString())
+// at db021da0.
 func TestParityMatterJS_BasicInfoServer_InitializeDefaults(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -619,5 +621,19 @@ func TestParityMatterJS_BasicInfoServer_InitializeDefaults(t *testing.T) {
 	}
 	if v, _ := b.MatterRead(0x000E); v != "Label" {
 		t.Errorf("ProductLabel %v, want the host's %q", v, "Label")
+	}
+
+	// NodeLabel: empty is the ProductName, and the node starts; a host's
+	// own label stays its own.
+	cfg = validBasicInfoConfig()
+	cfg.NodeLabel = ""
+	if b, err = core.NewBasicInformation(cfg); err != nil {
+		t.Fatalf("NewBasicInformation with no NodeLabel: %v", err)
+	}
+	if v, _ := b.MatterRead(0x0005); v != (tlv.BoundedString{Value: cfg.ProductName, MaxBytes: 32}) {
+		t.Errorf("NodeLabel %#v, want the ProductName %q", v, cfg.ProductName)
+	}
+	if v, _ := newValidBasicInfo(t).MatterRead(0x0005); v != (tlv.BoundedString{Value: validBasicInfoConfig().NodeLabel, MaxBytes: 32}) {
+		t.Errorf("NodeLabel %#v, want the host's %q", v, validBasicInfoConfig().NodeLabel)
 	}
 }

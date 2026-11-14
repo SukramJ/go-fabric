@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 const testPasscode = 20202021
@@ -496,7 +497,6 @@ func TestConfigValidate(t *testing.T) {
 		{"iterations high", func(c *node.Config) { c.Commissioning.PBKDFIterations = 100001 }},
 		{"salt short", func(c *node.Config) { c.Commissioning.Salt = []byte("short") }},
 		{"vendor", func(c *node.Config) { c.ProductDescription.VendorID = 0 }},
-		{"label", func(c *node.Config) { c.BasicInformation.NodeLabel = " " }},
 		{"store", func(c *node.Config) { c.Store = node.Store{} }},
 		{"ota dir", func(c *node.Config) { c.OTA = &node.OTAConfig{} }},
 	}
@@ -513,6 +513,25 @@ func TestConfigValidate(t *testing.T) {
 	cfg := minimalConfig(db)
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("minimal config: %v", err)
+	}
+}
+
+// TestEmptyNodeLabelIsTheProductName: a node configured without a
+// NodeLabel starts and serves its ProductName as the NodeLabel. Mirrors
+// matter.js packages/node/src/behaviors/basic-information/
+// BasicInformationServer.ts:68 at db021da0 — setDefault("nodeLabel",
+// state.productName).
+func TestEmptyNodeLabelIsTheProductName(t *testing.T) {
+	t.Parallel()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.BasicInformation.NodeLabel = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	n := newNode(t, cfg)
+	v, ok := n.Root().BasicInformation.MatterRead(0x0005)
+	if s, _ := v.(tlv.BoundedString); !ok || s.Value != cfg.BasicInformation.ProductName {
+		t.Errorf("NodeLabel (%#v, %v), want the ProductName %q", v, ok, cfg.BasicInformation.ProductName)
 	}
 }
 

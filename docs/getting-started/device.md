@@ -157,7 +157,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the discriminator fits 12 bits;
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
-- `VendorID`, `ProductID` and `NodeLabel` are set;
+- `VendorID` and `ProductID` are set;
 - a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
   and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
 - `Attestation.Files` is not combined with `Chain` or the CD, and
@@ -197,6 +197,7 @@ Defaults worth knowing:
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
+| `BasicInformation.NodeLabel` | `BasicInformation.ProductName` |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
 | `ProductDescription.DeviceType` | RootNode (0x0016) |
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
@@ -215,7 +216,8 @@ Defaults worth knowing:
 ### The node's own name
 
 `BasicInformation.NodeLabel` is the label the node serves on its first
-boot. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
+boot; empty, it is `BasicInformation.ProductName`, as matter.js defaults
+it. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
 controller's write semantics: a label over 32 bytes is refused with
 `CONSTRAINT_ERROR` (an `im.StatusCodeError`), and an accepted one is
 persisted where a controller's written label is — a store failure fails

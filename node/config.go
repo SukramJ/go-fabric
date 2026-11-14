@@ -516,7 +516,10 @@ type BasicInformation struct {
 	VendorName   string
 	ProductName  string
 	ProductLabel string
-	NodeLabel    string // mandatory
+	// NodeLabel is the label the node serves on its first boot; empty is
+	// the ProductName, as matter.js's BasicInformationServer.ts:68 at
+	// db021da0 (setDefault("nodeLabel", state.productName)).
+	NodeLabel    string
 	SerialNumber string
 	// UniqueID pins BasicInformation.UniqueID (quality F, Matter
 	// §11.1.5.13) to a value the host persisted itself; at most 32 UTF-8
@@ -536,6 +539,18 @@ type BasicInformation struct {
 	HardwareVersionString string
 	SoftwareVersion       uint32
 	SoftwareVersionString string
+}
+
+// defaultNodeLabel sets an empty NodeLabel to the ProductName, before
+// anything reads it: the root serves it, the commissionable record
+// advertises it when ProductDescription.Name is empty, and the first
+// boot derives UniqueID from it. Mirrors matter.js
+// packages/node/src/behaviors/basic-information/BasicInformationServer.ts:68
+// at db021da0 — setDefault("nodeLabel", state.productName).
+func (b *BasicInformation) defaultNodeLabel() {
+	if b.NodeLabel == "" {
+		b.NodeLabel = b.ProductName
+	}
 }
 
 // Store names the node's persistence. With DB the node applies both
@@ -683,6 +698,9 @@ func checkPBKDF(iterations int64, saltLen int) []error {
 // [PBKDFSaltMin] and [PBKDFSaltMax]; the passcode check is
 // [ValidateSetupPIN] — a host checks its own configuration against them
 // before New.
+//
+// An empty BasicInformation.NodeLabel is valid: New serves the
+// ProductName ([BasicInformation.defaultNodeLabel]).
 func (c *Config) Validate() error {
 	var errs []error
 	cm := c.Commissioning
@@ -695,9 +713,6 @@ func (c *Config) Validate() error {
 	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
-	}
-	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
-		errs = append(errs, errors.New("node: BasicInformation.NodeLabel must be non-empty"))
 	}
 	switch {
 	case c.Store.Path != "" && c.Store.DB != nil:

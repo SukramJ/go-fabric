@@ -60,16 +60,6 @@ func TestBasicInfo_ValidationProductIDZero(t *testing.T) {
 	}
 }
 
-func TestBasicInfo_ValidationEmptyNodeLabel(t *testing.T) {
-	t.Parallel()
-	cfg := validBasicInfoConfig()
-	cfg.NodeLabel = ""
-	_, err := core.NewBasicInformation(cfg)
-	if err == nil {
-		t.Fatal("expected error for empty NodeLabel, got nil")
-	}
-}
-
 func TestBasicInfo_DefaultLocation(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
