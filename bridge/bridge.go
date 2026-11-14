@@ -1041,8 +1041,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// left the wiring to it; the initial assembly wired the manager it
 	// saw then (review II, R2-P2-dr-req-05). An attach from here on finds
 	// the run started and wires by itself.
-	rewire := b.subManager != b.listenerManager
-	run := b.runGen
+	rewire, run := b.subManager != b.listenerManager, b.runGen
 	// Spawn the ACK pump only when an AckTracker has been wired
 	// (daemon's [Bridge.AttachAckTracker] call). Test setups that
 	// skip the wiring leave the pump dormant, which is fine — the
@@ -1055,13 +1054,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 		b.startAckPump()
 	}
 	if rewire {
-		generation := b.rewireMeasurementListeners()
-		b.mu.RLock()
-		ended := b.runEndedLocked(&run)
-		b.mu.RUnlock()
-		if ended {
-			b.detachListenersOfGeneration(generation)
-		}
+		b.rewireListenersOfRun(run)
 	}
 
 	// Join the multicast group of every group with a member endpoint, and
@@ -1186,6 +1179,19 @@ func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error)
 // for Start's own assembly) is over. Caller holds b.mu.
 func (b *Bridge) runEndedLocked(run *uint64) bool {
 	return run != nil && (!b.started || b.runGen != *run)
+}
+
+// rewireListenersOfRun wires the host's value listeners onto the attached
+// subscription manager for run, and detaches them again when a Stop ended
+// run meanwhile — the wiring a Stop that set in before it missed.
+func (b *Bridge) rewireListenersOfRun(run uint64) {
+	generation := b.rewireMeasurementListeners()
+	b.mu.RLock()
+	ended := b.runEndedLocked(&run)
+	b.mu.RUnlock()
+	if ended {
+		b.detachListenersOfGeneration(generation)
+	}
 }
 
 // reassembleLocked is the shared implementation behind initial
