@@ -38,22 +38,39 @@ type Node struct {
 // stream ends.
 var ErrUnbalanced = errors.New("spec: TLV container not closed")
 
+// ErrArrayElementTag is returned for an array that holds an element with a
+// tag: the elements of a TLV array are anonymous. Both references refuse
+// such an array when they read it — matter.js packages/types/src/tlv/
+// TlvArray.ts:77-78 at db021da0 ("Array element tags should be
+// anonymous."), connectedhomeip src/lib/core/TLVReader.cpp:873-875 at
+// 6170af84 (CHIP_ERROR_INVALID_TLV_TAG).
+var ErrArrayElementTag = errors.New("spec: TLV array element with a tag")
+
 // ReadContainer reads the members of the container open opened — open
-// already consumed from dec — through its EndContainer.
+// already consumed from dec — through its EndContainer. An array with a
+// tagged element is refused with [ErrArrayElementTag] once the container
+// has been read through, so the stream stands behind it either way.
 func ReadContainer(dec *tlv.Decoder, open tlv.Element) (Node, error) {
 	n := Node{El: open}
+	var refused error
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return n, fmt.Errorf("%w: %w", ErrUnbalanced, err)
 		}
 		if el.IsEndContainer {
-			return n, nil
+			return n, refused
+		}
+		if open.Type == tlv.TypeArray && el.Tag.Kind != tlv.TagKindAnonymous && refused == nil {
+			refused = ErrArrayElementTag
 		}
 		child := Node{El: el}
 		if el.IsContainer {
 			if child, err = ReadContainer(dec, el); err != nil {
-				return n, err
+				if !errors.Is(err, ErrArrayElementTag) {
+					return n, err
+				}
+				refused = err
 			}
 		}
 		n.Children = append(n.Children, child)

@@ -4,8 +4,6 @@
 package bridge
 
 import (
-	"fmt"
-
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/im"
@@ -37,7 +35,7 @@ func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.El
 	}
 	n, err := spec.ReadContainer(dec, el)
 	if err != nil {
-		return nil, true, fmt.Errorf("%s.%s: %w", def.Name, cmd.Name, err)
+		return nil, true, fieldsReadError(def.Name+"."+cmd.Name, err)
 	}
 	fields, err = cmd.DecodeRequest(withFallbacks(path, n))
 	return fields, true, err

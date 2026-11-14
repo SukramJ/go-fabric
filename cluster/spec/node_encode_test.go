@@ -69,3 +69,26 @@ func TestListElements(t *testing.T) {
 		t.Fatalf("ListElements(uint) = %v, %v", isList, err)
 	}
 }
+
+// TestNodeEncodeTLVWritesArrayElementsAnonymous: a tree whose array holds
+// an element with a tag — never one read from a peer, which
+// [spec.ReadContainer] refuses — is written with that element anonymous;
+// the encoder would panic for a context tag inside an array.
+func TestNodeEncodeTLVWritesArrayElementsAnonymous(t *testing.T) {
+	t.Parallel()
+	n := spec.Node{
+		El: tlv.Element{Type: tlv.TypeArray, IsContainer: true},
+		Children: []spec.Node{
+			{El: tlv.Element{Tag: tlv.ContextTag(2), Type: tlv.TypeUnsignedInt1, Uint: 5}},
+		},
+	}
+	enc := tlv.NewEncoder()
+	n.EncodeTLV(enc, tlv.AnonymousTag())
+	got, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []byte{0x16, 0x04, 0x05, 0x18}; !bytes.Equal(got, want) {
+		t.Fatalf("encoded % X, want % X", got, want)
+	}
+}

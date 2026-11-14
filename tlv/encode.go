@@ -525,11 +525,14 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 		tag.Kind == TagKindContext {
 		// invariant: both the container nesting (StartArray/EndContainer
 		// calls) and the tag kind passed to every Put* method are chosen
-		// by our own cluster-server encoding code, never by re-emitting
-		// a tag lifted from a decoded remote message — so this only
-		// fires when a caller in this codebase picks ContextTag() for
-		// an element it is writing into an Array, a coding mistake
-		// caught by the parity/encode tests, not a wire-triggerable path.
+		// by our own encoding code. The one encoder that writes a tree
+		// read from a peer (cluster/spec Node.EncodeTLV) writes an
+		// array's elements anonymous whatever tag a node carries, and
+		// the tree's reader refuses an array with a tagged element
+		// (spec.ErrArrayElementTag) — so this only fires when a caller
+		// in this codebase picks ContextTag() for an element it is
+		// writing into an Array, a coding mistake caught by the
+		// parity/encode tests, not a wire-triggerable path.
 		panic(fmt.Sprintf("tlv: context tag inside Array container (tag=%d); use AnonymousTag()", tag.Number))
 	}
 	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules
@@ -538,8 +541,8 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 	// chip's verifier — Apple's MTRDevice drops the whole IM message
 	// when either rule fires. go-fabric's writer stays permissive
 	// so codec-level tests can construct malformed fixtures to
-	// validate the decoder rejection path; the matching decoder
-	// enforcement lives in decode.go (StrictCheck).
+	// validate the decoder rejection path; the strict rules are
+	// checked by [Validate] (decode.go).
 	control := byte(tag.Kind)<<5 | byte(t)
 	e.buf = append(e.buf, control)
 	switch tag.Kind {

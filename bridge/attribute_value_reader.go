@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -137,6 +138,13 @@ type undecodedValue struct{ err error }
 // dispatcher to append.
 func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, dec *tlv.Decoder, item bool) (im.AttributeValue, error) {
 	n, err := spec.ReadContainer(dec, el)
+	if errors.Is(err, spec.ErrArrayElementTag) {
+		// A value its schema does not decode, read through to its end:
+		// the server's write check answers it, as any other such value
+		// (matter.js packages/types/src/tlv/TlvArray.ts:77-78 at db021da0
+		// throws for an array element with a tag).
+		return im.AttributeValue{Value: undecodedValue{fmt.Errorf("%s: %w", def.Name, err)}}, nil
+	}
 	if err != nil {
 		return im.AttributeValue{}, fmt.Errorf("%s: %w", def.Name, err)
 	}

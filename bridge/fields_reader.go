@@ -101,7 +101,7 @@ func handReader(path im.ConcreteCommandPath) (*spec.Cluster, handRead) {
 func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element, read handRead) (any, error) {
 	n, err := spec.ReadContainer(dec, el)
 	if err != nil {
-		return nil, fmt.Errorf("%s command 0x%02X: %w", def.Name, path.Command, err)
+		return nil, fieldsReadError(fmt.Sprintf("%s command 0x%02X", def.Name, path.Command), err)
 	}
 	if cmd := def.Command(path.Command, spec.Request); cmd != nil && cmd.Decode != nil {
 		if _, err := cmd.DecodeRequest(n); err != nil {
@@ -131,6 +131,22 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	}
 	fields, err = decodeGenericTagMap(sub)
 	return fields, consumed(err)
+}
+
+// fieldsReadError is the refusal of command fields [spec.ReadContainer]
+// could not read as a tree. An array with a tagged element is a payload
+// the command's schema does not decode — INVALID_COMMAND for this command
+// alone, as matter.js answers a payload its schema refuses
+// (packages/types/src/tlv/TlvArray.ts:77-78 throws,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:549-563 at
+// db021da0 turns it into InvalidCommandError); the container has been read
+// through, which the [spec.FieldError] says. Any other failure is a
+// malformed request and passes without a status.
+func fieldsReadError(what string, err error) error {
+	if errors.Is(err, spec.ErrArrayElementTag) {
+		return &spec.FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf("%s: %v", what, err)}
+	}
+	return fmt.Errorf("%s: %w", what, err)
 }
 
 // reopen is a decoder over n's encoding, positioned inside its container
