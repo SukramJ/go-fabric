@@ -553,16 +553,27 @@ func (g *GroupKeyManagement) writeFabric(ctx context.Context) (uint8, error) {
 // §11.2.10.4.1). The IM layer pre-filters the list to the requesting
 // fabric.
 func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := g.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [GroupKeyManagement.MatterWrite], changed when the fabric's
+// bindings after it differ from the ones it held — the comparison that
+// advances the server's own version (matter.js Datasource.ts:1456-1457,
+// :1479 at db021da0: an equal value is no change). The bindings are kept
+// per group, so the order of the written entries does not count.
+func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
-		return spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
+		return false, spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
 	}
 	list, ok := value.([]GroupKeyMapStruct)
 	if !ok {
-		return fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidArg, value)
+		return false, fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidArg, value)
 	}
 	fabric, err := g.writeFabric(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Matter §11.2.10.4.1 semantics: writing GroupKeyMap REPLACES the
@@ -582,19 +593,20 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// that omits the field (decoded as 0) or echoes a stale value gets
 	// its write applied, not refused.
 	if err := g.validateGroupKeyMap(list); err != nil {
-		return err
+		return false, err
 	}
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
-		return fmt.Errorf("core: GroupKeyMap write: list current bindings: %w", err)
+		return false, fmt.Errorf("core: GroupKeyMap write: list current bindings: %w", err)
 	}
+	changed := !sameGroupKeyMap(existing, list)
 	for _, m := range list {
 		if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{
 			FabricIndex:   fabric,
 			GroupID:       m.GroupID,
 			GroupKeySetID: m.GroupKeySetID,
 		}); err != nil {
-			return fmt.Errorf("core: GroupKeyMap write: %w", err)
+			return false, fmt.Errorf("core: GroupKeyMap write: %w", err)
 		}
 	}
 	for _, prev := range existing {
@@ -602,13 +614,35 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 			continue
 		}
 		if err := g.store.RemoveGroupKeyMapping(ctx, fabric, prev.GroupID); err != nil {
-			return fmt.Errorf("core: GroupKeyMap write: remove dropped binding %d: %w", prev.GroupID, err)
+			return false, fmt.Errorf("core: GroupKeyMap write: remove dropped binding %d: %w", prev.GroupID, err)
 		}
 	}
-	// Bump DataVersion after a successful GroupKeyMap mutation so
-	// DataVersionFilter evaluation correctly detects the cluster changed.
-	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	// A GroupKeyMap that changed advances DataVersion so DataVersionFilter
+	// evaluation detects the cluster changed; one written as it was held
+	// leaves it.
+	if changed {
+		g.dataVersion.Bump()
+	}
+	return changed, g.syncGroups(ctx, fabric)
+}
+
+// sameGroupKeyMap reports whether the written list binds the groups the
+// held mappings bind, each to the same key set.
+func sameGroupKeyMap(held []store.GroupKeyMapping, list []GroupKeyMapStruct) bool {
+	if len(held) != len(list) {
+		return false
+	}
+	bound := make(map[uint16]uint16, len(held))
+	for _, m := range held {
+		bound[m.GroupID] = m.GroupKeySetID
+	}
+	for _, m := range list {
+		if ks, ok := bound[m.GroupID]; !ok || ks != m.GroupKeySetID {
+			return false
+		}
+		delete(bound, m.GroupID)
+	}
+	return true
 }
 
 // gkmStatusError is a GroupKeyManagement rejection that carries the exact

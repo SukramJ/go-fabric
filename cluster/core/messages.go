@@ -223,6 +223,12 @@ func (m *Messages) MatterWrite(_ context.Context, attrID uint32, value any) erro
 	return refusedWrite{sentinel: fmt.Errorf("core: Messages has no writable attribute 0x%04X", attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (m *Messages) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, m.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke implements [contract.ClusterServer].
 func (m *Messages) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !m.Accepts(cmdID) {

@@ -515,7 +515,7 @@ func (w *WiFiNetworkCommissioning) disarmRejoinLocked() {
 // Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
 // and :1476-1480 at db021da0 (#noteIfChanged returns for an equal value;
 // advanceVersion runs only when the commit changed something). w.mu is held.
-func (w *WiFiNetworkCommissioning) setInterfaceEnabledLocked(v bool) {
+func (w *WiFiNetworkCommissioning) setInterfaceEnabledLocked(v bool) (changed bool) {
 	was := w.interfaceEnabled
 	w.interfaceEnabled = v
 	if was != v {
@@ -531,6 +531,7 @@ func (w *WiFiNetworkCommissioning) setInterfaceEnabledLocked(v bool) {
 	case !was && v:
 		w.rejoinNowLocked()
 	}
+	return was != v
 }
 
 // rejoin is one attempt to bring the link back onto the first committed
@@ -707,6 +708,22 @@ func (w *WiFiNetworkCommissioning) MatterWrite(ctx context.Context, attrID uint3
 	if !ok {
 		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
+	_, err := w.switchInterface(ctx, v)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [WiFiNetworkCommissioning.MatterWrite], changed when it moved
+// InterfaceEnabled — the comparison that advances the server's own
+// version ([WiFiNetworkCommissioning.switchInterface]).
+func (w *WiFiNetworkCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	if attrID != netcommAttrInterfaceEnabled {
+		return false, w.MatterWrite(ctx, attrID, value)
+	}
+	v, ok := value.(bool)
+	if !ok {
+		return false, fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
+	}
 	return w.switchInterface(ctx, v)
 }
 
@@ -725,7 +742,8 @@ func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
 	}
 	// SetAttributes takes no context; the driver bounds its own wait
 	// (contract.WiFiInterfaceSwitcher).
-	return w.switchInterface(context.Background(), enabled) //nolint:contextcheck // see above
+	_, err = w.switchInterface(context.Background(), enabled) //nolint:contextcheck // see above
+	return err
 }
 
 // switchInterface sets InterfaceEnabled to v through the driver's
@@ -743,29 +761,29 @@ func (w *WiFiNetworkCommissioning) SetAttributes(values map[uint32]any) error {
 // the feature: SetEnabled unsupported, GetEnabled true). Unlike chip, a
 // write of the value held does not call the driver, and a write of true
 // to a driver without the switch succeeds: the interface is on.
-func (w *WiFiNetworkCommissioning) switchInterface(ctx context.Context, v bool) error {
+func (w *WiFiNetworkCommissioning) switchInterface(ctx context.Context, v bool) (changed bool, err error) {
 	w.switchMu.Lock()
 	defer w.switchMu.Unlock()
 	w.mu.Lock()
 	held := w.interfaceEnabled
 	w.mu.Unlock()
 	if held == v {
-		return nil
+		return false, nil
 	}
-	err := errors.ErrUnsupported
+	err = errors.ErrUnsupported
 	if sw, ok := w.driver.(contract.WiFiInterfaceSwitcher); ok {
 		err = sw.SetInterfaceEnabled(ctx, v)
 	}
 	switch {
 	case errors.Is(err, errors.ErrUnsupported):
-		return netcommStatus(im.StatusInvalidAction, "core: InterfaceEnabled %t: the Wi-Fi driver cannot switch its interface: %v", v, err)
+		return false, netcommStatus(im.StatusInvalidAction, "core: InterfaceEnabled %t: the Wi-Fi driver cannot switch its interface: %v", v, err)
 	case err != nil:
-		return fmt.Errorf("core: InterfaceEnabled %t: the Wi-Fi driver did not switch its interface: %w", v, err)
+		return false, fmt.Errorf("core: InterfaceEnabled %t: the Wi-Fi driver did not switch its interface: %w", v, err)
 	}
 	w.mu.Lock()
-	w.setInterfaceEnabledLocked(v)
+	changed = w.setInterfaceEnabledLocked(v)
 	w.mu.Unlock()
-	return nil
+	return changed, nil
 }
 
 // netcommStatusError is a command refused with an IM status.

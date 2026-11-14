@@ -552,14 +552,23 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					results = append(results, im.WriteResult{Path: aPath, Status: status})
 					continue
 				}
-				res := d.writeStored(writeCtx, ep, srv, aPath, v)
-				// A successful write mutated cluster state; advance the
-				// endpoint-hosted DataVersion so DataVersionFilters miss
-				// and subscribers see the change (matter.js
-				// Datasource.ts:1456-1457). A root or Aggregator server with a
-				// tracker of its own bumps it inside the write handler.
-				if _, own := ownDataVersion(ep, srv); res.Status == im.StatusSuccess && !own {
-					ep.BumpClusterDataVersion(cPath.Cluster)
+				res, changed := d.writeStored(writeCtx, ep, srv, aPath, v)
+				// A successful write that changed the cluster advances the
+				// endpoint-hosted DataVersion once, so DataVersionFilters
+				// miss and subscribers see the change; one that changed
+				// nothing leaves it, as matter.js advances a datasource's
+				// version only for a commit that changed a value
+				// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+				// at db021da0, an equal value no change at :1479). The
+				// verdict is the server's ([contract.ChangeReportingWriter]);
+				// a server without one changed something. A root or
+				// Aggregator server with a tracker of its own advances it
+				// inside the same write, on the same verdict.
+				if res.Status == im.StatusSuccess {
+					if _, own := ownDataVersion(ep, srv); changed && !own {
+						ep.BumpClusterDataVersion(cPath.Cluster)
+					}
+					writeChangesFrom(ctx).record(aPath, changed)
 				}
 				results = append(results, res)
 			}
@@ -1062,15 +1071,16 @@ func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
 // writeStored is [writeOne] behind the topology's [WritePersister]: a
 // nonvolatile attribute the module holds is stored before the server
 // takes it; a refused store write answers FAILURE and the server never
-// sees the value, a write the server refuses puts the store back.
-func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+// sees the value, a write the server refuses puts the store back. changed
+// is [writeOne]'s.
+func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
 	p := d.topology.Persister
 	if p == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	done, err := p.PersistWrite(ctx, ep, srv, path.Attribute, value)
 	if err != nil {
-		return im.WriteResult{Path: path, Status: im.StatusFailure}
+		return im.WriteResult{Path: path, Status: im.StatusFailure}, false
 	}
 	return persistedWrite(ctx, srv, path, value, done)
 }
@@ -1078,15 +1088,15 @@ func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv 
 // persistedWrite is [writeOne] followed by done, the [WritePersister]'s
 // settlement, with whether srv applied the write — also when srv panics,
 // so the persister is never left waiting. A nil done is writeOne alone.
-func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) im.WriteResult {
+func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) (res im.WriteResult, changed bool) {
 	if done == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	applied := false
 	defer func() { done(applied) }()
-	res := writeOne(ctx, srv, path, value)
+	res, changed = writeOne(ctx, srv, path, value)
 	applied = res.Status == im.StatusSuccess
-	return res
+	return res, changed
 }
 
 // writtenHeld is the status the definition of srv's cluster answers a
@@ -1117,17 +1127,28 @@ func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeVa
 
 // writeOne dispatches a single Write against srv. Errors are mapped
 // to spec-coded status values where the cluster surfaces them
-// distinctly; the catch-all is StatusFailure.
-func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+// distinctly; the catch-all is StatusFailure. changed is whether a
+// successful write changed the cluster: the server's own verdict when it
+// gives one ([contract.ChangeReportingWriter] — decided inside the write,
+// so a change another writer makes around it never stands in for it),
+// true for a server that gives none; false for a refused write.
+func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
 	v := value.Value
 	if value.IsNull {
 		v = nil
 	}
-	if err := srv.MatterWrite(contract.WithOrigin(ctx, contract.OriginControllerWrite), path.Attribute, v); err != nil {
-		status, cs, hasCS := classifyError(err)
-		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
+	ctx = contract.WithOrigin(ctx, contract.OriginControllerWrite)
+	var err error
+	if cw, ok := srv.(contract.ChangeReportingWriter); ok {
+		changed, err = cw.MatterWriteChanged(ctx, path.Attribute, v)
+	} else {
+		changed, err = true, srv.MatterWrite(ctx, path.Attribute, v)
 	}
-	return im.WriteResult{Path: path, Status: im.StatusSuccess}
+	if err != nil {
+		status, cs, hasCS := classifyError(err)
+		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}, false
+	}
+	return im.WriteResult{Path: path, Status: im.StatusSuccess}, changed
 }
 
 // classifyError maps a cluster server's write or invoke error to the

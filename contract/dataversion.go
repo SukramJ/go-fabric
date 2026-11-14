@@ -10,9 +10,11 @@ import (
 )
 
 // DataVersionTracker is a per-cluster monotonic counter satisfying the
-// [ClusterDataVersion] contract. Every successful attribute write SHOULD
-// call [DataVersionTracker.Bump] so subscribers see a fresh version
-// number in their cached state.
+// [ClusterDataVersion] contract. Every attribute write that changed a
+// value SHOULD call [DataVersionTracker.Bump] so subscribers see a fresh
+// version number in their cached state; a write that changed nothing
+// leaves it, and a server that says so implements
+// [ChangeReportingWriter].
 //
 // A cluster's data version is a Matter concept, so the counter lives
 // with the other Matter port contracts rather than in the host type
@@ -38,7 +40,7 @@ import (
 //	func (c *MyCluster) MatterDataVersion() uint32 { return c.DataVersionTracker.Current() }
 //
 //	func (c *MyCluster) MatterWrite(...) error {
-//	    // do mutation ...
+//	    // do mutation; when it changed a value:
 //	    c.DataVersionTracker.Bump()
 //	    return nil
 //	}

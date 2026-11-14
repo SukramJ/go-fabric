@@ -1011,18 +1011,29 @@ func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32
 // [Sink], a SystemMode or occupied-setpoint write reaches it after all of
 // that and before anything is stored ([Sink] has the answer to a refusal).
 func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [ThermostatServer.MatterWrite], changed when it moved an
+// attribute — the comparisons that decide the change report. A staged
+// Presets or Schedules write and an ignored write change nothing.
+func (s *ThermostatServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
-		return err
+		return false, err
 	}
+	// Presets and Schedules are staged in their atomic write; the
+	// attribute changes when the write commits, through its command.
 	switch attrID {
 	case tdef.AttrPresets:
-		return s.writePresets(ctx, v)
+		return false, s.writePresets(ctx, v)
 	case tdef.AttrSchedules:
-		return s.writeSchedules(ctx, v)
+		return false, s.writeSchedules(ctx, v)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -1034,7 +1045,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		n, _ := v.(int64) // an int16 per ValidateWrite
 		changed, err := s.writeSetpoint(ctx, attrID, int(n))
 		if err != nil {
-			return err
+			return false, err
 		}
 		// The written attribute and what the reconcile moved besides it
 		// reach the listeners from the write, as matter.js emits each
@@ -1045,7 +1056,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		// path's as well; a subscription reports it once.
 		slices.Sort(changed)
 		s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
-		return nil
+		return len(changed) > 0, nil
 	case thermoAttrControlSequenceOfOperation:
 		// "For backwards compatibility, this attribute is optionally
 		// writeable. However, any writes to this attribute SHALL be
@@ -1053,12 +1064,12 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		// #ensureControlSequenceOfOperationNotWritable accepts the write
 		// and reverts it (TC-TSTAT-2.2 step 12). The definition checked the
 		// enum.
-		return nil
+		return false, nil
 	case thermoAttrMinSetpointDeadBand:
 		// Likewise optionally writable and silently ignored (matter.js
 		// #ensureMinSetpointDeadBandNotWritable); the definition checked
 		// "0 to 12.7°C" (0 to 127).
-		return nil
+		return false, nil
 	case thermoAttrLocalTemperatureCalibration:
 		// "RW VM", plain state in matter.js.
 		n, _ := v.(int64) // an int8 per ValidateWrite
@@ -1070,7 +1081,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		if changed {
 			s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrLocalTemperatureCalibration)
 		}
-		return nil
+		return changed, nil
 	case thermoAttrTemperatureSetpointHold:
 		n, _ := v.(uint64)                // an enum8 per ValidateWrite
 		return s.writeHold(ctx, uint8(n)) //nolint:gosec // an enum8 per ValidateWrite
@@ -1090,7 +1101,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		if changed {
 			s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrTemperatureSetpointHoldDur)
 		}
-		return nil
+		return changed, nil
 	default: // thermoAttrSystemMode, the last writable attribute
 		n, _ := v.(uint64)                      // an enum8 per ValidateWrite, its conformance checked
 		return s.writeSystemMode(ctx, uint8(n)) //nolint:gosec // an enum8 per ValidateWrite
@@ -1136,7 +1147,7 @@ func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
 // s.mu; once it consented the mode is stored over whatever
 // [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
 // s.op.
-func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
+func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) (changed bool, err error) {
 	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1476-1481
 	// (#noteIfChanged: isDeepEqual notes no change for an unchanged value
 	// on commit) and :1203-1213 with :1405-1408 ($Changing only for
@@ -1146,11 +1157,11 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 	same := s.systemMode == v
 	s.mu.RUnlock()
 	if same {
-		return nil
+		return false, nil
 	}
 	if s.sink != nil {
 		if err := s.sink.SetSystemMode(ctx, v); err != nil {
-			return sinkError(fmt.Sprintf("SystemMode %d", v), err)
+			return false, sinkError(fmt.Sprintf("SystemMode %d", v), err)
 		}
 	}
 	s.mu.Lock()
@@ -1165,7 +1176,7 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrThermostatRunningMode)
 	}
 	s.emitChanges(ctx, before, after)
-	return nil
+	return true, nil
 }
 
 // writeHold applies a TemperatureSetpointHold the definition admitted. With
@@ -1174,16 +1185,16 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 // call the Sink (Datasource.ts:1476-1481 at db021da0, as for SystemMode).
 // matter.js stores the value only (ThermostatServer.ts:381 at db021da0);
 // the Sink call is this module's. The caller holds s.op.
-func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) error {
+func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) (changed bool, err error) {
 	s.mu.RLock()
 	same := s.hold == v
 	s.mu.RUnlock()
 	if same {
-		return nil
+		return false, nil
 	}
 	if s.sink != nil {
 		if err := s.sink.SetTemperatureSetpointHold(ctx, v); err != nil {
-			return sinkError(fmt.Sprintf("TemperatureSetpointHold %d", v), err)
+			return false, sinkError(fmt.Sprintf("TemperatureSetpointHold %d", v), err)
 		}
 	}
 	s.mu.Lock()
@@ -1192,7 +1203,7 @@ func (s *ThermostatServer) writeHold(ctx context.Context, v uint8) error {
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrTemperatureSetpointHold)
 	// A hold keeps the thermostat off its current suggestion (suggestions.go).
 	s.reevaluateSuggestions(contract.WithOrigin(ctx, contract.OriginControllerWrite))
-	return nil
+	return true, nil
 }
 
 // equalDuration compares two nullable TemperatureSetpointHoldDuration values.

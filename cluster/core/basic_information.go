@@ -800,30 +800,39 @@ func (b *BasicInformation) uniqueID() string {
 // advanceVersion (:1456-1466), commit1 (:1232, store.set :1261) writes
 // the store fields, and postCommit (:1286) emits the change events.
 func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := b.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [BasicInformation.MatterWrite], changed when it committed a new
+// NodeLabel or Location ([BasicInformation.commitLabel], whose comparison
+// advances the server's own version).
+func (b *BasicInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
-			return err
+			return false, err
 		}
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
+			return false, fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 		}
 		return b.commitLabel(ctx, attrID, s)
 	case basicInfoAttrLocation:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
-			return err
+			return false, err
 		}
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("core: Location write expected string, got %T", value)
+			return false, fmt.Errorf("core: Location write expected string, got %T", value)
 		}
 		return b.commitLabel(ctx, attrID, s)
 	}
 	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
 	// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 	_, err := b.inst().ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
+	return false, refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
 }
 
 // commitLabel sets NodeLabel or Location to s. An unchanged value commits
@@ -852,7 +861,7 @@ func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value
 // the order of two writers' reports does not matter, and an inline
 // observer that writes the label from OnAttributeChanged does not
 // deadlock on its own write.
-func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) error {
+func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) (changed bool, err error) {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	label, loc, persist := b.nodeLabel, b.location, b.onPersistentWrite
@@ -863,13 +872,13 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 	}
 	if *cur == s {
 		b.writeMu.Unlock()
-		return nil
+		return false, nil
 	}
 	*cur = s
 	if persist != nil {
 		if err := persist(label, loc); err != nil {
 			b.writeMu.Unlock()
-			return fmt.Errorf("core: BasicInformation 0x%04X write not persisted: %w", attrID, err)
+			return false, fmt.Errorf("core: BasicInformation 0x%04X write not persisted: %w", attrID, err)
 		}
 	}
 	b.mu.Lock()
@@ -882,7 +891,7 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 	b.dataVersion.Bump()
 	b.writeMu.Unlock()
 	b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
-	return nil
+	return true, nil
 }
 
 // checkLabelWrite holds a NodeLabel or Location write to the attribute's

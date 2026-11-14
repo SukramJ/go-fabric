@@ -561,6 +561,12 @@ func (s *ScenesManagement) MatterWrite(_ context.Context, attrID uint32, value a
 	return refusedWrite{sentinel: fmt.Errorf("core: ScenesManagement attribute 0x%04X is read-only", attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterReportable implements [contract.ClusterServer].
 func (s *ScenesManagement) MatterReportable() []uint32 {
 	return []uint32{scenesAttrSceneTableSize, scenesAttrFabricSceneInfo}

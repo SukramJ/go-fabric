@@ -555,6 +555,12 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: every
+// attribute is read-only, so no write changes the server.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke carries out SelectAreas and SkipArea; a host handler
 // registered with [Server.Handle] takes the command instead.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

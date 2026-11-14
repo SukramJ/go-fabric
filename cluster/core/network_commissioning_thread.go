@@ -324,6 +324,13 @@ func (n *ThreadNetworkCommissioning) MatterWrite(_ context.Context, attrID uint3
 	return nil
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the only
+// write accepted is the InterfaceEnabled value the border router already
+// has, so no write changes the server.
+func (n *ThreadNetworkCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, n.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke implements [contract.ClusterServer] (InvokeCommand,
 // :1138-1194): Busy while a scan or a connect runs.
 func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

@@ -9,6 +9,9 @@ import (
 	"time"
 
 	core "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
+	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -44,13 +47,80 @@ func TestWrittenAttributeReachesASubscriber(t *testing.T) {
 	b.reportWrittenAttributes(im.WriteResponse{Responses: []im.AttributeStatus{
 		{Path: nodeLabel, Status: im.StatusIB{Status: im.StatusSuccess}},
 		{Path: failed, Status: im.StatusIB{Status: im.StatusConstraintError}},
-	}})
+	}}, nil)
 
 	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
 	spy.mu.Lock()
 	defer spy.mu.Unlock()
 	if len(spy.calls) != 1 || len(spy.calls[0]) != 1 || spy.calls[0][0] != nodeLabel {
 		t.Fatalf("reported %+v, want exactly the written NodeLabel path", spy.calls)
+	}
+}
+
+// labelSource is a bridged endpoint serving one cluster server.
+type labelSource struct{ srv contract.ClusterServer }
+
+func (labelSource) MatterDeviceType() uint16 { return 0x010A }
+func (s labelSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{s.srv}
+}
+
+// TestUnchangedWrittenAttributeIsNotReported: a write whose server says it
+// changed nothing (contract.ChangeReportingWriter) is not reported to a
+// subscriber; a write that changed the value is. matter.js broadcasts only
+// the properties a commit changed (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+// an equal value no change at :1479, at db021da0).
+func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
+	t.Parallel()
+	labels, err := core.NewUserLabel(core.UserLabelConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ep := &endpointpkg.Endpoint{ID: 7, DeviceType: 0x010A, SourceKey: endpointpkg.StringKey("u"), Scope: "s", DeviceAddress: "d", Source: labelSource{labels}}
+	b := newReachabilityBridge(t, ep)
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	labelList := im.ConcreteAttributePath{
+		Endpoint: 7, Cluster: userlabeldef.ClusterID, Attribute: userlabeldef.AttrLabelList,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{labelList},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b.AttachSubscriptionManager(mgr)
+	d := endpointpkg.NewTopologyDispatcher(b.topology)
+
+	now := time.Now()
+	reports := func(name string) int {
+		t.Helper()
+		changes := &endpointpkg.WriteChanges{}
+		ctx := endpointpkg.WithWriteChanges(context.Background(), changes)
+		value := im.AttributeValue{Value: spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "hall"}}}
+		results := d.Write(ctx, labelList, value)
+		resp := im.WriteResponse{}
+		for _, r := range results {
+			resp.Responses = append(resp.Responses, im.AttributeStatus{Path: r.Path, Status: im.StatusIB{Status: r.Status}})
+		}
+		if len(resp.Responses) != 1 || resp.Responses[0].Status.Status != im.StatusSuccess {
+			t.Fatalf("%s: %+v", name, resp.Responses)
+		}
+		b.reportWrittenAttributes(resp, changes)
+		now = now.Add(2 * time.Second)
+		mgr.Tick(context.Background(), now)
+		spy.mu.Lock()
+		defer spy.mu.Unlock()
+		n := len(spy.calls)
+		spy.calls = nil
+		return n
+	}
+	if n := reports("first write"); n != 1 {
+		t.Fatalf("a changed LabelList reported %d times, want 1", n)
+	}
+	if n := reports("the same list again"); n != 0 {
+		t.Fatalf("an unchanged LabelList reported %d times, want none", n)
 	}
 }
 

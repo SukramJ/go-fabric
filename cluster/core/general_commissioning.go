@@ -518,15 +518,23 @@ func (g *GeneralCommissioning) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite handles Breadcrumb writes (Matter §11.10.6.1). Other
 // attributes are read-only.
 func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := g.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [GeneralCommissioning.MatterWrite], changed when it moved
+// Breadcrumb — the comparison that advances the server's own version.
+func (g *GeneralCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != gencommAttrBreadcrumb {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 		_, err := g.inst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("core: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(uint64)
 	if !ok {
-		return fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidArg, value)
+		return false, fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidArg, value)
 	}
 	g.mu.Lock()
 	changed := g.breadcrumb != v
@@ -541,7 +549,7 @@ func (g *GeneralCommissioning) MatterWrite(ctx context.Context, attrID uint32, v
 	if changed {
 		g.changes.NotifyFrom(contract.OriginFrom(ctx), gencommAttrBreadcrumb)
 	}
-	return nil
+	return changed, nil
 }
 
 // OnAttributeChange implements [contract.AttributeChangeNotifier]: a

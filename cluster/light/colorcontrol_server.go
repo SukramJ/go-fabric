@@ -741,9 +741,18 @@ func (s *ColorControlServer) readColorPoint(attrID uint32) (any, bool) {
 // apply it (ColorControlServer.ts:376-393 initializeColorTemperature:
 // `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [ColorControlServer.MatterWrite], changed when it moved the
+// attribute — the comparison, made under the server's lock, that decides
+// the change report.
+func (s *ColorControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// The write veto ([ColorControlServer.SetBeforeWrite]) sees the value
 	// in its stored form.
@@ -755,7 +764,7 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 		}
 	}
 	if err := s.veto.Check(ctx, attrID, vetoed); err != nil {
-		return err
+		return false, err
 	}
 	changed := false
 	s.mu.Lock()
@@ -782,7 +791,7 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 	if changed {
 		s.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 	}
-	return nil
+	return changed, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:

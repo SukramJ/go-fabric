@@ -272,6 +272,12 @@ func (e *EcosystemInformation) MatterWrite(_ context.Context, attrID uint32, val
 	return err
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (e *EcosystemInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, e.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke answers UNSUPPORTED_COMMAND: the cluster has no commands.
 func (e *EcosystemInformation) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, im.UnsupportedCommandf("EcosystemInformation: command 0x%02X is not supported", cmdID)

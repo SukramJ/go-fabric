@@ -471,6 +471,12 @@ func (s *DiagnosticsServer) MatterWrite(ctx context.Context, attrID uint32, valu
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *DiagnosticsServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke implements [contract.ClusterServer]: ResetCounts is
 // ErrorCounts' (ThreadNetworkDiagnosticsCluster.cpp:237-250), which the
 // server does not serve; the definition answers.

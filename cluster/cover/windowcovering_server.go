@@ -565,12 +565,20 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // reported when it moved. In MaintenanceMode the movement commands answer
 // BUSY ([WindowCoveringServer.MatterInvoke]).
 func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [WindowCoveringServer.MatterWrite], changed when it moved Mode
+// or the ConfigStatus Mode drives — the attributes it notifies.
+func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
-			return windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
+			return false, windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
 		}
-		return err
+		return false, err
 	}
 	n, _ := v.(uint64) // a map8 ≤ 15 per ValidateWrite
 	mode := uint8(n)   //nolint:gosec // ≤ 15 per ValidateWrite
@@ -579,10 +587,10 @@ func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, v
 		mode &^= calibration
 	}
 	if mode&calibration != 0 {
-		return windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
+		return false, windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
 	}
 	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
-		return err
+		return false, err
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -602,7 +610,7 @@ func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, v
 		changed = append(changed, wire.WindowCoveringAttrMode)
 	}
 	s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
-	return nil
+	return len(changed) > 0, nil
 }
 
 // maintenanceErr answers a movement command in MaintenanceMode.

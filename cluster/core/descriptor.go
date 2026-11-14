@@ -338,6 +338,12 @@ func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, value any) er
 	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errDescriptorReadOnly, attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (d *Descriptor) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, d.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke always rejects — Descriptor has no commands.
 func (d *Descriptor) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, im.UnsupportedCommandf("core: Descriptor has no commands (got 0x%02X)", cmdID)

@@ -247,6 +247,12 @@ func (t *TimeSynchronization) MatterWrite(_ context.Context, attrID uint32, valu
 	return timeSyncReadOnlyErr{fmt.Sprintf("core: TimeSynchronization attribute 0x%04X is read-only", attrID)}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (t *TimeSynchronization) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, t.MatterWrite(ctx, attrID, value)
+}
+
 // timeSyncReadOnlyErr answers a write UNSUPPORTED_WRITE, as the comment
 // above promised; a plain error read as FAILURE.
 type timeSyncReadOnlyErr struct{ msg string }

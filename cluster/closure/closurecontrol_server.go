@@ -327,6 +327,12 @@ func (s *ControlServer) MatterWrite(ctx context.Context, attrID uint32, value an
 	return s.CheckWrite(ctx, attrID, v)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: every
+// attribute is read-only, so no write changes the server.
+func (s *ControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
 // command the advertised feature set does not include.
 type closureUnsupportedCommandErr struct{ msg string }

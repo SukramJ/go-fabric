@@ -631,12 +631,20 @@ func nullableLevel(level uint8, known bool) (any, bool) {
 // nullable uint8 range of StartUpCurrentLevel; the Options bits the
 // FeatureMap does not make conformant are the server's to refuse.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when it moved the attribute — the
+// comparison that advances the server's own version and notifies.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, attrID, storedUint8(v)); err != nil {
-		return err
+		return false, err
 	}
 	switch attrID {
 	case AttrOptions:
@@ -657,7 +665,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 			s.tracker().Bump()
 			s.changes.NotifyFrom(contract.OriginControllerWrite, AttrStartUpCurrentLevel)
 		}
-		return nil
+		return changed, nil
 	}
 }
 
@@ -698,44 +706,46 @@ func nullableUint8Of(v any) *uint8 {
 // writeOptions forwards an Options write. The bitmap carries constraint
 // "desc"; what "desc" resolves to here is [Server.optionsMask] — the bits
 // whose conformance the advertised FeatureMap satisfies.
-func (s *Server) writeOptions(ctx context.Context, options uint8) error {
+func (s *Server) writeOptions(ctx context.Context, options uint8) (changed bool, err error) {
 	if options&^s.optionsMask() != 0 {
-		return constraintErr{fmt.Sprintf(
+		return false, constraintErr{fmt.Sprintf(
 			"levelcontrol: Options 0x%02X sets a bit that is not conformant under FeatureMap 0x%02X", options, s.features(),
 		)}
 	}
 	if s.src == nil {
-		return errNoSource("Options write")
+		return false, errNoSource("Options write")
 	}
 	before := s.src.Options()
 	if err := s.src.SetOptions(ctx, options); err != nil {
-		return fmt.Errorf("levelcontrol: Options write: %w", err)
+		return false, fmt.Errorf("levelcontrol: Options write: %w", err)
 	}
 	// A change advances the DataVersion and is reported to the server's
 	// listeners; a write of the value in effect changes nothing
 	// (Datasource.ts:1456-1457, :1476-1480 at db021da0 #noteIfChanged).
-	if s.src.Options() != before {
-		s.tracker().Bump()
-		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
+	if s.src.Options() == before {
+		return false, nil
 	}
-	return nil
+	s.tracker().Bump()
+	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
+	return true, nil
 }
 
 // writeOnLevel forwards an OnLevel write. A null clears the on-level,
 // which the spec reads as "it has no effect" (resource :146-149).
-func (s *Server) writeOnLevel(ctx context.Context, level *uint8) error {
+func (s *Server) writeOnLevel(ctx context.Context, level *uint8) (changed bool, err error) {
 	if s.src == nil {
-		return errNoSource("OnLevel write")
+		return false, errNoSource("OnLevel write")
 	}
 	before, knownBefore := s.src.OnLevel()
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
-		return fmt.Errorf("levelcontrol: OnLevel write: %w", err)
+		return false, fmt.Errorf("levelcontrol: OnLevel write: %w", err)
 	}
-	if after, known := s.src.OnLevel(); known != knownBefore || (known && after != before) {
-		s.tracker().Bump()
-		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
+	if after, known := s.src.OnLevel(); known == knownBefore && (!known || after == before) {
+		return false, nil
 	}
-	return nil
+	s.tracker().Bump()
+	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
+	return true, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:

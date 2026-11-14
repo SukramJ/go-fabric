@@ -749,6 +749,12 @@ func (d *Datastore) MatterWrite(ctx context.Context, attrID uint32, value any) e
 	return d.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (d *Datastore) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return d.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches the commands; a host's handler runs in its
 // place ([spec.SelfHeld.Handle]).
 func (d *Datastore) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

@@ -144,6 +144,10 @@ type occStore struct {
 // store the write a second time, out of that order.
 var errHoldTimeQueued = errors.New("sensing: OccupancySensing: HoldTime store queued")
 
+// errHoldTimeKept tells MatterWrite that the written HoldTime is the one
+// held: a successful write that changed nothing, nothing to store.
+var errHoldTimeKept = errors.New("sensing: OccupancySensing: HoldTime unchanged")
+
 // Compile-time assertions.
 var (
 	_ contract.ClusterServer                  = (*Occupancy)(nil)
@@ -302,14 +306,19 @@ type occSink struct{ o *Occupancy }
 
 // MatterWriteAttribute implements [spec.Sink]: the hold time is changed
 // and its store queued with the decision, so the write answers
-// errHoldTimeQueued for the generated server not to store it again.
+// errHoldTimeQueued for the generated server not to store it again, or
+// errHoldTimeKept when it is the hold time held.
 func (k occSink) MatterWriteAttribute(_ context.Context, attrID uint32, value any) error {
 	if attrID != occdef.AttrHoldTime {
 		return nil
 	}
 	h, _ := value.(uint16)
-	if err := k.o.setHoldTime(h, contract.OriginControllerWrite); err != nil {
+	changed, err := k.o.setHoldTime(h, contract.OriginControllerWrite)
+	switch {
+	case err != nil:
 		return err
+	case !changed:
+		return errHoldTimeKept
 	}
 	return errHoldTimeQueued
 }
@@ -319,20 +328,20 @@ func (k occSink) MatterWriteAttribute(_ context.Context, attrID uint32, value an
 // what remains of the new hold time — or Occupancy cleared at once when
 // that has elapsed — and the store of HoldTime from origin, queued in that
 // order and made before it returns unless another goroutine is making
-// them ([Occupancy.publish]).
-func (o *Occupancy) setHoldTime(h uint16, origin contract.Origin) error {
+// them ([Occupancy.publish]). changed is false for the hold time held.
+func (o *Occupancy) setHoldTime(h uint16, origin contract.Origin) (changed bool, err error) {
 	o.mu.Lock()
 	if !o.hold { // :208
 		o.mu.Unlock()
-		return spec.Errorf(im.StatusUnsupportedAttribute, "OccupancySensing: HoldTime is not served")
+		return false, spec.Errorf(im.StatusUnsupportedAttribute, "OccupancySensing: HoldTime is not served")
 	}
 	if h < o.limits[0] || h > o.limits[1] { // :209-210
 		o.mu.Unlock()
-		return spec.Errorf(im.StatusConstraintError, "OccupancySensing: HoldTime %d outside %d..%d", h, o.limits[0], o.limits[1])
+		return false, spec.Errorf(im.StatusConstraintError, "OccupancySensing: HoldTime %d outside %d..%d", h, o.limits[0], o.limits[1])
 	}
 	if h == o.holdTime { // :212-215: the same value is a successful no-op
 		o.mu.Unlock()
-		return nil
+		return false, nil
 	}
 	o.holdTime = h
 	elapsedAll := false
@@ -361,7 +370,7 @@ func (o *Occupancy) setHoldTime(h uint16, origin contract.Origin) error {
 	o.pending = append(o.pending, occStore{origin: origin, values: map[uint32]any{occdef.AttrHoldTime: h}})
 	o.mu.Unlock()
 	o.publish()
-	return nil
+	return true, nil
 }
 
 // armLocked (re)starts the hold timer to fire after d; the timer started
@@ -515,7 +524,7 @@ func (o *Occupancy) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	if hold != nil {
-		if err := o.setHoldTime(*hold, contract.OriginHostSet); err != nil {
+		if _, err := o.setHoldTime(*hold, contract.OriginHostSet); err != nil {
 			return fmt.Errorf("%w: %w", spec.ErrInvalidValue, err)
 		}
 	}
@@ -568,15 +577,30 @@ func (o *Occupancy) MatterRead(attrID uint32) (any, bool) { return o.srv.MatterR
 // MatterWrite applies a controller's write: HoldTime, or a deprecated
 // delay attribute as HoldTime (OccupancySensingCluster.cpp:170-181).
 func (o *Occupancy) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := o.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Occupancy.MatterWrite], changed when HoldTime moved — decided
+// with the hold time under the server's lock (chip's same-value no-op,
+// OccupancySensingCluster.cpp:212-215) — or the generated server's store
+// changed the value.
+func (o *Occupancy) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if slices.Contains(holdTimeAliases, attrID) && o.Serves(attrID) {
 		attrID = occdef.AttrHoldTime
 	}
 	// The Sink queues the HoldTime store with its decision
-	// (errHoldTimeQueued); the generated server's checks run before it.
-	if err := o.srv.MatterWrite(ctx, attrID, value); err != nil && !errors.Is(err, errHoldTimeQueued) {
-		return err
+	// (errHoldTimeQueued) or keeps the hold time held (errHoldTimeKept);
+	// the generated server's checks run before it.
+	changed, err := o.srv.MatterWriteChanged(ctx, attrID, value)
+	switch {
+	case errors.Is(err, errHoldTimeQueued):
+		return true, nil
+	case errors.Is(err, errHoldTimeKept):
+		return false, nil
 	}
-	return nil
+	return changed, err
 }
 
 // MatterInvoke answers every command: the cluster has none.

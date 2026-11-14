@@ -657,20 +657,36 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 // SensitivityEnum member, as matter.js validates an enum write before any
 // behavior runs and answers ConstraintError otherwise.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when the alarm the host reports
+// after it differs from before it, which is when the server's own version
+// advances — matter.js advances it only for a commit that changed a value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+// :1479 at db021da0). The state is the host's, read through its source,
+// as FanControl's write reads it (cluster/fan Server.MatterWriteChanged).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
-		return err
+		return false, err
 	}
+	before := s.state()
 	n, _ := v.(uint64)                                                           // an enum8 per ValidateWrite
 	setter, _ := s.src.(SensitivitySetter)                                       // guaranteed by NewServer
 	if err := setter.SetSmokeSensitivityLevel(ctx, Sensitivity(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
-		return fmt.Errorf("alarm: SmokeSensitivityLevel write: %w", err)
+		return false, fmt.Errorf("alarm: SmokeSensitivityLevel write: %w", err)
+	}
+	if s.state() == before {
+		return false, nil
 	}
 	s.tracker().Bump()
-	return nil
+	return true, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:

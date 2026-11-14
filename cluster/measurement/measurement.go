@@ -326,6 +326,12 @@ func (s *TemperatureServer) MatterWrite(_ context.Context, attrID uint32, value 
 	return refuseWrite(tempInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *TemperatureServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Temperature Measurement cluster has no commands.
 func (s *TemperatureServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -400,6 +406,12 @@ func (s *HumidityServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Relative Humidity Measurement cluster is read-only at the wire layer.
 func (s *HumidityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(humidityInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *HumidityServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Relative Humidity Measurement cluster has no commands.
@@ -483,6 +495,12 @@ func (s *IlluminanceServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Illuminance Measurement cluster is read-only at the wire layer.
 func (s *IlluminanceServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(illuminanceInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *IlluminanceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Illuminance Measurement cluster has no commands.
@@ -587,6 +605,12 @@ func (s *PressureServer) MatterWrite(_ context.Context, attrID uint32, value any
 	return refuseWrite(pressureInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PressureServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Pressure Measurement cluster has no commands.
 func (s *PressureServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -689,6 +713,12 @@ func (s *BooleanStateServer) ObservedStateValue() (value, observed bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Boolean State cluster is read-only at the wire layer.
 func (s *BooleanStateServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(booleanStateInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *BooleanStateServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Boolean State cluster has no commands.
@@ -854,6 +884,12 @@ func (s *OccupancySensingServer) ObservedOccupancy() (bitmap uint8, observed boo
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Occupancy Sensing cluster is read-only at the wire layer.
 func (s *OccupancySensingServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(s.inst(), attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *OccupancySensingServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Occupancy Sensing cluster has no commands.
@@ -1039,6 +1075,12 @@ func (s *ElectricalPowerServer) MatterWrite(_ context.Context, attrID uint32, va
 	return refuseWrite(electricalPowerInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ElectricalPowerServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Electrical Power Measurement cluster has no commands.
 func (s *ElectricalPowerServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1204,6 +1246,12 @@ func (s *ElectricalEnergyServer) MatterWrite(_ context.Context, attrID uint32, v
 	return refuseWrite(electricalEnergyInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ElectricalEnergyServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Electrical Energy Measurement cluster has no commands.
 func (s *ElectricalEnergyServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1341,6 +1389,12 @@ func (s *AirQualityServer) MatterWrite(_ context.Context, attrID uint32, value a
 	return refuseWrite(s.inst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *AirQualityServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Air Quality cluster has no commands.
 func (s *AirQualityServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1456,6 +1510,12 @@ func (s *concentrationServer) readSelected(attrID uint32) (any, bool) {
 
 func (s *concentrationServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(s.inst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *concentrationServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 func (s *concentrationServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
@@ -1744,6 +1804,12 @@ func (s *PowerSourceServer) MatterWrite(_ context.Context, attrID uint32, value 
 	return refuseWrite(s.inst(), attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PowerSourceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Power Source cluster has no commands.
 func (s *PowerSourceServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1857,6 +1923,12 @@ func (s *PowerTopologyServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the PowerTopology is read-only at the wire layer.
 func (s *PowerTopologyServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(powerTopologyInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PowerTopologyServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — PowerTopology has no commands.

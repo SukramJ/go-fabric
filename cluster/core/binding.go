@@ -348,17 +348,29 @@ func defTargets(l []TargetStruct) []bindingdef.TargetStruct {
 // entry is one removed and one added (BindingServer.ts:127-157). A failed
 // write tells nobody.
 func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := b.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Binding.MatterWrite], unchanged when the written entries are
+// the ones the accessing fabric holds, in their order (the whole list for
+// a local writer) — then nothing is saved, stored or told, as matter.js
+// commits and stores nothing for an equal value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
+// :1479 at db021da0).
+func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bindingAttrBinding {
 		_, err := bindingInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("core: Binding has no writable attribute 0x%04X", attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: Binding has no writable attribute 0x%04X", attrID), status: err}
 	}
 	_, fabric, request := im.LookupFabricFilter(ctx)
 	if request && fabric == 0 {
-		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding is fabric-scoped; the session has no fabric"}
+		return false, bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding is fabric-scoped; the session has no fabric"}
 	}
 	list, err := bindingWriteList(value, fabric, request)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if request {
 		for i := range list {
@@ -368,7 +380,7 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	// The veto sees the written entries as they would be stored, the
 	// accessing fabric stamped.
 	if err := b.veto.Check(ctx, bindingAttrBinding, slices.Clone(list)); err != nil {
-		return err
+		return false, err
 	}
 	origin := contract.OriginFrom(ctx)
 	if origin == contract.OriginUnknown {
@@ -377,6 +389,10 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	return b.replace(origin, func(before []TargetStruct) ([]TargetStruct, error) {
 		after := list
 		if request {
+			held := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex != fabric })
+			if slices.Equal(held, list) {
+				return before, nil // the fabric's entries as they are
+			}
 			after = append(slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric }), list...)
 		}
 		// The table's bound, checked as connectedhomeip checks a write: the
@@ -398,8 +414,10 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 
 // replace commits the list build makes of the current one: saved first,
 // then stored, then told to the [Binding.OnChange] observers. An error of
-// build is the write's, and changes nothing.
-func (b *Binding) replace(origin contract.Origin, build func(before []TargetStruct) ([]TargetStruct, error)) error {
+// build is the write's, and changes nothing; so does a list equal to the
+// current one, entry for entry, which is neither saved nor stored.
+// changed reports whether the list was replaced.
+func (b *Binding) replace(origin contract.Origin, build func(before []TargetStruct) ([]TargetStruct, error)) (changed bool, err error) {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	before := b.bindings
@@ -407,10 +425,14 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 	after, err := build(before)
 	if err != nil {
 		b.writeMu.Unlock()
-		return err
+		return false, err
 	}
 	if after == nil {
 		after = []TargetStruct{}
+	}
+	if slices.Equal(before, after) {
+		b.writeMu.Unlock()
+		return false, nil
 	}
 	// The change is stored before it commits: a write the store refuses
 	// changes nothing, as a matter.js transaction whose persistence fails
@@ -418,7 +440,7 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 	if b.save != nil {
 		if err := b.save(slices.Clone(after)); err != nil {
 			b.writeMu.Unlock()
-			return fmt.Errorf("core: Binding persist: %w", err)
+			return false, fmt.Errorf("core: Binding persist: %w", err)
 		}
 	}
 	b.mu.Lock()
@@ -426,7 +448,7 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 	b.mu.Unlock()
 	b.writeMu.Unlock()
 	b.notify(origin, before, after)
-	return nil
+	return true, nil
 }
 
 // SetAttributes implements [spec.AttributeSetter]: the host's own change
@@ -459,7 +481,8 @@ func (b *Binding) SetAttributes(values map[uint32]any) error {
 	if !set {
 		return nil
 	}
-	return b.replace(contract.OriginHostSet, func([]TargetStruct) ([]TargetStruct, error) { return list, nil })
+	_, err := b.replace(contract.OriginHostSet, func([]TargetStruct) ([]TargetStruct, error) { return list, nil })
+	return err
 }
 
 // Handle implements [spec.CommandRegistrar]. Binding has no command, so

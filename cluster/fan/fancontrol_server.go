@@ -449,6 +449,18 @@ func nullableCapped(v *uint8, ceiling uint8) (any, bool) {
 // ([Server.bumpIfChanged]): a value written over itself and a null
 // PercentSetting or SpeedSetting leave it.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when the fan the host reports
+// after it differs from before it — the comparison that advances the
+// server's own version ([Server.bumpIfChanged]), so the two agree. The
+// fan's state is the host's, read through its source: a change the host
+// makes while the write runs counts as the write's (a version advanced
+// once more, never one missed for a write that changed the fan).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	before := s.src.FanState()
 	var err error
 	if attrID == AttrFanMode {
@@ -457,10 +469,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		err = s.writeChecked(ctx, attrID, value)
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
-	s.bumpIfChanged(before)
-	return nil
+	return s.bumpIfChanged(before), nil
 }
 
 // writeChecked applies a write the definition has checked.
@@ -707,11 +718,14 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 // changes no attribute. Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
 // :1476-1481 at db021da0 (#noteIfChanged returns for an equal value; the
-// version advances only when the commit changed something).
-func (s *Server) bumpIfChanged(before fanState) {
-	if !sameFanState(before, s.src.FanState()) {
-		s.tracker().Bump()
+// version advances only when the commit changed something). It returns
+// whether it advanced.
+func (s *Server) bumpIfChanged(before fanState) (changed bool) {
+	if sameFanState(before, s.src.FanState()) {
+		return false
 	}
+	s.tracker().Bump()
+	return true
 }
 
 // sameFanState reports whether a and b observe the same fan, the nullable

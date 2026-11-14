@@ -768,6 +768,12 @@ func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error 
 	return err
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke answers Pause, Stop, Start, Resume and GoHome with an
 // OperationalCommandResponse. Each command is first checked against the
 // current state as matter.js OperationalStateUtils checks it; a command

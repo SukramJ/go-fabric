@@ -211,6 +211,7 @@ type pendingSceneApply struct {
 var (
 	_ contract.ClusterServer                  = (*Server)(nil)
 	_ contract.ClusterDataVersion             = (*Server)(nil)
+	_ contract.ChangeReportingWriter          = (*Server)(nil)
 	_ contract.ClusterAttributeLister         = (*Server)(nil)
 	_ contract.ClusterCommandLister           = (*Server)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*Server)(nil)
@@ -719,15 +720,23 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) { return s.srv.MatterRead
 // countdown; one that parks the running countdown's attribute at 0 or
 // 0xFFFF stops it (OnOffServer.ts:52-58, #stopHeldTimer :71-84).
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite] with the generated server's verdict.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	s.op.Lock()
 	defer s.op.Unlock()
-	if err := s.srv.MatterWrite(ctx, attrID, value); err != nil {
-		return err
+	changed, err := s.srv.MatterWriteChanged(ctx, attrID, value)
+	if err != nil {
+		return false, err
 	}
 	if s.lighting && (attrID == AttrOnTime || attrID == AttrOffWaitTime) {
 		s.stopHeldTimer()
 	}
-	return nil
+	return changed, nil
 }
 
 // stopHeldTimer is OnOffServer.ts:71-84; the caller holds s.op.

@@ -579,6 +579,10 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
+	// The dispatcher records which written attributes changed nothing
+	// (endpoint.WriteChanges); their report is left out.
+	changes := &endpointpkg.WriteChanges{}
+	writeCtx = endpointpkg.WithWriteChanges(writeCtx, changes)
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
 	// An interaction that ended at a data element (im.WriteResponse.Status)
 	// ends the transaction: the elements before it were written and are
@@ -587,11 +591,11 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	// (InteractionMessenger.ts:431-460 at db021da0).
 	if !resp.Status.IsSuccess() {
 		b.endWriteInteraction(txKey)
-		b.reportWrittenAttributes(resp)
+		b.reportWrittenAttributes(resp, changes)
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
 	}
 	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
-	b.reportWrittenAttributes(resp)
+	b.reportWrittenAttributes(resp, changes)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
@@ -912,10 +916,20 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 // to fire a change notification of its own; a root attribute such as
 // BasicInformation.NodeLabel was never reported at all. Found by the CHIP
 // Python harness (TC-IDM-2.3 step 4).
-func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse) {
+//
+// An attribute changes records as unchanged — every write of it in the
+// interaction left the cluster as it was, by its server's verdict
+// (contract.ChangeReportingWriter) — is not marked: matter.js broadcasts
+// only the properties a commit changed and advances no version for an
+// equal value (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+// :1479 at db021da0), and the dispatcher left the version as it was.
+func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse, changes *endpointpkg.WriteChanges) {
 	mgr := b.subscriptionManagerLocked()
 	for _, r := range resp.Responses {
 		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
+			continue
+		}
+		if changes.Unchanged(r.Path) {
 			continue
 		}
 		if mgr != nil {

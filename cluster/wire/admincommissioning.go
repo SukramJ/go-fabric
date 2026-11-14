@@ -384,6 +384,12 @@ func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint3
 	return err
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (a *AdministratorCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, a.MatterWrite(ctx, attrID, value)
+}
+
 // assertNoCommissioningInProgress is Busy while the fail-safe is armed
 // or an administrator's window is open, and without a controller to
 // open one. Mirrors matter.js

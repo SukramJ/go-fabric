@@ -154,7 +154,8 @@ type ClusterCommandLister interface {
 // on every AttributeDataIB returned for that cluster. Without this
 // capability the endpoint keeps the cluster's version: every (endpoint,
 // cluster) has one, which the stack advances on every change it sees — a
-// write, a change the server reports, a command that moved an attribute.
+// write that changed a value ([ChangeReportingWriter]), a change the
+// server reports, a command that moved an attribute.
 // A server of the root or the Aggregator that implements it advances its
 // own; a bridged endpoint's servers are versioned by the endpoint always.
 //
@@ -166,6 +167,38 @@ type ClusterDataVersion interface {
 	// write's DataVersion are compared with it whatever it is (review II,
 	// decision 46). [DataVersionTracker] skips 0 when it wraps.
 	MatterDataVersion() uint32
+}
+
+// ChangeReportingWriter is the optional capability a [ClusterServer]
+// implements to say whether a controller's write changed anything. The
+// endpoint dispatcher calls MatterWriteChanged instead of MatterWrite
+// when a server implements it: a successful write that changed nothing
+// advances no DataVersion and is reported to no subscriber, as matter.js
+// advances a datasource's version only for a commit that changed a value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0) and holds an equal value as no change (:1479, oldval ===
+// newval or isDeepEqual). A server without it is taken to have changed
+// something with every successful write: its cluster's version advances
+// and the written attribute is reported.
+//
+// The verdict is the write's own: the server decides it while it applies
+// the value, under whatever serialises its state, so a change another
+// writer makes around the write — a host's Set, a second controller, a
+// timer — never stands in for it. A server with its own
+// [ClusterDataVersion] advances that version exactly when it answers
+// changed.
+//
+// A type that embeds a server implementing this and declares its own
+// MatterWrite declares its own MatterWriteChanged as well: the promoted
+// method would apply the write without the type's MatterWrite.
+type ChangeReportingWriter interface {
+	// MatterWriteChanged applies the write as MatterWrite does and
+	// reports whether it changed any attribute of the cluster — the
+	// written one or another the write moves with it (FanMode moves
+	// PercentSetting). A list written as the list the server holds is no
+	// change; an appended element always is. changed is ignored with a
+	// non-nil err: a refused write has changed nothing.
+	MatterWriteChanged(ctx context.Context, attrID uint32, value any) (changed bool, err error)
 }
 
 // ClusterEventLister is the optional capability a

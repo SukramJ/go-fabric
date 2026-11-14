@@ -447,16 +447,27 @@ func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { 
 
 // MatterWrite accepts NodeLabel only; Reachable updates flow through
 // [BridgedDeviceBasicInformation.SetReachable] from the bridge core.
-func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID uint32, value any) error {
+func (b *BridgedDeviceBasicInformation) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := b.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [BridgedDeviceBasicInformation.MatterWrite], changed when the
+// NodeLabel differs from the one held — the comparison, made under the
+// lock that stores it, that advances the server's own version (matter.js
+// Datasource.ts:1456-1457, :1479 at db021da0). OnNodeLabelWrite receives
+// every accepted NodeLabel, an unchanged one too.
+func (b *BridgedDeviceBasicInformation) MatterWriteChanged(_ context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bridgedBasicInfoAttrNodeLabel {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 		_, err := b.inst().ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBridgedBasicInfoUnknown, attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBridgedBasicInfoUnknown, attrID), status: err}
 	}
 	s, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
+		return false, fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 	}
 	// NodeLabel is BasicInformation's by reference
 	// (bridged-device-basic-information.element.ts:30 at 862ad75f), "max
@@ -467,19 +478,22 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 	// 862ad75f (ConstraintError, "String length of … is not within
 	// bounds"); the refusal used to surface as FAILURE.
 	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
-		return refusedWrite{sentinel: fmt.Errorf("core: BridgedDeviceBasicInformation NodeLabel write of %d bytes", len(s)), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: BridgedDeviceBasicInformation NodeLabel write of %d bytes", len(s)), status: err}
 	}
 	b.mu.Lock()
+	changed := b.nodeLabel != s
 	b.nodeLabel = s
 	hook := b.onNodeLabelWrite
 	b.mu.Unlock()
 	if hook != nil {
 		hook(s)
 	}
-	// Bump DataVersion after a successful NodeLabel mutation so
-	// DataVersionFilter evaluation correctly detects the cluster changed.
-	b.dataVersion.Bump()
-	return nil
+	// A changed NodeLabel advances DataVersion so DataVersionFilter
+	// evaluation detects the cluster changed.
+	if changed {
+		b.dataVersion.Bump()
+	}
+	return changed, nil
 }
 
 // MatterInvoke always rejects — BridgedDeviceBasicInformation has no

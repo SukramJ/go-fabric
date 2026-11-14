@@ -154,6 +154,12 @@ func (s *SchedulesServer) MatterWrite(_ context.Context, attrID uint32, _ any) e
 	return spec.Errorf(im.StatusUnsupportedWrite, "%w: attribute 0x%04X", ErrSchedulesReadOnly, attrID)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *SchedulesServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke implements [contract.ClusterServer]. All invocations
 // are rejected: the Schedules cluster exposes no commands in the v1.1 bridge.
 func (s *SchedulesServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {

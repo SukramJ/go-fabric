@@ -1037,6 +1037,12 @@ func (p *PushTransport) MatterWrite(ctx context.Context, attrID uint32, value an
 	return p.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (p *PushTransport) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return p.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches an accepted command; a host's handler runs in
 // its place ([spec.SelfHeld.Handle]).
 func (p *PushTransport) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

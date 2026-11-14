@@ -143,6 +143,7 @@ type Server struct {
 var (
 	_ contract.ClusterServer                  = (*Server)(nil)
 	_ contract.ClusterDataVersion             = (*Server)(nil)
+	_ contract.ChangeReportingWriter          = (*Server)(nil)
 	_ contract.ClusterAttributeLister         = (*Server)(nil)
 	_ contract.ClusterCommandLister           = (*Server)(nil)
 	_ contract.ClusterEventLister             = (*Server)(nil)
@@ -308,15 +309,25 @@ func (s *Server) peers(attrID uint32) (any, bool) { return s.MatterRead(attrID) 
 // Sink, each handed the value in its stored form; then the value is
 // stored, and a change bumps the data version and is notified.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the write
+// of [Server.MatterWrite], and whether its store changed the value — the
+// comparison that bumps the data version, made under the lock that stores
+// it (matter.js Datasource.ts:1479 at db021da0: an equal value, a list
+// deep-equal to the one held included, is no change).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.ValidateWrite(attrID, value, s.peers)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// A struct's fields are held to their conformance as well (matter.js
 	// validates the written state,
 	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
 	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
-		return err
+		return false, err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	s.mu.Lock()
@@ -326,16 +337,15 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		if err := veto(ctx, attrID, v); err != nil {
 			// As given: its IM status when it carries one, FAILURE
 			// otherwise (the dispatcher reads no status from the text).
-			return err
+			return false, err
 		}
 	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
-			return err
+			return false, err
 		}
 	}
-	s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v})
-	return nil
+	return s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v}), nil
 }
 
 // Set records a change the device made to attrID. The value is checked
@@ -460,8 +470,9 @@ func defaultOf(t Type, d any) (any, bool) {
 	return nil, false
 }
 
-// store keeps values and reports the ones that changed, from origin.
-func (s *Server) store(origin contract.Origin, values map[uint32]any) {
+// store keeps values and reports the ones that changed, from origin; it
+// returns whether any changed.
+func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 	var changed []uint32
 	s.mu.Lock()
 	for id, v := range values {
@@ -473,11 +484,12 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) {
 	}
 	s.mu.Unlock()
 	if len(changed) == 0 {
-		return
+		return false
 	}
 	slices.Sort(changed)
 	s.tracker().Bump()
 	s.NotifyFrom(origin, changed...)
+	return true
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command

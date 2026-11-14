@@ -204,6 +204,12 @@ func (s *MicrowaveServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *MicrowaveServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches an accepted command: the host's handler where
 // it registered one ([spec.SelfHeld]), the server's own otherwise.
 func (s *MicrowaveServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

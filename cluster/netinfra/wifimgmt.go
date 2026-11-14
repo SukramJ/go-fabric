@@ -282,6 +282,12 @@ func (s *WiFiManagementServer) MatterWrite(ctx context.Context, attrID uint32, v
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *WiFiManagementServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke implements [contract.ClusterServer]: a host's handler
 // first ([spec.SelfHeld.Handle]), then the server's own.
 func (s *WiFiManagementServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

@@ -632,6 +632,12 @@ func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value
 	return refusedWrite{sentinel: fmt.Errorf("core: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (g *GeneralDiagnostics) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, g.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke handles GeneralDiagnostics commands per Matter §11.12.7.
 //
 // Implemented:

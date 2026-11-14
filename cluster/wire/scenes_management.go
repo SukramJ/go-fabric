@@ -72,6 +72,12 @@ func (ScenesManagement) MatterWrite(_ context.Context, attrID uint32, _ any) err
 	return spec.Errorf(im.StatusUnsupportedWrite, "%w: attrID 0x%04X", errScenesStub, attrID)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke rejects every command with a typed UnsupportedCommand
 // (0x81); errScenesStub alone would answer StatusFailure (0x01).
 // matter.js `packages/node/src/behaviors/scenes-management/` + chip

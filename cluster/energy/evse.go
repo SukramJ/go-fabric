@@ -1428,6 +1428,12 @@ func (s *EvseServer) MatterWrite(ctx context.Context, attrID uint32, value any) 
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *EvseServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches the commands — to the host's handler when one
 // is registered ([spec.SelfHeld.Handle]).
 func (s *EvseServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

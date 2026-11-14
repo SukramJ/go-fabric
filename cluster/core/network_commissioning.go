@@ -243,13 +243,22 @@ func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 // packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0 (a commit that changed a value calls advanceVersion).
 func (n *NetworkCommissioning) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := n.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [NetworkCommissioning.MatterWrite], changed when it moved
+// InterfaceEnabled — the comparison that advances the server's own
+// version.
+func (n *NetworkCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != netcommAttrInterfaceEnabled {
 		_, err := netcommInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(bool)
 	if !ok {
-		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
+		return false, fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
 	n.mu.Lock()
 	changed := n.interfaceEnabled != v
@@ -261,7 +270,7 @@ func (n *NetworkCommissioning) MatterWrite(ctx context.Context, attrID uint32, v
 	if changed {
 		n.changes.NotifyFrom(contract.OriginFrom(ctx), netcommAttrNetworks)
 	}
-	return nil
+	return changed, nil
 }
 
 // SetAttributes implements [spec.AttributeSetter] for the one attribute

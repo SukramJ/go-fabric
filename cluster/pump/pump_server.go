@@ -33,6 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sync"
 
@@ -522,13 +523,26 @@ func nullableUint32(v *uint32, ceiling uint32) any {
 // supported enum value or a value inside the nullable range — and the
 // setter the host implements applies it.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when the pump the host reports
+// after it differs from before it, which is when the server's own version
+// advances — matter.js advances it only for a commit that changed a value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+// :1479 at db021da0). The state is the host's, read through its source,
+// as FanControl's write reads it (cluster/fan Server.MatterWriteChanged).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, attrID, storedForm(attrID, v)); err != nil {
-		return err
+		return false, err
 	}
+	before := s.src.PumpState()
 	n, _ := v.(uint64) // an enum8 or a counter per ValidateWrite; nil for null
 	switch attrID {
 	case AttrOperationMode:
@@ -544,10 +558,13 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		err = setter.SetLifetimeEnergyConsumed(ctx, counter(v))
 	}
 	if err != nil {
-		return fmt.Errorf("pump: attribute 0x%04X write: %w", attrID, err)
+		return false, fmt.Errorf("pump: attribute 0x%04X write: %w", attrID, err)
+	}
+	if reflect.DeepEqual(s.src.PumpState(), before) {
+		return false, nil
 	}
 	s.tracker().Bump()
-	return nil
+	return true, nil
 }
 
 // storedForm is a value [spec.Instance.ValidateWrite] normalised, in the

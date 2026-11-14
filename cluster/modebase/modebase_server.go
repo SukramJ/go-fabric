@@ -676,6 +676,12 @@ func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error 
 	return err
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke answers ChangeToMode with a ChangeToModeResponse where the
 // definition accepts it (MicrowaveOvenMode's does not).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

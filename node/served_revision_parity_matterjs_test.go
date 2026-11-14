@@ -41,6 +41,14 @@ import (
 // outside the list is a report for an attribute AttributeList does not
 // name (W3-clucore-11 was one). The listed attributes that answer no read
 // at this revision are pinned in unansweredWithDefaults, exactly.
+//
+// And every server says whether a controller's write changed anything
+// (contract.ChangeReportingWriter, review II owner decision 78): a server
+// without it advances its cluster's DataVersion and reports the written
+// attribute after every successful write, an unchanged one included,
+// where matter.js changes nothing (Datasource.ts:1456-1457 at db021da0).
+// OperationalCredentials is the one exception: every write to it is
+// refused, so no verdict is ever asked for.
 func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 	t.Parallel()
 	type served struct {
@@ -76,6 +84,9 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 		id := s.srv.MatterClusterID()
 		clusters[id] = true
 		js := paritytest.ClusterSnapshot(t, id)
+		if _, ok := s.srv.(contract.ChangeReportingWriter); !ok && id != operationalCredentialsClusterID {
+			t.Errorf("%s: %s (0x%04X) %T does not say whether a write changed anything (contract.ChangeReportingWriter)", s.where, js.Name, id, s.srv)
+		}
 		rev, ok := readUint(s.srv, cluster.AttrGlobalClusterRevision)
 		if !ok || rev != uint64(js.Revision) {
 			t.Errorf("%s: %s (0x%04X) answers ClusterRevision %v (%v), matter.js %d", s.where, js.Name, id, rev, ok, js.Revision)
@@ -125,6 +136,10 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 	}
 	t.Logf("%d servers of %d clusters read (root, %d device types; %d need declarations)", len(all), len(clusters), built, refused)
 }
+
+// operationalCredentialsClusterID is OperationalCredentials (0x003E),
+// whose every write is refused.
+const operationalCredentialsClusterID = 0x003E
 
 // unansweredWithDefaults are the listed attributes that answer no read at
 // this revision, as "<where> <cluster> <cluster id>:<attribute id>" —

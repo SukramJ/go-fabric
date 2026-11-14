@@ -536,17 +536,26 @@ func (e otaStatusError) MatterStatusCode() im.StatusCode { return e.code }
 // is writable: a fabric-scoped list, so the written entries replace the
 // accessing fabric's, stamped with its FabricIndex.
 func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := r.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [OTASoftwareUpdateRequestor.MatterWrite], changed when the
+// providers list after it differs from before — the comparison that
+// advances the server's own version and reports the change.
+func (r *OTASoftwareUpdateRequestor) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != otadef.AttrDefaultOtaProviders {
 		_, err := r.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("core: OtaSoftwareUpdateRequestor attribute 0x%04X is not writable", attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: OtaSoftwareUpdateRequestor attribute 0x%04X is not writable", attrID), status: err}
 	}
 	_, fabric := im.FabricFilterFromContext(ctx)
 	if fabric == 0 {
-		return otaStatusError{im.StatusUnsupportedAccess, "DefaultOTAProviders written without an accessing fabric"}
+		return false, otaStatusError{im.StatusUnsupportedAccess, "DefaultOTAProviders written without an accessing fabric"}
 	}
 	written, ok := value.(spec.List[otadef.ProviderLocation])
 	if !ok {
-		return otaStatusError{im.StatusConstraintError, fmt.Sprintf("DefaultOTAProviders value %T", value)}
+		return false, otaStatusError{im.StatusConstraintError, fmt.Sprintf("DefaultOTAProviders value %T", value)}
 	}
 	entries := make(spec.List[otadef.ProviderLocation], len(written))
 	for i, e := range written {
@@ -554,7 +563,7 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 		entries[i] = e
 	}
 	if _, err := r.ValidateWrite(attrID, entries, nil); err != nil {
-		return err
+		return false, err
 	}
 
 	r.mu.Lock()
@@ -571,7 +580,7 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 	seen := map[uint8]bool{}
 	for _, p := range next {
 		if seen[p.FabricIndex] {
-			return otaStatusError{im.StatusConstraintError, fmt.Sprintf("Only one defaultOtaProviders entry per FabricIndex %d is allowed.", p.FabricIndex)}
+			return false, otaStatusError{im.StatusConstraintError, fmt.Sprintf("Only one defaultOtaProviders entry per FabricIndex %d is allowed.", p.FabricIndex)}
 		}
 		seen[p.FabricIndex] = true
 	}
@@ -582,7 +591,7 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 			rows[i] = store.OTAProviderLocation{FabricIndex: fabric, ProviderNodeID: e.ProviderNodeId, Endpoint: e.Endpoint}
 		}
 		if err := r.cfg.Store.ReplaceDefaultOTAProviders(context.WithoutCancel(ctx), fabric, rows); err != nil {
-			return otaStatusError{im.StatusFailure, err.Error()}
+			return false, otaStatusError{im.StatusFailure, err.Error()}
 		}
 	}
 	r.mu.Lock()
@@ -595,12 +604,12 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 	// for a changed value (Datasource.ts:1476-1492 at db021da0,
 	// #noteIfChanged).
 	if slices.Equal(before, next) {
-		return nil
+		return false, nil
 	}
 	r.dv.Bump()
 	r.NotifyFrom(contract.OriginControllerWrite, otadef.AttrDefaultOtaProviders)
 	r.handleUpdatedDefaultOtaProviders(ctx, fabric, entries)
-	return nil
+	return true, nil
 }
 
 // handleUpdatedDefaultOtaProviders mirrors #handleUpdatedDefaultOtaProviders

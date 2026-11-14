@@ -198,6 +198,12 @@ func (s *Groups) MatterWrite(_ context.Context, attrID uint32, value any) error 
 	return refusedWrite{sentinel: fmt.Errorf("core: Groups attribute 0x%04X is read-only", attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *Groups) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterReportable implements [contract.ClusterServer].
 func (s *Groups) MatterReportable() []uint32 { return []uint32{groupsAttrNameSupport} }
 

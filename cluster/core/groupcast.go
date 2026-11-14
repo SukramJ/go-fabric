@@ -438,6 +438,12 @@ func (g *Groupcast) MatterWrite(_ context.Context, attrID uint32, _ any) error {
 	return spec.Errorf(im.StatusUnsupportedWrite, "core: Groupcast attribute 0x%04X is read-only", attrID)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (g *Groupcast) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, g.MatterWrite(ctx, attrID, value)
+}
+
 // MatterReportable implements [contract.ClusterServer].
 func (g *Groupcast) MatterReportable() []uint32 {
 	return []uint32{
