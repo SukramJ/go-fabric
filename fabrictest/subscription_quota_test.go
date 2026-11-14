@@ -32,16 +32,37 @@ func onOffSubscription(ep uint16) interaction.SubscribeRequest {
 	}
 }
 
-// openSubscriptions opens n subscriptions for p and fails the test when
-// one is refused.
-func openSubscriptions(ctx context.Context, t *testing.T, p *fabrictest.Pair, ep uint16, n int) {
+// openSubscriptions opens n subscriptions req for p and fails the test
+// when one is refused.
+func openSubscriptions(ctx context.Context, t *testing.T, p *fabrictest.Pair, req interaction.SubscribeRequest, n int) {
 	t.Helper()
 	for i := range n {
-		sub, err := fabrictest.Subscribe(ctx, p, onOffSubscription(ep))
+		sub, err := fabrictest.Subscribe(ctx, p, req)
 		if err != nil {
 			t.Fatalf("subscription %d of %d: %v", i+1, n, err)
 		}
 		t.Cleanup(sub.Close)
+	}
+}
+
+// letPass lets d pass on the site's clock the way [fabrictest.Site.Run]
+// moves it: to its next deadline each time the site is quiet, until d has
+// passed, and then until the site is quiet again. A report that falls due
+// on the way is acknowledged before the clock moves on. One
+// [fabrictest.Site.Step] over d does not give that: the advance fires the
+// report's timer and, in the same call, every retransmission timer the
+// report arms behind it ([clocktest.Fake.Advance]), before the peer's
+// acknowledgement can arrive, and the device ends the subscription for a
+// peer it takes for unreachable.
+func letPass(ctx context.Context, t *testing.T, site *fabrictest.Site, d time.Duration) {
+	t.Helper()
+	until := site.Fake().Now().Add(d)
+	passed := func() bool { return !site.Fake().Now().Before(until) }
+	if err := site.Eventually(ctx, "the site's clock to pass "+d.String(), passed); err != nil {
+		t.Fatal(err)
+	}
+	if err := site.Settle(ctx); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -62,7 +83,7 @@ func TestFabricAtItsSubscriptionQuotaMakesRoom(t *testing.T) {
 	if err := p.Grant(ctx, store.PrivilegeView); err != nil {
 		t.Fatal(err)
 	}
-	openSubscriptions(ctx, t, p, ep, subscription.DefaultMaxSubscriptionsPerFabric)
+	openSubscriptions(ctx, t, p, onOffSubscription(ep), subscription.DefaultMaxSubscriptionsPerFabric)
 	if got := p.Device.Node().Subscriptions().Active(); got != subscription.DefaultMaxSubscriptionsPerFabric {
 		t.Fatalf("the device holds %d subscriptions, want the fabric's quota %d", got, subscription.DefaultMaxSubscriptionsPerFabric)
 	}
@@ -104,15 +125,15 @@ func TestSubscriptionEndsWhenItsSubjectReadsNothing(t *testing.T) {
 	if err := p.Grant(ctx, store.PrivilegeView); err != nil {
 		t.Fatal(err)
 	}
-	const n = 3
-	openSubscriptions(ctx, t, p, ep, n)
+	// A report every five seconds at the latest, so the test's clock has
+	// few deadlines to walk ([letPass]).
+	const n, maxInterval = 3, 5 * time.Second
+	req := onOffSubscription(ep)
+	req.MaxIntervalCeiling = interaction.Interval(maxInterval)
+	openSubscriptions(ctx, t, p, req, n)
 	step := func() {
 		t.Helper()
-		for range 2 {
-			if err := site.Step(ctx, time.Minute); err != nil {
-				t.Fatalf("step: %v", err)
-			}
-		}
+		letPass(ctx, t, site, 2*maxInterval)
 	}
 	step() // the keep-alives of a subject that may read its path
 	if got := p.Device.Node().Subscriptions().Active(); got != n {
@@ -206,9 +227,7 @@ func TestChunkedACLRewriteKeepsTheFabricsSubscriptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 4 {
-		if err := site.Step(ctx, 5*time.Second); err != nil {
-			t.Fatal(err)
-		}
+		letPass(ctx, t, site, 5*time.Second)
 		if got := p.Device.Node().Subscriptions().Active(); got != 1 {
 			t.Fatalf("between the chunks of the ACL rewrite the device holds %d subscriptions, want 1", got)
 		}
@@ -231,9 +250,7 @@ func TestChunkedACLRewriteKeepsTheFabricsSubscriptions(t *testing.T) {
 		}
 	}
 	for range 2 {
-		if err := site.Step(ctx, 5*time.Second); err != nil {
-			t.Fatal(err)
-		}
+		letPass(ctx, t, site, 5*time.Second)
 	}
 	if got := p.Device.Node().Subscriptions().Active(); got != 1 {
 		t.Fatalf("after the ACL rewrite the device holds %d subscriptions, want 1", got)
