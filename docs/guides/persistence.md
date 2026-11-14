@@ -136,8 +136,8 @@ idempotent.
 
 | Table | Since | Holds |
 | --- | --- | --- |
-| `matter_fabrics` | v1 (v0.1.0) | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id |
-| `matter_node_identities` | v1 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it |
+| `matter_fabrics` | v1 (v0.1.0), columns added in v8 | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id; since v8 its commit state (`pending`: 0 committed, 1 an uncommitted AddNOC, 2 an uncommitted UpdateNOC), its VID verification statement and VVSC, and while it is 2 the node id, vendor id and VID data the UpdateNOC replaced |
+| `matter_node_identities` | v1, columns added in v8 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is, in clear) |
 | `matter_group_keys` | v1 | group key sets per fabric, up to three epoch keys |
 | `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
@@ -164,7 +164,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-349`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql:18-390`, `store/migrations.go:43-62`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
 
 ### Settings keys
 
@@ -189,7 +189,7 @@ facade's own state.
 | `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
-| `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
+| `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric, hex; since v8 the data belongs in `matter_fabrics` (`UpdateFabricVIDVerification`), and `store.Upgrade` moves every such key into its fabric's columns and deletes it |
 | `operational_credentials.pending_noc`, `operational_credentials.pending_noc_update` | `cluster/core` | what an AddNOC (the first key: the new fabric's id and root key, then the index the store assigned it, written before its identity) or an UpdateNOC (the second key: the replaced credentials, private key included) wrote that CommissioningComplete has not committed, as JSON; written ahead of the command's first store write, cleared at CommissioningComplete or once the fail-safe's rollback has landed in full — a rollback with a failed read or write keeps it and is retried at the next expiry, arm, CommissioningComplete (which writes it back if it cleared it), AddNOC or UpdateNOC (before either reads the fabric table) and at the next start; an UpdateNOC's rollback whose fabric was removed meanwhile has nothing left to restore and is settled without a write. Each key holds one marker, so an AddNOC admitted after a failed UpdateNOC in the same fail-safe keeps the update's. GeneralCommissioning clears both through its `Settings` before CommissioningComplete answers — it reads both before it clears either, and clears the AddNOC's first: when a read or a clear fails, it writes back what it had cleared, CommissioningComplete answers FAILURE and the fail-safe stays armed. It clears them with two writes, so a node that goes down between the two clears, before it answers, comes back with the AddNOC committed and the UpdateNOC rolled back. A node that finds it at start rolls back what it names before it reads its fabrics — an AddNOC's fabric by that index, or, when the index was never written, the fabric with that id and root key only if it has no identity yet, so a marker an AddNOC refused by the store left never removes a committed fabric; empty when no fail-safe window is open |
 | `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion |
 | `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
@@ -231,7 +231,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:250-256`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:274-280`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 
@@ -262,13 +262,18 @@ Each schema ships three ways:
 - **`Apply`** runs the whole DDL. It is idempotent and safe on every boot.
   `store.Apply` then runs `store.Upgrade`, which rebuilds what an
   idempotent `CREATE` cannot change (the v3 rebuild of
-  `matter_group_key_map`).
+  `matter_group_key_map`, v8's added columns) and moves data an earlier
+  release kept elsewhere (the VID settings into `matter_fabrics`). A host
+  that runs `Migrations()` with its own tool calls `store.Upgrade` once
+  after it, for the moves.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
   `len(Migrations())` and the last version, so the next release's new step
   fails the pin at the dependency bump instead of at a live write. `v3`'s
-  `Down` is lossy.
+  `Down` is lossy; `v8`'s rolls every pending fabric back first (an
+  uncommitted AddNOC's fabric is deleted, which needs the foreign-key
+  pragma for its cascade) and writes the VID data back into the settings.
 - **`SchemaFingerprint(db)`** hashes the module's tables and indexes as
   SQLite records them. Compare it with the value the CHANGELOG records for
   the release to know your tables match. A host's own tables and indexes
@@ -282,7 +287,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-90`, `store/migrations.go:22-123`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-106`, `store/migrations.go:22-128`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
@@ -299,5 +304,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-39`, `store/schema.sql:48-57`, `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-39`, `store/schema.sql:64-78`, `examples/reference-controller/README.md` (The database).*
 

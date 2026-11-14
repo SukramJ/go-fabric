@@ -88,7 +88,7 @@ key that is not beside the data, is an open architecture question of the
 2026-11 review. Nothing on this page promises it; protect the file as the
 keys it holds.
 
-*Source: `store/schema.sql:171-175`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
+*Source: `store/schema.sql:195-199`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side
 

@@ -46,9 +46,17 @@ import "context"
 // context, so a backend stores records, not opaque values.
 
 // Fabrics is the fabric table (Matter §11.18.5, FabricDescriptorStruct).
-// AddFabric allocates the index from the persisted next-fabric-index
-// counter when the record carries none.
+// Each row carries its own commit state ([FabricPending]): an AddNOC or
+// UpdateNOC writes its fabric at once and marks the row, CommissioningComplete
+// commits it, a fail-safe expiry or a start-up rolls it back — so the state
+// can never disagree with the row it describes, and it leaves with the row.
 type Fabrics interface {
+	// AddFabric inserts rec and returns its index: the record's, or one
+	// allocated from the persisted next-fabric-index counter when the
+	// record carries none. The row takes rec.Pending as given —
+	// [FabricCommitted], or [FabricPendingAdd] for an AddNOC that
+	// CommissioningComplete has not committed; [FabricPendingUpdate] or an
+	// unknown state is refused and nothing is inserted.
 	AddFabric(ctx context.Context, rec FabricRecord) (uint8, error)
 	// GetFabric returns [ErrFabricNotFound] for an index the table does
 	// not hold.
@@ -58,8 +66,16 @@ type Fabrics interface {
 	UpdateFabricLabel(ctx context.Context, fabricIndex uint8, label string) error
 	UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error
 	UpdateFabricNodeID(ctx context.Context, fabricIndex uint8, nodeID uint64) error
+	// UpdateFabricVIDVerification replaces the fabric's VID verification
+	// statement and VVSC (nil or empty: none), both in one write. The data
+	// is part of the row: it leaves with the row, and on a
+	// [FabricPendingUpdate] row it changes the live values only, so a
+	// rollback restores the ones the UpdateNOC found. It does not change
+	// the row's [FabricPending] state. Returns [ErrFabricNotFound] for an
+	// index the table does not hold.
+	UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error
 	// RemoveFabric removes the fabric and every row it owns; see the
-	// cascade above.
+	// cascade above. A pending row is removed like any other.
 	RemoveFabric(ctx context.Context, fabricIndex uint8) error
 }
 

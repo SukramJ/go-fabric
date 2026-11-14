@@ -27,6 +27,15 @@
 -- Subscribe-Initial ReportData stream. root_public_key is kept alongside it
 -- as a cache: it is extractable from root_cert but is read on every Sigma1
 -- lookup and on the CompressedFabricID HKDF (Matter §4.13.2.4).
+--
+-- pending is the row's commit state (v8, store.FabricPending): 0 committed,
+-- 1 installed by an AddNOC that CommissioningComplete has not committed,
+-- 2 credentials replaced by an UpdateNOC not yet committed. vid_statement
+-- and vvsc are the fabric's VID verification data (NULL = none). The prior_*
+-- columns hold, while pending is 2, the values the UpdateNOC replaced;
+-- they are NULL otherwise. The columns follow root_cert in the order v8's
+-- ALTER TABLE statements add them, so a database built by Migrations and
+-- one built here hold the same table text (SchemaFingerprint).
 CREATE TABLE IF NOT EXISTS matter_fabrics (
     fabric_index    INTEGER PRIMARY KEY CHECK(fabric_index BETWEEN 1 AND 254),
     fabric_id       BLOB    NOT NULL,
@@ -37,7 +46,14 @@ CREATE TABLE IF NOT EXISTS matter_fabrics (
     compressed_id   BLOB    NOT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    root_cert       BLOB
+    root_cert       BLOB,
+    pending INTEGER NOT NULL DEFAULT 0 CHECK(pending BETWEEN 0 AND 2),
+    vid_statement BLOB,
+    vvsc BLOB,
+    prior_node_id BLOB,
+    prior_vendor_id INTEGER CHECK(prior_vendor_id BETWEEN 0 AND 65535),
+    prior_vid_statement BLOB,
+    prior_vvsc BLOB
 );
 
 -- (fabric_id, root_public_key) is unique per Matter §11.18.5: the same
@@ -54,6 +70,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS matter_fabrics_id_root
 -- handshake keys on the derived operational IPK instead — see
 -- sigma.DeriveOperationalIPK — so a reader must not feed this column
 -- straight into sigma.Identity.
+--
+-- prior_noc, prior_icac and prior_private_key (v8) hold, while the
+-- fabric's row is pending 2, the credentials an uncommitted UpdateNOC
+-- replaced; NULL otherwise. prior_private_key is stored as private_key is,
+-- as-is (store.IdentityRecord.PrivateKey).
 CREATE TABLE IF NOT EXISTS matter_node_identities (
     fabric_index    INTEGER PRIMARY KEY,
     noc             BLOB    NOT NULL,
@@ -61,6 +82,9 @@ CREATE TABLE IF NOT EXISTS matter_node_identities (
     private_key     BLOB    NOT NULL,
     ipk             BLOB    NOT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    prior_noc BLOB,
+    prior_icac BLOB,
+    prior_private_key BLOB,
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 

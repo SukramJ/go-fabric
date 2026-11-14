@@ -20,7 +20,18 @@ import (
 func cloneFabric(f store.FabricRecord) store.FabricRecord {
 	f.RootPublicKey = bytes.Clone(f.RootPublicKey)
 	f.RootCert = bytes.Clone(f.RootCert)
+	f.VIDVerificationStatement = cloneNoneIfEmpty(f.VIDVerificationStatement)
+	f.VVSC = cloneNoneIfEmpty(f.VVSC)
 	return f
+}
+
+// cloneNoneIfEmpty copies b, an empty slice becoming nil: SQLite stores the
+// VID data's none as NULL, which reads back nil.
+func cloneNoneIfEmpty(b []byte) []byte {
+	if len(b) == 0 {
+		return nil
+	}
+	return bytes.Clone(b)
 }
 
 func cloneIdentity(r store.IdentityRecord) store.IdentityRecord {

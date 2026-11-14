@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // FabricRecord mirrors the Fabric Descriptor from Matter Core Spec
@@ -52,6 +53,49 @@ type FabricRecord struct {
 	// CompressedID is the 8-byte compressed fabric identifier
 	// (HKDF over RootPublicKey + FabricID per §4.13.2.4).
 	CompressedID [8]byte
+	// Pending is the row's commit state. [Fabrics.AddFabric] takes
+	// [FabricCommitted] or [FabricPendingAdd]; afterwards only
+	// UpdateFabricCredentials, CommitFabric and RollbackFabric move it. A
+	// pending row is read like any other: a reader that does not care sees
+	// no difference.
+	Pending FabricPending
+	// VIDVerificationStatement and VVSC are the fabric's vendor ID
+	// verification data (SetVIDVerificationStatement, Matter §11.18.6.17);
+	// nil is none, and an empty slice is stored as none and read back nil.
+	VIDVerificationStatement []byte
+	VVSC                     []byte
+}
+
+// FabricPending is a fabric row's commit state: whether a fail-safe's
+// AddNOC or UpdateNOC wrote it and CommissioningComplete has not yet
+// committed it. The row carries the state, so it leaves with the row and
+// survives a restart with it. The values are the matter_fabrics.pending
+// column's.
+type FabricPending uint8
+
+const (
+	// FabricCommitted is a committed row, the zero value.
+	FabricCommitted FabricPending = iota
+	// FabricPendingAdd is a row an uncommitted AddNOC installed; its
+	// rollback deletes it.
+	FabricPendingAdd
+	// FabricPendingUpdate is a row whose credentials an uncommitted
+	// UpdateNOC replaced; the store keeps the values it replaced, and its
+	// rollback moves them back.
+	FabricPendingUpdate
+)
+
+// String names the state.
+func (p FabricPending) String() string {
+	switch p {
+	case FabricCommitted:
+		return "committed"
+	case FabricPendingAdd:
+		return "pending add"
+	case FabricPendingUpdate:
+		return "pending update"
+	}
+	return "FabricPending(" + strconv.Itoa(int(p)) + ")"
 }
 
 // AddFabric inserts a new fabric. If rec.FabricIndex is 0 the next
@@ -69,6 +113,9 @@ type FabricRecord struct {
 // rapid re-use. Falls back to the lowest-free-slot scan when the
 // matter_metadata table is absent (pre-013 schema).
 func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) {
+	if err := insertablePending(rec.Pending); err != nil {
+		return 0, fmt.Errorf("store: add fabric: %w", err)
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("store: add fabric: begin tx: %w", err)
@@ -95,8 +142,9 @@ func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) 
 	if _, err := tx.ExecContext(
 		ctx, `
 INSERT INTO matter_fabrics
-    (fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    (fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id,
+     pending, vid_statement, vvsc)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		idx,
 		uint64ToBE(rec.FabricID),
 		uint64ToBE(rec.NodeID),
@@ -105,6 +153,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.VendorID,
 		rec.Label,
 		rec.CompressedID[:],
+		rec.Pending,
+		noneIfEmpty(rec.VIDVerificationStatement),
+		noneIfEmpty(rec.VVSC),
 	); err != nil {
 		return 0, fmt.Errorf("store: add fabric: insert: %w", err)
 	}
@@ -139,7 +190,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 // [ErrFabricNotFound] when no row exists.
 func (s *Store) GetFabric(ctx context.Context, fabricIndex uint8) (FabricRecord, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id
+SELECT `+fabricColumns+`
 FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
 	rec, err := scanFabric(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -154,7 +205,7 @@ FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
 // ListFabrics returns every fabric ordered by fabric_index ascending.
 func (s *Store) ListFabrics(ctx context.Context) ([]FabricRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id
+SELECT `+fabricColumns+`
 FROM matter_fabrics ORDER BY fabric_index ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list fabrics: %w", err)
@@ -232,6 +283,26 @@ WHERE fabric_index = ?`, uint64ToBE(nodeID), fabricIndex)
 	n, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("store: update fabric node id: rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrFabricNotFound
+	}
+	return nil
+}
+
+// UpdateFabricVIDVerification implements [Fabrics]: one UPDATE of the
+// row's live vid_statement and vvsc; the prior_* columns of a pending
+// update are not touched.
+func (s *Store) UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error {
+	res, err := s.db.ExecContext(ctx, `
+UPDATE matter_fabrics SET vid_statement = ?, vvsc = ?, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ?`, noneIfEmpty(statement), noneIfEmpty(vvsc), fabricIndex)
+	if err != nil {
+		return fmt.Errorf("store: update fabric VID verification: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: update fabric VID verification: rows affected: %w", err)
 	}
 	if n == 0 {
 		return ErrFabricNotFound
@@ -352,6 +423,10 @@ type scanRow interface {
 	Scan(dest ...any) error
 }
 
+// fabricColumns are the columns [scanFabric] reads, in its order.
+const fabricColumns = `fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id,
+       pending, vid_statement, vvsc`
+
 func scanFabric(r scanRow) (FabricRecord, error) {
 	var (
 		rec      FabricRecord
@@ -359,8 +434,12 @@ func scanFabric(r scanRow) (FabricRecord, error) {
 		nodeID   []byte
 		compID   []byte
 	)
-	if err := r.Scan(&rec.FabricIndex, &fabricID, &nodeID, &rec.RootPublicKey, &rec.RootCert, &rec.VendorID, &rec.Label, &compID); err != nil {
+	if err := r.Scan(&rec.FabricIndex, &fabricID, &nodeID, &rec.RootPublicKey, &rec.RootCert, &rec.VendorID, &rec.Label, &compID,
+		&rec.Pending, &rec.VIDVerificationStatement, &rec.VVSC); err != nil {
 		return FabricRecord{}, err
+	}
+	if rec.Pending > FabricPendingUpdate {
+		return FabricRecord{}, fmt.Errorf("store: pending=%d is no FabricPending", rec.Pending)
 	}
 	if len(fabricID) != 8 {
 		return FabricRecord{}, fmt.Errorf("store: fabric_id length=%d, want 8", len(fabricID))
@@ -375,6 +454,28 @@ func scanFabric(r scanRow) (FabricRecord, error) {
 	rec.NodeID = binary.BigEndian.Uint64(nodeID)
 	copy(rec.CompressedID[:], compID)
 	return rec, nil
+}
+
+// insertablePending refuses a state AddFabric cannot insert: only a
+// committed row or an AddNOC's pending one is new; an UpdateNOC's state
+// needs a row to update.
+func insertablePending(p FabricPending) error {
+	switch p {
+	case FabricCommitted, FabricPendingAdd:
+		return nil
+	case FabricPendingUpdate:
+		return errors.New("a row cannot be inserted as a pending update")
+	}
+	return fmt.Errorf("%v is no fabric state", p)
+}
+
+// noneIfEmpty turns an empty or nil byte slice into SQL NULL: the VID
+// columns hold NULL for none, so an empty slice reads back nil.
+func noneIfEmpty(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
 }
 
 func uint64ToBE(v uint64) []byte {

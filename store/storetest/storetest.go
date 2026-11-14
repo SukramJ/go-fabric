@@ -61,6 +61,8 @@ var cases = []testCase{
 	{"fabrics/explicit-index", fabricsExplicitIndex},
 	{"fabrics/exhausted-and-wrap", fabricsExhaustedAndWrap},
 	{"fabrics/duplicate-root-and-id", fabricsDuplicate},
+	{"fabrics/pending-add", fabricsPendingAdd},
+	{"fabrics/vid-verification", fabricsVIDVerification},
 	{"identity", identityCase},
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
@@ -78,6 +80,7 @@ var cases = []testCase{
 	{"constraints", constraintsCase},
 	{"fabric-cascade", fabricCascade},
 	{"copies", copiesCase},
+	{"copies/vid", copiesVIDCase},
 	{"concurrent", concurrentCase},
 	{"erase", eraseCase},
 }
@@ -190,11 +193,12 @@ func fabricsRoundTrip(ctx context.Context, t *testing.T, p store.Port) {
 
 func fabricsNotFound(ctx context.Context, t *testing.T, p store.Port) {
 	for name, err := range map[string]error{
-		"GetFabric":            func() error { _, err := p.GetFabric(ctx, 7); return err }(),
-		"UpdateFabricLabel":    p.UpdateFabricLabel(ctx, 7, "x"),
-		"UpdateFabricVendorID": p.UpdateFabricVendorID(ctx, 7, 1),
-		"UpdateFabricNodeID":   p.UpdateFabricNodeID(ctx, 7, 1),
-		"RemoveFabric":         p.RemoveFabric(ctx, 7),
+		"GetFabric":                   func() error { _, err := p.GetFabric(ctx, 7); return err }(),
+		"UpdateFabricLabel":           p.UpdateFabricLabel(ctx, 7, "x"),
+		"UpdateFabricVendorID":        p.UpdateFabricVendorID(ctx, 7, 1),
+		"UpdateFabricNodeID":          p.UpdateFabricNodeID(ctx, 7, 1),
+		"UpdateFabricVIDVerification": p.UpdateFabricVIDVerification(ctx, 7, []byte{1}, nil),
+		"RemoveFabric":                p.RemoveFabric(ctx, 7),
 	} {
 		if !errors.Is(err, store.ErrFabricNotFound) {
 			t.Errorf("%s on a missing fabric = %v, want ErrFabricNotFound", name, err)
@@ -255,6 +259,69 @@ func fabricsDuplicate(ctx context.Context, t *testing.T, p store.Port) {
 	addFabric(ctx, t, p, 1)
 	if _, err := p.AddFabric(ctx, fabric(1)); err == nil {
 		t.Fatal("AddFabric of the same FabricID under the same root succeeded")
+	}
+}
+
+// fabricsPendingAdd: a row AddFabric inserts as FabricPendingAdd is read
+// and listed like any other, with its mark and its VID data; a
+// FabricPendingUpdate (or an unknown state) is refused on insert and adds
+// nothing.
+func fabricsPendingAdd(ctx context.Context, t *testing.T, p store.Port) {
+	committed := addFabric(ctx, t, p, 1)
+	rec := fabric(2)
+	rec.Pending = store.FabricPendingAdd
+	rec.VIDVerificationStatement = bytes.Repeat([]byte{0x85}, 85)
+	rec.VVSC = []byte{0x15, 0x18}
+	pending, err := p.AddFabric(ctx, rec)
+	must(t, err)
+	rec.FabricIndex = pending
+	got, err := p.GetFabric(ctx, pending)
+	must(t, err)
+	wantEqual(t, "GetFabric of the pending add", got, rec)
+	list, err := p.ListFabrics(ctx)
+	must(t, err)
+	if len(list) != 2 || list[0].FabricIndex != committed || list[0].Pending != store.FabricCommitted || list[1].Pending != store.FabricPendingAdd {
+		t.Fatalf("ListFabrics = %+v, want the committed fabric and the pending add", list)
+	}
+	wantEqual(t, "ListFabrics()[1]", list[1], rec)
+	for _, state := range []store.FabricPending{store.FabricPendingUpdate, store.FabricPending(3)} {
+		bad := fabric(3)
+		bad.Pending = state
+		if _, err := p.AddFabric(ctx, bad); err == nil {
+			t.Errorf("AddFabric with %v succeeded", state)
+		}
+	}
+	if list, _ := p.ListFabrics(ctx); len(list) != 2 {
+		t.Fatalf("a refused AddFabric left %d fabrics, want 2", len(list))
+	}
+}
+
+// fabricsVIDVerification: the VID data is part of the row; it is set and
+// cleared in one write, an empty slice reads back as none, and the write
+// leaves the commit state alone.
+func fabricsVIDVerification(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
+	rec := fabric(2)
+	rec.Pending = store.FabricPendingAdd
+	pending, err := p.AddFabric(ctx, rec)
+	must(t, err)
+	statement, vvsc := bytes.Repeat([]byte{7}, 85), []byte{1, 2, 3}
+	for _, f := range []uint8{idx, pending} {
+		must(t, p.UpdateFabricVIDVerification(ctx, f, statement, vvsc))
+	}
+	got, err := p.GetFabric(ctx, idx)
+	must(t, err)
+	wantEqual(t, "statement", got.VIDVerificationStatement, statement)
+	wantEqual(t, "VVSC", got.VVSC, vvsc)
+	wantEqual(t, "state of the committed fabric", got.Pending, store.FabricCommitted)
+	if got, _ := p.GetFabric(ctx, pending); got.Pending != store.FabricPendingAdd || !bytes.Equal(got.VVSC, vvsc) {
+		t.Fatalf("the pending add after the VID write = %+v", got)
+	}
+	must(t, p.UpdateFabricVIDVerification(ctx, idx, []byte{}, nil))
+	got, err = p.GetFabric(ctx, idx)
+	must(t, err)
+	if got.VIDVerificationStatement != nil || got.VVSC != nil {
+		t.Fatalf("cleared VID data reads back as %#v, %#v; want nil, nil", got.VIDVerificationStatement, got.VVSC)
 	}
 }
 
@@ -941,6 +1008,32 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, err)
 	if *got2.Users[0].UserUniqueID != 5 || got2.Users[0].Credentials[0].Index != 1 || got2.Credentials[0].Data[0] != 7 {
 		t.Fatal("mutating written door-lock records changed the store")
+	}
+}
+
+// copiesVIDCase: the VID data of a fabric, written by AddFabric or
+// UpdateFabricVIDVerification and read back, is copied both ways.
+func copiesVIDCase(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
+	statement, vvsc := []byte{1, 2}, []byte{3, 4}
+	must(t, p.UpdateFabricVIDVerification(ctx, idx, statement, vvsc))
+	statement[0], vvsc[0] = 0xEE, 0xEE
+	got, err := p.GetFabric(ctx, idx)
+	must(t, err)
+	if !bytes.Equal(got.VIDVerificationStatement, []byte{1, 2}) || !bytes.Equal(got.VVSC, []byte{3, 4}) {
+		t.Fatal("mutating the written VID data changed the store")
+	}
+	got.VIDVerificationStatement[0], got.VVSC[0] = 0xDD, 0xDD
+	if list, _ := p.ListFabrics(ctx); !bytes.Equal(list[0].VIDVerificationStatement, []byte{1, 2}) || !bytes.Equal(list[0].VVSC, []byte{3, 4}) {
+		t.Fatal("mutating read VID data changed the store")
+	}
+	withVID := fabric(9)
+	withVID.VIDVerificationStatement, withVID.VVSC = []byte{5}, []byte{6}
+	vidIdx, err := p.AddFabric(ctx, withVID)
+	must(t, err)
+	withVID.VIDVerificationStatement[0], withVID.VVSC[0] = 0xCC, 0xCC
+	if again, _ := p.GetFabric(ctx, vidIdx); !bytes.Equal(again.VIDVerificationStatement, []byte{5}) || !bytes.Equal(again.VVSC, []byte{6}) {
+		t.Fatal("mutating the VID data of a written FabricRecord changed the store")
 	}
 }
 

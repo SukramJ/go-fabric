@@ -147,6 +147,11 @@ func (s *Store) hasFabric(fabricIndex uint8) bool {
 // after 254 and skipping occupied indexes (store/fabric.go AddFabric,
 // matter.js FabricManager.ts:178-179).
 func (s *Store) AddFabric(_ context.Context, rec store.FabricRecord) (uint8, error) {
+	switch rec.Pending {
+	case store.FabricCommitted, store.FabricPendingAdd:
+	default:
+		return 0, fmt.Errorf("memstore: add fabric: a row cannot be inserted as %v", rec.Pending)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	idx := rec.FabricIndex
@@ -163,9 +168,9 @@ func (s *Store) AddFabric(_ context.Context, rec store.FabricRecord) (uint8, err
 	if s.hasFabric(idx) {
 		return 0, fmt.Errorf("memstore: add fabric: index %d is taken", idx)
 	}
-	for _, f := range s.fabrics {
-		if f.FabricID == rec.FabricID && bytes.Equal(f.RootPublicKey, rec.RootPublicKey) {
-			return 0, fmt.Errorf("memstore: add fabric: fabric %#x under this root exists as index %d", rec.FabricID, f.FabricIndex)
+	for i := range s.fabrics {
+		if s.fabrics[i].FabricID == rec.FabricID && bytes.Equal(s.fabrics[i].RootPublicKey, rec.RootPublicKey) {
+			return 0, fmt.Errorf("memstore: add fabric: fabric %#x under this root exists as index %d", rec.FabricID, i)
 		}
 	}
 	rec.FabricIndex = idx
@@ -255,6 +260,14 @@ func (s *Store) UpdateFabricVendorID(_ context.Context, fabricIndex uint8, vendo
 // UpdateFabricNodeID implements [store.Fabrics].
 func (s *Store) UpdateFabricNodeID(_ context.Context, fabricIndex uint8, nodeID uint64) error {
 	return s.updateFabric(fabricIndex, func(f *store.FabricRecord) { f.NodeID = nodeID })
+}
+
+// UpdateFabricVIDVerification implements [store.Fabrics]: the live values
+// only; a pending update's prior values stay.
+func (s *Store) UpdateFabricVIDVerification(_ context.Context, fabricIndex uint8, statement, vvsc []byte) error {
+	return s.updateFabric(fabricIndex, func(f *store.FabricRecord) {
+		f.VIDVerificationStatement, f.VVSC = cloneNoneIfEmpty(statement), cloneNoneIfEmpty(vvsc)
+	})
 }
 
 func (s *Store) updateFabric(fabricIndex uint8, change func(*store.FabricRecord)) error {
