@@ -42,3 +42,23 @@ func TestResponseBounds(t *testing.T) {
 		t.Fatal("an answer over maxResponseBody was read")
 	}
 }
+
+// TestListingBound: the items of one paginated listing are bounded in
+// total, not only per answer — a listing whose pages keep coming stops
+// once its items pass maxListingBytes (review II, R2-P2-alloc-08).
+func TestListingBound(t *testing.T) {
+	t.Parallel()
+	const pageItems = 96 << 10
+	var pages atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		n := pages.Add(1)
+		_, _ = fmt.Fprintf(w, `{"vendorInfo":[{"vendorName":"%s"}],"pagination":{"next_key":"k%d"}}`, strings.Repeat("x", pageItems), n)
+	}))
+	t.Cleanup(srv.Close)
+	c := &Client{BaseURL: srv.URL, HTTPClient: srv.Client()}
+	_, err := c.Vendors(t.Context())
+	if want := int32(maxListingBytes/pageItems + 1); err == nil || pages.Load() > want {
+		t.Fatalf("a listing of %d-byte pages: %v after %d pages, want an error after at most %d", pageItems, err, pages.Load(), want)
+	}
+}

@@ -183,23 +183,27 @@ func (c *Client) fetchJSON(ctx context.Context, path string, out any) error {
 	return nil
 }
 
-// maxResponseBody bounds a ledger or GitHub answer the client reads, and
-// maxPages the pages of one paginated listing: a misbehaving endpoint
-// costs bounded memory (W4-ctlint-10). matter.js reads the whole answer
+// maxResponseBody bounds a ledger or GitHub answer the client reads,
+// maxPages the pages of one paginated listing and maxListingBytes the
+// items those pages hold together (review II, R2-P2-alloc-08: the first
+// two alone multiply to 16 GiB): a misbehaving endpoint costs bounded
+// memory (W4-ctlint-10). matter.js reads the whole answer
 // (DclClient.ts:91-121, Github.ts:120-141) and follows next_key without a
-// bound (:62-89); both bounds sit far above the production ledger's
+// bound (:62-89); the bounds sit far above the production ledger's
 // answers.
 const (
 	maxResponseBody = 16 << 20
 	maxPages        = 1000
+	maxListingBytes = 64 << 20
 )
 
 // fetchPaginated is DclClient.#fetchPaginatedJson (DclClient.ts:62-89):
 // the items of field, page after page while the answer names a
 // pagination.next_key, which the next request carries as pagination.key —
-// at most maxPages pages.
+// at most maxPages pages holding at most maxListingBytes of items.
 func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) ([]T, error) {
 	var all []T
+	listed := 0
 	nextKey := ""
 	for page := 0; page == 0 || nextKey != ""; page++ {
 		if page == maxPages {
@@ -219,6 +223,9 @@ func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) (
 		}
 		// Items that are not an array are skipped (:79-82).
 		if raw, ok := answer[field]; ok {
+			if listed += len(raw); listed > maxListingBytes {
+				return nil, fmt.Errorf("dcl: %s: the listing's items pass %d bytes", path, maxListingBytes)
+			}
 			var items []T
 			if json.Unmarshal(raw, &items) == nil {
 				all = append(all, items...)
