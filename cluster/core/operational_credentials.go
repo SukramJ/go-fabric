@@ -110,8 +110,9 @@ type OperationalCredentials struct {
 	// owner decision 36). Cleared by clearPendingState.
 	pendingFabric uint8
 
-	// nocMu serialises AddNOC, UpdateNOC, RemoveFabric's store removal,
-	// the fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
+	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
+	// the fail-safe's key pair, RemoveFabric's store removal, the
+	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
 	// last write waits for the command and then rolls its row back (review
@@ -1803,10 +1804,18 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// A nil accessor is a disarmed fail-safe, as in handleAddNOC /
 	// handleAddTrustedRootCertificate. A window armed for another fabric
 	// is not armed for this one (chip :341, failSafeRequired).
+	//
+	// From the fail-safe check to the record of the CSR, one with the NOC
+	// commands, the commit and the rollback (nocMu): the key pair the
+	// request draws and the CSR it records belong to one fail-safe context,
+	// so a context that ends, or an AddNOC that consumes the pair, either
+	// precedes the request or follows its record.
+	o.nocMu.Lock()
 	o.mu.RLock()
 	nocInvoked := o.pendingFabric != 0
 	o.mu.RUnlock()
 	if o.failSafeRequired(ctx) {
+		o.nocMu.Unlock()
 		return nil, errOpcredsFailsafeRequired
 	}
 	// A CSRRequest after AddNOC or UpdateNOC has already run in this FailSafe
@@ -1815,9 +1824,11 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// OperationalCredentialsServer.ts:132-138 (`if (failsafeContext.fabricIndex
 	// !== undefined) throw ConstraintError`). Matter §11.18.6.5.
 	if nocInvoked {
+		o.nocMu.Unlock()
 		return nil, opcredsConstraintErr{msg: "core: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	if err := o.resolveAttestation(ctx); err != nil {
+		o.nocMu.Unlock()
 		return nil, err
 	}
 	// The operational key pair belongs to the fail-safe context: the first
@@ -1829,10 +1840,12 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// the builder's pair, packages/protocol/src/fabric/Fabric.ts:549-551).
 	priv, err := o.failSafeKeyPair()
 	if err != nil {
+		o.nocMu.Unlock()
 		return nil, err
 	}
 	csr, err := buildPKCS10CSR(priv)
 	if err != nil {
+		o.nocMu.Unlock()
 		return nil, fmt.Errorf("core: CSRRequest: build CSR: %w", err)
 	}
 	nocsrElements := encodeNOCSRElements(csr, req.CSRNonce)
@@ -1844,7 +1857,6 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	csrSessionID := InvokeSessionIDFromContext(ctx)
 
 	o.mu.Lock()
-	o.pendingPrivKey = priv
 	o.pendingCSRNonce = append([]byte(nil), req.CSRNonce...)
 	o.pendingCSRSessionID = csrSessionID
 	// Capture the IsForUpdateNOC flag so the follow-up AddNOC/UpdateNOC
@@ -1853,6 +1865,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	o.pendingCSRForUpdate = req.IsForUpdateNOC
 	dacKey := o.devAttestKey
 	o.mu.Unlock()
+	o.nocMu.Unlock()
 
 	sig, err := signAttestationPayload(dacKey, nocsrElements, challenge)
 	if err != nil {
@@ -1865,7 +1878,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 }
 
 // failSafeKeyPair returns the fail-safe context's pending operational key
-// pair, drawing it on the context's first CSRRequest.
+// pair, drawing it on the context's first CSRRequest. nocMu is held.
 func (o *OperationalCredentials) failSafeKeyPair() (*ecdsa.PrivateKey, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
