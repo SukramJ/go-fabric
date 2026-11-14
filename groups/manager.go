@@ -415,8 +415,8 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("groups: list fabrics: %w", err)
 	}
-	for _, r := range recs {
-		if _, err := m.fabricStore(ctx, r.FabricIndex); err != nil {
+	for i := range recs {
+		if _, err := m.fabricStore(ctx, recs[i].FabricIndex); err != nil {
 			return err
 		}
 	}
@@ -536,8 +536,8 @@ func (m *Manager) StoredFabrics(ctx context.Context) ([]uint8, error) {
 		return nil, fmt.Errorf("groups: list fabrics: %w", err)
 	}
 	out := make([]uint8, 0, len(recs))
-	for _, r := range recs {
-		out = append(out, r.FabricIndex)
+	for i := range recs {
+		out = append(out, recs[i].FabricIndex)
 	}
 	slices.Sort(out)
 	return out, nil

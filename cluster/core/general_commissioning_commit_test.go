@@ -18,22 +18,18 @@ import (
 	"github.com/SukramJ/go-fabric/store/memstore"
 )
 
-// pendingNOCKey is the settings key of OperationalCredentials' durable
-// pending-NOC marker (operational_credentials_pending.go).
-const pendingNOCKey = "operational_credentials.pending_noc"
-
-// clearFailingStore is a memstore whose clear of the pending-NOC marker
+// clearFailingStore is a memstore whose commit of a pending fabric row
 // fails while fail is set — exactly that write, every other one lands.
 type clearFailingStore struct {
 	*memstore.Store
 	fail atomic.Bool
 }
 
-func (s *clearFailingStore) SetSetting(ctx context.Context, key, value string) error {
-	if key == pendingNOCKey && value == "" && s.fail.Load() {
+func (s *clearFailingStore) CommitFabric(ctx context.Context, fabricIndex uint8) error {
+	if s.fail.Load() {
 		return errCrashed
 	}
-	return s.Store.SetSetting(ctx, key, value)
+	return s.Store.CommitFabric(ctx, fabricIndex)
 }
 
 // failSafeRig is the node's wiring of the two clusters (node/root.go):
@@ -64,13 +60,10 @@ func newFailSafeRig(t *testing.T, st core.StoreFacade, settings mstore.Settings,
 	if err != nil {
 		t.Fatal(err)
 	}
-	gc.SetOnFailSafeArmed(func(context.Context, uint8) { oc.ClearPendingState() })
+	wireFailSafeRig(gc, oc)
 	if expired != nil {
 		gc.SetOnFailSafeExpired(expired(oc))
-	} else {
-		gc.SetOnFailSafeExpired(oc.OnFailSafeExpiry)
 	}
-	gc.SetOnCommissioningComplete(func(context.Context, uint8) { oc.ClearPendingState() })
 	return failSafeRig{gc: gc, oc: oc}
 }
 
@@ -101,8 +94,9 @@ func (r failSafeRig) commissioningComplete(ctx context.Context, t *testing.T, id
 }
 
 // TestGencomm_CommissioningCompleteCommitsThePendingNOCOrFails pins core2
-// item 1a: CommissioningComplete does not answer success while the
-// pending-NOC marker stands. When the marker's clear fails, it answers
+// item 1a on the row (owner decision 36): CommissioningComplete does not
+// answer success while the fabric row stays pending. When its commit
+// fails, it answers
 // FAILURE (a store error, as the terms commit's) with the fail-safe still
 // armed; a restart then rolls the fabric back, and a retried
 // CommissioningComplete over a healthy store commits it — every outcome
@@ -126,7 +120,7 @@ func TestGencomm_CommissioningCompleteCommitsThePendingNOCOrFails(t *testing.T) 
 			if ok {
 				restartOpcreds(t, st.Store)
 				_, err := st.GetFabric(ctx, idx)
-				t.Fatalf("CommissioningComplete answered success while the pending-NOC marker could not be cleared; the fabric after a restart: %v", err)
+				t.Fatalf("CommissioningComplete answered success while the fabric row could not be committed; the fabric after a restart: %v", err)
 			}
 			if !r.gc.FailSafeArmed() {
 				t.Fatal("the failed CommissioningComplete disarmed the fail-safe")

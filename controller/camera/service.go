@@ -164,9 +164,12 @@ type Service struct {
 	closed   bool
 	sessions map[sessionKey]*Session
 	lastSeen map[watchKey][]sessionPeer
-	// ending counts the ends of overflowed sessions in flight; Close waits
-	// for them. Added to under mu while not closed only.
-	ending sync.WaitGroup
+	// ending counts the ends of overflowed sessions and the raw provider
+	// commands in flight; Close waits for them. Added to under mu while
+	// not closed only. closeDone is closed when the Close that set closed
+	// returns; a second Close waits for it (review II, R2-P2-stop-07).
+	ending    sync.WaitGroup
+	closeDone chan struct{}
 }
 
 // New starts a service over ctrl, attaching to its requestor
@@ -220,14 +223,26 @@ func (s *Service) wire() {
 }
 
 // Close ends every session this service holds, stops its sweeps and
-// detaches it from the controller.
+// detaches it from the controller. A raw provider command in flight is
+// waited for; an offer of one answered once Close began ends its session
+// instead of keeping it (review II, R2-P2-stop-03). A second Close
+// returns once the first has, or with ctx's error when ctx ends first.
 func (s *Service) Close(ctx context.Context) error {
 	s.mu.Lock()
 	if s.closed {
+		done := s.closeDone
 		s.mu.Unlock()
-		return nil
+		select {
+		case <-done:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	s.closed = true
+	s.closeDone = make(chan struct{})
+	defer close(s.closeDone)
+	s.ps.close()
 	s.mu.Unlock()
 	if s.cfg.Reports != nil {
 		s.cfg.Reports.detach(s)
@@ -251,6 +266,18 @@ func (s *Service) Close(ctx context.Context) error {
 		sess.box.close()
 	}
 	return nil
+}
+
+// enter counts a raw provider command in with ending, false once Close
+// has begun; the caller calls ending.Done when it returns.
+func (s *Service) enter() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return false
+	}
+	s.ending.Add(1)
+	return true
 }
 
 func (s *Service) isClosed() bool {

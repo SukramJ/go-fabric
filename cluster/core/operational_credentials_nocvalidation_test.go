@@ -85,6 +85,7 @@ func TestAddNOC_SameFabricIDAndRootTwiceRejectedAsFabricConflict(t *testing.T) {
 	// production (GeneralCommissioning.ArmFailSafe calls
 	// ClearPendingState); simulate that directly since this test does
 	// not wire GeneralCommissioning.
+	commitForTest(t, oc)
 	oc.ClearPendingState()
 
 	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
@@ -172,6 +173,7 @@ func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	// (matter.js OperationalCredentialsServer.ts:132-138). The fabric
 	// that updates its NOC armed the new window.
 	oc.SetFailSafe(armedFailSafe(fabricIndex))
+	commitForTest(t, oc)
 	oc.ClearPendingState()
 	// Issue the update CSR (sets a pending key) but mint the NOC over an
 	// unrelated throwaway key instead of the one the CSR carried.
@@ -448,7 +450,7 @@ func TestUpdateNOC_RevertedOnFailSafeExpiry(t *testing.T) {
 	}
 
 	update(testDefaultNodeID + 8)
-	oc.ClearPendingState() // CommissioningComplete
+	commitForTest(t, oc) // CommissioningComplete
 	oc.OnFailSafeExpiry(ctx, fabricIndex)
 	if f, _ := fs.GetFabric(ctx, fabricIndex); f.NodeID != testDefaultNodeID+8 {
 		t.Fatalf("a committed UpdateNOC was reverted (node 0x%X)", f.NodeID)

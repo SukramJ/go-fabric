@@ -42,7 +42,9 @@ type Observers struct {
 	// (FabricManager.ts:209).
 	OnFabricAdded func(FabricInfo)
 	// OnFabricRemoved runs after RemoveFabric (or the fail-safe rollback
-	// of an AddNOC) deleted a fabric and the facade's cleanup ran: the
+	// of an AddNOC) deleted a fabric and the facade's cleanup ran — for a
+	// fabric stored when the node started or reported by OnFabricAdded,
+	// not for the row of an AddNOC that failed: the
 	// fabric, its ACL and its keys are gone from the store, its CASE
 	// identity and operational record are withdrawn, its sessions are
 	// told and closed (the invoking one after the response). When it was

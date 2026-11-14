@@ -87,7 +87,9 @@ func (s *Subscription) PeerSubscription(isFabricFiltered bool) PeerSubscription 
 // review II, R2-P1-dr-req-06.
 //
 // Restore enforces the per-fabric quota and refuses an id that already
-// names a live subscription ([ErrIDInUse]).
+// names a live subscription ([ErrIDInUse]). A restored subscription fires
+// the session-subscriptions-changed hook
+// ([Manager.SetOnSessionSubscriptionsChanged]) as Subscribe does.
 func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, error) {
 	if p.SubscriptionID == 0 {
 		return nil, errors.New("subscription: restore: zero subscription id")
@@ -125,7 +127,13 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 	}
 	m.byID[sub.ID] = sub
 	m.perFabric[sub.FabricIndex]++
+	changed := m.onSessionChanged
 	m.mu.Unlock()
+	// The session carries a subscription now, as after Subscribe (review
+	// II, R2-P2-sess-08).
+	if changed != nil {
+		changed(sessionID)
+	}
 
 	m.logger.Debug(
 		"im.subscription.restored",

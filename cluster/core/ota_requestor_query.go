@@ -718,9 +718,13 @@ func (w *otaHTTPSWriter) Write(p []byte) (int, error) {
 
 // handleBdxDownload mirrors #handleBdxDownload (:959-1006): up to three
 // attempts of a receiver-driven transfer into the download location, in
-// 8192-byte blocks over TCP and 1024-byte blocks otherwise (:962-963,
-// [bdxMaxBlockSize]); the last failure becomes an otaDownloadError with the
-// BDX status code, or UpdateState Unknown's value (0) for any other error.
+// 8192-byte blocks over TCP and 1024-byte blocks otherwise (:975-976 at
+// db021da0, [bdxMaxBlockSize]); the last failure becomes an
+// otaDownloadError with the BDX status code, or UpdateState Unknown's value
+// (0) for any other error.
+// Beyond matter.js, a transfer that passes the size cap
+// ([otaBdxMaxImageSize]) fails with LengthTooLarge, reported to the
+// provider, and ends the attempts: the image will not shrink.
 func (r *OTASoftwareUpdateRequestor) handleBdxDownload(ctx context.Context, sess OtaProviderSession, fd bdx.FileDesignator) error {
 	for attempt := 1; ; attempt++ {
 		zero := uint8(0)
@@ -730,7 +734,7 @@ func (r *OTASoftwareUpdateRequestor) handleBdxDownload(ctx context.Context, sess
 			return nil
 		}
 		r.logger.Info("matter.ota.bdx_attempt_failed", slog.Int("attempt", attempt), slog.Any("err", err))
-		if attempt >= otaBdxDownloadAttempts || ctx.Err() != nil {
+		if attempt >= otaBdxDownloadAttempts || ctx.Err() != nil || errors.Is(err, errOtaBdxTooLarge) {
 			code := int64(otadef.UpdateStateUnknown)
 			if be, ok := bdx.AsError(err); ok {
 				code = int64(be.Code)
@@ -749,7 +753,7 @@ func (r *OTASoftwareUpdateRequestor) bdxAttempt(ctx context.Context, sess OtaPro
 	defer func() { _ = ex.Close() }()
 	_, err = bdx.Receive(ctx, bdx.NewMessenger(ex, 0), bdx.ReceiveOptions{
 		TransferFileDesignator: fd,
-		Sink:                   bdx.NewFileSink(r.downloadPath()),
+		Sink:                   &otaBdxCappedSink{Sink: bdx.NewFileSink(r.downloadPath()), room: r.bdxMaxImageSize},
 		PreferredDriverModes:   []bdx.DriverMode{bdx.ReceiverDrive},
 		MaxBlockSize:           bdxMaxBlockSize(ex),
 		Progress:               r.updateProgress,
@@ -757,9 +761,29 @@ func (r *OTASoftwareUpdateRequestor) bdxAttempt(ctx context.Context, sess OtaPro
 	return err
 }
 
+// errOtaBdxTooLarge is a BDX download past [otaBdxMaxImageSize].
+var errOtaBdxTooLarge = errors.New("core: OTA BDX download exceeds the size cap")
+
+// otaBdxCappedSink takes the bytes of a BDX download up to the size cap
+// and refuses the block that would pass it with a BDX LengthTooLarge, which
+// the transfer reports to the provider before it closes the sink with it.
+type otaBdxCappedSink struct {
+	bdx.Sink
+	room uint64
+}
+
+func (s *otaBdxCappedSink) Write(p []byte) (int, error) {
+	if uint64(len(p)) > s.room {
+		return 0, fmt.Errorf("%w: %w", errOtaBdxTooLarge, &bdx.Error{Code: bdx.StatusLengthTooLarge, Msg: "the image passes the requestor's size cap"})
+	}
+	n, err := s.Sink.Write(p)
+	s.room -= uint64(n) //nolint:gosec // a write count is not negative
+	return n, err
+}
+
 // bdxMaxBlockSize is the block size the requestor asks for on ex:
 // OTA_BDX_MAX_BLOCK_SIZE_TCP when the exchange's channel is TCP,
-// OTA_BDX_MAX_BLOCK_SIZE_NON_TCP otherwise (:962-963). The transfer still
+// OTA_BDX_MAX_BLOCK_SIZE_NON_TCP otherwise (:975-976). The transfer still
 // caps it at what one message of the exchange carries (bdx).
 func bdxMaxBlockSize(ex bdx.Exchange) uint16 {
 	if re, ok := ex.(reliableExchange); ok && re.Reliable() {

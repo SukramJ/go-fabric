@@ -209,7 +209,12 @@ func newNode(cfg Config) (*Node, error) {
 // 862ad75f); nil is the current epoch. emitEvents is mutate's
 // options.emitEvents (ClientStructure.ts:412): the report's events reach
 // Hooks.Event and the cursor only when it is set. A read applies after its
-// exchange ended, so it writes and delivers on the caller's goroutine.
+// exchange ended, so it writes and delivers on the caller's goroutine —
+// when the node's job queue is idle. With a subscription report's job
+// pending, its writes and hooks take their place behind it, so every apply
+// of the node writes and delivers in the order it changed the image
+// (review II, R2-P2-dr-ctl-02); it does not wait for them, since a hook
+// that runs on the queue may read.
 func (n *Node) applyIn(sc scope, r *Report, emitEvents bool, in *epoch) {
 	n.applyWith(sc, r, emitEvents, false, in)
 }
@@ -230,9 +235,7 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epo
 	before := n.configurationVersionsLocked()
 	icdBefore := n.icdModeLocked()
 	var saves []saveJob
-	if deferred {
-		n.persist.collect = &saves
-	}
+	n.persist.collect = &saves
 	n.s.mutate(sc, r, emitEvents, in)
 	n.persist.collect = nil
 	em := n.s.takeEmissions()
@@ -241,15 +244,25 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epo
 	}
 	changed := n.changedConfigurationVersionsLocked(before)
 	icdAfter := n.icdModeLocked()
-	n.mu.Unlock()
-	if !deferred {
-		n.deliverApplied(em, icdBefore != icdAfter, changed)
-		return
-	}
-	n.jobs.enqueue(func() {
+	job := func() {
 		n.persist.write(saves)
 		n.deliverApplied(em, icdBefore != icdAfter, changed)
-	})
+	}
+	// The job takes its place in the queue under the lock, so two applies
+	// that run concurrently write and deliver in the order they changed
+	// the image (review II, R2-P2-store-09, R2-P2-dr-ctl-02).
+	if !deferred {
+		claimed := n.jobs.claim(job)
+		n.mu.Unlock()
+		if claimed {
+			n.jobs.runClaimed(job)
+		}
+		return
+	}
+	// The back-pressure wait comes after the lock, since a job may need it.
+	pending := n.jobs.add(job)
+	n.mu.Unlock()
+	n.jobs.throttle(pending)
 }
 
 // deliverApplied runs the hooks of one applied report: the structure's

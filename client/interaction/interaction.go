@@ -92,6 +92,9 @@ type Interaction struct {
 	rand     func() float64
 	// network is [Config].Network, #network (ClientInteraction.ts:231).
 	network string
+	// maxReport is the report bound of its exchanges
+	// ([Config].MaxReportBytesPerSession).
+	maxReport int
 	// attemptHook, a test seam, replaces a sustained subscription's
 	// subscribe of one attempt — matter.js's injected subscribe
 	// (SustainedSubscription.Configuration.subscribe).
@@ -142,6 +145,11 @@ type Config struct {
 	// batch lane of a command (:765): a command without a network and one
 	// naming this network share a batch. "" is the peer's medium profile.
 	Network string
+	// MaxReportBytesPerSession bounds the report chunks the session's
+	// interactions hold while the rest of their chunks arrive
+	// ([ErrReportTooLarge]); zero or less is the bound of Subscriptions
+	// when it is set, else [DefaultMaxReportBytesPerSession].
+	MaxReportBytesPerSession int
 }
 
 // New returns the interaction over session s of mgr — matter.js
@@ -153,7 +161,7 @@ func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interact
 
 // Bind returns the interaction over provider p.
 func Bind(p Provider, cfg Config) *Interaction {
-	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, network: cfg.Network}
+	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, network: cfg.Network, maxReport: cfg.MaxReportBytesPerSession}
 	c.abort, c.abortFn = context.WithCancelCause(context.Background())
 	if c.log == nil {
 		c.log = slog.Default()
@@ -163,6 +171,12 @@ func Bind(p Provider, cfg Config) *Interaction {
 	}
 	if c.rand == nil {
 		c.rand = mrand.Float64
+	}
+	if c.maxReport <= 0 {
+		c.maxReport = DefaultMaxReportBytesPerSession
+		if c.subs != nil {
+			c.maxReport = c.subs.maxReport
+		}
 	}
 	return c
 }
@@ -229,6 +243,9 @@ func (c *Interaction) CloseSubscriptions() {
 type messenger struct {
 	x       *exchange.Exchange
 	release func()
+	// maxReport is the bound on the report chunks the exchange's session
+	// holds ([Config].MaxReportBytesPerSession); zero is the default.
+	maxReport int
 	// reportAwaitsStatus and reportSubscriptionID are #reportAwaitsStatus
 	// and #subscriptionId (InteractionMessenger.ts:982, :1013-1025 at
 	// 862ad75f): a report was read whose status is still owed, and the
@@ -269,7 +286,7 @@ func (c *Interaction) begin(ctx context.Context, opts ExchangeOptions) (*messeng
 		release()
 		return nil, ctx, c.closedCause(ictx, err)
 	}
-	return &messenger{x: x, release: release}, ictx, nil
+	return &messenger{x: x, release: release, maxReport: c.maxReport}, ictx, nil
 }
 
 // networkFor is `request.network ?? this.#network`

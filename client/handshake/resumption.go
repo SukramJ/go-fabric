@@ -15,9 +15,9 @@ import (
 // PeerAddress names a peer on one of our fabrics: our fabric index and
 // the peer's operational node id — matter.js
 // packages/protocol/src/peer/PeerAddress.ts, the key of
-// SessionManager.findResumptionRecordByAddress (SessionManager.ts:851-857,
-// called at CaseClient.ts:127). The one type of the controller packages
-// (exchange.PeerAddress).
+// SessionManager.findResumptionRecordByAddress (SessionManager.ts:888-894,
+// called at CaseClient.ts:128, at db021da0). The one type of the
+// controller packages (exchange.PeerAddress).
 type PeerAddress = exchange.PeerAddress
 
 // ResumptionRecord is what a CASE client keeps of its last session with a

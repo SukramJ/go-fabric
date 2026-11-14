@@ -18,7 +18,10 @@ import (
 // package that no non-test code in the module calls. Each entry carries the
 // reason it is still here; a new constructor lands with a caller or with an
 // entry, never silently.
-var constructorsWithoutCaller = map[string]string{}
+var constructorsWithoutCaller = map[string]string{
+	"NewWindowNoRollover": "deprecated (the secure session starts its window at 0 with NewWindowNoRolloverAt); " +
+		"kept for the deprecation window, and the matter.js class tests construct the unanchored state with it",
+}
 
 // TestEveryConstructorHasAProductionCaller guards this package against a
 // second unwired primitive whose doc comment names a consumer that does

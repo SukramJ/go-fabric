@@ -206,3 +206,50 @@ func TestStopReaperWaitsForTheReaper(t *testing.T) {
 		t.Fatalf("%d tickers armed after the parent's cancel and StopReaper, want 0", n)
 	}
 }
+
+// TestReapIdleAsksTheExemptionOutsideTheLock pins the reap exemption
+// (review II, R2-P2-sess-02, owner decision 43): an idle session the
+// exemption spares stays, one it does not spare is reaped in the same
+// sweep, and the exemption runs outside the manager's lock — it may call
+// back into the manager.
+func TestReapIdleAsksTheExemptionOutsideTheLock(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m := NewManager(newMinimalFakeStore())
+	m.SetClock(clk)
+	rec := &closeRecorder{}
+	rec.wire(m)
+	spared := openReaperSession(t, m, 0xB0B)
+	reaped := openReaperSession(t, m, 0xB0C)
+	var asked []uint16
+	m.SetReapExemption(func(id uint16) bool {
+		asked = append(asked, id)
+		if _, err := m.Get(id); err != nil { // re-enters the manager
+			t.Errorf("Get(%d) inside the exemption: %v", id, err)
+		}
+		return id == spared.SessionID
+	})
+
+	clk.Advance(reaperTestIdle + time.Second)
+	m.reapIdle(reaperTestIdle)
+	if !slices.Contains(asked, spared.SessionID) || !slices.Contains(asked, reaped.SessionID) {
+		t.Fatalf("exemption asked for %v, want both idle sessions", asked)
+	}
+	if _, err := m.Get(spared.SessionID); err != nil {
+		t.Fatalf("the exempt session was reaped: %v", err)
+	}
+	if _, err := m.Get(reaped.SessionID); err == nil {
+		t.Fatal("the idle session the exemption did not spare survived")
+	}
+	_, closed, _, _ := rec.snapshot()
+	if !slices.Equal(closed, []uint16{reaped.SessionID}) {
+		t.Fatalf("close hook fired for %v, want [%d]", closed, reaped.SessionID)
+	}
+
+	// Without the exemption the next sweep takes it.
+	m.SetReapExemption(nil)
+	m.reapIdle(reaperTestIdle)
+	if _, err := m.Get(spared.SessionID); err == nil {
+		t.Fatal("the idle session survived a sweep without the exemption")
+	}
+}

@@ -31,14 +31,17 @@ const maxCounter32 = int64(0xFFFFFFFF)
 //     Only the 32 counters directly below max count as "behind";
 //     everything further back is a restarted free-running counter and
 //     rolls the window forward onto it. See [Window.diff].
-//   - [NewWindowNoRollover] — the no-rollover variant used for secure
-//     sessions, mirroring matter.js
-//     MessageReceptionStateEncryptedWithoutRollover (NodeSession.ts:122).
-//     Diffs are plain subtraction: a counter that appears to roll over
-//     is rejected as a duplicate, because a secure session MUST
-//     re-establish before its counter wraps rather than reuse a nonce.
+//   - [NewWindowNoRollover] and [NewWindowNoRolloverAt] — the
+//     no-rollover variant, mirroring matter.js
+//     MessageReceptionStateEncryptedWithoutRollover. Diffs are plain
+//     subtraction: a counter that appears to roll over is rejected as a
+//     duplicate, because a secure session MUST re-establish before its
+//     counter wraps rather than reuse a nonce. A secure unicast session
+//     uses [NewWindowNoRolloverAt] with counter 0, as matter.js
+//     constructs it (packages/protocol/src/session/NodeSession.ts:124
+//     `new MessageReceptionStateEncryptedWithoutRollover(0)`).
 //
-// The two variants also seed the bitmap differently when they anchor on
+// The variants also seed the bitmap differently when they anchor on
 // their first counter — see [Window.initialBitmap].
 //
 // Concurrency: Window is safe for concurrent use; lookups and updates
@@ -68,12 +71,32 @@ type Window struct {
 // MessageReceptionStateUnencryptedWithRollover.
 func NewWindow() *Window { return &Window{rollover: true, initialBitmap: 0} }
 
-// NewWindowNoRollover returns a fresh no-rollover window for secure
-// sessions. A secure-session counter that wraps is rejected rather than
-// accepted, and the bitmap anchors full so no counter below the first
-// one seen is ever accepted, matching matter.js
-// MessageReceptionStateEncryptedWithoutRollover.
+// NewWindowNoRollover returns a fresh, unanchored no-rollover window: a
+// counter that wraps is rejected rather than accepted, and the bitmap
+// anchors full on the first counter seen, so no counter below that one
+// is ever accepted — matter.js
+// MessageReceptionStateEncryptedWithoutRollover constructed without a
+// counter. A secure unicast session does not use it: see
+// [NewWindowNoRolloverAt].
+//
+// Deprecated: use [NewWindowNoRolloverAt] with counter 0, the window a
+// secure unicast session starts with. Removable in v0.23.0.
 func NewWindowNoRollover() *Window { return &Window{rollover: false, initialBitmap: ^uint32(0)} }
+
+// NewWindowNoRolloverAt returns a no-rollover window already anchored at
+// counter with the full bitmap — matter.js
+// MessageReceptionStateEncryptedWithoutRollover constructed with a
+// counter. A secure unicast session starts it at 0, as both references
+// do (matter.js packages/protocol/src/session/NodeSession.ts:124;
+// connectedhomeip src/protocols/secure_channel/PairingSession.cpp:50,
+// `SetCounter(Transport::PeerMessageCounter::kInitialSyncValue)`): the
+// peer's first counter, drawn well above 32, then clears the bitmap, so
+// the up to 32 counters below it stay acceptable once and a message
+// overtaken at the start of the session is still delivered. Counter 0 —
+// the anchor — is a duplicate.
+func NewWindowNoRolloverAt(counter uint32) *Window {
+	return &Window{rollover: false, initialBitmap: ^uint32(0), max: counter, bitmap: ^uint32(0), primed: true}
+}
 
 // NewWindowEncryptedRollover returns a fresh window for group messages:
 // encrypted, so the bitmap anchors full and nothing below the first

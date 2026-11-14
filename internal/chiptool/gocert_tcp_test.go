@@ -421,7 +421,7 @@ const (
 // chunks of it (bridge's matter.rx.im.read and matter.rx.im.read.chunk).
 var (
 	reReadServed = regexp.MustCompile(`msg=matter\.rx\.im\.read subsystem=\S+ src="(tcp://\S+) \(inbound\)" attribute_reports=(\d+) chunks=(\d+)`)
-	reReadChunk  = regexp.MustCompile(`msg=matter\.rx\.im\.read\.chunk subsystem=\S+ src="(tcp://\S+) \(inbound\)" chunk=(\d+) of=(\d+) bytes=(\d+)`)
+	reReadChunk  = regexp.MustCompile(`msg=matter\.rx\.im\.read\.chunk subsystem=\S+ src="(tcp://\S+) \(inbound\)" chunk=(\d+) bytes=(\d+) more=(?:true|false)`)
 )
 
 // caseSC86 is TC-SC-8.6: a read of every attribute of every cluster.
@@ -468,12 +468,19 @@ func caseSC86() goCertCase {
 			}) {
 				return fmt.Errorf("the DUT's log shows no read answered on %s", r.facts.channel)
 			}
+			// A chunk line names its index and no total (the response is
+			// generated chunk by chunk): the read's chunks are the channel's
+			// lines from its last chunk 0 on.
 			var sizes []int
 			for _, m := range reReadChunk.FindAllStringSubmatch(thLogSince(th, from), -1) {
-				if m[1] == r.facts.channel && m[3] == served[3] {
-					n, _ := strconv.Atoi(m[4])
-					sizes = append(sizes, n)
+				if m[1] != r.facts.channel {
+					continue
 				}
+				if m[2] == "0" {
+					sizes = nil
+				}
+				n, _ := strconv.Atoi(m[3])
+				sizes = append(sizes, n)
 			}
 			chunks, _ := strconv.Atoi(served[3])
 			if len(sizes) != chunks || chunks == 0 {

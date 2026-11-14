@@ -40,3 +40,22 @@ func TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout(t *testing.T) 
 			operational.SessionIdleTimeout)
 	}
 }
+
+// TestSendInterval_FloorAboveSessionIdleTimeoutIsKept: a subscriber's
+// MinIntervalFloor is its rate limit and is not shortened to fit the idle
+// reaper's timeout; the reaper spares a session that carries a live
+// subscription instead (review II, R2-P2-sess-02, owner decision 43).
+func TestSendInterval_FloorAboveSessionIdleTimeoutIsKept(t *testing.T) {
+	t.Parallel()
+	m := newManager(subscription.Config{}, nil)
+	args := defaultArgs()
+	args.MinIntervalFloor = 600
+	args.MaxIntervalCeiling = 3600
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	if got := sub.SendInterval(); got != 10*time.Minute || got <= operational.SessionIdleTimeout {
+		t.Fatalf("SendInterval = %v, want the 10 min floor (above the %v idle timeout)", got, operational.SessionIdleTimeout)
+	}
+}

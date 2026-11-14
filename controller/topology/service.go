@@ -549,7 +549,10 @@ type Changes struct {
 // connection-state change, its commission and its decommission also
 // schedule a rebuild of the attached services — matterjs-server's
 // attributeChanged, nodeAvailabilityChanged, nodeAdded and
-// nodeDecommissioned at 0bd06f22 (NetworkTopologyService.ts:161-169).
+// nodeDecommissioned at 0bd06f22 (NetworkTopologyService.ts:161-169) —
+// and so does its leaving the registry (Deleted: a Forget, an Erase, a
+// cull), which no decommission announces (review II, rework of
+// R2-P2-fabric-08).
 // The host's hooks run first and keep their behaviour; the service's part
 // only restarts a timer, so it is safe on the node's job queue. The
 // composition follows the controller's own OTA hooks.
@@ -566,7 +569,7 @@ func (c *Changes) Install(cfg *controller.Config) {
 }
 
 func (c *Changes) wrap(h client.Hooks) client.Hooks {
-	changed, state, commissioned, decommissioned := h.Changed, h.ConnectionStateChanged, h.Commissioned, h.Decommissioned
+	changed, state, commissioned, decommissioned, deleted := h.Changed, h.ConnectionStateChanged, h.Commissioned, h.Decommissioned, h.Deleted
 	h.Changed = func() {
 		if changed != nil {
 			changed()
@@ -588,6 +591,12 @@ func (c *Changes) wrap(h client.Hooks) client.Hooks {
 	h.Decommissioned = func() {
 		if decommissioned != nil {
 			decommissioned()
+		}
+		c.notify()
+	}
+	h.Deleted = func() {
+		if deleted != nil {
+			deleted()
 		}
 		c.notify()
 	}

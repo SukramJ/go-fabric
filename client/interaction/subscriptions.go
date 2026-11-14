@@ -24,6 +24,13 @@ type SubscriptionsConfig struct {
 	// logged and contained — matter.js ClientSubscriptions.reportStarted
 	// (ClientSubscriptions.ts:152-158).
 	ReportStarted func(s *exchange.Session)
+	// MaxReportBytesPerSession bounds the report chunks a session's
+	// interactions hold while the rest of their chunks arrive
+	// ([ErrReportTooLarge]) — the subscription reports the registry
+	// reads, and the interactions bound to it whose own
+	// [Config].MaxReportBytesPerSession is zero; zero or less is
+	// [DefaultMaxReportBytesPerSession].
+	MaxReportBytesPerSession int
 }
 
 // Subscriptions is the controller's subscription registry: the
@@ -36,6 +43,8 @@ type Subscriptions struct {
 	clock         exchange.Clock
 	log           *slog.Logger
 	reportStarted func(s *exchange.Session)
+	// maxReport is [SubscriptionsConfig].MaxReportBytesPerSession.
+	maxReport int
 
 	// mu guards active, blocked, drained, peers and timer.
 	mu       sync.Mutex
@@ -62,6 +71,7 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 		clock:         cfg.Clock,
 		log:           cfg.Logger,
 		reportStarted: cfg.ReportStarted,
+		maxReport:     cfg.MaxReportBytesPerSession,
 		active:        make(map[*Subscription]struct{}),
 		peers:         make(map[exchange.PeerAddress]map[uint32]*Subscription),
 	}
@@ -71,9 +81,19 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 	if r.log == nil {
 		r.log = slog.Default()
 	}
+	if r.maxReport <= 0 {
+		r.maxReport = DefaultMaxReportBytesPerSession
+	}
 	r.readingCtx, r.readingCancel = context.WithCancel(context.Background())
 	return r
 }
+
+// MaxReportBytesPerSession is the bound on the report chunks a session's
+// interactions hold that the registry carries
+// ([SubscriptionsConfig].MaxReportBytesPerSession, the default when it
+// was zero or less), so an interaction bound outside the registry takes
+// it too.
+func (r *Subscriptions) MaxReportBytesPerSession() int { return r.maxReport }
 
 // IsBlocked reports whether new report processing is blocked (:58-63).
 func (r *Subscriptions) IsBlocked() bool {

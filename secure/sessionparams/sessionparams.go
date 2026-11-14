@@ -65,6 +65,40 @@ type Parameters struct {
 	MaxTCPMessageSize uint32 // [9]
 }
 
+// MaxUnauthenticatedInterval is the largest SessionIdleInterval and
+// SessionActiveInterval, in milliseconds, a node adopts from a peer that
+// has not authenticated: one hour, the bound this module already puts on
+// the intervals it advertises (mdns/service.go:726, maxAdvertisedInterval).
+// The active threshold needs no bound: its field is 16 bits wide.
+//
+// This module's own rule (review II, owner decision 45): a stated
+// 0xFFFFFFFF ms would otherwise pace a handshake's retransmissions — and
+// the wait for their acknowledgement — over weeks. Both references take
+// the intervals of a PASE or CASE message as stated (matter.js
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db021da0,
+// "accepted unbounded"; connectedhomeip
+// src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
+// A DNS-SD interval above one hour connectedhomeip reads as not stated
+// (src/lib/dnssd/TxtFields.cpp:210-218 GetRetryInterval, kMaxRetryInterval
+// at TxtFields.h:38), and matter.js keeps from a discovered record only
+// an interval an advertisement can carry (SessionIntervals.ts:99-118
+// advertisable, in toLongForm at
+// packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:223-227).
+const MaxUnauthenticatedInterval uint32 = 3_600_000
+
+// ClampUnauthenticated returns p with SessionIdleInterval and
+// SessionActiveInterval reduced to [MaxUnauthenticatedInterval]; every
+// other field, and an interval within the bound or not stated, is kept.
+// It is for the parameters of a peer that has not authenticated, at the
+// point a node adopts them for the handshake's own session; the
+// parameters a secure session is established with are the peer's as
+// stated.
+func ClampUnauthenticated(p Parameters) Parameters {
+	p.SessionIdleInterval = min(p.SessionIdleInterval, MaxUnauthenticatedInterval)
+	p.SessionActiveInterval = min(p.SessionActiveInterval, MaxUnauthenticatedInterval)
+	return p
+}
+
 // IsEmpty reports whether no field is stated. An empty structure is
 // omitted on the wire so the peer behaves as if none was supplied.
 func (p Parameters) IsEmpty() bool {

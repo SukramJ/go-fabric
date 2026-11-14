@@ -21,9 +21,10 @@ import (
 )
 
 // parkedPeer is a handshake handler whose initiator stated the largest
-// session intervals the field holds: a reply on its exchange would wait
-// 0xFFFFFFFF ms — 49.7 days, before the backoff — for its first
-// retransmission. Neither reference clamps what a peer states (matter.js
+// session intervals the field holds: unclamped, a reply on its exchange
+// would wait 0xFFFFFFFF ms — 49.7 days, before the backoff — for its first
+// retransmission; the bridge adopts them clamped to an hour
+// (handshakePeerTimingOf, owner decision 45). Neither reference clamps what a peer states (matter.js
 // packages/protocol/src/session/SessionIntervals.ts:52-53 at db021da0, "SII/SAI
 // in the CASE/PASE session-parameter struct are uint32 and accepted
 // unbounded"; chip src/protocols/secure_channel/PairingSession.cpp:175-189 at

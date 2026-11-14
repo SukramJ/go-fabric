@@ -128,13 +128,14 @@ type DiscoverOptions struct {
 // discovery.FindInstance one (InstanceDiscovery); a device is reported
 // once it has an address.
 func (c *Controller) DiscoverWith(ctx context.Context, id discovery.Identifier, timeout time.Duration, opts DiscoverOptions) ([]client.Device, error) {
-	if c.names == nil {
-		return nil, fmt.Errorf("%w: the controller is closed", ErrConfiguration)
+	st, ok := c.open()
+	if !ok || st.names == nil {
+		return nil, errClosed
 	}
 	if timeout <= 0 {
 		timeout = DefaultDiscoveryTimeout
 	}
-	sc := discovery.NewScanner(c.names)
+	sc := discovery.NewScanner(st.names)
 	defer sc.Close()
 	transports := []discovery.Transport{discovery.IPTransport(sc)}
 	so := discovery.SessionOptions{Identifier: id, Timeout: timeout, Clock: c.clock, Logger: c.log}

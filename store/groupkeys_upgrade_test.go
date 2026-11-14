@@ -125,7 +125,7 @@ CREATE TABLE matter_group_keys (
 		t.Fatalf("legacy DDL: %v", err)
 	}
 	s := store.New(db)
-	addTestFabric(t, s, 1, 1)
+	insertLegacyFabric(t, db, 1, 1)
 	if err := s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: 1, GroupKeySetID: 5, EpochKey0: epochKey(5), EpochStart0: 1}); err != nil {
 		t.Fatal(err)
 	}

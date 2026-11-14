@@ -32,6 +32,9 @@ func (d *dataVersionDispatcher) Read(_ context.Context, p ConcreteAttributePath)
 		Value:       d.readVal,
 		Status:      d.readStat,
 		DataVersion: d.dataVersion,
+		// The cluster has a version (every cluster instance does,
+		// review II decision 46).
+		HasDataVersion: true,
 	}}
 }
 

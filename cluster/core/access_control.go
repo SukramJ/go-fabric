@@ -345,6 +345,7 @@ var (
 	_ contract.ClusterDataVersion             = (*AccessControl)(nil)
 	_ contract.ClusterAttributeReadPrivilege  = (*AccessControl)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*AccessControl)(nil)
+	_ contract.FabricScopedState              = (*AccessControl)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -408,20 +409,47 @@ func (a *AccessControl) SetCurrentFabric(idx uint8) {
 // so the next controller assigned index N would read back index N's
 // stale metadata as if it had written it itself.
 //
-// Called from the daemon's matterFabricTeardown, the same composition-
-// root fan-out that closes operational sessions and subscriptions for
-// the removed fabric.
+// The node calls it through the removal contract
+// ([AccessControl.MatterDropFabric]) when a fabric is removed, and for
+// every stored entry of a fabric the table no longer holds before it
+// serves a topology.
 func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
+	_ = a.MatterDropFabric(context.Background(), fabricIndex)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]: the fabric's
+// Extension entry leaves memory and its setting
+// ([AccessControl.RemoveFabricExtension]); the error is the setting's.
+// The ACL entries are the store's rows, which its fabric cascade removes.
+func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	a.mu.Lock()
 	_, had := a.extensions[fabricIndex]
 	if had {
 		delete(a.extensions, fabricIndex)
 	}
 	a.mu.Unlock()
-	if had {
-		_ = a.persistExtension(context.Background(), fabricIndex, nil)
-		a.dataVersion.Bump()
+	if !had {
+		return nil
 	}
+	a.dataVersion.Bump()
+	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
+		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
+	}
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// with an Extension entry, which [AccessControl] restores from every
+// stored setting at construction.
+func (a *AccessControl) MatterHeldFabrics() []uint8 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make([]uint8, 0, len(a.extensions))
+	for f := range a.extensions {
+		out = append(out, f)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // MatterRead implements [contract.ClusterServer].
@@ -612,7 +640,8 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 		return nil, fmt.Errorf("core: AccessControl: list fabrics: %w", err)
 	}
 	out := make([]uint8, 0, len(recs)+1)
-	for _, r := range recs {
+	for i := range recs {
+		r := &recs[i]
 		out = append(out, r.FabricIndex)
 	}
 	a.mu.RLock()

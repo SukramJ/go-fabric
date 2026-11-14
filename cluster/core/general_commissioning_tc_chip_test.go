@@ -52,6 +52,18 @@ func (f *settingsFake) SetSetting(_ context.Context, key, value string) error {
 	return nil
 }
 
+func (f *settingsFake) SetSettings(_ context.Context, values map[string]string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail != nil {
+		return f.fail
+	}
+	for k, v := range values {
+		f.kv[k] = v
+	}
+	return nil
+}
+
 func (f *settingsFake) DeleteSetting(_ context.Context, key string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

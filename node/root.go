@@ -208,7 +208,14 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	opCreds := r.OperationalCredentials
 
 	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
-	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() }) //nolint:contextcheck // ClearPendingState takes no context
+	// A fresh fail-safe context starts before its arm is recorded, so an
+	// arm from a fabric whose earlier rollback it lands arms nothing
+	// (review II, R2-P2-dr-noc-04).
+	generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
+	// CommissioningComplete commits the fabric row the fail-safe's NOC
+	// command wrote, as its last store write (owner decision 36); a Wi-Fi
+	// node stores its network list before it (below).
+	generalCom.SetFailSafeCommit(opCreds.CommitFailSafe)
 	// The topology's fail-safe participants revert after the root's own
 	// rollback (failsafe.go).
 	participants := d.onFailSafeExpired
@@ -231,7 +238,6 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	otaRequestor := r.OTARequestor
 	observer := d.onCommissioningComplete
 	commissioned := func(ctx context.Context, fabricIndex uint8) {
-		opCreds.ClearPendingState() //nolint:contextcheck // ClearPendingState takes no context
 		if otaRequestor != nil {
 			// A query 30 s after a commissioning (wiring.go:210-215 at b4ea1f96^).
 			otaRequestor.Commissioned()
@@ -300,6 +306,10 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			wifiNC.OnCommissioningComplete(ctx)
 			commissioned(ctx, fi)
 		})
+		// The network list is stored before the fabric row is committed,
+		// and written back when that commit fails (review II,
+		// R2-P2-store-01).
+		generalCom.SetFailSafeCommit(wifiFailSafeCommit(opCreds, wifiNC))
 		netComm = wifiNC
 	} else {
 		r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
@@ -717,4 +727,26 @@ func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.Gener
 		d.logger.Warn("node.terms.restore", slog.Any("err", err))
 	}
 	return gc, nil
+}
+
+// wifiFailSafeCommit is CommissioningComplete's durable commit on a Wi-Fi
+// node: the network list is stored, then the fabric row committed; a
+// fabric commit that fails writes the committed list back (review II,
+// R2-P2-store-01).
+func wifiFailSafeCommit(opCreds *mattercore.OperationalCredentials, wifiNC *mattercore.WiFiNetworkCommissioning) mattercore.FailSafeCommitFunc {
+	return func(ctx context.Context, complete func(commit func(ctx context.Context) error)) {
+		opCreds.CommitFailSafe(ctx, func(commitFabric func(ctx context.Context) error) {
+			complete(func(ctx context.Context) error {
+				restore, err := wifiNC.StoreNetworks(ctx)
+				if err != nil {
+					return err
+				}
+				if err := commitFabric(ctx); err != nil {
+					restore(context.WithoutCancel(ctx))
+					return err
+				}
+				return nil
+			})
+		})
+	}
 }

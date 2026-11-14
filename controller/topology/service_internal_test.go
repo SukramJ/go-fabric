@@ -502,6 +502,34 @@ func TestChangesInstall(t *testing.T) {
 	bare.Decommissioned()
 }
 
+// TestChangesInstallDeleted (review II, rework of R2-P2-fabric-08): a
+// node leaving the registry (Hooks.Deleted — a Forget, an Erase, the cull
+// of an expired node) schedules a rebuild as a decommission does, after
+// the host's own Deleted ran. Before, only Decommissioned rebuilt, so a
+// forgotten node stayed in the graph until the next change.
+func TestChangesInstallDeleted(t *testing.T) {
+	var host []string
+	var changes Changes
+	cfg := controller.Config{HooksFor: func(string) client.Hooks {
+		return client.Hooks{Deleted: func() { host = append(host, "deleted") }}
+	}}
+	changes.Install(&cfg)
+	h := newHarness(t, Config{Changes: &changes}, router(1, 1024))
+	hooks := cfg.HooksFor("peer1")
+	if hooks.Deleted == nil {
+		t.Fatal("no Deleted hook")
+	}
+	h.set(router(1, 2000))
+	hooks.Deleted()
+	h.fake.Advance(5 * time.Millisecond)
+	h.want(1, "hook Deleted")
+	if !slices.Equal(host, []string{"deleted"}) {
+		t.Errorf("host hooks: %v", host)
+	}
+	h.svc.Close()
+	changes.wrap(client.Hooks{}).Deleted()
+}
+
 // fakeSource is a Source whose images the test swaps.
 type fakeSource struct {
 	mu   sync.Mutex

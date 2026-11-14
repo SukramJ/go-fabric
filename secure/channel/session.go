@@ -71,6 +71,10 @@ type Session struct {
 	out *mrp.Counter
 	in  *mrp.Window
 
+	// rolloverNoticed is set by the first [Session.RolloverDue] that
+	// reported the outbound counter near exhaustion.
+	rolloverNoticed atomic.Bool
+
 	// privacyMu guards lazy derivation of the privacy keys. The keys
 	// are derived on first use and reused for every privacy-flagged
 	// frame for the lifetime of the session.
@@ -148,13 +152,39 @@ func New(cfg Config) (*Session, error) {
 		out:           counter,
 		// Secure sessions use a no-rollover reception window: a counter
 		// that appears to wrap is a duplicate, not a fresh value — the
-		// session re-establishes before the counter rolls over. Mirrors
-		// matter.js NodeSession.ts:122 (MessageReceptionStateEncryptedWithoutRollover).
-		in: mrp.NewWindowNoRollover(),
+		// session re-establishes before the counter rolls over. The
+		// window starts anchored at counter 0, so the counters below the
+		// peer's first one stay acceptable within the 32-window. Mirrors
+		// matter.js packages/protocol/src/session/NodeSession.ts:124
+		// `messageReceptionState: new MessageReceptionStateEncryptedWithoutRollover(0)`
+		// and connectedhomeip src/protocols/secure_channel/PairingSession.cpp:50.
+		in: mrp.NewWindowNoRolloverAt(0),
 	}
 	sess.encCipher.Store(enc)
 	sess.decCipher.Store(dec)
 	return sess, nil
+}
+
+// rolloverInfoDifference is how many messages before the outbound
+// counter's maximum the session is wound down: matter.js
+// packages/protocol/src/protocol/MessageCounter.ts:13
+// `const ROLLOVER_INFO_DIFFERENCE = 100_000;`, the margin NodeSession's
+// counter calls #scheduleRolloverClose at (MessageCounter.ts:71-76,
+// NodeSession.ts:123).
+const rolloverInfoDifference = 100_000
+
+// RolloverDue reports, once, that the session's outbound counter has
+// come within 100 000 messages of 0xFFFFFFFF (or is used up): the caller
+// then ends the session gracefully while its keys still seal, as matter.js
+// does (packages/protocol/src/session/NodeSession.ts:398-412,
+// #scheduleRolloverClose → initiateClose with closeSubscriptions). Every
+// later call returns false. A session that is not closed keeps sending
+// until [Encrypt] refuses with [mrp.ErrCounterExhausted].
+func (s *Session) RolloverDue() bool {
+	if s.out.Peek() <= 0xFFFFFFFF-rolloverInfoDifference {
+		return false
+	}
+	return s.rolloverNoticed.CompareAndSwap(false, true)
 }
 
 // PeerSessionID returns the SessionID the peer expects in our
@@ -187,7 +217,8 @@ func (s *Session) Encrypt(header *message.Header, secFlags uint8, plaintext []by
 	// reuses an AES-CCM nonce under the live key (Matter §4.6.6). An
 	// exhausted counter makes the session permanently unusable; the
 	// peer re-establishes via CASE/PASE. matter.js closes the session
-	// before rollover (NodeSession.ts:115).
+	// before rollover (NodeSession.ts:398-412); [Session.RolloverDue]
+	// tells the caller when.
 	counter, err := s.out.NextNoRollover()
 	if err != nil {
 		return nil, fmt.Errorf("channel: %w", err)

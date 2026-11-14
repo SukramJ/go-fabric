@@ -154,9 +154,13 @@ type EventLog struct {
 	// (CHIP_DEVICE_CONFIG_EVENT_ID_COUNTER_EPOCH) and the durable
 	// numbering matter.js delegates to its EventStore
 	// (OccurrenceManager.ts).
+	// A ceiling the store refuses does not move persistCeiling: the
+	// number is handed out (an Append cannot fail) and the next Append
+	// tries the write again, so the stored ceiling covers the numbers
+	// once the store takes a write again.
 	persistCeiling uint64
 	persistEpoch   uint64
-	persistFn      func(ceiling uint64)
+	persistFn      func(ceiling uint64) error
 
 	// clock stamps a record that carries no timestamp; nil is
 	// [clock.System]. See [EventLog.SetClock].
@@ -196,8 +200,11 @@ func (l *EventLog) AppendRecord(rec EventRecord) EventRecord {
 	// (raiseCeiling); an Append meanwhile waits for it in raiseCeiling.
 	for l.persistFn != nil && l.next+1 >= l.persistCeiling {
 		l.mu.Unlock()
-		l.raiseCeiling()
+		raised := l.raiseCeiling()
 		l.mu.Lock()
+		if !raised {
+			break
+		}
 	}
 	defer l.mu.Unlock()
 	l.next++
@@ -240,30 +247,37 @@ func (l *EventLog) DropBuffered() {
 	l.occurrences = nil
 	l.mu.Unlock()
 	if fn != nil {
-		fn(ceiling)
+		// A refused write leaves the higher ceiling stored before, which
+		// still covers every number handed out; the lowered one in memory
+		// makes the next Append write a ceiling again.
+		_ = fn(ceiling)
 	}
 }
 
 // raiseCeiling persists the ceiling the next number needs, unless another
 // Append did meanwhile: under ceilingMu, with mu released across persist.
-// The ceiling in memory moves once the store holds it.
-func (l *EventLog) raiseCeiling() {
+// The ceiling in memory moves once the store holds it; false when the
+// store refused it, and the ceiling stays where it was.
+func (l *EventLog) raiseCeiling() bool {
 	l.ceilingMu.Lock()
 	defer l.ceilingMu.Unlock()
 	l.mu.Lock()
 	fn := l.persistFn
 	if fn == nil || l.next+1 < l.persistCeiling {
 		l.mu.Unlock()
-		return
+		return true
 	}
 	ceiling := l.next + 1 + l.persistEpoch
 	l.mu.Unlock()
-	fn(ceiling)
+	if fn(ceiling) != nil {
+		return false
+	}
 	l.mu.Lock()
 	if ceiling > l.persistCeiling {
 		l.persistCeiling = ceiling
 	}
 	l.mu.Unlock()
+	return true
 }
 
 // DropFabric removes the records of fabric-sensitive events that belong to
@@ -409,12 +423,31 @@ func (l *EventLog) SetUTCClock(utc func() (time.Time, bool)) {
 	l.utcClock = utc
 }
 
-// SetCounterPersistence wires the durable half of the EventNumber
+// SetCounterPersistence is [EventLog.SetCeilingPersistence] with a persist
+// function that cannot report a refused write: every ceiling counts as
+// stored.
+//
+// Deprecated: use [EventLog.SetCeilingPersistence], whose persist function
+// returns the store's error, so a refused ceiling is written again instead
+// of counting as stored.
+func (l *EventLog) SetCounterPersistence(persist func(ceiling uint64), epoch uint64) {
+	if persist == nil {
+		l.SetCeilingPersistence(nil, epoch)
+		return
+	}
+	l.SetCeilingPersistence(func(ceiling uint64) error { persist(ceiling); return nil }, epoch)
+}
+
+// SetCeilingPersistence wires the durable half of the EventNumber
 // counter: persist is invoked (with the log's lock released, at most once
 // per epoch; an Append that needs the new ceiling waits for it) with the
 // new ceiling whenever the counter reaches the current one. epoch <= 0 selects the default 0x10000, chip's
 // CHIP_DEVICE_CONFIG_EVENT_ID_COUNTER_EPOCH. Pass nil to detach.
-func (l *EventLog) SetCounterPersistence(persist func(ceiling uint64), epoch uint64) {
+//
+// An error from persist means the store does not hold the ceiling: the
+// ceiling in memory stays where it was and the next Append writes it
+// again. The Append that met the error still hands out its number.
+func (l *EventLog) SetCeilingPersistence(persist func(ceiling uint64) error, epoch uint64) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if epoch == 0 {

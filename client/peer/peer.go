@@ -613,7 +613,7 @@ func (p *Peer) sessionFor(transports []exchange.Transport) *exchange.Session {
 // one of transports, any transport for nil. The caller holds p.mu.
 func (p *Peer) liveSessionLocked(transports []exchange.Transport) bool {
 	for _, s := range p.sessions {
-		if s.IsClosed() || s.IsPeerLost() {
+		if s.IsClosing() {
 			continue
 		}
 		if transports == nil || slices.Contains(transports, s.Transport()) {
@@ -631,7 +631,11 @@ func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 	var found *exchange.Session
 	var at time.Duration
 	for _, s := range p.Sessions() {
-		if s.IsClosed() || s.IsPeerLost() {
+		// A closing session — closed, lost, or wound down at counter
+		// rollover until its exchanges end — is not chosen (Peer.ts:587-590
+		// at db021da0); the Closing watcher (addSession) removes it soon
+		// after.
+		if s.IsClosing() {
 			continue
 		}
 		if t != nil && s.Transport() != *t {

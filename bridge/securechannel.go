@@ -509,12 +509,13 @@ func (b *Bridge) dispatchPase(
 const paseMaxErrors = 20
 
 // maxUnsecuredWindows caps the number of per-SourceNodeID duplicate-detection
-// windows tracked for unsecured PASE traffic within one commissioning window.
-// SourceNodeID is attacker-controlled and unauthenticated at this stage, so
-// without a cap a spoofed-source flood grows unsecuredWindows without bound.
-// A real commissioning window sees only a handful of commissioners; 256 is far
-// above that. Past the cap a new source is treated as fresh — the PASE
-// handshake handler's own state-replay guard still rejects a genuine replay.
+// windows held for unsecured traffic at one time. SourceNodeID is
+// attacker-controlled and unauthenticated at this stage. A window lives only
+// as long as the handshake it serves ([unsecuredWindowTable]), so the windows
+// held are those of the handful of live handshakes; only sources whose
+// messages name the exchange of a live handshake can reach the cap. Past it a
+// new source is treated as fresh — the PASE handshake handler's own
+// state-replay guard still rejects a genuine replay.
 const maxUnsecuredWindows = 256
 
 // pasePairingTimeout bounds how long a single PASE handshake may hold
@@ -606,18 +607,24 @@ func (b *Bridge) releasePaseInFlight(exchangeID uint16) {
 }
 
 // recordPaseFailure increments the PASE failure counter and, when it
-// reaches [paseMaxErrors], revokes the open commissioning window and
+// reaches [paseMaxErrors], closes the open commissioning window and
 // engages a timed PASE lockout. Mirrors matter.js PaseServer.ts:95-110
-// (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:70-72
-// (tooManyPaseErrors → endCommissioning). Called from the handlePase
-// error path for genuine pairing failures only (not missing-handler or
-// state-replay retransmits).
+// (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:78-82
+// at db021da0 (tooManyPaseErrors → endCommissioning). The window closes
+// as the end of commissioning closes it ([CommissioningWindow.EndCommissioning]),
+// not as RevokeCommissioning does: matter.js's endCommissioning →
+// #closeWindow (DeviceCommissioner.ts:319-324, :283-299) stops the timer,
+// removes the PASE commissioner and leaves commissioning mode, and touches
+// neither the fail-safe nor a PASE session — a commissioning already past
+// PASE keeps its fail-safe and its pending fabric. Called from the
+// handlePase error path for genuine pairing failures only (not
+// missing-handler or state-replay retransmits).
 func (b *Bridge) recordPaseFailure() {
 	b.count(contract.MetricPASEFailures)
 	if b.paseFailures.Add(1) != paseMaxErrors {
 		// Below the cap, or a straggler arriving between the cap and the
 		// lockout taking effect. Only the transition to exactly
-		// paseMaxErrors engages the lockout, so the revoke + diagnostic
+		// paseMaxErrors engages the lockout, so the close + diagnostic
 		// fire once per batch.
 		return
 	}
@@ -627,7 +634,7 @@ func (b *Bridge) recordPaseFailure() {
 	b.logger.Warn("matter.rx.sc.pase_bruteforce",
 		slog.Int("max_errors", paseMaxErrors),
 		slog.Duration("lockout", cooldown),
-		slog.String("hint", "too many PASE pairing failures; revoking commissioning window and refusing PASE for the lockout period"))
+		slog.String("hint", "too many PASE pairing failures; closing the commissioning window and refusing PASE for the lockout period"))
 	b.diagRing().Record(diagevent.Event{
 		Kind:     diagevent.KindPairing,
 		Severity: diagevent.SeverityError,
@@ -640,7 +647,7 @@ func (b *Bridge) recordPaseFailure() {
 		},
 	})
 	if win != nil {
-		// RevokeWindow runs the window's restore closure synchronously, and
+		// EndCommissioning runs the window's restore closure synchronously, and
 		// every production restore closure re-attaches the configured PASE
 		// acceptor via AttachPaseHandler / AttachPaseHandlerProvider — each of
 		// which calls resetPaseFailures(). Without this guard that reset
@@ -650,7 +657,7 @@ func (b *Bridge) recordPaseFailure() {
 		// restore; a genuine operator-initiated window open takes a different
 		// path and still starts clean.
 		b.preserveLockoutOnReset.Store(true)
-		_ = win.RevokeWindow(context.Background())
+		win.EndCommissioning()
 		b.preserveLockoutOnReset.Store(false)
 	}
 }
@@ -700,12 +707,12 @@ func (b *Bridge) paseLockedOut() bool {
 }
 
 // resetPaseFailures clears the per-window PASE state — the failure counter,
-// any active lockout and its backoff streak, and the unsecured
-// duplicate-detection windows. Called when a fresh PASE acceptor is
-// installed ([Bridge.AttachPaseHandler] /
+// any active lockout and its backoff streak. Called when a fresh PASE
+// acceptor is installed ([Bridge.AttachPaseHandler] /
 // [Bridge.AttachPaseHandlerProvider]) — a commissioning-window boundary —
-// so each window gets its own [paseMaxErrors] budget, an unlocked PASE
-// path and a clean set of per-source dedup windows.
+// so each window gets its own [paseMaxErrors] budget and an unlocked PASE
+// path. The unsecured duplicate-detection windows are not window state:
+// each lives with its handshake ([unsecuredWindowTable]).
 //
 // Exception: when the brute-force cap's own RevokeWindow drives the
 // re-attach (preserveLockoutOnReset is raised), an in-force lockout and its
@@ -724,8 +731,6 @@ func (b *Bridge) resetPaseFailures() {
 		b.paseLockoutStreak = 0
 	}
 	b.mu.Unlock()
-	b.unsecuredWindows.Clear()
-	b.unsecuredWindowCount.Store(0)
 }
 
 // handlePase + handleCase share the handler-invocation + reply-send
@@ -986,10 +991,19 @@ type peerSessionParamsSource interface {
 // parameters before it replies (PaseServer.ts:153-156,
 // CaseServer.ts:120-123), so its PBKDFParamResponse, Pake2 and Sigma2
 // retransmit at the peer's active interval (MRP.ts:181).
+//
+// The initiator has not authenticated yet, so its intervals are clamped to
+// [sessionparams.MaxUnauthenticatedInterval] here, where the bridge adopts
+// them for the handshake's own replies (review II, owner decision 45; the
+// controller side clamps at the same point, client/exchange). The secure
+// session the handshake establishes keeps them as stated.
 func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 	var params *sessionparams.Parameters
 	if s, ok := handler.(peerSessionParamsSource); ok {
-		params = s.PeerSessionParams()
+		if stated := s.PeerSessionParams(); stated != nil {
+			clamped := sessionparams.ClampUnauthenticated(*stated)
+			params = &clamped
+		}
 	}
 	return newHandshakePeerTiming(params, rxAt)
 }
@@ -1100,7 +1114,9 @@ type reannounceTriggerSetter interface {
 // inbound-CloseSession and shutdown paths, it self-wires the reverse
 // hooks when the registry supports them: the graceful-close notifier
 // (outbound CloseSession StatusReport before key zeroise) and the
-// mDNS reannounce trigger. Pass nil to detach.
+// mDNS reannounce trigger, the PASE close hook and the idle reaper's
+// exemption for a session that carries a live subscription. Pass nil to
+// detach.
 //
 // The registry's own close hook is the host's to wire (it also feeds the
 // subscription manager): the host calls [Bridge.SessionClosed] from it,
@@ -1127,6 +1143,7 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	if setter, ok := reg.(paseCloseNotifierSetter); ok {
 		setter.SetOnPaseSessionClose(b.triggerCommissioningReannounce)
 	}
+	b.wireReapExemption(reg)
 }
 
 // paseCloseNotifierSetter is the session registry's hook for a closed
@@ -1421,7 +1438,7 @@ type serviceRetransmitter interface {
 // waits for it before the advertiser closes. No-op once the bridge
 // stopped — matter.js shuts the advertiser down before removing
 // sessions to prevent exactly this re-announce
-// (ServerNetworkRuntime.ts:427).
+// (ServerNetworkRuntime.ts:450-453 at db021da0).
 func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 	if fabricIndex == 0 {
 		return

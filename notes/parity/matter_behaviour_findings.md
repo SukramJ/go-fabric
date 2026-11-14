@@ -779,23 +779,6 @@ with a port of the named case.
   hands all three and the peer term uses `maxScheduleTime` as the local
   one does; `TestChunkStatusResponseTimeoutSumsBothDirections` gains the
   case. Found in review II, phase 1 (the fix of R2-P1-req2-12).
-- **F-db021da0-14: a refused SubscribeRequest leaves the peer's
-  subscriptions standing where matter.js has cleared them.** matter.js
-  checks the path count (`InteractionServer.ts:635-641` at `db021da0`),
-  then runs the KeepSubscriptions=false teardown (`:647-665`), then
-  refuses a request that names no path (`:667-672`) and, further down,
-  one with an illegal path (`validateReadPaths`, `:699`; the checks
-  between `:672` and `:699` were not read). `handleSubscribeRequest`
-  validates the paths and refuses the empty request first
-  (`bridge/subscribe.go`, `im.ValidateReadPaths`, then the "empty"
-  refusal) and tears down only when it registers the subscription
-  (`registerSubscription`). So a KeepSubscriptions=false request refused
-  for an illegal path or for naming none has cancelled the peer's
-  subscriptions in matter.js and none here. Read, not exercised
-  (unverified by a test on either side); which of the two a controller
-  relies on is not known. Fix: the teardown before the two refusals, as
-  the lines have it, with a parity case — or a `by_design` row. Found in
-  review II, phase 1 (the citation pass).
 - **F-db021da0-15: the controller holds reported values to their
   constraints, and fails on a malformed one, where matter.js decodes by
   shape and skips.** matter.js decodes each attribute of a data report
@@ -819,6 +802,49 @@ with a port of the named case.
   the generated decoders — and the skip-and-continue rule, each with a
   parity case; phase 4. Found by CAMERA-GO-1.1 on a CI runner of pull
   request 525.
+- **F-db021da0-16: the priming report is sorted ascending, where matter.js's
+  read walks its collections without a sort.** A Subscribe's priming report
+  visits each path's results in
+  ascending (endpoint, cluster, attribute) order: the endpoints of a wildcard
+  path in ascending id order, each endpoint's results sorted
+  (`newPrimingSource`, `bridge/subscribe_dispatch.go`, calls
+  `im.NewAttributeExpansion(…).Ascending()`; the option is in
+  `im/read_expansion.go`). matter.js's read response iterates the node's
+  endpoints, an endpoint's clusters and a cluster's attributes as their
+  collections yield them, with no sort at these lines
+  (`packages/protocol/src/action/server/AttributeReadResponse.ts:183-185`,
+  `:337-339`, `:378-380` at `db021da0`). What order those collections yield
+  was not read here: the comment on the Go side names the order of insertion,
+  with lines of `ProtocolService.ts` that were not re-read, and whether that
+  order is ascending in practice is unverified — so this is not yet known to
+  differ on the wire. The ascending order is this module's own, kept for a
+  controller that processes the priming report in stream order (the same
+  comment). Fix, if the orders differ: the priming report follows matter.js's
+  order, or the difference becomes a `by_design` entry with its reason, each
+  with a parity case; phase 4. Found in review II, phase 2 (the rework of the
+  priming report for R2-P2-alloc-04).
+- **F-db021da0-17: a DataVersion here is never 0 and is new at every
+  start; matter.js's can be 0 and comes back from its store.** A
+  `contract.DataVersionTracker` starts at a random value that is not 0,
+  `Bump` skips 0 on its way round ("reserved per Matter §10.6.5" in its
+  comment — the specification was not read), and `Current` uses 0 for
+  "not installed yet" (`contract/dataversion.go`). matter.js starts a
+  datasource's version at `entropy.randomUint32`, which can be 0
+  (`packages/node/src/behavior/state/managed/Datasource.ts:597` at
+  `db021da0`), and `advanceVersion` wraps past 0xFFFF_FFFF to 0
+  (`:690-699`). It also takes the version from its store where there is
+  one (`:802`, `:837`: `this.version = store.version`); which datasources
+  have such a store, and so which versions survive a restart there, was
+  not read (unverified) — here every version is new at each start, so a
+  controller's cached versions never match after one and every priming
+  report is whole. Neither difference is in `by_design.md`. Since owner
+  decision 46 the wire and the filters treat 0 as an ordinary version; the
+  tracker's own zero state is what is left of the sentinel. Fix: the
+  tracker holds "installed" beside the value and 0 becomes a version, or a
+  `by_design` entry with the reason; and a decision whether versions are
+  kept across a restart, with what matter.js keeps read first; phase 4.
+  Found in review II, phase 2 (the third citation pass; design note 6 of
+  the counters flow).
 
 ## Tier 3 — LOW
 

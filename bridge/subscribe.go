@@ -135,8 +135,26 @@ func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad t
 func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	b.mu.Lock()
 	b.subManager = m
+	started, run := b.started, b.runGen
 	b.mu.Unlock()
-	b.rewireMeasurementListeners()
+	// The host's value listeners are rewired onto m only while a run is
+	// live: Stop detached them and keeps the topology, so a rewire on a
+	// stopped bridge would register it with the host's notifiers again;
+	// the next Start's assembly wires them (review II, R2-P2-sess-09,
+	// N-bridge2-4). A Stop that sets in after the wiring detaches what it
+	// finds; one that set in before the wiring was installed missed it,
+	// so it goes again here — as in Reassemble. An attach while Start
+	// runs is wired by Start once the run is started (review II,
+	// R2-P2-dr-req-05).
+	if started {
+		generation := b.rewireMeasurementListeners()
+		b.mu.RLock()
+		ended := b.runEndedLocked(&run)
+		b.mu.RUnlock()
+		if ended {
+			b.detachListenersOfGeneration(generation)
+		}
+	}
 	if m != nil {
 		// The manager owns subscription lifetime; the bridge owns the
 		// routing state keyed by subscription ID. Without this hook the
@@ -244,8 +262,10 @@ type subTarget struct {
 	// abort, when it closes, ends the wait for the peer's answer to a
 	// chunk of the report being sent ([errChunkWaitAborted]). The ongoing
 	// reporters set it to their context's Done on the copy they send
-	// with — the subscription engine's stop — and it is never stored in
-	// the routing table. Nil: the wait ends with its answer or its timer.
+	// with — the subscription engine's stop — the flush reporter to its
+	// flush's ctx (Stop's budget, a fabric removal), and it is never
+	// stored in the routing table. Nil: the wait ends with its answer or
+	// its timer.
 	abort <-chan struct{}
 }
 
@@ -532,13 +552,31 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 	// A wildcard path's WildcardPathFlags skip their paths in the
 	// subscription's reports as in a read (AttributeReadResponse.ts:149-197).
 	results := im.ApplyWildcardPathFlags(im.WithElementQualities(ctx, specElementQualities{}), dispatcher, path, dispatcher.Read(ctx, path))
+	allow := readResultAuthorizer(ctx, dispatcher)
+	if allow == nil {
+		return results
+	}
+	authorized := make([]im.ReadResult, 0, len(results))
+	for _, rr := range results {
+		if allow(rr) {
+			authorized = append(authorized, rr)
+		}
+	}
+	return authorized
+}
+
+// readResultAuthorizer is the gate [Bridge.readAuthorizedResults] applies
+// to each result, for the subject ctx carries: nil when every result
+// passes (PASE, or a dispatcher without an ACL), else a func reporting
+// whether the subject may read the result's attribute.
+func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im.ReadResult) bool {
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if im.IsPASEFromContext(ctx) {
-		return results // PASE — commissioning channel, implicit Administer
+		return nil // PASE — commissioning channel, implicit Administer
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
-		return results
+		return nil
 	}
 	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
@@ -549,22 +587,18 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 		// either, as at every gate of im: the filter does not rest on the
 		// access-control source knowing that index (review II,
 		// R2-P0-rv-A08).
-		return nil
+		return func(im.ReadResult) bool { return false }
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
-	authorized := make([]im.ReadResult, 0, len(results))
-	for _, rr := range results {
+	return func(rr im.ReadResult) bool {
 		var priv uint8 = 1 // View default
 		if hasPriv {
 			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		}
-		if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv); !status.IsSuccess() {
-			continue // subject not permitted to read this attribute — drop
-		}
-		authorized = append(authorized, rr)
+		// A subject not permitted to read this attribute — drop.
+		return aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv).IsSuccess()
 	}
-	return authorized
 }
 
 // reportSubscription assembles + ships a ReportData for sub. Called
@@ -696,6 +730,11 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		return
 	}
 	target.flush = true
+	// ctx ends every chunk's wait, not only the last one's
+	// (awaitFlushedReport): Stop's stopSessionCloseBudget and a fabric
+	// removal's ctx bound the whole flush however many chunks it takes
+	// (review II, R2-P2-dr-req-01).
+	target.abort = ctx.Done()
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
@@ -703,6 +742,12 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		}
 		if len(paths) > 0 {
 			sub.RequeueAttributes(paths)
+		}
+		if errors.Is(err, errChunkWaitAborted) {
+			// ctx ended the flush (Stop's budget, a removal's ctx): the
+			// peer did nothing wrong, as for the ongoing reporters (review
+			// II, R2-P2-rr-dev-05).
+			return
 		}
 		b.noteSubscriptionSendError(sub.ID, "flush", err)
 		return
@@ -942,27 +987,21 @@ func (b *Bridge) captureSubTarget(subID uint32, src net.Addr, requestHdr *messag
 	})
 }
 
-// nextOutboundExchangeID allocates a fresh 15-bit exchange identifier
-// for a server-initiated exchange. Mirrors matter.js's
-// `ExchangeManager.#getNextExchangeId` (packages/protocol/src/
-// protocol/ExchangeManager.ts). The high bit (0x8000) is reserved by
-// Matter §4.13 as the Initiator flag and is set in the protocol
-// header on the wire, not embedded in the exchange ID itself.
+// nextOutboundExchangeID allocates the exchange identifier of a
+// server-initiated exchange: the next value of a 16-bit counter that New
+// seeds at random and that wraps past 0xFFFF to 0. Mirrors matter.js
+// ExchangeCounter.getIncrementedCounter
+// (packages/protocol/src/protocol/ExchangeManager.ts:794-808) and
+// connectedhomeip src/messaging/ExchangeMgr.cpp:67, :128
+// (`mNextExchangeId++` on a uint16). The exchange id is a full 16-bit
+// field; the Initiator flag is a separate bit of the exchange flags.
 //
-// Counter wraps via modulo 0x7FFF + 1; the bridge re-uses an ID only
-// after the entire 15-bit space has been consumed, which keeps the
-// risk of an ID collision with a still-live commissioner exchange
-// negligible (the longest-running subscription is bounded by Apple's
-// MaxIntervalCeiling ~600 s, far below the wrap time at any realistic
-// outbound rate).
+// An id is re-used only after the whole 16-bit space has been consumed.
+// matter.js also skips an id an open exchange it started on the same
+// session still holds (ExchangeManager.ts:189-197, #freeExchangeIdFor);
+// the bridge keeps no table of its own initiated exchanges to consult.
 func (b *Bridge) nextOutboundExchangeID() uint16 {
-	for {
-		next := b.outboundExchangeID.Add(1)
-		exch := uint16((next & 0x7FFF) & 0xFFFF)
-		if exch != 0 {
-			return exch
-		}
-	}
+	return uint16(b.outboundExchangeID.Add(1)) //nolint:gosec // G115: the truncation to 16 bits is the wrap past 0xFFFF to 0
 }
 
 // sendReportChunks splits report into per-datagram chunks and ships
@@ -1352,9 +1391,11 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 // Orchestrates the Subscribe flow in four steps — each extracted into
 // its own method in subscribe_dispatch.go (mirrors the ADR 0031 pattern
 // for handleIMOpcode → receive_dispatch.go):
-//  1. buildInitialReport — read all requested paths + events, sort.
-//  2. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
-//  3. streamInitialReportChunks — chunked ReportData send with per-chunk ack wait.
+//  1. teardownForSubscribe — the KeepSubscriptions=false teardown, before
+//     the request's refusals; registerSubscription — manager Subscribe.
+//  2. primingMatches — reject a Subscribe that matches nothing.
+//  3. streamPrimingChunks — the priming report, generated chunk by chunk
+//     (newPrimingSource, primingEvents), with a per-chunk ack wait.
 //  4. sendSubscribeResponse — SubscribeResponse with piggyback ack + TouchLastReport.
 //
 // abandonPrimingSubscription closes a subscription whose priming report
@@ -1382,25 +1423,56 @@ func (b *Bridge) handleSubscribeRequest(
 			slog.String("src", srcString(src)))
 		return nil
 	}
+	return b.subscribeWith(ctx, dispatcher, src, requestHdr, proto, req)
+}
 
-	// Reject illegal paths up front with a top-level InvalidAction
-	// StatusResponse (wildcard cluster + concrete non-global attribute, or
-	// wildcard cluster + concrete event), and a request beyond the path
-	// ceiling with PathsExhausted, before building any report. Mirrors
-	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
-	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
-	// gates Read and Subscribe through the same check, and the
-	// MAX_SUBSCRIBE_PATHS check (:635-641), which matter.js runs before
-	// it.
-	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
-		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
+// subscribeWith is [Bridge.handleSubscribeRequest] against dispatcher.
+func (b *Bridge) subscribeWith(
+	ctx context.Context,
+	dispatcher im.Dispatcher,
+	src net.Addr,
+	requestHdr *message.Header,
+	proto message.ProtocolHeader,
+	req im.SubscribeRequest,
+) error {
+	// The order is matter.js InteractionServer.handleSubscribeRequest's
+	// at db021da0 (F-db021da0-14, review II R2-P2-sess-04): the path
+	// count (:635-641), the KeepSubscriptions=false teardown (:647-665),
+	// the request naming no path (:667-672), the illegal paths
+	// (validateReadPaths, :699). A request refused for naming no path or
+	// an illegal one has cost the peer its subscriptions, as there.
+	if len(req.AttributeRequests)+len(req.EventRequests) > im.MaxReadPaths {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", im.StatusPathsExhausted)
 	}
+
+	// The priming report waits for the peer's answer to each chunk; a
+	// session already holding [maxChunkWaitsPerSession] such waits is
+	// answered Busy before anything is registered or torn down (review
+	// II, R2-P1-req2-01). matter.js has no such refusal; this module's
+	// own bound refuses side-effect free, and the controller retries.
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	if !claimed {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
+	}
+	defer release()
+
+	b.teardownForSubscribe(src, requestHdr, req)
 
 	// A Subscribe naming no attribute and no event paths at all is
 	// InvalidAction — matter.js InteractionServer.ts:667-672 at db021da0 ("No
 	// attributes or events requested").
 	if len(req.AttributeRequests) == 0 && len(req.EventRequests) == 0 {
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "empty")
+	}
+
+	// Reject illegal paths with a top-level InvalidAction StatusResponse
+	// (wildcard cluster + concrete non-global attribute, or wildcard
+	// cluster + concrete event) before building any report. Mirrors
+	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
+	// §8.4.3.2; :138, called for a subscribe at :699 at db021da0), which
+	// gates Read and Subscribe through the same check.
+	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
 	}
 
 	// Stamp the FabricFiltered flag + requesting FabricIndex into the
@@ -1414,19 +1486,13 @@ func (b *Bridge) handleSubscribeRequest(
 	subSubjectNodeID, subSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	subCtx := im.WithFabricFilter(ctx, req.FabricFiltered, subFabricIndex)
 	subCtx = im.WithSubject(subCtx, subSubjectNodeID, subSubjectCATs)
+	// A path naming a node is answered for this node's id on the
+	// session's fabric only (review II, R2-P2-alloc-07).
+	subLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, subFabricIndex)
+	subCtx = im.WithLocalNodeID(subCtx, subLocalNodeID)
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
-
-	// The priming report waits for the peer's answer to each chunk; a
-	// session already holding [maxChunkWaitsPerSession] such waits is
-	// answered Busy before anything is registered or torn down (review
-	// II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
-	if !claimed {
-		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
-	}
-	defer release()
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.
@@ -1474,19 +1540,31 @@ func (b *Bridge) handleSubscribeRequest(
 	// node (matter.js EventReadResponse.ts:68-77; review 2026-11
 	// W2-wire-05).
 	primingReq := req
-	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, subFabricIndex))
-	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, primingReq)
+	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, subLocalNodeID)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
-	// the admission above as there. The matched count is taken BEFORE
+	// the admission above as there. The match is taken BEFORE
 	// DataVersionFilter suppression, so a legitimately quiet re-subscribe
-	// (all clusters cached) still establishes.
-	if matchedPaths == 0 {
+	// (all clusters cached) still establishes. It is decided before the
+	// first chunk, by an expansion that stops at the first match.
+	if !b.primingMatches(subCtx, dispatcher, primingReq) {
 		b.abandonPrimingSubscription(subID)
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
 	}
-	initialReport.HasSubscription, initialReport.SubscriptionID = stamp.HasSubscription, stamp.SubscriptionID
+	// The priming report is generated chunk by chunk (review II, decision
+	// 44): attribute reports in request-path order, then the events.
+	attributes := b.newPrimingSource(subCtx, dispatcher, primingReq)
+	var primed im.ReportData
+	var events func() []im.EventReport
+	if len(primingReq.EventRequests) > 0 {
+		events = func() []im.EventReport {
+			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq)
+			return primed.EventReports
+		}
+	}
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunker := newReportChunker(stamp, limits.budget, limits.hardCap, attributes.next, events)
 	// The priming report waits for the peer's StatusResponse per chunk,
 	// which arrives on this session: hand its turn on. The wait ends with
 	// the subscription too — a KeepSubscriptions=false request that
@@ -1494,11 +1572,14 @@ func (b *Bridge) handleSubscribeRequest(
 	abort := b.primingAbort(subID)
 	defer b.forgetPrimingAbort(subID)
 	leaveSessionOrder(ctx)
-	if err := b.streamInitialReportChunks(ctx, abort, src, requestHdr, proto, subID, initialReport); err != nil {
+	if err := b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
-	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport); err != nil {
+	b.logger.Debug("matter.tx.subscribe.initial_reports",
+		slog.Int("subscription_id", int(subID)),
+		slog.Int("initial_reports", attributes.reports))
+	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, primed); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
@@ -1705,6 +1786,7 @@ func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	b.listenerGeneration++
 	generation = b.listenerGeneration
 	mgr, topology := b.subManager, b.topology
+	b.listenerManager = mgr
 	b.mu.Unlock()
 	runUnsubscribers(stale)
 	if mgr == nil || topology == nil {
@@ -1769,11 +1851,14 @@ func runUnsubscribers(unsubs []func()) {
 // wireRootNotifiers subscribes every root cluster server that
 // implements [contract.ChangeNotifier] — today the Groupcast server, whose
 // Membership and counts move with the group state — to its own reportable
-// attributes on endpoint 0: a fire marks them dirty so subscribers get a
-// report. A root server keeps its own DataVersion (it bumps it before it
-// fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
-// reactive state matter.js keeps for root behaviors. The caller holds no
-// bridge lock.
+// attributes on endpoint 0: a fire advances the cluster's DataVersion
+// through [endpointpkg.Endpoint.BumpDataVersionOf] — the endpoint-held one
+// of a server that keeps none of its own; a server with a tracker of its
+// own advances that itself, so nothing is advanced twice — and then marks
+// the attributes dirty so subscribers get a report. A fire while a command
+// runs against the cluster does neither: the command advances the version
+// once when it ends (invokeCommitTable). Mirrors the reactive state
+// matter.js keeps for root behaviors. The caller holds no bridge lock.
 func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	root := topology.FindByID(0)
 	if root == nil {
@@ -1791,7 +1876,18 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 				HasEndpoint: true, HasCluster: true, HasAttribute: true,
 			})
 		}
+		clusterID := srv.MatterClusterID()
+		attrs := srv.MatterReportable()
 		set.add(notifier.OnMatterValueChanged(func() {
+			// A command running against the cluster advances the
+			// version once when it ends (invokeCommitTable).
+			if b.invokeCommits.hold(root.ID, clusterID, attrs) {
+				return
+			}
+			// The version first, so the report carries the post-change
+			// one: the endpoint-held tracker of a server that keeps none
+			// of its own (review II, decision 46).
+			root.BumpDataVersionOf(clusterID)
 			for _, p := range paths {
 				mgr.OnAttributeChanged(p)
 			}
@@ -1810,10 +1906,13 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // advanceVersion, then broadcastChanges for the changed properties only)
 // — but for a change from a controller's write, whose version the
 // dispatcher advanced already: one write, one advance.
-// A root or aggregator server is a persistent instance whose own tracker
-// is the DataVersion the dispatcher reports (endpoint/dispatcher.go
+// A root or aggregator server with a tracker of its own
+// (contract.ClusterDataVersion) is a persistent instance whose tracker is
+// the DataVersion the dispatcher reports (endpoint/dispatcher.go
 // clusterDataVersionFor), so it bumps that itself before it fires and
-// nothing is bumped here. matter.js reports a state change of every
+// nothing is bumped here; one without has the endpoint-held version
+// advanced as a bridged endpoint's is ([endpointpkg.Endpoint.BumpDataVersionOf]).
+// matter.js reports a state change of every
 // behavior on every endpoint the same way, the root's included — the OTA
 // requestor's UpdateState is plain behavior state
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
@@ -1830,7 +1929,6 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 		if ep == nil {
 			continue
 		}
-		persistent := ep.IsRoot() || ep.IsAggregator()
 		for _, srv := range endpointpkg.ClusterServers(ep) {
 			notifier, ok := srv.(contract.AttributeChangeNotifier)
 			if !ok {
@@ -1849,13 +1947,22 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				if len(attrIDs) == 0 {
 					return
 				}
+				// A command running against the cluster advances the
+				// version once when it ends (invokeCommitTable); a
+				// controller's write keeps its own commit.
+				if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
+					if hook := b.onAttributeChange.Load(); hook != nil {
+						(*hook)(ep.ID, clusterID, change)
+					}
+					return
+				}
 				// A controller's write is one commit with one advance:
 				// the dispatcher's (endpoint/dispatcher.go WriteAuthorized),
 				// so the change the write itself reports does not advance
-				// it again (matter.js Datasource.ts:1440-1448,
+				// it again (matter.js Datasource.ts:1446-1457 at db021da0,
 				// advanceVersion once per commit).
-				if !persistent && change.Origin != contract.OriginControllerWrite {
-					ep.BumpClusterDataVersion(clusterID)
+				if change.Origin != contract.OriginControllerWrite {
+					ep.BumpDataVersionOf(clusterID)
 				}
 				for _, attr := range attrIDs {
 					mgr.OnAttributeChanged(im.ConcreteAttributePath{
@@ -1875,7 +1982,9 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // advances the touched clusters' endpoint-hosted DataVersion BEFORE dirty-
 // marking (so the shipped report carries the post-change version and a
 // controller's DataVersionFilter misses on the next read — mirrors matter.js
-// Datasource.ts:1035), then marks every path dirty on the Subscribe manager. The
+// Datasource.ts:1456-1457 at db021da0, where a commit advances the version in
+// its first phase, ahead of the change notifications of postCommit,
+// :1286-1326), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
 func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
@@ -1899,6 +2008,11 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 				slog.Int("paths", len(pathSet)),
 				slog.Int("changed", len(changed)))
 		}
+		// A command running against a cluster advances its version
+		// once when it ends (invokeCommitTable): its paths are held.
+		changed = slices.DeleteFunc(changed, func(p im.ConcreteAttributePath) bool {
+			return b.invokeCommits.hold(epID, p.Cluster, []uint32{p.Attribute})
+		})
 		bumped := make(map[uint32]struct{}, 1)
 		for _, p := range changed {
 			if _, done := bumped[p.Cluster]; !done {

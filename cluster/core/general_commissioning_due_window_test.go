@@ -107,3 +107,69 @@ func TestGencomm_ArmOverADueWindowFromASurvivingSessionArms(t *testing.T) {
 		t.Fatalf("FailSafeFabric = %d, %v; want %d, armed", fabric, armed, idx)
 	}
 }
+
+// TestGencomm_CommissioningCompleteOnADueWindowCommitsNothing is
+// R2-P2-comm-09 = N-core2-1: a CommissioningComplete that arrives once the
+// window is past its deadline, before the watcher ran, answers
+// NoFailSafe and the window's AddNOC is rolled back.
+func TestGencomm_CommissioningCompleteOnADueWindowCommitsNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	clk := clocktest.New(time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC))
+	st := memstore.New()
+	r := newFailSafeRig(t, st, st, clk, nil)
+	idx := r.armAndAddNOC(ctx, t)
+	defer func() { _ = r.gc.ArmFailSafeFor(ctx, 0, 0) }()
+	clk.StepWall(61 * time.Second)
+	resp, err := r.gc.MatterInvoke(im.WithFabricFilter(ctx, true, idx), 0x04, nil)
+	if err != nil {
+		t.Fatalf("CommissioningComplete: %v", err)
+	}
+	if code := resp.(core.CommissioningCompleteResponse).ErrorCode; code != core.CommissioningErrorNoFailSafe {
+		t.Fatalf("CommissioningComplete on a due window: ErrorCode %d, want NoFailSafe (%d)", code, core.CommissioningErrorNoFailSafe)
+	}
+	if fabrics, _ := st.ListFabrics(ctx); len(fabrics) != 0 {
+		t.Fatalf("%d fabric(s) after a CommissioningComplete on a due window, want the AddNOC rolled back", len(fabrics))
+	}
+}
+
+// TestGencomm_PASEAutoArmReArmsThePASEFailSafe pins owner decision 47:
+// every new PASE session arms the fail-safe for 60 s — a fresh one when
+// none is armed, and the one a PASE session armed is re-armed to 60 s from
+// now (matter.js GeneralCommissioningServer.ts #handleAddedPaseSessions →
+// #armFailSafe → failsafeContext.extend at db021da0) — while a fail-safe
+// an administrator armed over CASE is left as it is (extend refuses
+// another fabric). Check and arm are one step. The re-arm keeps the
+// Breadcrumb, as matter.js re-arms with the current one
+// (GeneralCommissioningServer.ts:65, :117-119 at db021da0).
+func TestGencomm_PASEAutoArmReArmsThePASEFailSafe(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name       string
+		ctx        context.Context
+		wantArmed  bool
+		wantFabric uint8
+	}{
+		{"armed over PASE", im.WithAuthModePASE(context.Background()), false, 0},
+		{"armed over CASE", im.WithFabricFilter(context.Background(), true, 2), true, 2},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			clk := clocktest.New(time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC))
+			gc := newGencomm(t, core.GeneralCommissioningConfig{Clock: clk})
+			if resp, err := gc.MatterInvoke(c.ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 900, Breadcrumb: 7}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+				t.Fatalf("ArmFailSafe: %+v, %v", resp, err)
+			}
+			defer func() { _ = gc.ArmFailSafeFor(context.Background(), 0, 0) }()
+			gc.AutoArmOnPaseEstablished(context.Background())
+			if v, _ := gc.MatterRead(0x0000); v.(uint64) != 7 {
+				t.Fatalf("Breadcrumb after a new PASE session's arm = %v, want 7 (kept)", v)
+			}
+			clk.StepWall(61 * time.Second)
+			fabric, armed := gc.FailSafeFabric()
+			if armed != c.wantArmed || fabric != c.wantFabric {
+				t.Fatalf("61 s after a new PASE session: FailSafeFabric = %d, %v; want %d, %v", fabric, armed, c.wantFabric, c.wantArmed)
+			}
+		})
+	}
+}

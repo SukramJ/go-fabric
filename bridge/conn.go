@@ -427,25 +427,100 @@ func (b *Bridge) closeConnRoute(r *connRoute) {
 	_ = c.Close()
 }
 
+// reapExemptionSetter is the session registry's idle-reaper exemption
+// (secure/operational Manager.SetReapExemption).
+type reapExemptionSetter interface {
+	SetReapExemption(fn func(sessionID uint16) bool)
+}
+
+// wireReapExemption hands reg, when it has an idle reaper, the bridge's
+// answer to whether a session may be reaped: not while it carries a live
+// subscription ([Bridge.sessionHoldsSubscription]). Called from
+// [Bridge.AttachSessionRegistry] beside the registry's other reverse hooks
+// (review II, R2-P2-sess-02, owner decision 43).
+func (b *Bridge) wireReapExemption(reg SessionRegistry) {
+	if setter, ok := reg.(reapExemptionSetter); ok {
+		setter.SetReapExemption(b.sessionHoldsSubscription)
+	}
+}
+
+// sessionHoldsSubscription reports whether sessionID carries a live
+// subscription — the idle reaper spares such a session: a subscriber's
+// MinIntervalFloor can hold back every report, and with them the
+// session's only traffic, beyond the reaper's idle timeout. The
+// subscription's own liveness (its report sends failing, the peer's MRP
+// exhaustion) ends a session whose peer is gone, and the reaper takes it
+// once its last subscription has closed.
+func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
+	m := b.subscriptionManagerLocked()
+	if m == nil {
+		return false
+	}
+	return m.CountBySession()[sessionID] > 0
+}
+
 // SessionClosed tells the bridge that secure session sessionID is gone.
 // The host calls it from the session registry's close hook — the hook
 // that also cascades into the subscription manager
 // (operational.Manager.SetOnSessionClose) — so every close path reaches
 // it: CloseSession, fabric removal, NOC rotation, the idle reaper, a
 // peer-loss eviction. The bridge ends the session's chunk waits and its
-// open chunked writes, forgets the session's route and closes a TCP
+// open chunked writes, drops its outbound reliable entries, timed
+// deadlines, exchange reply routes and ack obligations
+// ([Bridge.purgeSessionState]), forgets the session's route and closes a TCP
 // connection whose last session this was (unbindSessionRoute;
 // matter.js ExchangeManager.ts:674-681). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
+	b.purgeSessionState(sessionID)
+	b.unbindSessionRoute(sessionID)
+	b.recordSessionsOpen()
+}
+
+// purgeSessionState drops everything the bridge holds for the secure
+// session sessionID but its route: every close path calls it —
+// [Bridge.SessionClosed], which the registry's close hook reaches for
+// every close, and [Bridge.evictSession], which runs before it — so no
+// table keeps an entry of a closed session until its own sweep. It is
+// idempotent. Review II, R2-P2-sess-06 and R2-P2-sess-10 (S-21).
+func (b *Bridge) purgeSessionState(sessionID uint16) {
 	// A handler waiting for the session's answer to a chunk stops now,
 	// not at its timer (review II, R2-P1-req2-01).
 	b.endSessionChunkWaits(sessionID)
 	// Its open chunked writes end and release their holds (review II,
 	// R2-P1-dr-req-02).
 	b.routing.dropSessionWriteTxs(sessionID)
-	b.unbindSessionRoute(sessionID)
-	b.recordSessionsOpen()
+	// Its exchanges die with it, so no timed deadline it registered can
+	// be consumed.
+	b.routing.dropSessionTimedDeadlines(sessionID)
+	b.mu.RLock()
+	outbound, tracker := b.outboundReliable, b.ackTracker
+	b.mu.RUnlock()
+	// Nothing it sent is retransmitted on the closed session's keys.
+	outbound.DropSession(sessionID)
+	b.dropSessionReplyRoutes(tracker, sessionID)
+}
+
+// dropSessionReplyRoutes deletes the exchange reply routes of sessionID
+// and discharges the ack obligations they route, under
+// exchangeRouting.ackRouteMu — the mutex that orders a route's store with
+// its obligation ([Bridge.owedInboundAck]), so an arrival racing the purge
+// is either dropped whole or stores both afterwards. tracker may be nil
+// (no MRP wired): the routes still go.
+func (b *Bridge) dropSessionReplyRoutes(tracker *mrp.AckTracker, sessionID uint16) {
+	b.routing.ackRouteMu.Lock()
+	defer b.routing.ackRouteMu.Unlock()
+	b.routing.exchangeSrcs.Range(func(k, _ any) bool {
+		key, ok := k.(mrp.ExchangeKey)
+		if !ok || key.SessionID != sessionID {
+			return true
+		}
+		if tracker != nil {
+			tracker.Discharge(key.SessionID, key.ExchangeID, key.Initiator)
+		}
+		b.routing.exchangeSrcs.Delete(k)
+		return true
+	})
 }
 
 // receive is the transport-neutral receive entry: buf is one complete
@@ -548,17 +623,10 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	// Exchanges: a chunked report waiting for its StatusResponse on the
 	// dead connection is released now rather than at its timeout, and
-	// the per-exchange reply routes and timed deadlines go with the
-	// session.
-	b.endSessionChunkWaits(sid)
-	b.routing.exchangeSrcs.Range(func(k, _ any) bool {
-		if key, ok := k.(mrp.ExchangeKey); ok && key.SessionID == sid {
-			b.routing.exchangeSrcs.Delete(k)
-		}
-		return true
-	})
-	b.routing.dropSessionTimedDeadlines(sid)
-	b.routing.dropSessionWriteTxs(sid)
+	// the per-exchange reply routes, ack obligations, timed deadlines and
+	// reliable entries go with the session (purgeSessionState; the reply
+	// routes under ackRouteMu, review II, R2-P2-sess-10).
+	b.purgeSessionState(sid)
 	b.sessionPeerAddrs.Delete(sid)
 	b.sessionRouteOwners.Delete(sid)
 

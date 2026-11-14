@@ -79,7 +79,7 @@ import (
 //
 // 410 after review II, phase 1: the citations the phase's fixes touched
 // were re-read and re-cited at the pin (41 comments in 29 files).
-const citecheckDriftRatchet = 410
+const citecheckDriftRatchet = 404
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

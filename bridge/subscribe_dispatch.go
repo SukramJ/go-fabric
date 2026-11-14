@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"sort"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -17,171 +17,275 @@ import (
 )
 
 // buildInitialReport assembles the initial ReportData for a Subscribe-Initial
-// by running each requested attribute path through the dispatcher, merging
-// cached EventReports, sorting the result, and emitting per-attribute
-// diagnostic log lines. Returns the assembled report with
-// HasSubscription=false (the caller stamps that after registerSubscription)
-// plus the count of matched attribute/event paths — taken BEFORE
-// DataVersionFilter suppression, so the caller can reject a
+// whole: the drained form of [Bridge.newPrimingSource] and
+// [Bridge.primingEvents]. Returns the assembled report with
+// HasSubscription=false plus the count of matched attribute/event paths —
+// taken BEFORE DataVersionFilter suppression, so a caller can reject a
 // zero-matching Subscribe (ServerSubscription.ts:610-614) without
-// misfiring on an all-cached re-subscribe.
-//
-// Mirrors matter.js InteractionServer.ts:startReadInteraction for the
-// Subscribe path (attribute reading + event merging + sort).
+// misfiring on an all-cached re-subscribe. The Subscribe and the
+// re-establishment stream the same reports chunk by chunk instead
+// (review II, decision 44).
 func (b *Bridge) buildInitialReport(
 	subCtx context.Context,
 	dispatcher im.Dispatcher,
 	req im.SubscribeRequest,
 ) (report im.ReportData, matchedPaths int) {
-	// Build the initial ReportData by running each requested path
-	// through the dispatcher and collecting the results into one
-	// AttributeReport list. Mirrors HandleReadRequest at the path
-	// level but lets the caller stamp HasSubscription/SubscriptionID
-	// on the output.
-	initialReport := im.ReportData{
-		HasSubscription: false, // overwritten below when manager wires the subscription
-		Reports:         nil,
+	src := b.newPrimingSource(subCtx, dispatcher, req)
+	for rep, ok := src.next(); ok; rep, ok = src.next() {
+		report.Reports = append(report.Reports, rep)
 	}
-	matched := 0
-	// A repeated AttributePathIB expands to the same results again;
-	// read each distinct path once (see [im.DedupAttributePaths]).
-	for _, path := range im.DedupAttributePaths(req.AttributeRequests) {
-		// Authorize each result against the requesting subject (subCtx
-		// carries fabric + subject from handleSubscribeRequest). Without
-		// this the Subscribe-Initial would leak fabric-sensitive
-		// attributes (ACL, NOCs) to a View-only / ACE-less subject, the
-		// same bypass reportSubscription closes for ongoing reports.
-		for _, rr := range b.readAuthorizedResults(subCtx, dispatcher, path) {
-			// Only a path that exists establishes the subscription: a
-			// status (unsupported endpoint, cluster or attribute) does not
-			// count (matter.js AttributeReadResponse.counts.existent,
-			// packages/protocol/src/action/server/AttributeReadResponse.ts:
-			// 125-131, the values and the version-filtered ones, read by
-			// ServerSubscription.ts:674, :707-711).
-			if rr.Status == im.StatusSuccess {
-				matched++
-			}
-			// DataVersionFilter evaluation: skip attributes whose cluster
-			// DataVersion matches the controller's cached version.
-			// Matter §10.6.5 — the controller infers "no change since
-			// cached" from the absence of reports for that cluster.
-			// Mirrors matter.js InteractionServer.ts:startReadInteraction
-			// DataVersionFilter evaluation.
-			//
-			// Sentinel guard: clusters without per-instance tracking
-			// return rr.DataVersion=0 and the wire encoder substitutes
-			// the §10.6.1.4 floor of 1. A controller that cached the
-			// sentinel-1 and replays it on re-pair must NOT cause the
-			// entire cluster to be omitted from the Subscribe-Initial —
-			// the bridged-endpoint clusters would silently disappear
-			// from Apple's MTRDevice ClusterStateCache and
-			// `endpointDeviceTypes` would collapse to `{0=(22)}`.
-			// Guard at >1 keeps the sentinel from ever matching.
-			if len(req.DataVersionFilters) > 0 && rr.Status == im.StatusSuccess {
-				if cached, ok := im.MatchDataVersionFilter(req.DataVersionFilters, rr.Path.Endpoint, rr.Path.Cluster); ok {
-					if cached == rr.DataVersion && rr.DataVersion > 1 {
-						continue
-					}
+	matched := src.matched
+	if len(req.EventRequests) > 0 {
+		matched += b.primingEventPaths(subCtx, dispatcher, req)
+		report.EventReports = b.primingEvents(subCtx, dispatcher, req)
+	}
+	return report, matched
+}
+
+// primingSource generates the attribute reports of a priming report one
+// at a time, for the subject subCtx carries: each requested path in
+// request order, expanded by an [im.AttributeExpansion]; each result the
+// subject may not read dropped (the gate of
+// [Bridge.readAuthorizedResults]: without it the Subscribe-Initial would
+// leak fabric-sensitive attributes — ACL, NOCs — to a View-only or
+// ACE-less subject, the same bypass reportSubscription closes for ongoing
+// reports); each cluster the controller holds at its current DataVersion
+// left out.
+//
+// Reports go out in ascending (endpoint, cluster, attribute) order per
+// path. Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
+// stream order and the HAP-Service-Mapper's topology builder needs
+// Descriptor (0x001D) cached BEFORE the cluster surfaces it references —
+// otherwise `_attributeValueDictionaryForAttributePath` reports "PartsList
+// absent from cache" and HAP-Build aborts with HAPErrorDomain Code=14 ~5s
+// after Subscribe-Initial. The ascending order is not read from matter.js,
+// which sorts nothing in a read at db021da0: a wildcard walks the node's
+// endpoints, an endpoint's clusters and a cluster's attributes
+// (packages/protocol/src/action/server/
+// AttributeReadResponse.ts:183-185, :337-339, :378-380) in the order each
+// was added to its Set or list (packages/node/src/node/integration/
+// ProtocolService.ts:153, :177, :206; :227, :248, :279; :432-434, :522).
+// matter.js emits the request's paths one after the other, a producer each
+// (AttributeReadResponse.ts:88-100 at db021da0) — so two paths are no longer
+// merged into one sorted run: the second path's reports follow the first's.
+//
+// Mirrors matter.js ServerSubscription.ts:629-722 at db021da0
+// (#processAttributesAndEventsReport: the attributes, then the events) for
+// the Subscribe path, generated as it pulls AttributeReadResponse.process
+// (:644-645).
+type primingSource struct {
+	b       *Bridge
+	exp     *im.AttributeExpansion
+	allow   func(im.ReadResult) bool
+	filters []im.DataVersionFilter
+	// suppressStatuses leaves every status report out: a re-established
+	// subscription reports no per-path error again.
+	suppressStatuses bool
+
+	// matched counts the authorized results of attributes that exist
+	// (matter.js AttributeReadResponse.counts.existent,
+	// packages/protocol/src/action/server/AttributeReadResponse.ts:
+	// 125-131, the values and the version-filtered ones, read by
+	// ServerSubscription.ts:674, :707-711): a status (unsupported
+	// endpoint, cluster or attribute) does not count.
+	matched int
+	// reports counts the reports handed out.
+	reports int
+}
+
+// newPrimingSource returns the priming reports of req's attribute paths
+// against dispatcher for the subject subCtx carries (fabric, subject,
+// auth mode, fabric filter).
+func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) *primingSource {
+	allow := readResultAuthorizer(subCtx, dispatcher)
+	if allow == nil {
+		allow = func(im.ReadResult) bool { return true }
+	}
+	return &primingSource{
+		b: b,
+		// A wildcard path's WildcardPathFlags skip their paths as in a
+		// read (AttributeReadResponse.ts:149-197).
+		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
+		allow:   allow,
+		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
+	}
+}
+
+// primingDataVersionFilters returns the DataVersionFilters that apply to
+// this node: a filter addressed to another node is ignored
+// ([im.DataVersionFiltersFor]; matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts:73-77).
+func primingDataVersionFilters(subCtx context.Context, filters []im.DataVersionFilter) []im.DataVersionFilter {
+	if localNodeID, ok := im.LocalNodeIDFromContext(subCtx); ok {
+		return im.DataVersionFiltersFor(filters, localNodeID)
+	}
+	return filters
+}
+
+// result returns the next result the subject may read.
+func (p *primingSource) result() (im.ReadResult, bool) {
+	for {
+		_, rr, ok := p.exp.Next()
+		if !ok {
+			return im.ReadResult{}, false
+		}
+		// A path naming another node is refused before any access check
+		// (AttributeReadResponse.ts:205-208 at db021da0).
+		if rr.Status != im.StatusUnsupportedNode && !p.allow(rr) {
+			continue
+		}
+		if rr.Status == im.StatusSuccess {
+			p.matched++
+		}
+		return rr, true
+	}
+}
+
+// matches reports whether any requested attribute path resolves to an
+// attribute that exists and the subject may read; it stops at the first.
+// It consumes the source: a Subscribe asks a source of its own.
+func (p *primingSource) matches() bool {
+	for {
+		rr, ok := p.result()
+		if !ok {
+			return false
+		}
+		if rr.Status == im.StatusSuccess {
+			return true
+		}
+	}
+}
+
+// next returns the next priming report; ok is false once the paths are
+// exhausted.
+func (p *primingSource) next() (im.AttributeReport, bool) {
+	for {
+		rr, ok := p.result()
+		if !ok {
+			return im.AttributeReport{}, false
+		}
+		// DataVersionFilter evaluation: skip attributes whose cluster
+		// DataVersion matches the controller's cached version.
+		// Matter §10.6.5 — the controller infers "no change since
+		// cached" from the absence of reports for that cluster.
+		// Mirrors matter.js AttributeReadResponse.ts:69-85 at db021da0
+		// (the filters indexed) and :276-281, :366-385 (a cluster at its
+		// filter's version skipped). Only a result that has a version is
+		// compared (ReadResult.HasDataVersion); every value, 0 and 1
+		// included, is an ordinary version (review II, decision 46).
+		if len(p.filters) > 0 && rr.Status == im.StatusSuccess && rr.HasDataVersion {
+			if cached, ok := im.MatchDataVersionFilter(p.filters, rr.Path.Endpoint, rr.Path.Cluster); ok {
+				if cached == rr.DataVersion {
+					continue
 				}
 			}
-			rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
-			if rr.Status != im.StatusSuccess {
-				rep.IsStatus = true
-				rep.Status = im.StatusIB{Status: rr.Status}
-			} else {
-				rep.Value = rr.Value
+		}
+		rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, HasDataVersion: rr.HasDataVersion}
+		if rr.Status != im.StatusSuccess {
+			if p.suppressStatuses {
+				continue
 			}
-			initialReport.Reports = append(initialReport.Reports, rep)
+			rep.IsStatus = true
+			rep.Status = im.StatusIB{Status: rr.Status}
+		} else {
+			rep.Value = rr.Value
 		}
+		p.log(rep)
+		p.reports++
+		return rep, true
 	}
+}
 
-	// EventRequests handling — matter.js's `InteractionServer.ts:
-	// startReadInteraction` (mirrored here for Subscribe) walks
-	// req.EventRequests and emits any cached events that match. Apple
-	// Home's MTRDevice (`MTRDevice_Concrete`) transitions from
-	// `Subscribing` to `InitialSubscriptionEstablished` only AFTER
-	// the report-end frame; an Apple Subscribe with `events: *.*.*`
-	// that comes back attributes-only leaves the controller's state
-	// machine permanently stuck in `Subscribing`, which surfaces as
-	// `Storing cluster information count: 3` and the bridge as
-	// "added but not supported". matter.js Sample byte-dump
-	// emitted 0+ EventReports per Subscribe-Initial and
-	// Apple flipped to count: 21 + InitialSubscriptionEstablished.
-	if len(req.EventRequests) > 0 {
-		raw := im.BuildEventReports(req.EventRequests, b.eventLog, req.EventFilters)
-		// The establish decision (matched > 0) counts the requested event paths
-		// that resolve to a cluster the subject may read events of, not the
-		// priming-log instances: a momentary/event-only subscribe
-		// (GenericSwitch button) is placed BEFORE the event fires, so its event
-		// log is empty at establish time — counting log records would reject it
-		// with no_match and it could never receive the future press. matter.js
-		// establishes an event subscription regardless of the priming log
-		// (ServerSubscription.ts emits 0+ EventReports on Subscribe-Initial).
-		// The raw records still seed the initial report below; authorization
-		// filtering only affects which events are disclosed, not whether the
-		// subscription establishes — then authorize + fabric-project the priming
-		// events so a wildcard event subscribe from fabric B does not receive
-		// fabric A's AccessControl-change events, and a non-Administer subject
-		// sees no AccessControl events (Matter §8.4.3.2 / §9.10.7.1). Mirrors
-		// matter.js EventReadResponse.ts #readAllowedEvents; subCtx carries the
-		// requesting fabric + subject.
-		_, subFabricIndex := im.FabricFilterFromContext(subCtx)
-		subSubjectNodeID, subSubjectCATs := im.SubjectFromContext(subCtx)
-		auth := b.eventReadAuthorizer(dispatcher, subFabricIndex, im.IsPASEFromContext(subCtx), subSubjectNodeID, subSubjectCATs)
-		matched += b.allowedEventPaths(subCtx, dispatcher, auth, req.EventRequests)
-		initialReport.EventReports = append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
-			im.AuthorizeEventReports(subCtx, auth, raw)...)
+// log is the priming report's diagnostic: each AttributeReport's
+// (endpoint, cluster, attribute, value_type), so a failing pair (Apple's
+// IM-decoder silently dropping a chunk) can be traced to a single
+// attribute without re-hexing the wire bytes. Apple's `<private>` log
+// mask hides the offending path on its side; this emit is the only
+// bridge-side window into what the Subscribe-Initial actually carried for
+// a given cluster.
+func (p *primingSource) log(r im.AttributeReport) {
+	valueType := "<status>"
+	var valuePreview any
+	if !r.IsStatus {
+		valueType = fmt.Sprintf("%T", r.Value.Value)
+		valuePreview = r.Value.Value
 	}
-	// Sort reports by (endpoint, cluster, attribute) ascending. Apple
-	// Home's MTRDevice processes the wildcard Subscribe-Initial in
-	// stream order and the HAP-Service-Mapper's topology builder needs
-	// Descriptor (0x001D) cached BEFORE the cluster surfaces it
-	// references — otherwise `_attributeValueDictionaryForAttributePath`
-	// reports "PartsList absent from cache" and HAP-Build aborts with
-	// HAPErrorDomain Code=14 ~5s after Subscribe-Initial. matter.js
-	// emits its reports in the same ascending order
-	// (`packages/protocol/src/interaction/InteractionServer.ts:
-	// generateAttributeListReport` walks endpoints sorted then
-	// clusters sorted then attributes sorted).
-	sort.Slice(initialReport.Reports, func(i, j int) bool {
-		a, b := initialReport.Reports[i].Path, initialReport.Reports[j].Path
-		if a.Endpoint != b.Endpoint {
-			return a.Endpoint < b.Endpoint
-		}
-		if a.Cluster != b.Cluster {
-			return a.Cluster < b.Cluster
-		}
-		return a.Attribute < b.Attribute
-	})
-	// Diagnostic: log each AttributeReport's (endpoint, cluster,
-	// attribute, value_type) so a failing pair (Apple's IM-decoder
-	// silently dropping a chunk) can be traced to a single attribute
-	// without re-hexing the wire bytes. Apple's `<private>` log mask
-	// hides the offending path on its side; this emit is the only
-	// bridge-side window into what the Subscribe-Initial actually
-	// carried for a given cluster.
-	for idx, r := range initialReport.Reports {
-		valueType := "<status>"
-		var valuePreview any
-		if !r.IsStatus {
-			valueType = fmt.Sprintf("%T", r.Value.Value)
-			valuePreview = r.Value.Value
-		}
-		b.logger.Debug("matter.tx.subscribe.initial_report",
-			slog.Int("path_index", idx),
-			slog.Any("endpoint", r.Path.Endpoint),
-			slog.Any("cluster", r.Path.Cluster),
-			slog.Any("attribute", r.Path.Attribute),
-			slog.Bool("status", r.IsStatus),
-			slog.Any("status_code", r.Status.Status),
-			slog.String("value_type", valueType),
-			slog.Any("value", valuePreview))
+	p.b.logger.Debug("matter.tx.subscribe.initial_report",
+		slog.Int("path_index", p.reports),
+		slog.Any("endpoint", r.Path.Endpoint),
+		slog.Any("cluster", r.Path.Cluster),
+		slog.Any("attribute", r.Path.Attribute),
+		slog.Bool("status", r.IsStatus),
+		slog.Any("status_code", r.Status.Status),
+		slog.String("value_type", valueType),
+		slog.Any("value", valuePreview))
+}
+
+// primingEventAuthorizer authorizes the priming events for the subject
+// subCtx carries.
+func (b *Bridge) primingEventAuthorizer(subCtx context.Context, dispatcher im.Dispatcher) im.EventReadAuthorizer {
+	_, subFabricIndex := im.FabricFilterFromContext(subCtx)
+	subSubjectNodeID, subSubjectCATs := im.SubjectFromContext(subCtx)
+	return b.eventReadAuthorizer(dispatcher, subFabricIndex, im.IsPASEFromContext(subCtx), subSubjectNodeID, subSubjectCATs)
+}
+
+// primingEventPaths counts req's event paths that establish a
+// subscription. The establish decision (matched > 0) counts the requested
+// event paths that resolve to a cluster the subject may read events of,
+// not the priming-log instances: a momentary/event-only subscribe
+// (GenericSwitch button) is placed BEFORE the event fires, so its event
+// log is empty at establish time — counting log records would reject it
+// with no_match and it could never receive the future press. matter.js
+// establishes an event subscription regardless of the priming log
+// (ServerSubscription.ts emits 0+ EventReports on Subscribe-Initial).
+func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) int {
+	return b.allowedEventPaths(subCtx, dispatcher, b.primingEventAuthorizer(subCtx, dispatcher), req.EventRequests)
+}
+
+// primingEvents returns the EventReports of a priming report.
+// EventRequests handling — matter.js's ServerSubscription.ts:677-705 at
+// db021da0 (#processAttributesAndEventsReport, mirrored here) runs the
+// request through EventReadResponse and emits its reports. Apple
+// Home's MTRDevice (`MTRDevice_Concrete`) transitions from
+// `Subscribing` to `InitialSubscriptionEstablished` only AFTER
+// the report-end frame; an Apple Subscribe with `events: *.*.*`
+// that comes back attributes-only leaves the controller's state
+// machine permanently stuck in `Subscribing`, which surfaces as
+// `Storing cluster information count: 3` and the bridge as
+// "added but not supported". matter.js Sample byte-dump
+// emitted 0+ EventReports per Subscribe-Initial and
+// Apple flipped to count: 21 + InitialSubscriptionEstablished.
+//
+// The raw records seed the report; authorization filtering only affects
+// which events are disclosed, not whether the subscription establishes
+// ([Bridge.primingEventPaths]) — the priming events are authorized and
+// fabric-projected so a wildcard event subscribe from fabric B does not
+// receive fabric A's AccessControl-change events, and a non-Administer
+// subject sees no AccessControl events (Matter §8.4.3.2 / §9.10.7.1).
+// Mirrors matter.js EventReadResponse.ts #readAllowedEvents; subCtx
+// carries the requesting fabric + subject.
+func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) []im.EventReport {
+	raw := im.BuildEventReports(req.EventRequests, b.eventLog, req.EventFilters)
+	auth := b.primingEventAuthorizer(subCtx, dispatcher)
+	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
+		im.AuthorizeEventReports(subCtx, auth, raw)...)
+}
+
+// primingMatches reports whether req establishes a subscription: one of
+// its event paths or attribute paths matches what the subject may read
+// (matter.js ServerSubscription.ts:707-711 at db021da0 rejects "no attributes or
+// events are matching the query"). The attribute half runs an expansion
+// of its own that stops at the first match and keeps nothing.
+func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) bool {
+	if len(req.EventRequests) > 0 && b.primingEventPaths(subCtx, dispatcher, req) > 0 {
+		return true
 	}
-	return initialReport, matched
+	return b.newPrimingSource(subCtx, dispatcher, req).matches()
 }
 
 // registerSubscription registers the subscribe request in the subscription
-// manager (handling KeepSubscriptions teardown), captures the routing
+// manager (the KeepSubscriptions=false teardown ran before, in
+// [Bridge.teardownForSubscribe]), captures the routing
 // subTarget, and stamps HasSubscription + SubscriptionID on initialReport in
 // place. Returns the allocated subID, or 0 with a nil error when no manager
 // is wired (test fixtures — the orchestrator then answers with a synthetic
@@ -193,8 +297,7 @@ func (b *Bridge) buildInitialReport(
 // not: no report ever arrives, and the device goes stale with nothing on the
 // wire to explain it.
 //
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts:647-665
-// at db021da0 for the KeepSubscriptions teardown, and
+// Mirrors matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts for the
 // EventPaths wiring.
 func (b *Bridge) registerSubscription(
@@ -214,46 +317,6 @@ func (b *Bridge) registerSubscription(
 		fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
 		subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
 		peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
-		// KeepSubscriptions=false teardown — Matter §10.6.5: when the
-		// commissioner clears `KeepSubscriptions`, the bridge MUST
-		// cancel every existing subscription owned by the same peer
-		// before admitting the new one.
-		//
-		// Mirrors matter.js packages/node/src/node/server/
-		// InteractionServer.ts:647-665 at db021da0 for a session with a
-		// fabric: it matches on the peer address, (fabric, peerNodeID).
-		// On a session without one (PASE) matter.js tears nothing down
-		// (`fabric !== undefined`, :647); the same-session teardown
-		// below is this module's own
-		// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
-		// previous guard
-		// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
-		// silently skipped PASE re-subscriptions (fabricIndex=0) so a
-		// PASE subscriber that re-subscribes with KeepSubscriptions=false
-		// would accumulate stale subscriptions.
-		if !req.KeepSubscriptions {
-			if fabricIndex != 0 && peerNodeID != 0 {
-				// CASE session — tear down by (fabric, peer) tuple. The
-				// peer is the session's subject, whatever source node id
-				// the frame's header claims (subscriptionPeerNodeID), as
-				// matter.js matches on session.peerAddress.
-				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
-					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
-						slog.String("src", srcString(src)),
-						slog.Int("fabric_index", int(fabricIndex)),
-						slog.Uint64("node_id", peerNodeID),
-						slog.Int("cleared", cleared))
-				}
-			} else {
-				// PASE session (fabricIndex=0) — tear down by SessionID so
-				// a re-subscribe on the same PASE exchange replaces, rather
-				// than accumulates, the prior subscription.
-				// This module's own: matter.js tears nothing down on a
-				// session without a fabric (InteractionServer.ts:647 at
-				// db021da0; findings F-db021da0-12).
-				m.CloseSession(requestHdr.SessionID)
-			}
-		}
 		sub, err := m.Subscribe(subscription.SubscribeArgs{
 			FabricIndex:        fabricIndex,
 			PeerNodeID:         peerNodeID,
@@ -261,7 +324,13 @@ func (b *Bridge) registerSubscription(
 			MinIntervalFloor:   req.MinIntervalFloor,
 			MaxIntervalCeiling: req.MaxIntervalCeiling,
 			KeepSubscriptions:  req.KeepSubscriptions,
-			AttributePaths:     req.AttributeRequests,
+			// A path naming this node is kept as one naming no node: a
+			// change notification names none, and the subscription
+			// reports this node's changes for it as its priming report
+			// did (review II, R2-P2-alloc-07). A path naming another
+			// node is left out: it selects nothing in the priming
+			// report and matches no change (R2-P2-dr-req-06).
+			AttributePaths: pathsForThisNode(req.AttributeRequests, b.localNodeIDFor(requestHdr.SessionID, fabricIndex)),
 			// EventPaths wiring was missing — without this every
 			// cluster-emitted event (GenericSwitch press, BDBI
 			// ReachableChanged, OperationalCredentials NOCsChanged,
@@ -307,8 +376,105 @@ func (b *Bridge) registerSubscription(
 		initialReport.HasSubscription = true
 		initialReport.SubscriptionID = subID
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
+		b.releaseTargetOfClosed(m, subID)
 	}
 	return subID, nil
+}
+
+// releaseTargetOfClosed releases the routing of subID when the
+// subscription is no longer in m and reports whether it did. Called right
+// after the routing target was stored: the manager drops a subscription
+// from its tables before it runs the close hook (releaseSubscriptionRouting),
+// so a close that ran before the store is seen here and one after it finds
+// the target — the pattern of [Bridge.primingAbort]. Without it a close
+// landing between the admission and the store (the session closed by
+// another goroutine) left the target for the process lifetime (review II,
+// R2-P2-sess-07).
+func (b *Bridge) releaseTargetOfClosed(m *subscription.Manager, subID uint32) bool {
+	if _, err := m.Get(subID); err == nil {
+		return false
+	}
+	b.releaseSubscriptionRouting(subID)
+	return true
+}
+
+// teardownForSubscribe runs the KeepSubscriptions=false teardown of a
+// SubscribeRequest: before the request is checked any further, so a
+// request refused afterwards (no path, an illegal path) has cancelled the
+// peer's subscriptions too, as matter.js InteractionServer.ts:647-665 at
+// db021da0 runs it before those refusals (F-db021da0-14, review II
+// R2-P2-sess-04). A no-op when the request keeps its subscriptions or no
+// manager is attached.
+func (b *Bridge) teardownForSubscribe(src net.Addr, requestHdr *message.Header, req im.SubscribeRequest) {
+	m := b.subscriptionManagerLocked()
+	if m == nil || req.KeepSubscriptions {
+		return
+	}
+	fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
+	subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
+	peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
+	// KeepSubscriptions=false teardown — Matter §10.6.5: when the
+	// commissioner clears `KeepSubscriptions`, the bridge MUST
+	// cancel every existing subscription owned by the same peer
+	// before admitting the new one.
+	//
+	// Mirrors matter.js packages/node/src/node/server/
+	// InteractionServer.ts:647-665 at db021da0 for a session with a
+	// fabric: it matches on the peer address, (fabric, peerNodeID).
+	// On a session without one (PASE) matter.js tears nothing down
+	// (`fabric !== undefined`, :647); the same-session teardown
+	// below is this module's own
+	// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
+	// previous guard
+	// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
+	// silently skipped PASE re-subscriptions (fabricIndex=0) so a
+	// PASE subscriber that re-subscribes with KeepSubscriptions=false
+	// would accumulate stale subscriptions.
+	if fabricIndex != 0 && peerNodeID != 0 {
+		// CASE session — tear down by (fabric, peer) tuple. The
+		// peer is the session's subject, whatever source node id
+		// the frame's header claims (subscriptionPeerNodeID), as
+		// matter.js matches on session.peerAddress.
+		if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
+			b.logger.Info("matter.rx.im.subscribe.peer_teardown",
+				slog.String("src", srcString(src)),
+				slog.Int("fabric_index", int(fabricIndex)),
+				slog.Uint64("node_id", peerNodeID),
+				slog.Int("cleared", cleared))
+		}
+	} else {
+		// PASE session (fabricIndex=0) — tear down by SessionID so
+		// a re-subscribe on the same PASE exchange replaces, rather
+		// than accumulates, the prior subscription.
+		// This module's own: matter.js tears nothing down on a
+		// session without a fabric (InteractionServer.ts:647 at
+		// db021da0; findings F-db021da0-12).
+		m.CloseSession(requestHdr.SessionID)
+	}
+}
+
+// pathsForThisNode returns paths with the node cleared from each path
+// that names localNodeID — this node on the session's fabric, which is
+// what a path naming no node selects — and without each path that names
+// another node, which selects nothing ([im.AttributeExpansion], whose
+// context carries localNodeID): a change notification names no node, so
+// a kept path naming node 0 would match every change (review II,
+// R2-P2-dr-req-06). Returns paths when none names a node.
+func pathsForThisNode(paths []im.ConcreteAttributePath, localNodeID uint64) []im.ConcreteAttributePath {
+	if !slices.ContainsFunc(paths, func(p im.ConcreteAttributePath) bool { return p.HasNode }) {
+		return paths
+	}
+	out := make([]im.ConcreteAttributePath, 0, len(paths))
+	for _, p := range paths {
+		if p.HasNode {
+			if p.Node != localNodeID {
+				continue
+			}
+			p.HasNode, p.Node = false, 0
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // latestEventNumber is the highest number of the events reports carries
@@ -375,7 +541,7 @@ func subscribeRejectStatus(err error) im.StatusCode {
 // → `OnMessageReceived`) emits exactly one StatusResponse per
 // inbound ReportData and stays in the per-chunk read state until
 // that response is on the wire.
-func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack synchronisation loop mirrors matter.js sendDataReportMessage; splitting would obscure the atomic arm→send→wait sequence
+func (b *Bridge) streamInitialReportChunks(
 	ctx context.Context,
 	abort <-chan struct{},
 	src net.Addr,
@@ -384,14 +550,31 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 	subID uint32,
 	initialReport im.ReportData,
 ) error {
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunker := newReportChunker(initialReport, limits.budget, limits.hardCap,
+		sliceAttributeReports(initialReport.Reports), func() []im.EventReport { return initialReport.EventReports })
+	return b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker)
+}
+
+// streamPrimingChunks is [Bridge.streamInitialReportChunks] over a
+// chunker: chunk N+1 is generated only once the peer answered chunk N
+// (review II, decision 44).
+func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchronisation loop mirrors matter.js sendDataReportMessage; splitting would obscure the atomic arm→send→wait sequence
+	ctx context.Context,
+	abort <-chan struct{},
+	src net.Addr,
+	requestHdr *message.Header,
+	proto message.ProtocolHeader,
+	subID uint32,
+	chunker *reportChunker,
+) error {
 	// Send initial ReportData (opcode 0x05) chunked. Apple Home's
 	// initial subscribe over CASE expands to ~1100 attribute reports
 	// totalling 60+ KB — well past the AES-CCM 64KB plaintext cap
-	// AND the per-datagram budget. chunkReportData splits on
+	// AND the per-datagram budget. The chunker splits on
 	// per-attribute boundaries; each chunk except the last carries
 	// MoreChunkedMessages=true (Matter §10.6.6).
-	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunks, err := chunkReportData(initialReport, limits.budget, limits.hardCap)
+	chunk, have, err := chunker.next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_initial_report", src, err)
 		return err
@@ -416,7 +599,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 	// trip is sub-millisecond. A chunk that is never answered aborts the
 	// Subscribe instead of releasing the next chunk to a peer that is not
 	// listening.
-	for i, chunk := range chunks {
+	for i := 0; have; i++ {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_initial_report", src, err)
@@ -427,9 +610,8 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		b.logger.Debug("matter.tx.im.subscribe.chunk",
 			slog.Int("subscription_id", int(subID)),
 			slog.Int("chunk", i),
-			slog.Int("chunk_count", len(chunks)),
 			slog.Int("bytes", len(body)),
-			slog.Bool("final", i == len(chunks)-1))
+			slog.Bool("final", !chunk.MoreChunkedMessages))
 
 		// Arm the per-exchange StatusResponse waiter BEFORE the send
 		// to avoid a missed-wakeup race: Apple can reply faster than
@@ -472,9 +654,12 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		b.logger.Debug("matter.rx.im.subscribe.chunk",
 			slog.String("src", srcString(src)),
 			slog.Int("chunk", i),
-			slog.Int("of", len(chunks)),
 			slog.Int("bytes", len(body)),
 			slog.Bool("more", chunk.MoreChunkedMessages))
+		if chunk, have, err = chunker.next(); err != nil {
+			debugReplyError(b.logger, "chunk_initial_report", src, err)
+			return err
+		}
 	}
 	return nil
 }
@@ -608,7 +793,6 @@ func (b *Bridge) sendSubscribeResponse(
 		slog.Int("subscription_id", int(subID)),
 		slog.Int("paths", len(req.AttributeRequests)),
 		slog.Int("event_paths", len(req.EventRequests)),
-		slog.Int("initial_reports", len(initialReport.Reports)),
 		slog.Int("initial_events", len(initialReport.EventReports)),
 		slog.Int("min_interval", int(req.MinIntervalFloor)),
 		slog.Int("max_interval", int(req.MaxIntervalCeiling)))

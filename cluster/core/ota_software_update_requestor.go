@@ -96,6 +96,9 @@ type OTASoftwareUpdateRequestor struct {
 	cancelRun            context.CancelFunc
 	wg                   sync.WaitGroup
 	started, stopped     bool
+	// bdxMaxImageSize caps the bytes a BDX download takes
+	// ([otaBdxMaxImageSize]; a test lowers it).
+	bdxMaxImageSize uint64
 }
 
 // OTARequestorConfig configures [NewOTASoftwareUpdateRequestor].
@@ -310,6 +313,12 @@ const (
 	defaultOtaHTTPSIdleTimeout  = 60 * time.Second
 )
 
+// otaBdxMaxImageSize caps the bytes a BDX download takes, which matter.js
+// does not bound either: the HTTPS path's default cap
+// ([defaultOtaHTTPSMaxImageSize]), so an image either path can fetch by
+// default is the same size (review II, rework of R2-P2-ctl).
+const otaBdxMaxImageSize = defaultOtaHTTPSMaxImageSize
+
 // scheduleReason is ScheduleReason (:89-95).
 type scheduleReason uint8
 
@@ -353,6 +362,7 @@ var (
 	_ contract.FabricScopedReader             = (*OTASoftwareUpdateRequestor)(nil)
 	_ contract.AttributeChangeNotifier        = (*OTASoftwareUpdateRequestor)(nil)
 	_ contract.EventReceiver                  = (*OTASoftwareUpdateRequestor)(nil)
+	_ contract.FabricScopedState              = (*OTASoftwareUpdateRequestor)(nil)
 )
 
 // OtaRequestorDeviceType is the OtaRequestor device type the requestor's
@@ -413,7 +423,8 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 		logger:         cfg.Logger,
 		updatePossible: true,
 		// initialize (:175-178): an Unknown state becomes Idle.
-		state: otadef.UpdateStateIdle,
+		state:           otadef.UpdateStateIdle,
+		bdxMaxImageSize: otaBdxMaxImageSize,
 	}
 	if cfg.UpdatePossible != nil {
 		r.updatePossible = *cfg.UpdatePossible
@@ -581,7 +592,8 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 	// A write that changes nothing reports nothing and schedules nothing:
 	// matter.js reacts to defaultOtaProviders$Changed
 	// (OtaSoftwareUpdateRequestorServer.ts:188), which a commit emits only
-	// for a changed value (Datasource.ts:1440-1441).
+	// for a changed value (Datasource.ts:1476-1492 at db021da0,
+	// #noteIfChanged).
 	if slices.Equal(before, next) {
 		return nil
 	}
@@ -785,6 +797,21 @@ func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
 	if changed {
 		r.changed(otadef.AttrDefaultOtaProviders)
 	}
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]:
+// [OTASoftwareUpdateRequestor.FabricRemoved].
+func (r *OTASoftwareUpdateRequestor) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	r.FabricRemoved(fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the DefaultOTAProviders entries.
+func (r *OTASoftwareUpdateRequestor) MatterHeldFabrics() []uint8 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return fabricsOf(r.defaults, func(d otadef.ProviderLocation) uint8 { return d.FabricIndex })
 }
 
 // SetUpdatePossible changes UpdatePossible, which starts or stops the

@@ -41,3 +41,20 @@ func TestSessionSubscriptionsChangedHook(t *testing.T) {
 		t.Errorf("a detached hook fired: %v", seen)
 	}
 }
+
+// TestSessionSubscriptionsChangedHookOnRestore: a former subscription
+// restored on a session after a restart is a subscription added on it —
+// the hook fires for it as for one Subscribe admits (review II,
+// R2-P2-sess-08).
+func TestSessionSubscriptionsChangedHookOnRestore(t *testing.T) {
+	t.Parallel()
+	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+	var seen []uint16
+	m.SetOnSessionSubscriptionsChanged(func(id uint16) { seen = append(seen, id) })
+	if _, err := m.Restore(samplePeerSubscription(), 0x4242); err != nil {
+		t.Fatal(err)
+	}
+	if want := []uint16{0x4242}; !slices.Equal(seen, want) {
+		t.Fatalf("hook saw %v after Restore, want %v", seen, want)
+	}
+}

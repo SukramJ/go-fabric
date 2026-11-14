@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -136,6 +137,45 @@ func TestBridge_PaseFailures_NoWindowIsNilSafe(t *testing.T) {
 
 	for range paseMaxErrors {
 		b.recordPaseFailure()
+	}
+}
+
+// countingFailSafeExpirer counts the window's fail-safe expiries.
+type countingFailSafeExpirer struct{ n atomic.Int32 }
+
+func (e *countingFailSafeExpirer) ExpireFailSafeArmedOverPASE(context.Context) { e.n.Add(1) }
+
+// TestBridge_PaseLockoutClosesOnlyTheWindow pins that the brute-force
+// cap ends the window as the end of commissioning does: a commissioning
+// already past PASE keeps its PASE-armed fail-safe and its PASE session,
+// so failed handshakes of another party cannot roll its fabric back.
+// Mirrors matter.js DeviceCommissioner.ts:78-82 (tooManyPaseErrors →
+// endCommissioning) and :283-299 (#closeWindow: no fail-safe, no session
+// close) at db021da0.
+func TestBridge_PaseLockoutClosesOnlyTheWindow(t *testing.T) {
+	t.Parallel()
+	b := newUnstartedBridge(t)
+	w := openedWindow(t, b)
+	expirer := &countingFailSafeExpirer{}
+	closer := &countingPaseCloser{}
+	w.SetFailSafeExpirer(expirer)
+	w.SetPaseSessionCloser(closer)
+
+	for range paseMaxErrors {
+		b.recordPaseFailure()
+	}
+
+	if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
+		t.Errorf("window Status = %v, want Closed (ended by the cap)", got)
+	}
+	if !b.paseLockedOut() {
+		t.Error("paseLockedOut = false after the cap")
+	}
+	if got := expirer.n.Load(); got != 0 {
+		t.Errorf("the lockout expired the PASE-armed fail-safe %d time(s), want 0", got)
+	}
+	if got := closer.calls; got != 0 {
+		t.Errorf("the lockout closed the PASE sessions %d time(s), want 0", got)
 	}
 }
 

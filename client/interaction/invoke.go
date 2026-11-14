@@ -298,9 +298,14 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		return nil, err
 	}
 	var entries []im.InvokeResponseEntry
+	held := 0
+	defer func() { releaseAssembly(m.x.Session(), held) }()
 	for {
 		msg, err := m.next(ctx, im.OpcodeInvokeResponse, ept)
 		if err != nil {
+			return nil, err
+		}
+		if err := m.holdChunk(ctx, &held, msg.Payload); err != nil {
 			return nil, err
 		}
 		resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), readFields)

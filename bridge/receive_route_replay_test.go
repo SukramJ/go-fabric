@@ -6,9 +6,11 @@ package bridge
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // sealHarnessStatusResponse seals one StatusResponse on the harness session
@@ -74,4 +76,65 @@ func TestReceive_NewMessageFromNewAddressMovesSessionRoute(t *testing.T) {
 	moved := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9}
 	h.bridge.handleDatagram(sealHarnessStatusResponse(t, h, 0x322), moved)
 	assertHarnessRoute(t, h, "after a new datagram from the peer's new address", moved)
+}
+
+// TestReceive_ReplayDoesNotMoveExchangeAckRoute: the same rule for the
+// route an exchange's standalone acknowledgements take — a replayed
+// duplicate is acknowledged at the address the exchange (or the session)
+// already has, not at the replayer's, the rule the session route follows
+// (by_design BD-chip-SessionRouteByNewCounter).
+func TestReceive_ReplayDoesNotMoveExchangeAckRoute(t *testing.T) {
+	t.Parallel()
+	h := newSecureHarness(t, nil, nil)
+	// A grace window longer than the test: the original's obligation waits,
+	// so the one acknowledgement sent is the duplicate's, expedited.
+	h.bridge.AttachAckTracker(mrp.NewAckTracker(time.Minute))
+	datagram := sealHarnessStatusResponse(t, h, 0x321)
+	rhdr, _, err := message.UnmarshalHeader(datagram)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, _ := h.conn.LocalAddr().(*net.UDPAddr)
+	replayer, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = replayer.Close() })
+
+	h.bridge.handleDatagram(append([]byte(nil), datagram...), peer)
+	replayerAddr, _ := replayer.LocalAddr().(*net.UDPAddr)
+	h.bridge.handleDatagram(append([]byte(nil), datagram...), replayerAddr)
+
+	if !receivesAckFor(t, h, h.conn, rhdr.MessageCounter) {
+		t.Fatalf("no acknowledgement of counter %d reached the peer; the replay moved the exchange's ack route", rhdr.MessageCounter)
+	}
+}
+
+// receivesAckFor reads conn until a standalone acknowledgement of counter
+// arrives (true) or the read deadline passes (false).
+func receivesAckFor(t *testing.T, h *secureHarness, conn *net.UDPConn, counter uint32) bool {
+	t.Helper()
+	buf := make([]byte, 1500)
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	for {
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			return false
+		}
+		hdr, hl, err := message.UnmarshalHeader(buf[:n])
+		if err != nil {
+			continue
+		}
+		body, _, err := h.peer.Decrypt(&hdr, securityFlagsByte(&hdr), append([]byte(nil), buf[hl:n]...))
+		if err != nil {
+			continue
+		}
+		proto, _, err := message.UnmarshalProtocolHeader(body)
+		if err != nil {
+			continue
+		}
+		if proto.Opcode == mrp.StandaloneAckOpcode && proto.HasAck && proto.AckCounter == counter {
+			return true
+		}
+	}
 }

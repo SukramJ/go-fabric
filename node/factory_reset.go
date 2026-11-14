@@ -59,17 +59,18 @@ import (
 // fabrics, occurrences, credentials and the node store); the node that
 // comes back is a new one here (BD-Matter-FactoryResetEndsTheNode).
 func (n *Node) FactoryReset(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.lifecycle <- struct{}{}
+	defer n.leaveLifecycle()
 	var errs []error
 	if !n.stopped {
 		recs, err := n.st.ListFabrics(ctx)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("node: factory reset: list fabrics: %w", err))
 		}
-		for _, rec := range recs {
-			if err := n.root.OperationalCredentials.RemoveFabric(ctx, rec.FabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
-				errs = append(errs, fmt.Errorf("node: factory reset: remove fabric %d: %w", rec.FabricIndex, err))
+		for i := range recs {
+			idx := recs[i].FabricIndex
+			if err := n.root.OperationalCredentials.RemoveFabric(ctx, idx); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+				errs = append(errs, fmt.Errorf("node: factory reset: remove fabric %d: %w", idx, err))
 			}
 		}
 		n.keepOwnedDB = true

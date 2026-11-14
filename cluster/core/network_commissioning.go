@@ -6,6 +6,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -237,6 +239,42 @@ func (n *NetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, val
 	n.interfaceEnabled = v
 	n.mu.Unlock()
 	return nil
+}
+
+// SetAttributes implements [spec.AttributeSetter] for the one attribute
+// the server holds, InterfaceEnabled: the node restores a controller's
+// write of it through this after a restart (node/nonvolatile.go). Every
+// other attribute is the interface's ([spec.ErrNotHeld]); nothing is set
+// unless every value is accepted.
+func (n *NetworkCommissioning) SetAttributes(values map[uint32]any) error {
+	enabled, set, err := netcommInterfaceEnabledOf(netcommInst, values)
+	if err != nil || !set {
+		return err
+	}
+	n.mu.Lock()
+	n.interfaceEnabled = enabled
+	n.mu.Unlock()
+	return nil
+}
+
+// netcommInterfaceEnabledOf checks the values a NetworkCommissioning
+// server is set with against inst: InterfaceEnabled is the one it holds.
+func netcommInterfaceEnabledOf(inst *spec.Instance, values map[uint32]any) (enabled, set bool, err error) {
+	for _, id := range slices.Sorted(maps.Keys(values)) {
+		v, err := inst.CheckSet(id, values[id], nil)
+		if err != nil {
+			return false, false, err
+		}
+		if id != netcommAttrInterfaceEnabled {
+			return false, false, fmt.Errorf("%w: core: NetworkCommissioning attribute 0x%04X is the interface's", spec.ErrNotHeld, id)
+		}
+		b, ok := v.(bool)
+		if !ok {
+			return false, false, fmt.Errorf("%w: core: InterfaceEnabled expects bool, got %T", spec.ErrInvalidValue, v)
+		}
+		enabled, set = b, true
+	}
+	return enabled, set, nil
 }
 
 // MatterInvoke rejects every command — go-fabric ships Ethernet-only

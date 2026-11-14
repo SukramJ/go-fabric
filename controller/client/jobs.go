@@ -42,7 +42,16 @@ func newJobQueue() *jobQueue { return &jobQueue{} }
 //
 //nolint:contextcheck // the back-pressure runs in subscription callbacks, which outlive the request context their closures were built under
 func (q *jobQueue) enqueue(job func()) {
-	if q.add(job) > maxPendingJobs {
+	q.throttle(q.add(job))
+}
+
+// throttle is enqueue's back-pressure for a job [jobQueue.add] queued
+// with pending jobs: past maxPendingJobs it waits until the queue has
+// drained.
+//
+//nolint:contextcheck // as enqueue: the callers are subscription callbacks without a live context
+func (q *jobQueue) throttle(pending int) {
+	if pending > maxPendingJobs {
 		q.wait()
 	}
 }
@@ -63,6 +72,41 @@ func (q *jobQueue) add(job func()) int {
 	q.drained = make(chan struct{})
 	go q.run()
 	return pending
+}
+
+// claim is add for a job its caller runs itself when it can: with the
+// queue idle it marks the queue running and returns true, and the caller
+// runs job with [jobQueue.runClaimed] — so a job added meanwhile waits
+// for it; with a job pending it adds job as the last and returns false.
+// It never waits, so a job may reach it (review II, R2-P2-dr-ctl-02).
+func (q *jobQueue) claim(job func()) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.running {
+		q.jobs = append(q.jobs, job)
+		return false
+	}
+	q.running = true
+	q.drained = make(chan struct{})
+	return true
+}
+
+// runClaimed runs the job [jobQueue.claim] claimed the queue for on the
+// caller's goroutine, then hands the jobs added meanwhile to the queue's
+// own run, or ends the run when none was.
+func (q *jobQueue) runClaimed(job func()) {
+	defer func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		if len(q.jobs) > 0 {
+			go q.run()
+			return
+		}
+		q.running = false
+		close(q.drained)
+		q.drained = nil
+	}()
+	job()
 }
 
 // run runs the queued jobs in order until none is left.

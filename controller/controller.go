@@ -75,6 +75,11 @@ var (
 	ErrNoDevice = errors.New("controller: no commissionable device answered")
 )
 
+// errClosed is the error of a method called on a controller after or
+// during [Controller.Close]: [ErrConfiguration], which SetGroupKey and
+// Discover returned for it first.
+var errClosed = fmt.Errorf("%w: the controller is closed", ErrConfiguration)
+
 // DefaultVendorID is the vendor ID of our fabric when [Config] sets none:
 // 0xFFF1, one of the test vendor IDs (0xFFF1–0xFFF4).
 const DefaultVendorID uint16 = 0xFFF1
@@ -241,6 +246,17 @@ type Config struct {
 	// ([Controller.DiagnosticEvents]); the zero value keeps
 	// diag.DefaultDiagnosticsCapacity events.
 	Diagnostics diag.Diagnostics
+	// MaxReportBytesPerSession bounds the report chunks (message payload
+	// bytes) the interactions of one session hold while the rest of their
+	// chunks arrive — reads, subscription reports and invoke responses of
+	// the paired nodes together: the chunk that would pass it is answered
+	// ResourceExhausted and the call returns interaction.ErrReportTooLarge.
+	// 0 is interaction.DefaultMaxReportBytesPerSession (2 MiB); a negative
+	// bound is [ErrConfiguration]. It holds for every interaction with a
+	// paired node, the reads a pairing makes once the node is commissioned
+	// included; the commissioning steps themselves, over PASE and the CASE
+	// session they open, keep the default.
+	MaxReportBytesPerSession int
 	// Metrics receives the controller's named counters and gauges
 	// (controller/metrics.go: sessions.open, mrp.retransmits,
 	// pair.failures, case.unresponsive, reachability.probes,
@@ -250,7 +266,13 @@ type Config struct {
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
-// it, and the stack under them. Its methods are safe for concurrent use.
+// it, and the stack under them. Its methods are safe for concurrent use,
+// [Controller.Close] included: once Close has begun, a method that
+// returns an error returns one wrapping [ErrConfiguration], and one that
+// does not returns its zero result — no component, an empty list, an
+// unsubscribe that does nothing. Fabric, Clock, TCP, Addr and TCPAddr,
+// fixed at New, keep answering, and Erase is the reset that runs after a
+// Close.
 type Controller struct {
 	db  *sql.DB
 	log *slog.Logger
@@ -268,8 +290,11 @@ type Controller struct {
 	// stopping is the registry a Close left with nodes still stopping —
 	// report jobs and the store's final flush queued behind a hook that
 	// outlasted Close's ctx ([client.Node.Stop]). Erase waits for it
-	// before it deletes a row (review II, R2-P1-ctl-02).
+	// before it deletes a row (review II, R2-P1-ctl-02). eraseMu guards
+	// it and serialises Erase: concurrent Erases wait and erase one after
+	// the other.
 	stopping *client.Registry
+	eraseMu  sync.Mutex
 	udp      *udp.Listener
 	stop     func()
 	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address;
@@ -313,14 +338,34 @@ type Controller struct {
 	diagRing *diagevent.Ring
 	metrics  contract.Metrics
 	peerSet  atomic.Pointer[peer.Set]
-	// closeMu orders DiagnoseMDNS and SetGroupKey against Close, which
-	// clears adv, names and groups: Close sets closed under it first.
+	// closeMu is the controller's one closed gate: Close sets closed
+	// under it first, and every public method reads closed — and the
+	// fields Close clears (reg, peers, com, names, adv, groups,
+	// otaProvider) — under it, so a method either saw the controller
+	// open and read them before Close began or returns closed. closeDone
+	// is closed when the Close that set closed returns; a second Close
+	// waits for it (review II, R2-P2-stop-01).
 	closeMu      sync.RWMutex
 	closed       bool
+	closeDone    chan struct{}
 	icdMu        sync.Mutex
 	icdWatched   map[*client.Node][]func() // guarded by icdMu
 	icdClosed    bool                      // guarded by icdMu: Close stopped every watch
 	stopDiscover func()
+}
+
+// checkRequired refuses a configuration without its required fields or
+// with a negative report bound.
+func checkRequired(cfg *Config) error {
+	switch {
+	case cfg.DB == nil:
+		return fmt.Errorf("%w: DB is required", ErrConfiguration)
+	case cfg.Attestation == nil:
+		return fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
+	case cfg.MaxReportBytesPerSession < 0:
+		return fmt.Errorf("%w: MaxReportBytesPerSession %d is negative", ErrConfiguration, cfg.MaxReportBytesPerSession)
+	}
+	return nil
 }
 
 // New builds the controller over cfg.DB: the fabric is created on the
@@ -335,11 +380,8 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 			_ = cfg.Listener.Close()
 		}
 	}()
-	switch {
-	case cfg.DB == nil:
-		return nil, fmt.Errorf("%w: DB is required", ErrConfiguration)
-	case cfg.Attestation == nil:
-		return nil, fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
+	if err := checkRequired(&cfg); err != nil {
+		return nil, err
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -405,7 +447,11 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if cfg.OTA != nil {
 		c.armer = peer.NewRebootResubscribeArmer(c.armerContext())
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk, ReportStarted: c.reportStarted})
+	// The registry carries the report bound to every node interaction
+	// bound to it (commissioner.Interaction).
+	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{
+		Logger: log, Clock: clk, ReportStarted: c.reportStarted, MaxReportBytesPerSession: cfg.MaxReportBytesPerSession,
+	})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
@@ -564,18 +610,29 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	return nil
 }
 
+// keepStopping records reg as the registry a Close left with nodes still
+// stopping, for Erase to wait for.
+func (c *Controller) keepStopping(reg *client.Registry) {
+	c.eraseMu.Lock()
+	c.stopping = reg
+	c.eraseMu.Unlock()
+}
+
 // Close tears the stack down in the reverse order of [New], once no
 // request for the endpoints the controller serves is dispatched any more
 // and the one in flight has returned: the update manager and the OTA
 // provider, the registry (its nodes and their subscriptions), the client
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is
-// idempotent.
+// idempotent: a second Close waits for the first to return, within ctx
+// (ctx's error when ctx ends first), and returns nil.
 func (c *Controller) Close(ctx context.Context) error {
+	done, first := c.beginClose()
+	if !first {
+		return awaitClose(ctx, done)
+	}
+	defer close(done)
 	var errs []error
-	c.closeMu.Lock()
-	c.closed = true
-	c.closeMu.Unlock()
 	if c.subs != nil {
 		// Before a served component stops: a QueryImage that arrived after
 		// the OTA provider stopped would be dispatched to it, and the
@@ -604,7 +661,7 @@ func (c *Controller) Close(ctx context.Context) error {
 	if c.reg != nil {
 		if err := c.reg.Close(ctx); err != nil {
 			errs = append(errs, err)
-			c.stopping = c.reg
+			c.keepStopping(c.reg)
 		}
 		c.reg = nil
 	}
@@ -657,6 +714,47 @@ func (c *Controller) Close(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// beginClose sets closed under the gate. first is true for the Close
+// that set it, which closes done when it returns; a later Close waits on
+// done.
+func (c *Controller) beginClose() (done chan struct{}, first bool) {
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+	if c.closed {
+		return c.closeDone, false
+	}
+	c.closed = true
+	c.closeDone = make(chan struct{})
+	return c.closeDone, true
+}
+
+// closeFinished reports whether a Close began and returned.
+func (c *Controller) closeFinished() bool {
+	c.closeMu.RLock()
+	done := c.closeDone
+	c.closeMu.RUnlock()
+	if done == nil {
+		return false
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
+
+// awaitClose is a second Close: nil once the first has returned, ctx's
+// error when ctx ends first.
+func awaitClose(ctx context.Context, done <-chan struct{}) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // closeOTAProvider stops the OTA provider, its BDX handler unregistered
 // first, so no BDX exchange is handed to the responder that closes.
 func (c *Controller) closeOTAProvider() {
@@ -685,15 +783,60 @@ type BorderRouterConfig struct {
 // controller/topology classifies Thread neighbours by — matterjs-server's
 // controller keeps one always (NetworkTopologyService.ts:88-89 of
 // matterjs-server at 0bd06f2). Nil when [BorderRouterConfig].Disabled;
-// the registry's methods are safe on nil (no entries, no events).
-func (c *Controller) BorderRouters() *brdiscovery.Registry { return c.brs }
+// the registry's methods are safe on nil (no entries, no events). Nil
+// once Close has begun.
+func (c *Controller) BorderRouters() *brdiscovery.Registry {
+	if _, ok := c.open(); !ok {
+		return nil
+	}
+	return c.brs
+}
 
 // Registry is the registry of the paired nodes: Commissioned lists them,
 // Get finds one by id. A seam of the role (docs/guides/advanced-seams.md).
-func (c *Controller) Registry() *client.Registry { return c.reg }
+// Nil once Close has begun.
+func (c *Controller) Registry() *client.Registry {
+	st, _ := c.open()
+	return st.reg
+}
 
-// Nodes are the commissioned nodes, in the registry's order.
-func (c *Controller) Nodes() []*client.Node { return c.reg.Commissioned() }
+// Nodes are the commissioned nodes, in the registry's order; none once
+// Close has begun.
+func (c *Controller) Nodes() []*client.Node {
+	st, ok := c.open()
+	if !ok {
+		return nil
+	}
+	return st.reg.Commissioned()
+}
+
+// stack is what Close tears down, as a method read it under closeMu
+// while the controller was open.
+type stack struct {
+	reg    *client.Registry
+	peers  *peer.Set
+	com    *commissioner.Commissioner
+	names  *discovery.Names
+	groups *groups.Manager
+	bdx    *bdx.Responder
+}
+
+// open is the stack of an open controller, read under the closed gate;
+// false, and the zero stack, once Close has begun. A method that uses the
+// stack after open returned runs against components that Close may be
+// closing: each refuses work once closed.
+func (c *Controller) open() (stack, bool) {
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		return stack{}, false
+	}
+	st := stack{reg: c.reg, peers: c.peers, com: c.com, names: c.names, groups: c.groups}
+	if c.otaProvider != nil {
+		st.bdx = c.otaProvider.bdx
+	}
+	return st, true
+}
 
 // Fabric is our fabric: its ID, our node ID, the root of trust. A seam of
 // the role.
@@ -705,7 +848,11 @@ func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
 // (peer.Set.AddKnownPeer) and reaches it with
 // Commissioner().Interaction. A seam of the role — matter.js's node
 // peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
-func (c *Controller) Peers() *peer.Set { return c.peers }
+// Nil once Close has begun.
+func (c *Controller) Peers() *peer.Set {
+	st, _ := c.open()
+	return st.peers
+}
 
 // Clock is the time source of the controller's stack ([Config.Clock], the
 // system clock without one), for a service composed over the controller
@@ -722,8 +869,11 @@ func (c *Controller) TCP() TCPConfig { return c.tcp }
 func (c *Controller) Addr() *net.UDPAddr { return c.udp.LocalAddr() }
 
 // Commissioner is the commissioner the registry pairs through. A seam of
-// the role.
-func (c *Controller) Commissioner() *commissioner.Commissioner { return c.com }
+// the role. Nil once Close has begun.
+func (c *Controller) Commissioner() *commissioner.Commissioner {
+	st, _ := c.open()
+	return st.com
+}
 
 // PairOptions configure [Controller.Pair]; the zero value pairs with the
 // defaults.
@@ -848,6 +998,10 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 	if err != nil {
 		return nil, err
 	}
+	st, ok := c.open()
+	if !ok {
+		return nil, errClosed
+	}
 	opts.Progress = c.tracePairing(pc, tr, opts.Progress)
 	if c.keepCodes {
 		opts.onboardingCode = code
@@ -877,15 +1031,15 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 		if _, ok := ctx.Deadline(); !ok {
 			searchTimeout = DefaultPairTimeout
 		}
-		return c.pairDiscovered(ctx, pc, identity, opts, searchTimeout)
+		return c.pairDiscovered(ctx, st, pc, identity, opts, searchTimeout)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
-	n, err := c.reg.ForDevice(ctx, *known, "")
+	n, err := st.reg.ForDevice(ctx, *known, "")
 	if err != nil {
 		return nil, err
 	}
 	o := c.pairOptions(passcode, nil, opts, opts.Progress)
-	if err := c.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}); err != nil {
+	if err := st.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}); err != nil {
 		return n, err
 	}
 	return n, nil

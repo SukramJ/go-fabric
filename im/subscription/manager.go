@@ -651,6 +651,25 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // sessions right after, when the fabric is removed. In that window only
 // an ongoing report can go out, and none waits for its answer.
 func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSessionID uint16) {
+	m.flush(ctx, func(sub *Subscription) bool {
+		return sub.FabricIndex == fabricIndex && sub.SessionID != exceptSessionID
+	})
+}
+
+// FlushSession is [Manager.FlushFabric] for the subscriptions of one
+// session: it reports what they owe and returns once the reports are
+// answered or given up, leaving the subscriptions open to close with
+// their session. It is the flush of matter.js's rollover close
+// (packages/protocol/src/session/NodeSession.ts:406-410 at db021da0,
+// `closeSubscriptions(true)` before the session closes; NodeSession.ts
+// :312-323) (review II, R2-P2-dr-req-07).
+func (m *Manager) FlushSession(ctx context.Context, sessionID uint16) {
+	m.flush(ctx, func(sub *Subscription) bool { return sub.SessionID == sessionID })
+}
+
+// flush reports what every open, primed subscription selected by match
+// owes, one report each, and waits for the reports.
+func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 	m.mu.RLock()
 	flushReporter := m.flushReporter
 	m.mu.RUnlock()
@@ -660,7 +679,7 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 	now := m.cfg.Clock.Now()
 	var wg sync.WaitGroup
 	for _, sub := range m.snapshot() {
-		if sub.FabricIndex != fabricIndex || sub.SessionID == exceptSessionID || sub.IsClosed() || sub.isPriming() {
+		if !match(sub) || sub.IsClosed() || sub.isPriming() {
 			continue
 		}
 		if !m.claimReport(ctx, sub) {

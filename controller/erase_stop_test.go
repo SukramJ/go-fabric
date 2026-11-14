@@ -17,6 +17,25 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
+// renameDevice changes the paired device's NodeLabel, which the device
+// reports to a standing subscription (node.Node.SetNodeLabel), so a
+// report carrying it reaches the controller and runs its Changed hook
+// whether the default subscription stood before the change or primes
+// after it. SoftwareVersion, which these tests changed before, is not
+// reported to a standing subscription: BasicInformation.SetSoftwareVersion
+// advances the DataVersion and notifies no subscription. It reached the
+// controller only in the priming report of a subscription that was not
+// yet established when the change landed; on a loaded machine the
+// subscription stood first, and the hook never ran.
+func renameDevice(t *testing.T, dev *fabrictest.Device) {
+	t.Helper()
+	if err := dev.Act(func(n *node.Node) error {
+		return n.SetNodeLabel(t.Context(), "renamed")
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestEraseWaitsForTheNodesStop (review II, R2-P1-ctl-02): an Erase whose
 // context ends while a host hook holds a node's report queue erases
 // nothing and says so; once the hook returned, Erase waits for the node's
@@ -53,11 +72,7 @@ func TestEraseWaitsForTheNodesStop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	armed.Store(true)
-	if err := dev.Act(func(n *node.Node) error {
-		return n.Root().BasicInformation.SetSoftwareVersion(77, "77")
-	}); err != nil {
-		t.Fatal(err)
-	}
+	renameDevice(t, dev)
 	if err := site.Run(ctx, func(ctx context.Context) error {
 		select {
 		case <-entered:
@@ -95,5 +110,153 @@ func TestEraseWaitsForTheNodesStop(t *testing.T) {
 	}
 	if ids, err := nodes.NodeIDs(); err != nil || len(ids) != 0 {
 		t.Fatalf("erased node rows came back: %v (%v)", ids, err)
+	}
+}
+
+// TestConcurrentErasesOfAStoppingNode (review II, rework of R2-P1-ctl-02):
+// two Erase calls that run at once after a Close left a node stopping run
+// one after the other — the registry Close left is read and cleared under
+// a lock — and both return nil; the node's rows are gone. Before, both
+// read and cleared it unguarded (a data race under -race) and their store
+// erases ran at once (one scrub blocked by the other's reader).
+func TestConcurrentErasesOfAStoppingNode(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	var nodes *sqlstore.Store
+	site, dev, c, _ := sitePair(t, fabrictest.Topology{}, func(cfg *controller.Config) {
+		nodes = sqlstore.New(cfg.DB)
+		cfg.Node.FlushInterval = time.Hour
+		cfg.HooksFor = func(string) client.Hooks {
+			return client.Hooks{Changed: func() {
+				if !armed.Load() {
+					return
+				}
+				select {
+				case entered <- struct{}{}:
+					<-release
+				default:
+				}
+			}}
+		}
+	})
+	t.Cleanup(releaseOnce)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	armed.Store(true)
+	renameDevice(t, dev)
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		select {
+		case <-entered:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}); err != nil {
+		t.Fatalf("the report's hook never ran: %v", err)
+	}
+	// A Close that cannot wait leaves the node stopping.
+	ended, end := context.WithCancel(t.Context())
+	end()
+	if err := c.Close(ended); err == nil {
+		t.Fatal("Close with the node still stopping returned nil")
+	}
+	releaseOnce()
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		errs := make(chan error, 2)
+		for range 2 {
+			go func() { errs <- c.Erase(ctx) }()
+		}
+		for range 2 {
+			if err := <-errs; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("concurrent Erase: %v", err)
+	}
+	if ids, err := nodes.NodeIDs(); err != nil || len(ids) != 0 {
+		t.Fatalf("stored nodes after the Erases: %v (%v), want none", ids, err)
+	}
+}
+
+// TestEraseDuringAnotherClose (review II, rework2): an Erase whose own
+// Close is a second one that returns on its ended context while the first
+// Close still waits for a node's stop erases nothing and says so; once the
+// first Close returned, Erase erases, and no row comes back.
+func TestEraseDuringAnotherClose(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	var nodes *sqlstore.Store
+	site, dev, c, n := sitePair(t, fabrictest.Topology{}, func(cfg *controller.Config) {
+		nodes = sqlstore.New(cfg.DB)
+		cfg.Node.FlushInterval = time.Hour
+		cfg.HooksFor = func(string) client.Hooks {
+			return client.Hooks{Changed: func() {
+				if !armed.Load() {
+					return
+				}
+				select {
+				case entered <- struct{}{}:
+					<-release
+				default:
+				}
+			}}
+		}
+	})
+	t.Cleanup(releaseOnce)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	armed.Store(true)
+	renameDevice(t, dev)
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		select {
+		case <-entered:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}); err != nil {
+		t.Fatalf("the report's hook never ran: %v", err)
+	}
+	// The first Close waits for the node's stop, which the hook holds.
+	firstClose := make(chan error, 1)
+	go func() { firstClose <- c.Close(ctx) }()
+	if err := site.Eventually(ctx, "the first Close", func() bool { return controller.CloseBegun(c) }); err != nil {
+		t.Fatal(err)
+	}
+	ended, end := context.WithCancel(t.Context())
+	end()
+	if err := c.Erase(ended); err == nil {
+		t.Fatal("Erase during another Close returned nil")
+	}
+	if ids, err := nodes.NodeIDs(); err != nil || len(ids) == 0 {
+		t.Fatalf("stored nodes after the Erase during another Close: %v (%v), want the paired one kept", ids, err)
+	}
+	releaseOnce()
+	select {
+	case err := <-firstClose:
+		if err != nil {
+			t.Fatalf("the first Close: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("the first Close did not return")
+	}
+	if err := site.Run(ctx, c.Erase); err != nil {
+		t.Fatalf("Erase after the first Close: %v", err)
+	}
+	if err := site.Run(ctx, n.Close); err != nil {
+		t.Fatal(err)
+	}
+	if ids, err := nodes.NodeIDs(); err != nil || len(ids) != 0 {
+		t.Fatalf("stored nodes after the Erase: %v (%v), want none", ids, err)
 	}
 }

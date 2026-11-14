@@ -448,7 +448,8 @@ func (c *countingAdvertiser) publishes() int {
 // broadcast-resume trigger re-publishes every active mDNS record
 // (matter.js DeviceAdvertiser.ts:132-149 serviceDisconnected resumes
 // broadcasting) and becomes a no-op once the bridge stopped
-// (ServerNetworkRuntime.ts:427 — no re-announces during teardown).
+// (ServerNetworkRuntime.ts:450-453 at db021da0 — no re-announces during
+// teardown).
 func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	t.Parallel()
 	adv := &countingAdvertiser{Noop: mdns.NewNoop()}

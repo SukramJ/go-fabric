@@ -51,9 +51,12 @@ type commissioningHost struct {
 	// (security.go responderSessionParams).
 	responderParams *sessionparams.Parameters
 	advert          bridge.CommissioningAdvertisement
-	// installMu guards active.
+	// installMu guards active and stopped.
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	// stopped: stop ran; no verifier is installed from then on, so no
+	// provider and no reaper outlive the node (review II, R2-P2-stop-02).
+	stopped bool
 	// observers lists the host's observers, Config.Observers first
 	// (Node.observerList); nil: none.
 	observers func() []Observers
@@ -103,7 +106,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	h.fabricCount = fabrics
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)
-	window.SetFailSafeArmer(h.root.GeneralCommissioning)
+	window.SetFailSafeExpirer(h.root.GeneralCommissioning)
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
 	window.SetTransitionHook(func() {
@@ -111,7 +114,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 		reopen := h.transition(ctx, window)
 		// The host's observer runs after the facade's handling.
 		h.notifyTransition(window)
-		if reopen {
+		if reopen && ctx.Err() == nil {
 			// A basic window closed on a node without a fabric: the node's
 			// own window with the configured credentials comes back, as at
 			// start. After the observer saw the close, so the host sees
@@ -126,7 +129,14 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 // whether a [Node.OpenBasicWindow] window just closed with no other window
 // open, after which the caller restores the node's own window if the node
 // has no fabric.
+//
+// ctx is the window's lifetime (Node.windowLife), which Stop cancels
+// first: once it is done the transition switches the PASE acceptor only.
+// The record and the radio are Stop's — br.Stop withdraws every record
+// and stops the BLE advertisement — so no announce, withdraw or BLE step
+// runs under the cancelled lifetime (review II, R2-P2-stop-04).
 func (h *commissioningHost) transition(ctx context.Context, window *bridge.CommissioningWindow) (reopen bool) {
+	live := ctx.Err() == nil
 	snap := window.CurrentWindow()
 	basic := h.currentBasic()
 	endedBasic := false
@@ -156,8 +166,10 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		if basic != nil {
 			adv.Discriminator = basic.discriminator
 		}
-		h.announce(ctx, adv, "commissioning.own_window.announce")
-		h.followOnBLE(ctx, adv)
+		if live {
+			h.announce(ctx, adv, "commissioning.own_window.announce")
+			h.followOnBLE(ctx, adv)
+		}
 		h.logger.Info("commissioning.own_window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
@@ -170,12 +182,14 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 			// CommissioningWindowManager.cpp:491, kEnabledJointFabric).
 			adv.CommissioningMode = 3
 		}
-		h.announce(ctx, adv, "commissioning.window.announce")
-		// An administrator's window is never on BLE: the node has a fabric
-		// (matter.js BleAdvertiser announces basic windows only,
-		// BleAdvertiser.ts:40-42, and only while uncommissioned,
-		// ServerNetworkRuntime.ts:271-274).
-		h.withdrawBLE(ctx)
+		if live {
+			h.announce(ctx, adv, "commissioning.window.announce")
+			// An administrator's window is never on BLE: the node has a
+			// fabric (matter.js BleAdvertiser announces basic windows only,
+			// BleAdvertiser.ts:40-42, and only while uncommissioned,
+			// ServerNetworkRuntime.ts:271-274).
+			h.withdrawBLE(ctx)
+		}
 		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
 		return false
 	}
@@ -188,8 +202,10 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// 862ad75f) and #open advertises the configured discriminator
 		// (:236-256), the status BasicWindowOpen.
 		h.attachPase(h.baseline)
-		h.announce(ctx, h.advert, "commissioning.basic_window.announce")
-		h.withdrawBLE(ctx)
+		if live {
+			h.announce(ctx, h.advert, "commissioning.basic_window.announce")
+			h.withdrawBLE(ctx)
+		}
 		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
 		return false
 	}
@@ -198,9 +214,11 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (matter.js #closeWindow: removePaseCommissioner,
 		// exitCommissioningMode).
 		h.attachPase(nil)
-		h.br.WithdrawCommissioning(ctx)
-		h.withdrawBLE(ctx)
-		h.setAnnounced(0, 0)
+		if live {
+			h.br.WithdrawCommissioning(ctx)
+			h.withdrawBLE(ctx)
+			h.setAnnounced(0, 0)
+		}
 		h.logger.Info("commissioning.window.closed")
 		return endedBasic && !window.IsOpen()
 	}
@@ -255,7 +273,11 @@ func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierCo
 		return bridge.ErrAdministratorWindowOpen
 	}
 	//nolint:contextcheck // the provider outlives this call; the adapters it builds carry no ctx of their own (as InstallVerifier's)
-	b := &basicWindow{discriminator: discriminator, restore: h.installVerifierContext(vc, iterations, salt), opening: true}
+	restore, err := h.installVerifierContext(vc, iterations, salt)
+	if err != nil {
+		return err
+	}
+	b := &basicWindow{discriminator: discriminator, restore: restore, opening: true}
 	h.basicMu.Lock()
 	prev := h.basic
 	h.basic = b
@@ -418,13 +440,21 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 	if err != nil {
 		return nil, fmt.Errorf("PAKE passcode verifier: %w", err)
 	}
-	return h.installVerifierContext(vc, iterations, salt), nil
+	return h.installVerifierContext(vc, iterations, salt)
 }
 
 // installVerifierContext makes a PASE acceptor over vc the bridge's until
 // the returned restore runs: the path both an administrator's verifier
-// (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take.
-func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func()) {
+// (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take. Once
+// stop ran it installs nothing and returns [ErrStopped]: a window opened
+// while the node stops has no acceptor and starts no reaper (review II,
+// R2-P2-stop-02).
+func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func(), err error) {
+	h.installMu.Lock()
+	defer h.installMu.Unlock()
+	if h.stopped {
+		return nil, ErrStopped
+	}
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapterFromContext(h.life, h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
 		if err != nil {
@@ -434,15 +464,15 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 		return adapter
 	})
 	provider.SetClock(h.br.Clock())
-	provider.StartReaper(context.Background(), 30*time.Second, time.Minute)
+	// On the node's lifetime: a provider no restore stops ends with the
+	// node.
+	provider.StartReaper(h.life, 30*time.Second, time.Minute)
 
-	h.installMu.Lock()
 	if h.active != nil {
 		h.active.Stop()
 	}
 	h.active = provider
 	h.br.AttachPaseHandlerProvider(provider.Resolve)
-	h.installMu.Unlock()
 	h.logger.Info("pase.window.verifier_installed", slog.Int("iterations", int(iterations)))
 
 	return func() {
@@ -456,13 +486,15 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 		}
 		provider.Stop()
 		h.logger.Info("pase.window.verifier_restored")
-	}
+	}, nil
 }
 
-// stop ends a window provider still running at shutdown.
+// stop ends a window provider still running at shutdown; no verifier is
+// installed afterwards.
 func (h *commissioningHost) stop() {
 	h.installMu.Lock()
 	defer h.installMu.Unlock()
+	h.stopped = true
 	if h.active != nil {
 		h.active.Stop()
 		h.active = nil
@@ -546,7 +578,8 @@ func (c *WindowCredentials) validate() error {
 // credentials are back: a node without a fabric reopens its own window
 // under the configured discriminator, a commissioned node publishes no
 // commissionable record until the next window — the facade's window
-// semantics, unchanged.
+// semantics, unchanged. From the first [Node.Stop] on it returns
+// [ErrStopped] and opens nothing.
 //
 // matter.js has no per-window basic credentials: openBasicCommissioningWindow
 // opens the window with the node's own passcode
@@ -557,6 +590,9 @@ func (c *WindowCredentials) validate() error {
 // host extension, exposed as the facade's own API rather than as a cluster
 // command.
 func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) error {
+	if n.stopBegan() {
+		return ErrStopped
+	}
 	if err := creds.validate(); err != nil {
 		return err
 	}
@@ -564,7 +600,16 @@ func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) err
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)
 	}
-	return n.window.openBasic(ctx, vc, creds.PBKDFIterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout)
+	return stoppedAs(n.window.openBasic(ctx, vc, creds.PBKDFIterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout))
+}
+
+// stoppedAs is err with the bridge's ErrStopped — its window refused an
+// open once br.Stop stopped it — reported as the node's [ErrStopped].
+func stoppedAs(err error) error {
+	if errors.Is(err, bridge.ErrStopped) {
+		return ErrStopped
+	}
+	return err
 }
 
 // OpenOwnWindow opens the node's own commissioning window with the
@@ -580,9 +625,13 @@ func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) err
 // Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:130-137), which
 // opens the window with the node's configured passcode; ADR 0025 principle
-// 3 (the window's wiring stays behind [Node.Bridge]).
+// 3 (the window's wiring stays behind [Node.Bridge]). From the first
+// [Node.Stop] on it returns [ErrStopped] and opens nothing.
 func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
-	return n.br.CommissioningWindow().OpenOwnWindow(ctx, timeout)
+	if n.stopBegan() {
+		return ErrStopped
+	}
+	return stoppedAs(n.br.CommissioningWindow().OpenOwnWindow(ctx, timeout))
 }
 
 // CloseWindow closes the open commissioning window, whoever opened it —
@@ -592,7 +641,7 @@ func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 // their commissioner. Without an open window it does nothing. A node
 // without a fabric that closes a basic window reopens its own window, as
 // when that window closes on its timeout. It returns ctx.Err() when ctx
-// is done before the call.
+// is done before the call, and [ErrStopped] from the first [Node.Stop] on.
 //
 // Mirrors matter.js DeviceCommissioner.endCommissioning ("Close the open
 // commissioning window, whoever opened it",
@@ -602,6 +651,9 @@ func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 func (n *Node) CloseWindow(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if n.stopBegan() {
+		return ErrStopped
 	}
 	n.br.CommissioningWindow().EndCommissioning()
 	return nil

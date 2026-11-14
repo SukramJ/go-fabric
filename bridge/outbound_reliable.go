@@ -301,8 +301,9 @@ const unsecuredEntryLimit = 16
 // ([outboundReliableTracker.AbandonUnsecuredExchange]) — but three kinds
 // are bounded by no handshake timeout: the StatusReport that ends a
 // handshake, which is retransmitted after the handshake is over and paced
-// by the intervals the peer stated (0xFFFFFFFF ms puts the first
-// retransmission weeks away); a CASE reply of a host that runs no reaper
+// by the intervals the peer stated (clamped to an hour,
+// [sessionparams.MaxUnauthenticatedInterval], where they are adopted —
+// [handshakePeerTimingOf]); a CASE reply of a host that runs no reaper
 // ([PerExchangeCaseProvider.StartReaper]); and a PASE reply whose slot
 // nobody takes over, since [pasePairingTimeout] is looked at by the next
 // PBKDFParamRequest only. The value is [pasePairingTimeout]'s — matter.js's
@@ -392,6 +393,19 @@ func (t *outboundReliableTracker) dropLocked(key outboundKey) {
 	}
 }
 
+// holdsUnsecuredExchange reports whether a message of the unsecured
+// session's exchangeID still waits for its acknowledgement.
+func (t *outboundReliableTracker) holdsUnsecuredExchange(exchangeID uint16) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, key := range t.unsecured {
+		if e, ok := t.pending[key]; ok && e.exchangeID == exchangeID {
+			return true
+		}
+	}
+	return false
+}
+
 // Untrack drops a message Track registered whose send then failed: there is
 // nothing on the wire to retransmit or to wait for.
 func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
@@ -451,6 +465,48 @@ func (t *outboundReliableTracker) AbandonUnsecuredExchange(exchangeID uint16) in
 		}
 	}
 	return cleared
+}
+
+// errOutboundSessionClosed wakes a [outboundReliableTracker.WaitForAck]
+// caller whose entry went with its session ([outboundReliableTracker.DropSession]).
+var errOutboundSessionClosed = errors.New("bridge: outbound retransmit: the session closed")
+
+// DropSession drops every entry of the secure session sessionID — the
+// session closed, so nothing it sent is retransmitted or acknowledged any
+// more — and wakes any [outboundReliableTracker.WaitForAck] caller blocked
+// on one with errOutboundSessionClosed. It returns the number of entries
+// dropped. Session 0 (the unsecured session) is left alone: its entries
+// belong to handshakes, which end on their own clock. matter.js stops
+// retransmitting when the send fails with SessionClosedError
+// (MessageExchange.ts:1008-1014 at db021da0, the lines
+// [outboundReliableTracker.Tick] cites at 862ad75f); review II,
+// R2-P2-sess-06.
+func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
+	if t == nil || sessionID == 0 {
+		return 0
+	}
+	t.mu.Lock()
+	dropped := 0
+	var wakers []chan error
+	for key := range t.pending {
+		if key.sessionID != sessionID {
+			continue
+		}
+		t.dropLocked(key)
+		dropped++
+	}
+	for key, ch := range t.waiters {
+		if key.sessionID == sessionID {
+			delete(t.waiters, key)
+			wakers = append(wakers, ch)
+		}
+	}
+	t.mu.Unlock()
+	for _, ch := range wakers {
+		ch <- errOutboundSessionClosed // buffered (WaitForAck); one send per channel
+		close(ch)
+	}
+	return dropped
 }
 
 // Ack removes the pending entry for (sessionID, acked). Returns true

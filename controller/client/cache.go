@@ -165,8 +165,8 @@ type persister struct {
 	log      *slog.Logger
 	// image is the node's lock, which guards the caches.
 	image sync.Locker
-	// collect, set under the node's lock while a subscription report is
-	// applied, gathers the unbuffered writes for the job queue.
+	// collect, set under the node's lock while a report is applied,
+	// gathers the unbuffered writes for the job queue.
 	collect *[]saveJob
 
 	// flushMu serialises the flushes, snapshot and store writes together,
@@ -195,8 +195,8 @@ type saveJob struct {
 }
 
 // save writes keys of c and its version now — or, while collect is set (a
-// subscription report applied inside its exchange), encodes them and
-// collects the write for the node's job queue; a store error is logged,
+// report applied), encodes them and collects the write for the node's job
+// queue; a store error is logged,
 // never raised (DatasourceCache.ts:297-303). The caller holds the node's
 // lock.
 func (p *persister) save(c *cache, keys []uint32) {

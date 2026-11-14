@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -154,6 +156,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	body := buf[hdrLen:]
 
 	plain, duplicate, err := b.decryptIfNeeded(&hdr, body)
+	// An unsecured source's window lives on past this message only if a
+	// handshake holds its exchange ([unsecuredWindowTable]).
+	defer b.releaseUnsecuredWindow(&hdr)
 	if err != nil {
 		return err
 	}
@@ -192,13 +197,16 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Any("err", err))
 		return err
 	}
+	if !duplicate {
+		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
+	}
 
 	// Reliable inbound traffic: register an ACK obligation. The
 	// pump goroutine fires a StandaloneAck if no piggyback opportunity
 	// arises within the grace window; sendReply paths discharge the
 	// obligation directly when they fire.
 	if proto.NeedsAck {
-		b.owedInboundAck(src, &hdr, proto)
+		b.owedInboundAck(b.inboundAckRoute(src, &hdr, proto, duplicate), &hdr, proto)
 	}
 
 	// Authentic duplicate (MRP retransmit): we already ran the IM
@@ -296,27 +304,269 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	}
 }
 
+// unsecuredWindowTable is the per-source duplicate-detection state of the
+// unsecured session, and its lifetime is the handshake's: matter.js keeps
+// the reception state in the UnsecuredSession, and an unsecured session
+// created for an inbound message does not outlive that message unless a
+// protocol handler adopts it — PASE and CASE do, until their exchange ends
+// (packages/protocol/src/protocol/ExchangeManager.ts:244-256,
+// packages/protocol/src/session/UnsecuredSession.ts:94-102 at db021da0).
+//
+// Here a window is bound to the exchanges of its source's new messages and
+// is dropped at the end of a message once none of them holds handshake
+// state ([Bridge.unsecuredExchangeLive]), and by the next new source once
+// its handshakes' state is gone. So a source whose datagram starts nothing
+// leaves nothing behind, and a handshake's window stays while a
+// retransmission of its last message can still arrive — until its reply is
+// acknowledged or given up — whatever exchange another datagram claiming
+// the same source node id names (review II, R2-P2-dr-req-02).
+//
+// Creation stays capped at [maxUnsecuredWindows]: past the cap a new source
+// is treated as fresh. The cap counts windows that are in use by a message
+// being dispatched or bound to a live handshake, so only sources whose
+// messages name the exchange of a live handshake can fill it.
+type unsecuredWindowTable struct {
+	mu      sync.Mutex
+	entries map[uint64]*unsecuredWindowEntry
+}
+
+// unsecuredWindowEntry is one source's window and what holds it.
+type unsecuredWindowEntry struct {
+	window *mrp.Window
+	// exchanges are the exchange ids of the source's new messages whose
+	// exchange held handshake state at the end of a message, plus those of
+	// the messages in dispatch; empty until the first message's protocol
+	// header was read (and for a window the bridgetest seam anchored).
+	// A message's end prunes those that hold no state any more, so the
+	// set stays within the live handshakes and the messages in dispatch,
+	// and it never holds more than [maxUnsecuredWindowExchanges].
+	exchanges []uint16
+	// inUse counts the source's messages between their window lookup and
+	// the end of their dispatch; such a window is never swept.
+	inUse int
+}
+
+// len reports the number of windows held.
+func (t *unsecuredWindowTable) len() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.entries)
+}
+
 // unsecuredWindow returns the per-source duplicate-detection window for id,
-// creating one on first use. Creation is capped at [maxUnsecuredWindows]: past
-// the cap a new source returns nil and is treated as fresh, so an
-// unauthenticated spoofed-source flood cannot grow unsecuredWindows without
-// bound. The count is best-effort (a concurrent burst may create a few beyond
-// the cap, bounded by the UDP dispatch limit) — the goal is a hard ceiling,
-// not an exact size.
+// creating one on first use, without marking it in use: the bridgetest seam
+// anchors a window through it.
 func (b *Bridge) unsecuredWindow(id uint64) *mrp.Window {
-	if raw, ok := b.unsecuredWindows.Load(id); ok {
-		w, _ := raw.(*mrp.Window)
-		return w
+	return b.acquireUnsecuredWindow(id, false)
+}
+
+// acquireUnsecuredWindow returns the window for id, creating one on first
+// use, and with use set counts one more message of id in dispatch
+// ([Bridge.releaseUnsecuredWindow] ends it). Before it creates a window it
+// sweeps those whose handshake is over; past [maxUnsecuredWindows] it
+// returns nil and the message is treated as fresh.
+func (b *Bridge) acquireUnsecuredWindow(id uint64, use bool) *mrp.Window {
+	t := &b.unsecuredWindows
+	t.mu.Lock()
+	if e, ok := t.entries[id]; ok {
+		if use {
+			e.inUse++
+		}
+		t.mu.Unlock()
+		return e.window
 	}
-	if b.unsecuredWindowCount.Load() >= maxUnsecuredWindows {
+	t.mu.Unlock()
+	b.sweepUnsecuredWindows()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if e, ok := t.entries[id]; ok {
+		if use {
+			e.inUse++
+		}
+		return e.window
+	}
+	if len(t.entries) >= maxUnsecuredWindows {
 		return nil
 	}
-	raw, loaded := b.unsecuredWindows.LoadOrStore(id, mrp.NewWindow())
-	if !loaded {
-		b.unsecuredWindowCount.Add(1)
+	if t.entries == nil {
+		t.entries = make(map[uint64]*unsecuredWindowEntry)
 	}
-	w, _ := raw.(*mrp.Window)
-	return w
+	e := &unsecuredWindowEntry{window: mrp.NewWindow()}
+	if use {
+		e.inUse = 1
+	}
+	t.entries[id] = e
+	return e.window
+}
+
+// unsecuredSource returns the source node id an unsecured message's window
+// is keyed by, and false for a message that has none.
+func unsecuredSource(hdr *message.Header) (uint64, bool) {
+	if hdr.SessionID != 0 || !hdr.HasSourceNodeID || hdr.SourceNodeID == 0 {
+		return 0, false
+	}
+	return hdr.SourceNodeID, true
+}
+
+// maxUnsecuredWindowExchanges caps the exchanges one unsecured source's
+// window is bound to, as [maxUnsecuredWindows] caps the windows: the source
+// node id and the exchange id are the sender's unauthenticated choice, and
+// while one message of a source is in dispatch its set is not pruned, so a
+// source rotating exchange ids grew it to every exchange id, each further
+// message scanning and cloning it under the table's lock (review II,
+// R2-P2-rr-dev-02). Past the cap a new exchange is not bound: its window
+// lives on only while an exchange bound before holds handshake state, and
+// once the window goes the handshake handler's own state-replay guard
+// rejects a genuine replay, as past [maxUnsecuredWindows].
+const maxUnsecuredWindowExchanges = 4
+
+// bindUnsecuredWindow adds exchangeID to the exchanges of hdr's unsecured
+// source, up to [maxUnsecuredWindowExchanges]; the caller binds new
+// messages only, so a replayed datagram moves nothing.
+func (b *Bridge) bindUnsecuredWindow(hdr *message.Header, exchangeID uint16) {
+	id, ok := unsecuredSource(hdr)
+	if !ok {
+		return
+	}
+	t := &b.unsecuredWindows
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if e, ok := t.entries[id]; ok && len(e.exchanges) < maxUnsecuredWindowExchanges && !slices.Contains(e.exchanges, exchangeID) {
+		e.exchanges = append(e.exchanges, exchangeID)
+	}
+}
+
+// liveUnsecuredExchanges returns those of exchanges that hold handshake
+// state. The caller must not hold the window table's lock.
+func (b *Bridge) liveUnsecuredExchanges(exchanges []uint16) []uint16 {
+	var live []uint16
+	for _, exchange := range exchanges {
+		if b.unsecuredExchangeLive(exchange) {
+			live = append(live, exchange)
+		}
+	}
+	return live
+}
+
+// releaseUnsecuredWindow ends one message of hdr's unsecured source in
+// dispatch and drops the window when no message of that source is in
+// dispatch and none of its exchanges holds handshake state — the message
+// was not adopted by a handshake, or ended it. A window that stays keeps
+// only its live exchanges.
+func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
+	id, ok := unsecuredSource(hdr)
+	if !ok {
+		return
+	}
+	t := &b.unsecuredWindows
+	t.mu.Lock()
+	e, ok := t.entries[id]
+	if !ok {
+		t.mu.Unlock()
+		return
+	}
+	if e.inUse > 0 {
+		e.inUse--
+	}
+	idle, exchanges := e.inUse == 0, slices.Clone(e.exchanges)
+	t.mu.Unlock()
+	if !idle {
+		return
+	}
+	live := b.liveUnsecuredExchanges(exchanges)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if cur, ok := t.entries[id]; !ok || cur != e || e.inUse != 0 || !slices.Equal(e.exchanges, exchanges) {
+		return
+	}
+	if len(exchanges) > 0 && len(live) > 0 {
+		e.exchanges = live
+		return
+	}
+	delete(t.entries, id)
+}
+
+// sweepUnsecuredWindows drops every window that no message is in dispatch
+// for and whose handshake holds no state any more: a handshake whose last
+// reply was acknowledged, given up or evicted after its source's last
+// message. The liveness of each exchange is read outside the table's lock.
+func (b *Bridge) sweepUnsecuredWindows() {
+	t := &b.unsecuredWindows
+	t.mu.Lock()
+	idle := make(map[uint16]bool)
+	for _, e := range t.entries {
+		if e.inUse == 0 {
+			for _, exchange := range e.exchanges {
+				idle[exchange] = false
+			}
+		}
+	}
+	t.mu.Unlock()
+	if len(idle) == 0 {
+		return
+	}
+	for exchange := range idle {
+		idle[exchange] = b.unsecuredExchangeLive(exchange)
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for id, e := range t.entries {
+		if e.inUse != 0 || len(e.exchanges) == 0 {
+			continue
+		}
+		held := false
+		for _, exchange := range e.exchanges {
+			if live, seen := idle[exchange]; !seen || live {
+				held = true
+				break
+			}
+		}
+		if !held {
+			delete(t.entries, id)
+		}
+	}
+}
+
+// unsecuredExchangeLive reports whether the bridge still holds state of a
+// handshake on the unsecured session's exchangeID: a reply that waits for
+// its acknowledgement, the single-active-PASE claim within
+// [pasePairingTimeout], or the CASE responder's Sigma1 record that ends
+// with Sigma3 or the host's reaper ([Bridge.ForgetSigma1Replied]).
+func (b *Bridge) unsecuredExchangeLive(exchangeID uint16) bool {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	_, sigma1 := b.sigma1Replied[exchangeID]
+	pase := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange == exchangeID &&
+		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
+	b.mu.RUnlock()
+	if sigma1 || pase {
+		return true
+	}
+	return tracker != nil && tracker.holdsUnsecuredExchange(exchangeID)
+}
+
+// inboundAckRoute is the route the acknowledgement of an inbound message
+// goes by: where it came from, unless it is a secure session's duplicate.
+// A duplicate does not move the exchange's acknowledgement route, the rule
+// the session route follows (by_design BD-chip-SessionRouteByNewCounter): a
+// captured datagram decrypts again from anywhere, so it is answered at the
+// route the exchange already has, else the session's route (bound by new
+// messages only), else none — the obligation is then dropped by the pump,
+// and the peer's next new message repairs the route.
+func (b *Bridge) inboundAckRoute(src net.Addr, hdr *message.Header, proto message.ProtocolHeader, duplicate bool) net.Addr {
+	if !duplicate || hdr.SessionID == 0 || !routeUsesMRP(src) {
+		return src
+	}
+	key := mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
+	if target, ok := b.replyRoute(key); ok && !isNilRoute(target.src) {
+		return target.src
+	}
+	if raw, ok := b.sessionPeerAddrs.Load(hdr.SessionID); ok {
+		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
+			return addr
+		}
+	}
+	return nil
 }
 
 // decryptIfNeeded returns the plaintext body for the datagram. For
@@ -338,7 +588,7 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 		// source node id there is nothing stable to key on — treat as fresh
 		// (the handshake handler's own state-replay guard still catches it).
 		if hdr.HasSourceNodeID && hdr.SourceNodeID != 0 {
-			if w := b.unsecuredWindow(hdr.SourceNodeID); w != nil && !w.Accept(hdr.MessageCounter) {
+			if w := b.acquireUnsecuredWindow(hdr.SourceNodeID, true); w != nil && !w.Accept(hdr.MessageCounter) {
 				return body, true, nil
 			}
 		}
@@ -723,7 +973,8 @@ func (b *Bridge) notifyReachable(ep *endpoint.Endpoint, reachable bool) {
 		contract.EventPriorityInfo)
 	// Advance the endpoint-hosted BDBI DataVersion — the reachability
 	// flip is a cluster state change, so DataVersionFilters must miss
-	// afterwards (matter.js Datasource.ts:1035).
+	// afterwards (matter.js Datasource.ts:1456-1457 at db021da0: a
+	// commit that changed a property advances the version).
 	ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
 	// Also dirty the Reachable ATTRIBUTE (BDBI 0x0039 / 0x0011), not
 	// just fire the event: a controller subscribed to the attribute

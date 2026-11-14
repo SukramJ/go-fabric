@@ -598,3 +598,99 @@ func TestStructureRetractedClaim(t *testing.T) {
 		t.Fatalf("tree %s", got)
 	}
 }
+
+// TestStructurePartsCycleRefused: a PartsList that names the root, the
+// claimant itself or one of the claimant's ancestors does not make the
+// claimed endpoint a child of its own descendant (review II, R2-P2-alloc-01);
+// the root's later list and Erase end normally.
+func TestStructurePartsCycleRefused(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		b    func() *report
+		want string
+	}{
+		{"root named by its child", func() *report {
+			b := &report{}
+			b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID}, 1)
+			b.endpoint(1, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID}, 0)
+			return b
+		}, "0:0x16:- 1:0x100:0"},
+		{"an endpoint naming itself", func() *report {
+			b := &report{}
+			b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID}, 1)
+			b.endpoint(1, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID}, 1)
+			return b
+		}, "0:0x16:- 1:0x100:0"},
+		{"two endpoints naming each other", func() *report {
+			b := &report{}
+			b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID}, 1, 2)
+			b.endpoint(1, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID}, 2)
+			b.endpoint(2, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID}, 1)
+			return b
+		}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			st := &MemoryStore{}
+			n, _, _ := testNode(t, st)
+			n.apply(wildcard, &tc.b().r, true)
+			got := tree(n)
+			if tc.want != "" && got != tc.want {
+				t.Fatalf("tree %s, want %s", got, tc.want)
+			}
+			assertAcyclic(t, n)
+			// A persisted image of the same lists loads without a cycle.
+			reloaded, _, _ := testNode(t, st)
+			if r := tree(reloaded); r != got {
+				t.Fatalf("reloaded tree %s, want %s", r, got)
+			}
+			assertAcyclic(t, reloaded)
+			n.apply(wildcard, &(&report{}).attr(0, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 9).r, true)
+			if got := tree(n); got != "0:0x16:-" {
+				t.Fatalf("tree after the root's empty list %s", got)
+			}
+			if err := reloaded.Erase(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// assertAcyclic fails when an endpoint's owner chain does not reach the
+// root within the number of endpoints.
+func assertAcyclic(t *testing.T, n *Node) {
+	t.Helper()
+	eps := n.Endpoints()
+	for _, ep := range eps {
+		steps := 0
+		for o := ep.Owner(); o != nil; o = o.Owner() {
+			steps++
+			if steps > len(eps) || o == ep {
+				t.Fatalf("endpoint %d is its own ancestor: %s", ep.Number(), tree(n))
+			}
+		}
+	}
+}
+
+// TestStructureWalksEndOnACycle: visitBelow and erase visit each endpoint
+// once even when the children links form a cycle (review II,
+// R2-P2-alloc-01).
+func TestStructureWalksEndOnACycle(t *testing.T) {
+	t.Parallel()
+	n, _, _ := testNode(t, &MemoryStore{})
+	n.apply(wildcard, &bridge(1).r, true)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	root, agg := n.s.endpoints[0], n.s.endpoints[1]
+	agg.children = append(agg.children, root)
+	var visited []uint16
+	n.s.visitBelow(root, func(ep *Endpoint) { visited = append(visited, ep.number) })
+	if !slices.Equal(visited, []uint16{1, 2}) {
+		t.Fatalf("visited %v", visited)
+	}
+	n.s.erase(agg)
+	if len(n.s.endpoints) != 0 {
+		t.Fatalf("endpoints left %d", len(n.s.endpoints))
+	}
+}

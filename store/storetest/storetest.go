@@ -61,6 +61,18 @@ var cases = []testCase{
 	{"fabrics/explicit-index", fabricsExplicitIndex},
 	{"fabrics/exhausted-and-wrap", fabricsExhaustedAndWrap},
 	{"fabrics/duplicate-root-and-id", fabricsDuplicate},
+	{"fabrics/pending-add", fabricsPendingAdd},
+	{"fabrics/vid-verification", fabricsVIDVerification},
+	{"fabrics/commit", fabricsCommit},
+	{"fabrics/rollback-pending-add", fabricsRollbackPendingAdd},
+	{"fabrics/update-rollback", fabricsUpdateRollback},
+	{"fabrics/update-commit", fabricsUpdateCommit},
+	{"fabrics/update-writes-what-it-changes", fabricsUpdateWritesWhatItChanges},
+	{"fabrics/update-twice", fabricsUpdateTwice},
+	{"fabrics/update-pending-add", fabricsUpdatePendingAdd},
+	{"fabrics/update-refused", fabricsUpdateRefused},
+	{"fabrics/pending-not-found", fabricsPendingNotFound},
+	{"fabrics/concurrent-updates", fabricsConcurrentUpdates},
 	{"identity", identityCase},
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
@@ -68,7 +80,9 @@ var cases = []testCase{
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
 	{"server-subscriptions", serverSubscriptionsCase},
+	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},
+	{"settings/set-settings", setSettingsCase},
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
@@ -77,6 +91,8 @@ var cases = []testCase{
 	{"constraints", constraintsCase},
 	{"fabric-cascade", fabricCascade},
 	{"copies", copiesCase},
+	{"copies/vid", copiesVIDCase},
+	{"copies/credentials", copiesCredentials},
 	{"concurrent", concurrentCase},
 	{"erase", eraseCase},
 }
@@ -189,11 +205,12 @@ func fabricsRoundTrip(ctx context.Context, t *testing.T, p store.Port) {
 
 func fabricsNotFound(ctx context.Context, t *testing.T, p store.Port) {
 	for name, err := range map[string]error{
-		"GetFabric":            func() error { _, err := p.GetFabric(ctx, 7); return err }(),
-		"UpdateFabricLabel":    p.UpdateFabricLabel(ctx, 7, "x"),
-		"UpdateFabricVendorID": p.UpdateFabricVendorID(ctx, 7, 1),
-		"UpdateFabricNodeID":   p.UpdateFabricNodeID(ctx, 7, 1),
-		"RemoveFabric":         p.RemoveFabric(ctx, 7),
+		"GetFabric":                   func() error { _, err := p.GetFabric(ctx, 7); return err }(),
+		"UpdateFabricLabel":           p.UpdateFabricLabel(ctx, 7, "x"),
+		"UpdateFabricVendorID":        p.UpdateFabricVendorID(ctx, 7, 1),
+		"UpdateFabricNodeID":          p.UpdateFabricNodeID(ctx, 7, 1),
+		"UpdateFabricVIDVerification": p.UpdateFabricVIDVerification(ctx, 7, []byte{1}, nil),
+		"RemoveFabric":                p.RemoveFabric(ctx, 7),
 	} {
 		if !errors.Is(err, store.ErrFabricNotFound) {
 			t.Errorf("%s on a missing fabric = %v, want ErrFabricNotFound", name, err)
@@ -254,6 +271,69 @@ func fabricsDuplicate(ctx context.Context, t *testing.T, p store.Port) {
 	addFabric(ctx, t, p, 1)
 	if _, err := p.AddFabric(ctx, fabric(1)); err == nil {
 		t.Fatal("AddFabric of the same FabricID under the same root succeeded")
+	}
+}
+
+// fabricsPendingAdd: a row AddFabric inserts as FabricPendingAdd is read
+// and listed like any other, with its mark and its VID data; a
+// FabricPendingUpdate (or an unknown state) is refused on insert and adds
+// nothing.
+func fabricsPendingAdd(ctx context.Context, t *testing.T, p store.Port) {
+	committed := addFabric(ctx, t, p, 1)
+	rec := fabric(2)
+	rec.Pending = store.FabricPendingAdd
+	rec.VIDVerificationStatement = bytes.Repeat([]byte{0x85}, 85)
+	rec.VVSC = []byte{0x15, 0x18}
+	pending, err := p.AddFabric(ctx, rec)
+	must(t, err)
+	rec.FabricIndex = pending
+	got, err := p.GetFabric(ctx, pending)
+	must(t, err)
+	wantEqual(t, "GetFabric of the pending add", got, rec)
+	list, err := p.ListFabrics(ctx)
+	must(t, err)
+	if len(list) != 2 || list[0].FabricIndex != committed || list[0].Pending != store.FabricCommitted || list[1].Pending != store.FabricPendingAdd {
+		t.Fatalf("ListFabrics = %+v, want the committed fabric and the pending add", list)
+	}
+	wantEqual(t, "ListFabrics()[1]", list[1], rec)
+	for _, state := range []store.FabricPending{store.FabricPendingUpdate, store.FabricPending(3)} {
+		bad := fabric(3)
+		bad.Pending = state
+		if _, err := p.AddFabric(ctx, bad); err == nil {
+			t.Errorf("AddFabric with %v succeeded", state)
+		}
+	}
+	if list, _ := p.ListFabrics(ctx); len(list) != 2 {
+		t.Fatalf("a refused AddFabric left %d fabrics, want 2", len(list))
+	}
+}
+
+// fabricsVIDVerification: the VID data is part of the row; it is set and
+// cleared in one write, an empty slice reads back as none, and the write
+// leaves the commit state alone.
+func fabricsVIDVerification(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
+	rec := fabric(2)
+	rec.Pending = store.FabricPendingAdd
+	pending, err := p.AddFabric(ctx, rec)
+	must(t, err)
+	statement, vvsc := bytes.Repeat([]byte{7}, 85), []byte{1, 2, 3}
+	for _, f := range []uint8{idx, pending} {
+		must(t, p.UpdateFabricVIDVerification(ctx, f, statement, vvsc))
+	}
+	got, err := p.GetFabric(ctx, idx)
+	must(t, err)
+	wantEqual(t, "statement", got.VIDVerificationStatement, statement)
+	wantEqual(t, "VVSC", got.VVSC, vvsc)
+	wantEqual(t, "state of the committed fabric", got.Pending, store.FabricCommitted)
+	if got, _ := p.GetFabric(ctx, pending); got.Pending != store.FabricPendingAdd || !bytes.Equal(got.VVSC, vvsc) {
+		t.Fatalf("the pending add after the VID write = %+v", got)
+	}
+	must(t, p.UpdateFabricVIDVerification(ctx, idx, []byte{}, nil))
+	got, err = p.GetFabric(ctx, idx)
+	must(t, err)
+	if got.VIDVerificationStatement != nil || got.VVSC != nil {
+		t.Fatalf("cleared VID data reads back as %#v, %#v; want nil, nil", got.VIDVerificationStatement, got.VVSC)
 	}
 }
 
@@ -520,9 +600,7 @@ func resumptionCase(ctx context.Context, t *testing.T, p store.Port) {
 }
 
 // serverSubscriptionsCase checks the load order the bridge restores
-// subscriptions in (ADR 0008): the least recently saved first. Rows saved
-// within one tick of a store's clock are ordered by subscription id, so the
-// case saves them in id order.
+// subscriptions in (ADR 0008): the least recently saved first.
 func serverSubscriptionsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err := p.LoadServerSubscriptions(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("LoadServerSubscriptions on an empty store = %v, %v", got, err)
@@ -546,6 +624,25 @@ func serverSubscriptionsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err = p.LoadServerSubscriptions(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("LoadServerSubscriptions after Clear = %v, %v", got, err)
 	}
+}
+
+// serverSubscriptionsSaveOrder: the load order is the exact save order,
+// not the subscription ids' — saves in one instant, ids descending — and a
+// save of an existing row makes it the most recent. The bridge's
+// re-establishment walks a peer's subscriptions newest first by this order
+// and re-saves them to restore it (review II, rework of R2-P2-sess-01).
+func serverSubscriptionsSaveOrder(ctx context.Context, t *testing.T, p store.Port) {
+	for _, id := range []byte{30, 20, 10} {
+		must(t, p.SaveServerSubscription(ctx, uint32(id), 1, 0x10, []byte{id}))
+	}
+	got, err := p.LoadServerSubscriptions(ctx)
+	must(t, err)
+	wantEqual(t, "LoadServerSubscriptions after saving 30, 20, 10", got, [][]byte{{30}, {20}, {10}})
+	must(t, p.SaveServerSubscription(ctx, 30, 1, 0x10, []byte{30}))
+	must(t, p.SaveServerSubscription(ctx, 20, 1, 0x10, []byte{20}))
+	got, err = p.LoadServerSubscriptions(ctx)
+	must(t, err)
+	wantEqual(t, "LoadServerSubscriptions after re-saving 30, 20", got, [][]byte{{10}, {30}, {20}})
 }
 
 func settingsCase(ctx context.Context, t *testing.T, p store.Port) {
@@ -575,6 +672,31 @@ func settingsCase(ctx context.Context, t *testing.T, p store.Port) {
 	}
 	if v, _, err := p.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); err != nil || v != 1<<62 {
 		t.Fatalf("a refused counter write changed the counter to %d (%v)", v, err)
+	}
+}
+
+// setSettingsCase is the atomic multi-key write: every key lands, an
+// existing key is overwritten, an empty value is a value, an empty or nil
+// map writes nothing, and the map stays the caller's. That a failing write
+// leaves none of the keys behind needs a provoked failure, which only an
+// implementation's own test can arrange (store: TestSetSettingsAllOrNothing).
+func setSettingsCase(ctx context.Context, t *testing.T, p store.Port) {
+	must(t, p.SetSettings(ctx, nil))
+	must(t, p.SetSettings(ctx, map[string]string{}))
+	for _, k := range []string{"multi.a", "multi.b", "multi.c"} {
+		if _, ok, err := p.GetSetting(ctx, k); err != nil || ok {
+			t.Fatalf("an empty SetSettings wrote %q: ok=%v err=%v", k, ok, err)
+		}
+	}
+	must(t, p.SetSetting(ctx, "multi.a", "old"))
+	values := map[string]string{"multi.a": "1", "multi.b": "", "multi.c": "3"}
+	must(t, p.SetSettings(ctx, values))
+	values["multi.a"] = "mutated"
+	delete(values, "multi.c")
+	for k, want := range map[string]string{"multi.a": "1", "multi.b": "", "multi.c": "3"} {
+		if v, ok, err := p.GetSetting(ctx, k); err != nil || !ok || v != want {
+			t.Errorf("GetSetting(%q) after SetSettings = %q, %v, %v; want %q", k, v, ok, err, want)
+		}
 	}
 }
 
@@ -763,6 +885,63 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, p.ReplaceICDRegistrations(ctx, missing, nil))
 }
 
+// seedFabricRows writes one row of every fabric-owned kind the cascade
+// removes (store/port.go): identity, ACL, key set, key map, group table,
+// groupcast, resumption, default OTA provider, ICD registration.
+func seedFabricRows(ctx context.Context, t *testing.T, p store.Port, f uint8) {
+	t.Helper()
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
+	must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
+	must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
+	must(t, p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: f, GroupID: 1, Endpoints: []uint16{1}}))
+	must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: f, GroupID: 1}))
+	must(t, p.UpsertResumption(ctx, resumptionRec(f, 7, f)))
+	must(t, p.ReplaceDefaultOTAProviders(ctx, f, []store.OTAProviderLocation{{ProviderNodeID: uint64(f)}}))
+	must(t, p.ReplaceICDRegistrations(ctx, f, []store.ICDRegistration{{CheckInNodeID: uint64(f), Key: make([]byte, 16)}}))
+}
+
+// allFabricRows and noFabricRows are what [fabricRows] counts for a fabric
+// [seedFabricRows] seeded, and for one whose rows are gone.
+var (
+	allFabricRows = map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1, "icd": 1}
+	noFabricRows  = map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0, "icd": 0}
+)
+
+// fabricRows counts the fabric's rows of each kind seedFabricRows writes.
+func fabricRows(ctx context.Context, p store.Port, f uint8) map[string]int {
+	n := map[string]int{"identity": 0, "resumption": 0, "ota": 0, "icd": 0}
+	if _, err := p.GetIdentity(ctx, f); err == nil {
+		n["identity"]++
+	}
+	acl, _ := p.ListACL(ctx, f)
+	n["acl"] = len(acl)
+	sets, _ := p.ListGroupKeySets(ctx, f)
+	n["key sets"] = len(sets)
+	maps, _ := p.ListGroupKeyMappings(ctx, f)
+	n["key map"] = len(maps)
+	table, _ := p.ListGroupTable(ctx, f)
+	n["group table"] = len(table)
+	gc, _ := p.ListGroupcastGroups(ctx, f)
+	n["groupcast"] = len(gc)
+	if _, err := p.GetResumptionByPeer(ctx, f, 7); err == nil {
+		n["resumption"]++
+	}
+	ota, _ := p.ListDefaultOTAProviders(ctx)
+	for _, o := range ota {
+		if o.FabricIndex == f {
+			n["ota"]++
+		}
+	}
+	regs, _ := p.ListICDRegistrations(ctx)
+	for _, r := range regs {
+		if r.FabricIndex == f {
+			n["icd"]++
+		}
+	}
+	return n
+}
+
 // fabricCascade is the removal of a fabric: everything it owns goes, the
 // other fabric's rows and the rows no fabric owns stay. matter.js runs the
 // fabric storage's clearAll (FabricManager.ts:262-271).
@@ -770,15 +949,7 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 	one := addFabric(ctx, t, p, 1)
 	two := addFabric(ctx, t, p, 2)
 	for _, f := range []uint8{one, two} {
-		must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
-		must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
-		must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
-		must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
-		must(t, p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: f, GroupID: 1, Endpoints: []uint16{1}}))
-		must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: f, GroupID: 1}))
-		must(t, p.UpsertResumption(ctx, resumptionRec(f, 7, f)))
-		must(t, p.ReplaceDefaultOTAProviders(ctx, f, []store.OTAProviderLocation{{ProviderNodeID: uint64(f)}}))
-		must(t, p.ReplaceICDRegistrations(ctx, f, []store.ICDRegistration{{CheckInNodeID: uint64(f), Key: make([]byte, 16)}}))
+		seedFabricRows(ctx, t, p, f)
 		must(t, p.SaveServerSubscription(ctx, uint32(f), f, 7, []byte{f}))
 	}
 	must(t, p.SaveThermostatPresets(ctx, "t", []byte{1}, nil))
@@ -787,42 +958,8 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 
 	must(t, p.RemoveFabric(ctx, one))
 
-	count := func(f uint8) map[string]int {
-		n := map[string]int{"identity": 0, "resumption": 0, "ota": 0, "icd": 0}
-		if _, err := p.GetIdentity(ctx, f); err == nil {
-			n["identity"]++
-		}
-		acl, _ := p.ListACL(ctx, f)
-		n["acl"] = len(acl)
-		sets, _ := p.ListGroupKeySets(ctx, f)
-		n["key sets"] = len(sets)
-		maps, _ := p.ListGroupKeyMappings(ctx, f)
-		n["key map"] = len(maps)
-		table, _ := p.ListGroupTable(ctx, f)
-		n["group table"] = len(table)
-		gc, _ := p.ListGroupcastGroups(ctx, f)
-		n["groupcast"] = len(gc)
-		if _, err := p.GetResumptionByPeer(ctx, f, 7); err == nil {
-			n["resumption"]++
-		}
-		ota, _ := p.ListDefaultOTAProviders(ctx)
-		for _, o := range ota {
-			if o.FabricIndex == f {
-				n["ota"]++
-			}
-		}
-		regs, _ := p.ListICDRegistrations(ctx)
-		for _, r := range regs {
-			if r.FabricIndex == f {
-				n["icd"]++
-			}
-		}
-		return n
-	}
-	all := map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1, "icd": 1}
-	none := map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0, "icd": 0}
-	wantEqual(t, "the removed fabric's rows", count(one), none)
-	wantEqual(t, "the other fabric's rows", count(two), all)
+	wantEqual(t, "the removed fabric's rows", fabricRows(ctx, p, one), noFabricRows)
+	wantEqual(t, "the other fabric's rows", fabricRows(ctx, p, two), allFabricRows)
 	if _, err := p.GetResumptionByID(ctx, resumptionRec(one, 7, one).ResumptionID); !errors.Is(err, store.ErrResumptionNotFound) {
 		t.Errorf("the removed fabric's resumption id still resolves: %v", err)
 	}
@@ -915,6 +1052,32 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, err)
 	if *got2.Users[0].UserUniqueID != 5 || got2.Users[0].Credentials[0].Index != 1 || got2.Credentials[0].Data[0] != 7 {
 		t.Fatal("mutating written door-lock records changed the store")
+	}
+}
+
+// copiesVIDCase: the VID data of a fabric, written by AddFabric or
+// UpdateFabricVIDVerification and read back, is copied both ways.
+func copiesVIDCase(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
+	statement, vvsc := []byte{1, 2}, []byte{3, 4}
+	must(t, p.UpdateFabricVIDVerification(ctx, idx, statement, vvsc))
+	statement[0], vvsc[0] = 0xEE, 0xEE
+	got, err := p.GetFabric(ctx, idx)
+	must(t, err)
+	if !bytes.Equal(got.VIDVerificationStatement, []byte{1, 2}) || !bytes.Equal(got.VVSC, []byte{3, 4}) {
+		t.Fatal("mutating the written VID data changed the store")
+	}
+	got.VIDVerificationStatement[0], got.VVSC[0] = 0xDD, 0xDD
+	if list, _ := p.ListFabrics(ctx); !bytes.Equal(list[0].VIDVerificationStatement, []byte{1, 2}) || !bytes.Equal(list[0].VVSC, []byte{3, 4}) {
+		t.Fatal("mutating read VID data changed the store")
+	}
+	withVID := fabric(9)
+	withVID.VIDVerificationStatement, withVID.VVSC = []byte{5}, []byte{6}
+	vidIdx, err := p.AddFabric(ctx, withVID)
+	must(t, err)
+	withVID.VIDVerificationStatement[0], withVID.VVSC[0] = 0xCC, 0xCC
+	if again, _ := p.GetFabric(ctx, vidIdx); !bytes.Equal(again.VIDVerificationStatement, []byte{5}) || !bytes.Equal(again.VVSC, []byte{6}) {
+		t.Fatal("mutating the VID data of a written FabricRecord changed the store")
 	}
 }
 

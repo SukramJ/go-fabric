@@ -34,6 +34,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
@@ -272,7 +273,20 @@ func TestDecommissionParity(t *testing.T) {
 		cp := newClientPair(t, clientPairOptions{})
 		unacknowledged(cp)
 		expectKept(t, cp, cp.decommission(t))
-		expectKept(t, cp, cp.decommission(t))
+		// The unacknowledged RemoveFabric showed the peer gone and lost
+		// its session (client/exchange Manager.handlePeerLoss), so the
+		// second attempt is accepted and ends while connecting, transient
+		// too. matter.js's case (DecommissionTest.ts:205-222) throws from
+		// a patched removeFabric and loses no session.
+		err := cp.decommission(t)
+		var ue *peer.UnreachableError
+		if !errors.As(err, &ue) {
+			t.Fatalf("second decommission: %v, want the peer unreachable", err)
+		}
+		addr, _ := cp.node.PeerAddress()
+		if cp.pair.Controller.Registry().Size() != 1 || fabrictestseam.Peers(cp.pair.Controller).Get(addr) == nil || !cp.node.IsCommissioned() {
+			t.Fatal("the node or its peer was not kept")
+		}
 	})
 
 	t.Run("rejects a decommission while one is in progress", func(t *testing.T) {

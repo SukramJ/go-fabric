@@ -150,6 +150,25 @@ func IsPASEFromContext(ctx context.Context) bool {
 	return ok
 }
 
+type localNodeIDCtxKey struct{}
+
+// WithLocalNodeID stamps the node's operational node id on the accessing
+// session's fabric into ctx — 0 for a session without a fabric. A read or
+// subscribe path that names a node is then answered for this node only
+// ([AttributeExpansion]): matter.js filters a path's nodeId against that
+// id (packages/protocol/src/action/server/DataResponse.ts:57-62 at
+// db021da0, UNSPECIFIED_NODE_ID without a fabric).
+func WithLocalNodeID(ctx context.Context, nodeID uint64) context.Context {
+	return context.WithValue(ctx, localNodeIDCtxKey{}, nodeID)
+}
+
+// LocalNodeIDFromContext returns the id [WithLocalNodeID] stamped; ok is
+// false when none was, and a path's node is then not looked at.
+func LocalNodeIDFromContext(ctx context.Context) (nodeID uint64, ok bool) {
+	nodeID, ok = ctx.Value(localNodeIDCtxKey{}).(uint64)
+	return nodeID, ok
+}
+
 // checkSubjectACL is the IM ACL gate for one location once the gate is
 // active (an [ACLChecker] is wired and the session is not PASE). A
 // request without an accessing fabric that is not PASE has no subject

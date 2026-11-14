@@ -354,7 +354,7 @@ func TestClose_PeerInitiated_DoesNotEchoGracefulClose(t *testing.T) {
 // ExchangeManager.ts:716-726), placeholders are dropped silently, and the
 // reannounce trigger stays silent — matter.js shuts the advertiser
 // down before removing sessions to prevent re-announces during
-// teardown (ServerNetworkRuntime.ts:427).
+// teardown (ServerNetworkRuntime.ts:450-453 at db021da0).
 func TestCloseAllGraceful_NotifiesEveryPeerWithoutReannounce(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())

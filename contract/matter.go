@@ -144,14 +144,19 @@ type ClusterCommandLister interface {
 // [ClusterServer] can implement to expose its current DataVersion.
 // The IM read layer reads it once per cluster per request and stamps it
 // on every AttributeDataIB returned for that cluster. Without this
-// capability, the IM layer falls back to a constant 1.
+// capability the endpoint keeps the cluster's version: every (endpoint,
+// cluster) has one, which the stack advances on every change it sees — a
+// write, a change the server reports, a command that moved an attribute.
+// A server of the root or the Aggregator that implements it advances its
+// own; a bridged endpoint's servers are versioned by the endpoint always.
 //
 // Mirrors matter.js packages/protocol/src/interaction/InteractionServer.ts
 // startReadInteraction DataVersion stamping on AttributeReportPayload.
 type ClusterDataVersion interface {
 	// MatterDataVersion returns the current per-cluster monotonic counter.
-	// Matter §10.6.5: "A DataVersion of zero is reserved for absent or
-	// invalid"; implementations MUST return ≥ 1.
+	// Every value is a version, 0 included: a DataVersionFilter and a
+	// write's DataVersion are compared with it whatever it is (review II,
+	// decision 46). [DataVersionTracker] skips 0 when it wraps.
 	MatterDataVersion() uint32
 }
 

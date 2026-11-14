@@ -89,6 +89,25 @@ func sealNext(t *testing.T, peerSide *channel.Session, payload []byte) sealed {
 	return sealed{hdr: hdr, ct: res.Ciphertext}
 }
 
+// sealAt has a second peer-side session, primed at counter, encrypt one
+// frame: the modelled SubscribeRequest itself, whose counter the peer's
+// own session in newPairedSessions has already passed.
+func sealAt(t *testing.T, counter uint32, payload []byte) sealed {
+	t.Helper()
+
+	peerSide, err := channel.New(channel.Config{
+		EncryptKey:     []byte("0123456789abcdef"),
+		DecryptKey:     []byte("fedcba9876543210"),
+		LocalNodeID:    anchorPeerNodeID,
+		PeerNodeID:     anchorBridgeNodeID,
+		InitialCounter: counter,
+	})
+	if err != nil {
+		t.Fatalf("peer-side channel.New: %v", err)
+	}
+	return sealNext(t, peerSide, payload)
+}
+
 // attachSession wires bridgeSide into the bridge under anchorSessionID, the
 // same port the receive pipeline resolves a session through.
 func attachSession(b *bridge.Bridge, bridgeSide *channel.Session) {
@@ -105,13 +124,14 @@ func attachSession(b *bridge.Bridge, bridgeSide *channel.Session) {
 // TestEstablishSubscriptionTarget_AnchorsThePeerReceiveWindow is the effect
 // the PeerCounter field exists for. The peer's StandaloneAck and its
 // follow-up StatusResponse are handed to the session out of order — the
-// later counter first — and the earlier one must still decrypt as fresh.
+// later counter first — and the earlier one must still decrypt as fresh,
+// while the SubscribeRequest's own counter, which the anchor recorded, is a
+// duplicate.
 //
-// Without an anchor the window primes on whichever arrives first, with the
-// all-ones bitmap a secure session uses (transport/mrp/window.go:72), so
-// everything below it reads as already-received
-// (transport/mrp/window.go:130) and the receive path drops it into the
-// duplicate branch (bridge/receive.go:162) instead of processing it.
+// A secure session's window starts at counter 0 (secure/channel New,
+// mrp.NewWindowNoRolloverAt), so the out-of-order pair alone is accepted
+// with or without the anchor; what the anchor adds is that the window sits
+// where the real SubscribeRequest would have left it.
 func TestEstablishSubscriptionTarget_AnchorsThePeerReceiveWindow(t *testing.T) {
 	t.Parallel()
 
@@ -148,16 +168,22 @@ func TestEstablishSubscriptionTarget_AnchorsThePeerReceiveWindow(t *testing.T) {
 		t.Fatalf("counter %d: Decrypt: %v", ack.hdr.MessageCounter, err)
 	}
 	if duplicate {
-		t.Fatalf("counter %d arriving after %d was rejected as a duplicate; the established target left the peer's receive window unanchored",
+		t.Fatalf("counter %d arriving after %d was rejected as a duplicate",
 			ack.hdr.MessageCounter, status.hdr.MessageCounter)
+	}
+	request := sealAt(t, anchorFirstCounter, []byte("subscribe-request"))
+	if _, duplicate, err := bridgeSide.Decrypt(request.hdr, 0, request.ct); err != nil || !duplicate {
+		t.Fatalf("counter %d (the anchored SubscribeRequest's): duplicate = %v, err = %v; want true, nil — the established target left the peer's receive window unanchored",
+			request.hdr.MessageCounter, duplicate, err)
 	}
 }
 
 // TestPeerReceiveWindowIsUnanchoredWithoutAPeerCounter is the control for
-// the test above: the identical out-of-order pair on a session the target
-// never anchored must lose the earlier counter to the duplicate path.
-// Without it, a window that accepted both for some unrelated reason would
-// read as a pass.
+// the test above: on a session the target never anchored, the identical
+// out-of-order pair is accepted too — the window starts at counter 0 — but
+// the SubscribeRequest's counter is fresh, because nothing recorded it.
+// Without it, a window that refused that counter for some unrelated reason
+// would read as a pass.
 //
 // It establishes nothing, because the secure path now refuses a target with
 // no PeerCounter — which is itself the state under test.
@@ -190,9 +216,14 @@ func TestPeerReceiveWindowIsUnanchoredWithoutAPeerCounter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("counter %d: Decrypt: %v", ack.hdr.MessageCounter, err)
 	}
-	if !duplicate {
-		t.Fatalf("counter %d arriving after %d was accepted on an unanchored window; the anchor the effect test measures is not what makes it acceptable",
+	if duplicate {
+		t.Fatalf("counter %d arriving after %d was rejected as a duplicate on a window that starts at 0",
 			ack.hdr.MessageCounter, status.hdr.MessageCounter)
+	}
+	request := sealAt(t, anchorFirstCounter, []byte("subscribe-request"))
+	if _, duplicate, err := bridgeSide.Decrypt(request.hdr, 0, request.ct); err != nil || duplicate {
+		t.Fatalf("counter %d on an unanchored window: duplicate = %v, err = %v; want false, nil — the anchor the effect test measures is not what makes it a duplicate",
+			request.hdr.MessageCounter, duplicate, err)
 	}
 }
 

@@ -268,7 +268,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node",
-		min: 85,
+		min: 88,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package. Measures 86.0–86.1 (2026-11-02, the fabric-scoped broadcast events); 85 leaves the timing-dependent paths a point",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
@@ -290,6 +290,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 55},
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/fabricscopecheck", min: 0, why: "doc and test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/refusalcheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, why: "test only, no statements to cover: the guard is the test"},

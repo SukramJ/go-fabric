@@ -409,7 +409,10 @@ the set but reserves its number, and its parts' numbers, for the key's
 return, across restarts too: an `Add` of the same key gets them back, and
 no other device is given them, as a closed matter.js endpoint keeps its
 number. `Forget(ctx, key)` frees them — the device is gone for good, and
-an `Add` of the key later is numbered like a new device.
+an `Add` of the key later is numbered like a new device. It erases the
+values the node stored for the key too (the nonvolatile attributes the
+module holds, the UserLabel list), so that `Add` starts from the
+device's declaration; `Remove` keeps them.
 
 A device a previous run served and this run has not added yet keeps its
 stored number too, however long the host's model takes to load: the node
@@ -535,14 +538,19 @@ settings key.
 4. PASE, the commissioning window and the CASE reaper stop;
 5. the subscription engine, the group sender, BDX and the health probe
    stop;
-6. the bridge stops (sessions are closed with a CloseSession to each
-   peer, then the socket closes and the mDNS records are withdrawn);
+6. the bridge stops (what each subscription owes is reported, the
+   ShutDown event among it, then the sessions are closed with a
+   CloseSession to each peer, then the socket closes and the mDNS
+   records are withdrawn);
 7. the advertiser closes, and the store the node opened for
    `Store.Path`.
 
 `Stop` is idempotent and safe without `Start`. A stopped node does not
-restart: `Start` after `Stop` returns `node.ErrStopped`. To restart, build a
-new node on the same store.
+restart: `Start` after `Stop` returns `node.ErrStopped`, and so do
+`OpenOwnWindow`, `OpenBasicWindow` and `CloseWindow` from the moment `Stop`
+begins. To restart, build a new node on the same store. The bridge under
+it is single-run in the same way: `bridge.Bridge.Start` after `Stop`
+returns `bridge.ErrStopped`.
 
 `New` already starts the subscription engine and the session reapers. Call
 `Stop` on every node that `New` returned, including one you never started.

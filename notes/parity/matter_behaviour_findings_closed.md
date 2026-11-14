@@ -351,6 +351,31 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   exported for it — before the access-control source is asked. Pinned by
   `bridge:TestReadAuthorizedResults_UnresolvableFabricIsNoAccessingFabric`,
   with a checker that grants whatever it is asked.
+- **F-db021da0-14: a refused SubscribeRequest leaves the peer's
+  subscriptions standing where matter.js has cleared them.** matter.js
+  checks the path count (`InteractionServer.ts:635-641` at `db021da0`),
+  then runs the KeepSubscriptions=false teardown (`:647-665`), then
+  refuses a request that names no path (`:667-672`) and, further down,
+  one with an illegal path (`validateReadPaths`, `:699`; the checks
+  between `:672` and `:699` were not read). `handleSubscribeRequest`
+  validates the paths and refuses the empty request first
+  (`bridge/subscribe.go`, `im.ValidateReadPaths`, then the "empty"
+  refusal) and tears down only when it registers the subscription
+  (`registerSubscription`). So a KeepSubscriptions=false request refused
+  for an illegal path or for naming none has cancelled the peer's
+  subscriptions in matter.js and none here. Read, not exercised
+  (unverified by a test on either side); which of the two a controller
+  relies on is not known. Fix: the teardown before the two refusals, as
+  the lines have it, with a parity case — or a `by_design` row. Found in
+  review II, phase 1 (the citation pass).
+  Closed 2026-11-14 (review II, R2-P2-sess-04, `a3fe0892`): the bridge
+  runs the KeepSubscriptions=false teardown (`teardownForSubscribe`,
+  `bridge/subscribe_dispatch.go`) after the path count and before the
+  two refusals, the order of the lines above. The Busy answer for a
+  session's chunk waits, this module's own refusal, of which matter.js
+  has none between `:635` and `:672`, stays ahead of the teardown and
+  cancels nothing. Pinned by
+  `bridge:TestRefusedSubscribeTearsDownFirst`.
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 

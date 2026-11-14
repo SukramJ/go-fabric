@@ -225,17 +225,26 @@ func (g *GeneralCommissioning) commitTermsLocked(ctx context.Context) error {
 		g.tcTouched = false
 		return nil
 	}
-	if g.tcSettings != nil {
-		v := strconv.FormatUint(uint64(g.tcTemporal.version), 10) + ":" + strconv.FormatUint(uint64(g.tcTemporal.acks), 10)
-		if err := g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, v); err != nil {
-			// The window's flag stays: the acceptance is still tentative,
-			// and the fail-safe's expiry reverts it (chip keeps
-			// UpdateTermsAndConditionsHasBeenInvoked on a failed commit,
-			// GeneralCommissioningCluster.cpp:512-526).
-			return fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)
-		}
+	if err := g.persistTermsLocked(ctx, g.tcTemporal); err != nil {
+		return err
 	}
 	g.tcCommitted, g.tcTemporal, g.tcTouched = g.tcTemporal, nil, false
+	return nil
+}
+
+// persistTermsLocked writes acc as the stored acceptance (nil: none) when
+// the server has a store; it does not change the acceptance in memory.
+func (g *GeneralCommissioning) persistTermsLocked(ctx context.Context, acc *termsAcceptance) error {
+	if g.tcSettings == nil {
+		return nil
+	}
+	v := ""
+	if acc != nil {
+		v = strconv.FormatUint(uint64(acc.version), 10) + ":" + strconv.FormatUint(uint64(acc.acks), 10)
+	}
+	if err := g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, v); err != nil {
+		return fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)
+	}
 	return nil
 }
 

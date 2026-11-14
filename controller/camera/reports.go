@@ -67,7 +67,12 @@ func (r *Reports) attach(s *Service) {
 	if r.known == nil {
 		r.known = map[string]uint64{}
 	}
-	for _, n := range s.ctrl.Registry().Nodes() {
+	// The registry is nil once the controller's Close has begun.
+	reg := s.ctrl.Registry()
+	if reg == nil {
+		return
+	}
+	for _, n := range reg.Nodes() {
 		if addr, ok := n.PeerAddress(); ok {
 			r.known[n.ID()] = addr.NodeID
 		}
@@ -93,10 +98,14 @@ func (r *Reports) with(id string, fn func(s *Service, nodeID uint64)) {
 		return
 	}
 	nodeID, ok := uint64(0), false
-	if n := s.ctrl.Registry().Get(id); n != nil {
-		var addr client.PeerAddress
-		if addr, ok = n.PeerAddress(); ok {
-			nodeID = addr.NodeID
+	// The registry is nil once the controller's Close has begun; the node
+	// is then named by the id it had.
+	if reg := s.ctrl.Registry(); reg != nil {
+		if n := reg.Get(id); n != nil {
+			var addr client.PeerAddress
+			if addr, ok = n.PeerAddress(); ok {
+				nodeID = addr.NodeID
+			}
 		}
 	}
 	r.mu.Lock()
@@ -123,7 +132,7 @@ func isStartUp(endpoint uint16, cluster, event uint32) bool {
 }
 
 func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
-	event, alive, installed, decommissioned := h.Event, h.SubscriptionAlive, h.EndpointInstalled, h.Decommissioned
+	event, alive, installed, decommissioned, deleted := h.Event, h.SubscriptionAlive, h.EndpointInstalled, h.Decommissioned, h.Deleted
 	h.Event = func(endpoint uint16, cluster, ev uint32, e client.EventData, value any) {
 		if event != nil {
 			event(endpoint, cluster, ev, e, value)
@@ -147,6 +156,16 @@ func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
 	h.Decommissioned = func() {
 		if decommissioned != nil {
 			decommissioned()
+		}
+		r.with(id, func(s *Service, nodeID uint64) { s.nodeRemoved(nodeID) })
+	}
+	// A node that leaves the registry without a decommission (Forget,
+	// Erase, the cull) fires Deleted only; it is forgotten all the same.
+	// After a decommission this runs a second time and finds nothing left
+	// (review II, R2-P2-fabric-08).
+	h.Deleted = func() {
+		if deleted != nil {
+			deleted()
 		}
 		r.with(id, func(s *Service, nodeID uint64) { s.nodeRemoved(nodeID) })
 	}

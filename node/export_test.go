@@ -10,9 +10,12 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 )
 
-// RemoveFabricBindings is the node's removal of a fabric's Binding entries,
-// what OperationalCredentials' RemoveFabric runs (fabricRemoved).
-func RemoveFabricBindings(n *Node, fabricIndex uint8) { n.removeFabricBindings(fabricIndex) }
+// RemoveFabricBindings is the node's removal of a fabric's server state —
+// its Binding entries among it — what OperationalCredentials' RemoveFabric
+// runs first (fabricRemoved → dropFabricState).
+func RemoveFabricBindings(n *Node, fabricIndex uint8) {
+	n.dropFabricState(context.Background(), fabricIndex)
+}
 
 // Reassemblies is the number of reassemblies the Aggregator completed.
 func Reassemblies(a *Aggregator) int64 { return a.reassemblies.Load() }

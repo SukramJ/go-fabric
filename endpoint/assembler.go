@@ -99,6 +99,12 @@ type Assembler struct {
 	// running Identify survive reassembly — see
 	// [endpointStateRegistry] and [Endpoint.state].
 	states *endpointStateRegistry
+	// rootState and aggregatorState are the root's and the Aggregator's
+	// state — the DataVersion trackers of their clusters whose servers
+	// keep none of their own — bound to every assembled root and
+	// Aggregator, so a version survives reassembly as a bridged
+	// endpoint's does (review II, decision 46).
+	rootState, aggregatorState *endpointState
 }
 
 // New returns an assembler. logger may be nil; the assembler then
@@ -121,6 +127,8 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 		logger: logger,
 		states: newEndpointStateRegistry(cfg.Clock),
 	}
+	a.rootState = newEndpointState(cfg.Clock)
+	a.aggregatorState = newEndpointState(cfg.Clock)
 	return a, nil
 }
 
@@ -144,12 +152,14 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		DeviceType:       deviceTypeRootNode,
 		Reachable:        true,
 		DeviceConditions: append([]string(nil), a.cfg.RootDeviceConditions...),
+		state:            a.rootState,
 	}
 	aggregator := &Endpoint{
 		ID:         1,
 		Aggregator: true,
 		DeviceType: deviceTypeAggregator,
 		Reachable:  true,
+		state:      a.aggregatorState,
 	}
 	topology := &Topology{
 		Endpoints:  []*Endpoint{root, aggregator},

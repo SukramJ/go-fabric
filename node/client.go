@@ -58,6 +58,8 @@ type clientStack struct {
 	names     *discovery.Names
 	ownNames  bool
 	peers     *peer.Set
+	// resumption holds the peers' resumption records, in memory.
+	resumption *peer.MemoryResumptionStore
 	// subs is the registry of the subscriptions the node holds on its
 	// peers: a bound peer's interaction subscribes through it.
 	subs   *interaction.Subscriptions
@@ -111,9 +113,10 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	// Resumption records stay in memory: the store's resumption table is
 	// the responder's, one row per peer, and holds neither the session
 	// parameters nor our CATs a client record carries.
+	cs.resumption = &peer.MemoryResumptionStore{}
 	cs.peers, err = peer.NewSet(peer.Context{
 		Exchanges: cs.exchanges, Names: cs.names, Fabrics: n.clientFabric,
-		Resumption: &peer.MemoryResumptionStore{}, Logger: n.logger, Clock: n.cfg.Clock,
+		Resumption: cs.resumption, Logger: n.logger, Clock: n.cfg.Clock,
 	})
 	if err != nil {
 		return fail(fmt.Errorf("node: client peers: %w", err))
@@ -170,6 +173,49 @@ func (n *Node) clientFabric(addr handshake.PeerAddress) (handshake.Fabric, bool)
 		}
 	}
 	return handshake.Fabric{Identity: f.identity, RootPublicKey: f.rootPublicKey, Verifier: verifier}, true
+}
+
+// forgetClientPeers deletes every client-stack peer of a removed fabric:
+// its sessions close, its resumption record and its descriptor go
+// (peer.Peer.Delete). Mirrors matter.js, where every NodeSession
+// registers with its fabric whatever its role (NodeSession.ts:153-156),
+// the fabric's deletion force-closes them all (Fabric.ts:478-488) and
+// SessionManager deletes the fabric's resumption records
+// (SessionManager.ts:308-310, :537-552 at db021da0).
+func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
+	if n.client == nil {
+		return
+	}
+	for _, p := range n.client.peers.Peers() {
+		if p.Address().FabricIndex == fabricIndex {
+			p.Delete(ctx)
+		}
+	}
+}
+
+// closeClientFabricSessions ends the client stack's sessions to the peers
+// of a fabric whose operational identity UpdateNOC replaced, and forgets
+// their resumption records, so no session or resumption made under the
+// old NOC outlives it; the peers stay and connect again under the new
+// one. Mirrors matter.js FailsafeContext.ts:167-170 (replaceFabric →
+// SessionManager.deleteResumptionRecordsForFabric) with the fabric's
+// sessions, which every role registers with it (NodeSession.ts:153-156).
+func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8) {
+	if n.client == nil {
+		return
+	}
+	for _, p := range n.client.peers.Peers() {
+		addr := p.Address()
+		if addr.FabricIndex != fabricIndex {
+			continue
+		}
+		for _, s := range n.client.exchanges.SessionsFor(addr) {
+			n.client.exchanges.CloseSession(ctx, s)
+		}
+		if _, err := n.client.resumption.DeleteResumptionRecord(addr); err != nil {
+			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+		}
+	}
 }
 
 // Peers returns the client stack's peer set — the nodes of our fabrics
@@ -248,6 +294,10 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		}
 		n.persistBindings(ctx, t)
 		n.persistUserLabels(ctx, t)
+		n.persistNonVolatile(ctx, t)
+		// What the servers restored for a fabric the table no longer
+		// holds goes before the topology is served (fabric_state.go).
+		n.reconcileFabricState(ctx, t)
 		n.attachFailSafe(ctx, t)
 		n.attachTLS(t)
 		n.attachNodeServices(t)
@@ -255,6 +305,12 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		n.bindSync.topo = t
 		running := n.bindSync.running
 		n.bindSync.mu.Unlock()
+		// Once more, now that a removal's fan-out walks t: a fabric
+		// removed after the reconcile above read the table had its
+		// fan-out walk the topology before t, and only this second read
+		// of the table finds it gone (review II, R2-P2-dr-node-03). A
+		// removal whose row goes after this read fans out over t.
+		n.reconcileFabricState(ctx, t)
 		if running {
 			n.syncBindings(t)
 		}
@@ -338,20 +394,6 @@ func (n *Node) syncBindings(t *endpoint.Topology) {
 	}
 	for ep, b := range want {
 		n.bindings.Attach(ep, b)
-	}
-}
-
-// removeFabricBindings drops a removed fabric's Binding entries from every
-// Binding server (FabricScopedDataHandler.ts:109-122).
-func (n *Node) removeFabricBindings(fabricIndex uint8) {
-	n.bindSync.mu.Lock()
-	t := n.bindSync.topo
-	n.bindSync.mu.Unlock()
-	if t == nil {
-		t = n.br.Topology()
-	}
-	for _, b := range bindingServers(t) {
-		b.RemoveFabric(fabricIndex)
 	}
 }
 

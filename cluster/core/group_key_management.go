@@ -426,8 +426,8 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 			return nil, fmt.Errorf("core: GroupKeyManagement: list fabrics: %w", err)
 		}
 		out := make([]uint8, 0, len(recs))
-		for _, r := range recs {
-			out = append(out, r.FabricIndex)
+		for i := range recs {
+			out = append(out, recs[i].FabricIndex)
 		}
 		slices.Sort(out)
 		return out, nil

@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
+	mstore "github.com/SukramJ/go-fabric/store"
 )
 
 // TestOpcreds_UpdateNOCSettlesTheOwedRevertBeforeItsRecord pins review II
@@ -28,13 +29,13 @@ func TestOpcreds_UpdateNOCSettlesTheOwedRevertBeforeItsRecord(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			inner := open(t)
-			st := &identityFailingStore{restartStore: inner}
+			st := &identityFailingStore{rollbackFailingStore{restartStore: inner}}
 			oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 			if err != nil {
 				t.Fatal(err)
 			}
 			_, rootPriv, idx := commissionTestFabric(ctx, t, oc)
-			oc.ClearPendingState() // CommissioningComplete
+			commitForTest(t, oc) // CommissioningComplete
 			before := readCredentials(ctx, t, inner, idx)
 			fabCtx := im.WithFabricFilter(ctx, true, idx)
 			nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
@@ -84,7 +85,7 @@ func TestOpcreds_AddNOCSettlesTheOwedRevertBeforeItsChecks(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			inner := restartStores["memstore"](t)
-			st := &removeFailingStore{restartStore: inner}
+			st := &removeFailingStore{rollbackFailingStore{restartStore: inner}}
 			oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: tc.supported, FailSafe: armedFailSafe(0)})
 			if err != nil {
 				t.Fatal(err)
@@ -126,11 +127,11 @@ func TestOpcreds_AddNOCSettlesTheOwedRevertBeforeItsChecks(t *testing.T) {
 }
 
 // TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled pins review II
-// R2-P1-rw-02: an UpdateNOC revert the expiry could not land is owed;
-// the administrator then removes that fabric. With the store healthy
-// again, the revert has nothing left to restore: the next retry settles
-// it — the marker goes, no identity is written for the removed index —
-// and an UpdateNOC on another fabric is no longer refused for it.
+// R2-P1-rw-02 on the row: an UpdateNOC rollback the fail-safe's end could
+// not land leaves the row pending; the administrator then removes that
+// fabric, and the pending state leaves with its row. The next arm finds
+// nothing left to roll back — no identity is written for the removed
+// index — and an UpdateNOC on another fabric is admitted.
 func TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled(t *testing.T) {
 	t.Parallel()
 	for name, open := range restartStores {
@@ -138,15 +139,15 @@ func TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			inner := open(t)
-			st := &identityFailingStore{restartStore: inner}
+			st := &identityFailingStore{rollbackFailingStore{restartStore: inner}}
 			oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
 			if err != nil {
 				t.Fatal(err)
 			}
 			_, rootPriv, idx := commissionTestFabric(ctx, t, oc)
-			oc.ClearPendingState() // CommissioningComplete
+			commitForTest(t, oc) // CommissioningComplete
 			_, otherRootPriv, other := commissionTestFabric(ctx, t, oc)
-			oc.ClearPendingState() // CommissioningComplete
+			commitForTest(t, oc) // CommissioningComplete
 			fabCtx := im.WithFabricFilter(ctx, true, idx)
 			nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
 			if resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw}); err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
@@ -159,8 +160,8 @@ func TestOpcreds_OwedUpdateRevertOfARemovedFabricIsSettled(t *testing.T) {
 				t.Fatalf("RemoveFabric: %v", err)
 			}
 			oc.ClearPendingState() // the next fresh arm, over a healthy store
-			if v, _, _ := inner.GetSetting(ctx, pendingNOCUpdateKey); v != "" {
-				t.Fatal("the owed revert of a removed fabric was not settled: its marker stands over a healthy store")
+			if fabrics, _ := inner.ListFabrics(ctx); len(fabrics) != 1 || fabrics[0].Pending != mstore.FabricCommitted {
+				t.Fatalf("fabrics after the removal and a healthy arm = %+v, want only the other committed fabric", fabrics)
 			}
 			if _, err := inner.GetIdentity(ctx, idx); err == nil {
 				t.Fatalf("the retry wrote an identity for the removed fabric %d", idx)

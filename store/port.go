@@ -29,6 +29,10 @@ import "context"
 //     fabric-owned rows and stay (the bridge deletes a fabric's
 //     subscriptions itself).
 //   - A row that names a fabric the store does not hold is refused.
+//   - A fabric row carries its commit state ([FabricPending]) and, while an
+//     UpdateNOC is pending, the values it replaced: UpdateFabricCredentials,
+//     CommitFabric and RollbackFabric each move it in one atomic write, so
+//     the state survives a restart with the row and leaves with it.
 //   - The fabric index is allocated from a counter that only moves forward
 //     and wraps after 254, skipping occupied indexes (matter.js
 //     FabricManager #nextFabricIndex).
@@ -46,9 +50,17 @@ import "context"
 // context, so a backend stores records, not opaque values.
 
 // Fabrics is the fabric table (Matter §11.18.5, FabricDescriptorStruct).
-// AddFabric allocates the index from the persisted next-fabric-index
-// counter when the record carries none.
+// Each row carries its own commit state ([FabricPending]): an AddNOC or
+// UpdateNOC writes its fabric at once and marks the row, CommissioningComplete
+// commits it, a fail-safe expiry or a start-up rolls it back — so the state
+// can never disagree with the row it describes, and it leaves with the row.
 type Fabrics interface {
+	// AddFabric inserts rec and returns its index: the record's, or one
+	// allocated from the persisted next-fabric-index counter when the
+	// record carries none. The row takes rec.Pending as given —
+	// [FabricCommitted], or [FabricPendingAdd] for an AddNOC that
+	// CommissioningComplete has not committed; [FabricPendingUpdate] or an
+	// unknown state is refused and nothing is inserted.
 	AddFabric(ctx context.Context, rec FabricRecord) (uint8, error)
 	// GetFabric returns [ErrFabricNotFound] for an index the table does
 	// not hold.
@@ -58,9 +70,52 @@ type Fabrics interface {
 	UpdateFabricLabel(ctx context.Context, fabricIndex uint8, label string) error
 	UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error
 	UpdateFabricNodeID(ctx context.Context, fabricIndex uint8, nodeID uint64) error
+	// UpdateFabricVIDVerification replaces the fabric's VID verification
+	// statement and VVSC (nil or empty: none), both in one write. The data
+	// is part of the row: it leaves with the row, and on a
+	// [FabricPendingUpdate] row it changes the live values only, so a
+	// rollback restores the ones the UpdateNOC found. It does not change
+	// the row's [FabricPending] state. Returns [ErrFabricNotFound] for an
+	// index the table does not hold.
+	UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error
 	// RemoveFabric removes the fabric and every row it owns; see the
-	// cascade above.
+	// cascade above. A pending row is removed like any other.
 	RemoveFabric(ctx context.Context, fabricIndex uint8) error
+	// UpdateFabricCredentials writes what an UpdateNOC changes ([FabricCredentials]):
+	// the identity's NOC, ICAC and private key and the row's node id, in
+	// one atomic write. It writes nothing else: the IPK, the vendor id and
+	// the VID verification data stay as the row holds them when the write
+	// lands. On a [FabricCommitted] row it first keeps the
+	// current value of every field the update's fail-safe can change — the
+	// identity and node id it writes, and the vendor id and VID
+	// verification data — as the prior value and marks the row
+	// [FabricPendingUpdate]; on a
+	// FabricPendingUpdate row it keeps the prior values it already holds,
+	// so a second UpdateNOC in the same fail-safe rolls back to the state
+	// before the first; on a [FabricPendingAdd] row it only writes, since
+	// that row's rollback deletes it. While the row is FabricPendingUpdate,
+	// UpdateFabricVendorID, UpdateFabricNodeID and
+	// UpdateFabricVIDVerification change the live values only: what they
+	// write belongs to the pending update and is dropped by its rollback.
+	// A crash at any point leaves the row as it was before the call or as
+	// it is after it. Returns [ErrFabricNotFound] for an index the table
+	// does not hold, [ErrIdentityNotFound] for a fabric without an identity,
+	// and an error for an empty NOC or private key; each changes nothing.
+	UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c FabricCredentials) error
+	// CommitFabric commits a pending row in one atomic write: the row
+	// becomes [FabricCommitted] and every prior value is erased, so no later
+	// rollback can reach them. A committed row is left as it is (nil).
+	// Returns [ErrFabricNotFound] for an index the table does not hold.
+	CommitFabric(ctx context.Context, fabricIndex uint8) error
+	// RollbackFabric undoes a pending row in one atomic write and returns
+	// the state it found: [FabricPendingAdd] — the row is deleted with
+	// every row it owns, as RemoveFabric deletes it; [FabricPendingUpdate] —
+	// every prior value moves back (identity and row), the prior values are
+	// erased and the row is committed; [FabricCommitted] — nothing changes.
+	// A crash at any point leaves the pending row or its rollback whole.
+	// Returns [ErrFabricNotFound] (and FabricCommitted) for an index the
+	// table does not hold.
+	RollbackFabric(ctx context.Context, fabricIndex uint8) (FabricPending, error)
 }
 
 // Identity is the node's operational identity on each fabric: NOC, ICAC,
@@ -147,6 +202,14 @@ type ServerSubscriptions interface {
 type Settings interface {
 	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
 	SetSetting(ctx context.Context, key, value string) error
+	// SetSettings writes every key of values or none: one change that
+	// spans several keys lands whole or not at all. A reader sees the
+	// keys as they stood before the call or as they stand after it, never
+	// some of each, and a crash at any point leaves all of the old values
+	// or all of the new ones. An error means nothing was written. An
+	// empty (or nil) map is a no-op that returns nil. The map is the
+	// caller's; the store keeps no reference to it.
+	SetSettings(ctx context.Context, values map[string]string) error
 	GetMetadataCounter(ctx context.Context, key string) (value uint64, ok bool, err error)
 	SetMetadataCounter(ctx context.Context, key string, value uint64) error
 }

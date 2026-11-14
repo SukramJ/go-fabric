@@ -25,9 +25,43 @@ const bridgedUserLabelKeyRoot = "bridged_user_label."
 // userLabelSync tracks the UserLabel servers of bridged endpoints whose
 // list the store keeps (persistUserLabels).
 type userLabelSync struct {
-	// mu guards persisted: each server's change unsubscribe.
+	// mu guards persisted: each server's key and change unsubscribe.
 	mu        sync.Mutex
-	persisted map[contract.ClusterServer]func()
+	persisted map[contract.ClusterServer]labelSub
+}
+
+// labelSub is a UserLabel server whose list the store keeps: its settings
+// key and the function that stops the saving.
+type labelSub struct {
+	key         string
+	unsubscribe func()
+}
+
+// tracks reports whether the store keeps srv's list.
+func (u *userLabelSync) tracks(srv contract.ClusterServer) bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	_, ok := u.persisted[srv]
+	return ok
+}
+
+// release stops keeping the lists of the servers kept under one of keys
+// (a forgotten endpoint's, [nonVolatile.forget]): their later changes are
+// not stored, and a server met under such a key again is restored as a
+// new one.
+func (u *userLabelSync) release(keys []string) {
+	u.mu.Lock()
+	var unsubscribes []func()
+	for srv, sub := range u.persisted {
+		if slices.Contains(keys, sub.key) {
+			unsubscribes = append(unsubscribes, sub.unsubscribe)
+			delete(u.persisted, srv)
+		}
+	}
+	u.mu.Unlock()
+	for _, unsubscribe := range unsubscribes {
+		unsubscribe()
+	}
 }
 
 // persistUserLabels restores each UserLabel server of a bridged endpoint
@@ -41,7 +75,7 @@ type userLabelSync struct {
 func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) {
 	n.userLabels.mu.Lock()
 	defer n.userLabels.mu.Unlock()
-	current := map[contract.ClusterServer]func(){}
+	current := map[contract.ClusterServer]labelSub{}
 	for _, ep := range t.Endpoints {
 		if ep == nil {
 			continue
@@ -54,16 +88,17 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) {
 			if srv.MatterClusterID() != userlabeldef.ClusterID {
 				continue
 			}
-			if unsub, met := n.userLabels.persisted[srv]; met {
-				current[srv] = unsub
+			if sub, met := n.userLabels.persisted[srv]; met {
+				current[srv] = sub
 				continue
 			}
-			current[srv] = n.persisted.userLabel(context.WithoutCancel(ctx), bridgedUserLabelKeyRoot+k, srv)
+			key := bridgedUserLabelKeyRoot + k
+			current[srv] = labelSub{key: key, unsubscribe: n.persisted.userLabel(context.WithoutCancel(ctx), key, srv)}
 		}
 	}
-	for srv, unsub := range n.userLabels.persisted {
+	for srv, sub := range n.userLabels.persisted {
 		if _, kept := current[srv]; !kept {
-			unsub()
+			sub.unsubscribe()
 		}
 	}
 	n.userLabels.persisted = current

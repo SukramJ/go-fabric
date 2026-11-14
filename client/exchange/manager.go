@@ -117,6 +117,11 @@ type Manager struct {
 	localAdditional time.Duration
 	localFixed      time.Duration
 
+	// lifetime ends when the manager closes: the context of the work the
+	// manager starts by itself (the rollover close's farewell).
+	lifetime       context.Context
+	cancelLifetime context.CancelFunc
+
 	// inflight counts the messages delivered to an exchange whose reader
 	// has not finished with them (internal/inflight ExchangeDelivered):
 	// the group the clock carries, nil outside a fabrictest site.
@@ -140,7 +145,16 @@ type Manager struct {
 	checkIn   CheckInReceiver
 	sessions  map[uint16]*Session
 	unsecured map[uint64]*Session
-	exchanges map[uint32]*Exchange
+	// inboundOrder is the inbound unsecured sessions, oldest first
+	// ([maxInboundUnsecuredSessions]); ackWaits the messages sent on them
+	// that wait for an acknowledgement, oldest first
+	// ([inboundUnsecuredAckWaitLimit]).
+	inboundOrder []*Session
+	ackWaits     []ackWait
+	// exchanges is the open exchanges by session and index: two peers
+	// may use the same exchange id at once (matter.js
+	// ExchangeManager.ts:103 at db021da0, a map per session).
+	exchanges map[exchangeKey]*Exchange
 	// channels and channelAddrs are the attached channels by the address
 	// that names them and back (channel.go).
 	channels       map[*net.UDPAddr]Channel
@@ -179,7 +193,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
 		unsecured:    make(map[uint64]*Session),
-		exchanges:    make(map[uint32]*Exchange),
+		exchanges:    make(map[exchangeKey]*Exchange),
 		handlers:     make(map[uint16]ProtocolHandler),
 		channels:     make(map[*net.UDPAddr]Channel),
 		channelAddrs: make(map[Channel]*net.UDPAddr),
@@ -189,6 +203,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		sessionIDLimit: sessionIDUpperBound,
 	}
 	m.nextSessionID = binary.LittleEndian.Uint16(seed[2:4])%sessionIDUpperBound + 1
+	m.lifetime, m.cancelLifetime = context.WithCancel(context.Background())
 	if cfg.LocalParameters != nil {
 		m.local = *cfg.LocalParameters
 	}
@@ -302,11 +317,17 @@ func (m *Manager) handler(protocol uint16) ProtocolHandler {
 // (from its DNS-SD record), nil for none. Our side is the initiator: the
 // session draws a random ephemeral node id, sends with the global
 // unencrypted counter and counts the peer as idle until it answers —
-// matter.js SessionManager.ts:418-458 (createUnsecuredSession) and
-// UnsecuredSession.ts:26-34.
+// matter.js SessionManager.ts:469-509 (createUnsecuredSession) and
+// UnsecuredSession.ts:26-40 at db021da0. The peer's intervals are clamped to
+// [sessionparams.MaxUnauthenticatedInterval]: nothing has authenticated
+// them (review II, owner decision 45).
 func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Parameters) (*Session, error) {
 	if addr == nil {
 		return nil, errors.New("exchange: nil peer address")
+	}
+	if peer != nil {
+		clamped := sessionparams.ClampUnauthenticated(*peer)
+		peer = &clamped
 	}
 	s := &Session{
 		m:         m,
@@ -496,6 +517,12 @@ func (m *Manager) forget(s *Session) {
 		if m.unsecured[s.nodeID] == s {
 			delete(m.unsecured, s.nodeID)
 		}
+		if s.inbound {
+			m.inboundOrder = slices.DeleteFunc(m.inboundOrder, func(o *Session) bool { return o == s })
+			if s.lifetime != nil {
+				s.lifetime.Stop()
+			}
+		}
 		return
 	}
 	if m.sessions[s.id] == s {
@@ -578,6 +605,7 @@ func (m *Manager) goWork(fn func()) bool {
 
 // closeAll marks the manager closed and closes every session.
 func (m *Manager) closeAll() {
+	m.cancelLifetime()
 	m.mu.Lock()
 	m.closed = true
 	all := make([]*Session, 0, len(m.sessions)+len(m.unsecured))
@@ -600,19 +628,40 @@ func (m *Manager) closeAll() {
 	}
 }
 
+// exchangeKey is an exchange's place in the table: its session and its
+// index.
+type exchangeKey struct {
+	s     *Session
+	index uint32
+}
+
 // Initiate opens an exchange on s for protocol — matter.js
-// ExchangeManager.ts:145-156 (initiateExchangeForSession): the exchange id
+// ExchangeManager.ts:170-181 (initiateExchangeForSession): the exchange id
 // is the next value of a counter that starts at random and wraps at
-// 0xFFFF (:729-743), and the exchange is indexed apart from received ones.
+// 0xFFFF (:794-808), skipping an id an open exchange this node started on
+// s still holds (#freeExchangeIdFor, :189-199 at db021da0), and the
+// exchange is indexed apart from received ones.
 func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange, error) {
 	if s.IsClosed() {
 		return nil, ErrSessionClosed
 	}
 	m.mu.Lock()
-	m.exchangeID++
-	id := m.exchangeID
+	var id uint16
+	free := false
+	for range 0x10000 {
+		m.exchangeID++
+		id = m.exchangeID
+		if _, taken := m.exchanges[exchangeKey{s, uint32(id) | initiatedExchangeFlag}]; !taken {
+			free = true
+			break
+		}
+	}
+	if !free {
+		m.mu.Unlock()
+		return nil, errors.New("exchange: every exchange id is in use on the session")
+	}
 	x := newExchange(m, s, id, protocol, true, opts)
-	m.exchanges[x.index] = x
+	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
 	s.addExchange(x)
 	m.cleanupSessionExchanges(s)
@@ -622,8 +671,8 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 // removeExchange drops x from the table if the index still maps to it.
 func (m *Manager) removeExchange(x *Exchange) {
 	m.mu.Lock()
-	if m.exchanges[x.index] == x {
-		delete(m.exchanges, x.index)
+	if key := (exchangeKey{x.session, x.index}); m.exchanges[key] == x {
+		delete(m.exchanges, key)
 	}
 	m.mu.Unlock()
 	x.session.deleteExchange(x)
@@ -784,15 +833,122 @@ func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Sess
 	s.timestamp = m.clock.Now()
 	s.createdAt = s.timestamp
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.closed {
+		m.mu.Unlock()
 		return nil
 	}
 	if _, taken := m.unsecured[s.nodeID]; taken {
+		m.mu.Unlock()
 		return nil
 	}
+	var evicted *Session
+	if len(m.inboundOrder) >= maxInboundUnsecuredSessions {
+		evicted = m.inboundOrder[0]
+		m.inboundOrder = slices.Delete(m.inboundOrder, 0, 1)
+	}
 	m.unsecured[s.nodeID] = s
+	m.inboundOrder = append(m.inboundOrder, s)
+	s.lifetime = m.clock.AfterFunc(inboundUnsecuredLifetime, s.Close)
+	m.mu.Unlock()
+	if evicted != nil {
+		m.log.Warn("matter.controller.unsecured_session_evicted", slog.Uint64("node_id", evicted.nodeID),
+			slog.String("reason", "too many sessions opened by unauthenticated peers"))
+		evicted.Close()
+	}
 	return s
+}
+
+// The bounds on what peers that have not authenticated can make the
+// controller hold — the sessions their initiating messages open, the
+// messages sent on those that wait for an acknowledgement, and how long
+// such a session lives. This module's own rule (review II,
+// R2-P2-alloc-02, owner decision 45: the controller takes the device
+// side's policy). Of the references, connectedhomeip bounds the sessions:
+// a pool of 4 unauthenticated sessions
+// (CHIP_CONFIG_UNAUTHENTICATED_CONNECTION_POOL_SIZE,
+// src/lib/core/CHIPConfig.h:768-777 at 6170af84) whose least recently
+// used entry makes room for a new one where its pools are static
+// (src/transport/UnauthenticatedSessionTable.h:341-355); matter.js ends
+// the unsecured session of an inbound message that no protocol handler
+// adopts (packages/protocol/src/protocol/ExchangeManager.ts:244-256 at
+// db021da0). Each bound evicts the oldest entry and never touches a
+// secure session or an unsecured session this node opened.
+const (
+	// maxInboundUnsecuredSessions is how many inbound unsecured sessions
+	// are held; the next one closes the oldest. The number is the device
+	// side's bound on per-source state of unauthenticated traffic
+	// (bridge/securechannel.go:518, maxUnsecuredWindows). A flood that
+	// fills it within one handshake's round trips closes that handshake;
+	// one that fills it more slowly costs a legitimate peer nothing.
+	maxInboundUnsecuredSessions = 256
+	// inboundUnsecuredAckWaitLimit is how many messages on inbound
+	// unsecured sessions wait for their acknowledgement; the next one ends
+	// the oldest wait — the message went out, it loses its retransmissions
+	// and nothing else, and its send returns as if acknowledged. The
+	// number and the rule are the device side's unsecured retransmit
+	// table (bridge/outbound_reliable.go:296, unsecuredEntryLimit). A
+	// flood that ends a legitimate handshake's wait costs it a lost
+	// datagram's retransmission only.
+	inboundUnsecuredAckWaitLimit = 16
+	// inboundUnsecuredLifetime is how long an inbound unsecured session
+	// lives, whatever its handshake waits for: the device side's lifetime
+	// of a message on the unsecured session (bridge/outbound_reliable.go:312,
+	// unsecuredEntryLifetime, matter.js's PASE_PAIRING_TIMEOUT at
+	// PaseServer.ts:33 as cited there).
+	inboundUnsecuredLifetime = 60 * time.Second
+	// maxInboundUnsecuredHandshakes is how many exchanges a Sigma1 opened
+	// an inbound unsecured session holds at once; a further Sigma1 on a
+	// new exchange is acknowledged and dropped while they are open, so the
+	// session bound bounds the CASE handlers too (review II,
+	// R2-P2-dr-ctl-04). One, because a session carries one handshake: the
+	// CASE responder closes the session when its handshake ends
+	// (client/handshake/server.go:148, CaseServer.ts:95-99 as cited
+	// there). An ICD Check-In's exchange, which ends with its message, and
+	// a refused PBKDFParamRequest's, whose answer's wait
+	// inboundUnsecuredAckWaitLimit bounds, are not counted. The rule is
+	// the device side's for a second PASE handshake while one is in
+	// progress (bridge/securechannel.go:456-464, matter.js
+	// PaseServer.ts:80-86 as cited there): the new attempt is ignored, the
+	// running one kept. A device whose Sigma1 opens a second exchange on
+	// its source's session, while its earlier handshake still runs, sees
+	// the acknowledgement and no Sigma2; its retry after that handshake
+	// ended (its session lives inboundUnsecuredLifetime at most) is served.
+	maxInboundUnsecuredHandshakes = 1
+)
+
+// ackWait is a message on an inbound unsecured session that waits for its
+// acknowledgement.
+type ackWait struct {
+	x *Exchange
+	p *pending
+}
+
+// holdAckWait counts p, sent on x, against [inboundUnsecuredAckWaitLimit]
+// while its send waits for the acknowledgement, ending the oldest wait at
+// the limit; the returned func releases the place. A message on any other
+// session is not counted.
+func (m *Manager) holdAckWait(x *Exchange, p *pending) (release func()) {
+	if x.session.secure != nil || !x.session.inbound {
+		return func() {}
+	}
+	m.mu.Lock()
+	m.ackWaits = append(m.ackWaits, ackWait{x: x, p: p})
+	var evicted []ackWait
+	if over := len(m.ackWaits) - inboundUnsecuredAckWaitLimit; over > 0 {
+		evicted = slices.Clone(m.ackWaits[:over])
+		m.ackWaits = slices.Delete(m.ackWaits, 0, over)
+	}
+	m.mu.Unlock()
+	for _, e := range evicted {
+		m.log.Warn("matter.controller.unsecured_ack_wait_evicted", slog.Uint64("node_id", e.x.session.nodeID), slog.Int("exchange_id", int(e.x.id)),
+			slog.String("reason", "too many messages to unauthenticated peers wait for an acknowledgement"))
+		e.x.dropPending(e.p)
+	}
+	return func() {
+		m.mu.Lock()
+		m.ackWaits = slices.DeleteFunc(m.ackWaits, func(e ackWait) bool { return e.p == p })
+		m.mu.Unlock()
+	}
 }
 
 // releaseInbound closes an inbound session no exchange holds —
@@ -812,11 +968,8 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		idx |= initiatedExchangeFlag
 	}
 	m.mu.Lock()
-	x := m.exchanges[idx]
+	x := m.exchanges[exchangeKey{s, idx}]
 	m.mu.Unlock()
-	if x != nil && x.session != s {
-		x = nil
-	}
 	if x != nil {
 		if x.considerClosed() && !msg.isStandaloneAck() {
 			// ExchangeManager.ts:359-378: acknowledge, then close.
@@ -828,8 +981,8 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		return
 	}
 	// A new exchange on a closing session is declined
-	// (ExchangeManager.ts:386-389).
-	if s.IsClosed() || s.IsPeerLost() {
+	// (ExchangeManager.ts:386-389; :441-444 at db021da0).
+	if s.IsClosing() {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session_id", int(s.id)))
 		return
 	}
@@ -912,6 +1065,16 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 // starts no handler and closes the exchange.
 func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	x := m.accept(s, msg)
+	if x == nil {
+		// An inbound unsecured session holds its one handshake
+		// ([maxInboundUnsecuredHandshakes]): acknowledged, then dropped.
+		m.log.Warn("matter.controller.unsecured_handshake_refused", slog.Uint64("node_id", s.nodeID), slog.Int("exchange_id", int(msg.ExchangeID)),
+			slog.String("reason", "the session of an unauthenticated peer holds a handshake already"))
+		if msg.RequiresAck {
+			m.sendAck(s, msg, 0)
+		}
+		return
+	}
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
 	if !m.goWork(func() {
@@ -978,10 +1141,43 @@ func (m *Manager) seal(s *Session, proto message.ProtocolHeader, payload []byte,
 	}
 	hdr := message.Header{SessionID: s.peer}
 	sealed, err := s.secure.Encrypt(&hdr, hdr.SecurityFlags(), plain)
+	if s.secure.RolloverDue() {
+		m.endSessionAtRollover(s)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w: %w", ErrSessionClosed, err)
 	}
 	return append(hdr.Marshal(), sealed.Ciphertext...), sealed.Counter, nil
+}
+
+// endSessionAtRollover ends the secure session s whose outbound counter
+// nears exhaustion ([channel.Session.RolloverDue]): the session turns
+// closing at once, so it takes no new exchange and the next interaction
+// establishes a new one; the exchanges in flight, the one whose send
+// consumed the counter included, end normally; when the last has ended
+// the peer is told with a CloseSession while the keys still seal, and the
+// session closes ([Session.closeIfDeferred]). Mirrors matter.js
+// packages/protocol/src/session/NodeSession.ts:398-412
+// (#scheduleRolloverClose → initiateClose) with :367-376 and :384-391 at
+// db021da0: the close is deferred while exchanges are active, and no
+// timer bounds the wait — an exchange ends by its own MRP retransmission
+// limit, its receive timeout or its caller's context. The device side is
+// bridge/reply.go endSessionAtRollover.
+func (m *Manager) endSessionAtRollover(s *Session) {
+	if !s.deferClose() {
+		return
+	}
+	m.log.Info("matter.controller.session.rollover_close", slog.Int("session_id", int(s.id)))
+	s.closeIfDeferred()
+}
+
+// closeGracefully sends s a CloseSession and closes it on a goroutine of
+// the manager ([Manager.CloseSession]); a closed manager closed the
+// session already.
+func (m *Manager) closeGracefully(s *Session) {
+	if !m.goWork(func() { m.CloseSession(m.lifetime, s) }) {
+		s.Close()
+	}
 }
 
 // reportPeerLost calls the PeerLost hook once for a secure session that
@@ -1046,7 +1242,14 @@ func (m *Manager) HandlePeerLoss(peer PeerAddress, cause error, asOf time.Time) 
 
 func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, current *Exchange) {
 	for _, s := range m.SessionsFor(peer) {
-		if !asOf.IsZero() && !s.createdAt.Before(asOf) {
+		// The exchange that observed the loss runs on a session that
+		// existed before it, so that session is never spared by the
+		// cutoff, even when the clock did not move between the two (a
+		// fake clock, a coarse one): matter.js compares the same instants
+		// (SessionManager.ts:740-742 against ExchangeManager.ts:614 and
+		// Session.ts:60) and relies on the clock moving.
+		own := current != nil && s == current.session
+		if !own && !asOf.IsZero() && !s.createdAt.Before(asOf) {
 			continue
 		}
 		s.handlePeerLoss(cause, current)
@@ -1055,13 +1258,21 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 
 // accept registers the exchange the peer opened with msg — matter.js
 // MessageExchange.fromInitialMessage and #addExchange
-// (ExchangeManager.ts:423-434, :494-508).
+// (ExchangeManager.ts:478-489, :551-566 at db021da0). A Sigma1 on an inbound
+// unsecured session that holds [maxInboundUnsecuredHandshakes] handshakes
+// already registers none and returns nil.
 func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
+	handshake := s.inbound && s.secure == nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Opcode == mrp.SCOpcodeSigma1
+	if handshake && !s.addHandshake(x) {
+		return nil
+	}
 	m.mu.Lock()
-	m.exchanges[x.index] = x
+	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	s.addExchange(x)
+	if !handshake {
+		s.addExchange(x)
+	}
 	m.cleanupSessionExchanges(s)
 	return x
 }

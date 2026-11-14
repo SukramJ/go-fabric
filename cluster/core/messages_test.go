@@ -160,9 +160,18 @@ func TestMessagesPerFabric(t *testing.T) {
 	if len(d.cancelled) != 0 {
 		t.Errorf("cancelled %v", d.cancelled)
 	}
-	m.RemoveFabric(1)
+	// The removal contract names both fabrics and drops one of them.
+	if got := m.MatterHeldFabrics(); !slices.Equal(got, []uint8{1, 2}) {
+		t.Errorf("held %v, want [1 2]", got)
+	}
+	if err := m.MatterDropFabric(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
 	if v, _ := m.MatterRead(messagesdef.AttrMessages); len(v.(spec.List[messagesdef.MessageStruct])) != 1 {
-		t.Errorf("after RemoveFabric(1): %+v", v)
+		t.Errorf("after dropping fabric 1: %+v", v)
+	}
+	if got := m.MatterHeldFabrics(); !slices.Equal(got, []uint8{2}) {
+		t.Errorf("held after dropping fabric 1 %v, want [2]", got)
 	}
 	m.RemoveFabric(9) // no message of that fabric: nothing changes
 }

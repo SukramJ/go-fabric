@@ -37,7 +37,9 @@ import (
 )
 
 // ErrStopped is returned by [Node.Start] after [Node.Stop]: a node is not
-// restarted; a host builds a new one on the same store.
+// restarted; a host builds a new one on the same store. [Node.OpenOwnWindow],
+// [Node.OpenBasicWindow] and [Node.CloseWindow] return it from the first
+// Stop on.
 var ErrStopped = errors.New("node: stopped")
 
 // ErrNotStarted is returned by a call that needs the running node's
@@ -140,6 +142,9 @@ type Node struct {
 	// userLabels keeps the bridged endpoints' UserLabel lists in the
 	// store (user_labels.go).
 	userLabels userLabelSync
+	// nonVolatile stores and restores the nonvolatile attributes the
+	// module holds (nonvolatile.go).
+	nonVolatile *nonVolatile
 	// bdx serves the BDX transfers peers open (the provider's images) and
 	// otaProvider is the OTA Software Update Provider; both nil without
 	// Config.OTAProvider (ota_provider.go).
@@ -183,17 +188,30 @@ type Node struct {
 	windowLife   context.Context //nolint:containedctx // a child of life that Stop cancels first
 	cancelWindow context.CancelFunc
 
-	// mu serialises Start and Stop, the lifecycle; it is held across
-	// them, host callbacks included (the host's Snapshotter), and
-	// taken by nothing else. started is atomic so a host's call during
-	// either (SetCommissioningBlocked) never waits for it (ADR 0026 P6).
-	mu      sync.Mutex
-	started atomic.Bool
-	stopped bool
+	// lifecycle serialises Start, Stop and FactoryReset: a slot of
+	// capacity one, held across them, host callbacks included (the host's
+	// Snapshotter), and taken by nothing else. Stop's wait for it ends
+	// with Stop's ctx (enterLifecycle; review II, R2-P2-stop-08). started
+	// is atomic so a host's call during either (SetCommissioningBlocked)
+	// never waits for it (ADR 0026 P6).
+	lifecycle chan struct{}
+	started   atomic.Bool
+	stopped   bool
 	// stopBegun: a Stop took the node's own parts down; stopped is set
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
 	stopBegun bool
+	// rolledBackReported: Start ran the removal consequences of the
+	// fabrics construction rolled back (reportRolledBackFabrics); a Start
+	// after a failed one does not run them again. Under lifecycle.
+	rolledBackReported bool
+
+	// announcedMu guards announced: the fabrics the host may know of —
+	// stored when the node started, or installed in this process
+	// (OnFabricAdded's hook ran). The row of an AddNOC that failed is in
+	// neither, so its rollback does not reach the host's OnFabricRemoved.
+	announcedMu sync.Mutex
+	announced   map[uint8]bool
 }
 
 // New builds the node: everything the reference daemon builds before
@@ -235,7 +253,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
 		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
-		attestationErr: attestationErr,
+		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	n.windowLife, n.cancelWindow = context.WithCancel(n.life)
@@ -262,6 +280,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.cfg.Store.Credentials = n.st
 	n.persisted = persisted{st: n.st, logger: n.logger}
+	n.nonVolatile = &nonVolatile{n: n}
 	n.endpoints = cfg.EndpointPersistence
 	if n.endpoints == nil {
 		n.endpoints = n.persisted
@@ -370,6 +389,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}); err != nil {
 		return nil, err
 	}
+	// The root's construction rolled back an uncommitted UpdateNOC and
+	// committed the row back: the next process finds nothing to roll back,
+	// so the store-side consequence runs here, not at Start, which a host
+	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
+	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
 	// DiagnosticLogs hands logs over BDX on the requesting session
 	// (ADR 0021).
@@ -425,13 +449,24 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.wireEventsUTC()
 
 	// Event numbers continue across a reboot (main.go:416-426 at b4ea1f96^).
-	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
+	// A ceiling the store cannot read fails New, as the reboot count does:
+	// numbering from 1 would write a lower ceiling over the stored one and
+	// hand out numbers a controller has seen.
+	ceiling, found, err := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber)
+	if err != nil {
+		return nil, fmt.Errorf("node: event number ceiling: %w", err)
+	}
+	if found {
 		n.br.EventLog().SeedNumber(ceiling)
 	}
-	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
-		if err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
+	// A refused ceiling stays unwritten in the log too, which writes it
+	// again at the next event (im.EventLog.SetCeilingPersistence).
+	n.br.EventLog().SetCeilingPersistence(func(ceiling uint64) error { //nolint:contextcheck // runs per event-number ceiling, for the node's lifetime
+		err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling)
+		if err != nil {
 			n.logger.Warn("eventlog.persist_ceiling", slog.Any("err", err))
 		}
+		return err
 	}, 0)
 
 	// --- the client stack and the binding manager (brief AO) -------------
@@ -562,12 +597,29 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
 		return
 	}
+	if !n.announceInstalled(ctx, fabricIndex) {
+		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
+	}
+}
+
+// announceInstalled publishes fabricIndex's operational record from the
+// fabric's loaded CASE identity, and reports false for a fabric without
+// one. A removal or an UpdateNOC that forgot or replaced the identity
+// while the record was being published withdrew a record that was not
+// yet out; the record is withdrawn again once it is, so a removed
+// fabric's record does not stay published (review II, R2-P2-fabric-05).
+// The withdraw and the publish of one fabric are ordered by the identity:
+// a removal forgets it before it withdraws ([Node.fabricRemoved]).
+func (n *Node) announceInstalled(ctx context.Context, fabricIndex uint8) bool {
 	compressedID, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
 	if !ok {
-		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
-		return
+		return false
 	}
 	n.br.AnnounceFabric(ctx, fabricIndex, compressedID, nodeID)
+	if c, id, still := n.caseIDs.announceIdentity(fabricIndex); !still || c != compressedID || id != nodeID {
+		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
+	}
+	return true
 }
 
 // fabricLeaving is the cluster's OnFabricLeaving hook: the Leave event,
@@ -584,13 +636,19 @@ func (n *Node) fabricLeaving(ctx context.Context, fabricIndex uint8) {
 }
 
 // fabricRemoved is OperationalCredentials' OnFabricRemoved
-// (main.go:362-385 at b4ea1f96^): the OTA providers, the CASE identity and
-// record, the sessions, and the node's own window once the last fabric
-// is gone; the Leave event went out in [Node.fabricLeaving].
+// (main.go:362-385 at b4ea1f96^), the one function that runs every
+// consequence of a fabric's removal once the store no longer holds it:
+// first every server's state for the fabric, through the removal
+// contract on the root, the Aggregator and every endpoint
+// ([Node.dropFabricState]); then what is no cluster server's state — the
+// CASE identity and record, the bridge's subscriptions, window, groups,
+// scenes, sessions and the host's hook, the event log, the participants,
+// the terms-and-conditions acceptance and the node's own window once the
+// last fabric is gone. The Leave event went out in [Node.fabricLeaving].
 func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
-	if n.root.OTARequestor != nil {
-		n.root.OTARequestor.FabricRemoved(fabricIndex)
-	}
+	n.dropFabricState(ctx, fabricIndex)
+	// The client stack's peers of the fabric, while its identity lasts.
+	n.forgetClientPeers(ctx, fabricIndex)
 	if compressedID, nodeID, ok := n.caseIDs.forget(fabricIndex); ok {
 		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
 	}
@@ -600,17 +658,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}
-	n.removeFabricBindings(fabricIndex)
 	n.fabricRemovedParticipants(ctx, fabricIndex)
-	if srv := n.root.ICDManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
-	// The removed fabric's trusted time source goes, with
-	// MissingTrustedTimeSource (TimeSynchronizationCluster.cpp:1020-1028
-	// at 6170af84).
-	if srv := n.root.TimeSynchronization; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
 	// The last fabric's removal resets the terms-and-conditions acceptance
 	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
 	if srv := n.root.GeneralCommissioning; srv != nil {
@@ -622,15 +670,6 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 				n.logger.Warn("node.terms.reset", slog.Any("err", err))
 			}
 		}
-	}
-	// The root's TLS tables drop the fabric's entries
-	// (TLSCertificateManagementCluster.cpp:571-575,
-	// TLSClientManagementCluster.cpp:272-275 at 6170af84).
-	if srv := n.root.TLSClientManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
-	if srv := n.root.TLSCertificateManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
 	}
 	n.reopenIfDecommissionedWhenIdle(ctx)
 }
@@ -705,6 +744,15 @@ func (n *Node) reopenUnlessStopping() {
 	n.window.reopenIfDecommissioned(n.windowLife, n.st)
 }
 
+// stopBegan reports whether a Stop began: the gate of the keepers
+// (keeperMu, stopping), which the host's window calls share (review II,
+// R2-P2-stop-02).
+func (n *Node) stopBegan() bool {
+	n.keeperMu.Lock()
+	defer n.keeperMu.Unlock()
+	return n.stopping
+}
+
 // goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
 // began; it reports whether it started one. A handler that outlives
 // br.Stop's bounded wait starts nothing (TestLateHandlerKeeperDoesNotRaceStop).
@@ -727,13 +775,16 @@ func (n *Node) goKeeper(fn func()) bool {
 // operational record, and ends the fabric's other sessions, each told
 // with a CloseSession (Bridge.CloseFabricSessionsExcept). The fabric's
 // resumption records go with the replaced identity, so no peer resumes a
-// session established under the old NOC. Mirrors matter.js
+// session established under the old NOC, and so do the client stack's
+// sessions and records towards the fabric's peers
+// ([Node.closeClientFabricSessions]). Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
 		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 	}
+	n.closeClientFabricSessions(ctx, fabricIndex)
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
@@ -752,6 +803,7 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 // host's OnFabricAdded with what the AddNOC hook carries.
 func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte) {
 	n.fabricInstalled(ctx, fabricIndex, fabricID, nodeID, rootPublicKey)
+	n.setAnnounced(fabricIndex, true)
 	obs := n.observerList()
 	if !slices.ContainsFunc(obs, func(o Observers) bool { return o.OnFabricAdded != nil }) {
 		return
@@ -772,6 +824,13 @@ func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, f
 // fires, so its identity is read from the CASE identity the facade holds
 // until its own handler forgets it.
 func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
+	if !n.setAnnounced(fabricIndex, false) {
+		// The rolled-back row of an AddNOC that failed: the host never
+		// saw it added, so it is not told of a removal; the facade's
+		// cleanup runs all the same.
+		n.fabricRemoved(ctx, fabricIndex)
+		return
+	}
 	info := FabricInfo{FabricIndex: fabricIndex}
 	if f, ok := n.caseIDs.forFabric(fabricIndex); ok {
 		info.FabricID = f.identity.FabricID
@@ -779,7 +838,104 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		info.CompressedFabricID = f.identity.CompressedFabricID
 		info.RootPublicKey = append([]byte(nil), f.rootPublicKey...)
 	}
-	n.fabricRemoved(ctx, fabricIndex)
+	n.fabricRemovedWith(ctx, info)
+}
+
+// loadStoredFabrics loads the CASE identity of every fabric stored when
+// the node starts and returns those it loaded; every stored fabric counts
+// as one the host may know of.
+func (n *Node) loadStoredFabrics(ctx context.Context, fabrics []store.FabricRecord) []store.FabricRecord {
+	loaded := make([]store.FabricRecord, 0, len(fabrics))
+	for i := range fabrics {
+		n.setAnnounced(fabrics[i].FabricIndex, true)
+		if err := n.caseIDs.load(ctx, n.st, fabrics[i].FabricIndex); err != nil {
+			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
+			continue
+		}
+		loaded = append(loaded, fabrics[i])
+	}
+	return loaded
+}
+
+// setAnnounced records whether the host may know of fabricIndex and
+// returns whether it could before.
+func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
+	n.announcedMu.Lock()
+	defer n.announcedMu.Unlock()
+	was := n.announced[fabricIndex]
+	if known {
+		if n.announced == nil {
+			n.announced = map[uint8]bool{}
+		}
+		n.announced[fabricIndex] = true
+	} else {
+		delete(n.announced, fabricIndex)
+	}
+	return was
+}
+
+// reportRolledBackFabrics runs, once, the consequences of every rollback
+// OperationalCredentials made at construction — for a rolled-back
+// UpdateNOC those of its rollback at run time (below), and the removal
+// consequences of every fabric it removed: an AddNOC
+// of the previous run that no CommissioningComplete committed before the
+// node went down. That run announced the fabric (OnFabricAdded) and the
+// commissioner may have written fabric-scoped state for it outside the
+// rows its removal cascades — a binding, a trusted time source, an
+// Extension entry — so the node runs its fabric-removed fan-out and the
+// host's OnFabricRemoved for it, with the identity the row carried, before
+// it serves. connectedhomeip does the same after its start-up rollback:
+// FabricTable::Init remembers the deleted index
+// (src/credentials/FabricTable.cpp:1129-1140) and Server::Init schedules
+// the fail-safe cleanup for it once everything is initialised
+// (src/app/server/Server.cpp:662-685 at 6170af84). Review II,
+// R2-P2-comm-03. The lifecycle slot is held.
+func (n *Node) reportRolledBackFabrics(ctx context.Context) {
+	if n.rolledBackReported {
+		return
+	}
+	n.rolledBackReported = true
+	recs := n.root.OperationalCredentials.RolledBackFabrics()
+	for i := range recs {
+		n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(recs[i].FabricIndex)))
+		n.fabricRemovedWith(ctx, fabricInfoOf(recs[i]))
+	}
+	// A rolled-back UpdateNOC runs what its rollback at run time runs
+	// through the OnFabricUpdated hook (observedFabricUpdated): the
+	// fabric's resumption records made under the uncommitted identity go —
+	// in New already (removeRolledBackUpdateResumptions) — with the client
+	// stack's records, and the host hears the fabric reverted (review II,
+	// R2-P2-dr-noc-05). The CASE identity and the operational record are
+	// not moved here: nothing is announced and no session exists before
+	// the bridge starts, and Start loads and announces the identity as the
+	// store holds it again.
+	updates := n.root.OperationalCredentials.RolledBackUpdates()
+	for i := range updates {
+		idx := updates[i].FabricIndex
+		n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
+		n.closeClientFabricSessions(ctx, idx)
+		n.notifyFabricUpdated(ctx, idx)
+	}
+}
+
+// removeRolledBackUpdateResumptions removes the resumption records of each
+// fabric whose UpdateNOC the root's construction rolled back: those made
+// under the uncommitted identity are the rollback's store-side
+// consequence, which no later process could run.
+func (n *Node) removeRolledBackUpdateResumptions(ctx context.Context) {
+	updates := n.root.OperationalCredentials.RolledBackUpdates()
+	for i := range updates {
+		idx := updates[i].FabricIndex
+		if err := n.st.RemoveResumptionsByFabric(ctx, idx); err != nil {
+			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		}
+	}
+}
+
+// fabricRemovedWith is the facade's fabricRemoved for info's fabric, then
+// the host's OnFabricRemoved with info.
+func (n *Node) fabricRemovedWith(ctx context.Context, info FabricInfo) {
+	n.fabricRemoved(ctx, info.FabricIndex)
 	for _, o := range n.observerList() {
 		if fn := o.OnFabricRemoved; fn != nil {
 			observe(n.logger, "fabric_removed", func() { fn(info) })
@@ -883,8 +1039,8 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // socket and no open window behind. A host that gives up calls Stop;
 // [Node.Run] does.
 func (n *Node) Start(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.lifecycle <- struct{}{}
+	defer n.leaveLifecycle()
 	switch {
 	case n.stopped || n.stopBegun:
 		return ErrStopped
@@ -898,7 +1054,7 @@ func (n *Node) Start(ctx context.Context) error {
 	return nil
 }
 
-// startLocked is Start's work; n.mu is held. It fails only before it has
+// startLocked is Start's work; the lifecycle slot is held. It fails only before it has
 // started anything (see Start): every fallible step comes first.
 func (n *Node) startLocked(ctx context.Context) error {
 	// The start is work in hand of the node's in-flight group but for its
@@ -922,6 +1078,9 @@ func (n *Node) startLocked(ctx context.Context) error {
 	if err := attachPartsListProviders(n.br); err != nil {
 		return err
 	}
+	// The fabrics construction rolled back go before anything is served
+	// (R2-P2-comm-03).
+	n.reportRolledBackFabrics(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
 	if err := n.br.Start(ctx); err != nil {
@@ -980,14 +1139,7 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// only on a node already marked commissioned; marking it at the end
 	// would mark it again from this stale count.
 	n.commissioned.Store(err == nil && stored > 0)
-	loaded := make([]store.FabricRecord, 0, stored)
-	for _, fabric := range fabrics {
-		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
-			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
-			continue
-		}
-		loaded = append(loaded, fabric)
-	}
+	loaded := n.loadStoredFabrics(ctx, fabrics)
 	work.pause()
 	n.br.ReestablishFormerSubscriptions(ctx)
 	work.resume()
@@ -996,8 +1148,10 @@ func (n *Node) startLocked(ctx context.Context) error {
 			n.logger.Warn("ota.requestor_start", slog.Any("err", err))
 		}
 	}
-	for _, fabric := range loaded {
-		n.br.AnnounceFabric(ctx, fabric.FabricIndex, fabric.CompressedID, fabric.NodeID)
+	// A fabric removed since its identity loaded is not announced, and
+	// one removed while its record went out is withdrawn again.
+	for i := range loaded {
+		n.announceInstalled(ctx, loaded[i].FabricIndex)
 	}
 	// The server is ready: without a time the root's TimeSynchronization
 	// asks the trusted time source, then the default NTP server
@@ -1042,16 +1196,41 @@ func (n *Node) startLocked(ctx context.Context) error {
 // (matter.js Node.stop, Node.ts:193) and safe without Start. A context
 // already done cuts short only Stop's waits; Stop returns an error only
 // when the bridge did not stop (a bridge Start or Stop the host runs
-// itself held it until ctx ended), and then the node is not stopped yet:
-// it keeps its store and the next Stop finishes the work. Start is refused
-// from the first Stop on.
+// itself held it until ctx ended, or a Start of the node's own was still
+// running when ctx ended), and then the node is not stopped yet: it keeps
+// its store and the next Stop finishes the work. Start is refused from the
+// first Stop on.
 func (n *Node) Stop(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	if err := n.enterLifecycle(ctx); err != nil {
+		return err
+	}
+	defer n.leaveLifecycle()
 	return n.stopLocked(ctx)
 }
 
-// stopLocked is Stop's work; n.mu is held. When the bridge does not
+// enterLifecycle takes the lifecycle slot, waiting for a Start or
+// FactoryReset in progress until ctx ends. A free slot is taken whatever
+// ctx's state, so a Stop with a context already done still stops an idle
+// node. The shape of bridge.Bridge.enterLifecycle (review II,
+// R2-P2-stop-08).
+func (n *Node) enterLifecycle(ctx context.Context) error {
+	select {
+	case n.lifecycle <- struct{}{}:
+		return nil
+	default:
+	}
+	select {
+	case n.lifecycle <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("node: waiting for a start in progress: %w", ctx.Err())
+	}
+}
+
+// leaveLifecycle releases the lifecycle slot.
+func (n *Node) leaveLifecycle() { <-n.lifecycle }
+
+// stopLocked is Stop's work; the lifecycle slot is held. When the bridge does not
 // stop (its Stop waited for a bridge Start or Stop in progress until ctx
 // ended), the node is not stopped: the advertiser, the lifetime context
 // and the store stay, and the next Stop resumes at the bridge (review II,
@@ -1068,6 +1247,12 @@ func (n *Node) stopLocked(ctx context.Context) error {
 		n.stopBegun = true
 		n.stopParts(ctx, work)
 	}
+	// A fail-safe rollback that began before the stop ends before the
+	// store goes (review II, R2-P2-stop-06); a ctx that ends first fails
+	// Stop, and the next Stop waits again.
+	if err := n.root.GeneralCommissioning.Close(ctx); err != nil {
+		return fmt.Errorf("node: %w", err)
+	}
 	if err := n.br.Stop(ctx); err != nil {
 		return fmt.Errorf("node: bridge stop: %w", err)
 	}
@@ -1082,6 +1267,8 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()
+	// A nonvolatile change the store refused is written once more.
+	n.nonVolatile.stop(ctx)
 	n.closeOwnedDB()
 	return nil
 }
@@ -1254,7 +1441,7 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 		return
 	}
 	// Lock-free: a host may call this from a callback that runs inside
-	// Start or Stop, which hold n.mu (a Snapshotter, say).
+	// Start or Stop, which hold the lifecycle slot (a Snapshotter, say).
 	if n.started.Load() && n.window != nil && n.st != nil {
 		n.window.reopenIfDecommissioned(ctx, n.st)
 	}
@@ -1269,8 +1456,8 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 		return nil, err
 	}
 	out := make([]FabricInfo, 0, len(recs))
-	for _, rec := range recs {
-		out = append(out, fabricInfoOf(rec))
+	for i := range recs {
+		out = append(out, fabricInfoOf(recs[i]))
 	}
 	return out, nil
 }

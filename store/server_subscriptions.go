@@ -16,16 +16,20 @@ import (
 // signatures use only standard types so *Store satisfies the bridge's
 // SubscriptionStore port without either package importing the other.
 
-// SaveServerSubscription inserts or replaces the row of subscriptionID.
+// SaveServerSubscription inserts or replaces the row of subscriptionID and
+// makes it the most recent: save_seq one past the table's largest, in the
+// same statement, so the order is exact where updated_at's whole seconds
+// tie.
 func (s *Store) SaveServerSubscription(ctx context.Context, subscriptionID uint32, fabricIndex uint8, peerNodeID uint64, payload []byte) error {
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO matter_server_subscriptions (subscription_id, fabric_index, peer_node_id, payload, updated_at)
-VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+INSERT INTO matter_server_subscriptions (subscription_id, fabric_index, peer_node_id, payload, updated_at, save_seq)
+VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, (SELECT COALESCE(MAX(save_seq), 0) + 1 FROM matter_server_subscriptions))
 ON CONFLICT(subscription_id) DO UPDATE SET
     fabric_index = excluded.fabric_index,
     peer_node_id = excluded.peer_node_id,
     payload      = excluded.payload,
-    updated_at   = CURRENT_TIMESTAMP`,
+    updated_at   = CURRENT_TIMESTAMP,
+    save_seq     = excluded.save_seq`,
 		int64(subscriptionID), fabricIndex, uint64ToBE(peerNodeID), payload)
 	if err != nil {
 		return fmt.Errorf("store: save server subscription: %w", err)
@@ -50,10 +54,12 @@ func (s *Store) DeleteServerSubscriptionsByFabric(ctx context.Context, fabricInd
 	return nil
 }
 
-// LoadServerSubscriptions returns every row's payload, oldest first.
+// LoadServerSubscriptions returns every row's payload, the least recently
+// saved first (save_seq; rows saved before v8, all 0, by updated_at and
+// then subscription id, as before).
 func (s *Store) LoadServerSubscriptions(ctx context.Context) ([][]byte, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT payload FROM matter_server_subscriptions ORDER BY updated_at ASC, subscription_id ASC`)
+SELECT payload FROM matter_server_subscriptions ORDER BY save_seq ASC, updated_at ASC, subscription_id ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: load server subscriptions: %w", err)
 	}

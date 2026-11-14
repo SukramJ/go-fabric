@@ -640,6 +640,7 @@ func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
 		_, rootPriv, fabricIndex := commissionTestFabric(ctx, t, oc)
 		armed := fabricIndex
 		oc.SetFailSafe(func() (uint8, bool) { return armed, true })
+		commitForTest(t, oc)
 		oc.ClearPendingState() // a fresh fail-safe window
 		fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
 		if _, err := oc.MatterInvoke(sessionChallengeCtx(fabCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32), IsForUpdateNOC: true}); err != nil {

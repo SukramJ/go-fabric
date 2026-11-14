@@ -200,3 +200,45 @@ func TestWindowEncryptedRollover(t *testing.T) {
 		t.Fatal("counter just under 2^31 ahead must be new")
 	}
 }
+
+// TestNoRolloverWindowAtZeroAcceptsReorderedFirstMessages — a secure
+// unicast session's window starts primed at counter 0 with the full
+// bitmap, so a first counter more than 32 above 0 clears the bitmap and
+// the 32 counters below it stay acceptable once: a message overtaken at
+// the start of a session is still delivered. Counter 0 itself is the
+// primed maximum and so a duplicate. Mirrors matter.js
+// packages/protocol/src/session/NodeSession.ts:124
+// `messageReceptionState: new MessageReceptionStateEncryptedWithoutRollover(0)`.
+func TestNoRolloverWindowAtZeroAcceptsReorderedFirstMessages(t *testing.T) {
+	t.Parallel()
+	w := NewWindowNoRolloverAt(0)
+	if !w.Accept(5001) {
+		t.Fatal("Accept(5001) as the first counter should be fresh")
+	}
+	if !w.Accept(5000) {
+		t.Fatal("Accept(5000) after 5001 should be fresh: it was never received")
+	}
+	if w.Accept(5000) {
+		t.Fatal("Accept(5000) again should be a duplicate")
+	}
+	if !w.Accept(4969) {
+		t.Fatal("Accept(4969) = first-32 should be fresh")
+	}
+	if w.Accept(4968) {
+		t.Fatal("Accept(4968) = first-33 is outside the window and must be a duplicate")
+	}
+
+	z := NewWindowNoRolloverAt(0)
+	if z.Accept(0) {
+		t.Fatal("Accept(0) on a window primed at 0 should be a duplicate")
+	}
+	if !z.Accept(5) {
+		t.Fatal("Accept(5) should be fresh")
+	}
+	if !z.Accept(3) {
+		t.Fatal("Accept(3) below a first counter within the window should be fresh")
+	}
+	if z.Accept(0) {
+		t.Fatal("Accept(0) stays a duplicate after advancing")
+	}
+}

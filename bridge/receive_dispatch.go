@@ -10,14 +10,17 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -213,16 +216,40 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	readSubjectNodeID, readSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	readCtx := im.WithFabricFilter(ctx, req.FabricFiltered, readFabricIndex)
 	readCtx = im.WithSubject(readCtx, readSubjectNodeID, readSubjectCATs)
+	// A path naming a node is answered for this node's id on the
+	// session's fabric only (review II, R2-P2-alloc-07).
+	readLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, readFabricIndex)
+	readCtx = im.WithLocalNodeID(readCtx, readLocalNodeID)
 	readPASE := b.resolveSessionPASE(requestHdr.SessionID)
 	if readPASE {
 		readCtx = im.WithAuthModePASE(readCtx)
 	}
-	report := im.HandleReadRequest(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
+	// The response is generated chunk by chunk (review II, decision 44):
+	// chunk N+1 is pulled from the reports only once chunk N went out and
+	// the peer answered it, so what the read holds across a chunk wait is
+	// the expansion's cursor and the chunk in flight, not the whole
+	// response. Mirrors matter.js
+	// packages/protocol/src/action/server/AttributeReadResponse.ts:64 at
+	// db021da0 (*process, a generator) and its consumer,
+	// InteractionMessenger.ts:470-797 (sendDataReport, which pulls the next
+	// report at :555).
+	reports := im.NewReadReports(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
+	attributeReports := 0
+	attributes := func() (im.AttributeReport, bool) {
+		rep, ok := reports.Next()
+		if ok {
+			b.logReadAttributeReport(attributeReports, rep)
+			attributeReports++
+		}
+		return rep, ok
+	}
 	// Evaluate EventRequests against the persistent event log so
 	// chip-tool `read-event-by-id` and Apple MTRDevice liveness
 	// checks return the buffered StartUp / BootReason / etc. events.
 	// Matter §10.6.6: a ReadRequest may carry both AttributeRequests
-	// and EventRequests; the bridge merges both into one ReportData.
+	// and EventRequests; the bridge merges both into one ReportData,
+	// the events after the attributes — read once the attributes are
+	// out.
 	//
 	// Gate the event reads by ACL + fabric-sensitive filtering the same
 	// way HandleReadRequest gates attribute reads: a wildcard event read
@@ -230,111 +257,131 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// non-Administer subject must not read AccessControl events (Matter
 	// §8.4.3.2 / §9.10.7.1). Mirrors matter.js EventReadResponse.ts
 	// #readAllowedEvents.
+	var events func() []im.EventReport
 	if len(req.EventRequests) > 0 {
-		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
-		// One EventFilterIB applies: the first for this node (matter.js
-		// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
-		eventReq := req
-		eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
-		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
-			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
+		events = func() []im.EventReport {
+			auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
+			// One EventFilterIB applies: the first for this node (matter.js
+			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
+			eventReq := req
+			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, readLocalNodeID)
+			evs := append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
+				im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
+			if len(evs) > 0 {
+				b.logger.Debug("matter.tx.im.read_event_reports",
+					slog.Int("event_reports", len(evs)))
+			}
+			return evs
+		}
 	}
-	b.logReadReport(report)
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
+	// A plain Read's response suppresses the answer to its last chunk
+	// (see [im.HandleReadRequest]).
+	chunker := newReportChunker(im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
+	chunk, have, err := chunker.next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
 	}
 	// A read that waits for the peer's answer to a chunk takes one of the
 	// session's [maxChunkWaitsPerSession] claims; beyond them it is
-	// answered Busy (review II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks(chunks))
+	// answered Busy (review II, R2-P1-req2-01). Its first chunk tells: only
+	// the last chunk suppresses the answer.
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_chunk_waits", im.StatusBusy)
 	}
 	defer release()
-	for i, chunk := range chunks {
-		body, err := EncodeReportData(chunk)
-		if err != nil {
-			debugReplyError(b.logger, "encode_report", src, err)
+	chunks := 0
+	for i := 0; have; i++ {
+		if err := b.sendReadChunk(ctx, src, requestHdr, proto, i, chunk); err != nil {
 			return err
 		}
-		// Mirror the Subscribe path's per-chunk IM:StatusResponse wait
-		// so Apple Home's MTRDevice processes each ReportData frame on
-		// the IM layer before the next arrives. matter.js's
-		// InteractionMessenger acks every non-final chunk on the IM layer
-		// (not just MRP); without the wait go-fabric
-		// burst-fires all chunks back-to-back and Apple's
-		// `ProcessReadResponse` state machine drops late chunks.
-		//
-		// A chunk carrying SuppressResponse=true (only the terminal chunk
-		// of a plain Read — see [im.HandleReadRequest]) expects nothing but
-		// a Standalone MRP-Ack, so the controller never emits an IM
-		// StatusResponse for it; waiting would only run out the exchange timeout.
-		// Mirrors matter.js
-		// packages/protocol/src/interaction/InteractionMessenger.ts:679,701
-		// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
-		// wait). Reliable delivery of the final chunk is still guaranteed by
-		// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
-		var waitCh <-chan im.StatusCode
-		if !chunk.SuppressResponse {
-			waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		}
-		// Piggyback the latest peer-sent counter on this chunk's
-		// AckCounter. Without this rewrite every chunk carries
-		// the stale ReadRequest counter, and python-matter-server's
-		// ReliableMessaging drops chunk N+1 after the peer has
-		// StatusResponse-acked chunk N — "Dropping message without
-		// piggyback ack when we are waiting for an ack". Mirrors
-		// the symmetric fix in the Subscribe-Initial loop.
-		chunkHdr := *requestHdr
-		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
-		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
-			if waitCh != nil {
-				b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			}
-			debugReplyError(b.logger, "send_report", src, err)
+		chunks++
+		if chunk, have, err = chunker.next(); err != nil {
+			debugReplyError(b.logger, "chunk_report", src, err)
 			return err
 		}
-		if waitCh != nil {
-			leaveSessionOrder(ctx) // the answer arrives on this session
-			if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
-				return err
-			}
-		}
-		b.logger.Debug("matter.rx.im.read.chunk",
-			slog.String("src", srcString(src)),
-			slog.Int("chunk", i),
-			slog.Int("of", len(chunks)),
-			slog.Int("bytes", len(body)),
-			slog.Bool("more", chunk.MoreChunkedMessages))
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	b.logger.Debug("matter.rx.im.read",
 		slog.String("src", srcString(src)),
-		slog.Int("attribute_reports", len(report.Reports)),
-		slog.Int("chunks", len(chunks)))
+		slog.Int("attribute_reports", attributeReports),
+		slog.Int("chunks", chunks))
 	return nil
 }
 
-// logReadReport is the read's diagnostic: what it returns per path.
-func (b *Bridge) logReadReport(report im.ReportData) {
-	for i, r := range report.Reports {
-		b.logger.Debug("matter.tx.im.read_report",
-			slog.Int("path_index", i),
-			slog.Any("endpoint", r.Path.Endpoint),
-			slog.Any("cluster", r.Path.Cluster),
-			slog.Any("attribute", r.Path.Attribute),
-			slog.Bool("status", r.IsStatus),
-			slog.Any("status_code", r.Status.Status),
-			slog.String("value_type", fmt.Sprintf("%T", r.Value.Value)),
-			slog.Any("value", r.Value.Value))
+// sendReadChunk sends chunk i of a read's response and, unless the chunk
+// suppresses the answer, waits for the peer's StatusResponse to it.
+func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, i int, chunk im.ReportData) error {
+	body, err := EncodeReportData(chunk)
+	if err != nil {
+		debugReplyError(b.logger, "encode_report", src, err)
+		return err
 	}
-	if len(report.EventReports) > 0 {
-		b.logger.Debug("matter.tx.im.read_event_reports",
-			slog.Int("event_reports", len(report.EventReports)))
+	// Mirror the Subscribe path's per-chunk IM:StatusResponse wait
+	// so Apple Home's MTRDevice processes each ReportData frame on
+	// the IM layer before the next arrives. matter.js's
+	// InteractionMessenger acks every non-final chunk on the IM layer
+	// (not just MRP); without the wait go-fabric
+	// burst-fires all chunks back-to-back and Apple's
+	// `ProcessReadResponse` state machine drops late chunks.
+	//
+	// A chunk carrying SuppressResponse=true (only the terminal chunk
+	// of a plain Read — see [im.HandleReadRequest]) expects nothing but
+	// a Standalone MRP-Ack, so the controller never emits an IM
+	// StatusResponse for it; waiting would only run out the exchange timeout.
+	// Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:824-845 at db021da0
+	// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
+	// wait). Reliable delivery of the final chunk is still guaranteed by
+	// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
+	var waitCh <-chan im.StatusCode
+	if !chunk.SuppressResponse {
+		waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	}
+	// Piggyback the latest peer-sent counter on this chunk's
+	// AckCounter. Without this rewrite every chunk carries
+	// the stale ReadRequest counter, and python-matter-server's
+	// ReliableMessaging drops chunk N+1 after the peer has
+	// StatusResponse-acked chunk N — "Dropping message without
+	// piggyback ack when we are waiting for an ack". Mirrors
+	// the symmetric fix in the Subscribe-Initial loop.
+	chunkHdr := *requestHdr
+	b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
+	if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
+		if waitCh != nil {
+			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		}
+		debugReplyError(b.logger, "send_report", src, err)
+		return err
+	}
+	if waitCh != nil {
+		leaveSessionOrder(ctx) // the answer arrives on this session
+		if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+			return err
+		}
+	}
+	b.logger.Debug("matter.rx.im.read.chunk",
+		slog.String("src", srcString(src)),
+		slog.Int("chunk", i),
+		slog.Int("bytes", len(body)),
+		slog.Bool("more", chunk.MoreChunkedMessages))
+	return nil
+}
+
+// logReadAttributeReport is the read's diagnostic: what it returns per
+// path, as each report is generated.
+func (b *Bridge) logReadAttributeReport(i int, r im.AttributeReport) {
+	b.logger.Debug("matter.tx.im.read_report",
+		slog.Int("path_index", i),
+		slog.Any("endpoint", r.Path.Endpoint),
+		slog.Any("cluster", r.Path.Cluster),
+		slog.Any("attribute", r.Path.Attribute),
+		slog.Bool("status", r.IsStatus),
+		slog.Any("status_code", r.Status.Status),
+		slog.String("value_type", fmt.Sprintf("%T", r.Value.Value)),
+		slog.Any("value", r.Value.Value))
 }
 
 // readWaitsForChunks reports whether the chunk loop of a read waits for
@@ -637,10 +684,15 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 		b.deferReportsFor(invokeCtx, dispatcher, req)
 	}
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
-	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
-	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
-	b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
-	b.reportInvokeChanges(invokeCtx, dispatcher, before)
+	var resp im.InvokeResponse
+	func() {
+		// Deferred, so a command that panics still ends the commits
+		// snapshotInvokedClusters opened.
+		defer b.reportInvokeChanges(invokeCtx, dispatcher, before)
+		resp = im.HandleInvokeRequest(invokeCtx, dispatcher, req)
+		b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
+		b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
+	}()
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
 	}
@@ -808,9 +860,10 @@ type invokedCluster struct {
 }
 
 // snapshotInvokedClusters reads every attribute of each cluster a
-// concrete invoke path names, before the commands run. A subscription
-// manager is required for the comparison to matter; without one this is a
-// no-op.
+// concrete invoke path names, before the commands run, and opens the
+// commit of each ([invokeCommitTable]) that [Bridge.reportInvokeChanges]
+// ends. A subscription manager is required for the comparison to matter;
+// without one this is a no-op.
 func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]attributeReading {
 	if b.subscriptionManagerLocked() == nil {
 		return nil
@@ -825,11 +878,91 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 			out[key] = readCluster(ctx, d, key)
 		}
 	}
+	for key := range out {
+		b.invokeCommits.begin(key)
+	}
 	return out
 }
 
+// invokeCommitTable makes a command one commit with one DataVersion
+// advance (review II, R2-P2-dr-req-03). A cluster server that reports its
+// own changes — [contract.AttributeChangeNotifier], [contract.ChangeNotifier]
+// — would advance the version on each report, and the before/after
+// comparison of [Bridge.reportInvokeChanges] once more. While a command
+// runs against a cluster instance, its servers' reports are held here
+// instead of advancing the version and marking the attributes dirty; the
+// command's end advances once and marks the held attributes with the
+// compared ones (matter.js packages/node/src/behavior/state/managed/
+// Datasource.ts:1446-1457 at db021da0: a commit notes each changed
+// property, then advances the version once). A report outside a command is not held. Nothing is reported
+// before the version moves, so no report carries the command's change at
+// the version before it.
+type invokeCommitTable struct {
+	mu   sync.Mutex
+	open map[invokedCluster]*invokeCommit
+}
+
+// invokeCommit is one cluster instance's open commit: the commands
+// running against it and the attributes its servers reported meanwhile.
+type invokeCommit struct {
+	running int
+	held    []uint32
+}
+
+// begin opens (or joins) the commit of key for one command.
+func (t *invokeCommitTable) begin(key invokedCluster) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.open == nil {
+		t.open = make(map[invokedCluster]*invokeCommit)
+	}
+	c, ok := t.open[key]
+	if !ok {
+		c = &invokeCommit{}
+		t.open[key] = c
+	}
+	c.running++
+}
+
+// hold records attrs as changed in the commit of (endpoint, cluster) and
+// reports true when one is open; false leaves the change to the caller.
+func (t *invokeCommitTable) hold(endpoint uint16, cluster uint32, attrs []uint32) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	c, ok := t.open[invokedCluster{endpoint, cluster}]
+	if !ok {
+		return false
+	}
+	for _, attr := range attrs {
+		if !slices.Contains(c.held, attr) {
+			c.held = append(c.held, attr)
+		}
+	}
+	return true
+}
+
+// end ends one command's part in the commit of key and returns the
+// attributes held so far; the commit closes with its last command.
+func (t *invokeCommitTable) end(key invokedCluster) []uint32 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	c, ok := t.open[key]
+	if !ok {
+		return nil
+	}
+	held := c.held
+	c.held = nil
+	c.running--
+	if c.running <= 0 {
+		delete(t.open, key)
+	}
+	return held
+}
+
 // reportInvokeChanges marks dirty every attribute whose value a command
-// changed, after advancing a bridged cluster's DataVersion. A command is a
+// changed or whose server reported it changed while the command ran
+// ([invokeCommitTable]), after advancing the cluster's DataVersion once,
+// and ends the commits [Bridge.snapshotInvokedClusters] opened. A command is a
 // state change like a write: matter.js commits whatever the command handler
 // assigned to the behavior's state, and its Datasource advances the version
 // and reports the changed properties (Datasource.ts). Root servers here
@@ -840,15 +973,41 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 // Breadcrumb and arms the fail-safe). The comparison is by value
 // ([attributeReading]), as matter.js's Datasource deep-compares.
 func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]attributeReading) {
+	if len(before) == 0 {
+		return
+	}
 	mgr := b.subscriptionManagerLocked()
-	if mgr == nil || len(before) == 0 {
+	if mgr == nil {
+		for key := range before {
+			b.invokeCommits.end(key)
+		}
 		return
 	}
 	topo := b.Topology()
+	// Each commit ends after its cluster's read, so a report between the
+	// two is returned by end, not taken twice. A read that panics still
+	// ends every commit not ended yet — its own and those after it — and
+	// what their servers reported while the command ran is reported without
+	// the comparison: an open commit would hold every later report of its
+	// cluster (review II, R2-P2-rr-dev-04).
+	ended := make(map[invokedCluster]bool, len(before))
+	defer func() {
+		held := make(map[invokedCluster][]uint32)
+		for key := range before {
+			if !ended[key] {
+				ended[key] = true
+				held[key] = b.invokeCommits.end(key)
+			}
+		}
+		for key, changed := range held {
+			reportCommandChange(topo, mgr, key, changed)
+		}
+	}()
 	for key, old := range before {
 		now := readCluster(ctx, d, key)
+		changed := b.invokeCommits.end(key)
+		ended[key] = true
 		selfReported := selfReportedAttributes(topo, key)
-		bumped := false
 		for attr, v := range now {
 			if attr >= 0xFFF8 || selfReported[attr] {
 				continue
@@ -856,17 +1015,30 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 			if prev, ok := old[attr]; ok && prev.equal(v) {
 				continue
 			}
-			if !bumped && topo != nil {
-				if ep := topo.FindByID(key.endpoint); ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
-					ep.BumpClusterDataVersion(key.cluster)
-				}
-				bumped = true
+			if !slices.Contains(changed, attr) {
+				changed = append(changed, attr)
 			}
-			mgr.OnAttributeChanged(im.ConcreteAttributePath{
-				Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
-				HasEndpoint: true, HasCluster: true, HasAttribute: true,
-			})
 		}
+		reportCommandChange(topo, mgr, key, changed)
+	}
+}
+
+// reportCommandChange advances key's DataVersion once and marks changed
+// dirty; nothing changed moves nothing.
+func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32) {
+	if len(changed) == 0 {
+		return
+	}
+	if topo != nil {
+		if ep := topo.FindByID(key.endpoint); ep != nil {
+			ep.BumpDataVersionOf(key.cluster)
+		}
+	}
+	for _, attr := range changed {
+		mgr.OnAttributeChanged(im.ConcreteAttributePath{
+			Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+		})
 	}
 }
 

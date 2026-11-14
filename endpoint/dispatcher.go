@@ -19,8 +19,7 @@ import (
 
 // clusterDataVersion returns the current DataVersion for srv by
 // type-asserting to [contract.ClusterDataVersion]. Falls back
-// to 0 when the cluster does not implement the capability — the IM
-// layer then encodes 1 (the spec-minimum) per AttributeDataIB rules.
+// to 0 when the cluster does not implement the capability.
 func clusterDataVersion(srv contract.ClusterServer) uint32 {
 	if dv, ok := srv.(contract.ClusterDataVersion); ok {
 		return dv.MatterDataVersion()
@@ -28,19 +27,38 @@ func clusterDataVersion(srv contract.ClusterServer) uint32 {
 	return 0
 }
 
-// clusterDataVersionFor resolves the DataVersion for srv on ep. Root
-// and Aggregator servers are persistent instances, so their embedded
-// tracker is authoritative. Bridged endpoints materialise their
-// cluster servers fresh on every dispatch ([ClusterServers]) — an
-// instance-embedded tracker would report a new random initial version
-// on every read, so their version identity lives on the persistent
-// [Endpoint] keyed by cluster id instead. Mirrors matter.js
-// Datasource.ts:410 (version set once per lifetime, not per access).
-func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
-	if ep == nil || ep.IsRoot() || ep.IsAggregator() {
-		return clusterDataVersion(srv)
+// ownDataVersion returns srv's own version tracker when it is the one the
+// dispatcher reports for srv on ep: a root or Aggregator server is a
+// persistent instance, so a tracker it keeps itself
+// ([contract.ClusterDataVersion]) is authoritative. Bridged endpoints
+// materialise their cluster servers fresh on every dispatch
+// ([ClusterServers]) — an instance-embedded tracker would report a new
+// random initial version on every read — so their servers' own trackers
+// are never consulted.
+func ownDataVersion(ep *Endpoint, srv contract.ClusterServer) (contract.ClusterDataVersion, bool) {
+	if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+		return nil, false
 	}
-	return ep.ClusterDataVersion(srv.MatterClusterID())
+	dv, ok := srv.(contract.ClusterDataVersion)
+	return dv, ok
+}
+
+// clusterDataVersionFor resolves the DataVersion for srv on ep: the
+// server's own tracker where [ownDataVersion] names one, the tracker the
+// persistent [Endpoint] keeps for the cluster otherwise — every cluster
+// instance has a version, the root's and the Aggregator's included
+// (review II, decision 46). Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:597 (every
+// Datasource samples a version once per lifetime). ok is false only
+// without an endpoint to keep one.
+func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) (version uint32, ok bool) {
+	if own, has := ownDataVersion(ep, srv); has {
+		return own.MatterDataVersion(), true
+	}
+	if ep == nil {
+		return 0, false
+	}
+	return ep.ClusterDataVersion(srv.MatterClusterID()), true
 }
 
 // TopologyDispatcher bridges the assembled [Topology] to the
@@ -198,6 +216,7 @@ var (
 	_ im.DataVersionReader              = (*TopologyDispatcher)(nil)
 	_ im.AttributeReadPrivilegeProvider = (*TopologyDispatcher)(nil)
 	_ im.ACLChecker                     = (*TopologyDispatcher)(nil)
+	_ im.EndpointExpander               = (*TopologyDispatcher)(nil)
 	_ im.AuthorizingWriter              = (*TopologyDispatcher)(nil)
 	_ im.AuthorizingInvoker             = (*TopologyDispatcher)(nil)
 )
@@ -231,38 +250,69 @@ func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttribute
 	wildcardEndpoint := !path.HasEndpoint
 	var results []im.ReadResult
 	for _, ep := range endpoints {
-		ePath := path
-		ePath.Endpoint = ep.ID
-		ePath.HasEndpoint = true
+		results = d.readAt(ctx, ep, path, wildcardEndpoint, results)
+	}
+	return results
+}
 
-		servers := d.serversFor(ep, path)
-		if len(servers) == 0 {
-			// Wildcard endpoint expansion (Matter §4.5.4 "Path
-			// Generation"): paths that match no concrete cluster on
-			// this endpoint are SILENTLY SKIPPED, not surfaced as
-			// UnsupportedCluster — the spec says the generator only
-			// emits paths where the cluster/attribute actually
-			// exists. Concrete endpoints (operator named the EP
-			// explicitly) keep the error surface so callers see why
-			// their read returned nothing.
-			if wildcardEndpoint {
-				continue
-			}
-			results = append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
-			continue
+// ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
+// endpoints [TopologyDispatcher.Read] visits for path, in its order.
+func (d *TopologyDispatcher) ExpansionEndpoints(path im.ConcreteAttributePath) []uint16 {
+	endpoints := d.resolveEndpoints(path)
+	ids := make([]uint16, len(endpoints))
+	for i, ep := range endpoints {
+		ids[i] = ep.ID
+	}
+	return ids
+}
+
+// ReadAtEndpoint implements [im.EndpointExpander]: what
+// [TopologyDispatcher.Read] returns for path, a path naming no endpoint,
+// at endpointID alone — nothing when that endpoint is not in the
+// topology.
+func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.ConcreteAttributePath, endpointID uint16) []im.ReadResult {
+	ep := d.topology.FindByID(endpointID)
+	if ep == nil {
+		return nil
+	}
+	return d.readAt(ctx, ep, path, true, nil)
+}
+
+// readAt appends to results what path reads at ep: one result per
+// attribute of each matching cluster server. A concrete endpoint lacking
+// the cluster answers UnsupportedCluster; under a wildcard endpoint it is
+// skipped.
+func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
+	ePath := path
+	ePath.Endpoint = ep.ID
+	ePath.HasEndpoint = true
+
+	servers := d.serversFor(ep, path)
+	if len(servers) == 0 {
+		// Wildcard endpoint expansion (Matter §4.5.4 "Path
+		// Generation"): paths that match no concrete cluster on
+		// this endpoint are SILENTLY SKIPPED, not surfaced as
+		// UnsupportedCluster — the spec says the generator only
+		// emits paths where the cluster/attribute actually
+		// exists. Concrete endpoints (operator named the EP
+		// explicitly) keep the error surface so callers see why
+		// their read returned nothing.
+		if wildcardEndpoint {
+			return results
 		}
-		for _, srv := range servers {
-			cPath := ePath
-			cPath.Cluster = srv.MatterClusterID()
-			cPath.HasCluster = true
+		return append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
+	}
+	for _, srv := range servers {
+		cPath := ePath
+		cPath.Cluster = srv.MatterClusterID()
+		cPath.HasCluster = true
 
-			attrs := d.attributesFor(srv, path)
-			for _, attrID := range attrs {
-				aPath := cPath
-				aPath.Attribute = attrID
-				aPath.HasAttribute = true
-				results = append(results, readOne(ctx, ep, srv, aPath))
-			}
+		attrs := d.attributesFor(srv, path)
+		for _, attrID := range attrs {
+			aPath := cPath
+			aPath.Attribute = attrID
+			aPath.HasAttribute = true
+			results = append(results, readOne(ctx, ep, srv, aPath))
 		}
 	}
 	return results
@@ -275,6 +325,23 @@ func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttribute
 // access control.
 func (d *TopologyDispatcher) Write(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue) []im.WriteResult {
 	return d.WriteAuthorized(ctx, path, value, nil)
+}
+
+// WritePersister stores a controller's write of an attribute whose value
+// outlives a restart — a nonvolatile attribute the module holds — before
+// the cluster server takes it, so a store that refuses the value refuses
+// the write: the value is never in effect without being stored, the rule
+// BasicInformation's NodeLabel follows (mattercore.BasicInformation
+// SetOnPersistentWrite).
+type WritePersister interface {
+	// PersistWrite runs for a write every gate of the dispatcher passed,
+	// before srv sees it. It returns a nil done for an attribute it does
+	// not keep. Otherwise it has stored value and returns done, which the
+	// dispatcher calls with whether srv applied the write: false puts the
+	// stored value back as it stood. An error refuses the write with
+	// FAILURE; srv never sees it. Between PersistWrite and done no other
+	// write of the same attribute is stored.
+	PersistWrite(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (done func(applied bool), err error)
 }
 
 // WriteAuthorized implements [im.AuthorizingWriter]. It is
@@ -425,13 +492,13 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
 				}
-				res := writeOne(writeCtx, srv, aPath, value)
+				res := d.writeStored(writeCtx, ep, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
-				// Datasource.ts:1035). Root/Aggregator servers bump their
-				// own persistent trackers inside the write handler.
-				if res.Status == im.StatusSuccess && !ep.IsRoot() && !ep.IsAggregator() {
+				// Datasource.ts:1456-1457). A root or Aggregator server with a
+				// tracker of its own bumps it inside the write handler.
+				if _, own := ownDataVersion(ep, srv); res.Status == im.StatusSuccess && !own {
 					ep.BumpClusterDataVersion(cPath.Cluster)
 				}
 				results = append(results, res)
@@ -731,21 +798,21 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
 // (:306-326 at 862ad75f).
 //
-// DataVersion: when srv implements [contract.ClusterDataVersion]
-// its current DataVersion is stamped on the ReadResult. The IM layer
-// uses this in HandleReadRequest for DataVersionFilter evaluation.
+// DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
+// is stamped on the ReadResult with HasDataVersion. The IM layer uses
+// this in HandleReadRequest for DataVersionFilter evaluation.
 // Mirrors matter.js InteractionServer.ts attributeReportPayload building.
 func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath) im.ReadResult {
-	dv := clusterDataVersionFor(ep, srv)
+	dv, hasDV := clusterDataVersionFor(ep, srv)
 	// Fabric-scoped attributes: prefer MatterReadFiltered when the
 	// cluster server opts in by implementing FabricScopedReader.
 	if fsr, ok := srv.(contract.FabricScopedReader); ok {
 		v, ok := fsr.MatterReadFiltered(ctx, path.Attribute)
 		if ok {
 			if v == nil {
-				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv}
+				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 			}
-			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
 		// FabricScopedReader returned (nil, false) — fall through to
 		// the universal MatterRead path so non-fabric attributes on
@@ -754,9 +821,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
 		if v == nil {
-			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
@@ -765,7 +832,7 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	// wins when it returns a value (so clusters that want a richer
 	// AcceptedCommandList can override).
 	if synth, synthOK := synthesizeGlobalRead(srv, path.Attribute); synthOK {
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
 }
@@ -871,6 +938,36 @@ func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
 		return true
 	}
 	return slices.Contains(ids, attrID)
+}
+
+// writeStored is [writeOne] behind the topology's [WritePersister]: a
+// nonvolatile attribute the module holds is stored before the server
+// takes it; a refused store write answers FAILURE and the server never
+// sees the value, a write the server refuses puts the store back.
+func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+	p := d.topology.Persister
+	if p == nil {
+		return writeOne(ctx, srv, path, value)
+	}
+	done, err := p.PersistWrite(ctx, ep, srv, path.Attribute, value)
+	if err != nil {
+		return im.WriteResult{Path: path, Status: im.StatusFailure}
+	}
+	return persistedWrite(ctx, srv, path, value, done)
+}
+
+// persistedWrite is [writeOne] followed by done, the [WritePersister]'s
+// settlement, with whether srv applied the write — also when srv panics,
+// so the persister is never left waiting. A nil done is writeOne alone.
+func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) im.WriteResult {
+	if done == nil {
+		return writeOne(ctx, srv, path, value)
+	}
+	applied := false
+	defer func() { done(applied) }()
+	res := writeOne(ctx, srv, path, value)
+	applied = res.Status == im.StatusSuccess
+	return res
 }
 
 // writeOne dispatches a single Write against srv. Errors are mapped
@@ -1419,12 +1516,12 @@ func privilegeRank(p uint8) int {
 
 // CurrentDataVersion implements [im.DataVersionReader]. It looks up the
 // cluster server for (endpoint, clusterID) and returns its current
-// DataVersion when the server implements [contract.ClusterDataVersion].
+// DataVersion ([clusterDataVersionFor]): every cluster that exists has
+// one, and 0 is an ordinary version.
 //
 // Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// DataVersion check before write dispatch. Returns (0, false) when the
-// cluster is not found or does not implement version tracking — callers
-// treat (0, false) as "version not constrained, proceed with the write".
+// DataVersion check before write dispatch. Returns (0, false) only when
+// the cluster is not found.
 func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint16, clusterID uint32) (uint32, bool) {
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
@@ -1434,23 +1531,7 @@ func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		// Bridged endpoints host the version on the Endpoint (their
-		// server instances are rebuilt per dispatch) — see
-		// clusterDataVersionFor.
-		if !ep.IsRoot() && !ep.IsAggregator() {
-			return ep.ClusterDataVersion(clusterID), true
-		}
-		dv, ok := srv.(contract.ClusterDataVersion)
-		if !ok {
-			return 0, false
-		}
-		v := dv.MatterDataVersion()
-		if v == 0 {
-			// Cluster implements the interface but version is 0 (initial /
-			// untracked). Return (0, false) — callers treat 0 as "unconstrained".
-			return 0, false
-		}
-		return v, true
+		return clusterDataVersionFor(ep, srv)
 	}
 	return 0, false
 }

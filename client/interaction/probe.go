@@ -71,7 +71,7 @@ func (c *Interaction) Probe(ctx context.Context, opts ProbeOptions) bool {
 		c.probeFailed(ictx, err)
 		return false
 	}
-	if err := readDataReports(ictx, c.log, m, nil, func(*im.ReportData) error { return nil }); err != nil {
+	if err := readDataReports(ictx, c.log, m, nil, nil, func(*im.ReportData) error { return nil }); err != nil {
 		c.probeFailed(ictx, err)
 		return false
 	}

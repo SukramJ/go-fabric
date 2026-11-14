@@ -49,7 +49,7 @@ func (r *Subscriptions) Register(mgr *exchange.Manager) {
 // The chunks are acknowledged as readDataReports does
 // (InteractionMessenger.ts:938-972).
 func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Message) {
-	m := &messenger{x: x}
+	m := &messenger{x: x, maxReport: r.maxReport}
 	ctx := r.readingCtx
 	if s := r.serverFor(first.Opcode); s != nil {
 		// A request for the endpoints this stack serves itself
@@ -134,7 +134,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 			sub.request.KeepaliveReceived()
 		}
 		chunk := 0
-		return readDataReports(ctx, r.log, m, initial, func(*im.ReportData) error {
+		return readDataReports(ctx, r.log, m, initial, first.Payload, func(*im.ReportData) error {
 			chunk++
 			if chunk > 1 {
 				r.log.Warn("matter.controller.interaction.data_after_keepalive", slog.Uint64("subscription_id", uint64(initial.SubscriptionID)))
@@ -144,7 +144,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 	}
 	a := newAssembler(r.log)
 	a.report.Session = session
-	return readDataReports(ctx, r.log, m, initial, func(rd *im.ReportData) error {
+	return readDataReports(ctx, r.log, m, initial, first.Payload, func(rd *im.ReportData) error {
 		if rd != initial && (!rd.HasSubscription || rd.SubscriptionID != initial.SubscriptionID) {
 			r.log.Debug("matter.controller.interaction.report_for_another_subscription", slog.Uint64("subscription_id", uint64(rd.SubscriptionID)))
 			r.sendStatus(ctx, m, im.StatusInvalidSubscription)

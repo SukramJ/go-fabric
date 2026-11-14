@@ -167,3 +167,46 @@ func TestSettings_DeleteSetting(t *testing.T) {
 		t.Fatalf("DeleteSetting of a missing key: %v", err)
 	}
 }
+
+// TestSetSettingsAllOrNothing provokes a failure inside SetSettings'
+// transaction: a trigger on matter_settings aborts the insert of one key,
+// which the store writes after the others (keys in ascending order). None
+// of the keys may be left behind, the one an earlier write held keeps its
+// old value, and with the trigger gone the same call writes them all.
+func TestSetSettingsAllOrNothing(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s := store.New(db)
+	if err := s.SetSetting(ctx, "multi.a", "old"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+CREATE TRIGGER refuse_multi_z BEFORE INSERT ON matter_settings
+WHEN NEW.key = 'multi.z' BEGIN SELECT RAISE(ABORT, 'refused by the test'); END`); err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]string{"multi.a": "new", "multi.b": "2", "multi.z": "26"}
+	if err := s.SetSettings(ctx, values); err == nil {
+		t.Fatal("SetSettings with a refused key: want error")
+	}
+	if v, ok, err := s.GetSetting(ctx, "multi.a"); err != nil || !ok || v != "old" {
+		t.Errorf("multi.a after the failed SetSettings = %q, %v, %v; want old", v, ok, err)
+	}
+	for _, k := range []string{"multi.b", "multi.z"} {
+		if _, ok, err := s.GetSetting(ctx, k); err != nil || ok {
+			t.Errorf("%s after the failed SetSettings: ok=%v err=%v; want absent", k, ok, err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, `DROP TRIGGER refuse_multi_z`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSettings(ctx, values); err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range values {
+		if v, ok, err := s.GetSetting(ctx, k); err != nil || !ok || v != want {
+			t.Errorf("GetSetting(%q) = %q, %v, %v; want %q", k, v, ok, err, want)
+		}
+	}
+}

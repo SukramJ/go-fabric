@@ -24,7 +24,7 @@ module's consumers call:
 | `store.Groups` | the group table and the Groupcast groups (`groups.Store` embeds it) | the group manager |
 | `store.Resumption` | CASE resumption records | the operational session manager, the node's CASE initiator |
 | `store.ServerSubscriptions` | the subscriptions of active CASE sessions | the bridge's subscription persistence |
-| `store.Settings` | string settings and counters | the facade, AccessControl's Extension, VID verification, the group counter, the event-number ceiling |
+| `store.Settings` | string settings and counters; `SetSettings` writes several keys at once, all or none | the facade, AccessControl's Extension, VID verification, the group counter, the event-number ceiling |
 | `store.OTA` | the OTA requestor's DefaultOTAProviders and state | the OTA requestor |
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
@@ -57,14 +57,36 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
 - **Atomic per method.** A multi-row write (`ReplaceACL`,
   `ReplaceDefaultOTAProviders`, `SaveDoorLockAuth`, `RemoveGroupKeySet`,
   `RemoveFabric`, …) applies whole or not at all, and a refused write
-  changes nothing. The port has no transaction across methods; the
-  consumers do not need one.
+  changes nothing. The port has no transaction across methods; a change
+  that spans several settings keys is one `SetSettings` call, which writes
+  every key or none (the SQLite store in one transaction).
 - **The fabric cascade.** `RemoveFabric` removes everything the fabric
   owns: its identity, key sets, key map, group table, Groupcast groups,
   ACL, resumption records, default OTA providers and ICD registrations. Server
   subscriptions, presets, lock records, settings and counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
-  fabric the store does not hold is refused.
+  fabric the store does not hold is refused. What a cluster server keeps
+  for a fabric under its own settings key — the AccessControl Extension
+  entry, Binding lists, scene tables, the TLS tables, the trusted time
+  source — the server drops itself when the node removes the fabric
+  (`contract.FabricScopedState`), and the node drops what is stored for a
+  fabric the table no longer holds before it serves a topology: at start
+  and whenever an endpoint joins.
+- **The fabric row carries its commit state.** `FabricRecord.Pending`
+  is `FabricCommitted`, `FabricPendingAdd` (an AddNOC that
+  CommissioningComplete has not committed; `AddFabric` takes it) or
+  `FabricPendingUpdate`. `UpdateFabricCredentials` writes an UpdateNOC's
+  NOC, ICAC, private key and node id in one write — the vendor id and VID
+  data stay as the row holds them when it lands — and, on a committed row,
+  first keeps those values and the vendor id and VID data as the prior and
+  marks the row; a second update before the commit keeps the first prior.
+  `CommitFabric` commits and erases the prior values;
+  `RollbackFabric` deletes a pending add with everything it owns, or moves
+  a pending update's prior values back, and returns the state it found.
+  While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
+  and `UpdateFabricVIDVerification` change the live values only. Each of
+  these is one atomic write, and the state is on disk with the row, so a
+  restart finds it. Readers see a pending row like any other.
 - **Monotonic counters.** The fabric index comes from a counter that only
   moves forward, wraps after 254 and skips occupied indexes, so a removed
   index is not reissued at once (matter.js FabricManager
@@ -103,7 +125,7 @@ fabric is deleted (`FabricManager.ts:262-271`). go-fabric types the port by
 area instead of by key-value context, so a backend stores records, not
 opaque values.
 
-*Source: `store/port.go:8-41`, `store/port.go:49-198`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
+*Source: `store/port.go:8-45`, `store/port.go:53-258`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
 
 ## Opening the database
 
@@ -135,8 +157,8 @@ idempotent.
 
 | Table | Since | Holds |
 | --- | --- | --- |
-| `matter_fabrics` | v1 (v0.1.0) | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id |
-| `matter_node_identities` | v1 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it |
+| `matter_fabrics` | v1 (v0.1.0), columns added in v8 | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id; since v8 its commit state (`pending`: 0 committed, 1 an uncommitted AddNOC, 2 an uncommitted UpdateNOC), its VID verification statement and VVSC, and while it is 2 the node id, vendor id and VID data the UpdateNOC replaced |
+| `matter_node_identities` | v1, columns added in v8 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is, in clear) |
 | `matter_group_keys` | v1 | group key sets per fabric, up to three epoch keys |
 | `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
@@ -147,7 +169,7 @@ idempotent.
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
 | `matter_groupcast_groups` | v2 | the Groupcast cluster's per-group properties |
-| `matter_server_subscriptions` | v2 | the subscriptions of active CASE sessions, to re-establish after a restart |
+| `matter_server_subscriptions` | v2, a column added in v8 | the subscriptions of active CASE sessions, to re-establish after a restart; since v8 the exact order they were saved in (`save_seq`), which the re-establishment walks newest first |
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
 | `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |
@@ -163,7 +185,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-349`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql:18-390`, `store/migrations.go:43-62`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
 
 ### Settings keys
 
@@ -172,7 +194,7 @@ facade's own state.
 
 | Key | Written by | Holds |
 | --- | --- | --- |
-| `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them, the NodeLabel also as `Node.SetNodeLabel` set it |
+| `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them, the NodeLabel also as `Node.SetNodeLabel` set it; both in one write |
 | `basic_information.configuration_version` | the facade | the root's ConfigurationVersion |
 | `basic_information.unique_id` | the facade | UniqueID, derived on the first boot and pinned |
 | `bridged_node_label.<key>` | the facade | a bridged endpoint's NodeLabel |
@@ -180,7 +202,8 @@ facade's own state.
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |
 | `binding.<key>`, `binding.@<endpoint>` | the facade | an endpoint's Binding list; `@` and the number for an endpoint without a stable key |
 | `user_label.root`, `user_label.aggregator` | the facade | the UserLabel lists of the root and the Aggregator |
-| `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster |
+| `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster; a controller's write is stored before it answers, and a refused store write answers FAILURE; a write the server refuses puts the stored list back, and when the store refuses that too, the list the server holds is written when the node stops. `Aggregator.Forget` erases it |
+| `nonvolatile.<key>.<cluster>.<attribute>`, `nonvolatile.@<endpoint>.<cluster>.<attribute>` | the facade | the value a nonvolatile attribute the module holds was last changed to, the cluster and attribute id in hex: every attribute whose generated definition carries the N quality and write access, not fabric-scoped and not kept under a key of its own above, of a server the module holds — the root's own, not one the host mounts there (`Config.RootServers`) (ActiveLocale, HourFormat, ActiveCalendarType, TemperatureUnit, NetworkCommissioning's InterfaceEnabled, …) and, on a bridged endpoint, one its `device.Device` built itself where no declared host port takes the attribute (`Device.HoldsAttribute`: StartUpOnOff, StartUpCurrentLevel, StartUpColorTemperatureMireds, WindowCovering's Mode, the Thermostat's limits, …). The value is the TLV of the value, hex. Every change is stored, whatever made it. A controller's write is stored before the server takes it: a refused store write answers FAILURE and the value is not in effect, a write the server refuses puts the stored value back, and the value the server holds after it applied the write (WindowCovering's Mode without CalibrationMode under MaintenanceMode, a companion setpoint the write moved) replaces it, so a restart serves what was served. Any other change — a command (SetpointRaiseLower), the host's `Set`, a companion the server moves — is stored after the server committed it, from the server's change notification; a store that refuses it is logged and the value is written again at the next change of the attribute and when the node stops. A crash between such a commit and its store write leaves the value stored before the change, which the restart serves. Only writes of the same attribute wait for one another (a host's `OnWrite` veto included). It is restored before the endpoint is served and overrides the declaration's `Initial`, once per server: a `Device` the host removes and adds again keeps what it holds and its stored values; one the host forgets (`Aggregator.Forget`) is let go, its later changes are not stored, and every value stored under its key and its parts' keys is erased, so a device added under the key afterwards starts from its declaration's `Initial`. A controller's write that reaches a server no longer in its key's place — a `Device` the host replaced or forgot, answering on the topology the write was resolved on — is not stored. Under the Aggregator a restored StartUp attribute is read back, not applied |
 | `gendiag.reboot_count` | the facade | RebootCount: 0 on a database's first boot, then one more per boot |
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |
@@ -188,14 +211,14 @@ facade's own state.
 | `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
-| `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |
-| `operational_credentials.pending_noc`, `operational_credentials.pending_noc_update` | `cluster/core` | what an AddNOC (the first key: the new fabric's id and root key, then the index the store assigned it, written before its identity) or an UpdateNOC (the second key: the replaced credentials, private key included) wrote that CommissioningComplete has not committed, as JSON; written ahead of the command's first store write, cleared at CommissioningComplete or once the fail-safe's rollback has landed in full — a rollback with a failed read or write keeps it and is retried at the next expiry, arm, CommissioningComplete (which writes it back if it cleared it), AddNOC or UpdateNOC (before either reads the fabric table) and at the next start; an UpdateNOC's rollback whose fabric was removed meanwhile has nothing left to restore and is settled without a write. Each key holds one marker, so an AddNOC admitted after a failed UpdateNOC in the same fail-safe keeps the update's. GeneralCommissioning clears both through its `Settings` before CommissioningComplete answers — it reads both before it clears either, and clears the AddNOC's first: when a read or a clear fails, it writes back what it had cleared, CommissioningComplete answers FAILURE and the fail-safe stays armed. The settings port has no call that writes two keys at once, so a node that goes down between the two clears, before it answers, comes back with the AddNOC committed and the UpdateNOC rolled back. A node that finds it at start rolls back what it names before it reads its fabrics — an AddNOC's fabric by that index, or, when the index was never written, the fabric with that id and root key only if it has no identity yet, so a marker an AddNOC refused by the store left never removes a committed fabric; empty when no fail-safe window is open |
-| `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion |
+| `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` (releases before v8) | the VID verification statement and VVSC per fabric, hex, as releases before v8 kept them; the data now lives in `matter_fabrics` (`UpdateFabricVIDVerification`), `store.Upgrade` moves every such key into its fabric's columns and deletes it, and nothing writes the keys any more |
+| `operational_credentials.pending_noc`, `operational_credentials.pending_noc_update` | `cluster/core` (releases before v8) | what an AddNOC (the first key) or an UpdateNOC (the second) of a release before v8 wrote that CommissioningComplete had not committed, as JSON. Since v8 the fabric row carries that state itself (`matter_fabrics.pending`): an AddNOC inserts its row pending, an UpdateNOC marks it pending with the values it replaced, CommissioningComplete commits it with one write, and a fail-safe's end, a fresh arm and every start roll back each row still pending. A start that finds one of the two keys — a database such a release left in the middle of a commissioning — rolls back exactly what that release's start rolled back (an AddNOC's fabric by its index, or, when the index was never written, the fabric with that id and root key only if it has no identity yet; an UpdateNOC's replaced credentials when the fabric still carries the marker's id and root key) and clears the key; nothing else reads or writes them |
+| `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion; a change's digests are stored in one write with the ConfigurationVersions it raised, so a refused write stores neither and the next start announces the change again |
 | `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
 | `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names; the offset of the node's UTC over its clock is not stored |
 | `general_commissioning.tc_acceptance` (`store.SettingTermsAcceptance`) | `cluster/core` | the committed terms-and-conditions acceptance (`<version>:<bits>`) of GeneralCommissioning's TC feature (`node.Commissioning.TermsAndConditions`); written at CommissioningComplete or by a SetTCAcknowledgements outside a fail-safe window, deleted with the last fabric, erased by the factory reset |
-| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`). The credentials are stored in clear, like the fabric's keys: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
+| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
 | `thermostat_user_interface_configuration.keypad_lockout` (`thermo.DefaultKeypadLockoutSetting`) | `cluster/thermo` | ThermostatUserInterfaceConfiguration's KeypadLockout, when the server is given `Settings`; `ThermostatUIConfig.SettingKey` names another key, which a second endpoint with the cluster needs |
 | `tls.certificates:<key>`, `tls.endpoints:<key>` | `cluster/tls` | the certificate tables of TlsCertificateManagement and the provisioned endpoints of TlsClientManagement, when the servers are given a `Store`; `<key>` is the server's `Key` |
 | `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key` |
@@ -209,7 +232,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/nonvolatile.go`, `device/held.go`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
 
 `script/docscheck` (`TestSettingsKeysDocumented`) holds the table to the
 code: a `SetSetting` call that states its key as a constant fails the
@@ -221,7 +244,7 @@ build while the key is not in a table of this page.
 | --- | --- |
 | fabrics, NOCs, keys, ACL | live PASE and CASE sessions (controllers reconnect, with resumption) |
 | group keys, group table, Groupcast properties | the event log's events (their numbers continue past the stored ceiling) |
-| endpoint numbers, labels, ConfigurationVersions, scene tables, bindings | an open commissioning window (an uncommissioned node opens its own again at `Start`) |
+| endpoint numbers, labels, ConfigurationVersions, scene tables, bindings, the nonvolatile attributes the module holds (`nonvolatile.` keys) | an open commissioning window (an uncommissioned node opens its own again at `Start`) |
 | CASE resumption records | the diagnostic event ring behind DiagnosticLogs |
 | the subscriptions of active CASE sessions, re-established under their old ids (not on an ICD node, whose controllers re-subscribe on a Check-In) | |
 | UniqueID, RebootCount, operational time, OTA default providers | |
@@ -230,7 +253,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:250-256`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:274-280`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 
@@ -261,13 +284,18 @@ Each schema ships three ways:
 - **`Apply`** runs the whole DDL. It is idempotent and safe on every boot.
   `store.Apply` then runs `store.Upgrade`, which rebuilds what an
   idempotent `CREATE` cannot change (the v3 rebuild of
-  `matter_group_key_map`).
+  `matter_group_key_map`, v8's added columns) and moves data an earlier
+  release kept elsewhere (the VID settings into `matter_fabrics`). A host
+  that runs `Migrations()` with its own tool calls `store.Upgrade` once
+  after it, for the moves.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
   `len(Migrations())` and the last version, so the next release's new step
   fails the pin at the dependency bump instead of at a live write. `v3`'s
-  `Down` is lossy.
+  `Down` is lossy; `v8`'s rolls every pending fabric back first (an
+  uncommitted AddNOC's fabric is deleted, which needs the foreign-key
+  pragma for its cascade) and writes the VID data back into the settings.
 - **`SchemaFingerprint(db)`** hashes the module's tables and indexes as
   SQLite records them. Compare it with the value the CHANGELOG records for
   the release to know your tables match. A host's own tables and indexes
@@ -281,7 +309,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-90`, `store/migrations.go:22-123`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-106`, `store/migrations.go:22-128`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
@@ -298,5 +326,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-39`, `store/schema.sql:48-57`, `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-39`, `store/schema.sql:64-78`, `examples/reference-controller/README.md` (The database).*
 

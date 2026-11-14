@@ -6,7 +6,6 @@ package node
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -117,27 +116,32 @@ func (p persisted) configVersion(ctx context.Context, key device.SourceKey) uint
 	return p.loadUint32(ctx, endpointConfigVersionKey+k)
 }
 
-// storeConfigVersions persists what bridge.IncreaseConfigurationVersion
-// raised: a version never decreases, so it outlives a restart. Every
-// version is written; the writes that failed are returned, joined.
-func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topology, v bridge.ConfigurationVersions) error {
-	var errs []error
-	set := func(k string, n uint32) {
-		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
-			errs = append(errs, fmt.Errorf("node: persist configuration version %s: %w", k, err))
-		}
-	}
+// configVersionValues are the settings values of what
+// bridge.IncreaseConfigurationVersion raised, by key.
+func (p persisted) configVersionValues(topo *endpoint.Topology, v bridge.ConfigurationVersions) map[string]string {
+	values := map[string]string{}
 	if v.Node != 0 {
-		set(rootConfigVersionKey, v.Node)
+		values[rootConfigVersionKey] = strconv.FormatUint(uint64(v.Node), 10)
 	}
 	for id, n := range v.Bridged {
 		if ep := topo.FindByID(id); ep != nil {
 			if k, ok := keyString(ep.SourceKey); ok {
-				set(endpointConfigVersionKey+k, n)
+				values[endpointConfigVersionKey+k] = strconv.FormatUint(uint64(n), 10)
 			}
 		}
 	}
-	return errors.Join(errs...)
+	return values
+}
+
+// storeConfigVersions persists what bridge.IncreaseConfigurationVersion
+// raised: a version never decreases, so it outlives a restart. Every
+// version is written in one write, all or none; a refused write is
+// returned.
+func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topology, v bridge.ConfigurationVersions) error {
+	if err := p.st.SetSettings(ctx, p.configVersionValues(topo, v)); err != nil {
+		return fmt.Errorf("node: persist configuration versions: %w", err)
+	}
+	return nil
 }
 
 // OnNodeLabelWritten implements [EndpointPersistence]: it is the
@@ -180,16 +184,15 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	// SetOnPersistentWrite): the host's SetNodeLabel returns it, a
 	// controller's write answers FAILURE. The write uses New's context
 	// without its cancellation, so a caller's cancelled context does not
-	// abort a store write already begun.
+	// abort a store write already begun. Both keys go in one write
+	// (store.Settings.SetSettings): a refused write leaves neither changed,
+	// so a label that answered FAILURE is not served after a restart.
 	b.SetOnPersistentWrite(func(nodeLabel, location string) error {
-		var errs []error
-		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
-			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
-				p.logger.Warn("label.persist", slog.Any("err", err))
-				errs = append(errs, err)
-			}
+		err := p.st.SetSettings(context.WithoutCancel(ctx), map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location})
+		if err != nil {
+			p.logger.Warn("label.persist", slog.Any("err", err))
 		}
-		return errors.Join(errs...)
+		return err
 	})
 }
 

@@ -10,10 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"strconv"
-	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
@@ -35,78 +32,6 @@ const (
 	// fixes (octstr, 32).
 	vidClientChallengeSize = 32
 )
-
-// vidVerificationSettings is the optional capability of a [StoreFacade] to
-// persist a fabric's vendor verification data (store.Store has it); the
-// data then survives a restart, as matter.js persists it with the fabric.
-// Without it the data lives in memory.
-type vidVerificationSettings interface {
-	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
-	SetSetting(ctx context.Context, key, value string) error
-}
-
-// fabricVendorIDUpdater is the optional capability of a [StoreFacade] to
-// change a fabric's vendor id (SetVIDVerificationStatement.VendorID).
-type fabricVendorIDUpdater interface {
-	UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error
-}
-
-type vidData struct {
-	statement []byte
-	vvsc      []byte
-}
-
-type vidVerificationMemory struct {
-	// mu guards fabric, the VID verification data kept in memory when the
-	// store keeps no settings.
-	mu     sync.Mutex
-	fabric map[uint8]vidData
-}
-
-func vidSettingKey(fabricIndex uint8, field string) string {
-	return "matter.fabric." + strconv.Itoa(int(fabricIndex)) + ".vid." + field
-}
-
-// vidVerification returns the fabric's statement and VVSC (nil when unset).
-func (o *OperationalCredentials) vidVerification(ctx context.Context, fabricIndex uint8) vidData {
-	if st, ok := o.store.(vidVerificationSettings); ok {
-		var d vidData
-		if v, ok, err := st.GetSetting(ctx, vidSettingKey(fabricIndex, "statement")); err == nil && ok && v != "" {
-			d.statement, _ = hex.DecodeString(v)
-		}
-		if v, ok, err := st.GetSetting(ctx, vidSettingKey(fabricIndex, "vvsc")); err == nil && ok && v != "" {
-			d.vvsc, _ = hex.DecodeString(v)
-		}
-		return d
-	}
-	o.vid.mu.Lock()
-	defer o.vid.mu.Unlock()
-	return o.vid.fabric[fabricIndex]
-}
-
-func (o *OperationalCredentials) storeVidVerification(ctx context.Context, fabricIndex uint8, d vidData) error {
-	if st, ok := o.store.(vidVerificationSettings); ok {
-		if err := st.SetSetting(ctx, vidSettingKey(fabricIndex, "statement"), hex.EncodeToString(d.statement)); err != nil {
-			return err
-		}
-		return st.SetSetting(ctx, vidSettingKey(fabricIndex, "vvsc"), hex.EncodeToString(d.vvsc))
-	}
-	o.vid.mu.Lock()
-	defer o.vid.mu.Unlock()
-	if o.vid.fabric == nil {
-		o.vid.fabric = map[uint8]vidData{}
-	}
-	if len(d.statement) == 0 && len(d.vvsc) == 0 {
-		delete(o.vid.fabric, fabricIndex)
-	} else {
-		o.vid.fabric[fabricIndex] = d
-	}
-	return nil
-}
-
-func (o *OperationalCredentials) forgetVidVerification(ctx context.Context, fabricIndex uint8) {
-	_ = o.storeVidVerification(context.WithoutCancel(ctx), fabricIndex, vidData{})
-}
 
 // handleSetVidVerificationStatement is matter.js setVidVerificationStatement
 // with Fabric.updateVendorVerificationData, for the accessing fabric: at
@@ -145,7 +70,11 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 			return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: a VVSC is only allowed without an ICAC"}
 		}
 	}
-	d := o.vidVerification(ctx, fabricIndex)
+	fab, err := o.store.GetFabric(ctx, fabricIndex)
+	if err != nil {
+		return nil, fmt.Errorf("core: SetVIDVerificationStatement: fabric: %w", err)
+	}
+	d := vidData{statement: fab.VIDVerificationStatement, vvsc: fab.VVSC}
 	if req.HasVidVerificationStatement {
 		switch len(req.VidVerificationStatement) {
 		case 0:
@@ -162,17 +91,19 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 			d.vvsc = append([]byte(nil), req.Vvsc...)
 		}
 	}
+	// The data is part of the fabric row (store.Fabrics
+	// UpdateFabricVIDVerification): on a row a pending UpdateNOC marked, it
+	// belongs to that update and leaves with its rollback (TC-OPCREDS-3.8
+	// step 24).
 	if req.HasVendorID {
-		up, ok := o.store.(fabricVendorIDUpdater)
-		if !ok {
-			return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: the store cannot change a fabric's vendor id"}
-		}
-		if err := up.UpdateFabricVendorID(ctx, fabricIndex, req.VendorID); err != nil {
+		if err := o.store.UpdateFabricVendorID(ctx, fabricIndex, req.VendorID); err != nil {
 			return nil, fmt.Errorf("core: SetVIDVerificationStatement: vendor id: %w", err)
 		}
 	}
-	if err := o.storeVidVerification(ctx, fabricIndex, d); err != nil {
-		return nil, fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
+	if req.HasVidVerificationStatement || req.HasVvsc {
+		if err := o.store.UpdateFabricVIDVerification(ctx, fabricIndex, d.statement, d.vvsc); err != nil {
+			return nil, fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
+		}
 	}
 	o.dataVersion.Bump()
 	// The fabric changed: matter.js Fabric.updateVendorVerificationData
@@ -210,7 +141,7 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 		return nil, fmt.Errorf("core: SignVIDVerificationRequest: operational key: %w", err)
 	}
 	tbs := vidVerificationTBS(req.ClientChallenge, challenge, req.FabricIndex, fabric.RootPublicKey, fabric.FabricID, fabric.VendorID,
-		o.vidVerification(ctx, req.FabricIndex).statement)
+		fabric.VIDVerificationStatement)
 	digest := sha256.Sum256(tbs)
 	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
 	if err != nil {

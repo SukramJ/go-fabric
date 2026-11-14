@@ -64,8 +64,10 @@ WebRtcTransportRequestor:
 6. The host calls `Requestor.RemoveSession` when it tears a stream down
    itself.
 
-A removed fabric's sessions stay in `CurrentSessions` until the host
-removes them, as in matter.js, whose server has no fabric-removal hook.
+A removed fabric's sessions leave `CurrentSessions` when the node removes
+the fabric, as matter.js strips a fabric-sensitive list on the fabric's
+deletion, and the port's `End` is told of each with UnknownReason, so the
+host tears the stream down (`contract.FabricScopedState`).
 
 The four commands are large messages, so a controller sends them over
 TCP. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
@@ -362,7 +364,8 @@ invoker's session (`NOT_FOUND` for another peer's). `ProvideAnswer`,
 `ProvideICECandidates` and `EndSession` name a session of the invoker's
 node and fabric; `EndSession` removes the session whatever the port
 answers. The host changes a session itself with `Provider.UpsertSession`
-and `RemoveSession`.
+and `RemoveSession`. A removed fabric's sessions end through the port's
+`EndSession` with UnknownReason and leave CurrentSessions.
 
 **Push transports.** `AllocatePushTransport` checks, in chip's order: the
 fabric's room (4 transports, `PushTransportConfig.MaxPerFabric`), the
@@ -384,7 +387,8 @@ activates it, `ManuallyTriggerTransport` triggers an active, not
 continuous one. An ExpiryTime deallocates the transport after that many
 seconds, as chip counts it. The host reports an upload's start and end
 with `PushTransport.TransportStarted` and `TransportStopped`, the
-PushTransportBegin and PushTransportEnd events.
+PushTransportBegin and PushTransportEnd events. A removed fabric's
+transports are deallocated through the port and leave CurrentConnections.
 
 **TLS provisioning.** A controller provisions a root certificate
 (`ProvisionRootCertificate`), asks for a client CSR (`ClientCSR`; the

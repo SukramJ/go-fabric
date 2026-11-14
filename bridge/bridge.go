@@ -14,7 +14,9 @@
 //
 // Lifecycle: [New] → [Start] → (optional) [Reassemble] → [Stop].
 // Start is idempotent (returns ErrAlreadyStarted on a second call).
-// Stop is idempotent and safe to call after a failed Start.
+// Stop is idempotent and safe to call after a failed Start. A bridge is
+// single-run, as node.Node is: Start after Stop returns [ErrStopped], and
+// a host that comes back builds a new bridge.
 //
 // Transports: Start binds the UDP socket and, when [Config].TCP.Incoming
 // is set, a TCP listener on the same port (matter.js
@@ -235,6 +237,8 @@ package bridge
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -267,6 +271,10 @@ var (
 	// ErrAlreadyStarted surfaces from a second [Start] call on the
 	// same bridge instance.
 	ErrAlreadyStarted = errors.New("bridge: already started")
+	// ErrStopped is returned by [Bridge.Start] after [Bridge.Stop]: a
+	// bridge is not restarted; a host builds a new one. Its commissioning
+	// window's opens return it too once Stop has stopped the window.
+	ErrStopped = errors.New("bridge: stopped")
 )
 
 // Snapshotter supplies the endpoint topology the bridge serves.
@@ -492,6 +500,10 @@ type Bridge struct {
 	// wiring that finds it moved while it registered was overtaken and
 	// detaches what it registered ([Bridge.rewireMeasurementListeners]).
 	listenerGeneration uint64
+	// listenerManager is the subscription manager the latest wiring read
+	// ([Bridge.rewireMeasurementListeners]); Start wires again when the
+	// manager attached since its initial assembly is another one.
+	listenerManager *subscription.Manager
 	// switchUnsubscribers holds the unsubscribe closures returned by
 	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
 	// matterSwitchSubscribable assertion) and by a position source's
@@ -515,6 +527,10 @@ type Bridge struct {
 	// (triggerSessionReannounce), added under mu while started and waited
 	// for by Stop before the advertiser closes.
 	reannounces sync.WaitGroup
+	// rolloverCloses is the goroutines that end a secure session whose
+	// outbound counter nears exhaustion (endSessionAtRollover), added
+	// under mu while started and waited for by Stop.
+	rolloverCloses sync.WaitGroup
 
 	// routing bundles the exchange-src / timed-deadline / sub-target /
 	// status-response-wait tables the receive, ack-pump, and subscribe
@@ -640,19 +656,17 @@ type Bridge struct {
 	paseInFlightSince    time.Time
 
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
-	// detector for unsecured (SessionID==0, PASE) traffic, so a
-	// retransmitted Pake1/Pake3 is acked without re-invoking the handshake
-	// handler. Keyed by SourceNodeID (uint64) → *mrp.Window. Cleared on
-	// each PASE-acceptor swap (a commissioning-window boundary) so it stays
-	// bounded to the current window's transient commissioners. Mirrors
-	// matter.js UnsecuredSession's MessageReceptionState.
-	unsecuredWindows sync.Map
-	// unsecuredWindowCount tracks the live entry count of unsecuredWindows so
-	// creation can be capped at [maxUnsecuredWindows]: SourceNodeID is
-	// attacker-controlled in unsecured PASE traffic, and within a single open
-	// commissioning window a spoofed-source flood would otherwise grow the map
-	// without bound. Reset to 0 alongside the Clear at each window boundary.
-	unsecuredWindowCount atomic.Int64
+	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
+	// retransmitted handshake message is acked without re-invoking the
+	// handshake handler. A window lives as long as the handshake it serves
+	// — see [unsecuredWindowTable]. Mirrors matter.js UnsecuredSession's
+	// MessageReceptionState.
+	unsecuredWindows unsecuredWindowTable
+
+	// invokeCommits holds the changes cluster servers report while a
+	// command runs against their cluster, so the command advances the
+	// cluster's DataVersion once ([invokeCommitTable]).
+	invokeCommits invokeCommitTable
 
 	// commissioningInstanceName remembers the mDNS instance name the
 	// bridge published via [Bridge.AnnounceCommissioning] so the
@@ -688,17 +702,15 @@ type Bridge struct {
 	// SessionID==0 replies (PASE / commissioning chatter pre-CASE).
 	// Encrypted sessions get their counters from the underlying
 	// channel.Session. Atomic so the receive goroutine can fan out
-	// without blocking on the bridge's mutex.
+	// without blocking on the bridge's mutex. New seeds it with a random
+	// 28-bit value plus one — see [seedUnsecuredCounter].
 	unsecuredCounter atomic.Uint32
 
-	// outboundExchangeID allocates fresh 15-bit exchange identifiers
-	// for server-initiated exchanges (subscribe ongoing reports,
-	// future timed-write / spontaneous-event paths). The high bit
-	// (0x8000) is reserved by Matter §4.13 as the Initiator flag —
-	// our exchange IDs therefore stay inside [1, 0x7FFF]. Mirrors
-	// matter.js packages/protocol/src/protocol/MessageExchange.ts
-	// where the ExchangeManager hands out a 15-bit counter via
-	// `ExchangeManager.#getNextExchangeId`.
+	// outboundExchangeID allocates exchange identifiers for
+	// server-initiated exchanges (subscribe ongoing reports, CASE
+	// re-establishment, check-ins, the OTA provider link): the full
+	// 16-bit space, starting at a random value New seeds — see
+	// [Bridge.nextOutboundExchangeID]. Only the low 16 bits are used.
 	outboundExchangeID atomic.Uint32
 
 	// startClaim is the race-free entry guard for [Bridge.Start].
@@ -708,6 +720,9 @@ type Bridge struct {
 	// b.mu across that, concurrent reads (Topology, Dispatcher)
 	// would block on the listener's bind latency.
 	startClaim atomic.Bool
+	// stopBegun: a Stop was called; Start is refused from then on with
+	// ErrStopped — the bridge is single-run (review II, R2-P2-stop-05).
+	stopBegun atomic.Bool
 	// lifecycle runs Start and Stop one at a time: a Stop that arrives
 	// while a Start is running waits for it and then stops the run,
 	// instead of finding nothing started and letting the bridge come up
@@ -878,7 +893,34 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		sigma1Replied:  make(map[uint16][32]byte),
 	}
 	br.eventLog.SetClock(br.clock)
+	if err := br.seedCounters(); err != nil {
+		return nil, err
+	}
 	return br, nil
+}
+
+// seedCounters starts the unsecured message counter and the exchange-id
+// counter at random values, as both references start them, so a process
+// restart does not replay the same numbers from 1.
+//
+// The unsecured counter starts at a random 28-bit value plus one, the
+// first message taking the next: matter.js
+// packages/protocol/src/protocol/MessageCounter.ts:60
+// `this.messageCounter = (crypto.randomUint32 >>> 4) + 1;`, the global
+// unencrypted counter of SessionManager.ts:305; connectedhomeip
+// src/transport/MessageCounter.h:57, :65 (a random 28-bit initial value).
+// The exchange ids start at a random 16-bit value: matter.js
+// ExchangeManager.ts:794-808 (`ExchangeCounter`, seeded with
+// entropy.randomUint16); connectedhomeip src/messaging/ExchangeMgr.cpp:67
+// `mNextExchangeId = chip::Crypto::GetRandU16();`.
+func (b *Bridge) seedCounters() error {
+	var seed [6]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		return fmt.Errorf("bridge: counter seed: %w", err)
+	}
+	b.unsecuredCounter.Store(binary.BigEndian.Uint32(seed[:4])>>4 + 1)
+	b.outboundExchangeID.Store(uint32(binary.BigEndian.Uint16(seed[4:])))
+	return nil
 }
 
 // Start brings the bridge online: assembles the initial topology,
@@ -893,8 +935,10 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 // call [Stop]) to tear everything down.
 //
 // Calling Start a second time on the same instance returns
-// [ErrAlreadyStarted], and so does a Start while a [Bridge.Stop] of the
-// run before has not returned: the bridge has not stopped until then.
+// [ErrAlreadyStarted]. A bridge is single-run: from the first
+// [Bridge.Stop] on, Start returns [ErrStopped] — Stop closes what the
+// bridge holds, the advertiser among them, and a host that comes back
+// builds a new bridge. A Start that failed leaves the bridge startable.
 //
 //nolint:contextcheck // serve/ack-pump goroutines run in a fresh context torn down explicitly via the stored serveCancel (Stop); rooting them in the caller ctx would race listener teardown
 func (b *Bridge) Start(ctx context.Context) error {
@@ -993,6 +1037,11 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.serveDone = done
 	b.started = true
 	committed = true
+	// A manager attached while Start ran found the run not started and
+	// left the wiring to it; the initial assembly wired the manager it
+	// saw then (review II, R2-P2-dr-req-05). An attach from here on finds
+	// the run started and wires by itself.
+	rewire, run := b.subManager != b.listenerManager, b.runGen
 	// Spawn the ACK pump only when an AckTracker has been wired
 	// (daemon's [Bridge.AttachAckTracker] call). Test setups that
 	// skip the wiring leave the pump dormant, which is fine — the
@@ -1003,6 +1052,9 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.setBLERunning(true)
 	if pumpTracker != nil {
 		b.startAckPump()
+	}
+	if rewire {
+		b.rewireListenersOfRun(run)
 	}
 
 	// Join the multicast group of every group with a member endpoint, and
@@ -1060,6 +1112,9 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 // a Stop holds it — and then the lifecycle slot; the claim is given back
 // when the slot cannot be had.
 func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
+	if b.stopBegun.Load() {
+		return nil, ErrStopped
+	}
 	if !b.startClaim.CompareAndSwap(false, true) {
 		return nil, ErrAlreadyStarted
 	}
@@ -1067,6 +1122,12 @@ func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
 	if err != nil {
 		b.startClaim.Store(false)
 		return nil, err
+	}
+	// A Stop that began while this Start waited for the lifecycle slot.
+	if b.stopBegun.Load() {
+		release()
+		b.startClaim.Store(false)
+		return nil, ErrStopped
 	}
 	return release, nil
 }
@@ -1118,6 +1179,19 @@ func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error)
 // for Start's own assembly) is over. Caller holds b.mu.
 func (b *Bridge) runEndedLocked(run *uint64) bool {
 	return run != nil && (!b.started || b.runGen != *run)
+}
+
+// rewireListenersOfRun wires the host's value listeners onto the attached
+// subscription manager for run, and detaches them again when a Stop ended
+// run meanwhile — the wiring a Stop that set in before it missed.
+func (b *Bridge) rewireListenersOfRun(run uint64) {
+	generation := b.rewireMeasurementListeners()
+	b.mu.RLock()
+	ended := b.runEndedLocked(&run)
+	b.mu.RUnlock()
+	if ended {
+		b.detachListenersOfGeneration(generation)
+	}
 }
 
 // reassembleLocked is the shared implementation behind initial
@@ -2043,13 +2117,14 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 	return false
 }
 
-// Stop tears down the bridge: gracefully closes every secure session
-// (best-effort CloseSession StatusReport per peer, capped by
-// [stopSessionCloseBudget]), closes the UDP listener, withdraws
+// Stop tears down the bridge: reports what every subscription owes,
+// gracefully closes every secure session (best-effort CloseSession
+// StatusReport per peer; each step capped by [stopSessionCloseBudget]),
+// closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
-// no-op. Safe to call after a failed [Start]. The bridge counts as
-// started until Stop returns: a [Bridge.Start] before that is refused.
+// no-op. Safe to call after a failed [Start]. The bridge is single-run:
+// from the first Stop on, [Bridge.Start] returns [ErrStopped].
 // A Stop that overlaps a Start waits for it, until ctx ends, and then
 // stops its run; only that wait can make Stop return an error, and then
 // it has torn nothing down. A Stop with a context already done when no
@@ -2059,7 +2134,8 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 //nolint:funlen // one teardown sequence; its order is the contract, and split up it is no longer visible in one place
 func (b *Bridge) Stop(ctx context.Context) error {
 	// A Start still running finishes first; Stop then stops its run
-	// (review II, R2-P1-req2-05).
+	// (review II, R2-P1-req2-05). No Start is let in from here on.
+	b.stopBegun.Store(true)
 	release, err := b.enterLifecycle(ctx)
 	if err != nil {
 		return err
@@ -2068,10 +2144,15 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
 	// CASE sessions and show the bridge unresponsive for minutes after
-	// a restart. Mirrors matter.js's shutdown ordering: sessions close
-	// gracefully (Session.ts:248 initiateClose → gracefulClose →
-	// ExchangeManager.ts:716-726 #sendCloseSession) before the transport
-	// is torn down (ServerNetworkRuntime.ts:410-447 stop()).
+	// a restart. The order is matter.js's at db021da0: the runtime's
+	// stop() (ServerNetworkRuntime.ts:427-498) ends the sessions
+	// (:456-459 prepareRuntimeShutdown → SessionManager.ts:1097-1113
+	// closeAllSessions) before the exchanges and the transports close
+	// (:475-490). The CloseSession is this module's: closeAllSessions
+	// force-closes each session without one (the comment of
+	// operational.Manager.CloseAllGraceful; owner decision 49). What the
+	// subscriptions owe goes out before the sessions close.
+	b.flushSubscriptionsForShutdown(ctx)
 	b.closeSecureSessionsForShutdown()
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.
@@ -2101,8 +2182,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.serveDone = nil
 	// handlerCtx stays: the serve context, cancelled below. A handler
 	// the ordered pool still dispatches after this point runs under a
-	// cancelled context instead of one that never ends; the next Start
-	// replaces it.
+	// cancelled context instead of one that never ends.
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false
@@ -2150,6 +2230,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// the serve context's cancel above ends it, and it is gone before the
 	// advertiser closes.
 	b.reannounces.Wait()
+	b.rolloverCloses.Wait()
 	// A BDX responder (an OTA image transfer) runs under the handler
 	// context the cancel above ended; it is gone before Stop returns.
 	if !b.waitBDXResponders(ctx) {
@@ -2193,6 +2274,49 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// flushSubscriptionsForShutdown reports what every subscription owes —
+// the pending events, the ShutDown event the node emitted a moment before
+// among them, and the dirty attributes — before [Bridge.Stop] closes the
+// sessions, one fabric's subscriptions beside the other's
+// ([subscription.Manager.FlushFabric], each report waiting for its
+// answer), bounded by ctx and by [stopSessionCloseBudget]. The
+// subscriptions stay open; they close with their sessions right after,
+// not terminated, so they stay persisted for the re-establishment on the
+// next start (ADR 0008). A subscription engine the node stopped before
+// still flushes; without a subscription manager or its flush reporter, or
+// on a bridge that is not started, nothing is sent (review II,
+// R2-P2-sess-03).
+//
+// Mirrors the flush of matter.js's shutdown at db021da0:
+// ServerNode.ts:152-155 prepareRuntimeShutdown → SessionManager.ts:1097-1113
+// closeAllSessions, which runs each session's closeSubscriptionsForShutdown
+// (NodeSession.ts:326-329, a flush through the session; the subscription
+// is closed without being terminated, ServerSubscription.ts:772-774) before
+// the session ends.
+func (b *Bridge) flushSubscriptionsForShutdown(ctx context.Context) {
+	b.mu.RLock()
+	started := b.started
+	m := b.subManager
+	b.mu.RUnlock()
+	if !started || m == nil {
+		return
+	}
+	fabrics := map[uint8]struct{}{}
+	for _, info := range m.Snapshot() {
+		fabrics[info.FabricIndex] = struct{}{}
+	}
+	if len(fabrics) == 0 {
+		return
+	}
+	ctx, cancel := clock.WithTimeout(ctx, b.clk(), stopSessionCloseBudget)
+	defer cancel()
+	var wg sync.WaitGroup
+	for fabricIndex := range fabrics {
+		wg.Go(func() { m.FlushFabric(ctx, fabricIndex, 0) })
+	}
+	wg.Wait()
 }
 
 // waitServeStopped waits, bounded by ctx, for the UDP and TCP serve loops

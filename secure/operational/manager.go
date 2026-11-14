@@ -91,8 +91,13 @@ type Manager struct {
 	// fired by [Manager.CloseAllGraceful]: matter.js kicks off the
 	// advertiser shutdown before removing sessions precisely to prevent
 	// re-announces during teardown (packages/node/src/behavior/system/
-	// network/ServerNetworkRuntime.ts:427).
+	// network/ServerNetworkRuntime.ts:450-453 at db021da0).
 	onReannounce func(fabricIndex uint8)
+
+	// reapExempt, when non-nil, is asked by the idle reaper for every
+	// session it found idle; true spares the session
+	// ([Manager.SetReapExemption]).
+	reapExempt func(sessionID uint16) bool
 }
 
 // SetGracefulCloseNotifier registers the wire-layer callback invoked
@@ -117,6 +122,21 @@ func (m *Manager) SetGracefulCloseNotifier(fn func(sessionID uint16, sess *chann
 func (m *Manager) SetReannounceTrigger(fn func(fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onReannounce = fn
+	m.mu.Unlock()
+}
+
+// SetReapExemption registers the callback the idle reaper
+// ([Manager.StartReaper]) asks before it closes a session it found idle:
+// true spares the session for this sweep. The bridge wires it to its
+// subscription manager, so a session that carries a live subscription is
+// never reaped for idleness — the subscriber's MinIntervalFloor can hold
+// its reports, and with them the session's only traffic, beyond
+// [SessionIdleTimeout] (review II, R2-P2-sess-02, owner decision 43).
+// matter.js has no idle reaper (BD-Matter-IdleSessionReaper). The
+// callback runs outside the manager's lock; passing nil clears it.
+func (m *Manager) SetReapExemption(fn func(sessionID uint16) bool) {
+	m.mu.Lock()
+	m.reapExempt = fn
 	m.mu.Unlock()
 }
 
@@ -1073,14 +1093,19 @@ func (m *Manager) Close(sessionID uint16) error {
 // remaining peers are closed locally without a wire notification so a
 // daemon shutdown never blocks on the network. The reannounce trigger
 // deliberately does not fire — the caller is shutting the bridge down
-// and matter.js likewise kicks off the advertiser shutdown before
-// removing sessions "to prevent re-announces when removing sessions"
-// (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:427).
+// and matter.js likewise kicks off the advertiser shutdown before removing
+// sessions "to prevent re-announces when removing sessions" (at db021da0,
+// packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:450-453).
 //
-// Mirrors the matter.js shutdown chain: each session's close emits
-// gracefulClose (Session.ts:248 initiateClose → NodeSession.ts:368)
-// and the exchange layer ships a CloseSession StatusReport per session
-// (ExchangeManager.ts:716-726 #sendCloseSession).
+// The CloseSession per session departs from matter.js at db021da0, whose
+// shutdown flushes each session's subscriptions and then force-closes the
+// session without a CloseSession (SessionManager.ts:1097-1113
+// closeAllSessions: closeSubscriptionsForShutdown, then
+// initiateForceClose, which marks the peer lost, NodeSession.ts:379-382,
+// so close() skips gracefulClose, :414-425). The flush is mirrored: the
+// bridge's Stop reports what the subscriptions owe before it calls this.
+// The CloseSession is kept by decision (review II, owner decision 49;
+// notes/parity/by_design.md, BD-Matter-Shutdown-CloseSessionKept).
 func (m *Manager) CloseAllGraceful(deadline time.Time) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0, len(m.sessions))
@@ -1164,10 +1189,15 @@ func (m *Manager) ClosePASESessions() int {
 
 // ClosePeer tears down every live session matching the
 // (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
-// first. Returns the number of sessions closed. The bridge uses it for
-// the KeepSubscriptions=false teardown (matter.js InteractionServer.ts:
-// 549-566 closes the peer's subscriptions by (fabric, node)); a peer that
-// stopped answering is closed with [Manager.ClosePeerLost] instead.
+// first. Returns the number of sessions closed. A peer that stopped
+// answering is closed with [Manager.ClosePeerLost] instead.
+//
+// Deprecated: nothing in the module calls it — the KeepSubscriptions=false
+// teardown it was written for closes the peer's subscriptions, not its
+// sessions (subscription.Manager.ClosePeer). There is no replacement
+// that sends the farewell; [Manager.Close] on each id
+// [Manager.SessionIDsForPeer] returns closes the sessions without one.
+// Removable in v0.23.0 (review II, R2-P2 design note 4).
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)
@@ -1355,7 +1385,9 @@ func (m *Manager) Active() int {
 // handshake has not completed) are skipped so that in-progress
 // commissioning handshakes are not torn down. A session where
 // LastActivity is the zero time (opened, no traffic yet) is measured
-// from its creation instead.
+// from its creation instead. A session the reap exemption spares
+// ([Manager.SetReapExemption]) — the bridge's: one that carries a live
+// subscription — stays however long it is idle.
 //
 // The manager owns the goroutine: [Manager.StopReaper] cancels it and
 // waits for it to return. One reaper runs at a time; a second StartReaper
@@ -1408,12 +1440,22 @@ func (m *Manager) StopReaper() {
 // last-activity time; its idle clock starts at its creation, so it is
 // reaped one idle timeout after it was installed (review II, W1-sec-06
 // — before, such a session was exempt for good).
+//
+// A session the reap exemption spares ([Manager.SetReapExemption]) stays.
+// The exemption is asked outside the manager's lock — it reaches into
+// another component — so the idle sessions are collected first and taken
+// out of the table afterwards, each only while it is still the entry
+// under its id and still idle.
 func (m *Manager) reapIdle(idleTimeout time.Duration) {
 	now := m.clk().Now()
 	cutoff := now.Add(-idleTimeout)
 	placeholderCutoff := now.Add(-PlaceholderIDTTL)
+	type idleEntry struct {
+		id uint16
+		e  *Entry
+	}
 	m.mu.Lock()
-	var victims []*Entry
+	var idle []idleEntry
 	for id, e := range m.sessions {
 		if e.Session == nil {
 			// Placeholder for a handshake that has not opened its
@@ -1428,20 +1470,26 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 			}
 			continue
 		}
-		la := e.LastActivity()
-		if la.IsZero() {
-			// Never used: the idle clock runs from the creation. A
-			// commissioning still in flight is inside the timeout; an
-			// entry without a creation time is left alone.
-			la = e.CreatedAt()
-			if la.IsZero() {
-				continue
-			}
+		if idleSince(e, cutoff) {
+			idle = append(idle, idleEntry{id: id, e: e})
 		}
-		if la.Before(cutoff) {
-			victims = append(victims, e)
-			delete(m.sessions, id)
+	}
+	exempt := m.reapExempt
+	m.mu.Unlock()
+	if len(idle) == 0 {
+		return
+	}
+	if exempt != nil {
+		idle = slices.DeleteFunc(idle, func(c idleEntry) bool { return exempt(c.id) })
+	}
+	m.mu.Lock()
+	victims := make([]*Entry, 0, len(idle))
+	for _, c := range idle {
+		if m.sessions[c.id] != c.e || !idleSince(c.e, cutoff) {
+			continue // closed, replaced or active again meanwhile
 		}
+		victims = append(victims, c.e)
+		delete(m.sessions, c.id)
 	}
 	m.mu.Unlock()
 	// Tell each reaped peer its session is gone while the keys can
@@ -1454,6 +1502,21 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
 	m.fireReannounceIfPeerGone(victims)
+}
+
+// idleSince reports whether e's last activity — its creation when it
+// never carried a message (a commissioning still in flight is inside the
+// timeout) — lies before cutoff. An entry without either time is never
+// idle.
+func idleSince(e *Entry, cutoff time.Time) bool {
+	la := e.LastActivity()
+	if la.IsZero() {
+		la = e.CreatedAt()
+		if la.IsZero() {
+			return false
+		}
+	}
+	return la.Before(cutoff)
 }
 
 // PersistResumption stores a resumption-id pre-shared secret so a

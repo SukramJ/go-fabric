@@ -79,6 +79,28 @@ func (stubOpCredsStore) UpsertGroupKeySet(_ context.Context, _ store.GroupKeySet
 
 func (stubOpCredsStore) RemoveGroupKeysByFabric(_ context.Context, _ uint8) error { return nil }
 
+func (stubOpCredsStore) UpdateFabricVendorID(context.Context, uint8, uint16) error { return nil }
+
+func (stubOpCredsStore) UpdateFabricVIDVerification(context.Context, uint8, []byte, []byte) error {
+	return nil
+}
+
+func (stubOpCredsStore) UpdateFabricCredentials(context.Context, uint8, store.FabricCredentials) error {
+	return nil
+}
+
+func (stubOpCredsStore) CommitFabric(context.Context, uint8) error { return nil }
+
+func (stubOpCredsStore) RollbackFabric(context.Context, uint8) (store.FabricPending, error) {
+	return store.FabricCommitted, nil
+}
+
+func (stubOpCredsStore) GetSetting(context.Context, string) (value string, ok bool, err error) {
+	return "", false, nil
+}
+
+func (stubOpCredsStore) SetSettings(context.Context, map[string]string) error { return nil }
+
 var _ mattercore.StoreFacade = stubOpCredsStore{}
 
 // plainClusterID is an arbitrary cluster ID distinct from AccessControl

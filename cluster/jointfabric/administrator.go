@@ -266,7 +266,8 @@ func (a *Administrator) OnCommissioningComplete(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	for _, f := range list {
+	for i := range list {
+		f := &list[i]
 		id, err := fabrics.GetIdentity(ctx, f.FabricIndex)
 		if err != nil {
 			continue

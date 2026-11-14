@@ -4,12 +4,14 @@
 package discovery
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +39,29 @@ const (
 	stagedIPMaxHosts      = 250
 	stagedIPMinHosts      = 200
 	stagedIPPruneInterval = time.Minute
+)
+
+// Bounds on what unauthenticated senders on the link make the cache hold
+// (review II, R2-P2-alloc-03; owner decision 45: the controller takes the
+// device side's policy against unauthenticated input). matter.js bounds
+// only the staged addresses (packages/general/src/net/dns-sd/DnssdNames.ts:21
+// at db021da0, STAGED_IP_RECORDS_MAX_HOSTS); these are this module's own.
+const (
+	// maxRecordTTL is the longest a record is cached, whatever TTL its
+	// sender states: RFC 6762 §10's recommended TTL for records other than
+	// a host's addresses (75 minutes), the longest a reference stack
+	// announces as this tree records it (chip's TXT TTL of 4500 s,
+	// mdns/records.go:19). A legitimate responder re-announces well inside
+	// it; a record a sender states for 136 years is gone after it.
+	maxRecordTTL = 4500 * time.Second
+	// maxCachedRecords is how many records the cache holds. Past it the
+	// record installed or refreshed longest ago is deleted, as an expiry
+	// would delete it, and its name goes once nothing keeps it. A
+	// legitimate responder refreshes its records whenever it answers, so a
+	// flood evicts them only if it brings more records than this between
+	// two of its answers; the browser asks again for a name it still
+	// needs.
+	maxCachedRecords = 8192
 )
 
 // admittedServiceSuffixes are the DNS-SD service types whose records enter
@@ -113,11 +138,15 @@ type Names struct {
 	cancel context.CancelFunc
 
 	// Loop-owned state below.
-	names        *omap[string, *Name]
-	stagedIPs    *omap[string, []stagedIP]
-	filters      []*ingressFilter
-	discovered   []*discoveredObserver
-	expiring     map[*Record]struct{}
+	names      *omap[string, *Name]
+	stagedIPs  *omap[string, []stagedIP]
+	filters    []*ingressFilter
+	discovered []*discoveredObserver
+	// expiring is every cached record, each with its place in installed,
+	// the records in the order they were installed or refreshed
+	// ([maxCachedRecords]).
+	expiring     map[*Record]*list.Element
+	installed    *list.List
 	expiryTimer  stopper
 	expiryAt     time.Time
 	pruneTimer   stopper
@@ -164,7 +193,8 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 		ttlGraceFactor: DefaultTTLGraceFactor,
 		names:          newOmap[string, *Name](),
 		stagedIPs:      newOmap[string, []stagedIP](),
-		expiring:       make(map[*Record]struct{}),
+		expiring:       make(map[*Record]*list.Element),
+		installed:      list.New(),
 	}
 	if n.clock == nil {
 		n.clock = fabricclock.System{}
@@ -402,11 +432,7 @@ func (n *Names) processMessage(msg mdns.DNSMessage, sourceIntf string) []*Name {
 		rec := records[i]
 		nm := n.get(rec.Name)
 		if rec.TTL != 0 {
-			if rec.TTL < n.minTTL {
-				raised := *rec
-				raised.TTL = n.minTTL
-				rec = &raised
-			}
+			rec = n.boundedTTL(rec)
 			was := nm.isDiscovered()
 			if nm.installRecord(rec, sourceIntf, packetAt) {
 				packetRelevant = true
@@ -448,7 +474,38 @@ func (n *Names) processMessage(msg mdns.DNSMessage, sourceIntf string) []*Name {
 	if packetRelevant {
 		n.stageAddresses(records, consumed, packetAt, sourceIntf)
 	}
+	n.evictOverflow()
 	return newly
+}
+
+// boundedTTL is rec with its TTL raised to the cache's minimum or lowered
+// to [maxRecordTTL], rec itself when it is within both.
+func (n *Names) boundedTTL(rec *Record) *Record {
+	ttl := min(max(rec.TTL, n.minTTL), maxRecordTTL)
+	if ttl == rec.TTL {
+		return rec
+	}
+	bounded := *rec
+	bounded.TTL = ttl
+	return &bounded
+}
+
+// evictOverflow deletes the records installed or refreshed longest ago
+// until at most [maxCachedRecords] remain.
+func (n *Names) evictOverflow() {
+	evicted := 0
+	for len(n.expiring) > maxCachedRecords {
+		rec, _ := n.installed.Front().Value.(*Record)
+		n.unregisterForExpiration(rec)
+		if nm := n.maybeGet(rec.Name); nm != nil {
+			nm.deleteRecord(rec)
+		}
+		evicted++
+	}
+	if evicted > 0 {
+		n.logger.Warn("matter.discovery.cache_records_evicted", slog.Int("dropped", evicted),
+			slog.String("reason", "the cache holds at most "+strconv.Itoa(maxCachedRecords)+" records"))
+	}
 }
 
 // unstageGoodbyes honours a goodbye for a staged host regardless of the
@@ -490,12 +547,7 @@ func (n *Names) stageAddresses(records []*Record, consumed []bool, packetAt time
 		if n.names.has(key) {
 			continue
 		}
-		rec := r
-		if rec.TTL < n.minTTL {
-			raised := *rec
-			raised.TTL = n.minTTL
-			rec = &raised
-		}
+		rec := n.boundedTTL(r)
 		staged, _ := n.stagedIPs.get(key)
 		if rec.CacheFlush {
 			supersededBefore := packetAt.Add(-n.evictionDelay)
@@ -573,14 +625,20 @@ func (n *Names) armPrune() {
 // registerForExpiration schedules rec's deletion at its ExpiresAt
 // (matter.js's expiration Scheduler, DnssdNames.ts:85-95).
 func (n *Names) registerForExpiration(rec *Record) {
-	n.expiring[rec] = struct{}{}
+	if _, ok := n.expiring[rec]; ok {
+		return
+	}
+	n.expiring[rec] = n.installed.PushBack(rec)
 	if n.expiryTimer == nil || rec.ExpiresAt.Before(n.expiryAt) {
 		n.armExpiry(rec.ExpiresAt)
 	}
 }
 
 func (n *Names) unregisterForExpiration(rec *Record) {
-	delete(n.expiring, rec)
+	if e, ok := n.expiring[rec]; ok {
+		n.installed.Remove(e)
+		delete(n.expiring, rec)
+	}
 }
 
 func (n *Names) armExpiry(at time.Time) {
@@ -615,7 +673,7 @@ func (n *Names) expireDue() {
 		if _, still := n.expiring[rec]; !still {
 			continue
 		}
-		delete(n.expiring, rec)
+		n.unregisterForExpiration(rec)
 		if nm := n.maybeGet(rec.Name); nm != nil {
 			nm.deleteRecord(rec)
 		}
@@ -643,6 +701,7 @@ func (n *Names) shutdown() {
 	}
 	n.stagedIPs.clear()
 	n.discovered = nil
-	n.expiring = make(map[*Record]struct{})
+	n.expiring = make(map[*Record]*list.Element)
+	n.installed.Init()
 	n.names.clear()
 }

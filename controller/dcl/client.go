@@ -4,6 +4,7 @@
 package dcl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -183,23 +184,33 @@ func (c *Client) fetchJSON(ctx context.Context, path string, out any) error {
 	return nil
 }
 
-// maxResponseBody bounds a ledger or GitHub answer the client reads, and
-// maxPages the pages of one paginated listing: a misbehaving endpoint
+// maxResponseBody bounds a ledger or GitHub answer the client reads,
+// maxPages the pages of one paginated listing, maxListingBytes the wire
+// bytes of the items those pages hold together (review II, R2-P2-alloc-08:
+// the first two alone multiply to 16 GiB) and maxListingItems their count
+// (review II, R2-P2-dr-ctl-03: an item of three wire bytes, "{},",
+// decodes to a whole struct, so the bytes alone let a listing decode to
+// gigabytes). Decoded, a listing holds at most maxListingItems structs
+// and the strings of at most maxListingBytes: a misbehaving endpoint
 // costs bounded memory (W4-ctlint-10). matter.js reads the whole answer
 // (DclClient.ts:91-121, Github.ts:120-141) and follows next_key without a
-// bound (:62-89); both bounds sit far above the production ledger's
+// bound (:62-89); the bounds sit far above the production ledger's
 // answers.
 const (
 	maxResponseBody = 16 << 20
 	maxPages        = 1000
+	maxListingBytes = 64 << 20
+	maxListingItems = 1 << 16
 )
 
 // fetchPaginated is DclClient.#fetchPaginatedJson (DclClient.ts:62-89):
 // the items of field, page after page while the answer names a
 // pagination.next_key, which the next request carries as pagination.key —
-// at most maxPages pages.
+// at most maxPages pages holding at most maxListingBytes of items and at
+// most maxListingItems of them.
 func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) ([]T, error) {
 	var all []T
+	listed := 0
 	nextKey := ""
 	for page := 0; page == 0 || nextKey != ""; page++ {
 		if page == maxPages {
@@ -219,9 +230,12 @@ func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) (
 		}
 		// Items that are not an array are skipped (:79-82).
 		if raw, ok := answer[field]; ok {
-			var items []T
-			if json.Unmarshal(raw, &items) == nil {
-				all = append(all, items...)
+			if listed += len(raw); listed > maxListingBytes {
+				return nil, fmt.Errorf("dcl: %s: the listing's items pass %d bytes", path, maxListingBytes)
+			}
+			var over bool
+			if all, over = appendItems(all, raw); over {
+				return nil, fmt.Errorf("dcl: %s: the listing passes %d items", path, maxListingItems)
 			}
 		}
 		nextKey = ""
@@ -235,6 +249,29 @@ func fetchPaginated[T any](ctx context.Context, c *Client, path, field string) (
 		}
 	}
 	return all, nil
+}
+
+// appendItems appends the items of the JSON array raw to all, one item
+// decoded at a time; over is true, and nothing returned, before it would
+// decode an item past maxListingItems. Items that are not an array of T
+// append nothing, as json.Unmarshal's error skipped them before.
+func appendItems[T any](all []T, raw json.RawMessage) (_ []T, over bool) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if tok, _ := dec.Token(); tok != json.Delim('[') { // an unreadable token is none
+		return all, false
+	}
+	start := len(all)
+	for dec.More() {
+		if len(all) == maxListingItems {
+			return nil, true
+		}
+		var item T
+		if dec.Decode(&item) != nil {
+			return all[:start], false
+		}
+		all = append(all, item)
+	}
+	return all, false
 }
 
 // encodeURIComponent is JavaScript's: every byte but A-Z a-z 0-9 and

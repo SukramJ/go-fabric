@@ -487,6 +487,27 @@ func (t *TimeSynchronization) FabricRemoved(ctx context.Context, fabricIndex uin
 	t.requestTime() // SetTrustedTimeSource, :584-587
 }
 
+// MatterDropFabric implements [contract.FabricScopedState]:
+// [TimeSynchronization.FabricRemoved].
+func (t *TimeSynchronization) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	t.FabricRemoved(ctx, fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabric
+// of the trusted time source, which only the TimeSyncClient feature keeps.
+func (t *TimeSynchronization) MatterHeldFabrics() []uint8 {
+	if !t.has(timesyncdef.FeatureTimeSyncClient) {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.state.trusted == nil {
+		return nil
+	}
+	return []uint8{t.state.trusted.FabricIndex}
+}
+
 // errTooMany is chip's CHIP_ERROR_BUFFER_TOO_SMALL from a setter, which
 // the handlers answer RESOURCE_EXHAUSTED; errInvalid its malformed data
 // (CONSTRAINT_ERROR).

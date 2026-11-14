@@ -45,9 +45,9 @@ func (s *stallingStore) AddFabric(ctx context.Context, rec mstore.FabricRecord) 
 	return s.restartStore.AddFabric(ctx, rec)
 }
 
-func (s *stallingStore) UpsertIdentity(ctx context.Context, rec mstore.IdentityRecord) error {
-	s.stall("UpsertIdentity")
-	return s.restartStore.UpsertIdentity(ctx, rec)
+func (s *stallingStore) UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c mstore.FabricCredentials) error {
+	s.stall("UpdateFabricCredentials")
+	return s.restartStore.UpdateFabricCredentials(ctx, fabricIndex, c)
 }
 
 // expireDuringStall runs cmd, which stalls in the store, fires the
@@ -107,12 +107,12 @@ func TestOpcreds_ExpiryDuringUpdateNOC_RestoresTheIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, rootPriv, idx := commissionTestFabric(ctx, t, oc)
-	oc.ClearPendingState() // CommissioningComplete
+	commitForTest(t, oc) // CommissioningComplete
 	before, _ := st.GetIdentity(ctx, idx)
 	fabCtx := im.WithFabricFilter(ctx, true, idx)
 	nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
 	st.mu.Lock()
-	st.armed = "UpsertIdentity"
+	st.armed = "UpdateFabricCredentials"
 	st.mu.Unlock()
 	waited := expireDuringStall(t, st, oc, func() {
 		_, _ = oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw})

@@ -88,39 +88,50 @@ func assembledSurface(topo *endpoint.Topology) []assembledEndpoint {
 // loadSurface returns the surface persisted under storeKey: its digest —
 // recomputed from the stored surface when that decodes, so a change of
 // the canonical encoding is no change of the surface — and the surface;
-// ok is false when none is persisted (or what is cannot be read, which
-// counts as none).
-func (p persisted) loadSurface(ctx context.Context, storeKey string) (digest [32]byte, before *surface.Endpoint, ok bool) {
+// ok is false when none is persisted (or what is does not decode, which
+// counts as none). A store that fails the read returns its error: the
+// endpoint's surface is unknown, not absent.
+func (p persisted) loadSurface(ctx context.Context, storeKey string) (digest [32]byte, before *surface.Endpoint, ok bool, err error) {
 	v, found, err := p.st.GetSetting(ctx, storeKey)
-	if err != nil || !found || v == "" {
-		return digest, nil, false
+	if err != nil {
+		return digest, nil, false, err
+	}
+	if !found || v == "" {
+		return digest, nil, false, nil
 	}
 	var st storedSurface
 	if err := json.Unmarshal([]byte(v), &st); err != nil {
 		p.logger.Warn("surface.restore", slog.String("key", storeKey), slog.Any("err", err))
-		return digest, nil, false
+		return digest, nil, false, nil
 	}
 	if len(st.Surface.Endpoints) == 1 {
 		ep := st.Surface.Endpoints[0]
-		return ep.Digest(), &ep, true
+		return ep.Digest(), &ep, true, nil
 	}
-	b, err := hex.DecodeString(st.Digest)
-	if err != nil || len(b) != len(digest) {
+	b, derr := hex.DecodeString(st.Digest)
+	if derr != nil || len(b) != len(digest) {
 		p.logger.Warn("surface.restore", slog.String("key", storeKey), slog.String("value", st.Digest))
-		return digest, nil, false
+		return digest, nil, false, nil //nolint:nilerr // a stored digest that does not decode counts as none, as an undecodable surface does
 	}
 	copy(digest[:], b)
-	return digest, nil, true
+	return digest, nil, true, nil
+}
+
+// surfaceValue is ep (its number left out) and its digest as the settings
+// value storeSurface writes.
+func surfaceValue(ep surface.Endpoint) (string, error) {
+	ep.Number = 0
+	digest := ep.Digest()
+	b, err := json.Marshal(storedSurface{Digest: hex.EncodeToString(digest[:]), Surface: surface.Surface{Endpoints: []surface.Endpoint{ep}}})
+	return string(b), err
 }
 
 // storeSurface persists ep (its number left out) and its digest under
 // storeKey.
 func (p persisted) storeSurface(ctx context.Context, storeKey string, ep surface.Endpoint) {
-	ep.Number = 0
-	digest := ep.Digest()
-	b, err := json.Marshal(storedSurface{Digest: hex.EncodeToString(digest[:]), Surface: surface.Surface{Endpoints: []surface.Endpoint{ep}}})
+	v, err := surfaceValue(ep)
 	if err == nil {
-		err = p.st.SetSetting(ctx, storeKey, string(b))
+		err = p.st.SetSetting(ctx, storeKey, v)
 	}
 	if err != nil {
 		p.logger.Warn("surface.persist", slog.String("key", storeKey), slog.Any("err", err))
@@ -184,8 +195,12 @@ func (n *Node) announceSurface(ctx context.Context) {
 	var drifts []surfaceDrift
 	for _, e := range assembledSurface(topo) {
 		after := e.surface.Digest()
-		before, prev, ok := n.persisted.loadSurface(ctx, e.storeKey)
+		before, prev, ok, err := n.persisted.loadSurface(ctx, e.storeKey)
 		switch {
+		case err != nil:
+			// Neither a first assembly nor a known surface: nothing is
+			// stored over it, and the next announcement compares again.
+			n.logger.Warn("surface.restore", slog.String("key", e.storeKey), slog.Any("err", err))
 		case !ok:
 			n.persisted.storeSurface(ctx, e.storeKey, e.surface)
 		case before != after:
@@ -211,7 +226,21 @@ func (n *Node) announceSurface(ctx context.Context) {
 			c.IncreaseEndpointConfigurationVersion(id)
 		}
 	})
-	if err := n.persisted.storeConfigVersions(ctx, topo, versions); err != nil {
+	// The raised versions and the new surfaces are one write: a surface
+	// stored without its raised version would keep the next start from
+	// finding the change again, and the version served now would go back
+	// down after a restart. A refused write stores neither, and the next
+	// start raises again.
+	values := n.persisted.configVersionValues(topo, versions)
+	for i := range drifts {
+		v, err := surfaceValue(drifts[i].surface)
+		if err != nil {
+			n.logger.Warn("surface.persist", slog.String("key", drifts[i].storeKey), slog.Any("err", err))
+			continue
+		}
+		values[drifts[i].storeKey] = v
+	}
+	if err := n.persisted.st.SetSettings(ctx, values); err != nil {
 		n.logger.Warn("configuration_version.persist", slog.Any("err", err))
 	}
 	at := n.cfg.Clock.Now()
@@ -229,7 +258,6 @@ func (n *Node) announceSurface(ctx context.Context) {
 				}
 			}
 		}
-		n.persisted.storeSurface(ctx, d.storeKey, d.surface)
 		change := surface.SurfaceChange{Endpoint: d.key, Before: d.before, After: d.after, Changes: d.changes, At: at}
 		n.recordChange(change)
 		announced = append(announced, change)

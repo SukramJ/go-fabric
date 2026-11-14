@@ -103,11 +103,11 @@ type SubscriptionTarget struct {
 	// peer's own outbound counter had reached, and nothing on the bridge
 	// side can observe or derive that from a handshake that never happened.
 	//
-	// It matters because a secure session's window anchors with an all-ones
-	// bitmap — every counter below the first one it ever sees is a
-	// duplicate. An unanchored window therefore anchors on whichever of the
-	// peer's next two messages arrives first, and if they arrive out of
-	// order the earlier one is dropped. Required whenever SessionID is
+	// It matters because a secure session's window starts at counter 0 and
+	// accepts only the 32 counters directly below its maximum: recording
+	// the SubscribeRequest's counter puts the window where the real
+	// request would have left it, so the peer's next messages are judged
+	// against the counter they follow. Required whenever SessionID is
 	// non-zero (see [ErrNoPeerCounter]).
 	//
 	// Optional for SessionID 0: unsecured traffic is deduplicated per

@@ -253,6 +253,23 @@ type providerSessions struct {
 	// (review II, R2-P1-cam-b-02).
 	owners   map[providerKey]*lifecycle
 	recordMu sync.Mutex
+	// closed, guarded by mu: the Service's Close began; a new session
+	// answered from now on is ended, not registered (review II,
+	// R2-P2-stop-03).
+	closed bool
+}
+
+// close refuses every session answered from now on.
+func (p *providerSessions) close() {
+	p.mu.Lock()
+	p.closed = true
+	p.mu.Unlock()
+}
+
+func (p *providerSessions) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 func (p *providerSessions) key(t target, id uint16) providerKey {
@@ -507,6 +524,11 @@ func (p *providerSessions) newSession(ctx context.Context, t target, fields spec
 		return nil, stackError("the offer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
 	}
 	a.learn(resp) // registers the session unless its arrival did
+	if a.isRefused() {
+		// Answered once the service's Close began: no one would end it.
+		p.endWithinBudget(ctx, p.cleanup, t, id)
+		return nil, ErrClosed
+	}
 	if a.learnedID() != id {
 		// An internal invariant, not a camera's behaviour: the arrival and
 		// the result are the same message, and the clock retry follows
@@ -556,6 +578,9 @@ type arrivedSession struct {
 	held      bool
 	withdraw  func()
 	upsertErr error
+	// refused: the response arrived once the service's Close began, and
+	// learn registered nothing.
+	refused bool
 }
 
 func (a *arrivedSession) learn(resp any) {
@@ -569,6 +594,10 @@ func (a *arrivedSession) learn(resp any) {
 		return
 	}
 	a.learned, a.id = true, id
+	if a.p.isClosed() {
+		a.refused = true
+		return
+	}
 	a.session, a.trackable = a.p.trackableSession(a.t, a.fields, resp)
 	var life *lifecycle
 	if a.establishing != nil {
@@ -586,6 +615,14 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	a.upsertErr = a.p.requestor.upsert(a.session)
 	a.held = a.upsertErr == nil
+}
+
+// isRefused reports whether learn refused the session for the service's
+// Close.
+func (a *arrivedSession) isRefused() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.refused
 }
 
 // seal stops learn from registering a session from now on.
@@ -625,7 +662,9 @@ func (a *arrivedSession) forget() bool {
 // reOffer is a ProvideOffer naming a session the camera holds: it never
 // ends a session nor overwrites a requestor entry; it adds one only when
 // absent and trackable. The offer is withdrawn when the camera refuses it
-// or the requestor does not hold the session. Mirrors matterjs-server
+// or the requestor does not hold the session, and an answer that arrives
+// once the service's Close began adds nothing and returns [ErrClosed].
+// Mirrors matterjs-server
 // packages/ws-controller/src/controller/webRtcSessionStreams.ts:240-268 at
 // 0bd06f2.
 func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.ProvideOfferRequest) (any, error) {
@@ -639,6 +678,14 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 	if _, _, _, ok := sessionIDOf(resp); !ok {
 		withdraw()
 		return nil, stackError("ProvideOffer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
+	}
+	if p.isClosed() {
+		// Answered once the service's Close began, as newSession's arrival
+		// refuses: the requestor gains no entry nothing would remove. A
+		// re-offer never ends a session (review II, rework of
+		// R2-P2-stop-03).
+		withdraw()
+		return nil, ErrClosed
 	}
 	if session, ok := p.trackableSession(t, fields, resp); ok && !p.tracks(k) {
 		if err := p.requestor.upsert(session); err != nil {
