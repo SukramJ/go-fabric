@@ -125,6 +125,12 @@ func (joinLab) ConnectNetwork(context.Context, []byte, []byte) (status uint8, de
 	return 0, "", 0
 }
 
+// switchLab is a joinLab whose interface switches
+// (contract.WiFiInterfaceSwitcher).
+type switchLab struct{ joinLab }
+
+func (switchLab) SetInterfaceEnabled(context.Context, bool) error { return nil }
+
 // TestWiFiDriver: Network.WiFi's Driver mounts NetworkCommissioning with
 // the Wi-Fi feature in place of the Ethernet one, without
 // WiFiNetworkDiagnostics; the root states the condition WiFi, and a node

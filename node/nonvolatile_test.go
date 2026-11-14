@@ -60,7 +60,7 @@ var nvCases = map[string]nvCase{
 	"root NetworkCommissioning.InterfaceEnabled":  {cluster: 0x0031, attr: 0x0004, write: false, want: "false"},
 	"root NetworkCommissioning.InterfaceEnabled, Wi-Fi": {
 		cluster: 0x0031, attr: 0x0004, write: false, want: "false",
-		edit: func(cfg *node.Config) { cfg.Network.WiFi = &node.WiFi{Driver: joinLab{}} },
+		edit: func(cfg *node.Config) { cfg.Network.WiFi = &node.WiFi{Driver: switchLab{}} },
 	},
 	"Thermostat.MinHeatSetpointLimit": {key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating}), cluster: 0x0201, attr: 0x0015, write: int64(1000), want: "1000"},
 }

@@ -5,6 +5,8 @@ package node
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -80,6 +82,50 @@ type reportingWiFi struct {
 
 func (w reportingWiFi) CurrentNetwork(context.Context) (ssid []byte, known bool) {
 	return []byte(w.ssid), true
+}
+
+// switchingWiFi is a fixedWiFi whose interface switches, answering err.
+type switchingWiFi struct {
+	fixedWiFi
+	switched *[]bool
+	err      error
+}
+
+func (w switchingWiFi) SetInterfaceEnabled(_ context.Context, enabled bool) error {
+	*w.switched = append(*w.switched, enabled)
+	return w.err
+}
+
+// TestReannouncingDriverForwardsTheInterfaceSwitch: the driver the node
+// hands the cluster switches the interface through the host driver when
+// that driver can (contract.WiFiInterfaceSwitcher), with its answer, and
+// answers errors.ErrUnsupported when it cannot — the cluster's
+// INVALID_ACTION for a write of InterfaceEnabled false.
+func TestReannouncingDriverForwardsTheInterfaceSwitch(t *testing.T) {
+	t.Parallel()
+	var switched []bool
+	refused := errors.New("rfkill")
+	for _, tc := range []struct {
+		name   string
+		driver contract.WiFiDriver
+		want   error
+	}{
+		{"switching", switchingWiFi{switched: &switched}, nil},
+		{"switching, refused", switchingWiFi{switched: &switched, err: refused}, refused},
+		{"not switching", fixedWiFi{}, errors.ErrUnsupported},
+	} {
+		n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Driver: tc.driver}}}}
+		s, ok := n.wifiDriver().(contract.WiFiInterfaceSwitcher)
+		if !ok {
+			t.Fatal("the node's driver is no contract.WiFiInterfaceSwitcher")
+		}
+		if err := s.SetInterfaceEnabled(t.Context(), false); !errors.Is(err, tc.want) || (tc.want == nil) != (err == nil) {
+			t.Errorf("%s: SetInterfaceEnabled = %v, want %v", tc.name, err, tc.want)
+		}
+	}
+	if !slices.Equal(switched, []bool{false, false}) {
+		t.Errorf("the host driver switched %v, want [false false]", switched)
+	}
 }
 
 // TestReannouncingDriverForwardsTheReportedLink: the driver the node hands
