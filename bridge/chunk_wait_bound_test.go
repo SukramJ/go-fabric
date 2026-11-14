@@ -193,9 +193,8 @@ func TestSessionCloseEndsItsChunkWaits(t *testing.T) {
 	}
 }
 
-// TestSubscriptionCloseEndsItsPrimingWait: a SubscribeRequest with
-// KeepSubscriptions=false closes the session's subscription still
-// priming, and the handler streaming that priming report stops waiting.
+// TestSubscriptionCloseEndsItsPrimingWait: the close of a subscription
+// still priming ends the wait of the handler streaming its priming report.
 func TestSubscriptionCloseEndsItsPrimingWait(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
@@ -204,33 +203,36 @@ func TestSubscriptionCloseEndsItsPrimingWait(t *testing.T) {
 	mgr := subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil)
 	b.AttachSubscriptionManager(mgr)
 
-	subscribe := func(exchange uint16) []byte {
-		enc := tlv.NewEncoder()
-		im.SubscribeRequest{MaxIntervalCeiling: 60, AttributeRequests: []im.ConcreteAttributePath{{}}}.MarshalTLV(enc)
-		payload, err := enc.Bytes()
-		if err != nil {
-			t.Fatalf("SubscribeRequest.MarshalTLV: %v", err)
-		}
-		return encryptIMFromPeer(t, a.sess, a.id, message.ProtocolHeader{
-			Opcode: im.OpcodeSubscribeRequest, ExchangeID: exchange, Initiator: true,
-		}, payload)
+	enc := tlv.NewEncoder()
+	im.SubscribeRequest{MaxIntervalCeiling: 60, AttributeRequests: []im.ConcreteAttributePath{{}}}.MarshalTLV(enc)
+	payload, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("SubscribeRequest.MarshalTLV: %v", err)
 	}
-	first := make(chan error, 1)
-	go func() { first <- b.dispatch(context.Background(), subscribe(0x3500), a.addr) }()
+	subscribe := encryptIMFromPeer(t, a.sess, a.id, message.ProtocolHeader{
+		Opcode: im.OpcodeSubscribeRequest, ExchangeID: 0x3500, Initiator: true,
+	}, payload)
+	priming := make(chan error, 1)
+	go func() { priming <- b.dispatch(context.Background(), subscribe, a.addr) }()
 	if _, _, ok := readOneIMDatagram(t, a.conn, a.sess, 3*time.Second); !ok {
-		t.Fatal("the first subscription's priming chunk did not reach the peer")
+		t.Fatal("the subscription's priming chunk did not reach the peer")
 	}
-	go func() { _ = b.dispatch(context.Background(), subscribe(0x3501), a.addr) }()
+	open := mgr.Snapshot()
+	if len(open) != 1 {
+		t.Fatalf("%d subscriptions open, want the priming one", len(open))
+	}
+	if err := mgr.Close(open[0].ID); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
 
 	wait, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	select {
-	case err := <-first:
+	case err := <-priming:
 		if err == nil {
-			t.Error("the first priming returned nil after its subscription was closed")
+			t.Error("the priming returned nil after its subscription was closed")
 		}
 	case <-wait.Done():
-		t.Fatal("the first priming still waits 5 s after the second subscribe closed its subscription")
+		t.Fatal("the priming still waits 5 s after its subscription was closed")
 	}
-	b.SessionClosed(a.id) // ends the second priming's wait
 }
