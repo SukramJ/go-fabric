@@ -196,6 +196,7 @@ becomes permissible in:
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
 | `im.EventLog.SetCounterPersistence` | `EventLog.SetCeilingPersistence`, whose persist function returns the store's error | `v0.23.0` |
+| `secure/operational.Manager.ReleaseID` | `Manager.AllocateStake` and `Manager.ReleaseStake`, which free the caller's own stake only | `v0.23.0` |
 | `secure/operational.Manager.ClosePeer` | none with the CloseSession farewell; `Manager.Close` on each id `Manager.SessionIDsForPeer` returns closes without it | `v0.23.0` |
 | `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.23.0` |
 | `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |

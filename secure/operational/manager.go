@@ -849,7 +849,8 @@ const placeholderQueueSlack = 64
 // Deprecated: ReleaseID frees whatever placeholder holds id, also the
 // stake an allocation at a full table made for another handshake after it
 // took the caller's (review II, R2-P3-dr-dev-07). Use [Manager.AllocateStake]
-// and [Manager.ReleaseStake], which free the caller's own stake only.
+// and [Manager.ReleaseStake], which free the caller's own stake only;
+// ReleaseID is removable in v0.23.0.
 func (m *Manager) ReleaseID(id uint16) {
 	m.mu.Lock()
 	if e, ok := m.sessions[id]; ok && e.Session == nil {
