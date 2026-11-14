@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
@@ -2276,8 +2277,10 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
 	occupancy := newOccupancyEvents(b, ep, pathSet)
+	energy := newElectricalEnergyEvents(b, ep, notifier)
 	values := newPathValues(ep, pathSet)
 	set.add(notifier.OnMatterValueChanged(func() {
+		defer energy.check()
 		defer occupancy.check()
 		defer boolState.check()
 		// Only the attributes whose value moved are reported, and only
@@ -2614,6 +2617,80 @@ func (e *occupancyEvents) check() {
 	if changed {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterOccupancySensing, measurement.OccupancyEventChanged,
 			measurement.OccupancyChangedEvent{Occupancy: occdef.OccupancyBitmap(v)}, contract.EventPriorityInfo)
+	}
+}
+
+// electricalEnergyEvents emits ElectricalEnergyMeasurement's
+// CumulativeEnergyMeasured when the CumulativeEnergyImported of an
+// endpoint's measurement-projected server changes to a value: matter.js
+// emits the event with each measurement its server's setMeasurement sets
+// (packages/node/src/behaviors/electrical-energy-measurement/
+// ElectricalEnergyMeasurementServer.ts:44-62 at db021da0), connectedhomeip
+// when a snapshot changes the attribute to a value that is not null
+// (src/app/clusters/electrical-energy-measurement-server/
+// ElectricalEnergyMeasurementCluster.cpp:442-469 at 6170af84). The
+// projected server is rebuilt on every dispatch and keeps no reading, so
+// the change is observed here, where the host's notification arrives, as
+// for OccupancyChanged (review II, R2-P4-nv-05a).
+type electricalEnergyEvents struct {
+	b  *Bridge
+	ep *endpointpkg.Endpoint
+	// mu guards last and orders the readings (check, changed).
+	mu   sync.Mutex
+	last *int64
+}
+
+// newElectricalEnergyEvents returns nil unless notifier is the endpoint's
+// measurement-projected ElectricalEnergyMeasurement server and it lists
+// CumulativeEnergyMeasured. The server is wired as a notifier of its own
+// once per endpoint ([Bridge.wireMeasurementNotifier]'s callers), while its
+// paths may be in the path set of the endpoint's source as well: keyed to
+// the server, one change emits one event.
+func newElectricalEnergyEvents(b *Bridge, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier) *electricalEnergyEvents {
+	srv, ok := notifier.(*measurement.ElectricalEnergyServer)
+	if !ok || !slices.Contains(srv.MatterEvents(), measurement.ElectricalEnergyEventCumulativeMeasured) {
+		return nil
+	}
+	e := &electricalEnergyEvents{b: b, ep: ep}
+	if v, ok := e.read(); ok {
+		e.last = &v
+	}
+	return e
+}
+
+// read is the endpoint's current CumulativeEnergyImported in mWh; false
+// while the source has no reading (the attribute is null).
+func (e *electricalEnergyEvents) read() (int64, bool) {
+	for _, srv := range endpointpkg.ClusterServers(e.ep) {
+		s, ok := srv.(*measurement.ElectricalEnergyServer)
+		if !ok {
+			continue
+		}
+		v, _ := s.MatterRead(eemdef.AttrCumulativeEnergyImported)
+		m, isStruct := v.(measurement.EnergyMeasurementStruct)
+		return m.Energy, isStruct
+	}
+	return 0, false
+}
+
+// check is [booleanStateEvents.check] for CumulativeEnergyImported: read,
+// compare, remember and emit under e.mu. A reading that becomes null emits
+// nothing and is not remembered, as connectedhomeip skips a null snapshot.
+func (e *electricalEnergyEvents) check() {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	v, ok := e.read()
+	if !ok {
+		return
+	}
+	changed := e.last == nil || *e.last != v
+	e.last = &v
+	if changed {
+		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterElectricalEnergy, measurement.ElectricalEnergyEventCumulativeMeasured,
+			measurement.CumulativeEnergyMeasuredEvent{EnergyImported: &measurement.EnergyMeasurementStruct{Energy: v}}, contract.EventPriorityInfo)
 	}
 }
 

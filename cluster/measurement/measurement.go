@@ -1185,6 +1185,23 @@ func (s *ElectricalEnergyServer) MatterAttributes() []uint32 {
 	return electricalEnergyInst.MatterAttributes()
 }
 
+// MatterEvents implements [contract.ClusterEventLister]:
+// CumulativeEnergyMeasured, mandatory with the CumulativeEnergy feature
+// ("CUME", matter.js
+// packages/model/src/standard/elements/electrical-energy-measurement.element.ts:56-59
+// at db021da0). The server is rebuilt on every dispatch and keeps no
+// reading, so the bridge emits the event when the source's cumulative
+// value changes (review II, R2-P4-nv-05a).
+func (s *ElectricalEnergyServer) MatterEvents() []uint32 { return electricalEnergyInst.MatterEvents() }
+
+// ElectricalEnergyEventCumulativeMeasured is the CumulativeEnergyMeasured
+// event (0x00).
+const ElectricalEnergyEventCumulativeMeasured = eemdef.EventCumulativeEnergyMeasured
+
+// CumulativeEnergyMeasuredEvent is CumulativeEnergyMeasured's payload: the
+// cumulative energy imported (the server binds no ExportedEnergy).
+type CumulativeEnergyMeasuredEvent = eemdef.CumulativeEnergyMeasuredEvent
+
 func whToMilliWattHours(wh float64) int64 {
 	v := math.Round(wh * 1000)
 	if v > math.MaxInt64 {
