@@ -88,8 +88,8 @@ func TestReportBoundFromSubscriptions(t *testing.T) {
 
 // TestPushedReportBoundFromSubscriptions: a report the peer pushes on a
 // subscription is held to the registry's bound: the chunk that passes it
-// is answered ResourceExhausted. (The first chunk, which opens the
-// exchange, is read before the bound counts.)
+// is answered ResourceExhausted. The first chunk, which opens the
+// exchange, counts as every later one does.
 func TestPushedReportBoundFromSubscriptions(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -104,10 +104,8 @@ func TestPushedReportBoundFromSubscriptions(t *testing.T) {
 			Attributes: []im.ConcreteAttributePath{onOff},
 			Updated:    func(*interaction.Report) error { return nil },
 		}, 5)
-		s.push(t, 0x7001, im.OpcodeReportData, chunk)
+		s.push(t, 0x7001, im.OpcodeReportData, chunk) // the pushed report's first chunk holds the bound exactly
 		to := expectStatus(t, s, im.StatusSuccess)
-		s.continueOn(t, to, im.OpcodeReportData, chunk) // holds the bound exactly
-		to = expectStatus(t, s, im.StatusSuccess)
 		s.continueOn(t, to, im.OpcodeReportData, chunk)
 		if m := s.next(t); m.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, m.payload) != im.StatusResourceExhausted {
 			t.Fatalf("the chunk past the bound answered opcode 0x%02X status %v, want ResourceExhausted", m.proto.Opcode, decodeStatus(t, m.payload))

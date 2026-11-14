@@ -626,11 +626,17 @@ func (m *messenger) holdChunk(ctx context.Context, held *int, payload []byte) er
 // the next one awaited, the last one with a Success unless it suppresses
 // the response — sent before the exchange closes, a failure only logged
 // (the tracked end message, :950-966). first, when set, is the chunk
-// already received. A consumer returning errStopReports ends the reading
-// with nil and no answer.
-func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first *im.ReportData, consume func(rd *im.ReportData) error) error {
+// already received, firstPayload its bytes, held to the report bound as
+// every later chunk is. A consumer returning errStopReports ends the
+// reading with nil and no answer.
+func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first *im.ReportData, firstPayload []byte, consume func(rd *im.ReportData) error) error {
 	held := 0
 	defer func() { releaseAssembly(m.x.Session(), held) }()
+	if first != nil {
+		if err := m.holdChunk(ctx, &held, firstPayload); err != nil {
+			return err
+		}
+	}
 	rd := first
 	for {
 		if rd == nil {
