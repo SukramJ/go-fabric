@@ -662,7 +662,9 @@ func (a *arrivedSession) forget() bool {
 // reOffer is a ProvideOffer naming a session the camera holds: it never
 // ends a session nor overwrites a requestor entry; it adds one only when
 // absent and trackable. The offer is withdrawn when the camera refuses it
-// or the requestor does not hold the session. Mirrors matterjs-server
+// or the requestor does not hold the session, and an answer that arrives
+// once the service's Close began adds nothing and returns [ErrClosed].
+// Mirrors matterjs-server
 // packages/ws-controller/src/controller/webRtcSessionStreams.ts:240-268 at
 // 0bd06f2.
 func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.ProvideOfferRequest) (any, error) {
@@ -676,6 +678,14 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 	if _, _, _, ok := sessionIDOf(resp); !ok {
 		withdraw()
 		return nil, stackError("ProvideOffer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
+	}
+	if p.isClosed() {
+		// Answered once the service's Close began, as newSession's arrival
+		// refuses: the requestor gains no entry nothing would remove. A
+		// re-offer never ends a session (review II, rework of
+		// R2-P2-stop-03).
+		withdraw()
+		return nil, ErrClosed
 	}
 	if session, ok := p.trackableSession(t, fields, resp); ok && !p.tracks(k) {
 		if err := p.requestor.upsert(session); err != nil {

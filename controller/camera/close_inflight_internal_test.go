@@ -97,3 +97,35 @@ func TestSecondCloseWaitsForTheFirst(t *testing.T) {
 		}
 	})
 }
+
+// TestProviderReOfferAnsweredDuringCloseAddsNothing (review II, rework of
+// R2-P2-stop-03): a raw ProvideOffer naming a session the camera holds —
+// one the requestor does not track — whose response arrives once Close
+// began adds no requestor entry and returns ErrClosed. A re-offer never
+// ends a session, so none is ended. Before, the entry was added after
+// Close's sweep and nothing removed it.
+func TestProviderReOfferAnsweredDuringCloseAddsNothing(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		f := newPSFixture()
+		closed := make(chan error, 1)
+		f.respond = func(command string) (any, error) {
+			if command == callProvideOffer {
+				go func() { closed <- f.svc.Close(context.Background()) }()
+				synctest.Wait()
+			}
+			return wpdef.ProvideOfferResponse{WebRtcSessionId: 9}, nil
+		}
+		p := &Provider{s: f.svc, t: target{psCamera, psEndpoint}}
+		payload, _ := json.Marshal(map[string]any{"webRtcSessionId": 9, "sdp": psOffer, "streamUsage": 3, "videoStreams": []int{1}})
+		if _, _, err := p.Send(t.Context(), "ProvideOffer", payload); !errors.Is(err, ErrClosed) {
+			t.Errorf("re-offer answered during Close = %v, want ErrClosed", err)
+		}
+		if err := <-closed; err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		if got := f.sessions(); len(got) != 0 {
+			t.Errorf("requestor after Close holds %+v, want nothing", got)
+		}
+	})
+}
