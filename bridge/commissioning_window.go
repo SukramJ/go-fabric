@@ -39,6 +39,12 @@ type FailSafeChecker interface {
 // commissioner's ArmFailSafe or the 60 s arm of its PASE session does — so
 // the window never calls ArmFailSafeFor; [CommissioningWindow.SetFailSafeArmer]
 // keeps wiring an armer that is a [FailSafeExpirer] as one.
+//
+// Deprecated: nothing in the module arms a fail-safe through it. There is
+// no replacement: the fail-safe comes with the commissioner's ArmFailSafe
+// (or the arm of its PASE session); what a window still needs of
+// GeneralCommissioning is a [FailSafeExpirer]. Removable in v0.23.0
+// (review II, owner decision 47).
 type FailSafeArmer interface {
 	ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error
 }
@@ -235,6 +241,10 @@ func (w *CommissioningWindow) SetFailSafeChecker(c FailSafeChecker) {
 // one (core.GeneralCommissioning is), and clears it otherwise; the window
 // arms no fail-safe (owner decision 47). [CommissioningWindow.SetFailSafeExpirer]
 // is the direct wiring.
+//
+// Deprecated: the window arms no fail-safe, so there is nothing to wire an
+// armer for; use [CommissioningWindow.SetFailSafeExpirer] for the expirer
+// it wires. Removable in v0.23.0 (review II, owner decision 47).
 func (w *CommissioningWindow) SetFailSafeArmer(a FailSafeArmer) {
 	e, _ := a.(FailSafeExpirer)
 	w.SetFailSafeExpirer(e)
