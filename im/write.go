@@ -84,12 +84,22 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		return WriteRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidWriteRequest, open.Type)
 	}
 	var req WriteRequest
+	var hasTimed, hasWrites bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		if el.IsEndContainer {
+			// TimedRequest and WriteRequests are mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvWriteRequest.ts:21, :24
+			// at db021da0 (TlvField; SuppressResponse :18 is optional).
+			switch {
+			case !hasTimed:
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqTimedRequest, "TimedRequest"))
+			case !hasWrites:
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqWriteRequests, "WriteRequests"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -107,6 +117,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			req.SuppressResponse = el.Bool
 		case tagWriteReqTimedRequest:
 			req.TimedRequest = el.Bool
+			hasTimed = true
 		case tagWriteReqMoreChunked:
 			req.MoreChunkedMessages = el.Bool
 		case tagWriteReqWriteRequests:
@@ -118,6 +129,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 				return WriteRequest{}, err
 			}
 			req.Writes = ws
+			hasWrites = true
 		default:
 			if el.IsContainer {
 				if err := skipContainer(dec); err != nil {
@@ -151,12 +163,23 @@ func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]
 
 func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeWrite, error) {
 	var w AttributeWrite
+	var hasPath, hasData bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeWrite{}, err
 		}
 		if el.IsEndContainer {
+			// Path and Data are mandatory: matter.js
+			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
+			// db021da0 (TlvField). Without the check an AttributeDataIB
+			// without Data reached the server as a write of nil.
+			switch {
+			case !hasPath:
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataPath, "AttributeDataIB.Path"))
+			case !hasData:
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataValue, "AttributeDataIB.Data"))
+			}
 			return w, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -180,7 +203,9 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 				return AttributeWrite{}, err
 			}
 			w.Path = p
+			hasPath = true
 		case tagAttributeDataValue:
+			hasData = true
 			if valueReader == nil {
 				// Without a cluster-aware reader we cannot turn the
 				// element tree into a Go value. Drain the container so

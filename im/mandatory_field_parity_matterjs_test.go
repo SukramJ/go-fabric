@@ -58,3 +58,60 @@ func TestMandatoryFieldParity(t *testing.T) {
 		})
 	}
 }
+
+// TestMandatoryWriteInvokeFieldParity: the mandatory fields of the Write
+// and Invoke request messages and of their AttributeDataIB and
+// CommandDataIB at db021da0 — TlvWriteRequest.ts:21 timedRequest, :24
+// writeRequests; TlvInvokeRequest.ts:19 suppressResponse, :22 timedRequest,
+// :25 invokeRequests; TlvAttributeData.ts:18 path, :19 data;
+// TlvCommandData.ts:17 commandPath. Each is a TlvField, so a message
+// without it fails validation with ValidationMandatoryFieldMissingError
+// (packages/types/src/tlv/TlvObject.ts:255-262), answered InvalidAction.
+// SuppressResponse of a WriteRequest is a TlvOptionalField
+// (TlvWriteRequest.ts:18) and may be left out.
+func TestMandatoryWriteInvokeFieldParity(t *testing.T) {
+	t.Parallel()
+	write := func(b []byte) func() error {
+		return func() error { _, err := UnmarshalWriteRequestTLV(tlv.NewDecoder(b), nil); return err }
+	}
+	invoke := func(b []byte) func() error {
+		return func() error { _, err := UnmarshalInvokeRequestTLV(tlv.NewDecoder(b), nil); return err }
+	}
+	// 0x15 struct, 0x18 end, 0x28/0x29 tt = false/true, 0x36 tt = array,
+	// 0x37 tt = list, 0x24 tt v = uint8, 0x25 tt vvvv = uint16.
+	missing := []struct {
+		name   string
+		decode func() error
+	}{
+		{"WriteRequest without TimedRequest", write([]byte{0x15, 0x36, 0x02, 0x18, 0x18})},
+		{"WriteRequest without WriteRequests", write([]byte{0x15, 0x28, 0x01, 0x18})},
+		{"AttributeDataIB without Path and Data", write([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x15, 0x18, 0x18, 0x18})},
+		{"AttributeDataIB without Data", write([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x15, 0x37, 0x01, 0x24, 0x02, 0x01, 0x24, 0x03, 0x06, 0x25, 0x04, 0x01, 0x40, 0x18, 0x18, 0x18, 0x18})},
+		{"AttributeDataIB without Path", write([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x15, 0x24, 0x02, 0x07, 0x18, 0x18, 0x18})},
+		{"InvokeRequest without any field", invoke([]byte{0x15, 0x18})},
+		{"InvokeRequest without SuppressResponse", invoke([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x18, 0x18})},
+		{"InvokeRequest without TimedRequest", invoke([]byte{0x15, 0x28, 0x00, 0x36, 0x02, 0x18, 0x18})},
+		{"InvokeRequest without InvokeRequests", invoke([]byte{0x15, 0x28, 0x00, 0x28, 0x01, 0x18})},
+		{"CommandDataIB without CommandPath", invoke([]byte{0x15, 0x28, 0x00, 0x28, 0x01, 0x36, 0x02, 0x15, 0x18, 0x18, 0x18})},
+	}
+	for _, tc := range missing {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.decode()
+			var sce StatusCodeError
+			if !errors.Is(err, ErrMissingField) || !errors.As(err, &sce) || sce.MatterStatusCode() != StatusInvalidAction {
+				t.Fatalf("decode error = %v, want ErrMissingField (InvalidAction)", err)
+			}
+		})
+	}
+	// Controls: the smallest complete messages decode.
+	for name, decode := range map[string]func() error{
+		"WriteRequest without the optional SuppressResponse": write([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x18, 0x18}),
+		"WriteRequest with one complete AttributeDataIB":     write([]byte{0x15, 0x28, 0x01, 0x36, 0x02, 0x15, 0x37, 0x01, 0x24, 0x02, 0x01, 0x24, 0x03, 0x06, 0x25, 0x04, 0x01, 0x40, 0x18, 0x24, 0x02, 0x07, 0x18, 0x18, 0x18}),
+		"InvokeRequest with no commands":                     invoke([]byte{0x15, 0x28, 0x00, 0x28, 0x01, 0x36, 0x02, 0x18, 0x18}),
+	} {
+		if err := decode(); err != nil {
+			t.Errorf("%s: %v, want nil", name, err)
+		}
+	}
+}

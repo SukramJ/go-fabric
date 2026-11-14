@@ -207,12 +207,25 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 		return InvokeRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidInvokeRequest, open.Type)
 	}
 	var req InvokeRequest
+	var hasSuppress, hasTimed, hasInvokes bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 		}
 		if el.IsEndContainer {
+			// SuppressResponse, TimedRequest and InvokeRequests are
+			// mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvInvokeRequest.ts:19,
+			// :22, :25 at db021da0 (TlvField).
+			switch {
+			case !hasSuppress:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqSuppressResponse, "SuppressResponse"))
+			case !hasTimed:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqTimedRequest, "TimedRequest"))
+			case !hasInvokes:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqInvokeRequests, "InvokeRequests"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -228,8 +241,10 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidInvokeRequest)
 			}
 			req.SuppressResponse = el.Bool
+			hasSuppress = true
 		case tagInvokeReqTimedRequest:
 			req.TimedRequest = el.Bool
+			hasTimed = true
 		case tagInvokeReqInvokeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return InvokeRequest{}, fmt.Errorf("%w: InvokeRequests not array", ErrInvalidInvokeRequest)
@@ -239,6 +254,7 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, err
 			}
 			req.Invokes = invokes
+			hasInvokes = true
 		case tagInvokeReqDelayReportData:
 			drd, err := readDelayReportData(dec, el)
 			if err != nil {
@@ -282,12 +298,19 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 
 func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (CommandInvocation, error) {
 	var inv CommandInvocation
+	hasPath := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return CommandInvocation{}, err
 		}
 		if el.IsEndContainer {
+			// CommandPath is mandatory: matter.js
+			// packages/types/src/protocol/types/TlvCommandData.ts:17 at
+			// db021da0 (TlvField).
+			if !hasPath {
+				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagCmdDataPath, "CommandDataIB.CommandPath"))
+			}
 			return inv, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -303,6 +326,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				return CommandInvocation{}, err
 			}
 			inv.Path = p
+			hasPath = true
 		case tagCmdDataFields:
 			if err := readCommandFields(dec, el, fieldsReader, &inv); err != nil {
 				return CommandInvocation{}, err

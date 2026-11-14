@@ -134,6 +134,9 @@ func TestWriteRequestDecodeRefusals(t *testing.T) {
 		}, 2, true},
 		{"a field it does not know", func(enc *tlv.Encoder) {
 			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutBool(tlv.ContextTag(1), false) // TimedRequest and WriteRequests are mandatory
+			enc.StartArray(tlv.ContextTag(2))
+			_ = enc.EndContainer()
 			enc.StartStruct(tlv.ContextTag(9))
 			enc.PutBool(tlv.ContextTag(0), true)
 			_ = enc.EndContainer()
