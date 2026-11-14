@@ -370,12 +370,17 @@ func (c *Commissioner) closePASE(s *exchange.Session, ch Channel, cause error) {
 // (ControllerCommissioner.ts:442-492 for a BLE address): the unsecured
 // session on the channel's manager, PASE with the passcode within
 // timeout, peer loss suppressed; a lost channel force-closes the PASE
-// session so its exchanges end at once (Ble.ts:17-22, :44-55).
+// session so its exchanges end at once (Ble.ts:17-22, :44-55). The
+// device's PBKDFParamResponse marks a discovery race's attempt that runs
+// with ctx as answered (discovery.AttemptAnswered, owner decision 55).
 func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, timeout time.Duration, passcode uint32) (*exchange.Session, error) {
 	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("peer", ch.PeerAddress().String()), slog.String("channel", "ble"))
 	pctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	s, err := handshake.PASE(pctx, ch.Exchanges(), ch.PeerAddress(), passcode, handshake.PASEOptions{SuppressPeerLoss: true, Logger: c.log})
+	s, err := handshake.PASE(pctx, ch.Exchanges(), ch.PeerAddress(), passcode, handshake.PASEOptions{
+		SuppressPeerLoss: true, Logger: c.log,
+		OnPBKDFParamResponse: func() { discovery.AttemptAnswered(pctx) },
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +414,9 @@ func (c *Commissioner) EstablishPASE(ctx context.Context, opts PASEOptions) (*ex
 
 // establishFromCandidates is #establishPaseFromCandidates (:378-410): the
 // connection, a PairRetransmissionLimitReachedError becoming
-// PeerCommunicationError("Could not connect to device").
+// PeerCommunicationError("Could not connect to device"). A
+// PBKDFParamResponse marks a discovery race's attempt that runs with ctx
+// as answered (discovery.AttemptAnswered, owner decision 55).
 func (c *Commissioner) establishFromCandidates(ctx context.Context, devices []*candidate, timeout time.Duration, passcode uint32, suppressPeerLoss bool) (connectionResult, error) {
 	res, err := connectPASE(ctx, connectionConfig{
 		devices: devices,
@@ -417,7 +424,10 @@ func (c *Commissioner) establishFromCandidates(ctx context.Context, devices []*c
 		clock:   c.ctx.Clock,
 		log:     c.log,
 		establish: func(actx context.Context, addr *net.UDPAddr, cand *candidate, onPBKDF func()) (*exchange.Session, error) {
-			return c.establishEphemeralNodeSession(actx, addr, passcode, cand, suppressPeerLoss, onPBKDF)
+			return c.establishEphemeralNodeSession(actx, addr, passcode, cand, suppressPeerLoss, func() {
+				onPBKDF()
+				discovery.AttemptAnswered(actx)
+			})
 		},
 	})
 	var pr *PairRetransmissionLimitReachedError

@@ -674,8 +674,11 @@ every device until the timeout, `Stop` or the context ends; a callback per
 device), `discovery.FindInstance` (InstanceDiscovery: the first device),
 and the PASE races `discovery.Race`, `discovery.CommissioningRace` and
 `discovery.PASERace` (ParallelPaseDiscovery, CommissioningDiscovery,
-PaseDiscovery): every device found gets an attempt, one second apart, and
-the first to establish PASE wins; the others are cancelled. A session runs
+PaseDiscovery): every device found gets an attempt, one second apart while
+one runs and at most 16 s after it was found, at most 16 at once — a later
+one takes the place of the oldest attempt whose device has not answered PASE
+yet (`discovery.AttemptAnswered`) — and the first to establish PASE wins;
+the others are cancelled. A session runs
 on `discovery.Transport`s — `discovery.IPTransport` over DNS-SD,
 `ble.Transport` over a BLE scanner — selected by the payload's discovery
 capabilities (`discovery.SelectTransports`: the IP network always, BLE where

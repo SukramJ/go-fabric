@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -100,8 +101,29 @@ func (k *continuousKind) onStop(*Session[[]Candidate]) {}
 // matter.js counts the slot from every attempt found before, ended or not
 // (ParallelPaseDiscovery.ts:102-103 at db021da0); here an attempt that has
 // ended holds no slot, and with none running the next starts at once
-// (review II, R2-P3-ble-01, R2-P3-ctl-lan-06).
+// (review II, R2-P3-ble-01, R2-P3-ctl-lan-06). A start waits at most
+// raceStaggerCeiling, and at most maxRaceAttempts run at once.
 const CrossDeviceStagger = time.Second
+
+// maxRaceAttempts is how many of a race's attempts run at the same time.
+// A candidate whose ceiling has come while that many run takes the place
+// of the oldest attempt that has had no answer from its device yet
+// ([AttemptAnswered]), which ends; an answered attempt is never ended for
+// a candidate found later, and while every place holds one the candidate
+// waits for an attempt to end. The count is the module's bound on the
+// handshakes of honest peers awaiting an acknowledgement at one moment:
+// the device side's unsecuredEntryLimit (bridge/outbound_reliable.go:301)
+// and the controller's inboundUnsecuredAckWaitLimit
+// (client/exchange/manager.go:958). matter.js starts every candidate's
+// attempt after its stagger and bounds neither the attempts running nor
+// the stagger (ParallelPaseDiscovery.ts:102-103, :110-116 at db021da0;
+// review II, owner decision 55, R2-P3-ctl-lan-06, R2-P3-ble-01).
+const maxRaceAttempts = 16
+
+// raceStaggerCeiling is the longest a candidate's start waits after it
+// was found, however many candidates stand before it: the time the
+// stagger takes to fill every place.
+const raceStaggerCeiling = maxRaceAttempts * CrossDeviceStagger
 
 // The default timeouts of the two races: CommissioningDiscovery's 3
 // minutes, the spec's minimum commissioning window
@@ -117,13 +139,36 @@ const (
 // false when another won first or the discovery ended or was interrupted,
 // and the attempt then gives its session up. The winner's attempt runs to
 // its end (a commissioning, say) and its result is the race's; ctx ends
-// for every attempt but the winner's once the race is decided.
+// for every attempt but the winner's once the race is decided, and for an
+// attempt the race ends to give its place to a later candidate — which it
+// does only while the attempt has not called [AttemptAnswered] with ctx.
 type Attempt[W any] func(ctx context.Context, c Candidate, win func() bool) (W, error)
+
+// attemptKey is the context key of a race attempt's [attemptMark].
+type attemptKey struct{}
+
+// attemptMark is what [AttemptAnswered] finds in an attempt's context.
+type attemptMark struct{ answered func() }
+
+// AttemptAnswered tells the race whose attempt runs with ctx (or a
+// context derived from it) that the attempt's device has answered — for a
+// PASE attempt, that its PBKDFParamResponse has arrived. From then the race
+// never ends the attempt to give its place to a candidate found later.
+// With any other context it does nothing.
+func AttemptAnswered(ctx context.Context) {
+	if m, ok := ctx.Value(attemptKey{}).(*attemptMark); ok {
+		m.answered()
+	}
+}
 
 // Race runs attempt on every device found, in parallel and in the order
 // found, each next one a [CrossDeviceStagger] after the one before while
 // an attempt runs and at once when none does, and the first to win PASE
-// wins the race —
+// wins the race. A start waits at most 16 s after its device was found
+// however many stand before it; at most 16 attempts run at once, and a
+// candidate whose wait is up while they do takes the place of the oldest
+// attempt that has not called [AttemptAnswered] — matter.js has neither
+// bound (docs/guides/limits.md). Otherwise it is
 // matter.js ParallelPaseDiscovery (ParallelPaseDiscovery.ts:45-216):
 //
 //   - the race is decided on a win, an interruption before one, or the
@@ -172,7 +217,7 @@ func PASERace[W any](ctx context.Context, transports []Transport, opts SessionOp
 }
 
 func startRace[W any](ctx context.Context, transports []Transport, opts SessionOptions, attempt Attempt[W], accept func(*Session[W], Candidate) bool, failure string) *Session[W] {
-	k := &raceKind[W]{attempt: attempt, accept: accept, failure: failure, decided: make(chan struct{}), cancels: map[int]context.CancelFunc{}}
+	k := &raceKind[W]{attempt: attempt, accept: accept, failure: failure, decided: make(chan struct{})}
 	return start[W](ctx, k, transports, opts, describe(opts.Identifier))
 }
 
@@ -192,17 +237,31 @@ type raceKind[W any] struct {
 	attemptCount int
 	startedCount int
 	attemptErrs  []error
-	cancels      map[int]context.CancelFunc
 	pending      sync.WaitGroup
 
-	// The stagger: waiting holds the attempts found and not yet released,
-	// in the order found; running counts those released and not yet
-	// ended; lastRelease is when the latest was released, and staggerTimer
-	// the wait for the next slot.
-	waiting      []chan struct{}
-	running      int
+	// The stagger and the places: waiting holds the attempts found and not
+	// yet released, in the order found; active those released and not yet
+	// ended, in the order released (at most maxRaceAttempts); lastRelease
+	// is when the latest was released, and staggerTimer the wait for the
+	// next release.
+	waiting      []*raceAttempt
+	active       []*raceAttempt
 	lastRelease  time.Time
 	staggerTimer fabricclock.Timer
+}
+
+// raceAttempt is one candidate's attempt as the race schedules it; the
+// fields after release are set under the race's mutex.
+type raceAttempt struct {
+	index   int
+	device  string
+	foundAt time.Time
+	release chan struct{}
+
+	ctx      context.Context
+	cancel   context.CancelFunc
+	answered bool // AttemptAnswered was called
+	replaced bool // ended for a later candidate; it holds its place until it returns
 }
 
 // decideLocked closes the race: no attempt starts from now, win refuses,
@@ -219,9 +278,9 @@ func (k *raceKind[W]) decideLocked() {
 		k.staggerTimer.Stop()
 		k.staggerTimer = nil
 	}
-	for i, cancel := range k.cancels {
-		if !k.paseWon || i != k.winnerIndex {
-			cancel()
+	for _, a := range k.active {
+		if !k.paseWon || a.index != k.winnerIndex {
+			a.cancel()
 		}
 	}
 }
@@ -237,103 +296,149 @@ func (k *raceKind[W]) onDiscovered(s *Session[W], c Candidate) {
 		return
 	}
 	k.mu.Lock()
-	index := k.attemptCount
+	a := &raceAttempt{index: k.attemptCount, device: c.Device.InstanceID, foundAt: s.clock.Now(), release: make(chan struct{})}
 	k.attemptCount++
-	release := make(chan struct{})
 	if !k.isDecided {
-		k.waiting = append(k.waiting, release)
+		k.waiting = append(k.waiting, a)
 		k.releaseLocked(s)
 	}
 	k.mu.Unlock()
-	k.pending.Go(func() { k.run(s, c, index, release) })
+	k.pending.Go(func() { k.run(s, c, a) })
 }
 
-// releaseLocked releases the attempts whose slot has come: the first
-// waiting one at once when no attempt runs, else one [CrossDeviceStagger]
-// after the latest release, for which it arms the stagger timer. The
-// caller holds k.mu.
+// releaseLocked releases the waiting attempts whose start has come. The
+// first waiting one starts at once when no attempt runs, else one
+// [CrossDeviceStagger] after the latest release, and at the latest
+// raceStaggerCeiling after it was found. A start needs a place: with
+// maxRaceAttempts running it waits for its ceiling and then ends the
+// oldest running attempt that has had no answer, whose place it takes
+// once that attempt has returned; while every running attempt has had an
+// answer it waits for an attempt to end. The caller holds k.mu.
 func (k *raceKind[W]) releaseLocked(s *Session[W]) {
-	if k.isDecided || len(k.waiting) == 0 {
-		return
-	}
-	now := s.clock.Now()
-	if k.running > 0 {
-		if wait := k.lastRelease.Add(CrossDeviceStagger).Sub(now); wait > 0 {
-			if k.staggerTimer == nil {
-				var t fabricclock.Timer
-				t = s.clock.AfterFunc(wait, func() {
-					k.mu.Lock()
-					defer k.mu.Unlock()
-					if k.staggerTimer == t {
-						k.staggerTimer = nil
-					}
-					k.releaseLocked(s)
-				})
-				k.staggerTimer = t
-			}
-			return
-		}
-	}
 	if k.staggerTimer != nil {
 		k.staggerTimer.Stop()
 		k.staggerTimer = nil
 	}
-	next := k.waiting[0]
-	k.waiting = k.waiting[1:]
-	k.running++
-	k.lastRelease = now
-	close(next)
-	// The one released runs now, so the next waits for its slot.
-	k.releaseLocked(s)
+	for !k.isDecided && len(k.waiting) > 0 {
+		now := s.clock.Now()
+		next := k.waiting[0]
+		ceiling := next.foundAt.Add(raceStaggerCeiling)
+		due := now
+		if len(k.active) > 0 {
+			due = k.lastRelease.Add(CrossDeviceStagger)
+		}
+		if ceiling.Before(due) {
+			due = ceiling
+		}
+		if len(k.active) >= maxRaceAttempts {
+			due = ceiling
+		}
+		if now.Before(due) {
+			k.armLocked(s, due.Sub(now))
+			return
+		}
+		if len(k.active) >= maxRaceAttempts {
+			k.replaceLocked(s, next)
+			return
+		}
+		k.waiting = k.waiting[1:]
+		mark := &attemptMark{answered: func() {
+			k.mu.Lock()
+			next.answered = true
+			k.mu.Unlock()
+		}}
+		next.ctx, next.cancel = context.WithCancel(context.WithValue(s.ctx, attemptKey{}, mark)) //nolint:gosec // G118: run and decideLocked call cancel
+		k.active = append(k.active, next)
+		k.lastRelease = now
+		close(next.release)
+	}
 }
 
-// ended is an attempt's end: its slot is free, so the next waiting one may
-// start at once.
-func (k *raceKind[W]) ended(s *Session[W]) {
+// armLocked arms the stagger timer to release again after wait. The caller
+// holds k.mu.
+func (k *raceKind[W]) armLocked(s *Session[W], wait time.Duration) {
+	var t fabricclock.Timer
+	t = s.clock.AfterFunc(wait, func() {
+		k.mu.Lock()
+		defer k.mu.Unlock()
+		if k.staggerTimer != t {
+			return
+		}
+		k.staggerTimer = nil
+		k.releaseLocked(s)
+	})
+	k.staggerTimer = t
+}
+
+// replaceLocked ends the oldest running attempt that has had no answer,
+// for next to take its place when it has returned ([raceKind.ended]) — one
+// at a time: while an attempt so ended has not returned, it does nothing.
+// The caller holds k.mu.
+func (k *raceKind[W]) replaceLocked(s *Session[W], next *raceAttempt) {
+	var oldest *raceAttempt
+	for _, a := range k.active {
+		if a.replaced {
+			return
+		}
+		if oldest == nil && !a.answered {
+			oldest = a
+		}
+	}
+	if oldest == nil {
+		return
+	}
+	oldest.replaced = true
+	oldest.cancel()
+	s.log.Info("matter.controller.discovery.attempt_replaced", slog.String("discovery", s.description),
+		slog.String("device", oldest.device), slog.String("candidate", next.device))
+}
+
+// ended is an attempt's end: its place is free, so the next waiting one
+// may start.
+func (k *raceKind[W]) ended(s *Session[W], a *raceAttempt) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	k.running--
+	if i := slices.Index(k.active, a); i >= 0 {
+		k.active = slices.Delete(k.active, i, i+1)
+	}
 	k.releaseLocked(s)
 }
 
 // run is one registered attempt (registerAttempt, :81-147).
-func (k *raceKind[W]) run(s *Session[W], c Candidate, index int, release <-chan struct{}) {
+func (k *raceKind[W]) run(s *Session[W], c Candidate, a *raceAttempt) {
 	select {
-	case <-release:
-		defer k.ended(s)
+	case <-a.release:
+		defer k.ended(s, a)
 	case <-k.decided:
 		return
 	}
+	defer a.cancel()
 	s.checkCaller()
-	ctx, cancel := context.WithCancel(s.ctx)
-	defer cancel()
 	k.mu.Lock()
-	if k.isDecided {
+	if k.isDecided || a.replaced {
 		k.mu.Unlock()
 		return
 	}
-	k.cancels[index] = cancel
 	k.startedCount++
 	k.mu.Unlock()
 	isWinner := false
 	win := func() bool {
 		s.checkCaller()
 		k.mu.Lock()
-		if k.isDecided {
+		if k.isDecided || a.replaced {
 			k.mu.Unlock()
 			return false
 		}
-		k.paseWon, isWinner, k.winnerIndex = true, true, index
+		k.paseWon, isWinner, k.winnerIndex = true, true, a.index
 		k.winnerDone = make(chan struct{})
 		k.decideLocked()
 		k.mu.Unlock()
 		s.Stop()
 		return true
 	}
-	w, err := k.attempt(ctx, c, win)
+	w, err := k.attempt(a.ctx, c, win)
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	delete(k.cancels, index)
 	if isWinner {
 		k.winner, k.winnerErr = w, err
 		close(k.winnerDone)
@@ -342,7 +447,7 @@ func (k *raceKind[W]) run(s *Session[W], c Candidate, index int, release <-chan 
 	if err == nil {
 		return
 	}
-	if k.isDecided && errors.Is(err, context.Canceled) {
+	if (k.isDecided || a.replaced) && errors.Is(err, context.Canceled) {
 		s.log.Debug("matter.controller.discovery.attempt_canceled", slog.String("discovery", s.description), slog.Any("err", err))
 		return
 	}
