@@ -504,6 +504,47 @@ func TestDataVersionMovesOnWrites(t *testing.T) {
 	}
 }
 
+// TestStepAdvancesTheDataVersionOnlyOnAChange: a Step that leaves the fan
+// as it was — at the top without Wrap, or a host stepper that changed
+// nothing — leaves the DataVersion; one that moved the fan advances it
+// once. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1480 at db021da0 (#noteIfChanged returns for an equal value; the
+// version advances only when the commit changed something).
+func TestStepAdvancesTheDataVersionOnlyOnAChange(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	// At the top: SpeedSetting SpeedMax and the PercentSetting it maps to.
+	d := &device{st: fandef.State{SpeedSetting: u8(10), PercentSetting: u8(100)}}
+	srv := newFull(t, d)
+	before := srv.MatterDataVersion()
+	if _, err := srv.MatterInvoke(ctx, fan.CmdStep, step(fan.StepIncrease, false, true)); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before {
+		t.Errorf("a Step at the top without Wrap moved the DataVersion %d -> %d", before, got)
+	}
+	if _, err := srv.MatterInvoke(ctx, fan.CmdStep, step(fan.StepDecrease, false, true)); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before+1 {
+		t.Errorf("a Step that moved the speed moved the DataVersion %d -> %d, want +1", before, got)
+	}
+
+	st := &stepper{plainDevice: plainDevice{&device{}}}
+	srv, err := fan.NewServer(fan.Config{Source: st, Stepper: st, Features: fan.FeatureStep, Sequence: fan.SequenceOffHigh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before = srv.MatterDataVersion()
+	if _, err := srv.MatterInvoke(ctx, fan.CmdStep, step(fan.StepIncrease, false, true)); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before {
+		t.Errorf("a host Step that changed nothing moved the DataVersion %d -> %d", before, got)
+	}
+}
+
 func step(dir uint8, wrap, lowestOff bool) clusterwire.FanStepRequest {
 	return clusterwire.FanStepRequest{Direction: dir, Wrap: wrap, LowestOff: lowestOff}
 }

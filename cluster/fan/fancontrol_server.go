@@ -672,14 +672,15 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if err != nil {
 		return nil, err
 	}
+	before := s.src.FanState()
 	if stepper, ok := s.src.(Stepper); ok {
 		if err := stepper.Step(ctx, stepRequestOf(req)); err != nil {
 			return nil, fmt.Errorf("fan: Step: %w", err)
 		}
-		s.tracker().Bump()
+		s.bumpIfChanged(before)
 		return nil, nil
 	}
-	st := s.src.FanState()
+	st := before
 	var set settings
 	if s.has(FeatureMultiSpeed) {
 		current := st.SpeedCurrent
@@ -693,8 +694,30 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if err := s.apply(ctx, "Step", set); err != nil {
 		return nil, err
 	}
-	s.tracker().Bump()
+	s.bumpIfChanged(before)
 	return nil, nil
+}
+
+// bumpIfChanged advances the DataVersion when the fan the host reports
+// differs from before: a Step that left the fan as it was changes no
+// attribute. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1480 at db021da0 (#noteIfChanged returns for an equal value; the
+// version advances only when the commit changed something).
+func (s *Server) bumpIfChanged(before fanState) {
+	if !sameFanState(before, s.src.FanState()) {
+		s.tracker().Bump()
+	}
+}
+
+// sameFanState reports whether a and b observe the same fan, the nullable
+// settings compared by value.
+func sameFanState(a, b fanState) bool {
+	sameNullable := func(x, y *uint8) bool { return (x == nil) == (y == nil) && (x == nil || *x == *y) }
+	return a.FanMode == b.FanMode && sameNullable(a.PercentSetting, b.PercentSetting) &&
+		a.PercentCurrent == b.PercentCurrent && sameNullable(a.SpeedSetting, b.SpeedSetting) &&
+		a.SpeedCurrent == b.SpeedCurrent && a.RockSetting == b.RockSetting &&
+		a.WindSetting == b.WindSetting && a.AirflowDirection == b.AirflowDirection
 }
 
 // stepValue moves current one unit along [lowest, ceiling].
