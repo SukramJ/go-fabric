@@ -496,6 +496,11 @@ type Bridge struct {
 	// cleanup) or point at stale topology entries (cleanup but no
 	// re-bind).
 	measurementUnsubscribers []func()
+	// quietParked holds the quiet paths a torn-down wiring parked for the
+	// next one to take up ([Bridge.parkQuietPath]); guarded by quietMu, a
+	// leaf lock.
+	quietMu     sync.Mutex
+	quietParked map[im.ConcreteAttributePath]*quietPath
 	// listenerGeneration counts the wirings of the host's notifiers; a
 	// wiring that finds it moved while it registered was overtaken and
 	// detaches what it registered ([Bridge.rewireMeasurementListeners]).

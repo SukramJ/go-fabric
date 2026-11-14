@@ -145,6 +145,58 @@ func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
 	r.step(t, "a change after a quiet second", v0, 4, true)
 }
 
+// TestHeldQuieterChangeSurvivesReassemble: a change of a projected
+// quieter attribute the throttle holds back is reported when its interval
+// is up though the bridge re-wired its listeners meanwhile: the throttle
+// of a path outlives a wiring that serves the path again, as matter.js's
+// QuietEvent lives with its behavior, which a change of the node's
+// topology elsewhere does not re-create
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
+// db021da0). The re-wiring restarts no interval: the change after it is
+// still held. Review II, R2-P4-dr-sub-01.
+func TestHeldQuieterChangeSurvivesReassemble(t *testing.T) {
+	t.Parallel()
+	r := newQuietMeterRig(t, epmActivePower)
+	v0 := r.version()
+	r.src.setPower(10)
+	r.step(t, "a change from null", v0, 1, true)
+	r.clk.Advance(100 * time.Millisecond)
+	r.src.setPower(20) // held
+	r.step(t, "a change within the second", v0, 2, false)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := r.b.Reassemble(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.step(t, "after the re-wiring", v0, 2, false)
+	r.clk.Advance(900 * time.Millisecond)
+	r.step(t, "after the second", v0, 2, true)
+	r.clk.Advance(100 * time.Millisecond)
+	r.src.setPower(30) // within the second of the last report: held
+	r.step(t, "a change after the re-wiring within the second", v0, 3, false)
+}
+
+// TestStoppedBridgeQuieterPathIsSilent: once the bridge stopped, a
+// notification that still reaches the listener of its last wiring — a
+// host that delivers one while the bridge detaches — moves neither the
+// DataVersion nor the subscription: nothing is reported into a wiring the
+// bridge tore down. Review II, R2-P4-dr-sub-05.
+func TestStoppedBridgeQuieterPathIsSilent(t *testing.T) {
+	t.Parallel()
+	r := newQuietMeterRig(t, epmActivePower)
+	v0 := r.version()
+	r.src.setPower(10)
+	r.step(t, "a change from null", v0, 1, true)
+	if err := r.b.Stop(context.WithoutCancel(t.Context())); err != nil {
+		t.Fatal(err)
+	}
+	r.clk.Advance(2 * cluster.QuietMinimumInterval)
+	r.src.setPower(20) // fakeMeter's unsubscribe detaches nothing
+	r.step(t, "a notification after Stop", v0, 1, false)
+	r.clk.Advance(2 * cluster.QuietMinimumInterval)
+	r.step(t, "an interval after it", v0, 1, false)
+}
+
 // epmActivePower and epmVoltage are ElectricalPowerMeasurement's
 // ActivePower and Voltage.
 const (

@@ -2140,6 +2140,13 @@ func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *e
 			slog.Int("with_paths", withPaths),
 			slog.Int("registered", len(set.unsubs)))
 	}
+	// The throttles of quiet paths this wiring did not take up belong to
+	// paths it no longer serves; the ones it took up are parked when it is
+	// torn down, after every notifier that feeds them was detached.
+	b.dropParkedQuietPaths()
+	for _, qp := range set.quiet {
+		set.unsubs = append(set.unsubs, func() { b.parkQuietPath(qp) })
+	}
 	return set.unsubs
 }
 
@@ -2506,37 +2513,140 @@ func quietIntervalOf(clusterID, attrID uint32) time.Duration {
 // in one wiring ([listenerSet.quietPathFor]) — an endpoint's source and the
 // cluster server that forwards its notifier both do — so a change is
 // told to the throttle once.
+//
+// It outlives a wiring that serves the path again: the wiring's teardown
+// parks it ([Bridge.parkQuietPath]) and the next wiring takes it up with
+// its last value, its throttle's last report and a report the throttle
+// holds back, so a re-wiring neither drops a held change nor restarts the
+// interval. matter.js's QuietEvent lives with its behavior, which a change
+// of the node's topology elsewhere does not re-create
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
+// db021da0). Parked, it reads nothing and reports nothing: a notification
+// that still reaches it is left to the next wiring, which sees the change
+// against the last value, and a report its throttle sends is owed to that
+// wiring (review II, R2-P4-dr-sub-01, R2-P4-dr-sub-05).
 type quietPath struct {
-	ep   *endpointpkg.Endpoint
 	path im.ConcreteAttributePath
 	q    *clusterpkg.Quieter
-	// mu guards last and orders the readings and the throttle's calls.
+	// mu guards ep, last and had and orders the readings and the
+	// throttle's calls.
 	mu   sync.Mutex
+	ep   *endpointpkg.Endpoint // nil while parked
 	last attributeReading
 	had  bool // last holds a reading
+	// sinkMu guards mgr and owed; taken under mu, or alone by the
+	// throttle's report.
+	sinkMu sync.Mutex
+	mgr    *subscription.Manager // nil while parked
+	owed   bool                  // the throttle reported while parked
 }
 
-// quietPathFor returns the set's quietPath of p, made on first use; the
-// set's teardown stops its throttle, dropping a held report.
+// quietPathFor returns the set's quietPath of p: the one a torn-down
+// wiring parked for p, taken up, or a new one, reading its first value.
 func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *endpointpkg.Endpoint, p im.ConcreteAttributePath) *quietPath {
 	if qp, ok := l.quiet[p]; ok {
 		return qp
 	}
-	qp := &quietPath{ep: ep, path: p}
-	qp.q = &clusterpkg.Quieter{
-		Clock:    b.clk(),
-		Interval: quietIntervalOf(p.Cluster, p.Attribute),
-		Report: func() {
-			mgr.OnAttributeChanged(p)
-		},
+	qp := b.reclaimQuietPath(p)
+	fresh := qp == nil
+	if fresh {
+		qp = &quietPath{path: p}
+		qp.q = &clusterpkg.Quieter{
+			Clock:    b.clk(),
+			Interval: quietIntervalOf(p.Cluster, p.Attribute),
+			Report:   qp.reported,
+		}
 	}
-	qp.last, qp.had = qp.read()
+	qp.attach(ep, mgr, fresh)
 	if l.quiet == nil {
 		l.quiet = make(map[im.ConcreteAttributePath]*quietPath)
 	}
 	l.quiet[p] = qp
-	l.add(qp.q.Stop)
 	return qp
+}
+
+// attach binds qp to a wiring's endpoint and manager, reading its first
+// value when fresh, and marks the path dirty when its throttle reported
+// while qp was parked.
+func (qp *quietPath) attach(ep *endpointpkg.Endpoint, mgr *subscription.Manager, fresh bool) {
+	qp.mu.Lock()
+	qp.ep = ep
+	if fresh {
+		qp.last, qp.had = qp.read()
+	}
+	qp.sinkMu.Lock()
+	qp.mgr = mgr
+	owed := qp.owed
+	qp.owed = false
+	qp.sinkMu.Unlock()
+	qp.mu.Unlock()
+	if owed {
+		mgr.OnAttributeChanged(qp.path)
+	}
+}
+
+// park unbinds qp from its wiring; its throttle runs on.
+func (qp *quietPath) park() {
+	qp.mu.Lock()
+	qp.ep = nil
+	qp.sinkMu.Lock()
+	qp.mgr = nil
+	qp.sinkMu.Unlock()
+	qp.mu.Unlock()
+}
+
+// reported is the throttle's report: the path marked dirty on the wiring's
+// manager, or owed to the next wiring while qp is parked.
+func (qp *quietPath) reported() {
+	qp.sinkMu.Lock()
+	mgr := qp.mgr
+	if mgr == nil {
+		qp.owed = true
+	}
+	qp.sinkMu.Unlock()
+	if mgr != nil {
+		mgr.OnAttributeChanged(qp.path)
+	}
+}
+
+// parkQuietPath parks qp for the next wiring to take up
+// ([listenerSet.quietPathFor]). A path parked already by a wiring that was
+// overtaken while it registered gives its place to qp, and its throttle is
+// stopped.
+func (b *Bridge) parkQuietPath(qp *quietPath) {
+	qp.park()
+	b.quietMu.Lock()
+	prev := b.quietParked[qp.path]
+	if b.quietParked == nil {
+		b.quietParked = make(map[im.ConcreteAttributePath]*quietPath)
+	}
+	b.quietParked[qp.path] = qp
+	b.quietMu.Unlock()
+	if prev != nil && prev != qp {
+		prev.q.Stop()
+	}
+}
+
+// reclaimQuietPath takes the quietPath parked for p, nil when none is.
+func (b *Bridge) reclaimQuietPath(p im.ConcreteAttributePath) *quietPath {
+	b.quietMu.Lock()
+	defer b.quietMu.Unlock()
+	qp := b.quietParked[p]
+	delete(b.quietParked, p)
+	return qp
+}
+
+// dropParkedQuietPaths stops the throttle of every parked quietPath and
+// forgets it: a wiring that did not take one up serves its path no more,
+// and a change the throttle held back is dropped with the path.
+func (b *Bridge) dropParkedQuietPaths() {
+	b.quietMu.Lock()
+	parked := b.quietParked
+	b.quietParked = nil
+	b.quietMu.Unlock()
+	for _, qp := range parked {
+		qp.q.Stop()
+	}
 }
 
 // read is the path's current value; false when no server answers it.
@@ -2554,7 +2664,7 @@ func (qp *quietPath) read() (attributeReading, bool) {
 	return attributeReading{}, false
 }
 
-// check reads the value and, on a change, advances the cluster's
+// check reads the value of a bound quietPath and, on a change, advances the cluster's
 // DataVersion — unless bumped holds the cluster, advanced by this
 // notification already, which check adds it to — and tells the throttle,
 // with the nullness of the old and the new value; a value no server
@@ -2562,6 +2672,9 @@ func (qp *quietPath) read() (attributeReading, bool) {
 func (qp *quietPath) check(bumped map[uint32]struct{}) {
 	qp.mu.Lock()
 	defer qp.mu.Unlock()
+	if qp.ep == nil {
+		return // parked: the next wiring sees the change
+	}
 	cur, ok := qp.read()
 	wasNull := !qp.had || qp.last.raw == nil
 	isNull := !ok || cur.raw == nil
