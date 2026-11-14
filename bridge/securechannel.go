@@ -292,6 +292,11 @@ func (b *Bridge) resolveCaseHandlerOf(key HandshakeKey) (h CaseHandler, provided
 // stand-in handler ([completedCaseHandler]) is not there to answer.
 var errHandshakeNotBegun = errors.New("bridge: no Sigma1 or PBKDFParamRequest began this handshake")
 
+// errSigma1OverCompleted stands in for the outcome of a Sigma1 on the key of
+// a completed handshake that began nothing ([Bridge.handleSigma1]): the
+// handler's failure — an error or a failure report — is not sent.
+var errSigma1OverCompleted = errors.New("bridge: a Sigma1 on a completed handshake's key began nothing")
+
 // resolveCaseContinuation is [Bridge.resolveCaseHandler] for a Sigma3 or
 // Sigma2_Resume: a handshake no Sigma1 began ([Bridge.markSigma1Replied])
 // has no handler — begun is false — whatever the wiring: the provider is
@@ -337,7 +342,9 @@ func (b *Bridge) resolvePaseContinuation(key HandshakeKey) (h PaseHandler, begun
 // — and no more: no StatusReport, no counted PASE failure, nothing of
 // another handshake touched (review II, R2-P4-cert-02, owner decision 70).
 // A Sigma3 of a completed handshake that is not the retransmission of the
-// one that completed it ends here too ([Bridge.handleSigma3OfCompleted]).
+// one that completed it ends here too ([Bridge.handleSigma3OfCompleted]),
+// and so does a Sigma1 on a completed handshake's key that begins nothing
+// ([Bridge.handleSigma1]).
 // Mirrors matter.js
 // packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153 and
 // :43-50 at db021da0 (any other opening message goes to the base handler,
@@ -1179,6 +1186,7 @@ func (b *Bridge) handleCase(
 		isStateReject := errors.Is(err, sigma.ErrSessionState)
 		switch {
 		case errors.Is(err, ErrCaseHandlerMissing),
+			errors.Is(err, errSigma1OverCompleted),
 			isStateReject:
 			level = slog.LevelDebug
 		}
@@ -1190,10 +1198,11 @@ func (b *Bridge) handleCase(
 		// Send a StatusReport so the peer learns the exchange is rejected
 		// rather than waiting through MRP retransmission timeouts. Skip
 		// for state-machine replays (the original Sigma was processed and
-		// replied to) and for the missing-handler case (nothing is wired
-		// yet). Mirrors chip CASESession.cpp error-path StatusReport
-		// emission on Sigma-reject paths.
-		if !isStateReject && !errors.Is(err, ErrCaseHandlerMissing) {
+		// replied to), for the missing-handler case (nothing is wired
+		// yet) and for a Sigma1 on a completed handshake's key that began
+		// nothing ([Bridge.handleSigma1]). Mirrors chip CASESession.cpp
+		// error-path StatusReport emission on Sigma-reject paths.
+		if !isStateReject && !errors.Is(err, ErrCaseHandlerMissing) && !errors.Is(err, errSigma1OverCompleted) {
 			// Map the error to the Secure-Channel protocol code: a
 			// Sigma1 addressing no fabric this node holds is
 			// NoSharedTrustRoots, every other failure (decode error,
@@ -1417,19 +1426,33 @@ func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeK
 // its handshake; a Sigma1 that left no handshake state leaves no record
 // either (review II, R2-P3-dr-dev-03). On the key of a completed handshake
 // (overCompleted, [Bridge.markSigma1Replied]) the completed record stays
-// unless the Sigma1 began a handshake (review II, R2-P4-rr-sec-04).
+// unless the Sigma1 began a handshake (review II, R2-P4-rr-sec-04), and a
+// Sigma1 that began nothing there is acknowledged and not answered
+// ([Bridge.dropHandshakeNotBegun]): the handler's failure report is not
+// sent, and the success report waiting for the initiator's acknowledgement
+// stays the exchange's one reply. Mirrors matter.js
+// packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0: on
+// the handshake's live exchange a message that does not acknowledge the
+// pending report throws a flow error before it reaches the CASE server,
+// and nothing answers it. matter.js throws before it takes up the
+// message's acknowledgement (:553-561); this module acknowledges it, as it
+// acknowledges a Sigma3 or Sigma2_Resume no handshake takes (owner
+// decision 70).
 func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overCompleted bool) error {
 	ch, provided := b.resolveCaseHandlerOf(key)
 	begun := true
 	processSigma1 := func(p []byte) (uint8, []byte, error) {
 		op, reply, err := ch.ProcessSigma1(p)
 		begun = sigma1Began(op, reply, err)
+		if !begun && overCompleted {
+			return 0, nil, errSigma1OverCompleted
+		}
 		return op, reply, err
 	}
 	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, ch)
 	switch {
 	case !begun && overCompleted:
-		return err
+		return b.dropHandshakeNotBegun(src, proto)
 	case !begun:
 		b.forgetSigma1Replied(key)
 		return err

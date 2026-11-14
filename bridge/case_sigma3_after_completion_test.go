@@ -430,14 +430,15 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 
 // TestSigma1ThatBeginsNothingKeepsACompletedHandshake: once a CASE handshake
 // completed, a Sigma1 under its initiator node id and exchange that begins
-// no handshake — other bytes, from another address — leaves the completed
-// handshake as it was: its record answers the retransmission of the
-// completing Sigma3 over its route with the success report again, and the
-// success report waiting for the initiator's acknowledgement stays in
-// retransmission, through a PerExchangeCaseProvider and through the
-// singleton handler alike (review II, R2-P4-rr-sec-04). In matter.js a
-// message on the handshake's live exchange that does not acknowledge the
-// pending report fails before the retransmission timer is touched and
+// no handshake — other bytes, from another address — is acknowledged and
+// not answered, and leaves the completed handshake as it was: its record
+// answers the retransmission of the completing Sigma3 over its route with
+// the success report again, and the success report waiting for the
+// initiator's acknowledgement stays in retransmission, through a
+// PerExchangeCaseProvider and through the singleton handler alike (review
+// II, R2-P4-rr-sec-04; l1 item 3). In matter.js a message on the
+// handshake's live exchange that does not acknowledge the pending report
+// fails before the retransmission timer is touched, sends nothing and
 // changes nothing (packages/protocol/src/protocol/MessageExchange.ts:521-534
 // at db021da0).
 func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
@@ -457,6 +458,7 @@ func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 			if err := other.send(mrp.SCOpcodeSigma1, completedCaseExchange, []byte{0x15, 0x18}, nil); err != nil {
 				t.Fatal(err)
 			}
+			c.expectAcknowledgedOnly(t, 1, "a Sigma1 that began nothing")
 			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 				t.Fatal("a Sigma1 that began nothing ended the completed handshake's record")
 			}
