@@ -171,9 +171,22 @@ type ClusterDataVersion interface {
 // ClusterEventLister is the optional capability a
 // [ClusterServer] can implement to advertise the cluster's
 // event surface. The dispatcher consults it to synthesise the global
-// `EventList` (0xFFFA) attribute per Matter Core Spec §7.13.2.5.
-// Clusters that don't implement this interface report an empty
-// EventList, which is spec-compliant for clusters that emit no events.
+// `EventList` (0xFFFA) attribute per Matter Core Spec §7.13.2.5, and to
+// decide which event paths exist on the cluster: a path that names an
+// event the server does not list, and a path that names no event on a
+// server that lists none, is UNSUPPORTED_EVENT. Clusters that don't
+// implement this interface report an empty EventList and have no event
+// path, which is spec-compliant for clusters that emit no events.
+//
+// The list gates existence only. An event a server emits through its
+// [EventEmitter] is recorded and reported as emitted, so a server emits
+// only events it lists — as the generated servers do (cluster/spec
+// Server.Emit refuses an event outside EventList). matter.js gives a
+// behavior an event that records and reports only for the cluster's
+// conformant events it supports, so nothing else reaches a subscriber
+// there
+// (packages/node/src/behavior/internal/ClusterDerivation.ts:174-200 at
+// db021da0, createDerivedEvents).
 type ClusterEventLister interface {
 	// MatterEvents returns the cluster event IDs the server may
 	// surface via subscribed event reports.
