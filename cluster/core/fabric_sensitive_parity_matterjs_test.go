@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -75,4 +76,51 @@ func TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields(t *te
 	wantWire(t, "unfiltered read without a fabric", v, fabricIndexOnly(2), fabricIndexOnly(1))
 	v, _ = m.MatterReadFiltered(msgCtx(1, true), messagesdef.AttrMessages)
 	wantWire(t, "filtered read by fabric 1", v, whole[1])
+}
+
+// sceneInfoWire is a FabricSceneInfo entry on the wire; redacted leaves
+// out the "S" fields CurrentScene, CurrentGroup and SceneValid
+// (scenes-management.element.ts:179-186).
+type sceneInfoWire struct {
+	info     core.SceneInfoStruct
+	redacted bool
+}
+
+func (s sceneInfoWire) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	enc.StartStruct(tag)
+	enc.PutUint(tlv.ContextTag(0), uint64(s.info.SceneCount))
+	if !s.redacted {
+		enc.PutUint(tlv.ContextTag(1), uint64(s.info.CurrentScene))
+		enc.PutUint(tlv.ContextTag(2), uint64(s.info.CurrentGroup))
+		enc.PutBool(tlv.ContextTag(3), s.info.SceneValid)
+	}
+	enc.PutUint(tlv.ContextTag(4), uint64(s.info.RemainingCapacity))
+	enc.PutUint(tlv.ContextTag(0xFE), uint64(s.info.FabricIndex))
+	_ = enc.EndContainer()
+}
+
+// TestParityMatterJS_FabricSceneInfoOfAnotherFabricWithoutSensitiveFields:
+// fabric 1 adds and recalls a scene; another fabric's entry reads with
+// SceneCount, RemainingCapacity and FabricIndex only, and a read without a
+// request sees both entries whole.
+func TestParityMatterJS_FabricSceneInfoOfAnotherFabricWithoutSensitiveFields(t *testing.T) {
+	t.Parallel()
+	s, _ := newScenes(t, &sceneOnOff{}, nil)
+	invoke(t, s, 0x00, core.AddSceneRequest{
+		GroupID: 0x0101, SceneID: 7, SceneName: "Evening",
+		ExtensionFieldSets: []core.ExtensionFieldSet{{ClusterID: 0x0006, AttributeValueList: []core.AttributeValuePair{{AttributeID: 0, Tag: 1, Unsigned: 1, Fields: 1}}}},
+	})
+	invoke(t, s, 0x05, core.RecallSceneRequest{GroupID: 0x0101, SceneID: 7})
+	local, _ := s.MatterRead(0x0002)
+	whole := local.([]core.SceneInfoStruct)
+	if len(whole) != 2 || whole[0].FabricIndex != 1 || whole[0].CurrentScene != 7 || whole[0].CurrentGroup != 0x0101 || !whole[0].SceneValid {
+		t.Fatalf("local read %+v", whole)
+	}
+	one, two := whole[0], whole[1]
+	v, _ := s.MatterReadFiltered(msgCtx(2, false), 0x0002)
+	wantWire(t, "unfiltered read by fabric 2", v, sceneInfoWire{one, true}, sceneInfoWire{two, false})
+	v, _ = s.MatterReadFiltered(msgCtx(0, false), 0x0002)
+	wantWire(t, "unfiltered read without a fabric", v, sceneInfoWire{one, true}, sceneInfoWire{two, true})
+	v, _ = s.MatterReadFiltered(msgCtx(1, true), 0x0002)
+	wantWire(t, "filtered read by fabric 1", v, sceneInfoWire{one, false})
 }

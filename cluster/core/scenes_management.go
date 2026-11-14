@@ -102,6 +102,11 @@ type SceneInfoStruct struct {
 	SceneValid        bool
 	RemainingCapacity uint8
 	FabricIndex       uint8
+	// Redacted marks another fabric's entry on a non-fabric-filtered
+	// read: CurrentScene, CurrentGroup and SceneValid are fabric-sensitive
+	// ("S", scenes-management.element.ts SceneInfoStruct) and are left
+	// out; SceneCount, RemainingCapacity and FabricIndex are served.
+	Redacted bool
 }
 
 // ScenesState is an endpoint's scene table and scene info: the server is
@@ -477,13 +482,26 @@ func (s *ScenesManagement) MatterDropFabric(_ context.Context, fabricIndex uint8
 // ([ScenesState.Fabrics]).
 func (s *ScenesManagement) MatterHeldFabrics() []uint8 { return s.cfg.State.Fabrics() }
 
-// MatterRead implements [contract.ClusterServer] (unfiltered).
+// MatterRead implements [contract.ClusterServer]: a read without a
+// request behind it, which sees every fabric's entry whole.
 func (s *ScenesManagement) MatterRead(attrID uint32) (any, bool) {
-	return s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 0), attrID)
+	return s.MatterReadFiltered(context.Background(), attrID)
 }
 
 // MatterReadFiltered implements [contract.FabricScopedReader]:
-// FabricSceneInfo is fabric-scoped ("R F V").
+// FabricSceneInfo is fabric-scoped ("R F V"). A fabric-filtered read lists
+// the accessing fabric's entry; an unfiltered one every fabric's, and an
+// entry of another fabric than the accessing one — every entry, for a
+// session without a fabric — is served Redacted, without CurrentScene,
+// CurrentGroup and SceneValid, the fields that are "S"
+// (packages/model/src/standard/elements/scenes-management.element.ts:179-186).
+// A read without a request sees every entry whole. Mirrors matter.js at
+// db021da0, where FabricSceneInfo is plain behaviour state: a
+// fabric-sensitive field of another owning fabric reads undefined
+// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
+// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
+// mayRead) and the encoder leaves it out
+// (packages/types/src/tlv/TlvObject.ts:128-134).
 func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	st := s.cfg.State
 	switch attrID {
@@ -492,7 +510,7 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		defer st.mu.Unlock()
 		return st.tableSize, true
 	case scenesAttrFabricSceneInfo:
-		filtered, fabric := im.FabricFilterFromContext(ctx)
+		filtered, fabric, request := im.LookupFabricFilter(ctx)
 		// Every fabric of the node has an entry, created on read
 		// (infoFor), also one that never stored a scene. matter.js holds
 		// one for each fabric known when the server initialises and adds
@@ -517,7 +535,11 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 			if filtered && f != fabric {
 				continue
 			}
-			out = append(out, *st.infoFor(f))
+			info := *st.infoFor(f)
+			if request && (f != fabric || fabric == 0) {
+				info = SceneInfoStruct{SceneCount: info.SceneCount, RemainingCapacity: info.RemainingCapacity, FabricIndex: info.FabricIndex, Redacted: true}
+			}
+			out = append(out, info)
 		}
 		return out, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
