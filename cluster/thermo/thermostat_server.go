@@ -1264,6 +1264,24 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		s.flushSetpointEvents(ctx)
 		if !t.limit {
 			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+			return changed, nil
+		}
+		// A setpoint the limit's reconcile moved is a direct change of
+		// that setpoint: it ends the active preset when it is in effect.
+		// Mirrors matter.js packages/node/src/behaviors/thermostat/
+		// ThermostatServer.ts at db021da0: the limit's $Changing
+		// reconciles (#assertMaxHeatSetpointLimitChanging :730-733), the
+		// moved setpoint's $Changing runs in the same pre-commit with the
+		// write's session (packages/node/src/behavior/state/managed/
+		// Datasource.ts:1185-1215), which is no command, and sets
+		// activePresetHandle to null (:682-706, :744-768).
+		for _, id := range changed {
+			switch id {
+			case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
+				s.clearActivePresetOnDirectWrite(ctx, false)
+			case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
+				s.clearActivePresetOnDirectWrite(ctx, true)
+			}
 		}
 		return changed, nil
 	}
