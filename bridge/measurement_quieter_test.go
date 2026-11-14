@@ -6,12 +6,14 @@ package bridge
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/im"
@@ -163,5 +165,84 @@ func TestProjectedElectricalReadingsAreReported(t *testing.T) {
 	clk.Advance(900 * time.Millisecond)
 	if got := version(); got != v0+2 {
 		t.Fatalf("after the second: DataVersion %d, want %d (the held change reported once)", got, v0+2)
+	}
+}
+
+// fakeLowBat is a battery's LOWBAT reading that notifies its changes.
+type fakeLowBat struct {
+	mu  sync.Mutex
+	cbs []func()
+	low bool
+}
+
+func (*fakeLowBat) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementBattery
+}
+
+func (f *fakeLowBat) MatterBoolValue() (value, observed bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.low, true
+}
+
+func (f *fakeLowBat) OnMatterValueChanged(cb func()) func() {
+	f.mu.Lock()
+	f.cbs = append(f.cbs, cb)
+	f.mu.Unlock()
+	return func() {}
+}
+
+func (f *fakeLowBat) set(low bool) {
+	f.mu.Lock()
+	f.low = low
+	cbs := append([]func(){}, f.cbs...)
+	f.mu.Unlock()
+	for _, cb := range cbs {
+		cb()
+	}
+}
+
+// TestProjectedChangeAdvancesItsVersionOnce: a measurement endpoint's
+// source notifies the bridge twice for one change when a cluster server
+// it materialised forwards its notifier — the PowerSource of a battery
+// reading — and the change is still one commit: BatChargeLevel, which has
+// no quieter quality, advances PowerSource's DataVersion once, as one
+// matter.js commit advances a cluster's version once
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0, advanceVersion in the commit's first phase).
+func TestProjectedChangeAdvancesItsVersionOnce(t *testing.T) {
+	t.Parallel()
+	src := &fakeLowBat{}
+	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := func(ctx context.Context) (*endpoint.Topology, error) {
+		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
+			StableKey: endpoint.StringKey("bat"), DeviceAddress: "B", DeviceType: 0x0011,
+			FriendlyName: "Battery", ChannelAddress: "B:1", Measurement: src,
+		}}}})
+	}
+	b, err := New(snap, nil, Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := b.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.WithoutCancel(ctx)) })
+	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+	ep := b.Topology().Bridged()[0]
+	const powerSource = 0x002F
+	v0 := ep.ClusterDataVersion(powerSource)
+	src.set(true)
+	if got := ep.ClusterDataVersion(powerSource); got != v0+1 {
+		t.Fatalf("one change of BatChargeLevel: DataVersion %d, want %d (one advance)", got, v0+1)
+	}
+	src.set(true) // no change
+	if got := ep.ClusterDataVersion(powerSource); got != v0+1 {
+		t.Fatalf("a notification without a change: DataVersion %d, want %d", got, v0+1)
 	}
 }

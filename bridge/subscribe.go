@@ -2052,6 +2052,24 @@ type listenerSet struct {
 	// quiet holds the throttle of each quieter path of the wiring
 	// ([listenerSet.quietPathFor]).
 	quiet map[im.ConcreteAttributePath]*quietPath
+	// values holds the last values of each endpoint's paths of the
+	// wiring ([listenerSet.pathValuesFor]).
+	values map[uint16]*pathMemory
+}
+
+// pathValuesFor returns a pathValues of paths over the set's memory of
+// ep's paths, made on first use, so the notifiers of one wiring that cover
+// a path share its last value.
+func (l *listenerSet) pathValuesFor(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
+	mem, ok := l.values[ep.ID]
+	if !ok {
+		mem = &pathMemory{last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}
+		if l.values == nil {
+			l.values = make(map[uint16]*pathMemory)
+		}
+		l.values[ep.ID] = mem
+	}
+	return newPathValuesIn(mem, ep, paths)
 }
 
 // add keeps unsub; a notifier that returns none has nothing to detach.
@@ -2302,7 +2320,7 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 		}
 		direct = append(direct, p)
 	}
-	values := newPathValues(ep, direct)
+	values := set.pathValuesFor(ep, direct)
 	set.add(notifier.OnMatterValueChanged(func() {
 		defer energy.check()
 		defer occupancy.check()
@@ -2831,17 +2849,39 @@ func (e *electricalEnergyEvents) check() {
 // pathValues remembers the last value of each path a change notifier
 // covers, so a notification reports only the paths that moved.
 type pathValues struct {
-	// mu guards last and orders the readings (check, changed).
-	mu    sync.Mutex
 	ep    *endpointpkg.Endpoint
 	paths []im.ConcreteAttributePath
-	last  map[im.ConcreteAttributePath]attributeReading
+	mem   *pathMemory
+}
+
+// pathMemory is the last value of each path of one endpoint, shared by
+// the [pathValues] of every notifier that covers the path in one wiring
+// ([listenerSet.pathValuesFor]): an endpoint's measurement source and a
+// cluster server that forwards its notifier are told of one change twice,
+// and the first to read it reports it — one change, one DataVersion
+// advance, as one matter.js commit advances a cluster's version once
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0).
+type pathMemory struct {
+	// mu guards last and orders the readings (check, changed).
+	mu   sync.Mutex
+	last map[im.ConcreteAttributePath]attributeReading
 }
 
 func newPathValues(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
-	v := &pathValues{ep: ep, paths: paths, last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}
+	return newPathValuesIn(&pathMemory{last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}, ep, paths)
+}
+
+// newPathValuesIn is a pathValues over mem: it remembers the current
+// value of each of its paths mem holds none for.
+func newPathValuesIn(mem *pathMemory, ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
+	v := &pathValues{ep: ep, paths: paths, mem: mem}
+	mem.mu.Lock()
+	defer mem.mu.Unlock()
 	for p, val := range v.read() {
-		v.last[p] = val
+		if _, had := mem.last[p]; !had {
+			mem.last[p] = val
+		}
 	}
 	return v
 }
@@ -2870,22 +2910,22 @@ func (v *pathValues) read() map[im.ConcreteAttributePath]attributeReading {
 
 // changed returns the paths whose value differs from the last
 // notification's, compared by value ([attributeReading]), and remembers
-// the new values. The values are read under v.mu, so of two
+// the new values. The values are read under the memory's lock, so of two
 // notifications that overlap the later reading is remembered last
 // (review II, R2-P1-req2-10).
 func (v *pathValues) changed() []im.ConcreteAttributePath {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mem.mu.Lock()
+	defer v.mem.mu.Unlock()
 	now := v.read()
 	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
 	for _, p := range v.paths {
 		cur, ok := now[p]
-		if prev, had := v.last[p]; ok && had && prev.equal(cur) {
+		if prev, had := v.mem.last[p]; ok && had && prev.equal(cur) {
 			continue
 		}
 		out = append(out, p)
 		if ok {
-			v.last[p] = cur
+			v.mem.last[p] = cur
 		}
 	}
 	return out
