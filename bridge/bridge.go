@@ -2114,10 +2114,13 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// Session farewell FIRST, while the listener can still ship the
 	// CloseSession StatusReports — without it controllers keep stale
 	// CASE sessions and show the bridge unresponsive for minutes after
-	// a restart. Mirrors matter.js's shutdown ordering: sessions close
-	// gracefully (Session.ts:248 initiateClose → gracefulClose →
-	// ExchangeManager.ts:716-726 #sendCloseSession) before the transport
-	// is torn down (ServerNetworkRuntime.ts:410-447 stop()). What the
+	// a restart. The order is matter.js's at db021da0: the runtime's
+	// stop() (ServerNetworkRuntime.ts:427-498) ends the sessions
+	// (:456-459 prepareRuntimeShutdown → SessionManager.ts:1097-1113
+	// closeAllSessions) before the exchanges and the transports close
+	// (:475-490). The CloseSession is this module's: closeAllSessions
+	// force-closes each session without one (the comment of
+	// operational.Manager.CloseAllGraceful; owner decision 49). What the
 	// subscriptions owe goes out before the sessions close.
 	b.flushSubscriptionsForShutdown(ctx)
 	b.closeSecureSessionsForShutdown()
