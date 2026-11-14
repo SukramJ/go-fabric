@@ -989,6 +989,29 @@ func TestAutoArmOnPaseEstablished_DoesNotOverwriteExistingArm(t *testing.T) {
 	}
 }
 
+// TestAutoArmOnPaseEstablished_KeepsTheBreadcrumb is R2-P2-rr-dev-07: a new
+// PASE session arms the fail-safe with the current Breadcrumb, fresh or
+// not, as matter.js does (GeneralCommissioningServer.ts:65 `breadcrumb:
+// this.state.breadcrumb`, written back at :117-119, at db021da0) — a value
+// written while the fail-safe was disarmed stays, and nothing moved that
+// a subscriber would miss.
+func TestAutoArmOnPaseEstablished_KeepsTheBreadcrumb(t *testing.T) {
+	t.Parallel()
+	gc := defaultGencomm(t)
+	ctx := context.Background()
+	defer func() { _ = gc.Close(ctx) }()
+	if err := gc.MatterWrite(ctx, 0x0000, uint64(5)); err != nil {
+		t.Fatal(err)
+	}
+	gc.AutoArmOnPaseEstablished(ctx)
+	if !gc.FailSafeArmed() {
+		t.Fatal("the fresh auto-arm armed nothing")
+	}
+	if v, _ := gc.MatterRead(0x0000); v != uint64(5) {
+		t.Fatalf("Breadcrumb after a new PASE session's fresh auto-arm = %v, want the written 5", v)
+	}
+}
+
 func TestGenComm_MatterDataVersion(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)

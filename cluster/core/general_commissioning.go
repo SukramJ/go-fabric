@@ -1276,7 +1276,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	}
 	req := ArmFailSafeRequest{
 		ExpiryLengthSeconds: uint16(seconds & 0xFFFF), // window timeout ≤ 900 s, fits uint16
-		Breadcrumb:          0,                        // a fresh arm starts at 0; a re-arm keeps it (below)
+		Breadcrumb:          0,                        // ArmFailSafeFor's fresh arm starts at 0; the rest keep it (below)
 	}
 	// Temporarily inject the fabric index so handleArmFailSafe records it.
 	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
@@ -1322,11 +1322,13 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	if !fresh && g.failSafeCumulativeStarted && g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
 		g.failSafeExpiresAt = g.failSafeCumulativeDeadline
 	}
-	// A fresh arm starts at Breadcrumb 0; a re-arm keeps the Breadcrumb, as
-	// matter.js re-arms a new PASE session's fail-safe with the current one
+	// The PASE auto-arm (forSession) keeps the Breadcrumb, fresh or not, as
+	// matter.js arms a new PASE session's fail-safe with the current one
 	// (GeneralCommissioningServer.ts:65 `breadcrumb: this.state.breadcrumb`,
-	// written back at :117-119, at db021da0).
-	if fresh {
+	// written back at :117-119, at db021da0): a value written while the
+	// fail-safe was disarmed stays (review II, R2-P2-rr-dev-07). A re-arm
+	// keeps it too; ArmFailSafeFor's fresh arm starts at 0.
+	if fresh && !forSession {
 		g.breadcrumb = req.Breadcrumb
 	}
 	g.failSafeFabricIndex = fabricIndex
