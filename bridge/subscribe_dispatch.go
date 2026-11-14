@@ -843,20 +843,36 @@ func (b *Bridge) allowedEventPaths(ctx context.Context, dispatcher im.Dispatcher
 // eventPathAllowed resolves p's endpoint and cluster through the data model
 // (a read of ClusterRevision, which every cluster instance has, expands the
 // wildcards) and reports whether any resolved cluster's events are readable
-// by the subject.
+// by the subject — for a path naming its event, whether that event exists
+// on the resolved cluster, as the dispatcher's [im.EventPathChecker]
+// answers it (a dispatcher without one takes every event to exist). Mirrors
+// matter.js packages/protocol/src/action/server/EventReadResponse.ts at
+// db021da0: #addConcrete answers UnsupportedEvent before it registers the
+// path (:216-218, :235), a wildcard endpoint or cluster registers a named
+// event only where the cluster has it (:286-291), and only a registered
+// path counts as existent (:104-110) for ServerSubscription.ts:707-711
+// (review II, R2-P4-imread-08).
 func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.EventReadAuthorizer, p im.ConcreteEventPath) bool {
 	if dispatcher == nil {
 		return true
 	}
+	events, _ := dispatcher.(im.EventPathChecker)
 	probe := im.ConcreteAttributePath{
 		Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
 		Cluster: p.Cluster, HasCluster: p.HasCluster,
 		Attribute: clusterRevisionAttributeID, HasAttribute: true,
 	}
 	for _, rr := range dispatcher.Read(ctx, probe) {
-		if rr.Status == im.StatusSuccess && auth.Allows(ctx, rr.Path.Endpoint, rr.Path.Cluster) {
-			return true
+		if rr.Status != im.StatusSuccess || !auth.Allows(ctx, rr.Path.Endpoint, rr.Path.Cluster) {
+			continue
 		}
+		if p.HasEvent && events != nil && !events.EventPathStatus(im.ConcreteEventPath{
+			Endpoint: rr.Path.Endpoint, Cluster: rr.Path.Cluster, Event: p.Event,
+			HasEndpoint: true, HasCluster: true, HasEvent: true,
+		}).IsSuccess() {
+			continue
+		}
+		return true
 	}
 	return false
 }
