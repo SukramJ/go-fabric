@@ -1414,13 +1414,13 @@ func (b *Bridge) completedHandshake(key HandshakeKey) (*completedSigma3, bool) {
 // asked — a retransmission does not keep the handshake's adapter, nor so
 // its record, past the provider's TTL — and the answer names no session,
 // so nothing about the established session changes: not its route, not
-// the record of its establishment. matter.js answers a Sigma3 only on the
-// unsecured session and exchange the handshake ran on, whose pending
-// success report MRP retransmits over that session's channel
+// the record of its establishment. In matter.js a Sigma3 that repeats one
+// on the exchange the handshake ran on is a duplicate there, acknowledged
+// and not handed to CASE again
 // (packages/protocol/src/protocol/MessageExchange.ts:501-511 at db021da0),
-// and closes that unsecured session when the handshake ends
-// (packages/protocol/src/session/case/CaseServer.ts:95-98) (review II,
-// R2-P3-rr-dev-01).
+// and the unsecured session the handshake ran on is closed when the
+// handshake ends (packages/protocol/src/session/case/CaseServer.ts:95-98)
+// (review II, R2-P3-rr-dev-01).
 func (b *Bridge) handleSigma3OfCompleted(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, done *completedSigma3) error {
 	var h CaseHandler = unbegunCaseHandler{}
 	if done.matches(src, payload) {
