@@ -60,7 +60,7 @@ func recordedWrite(calls []uint32, attr uint32) bool {
 // WriteRequest to a schema-read-only attribute (OnOff.OnOff 0x0000, access
 // "R V") returns UNSUPPORTED_WRITE and never reaches the cluster server —
 // so the write cannot be dispatched to the CCU. Mirrors matter.js
-// AttributeWriteResponse.ts:229-231.
+// AttributeWriteResponse.ts:231-234 at db021da0.
 func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 	t.Parallel()
 	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}} // OnOff
@@ -198,7 +198,7 @@ func TestWrite_UnlistedAttributeIsUnsupportedAttribute(t *testing.T) {
 // server — on a cluster outside the read-only table too (ValveConfiguration).
 // TC-ACE-2.2 writes every one of them and accepts only UNSUPPORTED_WRITE or
 // UNSUPPORTED_ACCESS; matter.js models them read-only
-// (AttributeWriteResponse.ts:229-231).
+// (AttributeWriteResponse.ts:231-234 at db021da0).
 func TestWrite_GlobalAttributesAreNeverWritable(t *testing.T) {
 	t.Parallel()
 	srv := &recordingServer{id: 0x0081, attrs: []uint32{0x0000}}

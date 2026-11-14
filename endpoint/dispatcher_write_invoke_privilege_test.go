@@ -288,8 +288,9 @@ func privilegeEnforcementCtx() context.Context {
 // fabric whose only ACL entry grants Operate is rejected with
 // StatusUnsupportedAccess — the write dispatcher no longer applies a flat
 // Operate gate. Mirrors matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts
-// FabricAccessControl.forRequest and chip src/app/WriteHandler.cpp:780.
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:236-241 at
+// db021da0 (the access pass at the attribute's write privilege) and chip
+// src/app/WriteHandler.cpp:793-795 at 6170af84.
 func TestHandleWriteRequest_EnforcesElevatedWritePrivilege(t *testing.T) {
 	t.Parallel()
 	d := NewTopologyDispatcher(privilegeTestTopology(t))
@@ -313,9 +314,11 @@ func TestHandleWriteRequest_EnforcesElevatedWritePrivilege(t *testing.T) {
 // TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege is the invoke
 // counterpart: OperationalCredentials.RemoveFabric from an Operate-only
 // fabric must be rejected with StatusUnsupportedAccess before the command
-// ever reaches the cluster server. Mirrors chip
-// src/app/CommandHandler.cpp "Execute the ACL Access Granting Algorithm
-// before existence checks".
+// ever reaches the cluster server. Mirrors matter.js
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:273-279 at
+// db021da0 (the access pass at the command's privilege) and chip
+// src/app/InteractionModelEngine.cpp:1832-1842 at 6170af84 (the command's
+// invoke privilege, checked before it is dispatched).
 func TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege(t *testing.T) {
 	t.Parallel()
 	d := NewTopologyDispatcher(privilegeTestTopology(t))

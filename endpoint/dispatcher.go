@@ -297,7 +297,7 @@ func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.Concret
 // attribute of each matching cluster server. A concrete endpoint lacking
 // the cluster answers UnsupportedCluster; under a wildcard endpoint it is
 // skipped, and so is an attribute whose read does not succeed
-// (AttributeReadResponse.ts:386-387, :418-423 at db021da0).
+// (AttributeReadResponse.ts:386-387, :419-424 at db021da0).
 func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
 	ePath := path
 	ePath.Endpoint = ep.ID

@@ -51,8 +51,9 @@ var _ contract.ClusterAttributeLister = (*heldStub)(nil)
 // writable lists with a count constraint, Thermostat Presets and
 // Schedules, are the server's to judge: script/clustergen/relaxed.go) — as matter.js validates the value entering the behavior's state
 // (packages/node/src/behavior/state/managed/Datasource.ts:667-676 at
-// db021da0; the enum validator ValueValidator.ts:167-179, the constraint
-// validator's ConstraintError). A hand-written server's own write form is
+// db021da0; the enum validator
+// packages/node/src/behavior/state/validation/ValueValidator.ts:167-179,
+// the constraint validator's ConstraintError). A hand-written server's own write form is
 // read through its declared field map (spec.MapFields).
 func TestWrittenValueIsHeldByTheDefinition(t *testing.T) {
 	t.Parallel()
