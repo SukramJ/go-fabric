@@ -966,10 +966,12 @@ type SubscribeArgs struct {
 	// (src/app/InteractionModelEngine.cpp:1249-1360 at 6170af84,
 	// EnsureResourceForSubscription): a request is not refused for want of
 	// room, the requesting fabric's own subscriptions make it
-	// (:1341-1350). connectedhomeip applies it only to a subject that may
-	// read one of the paths it asks for — the access check precedes the
-	// resource check (:861-875) — so the caller sets it only for such a
-	// request.
+	// (:1341-1350) — except one that asks for more paths than
+	// kMinSupportedPathsPerSubscription when the path pool lacks them
+	// (:1302-1308), a pool this module does not keep. connectedhomeip
+	// applies it only to a subject that may read one of the paths it asks
+	// for — the access check precedes the resource check (:861-875) — so
+	// the caller sets it only for such a request.
 	EvictAtQuota bool
 }
 
