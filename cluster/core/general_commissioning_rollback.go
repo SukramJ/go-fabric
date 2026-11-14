@@ -188,7 +188,9 @@ func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric u
 // caller, and a rollback running on another goroutine is waited for —
 // unless ctx is that rollback's own, or ctx ends first, which is the
 // error. It reports the window it expired itself. Caller holds g.mu; it is
-// held again on return, and released in between.
+// held again on return — on a panic of the rollback too, so the caller's
+// deferred unlock frees it (review II, R2-P2-rr-dev-03) — and released in
+// between.
 func (g *GeneralCommissioning) settleExpiryLocked(ctx context.Context) (settledExpiry, error) {
 	inRollback := ctx.Value(expiryRollbackKey{}) != nil
 	var settled settledExpiry
@@ -205,9 +207,11 @@ func (g *GeneralCommissioning) settleExpiryLocked(ctx context.Context) (settledE
 				pasesClosed: g.onFailSafeRolledBack != nil,
 			}
 			after := g.expireLocked(fabricIndex)
-			g.mu.Unlock()
-			after(ctx)
-			g.mu.Lock()
+			func() {
+				g.mu.Unlock()
+				defer g.mu.Lock()
+				after(ctx)
+			}()
 			continue
 		}
 		done := g.expiryRollbacksDone

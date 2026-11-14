@@ -1058,16 +1058,22 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	// FailSafeFabric reports it, armed and not due (review II,
 	// R2-P2-comm-09). The settle runs before the commit's hold, which the
 	// rollback takes itself.
-	g.mu.Lock()
-	if _, err := g.settleExpiryLocked(ctx); err != nil {
-		g.mu.Unlock()
+	// The settle releases and re-takes the lock around the rollback it
+	// runs, and holds it again on a panic of that rollback: the deferred
+	// unlock frees it on every path (review II, R2-P2-rr-dev-03).
+	commitFn, err := func() (FailSafeCommitFunc, error) {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		if _, err := g.settleExpiryLocked(ctx); err != nil {
+			return nil, err
+		}
+		return g.failSafeCommit, nil
+	}()
+	if err != nil {
 		return nil, err
 	}
-	commitFn := g.failSafeCommit
-	g.mu.Unlock()
 	var (
 		resp  any
-		err   error
 		hooks func()
 	)
 	complete := func(commit func(ctx context.Context) error) {
@@ -1276,6 +1282,16 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
 	// override the context's fabric filter if needed, or set directly.
 	g.mu.Lock()
+	// The settle and the fresh start release the lock around the hooks they
+	// run and hold it again on return, on a panic of a hook too; this guard
+	// frees it then, as handleArmFailSafe's does, while every return below
+	// unlocks before the post-arm hook (review II, R2-P2-rr-dev-03).
+	unlocked := false
+	defer func() {
+		if !unlocked {
+			g.mu.Unlock()
+		}
+	}()
 	// An arm judges the state an expired fail-safe's rollback left: a due
 	// window is expired first, a rollback in flight waited for (core2
 	// item 1b). So a window armed now is not due, and fresh is "disarmed".
@@ -1286,7 +1302,6 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 		err = g.startFailSafeLocked(ctx, fabricIndex, false)
 	}
 	if err != nil {
-		g.mu.Unlock()
 		return err
 	}
 	// An arm for a session leaves a fail-safe another fabric armed alone,
@@ -1294,7 +1309,6 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// fabric, FailsafeTimer.ts:53-57 at db021da0; review II,
 	// R2-P2-comm-08).
 	if forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
-		g.mu.Unlock()
 		return nil
 	}
 	fresh := !g.failSafeArmed
@@ -1320,6 +1334,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	g.startFailSafeWatchLocked(ctx, fabricIndex, g.failSafeExpiresAt)
 	armedHook := g.onFailSafeArmed
 	g.mu.Unlock()
+	unlocked = true
 	// An arm from the disarmed state starts a new fail-safe context — the
 	// PASE auto-arm included, as matter.js arms a new
 	// ServerNodeFailsafeContext when the PASE session is established — so
