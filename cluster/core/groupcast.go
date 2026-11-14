@@ -974,15 +974,22 @@ func (g *Groupcast) setFabricUnderTest(fabric uint8, gen uint64) {
 }
 
 // onGroupMessage turns a group message outcome into a GroupcastTesting
-// event for the fabric under test. A message that names another fabric is
-// not reported; one that names none (it failed to authenticate) is
-// reported on the fabric under test. The destination address is derived
-// from the group id — the datagram's own is not available — as the
-// group's address when the fabric's group table holds endpoints for the
-// group (the address the node joined), the shared IANA address otherwise.
-// Mirrors matter.js GroupcastServer #onGroupMessage and, at db021da0,
-// packages/node/src/behaviors/groupcast/GroupcastServer.ts:514-519
-// (#arrivalAddress, `groups.endpoints.has(groupId)`).
+// event for the fabric under test. An authenticated message (the event
+// names its fabric) is reported only when that is the fabric under test.
+// A message no candidate key passed names no fabric and is always
+// reported on the fabric under test, with FailedAuth when a key of that
+// fabric was a candidate and NoAvailableKey otherwise
+// (GroupMessageEvent.ResultFor), and without its group id. The
+// destination address is derived from the group id — the datagram's own
+// is not available — and the fabric that owns it: the fabric under test
+// for an authenticated message or a plain header's id, the fabric whose
+// candidate key authenticated the id of a rejected one. It is that
+// fabric's address for the group when its group table holds endpoints
+// for the group (the address the node joined), the shared IANA address
+// otherwise — also for a fabric that is gone. Mirrors matter.js
+// GroupcastServer #onGroupMessage and #arrivalAddress
+// (packages/node/src/behaviors/groupcast/GroupcastServer.ts:457-488,
+// :514-520 at db021da0).
 func (g *Groupcast) onGroupMessage(ev groups.GroupMessageEvent) {
 	g.mu.RLock()
 	fut, emitter, endpoint := g.fabricUnderTest, g.emitter, g.endpoint
@@ -990,22 +997,34 @@ func (g *Groupcast) onGroupMessage(ev groups.GroupMessageEvent) {
 	if fut == 0 || emitter == nil {
 		return
 	}
-	if ev.FabricIndex != 0 && ev.FabricIndex != fut {
+	rejected := ev.FabricIndex == 0
+	owner, groupForAddress, haveGroup := fut, ev.GroupID, ev.HasGroupID
+	if rejected {
+		groupForAddress, haveGroup = ev.HeaderGroupID, ev.HasHeaderGroupID
+		if ev.HeaderGroupFabricIndex != 0 {
+			owner = ev.HeaderGroupFabricIndex
+		}
+	} else if ev.FabricIndex != fut {
 		return
 	}
 	ctx := context.Background()
 	dest := groups.IANAGroupcastAddress
-	groupForAddress, haveGroup := ev.GroupID, ev.HasGroupID
-	if !haveGroup {
-		groupForAddress, haveGroup = ev.HeaderGroupID, ev.HasHeaderGroupID
-	}
 	if haveGroup {
-		if table, err := g.groups.GroupTable(ctx, fut); err == nil &&
+		if table, err := g.groups.GroupTable(ctx, owner); err == nil &&
 			slices.ContainsFunc(table, func(e groups.TableEntry) bool { return e.GroupID == groupForAddress && len(e.Endpoints) > 0 }) {
-			if addr, err := g.groups.MulticastAddressFor(ctx, fut, groupForAddress); err == nil {
+			if addr, err := g.groups.MulticastAddressFor(ctx, owner, groupForAddress); err == nil {
 				dest = addr
 			}
 		}
+	}
+	if rejected {
+		emitter.MatterEmitEvent(endpoint, GroupcastClusterID, groupcastEventGroupcastTesting, GroupcastTestingEvent{
+			SourceIPAddress:      ipv6EventAddress(ev.SourceIP),
+			DestinationIPAddress: ipv6EventAddress(dest),
+			GroupcastTestResult:  ev.ResultFor(fut),
+			FabricIndex:          fut,
+		}, contract.EventPriorityInfo)
+		return
 	}
 	out := GroupcastTestingEvent{
 		SourceIPAddress:      ipv6EventAddress(ev.SourceIP),

@@ -204,13 +204,28 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 			t.Fatal(err)
 		}
 		unmapped, unmappedSID := opKeyOf(t, 0xB2)
-		var noKey *NoKeyError
 		_, err := m.Decode(ctx, sealGroup(t, unmapped, unmappedSID, 0x0101, 1, 7, true, []byte("toggle")))
-		if !errors.As(err, &noKey) || !noKey.Authenticated {
-			t.Fatalf("err = %v, want a NoKeyError that authenticated", err)
+		if !errors.Is(err, ErrNoKey) {
+			t.Fatalf("err = %v, want no key candidate", err)
 		}
 		if got := total(m); got != 0 {
 			t.Fatalf("%d reception windows after a message under an unmapped key set, want none", got)
+		}
+	})
+
+	// A mapped key that opens a message for a group GroupKeyMap does not
+	// map to it fails as a candidate (matter.js GroupSession.ts:431-433 at
+	// db021da0) before the reception state is touched.
+	t.Run("a mapped key for a group it is not mapped to", func(t *testing.T) {
+		t.Parallel()
+		m, _ := newTestManager(t)
+		_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0202, 1, 7, true, []byte("toggle")))
+		var rejected *DecodeError
+		if !errors.As(err, &rejected) || rejected.GroupFabricIndex != 1 || rejected.GroupID != 0x0202 {
+			t.Fatalf("err = %v (%+v), want a DecodeError naming group 0x0202 of fabric 1", err, rejected)
+		}
+		if got := total(m); got != 0 {
+			t.Fatalf("%d reception windows after a message its key is not mapped for, want none", got)
 		}
 	})
 }

@@ -165,7 +165,8 @@ func TestGroupsSubjectForGroup(t *testing.T) {
 		return m
 	}
 	// subjectFor decodes a message to group gid authenticated under the
-	// shared key.
+	// shared key: nil when GroupKeyMap does not allow the key for gid,
+	// which Decode refuses since matter.js db021da0 (GroupSession.ts:431-433).
 	subjectFor := func(t *testing.T, gid uint16) *Message {
 		t.Helper()
 		opKey, err := OperationalKey(shared, compressed)
@@ -176,17 +177,13 @@ func TestGroupsSubjectForGroup(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		msg, err := mapped(t).Decode(ctx, sealGroup(t, opKey, sid, gid, 0x1234, 1, false, []byte{0x01}))
-		if err != nil {
-			t.Fatalf("Decode: %v", err)
-		}
-		return msg
+		return decodeOrRefused(t, mapped(t), sealGroup(t, opKey, sid, gid, 0x1234, 1, false, []byte{0x01}))
 	}
 
 	t.Run("accepts a session-id collision peer that carries the authenticating key", func(t *testing.T) {
 		t.Parallel()
 		msg := subjectFor(t, 0x0101)
-		if !msg.HasValidMapping {
+		if msg == nil || !msg.HasValidMapping {
 			t.Error("hasValidMapping = false, want true")
 		}
 		if !slices.Equal(msg.Endpoints, []uint16{1}) {
@@ -196,19 +193,15 @@ func TestGroupsSubjectForGroup(t *testing.T) {
 
 	t.Run("rejects when the mapped key set does not carry the authenticating key", func(t *testing.T) {
 		t.Parallel()
-		if subjectFor(t, 0x0300).HasValidMapping {
+		if subjectFor(t, 0x0300) != nil {
 			t.Error("hasValidMapping = true, want false")
 		}
 	})
 
 	t.Run("rejects an unmapped group", func(t *testing.T) {
 		t.Parallel()
-		msg := subjectFor(t, 0x0999)
-		if msg.HasValidMapping {
+		if subjectFor(t, 0x0999) != nil {
 			t.Error("hasValidMapping = true, want false")
-		}
-		if len(msg.Endpoints) != 0 {
-			t.Errorf("endpoints = %v, want []", msg.Endpoints)
 		}
 	})
 }

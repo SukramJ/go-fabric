@@ -287,7 +287,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 	msg, err := port.Decode(ctx, buf)
 	if err != nil {
 		b.logger.Debug("matter.rx.group.drop", slog.String("src", srcString(src)), slog.Any("err", err))
-		if ev, ok := decodeFailureEvent(buf, srcIP, err); ok {
+		if ev, ok := decodeFailureEvent(srcIP, err); ok {
 			port.ReportGroupMessage(ev)
 		}
 		return err
@@ -364,48 +364,35 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 	return nil
 }
 
-// decodeFailureEvent is the report of a group message that did not
-// authenticate. NoAvailableKey names the fabric and group an unmapped key
-// set recovered, FailedAuth nothing but the group id of an unobfuscated
-// header; any other failure (a malformed message) is not reported. Mirrors
-// matter.js SessionManager.groupSessionFromPacket's catch block.
-func decodeFailureEvent(buf []byte, srcIP net.IP, err error) (groups.GroupMessageEvent, bool) {
-	ev := groups.GroupMessageEvent{SourceIP: srcIP}
-	// The group id is readable from the wire header only without privacy;
-	// it can derive the arrival address but is never reported as the
-	// authenticated group.
-	if len(buf) >= 4 && buf[3]&0x80 == 0 {
-		if hdr, _, herr := message.UnmarshalHeader(buf); herr == nil && hdr.DestSize == message.DestGroup {
-			ev.HeaderGroupID, ev.HasHeaderGroupID = hdr.DestGroupID, true
-		}
-	}
-	var noKey *groups.NoKeyError
-	switch {
-	case errors.As(err, &noKey):
-		ev.Result = groups.TestResultNoAvailableKey
-		if noKey.Authenticated {
-			ev.FabricIndex = noKey.FabricIndex
-			if !ev.HasHeaderGroupID {
-				ev.HeaderGroupID, ev.HasHeaderGroupID = noKey.GroupID, true
-			}
-		}
-	case errors.Is(err, groups.ErrNoKey):
-		ev.Result = groups.TestResultNoAvailableKey
-	case errors.Is(err, groups.ErrDecrypt):
-		ev.Result = groups.TestResultFailedAuth
-	default:
+// decodeFailureEvent is the report of a group message that no candidate
+// key passed: it names no fabric and carries the candidate fabrics and
+// the group the message names with its owner, for the listener to report
+// on its own fabric ([groups.DecodeError.Event]). Any other failure (a
+// malformed message, an unattached port) is not reported. Mirrors matter.js
+// SessionManager.groupSessionFromPacket's catch block
+// (packages/protocol/src/session/SessionManager.ts:811-820 at db021da0),
+// which reports a GroupSessionDecodeError only.
+func decodeFailureEvent(srcIP net.IP, err error) (groups.GroupMessageEvent, bool) {
+	var rejected *groups.DecodeError
+	if !errors.As(err, &rejected) {
 		return groups.GroupMessageEvent{}, false
 	}
-	return ev, true
+	return rejected.Event(srcIP), true
 }
 
 // invokeOutcomeEvents are the reports of a processed group Invoke: one
 // Success with AccessAllowed per endpoint the command ran on; without any,
-// FailedAuth for a message whose key is not the one its group is mapped
-// to, otherwise one Success per requested path whose AccessAllowed is
-// false when the group has member endpoints (access control filtered them
-// all) and absent when it has none. Mirrors matter.js
-// InteractionServer.handleInvokeRequest for a group session.
+// one Success per requested path whose AccessAllowed is false when the
+// group has member endpoints (access control filtered them all) and
+// absent when it has none. Mirrors matter.js
+// InteractionServer.handleInvokeRequest for a group session. A message
+// whose key its group is not mapped to never gets here: it fails in
+// [groups.Manager.Decode] and is reported by decodeFailureEvent (matter.js
+// GroupSession.ts:431-433 at db021da0). matter.js's FailedAuth branch
+// after dispatch covers a GroupKeyMap that changed between decode and
+// dispatch (packages/node/src/node/server/InteractionServer.ts:1071-1081
+// at db021da0); here the mapping Decode checked is the one the dispatcher
+// evaluates (groups.Message.HasValidMapping), so the branch has no case.
 func invokeOutcomeEvents(msg *groups.Message, srcIP net.IP, report im.GroupInvokeReport) []groups.GroupMessageEvent {
 	if !report.Processed {
 		return nil
@@ -428,11 +415,6 @@ func invokeOutcomeEvents(msg *groups.Message, srcIP net.IP, report im.GroupInvok
 			out = append(out, ev)
 		}
 		return out
-	}
-	if !msg.HasValidMapping {
-		return []groups.GroupMessageEvent{{
-			Result: groups.TestResultFailedAuth, FabricIndex: msg.FabricIndex, SourceIP: srcIP,
-		}}
 	}
 	var accessAllowed *bool
 	if len(msg.Endpoints) > 0 {

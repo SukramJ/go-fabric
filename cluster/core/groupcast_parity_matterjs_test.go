@@ -30,7 +30,9 @@ import (
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	mstore "github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // gcEvent is one event a cluster emitted.
@@ -660,7 +662,7 @@ func TestGroupcastTestingParityMatterJS(t *testing.T) {
 	if got := report(groups.GroupMessageEvent{Result: groups.TestResultMessageReplay, FabricIndex: 2, GroupID: 1, HasGroupID: true}); len(got) != 0 {
 		t.Errorf("another fabric's message reported: %+v", got)
 	}
-	got = report(groups.GroupMessageEvent{Result: groups.TestResultFailedAuth, HeaderGroupID: 9, HasHeaderGroupID: true, SourceIP: net.IPv4(10, 0, 0, 1)})
+	got = report(groups.GroupMessageEvent{Result: groups.TestResultFailedAuth, CandidateFabrics: []uint8{1}, HeaderGroupID: 9, HasHeaderGroupID: true, SourceIP: net.IPv4(10, 0, 0, 1)})
 	if len(got) != 1 || got[0].GroupID != nil || got[0].SourceIPAddress != nil ||
 		!slices.Equal(got[0].DestinationIPAddress, net.ParseIP("ff05::fa").To16()) || got[0].GroupcastTestResult != groups.TestResultFailedAuth || got[0].FabricIndex != 1 {
 		t.Errorf("FailedAuth event = %+v", got)
@@ -1736,18 +1738,151 @@ func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
 		}
 	})
 
-	t.Run("drops messages that another fabric authenticated", func(t *testing.T) {
-		t.Parallel()
+	// The cases of GroupcastServerTest.ts:1914-2150 at db021da0 on two
+	// fabrics, testing enabled for the first (twoFabricTestingNode,
+	// :1869-1895). A message no candidate key passed names no fabric and
+	// is reported on the fabric under test, with the result
+	// GroupMessageRejection.resultFor gives it, without its group id, from
+	// the address of the fabric that owns the group id
+	// (GroupcastServer.ts:478-487, :514-520).
+	twoFabrics := func(t *testing.T) *gcFixture {
+		t.Helper()
 		f := newGCFixture(t, 2)
 		enable(t, f, 1)
+		return f
+	}
+	// joinOn is joinGroup (GroupcastServerTest.ts:1897-1912): endpoint 1,
+	// key set 1, TEST_KEY, the given policy.
+	joinOn := func(t *testing.T, f *gcFixture, fabric uint8, group uint16, policy uint8) {
+		t.Helper()
+		f.join(as(fabric, 5), t, core.JoinGroupRequest{GroupID: group, Endpoints: []uint16{1}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(policy)})
+		f.emitter.take()
+	}
+	rejection := func(candidates []uint8, group uint16, owner uint8) groups.GroupMessageEvent {
+		return groups.GroupMessageEvent{
+			Result: groups.TestResultNoAvailableKey, CandidateFabrics: candidates,
+			HeaderGroupID: group, HasHeaderGroupID: true, HeaderGroupFabricIndex: owner, SourceIP: net.ParseIP("fd00::1"),
+		}
+	}
+
+	t.Run("drops authenticated messages of another fabric", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
 		for _, fabric := range []uint8{2, 1} {
-			f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
-				Result: groups.TestResultNoAvailableKey, FabricIndex: fabric, HeaderGroupID: 1, HasHeaderGroupID: true, SourceIP: net.ParseIP("fd00::1"),
-			})
+			for _, result := range []uint8{groups.TestResultSuccess, groups.TestResultMessageReplay} {
+				f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+					Result: result, FabricIndex: fabric, GroupID: 1, HasGroupID: true, SourceIP: net.ParseIP("fd00::1"),
+				})
+			}
 		}
 		evs := events(f)
-		if len(evs) != 1 || evs[0].FabricIndex != 1 || !slices.Equal(evs[0].DestinationIPAddress, iana) {
-			t.Errorf("events %+v, want one of fabric 1 from the IANA address", evs)
+		if len(evs) != 2 || evs[0].FabricIndex != 1 || evs[0].GroupcastTestResult != groups.TestResultSuccess ||
+			evs[1].FabricIndex != 1 || evs[1].GroupcastTestResult != groups.TestResultMessageReplay {
+			t.Errorf("events %+v, want Success and MessageReplay of fabric 1", evs)
+		}
+	})
+
+	t.Run("reports a message without candidate key on the fabric under test although another fabric's key named the group", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		f.mgr.ReportGroupMessage(rejection(nil, 1, 2))
+		evs := events(f)
+		if len(evs) != 1 || evs[0].FabricIndex != 1 || evs[0].GroupcastTestResult != groups.TestResultNoAvailableKey ||
+			evs[0].GroupID != nil || !slices.Equal(evs[0].DestinationIPAddress, iana) {
+			t.Errorf("events %+v, want one NoAvailableKey on fabric 1 from the IANA address", evs)
+		}
+	})
+
+	t.Run("reports failed authentication only to a fabric whose key was a candidate", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		for _, candidates := range [][]uint8{{2}, {2, 1}} {
+			f.mgr.ReportGroupMessage(rejection(candidates, 1, 0))
+		}
+		evs := events(f)
+		if len(evs) != 2 || evs[0].GroupcastTestResult != groups.TestResultNoAvailableKey || evs[1].GroupcastTestResult != groups.TestResultFailedAuth ||
+			evs[0].FabricIndex != 1 || evs[1].FabricIndex != 1 || evs[0].GroupID != nil || evs[1].GroupID != nil {
+			t.Errorf("events %+v, want NoAvailableKey then FailedAuth on fabric 1 without a group id", evs)
+		}
+	})
+
+	t.Run("does not use the fabric under test's address for a group id that another fabric owns", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		joinOn(t, f, 1, 1, groups.PolicyPerGroup)
+		f.mgr.ReportGroupMessage(rejection([]uint8{1}, 1, 2))
+		if evs := events(f); len(evs) != 1 || !slices.Equal(evs[0].DestinationIPAddress, iana) {
+			t.Errorf("events %+v, want one from the IANA address", evs)
+		}
+	})
+
+	t.Run("derives the arrival address from the fabric that owns the group id", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		joinOn(t, f, 1, 1, groups.PolicyIanaAddr)
+		joinOn(t, f, 2, 1, groups.PolicyPerGroup)
+		f.mgr.ReportGroupMessage(rejection([]uint8{1}, 1, 2))
+		addr, err := f.mgr.MulticastAddressFor(context.Background(), 2, 1)
+		if err != nil || addr.Equal(groups.IANAGroupcastAddress) {
+			t.Fatalf("fabric 2's address for group 1: %v, %v", addr, err)
+		}
+		if evs := events(f); len(evs) != 1 || !slices.Equal(evs[0].DestinationIPAddress, addr.To16()) {
+			t.Errorf("events %+v, want one from %v", evs, addr)
+		}
+	})
+
+	t.Run("uses the shared IANA address when the fabric that owns the group id no longer exists", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		if err := f.fs.RemoveFabric(context.Background(), 2); err != nil {
+			t.Fatal(err)
+		}
+		f.mgr.ForgetFabric(2)
+		f.mgr.ReportGroupMessage(rejection([]uint8{1}, 1, 2))
+		if evs := events(f); len(evs) != 1 || !slices.Equal(evs[0].DestinationIPAddress, iana) {
+			t.Errorf("events %+v, want one from the IANA address", evs)
+		}
+	})
+
+	t.Run("reports a received datagram that a key of another group authenticated as failed authentication", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		joinOn(t, f, 1, 1, groups.PolicyPerGroup)
+		other := []byte{0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff}
+		f.join(as(1, 5), t, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{1}, KeySetID: 2, Key: other, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
+		f.emitter.take()
+		// Key set 2 is mapped to group 2 only, so it does not authenticate
+		// a message for group 1.
+		msg, err := f.mgr.Decode(context.Background(), gcSealGroup(t, f, 1, other, 1, 0x1000, 0x1234))
+		var rejected *groups.DecodeError
+		if msg != nil || !errors.As(err, &rejected) {
+			t.Fatalf("Decode = %+v, %v; want a DecodeError", msg, err)
+		}
+		f.mgr.ReportGroupMessage(rejected.Event(net.ParseIP("fd00::1")))
+		addr, err := f.mgr.MulticastAddressFor(context.Background(), 1, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evs := events(f)
+		if len(evs) != 1 || evs[0].GroupcastTestResult != groups.TestResultFailedAuth || evs[0].GroupID != nil ||
+			evs[0].FabricIndex != 1 || !slices.Equal(evs[0].DestinationIPAddress, addr.To16()) {
+			t.Errorf("events %+v, want one FailedAuth on fabric 1 without a group id from %v", evs, addr)
+		}
+	})
+
+	// Characterization: a plain header names no fabric, so the address
+	// keeps using the fabric under test.
+	t.Run("derives the arrival address of an unauthenticated plain header group id from the fabric under test", func(t *testing.T) {
+		t.Parallel()
+		f := twoFabrics(t)
+		joinOn(t, f, 1, 1, groups.PolicyPerGroup)
+		f.mgr.ReportGroupMessage(rejection(nil, 1, 0))
+		addr, err := f.mgr.MulticastAddressFor(context.Background(), 1, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if evs := events(f); len(evs) != 1 || !slices.Equal(evs[0].DestinationIPAddress, addr.To16()) {
+			t.Errorf("events %+v, want one from %v", evs, addr)
 		}
 	})
 
@@ -1798,6 +1933,44 @@ func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
 			t.Errorf("events %+v, want one from the IANA address", evs)
 		}
 	})
+}
+
+// gcSealGroup is groupDatagram of matter.js packages/protocol/test/session/
+// group-datagrams.ts:37-89 at db021da0 for fabric's key epochKey: a
+// privacy group message to groupID from source with counter, an initiator
+// payload header (exchange 0x1234, protocol 1, opcode 8) and no payload,
+// as GroupcastServerTest.ts:2073-2108 encodes it.
+func gcSealGroup(t *testing.T, f *gcFixture, fabric uint8, epochKey []byte, groupID uint16, counter uint32, source uint64) []byte {
+	t.Helper()
+	rec, err := f.fs.GetFabric(context.Background(), fabric)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op, err := groups.OperationalKey(epochKey, rec.CompressedID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid, err := groups.SessionID(op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privacyKey, err := groups.PrivacyKey(op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdr := message.Header{
+		SessionID: sid, MessageCounter: counter, HasSourceNodeID: true, SourceNodeID: source,
+		DestSize: message.DestGroup, DestGroupID: groupID, SessionType: message.SessionGroup, Privacy: true,
+	}
+	ph := message.ProtocolHeader{Initiator: true, Opcode: 0x08, ExchangeID: 0x1234, ProtocolID: 0x0001}
+	raw, ct, err := channel.EncryptGroup(op, source, hdr, ph.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw, err = channel.ObfuscateGroupHeader(privacyKey, sid, raw, ct); err != nil {
+		t.Fatal(err)
+	}
+	return append(slices.Clone(raw), ct...)
 }
 
 // TestGroupcastDerivedMembershipParityMatterJS ports the server-side cases

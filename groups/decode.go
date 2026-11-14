@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/secure/aesccm"
@@ -23,30 +24,99 @@ var (
 	// ErrNotGroupMessage is returned for a datagram whose Security Flags
 	// do not name a group session.
 	ErrNotGroupMessage = errors.New("groups: not a group message")
-	// ErrNoKey is returned when no key set mapped to a group in
-	// GroupKeyMap has an epoch key with the message's group session id.
-	// Mirrors matter.js GroupSessionNoKeyError.
+	// ErrNoKey is what a [DecodeError] without a candidate key is: no
+	// key set mapped to a group in GroupKeyMap has an epoch key with the
+	// message's group session id. Mirrors the first message of matter.js
+	// GroupSessionDecodeError (packages/protocol/src/session/
+	// GroupSession.ts:94-98 at db021da0).
 	ErrNoKey = errors.New("groups: no key candidate for group message")
-	// ErrDecrypt is returned when the message authenticated under none of
-	// the candidate keys. Mirrors matter.js GroupSessionDecodeError.
+	// ErrDecrypt is what a [DecodeError] with candidate keys is: no
+	// candidate authenticated the message for its destination group.
+	// Mirrors the second message of matter.js GroupSessionDecodeError
+	// (GroupSession.ts:94-98 at db021da0).
 	ErrDecrypt = errors.New("groups: group message failed to authenticate")
 	// ErrMalformed is returned for a group message that authenticated but
 	// carries no source node id or no group id.
 	ErrMalformed = errors.New("groups: malformed group message")
 )
 
-// NoKeyError is the [ErrNoKey] outcome with what an unusable key set
-// revealed: when a key set that GroupKeyMap maps no group to still
-// authenticates the message, its fabric and the message's group id are
-// known — enough for Groupcast testing to name the fabric and derive the
-// arrival address, never enough to process the message. Mirrors matter.js
-// GroupSessionNoKeyError and GroupSession.decode's unmappedAuthentication.
+// NoKeyError was the [ErrNoKey] outcome with the fabric and group an
+// unmapped key set recovered.
+//
+// Deprecated: [Manager.Decode] no longer returns it — a key set that
+// GroupKeyMap maps no group to is never tried, as in matter.js
+// (GroupSession.ts:366-376 at db021da0). A message no candidate passes is
+// a [DecodeError].
 type NoKeyError struct {
 	// Authenticated reports that an unmapped key set opened the message;
 	// FabricIndex and GroupID are set only then.
 	Authenticated bool
 	FabricIndex   uint8
 	GroupID       uint16
+}
+
+// DecodeError is the outcome of a group message for which no candidate
+// key passed: none authenticated it for its destination group, or there
+// was no candidate at all. Any sender can cause it. It holds what is known
+// about the message for the Groupcast testing report and nothing that
+// lets it be processed. errors.Is matches [ErrNoKey] without candidates
+// and [ErrDecrypt] with them. Mirrors matter.js GroupSessionDecodeError
+// and GroupMessageRejection (packages/protocol/src/session/
+// GroupSession.ts:37-102 at db021da0).
+type DecodeError struct {
+	// CandidateFabrics are the fabrics with at least one candidate key —
+	// a key with the message's session id whose key set GroupKeyMap maps
+	// to a group — ascending and each once; empty when there was none.
+	CandidateFabrics []uint8
+	// GroupID is the group id the message names (HasGroupID), to derive
+	// the address it arrived on — never to be reported as the group:
+	// the destination of the first candidate that authenticated the
+	// message, else the id of a plain header; unset behind privacy when
+	// no candidate authenticated it.
+	GroupID    uint16
+	HasGroupID bool
+	// GroupFabricIndex is the fabric whose candidate key authenticated
+	// GroupID, so it owns the id; 0 for an id from a plain header. It is
+	// not the fabric to report on.
+	GroupFabricIndex uint8
+}
+
+func (e *DecodeError) Error() string {
+	if len(e.CandidateFabrics) == 0 {
+		return ErrNoKey.Error()
+	}
+	return ErrDecrypt.Error()
+}
+
+// Is makes errors.Is(err, ErrNoKey) hold without a candidate and
+// errors.Is(err, ErrDecrypt) with one.
+func (e *DecodeError) Is(target error) bool {
+	if len(e.CandidateFabrics) == 0 {
+		return target == ErrNoKey
+	}
+	return target == ErrDecrypt
+}
+
+// Event is the report of the rejected message from sourceIP: it names no
+// fabric, since no key passed, and carries the candidate fabrics and the
+// group id with its owner for the listener — which reports it on its own
+// fabric with [GroupMessageEvent.ResultFor]. Mirrors matter.js
+// SessionManager.groupSessionFromPacket emitting `{ kind:
+// "unauthenticated", candidateFabrics, group, sourceIp }`
+// (packages/protocol/src/session/SessionManager.ts:809-820 at db021da0).
+func (e *DecodeError) Event(sourceIP net.IP) GroupMessageEvent {
+	ev := GroupMessageEvent{
+		Result:                 TestResultNoAvailableKey,
+		CandidateFabrics:       slices.Clone(e.CandidateFabrics),
+		HeaderGroupID:          e.GroupID,
+		HasHeaderGroupID:       e.HasGroupID,
+		HeaderGroupFabricIndex: e.GroupFabricIndex,
+		SourceIP:               slices.Clone(sourceIP),
+	}
+	if len(e.CandidateFabrics) > 0 {
+		ev.Result = TestResultFailedAuth
+	}
+	return ev
 }
 
 func (e *NoKeyError) Error() string {
@@ -83,12 +153,13 @@ type Message struct {
 	// KeySetID is the key set that authenticated the message.
 	KeySetID uint16
 	// HasValidMapping reports whether the key that authenticated the
-	// message belongs to the key set GroupKeyMap maps GroupID to. Two key
-	// sets with identical key material share a session id, so the one
-	// that decrypted may differ from the one the group is mapped to.
-	// Without a valid mapping the message carries no Group subject and
-	// no access control entry can grant it anything. Mirrors matter.js
-	// Groups.subjectForGroup.
+	// message belongs to the key set GroupKeyMap maps GroupID to. It is
+	// always true for a message Decode returns: a candidate key the group
+	// is not mapped to fails there, and the next one is tried (matter.js
+	// GroupSession.ts:431-433 at db021da0). Two key sets with identical
+	// key material share a session id, so the one that decrypted may
+	// differ from the one the group is mapped to; the check compares key
+	// material. Mirrors matter.js Groups.subjectForGroup.
 	HasValidMapping bool
 	// Endpoints are the local endpoints that are members of GroupID on
 	// the fabric, in the order they joined.
@@ -110,18 +181,24 @@ type candidate struct {
 // Decode authenticates a group message and returns it with the subject it
 // is evaluated under.
 //
-// Mirrors matter.js GroupSession.decode and SessionManager
-// .groupSessionFromPacket (packages/protocol/src/session/GroupSession.ts,
-// SessionManager.ts): the candidates are the epoch keys, across every
-// fabric, whose group session id equals the message's session id; only
-// key sets that GroupKeyMap maps a group to participate ("matching the
-// CHIP SDK, only mapped key sets count as available"); each candidate is
-// tried in turn — privacy-deobfuscating the header with its privacy key
-// when the P flag is set, then opening the AEAD with the nonce built from
-// the Security Flags, the message counter and the source node id — and
-// the first that authenticates wins. The message counter then passes the
-// per-key, per-sender reception window (matter.js
+// Mirrors matter.js GroupSession.decodeWithCandidateKeys and
+// SessionManager.groupSessionFromPacket at db021da0
+// (packages/protocol/src/session/GroupSession.ts:330-462,
+// SessionManager.ts:806-820): the candidates are the epoch keys, across
+// every fabric, whose group session id equals the message's session id;
+// only key sets that GroupKeyMap maps a group to participate ("As in the
+// CHIP SDK, a key set that no group maps to is never tried",
+// GroupSession.ts:371-374); each candidate is tried in turn —
+// privacy-deobfuscating the header with its privacy key when the P flag
+// is set, then opening the AEAD with the nonce built from the Security
+// Flags, the message counter and the source node id. A candidate that
+// opens the message still fails when GroupKeyMap does not map the
+// message's group to a key set holding its key (:425-433), and the next
+// one is tried; the first that passes wins. Only then does the message
+// counter pass the per-key, per-sender reception window (matter.js
 // MessagingState.receptionStateFor, an encrypted-with-rollover window).
+// When none passes, the error is a [*DecodeError] with the candidate
+// fabrics and the group the message names (:454-461).
 //
 // The input is not modified.
 func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error) {
@@ -145,19 +222,12 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 		return nil, fmt.Errorf("%w: no source node id", ErrMalformed)
 	}
 	privacy := secFlags&0x80 != 0
-	cands := m.candidates(sessionID, true)
-	if len(cands) == 0 {
-		// Matching the CHIP SDK, only mapped key sets count as
-		// available; an unmapped one that authenticates the message
-		// only recovers its fabric and group for the report.
-		noKey := &NoKeyError{}
-		for _, c := range m.candidates(sessionID, false) {
-			if msg, ok := tryDecrypt(datagram, sessionID, privacy, c); ok && msg.Header.DestSize == message.DestGroup {
-				noKey.Authenticated, noKey.FabricIndex, noKey.GroupID = true, c.fabric.index, msg.Header.DestGroupID
-				break
-			}
+	cands := m.candidates(sessionID)
+	rejected := &DecodeError{}
+	for _, c := range cands {
+		if !slices.Contains(rejected.CandidateFabrics, c.fabric.index) {
+			rejected.CandidateFabrics = append(rejected.CandidateFabrics, c.fabric.index)
 		}
-		return nil, noKey
 	}
 	for _, c := range cands {
 		msg, ok := tryDecrypt(datagram, sessionID, privacy, c)
@@ -170,17 +240,53 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 			// (SessionManager.groupSessionFromPacket, GroupId.assertGroupId).
 			return nil, fmt.Errorf("%w: group id missing", ErrMalformed)
 		}
+		// The first candidate that opens the message owns the id it
+		// names (GroupSession.ts:429, `group ??=`).
+		if !rejected.HasGroupID {
+			rejected.GroupID, rejected.HasGroupID, rejected.GroupFabricIndex = msg.Header.DestGroupID, true, c.fabric.index
+		}
+		if !m.mappingAllows(c, msg.Header.DestGroupID) {
+			continue // GroupSession.ts:431-433
+		}
 		m.completeMessage(msg, c)
 		return msg, nil
 	}
-	return nil, ErrDecrypt
+	// With no candidate that opened it, the group id is the plain
+	// header's, without a fabric; behind privacy there is none
+	// (GroupSession.ts:454-456).
+	if !rejected.HasGroupID && !privacy {
+		if hdr, _, err := message.UnmarshalHeader(datagram); err == nil && hdr.DestSize == message.DestGroup {
+			rejected.GroupID, rejected.HasGroupID = hdr.DestGroupID, true
+		}
+	}
+	return nil, rejected
+}
+
+// mappingAllows reports whether GroupKeyMap maps groupID to a key set
+// that holds c's operational key. It compares key material, so a key of
+// another key set with identical material is allowed too. Mirrors
+// matter.js Groups.mappingAllows and KeySets.containsOperationalKey
+// (packages/protocol/src/groups/Groups.ts:78-81,
+// packages/protocol/src/groups/KeySets.ts:44-49 at db021da0).
+func (m *Manager) mappingAllows(c candidate, groupID uint16) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	mappedID, ok := c.fabric.idMap[groupID]
+	if !ok {
+		return false
+	}
+	ks, ok := c.fabric.keySets[mappedID]
+	if !ok {
+		return false
+	}
+	return slices.ContainsFunc(ks.epochs, func(e epochKey) bool { return slices.Equal(e.key, c.epoch.key) })
 }
 
 // candidates collects the epoch keys with sessionID of the key sets that
-// GroupKeyMap maps a group to (mapped) or of those it maps none to
-// (!mapped), ordered by fabric index and key set id so the outcome does
-// not depend on map iteration.
-func (m *Manager) candidates(sessionID uint16, mapped bool) []candidate {
+// GroupKeyMap maps a group to, ordered by fabric index and key set id so
+// the outcome does not depend on map iteration. Mirrors matter.js
+// GroupSession.ts:366-376 at db021da0 (fabric.groups.isKeySetMapped).
+func (m *Manager) candidates(sessionID uint16) []candidate {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	idxs := make([]uint8, 0, len(m.fabrics))
@@ -201,7 +307,7 @@ func (m *Manager) candidates(sessionID uint16, mapped bool) []candidate {
 		}
 		slices.Sort(ids)
 		for _, id := range ids {
-			if inMap[id] != mapped {
+			if !inMap[id] {
 				continue
 			}
 			for _, e := range f.keySets[id].epochs {
@@ -265,20 +371,17 @@ func protectedHeaderEnd(buf []byte) int {
 	return end
 }
 
-// completeMessage fills in the subject and runs the reception window.
+// completeMessage fills in the subject of a message whose candidate
+// passed [Manager.mappingAllows] and runs the reception window.
 func (m *Manager) completeMessage(msg *Message, c candidate) {
 	msg.FabricIndex = c.fabric.index
 	msg.GroupID = msg.Header.DestGroupID
 	msg.SourceNodeID = msg.Header.SourceNodeID
 	msg.KeySetID = c.keySetID
+	msg.HasValidMapping = true
 
 	m.mu.RLock()
 	msg.LocalNodeID = c.fabric.nodeID
-	if mappedID, ok := c.fabric.idMap[msg.GroupID]; ok {
-		if ks, ok := c.fabric.keySets[mappedID]; ok {
-			msg.HasValidMapping = slices.ContainsFunc(ks.epochs, func(e epochKey) bool { return slices.Equal(e.key, c.epoch.key) })
-		}
-	}
 	if e, ok := c.fabric.table[msg.GroupID]; ok {
 		msg.Endpoints = slices.Clone(e.Endpoints)
 	}

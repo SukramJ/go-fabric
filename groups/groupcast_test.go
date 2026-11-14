@@ -367,11 +367,13 @@ func TestGroupMessageListeners(t *testing.T) {
 	}
 }
 
-// TestDecodeNoKeyNamesAnUnmappedAuthentication pins GroupSession.decode's
-// unmappedAuthentication: with no mapped key set at the session id, an
-// unmapped one that opens the message names its fabric and group for the
-// report, and the message is still refused.
-func TestDecodeNoKeyNamesAnUnmappedAuthentication(t *testing.T) {
+// TestDecodeNeverTriesAnUnmappedKeySet pins matter.js
+// GroupSession.decodeWithCandidateKeys at db021da0 (GroupSession.ts:371-374,
+// :454-461): a key set that GroupKeyMap maps no group to is never tried,
+// even when its key would open the message — the message has no
+// candidate, names no fabric, and behind privacy reveals no group; a plain
+// header's group id is named without a fabric.
+func TestDecodeNeverTriesAnUnmappedKeySet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	m, st := newTestManager(t)
@@ -381,20 +383,18 @@ func TestDecodeNoKeyNamesAnUnmappedAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 5, true, []byte("x")))
-	var noKey *NoKeyError
-	if !errors.As(err, &noKey) || !errors.Is(err, ErrNoKey) {
-		t.Fatalf("Decode = %v, want a NoKeyError", err)
+	var rejected *DecodeError
+	if !errors.As(err, &rejected) || !errors.Is(err, ErrNoKey) || err.Error() != ErrNoKey.Error() {
+		t.Fatalf("Decode = %v, want a DecodeError without a candidate", err)
 	}
-	if !noKey.Authenticated || noKey.FabricIndex != 1 || noKey.GroupID != 0x0101 {
-		t.Errorf("NoKeyError = %+v, want fabric 1 group 0x0101", noKey)
+	if len(rejected.CandidateFabrics) != 0 || rejected.HasGroupID || rejected.GroupFabricIndex != 0 {
+		t.Errorf("DecodeError = %+v, want no candidate and no group", rejected)
 	}
-	if noKey.Error() == ErrNoKey.Error() {
-		t.Error("an authenticated NoKeyError does not say what authenticated")
-	}
-	// A key nobody holds authenticates nothing.
+	// A key nobody holds: the plain header's group, without a fabric.
 	other, otherSID := opKeyOf(t, 0x55)
 	_, err = m.Decode(ctx, sealGroup(t, other, otherSID, 0x0101, 1, 6, false, []byte("x")))
-	if !errors.As(err, &noKey) || noKey.Authenticated || noKey.Error() != ErrNoKey.Error() {
-		t.Errorf("unknown key: %v", err)
+	if !errors.As(err, &rejected) || len(rejected.CandidateFabrics) != 0 || !rejected.HasGroupID ||
+		rejected.GroupID != 0x0101 || rejected.GroupFabricIndex != 0 {
+		t.Errorf("unknown key: %v (%+v)", err, rejected)
 	}
 }

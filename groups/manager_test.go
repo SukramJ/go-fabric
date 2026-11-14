@@ -35,6 +35,27 @@ func newTestManager(t *testing.T) (*Manager, *memStore) {
 	return m, st
 }
 
+// decodeOrRefused decodes datagram and returns the message when its key
+// passed, or nil when a candidate key opened it but GroupKeyMap does not
+// map its group to a key set holding that key — the *DecodeError then
+// names the group's owner (matter.js GroupSession.ts:429-433 at
+// db021da0). Any other outcome fails t.
+func decodeOrRefused(t *testing.T, m *Manager, datagram []byte) *Message {
+	t.Helper()
+	msg, err := m.Decode(context.Background(), datagram)
+	if err == nil {
+		if !msg.HasValidMapping {
+			t.Fatal("Decode returned a message without a valid mapping")
+		}
+		return msg
+	}
+	var rejected *DecodeError
+	if !errors.As(err, &rejected) || rejected.GroupFabricIndex == 0 || len(rejected.CandidateFabrics) == 0 {
+		t.Fatalf("Decode: %v (%+v), want a message or a candidate refused by GroupKeyMap", err, rejected)
+	}
+	return nil
+}
+
 func opKeyOf(t *testing.T, seed byte) (opKey []byte, sessionID uint16) {
 	t.Helper()
 	op, err := OperationalKey(epochKeyOf(seed), testCompressed)
@@ -284,10 +305,12 @@ func TestDecodeRejections(t *testing.T) {
 	}
 }
 
-// TestDecodeReportsAnInvalidMapping pins matter.js Groups.subjectForGroup:
-// two key sets with identical key material share a session id; when the
-// group is mapped to a key set other than the one whose key decrypted, the
-// message authenticates but carries no valid Group subject.
+// TestDecodeReportsAnInvalidMapping pins matter.js GroupSession
+// .decodeWithCandidateKeys at db021da0 (GroupSession.ts:429-433, :458-461):
+// a candidate whose key opens the message fails when GroupKeyMap maps the
+// message's group to a key set without that key; with no other candidate
+// the message is refused, naming the candidate's fabric and the group it
+// owns, and touches no reception state.
 func TestDecodeReportsAnInvalidMapping(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -300,11 +323,18 @@ func TestDecodeReportsAnInvalidMapping(t *testing.T) {
 	}
 	op, sid := opKeyOf(t, 0xA1)
 	msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 9, true, []byte("x")))
-	if err != nil {
-		t.Fatal(err)
+	var rejected *DecodeError
+	if msg != nil || !errors.As(err, &rejected) || !errors.Is(err, ErrDecrypt) {
+		t.Fatalf("Decode = %+v, %v; want a DecodeError", msg, err)
 	}
-	if msg.HasValidMapping {
-		t.Fatal("a message authenticated by another key set's key carries a valid Group subject")
+	if !slices.Equal(rejected.CandidateFabrics, []uint8{1}) || !rejected.HasGroupID || rejected.GroupID != 0x0101 || rejected.GroupFabricIndex != 1 {
+		t.Errorf("DecodeError = %+v, want candidate fabric 1 and group 0x0101 of fabric 1", rejected)
+	}
+	m.receptionMu.Lock()
+	n := len(m.reception)
+	m.receptionMu.Unlock()
+	if n != 0 {
+		t.Errorf("%d reception states after a refused message, want none", n)
 	}
 }
 
