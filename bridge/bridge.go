@@ -593,6 +593,11 @@ type Bridge struct {
 	// closed via the existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
 
+	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
+	// last found: the ACL and topology the subject last read a path
+	// under, and the ACL and topology of a first refusing observation.
+	subAccess sync.Map // map[uint32]*subjectAccess (subscriptionID → state)
+
 	// eventLog is the persistent (in-process lifetime) event buffer.
 	// Every call to [Bridge.EmitEvent] appends to this log in addition
 	// to fanning out to live subscriptions. Controllers that send a
@@ -1266,7 +1271,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	aclLister := b.aclLister
 	auxACL := b.auxACL
 	b.mu.RUnlock()
-	dispatcher.SetACLLister(aclLister)
+	dispatcher.SetACLLister(pinnableACL(aclLister))
 	dispatcher.SetAuxiliaryACL(auxACL)
 
 	// Wire MatterEventReceiver-aware cluster servers so they can fire
@@ -1352,7 +1357,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// The sources once more, under the lock of the swap: an Attach… that
 	// ran since they were read above applied to the dispatcher this one
 	// replaces.
-	dispatcher.SetACLLister(b.aclLister)
+	dispatcher.SetACLLister(pinnableACL(b.aclLister))
 	dispatcher.SetAuxiliaryACL(b.auxACL)
 	b.dispatcher = dispatcher
 	staleSwitchUnsubs := b.switchUnsubscribers
@@ -1941,7 +1946,7 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	// The live dispatcher too (nil before the first assembly): before, a
 	// lister replaced on a running bridge waited for a Reassemble that a
 	// node with a fixed set of devices never runs (review II, W2-api-10).
-	b.dispatcher.SetACLLister(l)
+	b.dispatcher.SetACLLister(pinnableACL(l))
 	b.mu.Unlock()
 }
 

@@ -21,6 +21,7 @@ import (
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -197,6 +198,7 @@ func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 	b.closePrimingAbort(subID)
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
+	b.subAccess.Delete(subID)
 	b.forgetReportExchange(subID)
 	// reportCounterOwner is keyed by (session, counter), so the owning
 	// subscription is only visible in the value — a scan is the only
@@ -684,6 +686,7 @@ func (b *Bridge) endIfSubjectReadsNothing(ctx context.Context, dispatcher im.Dis
 	}
 	b.routing.subTargets.Delete(sub.ID)
 	b.subSendErrorCount.Delete(sub.ID)
+	b.subAccess.Delete(sub.ID)
 	b.forgetReportExchange(sub.ID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(sub.ID) // ErrNotFound is fine — racing with peer Close
@@ -696,15 +699,42 @@ func (b *Bridge) endIfSubjectReadsNothing(ctx context.Context, dispatcher im.Dis
 	return true
 }
 
-// subjectReadsNothing reports whether the ACL refuses the subscription's
-// subject every attribute and every event cluster its paths resolve to,
-// and at least one is refused. Only a plain refusal by an ACL that could
-// be read counts: a PASE subscription, a dispatcher without an ACL, a
-// session without an accessing fabric, an ACL source that is missing or
-// fails to list the fabric's entries, and any answer of the access check
-// other than UNSUPPORTED_ACCESS leave the subscription alone, as does a
-// subscription whose paths resolve to nothing at all. The walk stops at
-// the first path the subject may read.
+// subjectAccess is what [Bridge.subjectReadsNothing] remembers of one
+// subscription between its reports.
+type subjectAccess struct {
+	mu sync.Mutex
+	// passed: the subject last read a path of the subscription under
+	// passedACL, the fabric's entries, and the served topology passedGen.
+	passed    bool
+	passedACL []store.ACLEntry
+	passedGen uint64
+	// refused: a first observation found every path refused under
+	// refusedACL and refusedGen; a second one under the same ends the
+	// subscription.
+	refused    bool
+	refusedACL []store.ACLEntry
+	refusedGen uint64
+}
+
+// subjectReadsNothing reports whether the subscription's subject is
+// refused every attribute and every event cluster its paths resolve to,
+// at least one of them, at two consecutive observations of one unchanged
+// ACL of its fabric and one served topology — one observation is not
+// enough, since a list write of the ACL stores its REPLACE before its
+// appends and an observation between them finds the entries missing
+// (review II, R2-P3-dr-dev-01). It decides nothing while a chunked write
+// of the fabric's ACL is in progress (the write's hold, owner decision
+// 52), nor on a fabric ACL it cannot list: the walk over the paths is
+// judged against the entries listed for it, never against a second read
+// that may fail (R2-P3-dr-dev-05). A path that resolves to no attribute
+// the node serves is no refusal (R2-P3-dr-dev-04). The walk runs only when
+// the fabric's entries or the served topology differ from those the
+// subject last passed under, not before every report (R2-P3-dr-dev-06);
+// the entries are read at each report, the one store read the decision
+// costs. A PASE subscription, a dispatcher without an ACL, a session
+// without an accessing fabric, a bridge without an ACL source, and any
+// answer of the access check other than UNSUPPORTED_ACCESS leave the
+// subscription alone.
 func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
 	checker, hasACL := dispatcher.(im.ACLChecker)
 	if target.pase || !hasACL || !im.HasAccessingFabric(target.fabricIndex) {
@@ -712,13 +742,59 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 	}
 	b.mu.RLock()
 	lister := b.aclLister
+	gen := b.servedGen
 	b.mu.RUnlock()
-	if lister == nil {
+	if lister == nil || b.aclWriteInProgress(target.fabricIndex) {
 		return false
 	}
-	if _, err := lister.ListACL(ctx, target.fabricIndex); err != nil {
+	entries, err := lister.ListACL(ctx, target.fabricIndex)
+	if err != nil {
 		return false
 	}
+	raw, _ := b.subAccess.LoadOrStore(sub.ID, &subjectAccess{})
+	st, ok := raw.(*subjectAccess)
+	if !ok {
+		return false
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.passed && st.passedGen == gen && reflect.DeepEqual(st.passedACL, entries) {
+		return false
+	}
+	refused := b.subjectRefusedEveryPath(withPinnedACL(ctx, target.fabricIndex, entries), checker, dispatcher, target, sub)
+	if ctx.Err() != nil {
+		return false
+	}
+	if !refused {
+		st.passed, st.passedACL, st.passedGen = true, entries, gen
+		st.refused, st.refusedACL = false, nil
+		return false
+	}
+	if st.refused && st.refusedGen == gen && reflect.DeepEqual(st.refusedACL, entries) && !b.aclWriteInProgress(target.fabricIndex) {
+		return true
+	}
+	st.passed, st.passedACL = false, nil
+	st.refused, st.refusedACL, st.refusedGen = true, entries, gen
+	return false
+}
+
+// aclWriteInProgress reports whether a chunked write of fabricIndex's ACL
+// (AccessControl, endpoint 0, attribute ACL) holds the attribute.
+func (b *Bridge) aclWriteInProgress(fabricIndex uint8) bool {
+	return b.routing.writeHolds.Held(fabricIndex, 0, accessControlClusterID, accessControlACLAttributeID)
+}
+
+// accessControlClusterID and accessControlACLAttributeID name the
+// AccessControl cluster's ACL attribute (Matter §9.10.5.3).
+const (
+	accessControlClusterID      uint32 = 0x001F
+	accessControlACLAttributeID uint32 = 0x0000
+)
+
+// subjectRefusedEveryPath walks the subscription's paths, as ctx's subject
+// under its pinned ACL, and reports whether at least one is refused and
+// none may be read; it stops at the first path the subject may read.
+func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
 	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
 	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
@@ -729,8 +805,8 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 		if !ok {
 			break
 		}
-		if rr.Status == im.StatusUnsupportedNode {
-			continue
+		if notServed(rr.Status) {
+			continue // nothing the node serves: no refusal (R2-P3-dr-dev-04)
 		}
 		var priv uint8 = 1 // View default
 		if hasPriv {
@@ -759,6 +835,49 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 		}
 	}
 	return refused
+}
+
+// notServed reports whether a read result's status says that its path
+// resolves to nothing the node serves.
+func notServed(st im.StatusCode) bool {
+	return st == im.StatusUnsupportedNode || st == im.StatusUnsupportedEndpoint ||
+		st == im.StatusUnsupportedCluster || st == im.StatusUnsupportedAttribute
+}
+
+// pinnedACL is a fabric's ACL as one listing returned it, attached to a
+// context by [withPinnedACL].
+type pinnedACL struct {
+	fabricIndex uint8
+	entries     []store.ACLEntry
+}
+
+type pinnedACLKey struct{}
+
+// withPinnedACL has every access check made under ctx judge fabricIndex
+// against entries instead of reading the ACL source again.
+func withPinnedACL(ctx context.Context, fabricIndex uint8, entries []store.ACLEntry) context.Context {
+	return context.WithValue(ctx, pinnedACLKey{}, pinnedACL{fabricIndex: fabricIndex, entries: entries})
+}
+
+// pinnedACLSource is the ACL source the bridge hands its dispatcher: the
+// attached one, except for a context that carries a pinned ACL of the
+// fabric asked for ([withPinnedACL]).
+type pinnedACLSource struct{ inner endpointpkg.ACLLister }
+
+func (s pinnedACLSource) ListACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
+	if pin, ok := ctx.Value(pinnedACLKey{}).(pinnedACL); ok && pin.fabricIndex == fabricIndex {
+		return pin.entries, nil
+	}
+	return s.inner.ListACL(ctx, fabricIndex)
+}
+
+// pinnableACL wraps l for the dispatcher; nil stays nil, so a bridge
+// without an ACL source keeps denying every operational request.
+func pinnableACL(l endpointpkg.ACLLister) endpointpkg.ACLLister {
+	if l == nil {
+		return nil
+	}
+	return pinnedACLSource{inner: l}
 }
 
 // subscriptionAttributeReports reads paths for sub — the changed ones its

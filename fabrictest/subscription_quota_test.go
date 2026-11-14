@@ -9,12 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	acl "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // onOffSubscription is a subscription to the plug's OnOff attribute with a
@@ -123,5 +128,114 @@ func TestSubscriptionEndsWhenItsSubjectReadsNothing(t *testing.T) {
 	step()
 	if got := p.Device.Node().Subscriptions().Active(); got != 0 {
 		t.Fatalf("after the subject lost its ACL entry and its subscriptions' reports were due, the device holds %d subscriptions, want 0", got)
+	}
+}
+
+// TestChunkedACLRewriteKeepsTheFabricsSubscriptions: while an
+// administrator's chunked list write of its fabric's ACL is in progress —
+// the REPLACE with the empty list in one WriteRequest, the entries
+// appended in the next on the same exchange — the fabric's subscriptions
+// keep their place through every report due in between, and stay once the
+// rewrite has put the entries back (review II, R2-P3-dr-dev-01). The
+// subscription's ceiling makes several reports fall due between the
+// chunks, well inside the write's idle time (bridge writeTxTTL).
+func TestChunkedACLRewriteKeepsTheFabricsSubscriptions(t *testing.T) {
+	t.Parallel()
+	site, p, pl, ep := pairWithPlug(t, fabrictest.Options{})
+	ctx := testContext(t)
+	req := onOffSubscription(ep)
+	req.MaxIntervalCeiling = interaction.Interval(5 * time.Second)
+	sub, err := fabrictest.Subscribe(ctx, p, req)
+	if err != nil {
+		t.Fatalf("subscription: %v", err)
+	}
+	t.Cleanup(sub.Close)
+	fi := pairFabricIndex(t, p)
+	before, err := p.Device.Node().Store().ListACL(ctx, fi)
+	if err != nil || len(before) == 0 {
+		t.Fatalf("the fabric's ACL before the rewrite: %+v, %v", before, err)
+	}
+
+	aclPath := rootAttr(acl.ClusterID, acl.AttrAcl)
+	var x *exchange.Exchange
+	chunk := func(more bool, w im.AttributeWrite) im.StatusCode {
+		t.Helper()
+		enc := tlv.NewEncoder()
+		im.WriteRequest{MoreChunkedMessages: more, Writes: []im.AttributeWrite{w}}.MarshalTLV(enc,
+			func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) { v.Value.(encodeFunc).EncodeTLV(e, tag) })
+		payload, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var resp im.WriteResponse
+		err = site.Run(ctx, func(ctx context.Context) error {
+			if x == nil {
+				var err error
+				if x, err = fabrictestseam.Interaction(p).Provider().InitiateExchange(ctx, interaction.ExchangeOptions{}); err != nil {
+					return err
+				}
+			}
+			if err := x.Send(ctx, im.OpcodeWriteRequest, payload, exchange.SendOptions{}); err != nil {
+				return err
+			}
+			m, err := x.Next(ctx, exchange.ReceiveOptions{})
+			if err != nil {
+				return err
+			}
+			resp, err = im.UnmarshalWriteResponseTLV(tlv.NewDecoder(m.Payload))
+			return err
+		})
+		if err != nil || len(resp.Responses) != 1 {
+			t.Fatalf("WriteResponse %+v, %v", resp, err)
+		}
+		return resp.Responses[0].Status.Status
+	}
+	t.Cleanup(func() {
+		if x != nil {
+			x.Close()
+		}
+	})
+	emptyList := encodeFunc(func(enc *tlv.Encoder, tag tlv.Tag) { enc.StartArray(tag); _ = enc.EndContainer() })
+	if st := chunk(true, im.AttributeWrite{Path: aclPath, Value: im.AttributeValue{Value: emptyList}}); st != im.StatusSuccess {
+		t.Fatalf("the chunk that replaces the ACL with the empty list: %v", st)
+	}
+
+	// A change of the subscribed attribute and the keep-alives after it
+	// fall due between the chunks.
+	if err := p.Device.Act(func(*node.Node) error { pl.srv.Set(true); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	for range 4 {
+		if err := site.Step(ctx, 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if got := p.Device.Node().Subscriptions().Active(); got != 1 {
+			t.Fatalf("between the chunks of the ACL rewrite the device holds %d subscriptions, want 1", got)
+		}
+	}
+
+	add := aclPath
+	add.ListAppend = true
+	for i, e := range before {
+		entry := encodeFunc(func(enc *tlv.Encoder, tag tlv.Tag) {
+			acl.AccessControlEntryStruct{
+				Privilege:   acl.AccessControlEntryPrivilegeEnum(e.Privilege),
+				AuthMode:    acl.AccessControlEntryAuthModeEnum(e.AuthMode),
+				Subjects:    spec.Nullable[[]uint64]{Value: e.Subjects},
+				Targets:     spec.Nullable[[]acl.AccessControlTargetStruct]{Null: true},
+				FabricIndex: fi,
+			}.EncodeTLV(enc, tag)
+		})
+		if st := chunk(i < len(before)-1, im.AttributeWrite{Path: add, Value: im.AttributeValue{Value: entry}}); st != im.StatusSuccess {
+			t.Fatalf("the chunk that appends entry %d of %d: %v", i+1, len(before), st)
+		}
+	}
+	for range 2 {
+		if err := site.Step(ctx, 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := p.Device.Node().Subscriptions().Active(); got != 1 {
+		t.Fatalf("after the ACL rewrite the device holds %d subscriptions, want 1", got)
 	}
 }

@@ -605,6 +605,16 @@ type WriteHolds struct {
 	held map[writeHoldKey]*WriteTransaction
 }
 
+// Held reports whether a write interaction holds the attribute for an
+// interaction of fabricIndex: a chunked write of it is in progress — for
+// an attribute whose write is fabric-scoped, one of that fabric's.
+func (h *WriteHolds) Held(fabricIndex uint8, endpoint uint16, cluster, attribute uint32) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, ok := h.held[holdKey(fabricIndex, endpoint, cluster, attribute)]
+	return ok
+}
+
 // heldByOther reports whether another interaction holds the attribute for
 // an interaction of fabricIndex (InteractionServer.ts:211-214).
 func (tx *WriteTransaction) heldByOther(fabricIndex uint8, endpoint uint16, cluster, attribute uint32) bool {
