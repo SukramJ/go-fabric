@@ -137,9 +137,14 @@ signal that does not fit one message of the session it would go over —
 over TCP the connection's largest message, at most the MaxTcpMessageSize
 the peer stated — is refused with `camera.ErrPayloadTooLarge` and not sent
 (`bridge.ErrPayloadTooLarge` is the same value; a camera host needs
-`cluster/camera` alone). connectedhomeip establishes a TCP session for them
-(`TransportPayloadCapability::kLargePayload`); a controller that reached
-the camera over TCP leaves the session the signals need.
+`cluster/camera` alone). connectedhomeip's session setup takes TCP for a
+session asked for with `TransportPayloadCapability::kLargePayload` when the
+peer advertises a TCP server (`src/transport/SessionManager.h:72-74`,
+`src/app/OperationalSessionSetup.cpp:324-329` at `6170af84`); that its
+camera app asks for such a session for these signals
+(`webrtc-provider-manager.cpp`) was not read at the pin (unverified). A
+controller that reached the camera over TCP leaves the session the signals
+need.
 
 ## Chime
 
