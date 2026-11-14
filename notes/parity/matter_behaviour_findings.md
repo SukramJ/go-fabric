@@ -802,6 +802,27 @@ with a port of the named case.
   the generated decoders — and the skip-and-continue rule, each with a
   parity case; phase 4. Found by CAMERA-GO-1.1 on a CI runner of pull
   request 525.
+- **F-db021da0-16: the priming report is sorted ascending, where matter.js's
+  read walks its collections without a sort.** A Subscribe's priming report
+  visits each path's results in
+  ascending (endpoint, cluster, attribute) order: the endpoints of a wildcard
+  path in ascending id order, each endpoint's results sorted
+  (`newPrimingSource`, `bridge/subscribe_dispatch.go`, calls
+  `im.NewAttributeExpansion(…).Ascending()`; the option is in
+  `im/read_expansion.go`). matter.js's read response iterates the node's
+  endpoints, an endpoint's clusters and a cluster's attributes as their
+  collections yield them, with no sort at these lines
+  (`packages/protocol/src/action/server/AttributeReadResponse.ts:183-185`,
+  `:337-339`, `:378-380` at `db021da0`). What order those collections yield
+  was not read here: the comment on the Go side names the order of insertion,
+  with lines of `ProtocolService.ts` that were not re-read, and whether that
+  order is ascending in practice is unverified — so this is not yet known to
+  differ on the wire. The ascending order is this module's own, kept for a
+  controller that processes the priming report in stream order (the same
+  comment). Fix, if the orders differ: the priming report follows matter.js's
+  order, or the difference becomes a `by_design` entry with its reason, each
+  with a parity case; phase 4. Found in review II, phase 2 (the rework of the
+  priming report for R2-P2-alloc-04).
 
 ## Tier 3 — LOW
 
