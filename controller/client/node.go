@@ -241,15 +241,21 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epo
 	}
 	changed := n.changedConfigurationVersionsLocked(before)
 	icdAfter := n.icdModeLocked()
-	n.mu.Unlock()
 	if !deferred {
+		n.mu.Unlock()
 		n.deliverApplied(em, icdBefore != icdAfter, changed)
 		return
 	}
-	n.jobs.enqueue(func() {
+	// The job takes its place in the queue under the lock, so two reports
+	// applied concurrently write and deliver in the order they changed the
+	// image; the back-pressure wait comes after the lock, since a job may
+	// need it (review II, R2-P2-store-09).
+	pending := n.jobs.add(func() {
 		n.persist.write(saves)
 		n.deliverApplied(em, icdBefore != icdAfter, changed)
 	})
+	n.mu.Unlock()
+	n.jobs.throttle(pending)
 }
 
 // deliverApplied runs the hooks of one applied report: the structure's

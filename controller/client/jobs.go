@@ -42,7 +42,16 @@ func newJobQueue() *jobQueue { return &jobQueue{} }
 //
 //nolint:contextcheck // the back-pressure runs in subscription callbacks, which outlive the request context their closures were built under
 func (q *jobQueue) enqueue(job func()) {
-	if q.add(job) > maxPendingJobs {
+	q.throttle(q.add(job))
+}
+
+// throttle is enqueue's back-pressure for a job [jobQueue.add] queued
+// with pending jobs: past maxPendingJobs it waits until the queue has
+// drained.
+//
+//nolint:contextcheck // as enqueue: the callers are subscription callbacks without a live context
+func (q *jobQueue) throttle(pending int) {
+	if pending > maxPendingJobs {
 		q.wait()
 	}
 }
