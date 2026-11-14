@@ -381,7 +381,12 @@ a host, a path that ends in `/`, no query or fragment, `InvalidURL`;
 (`InvalidStreamUsage`), the motion zones (unique, within MaxZones, the
 camera's zones, `InvalidZone`), the streams, the segment duration against
 the key-frame interval (`InvalidOptions`), the bandwidth (the port) and
-the pre-roll (`InvalidPreRollLength`). The port then allocates the
+the pre-roll (`InvalidPreRollLength`). Three of the model's request
+constraints are the server's to judge, as chip judges them: an empty
+VideoStreams or AudioStreams list counts as no stream field, more than 16
+streams is `CONSTRAINT_ERROR`, and a MotionSensitivity on a camera with
+PERZONESENS is `INVALID_COMMAND` whatever its value (without PERZONESENS
+it must lie in 1 to 10, `CONSTRAINT_ERROR`). The port then allocates the
 transport with its `TLSCredentials`, the endpoint and its DER
 certificates; without the node's TLS servers or the declaration's
 lookups every allocation is InvalidTLSEndpoint. The transport starts inactive; `SetTransportStatus`
