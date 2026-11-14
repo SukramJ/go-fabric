@@ -22,7 +22,10 @@ import (
 // with the flush's ctx — the one Stop bounds with stopSessionCloseBudget
 // and fabric removal hands down — not only with the chunk's own
 // flushStatusResponseTimeout. The peer never answers chunk 0 and the
-// bridge's clock does not move: only ctx can end the flush.
+// bridge's clock does not move: only ctx can end the flush. A wait ended
+// so is no send failure of the subscription, as for the ongoing reporters
+// (review II, R2-P2-rr-dev-05): one that had two failures already is not
+// terminated by it.
 func TestFlushChunkWaitEndsWithItsContext(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 92
@@ -59,6 +62,7 @@ func TestFlushChunkWaitEndsWithItsContext(t *testing.T) {
 		sessionID:           sessionID,
 		peerInitiator:       true,
 	})
+	b.subSendErrorCount.Store(subID, sendErrorRetryLimit)
 
 	flushCtx, flushCancel := context.WithCancel(testCtx)
 	defer flushCancel()
@@ -87,5 +91,11 @@ func TestFlushChunkWaitEndsWithItsContext(t *testing.T) {
 	case <-done:
 	case <-testCtx.Done():
 		t.Fatal("the flush's wait for a non-final chunk did not end with its ctx")
+	}
+	if _, live := b.routing.subTargets.Load(subID); !live {
+		t.Fatal("the flush's ended wait terminated the subscription as a send failure")
+	}
+	if n, _ := b.subSendErrorCount.Load(subID); n != sendErrorRetryLimit {
+		t.Fatalf("send failures after the flush's ended wait = %v, want %d", n, sendErrorRetryLimit)
 	}
 }

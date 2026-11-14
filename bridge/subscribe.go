@@ -743,6 +743,12 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		if len(paths) > 0 {
 			sub.RequeueAttributes(paths)
 		}
+		if errors.Is(err, errChunkWaitAborted) {
+			// ctx ended the flush (Stop's budget, a removal's ctx): the
+			// peer did nothing wrong, as for the ongoing reporters (review
+			// II, R2-P2-rr-dev-05).
+			return
+		}
 		b.noteSubscriptionSendError(sub.ID, "flush", err)
 		return
 	}
