@@ -530,10 +530,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			processSigma3, ch); err != nil {
 			return err
 		}
-		// Sigma3 closes the CASE handshake on the wire — forget the
-		// per-exchange Sigma1 dedupe entry so a later exchange-id
-		// rollover starts clean.
-		b.forgetSigma1Replied(key)
+		b.sigma3Handled(key, established)
 		if !established {
 			return nil
 		}
@@ -1239,6 +1236,23 @@ func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) bool {
 	return false
 }
 
+// sigma3Handled ends the Sigma1 record of the handshake key names once its
+// Sigma3 was handled, as Sigma3 closes the CASE handshake on the wire. A
+// handshake that failed, or one a single handler served, leaves no record.
+// A completed one of a provider keeps its record until the provider lets
+// its adapter go ([Bridge.ForgetSigma1Replied]): a Sigma3 of it that
+// arrives again then meets the completed adapter, whose answer is the
+// success report again ([CaseAdapter.ProcessSigma3]), not the handler of a
+// handshake no Sigma1 began (review II, R2-P3-dr-dev-02).
+func (b *Bridge) sigma3Handled(key HandshakeKey, established bool) {
+	b.mu.RLock()
+	viaProvider := b.caseProvider != nil
+	b.mu.RUnlock()
+	if !established || !viaProvider {
+		b.forgetSigma1Replied(key)
+	}
+}
+
 // forgetSigma1Replied removes the dedupe entry for a handshake. Called
 // from the Sigma3 receive path: the CASE handshake is done, and a later
 // exchange-id rollover (uint16 wraps in long-lived daemons) must not see
@@ -1250,8 +1264,8 @@ func (b *Bridge) forgetSigma1Replied(key HandshakeKey) {
 }
 
 // ForgetSigma1Replied is the exported entry point the daemon wires into
-// [PerExchangeCaseProvider.SetOnEvict]. The Sigma3 success path already
-// calls [forgetSigma1Replied]; an ABORTED handshake (Sigma1 received,
+// [PerExchangeCaseProvider.SetOnEvict]. It ends the record of a handshake
+// a provider completed ([Bridge.sigma3Handled]); an ABORTED handshake (Sigma1 received,
 // Sigma3 never) leaves its dedupe entry orphaned forever because the
 // successful-path cleanup never runs. Routing the TTL reaper's eviction
 // through here lets a per-exchange provider clean up aborted handshakes

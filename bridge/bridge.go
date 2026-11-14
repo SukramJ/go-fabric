@@ -568,7 +568,9 @@ type Bridge struct {
 	// first Sigma1 arrival on an exchange records its payload hash and
 	// fires the reply; subsequent arrivals on the same exchange with
 	// matching hash log + drop. Sigma3 receive forgets the exchange so
-	// re-use under the same exchange-id-after-rollover stays correct.
+	// re-use under the same exchange-id-after-rollover stays correct —
+	// for a handshake a provider completed, once the provider lets its
+	// adapter go ([Bridge.sigma3Handled]).
 	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
 	// short-circuits replays via `fabric.locked` + per-exchange state.
 	sigma1Replied map[HandshakeKey][32]byte
