@@ -219,7 +219,7 @@ func unpackReadable(msg []byte) (m *dns.Msg, ok bool) {
 
 // MaxMessageSize is the largest mDNS message the module writes: an IPv6
 // minimum MTU of 1280 bytes less the IPv6 and UDP headers. Mirrors
-// matter.js packages/general/src/codec/DnsCodec.ts:26 at 862ad75f
+// matter.js packages/general/src/codec/DnsCodec.ts:26 at db021da0
 // (MAX_MDNS_MESSAGE_SIZE).
 const MaxMessageSize = 1232
 
@@ -230,8 +230,8 @@ const MaxMessageSize = 1232
 // and answers past the limit spill into follow-up messages without the
 // questions, every message but the last flagged truncated (RFC 6762
 // §7.2). Mirrors matter.js
-// packages/general/src/net/dns-sd/MdnsSocket.ts:102-178 at 862ad75f (send)
-// and :208-238 (splitQueries).
+// packages/general/src/net/dns-sd/MdnsSocket.ts:121-229 at db021da0 (send)
+// and :235-265 (#splitQueries).
 func PackDNSQueries(questions []DNSQuestion, knownAnswers []DNSRecord) ([][]byte, error) {
 	msgOf := func(qs []dns.Question, rrs []dns.RR, truncated bool) *dns.Msg {
 		m := new(dns.Msg)
