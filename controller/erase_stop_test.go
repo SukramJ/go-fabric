@@ -17,6 +17,25 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
+// renameDevice changes the paired device's NodeLabel, which the device
+// reports to a standing subscription (node.Node.SetNodeLabel), so a
+// report carrying it reaches the controller and runs its Changed hook
+// whether the default subscription stood before the change or primes
+// after it. SoftwareVersion, which these tests changed before, is not
+// reported to a standing subscription: BasicInformation.SetSoftwareVersion
+// advances the DataVersion and notifies no subscription. It reached the
+// controller only in the priming report of a subscription that was not
+// yet established when the change landed; on a loaded machine the
+// subscription stood first, and the hook never ran.
+func renameDevice(t *testing.T, dev *fabrictest.Device) {
+	t.Helper()
+	if err := dev.Act(func(n *node.Node) error {
+		return n.SetNodeLabel(t.Context(), "renamed")
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestEraseWaitsForTheNodesStop (review II, R2-P1-ctl-02): an Erase whose
 // context ends while a host hook holds a node's report queue erases
 // nothing and says so; once the hook returned, Erase waits for the node's
@@ -53,11 +72,7 @@ func TestEraseWaitsForTheNodesStop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	armed.Store(true)
-	if err := dev.Act(func(n *node.Node) error {
-		return n.Root().BasicInformation.SetSoftwareVersion(77, "77")
-	}); err != nil {
-		t.Fatal(err)
-	}
+	renameDevice(t, dev)
 	if err := site.Run(ctx, func(ctx context.Context) error {
 		select {
 		case <-entered:
@@ -132,11 +147,7 @@ func TestConcurrentErasesOfAStoppingNode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	armed.Store(true)
-	if err := dev.Act(func(n *node.Node) error {
-		return n.Root().BasicInformation.SetSoftwareVersion(77, "77")
-	}); err != nil {
-		t.Fatal(err)
-	}
+	renameDevice(t, dev)
 	if err := site.Run(ctx, func(ctx context.Context) error {
 		select {
 		case <-entered:
@@ -205,11 +216,7 @@ func TestEraseDuringAnotherClose(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	armed.Store(true)
-	if err := dev.Act(func(n *node.Node) error {
-		return n.Root().BasicInformation.SetSoftwareVersion(77, "77")
-	}); err != nil {
-		t.Fatal(err)
-	}
+	renameDevice(t, dev)
 	if err := site.Run(ctx, func(ctx context.Context) error {
 		select {
 		case <-entered:
