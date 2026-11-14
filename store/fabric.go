@@ -137,7 +137,7 @@ func (p FabricPending) String() string {
 // matter_metadata table is absent (pre-013 schema).
 func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) {
 	if err := insertablePending(rec.Pending); err != nil {
-		return 0, fmt.Errorf("store: add fabric: %w", err)
+		return 0, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -657,9 +657,9 @@ func insertablePending(p FabricPending) error {
 	case FabricCommitted, FabricPendingAdd:
 		return nil
 	case FabricPendingUpdate:
-		return errors.New("a row cannot be inserted as a pending update")
+		return errors.New("store: add fabric: a row cannot be inserted as a pending update")
 	}
-	return fmt.Errorf("%v is no fabric state", p)
+	return fmt.Errorf("store: add fabric: %v is no fabric state", p)
 }
 
 // noneIfEmpty turns an empty or nil byte slice into SQL NULL: the VID
