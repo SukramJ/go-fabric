@@ -179,8 +179,13 @@ doubling up to 5 minutes, for its lifetime, on its clock
 committed networks starts the same rejoin at once, and so does a
 `CommissioningComplete`. An attempt waits while a fail-safe is armed or a
 NetworkCommissioning command runs, and each one sets
-`LastNetworkingStatus`. After a join that failed, `Networks` reads no
-network as connected. The driver resolves the
+`LastNetworkingStatus`. After a join that failed, the node asks a
+driver that reports its link (`contract.WiFiLinkReporter`, which this
+driver implements) where the radio is: `Networks` reads that network
+connected — the one the failed join went back to — and a fail-safe expiry
+or `CommissioningComplete` that finds it among the committed networks
+joins nothing. A driver that does not report its link leaves no network
+read as connected after a failed join. The driver resolves the
 interface once, at `New`: after a wpa_supplicant restart the host builds a
 new driver. When the system-bus connection itself is lost, every later scan
 and join fails at once with UnknownError and the debug text "the driver's
@@ -189,7 +194,7 @@ join also ends with its caller's context while it waits for the driver.
 
 *Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
-[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`).*
+[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
 
 ## mDNS
 

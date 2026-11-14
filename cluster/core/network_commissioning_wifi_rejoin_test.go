@@ -26,16 +26,27 @@ import (
 
 // linkDriver is a contract.WiFiDriver that keeps which network the radio
 // is on, as wifi/wpasupplicant's driver leaves it: a join that succeeds
-// moves the radio, one that fails leaves it where it was. reachable
-// decides whether a join of an SSID succeeds; failFirst fails that many
-// joins first, whatever the SSID.
+// moves the radio, one that fails leaves it where it was — or on no
+// network with failDrops, a driver that could not go back. It reports the
+// network (contract.WiFiLinkReporter). reachable decides whether a join
+// of an SSID succeeds; failFirst fails that many joins first, whatever
+// the SSID.
 type linkDriver struct {
 	mu        sync.Mutex
 	link      []byte
 	joins     [][]byte
 	reachable map[string]bool
 	failFirst int
+	failDrops bool
 	joined    chan []byte
+}
+
+var _ contract.WiFiLinkReporter = (*linkDriver)(nil)
+
+func (d *linkDriver) CurrentNetwork(context.Context) (ssid []byte, known bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return bytes.Clone(d.link), true
 }
 
 func newLinkDriver(reachable ...string) *linkDriver {
@@ -57,8 +68,11 @@ func (d *linkDriver) ConnectNetwork(_ context.Context, ssid, _ []byte) (status u
 	if d.failFirst > 0 {
 		d.failFirst--
 	}
-	if ok {
+	switch {
+	case ok:
 		d.link = bytes.Clone(ssid)
+	case d.failDrops:
+		d.link = nil
 	}
 	d.mu.Unlock()
 	d.joined <- bytes.Clone(ssid)
@@ -193,14 +207,14 @@ func TestFailSafeExpiryRejoinsTheCommittedNetworkAfterAFailedJoin(t *testing.T) 
 	changed := netcommChanged(w)
 	commissionHome(t, w, d, &armed)
 
+	// The radio ends on no network: the driver cannot go back to "home"
+	// either. After a failed join nothing reads connected.
+	d.mu.Lock()
+	d.failDrops = true
+	d.mu.Unlock()
 	if r := moveTo(t, w, d, &armed, "new"); r.NetworkingStatus == netcommdef.NetworkCommissioningStatusSuccess {
 		t.Fatalf("the join of new succeeded: %+v", r)
 	}
-	// The radio is on no network: the driver could not go back to "home"
-	// either. After a failed join nothing reads connected.
-	d.mu.Lock()
-	d.link = nil
-	d.mu.Unlock()
 	if list := wifiNetworksOf(t, w); len(list) != 1 || list[0].Connected {
 		t.Fatalf("Networks after the failed join %+v, want new not connected", list)
 	}

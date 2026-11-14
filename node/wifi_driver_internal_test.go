@@ -71,3 +71,41 @@ func TestReannouncingDriver(t *testing.T) {
 		t.Error("a driver without Network.WiFi.Driver")
 	}
 }
+
+// reportingWiFi is a fixedWiFi that reports the radio on ssid.
+type reportingWiFi struct {
+	fixedWiFi
+	ssid string
+}
+
+func (w reportingWiFi) CurrentNetwork(context.Context) (ssid []byte, known bool) {
+	return []byte(w.ssid), true
+}
+
+// TestReannouncingDriverForwardsTheReportedLink: the driver the node hands
+// the cluster answers CurrentNetwork with the host driver's answer when
+// that driver reports its link, and as not known when it does not.
+func TestReannouncingDriverForwardsTheReportedLink(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		driver    contract.WiFiDriver
+		wantSSID  string
+		wantKnown bool
+	}{
+		{"reporting", reportingWiFi{ssid: "home"}, "home", true},
+		{"not reporting", fixedWiFi{}, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Driver: tc.driver}}}}
+			r, ok := n.wifiDriver().(contract.WiFiLinkReporter)
+			if !ok {
+				t.Fatal("the node's driver is no contract.WiFiLinkReporter")
+			}
+			if ssid, known := r.CurrentNetwork(t.Context()); string(ssid) != tc.wantSSID || known != tc.wantKnown {
+				t.Errorf("CurrentNetwork = %q, %v; want %q, %v", ssid, known, tc.wantSSID, tc.wantKnown)
+			}
+		})
+	}
+}

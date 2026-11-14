@@ -30,6 +30,22 @@ type WiFiDriver interface {
 	ConnectNetwork(ctx context.Context, ssid, credentials []byte) (status uint8, debugText string, errorValue int32)
 }
 
+// WiFiLinkReporter is an optional extension of a [WiFiDriver]: it reports
+// which network the radio is on. After a join that did not succeed the
+// cluster asks it, so the Networks attribute and the cluster's rejoin of
+// its committed network agree with the driver — a driver that puts the
+// radio back on the network it was on (github.com/SukramJ/go-fabric/
+// wifi/wpasupplicant) reports that network, and a working link is
+// neither read as disconnected nor joined again. Without it the cluster
+// reads the radio as on no network after a failed join.
+type WiFiLinkReporter interface {
+	// CurrentNetwork is the SSID of the network the radio is on or
+	// joining, nil when it is on none; known is false when the driver
+	// cannot tell. The driver bounds its own wait; ctx may carry no
+	// deadline.
+	CurrentNetwork(ctx context.Context) (ssid []byte, known bool)
+}
+
 // WiFiScanResult is one network a [WiFiDriver] scan found — Matter
 // WiFiInterfaceScanResultStruct.
 type WiFiScanResult struct {

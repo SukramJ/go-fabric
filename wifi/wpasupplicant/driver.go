@@ -31,6 +31,7 @@ const (
 	ifaceRoot       = "fi.w1.wpa_supplicant1"
 	ifaceInterface  = "fi.w1.wpa_supplicant1.Interface"
 	ifaceBSS        = "fi.w1.wpa_supplicant1.BSS"
+	ifaceNetwork    = "fi.w1.wpa_supplicant1.Network"
 	ifaceProperties = "org.freedesktop.DBus.Properties"
 	methodGet       = ifaceProperties + ".Get"
 	methodGetAll    = ifaceProperties + ".GetAll"
@@ -520,6 +521,45 @@ func (d *Driver) ScanNetworks(ctx context.Context, ssid []byte) (status uint8, d
 		}
 	}
 	return statusSuccess, "", results
+}
+
+var _ contract.WiFiLinkReporter = (*Driver)(nil)
+
+// CurrentNetwork implements contract.WiFiLinkReporter: the SSID of the
+// interface's CurrentNetwork — the network SelectNetwork chose last, which
+// after a failed join is the one [Driver.restore] selected again — read
+// from that network's Properties, its quotes stripped, as connectedhomeip's
+// WpaSupplicantClient::GetConfiguredNetwork reads it
+// (src/platform/Linux/WpaSupplicantClient.cpp:395-422 at 6170af84). A
+// CurrentNetwork of "/" is no network (:396-400). known is false when a
+// read fails or the SSID is not a quoted string: wpa_supplicant's form of
+// an SSID it does not quote is not decoded here. Each read is bounded by
+// removeTimeout, as the put-back's calls are.
+func (d *Driver) CurrentNetwork(ctx context.Context) (ssid []byte, known bool) {
+	ctx, cancel := context.WithTimeout(ctx, removeTimeout)
+	defer cancel()
+	v, err := d.property(ctx, "CurrentNetwork")
+	if err != nil {
+		return nil, false
+	}
+	cur, _ := v.Value().(dbus.ObjectPath)
+	if cur == "" || cur == "/" {
+		return nil, true
+	}
+	body, err := d.bus.Call(ctx, cur, methodGet, ifaceNetwork, "Properties")
+	if err != nil {
+		return nil, false
+	}
+	var pv dbus.Variant
+	if err := dbus.Store(body, &pv); err != nil {
+		return nil, false
+	}
+	props, _ := pv.Value().(map[string]dbus.Variant)
+	quoted, _ := props["ssid"].Value().(string)
+	if len(quoted) < 2 || quoted[0] != '"' || quoted[len(quoted)-1] != '"' {
+		return nil, false
+	}
+	return []byte(quoted[1 : len(quoted)-1]), true
 }
 
 // ConnectNetwork implements contract.WiFiDriver. Mirrors connectedhomeip

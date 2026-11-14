@@ -1139,3 +1139,59 @@ func TestAFailedJoinKeepsTheNetworkItWasOn(t *testing.T) {
 		}
 	})
 }
+
+// TestCurrentNetworkReportsTheNetworkTheRadioIsOn: CurrentNetwork is the
+// SSID of the interface's CurrentNetwork, read from the network's
+// Properties as connectedhomeip reads it — after a failed join, the
+// network the driver selected again; none for "/"; not known when the
+// SSID is not a quoted string or a read fails.
+func TestCurrentNetworkReportsTheNetworkTheRadioIsOn(t *testing.T) {
+	t.Parallel()
+	const working = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/7")
+	t.Run("after a failed join", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		b.props["State"] = dbus.MakeVariant(stateCompleted)
+		b.props["CurrentNetwork"] = dbus.MakeVariant(working)
+		b.networks[working] = map[string]dbus.Variant{"ssid": dbus.MakeVariant(`"home"`), "key_mgmt": dbus.MakeVariant("SAE WPA-PSK")}
+		b.networks[fakeNetwork] = map[string]dbus.Variant{"ssid": dbus.MakeVariant(`"new"`)}
+		b.onSelect = func(b *fakeBus, n int) {
+			if n == 1 {
+				b.setStateLocked("associating")
+				b.setStateLocked(stateDisconnected)
+			}
+		}
+		d, _ := startDriver(t, b, Options{})
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("new"), []byte(testCredential)); status == statusSuccess {
+			t.Fatalf("the join succeeded: %q", debug)
+		}
+		if ssid, known := d.CurrentNetwork(t.Context()); !known || string(ssid) != "home" {
+			t.Errorf("CurrentNetwork after the failed join = %q, %v; want home, known", ssid, known)
+		}
+	})
+	for _, tc := range []struct {
+		name      string
+		current   dbus.ObjectPath
+		props     map[string]dbus.Variant
+		wantSSID  string
+		wantKnown bool
+	}{
+		{"none selected", "/", nil, "", true},
+		{"hex SSID", working, map[string]dbus.Variant{"ssid": dbus.MakeVariant("686f6d65")}, "", false},
+		{"no Properties", working, nil, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := newFakeBus()
+			b.props["CurrentNetwork"] = dbus.MakeVariant(tc.current)
+			if tc.props != nil {
+				b.networks[tc.current] = tc.props
+			}
+			d, _ := startDriver(t, b, Options{})
+			ssid, known := d.CurrentNetwork(t.Context())
+			if string(ssid) != tc.wantSSID || known != tc.wantKnown {
+				t.Errorf("CurrentNetwork = %q, %v; want %q, %v", ssid, known, tc.wantSSID, tc.wantKnown)
+			}
+		})
+	}
+}

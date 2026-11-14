@@ -70,10 +70,12 @@ type WiFiNetworkCommissioning struct {
 	// a second write; nil when none is outstanding.
 	stored []wifiNetwork
 	busy   bool
-	// link is the SSID the driver last joined, nil after a join that
-	// failed (the cluster cannot tell where the radio is then); a network's
-	// connected flag is derived from it, as chip's Linux driver reports the
-	// network the link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
+	// link is the SSID the driver last joined; after a join that failed,
+	// the network a [contract.WiFiLinkReporter] driver reports the radio on,
+	// nil without one (the cluster cannot tell where the radio is then). A
+	// network's connected flag is derived from it, as chip's Linux driver
+	// reports the network the link is on (WiFiNetworkIterator::Next,
+	// NetworkCommissioningWiFiDriver.cpp:275-310).
 	link []byte
 	// life is Start's context, the server's lifetime: the rejoin of the
 	// committed network runs under it ([WiFiNetworkCommissioning.rejoin]).
@@ -345,22 +347,27 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 
 // joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
 // records the result as Start does; it reports whether the join
-// succeeded. A failed join leaves the link unknown: no network reads as
-// connected.
+// succeeded. After a failed join the link is where the driver reports the
+// radio ([WiFiNetworkCommissioning.linkAfterFailure]).
 func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wifiNetwork) bool {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
+	jctx, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
 	defer cancel()
-	code, _, errValue := w.driver.ConnectNetwork(ctx, target.ssid, target.credentials)
+	code, _, errValue := w.driver.ConnectNetwork(jctx, target.ssid, target.credentials)
 	status := netcommdef.NetworkCommissioningStatusEnum(code)
 	ok := statusOK(status)
+	var link []byte
+	if ok {
+		link = bytes.Clone(target.ssid)
+	} else {
+		link = w.linkAfterFailure(ctx)
+	}
 	w.mu.Lock()
+	w.link = link
 	if ok {
 		w.lastConnectErr = nil
-		w.link = bytes.Clone(target.ssid)
 	} else {
 		v := errValue
 		w.lastConnectErr = &v
-		w.link = nil
 	}
 	w.markConnectedLocked()
 	w.lastNetworkID = bytes.Clone(target.ssid)
@@ -369,6 +376,24 @@ func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wif
 	w.mu.Unlock()
 	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 	return ok
+}
+
+// linkAfterFailure is where the radio is after a join that did not
+// succeed: the network a [contract.WiFiLinkReporter] driver reports —
+// wifi/wpasupplicant puts the radio back on the network it was on — and
+// nil, on no network as far as the cluster can tell, without one or when
+// the driver cannot tell (review II, R2-P3-dr-net-01, R2-P3-dr-net-04).
+// It runs without w.mu; the driver bounds its own wait.
+func (w *WiFiNetworkCommissioning) linkAfterFailure(ctx context.Context) []byte {
+	r, ok := w.driver.(contract.WiFiLinkReporter)
+	if !ok {
+		return nil
+	}
+	ssid, known := r.CurrentNetwork(context.WithoutCancel(ctx))
+	if !known || len(ssid) == 0 {
+		return nil
+	}
+	return bytes.Clone(ssid)
 }
 
 // markConnectedLocked derives each network's connected flag from the
@@ -952,10 +977,14 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	status := netcommdef.NetworkCommissioningStatusNetworkIdNotFound
 	var text string
 	var errValue int32
+	var link []byte
 	if i >= 0 {
 		var code uint8
 		code, text, errValue = w.driver.ConnectNetwork(ctx, target.ssid, target.credentials)
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
+		if !statusOK(status) {
+			link = w.linkAfterFailure(ctx)
+		}
 	}
 	w.mu.Lock()
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, DebugText: debugText(text), ErrorValue: spec.Nullable[int32]{Null: true}}
@@ -982,10 +1011,10 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		v := errValue
 		w.lastConnectErr = &v
 		if i >= 0 {
-			// The driver's join failed: where the radio is now is not
-			// known here, so no network reads as connected (review II,
-			// R2-P3-net-02).
-			w.link = nil
+			// The driver's join failed: the radio is where the driver
+			// reports it, on no network when it reports none or cannot tell
+			// (review II, R2-P3-net-02, R2-P3-dr-net-04).
+			w.link = link
 		}
 	}
 	w.markConnectedLocked()
