@@ -77,12 +77,16 @@ func (b *Bridge) encryptSecureOutbound(sess *channel.Session, localSessionID uin
 // outbound counter nears exhaustion ([channel.Session.RolloverDue]): the
 // peer is told with a CloseSession while the keys still seal, then the
 // registry closes the session and runs its close hooks (the subscription
-// cascade). Mirrors matter.js packages/protocol/src/session/NodeSession.ts:398-412
-// #scheduleRolloverClose — initiateClose with closeSubscriptions — which
-// runs on a timer rather than on the stack of the send that consumed the
-// counter; here it runs on its own goroutine for the same reason (the
-// sender may hold locks the close hooks take). Without a registry the
-// session is closed locally.
+// cascade). Before the CloseSession, what the session's subscriptions owe
+// is reported ([subscription.Manager.FlushSession]), bounded by the run's
+// handler context, which Stop cancels. Mirrors matter.js
+// packages/protocol/src/session/NodeSession.ts:398-412
+// #scheduleRolloverClose — initiateClose with `closeSubscriptions(true)`,
+// a flush through the session (:406-410, :312-323) — which runs on a
+// timer rather than on the stack of the send that consumed the counter;
+// here it runs on its own goroutine for the same reason (the sender may
+// hold locks the close hooks take). Without a registry the session is
+// closed locally.
 func (b *Bridge) endSessionAtRollover(localSessionID uint16, sess *channel.Session) {
 	b.mu.RLock()
 	run := b.started
@@ -101,6 +105,9 @@ func (b *Bridge) endSessionAtRollover(localSessionID uint16, sess *channel.Sessi
 	}
 	go func() {
 		defer b.rolloverCloses.Done()
+		if m := b.subscriptionManagerLocked(); m != nil {
+			m.FlushSession(b.handlerContext(), localSessionID)
+		}
 		b.sendCloseSessionReport(localSessionID, sess)
 		if reg == nil {
 			sess.Close()
