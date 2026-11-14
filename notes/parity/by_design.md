@@ -875,6 +875,11 @@ non-empty (`endpoint/materialize.go`). With neither value set the attribute
 is not served, as in matter.js. Pinned by
 `TestParityMatterJS_BridgedVendorNameComesFromTheHost`.
 
+Review II, phase 4 (2026-11-14): matter.js's
+`examples/device-bridge-onoff/src/BridgedDevicesNode.ts` is outside the
+exports the review read and was not re-read; what this entry says of it is
+unverified.
+
 ### BD-Matter-ControllerProgressAndUpdateEvents — two Go-named commissioning steps and two Go-only update events
 
 `controller.PairOptions.Progress` reports matter.js's commissioning steps by
@@ -973,6 +978,10 @@ matter.js's reconnect step re-arms the fail-safe and calls `transitionToCase` (`
 ### BD-Matter-ControllerDiagnostics — the controller serves a diagnostics snapshot, a trace and mDNS findings
 
 matter.js exposes the controller's state as live observable sets — `PeerSet.peers` (`packages/protocol/src/peer/PeerSet.ts:218` at db021da0), `Peer.sessions` (`Peer.ts:259-265`), `SessionManager.sessions` (`SessionManager.ts:376`) — rendered by its `Diagnostic` presentation; no snapshot, trace or finding type is served to a host. matterjs-server (`0bd06f2`) offers the controller's client only Thread diagnostics (`get_thread_diagnostics`, `get_thread_border_routers`; `packages/ws-controller/src/server/WebSocketControllerHandler.ts:144`) and session loss only as a node state event. This module serves the controller the facade the node has: `Controller.SessionDiagnostics()` (`diag.SessionDiagnostics`: the sessions flat, the peers with their state), `Controller.DiagnosticEvents()` and `OnDiagnosticEvent` on a `diagevent.Ring` (pairing, session, discovery, reachability, icd, ota, camera), `Controller.DiagnoseMDNS()` and `contract.Metrics`. Reason: a host running the controller half alone shows its operator the paired nodes but nothing about why one is reconnecting (issue 483); the shapes are shared with the node so one page model serves both roles. The row closes when matter.js serves a diagnostics snapshot or trace.
+
+Review II, phase 4 (2026-11-14): matterjs-server at `0bd06f2` is outside the
+exports the review read and was not re-read; what this entry says of it is
+unverified.
 
 ### BD-Matter-LinkLocalZoneVariants — a link-local address leaves the service on every interface it was heard on
 
@@ -2163,6 +2172,10 @@ and no BoostEnded event (`WaterHeaterDelegateImpl.cpp:270-296`;
 TC_EWATERHTR_2_2.py:196-197, :470-473 expect it). Family EWATERHTR passes
 (#45). Retire when matter.js's server gains the rules.
 
+Review II, phase 4 (2026-11-14): connectedhomeip's example delegate
+`WaterHeaterDelegateImpl.cpp` is outside the exports the review read and was
+not re-read; what this entry says of it is unverified.
+
 ### BD-chip-EnergyPreference-IndexRule — CurrentEnergyBalance / CurrentLowPowerModeSensitivity at or beyond the list length are CONSTRAINT_ERROR
 
 matter.js's `EnergyPreferenceServer` adds no rule; the generated
@@ -2206,6 +2219,10 @@ Start under a standing OperationalError answering UnableToStartOrResume
 step 17) — `examples/reference-bridge/fleet_kitchen.go` (the cavity's Start rule and its OperationalStateList). Families
 MWOCTRL, MWOM, OTCCM, OVENOPSTATE pass (#46).
 
+Review II, phase 4 (2026-11-14): connectedhomeip's example delegate
+`oven-operational-state-delegate.h` and `.cpp` is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
+
 ### BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer — both servers transcribe connectedhomeip, with the quirks named
 
 matter.js's `DeviceEnergyManagementServer` and `EnergyEvseServer` are empty
@@ -2226,6 +2243,11 @@ chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
 classified (#46, #47); TC-EEVSE-2.3 runs since phase 30
 (`BD-chip-EVSE-TargetsServerHeld`).
+
+Review II, phase 4 (2026-11-14): connectedhomeip's example files
+`DeviceEnergyManagementDelegateImpl.cpp`, `EnergyEvseDelegateImpl.cpp` and
+`EnergyEvseTargetsStore.cpp` are outside the exports the review read and
+were not re-read; what this entry says of them is unverified.
 
 ### BD-chip-EnergyReporting-FakeReadings — the reference daemon's grid meter answers the EnergyReporting test event triggers
 
@@ -2251,6 +2273,11 @@ TC_EPM_2_2.py's ranges and differ from one another. Only the daemon is
 affected; the module's servers are unchanged. TC-EEM-2.2 and TC-EPM-2.2
 join the families (#370). Retire when matter.js's test node answers the
 triggers.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's example files
+`EnergyReportingEventTriggers.cpp` and `FakeReadings.cpp` are outside the
+exports the review read and were not re-read; what this entry says of them
+is unverified.
 
 ### BD-matterjs-server-NetworkTopology — the controller's network graph after matterjs-server's NetworkTopologyService
 
@@ -2285,6 +2312,10 @@ and the `TopologyUtilsTest.ts` cases of the ported functions, in
 one implementation of Matter knowledge (neighbour matching, LQI/RSSI
 buckets) that matter.js does not hold.
 
+Review II, phase 4 (2026-11-14): matterjs-server at `0bd06f22` is outside
+the exports the review read and was not re-read; what this entry says of it
+is unverified.
+
 ### BD-Matter-ClientNodeEventHistory — a bounded per-node event history in the controller client
 
 matter.js at `862ad75f` keeps no event history on the client side: a peer's
@@ -2307,6 +2338,10 @@ answers. Memory only, cleared by `Node.Erase`. Reason: go-fabric-ui's
 event tab and go-fabric-server's `node_event`/`diagnostics` read one source
 per node rather than each keeping its own list.
 
+Review II, phase 4 (2026-11-14): matterjs-server at `0bd06f22` is outside
+the exports the review read and was not re-read; what this entry says of it
+is unverified.
+
 ### BD-Matter-LogRing — a bounded slog ring with a run-time level, for every host
 
 matter.js at `db021da0` keeps no log records: a message reaches the
@@ -2327,6 +2362,10 @@ page reads one shape through one port on every host (openccu-loom,
 go-ha2fabric, go-fabric-server) instead of each host building its own
 ring. The record keeps what the module logs and nothing more; the module
 logs no passcode and no key.
+
+Review II, phase 4 (2026-11-14): matterjs-server at `0bd06f22` is outside
+the exports the review read and was not re-read; what this entry says of it
+is unverified.
 
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 
@@ -2627,6 +2666,11 @@ the charger. DEM/2.6 and 2.8 run on the ESA through the family table's
 per-case endpoint; the charger's forecast moving with it is invisible to
 them. `TestDemTriggerReachesBothEsas` pins it. A daemon choice, not a
 module behaviour.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/energy-management/energy-management-triggers/DEMTestEventTriggers.cpp`
+is outside the exports the review read and was not re-read; what this entry
+says of it is unverified.
 
 ### BD-Matter-TCP-GoMechanics — the TCP port's Go-side mechanics: a `net.Addr` route inside the bridge, a 64-message in-flight bound, 16 KiB socket reads
 
@@ -3647,6 +3691,10 @@ Report AR.
 By design (ADR 0022). The list bound and the fabric scope come from the
 model; the lifecycle has no reference and is the host's.
 
+Review II, phase 4 (2026-11-14): the tv-app's `MessagesManager.cpp` of
+connectedhomeip is outside the exports the review read and was not re-read;
+what this entry says of it is unverified.
+
 ### BD-Matter-DCL-OptIn — the DCL is reached only through a host-built client; development certificates from GitHub stay off; one trust-store blob; the CRL cache expires on use
 
 matter.js's `DclCertificateService` (`packages/protocol/src/dcl/DclCertificateService.ts`
@@ -3694,6 +3742,11 @@ Report AS.
 By design (ADR 0020 stage 6b). A fixed passcode on a reverse window is
 an example's convenience, not a protocol rule; the fabric comparison is
 what chip's TODO asks for.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/fabric-sync/bridge/CommissionerControlDelegate.cpp` is outside the
+exports the review read and was not re-read; what this entry says of it is
+unverified.
 
 ### BD-Matter-ControllerFabric-OneRecord — the controller keeps one fabric per database, with its key and NOC, and resumes sessions from memory only
 
@@ -4004,6 +4057,10 @@ host. Report AY §4.
 By design. A rule matter.js leaves to the application, taken from chip where
 the server can see everything it needs.
 
+Review II, phase 4 (2026-11-14): connectedhomeip's RVC example
+(`examples/rvc-app`) is outside the exports the review read and was not
+re-read; what this entry says of it is unverified.
+
 ### BD-Controller-KeysBehindSigner — the controller's CA and operational keys may live behind `crypto.Signer`
 
 matter.js keeps the fabric's operational key pair in the fabric itself
@@ -4220,6 +4277,10 @@ counterpart (it reaches BLE through a local adapter only), so the discovery
 is this module's own, pinned by `ble/esphome`'s discovery tests and
 `fabrictest.Device.BLE()`.
 
+Review II, phase 4 (2026-11-14): aioesphomeapi at `3b2a4a2d` and ESPHome at
+`1cc6c9d1` are outside the exports the review read and were not re-read;
+what this entry says of them is unverified.
+
 ### BD-Controller-BluezScanWithoutUuidFilter — `ble/bluez` scans LE without a `UUIDs` discovery filter
 
 matter.js scans with noble's `startScanningAsync([MatterBle.SERVICE_UUID_SHORT],
@@ -4241,6 +4302,10 @@ Report BC (phase 13b, 2026-10-18).
 
 By design. The same selection as matter.js, placed where BlueZ lets it
 run; the kernel filter would never see a Matter advertisement.
+
+Review II, phase 4 (2026-11-14): `@stoprocent/noble` 2.8.0 is outside the
+exports the review read and was not re-read; what this entry says of it is
+unverified.
 
 ### BD-Matter-SessionParams-ZeroIsUnset — a zero session parameter means "not stated"
 
@@ -5140,6 +5205,9 @@ matterjs-server's command path fills the same defaults before the TLV
 encoder sees the request; the rule is the schema's, only the place it is
 applied differs.
 
+Review II, phase 4 (2026-11-14): matterjs-server is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
+
 ### BD-Matter-FabricLabel-EveryNode — `Registry.SetFabricLabel` updates every connected node, where matter.js returns after the first
 
 matter.js's `CommissioningController` validates and updates the label on
@@ -5246,6 +5314,9 @@ there is reported, not silently widened into a scan the caller did not
 ask for; a caller that wants the fallback calls `Pair` without the
 address. go-fabric-server's `commission_on_network` with `ip_addr`
 implements matterjs-server's "dial first, then discover" on top of it.
+
+Review II, phase 4 (2026-11-14): matterjs-server is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
 
 ### BD-Matter-CommissionerAdvert-PrivacyMask — `Advertise.PrivacyMasked` drops the vendor subtype and VP, nothing else
 
@@ -5398,6 +5469,11 @@ SetpointChange, and ActivePresetChange on a setpoint write fires only when
 a preset was active. ThermostatRunningMode is served with TEVT and AUTO,
 as the conformance says (chip's test serves it without AUTO). Pinned by
 the thermostat event cases of `cluster/thermo` (5 chip cases, 6 rules).
+
+Review II, phase 4 (2026-11-14): connectedhomeip at `645b267a`
+(`ThermostatClusterSchedules.cpp` and `.h`) is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
+
 ### BD-chip-Thermostat-Suggestions — ThermostatSuggestions follows connectedhomeip; matter.js does not implement it
 
 matter.js's `ThermostatServer` has no suggestion logic: the 1782 lines of
@@ -5456,6 +5532,11 @@ feature behind the register row, the reference bridge with
 `--extensions BD-chip-Thermostat-Suggestions`, which the chip-tool harness
 passes. Retire the row when matter.js implements the feature; then
 reconcile onto it.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp`
+is outside the exports the review read and was not re-read; what this entry
+says of it is unverified.
 
 ### BD-Matter-Thermostat-Hold-ReachesHost — a TemperatureSetpointHold write reaches the Sink; matter.js only stores it
 
@@ -5797,6 +5878,10 @@ tests `TestHandleCalibrate`, `TestHandleMoveToAllFeatures`,
 `TestHandleMoveToConstraintValidation`,
 `TestSetOverallCurrentStateFeatureValidation`, by meaning).
 
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/closure-app/linux/ClosureManager.cpp` is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
+
 ### BD-chip-Valve-RulesInServer — the valve's rules, Level and TimeSync are connectedhomeip's; matter.js has none
 
 matter.js's `ValveConfigurationAndControlServer` is the empty subclass
@@ -5938,6 +6023,10 @@ had the route, and chip's empty-dataset attach
 (found by the first virtual OTBR run, 2026-10-28). Pinned by
 `management_chip_test.go` (chip's 22 cases) and the `fabrictest` wire tests.
 
+Review II, phase 4 (2026-11-14): ot-br-posix's `rest_web_server.cpp` is
+outside the exports the review read and was not re-read; what this entry
+says of it is unverified.
+
 ### BD-Thread-TND-FromBorderRouter — ThreadNetworkDiagnostics served from a border router's diagnostics record
 
 matter.js's `ThreadNetworkDiagnosticsServer.ts:14` at `862ad75f` is the
@@ -5971,6 +6060,11 @@ thread-br-app.matter` at `6170af84` composes endpoint 1 from
 ThreadNetworkDiagnostics and TBRM only, and the device type couples the
 Thread variant to a Secondary Network Interface. A host whose device is
 itself a Thread participant mounts it. Owner decision 2026-10-27.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/thread-br-app/thread-br-common/thread-br-app.matter` is outside
+the exports the review read and was not re-read; what this entry says of it
+is unverified.
 
 ### BD-chip-AmbientContextSensing-RulesInServer — detections, hold times and the count rules follow connectedhomeip; the kit mounts it only as a host server
 
@@ -6039,6 +6133,11 @@ transport uses answers the model's cluster status EndpointInUse, not the
 example delegate's INVALID_IN_STATE (owner decision 2026-10-28: the
 matter.js schema defines that status for this case). Pinned by
 `tls/client_chip_test.go` (chip's 16 cases).
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp`
+is outside the exports the review read and was not re-read; what this entry
+says of it is unverified.
 
 ### BD-chip-OccupancySensing-HoldTimer — the hold timer is connectedhomeip's; matter.js has none
 
@@ -6112,6 +6211,11 @@ camera over TCP leaves the session the signals need. Pinned by
 `node/webrtc_provider_peers_test.go` (the signals over CASE to a
 `camera.Requestor`, the UDP refusal).
 
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp`
+is outside the exports the review read and was not re-read; what this entry
+says of it is unverified.
+
 ### BD-chip-PushAvStreamTransport-RulesInServer — push transports follow connectedhomeip behind the `PushTransportPort`; ExpiryTime is taken as seconds until deallocation
 
 matter.js's `PushAvStreamTransportServer.ts:14` at `862ad75f` is the
@@ -6169,6 +6273,9 @@ left alone (R2-P1-cam-b-06, R2-P1-dr-rest-05; pinned by
 fabric takes this controller's stream leases along (R2-P1-cam-a-02), and
 a start, a raw offer, a snapshot or a stop after the service's `Close` is
 refused with `ErrClosed` (R2-P1-cam-b-04).
+
+Review II, phase 4 (2026-11-14): matterjs-server is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
 
 ### BD-chip-JointFabricDatastore-RulesInServer — the datastore's tables, refresh and sync follow connectedhomeip behind the `DatastoreSync` port
 
@@ -6239,6 +6346,11 @@ delegate does for an entry the node already holds were not re-read (not
 performable: not exported). Pinned by
 `cluster/jointfabric:TestBindingPushAfterARefreshThatDeliveredIt`.
 
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/jf-admin-app/linux/JFADatastoreSync.cpp` is outside the exports
+the review read and was not re-read; what this entry says of it is
+unverified.
+
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
 matter.js's `JointFabricAdministratorServer.ts:14` at `862ad75f` is the
@@ -6263,6 +6375,10 @@ records it in the datastore (`examples/jf-admin-app/linux/JFAManager.cpp:95-157`
 chip's server does not do this. Pinned by `commissionee_chip_test.go`
 (13 + 3 + 9 of chip's cases; the four C++ liveness cases are one context
 test) and `administrator_rules_test.go` (the statuses `TC_JFADMIN` checks).
+
+Review II, phase 4 (2026-11-14): connectedhomeip's
+`examples/jf-admin-app/linux/JFAManager.cpp` is outside the exports the
+review read and was not re-read; what this entry says of it is unverified.
 
 ### BD-chip-JCM-Commissioner — joint commissioning runs as step 10.2 after chip's commissioner
 
@@ -6539,6 +6655,10 @@ stops it a second later (`zone-manager.cpp:197`) — at the very end of the
 window TC-ZONEMGMT-2.4 allows (`TC_ZONEMGMT_2_4.py:279-285`). TESTING ONLY, off by default; the
 stream, PTZ and chime state is kept in `--db` as
 `BD-Matter-CameraPersistenceIsTheHosts` leaves it to the host.
+
+Review II, phase 4 (2026-11-14): connectedhomeip's camera-app
+(`examples/camera-app`) is outside the exports the review read and was not
+re-read; what this entry says of it is unverified.
 
 ### BD-Matter-BTP-RenegotiationAfterStall — a BTP central that stalls after the handshake is re-established once at the minimum segment size, as matter.js's channel does
 
@@ -6888,6 +7008,10 @@ Not carried over: PDC, AP mode and Wi-Fi PAF. Pinned by `TestConnect`,
 `TestScanDoneFailure` and `TestCredentialNeverLeaves`
 (`wifi/wpasupplicant/driver_test.go`). Retire a point when connectedhomeip's
 driver takes it; reconcile onto matter.js when it ships a driver.
+
+Review II, phase 4 (2026-11-14): hostap at `6d3d778` is outside the exports
+the review read and was not re-read; what this entry says of it is
+unverified.
 
 ### BD-Matter-CertValidityNotEnforced — a NOC or ICAC outside its validity period verifies; the verifier's clock is not read
 
