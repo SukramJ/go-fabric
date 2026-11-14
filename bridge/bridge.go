@@ -580,8 +580,15 @@ type Bridge struct {
 	// re-use under the same exchange-id-after-rollover stays correct —
 	// for a completed handshake, once its record ends
 	// ([Bridge.sigma3Handled]).
-	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
-	// short-circuits replays via `fabric.locked` + per-exchange state.
+	// The gate is this module's own: matter.js's CASE server has no
+	// replay step (its entry points are onNewExchange and #handleSigma1,
+	// packages/protocol/src/session/case/CaseServer.ts:61-63, :102-133
+	// at db021da0). A retransmitted Sigma1 meets its exchange layer,
+	// where a duplicate is acknowledged or the pending message's
+	// retransmission kicked
+	// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and a
+	// message whose id the pending reply acknowledges gets that reply
+	// again (:512-520).
 	sigma1Replied map[HandshakeKey]sigma1Record
 	// sigma1Seq numbers the Sigma1 records in the order they were made,
 	// for the oldest to lose its place past [maxCaseHandshakes]; guarded
