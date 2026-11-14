@@ -182,12 +182,20 @@ type ClusterDataVersion interface {
 // something with every successful write: its cluster's version advances
 // and the written attribute is reported.
 //
-// The verdict is the write's own: the server decides it while it applies
-// the value, under whatever serialises its state, so a change another
-// writer makes around the write — a host's Set, a second controller, a
-// timer — never stands in for it. A server with its own
-// [ClusterDataVersion] advances that version exactly when it answers
-// changed.
+// "Unchanged" means this write stored nothing: the written value, in its
+// stored form, equalled the one the server holds, so the server kept what
+// it held — for a state the host holds, no setter of the host's was
+// called. A write that stored, or one the server cannot tell, answers
+// changed: an over-report costs a version and a report, a missed change a
+// subscriber's view of the attribute. The verdict is the write's own: the
+// read of the held value, the comparison and the store are one step under
+// whatever serialises the server's writes, or the comparison comes first
+// and an equal value is not stored, so a change another writer makes
+// around the write — a host's Set, a second controller, a timer — is
+// never undone by a write that answers unchanged, and a write that stored
+// is never judged by what a host's state reads afterwards. A server with
+// its own [ClusterDataVersion] advances that version exactly when it
+// answers changed.
 //
 // A type that embeds a server implementing this and declares its own
 // MatterWrite declares its own MatterWriteChanged as well: the promoted
