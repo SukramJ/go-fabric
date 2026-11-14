@@ -106,7 +106,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	h.fabricCount = fabrics
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)
-	window.SetFailSafeArmer(h.root.GeneralCommissioning)
+	window.SetFailSafeExpirer(h.root.GeneralCommissioning)
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
 	window.SetTransitionHook(func() {

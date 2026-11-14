@@ -32,22 +32,26 @@ type FailSafeChecker interface {
 	FailSafeArmed() bool
 }
 
-// FailSafeArmer is the optional bridge-side hook CommissioningWindow
-// calls after successfully opening a window. Matter §11.19.6 mandates
-// that OpenCommissioningWindow MUST arm the fail-safe for the window
-// duration — the cluster itself does not own the FailSafe state, so it
-// delegates via this interface.
+// FailSafeArmer was the hook CommissioningWindow armed the fail-safe
+// through when a window opened.
 //
-// Pass fabricIndex=0 for pre-commissioning windows (the window opener
-// is not yet associated with any fabric). The implementation is wired
-// from daemon.go to GeneralCommissioning.ArmFailSafe.
-//
-// Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/
-// AdministratorCommissioningServer.ts:openCommissioningWindow call to
-// GeneralCommissioningBehavior.armFailSafeLogic.
+// Deprecated: a window arms no fail-safe (owner decision 47; matter.js
+// AdministratorCommissioningServer.ts openCommissioningWindow starts the
+// window only, at db021da0) — the commissioner's ArmFailSafe or the 60 s
+// arm of its PASE session does. Wire a [FailSafeExpirer] with
+// [CommissioningWindow.SetFailSafeExpirer]; the window never calls
+// ArmFailSafeFor.
 type FailSafeArmer interface {
 	ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error
+}
+
+// FailSafeExpirer is what RevokeCommissioning expires the fail-safe
+// through (Matter §11.19.8.3 step 1): the fail-safe armed over the PASE
+// session, with the rollback its timeout runs; one an administrator armed
+// over CASE stays (owner decision 42). core.GeneralCommissioning
+// implements it. Implementations must be goroutine-safe.
+type FailSafeExpirer interface {
+	ExpireFailSafeArmedOverPASE(ctx context.Context)
 }
 
 // PaseVerifierInstaller is the optional daemon-side hook CommissioningWindow
@@ -189,13 +193,10 @@ type CommissioningWindow struct {
 	// setups that do not exercise the fail-safe guard.
 	failSafeChecker FailSafeChecker
 
-	// failSafeArmer, when non-nil, is called after every successful
-	// window open to arm the fail-safe for the window duration per
-	// Matter §11.19.6. Wired from the daemon bootstrap to the
-	// GeneralCommissioning cluster's ArmFailSafe path via
-	// [SetFailSafeArmer]; nil in unit-test setups that do not exercise
-	// the fail-safe path.
-	failSafeArmer FailSafeArmer
+	// failSafeExpirer, when non-nil, expires the PASE-armed fail-safe on
+	// RevokeWindow ([SetFailSafeExpirer]); nil in unit-test setups that do
+	// not exercise the fail-safe path.
+	failSafeExpirer FailSafeExpirer
 
 	// paseSessionCloser, when non-nil, is called at the start of
 	// RevokeWindow to evict any open PASE session per Matter §11.19.7.3.
@@ -232,12 +233,22 @@ func (w *CommissioningWindow) SetFailSafeChecker(c FailSafeChecker) {
 	w.mu.Unlock()
 }
 
-// SetFailSafeArmer wires (or clears, when nil) the hook called after
-// a successful window open to arm the FailSafe timer per Matter §11.19.6.
-// Safe to call concurrently with [OpenWindow].
+// SetFailSafeArmer wires a as the window's [FailSafeExpirer] when it is
+// one (core.GeneralCommissioning is), and clears it otherwise.
+//
+// Deprecated: the window arms no fail-safe (owner decision 47); use
+// [CommissioningWindow.SetFailSafeExpirer].
 func (w *CommissioningWindow) SetFailSafeArmer(a FailSafeArmer) {
+	e, _ := a.(FailSafeExpirer)
+	w.SetFailSafeExpirer(e)
+}
+
+// SetFailSafeExpirer wires (or clears, when nil) what RevokeWindow
+// expires the PASE-armed fail-safe through. Safe to call concurrently
+// with [OpenWindow].
+func (w *CommissioningWindow) SetFailSafeExpirer(e FailSafeExpirer) {
 	w.mu.Lock()
-	w.failSafeArmer = a
+	w.failSafeExpirer = e
 	w.mu.Unlock()
 }
 
@@ -617,10 +628,9 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 // A second OpenWindow while one is already live returns BUSY per
 // Matter §11.19.7.1.
 //
-// After a successful state transition, the FailSafeArmer (if wired)
-// is called to arm the fail-safe for the window duration per Matter
-// §11.19.6. A FailSafe arm failure is logged but does not abort the
-// window: the window is already open and the controller expects Success.
+// Opening a window arms no fail-safe (owner decision 47): the
+// commissioner's ArmFailSafe or the 60 s arm of its PASE session
+// (GeneralCommissioning.AutoArmOnPaseEstablished) does, as in matter.js.
 func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWindowParams) error {
 	if err := w.blockedErr(); err != nil {
 		return err
@@ -684,7 +694,6 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		w.adminVendorSet = true
 	}
 	hook := w.transitionHooks()
-	armer := w.failSafeArmer
 	var timer clock.Timer
 	timer = w.clock.Load().AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
 		w.mu.Lock()
@@ -702,21 +711,6 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	if replaced != nil {
 		replaced()
 	}
-	// Defensive fail-safe arm for the window duration (fabricIndex=0 —
-	// window opened pre-commissioning). Note: matter.js does NOT arm the
-	// fail-safe on OpenCommissioningWindow (AdministratorCommissioningServer.ts
-	// openCommissioningWindow only starts the window timer; the fail-safe is
-	// armed when the commissioner sends ArmFailSafe). This arm is a
-	// deliberate divergence that guards the window even before the
-	// commissioner's first ArmFailSafe. It is armed for the window duration,
-	// so on a window TIMEOUT it expires on its own fail-safe timer at the
-	// same moment the window closes; on an EARLY RevokeWindow it is disarmed
-	// explicitly (see RevokeWindow). Either way it never lingers to
-	// Busy-lock the next OpenCommissioningWindow.
-	if armer != nil {
-		_ = armer.ArmFailSafeFor(ctx, uint32(params.CommissioningTimeoutSeconds), 0) //nolint:gosec // G115: timeout fits uint32 by spec; see #20
-	}
-
 	// Enhanced Commissioning Window: install a PASE acceptor built from the
 	// commissioner-supplied PAKE verifier for the window lifetime, so PASE
 	// runs against the passcode the commissioner chose (not the bridge's
@@ -735,8 +729,8 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		restore, err := installer.InstallVerifier(params.PAKEPasscodeVerifier, params.Iterations, params.Salt)
 		if err != nil {
 			// The window is useless without the acceptor — revoke to avoid a
-			// dangling open state (RevokeWindow disarms the fail-safe too),
-			// then surface the error to the cluster handler.
+			// dangling open state, then surface the error to the cluster
+			// handler.
 			_ = w.RevokeWindow(ctx)
 			return fmt.Errorf("install PASE verifier: %w", err)
 		}
@@ -769,13 +763,6 @@ func (w *CommissioningWindow) setRestore(restore func()) bool {
 	}
 	w.restore = restore
 	return true
-}
-
-// failSafeExpirer is the optional capability of a [FailSafeArmer] to expire
-// an armed fail-safe with its cleanup (core.GeneralCommissioning
-// .ExpireFailSafe).
-type failSafeExpirer interface {
-	ExpireFailSafe(ctx context.Context)
 }
 
 // RevokeWindow implements [wire.WindowController]. Per Matter §11.19.7.3
@@ -814,27 +801,18 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 		}
 	}
 
-	// Matter §11.19.7.3 step 1 ALSO expires the fail-safe, unconditionally
-	// and before the window-state check. An aborted commissioning attempt
-	// that armed the fail-safe (or the window-open arm in OpenWindow) must
-	// be disarmed here — otherwise the fail-safe stays armed for the full
-	// window duration and the next OpenCommissioningWindow is rejected Busy
-	// (the "cancel pairing in Apple Home, retry → BUSY for up to 900 s"
-	// symptom). Mirrors matter.js AdministratorCommissioningServer.ts:146-151
-	// (`failsafeContext.close(...)`) + `#assertCommissioningWindowRequirements`
-	// `isFailsafeArmed → BusyError`. Disarm as fabric 0 — the fabric the
-	// window-open arm and the PASE commissioner both use; the fail-safe
-	// ownership check (general_commissioning.go handleArmFailSafe) permits
-	// the owner (0) to disarm, and the disarm fires the pending-NOC revert.
+	// Matter §11.19.7.3 step 1 also expires the fail-safe the PASE
+	// session holds, before the window-state check, with the rollback its
+	// timeout runs — an aborted commissioning's fabric does not survive
+	// the revoke (TC-CGEN-2.4) and the next OpenCommissioningWindow is not
+	// Busy. A fail-safe an administrator armed over CASE is left alone
+	// (owner decision 42; GeneralCommissioning.ExpireFailSafeArmedOverPASE
+	// names where matter.js and connectedhomeip differ).
 	w.mu.RLock()
-	armer := w.failSafeArmer
+	expirer := w.failSafeExpirer
 	w.mu.RUnlock()
-	if expirer, ok := armer.(failSafeExpirer); ok {
-		// Expire with the timeout's cleanup, as matter.js
-		// failsafeContext.close() does (TC-CGEN-2.4).
-		expirer.ExpireFailSafe(context.WithoutCancel(ctx))
-	} else if armer != nil {
-		_ = armer.ArmFailSafeFor(ctx, 0, 0)
+	if expirer != nil {
+		expirer.ExpireFailSafeArmedOverPASE(context.WithoutCancel(ctx))
 	}
 
 	w.mu.Lock()

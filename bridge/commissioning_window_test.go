@@ -283,138 +283,100 @@ func TestCommissioningWindowOpener_SecondOpen_ReturnsAlreadyOpen(t *testing.T) {
 	}
 }
 
-// ─── FailSafeArmer ───────────────────────────────────────────────────────────
+// ─── FailSafeArmer / FailSafeExpirer ─────────────────────────────────────────
 
-// TestCommissioningWindow_FailSafeArmer_CalledOnOpen verifies that the
-// FailSafeArmer is invoked once after a successful window open, with the
-// window duration and fabricIndex=0 per Matter §11.19.6.
+// TestCommissioningWindow_FailSafeArmer_CalledOnOpen pins owner decision
+// 47: a successful window open arms no fail-safe — the armer a host still
+// wires through the deprecated SetFailSafeArmer is never called.
 func TestCommissioningWindow_FailSafeArmer_CalledOnOpen(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{}
-	w.SetFailSafeArmer(armer)
+	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
 
-	const duration uint16 = 600
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
-		CommissioningTimeoutSeconds: duration,
+		CommissioningTimeoutSeconds: 600,
 	}); err != nil {
 		t.Fatalf("OpenWindow: unexpected error: %v", err)
 	}
-
-	if n := armer.calls.Load(); n != 1 {
-		t.Errorf("ArmFailSafeFor call count = %d, want 1", n)
-	}
-	if len(armer.seconds) < 1 || armer.seconds[0] != uint32(duration) {
-		t.Errorf("ArmFailSafeFor seconds = %v, want [%d]", armer.seconds, duration)
-	}
-	if len(armer.fabric) < 1 || armer.fabric[0] != 0 {
-		t.Errorf("ArmFailSafeFor fabricIndex = %v, want [0] (pre-commissioning)", armer.fabric)
+	if n := armer.calls.Load(); n != 0 {
+		t.Errorf("ArmFailSafeFor call count = %d, want 0: opening a window arms nothing", n)
 	}
 }
 
-// TestCommissioningWindow_FailSafeArmer_NotCalledWhenWindowRejected verifies
-// that the FailSafeArmer is NOT invoked when OpenWindow rejects the call
-// (e.g. duplicate open).
+// TestCommissioningWindow_FailSafeArmer_NotCalledWhenWindowRejected: a
+// rejected second open arms nothing either.
 func TestCommissioningWindow_FailSafeArmer_NotCalledWhenWindowRejected(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{}
-	w.SetFailSafeArmer(armer)
+	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
 
-	// Open the window successfully.
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
 	}); err != nil {
 		t.Fatalf("first OpenWindow: unexpected error: %v", err)
 	}
-	firstCalls := armer.calls.Load()
-
-	// Second open must be rejected (BUSY). FailSafeArmer must not be called again.
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
 	}); !errors.Is(err, wire.ErrAdmCommBusy) {
 		t.Errorf("second OpenWindow: want ErrAdmCommBusy, got %v", err)
 	}
-	if n := armer.calls.Load(); n != firstCalls {
-		t.Errorf("ArmFailSafeFor call count after rejected open = %d, want %d (no extra arm)", n, firstCalls)
+	if n := armer.calls.Load(); n != 0 {
+		t.Errorf("ArmFailSafeFor call count = %d, want 0", n)
 	}
 }
 
-// TestCommissioningWindow_FailSafeArmer_ArmErrorDoesNotAbortWindow verifies
-// that a FailSafeArmer error does not abort the window open — the window is
-// already open when the arm fires, and aborting would leave the cluster in
-// an inconsistent state with the wire-level Success that was already returned.
+// TestCommissioningWindow_FailSafeArmer_ArmErrorDoesNotAbortWindow: an
+// armer that would fail is not called, so the window opens.
 func TestCommissioningWindow_FailSafeArmer_ArmErrorDoesNotAbortWindow(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	armer := &fakeFailSafeArmer{err: errors.New("fail-safe arm failed")}
-	w.SetFailSafeArmer(armer)
+	w.SetFailSafeArmer(armer) //nolint:staticcheck // the deprecated wiring still compiles and arms nothing
 
-	err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
+	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
-	})
-	if err != nil {
-		t.Errorf("OpenWindow: unexpected error %v — arm failure must not abort window", err)
+	}); err != nil {
+		t.Errorf("OpenWindow: unexpected error %v", err)
 	}
 	if snap := w.CurrentWindow(); snap.Status != wire.WindowStatusEnhanced {
-		t.Errorf("Status after arm error = %v, want Enhanced (window is open)", snap.Status)
+		t.Errorf("Status = %v, want Enhanced (window is open)", snap.Status)
 	}
 }
 
-// TestCommissioningWindow_RevokeWindow_DisarmsFailSafe verifies the H9 fix:
-// RevokeWindow disarms the fail-safe (Matter §11.19.7.3 step 1) via a
-// FailSafeArmer.ArmFailSafeFor(ctx, 0, 0) call, unconditionally and before
-// the window-state check. Without this, the fail-safe armed by OpenWindow
-// (or by the commissioner's own ArmFailSafe) stays armed for the full
-// window duration and the next OpenCommissioningWindow is rejected Busy.
+// TestCommissioningWindow_RevokeWindow_DisarmsFailSafe: RevokeWindow
+// expires the PASE-armed fail-safe through the expirer (Matter §11.19.7.3
+// step 1; owner decision 42), unconditionally and before the window-state
+// check, and never through a zero-second arm.
 func TestCommissioningWindow_RevokeWindow_DisarmsFailSafe(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
-	armer := &fakeFailSafeArmer{}
-	w.SetFailSafeArmer(armer)
-
-	const duration uint16 = 600
+	a := &expiringArmer{}
+	w.SetFailSafeExpirer(a)
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
-		CommissioningTimeoutSeconds: duration,
+		CommissioningTimeoutSeconds: 600,
 	}); err != nil {
 		t.Fatalf("OpenWindow: unexpected error: %v", err)
 	}
 	if err := w.RevokeWindow(context.Background()); err != nil {
 		t.Fatalf("RevokeWindow: unexpected error: %v", err)
 	}
-
-	// fakeFailSafeArmer records every call (not just the last), so the
-	// slice must hold both the window-open arm and the revoke disarm.
-	if n := armer.calls.Load(); n != 2 {
-		t.Fatalf("ArmFailSafeFor call count = %d, want 2 (one arm on Open + one disarm on Revoke)", n)
-	}
-	if armer.seconds[0] != uint32(duration) || armer.fabric[0] != 0 {
-		t.Errorf("first ArmFailSafeFor (Open) = (seconds=%d, fabric=%d), want (%d, 0)",
-			armer.seconds[0], armer.fabric[0], duration)
-	}
-	// The RevokeWindow disarm must be the last recorded call, with
-	// seconds=0 (disarm) and fabricIndex=0.
-	last := len(armer.seconds) - 1
-	if armer.seconds[last] != 0 {
-		t.Errorf("RevokeWindow disarm seconds = %d, want 0", armer.seconds[last])
-	}
-	if armer.fabric[last] != 0 {
-		t.Errorf("RevokeWindow disarm fabricIndex = %d, want 0", armer.fabric[last])
+	if a.expired.Load() != 1 || a.armed.Load() != 0 {
+		t.Fatalf("expired %d, armed %d; want one expiry and no arm", a.expired.Load(), a.armed.Load())
 	}
 }
 
-// fakeFailSafeArmerChecker implements both FailSafeArmer and
-// FailSafeChecker over shared state, so a test can observe the
-// "armed → Busy" linkage that OpenWindow's FailSafeChecker guard
-// enforces (see TestCommissioningWindow_OpenWindow_RejectsBusyWhenFailSafeArmed)
-// without wiring a real GeneralCommissioning cluster server.
+// fakeFailSafeArmerChecker implements FailSafeExpirer and FailSafeChecker
+// over shared state, so a test can observe the "armed → Busy" linkage
+// that OpenWindow's FailSafeChecker guard enforces without wiring a real
+// GeneralCommissioning cluster server.
 type fakeFailSafeArmerChecker struct {
 	armed atomic.Bool
 }
 
-func (f *fakeFailSafeArmerChecker) ArmFailSafeFor(_ context.Context, seconds uint32, _ uint8) error {
-	f.armed.Store(seconds != 0)
-	return nil
+func (f *fakeFailSafeArmerChecker) ExpireFailSafeArmedOverPASE(context.Context) {
+	f.armed.Store(false)
 }
 
 func (f *fakeFailSafeArmerChecker) FailSafeArmed() bool {
@@ -422,16 +384,14 @@ func (f *fakeFailSafeArmerChecker) FailSafeArmed() bool {
 }
 
 // TestCommissioningWindow_OpenAfterRevoke_NotBusy verifies the end-to-end
-// H9 regression: OpenWindow arms the fail-safe, RevokeWindow disarms it,
-// and a subsequent OpenWindow must succeed rather than being rejected
-// ErrAdmCommBusy by the FailSafeChecker guard. Before the H9 fix,
-// RevokeWindow left the fail-safe armed for the remainder of the window
-// duration, so this second OpenWindow would have hit Busy.
+// H9 regression: a commissioner's PASE session arms the fail-safe,
+// RevokeWindow expires it, and a subsequent OpenWindow must succeed rather
+// than being rejected ErrAdmCommBusy by the FailSafeChecker guard.
 func TestCommissioningWindow_OpenAfterRevoke_NotBusy(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	fake := &fakeFailSafeArmerChecker{}
-	w.SetFailSafeArmer(fake)
+	w.SetFailSafeExpirer(fake)
 	w.SetFailSafeChecker(fake)
 
 	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
@@ -439,15 +399,15 @@ func TestCommissioningWindow_OpenAfterRevoke_NotBusy(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("first OpenWindow: unexpected error: %v", err)
 	}
+	fake.armed.Store(true) // the commissioner's PASE session armed it
 	if err := w.RevokeWindow(context.Background()); err != nil {
 		t.Fatalf("RevokeWindow: unexpected error: %v", err)
 	}
-
 	err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
 		CommissioningTimeoutSeconds: 600,
 	})
 	if err != nil {
-		t.Errorf("OpenWindow after RevokeWindow: unexpected error %v, want nil (fail-safe must be disarmed)", err)
+		t.Errorf("OpenWindow after RevokeWindow: unexpected error %v, want nil (fail-safe must be expired)", err)
 	}
 }
 
@@ -815,17 +775,17 @@ func (a *expiringArmer) ArmFailSafeFor(context.Context, uint32, uint8) error {
 	return nil
 }
 
-func (a *expiringArmer) ExpireFailSafe(context.Context) { a.expired.Add(1) }
+func (a *expiringArmer) ExpireFailSafeArmedOverPASE(context.Context) { a.expired.Add(1) }
 
 // TestCommissioningWindow_RevokeExpiresTheFailSafe pins Matter §11.19.8.3
-// step 1 as matter.js runs it (failsafeContext.close()): RevokeWindow
-// expires the fail-safe with its cleanup when the armer can, instead of a
-// bare disarm (TC-CGEN-2.4).
+// step 1: RevokeWindow expires the PASE-armed fail-safe with its cleanup
+// through the deprecated SetFailSafeArmer wiring too, when the armer is an
+// expirer (TC-CGEN-2.4).
 func TestCommissioningWindow_RevokeExpiresTheFailSafe(t *testing.T) {
 	t.Parallel()
 	w := bridge.NewCommissioningWindow()
 	a := &expiringArmer{}
-	w.SetFailSafeArmer(a)
+	w.SetFailSafeArmer(a) //nolint:staticcheck // the deprecated wiring keeps wiring the expirer
 	_ = w.RevokeWindow(context.Background())
 	if a.expired.Load() != 1 || a.armed.Load() != 0 {
 		t.Fatalf("expired %d, disarmed %d; want one expiry", a.expired.Load(), a.armed.Load())

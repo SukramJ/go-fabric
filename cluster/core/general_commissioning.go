@@ -66,6 +66,12 @@ type GeneralCommissioning struct {
 	// installed (OpcredsConfig.RearmFailSafeForFabric) — so the window's
 	// rollback removes failSafeFabricIndex. Reset by every fresh arm.
 	failSafeFabricAdded bool
+	// failSafeOverPASE records that the armed fail-safe was armed, from
+	// the disarmed state, over a PASE session — the commissioner's own,
+	// not an administrator's over CASE. Kept by a re-arm, cleared when the
+	// fail-safe ends. RevokeCommissioning expires only such a fail-safe
+	// ([GeneralCommissioning.ExpireFailSafeArmedOverPASE]).
+	failSafeOverPASE bool
 	// failSafeWatch is the expiry watcher of the armed window, nil when
 	// none runs: one at a time, replaced on a re-arm and stopped on a
 	// disarm ([GeneralCommissioning.startFailSafeWatchLocked]).
@@ -709,6 +715,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		wasArmed := g.failSafeArmed
 		expiredFabric := g.failSafeFabricIndex
 		g.failSafeArmed = false
+		g.failSafeOverPASE = false
 		g.stopFailSafeWatchLocked()
 		g.failSafeFabricIndex = 0
 		g.failSafeCumulativeStarted = false
@@ -785,6 +792,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// (TC-CGEN-2.2 step 34).
 	extending := g.failSafeArmed
 	g.failSafeFabricAdded = g.failSafeFabricAdded && extending
+	g.failSafeOverPASE = extending && g.failSafeOverPASE || !extending && (sessFabric == 0 || im.IsPASEFromContext(ctx))
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = now.Add(time.Duration(req.ExpiryLengthSeconds) * time.Second)
 	// The cumulative limit is a timer of its own that expires the fail-safe,
@@ -907,6 +915,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 func (g *GeneralCommissioning) expireLocked(fabricIndex uint8) func(ctx context.Context) {
 	hadBreadcrumb := g.breadcrumb != 0
 	g.failSafeArmed = false
+	g.failSafeOverPASE = false
 	g.stopFailSafeWatchLocked()
 	// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
 	// branch) clears the Breadcrumb when the fail-safe expires —
@@ -1133,6 +1142,7 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 		g.tcCommitted, g.tcTemporal, g.tcTouched = g.tcTemporal, nil, false
 	}
 	g.failSafeArmed = false
+	g.failSafeOverPASE = false
 	g.stopFailSafeWatchLocked()
 	g.failSafeFabricIndex = 0
 	g.breadcrumb = 0
@@ -1166,17 +1176,10 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 	}, nil
 }
 
-// ArmFailSafeFor is the public entry-point called by the
-// [bridge.FailSafeArmer] adapter when a commissioning window opens.
-// Matter §11.19.6 requires the FailSafe to be armed for the window
-// duration; the daemon wires this to [bridge.CommissioningWindow]'s
-// [FailSafeArmer] interface so the window open-path actually arms
-// the timer.
-//
-// Mirrors matter.js packages/node/src/behaviors/administrator-commissioning/
-// AdministratorCommissioningServer.ts:openCommissioningWindow →
-// GeneralCommissioningBehavior.armFailSafeLogic(timeoutSeconds) and
-// chip CommissioningWindowManager.cpp ArmFailSafe() call.
+// ArmFailSafeFor arms the fail-safe for seconds on behalf of fabricIndex
+// (0: a PASE session), outside any ArmFailSafe command; seconds 0 disarms
+// it without its rollback. Opening a commissioning window no longer calls
+// it (owner decision 47).
 func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error {
 	return g.armFailSafeFor(ctx, seconds, fabricIndex, false)
 }
@@ -1188,25 +1191,16 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 // session to come (OpenCommissioningWindow's) arms either way.
 func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8, forSession bool) error {
 	if seconds == 0 {
-		// A zero-second arm is a DISARM request. Its only caller is
-		// CommissioningWindow.RevokeWindow, which disarms so the next
-		// OpenCommissioningWindow is not Busy-locked. Treat it as a pure state
-		// reset: do NOT run the arm logic below (now+0 is immediately expired,
-		// so watchFailSafeExpiry would fire onFailSafeExpired at once) and do
-		// NOT fire onFailSafeExpired here. Both RevokeWindow callers — the
-		// CommissioningComplete hook and the onFailSafeExpired hook — already
-		// ran the pending-NOC rollback (ClearPendingState / OnFailSafeExpiry)
-		// before revoking, and onFailSafeExpired itself calls RevokeWindow:
-		// firing the hook from here would re-enter RevokeWindow →
-		// ArmFailSafeFor(0) → watcher → hook → … an unbounded loop that pegs a
-		// core and floods the log.
-		//
-		// This differs from the cluster-wire ArmFailSafe(ExpiryLengthSeconds=0)
-		// disarm in handleArmFailSafe, which DOES fire the hook: that path is a
-		// commissioner-initiated disarm that owns the pending-NOC rollback and
-		// is never reached from inside the hook, so it cannot recurse.
+		// A zero-second arm is a DISARM request, a pure state reset: it
+		// does NOT run the arm logic below (now+0 is immediately expired,
+		// so watchFailSafeExpiry would fire onFailSafeExpired at once) and
+		// does NOT fire onFailSafeExpired — a caller inside that hook would
+		// otherwise re-enter it without end. The wire
+		// ArmFailSafe(ExpiryLengthSeconds=0) in handleArmFailSafe and
+		// ExpireFailSafe are the disarms that roll the window back.
 		g.mu.Lock()
 		g.failSafeArmed = false
+		g.failSafeOverPASE = false
 		g.stopFailSafeWatchLocked()
 		g.failSafeFabricIndex = 0
 		g.failSafeCumulativeStarted = false
@@ -1243,10 +1237,25 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 		g.mu.Unlock()
 		return err
 	}
+	// An arm for a session leaves a fail-safe another fabric armed alone,
+	// in the same lock hold as its check (matter.js extend refuses another
+	// fabric, FailsafeTimer.ts:53-57 at db021da0; review II,
+	// R2-P2-comm-08).
+	if forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
+		g.mu.Unlock()
+		return nil
+	}
 	fresh := !g.failSafeArmed
 	g.failSafeFabricAdded = g.failSafeFabricAdded && !fresh
+	if fresh {
+		g.failSafeOverPASE = fabricIndex == 0
+	}
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = g.clock.Now().Add(time.Duration(seconds) * time.Second)
+	// A re-arm stays within the cumulative limit, as the wire arm does.
+	if !fresh && g.failSafeCumulativeStarted && g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
+		g.failSafeExpiresAt = g.failSafeCumulativeDeadline
+	}
 	g.breadcrumb = req.Breadcrumb
 	g.failSafeFabricIndex = fabricIndex
 	g.dataVersion.Bump()
@@ -1280,8 +1289,36 @@ func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
 		g.mu.Unlock()
 		return
 	}
+	g.expireNowLocked(ctx)
+}
+
+// ExpireFailSafeArmedOverPASE is [GeneralCommissioning.ExpireFailSafe] for
+// a fail-safe armed over a PASE session only — the commissioner's own,
+// whether or not its AddNOC re-stamped it since; one an administrator
+// armed over CASE is left alone. RevokeCommissioning uses it (Matter
+// §11.19.8.3 step 1). This is the owner's rule (decision 42), a deliberate
+// divergence: matter.js closes whatever fail-safe context is open
+// (AdministratorCommissioningServer.ts:143-148 at db021da0, under a
+// comment that speaks of the "PASE-held fail-safe"), and connectedhomeip's
+// ExpireFailSafeIfHeldByOpenPASESession
+// (src/app/clusters/administrator-commissioning-server/AdministratorCommissioningLogic.cpp:113)
+// expires whatever fail-safe is armed while a PASE session exists
+// (src/app/server/CommissioningWindowManager.cpp:650-657 at 6170af84).
+func (g *GeneralCommissioning) ExpireFailSafeArmedOverPASE(ctx context.Context) {
+	g.mu.Lock()
+	if !g.failSafeArmed || !g.failSafeOverPASE {
+		g.mu.Unlock()
+		return
+	}
+	g.expireNowLocked(ctx)
+}
+
+// expireNowLocked expires the armed fail-safe at once and runs its
+// rollback; g.mu is held and released.
+func (g *GeneralCommissioning) expireNowLocked(ctx context.Context) {
 	fabric := g.failSafeFabricIndex
 	g.failSafeArmed = false
+	g.failSafeOverPASE = false
 	g.stopFailSafeWatchLocked()
 	g.failSafeFabricIndex = 0
 	g.failSafeCumulativeStarted = false
@@ -1352,28 +1389,21 @@ func FailSafeArmedFor(failSafe func() (fabricIndex uint8, armed bool), accessing
 // and no ArmFailSafe has been sent yet.
 const PaseSessionAutoArmSeconds uint16 = 60
 
-// AutoArmOnPaseEstablished arms a 60-second FailSafe window when the
-// bridge receives a new PASE session and the fail-safe is not already
-// armed. This mirrors the defensive safety-net that matter.js's
-// GeneralCommissioningServer.ts applies on every new PASE session
-// (packages/node/src/behaviors/general-commissioning/
-// GeneralCommissioningServer.ts:55-66 at 862ad75f): the window ensures that any
-// uncommitted configuration state is rolled back via the expiry hook
-// if the commissioner disappears without calling CommissioningComplete.
+// AutoArmOnPaseEstablished arms the fail-safe for 60 s when the bridge
+// receives a new PASE session: a fresh fail-safe when none is armed, and
+// one armed over PASE before is re-armed to 60 s from now, as matter.js's
+// GeneralCommissioningServer does on every new PASE session
+// (packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-66,
+// #armFailSafe → failsafeContext.extend when armed, :89-94, at db021da0).
+// A fail-safe another fabric armed is left as it is — matter.js's extend
+// refuses another fabric (FailsafeTimer.ts:53-57). The check and the arm
+// are one step (armFailSafeFor). Opening a commissioning window arms
+// nothing (owner decision 47): this arm, or the commissioner's
+// ArmFailSafe, is what arms the fail-safe of a commissioning.
 //
-// Callers that do not want the auto-arm (e.g. non-PASE paths) should
-// not call this function. The daemon wires it from the PaseAdapter's
-// onEstablished callback so the arm fires exactly once per successful
-// Pake3 completion.
+// The daemon wires it from the PaseAdapter's onEstablished callback so the
+// arm fires exactly once per successful Pake3 completion.
 func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
-	g.mu.Lock()
-	alreadyArmed := g.failSafeArmed && g.failSafeExpiresAt.After(g.clock.Now())
-	g.mu.Unlock()
-	if alreadyArmed {
-		// Commissioner already sent ArmFailSafe explicitly; don't
-		// overwrite the window they chose.
-		return
-	}
 	_ = g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
 }
 
