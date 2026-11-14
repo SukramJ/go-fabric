@@ -224,6 +224,13 @@ const (
 // generated requests of cluster/spec/levelcontrol — what
 // levelcontroldef.Declare carries. The documentation of its methods
 // follows.
+//
+// A controller's Options or OnLevel write reaches SetOptions or
+// SetOnLevel only when the written value differs from the one Options or
+// OnLevel reads at that moment; a write of the held value reaches no
+// setter. A write that reaches a setter counts as a change — its
+// DataVersion advances and it is reported — whether or not the getter
+// shows it when the setter returns, so a host may apply it later.
 type LevelSource = lvldef.LevelSource
 
 // source is the LevelSource the server drives, in cluster/wire's requests. The
@@ -263,10 +270,12 @@ type source interface {
 	OnLevel() (level uint8, known bool)
 
 	// SetOptions persists a bitmap the server has already checked
-	// against the advertised FeatureMap.
+	// against the advertised FeatureMap; it is called only for a bitmap
+	// that differs from what Options read.
 	SetOptions(ctx context.Context, options uint8) error
 	// SetOnLevel persists a new on-level; level is nil for a null write,
-	// which is the spec's "OnLevel has no effect".
+	// which is the spec's "OnLevel has no effect". It is called only for
+	// an on-level that differs from what OnLevel read.
 	SetOnLevel(ctx context.Context, level *uint8) error
 
 	// MoveToLevel drives the device to req.Level without touching OnOff.
@@ -715,15 +724,17 @@ func (s *Server) writeOptions(ctx context.Context, options uint8) (changed bool,
 	if s.src == nil {
 		return false, errNoSource("Options write")
 	}
-	before := s.src.Options()
+	// The value in effect, written again, reaches no setter and changes
+	// nothing; another reaches the setter, advances the DataVersion and is
+	// reported to the server's listeners, whatever the host's state reads
+	// when the setter returns (Datasource.ts:1456-1457, :1476-1492 at
+	// db021da0 #noteIfChanged; LevelControlServer.ts:253-255 reacts to no
+	// Options write).
+	if s.src.Options() == options {
+		return false, nil
+	}
 	if err := s.src.SetOptions(ctx, options); err != nil {
 		return false, fmt.Errorf("levelcontrol: Options write: %w", err)
-	}
-	// A change advances the DataVersion and is reported to the server's
-	// listeners; a write of the value in effect changes nothing
-	// (Datasource.ts:1456-1457, :1476-1480 at db021da0 #noteIfChanged).
-	if s.src.Options() == before {
-		return false, nil
 	}
 	s.tracker().Bump()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
@@ -736,12 +747,13 @@ func (s *Server) writeOnLevel(ctx context.Context, level *uint8) (changed bool, 
 	if s.src == nil {
 		return false, errNoSource("OnLevel write")
 	}
-	before, knownBefore := s.src.OnLevel()
+	// The on-level in effect, written again, reaches no setter and changes
+	// nothing, as for Options above.
+	if held, known := s.src.OnLevel(); known == (level != nil) && (!known || held == *level) {
+		return false, nil
+	}
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
 		return false, fmt.Errorf("levelcontrol: OnLevel write: %w", err)
-	}
-	if after, known := s.src.OnLevel(); known == knownBefore && (!known || after == before) {
-		return false, nil
 	}
 	s.tracker().Bump()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)

@@ -36,9 +36,11 @@ func TestSmokeCoAlarmOrigins(t *testing.T) {
 	if _, err := srv.MatterInvoke(ctx, smokedef.CmdSelfTestRequest, nil); err != nil || d.selfTests != 1 {
 		t.Errorf("command: %v, the source saw %d self-tests, want one", err, d.selfTests)
 	}
-	if err := srv.MatterWrite(ctx, smokedef.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityHigh)); err != nil ||
-		!slices.Equal(d.written, []alarm.Sensitivity{alarm.SensitivityHigh}) {
-		t.Errorf("controller write: %v, the source saw %v, want High", err, d.written)
+	// Low differs from the level the device holds (High, the zero value):
+	// a level equal to the held one reaches no setter.
+	if err := srv.MatterWrite(ctx, smokedef.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil ||
+		!slices.Equal(d.written, []alarm.Sensitivity{alarm.SensitivityLow}) {
+		t.Errorf("controller write: %v, the source saw %v, want Low", err, d.written)
 	}
 	var sce im.StatusCodeError
 	if err := srv.MatterWrite(ctx, smokedef.AttrExpressedState, uint64(0)); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusUnsupportedWrite {

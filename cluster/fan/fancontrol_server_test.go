@@ -278,7 +278,9 @@ func TestReadsProjectAndClampTheHostState(t *testing.T) {
 func TestFanModeWriteCouplesPercentAndSpeed(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	d := &device{}
+	// The fan starts at High: each write below differs from the FanMode
+	// the host holds, so each reaches it (a held value reaches no setter).
+	d := &device{st: fandef.State{FanMode: fan.FanModeHigh}}
 	srv := newFull(t, d)
 
 	if err := srv.MatterWrite(ctx, fan.AttrFanMode, uint64(fan.FanModeOff)); err != nil {
