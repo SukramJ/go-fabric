@@ -106,8 +106,18 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 		},
 		Read:  s.readLevel,
 		Apply: s.applyLevel,
+		// Each report of RemainingTime advances the DataVersion once.
+		// Mirrors matter.js
+		// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-259
+		// at db021da0 (the quiet observer runs advanceVersionFor before it
+		// broadcasts), Datasource.ts:679-688 (advanceVersionFor advances
+		// for a dynamic property) and
+		// packages/node/src/behaviors/level-control/LevelControlServer.ts:806-822
+		// (remainingTime is served from Val.properties, a dynamic property,
+		// when the attribute is supported).
 		RemainingTimeChanged: func() {
 			if s.lighting {
+				s.tracker().Bump()
 				s.changes.NotifyFrom(contract.OriginCommand, AttrRemainingTime)
 			}
 		},

@@ -896,7 +896,8 @@ func (s *Server) forward(name string, executes bool, before levelReading, call f
 // command changes (RemainingTime is computed, as matter.js's virtual
 // remainingTime is, LevelControlServer.ts:805-822 at db021da0) — and a
 // refusal keeps it where it was. Under the engine every
-// change of CurrentLevel advanced it already ([Server.observeLevel]).
+// change of CurrentLevel advanced it already ([Server.observeLevel]), and
+// every report of RemainingTime ([Server.initEngine]).
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
 // db021da0 (a commit advances the version only `if (changes)`).

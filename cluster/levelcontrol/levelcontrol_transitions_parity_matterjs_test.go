@@ -276,13 +276,16 @@ func TestMoveToLevelTransitionReadsPartWay(t *testing.T) {
 
 // TestEveryLevelChangeAdvancesTheDataVersionOnce: under the engine each
 // change of CurrentLevel — a transition's step as much as a level a
-// command applies at once — advances the server's DataVersion once, and
-// a command adds no advance of its own. Mirrors matter.js
+// command applies at once — advances the server's DataVersion once, each
+// report of RemainingTime advances it once more, and a command adds no
+// advance of its own. Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
 // db021da0 (every commit that changed a value advances the version; a
 // step writes currentLevel in a commit of its own); the quiet emit's
-// advanceVersionFor (ServerBehaviorBacking.ts:258-260) advances only for a
-// dynamic property (Datasource.ts:679-688), which currentLevel is not.
+// advanceVersionFor (ServerBehaviorBacking.ts:258-259) advances only for a
+// dynamic property (Datasource.ts:679-688), which currentLevel is not and
+// remainingTime is (LevelControlServer.ts:806-822, served from
+// Val.properties).
 func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDevice(50, true)
@@ -293,12 +296,15 @@ func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		sleep(35 * time.Second)
-		levels, _ := r.snapshot()
+		levels, times := r.snapshot()
 		if len(levels) < 2 || level(t, srv) != 200 {
 			t.Fatalf("the transition reported %v, want several steps ending at 200", levels)
 		}
-		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)) {
-			t.Errorf("%d level changes advanced the DataVersion by %d, want one each", len(levels), got)
+		if len(times) == 0 {
+			t.Fatal("the transition reported no RemainingTime")
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)+len(times)) { //nolint:gosec // a test's count of reports
+			t.Errorf("%d level changes and %d RemainingTime reports advanced the DataVersion by %d, want one each", len(levels), len(times), got)
 		}
 
 		before = srv.MatterDataVersion()
@@ -308,6 +314,49 @@ func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
 		synctest.Wait()
 		if got := srv.MatterDataVersion() - before; got != 1 || level(t, srv) != 100 {
 			t.Errorf("a MoveToLevel applied at once advanced the DataVersion by %d (level %d), want 1", got, level(t, srv))
+		}
+	})
+}
+
+// TestRemainingTimeReportAdvancesTheDataVersion: a report of RemainingTime
+// alone — at the start of a transition that has not moved CurrentLevel
+// yet, and at the Stop that cancels it — advances the server's
+// DataVersion once per report. Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-259 at
+// db021da0 (the quiet observer of a "Q" attribute runs advanceVersionFor
+// before it broadcasts), Datasource.ts:679-688 (advanceVersionFor advances
+// for a dynamic property) and LevelControlServer.ts:806-822 (remainingTime
+// is served from Val.properties, a dynamic property).
+func TestRemainingTimeReportAdvancesTheDataVersion(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := newDevice(10, true)
+		srv := engineServer(d, nil)
+		r := observe(t, srv)
+		before := srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 11, TransitionTime: u16(60000)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		levels, times := r.snapshot()
+		if len(times) == 0 || remaining(t, srv) == 0 {
+			t.Fatalf("the transition's start reported RemainingTime %v (now %d), want a report of a non-zero value", times, remaining(t, srv))
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)+len(times)) { //nolint:gosec // a test's count of reports
+			t.Errorf("the start reported %d levels and %d RemainingTime values and advanced the DataVersion by %d, want one each", len(levels), len(times), got)
+		}
+
+		before = srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdStop, wire.StopRequest{}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		levelsAfter, timesAfter := r.snapshot()
+		newLevels, newTimes := len(levelsAfter)-len(levels), len(timesAfter)-len(times)
+		if newTimes == 0 || remaining(t, srv) != 0 {
+			t.Fatalf("the Stop reported %d RemainingTime values (now %d), want a report of 0", newTimes, remaining(t, srv))
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(newLevels+newTimes) { //nolint:gosec // a test's count of reports
+			t.Errorf("the Stop reported %d levels and %d RemainingTime values and advanced the DataVersion by %d, want one each", newLevels, newTimes, got)
 		}
 	})
 }
