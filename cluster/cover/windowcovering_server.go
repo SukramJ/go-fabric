@@ -197,6 +197,18 @@ type Config struct {
 	// CurrentPositionTiltPercent100ths and
 	// TargetPositionTiltPercent100ths. Ignored without the Tilt feature.
 	InitialTiltPositionPercent100ths uint16
+	// InitialPositionUnknown starts the lift axis without a known
+	// position: CurrentPositionLiftPercent100ths, the deprecated
+	// CurrentPositionLiftPercentage and TargetPositionLiftPercent100ths
+	// read null — matter.js's defaults
+	// (window-covering-cluster.element.ts:47-48, :59-60, :71-72 at
+	// db021da0) — until [WindowCoveringServer.SetCurrentPosition] reports
+	// a position or, without a [Mover] and a MoveStep, a command moves the
+	// covering. InitialPositionPercent100ths is then unused.
+	InitialPositionUnknown bool
+	// InitialTiltPositionUnknown is InitialPositionUnknown for the tilt
+	// axis (:51-52, :63-64, :75-76).
+	InitialTiltPositionUnknown bool
 	// MoveStep makes a movement travel: when non-zero a command moves the
 	// axis in six steps of MoveStep, reporting OperationalStatus Opening
 	// or Closing until the target is reached, as matter.js's CHIP test
@@ -271,6 +283,10 @@ type axis struct {
 	// aware is the axis's position-aware feature (PA_LF, PA_TL).
 	aware           bool
 	current, target uint16
+	// currentNull and targetNull: the position, the target, is unknown and
+	// reads null (the attributes are "X", default null,
+	// window-covering-cluster.element.ts:59-64, :71-76 at db021da0).
+	currentNull, targetNull bool
 	// move is the running movement; nil when the axis stands still.
 	move *movement
 
@@ -392,6 +408,9 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		s.lift = &axis{
 			aware:   features&paLift != 0,
 			current: cfg.InitialPositionPercent100ths, target: cfg.InitialPositionPercent100ths,
+			// initialize copies the position into the target, null
+			// included (WindowCoveringServer.ts:138-143 at db021da0).
+			currentNull: cfg.InitialPositionUnknown, targetNull: cfg.InitialPositionUnknown,
 			attrCurrent: wcdef.AttrCurrentPositionLiftPercent100ths, attrPercentage: wcdef.AttrCurrentPositionLiftPercentage,
 			attrTarget: wcdef.AttrTargetPositionLiftPercent100ths, shift: liftShift,
 		}
@@ -400,6 +419,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		s.tilt = &axis{
 			aware:   features&paTilt != 0,
 			current: cfg.InitialTiltPositionPercent100ths, target: cfg.InitialTiltPositionPercent100ths,
+			currentNull: cfg.InitialTiltPositionUnknown, targetNull: cfg.InitialTiltPositionUnknown,
 			attrCurrent: wcdef.AttrCurrentPositionTiltPercent100ths, attrPercentage: wcdef.AttrCurrentPositionTiltPercentage,
 			attrTarget: wcdef.AttrTargetPositionTiltPercent100ths, shift: tiltShift,
 		}
@@ -453,13 +473,22 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 		switch attrID {
 		case a.attrPercentage:
 			// Deprecated uint8 field; the scaled-down value for Matter 1.0
-			// controllers (matter.js #syncLiftCurrentPositions /
-			// #syncTiltCurrentPositions, WindowCoveringServer.ts:239-240,
-			// :257-258 at 0ceb202d).
+			// controllers, null while the position is unknown (matter.js
+			// #syncLiftCurrentPositions / #syncTiltCurrentPositions,
+			// WindowCoveringServer.ts:237-240, :255-258 at db021da0).
+			if a.currentNull {
+				return nil, true
+			}
 			return uint8((a.current / 100) & 0xFF), true // value bounded 0-100 by design
 		case a.attrTarget:
+			if a.targetNull {
+				return nil, true
+			}
 			return a.target, true
 		case a.attrCurrent:
+			if a.currentNull {
+				return nil, true
+			}
 			return a.current, true
 		}
 	}
@@ -688,7 +717,7 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 			}
 			anyAware = true
 			s.stopLocked(a)
-			a.target = a.current
+			a.target, a.targetNull = a.current, a.currentNull
 			s.setAxisStatusLocked(a, movementStopped)
 		}
 		if !anyAware {
@@ -729,15 +758,21 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 			c.tilt = &v
 		}
 	}
-	// Only a position-aware axis stores its target.
+	// Only a position-aware axis stores its target; a stop's target is the
+	// position, null when it is unknown (:491-496).
 	liftTarget := c.lift != nil && s.lift.aware
 	tiltTarget := c.tilt != nil && s.tilt.aware
 	var prevLift, prevTilt uint16
+	var prevLiftNull, prevTiltNull, liftNull, tiltNull bool
 	if liftTarget {
-		prevLift, s.lift.target = s.lift.target, *c.lift
+		liftNull = c.stop && s.lift.currentNull
+		prevLift, prevLiftNull = s.lift.target, s.lift.targetNull
+		s.lift.target, s.lift.targetNull = *c.lift, liftNull
 	}
 	if tiltTarget {
-		prevTilt, s.tilt.target = s.tilt.target, *c.tilt
+		tiltNull = c.stop && s.tilt.currentNull
+		prevTilt, prevTiltNull = s.tilt.target, s.tilt.targetNull
+		s.tilt.target, s.tilt.targetNull = *c.tilt, tiltNull
 	}
 	s.mu.Unlock()
 
@@ -751,11 +786,11 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 		return nil
 	}
 	s.mu.Lock()
-	if liftTarget && s.lift.target == *c.lift {
-		s.lift.target = prevLift
+	if liftTarget && s.lift.target == *c.lift && s.lift.targetNull == liftNull {
+		s.lift.target, s.lift.targetNull = prevLift, prevLiftNull
 	}
-	if tiltTarget && s.tilt.target == *c.tilt {
-		s.tilt.target = prevTilt
+	if tiltTarget && s.tilt.target == *c.tilt && s.tilt.targetNull == tiltNull {
+		s.tilt.target, s.tilt.targetNull = prevTilt, prevTiltNull
 	}
 	s.mu.Unlock()
 	if spec.CarriesStatus(err) { // a host's contract.StatusError or an im.StatusCodeError
@@ -768,16 +803,15 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 // CurrentPositionLiftPercent100ths (and, scaled,
 // CurrentPositionLiftPercentage), tilt CurrentPositionTiltPercent100ths
 // (and CurrentPositionTiltPercentage); nil leaves an axis unchanged, and
-// a value for an axis the server does not serve is ignored. A value above
+// a value for an axis the server does not serve is ignored. A value ends
+// an unknown position ([Config].InitialPositionUnknown). A value above
 // 10000 (the attribute's "max 10000") is clamped to it and logged. It is
 // stored without the [Mover] and reported through the change notifier; it
 // does not move the targets or OperationalStatus. Without a Mover it does
 // not stop a simulated travel either.
 func (s *WindowCoveringServer) SetCurrentPosition(lift, tilt *uint16) {
 	s.setPositions(lift, tilt, "matter.windowcovering.inbound_position_clamped", func(a *axis, v uint16) (bool, []uint32) {
-		changed := a.current != v
-		a.current = v
-		return changed, []uint32{a.attrCurrent, a.attrPercentage}
+		return storePosition(&a.current, &a.currentNull, v), []uint32{a.attrCurrent, a.attrPercentage}
 	})
 }
 
@@ -796,10 +830,25 @@ func (s *WindowCoveringServer) SetCurrentPosition(lift, tilt *uint16) {
 // over it.
 func (s *WindowCoveringServer) SetTargetPosition(lift, tilt *uint16) {
 	s.setPositions(lift, tilt, "matter.windowcovering.inbound_target_clamped", func(a *axis, v uint16) (bool, []uint32) {
-		changed := a.target != v
-		a.target = v
-		return changed, []uint32{a.attrTarget}
+		return storePosition(&a.target, &a.targetNull, v), []uint32{a.attrTarget}
 	})
+}
+
+// storePosition stores v — a uint16, or nil for null — in pos and null,
+// and reports whether either changed.
+func storePosition(pos *uint16, null *bool, v any) bool {
+	if v == nil {
+		changed := !*null
+		*null = true
+		return changed
+	}
+	n, ok := v.(uint16)
+	if !ok {
+		return false
+	}
+	changed := *null || *pos != n
+	*pos, *null = n, false
+	return changed
 }
 
 // setPositions applies store to each served axis a value is given for,
@@ -868,10 +917,21 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 		return
 	}
 	s.stopLocked(a)
-	a.target = target
+	a.target, a.targetNull = target, false
 	cur := a.current
-	if s.moveStep == 0 || cur == target {
-		a.current = target
+	if s.moveStep == 0 || (!a.currentNull && cur == target) {
+		// matter.js's default handleMovement sets the position to the
+		// target, a null one included (WindowCoveringServer.ts:347-363 at
+		// db021da0).
+		a.current, a.currentNull = target, false
+		s.setAxisStatusLocked(a, movementStopped)
+		return
+	}
+	if a.currentNull {
+		// The CHIP test node does not travel from an unknown position
+		// (TestWindowCoveringServer.ts:55-62 at db021da0); the axis is
+		// Stopped, #computeOperationalState's answer for a null position
+		// (WindowCoveringServer.ts:273-275).
 		s.setAxisStatusLocked(a, movementStopped)
 		return
 	}
@@ -906,8 +966,20 @@ func (s *WindowCoveringServer) tick(a *axis, m *movement) {
 		s.mu.Unlock()
 		return // stopped or replaced between the fire and the lock
 	}
-	changed := []uint32{a.attrCurrent, a.attrPercentage}
 	m.counter++
+	if a.currentNull {
+		// The host set the position unknown during the travel: a step
+		// moves nothing, and the last ends the travel
+		// (TestWindowCoveringServer.ts:103-110, :120-125 at db021da0).
+		if m.counter >= moveSteps {
+			a.move = nil
+		} else {
+			m.timer.Reset(s.moveStep)
+		}
+		s.mu.Unlock()
+		return
+	}
+	changed := []uint32{a.attrCurrent, a.attrPercentage}
 	if m.counter >= moveSteps {
 		a.current = m.target
 		s.setAxisStatusLocked(a, movementStopped)

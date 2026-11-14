@@ -31,9 +31,11 @@ var (
 // [WindowCoveringServer.SetTargetPosition] and
 // [WindowCoveringServer.SetOperationalStatus] report — no write veto. The
 // held attributes are the served axes' CurrentPosition…Percent100ths and
-// TargetPosition…Percent100ths (null is refused: the server keeps a
-// position, [spec.ErrInvalidValue]), OperationalStatus and Mode (stored as
-// given; ConfigStatus follows it). A position set while a simulated
+// TargetPosition…Percent100ths (null is an unknown position or target,
+// which reads null until a value is set — matter.js's state takes null,
+// the attributes are "X", window-covering-cluster.element.ts:59-64,
+// :71-76 at db021da0), OperationalStatus and Mode (stored as given;
+// ConfigStatus follows it). A position set while a simulated
 // travel runs does not stop it: its next step overwrites the value, as
 // matter.js's next step overwrites a state write
 // (packages/node/src/behavior/Transitions.ts:455-534, :537-574).
@@ -56,11 +58,6 @@ func (s *WindowCoveringServer) SetAttributes(values map[uint32]any) error {
 				return fmt.Errorf("%w: windowcovering: attribute 0x%04X is the configuration's (%v)", spec.ErrNotHeld, id, cur)
 			}
 			continue
-		case wcdef.AttrCurrentPositionLiftPercent100ths, wcdef.AttrCurrentPositionTiltPercent100ths,
-			wcdef.AttrTargetPositionLiftPercent100ths, wcdef.AttrTargetPositionTiltPercent100ths:
-			if v == nil {
-				return fmt.Errorf("%w: windowcovering: attribute 0x%04X: the server keeps a position, not null", spec.ErrInvalidValue, id)
-			}
 		}
 		checked[id] = v
 	}
@@ -73,12 +70,10 @@ func (s *WindowCoveringServer) SetAttributes(values map[uint32]any) error {
 		if a == nil {
 			continue
 		}
-		if v, ok := checked[a.attrCurrent].(uint16); ok && v != a.current {
-			a.current = v
+		if v, ok := checked[a.attrCurrent]; ok && storePosition(&a.current, &a.currentNull, v) {
 			report = append(report, a.attrCurrent, a.attrPercentage)
 		}
-		if v, ok := checked[a.attrTarget].(uint16); ok && v != a.target {
-			a.target = v
+		if v, ok := checked[a.attrTarget]; ok && storePosition(&a.target, &a.targetNull, v) {
 			report = append(report, a.attrTarget)
 		}
 	}
