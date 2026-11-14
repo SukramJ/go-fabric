@@ -1608,7 +1608,7 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 // handleConnectionError picks the pause after a failed attempt and sleeps
 // it (PeerConnection.ts:653-752): a Busy status
 // waits the peer's delay plus up to DelayAfterNetworkError of jitter — and,
-// received at a proven address of the peer (Peer.provenAddress), holds
+// received at the peer's proven address (Peer.provenAddress), holds
 // every attempt of the peer for as long (Peer.holdBusy); a
 // NoSharedTrustRoots status whose resumption record could be deleted
 // retries at once; any other status waits DelayAfterPeerError; a transient
