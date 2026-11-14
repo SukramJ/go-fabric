@@ -907,7 +907,17 @@ func (c *connection) fallbackSupersededLocked() bool {
 // proven host ends the retention of the host's others too: its fresh set
 // replaces them, and a retained address it no longer carries is deleted as
 // discovery's deletion would have deleted it (provenHostReturnedLocked).
+//
+// An address that cannot be the destination of a datagram to one host is
+// not queued, silently as a hinted one: the filter a hinted address meets
+// (unicastDestination, HintAddresses),
+// since any host on the link can send the record that names it (review
+// II, R2-P3-ctl-lan-09). matter.js takes a discovered address as it
+// stands (IpService.ts:392-407 at db021da0, unicastDestination's doc).
 func (c *connection) addAddressLocked(a discovery.Address) {
+	if !unicastDestination(a.IP) {
+		return
+	}
 	ap := a.AddrPort()
 	if a.Host != "" {
 		c.hosts[ap] = a.Host
