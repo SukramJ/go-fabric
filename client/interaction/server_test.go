@@ -198,6 +198,50 @@ func TestServeRead(t *testing.T) {
 	})
 }
 
+// TestServeReadAnswersForItsOwnNodeOnly: a served read knows the
+// controller's node id on the session's fabric, so a concrete path that
+// names another node is answered UnsupportedNode and read for nothing, as
+// the device side answers it (matter.js AttributeReadResponse.ts:205-208
+// at db021da0); a path that names the controller is read.
+func TestServeReadAnswersForItsOwnNodeOnly(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, _, _ := serverRig(t, 0)
+		req := im.ReadRequest{}
+		const others = 40
+		for k := range others {
+			p := servedAttr(20)
+			p.Node, p.HasNode = 0xDEAD_0000_0000_0000+uint64(k), true
+			req.AttributeRequests = append(req.AttributeRequests, p)
+		}
+		own := servedAttr(20)
+		own.Node, own.HasNode = 0x1111, true // the rig's local node id (helpers_test.go)
+		req.AttributeRequests = append(req.AttributeRequests, own)
+		s.push(t, 0x7301, im.OpcodeReadRequest, encode(t, func(e *tlv.Encoder) { req.MarshalTLV(e) }))
+		values, unsupported := 0, 0
+		for {
+			m := expectOpcode(t, s, im.OpcodeReportData)
+			rd := decodeReport(t, m.payload)
+			for _, r := range rd.Reports {
+				switch {
+				case !r.IsStatus:
+					values++
+				case r.Status.Status == im.StatusUnsupportedNode:
+					unsupported++
+				}
+			}
+			if !rd.MoreChunkedMessages {
+				s.ackPushed(t, m)
+				break
+			}
+			s.continueOn(t, m, im.OpcodeStatusResponse, statusResponse(t, im.StatusSuccess))
+		}
+		if values != 1 || unsupported != others {
+			t.Fatalf("%d values and %d UnsupportedNode for %d paths naming other nodes and one naming the controller; want 1 and %d", values, unsupported, others, others)
+		}
+	})
+}
+
 // TestServeReadChunkRefused: a chunk the peer answers with a failure or
 // with anything but a StatusResponse ends the report.
 func TestServeReadChunkRefused(t *testing.T) {
