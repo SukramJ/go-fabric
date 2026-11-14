@@ -128,10 +128,10 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-ICDVerificationKeyConstantTime | `IcdManagementServer.ts:761` compares the presented VerificationKey with `Bytes.areEqual`, a data-dependent comparison (presence) | `packages/node/src/behaviors/icd-management/IcdManagementServer.ts` | `"!Bytes.areEqual(verificationKey, stored.key)"` | this module: Go `crypto/subtle.ConstantTimeCompare` (review 2026-11 W2-sec-04); the accept/refuse outcome is matter.js's | no |
 | BD-Matter-OtaImageHeaderSizeCap | `OtaImageReader.ts:181-183` reads the prefix's header size and collects that many bytes with no bound (absence: the line that would take the check, followed by the closing brace) | `packages/protocol/src/ota/OtaImageReader.ts` | `"this.#headerSize = headerReader.readUInt32();\n            }"` | connectedhomeip `src/lib/core/OTAImageHeader.cpp:53` (`kMaxHeaderSize = 1024`), checked at `:128` (review 2026-11 W4-ctlint-07) | no |
 | BD-chip-Commissioner-CsrNonceEchoed | `ControllerCommissioningFlow.ts:1412` at `db021da0` draws the CSR nonce and the flow never reads the echoed one back (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"fields: { csrNonce: this.fabric.crypto.randomBytes(32) },"` | connectedhomeip `src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:847-870` at `6170af84` (`VerifyNodeOperationalCSRInformation`) | no |
-| BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:164-166` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
+| BD-chip-EnergyReporting-FakeReadings | `GeneralDiagnosticsServer.ts:231-233` answers every test event trigger with INVALID_COMMAND, and the chip-testing node's `TestGeneralDiagnosticsServer.ts:15-22` accepts only the generic trigger; a grep for `0x0091`, `FakeReadings` and `EnergyReporting` over `packages/` and `support/chip-testing/` at the pin finds only the cluster id in `packages/types/src/clusters/electrical-energy-measurement.d.ts:25` (presence: the two rejections) | `packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts`<br>`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts` | `"Unsupported test event trigger "`<br>`"} else if (testEvent !== 0x0000000000000003) {\n            throw new StatusResponseError(\"Wrong test event\", Status.InvalidCommand);"` | connectedhomeip `src/app/clusters/electrical-energy-measurement-server/EnergyReportingTestEventTriggerHandler.h:47-51`, `examples/energy-management/energy-management-triggers/EnergyReportingEventTriggers.cpp:28-85` and `FakeReadings.cpp:73-175` at `6170af84` | no |
 | BD-matterjs-server-NetworkTopology | `NetworkClient.ts:35` declares the controller's network behaviour, which holds the subscription state only; matter.js at the pin has no topology service (absence: no neighbour-table or graph code under `packages/`) | `packages/node/src/behavior/system/network/NetworkClient.ts` | `class NetworkClient` | matterjs-server `packages/ws-controller/src/controller/NetworkTopologyService.ts` and `packages/ws-client/src/topology/topology-utils.ts` at `0bd06f22` | no |
-| BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :72-76, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
-| BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-93`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
+| BD-Matter-ClientNodeEventHistory | `ClientEventEmitter.ts:45-74` emits a peer's event to the node's observers and the ChangeNotificationService and keeps none; no code under `packages/node/src/node/client/` holds past events (absence: the end of `emitClientEvent`, :73-77, where a record would go) | `packages/node/src/node/client/ClientEventEmitter.ts` | `"            });\n        }\n    }\n\n    function getTarget(node: ClientNode, occurrence: ReadResult.EventValue, clusterName: string, eventName: string) {"` | matterjs-server `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`, `:368-380` at `0bd06f22` (a global last-25 list), kept per node here (issue #388 G-C2) | no |
+| BD-Matter-LogRing | absence: the default `LogDestination` formats a message and writes it (`LogDestination.ts:77-91`, `add` → `write`), `Logger.ts` fans a message out to its destinations and keeps nothing, and no file under `packages/general/src/log/` holds past records or a run-time level a host reads back as records | `packages/general/src/log/LogDestination.ts` | `"        add(message: Diagnostic.Message) {\n            this.write(this.format(message), message);\n        },"` | matterjs-server's dashboard sets and reads the console and file levels only (`packages/dashboard/src/components/dialogs/settings/log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`/`setLogLevel`, no records); the ring is this module's own design for go-fabric-ui's operation page (issue #393, M9 U5) | no |
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 | BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
 | BD-Matter-Commissioner-TermsRequirementRead | `ControllerCommissioningFlow.ts:570` at `db021da0` leaves the terms-and-conditions consent a TODO after step 8.2 and the flow reads no TC attribute (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"// TODO Step 9: If device and Controller supports T&C Feature then User consent is handled"` | this module: connectedhomeip sends the acknowledgement as a parameter and reads no TC attribute either (`src/controller/CHIPDeviceController.cpp:2592-2603`, `:3946-3957` at `6170af84`); the device side it reads is its own TC server (`BD-chip-GeneralCommissioning-TermsAndConditions`) | no |
@@ -2191,19 +2191,19 @@ MWOCTRL, MWOM, OTCCM, OVENOPSTATE pass (#46).
 
 ### BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer — both servers transcribe connectedhomeip, with the quirks named
 
-matter.js's `DeviceEnergyManagementServer` and `EvseServer` are empty
+matter.js's `DeviceEnergyManagementServer` and `EnergyEvseServer` are empty
 subclasses; `cluster/energy/devicemanagement.go` and `evse.go` transcribe
 connectedhomeip at the pin (`DeviceEnergyManagementCluster.cpp`,
 `DeviceEnergyManagementDelegateImpl.cpp`, `EnergyEvseCluster.cpp`,
 `EnergyEvseDelegateImpl.cpp`, `EnergyEvseTargetsStore.cpp`), each rule
 with its line. The places where the Go code knowingly differs from, or
 tightens, the transcription are commented where they occur:
-`devicemanagement.go:470-471` (chip dereferences a capability unchecked; a
-null one is left null here), `:491` (chip's INVALID_VALUE is answered
-as CONSTRAINT_ERROR, the IM status the spec names), `:845-846` (the
+`devicemanagement.go:467-468` (chip dereferences a capability unchecked; a
+null one is left null here), `:488` (chip's INVALID_VALUE is answered
+as CONSTRAINT_ERROR, the IM status the spec names), `:864-865` (the
 power-adjustment timer is cancelled in the pause failure path, transcribed
-as written), `:979` (only the first constraint's fields are checked,
-as chip does); `evse.go:363`, `:380-382`, `:786`, `:857`, `:1266-1271`.
+as written), `:998` (only the first constraint's fields are checked,
+as chip does); `evse.go:369`, `:387-388`, `:792`, `:863`, `:1294-1300`.
 PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
 chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
@@ -2214,7 +2214,7 @@ classified (#46, #47); TC-EEVSE-2.3 runs since phase 30
 
 matter.js has no EnergyReporting trigger and no fake readings: its
 `GeneralDiagnosticsServer.triggerTestEvent` answers every trigger with
-INVALID_COMMAND (`GeneralDiagnosticsServer.ts:164-166` at `862ad75f`) and the
+INVALID_COMMAND (`GeneralDiagnosticsServer.ts:231-233` at `db021da0`) and the
 chip-testing node accepts only the generic one
 (`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:15-22`).
 The reference daemon's grid meter (`examples/reference-bridge/
@@ -2275,7 +2275,8 @@ event reaches `emitClientEvent`
 (`packages/node/src/node/client/ClientEventEmitter.ts:45-74`), which emits
 it on the endpoint's behavior event and broadcasts it through the
 `ChangeNotificationService` (`broadcastEvent`,
-`packages/node/src/node/integration/ChangeNotificationService.ts:74-87`),
+`packages/node/src/node/integration/ChangeNotificationService.ts:100-113`
+at `db021da0`),
 and nothing stores it. matterjs-server keeps one global list of the last
 25 events of every node (`#addEventToHistory`, `EVENT_HISTORY_SIZE`,
 `packages/ws-controller/src/server/WebSocketControllerHandler.ts:112`,
@@ -2291,9 +2292,9 @@ per node rather than each keeping its own list.
 
 ### BD-Matter-LogRing — a bounded slog ring with a run-time level, for every host
 
-matter.js at `862ad75f` keeps no log records: a message reaches the
+matter.js at `db021da0` keeps no log records: a message reaches the
 destinations `Logger` holds, and the default destination's `add` formats it
-and hands it to `write` (`packages/general/src/log/LogDestination.ts:77-93`);
+and hands it to `write` (`packages/general/src/log/LogDestination.ts:77-91`);
 nothing under `packages/general/src/log/` stores what was written or
 answers a reader with past records. matterjs-server's dashboard changes
 the level only (`log-level-section.ts:56-82` at `0bd06f22`: `getLogLevel`,
@@ -2313,7 +2314,7 @@ logs no passcode and no key.
 ### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
 
 matter.js's `ClosureDimensionServer` is empty; `cluster/closure/
-closuredimension_server.go:20-65` lists the rules it takes from
+closuredimension_server.go:22-67` lists the rules it takes from
 connectedhomeip's `ClosureDimensionCluster.cpp` at the pin. The feature
 conformance is the model's, i.e. matter.js's, and is stricter than chip in
 one place: with Positioning it requires exactly one of Translation,
@@ -2560,8 +2561,8 @@ SoftwareVersion alone after an apply unless started with
 
 The reference daemon (`examples/reference-bridge/ota.go`) lists the
 OtaRequestor device type on the root (endpoint 0) — the CSA cases
-subscribe to UpdateState there (`TC_SU_2_7.py:216`, `:244` at the harness
-pin) — and, outside harness mode, validates the image, keeps it under
+subscribe to the requestor's StateTransition event there (`TC_SU_2_7.py:216`,
+`:244` at the harness pin) — and, outside harness mode, validates the image, keeps it under
 `<ota-dir>/applied/` and keeps running the old version, which the
 requestor reports as a failed update at the next start (matter.js
 `#handlePreviousUpdateOnStart`). With `--ota-harness` it instead stays in
@@ -2614,7 +2615,7 @@ module behaviour.
 
 matter.js threads a `MessageChannel` through the exchange and iterates the
 socket as an async stream
-(`packages/protocol/src/transport/tcp/TcpChannel.ts:87`,
+(`packages/protocol/src/transport/tcp/TcpChannel.ts:83` at `db021da0`,
 `for await (const chunk of this.#socket)`), with Node's stream buffering as
 backpressure. Here the bridge-internal route stays a `net.Addr` —
 `*net.UDPAddr` for UDP, `*connRoute` for a TCP connection
@@ -2622,9 +2623,9 @@ backpressure. Here the bridge-internal route stays a `net.Addr` —
 only the receive entry takes a `transport.Conn`; a session is bound to the
 first authenticated route and never switches transport
 (`bindSessionRoute`; matter.js replaces a channel UDP-for-UDP only,
-`MessageChannel.ts:140-148`). `transport/tcp` reads 16 KiB at a time and
+`packages/protocol/src/protocol/MessageChannel.ts:155-164` at `db021da0`). `transport/tcp` reads 16 KiB at a time and
 lets at most 64 messages of one connection be in flight before the reader
-stops (`transport/tcp/conn.go:26-36`); no matter.js constant exists for
+stops (`transport/tcp/conn.go:28-38`); no matter.js constant exists for
 either. The framing constants, the three-connections-per-peer cap and the
 10 s timer for an inbound connection's first message — which matter.js
 stops at the first complete message, not the first byte
@@ -2635,8 +2636,8 @@ records why the shapes differ.
 
 matter.js's device generator leaves such a cluster out of the type's
 default behaviours and lets device-type validation report it at runtime
-(`packages/node/src/devices/.../RequirementGenerator.ts:188-199`,
-`EndpointFile.ts:144-158`: "mandatory with extension" is not mounted
+(`support/codegen/src/endpoints/RequirementGenerator.ts:188-199`,
+`support/codegen/src/endpoints/EndpointFile.ts:144-158` at `db021da0`: "mandatory with extension" is not mounted
 until the application chooses). `device.New<Type>` refuses construction
 instead (`device/device.go` defaultServer: `ErrConfiguration`, "needs a
 feature selection (the declaration's Features)"), so a host learns at the constructor,
@@ -2740,7 +2741,7 @@ matter.js's runtime conformance compiler resolves a revision condition
 against the cluster's revision for element presence
 (`support/codegen`-fed `conformance-compiler.ts:252-256`), while its
 feature-combination judgement ignores revisions
-(`IllegalFeatureCombinations.ts:441-443`, `:464-468`). `cluster/spec`
+(`IllegalFeatureCombinations.ts:442-444`, `:464-468` at `db021da0`). `cluster/spec`
 does the same since wave 7: `Instance` resolves `Rev >= vN` against
 `Definition.Revision` so a default LevelControl serves MinLevel / MaxLevel
 (`LevelControlServer.ts:113-121`), and `CheckFeatures` still reports such
@@ -2752,8 +2753,8 @@ matter.js fires `<field>$Changing` in a transaction's pre-commit for every
 field that changed since the last pre-commit cycle, whoever changed it —
 a controller's write and the host's own `endpoint.set` alike — and a
 throw from an observer rolls the transaction back
-(`packages/node/src/behavior/state/managed/Datasource.ts:1172-1195` at
-`862ad75f`, `packages/general/src/transaction/Participant.ts:16-23`). A
+(`packages/node/src/behavior/state/managed/Datasource.ts:1179-1222` at
+`db021da0`, `packages/general/src/transaction/Participant.ts:16-23`). A
 thrown error that is no `StatusResponseError` leaves the write response
 (`packages/protocol/src/action/server/AttributeWriteResponse.ts:452-460`
 rolls back and rethrows) and the messenger answers the whole request with
@@ -2802,14 +2803,14 @@ scene with it. Here the ScenesManagement side commits first and a
 refusal by `onoff.Sink` leaves the stored or recalled scene as it is;
 Go's mutex-and-context model has no cross-cluster transaction
 (`BD-Matter-OnOff-SinkAsOverride`). A pending transition-delayed apply
-(`:267-310`, on the `Clock` seam) is dropped by `MatterQuiesce`, as a
+(`:267-308`, on the `Clock` seam) is dropped by `MatterQuiesce`, as a
 stopped matter.js timer would be.
 
 ### BD-Matter-SessionClosed-HostCall — a host wiring its own session registry calls `Bridge.SessionClosed`
 
 matter.js's ExchangeManager observes every session removal itself and
-closes a TCP channel whose last session went (`ExchangeManager.ts:674-681`,
-`:705-711`). The bridge learns of a close through
+closes a TCP channel whose last session went (`ExchangeManager.ts:739-746`,
+`:770-778` at `db021da0`). The bridge learns of a close through
 `operational.Manager.SetOnSessionClose`, a single callback the host owns;
 the inbound and outbound CloseSession paths close the connection by
 themselves, every other close (fabric removal, NOC rotation, the idle
@@ -2824,8 +2825,8 @@ takes more than one observer (report U, question 1).
 
 matter.js `Fabric.leave` / `replaced` run `initiateClose` on every session
 of the fabric; a session with an exchange in flight defers its close
-(`NodeSession.ts:337-347`), and the force close that follows marks it
-peer-lost (`:324-327`), so that session closes after its exchange without
+(`NodeSession.ts:367-377` at `db021da0`), and the force close that follows
+marks it peer-lost (`:379-382`), so that session closes after its exchange without
 a CloseSession. The bridge has no per-session view of active exchanges:
 `EmitFabricRemovedContext` and `Bridge.CloseFabricSessionsExcept` send the
 CloseSession to every routed session of the fabric except the invoking
@@ -2848,7 +2849,7 @@ to wait for that last report.
 ### BD-Matter-CaseHold-BoundedByEvictionOnly — an abandoned Sigma1 holds its TCP connection until the CASE state is evicted
 
 A CASE handshake in flight holds its TCP connection open
-(`ExchangeManager.ts:674-681`); the hold ends with the handshake, a peer
+(`ExchangeManager.ts:739-746` at `db021da0`); the hold ends with the handshake, a peer
 failure StatusReport, the connection dropping, or the eviction of the
 per-exchange CASE state (`Bridge.ForgetSigma1Replied`, which
 `node/security.go` (`caseProvider.SetOnEvict`) wires to the CASE provider's one-minute TTL through
@@ -2863,7 +2864,8 @@ provider itself knows what the eviction callback also does.
 
 matter.js has one set of setup credentials per node: an administrator's
 OpenBasicCommissioningWindow runs `allowBasicCommissioning` with the
-configured passcode (`AdministratorCommissioningServer.ts:105-121`), and
+configured passcode (`AdministratorCommissioningServer.ts:115-127` at
+`db021da0`), and
 every window the node opens itself is advertised under the configured
 discriminator unless an enhanced window supplied one
 (`DeviceCommissioner.ts:236-256` `#openWindow`, `discriminator ??
@@ -2894,7 +2896,8 @@ different behaviour: AddNOC answers TableFull at the limit either way.
 
 matter.js's `commissioned` event is a transition: `#syncCommissioned`
 compares the fabric count with the stored `commissioned` flag and emits
-only when the count crosses zero (`CommissioningServer.ts:143-157`). The
+only when the count crosses zero (`CommissioningServer.ts:148-165` at
+`db021da0`). The
 facade's `OnCommissioningComplete(fabricIndex)` runs after every successful
 CommissioningComplete, the second and later fabrics included, after the
 facade's own body (`ClearPendingState`, OTA `Commissioned`) and before
@@ -2907,8 +2910,8 @@ first-fabric transition is the host's one comparison
 
 matter.js emits its fabric events inline too: `FabricManager`'s
 `added`, `replaced`, `leaving`, `deleting`, `deleted` are Observables the
-manager emits from the operation itself (`FabricManager.ts:41-48`,
-`:216`, `:246`, `:272` at `862ad75f`), and an observer's error is logged,
+manager emits from the operation itself (`FabricManager.ts:44-49`,
+`:216`, `:246`, `:272` at `db021da0`), and an observer's error is logged,
 never surfaced (`FabricManager.ts:405-411` `unhandled`). The facade mirrors that: each
 observer runs on the handler's goroutine after the facade's own handler,
 inside AddNOC / UpdateNOC / RemoveFabric / CommissioningComplete and before
@@ -3075,8 +3078,8 @@ status code. Report AC, question 2.
 
 ### BD-Matter-SigmaInitiatorCheckOrder — the CASE initiator verifies the responder's chain before its node and fabric id
 
-matter.js `packages/protocol/src/session/case/CaseClient.ts:284-309` (at
-`0ceb202d`) takes the responder's public key straight out of the still
+matter.js `packages/protocol/src/session/case/CaseClient.ts:280-314` (at
+`db021da0`) takes the responder's public key straight out of the still
 unverified NOC, checks the transcript signature with it, then the NOC's
 node id and fabric id against the peer it set out to reach, then the
 ICAC's fabric id, and verifies the certificate chain last
@@ -3092,7 +3095,7 @@ until the chain is verified. Every input matter.js refuses is refused here
 too; only the error class differs for a NOC that is at once unverifiable
 and mismatched — `ErrSignatureInvalid` here, the identity mismatch there —
 and no peer can observe which. `client/handshake.CASE` reports
-InvalidParam either way (`CaseClient.ts:83-99`). Report AF, question 2.
+InvalidParam either way (`CaseClient.ts:85-100`). Report AF, question 2.
 
 ---
 
@@ -3120,8 +3123,8 @@ Report AE, question 1.
 
 ### BD-Matter-MdnsQueryNotSplit — a DNS-SD query goes out as one packet; no relevance pre-filter; U+FFFD per invalid byte
 
-matter.js `packages/general/src/net/dns-sd/MdnsSocket.ts:155-222` (at
-`0ceb202d`) splits a query whose questions and known answers exceed
+matter.js `packages/general/src/net/dns-sd/MdnsSocket.ts:121-265` (at
+`db021da0`) splits a query whose questions and known answers exceed
 `MAX_MDNS_MESSAGE_SIZE` (1232 bytes) into several packets, and
 `MdnsRelevanceFilter.ts` drops packets that name no Matter service before
 decoding them. `client/discovery.Solicitor` sends one packet whatever
@@ -3143,9 +3146,9 @@ questions 4 and 7.
 
 ### BD-Matter-Peer-SaveOncePerBurst — a peer's descriptor is saved once per burst of changes
 
-matter.js `Peer.ts:99-106` (at `0ceb202d`) wraps the descriptor in an
+matter.js `Peer.ts:99-106` (at `db021da0`) wraps the descriptor in an
 `ObservablePeerDescriptor` whose change callback starts `#save`
-(`:575-579`) unless one is already running; `#save` is an async function
+(`:576-580`) unless one is already running; `#save` is an async function
 that runs synchronously up to its `await this.#updated.emit(this)`, so
 the `#isSaving` guard coalesces nothing in practice and the node layer
 sees one `updated` per changed field. `client/peer.Peer` starts one
