@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -539,6 +540,70 @@ func decodeReport(payload []byte) (*im.ReportData, error) {
 // answered the chunk itself.
 var errStopReports = errors.New("interaction: reports stopped")
 
+// ErrReportTooLarge is the error of a read, subscription report or invoke
+// whose chunks would take the report bytes the session's interactions
+// hold past [maxAssemblyBytesPerSession]; the peer was answered
+// ResourceExhausted and the partial report dropped.
+var ErrReportTooLarge = errors.New("interaction: report too large")
+
+// maxAssemblyBytesPerSession is how many bytes of report chunks (the
+// message payloads) the interactions of one session may hold while the
+// rest of their chunks arrive: reads, subscription reports and invoke
+// responses together, so the 30 exchanges a session may have open do not
+// multiply it. The chunk that would pass it ends its interaction with a
+// StatusResponse ResourceExhausted and [ErrReportTooLarge]; the bytes are
+// released when an interaction ends. A peer reaches it only with its own
+// interactions: a wildcard read of a node of some thousand endpoints
+// stays below it. Neither reference bounds a report's chunks (review II,
+// R2-P2-alloc-05; owner decision 45, this module's own rule).
+const maxAssemblyBytesPerSession = 2 << 20
+
+// assemblies is the report bytes each session's interactions hold.
+var assemblies = struct {
+	sync.Mutex
+	held map[*exchange.Session]int
+}{held: map[*exchange.Session]int{}}
+
+// reserveAssembly adds n bytes to what s's interactions hold, false when
+// that would pass [maxAssemblyBytesPerSession].
+func reserveAssembly(s *exchange.Session, n int) bool {
+	assemblies.Lock()
+	defer assemblies.Unlock()
+	if assemblies.held[s]+n > maxAssemblyBytesPerSession {
+		return false
+	}
+	assemblies.held[s] += n
+	return true
+}
+
+// releaseAssembly gives back n bytes reserveAssembly took for s.
+func releaseAssembly(s *exchange.Session, n int) {
+	if n == 0 {
+		return
+	}
+	assemblies.Lock()
+	defer assemblies.Unlock()
+	if left := assemblies.held[s] - n; left > 0 {
+		assemblies.held[s] = left
+	} else {
+		delete(assemblies.held, s)
+	}
+}
+
+// holdChunk reserves a received chunk's payload for the interaction on m,
+// which holds held bytes so far; at the bound it answers the peer
+// ResourceExhausted and returns [ErrReportTooLarge].
+func (m *messenger) holdChunk(ctx context.Context, held *int, payload []byte) error {
+	if reserveAssembly(m.x.Session(), len(payload)) {
+		*held += len(payload)
+		return nil
+	}
+	if err := m.sendStatus(ctx, im.StatusResourceExhausted); err != nil {
+		return fmt.Errorf("%w: %w", ErrReportTooLarge, err)
+	}
+	return ErrReportTooLarge
+}
+
 // readDataReports reads the DataReport chunks of an exchange as matter.js
 // IncomingInteractionClientMessenger.readDataReports does
 // (interaction/InteractionMessenger.ts:938-972 at 0ceb202d): the next
@@ -551,11 +616,16 @@ var errStopReports = errors.New("interaction: reports stopped")
 // already received. A consumer returning errStopReports ends the reading
 // with nil and no answer.
 func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first *im.ReportData, consume func(rd *im.ReportData) error) error {
+	held := 0
+	defer func() { releaseAssembly(m.x.Session(), held) }()
 	rd := first
 	for {
 		if rd == nil {
 			msg, err := m.nextReport(ctx)
 			if err != nil {
+				return err
+			}
+			if err := m.holdChunk(ctx, &held, msg.Payload); err != nil {
 				return err
 			}
 			if rd, err = decodeReport(msg.Payload); err != nil {
