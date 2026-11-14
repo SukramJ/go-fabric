@@ -297,7 +297,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	// resolves to: an attribute another interaction holds is skipped
 	// (AttributeWriteResponse.ts:355-358), then the ACL decides.
 	authorizeWildcard := func(endpoint uint16, clusterID, attrID uint32) StatusCode {
-		if tx.heldByOther(endpoint, clusterID, attrID) {
+		if tx.heldByOther(fabricIndex, endpoint, clusterID, attrID) {
 			return StatusBusy
 		}
 		if !aclActive {
@@ -310,7 +310,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	var wr WriteResponse
 	for _, w := range req.Writes {
 		// The interaction's BUSY checks come first (busyBefore).
-		if tx.busyBefore(w.Path) {
+		if tx.busyBefore(w.Path, fabricIndex) {
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   w.Path,
 				Status: StatusIB{Status: StatusBusy},
@@ -335,13 +335,11 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 			continue
 		}
-		// A concrete path this interaction accepts is held before it is
-		// written when the write is chunked or holds already, and becomes
-		// the marker a following ADD is checked against (matter.js
-		// InteractionServer.ts:533-543, the hold taken before any await).
-		if w.Path.HasEndpoint {
-			tx.accept(w.Path, req.MoreChunkedMessages)
-		}
+		// A concrete path this interaction accepts becomes the marker a
+		// following ADD is checked against (matter.js
+		// InteractionServer.ts:533-537 at db021da0); it is held only once
+		// the access checks below have granted the write (holdGranted).
+		tx.accept(w.Path, fabricIndex)
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
 		// BasicInformation.NodeLabel → Manage) rather than a flat Operate,
@@ -391,6 +389,21 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				})
 				continue
 			}
+		}
+		// The hold of a chunked write is taken here, once the subject's
+		// access to write the path is granted and before the write is
+		// applied: a path the ACL or the accessing-fabric gate refuses
+		// holds nothing. matter.js takes the hold before the batch that
+		// checks access (InteractionServer.ts:536-543, :548 at db021da0);
+		// this order departs from it (review II, owner decision 52;
+		// BD-chip-ChunkedWritesBounded). Another interaction that took the
+		// hold since busyBefore makes the path BUSY.
+		if !tx.hold(w.Path, fabricIndex, req.MoreChunkedMessages) {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusBusy},
+			})
+			continue
 		}
 		// A DataVersion on a wildcard-endpoint path is ignored: Matter
 		// §8.9.2.8.1 forbids a client to send one (the controller refuses
@@ -560,11 +573,27 @@ func NewWriteTransaction(holds *WriteHolds) *WriteTransaction {
 }
 
 // writeHoldKey names one concrete attribute (matter.js
-// InteractionServer.ts:86-88 writePathKey).
+// InteractionServer.ts:86-88 writePathKey) and, for an attribute whose
+// write is fabric-scoped, the accessing fabric: each fabric writes its own
+// entries of such an attribute, so one fabric's chunked write of it leaves
+// another fabric's write free (review II, owner decision 52; matter.js's
+// key carries no fabric, BD-chip-ChunkedWritesBounded).
 type writeHoldKey struct {
+	fabric    uint8
 	endpoint  uint16
 	cluster   uint32
 	attribute uint32
+}
+
+// holdKey is the key of the attribute for an interaction of fabricIndex:
+// the fabric is part of it only when the attribute's write is fabric-scoped
+// (schema.IsFabricScopedWrite).
+func holdKey(fabricIndex uint8, endpoint uint16, cluster, attribute uint32) writeHoldKey {
+	k := writeHoldKey{endpoint: endpoint, cluster: cluster, attribute: attribute}
+	if schema.IsFabricScopedWrite(cluster, attribute) {
+		k.fabric = fabricIndex
+	}
+	return k
 }
 
 // WriteHolds is the table of attributes a chunked write holds, shared by
@@ -576,15 +605,15 @@ type WriteHolds struct {
 	held map[writeHoldKey]*WriteTransaction
 }
 
-// heldByOther reports whether another interaction holds the attribute
-// (InteractionServer.ts:211-214).
-func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint32) bool {
+// heldByOther reports whether another interaction holds the attribute for
+// an interaction of fabricIndex (InteractionServer.ts:211-214).
+func (tx *WriteTransaction) heldByOther(fabricIndex uint8, endpoint uint16, cluster, attribute uint32) bool {
 	if tx.holds == nil {
 		return false
 	}
 	tx.holds.mu.Lock()
 	defer tx.holds.mu.Unlock()
-	holder, ok := tx.holds.held[writeHoldKey{endpoint, cluster, attribute}]
+	holder, ok := tx.holds.held[holdKey(fabricIndex, endpoint, cluster, attribute)]
 	return ok && holder != tx
 }
 
@@ -599,45 +628,55 @@ func (tx *WriteTransaction) heldByOther(endpoint uint16, cluster, attribute uint
 //     read-only list is BUSY too, and a BUSY path leaves the marker where
 //     it was (:511-531, the marker previousProcessedAttributePath
 //     :456-458, not moved by a BUSY path, :529).
-func (tx *WriteTransaction) busyBefore(p ConcreteAttributePath) bool {
-	if p.HasEndpoint && p.HasCluster && p.HasAttribute && tx.heldByOther(p.Endpoint, p.Cluster, p.Attribute) {
+func (tx *WriteTransaction) busyBefore(p ConcreteAttributePath, fabricIndex uint8) bool {
+	if p.HasEndpoint && p.HasCluster && p.HasAttribute && tx.heldByOther(fabricIndex, p.Endpoint, p.Cluster, p.Attribute) {
 		return true
 	}
-	return p.ListAppend && !tx.followsLastQueued(p)
+	return p.ListAppend && !tx.followsLastQueued(p, fabricIndex)
 }
 
-// accept takes the hold [WriteTransaction.hold] decides on and records
-// the attribute as the interaction's last accepted one — matter.js's
-// previousProcessedAttributePath (InteractionServer.ts:533-537 at
-// db021da0).
-func (tx *WriteTransaction) accept(p ConcreteAttributePath, more bool) {
-	tx.hold(p, more)
-	tx.lastQueued = &writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
+// accept records a concrete attribute as the interaction's last accepted
+// one — matter.js's previousProcessedAttributePath
+// (InteractionServer.ts:533-537 at db021da0, a concrete path only). The
+// hold is taken apart from it, by [WriteTransaction.hold] once the write's
+// access is granted.
+func (tx *WriteTransaction) accept(p ConcreteAttributePath, fabricIndex uint8) {
+	if !p.HasEndpoint {
+		return
+	}
+	k := holdKey(fabricIndex, p.Endpoint, p.Cluster, p.Attribute)
+	tx.lastQueued = &k
 }
 
 // followsLastQueued reports whether p names the attribute the
 // interaction accepted last, the condition of a list ADD
 // (InteractionServer.ts:513-517 at db021da0); a path without an endpoint
 // never does.
-func (tx *WriteTransaction) followsLastQueued(p ConcreteAttributePath) bool {
+func (tx *WriteTransaction) followsLastQueued(p ConcreteAttributePath, fabricIndex uint8) bool {
 	return tx.lastQueued != nil && p.HasEndpoint &&
-		*tx.lastQueued == writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
+		*tx.lastQueued == holdKey(fabricIndex, p.Endpoint, p.Cluster, p.Attribute)
 }
 
-// hold takes the attribute for this interaction when the write is chunked
-// or already holds an attribute — taken before the write is applied, so no
-// other exchange passes the BUSY check meanwhile (InteractionServer.ts:
-// 536-543).
-func (tx *WriteTransaction) hold(p ConcreteAttributePath, more bool) {
-	if tx.holds == nil {
-		return
+// hold takes a concrete attribute for this interaction when the write is
+// chunked or already holds an attribute — taken before the write is
+// applied, so no other exchange writes it meanwhile
+// (InteractionServer.ts:536-543). It reports false, and takes nothing,
+// when another interaction holds the attribute: the check and the take are
+// one step under the table's lock. A path without an endpoint is never
+// held.
+func (tx *WriteTransaction) hold(p ConcreteAttributePath, fabricIndex uint8, more bool) bool {
+	if tx.holds == nil || !p.HasEndpoint {
+		return true
 	}
 	tx.holds.mu.Lock()
 	defer tx.holds.mu.Unlock()
 	if !more && len(tx.held) == 0 {
-		return
+		return true
 	}
-	k := writeHoldKey{p.Endpoint, p.Cluster, p.Attribute}
+	k := holdKey(fabricIndex, p.Endpoint, p.Cluster, p.Attribute)
+	if holder, ok := tx.holds.held[k]; ok && holder != tx {
+		return false
+	}
 	if tx.holds.held == nil {
 		tx.holds.held = make(map[writeHoldKey]*WriteTransaction)
 	}
@@ -646,6 +685,7 @@ func (tx *WriteTransaction) hold(p ConcreteAttributePath, more bool) {
 	}
 	tx.held[k] = struct{}{}
 	tx.holds.held[k] = tx
+	return true
 }
 
 // releaseHolds releases every attribute this interaction holds but keep

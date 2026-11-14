@@ -255,11 +255,12 @@ const writeTxTTL = time.Minute
 
 // maxChunkedWritesPerSession bounds the chunked writes one session may
 // have open at once: each keeps the hold of its last chunk's attribute
-// until its final chunk or [writeTxTTL] — a hold taken before the ACL
-// check, as matter.js takes it (InteractionServer.ts:533-543 at
-// db021da0), so without the bound a session could hold one attribute per
-// exchange id, writable or not (review II, R2-P1-req-03, owner decision
-// 30; by_design BD-chip-ChunkedWritesBounded). A controller runs
+// until its final chunk or [writeTxTTL] — a hold taken once the ACL grants
+// the write (matter.js takes it before, InteractionServer.ts:533-543 at
+// db021da0; this module after, review II owner decision 52), so without
+// the bound a session could hold one attribute it may write per exchange
+// id (review II, R2-P1-req-03, owner decision 30; by_design
+// BD-chip-ChunkedWritesBounded). A controller runs
 // one write interaction per exchange and one chunked write at a time;
 // the number is connectedhomeip's CHIP_IM_MAX_NUM_WRITE_HANDLER
 // (src/lib/core/CHIPConfig.h:991-992 at 6170af84), whose pool is
