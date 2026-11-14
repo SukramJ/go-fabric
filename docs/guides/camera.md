@@ -70,9 +70,9 @@ deletion, and the port's `End` is told of each with UnknownReason, so the
 host tears the stream down (`contract.FabricScopedState`).
 
 The four commands are large messages, so a controller sends them over
-TCP; one that arrives over UDP or BLE answers `INVALID_TRANSPORT_TYPE` and
-does not run, as in matter.js. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
-sessions only.
+TCP; the node serves them on the session they arrive on, whatever its
+transport. `CurrentSessions` is fabric-sensitive: a peer reads its own
+fabric's sessions only.
 
 **The ACL entry.** The camera needs Operate access to the requestor. The
 node writes that entry only into the fabrics the host grants through
@@ -130,17 +130,16 @@ The peer's refusal comes back as an error carrying its status
 (`im.StatusCodeError`): `NOT_FOUND` when the requestor holds no session of
 that id from this node, `UNSUPPORTED_ACCESS` when its ACL lacks the Operate
 entry (the node installs it on its own requestors in the fabrics its
-host grants, see above). The
-signals are large messages: each goes over a TCP session with the peer
-only, as matter.js's client sends such a command, and connectedhomeip
-establishes a TCP session for them
-(`TransportPayloadCapability::kLargePayload`). The node initiates CASE over
-UDP only and opens no TCP connection itself, so a signal reaches the peer
-over the newest live TCP session the peer opened to the camera; without
-one it is refused with `bridge.ErrLargeMessageTransport` and not sent. A
-signal that does not fit the TCP connection's largest message is refused
-with `camera.ErrPayloadTooLarge` (`bridge.ErrPayloadTooLarge` is the same
-value).
+host grants, see above). The signals carry an SDP, so they can exceed one
+UDP message (1178 bytes of payload). The node initiates CASE over UDP only
+and reuses the newest live session with the peer, of either transport; a
+signal that does not fit one message of the session it would go over —
+over TCP the connection's largest message, at most the MaxTcpMessageSize
+the peer stated — is refused with `camera.ErrPayloadTooLarge` and not sent
+(`bridge.ErrPayloadTooLarge` is the same value; a camera host needs
+`cluster/camera` alone). connectedhomeip establishes a TCP session for them
+(`TransportPayloadCapability::kLargePayload`); a controller that reached
+the camera over TCP leaves the session the signals need.
 
 ## Chime
 
@@ -444,10 +443,8 @@ Since phase 37 the controller role streams from a Matter camera itself
 Controller endpoint (`controller.CameraControllerEndpoint`) with a
 WebRtcTransportRequestor under its one operational identity — the camera
 stores RootNodeID as the session's peer and calls the controller back over
-the TCP session the controller opened, or over a TCP session of its own to
-the controller's operational record (connectedhomeip's camera; a camera
-built on this module opens none, so its signals need the controller's) —
-and `controller/camera` manages the
+the session the controller opened, or over a CASE session of its own to the
+controller's operational record — and `controller/camera` manages the
 streams after matterjs-server (`BD-matterjs-server-CameraStreamManagement`
 in `notes/parity/by_design.md`):
 

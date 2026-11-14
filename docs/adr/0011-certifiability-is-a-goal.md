@@ -103,6 +103,27 @@ exclusion written down and justified (`../matter.js/support/chip-testing/`,
 - The remaining scope boundaries are unchanged: no controller or commissioner
   role beyond the narrow initiator of ADR 0008, no Bluetooth, no Thread.
 
+## Amendment of 2026-11-14 — a fifth status, "not ported yet"
+
+Review II, phase 4 (owner decision 82): **beside passed and the four
+classes of decision 3, a case can be *not ported yet*.** That is a
+certification case matter.js automates at the snapshot's pin
+(`support/chip-testing/test/cert/TC-*.test.ts`) that this module could run
+now and has no port for, or a case whose fix is in the tree and whose
+certification run is pending. It is not a gap class — the module is
+unmeasured against the case, not found wanting — and it never stands for
+"does not pass yet": a case that ran and failed is class (a).
+
+The status page shows it in its own column, and
+`TestCertifiabilityDocument` holds each row. A not-ported row names a case
+of the pin's list, by its TS file, that no registered Go-TH port runs. A
+run-pending row names the unit test that holds the case's answer, which
+must exist and name the case, and the family run runs the case. A row
+leaves the status when its port passes in the Go-TH leg or its case passes
+in the family run; a run that fails moves it to class (a) with a finding.
+A case that needs a harness capability, or an element the reference daemon
+does not declare, is not in this status: it keeps class (c) or (b).
+
 ## What this does not claim
 
 Passing borrowed certification cases in this repository's CI is evidence of
