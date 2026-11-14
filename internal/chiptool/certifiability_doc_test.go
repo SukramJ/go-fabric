@@ -72,7 +72,7 @@ func TestCertifiabilityDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	ts := loadMatterJSCertCases(t)
-	checkMatterJSCertCases(t, g, ts)
+	checkMatterJSCertCases(t, g, ts, registeredGoCertPorts())
 
 	var unclassified []string
 	inFamily := map[string]bool{}

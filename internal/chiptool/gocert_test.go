@@ -249,6 +249,18 @@ func registerGoCert(build func() goCertCase) {
 	goCertCases[id] = build
 }
 
+// Hands the registry to the untagged guard (checkMatterJSCertCases), so a
+// golden goCert entry counts as run only for a registered port.
+func init() {
+	goCertRegistry = func() map[string]string {
+		ports := make(map[string]string, len(goCertCases))
+		for id, build := range goCertCases {
+			ports[id] = build().source()
+		}
+		return ports
+	}
+}
+
 // goCertID is "TC-IDM-1.1" → "IDM/1.1".
 func goCertID(tc string) string {
 	s := strings.TrimPrefix(tc, "TC-")
@@ -1126,7 +1138,8 @@ func checkGoCertCounts(t *testing.T, id string, got goCertCounts) {
 
 // writeGoCertGolden records the passing cases' counts under
 // -update-chip-cases, and drops their manual rows: a case the leg runs is
-// no longer one nobody automates.
+// no longer one nobody automates. An entry whose id no registered port
+// has (a port deleted or renamed) is dropped too.
 func writeGoCertGolden(t *testing.T, ran map[string]goCertCounts) {
 	t.Helper()
 	if !*updateChipCases || len(ran) == 0 {
@@ -1141,6 +1154,11 @@ func writeGoCertGolden(t *testing.T, ran map[string]goCertCounts) {
 	for id, c := range ran {
 		g.GoCert[id] = c
 		delete(g.HostSkipped, id)
+	}
+	for id := range g.GoCert {
+		if _, registered := goCertCases[id]; !registered {
+			delete(g.GoCert, id)
+		}
 	}
 	saveGolden(t, g)
 }

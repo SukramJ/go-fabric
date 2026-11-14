@@ -145,7 +145,10 @@
 // backchannel) are the daemon's app pipe. The leg needs no harness image;
 // its counts are pinned in testdata/chip-cases.golden.json under goCert,
 // and TestCertifiabilityDocument renders those cases as passed, "Go
-// controller as TH, after matter.js TC-X.test.ts".
+// controller as TH, after matter.js TC-X.test.ts". Built with the chiptool
+// tag, the same test holds those entries to the registered ports
+// (goCertCases): an entry no registered port has, or a port without an
+// entry, fails it.
 //
 // The same leg runs cases in matter.js's own direction (goCertCase role
 // roleDUT, phase 29b): the module's controller is the DUT and the daemon

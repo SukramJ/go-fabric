@@ -6,6 +6,7 @@ package chiptool
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -56,18 +57,18 @@ func tsCaseID(file string) (string, bool) {
 }
 
 // schemaPin is parity/schema.json's matter.sourceCommit, the matter.js pin.
-func schemaPin(t *testing.T) string {
-	t.Helper()
+func schemaPin(tb testing.TB) string {
+	tb.Helper()
 	var s struct {
 		Matter struct {
 			SourceCommit string `json:"sourceCommit"`
 		} `json:"matter"`
 	}
 	if err := json.Unmarshal(parity.SchemaJSON(), &s); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	if s.Matter.SourceCommit == "" {
-		t.Fatal("parity/schema.json carries no matter.sourceCommit")
+		tb.Fatal("parity/schema.json carries no matter.sourceCommit")
 	}
 	return s.Matter.SourceCommit
 }
@@ -129,6 +130,21 @@ func writeMatterJSCertCases(t *testing.T, file, commit string) {
 	}
 }
 
+// goCertRegistry lists the Go-TH leg's registered ports, case id → the
+// matter.js file it mirrors (goCertCase.source). gocert_test.go sets it
+// under the chiptool build tag, where the registry (goCertCases) is
+// compiled in; a build without the tag leaves it nil.
+var goCertRegistry func() map[string]string
+
+// registeredGoCertPorts is goCertRegistry's list, nil in a build without
+// the chiptool tag.
+func registeredGoCertPorts() map[string]string {
+	if goCertRegistry == nil {
+		return nil
+	}
+	return goCertRegistry()
+}
+
 // checkMatterJSCertCases holds the Go-TH leg to matter.js's certification
 // cases at the snapshot's pin: each is run by the leg (goCert in the golden
 // file, by its source file) or classified, as a controller-role case
@@ -136,48 +152,72 @@ func writeMatterJSCertCases(t *testing.T, file, commit string) {
 // exactly once; no classification names a case the pin does not have, and
 // the list is the pin's, so a pin lift fails here until the list is
 // regenerated and every case it adds is run or classified.
-func checkMatterJSCertCases(t *testing.T, g docGolden, ts matterJSCertCases) {
-	t.Helper()
-	if pin := schemaPin(t); ts.Commit != pin {
-		t.Errorf("testdata/%s lists matter.js's certification cases at %s, the snapshot pins %s: "+
+//
+// ports is the leg's registry (registeredGoCertPorts), nil in a build
+// without the chiptool tag. With it, a case counts as run only when a
+// registered port runs it, and the golden file's goCert names exactly the
+// registered ports with their sources: a port deleted or renamed fails
+// here although its golden entry stays.
+func checkMatterJSCertCases(tb testing.TB, g docGolden, ts matterJSCertCases, ports map[string]string) {
+	tb.Helper()
+	if pin := schemaPin(tb); ts.Commit != pin {
+		tb.Errorf("testdata/%s lists matter.js's certification cases at %s, the snapshot pins %s: "+
 			"regenerate with -update-matterjs-cert-cases and run or classify every case it adds", matterJSCertCasesFile, ts.Commit, pin)
 	}
 	run := map[string]bool{}
-	for _, c := range g.GoCert {
+	for id, c := range g.GoCert {
+		if ports != nil {
+			src, registered := ports[id]
+			if !registered {
+				tb.Errorf("testdata/%s: goCert names %s, which no registered Go-TH port runs (gocert_*.go): "+
+					"drop the entry or register the port", chipCasesGoldenFile, id)
+				continue
+			}
+			if src != c.Source {
+				tb.Errorf("testdata/%s: goCert %s names source %s, its registered port mirrors %s", chipCasesGoldenFile, id, c.Source, src)
+				continue
+			}
+		}
 		if strings.HasSuffix(c.Source, ".test.ts") {
 			run[c.Source] = true
+		}
+	}
+	for id := range ports {
+		if _, ok := g.GoCert[id]; !ok {
+			tb.Errorf("Go-TH port %s has no goCert entry in testdata/%s: run it with -update-chip-cases, read the diff, commit it",
+				id, chipCasesGoldenFile)
 		}
 	}
 	atPin := map[string]bool{}
 	for _, file := range ts.Cases {
 		id, ok := tsCaseID(file)
 		if !ok {
-			t.Errorf("testdata/%s: %q is no TC-<prefix>-<number>.test.ts file", matterJSCertCasesFile, file)
+			tb.Errorf("testdata/%s: %q is no TC-<prefix>-<number>.test.ts file", matterJSCertCasesFile, file)
 			continue
 		}
 		if atPin[id] {
-			t.Errorf("testdata/%s lists %s twice", matterJSCertCasesFile, id)
+			tb.Errorf("testdata/%s lists %s twice", matterJSCertCasesFile, id)
 		}
 		atPin[id] = true
 		_, role := controllerRoleCases[id]
 		_, notRun := matterJSCasesNotRun[id]
 		switch n := btoi(run[file]) + btoi(role) + btoi(notRun); {
 		case n == 0:
-			t.Errorf("%s (matter.js %s at %s) is neither run by the Go-TH leg nor classified: port it (gocert_*.go), "+
+			tb.Errorf("%s (matter.js %s at %s) is neither run by the Go-TH leg nor classified: port it (gocert_*.go), "+
 				"or give it its class and reason in matterJSCasesNotRun", id, file, ts.Commit)
 		case n > 1:
-			t.Errorf("%s: run by the Go-TH leg %v, a controller-role row %v, a not-run row %v — exactly one of them", id, run[file], role, notRun)
+			tb.Errorf("%s: run by the Go-TH leg %v, a controller-role row %v, a not-run row %v — exactly one of them", id, run[file], role, notRun)
 		}
 	}
 	for src := range run {
 		if !slices.Contains(ts.Cases, src) {
-			t.Errorf("the Go-TH leg runs %s, which matter.js does not have at %s", src, ts.Commit)
+			tb.Errorf("the Go-TH leg runs %s, which matter.js does not have at %s", src, ts.Commit)
 		}
 	}
 	for _, m := range []map[string]gap{controllerRoleCases, matterJSCasesNotRun} {
 		for id := range m {
 			if !atPin[id] {
-				t.Errorf("%s is classified as a matter.js certification case, but matter.js has no such case at %s", id, ts.Commit)
+				tb.Errorf("%s is classified as a matter.js certification case, but matter.js has no such case at %s", id, ts.Commit)
 			}
 		}
 	}
@@ -316,4 +356,64 @@ func daDUT(at, args string) gap {
 		"credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, "+args+
 		"): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) "+
 		"and serves a fixed product id (main.go:71, :503)")
+}
+
+// errorRecorder is a testing.TB whose Errorf records the message instead
+// of failing the test; everything else is the test's own.
+type errorRecorder struct {
+	testing.TB
+	errs []string
+}
+
+func (r *errorRecorder) Errorf(format string, args ...any) {
+	r.errs = append(r.errs, fmt.Sprintf(format, args...))
+}
+
+// TestMatterJSCertCasesCountOnlyRegisteredPorts: with the Go-TH leg's
+// registry at hand, a golden goCert entry counts a matter.js case as run
+// only while a registered port runs it — a port deleted or renamed fails
+// the guard although its golden entry stays — and a registered port
+// without a golden entry fails it too.
+func TestMatterJSCertCasesCountOnlyRegisteredPorts(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", chipCasesGoldenFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g docGolden
+	if err := json.Unmarshal(data, &g); err != nil {
+		t.Fatal(err)
+	}
+	ts := loadMatterJSCertCases(t)
+	var gone string
+	ports := map[string]string{}
+	for id, c := range g.GoCert {
+		ports[id] = c.Source
+		if strings.HasSuffix(c.Source, ".test.ts") && (gone == "" || id < gone) {
+			gone = id
+		}
+	}
+	if gone == "" {
+		t.Fatal("the golden file's goCert names no matter.js case")
+	}
+
+	r := &errorRecorder{TB: t}
+	checkMatterJSCertCases(r, g, ts, ports)
+	if len(r.errs) != 0 {
+		t.Fatalf("the registry the golden file names fails the guard: %q", r.errs)
+	}
+
+	delete(ports, gone)
+	r = &errorRecorder{TB: t}
+	checkMatterJSCertCases(r, g, ts, ports)
+	if !slices.ContainsFunc(r.errs, func(e string) bool { return strings.Contains(e, "goCert names "+gone+", which no registered") }) ||
+		!slices.ContainsFunc(r.errs, func(e string) bool { return strings.HasPrefix(e, gone+" (matter.js") }) {
+		t.Errorf("a golden entry for %s without a registered port: the guard said %q, want it to name the entry and the case as not run", gone, r.errs)
+	}
+
+	ports["IDM/0.0"] = "TC-IDM-0.0.test.ts"
+	r = &errorRecorder{TB: t}
+	checkMatterJSCertCases(r, g, ts, ports)
+	if !slices.ContainsFunc(r.errs, func(e string) bool { return strings.HasPrefix(e, "Go-TH port IDM/0.0 has no goCert entry") }) {
+		t.Errorf("a registered port without a golden entry: the guard said %q, want it named", r.errs)
+	}
 }
