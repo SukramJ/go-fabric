@@ -779,8 +779,6 @@ type invokeGate struct {
 	hasTimed        bool
 	timed           bool
 	timedKnown      bool
-	large           bool
-	largeKnown      bool
 }
 
 func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
@@ -793,20 +791,7 @@ func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
 	g.pathChecker, g.hasPathChecker = d.(CommandPathChecker)
 	g.timedProvider, g.hasTimed = d.(TimedCommandProvider)
 	g.timed, g.timedKnown = TimedInteractionFromContext(ctx)
-	g.large, g.largeKnown = LargeMessageSessionFromContext(ctx)
 	return g
-}
-
-// refusesLargeMessage reports whether the command carries the Large
-// Message quality ("L", [schema.CommandLargeMessage]) and the session's
-// transport carries no large messages ([WithLargeMessageSession]). Mirrors
-// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:282
-// at db021da0 (`limits.largeMessage && !this.session.largeMessage`, the
-// limit from the command's quality, AccessControl.ts:527) and
-// connectedhomeip src/app/InteractionModelEngine.cpp:1880-1884 at 6170af84
-// (CheckCommandFlags, kLargeMessage without AllowsLargePayload).
-func (g *invokeGate) refusesLargeMessage(clusterID, commandID uint32) bool {
-	return g.largeKnown && !g.large && schema.CommandLargeMessage(clusterID, commandID)
 }
 
 // isTimed reports whether the command needs a timed interaction: the
@@ -869,14 +854,6 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 			return status
 		}
 	}
-	// A command with the Large Message quality on a session whose
-	// transport carries no large messages (UDP, BLE) answers
-	// InvalidTransportType, after existence and access and before the
-	// fabric-scope and timed gates (CommandInvokeResponse.ts:281-285 at
-	// db021da0).
-	if g.refusesLargeMessage(inv.Path.Cluster, inv.Path.Command) {
-		return StatusInvalidTransportType
-	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
 	// session without one — PASE before AddNOC, or a session whose fabric
 	// the caller could not resolve ([HasAccessingFabric]) — it answers
@@ -897,8 +874,8 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 }
 
 // wildcardTarget is the [CommandAuthorizer] of a wildcard path's
-// endpoints: the command's privilege, its Large Message, fabric-scope and
-// timed qualities at the endpoint (#wildcardTargetOf,
+// endpoints: the command's privilege, its fabric scope and its timed
+// quality at the endpoint (#wildcardTargetOf,
 // CommandInvokeResponse.ts:367-398 at db021da0).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
@@ -906,11 +883,6 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 		if status := checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, g.invokePrivilege(at)); !status.IsSuccess() {
 			return status
 		}
-	}
-	// CommandInvokeResponse.ts:384-386 at db021da0: an endpoint where the
-	// command needs a transport the session lacks is skipped.
-	if g.refusesLargeMessage(clusterID, commandID) {
-		return StatusInvalidTransportType
 	}
 	// CommandInvokeResponse.ts:388 at db021da0, the same check at a
 	// wildcard path's endpoint.

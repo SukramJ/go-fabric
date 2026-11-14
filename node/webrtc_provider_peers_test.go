@@ -71,20 +71,16 @@ func (r *requestorStack) End(_ context.Context, _ wrdef.WebRTCSessionStruct, rea
 	r.ended = append(r.ended, reason)
 }
 
-// TestCameraProviderSignalsNeedATCPSession: a camera and a camera
+// TestCameraProviderSignalsReachTheRequestor: a camera and a camera
 // controller on one controller's fabric. The camera's host registers the
 // session on both sides, as the controller's ProvideOffer and the
-// requestor's host would have. Every requestor command carries the Large
-// Message quality (schema/large_message_gen.go), which a client sends over
-// TCP only (matter.js packages/protocol/src/action/client/ClientInteraction.ts:716-719,
-// :1235 at db021da0; connectedhomeip establishes the camera's session with
-// kLargePayload, webrtc-provider-manager.cpp:860-942 at 6170af84). The
-// camera's node holds no TCP session with the requestor's and opens none,
-// so each signal is refused with bridge.ErrLargeMessageTransport and not
-// sent — a large answer too, before its size is weighed — and End still
-// removes the camera's session (chip CleanupSession regardless of the
-// result, :999-1000).
-func TestCameraProviderSignalsNeedATCPSession(t *testing.T) {
+// requestor's host would have, then the camera's Answer, IceCandidates and
+// End reach the requestor's port over a CASE session the camera's node
+// initiates (connectedhomeip webrtc-provider-manager.cpp:860-1328 at
+// 6170af84: FindOrEstablishSession on the session's ScopedNodeId, the
+// command at originatingEndpointId). The requestor's Operate entry is the
+// one the node installs (webrtc_requestor_acl.go).
+func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 	site := quietSite(t)
 	ctx := parityCtx(t)
 	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
@@ -138,28 +134,80 @@ func TestCameraProviderSignalsNeedATCPSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	refused := func(what string, fn func(ctx context.Context) error) {
+	run := func(what string, fn func(ctx context.Context) error) {
 		t.Helper()
-		if err := site.Run(ctx, fn); !errors.Is(err, bridge.ErrLargeMessageTransport) {
-			t.Fatalf("%s over the UDP session: %v, want bridge.ErrLargeMessageTransport", what, err)
+		if err := site.Run(ctx, fn); err != nil {
+			t.Fatalf("%s: %v", what, err)
 		}
 	}
-	refused("Answer", func(ctx context.Context) error { return prov.Answer(ctx, 1, "v=0 answer") })
-	// 1500 bytes of SDP: more than a UDP message carries (1280 - 48 bytes
-	// less the 54-byte message overhead).
-	large := strings.Repeat("a=candidate:0123456789 ", 66)
-	refused("a large Answer", func(ctx context.Context) error { return prov.Answer(ctx, 1, large) })
+	run("Answer", func(ctx context.Context) error { return prov.Answer(ctx, 1, "v=0 answer") })
 	candidates := []camera.ProviderICECandidate{{Candidate: "candidate:1 1 udp 1 192.0.2.1 5000 typ host"}}
-	refused("IceCandidates", func(ctx context.Context) error { return prov.IceCandidates(ctx, 1, candidates) })
-	refused("End", func(ctx context.Context) error { return prov.End(ctx, 1, 6) })
+	run("IceCandidates", func(ctx context.Context) error { return prov.IceCandidates(ctx, 1, candidates) })
+	run("End", func(ctx context.Context) error { return prov.End(ctx, 1, 6) })
 
 	stack.mu.Lock()
 	defer stack.mu.Unlock()
-	if len(stack.answers) != 0 || len(stack.candidates) != 0 || len(stack.ended) != 0 {
-		t.Fatalf("the requestor received answers %q, candidates %+v, ends %v; want none", stack.answers, stack.candidates, stack.ended)
+	if len(stack.answers) != 1 || stack.answers[0] != "v=0 answer" {
+		t.Fatalf("the requestor's answers: %q", stack.answers)
+	}
+	if s := stack.sessions[0]; s.Id != 1 || s.PeerNodeId != camFabric.NodeID || s.FabricIndex != ctlFabric.FabricIndex {
+		t.Fatalf("the requestor matched session %+v", s)
+	}
+	if len(stack.candidates) != 1 || len(stack.candidates[0]) != 1 || stack.candidates[0][0].Candidate != candidates[0].Candidate {
+		t.Fatalf("the requestor's candidates: %+v", stack.candidates)
+	}
+	if len(stack.ended) != 1 || stack.ended[0] != 6 {
+		t.Fatalf("the requestor's ends: %v", stack.ended)
 	}
 	if n := len(prov.Sessions()); n != 0 {
 		t.Fatalf("the camera holds %d sessions after End", n)
+	}
+	if n := len(req.Sessions()); n != 0 {
+		t.Fatalf("the requestor holds %d sessions after End", n)
+	}
+}
+
+// TestCameraProviderSignalTooLargeForUDP: the camera's CASE session to the
+// requestor runs over UDP, and an answer that does not fit one message is
+// refused before it is sent (camera.ErrPayloadTooLarge, the value of
+// bridge.ErrPayloadTooLarge; chip sends its signals with kLargePayload over
+// TCP, webrtc-provider-manager.cpp:860-942).
+func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
+	site := quietSite(t)
+	ctx := parityCtx(t)
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{cam}}})
+	stack := &requestorStack{}
+	ctl, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("ctl:1"), Name: "ctl"}, wrdef.Declare{RequestorPort: stack})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctlDev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{ctl}})
+	if _, err := pair.Controller.Commission(ctx, ctlDev, fabrictest.CommissionOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	ctlEp, _ := ctlDev.EndpointOf("ctl:1")
+	camFabric, ctlFabric := oneFabric(t, pair.Device), oneFabric(t, ctlDev)
+	prov := cam.Server(wpdef.ClusterID).(*camera.Provider)
+	if err := prov.UpsertSession(camera.ProviderSession{
+		Id: 1, PeerNodeId: ctlFabric.NodeID, PeerEndpointId: ctlEp, FabricIndex: camFabric.FabricIndex, StreamUsage: wpdef.StreamUsageLiveView,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// 1500 bytes of SDP: more than a UDP message carries (1280 - 48 bytes
+	// less the 54-byte message overhead).
+	sdp := strings.Repeat("a=candidate:0123456789 ", 66)
+	err = site.Run(ctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, sdp) })
+	if !errors.Is(err, camera.ErrPayloadTooLarge) || !errors.Is(err, bridge.ErrPayloadTooLarge) {
+		t.Fatalf("a %d-byte answer over UDP: %v", len(sdp), err)
+	}
+	stack.mu.Lock()
+	defer stack.mu.Unlock()
+	if len(stack.answers) != 0 {
+		t.Fatalf("the requestor received %d answers", len(stack.answers))
 	}
 }
 

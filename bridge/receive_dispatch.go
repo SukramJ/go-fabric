@@ -24,7 +24,6 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
-	"github.com/SukramJ/go-fabric/transport/tcp"
 )
 
 // errChunkRejected is returned by a chunk loop when the peer answered a
@@ -723,9 +722,6 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	}
 	// The gate above passed, so a set Timed flag means a valid window.
 	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
-	// A command with the Large Message quality runs only over a transport
-	// that carries large messages ([routeCarriesLargeMessages]).
-	invokeCtx = im.WithLargeMessageSession(invokeCtx, routeCarriesLargeMessages(src))
 	// A server that sizes its response by the exchange (GeneralDiagnostics
 	// PayloadTestRequest) reads the largest payload one message of it
 	// carries ([Bridge.invokeMaxPayloadSize]).
@@ -843,23 +839,6 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 // fresh one, whose release is a no-op.
 func (b *Bridge) endWriteInteraction(key mrp.ExchangeKey) {
 	b.routing.writeTransaction(key, false, b.clk().Now()).Release()
-}
-
-// routeCarriesLargeMessages reports whether the route a request arrived on
-// carries large messages: a TCP connection does, a UDP datagram or a BTP
-// (BLE) connection does not. Mirrors matter.js's channel flag
-// supportsLargeMessages — packages/protocol/src/transport/tcp/TcpChannel.ts:45
-// at db021da0 true, packages/general/src/net/udp/UdpTransport.ts:69 and
-// packages/protocol/src/ble/Ble.ts:39 false — which the session reports
-// (packages/protocol/src/session/Session.ts:372-373). Reliable() is not the
-// test: BTP is reliable and carries no large messages.
-func routeCarriesLargeMessages(src net.Addr) bool {
-	r, ok := src.(*connRoute)
-	if !ok || r == nil || r.conn == nil {
-		return false
-	}
-	_, isTCP := r.conn.(*tcp.Conn)
-	return isTCP
 }
 
 // dispatchTimedRequest handles a decoded TimedRequest.

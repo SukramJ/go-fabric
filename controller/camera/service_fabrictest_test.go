@@ -6,13 +6,11 @@ package camera_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
@@ -297,21 +295,25 @@ func TestServiceOnTheFabric(t *testing.T) {
 	})
 
 	// After a camera restart — the node disabled so the registry does not
-	// reopen a session — the camera holds no TCP session with the
-	// controller, and its signals need one (the Large Message quality,
-	// matter.js ClientInteraction.ts:716-719, :1235 at db021da0): this node
-	// opens no TCP connection of its own, so the signal is refused with
-	// bridge.ErrLargeMessageTransport and not sent (review II,
-	// R2-P4-imwrite-01).
+	// reopen a session — the camera's next signal opens CASE to RootNodeID
+	// and reaches the session.
 	run(n.Disable)
 	run(dev.Restart)
 	run(func(ctx context.Context) error {
-		err := cam.IceCandidates(ctx, solicited.ID, []wpdef.ICECandidateStruct{{Candidate: "candidate:3 1 UDP 1 192.0.2.3 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
-		if !errors.Is(err, bridge.ErrLargeMessageTransport) {
-			return fmt.Errorf("a signal without a TCP session: %w, want bridge.ErrLargeMessageTransport", err)
-		}
-		return nil
+		return cam.IceCandidates(ctx, solicited.ID, []wpdef.ICECandidateStruct{{Candidate: "candidate:3 1 UDP 1 192.0.2.3 9 typ host", SdpMid: spec.Nullable[string]{Value: "0"}}})
 	})
+	if sig := next(t, solicited.Signals()); sig.Kind != camera.SignalICECandidates {
+		t.Fatalf("after the restart %+v", sig)
+	}
+	inbound := false
+	for _, p := range c.Peers().Peers() {
+		for _, s := range p.Sessions() {
+			inbound = inbound || !c.Peers().Initiated(s)
+		}
+	}
+	if !inbound {
+		t.Fatal("the camera's signal did not come over a session the camera opened")
+	}
 }
 
 // TestServiceRefusesWithoutTCP: the SDP needs TCP, so a controller

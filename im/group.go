@@ -6,8 +6,6 @@ package im
 import (
 	"context"
 	"slices"
-
-	"github.com/SukramJ/go-fabric/schema"
 )
 
 // GroupSubject is the Incoming Subject Descriptor of a group message: the
@@ -99,9 +97,9 @@ func HandleGroupInvokeRequest(ctx context.Context, d Dispatcher, req InvokeReque
 // command; a wildcard path may not share the message with another
 // command; the command then runs on each member endpoint of the group
 // that hosts the cluster and accepts the command, where the Group subject
-// holds the command's privilege and the command needs neither a timed
-// interaction nor a transport for large messages. A denied endpoint is
-// skipped silently, as every wildcard expansion skips it.
+// holds the command's privilege and the command needs no timed
+// interaction. A denied endpoint is skipped silently, as every wildcard
+// expansion skips it.
 func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, timedRequired func(clusterID, commandID uint32) bool) GroupInvokeReport {
 	if req.TimedRequest {
 		return GroupInvokeReport{Status: StatusTimedRequestMismatch}
@@ -129,14 +127,6 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 	}
 	authorize := groupAuthorizer(ctx, d, subject)
 	check := func(endpoint uint16, clusterID, commandID uint32) StatusCode {
-		// A group message travels UDP multicast, a channel that carries no
-		// large messages (matter.js packages/general/src/net/udp/UdpTransport.ts:69
-		// at db021da0): a command with the Large Message quality is skipped
-		// on every member endpoint, as #wildcardTargetOf skips it
-		// (packages/protocol/src/action/server/CommandInvokeResponse.ts:384-386).
-		if schema.CommandLargeMessage(clusterID, commandID) {
-			return StatusInvalidTransportType
-		}
 		if timedRequired != nil && timedRequired(clusterID, commandID) {
 			return StatusNeedsTimedInteraction
 		}
