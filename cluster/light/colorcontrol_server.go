@@ -113,7 +113,11 @@ type ColorControlServerConfig struct {
 	// MaxMireds is the physical upper bound of the CT range in mireds.
 	// Corresponds to ColorTempPhysicalMaxMireds (0x400C).
 	MaxMireds uint16
-	// InitialMireds is the starting value for ColorTemperatureMireds (0x0007).
+	// InitialMireds is the starting value for ColorTemperatureMireds
+	// (0x0007), cropped to the physical range. Like an applied
+	// StartUpColorTemperatureMireds, the value the server starts with
+	// reaches no writer: the host reads it from [ColorControlServer.Color]
+	// after construction and applies it to its device.
 	InitialMireds uint16
 	// CoupleColorTempToLevelMinMireds is CoupleColorTempToLevelMinMireds
 	// (0x400D): the colour temperature LevelControl's
@@ -174,7 +178,11 @@ type ColorControlServerConfig struct {
 	// the physical range, a value other than the current colour
 	// temperature becomes ColorTemperatureMireds and switches the colour
 	// mode to it (matter.js ColorControlServer.ts:376-393
-	// initializeColorTemperature).
+	// initializeColorTemperature). It is state only, as matter.js writes
+	// the state there and runs no logic method or transition (:386-390):
+	// no [ColorTemperatureWriter] is driven with it, and the host applies
+	// the colour temperature [ColorControlServer.Color] reads after
+	// construction to its device.
 	StartUpColorTemperatureMireds *uint16
 	// BootReason optionally returns the node's GeneralDiagnostics
 	// BootReason; StartUpColorTemperatureMireds is not applied after a
@@ -269,7 +277,10 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 // ColorTemperatureWriter is the optional sink a [ColorControlServer]
 // drives with every colour temperature it applies: the target of a command
 // that applies at once, each step of a transition, or the value a colour
-// mode switch converts to. Implementations translate the cropped mired
+// mode switch converts to — not the value it is constructed with
+// ([ColorControlServerConfig.InitialMireds],
+// [ColorControlServerConfig.StartUpColorTemperatureMireds]), which the
+// host applies itself. Implementations translate the cropped mired
 // value into the device's native unit — HM exposes COLOR_TEMPERATURE in
 // Kelvin (mireds = 1_000_000 / Kelvin) — and push it to the device. A
 // write error fails the command, or ends the transition, and leaves the
