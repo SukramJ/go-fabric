@@ -66,6 +66,15 @@ type OTASoftwareUpdateRequestor struct {
 	logger *slog.Logger
 	dv     cluster.DataVersionTracker
 
+	// writeMu serialises a controller's DefaultOTAProviders writes: one
+	// write's read of the fabric's held entries, its comparison and its
+	// store are one step, so a write that answers unchanged has stored
+	// nothing and the stores land in the order the writes commit (matter.js
+	// holds the datasource across a write's change and the commit's
+	// comparison, packages/node/src/behavior/state/managed/
+	// Datasource.ts:1446-1457 at db021da0). It is taken before mu, never
+	// under it, and the store is called under it.
+	writeMu sync.Mutex
 	// mu guards the emitter, the endpoint, the attribute state, the
 	// persisted state and the query state: every field below it up to
 	// stopped, wg aside (a WaitGroup).
@@ -541,9 +550,12 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
-// write of [OTASoftwareUpdateRequestor.MatterWrite], changed when the
-// providers list after it differs from before — the comparison that
-// advances the server's own version and reports the change.
+// write of [OTASoftwareUpdateRequestor.MatterWrite], changed when it
+// stored the entries — they differed from the accessing fabric's held
+// ones, wherever those sit in the list. Entries equal to the held ones
+// are not stored, advance no version and report nothing; the read, the
+// comparison and the store hold writeMu, and the entries replace the
+// fabric's own in the list as it is when the write commits.
 func (r *OTASoftwareUpdateRequestor) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != otadef.AttrDefaultOtaProviders {
 		_, err := r.ValidateWrite(attrID, value, nil)
@@ -566,20 +578,34 @@ func (r *OTASoftwareUpdateRequestor) MatterWriteChanged(ctx context.Context, att
 		return false, err
 	}
 
+	r.writeMu.Lock()
 	r.mu.Lock()
 	next := make([]otadef.ProviderLocation, 0, len(r.defaults)+len(entries))
+	var held []otadef.ProviderLocation
 	for _, p := range r.defaults {
 		if p.FabricIndex != fabric {
 			next = append(next, p)
+		} else {
+			held = append(held, p)
 		}
 	}
 	next = append(next, entries...)
 	r.mu.Unlock()
+	// The fabric's entries as they are: nothing is stored, nothing
+	// reported and nothing scheduled — matter.js reacts to
+	// defaultOtaProviders$Changed (OtaSoftwareUpdateRequestorServer.ts:188),
+	// which a commit emits only for a changed value (Datasource.ts:1476-1492
+	// at db021da0, #noteIfChanged).
+	if slices.Equal(held, entries) {
+		r.writeMu.Unlock()
+		return false, nil
+	}
 
 	// #assertDefaultOtaProviders (:339-349): one entry per FabricIndex.
 	seen := map[uint8]bool{}
 	for _, p := range next {
 		if seen[p.FabricIndex] {
+			r.writeMu.Unlock()
 			return false, otaStatusError{im.StatusConstraintError, fmt.Sprintf("Only one defaultOtaProviders entry per FabricIndex %d is allowed.", p.FabricIndex)}
 		}
 		seen[p.FabricIndex] = true
@@ -591,22 +617,20 @@ func (r *OTASoftwareUpdateRequestor) MatterWriteChanged(ctx context.Context, att
 			rows[i] = store.OTAProviderLocation{FabricIndex: fabric, ProviderNodeID: e.ProviderNodeId, Endpoint: e.Endpoint}
 		}
 		if err := r.cfg.Store.ReplaceDefaultOTAProviders(context.WithoutCancel(ctx), fabric, rows); err != nil {
+			r.writeMu.Unlock()
 			return false, otaStatusError{im.StatusFailure, err.Error()}
 		}
 	}
+	// The entries replace the fabric's own in the list as it is now: a
+	// change another path made to another fabric's entries since the read
+	// above (a provider removed, a fabric dropped) stands.
 	r.mu.Lock()
-	before := r.defaults
+	next = slices.DeleteFunc(slices.Clone(r.defaults), func(p otadef.ProviderLocation) bool { return p.FabricIndex == fabric })
+	next = append(next, entries...)
 	r.defaults = next
 	r.mu.Unlock()
-	// A write that changes nothing reports nothing and schedules nothing:
-	// matter.js reacts to defaultOtaProviders$Changed
-	// (OtaSoftwareUpdateRequestorServer.ts:188), which a commit emits only
-	// for a changed value (Datasource.ts:1476-1492 at db021da0,
-	// #noteIfChanged).
-	if slices.Equal(before, next) {
-		return false, nil
-	}
 	r.dv.Bump()
+	r.writeMu.Unlock()
 	r.NotifyFrom(contract.OriginControllerWrite, otadef.AttrDefaultOtaProviders)
 	r.handleUpdatedDefaultOtaProviders(ctx, fabric, entries)
 	return true, nil

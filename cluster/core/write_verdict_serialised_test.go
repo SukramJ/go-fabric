@@ -5,12 +5,15 @@ package core_test
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 )
@@ -212,5 +215,124 @@ func TestGroupKeyMapWritesAreSerialised(t *testing.T) {
 				t.Errorf("DataVersion %d → %d; want %d advances", v0, v, advances)
 			}
 		})
+	}
+}
+
+// gatedOtaStore is a DefaultOTAProviders store whose gated
+// ReplaceDefaultOTAProviders waits; replaces counts the calls.
+type gatedOtaStore struct {
+	mu       sync.Mutex
+	rows     map[uint8][]mstore.OTAProviderLocation
+	replaces int
+	gate     *storeGate
+}
+
+func (s *gatedOtaStore) ListDefaultOTAProviders(context.Context) ([]mstore.OTAProviderLocation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []mstore.OTAProviderLocation
+	for f := uint8(1); f < 255; f++ {
+		out = append(out, s.rows[f]...)
+	}
+	return out, nil
+}
+
+func (s *gatedOtaStore) ReplaceDefaultOTAProviders(ctx context.Context, f uint8, e []mstore.OTAProviderLocation) error {
+	s.mu.Lock()
+	s.rows[f] = slices.Clone(e)
+	s.replaces++
+	s.mu.Unlock()
+	s.gate.hold(ctx)
+	return nil
+}
+
+func (s *gatedOtaStore) LoadOTARequestorState(context.Context) (state []byte, ok bool, err error) {
+	return nil, false, nil
+}
+
+func (s *gatedOtaStore) SaveOTARequestorState(context.Context, []byte) error { return nil }
+
+func (s *gatedOtaStore) replaced() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.replaces
+}
+
+func newGatedOtaRequestor(t *testing.T) (*core.OTASoftwareUpdateRequestor, *gatedOtaStore) {
+	t.Helper()
+	st := &gatedOtaStore{rows: map[uint8][]mstore.OTAProviderLocation{}, gate: newStoreGate()}
+	r, err := core.NewOTASoftwareUpdateRequestor(core.OTARequestorConfig{
+		NodeInformation: func() core.OtaNodeInformation { return core.OtaNodeInformation{VendorID: 0xFFF1, ProductID: 0x8001} },
+		Store:           st,
+		DownloadDir:     t.TempDir(),
+		Logger:          slog.New(slog.DiscardHandler),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(r.Stop)
+	return r, st
+}
+
+// providers is a DefaultOTAProviders list of one provider.
+func providers(node uint64) spec.List[otadef.ProviderLocation] {
+	return spec.List[otadef.ProviderLocation]{{ProviderNodeId: node}}
+}
+
+// TestOTADefaultProvidersWriteOfTheHeldEntriesStoresNothing pins that a
+// fabric's write of the DefaultOTAProviders entries it holds stores
+// nothing and answers unchanged, wherever its entries sit in the list:
+// matter.js reacts to defaultOtaProviders$Changed
+// (OtaSoftwareUpdateRequestorServer.ts:188), which a commit emits only for
+// a changed value (Datasource.ts:1476-1492 at db021da0, #noteIfChanged).
+func TestOTADefaultProvidersWriteOfTheHeldEntriesStoresNothing(t *testing.T) {
+	t.Parallel()
+	r, st := newGatedOtaRequestor(t)
+	attr := otadef.AttrDefaultOtaProviders
+	for f, node := range map[uint8]uint64{1: 0xAA, 2: 0xBB} {
+		if changed, err := r.MatterWriteChanged(im.WithFabricFilter(context.Background(), true, f), attr, providers(node)); err != nil || !changed {
+			t.Fatalf("fabric %d's first write: changed %v, %v", f, changed, err)
+		}
+	}
+	v0, calls := r.MatterDataVersion(), st.replaced()
+	for f, node := range map[uint8]uint64{1: 0xAA, 2: 0xBB} {
+		changed, err := r.MatterWriteChanged(im.WithFabricFilter(context.Background(), true, f), attr, providers(node))
+		if err != nil || changed {
+			t.Errorf("fabric %d's held entries again: changed %v, %v; want unchanged", f, changed, err)
+		}
+	}
+	if r.MatterDataVersion() != v0 || st.replaced() != calls {
+		t.Errorf("the held entries again: DataVersion %d → %d, store calls %d → %d; want neither moved",
+			v0, r.MatterDataVersion(), calls, st.replaced())
+	}
+}
+
+// TestOTADefaultProvidersWritesAreSerialised pins that two fabrics'
+// concurrent DefaultOTAProviders writes both stand: each write's entries
+// replace its own fabric's in the list as it is when the write commits,
+// never in a copy taken before another write committed.
+func TestOTADefaultProvidersWritesAreSerialised(t *testing.T) {
+	t.Parallel()
+	r, st := newGatedOtaRequestor(t)
+	attr := otadef.AttrDefaultOtaProviders
+	ctx1 := im.WithFabricFilter(context.Background(), true, 1)
+	ctx2 := im.WithFabricFilter(context.Background(), true, 2)
+	heldV, otherV := interleave(t, st.gate,
+		func() (bool, error) {
+			return r.MatterWriteChanged(context.WithValue(ctx1, gateKey{}, true), attr, providers(0xAA))
+		},
+		func() (bool, error) { return r.MatterWriteChanged(ctx2, attr, providers(0xBB)) })
+	if heldV.err != nil || otherV.err != nil || !heldV.changed || !otherV.changed {
+		t.Fatalf("writes: fabric 1 %+v, fabric 2 %+v; want both changed", heldV, otherV)
+	}
+	v, _ := r.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 1), attr)
+	got, _ := v.(spec.List[otadef.ProviderLocation])
+	nodes := make([]uint64, 0, len(got))
+	for _, p := range got {
+		nodes = append(nodes, p.ProviderNodeId)
+	}
+	slices.Sort(nodes)
+	if !slices.Equal(nodes, []uint64{0xAA, 0xBB}) {
+		t.Errorf("DefaultOTAProviders after both writes holds providers %#x; want both fabrics' [0xaa 0xbb]", nodes)
 	}
 }
