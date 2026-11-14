@@ -785,7 +785,8 @@ func (b *Bridge) aclWriteInProgress(fabricIndex uint8) bool {
 }
 
 // accessControlClusterID and accessControlACLAttributeID name the
-// AccessControl cluster's ACL attribute (Matter §9.10.5.3).
+// AccessControl cluster's ACL attribute, the ids im/write_chunking.go
+// names (accessControlCluster, accessControlACL).
 const (
 	accessControlClusterID      uint32 = 0x001F
 	accessControlACLAttributeID uint32 = 0x0000
