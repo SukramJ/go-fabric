@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
@@ -76,7 +77,9 @@ type CaseHandler interface {
 	ProcessSigma3(payload []byte) (uint8, []byte, error)
 	// ProcessSigma2Resume handles the resumption variant. Returns
 	// either a Sigma2_Resume reply or an error rejecting the
-	// resumption (commissioner falls back to full Sigma1).
+	// resumption (commissioner falls back to full Sigma1). The bridge's
+	// router does not call it: a Sigma2_Resume the responder receives
+	// is acknowledged and not answered ([Bridge.dispatchSigma2Resume]).
 	ProcessSigma2Resume(payload []byte) (uint8, []byte, error)
 }
 
@@ -240,7 +243,7 @@ func (b *Bridge) resolvePaseHandler(key HandshakeKey) PaseHandler {
 // CaseHandlerProvider returns a [CaseHandler] scoped to a single
 // CASE handshake — one initiator's exchange ([HandshakeKey]). The
 // bridge's SecureChannel router calls the provider once per inbound
-// CASE opcode (Sigma1, Sigma3, Sigma2Resume) and dispatches to the
+// CASE opcode (Sigma1, Sigma3) and dispatches to the
 // returned handler. Returning a fresh handler per key is required
 // because Apple Home opens parallel CASE sessions from different IPs
 // (iPhone over IPv6, HomePod over IPv4) — a singleton CaseAdapter gets
@@ -293,12 +296,15 @@ func (b *Bridge) resolveCaseHandlerOf(key HandshakeKey) (h CaseHandler, provided
 var errHandshakeNotBegun = errors.New("bridge: no Sigma1 or PBKDFParamRequest began this handshake")
 
 // errSigma1OverCompleted stands in for the outcome of a Sigma1 on the key of
-// a completed handshake that began nothing ([Bridge.handleSigma1]): the
-// handler's failure — an error or a failure report — is not sent.
-var errSigma1OverCompleted = errors.New("bridge: a Sigma1 on a completed handshake's key began nothing")
+// a handshake the router holds — in progress or completed — that began
+// nothing ([Bridge.handleSigma1]): the handler's failure — an error or a
+// failure report — is not sent. It is a state refusal
+// ([sigma.ErrSessionState]): the handshake the record holds goes on, its
+// hold on a connection included ([Bridge.settleHandshake]).
+var errSigma1OverCompleted = fmt.Errorf("bridge: a Sigma1 on the key of a handshake in progress or completed began nothing: %w", sigma.ErrSessionState)
 
-// resolveCaseContinuation is [Bridge.resolveCaseHandler] for a Sigma3 or
-// Sigma2_Resume: a handshake no Sigma1 began ([Bridge.markSigma1Replied])
+// resolveCaseContinuation is [Bridge.resolveCaseHandler] for a Sigma3: a
+// handshake no Sigma1 began ([Bridge.markSigma1Replied])
 // has no handler — begun is false — whatever the wiring: the provider is
 // not asked, as it would build an adapter for a handshake that cannot
 // start, and the singleton is not handed a message of a handshake it does
@@ -419,7 +425,7 @@ func (b *Bridge) AttachAckHandler(h AckHandler) {
 //   - 0x24 Pake3                 → PaseHandler.ProcessPake3 (no reply or status ack)
 //   - 0x30 Sigma1                → CaseHandler.ProcessSigma1 → 0x31 Sigma2
 //   - 0x32 Sigma3                → CaseHandler.ProcessSigma3 (no reply or status ack)
-//   - 0x33 Sigma2Resume          → CaseHandler.ProcessSigma2Resume → 0x33 reply
+//   - 0x33 Sigma2Resume          → acknowledged, no handler, no reply
 //   - 0x40 StatusReport          → CloseSession closes the session;
 //     anything else logs (no reply)
 //   - everything else (incl. 0x21/0x23/0x25/0x31 = bridge-initiated
@@ -506,7 +512,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// arrivals on the same exchange via `fabric.locked`.
 		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		h := sha256.Sum256(payload)
-		replay, overCompleted := b.markSigma1Replied(key, h)
+		replay, overRecord := b.markSigma1Replied(key, h)
 		if replay {
 			b.logger.Debug("matter.rx.sc.sigma1.replay_dropped",
 				slog.String("src", srcString(src)),
@@ -515,9 +521,12 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		}
 		// The handshake holds a TCP connection it runs on open until it
 		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
-		// session on the channel).
-		b.holdHandshake(src, key, false)
-		return b.handleSigma1(src, requestHdr, proto, payload, key, h, overCompleted)
+		// session on the channel). Over the record of another handshake
+		// the hold is taken once the Sigma1 began one ([Bridge.handleSigma1]).
+		if !overRecord {
+			b.holdHandshake(src, key, false)
+		}
+		return b.handleSigma1(src, requestHdr, proto, payload, key, h, overRecord)
 	case mrp.SCOpcodeSigma3:
 		return b.dispatchSigma3(src, requestHdr, proto, payload)
 	case mrp.SCOpcodeSigma2Resume:
@@ -622,29 +631,23 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	return nil
 }
 
-// dispatchSigma2Resume routes a Sigma2_Resume to the handler of its
-// handshake; one no Sigma1 began, or of a handshake that completed, is
-// acknowledged and no more ([Bridge.dropHandshakeNotBegun]): after
-// completion only the completing Sigma3 over its route is answered
-// ([Bridge.handleSigma3OfCompleted]), and nothing else takes the success
-// report that waits for its acknowledgement from the retransmission — in
-// matter.js a message on the handshake's live exchange that does not
-// acknowledge that report fails before the retransmission timer is touched
+// dispatchSigma2Resume ends the handling of a Sigma2_Resume this node
+// receives as the responder: it is acknowledged and no more
+// ([Bridge.dropHandshakeNotBegun]) — whether no Sigma1 began its handshake,
+// the handshake is in progress or it completed. The responder sends
+// Sigma2_Resume and never receives one (the bridge's own handshakes as
+// initiator take theirs before this router, case_initiator.go), so it is no
+// step of any handshake here: no handler is asked, no failure report is
+// sent, and no reply that waits for its acknowledgement — a Sigma2 or the
+// success report — is taken from the retransmission (review II,
+// R2-P4-rr-sec-03, R2-P4-fr-sec-03). In matter.js a message on the
+// handshake's live exchange that does not acknowledge the pending reply
+// fails before the retransmission timer is touched
 // (packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0),
 // and a Sigma2_Resume opening an exchange is not taken
-// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146-153)
-// (review II, R2-P4-rr-sec-03).
-func (b *Bridge) dispatchSigma2Resume(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
-	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
-	if _, ok := b.completedHandshake(key); ok {
-		return b.dropHandshakeNotBegun(src, proto)
-	}
-	ch, _, begun := b.resolveCaseContinuation(key)
-	if !begun {
-		return b.dropHandshakeNotBegun(src, proto)
-	}
-	return b.handleCase(src, requestHdr, proto, payload, "sigma2_resume",
-		ch.ProcessSigma2Resume, ch)
+// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:146-153).
+func (b *Bridge) dispatchSigma2Resume(src net.Addr, _ *message.Header, proto message.ProtocolHeader, _ []byte) error {
+	return b.dropHandshakeNotBegun(src, proto)
 }
 
 // dispatchPase routes one inbound PASE opcode to the handler resolved
@@ -1199,9 +1202,10 @@ func (b *Bridge) handleCase(
 		// rather than waiting through MRP retransmission timeouts. Skip
 		// for state-machine replays (the original Sigma was processed and
 		// replied to), for the missing-handler case (nothing is wired
-		// yet) and for a Sigma1 on a completed handshake's key that began
-		// nothing ([Bridge.handleSigma1]). Mirrors chip CASESession.cpp
-		// error-path StatusReport emission on Sigma-reject paths.
+		// yet) and for a Sigma1 that began nothing on the key of a
+		// handshake in progress or completed ([Bridge.handleSigma1]).
+		// Mirrors chip CASESession.cpp error-path StatusReport emission
+		// on Sigma-reject paths.
 		if !isStateReject && !errors.Is(err, ErrCaseHandlerMissing) && !errors.Is(err, errSigma1OverCompleted) {
 			// Map the error to the Secure-Channel protocol code: a
 			// Sigma1 addressing no fabric this node holds is
@@ -1329,20 +1333,25 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 // handshake's place (review II, R2-P3-rr-dev-04). Until then the records
 // exceed the bound by at most the Sigma1s being judged.
 //
-// The record of a completed handshake is the exception: overCompleted
-// reports that it stays while the Sigma1 is judged, and is replaced only
-// once the Sigma1 began a handshake ([Bridge.handleSigma1]) — a Sigma1 that
-// begins nothing does not end a completed handshake, whose record answers
-// the retransmission of its Sigma3 ([Bridge.handleSigma3OfCompleted];
-// review II, R2-P4-rr-sec-04).
-func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) (replay, overCompleted bool) {
+// The record of a handshake the router holds already — in progress or
+// completed — stays while a Sigma1 of other bytes is judged: overRecord
+// reports it, and the record is replaced only once that Sigma1 began a
+// handshake ([Bridge.handleSigma1]). A Sigma1 that begins nothing ends no
+// handshake: a completed one's record answers the retransmission of its
+// Sigma3 ([Bridge.handleSigma3OfCompleted]; review II, R2-P4-rr-sec-04),
+// and one in progress still takes its initiator's Sigma3 (R2-P4-fr-sec-03).
+// The Sigma1 being judged is marked on the record, so its concurrent copies
+// are dropped as those of a first Sigma1 are.
+func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) (replay, overRecord bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	existing, ok := b.sigma1Replied[key]
-	if ok && existing.hash == hash {
+	if ok && (existing.hash == hash || (existing.judging && existing.judged == hash)) {
 		return true, false
 	}
-	if ok && existing.completed != nil {
+	if ok {
+		existing.judging, existing.judged = true, hash
+		b.sigma1Replied[key] = existing
 		return false, true
 	}
 	b.sigma1Seq++
@@ -1351,19 +1360,31 @@ func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) (replay, ove
 }
 
 // sigma1BeganHandshake follows a Sigma1 of hash that began a handshake on
-// key: on the key of a completed one ([Bridge.markSigma1Replied]) its record
-// is made now, replacing the completed one; bySingleton records that the
+// key: over the record of another handshake ([Bridge.markSigma1Replied]) its
+// record is made now, replacing that one; bySingleton records that the
 // singleton handler runs the handshake ([Bridge.AttachCaseHandler]).
-func (b *Bridge) sigma1BeganHandshake(key HandshakeKey, hash [32]byte, overCompleted, bySingleton bool) {
+func (b *Bridge) sigma1BeganHandshake(key HandshakeKey, hash [32]byte, overRecord, bySingleton bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if overCompleted {
+	if overRecord {
 		b.sigma1Seq++
 		b.sigma1Replied[key] = sigma1Record{hash: hash, seq: b.sigma1Seq, bySingleton: bySingleton}
 		return
 	}
 	if rec, ok := b.sigma1Replied[key]; ok && rec.hash == hash && rec.completed == nil {
 		rec.bySingleton = bySingleton
+		b.sigma1Replied[key] = rec
+	}
+}
+
+// sigma1BeganNothingOverRecord follows a Sigma1 of hash that began nothing
+// over the record of another handshake: the record stays as it was, without
+// the mark of that Sigma1 ([Bridge.markSigma1Replied]).
+func (b *Bridge) sigma1BeganNothingOverRecord(key HandshakeKey, hash [32]byte) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if rec, ok := b.sigma1Replied[key]; ok && rec.judging && rec.judged == hash {
+		rec.judging, rec.judged = false, [32]byte{}
 		b.sigma1Replied[key] = rec
 	}
 }
@@ -1401,6 +1422,10 @@ type sigma1Record struct {
 	// bySingleton is set once the Sigma1 began a handshake the singleton
 	// handler runs, not a provider's ([Bridge.AttachCaseHandler]).
 	bySingleton bool
+	// judging is set while a Sigma1 of other bytes, of hash judged, is
+	// judged over this record ([Bridge.markSigma1Replied]).
+	judging bool
+	judged  [32]byte
 }
 
 // oldestSigma1Record returns the key of the record made first, other than
@@ -1424,42 +1449,47 @@ func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeK
 
 // handleSigma1 runs a Sigma1 the router recorded through the handler of
 // its handshake; a Sigma1 that left no handshake state leaves no record
-// either (review II, R2-P3-dr-dev-03). On the key of a completed handshake
-// (overCompleted, [Bridge.markSigma1Replied]) the completed record stays
-// unless the Sigma1 began a handshake (review II, R2-P4-rr-sec-04), and a
-// Sigma1 that began nothing there is acknowledged and not answered
-// ([Bridge.dropHandshakeNotBegun]): the handler's failure report is not
-// sent, and the success report waiting for the initiator's acknowledgement
-// stays the exchange's one reply. Mirrors matter.js
+// either (review II, R2-P3-dr-dev-03). On the key of a handshake the router
+// holds — in progress or completed (overRecord, [Bridge.markSigma1Replied])
+// — its record stays unless the Sigma1 began a handshake (review II,
+// R2-P4-rr-sec-04, R2-P4-fr-sec-03), and a Sigma1 that began nothing there
+// is acknowledged and not answered ([Bridge.dropHandshakeNotBegun]): the
+// handler's failure report is not sent, and the reply waiting for the
+// initiator's acknowledgement — the Sigma2, or the success report — stays
+// the exchange's one reply. Mirrors matter.js
 // packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0: on
 // the handshake's live exchange a message that does not acknowledge the
-// pending report throws a flow error before it reaches the CASE server,
+// pending reply throws a flow error before it reaches the CASE server,
 // and nothing answers it — the exchange manager catches the error and
 // logs it (ExchangeManager.ts:435-438, :538-549). matter.js throws before
 // it takes up the message's acknowledgement
 // (MessageExchange.ts:553-561); this module acknowledges it, as it
 // acknowledges a Sigma3 or Sigma2_Resume no handshake takes (owner
 // decision 70).
-func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overCompleted bool) error {
+func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overRecord bool) error {
 	ch, provided := b.resolveCaseHandlerOf(key)
 	begun := true
 	processSigma1 := func(p []byte) (uint8, []byte, error) {
 		op, reply, err := ch.ProcessSigma1(p)
 		begun = sigma1Began(op, reply, err)
-		if !begun && overCompleted {
+		if !begun && overRecord {
 			return 0, nil, errSigma1OverCompleted
 		}
 		return op, reply, err
 	}
 	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, ch)
 	switch {
-	case !begun && overCompleted:
+	case !begun && overRecord:
+		b.sigma1BeganNothingOverRecord(key, hash)
 		return b.dropHandshakeNotBegun(src, proto)
 	case !begun:
 		b.forgetSigma1Replied(key)
 		return err
 	}
-	b.sigma1BeganHandshake(key, hash, overCompleted, !provided)
+	if overRecord {
+		b.holdHandshake(src, key, false)
+	}
+	b.sigma1BeganHandshake(key, hash, overRecord, !provided)
 	b.boundSigma1Records(key)
 	return err
 }

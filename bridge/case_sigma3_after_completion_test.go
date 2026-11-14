@@ -40,6 +40,8 @@ type completedCase struct {
 	sigma1     []byte
 	sigma2     []byte
 	sigma3     []byte
+	// sigma2Counter is the message counter of the Sigma2.
+	sigma2Counter uint32
 	// report is the message counter of the success report that answered
 	// the completing Sigma3.
 	report   uint32
@@ -52,7 +54,21 @@ type completedCase struct {
 // CaseAdapter attached as the singleton handler.
 func completeCASE(t *testing.T, clk clock.Clock, viaProvider bool) *completedCase {
 	t.Helper()
-	r := newUnsecuredRig(t)
+	c := beginCASE(t, newUnsecuredRig(t), clk, viaProvider)
+	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+		t.Fatal(err)
+	}
+	c.report = c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the report on Sigma3")
+	if got := c.route(t); got != c.controller.conn.LocalAddr().String() {
+		t.Fatalf("the established session's route is %s, want the controller's %s", got, c.controller.conn.LocalAddr())
+	}
+	return c
+}
+
+// beginCASE runs [completeCASE]'s handshake on r up to the controller's
+// receipt of the Sigma2: the handshake is in progress, its Sigma3 not sent.
+func beginCASE(t *testing.T, r *unsecuredRig, clk clock.Clock, viaProvider bool) *completedCase {
+	t.Helper()
 	ring := diagevent.NewRing(64)
 	r.b.AttachDiagnosticEvents(ring)
 	root, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -94,17 +110,9 @@ func completeCASE(t *testing.T, clk clock.Clock, viaProvider bool) *completedCas
 	if err := c.controller.send(mrp.SCOpcodeSigma1, completedCaseExchange, c.sigma1, nil); err != nil {
 		t.Fatal(err)
 	}
-	sigma2, counter, _ := c.controller.recv(mrp.SCOpcodeSigma2, "Sigma2")
-	c.sigma2 = sigma2
-	if c.sigma3, err = initiator.ProcessSigma2Bytes(sigma2); err != nil {
+	c.sigma2, c.sigma2Counter, _ = c.controller.recv(mrp.SCOpcodeSigma2, "Sigma2")
+	if c.sigma3, err = initiator.ProcessSigma2Bytes(c.sigma2); err != nil {
 		t.Fatal(err)
-	}
-	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &counter); err != nil {
-		t.Fatal(err)
-	}
-	c.report = c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the report on Sigma3")
-	if got := c.route(t); got != c.controller.conn.LocalAddr().String() {
-		t.Fatalf("the established session's route is %s, want the controller's %s", got, c.controller.conn.LocalAddr())
 	}
 	return c
 }

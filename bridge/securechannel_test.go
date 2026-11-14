@@ -309,11 +309,12 @@ func TestDispatchSC_Sigma3ForgetsExchange(t *testing.T) {
 	}
 }
 
-// TestDispatchSC_Sigma2ResumeInvokesHandler verifies that Sigma2Resume
-// dispatched with a wired handler, on a handshake a Sigma1 began, is routed
-// to ProcessSigma2Resume exactly once; one no Sigma1 began does not reach
-// the singleton handler (review II, R2-P4-nw-01).
-func TestDispatchSC_Sigma2ResumeInvokesHandler(t *testing.T) {
+// TestDispatchSC_Sigma2ResumeReachesNoHandler verifies that a Sigma2Resume
+// dispatched with a wired handler reaches no handler and is answered with
+// nothing — on a handshake no Sigma1 began (review II, R2-P4-nw-01) and on
+// one a Sigma1 began (R2-P4-fr-sec-03): the responder never receives a
+// Sigma2_Resume as a step of its handshake.
+func TestDispatchSC_Sigma2ResumeReachesNoHandler(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	h := &recordingCaseHandler{
@@ -336,8 +337,8 @@ func TestDispatchSC_Sigma2ResumeInvokesHandler(t *testing.T) {
 	if err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, []byte{0x01}); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
-	if got := h.sigma2ResumeCalls.Load(); got != 1 {
-		t.Errorf("sigma2ResumeCalls: want 1, got %d", got)
+	if got := h.sigma2ResumeCalls.Load(); got != 0 {
+		t.Errorf("sigma2ResumeCalls after a Sigma1 began the handshake: want 0, got %d", got)
 	}
 }
 
