@@ -277,6 +277,10 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 - WindowCovering TargetPosition mirrors CurrentPosition (no in-motion target). `internal/model/custom/cover/matter.go:322` vs `WindowCoveringServer.ts:578`. **FIXED (0.31.0–0.33.0):** `matterTargetState` (lift+tilt, Matter pct-100ths) on `Cover`/`Garage` holds the last commanded destination — UpOrOpen→0, DownOrClose→10000 (blind: both axes, `WindowCoveringServer.ts:522-525`/`:546-549`), GoToLift/TiltPercentage→requested (`:578`/`:600`); StopMotion clears the store so the reads snap back to mirroring CurrentPosition (`:490-493` handleStopMovement; the mirror also matches the startup init `:142`). A failed CCU command leaves the target untouched. All three projections (cover, blind, garage) updated; behaviour tests added.
 - DoorLock emits no LockOperation/DoorLockAlarm events. `cluster/lock/doorlock_server.go:117` vs `DoorLockServer.ts:1289-1301`. **FIXED (0.31.0–0.33.0):** `DoorLockServer` now implements `MatterEventReceiver`/`SetEndpoint` and emits LockOperation (id 0x02, priority critical) after every successful LockDoor/UnlockDoor/UnboltDoor — operation type Lock/Unlock/Unlatch per `DoorLockServer.ts:193-214` (UnboltDoor reports **Unlatch**, not Unlock), OperationSource=Remote(7), UserIndex/Credentials null (no USR/PIN feature), FabricIndex+SourceNode from the invoking session ctx (`:1289-1301`; PASE → null). `MatterEvents` advertises the three conformance-M events (DoorLockAlarm 0x00, LockOperation 0x02, LockOperationError 0x03 — `door-lock-cluster.element.ts:172/181/198`); DoorLockAlarm/LockOperationError have no emission path without PIN credentials, matching matter.js where they fire only from the wrong-code path (`:889`/`:941`). TLV payload encoder in `bridge/reply.go` (nullable tags 2-4). Behaviour + wire-shape tests added.
 
+## Matter 1.6.1 pin — open items
+
+- **A request field outside its constraint is answered by the handler, not refused on the wire.** matter.js's request TLV schema refuses it before the behavior runs (`CommandInvokeResponse.ts:484-487` at `862ad75f`, CONSTRAINT_ERROR); the Go generic server passes it to the handler, and the OnOff, DoorLock, EVSE, WaterHeater and CommodityPrice ports pin the handler's status. Route: a request-constraint check in `spec.Server`'s invoke path, with those ports' expectations re-read against the pin; brief CT report, question 2. (Triage 2026-10-29: wave H1, the device IM and write path.) Closed 2026-11-14 (review II, owner decision 64, `27cf0e19`, `2561b260`, `84d092cc`) for every request of a cluster with a generated definition: the definition's request decoder holds the fields to matter.js's request schema — bounds, lengths, counts and mandatory fields; an enum by its type only, `packages/types/src/tlv/TlvOfModel.ts:221-223` at `db021da0` — before the server runs, and the bridge's hand-decoded commissioning, group and scene requests pass it first (`heldByDefinition`, `bridge/fields_reader.go:88-101`). A server's departure is an entry of `script/clustergen/relaxed.go`, written into the definition (`BD-Matter-RequestCheck-RelaxationTable`), and written values are held in the dispatcher before the server (`spec.CheckWritten`). What it left open is F-db021da0-20 (DoorLock) and the response row of the open register. Pinned by `cluster/spec:TestRequestCheckParityMatterJS` and `bridge:TestHandDecodedRequestsAreHeldByTheirDefinition`.
+
 ## matter.js pin 862ad75f — open items (pin lift 2026-10-18)
 
 - **AdministratorCommissioning checks in another order** — closed
@@ -376,6 +380,67 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   has none between `:635` and `:672`, stays ahead of the teardown and
   cancels nothing. Pinned by
   `bridge:TestRefusedSubscribeTearsDownFirst`.
+- **F-db021da0-12: a SubscribeRequest with KeepSubscriptions=false on a
+  session without a fabric tears down that session's subscriptions.**
+  matter.js runs the teardown only for a session with a fabric
+  (`if (fabric !== undefined && !keepSubscriptions)`,
+  `packages/node/src/node/server/InteractionServer.ts:647` at `db021da0`;
+  the walk over the peer's sessions, `:649-659`); on a PASE session it
+  cancels nothing. `registerSubscription` closes the subscriptions of the
+  same session there (`m.CloseSession`, `bridge/subscribe_dispatch.go`),
+  one that is still priming included (noticed by the fix of
+  R2-P1-req2-01). Until `5b12fb30` the comment gave
+  `InteractionServer.ts:549-566` as matching "on same-session for
+  pre-fabric (PASE) subscriptions"; the pin has no such branch.
+  connectedhomeip was not read for a PASE session (unverified). Fix: no
+  teardown without a fabric, with the parity case in
+  `im/subscription/handler_parity_test.go` — or a `by_design` row if
+  connectedhomeip's handling is the reason to keep it. Found in review II,
+  phase 1 (the citation pass).
+  Closed 2026-11-14 (review II, `0591dff3`): `teardownForSubscribe`
+  returns for a session without a fabric and otherwise ends the
+  subscriptions of the peer — fabric and peer node id — on every session
+  (`bridge/subscribe_dispatch.go:506`), as the walk of
+  `InteractionServer.ts:647-659`. connectedhomeip was not read to the line
+  that answers a Subscribe on a PASE session; its engine's comment names
+  a rejection of "subscriptions without a fabric associated (with a PASE
+  session)" (`src/app/InteractionModelEngine.cpp:1355-1356` at `6170af84`),
+  beyond that unverified. matter.js admits the Subscribe, and so does
+  this module. Pinned by
+  `bridge:TestKeepSubscriptionsFalseTearsDownOnlyWithAFabric`.
+- **F-db021da0-16: the priming report is sorted ascending, where matter.js's
+  read walks its collections without a sort.** A Subscribe's priming report
+  visits each path's results in
+  ascending (endpoint, cluster, attribute) order: the endpoints of a wildcard
+  path in ascending id order, each endpoint's results sorted
+  (`newPrimingSource`, `bridge/subscribe_dispatch.go`, calls
+  `im.NewAttributeExpansion(…).Ascending()`; the option is in
+  `im/read_expansion.go`). matter.js's read response iterates the node's
+  endpoints, an endpoint's clusters and a cluster's attributes as their
+  collections yield them, with no sort at these lines
+  (`packages/protocol/src/action/server/AttributeReadResponse.ts:183-185`,
+  `:337-339`, `:378-380` at `db021da0`). What order those collections yield
+  was not read here: the comment on the Go side names the order of insertion,
+  with lines of `ProtocolService.ts` that were not re-read, and whether that
+  order is ascending in practice is unverified — so this is not yet known to
+  differ on the wire. The ascending order is this module's own, kept for a
+  controller that processes the priming report in stream order (the same
+  comment). Fix, if the orders differ: the priming report follows matter.js's
+  order, or the difference becomes a `by_design` entry with its reason, each
+  with a parity case; phase 4. Found in review II, phase 2 (the rework of the
+  priming report for R2-P2-alloc-04).
+  Closed 2026-11-14 for the attributes of a cluster (review II,
+  R2-P4-imread-12, owner decision 62, `c2ecdc6b`, `dc11f3d5`): a Read, a
+  priming report and a change report list them in matter.js's model
+  order, `im.CompareAttributeIDs` over the snapshot's `attributeOrder`,
+  compared by the fix with a matter.js node run at `db021da0`. What is
+  not mirrored — a server's own reordering, and the order of a wildcard's
+  endpoints and of an endpoint's clusters, which stays ascending where
+  matter.js walks its collections as they were filled — is recorded,
+  undecided, in `BD-Matter-AttributeOrder-ModelOrder`
+  ([`by_design.md`](./by_design.md)). Pinned by
+  `im:TestCompareAttributeIDsOnOffIsMatterJSsOrder` and
+  `TestCompareAttributeIDsFollowsTheSnapshotOrder`.
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 
