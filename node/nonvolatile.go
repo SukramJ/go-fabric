@@ -121,8 +121,11 @@ type nvKey struct {
 	// forget set them.
 	srv    contract.ClusterServer
 	attrID uint32
-	// label: a bridged LabelList, kept in persistUserLabels' form.
-	label bool
+	// label: a bridged LabelList, kept in persistUserLabels' form;
+	// labelSrv: the UserLabel server whose list an owed label key is
+	// written from when the node stops (a rollback the store refused).
+	label    bool
+	labelSrv contract.ClusterServer
 }
 
 // nvServer is a server met: its change subscription.
@@ -270,6 +273,9 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		if err := st.SetSetting(ctx, key, prev); err != nil {
 			v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
 			k.owed = true
+			if k.label {
+				k.labelSrv = srv
+			}
 			return
 		}
 		k.stored = prev
@@ -280,9 +286,13 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 // does not hold it already; a store that refuses it is logged and the key
 // owed (written again at the next change and when the node stops). The
 // caller holds k.store. A crash before it ran leaves the value stored
-// before the change.
+// before the change. A label key is [nonVolatile.storeLabel]'s.
 func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
-	if k.label || k.srv == nil {
+	if k.label {
+		v.storeLabel(ctx, k, key)
+		return
+	}
+	if k.srv == nil {
 		return
 	}
 	val, ok := k.srv.MatterRead(k.attrID)
@@ -305,6 +315,36 @@ func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
 		return
 	}
 	k.stored, k.known, k.owed = held, true, false
+}
+
+// storeLabel writes an owed label key from the list its UserLabel server
+// holds, as persistUserLabels stores each change of it, while the node
+// keeps that server's list; one it let go of (the endpoint left the
+// topology) takes its debt with it, and the server in its place stores
+// its own list. Only a refused rollback owes a label key; persistUserLabels
+// writes the list again at its next change. The caller holds k.store.
+func (v *nonVolatile) storeLabel(ctx context.Context, k *nvKey, key string) {
+	srv := k.labelSrv
+	if srv == nil {
+		return
+	}
+	v.n.userLabels.mu.Lock()
+	_, kept := v.n.userLabels.persisted[srv]
+	v.n.userLabels.mu.Unlock()
+	if !kept {
+		k.owed, k.labelSrv = false, nil
+		return
+	}
+	b, err := json.Marshal(userlabeldef.Wrap(srv).Get().LabelList)
+	if err == nil {
+		err = v.n.persisted.st.SetSetting(ctx, key, string(b))
+	}
+	if err != nil {
+		v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
+		k.owed = true
+		return
+	}
+	k.stored, k.known, k.owed, k.labelSrv = string(b), true, false, nil
 }
 
 // changed stores each attribute of keys that c reports, from the server's

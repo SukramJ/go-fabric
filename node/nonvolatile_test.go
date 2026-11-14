@@ -4,7 +4,10 @@
 package node_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -245,5 +248,54 @@ func TestNonVolatileStoresTheCommittedValue(t *testing.T) {
 	again, ep := nvRun(t, cfg, tc)
 	if got := dispatchRead(t, again, attrPath(ep, tc.cluster, tc.attr)); got != served {
 		t.Fatalf("Mode after the restart %s, served %s before it", got, served)
+	}
+}
+
+// TestBridgedUserLabelRollbackOwedUntilTheStop: a bridged LabelList write
+// the server refuses, whose rollback the store refuses too, is put right
+// when the node stops: the restart serves the list the server held, not
+// the refused one (R2-P2-rr-ctl-05).
+func TestBridgedUserLabelRollbackOwedUntilTheStop(t *testing.T) {
+	t.Parallel()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"bridged_user_label."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	var veto atomic.Bool
+	tc := nvCase{key: "light", build: func(t *testing.T, key string) node.Endpoint {
+		t.Helper()
+		d, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key}, userlabeldef.Declare{
+			OnWrite: func(context.Context, userlabeldef.State, uint32) error {
+				if !veto.Load() {
+					return nil
+				}
+				// The store refuses from here on: the rollback after the
+				// veto is refused.
+				st.refuse.Store(true)
+				return errors.New("vetoed")
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}}
+	n, ep := nvRun(t, cfg, tc)
+	path := attrPath(ep, userlabeldef.ClusterID, userlabeldef.AttrLabelList)
+	if got := dispatchWrite(t, n, path, spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "kitchen"}}); got != im.StatusSuccess {
+		t.Fatalf("UserLabel write: %v", got)
+	}
+	served := dispatchRead(t, n, path)
+	veto.Store(true)
+	if got := dispatchWrite(t, n, path, spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "attic"}}); got == im.StatusSuccess {
+		t.Fatal("the vetoed UserLabel write succeeded")
+	}
+	st.refuse.Store(false)
+	veto.Store(false)
+	if err := n.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	again, ep := nvRun(t, cfg, tc)
+	if got := dispatchRead(t, again, attrPath(ep, userlabeldef.ClusterID, userlabeldef.AttrLabelList)); got != served {
+		t.Errorf("LabelList after the restart %s, served %s before it", got, served)
 	}
 }
