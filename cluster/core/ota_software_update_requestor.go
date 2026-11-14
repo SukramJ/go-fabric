@@ -96,6 +96,9 @@ type OTASoftwareUpdateRequestor struct {
 	cancelRun            context.CancelFunc
 	wg                   sync.WaitGroup
 	started, stopped     bool
+	// bdxMaxImageSize caps the bytes a BDX download takes
+	// ([otaBdxMaxImageSize]; a test lowers it).
+	bdxMaxImageSize uint64
 }
 
 // OTARequestorConfig configures [NewOTASoftwareUpdateRequestor].
@@ -310,6 +313,12 @@ const (
 	defaultOtaHTTPSIdleTimeout  = 60 * time.Second
 )
 
+// otaBdxMaxImageSize caps the bytes a BDX download takes, which matter.js
+// does not bound either: the HTTPS path's default cap
+// ([defaultOtaHTTPSMaxImageSize]), so an image either path can fetch by
+// default is the same size (review II, rework of R2-P2-ctl).
+const otaBdxMaxImageSize = defaultOtaHTTPSMaxImageSize
+
 // scheduleReason is ScheduleReason (:89-95).
 type scheduleReason uint8
 
@@ -413,7 +422,8 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 		logger:         cfg.Logger,
 		updatePossible: true,
 		// initialize (:175-178): an Unknown state becomes Idle.
-		state: otadef.UpdateStateIdle,
+		state:           otadef.UpdateStateIdle,
+		bdxMaxImageSize: otaBdxMaxImageSize,
 	}
 	if cfg.UpdatePossible != nil {
 		r.updatePossible = *cfg.UpdatePossible

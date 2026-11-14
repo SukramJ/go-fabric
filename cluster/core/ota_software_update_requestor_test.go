@@ -1309,3 +1309,31 @@ func TestOTARequestor_DefaultProvidersWriteReportsAChange(t *testing.T) {
 		t.Fatalf("the same list again: changes %+v, DataVersion %d → %d", changes, dv, h.r.MatterDataVersion())
 	}
 }
+
+// TestOTARequestor_BDXDownloadIsCapped (review II, rework of R2-P2-ctl):
+// a BDX download that passes the size cap fails at the first block past
+// it — the provider is answered LengthTooLarge, the DownloadError carries
+// that code — without a second attempt, since the image will not shrink;
+// nothing is applied and no partial file is left. Before, the transfer
+// took whatever the provider sent.
+func TestOTARequestor_BDXDownloadIsCapped(t *testing.T) {
+	t.Parallel()
+	h := newOtaHarness(t, nil)
+	h.addActive(t)
+	h.r.bdxMaxImageSize = 1000 // the harness's image is some 2.5 KB
+	h.r.performUpdateQuery(context.Background())
+	if h.provider.transfers != 1 || len(h.applier.applied) != 0 {
+		t.Fatalf("%d transfers, applied %v; want one refused transfer", h.provider.transfers, h.applier.applied)
+	}
+	errs := h.events.of(otadef.EventDownloadError)
+	if len(errs) != 1 {
+		t.Fatalf("DownloadError %+v", errs)
+	}
+	de := errs[0].(otadef.DownloadErrorEvent) //nolint:forcetypeassert // test
+	if de.PlatformCode.Null || de.PlatformCode.Value != int64(bdx.StatusLengthTooLarge) {
+		t.Fatalf("DownloadError %+v, want platform code LengthTooLarge", de)
+	}
+	if _, err := os.Stat(h.r.downloadPath()); !os.IsNotExist(err) {
+		t.Fatal("partial file left")
+	}
+}
