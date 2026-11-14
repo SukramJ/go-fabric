@@ -246,7 +246,8 @@ func (n *Node) reannounceFabrics(ctx context.Context) {
 		n.logger.Warn("icd.reannounce_list_failed", slog.Any("err", err))
 		return
 	}
-	for _, f := range fabrics {
+	for i := range fabrics {
+		f := &fabrics[i]
 		n.br.AnnounceFabric(ctx, f.FabricIndex, f.CompressedID, f.NodeID)
 	}
 }

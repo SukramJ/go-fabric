@@ -91,9 +91,9 @@ type fakeFabrics struct {
 }
 
 func (f *fakeFabrics) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, error) {
-	for _, r := range f.fabrics {
-		if r.FabricIndex == idx {
-			return r, nil
+	for i := range f.fabrics {
+		if f.fabrics[i].FabricIndex == idx {
+			return f.fabrics[i], nil
 		}
 	}
 	return store.FabricRecord{}, store.ErrFabricNotFound

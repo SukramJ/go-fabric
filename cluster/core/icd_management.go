@@ -535,8 +535,8 @@ func (s *ICDManagement) loadClients(ctx context.Context) ([]icdClient, error) {
 		return nil, fmt.Errorf("core: icd management: list fabrics: %w", err)
 	}
 	live := map[uint8]bool{}
-	for _, f := range fabrics {
-		live[f.FabricIndex] = true
+	for i := range fabrics {
+		live[fabrics[i].FabricIndex] = true
 	}
 	var out []icdClient
 	pruned := map[uint8]bool{}

@@ -61,8 +61,8 @@ func (s *memStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
 		return nil, errors.New("memStore: list fabrics failed")
 	}
 	out := make([]store.FabricRecord, 0, len(s.fabrics))
-	for _, r := range s.fabrics {
-		out = append(out, r)
+	for idx := range s.fabrics {
+		out = append(out, s.fabrics[idx])
 	}
 	return out, nil
 }

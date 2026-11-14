@@ -67,9 +67,10 @@ func (n *Node) FactoryReset(ctx context.Context) error {
 		if err != nil {
 			errs = append(errs, fmt.Errorf("node: factory reset: list fabrics: %w", err))
 		}
-		for _, rec := range recs {
-			if err := n.root.OperationalCredentials.RemoveFabric(ctx, rec.FabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
-				errs = append(errs, fmt.Errorf("node: factory reset: remove fabric %d: %w", rec.FabricIndex, err))
+		for i := range recs {
+			idx := recs[i].FabricIndex
+			if err := n.root.OperationalCredentials.RemoveFabric(ctx, idx); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+				errs = append(errs, fmt.Errorf("node: factory reset: remove fabric %d: %w", idx, err))
 			}
 		}
 		n.keepOwnedDB = true

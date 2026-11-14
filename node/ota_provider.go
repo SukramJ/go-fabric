@@ -210,8 +210,8 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	for _, f := range fabrics {
-		n.ensureOTAProviderACLOn(ctx, f.FabricIndex, epID)
+	for i := range fabrics {
+		n.ensureOTAProviderACLOn(ctx, fabrics[i].FabricIndex, epID)
 	}
 }
 
