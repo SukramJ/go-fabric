@@ -1603,10 +1603,13 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 	case attrPwrOrder:
 		return uint8(1), true // primary source
 	case attrPwrDescription:
+		// matter.js PowerSourceServer.initialize's defaults for WIRED and
+		// BAT (packages/node/src/behaviors/power-source/
+		// PowerSourceServer.ts:40-46 at db021da0).
 		if s.wired {
 			return "Mains power", true
 		}
-		return "Battery", true
+		return "Battery power", true
 	case attrPwrWiredCurrentType:
 		if !s.wired {
 			return nil, false
