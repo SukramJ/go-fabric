@@ -567,7 +567,10 @@ func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 // BumpClusterDataVersion advances the per-(endpoint, cluster)
 // DataVersion after a state change so DataVersionFilters miss and
 // subscribers receive the fresh value. Mirrors matter.js
-// Datasource.ts:1035.
+// Datasource.ts:690-699 at db021da0 (advanceVersion), which a commit that
+// changed a property calls once (:1456-1457); past 0xFFFF_FFFF it wraps to
+// 0 there (:696-698), where the tracker skips 0
+// ([contract.DataVersionTracker.Bump]).
 func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()
 }
