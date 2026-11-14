@@ -25,7 +25,9 @@ var (
 
 // SetAttributes implements [spec.AttributeSetter]: the host's own change,
 // all or nothing, checked against each attribute's type and constraint and
-// reported — no write veto, no port write refusal. CurrentLevel is set
+// reported — no write veto, no port write refusal. An attribute set to the
+// value it holds is no change and is not reported; the set advances the
+// DataVersion once, or not at all when it changed nothing. CurrentLevel is set
 // directly ([New]'s level; a server over a [LevelSource] reads the level
 // from the port, so it is not the server's to set: [spec.ErrNotHeld]); a
 // running transition is not stopped — its next step overwrites the value,
@@ -67,6 +69,14 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 		}
 		checked = append(checked, set{id, v})
 	}
+	// One set is one commit: an attribute counts as changed only when it
+	// differs from before, as the controller's write does
+	// ([Server.MatterWrite]), and the DataVersion advances once for the
+	// set however many attributes it changed, CurrentLevel's included.
+	// Mirrors matter.js
+	// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+	// db021da0 (the version advances once `if (changes)`) and :1476-1481
+	// (#noteIfChanged notes nothing for an equal value).
 	var changed []uint32
 	level := false
 	for _, c := range checked {
@@ -76,20 +86,30 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			level = true
 		case AttrOptions:
 			options, _ := c.v.(uint8) // a map8 per CheckSet
+			before := s.src.Options()
 			if err := s.src.SetOptions(context.Background(), options); err != nil {
 				return fmt.Errorf("levelcontrol: set Options: %w", err)
 			}
-			changed = append(changed, c.id)
+			if s.src.Options() != before {
+				changed = append(changed, c.id)
+			}
 		case AttrOnLevel:
+			before, knownBefore := s.src.OnLevel()
 			if err := s.src.SetOnLevel(context.Background(), setUint8(c.v)); err != nil {
 				return fmt.Errorf("levelcontrol: set OnLevel: %w", err)
 			}
-			changed = append(changed, c.id)
+			if after, known := s.src.OnLevel(); known != knownBefore || (known && after != before) {
+				changed = append(changed, c.id)
+			}
 		case AttrStartUpCurrentLevel:
+			next := setUint8(c.v)
 			s.mu.Lock()
-			s.startUp = setUint8(c.v)
+			differs := !equalLevel(s.startUp, next)
+			s.startUp = next
 			s.mu.Unlock()
-			changed = append(changed, c.id)
+			if differs {
+				changed = append(changed, c.id)
+			}
 		}
 	}
 	if len(changed) > 0 {
@@ -97,7 +117,9 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if level {
-		s.observeLevel(contract.OriginHostSet) // the one place CurrentLevel is reported
+		// the one place CurrentLevel is reported; it advances the
+		// DataVersion only when the set advanced none
+		s.noteLevel(contract.OriginHostSet, len(changed) > 0)
 	}
 	return nil
 }

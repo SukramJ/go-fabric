@@ -6,6 +6,7 @@ package levelcontrol_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"testing"
@@ -222,6 +223,80 @@ func TestPortServerDoesNotHoldCurrentLevel(t *testing.T) {
 	s := lvldef.Wrap(levelcontrol.NewServer(levelcontrol.Config{Source: &fakeHost{}}))
 	if err := s.Set(lvldef.Patch{CurrentLevel: ptr(uint8(3))}); !errors.Is(err, spec.ErrNotHeld) {
 		t.Errorf("CurrentLevel over a port: %v", err)
+	}
+}
+
+// TestSetAttributesAdvancesTheDataVersionOncePerChange: a host set is one
+// commit — it advances the DataVersion once however many attributes it
+// changed, and not at all when it changed none; an attribute set to the
+// value it holds is not reported. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (the version advances once `if (changes)`) and :1476-1481
+// (#noteIfChanged notes nothing for an equal value).
+func TestSetAttributesAdvancesTheDataVersionOncePerChange(t *testing.T) {
+	t.Parallel()
+	for _, managed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("ManageTransitions=%v", managed), func(t *testing.T) {
+			t.Parallel()
+			l10 := uint8(10)
+			srv, err := levelcontrol.New(levelcontrol.HeldConfig{
+				Features: levelcontrol.FeatureOnOff | levelcontrol.FeatureLighting, Clock: clocktest.New(time.Unix(0, 0)),
+				CurrentLevel: &l10, ManageTransitions: managed,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			var reported []uint32
+			defer srv.OnAttributeChange(func(c contract.Change) {
+				mu.Lock()
+				reported = append(reported, c.Attributes...)
+				mu.Unlock()
+			})()
+			for _, c := range []struct {
+				name     string
+				set      map[uint32]any
+				want     uint32
+				reported []uint32
+			}{
+				{"CurrentLevel alone", map[uint32]any{levelcontrol.AttrCurrentLevel: uint8(20)}, 1, []uint32{levelcontrol.AttrCurrentLevel}},
+				{"OnLevel alone", map[uint32]any{levelcontrol.AttrOnLevel: uint8(50)}, 1, []uint32{levelcontrol.AttrOnLevel}},
+				{
+					"CurrentLevel and OnLevel",
+					map[uint32]any{levelcontrol.AttrCurrentLevel: uint8(30), levelcontrol.AttrOnLevel: uint8(60)},
+					1,
+					[]uint32{levelcontrol.AttrOnLevel, levelcontrol.AttrCurrentLevel},
+				},
+				{"the same two again", map[uint32]any{levelcontrol.AttrCurrentLevel: uint8(30), levelcontrol.AttrOnLevel: uint8(60)}, 0, nil},
+				{"OnLevel unchanged", map[uint32]any{levelcontrol.AttrOnLevel: uint8(60)}, 0, nil},
+				{"CurrentLevel unchanged", map[uint32]any{levelcontrol.AttrCurrentLevel: uint8(30)}, 0, nil},
+				{"Options unchanged", map[uint32]any{levelcontrol.AttrOptions: uint8(0)}, 0, nil},
+				{"StartUpCurrentLevel unchanged", map[uint32]any{levelcontrol.AttrStartUpCurrentLevel: nil}, 0, nil},
+				{
+					"OnLevel to null and StartUpCurrentLevel",
+					map[uint32]any{levelcontrol.AttrOnLevel: nil, levelcontrol.AttrStartUpCurrentLevel: uint8(7)},
+					1,
+					[]uint32{levelcontrol.AttrOnLevel, levelcontrol.AttrStartUpCurrentLevel},
+				},
+			} {
+				mu.Lock()
+				reported = nil
+				mu.Unlock()
+				before := srv.MatterDataVersion()
+				if err := srv.SetAttributes(c.set); err != nil {
+					t.Fatalf("%s: %v", c.name, err)
+				}
+				if got := srv.MatterDataVersion() - before; got != c.want {
+					t.Errorf("%s moved the DataVersion by %d, want %d", c.name, got, c.want)
+				}
+				mu.Lock()
+				got := slices.Clone(reported)
+				mu.Unlock()
+				if !slices.Equal(got, c.reported) {
+					t.Errorf("%s reported %v, want %v", c.name, got, c.reported)
+				}
+			}
+		})
 	}
 }
 

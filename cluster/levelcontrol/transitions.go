@@ -184,6 +184,13 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // command's change advances it in [Server.finish], so the listeners alone
 // are told.
 func (s *Server) observeLevel(origin contract.Origin) {
+	s.noteLevel(origin, false)
+}
+
+// noteLevel is [Server.observeLevel] within a change that advanced the
+// DataVersion already when advanced is true: the host's set of
+// CurrentLevel with another attribute is one commit, one advance.
+func (s *Server) noteLevel(origin contract.Origin, advanced bool) {
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
 	wasNull := !s.levelKnown
@@ -193,7 +200,7 @@ func (s *Server) observeLevel(origin contract.Origin) {
 	if !changed {
 		return
 	}
-	if s.engine != nil {
+	if s.engine != nil && !advanced {
 		s.tracker().Bump()
 	}
 	s.changes.ChangedFrom(origin, AttrCurrentLevel)
