@@ -224,6 +224,43 @@ func TestWriteOtherNodeParity(t *testing.T) {
 	}
 }
 
+// sendReliable dispatches one IM message on exchange with the R flag set,
+// as an initiator message or not, and returns dispatch's error.
+func (p *imPeer) sendReliable(exchange uint16, opcode uint8, initiator bool, payload []byte) error {
+	p.t.Helper()
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: opcode, ExchangeID: exchange, Initiator: initiator, NeedsAck: true}.Marshal()
+	return p.b.dispatch(context.Background(), secureTestDatagram(p.t, p.b, proto, payload), p.conn.LocalAddr())
+}
+
+// received collects what the bridge sends within wait: the number of
+// standalone acknowledgements and the opcodes of every other message.
+func (p *imPeer) received(wait time.Duration) (acks int, others []uint8) {
+	p.t.Helper()
+	deadline := time.Now().Add(wait)
+	buf := make([]byte, 2048)
+	for {
+		_ = p.conn.SetReadDeadline(deadline)
+		n, _, err := p.conn.ReadFromUDP(buf)
+		if err != nil {
+			return acks, others
+		}
+		got := openTestReplyFor(p.t, p.b, buf[:n])
+		_, hdrLen, err := message.UnmarshalHeader(got)
+		if err != nil {
+			p.t.Fatalf("UnmarshalHeader: %v", err)
+		}
+		proto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
+		if err != nil {
+			p.t.Fatalf("UnmarshalProtocolHeader: %v", err)
+		}
+		if proto.ProtocolID == mrp.SecureChannelProtocolID && proto.Opcode == mrp.StandaloneAckOpcode {
+			acks++
+			continue
+		}
+		others = append(others, proto.Opcode)
+	}
+}
+
 // silent reports that the bridge sends no IM message within wait.
 func (p *imPeer) silent(wait time.Duration) bool {
 	p.t.Helper()
@@ -366,20 +403,22 @@ func TestWriteContinuationChunkParity(t *testing.T) {
 // — matter.js opens an exchange for a protocol handler only for an
 // initiator message and otherwise acknowledges and ignores it
 // (packages/protocol/src/protocol/ExchangeManager.ts:462-467, :496-507 at
-// db021da0).
+// db021da0; the standalone acknowledgement at :502). The acknowledgement
+// is the one message the bridge sends for it.
 func TestNonInitiatorRequestIgnoredParity(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	srv := &countingInvokeServer{id: 0x0006}
 	b.AttachRootClusters([]contract.ClusterServer{srv})
+	b.AttachAckTracker(mrp.NewAckTracker(0)) // due at once; attached after Start: no pump
 	p := newIMPeer(t, b)
-	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeInvokeRequest, ExchangeID: 0x4205, NeedsAck: true}.Marshal()
 	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true})
-	if err := b.dispatch(context.Background(), secureTestDatagram(t, b, proto, payload), p.conn.LocalAddr()); err != nil {
+	if err := p.sendReliable(0x4205, im.OpcodeInvokeRequest, false, payload); err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
-	if !p.silent(300 * time.Millisecond) {
-		t.Error("the bridge answered a request that is not an initiator message")
+	b.RunAckPumpOnce(b.clk().Now())
+	if acks, others := p.received(300 * time.Millisecond); acks != 1 || len(others) != 0 {
+		t.Errorf("the bridge sent %d standalone acks and the messages %v, want one standalone ack and nothing else", acks, others)
 	}
 	if n := srv.invokes.Load(); n != 0 {
 		t.Errorf("the command ran %d times, want 0", n)

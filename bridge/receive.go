@@ -1047,13 +1047,30 @@ func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src net.Addr, reques
 }
 
 // suppressStatus ends a suppressed request's transaction without a
-// StatusResponse, discharging the owed acknowledgement.
+// StatusResponse; the acknowledgement it owes goes out
+// ([Bridge.ackUnansweredRequest]).
 func (b *Bridge) suppressStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.ackUnansweredRequest(requestHdr, proto)
 	b.logger.Debug("matter.rx.im.status_suppressed",
 		slog.String("src", srcString(src)),
 		slog.String("stage", stage),
 		slog.String("status", status.String()))
+}
+
+// ackUnansweredRequest sends now the acknowledgement owed for a request
+// whose exchange ends without a reply to carry it — a Write or Invoke whose
+// SuppressResponse elides the answer. Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:462 at
+// db021da0 (the exchange closed after the handler) and
+// packages/protocol/src/protocol/MessageExchange.ts:1150-1156 (close sends
+// the standalone acknowledgement of the message still owed one, at once).
+// Left to the pump's grace window instead, the peer retransmits first;
+// discharged, it is never sent and the peer retransmits until the
+// duplicate is acknowledged. No-op when nothing is owed or no tracker is
+// wired.
+func (b *Bridge) ackUnansweredRequest(requestHdr *message.Header, proto message.ProtocolHeader) {
+	b.expediteDuplicateAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.RunAckPumpOnce(b.clk().Now())
 }
 
 func (b *Bridge) replyTimedStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {

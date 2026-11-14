@@ -598,9 +598,10 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	// elide it. matter.js InteractionServer.ts and chip
 	// WriteHandler.cpp both gate the reply on this flag. We still
 	// drive the side-effects (cluster writes already happened
-	// inside HandleWriteRequest) and discharge any owed MRP ack.
+	// inside HandleWriteRequest) and send the owed MRP ack, which no
+	// reply carries ([Bridge.ackUnansweredRequest]).
 	if req.SuppressResponse {
-		b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.write.suppressed",
 			slog.String("src", srcString(src)),
 			slog.Int("attribute_statuses", len(resp.Responses)))
@@ -757,11 +758,11 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// matter.js packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
 	// (the held `suppressedBuffer` is discarded — no message sent — when no
 	// cmd-response is produced). The command side-effects already ran inside
-	// HandleInvokeRequest; we only elide the wire reply and discharge the owed
+	// HandleInvokeRequest; we only elide the wire reply and send the owed
 	// MRP ack (the controller opted out of the StatusResponse handshake, so the
-	// Standalone Ack is all it expects).
+	// Standalone Ack is all it expects; [Bridge.ackUnansweredRequest]).
 	if req.SuppressResponse && !resp.HasCommandData() {
-		b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.suppressed",
 			slog.String("src", srcString(src)),
 			slog.Int("statuses", len(resp.Responses)))
