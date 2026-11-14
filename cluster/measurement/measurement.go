@@ -815,14 +815,8 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		// non-nullable bitmap (packages/model/src/logic/
 		// SelectDefaultValue.ts:155-171), as BooleanStateServer.MatterRead
 		// answers false.
-		v, ok := s.src.MatterBoolValue()
-		if !ok {
-			return uint8(0), true
-		}
-		if v {
-			return uint8(1), true
-		}
-		return uint8(0), true
+		v, _ := s.ObservedOccupancy()
+		return v, true
 	case attrOccupancySensorType:
 		// A type the features leave unset reads as the enum's
 		// SelectDefaultValue, Pir (0), as the kit's server does.
@@ -835,6 +829,19 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		return s.inst().ReadGlobal(attrID)
 	}
 	return nil, false
+}
+
+// ObservedOccupancy returns the Occupancy bitmap of the source's reading
+// and whether the source observes one. An unobserved source reads 0 on
+// the wire ([OccupancySensingServer.MatterRead]) but has taken no
+// reading: the bridge's OccupancyChanged observer neither emits nor
+// remembers it.
+func (s *OccupancySensingServer) ObservedOccupancy() (bitmap uint8, observed bool) {
+	v, ok := s.src.MatterBoolValue()
+	if ok && v {
+		return 1, true
+	}
+	return 0, ok
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Occupancy Sensing cluster is read-only at the wire layer.

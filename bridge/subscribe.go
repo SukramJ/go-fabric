@@ -2742,14 +2742,14 @@ func projectedOccupancy(ep *endpointpkg.Endpoint) *measurement.OccupancySensingS
 	return nil
 }
 
+// read is the reading the source took: an unobserved source, which reads 0
+// on the wire, has taken none and is neither emitted nor remembered.
 func (e *occupancyEvents) read() (uint8, bool) {
 	srv := projectedOccupancy(e.ep)
 	if srv == nil {
 		return 0, false
 	}
-	v, ok := srv.MatterRead(0x0000)
-	bitmap, isU8 := v.(uint8)
-	return bitmap, ok && isU8
+	return srv.ObservedOccupancy()
 }
 
 // check is [booleanStateEvents.check] for Occupancy: read, compare,
