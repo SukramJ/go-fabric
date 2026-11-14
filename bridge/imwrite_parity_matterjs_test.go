@@ -404,20 +404,20 @@ func TestWriteContinuationChunkParity(t *testing.T) {
 // — matter.js opens an exchange for a protocol handler only for an
 // initiator message and otherwise acknowledges and ignores it
 // (packages/protocol/src/protocol/ExchangeManager.ts:462-467, :496-507 at
-// db021da0; the standalone acknowledgement at :502). The acknowledgement
-// is the one message the bridge sends for it.
+// db021da0; the standalone acknowledgement at :502, sent at once). The
+// acknowledgement is the one message the bridge sends for it, and it goes
+// out when the request is ignored, not after the pump's grace window.
 func TestNonInitiatorRequestIgnoredParity(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	srv := &countingInvokeServer{id: 0x0006}
 	b.AttachRootClusters([]contract.ClusterServer{srv})
-	b.AttachAckTracker(mrp.NewAckTracker(0)) // due at once; attached after Start: no pump
+	b.AttachAckTracker(mrp.NewAckTracker(time.Hour)) // attached after Start: no pump
 	p := newIMPeer(t, b)
 	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true})
 	if err := p.sendReliable(0x4205, im.OpcodeInvokeRequest, false, payload); err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
-	b.RunAckPumpOnce(b.clk().Now())
 	if acks, others := p.received(300 * time.Millisecond); acks != 1 || len(others) != 0 {
 		t.Errorf("the bridge sent %d standalone acks and the messages %v, want one standalone ack and nothing else", acks, others)
 	}

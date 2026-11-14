@@ -706,7 +706,7 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	b.count(contract.MetricIMReceived)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType, requestHdr.SessionID) {
 	case imGateProceed:
-		if b.unsolicitedRequest(src, proto) {
+		if b.unsolicitedRequest(src, requestHdr, proto) {
 			return nil
 		}
 		// fall through to decode + dispatch below
@@ -796,16 +796,19 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 // unsolicitedRequest reports, and logs, an IM request that is not an
 // initiator message. Such a request reaches handleIMOpcode only on an
 // exchange this node did not open ([Bridge.deliverInitiatedSecure] claims
-// the others): it is acknowledged — the ack owed since receipt — and not
-// served. Mirrors matter.js
+// the others): it is acknowledged at once — the ack owed since receipt
+// ([Bridge.ackUnansweredRequest]) — and not served. Mirrors matter.js
 // packages/protocol/src/protocol/ExchangeManager.ts:462-467 at db021da0 (an
 // exchange for a protocol handler only for
 // `message.payloadHeader.isInitiatorMessage`) and :496-507 (an unsolicited
-// message that requires an ack is acknowledged and ignored).
-func (b *Bridge) unsolicitedRequest(src net.Addr, proto message.ProtocolHeader) bool {
+// message that requires an ack is acknowledged and ignored; :502 sends the
+// standalone acknowledgement before the exchange closes, not after a
+// piggyback window).
+func (b *Bridge) unsolicitedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) bool {
 	if proto.Initiator {
 		return false
 	}
+	b.ackUnansweredRequest(requestHdr, proto)
 	b.logger.Debug("matter.rx.im.unsolicited",
 		slog.String("src", srcString(src)),
 		slog.Int("opcode", int(proto.Opcode)),
