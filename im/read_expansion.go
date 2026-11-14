@@ -7,6 +7,8 @@ import (
 	"cmp"
 	"context"
 	"slices"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // EndpointExpander is the optional [Dispatcher] interface that lets an
@@ -298,11 +300,34 @@ func compareReadResultPaths(a, b ReadResult) int {
 
 // CompareAttributeIDs orders two attributes of cluster as every report of
 // this module lists a cluster's attributes — a Read's wildcard expansion,
-// a priming report and a subscription's change report alike: by ascending
-// id. It is the one place that order is decided. matter.js lists them in
-// its model's member order instead (review II, R2-P4-imread-12, open).
+// a priming report and a subscription's change report alike. It is the one
+// place that order is decided, and it is matter.js's: the order of the
+// cluster model's members ([schema.AttributeOrder]) — ClusterRevision,
+// FeatureMap, the cluster's own attributes as the model defines them, then
+// AttributeList, AcceptedCommandList and GeneratedCommandList for OnOff.
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:449-522
+// at db021da0 — clusterTypeProtocolOf builds a cluster's attribute list in
+// Scope.membersOf order — and AttributeReadResponse.ts:378-380, which walks
+// that list as built (review II, R2-P4-imread-12).
+//
+// An attribute that order does not list comes before the listed ones,
+// ascending by id among its kind. matter.js lists the members a server's
+// schema adds to a cluster's model before the model's own (findAllMembers
+// visits the extending schema before its base,
+// packages/model/src/logic/Scope.ts:287-333 at db021da0), in the order the
+// extension defines them; that order is not known here, so ascending id
+// among them is this module's rule.
 func CompareAttributeIDs(cluster, a, b uint32) int {
-	_ = cluster
+	rankA, listedA := schema.AttributeOrder(cluster, a)
+	rankB, listedB := schema.AttributeOrder(cluster, b)
+	switch {
+	case listedA && listedB:
+		return cmp.Compare(rankA, rankB)
+	case listedA:
+		return 1
+	case listedB:
+		return -1
+	}
 	return cmp.Compare(a, b)
 }
 

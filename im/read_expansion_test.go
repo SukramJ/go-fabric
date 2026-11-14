@@ -97,8 +97,10 @@ func TestAttributeExpansionHoldsOneEndpoint(t *testing.T) {
 }
 
 // TestAttributeExpansionAscendingSortsEachPath pins the priming order: a
-// path's results in ascending (endpoint, cluster, attribute) order, the
-// paths in request order.
+// path's results in ascending (endpoint, cluster) order, a cluster's
+// attributes in [CompareAttributeIDs] order, the paths in request order.
+// Of the fake's OnOff attributes 0-2, only OnOff (0x0000) is in matter.js's
+// model of the cluster; 1 and 2 are not and come before it.
 func TestAttributeExpansionAscendingSortsEachPath(t *testing.T) {
 	t.Parallel()
 	d := &endpointsDispatcher{eps: []uint16{5, 1, 3}, attrs: 3}
@@ -110,7 +112,7 @@ func TestAttributeExpansionAscendingSortsEachPath(t *testing.T) {
 	}
 	want := make([]ConcreteAttributePath, 0, 12)
 	for _, ep := range []uint16{3, 1, 3, 5} {
-		for a := range uint32(3) {
+		for _, a := range []uint32{1, 2, 0} {
 			want = append(want, ConcreteAttributePath{Endpoint: ep, Attribute: a})
 		}
 	}

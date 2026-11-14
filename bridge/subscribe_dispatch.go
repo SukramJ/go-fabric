@@ -53,15 +53,17 @@ func (b *Bridge) buildInitialReport(
 // left out.
 //
 // The statuses of the concrete paths go out first, in request order; the
-// values follow in ascending (endpoint, cluster, attribute) order per
-// path. Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
+// values follow in ascending (endpoint, cluster) order per path, a
+// cluster's attributes in matter.js's order (im.CompareAttributeIDs).
+// Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
 // stream order and the HAP-Service-Mapper's topology builder needs
 // Descriptor (0x001D) cached BEFORE the cluster surfaces it references —
 // otherwise `_attributeValueDictionaryForAttributePath` reports "PartsList
 // absent from cache" and HAP-Build aborts with HAPErrorDomain Code=14 ~5s
-// after Subscribe-Initial. The ascending order is not read from matter.js,
-// which sorts nothing in a read at db021da0: a wildcard walks the node's
-// endpoints, an endpoint's clusters and a cluster's attributes
+// after Subscribe-Initial. The ascending endpoint and cluster order is not
+// read from matter.js, which sorts nothing in a read at db021da0: a
+// wildcard walks the node's endpoints, an endpoint's clusters and a
+// cluster's attributes
 // (packages/protocol/src/action/server/
 // AttributeReadResponse.ts:183-185, :337-339, :378-380) in the order each
 // was added to its Set or list (packages/node/src/node/integration/

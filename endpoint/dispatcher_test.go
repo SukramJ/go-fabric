@@ -500,17 +500,21 @@ func TestRead_WildcardAttribute_ListerExpands(t *testing.T) {
 	if len(results) != 7 {
 		t.Fatalf("want 7 results (2 cluster attrs + 5 Matter-1.3 globals, deduped, no EventList), got %d", len(results))
 	}
+	// In matter.js's order of OnOff's members (im.CompareAttributeIDs,
+	// review II, R2-P4-imread-12): ClusterRevision, FeatureMap, the
+	// cluster's own attributes, then the global lists — the order a
+	// matter.js node at db021da0 serves a wildcard read of OnOff in.
 	want := []uint32{
-		0x0000, 0x4001,
-		cluster.AttrGlobalGeneratedCommandList,
-		cluster.AttrGlobalAcceptedCommandList,
-		cluster.AttrGlobalAttributeList,
-		cluster.AttrGlobalFeatureMap,
 		cluster.AttrGlobalClusterRevision,
+		cluster.AttrGlobalFeatureMap,
+		0x0000, 0x4001,
+		cluster.AttrGlobalAttributeList,
+		cluster.AttrGlobalAcceptedCommandList,
+		cluster.AttrGlobalGeneratedCommandList,
 	}
 	for i, r := range results {
 		if r.Path.Attribute != want[i] {
-			t.Errorf("result[%d].Attribute = 0x%04X, want sorted 0x%04X", i, r.Path.Attribute, want[i])
+			t.Errorf("result[%d].Attribute = 0x%04X, want 0x%04X (matter.js's order)", i, r.Path.Attribute, want[i])
 		}
 	}
 }
