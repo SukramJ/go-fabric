@@ -9,6 +9,7 @@ package endpoint
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -76,6 +77,39 @@ func TestWriteNumericListIndexParity(t *testing.T) {
 		}
 		if srv.writes != c.wantWrites {
 			t.Errorf("%s: %d writes, want %d", c.name, srv.writes, c.wantWrites)
+		}
+	}
+
+	// The timed check comes before it: an attribute with the timed quality
+	// outside a timed interaction answers NEEDS_TIMED_INTERACTION on a
+	// concrete path and is skipped on a wildcard one, the interaction going
+	// on (AttributeWriteResponse.ts:243-247 and :343-345 before writeValue's
+	// :419-424 at db021da0); inside a timed interaction the index ends it.
+	for _, c := range []struct {
+		name       string
+		ctx        context.Context
+		writes     []im.AttributeWrite
+		wantStatus im.StatusCode
+		wantResp   []im.StatusCode
+	}{
+		{"timed attribute, untimed, concrete", caseCtx(false), []im.AttributeWrite{
+			writeOf(indexed(concreteAttrPath(2, gateOnOff, gateOnTime)), uint16(7)),
+			writeOf(concreteAttrPath(2, gateOnOff, 0x0000), true),
+		}, im.StatusSuccess, []im.StatusCode{im.StatusNeedsTimedInteraction, im.StatusUnsupportedWrite}},
+		{"timed attribute, untimed, wildcard endpoint", caseCtx(false), []im.AttributeWrite{writeOf(indexed(wildcard), uint16(7))}, im.StatusSuccess, nil},
+		{"timed attribute, timed, concrete", caseCtx(true), []im.AttributeWrite{writeOf(indexed(concreteAttrPath(2, gateOnOff, gateOnTime)), uint16(7))}, im.StatusInvalidAction, nil},
+		{"timed attribute, timed, wildcard endpoint", caseCtx(true), []im.AttributeWrite{writeOf(indexed(wildcard), uint16(7))}, im.StatusInvalidAction, nil},
+	} {
+		srv := onTimeServer()
+		d := gateDispatcher(t, store.PrivilegeAdminister, srv)
+		d.timedWrite = &timedWriteTable{isTimed: func(c, a uint32) bool { return c == gateOnOff && a == gateOnTime }}
+		resp := im.HandleWriteRequest(c.ctx, d, im.WriteRequest{Writes: c.writes})
+		got := make([]im.StatusCode, len(resp.Responses))
+		for i, r := range resp.Responses {
+			got[i] = r.Status.Status
+		}
+		if resp.Status != c.wantStatus || !slices.Equal(got, c.wantResp) || srv.writes != 0 {
+			t.Errorf("%s: interaction %v, responses %v after %d writes, want %v, %v after none", c.name, resp.Status, got, srv.writes, c.wantStatus, c.wantResp)
 		}
 	}
 

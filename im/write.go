@@ -510,8 +510,8 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		//
 		// A path with a numeric ListIndex is never written: where its
 		// value would be written — past every other gate, the dispatcher's
-		// included — the interaction ends with InvalidAction
-		// ([listIndexGate]).
+		// existence, writability, access and timed checks included — the
+		// interaction ends with InvalidAction ([listIndexGate]).
 		var results []WriteResult
 		var indexGate listIndexGate
 		numericIndex := w.Path.HasListIndex && !w.Path.ListAppend
@@ -586,7 +586,9 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 // nothing is written for the path (packages/protocol/src/action/server/
 // AttributeWriteResponse.ts:419-424 at db021da0, "Unsupported Write path
 // provided: listIndex"); on a wildcard or group path the first endpoint
-// that reaches writeValue ends it (:360).
+// that reaches writeValue ends it (:360). The gate rides on the
+// dispatcher's authorizer, which endpoint.TopologyDispatcher asks for such
+// a path after its timed check, not before it.
 type listIndexGate struct{ reached bool }
 
 // wrap returns the authorizer the dispatcher asks where the value would be

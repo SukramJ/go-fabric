@@ -370,7 +370,7 @@ type WritePersister interface {
 // wildcard-endpoint write can be authorized, since the requested path
 // names no endpoint. authorize may be nil, which dispatches without a
 // gate.
-func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit,funlen // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
+func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocyclo,gocognit,funlen // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
@@ -466,6 +466,27 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					continue
 				}
 
+				// An attribute with the timed access quality outside a
+				// timed interaction (the check below the access gate).
+				timedRefused := timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute)
+				// A path with a numeric ListIndex meets the timed check
+				// before authorize: im's authorizer for it ends the
+				// interaction where the value would be written
+				// (im.listIndexGate), which matter.js does in writeValue,
+				// after the timed check
+				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247,
+				// :343-345 before :419-424 at db021da0). The order against
+				// the access check is kept: on a concrete path im decided
+				// access before dispatch and the authorizer is the gate
+				// alone, on a wildcard path both refusals skip the
+				// attribute without a status.
+				if timedRefused && path.HasListIndex && !path.ListAppend {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
+					}
+					continue
+				}
+
 				// Access-control gate at the RESOLVED location, evaluated
 				// after the writability verdict and before the value is
 				// applied — the order matter.js uses in
@@ -492,7 +513,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// (`if (limits.timed && !this.session.timed) … Status.NeedsTimedInteraction`)
 				// and :343-345 for the wildcard path; chip
 				// src/app/WriteHandler.cpp:798-802.
-				if timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute) {
+				if timedRefused {
 					if !wildcardEndpoint && path.HasAttribute {
 						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
 					}
