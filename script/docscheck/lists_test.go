@@ -219,6 +219,11 @@ var settingsSkipped = []string{"examples/", "script/", "notes/", "docs/", "store
 var variableKeySites = map[string][]string{
 	// aclExtensionSettingKey(fabric)
 	"cluster/core/access_control.go:AccessControl.persistExtension": {"access_control.extension.<fabric>"},
+	// one of the two pendingNOCKeys a release before v8 wrote, cleared after
+	// its one start-up read
+	"cluster/core/operational_credentials_pending.go:OperationalCredentials.recoverPendingNOCKey": {
+		"operational_credentials.pending_noc", "operational_credentials.pending_noc_update",
+	},
 	// the four timeSyncKey… constants, from its callers
 	"cluster/core/time_synchronization_features.go:TimeSynchronization.save": {
 		"timesync.trusted_time_source", "timesync.default_ntp", "timesync.time_zone", "timesync.dst_offset",
