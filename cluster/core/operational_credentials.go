@@ -1109,8 +1109,26 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		for i := range fabrics {
 			f := &fabrics[i]
 			id, err := o.store.GetIdentity(ctx, f.FabricIndex)
-			if err != nil {
+			switch {
+			case errors.Is(err, store.ErrIdentityNotFound):
+				// AddNOC inserts the fabric's row before its identity
+				// (handleAddNOC: AddFabric, then UpsertIdentity), and a
+				// read takes no nocMu: a fabric
+				// without an identity is one whose AddNOC has not
+				// stored its NOC yet, and the list is the one before
+				// that AddNOC.
 				continue
+			case err != nil:
+				// An identity the store cannot give fails the read, as
+				// the fabric list's failure does above and as the
+				// fabric-filtered read does ([OperationalCredentials.MatterReadFiltered]),
+				// instead of answering SUCCESS without that fabric's
+				// entry (review II, R2-P4-fr-sec-04). matter.js derives
+				// every fabric's NOCStruct from the fabric it holds
+				// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:540-545
+				// at db021da0, #updateFabrics), so its list always
+				// carries every fabric.
+				return nil, false
 			}
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,

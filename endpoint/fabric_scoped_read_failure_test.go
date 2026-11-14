@@ -59,6 +59,13 @@ func (s *faultingReadStore) GetFabric(ctx context.Context, fabric uint8) (store.
 	return s.Store.GetFabric(ctx, fabric)
 }
 
+func (s *faultingReadStore) GetIdentity(ctx context.Context, fabric uint8) (store.IdentityRecord, error) {
+	if err := s.fault(); err != nil {
+		return store.IdentityRecord{}, err
+	}
+	return s.Store.GetIdentity(ctx, fabric)
+}
+
 func (s *faultingReadStore) ListACL(ctx context.Context, fabric uint8) ([]store.ACLEntry, error) {
 	if err := s.fault(); err != nil {
 		return nil, err
@@ -94,8 +101,9 @@ func (s *faultingReadStore) ListGroupcastGroups(ctx context.Context, fabric uint
 	return s.Store.ListGroupcastGroups(ctx, fabric)
 }
 
-// twoFabricStore is a store with two fabrics, each holding one ACL entry,
-// one Extension entry, one GroupKeyMap entry and one group table entry.
+// twoFabricStore is a store with two fabrics, each holding its operational
+// identity, one ACL entry, one Extension entry, one GroupKeyMap entry and
+// one group table entry.
 func twoFabricStore(t *testing.T) *store.Store {
 	t.Helper()
 	ctx := context.Background()
@@ -117,6 +125,11 @@ func twoFabricStore(t *testing.T) *store.Store {
 			CompressedID: [8]byte{byte(id)},
 		})
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.UpsertIdentity(ctx, store.IdentityRecord{
+			FabricIndex: f, NOC: []byte{0x15, byte(f), 0x18}, PrivateKey: make([]byte, 32), IPK: make([]byte, 16),
+		}); err != nil {
 			t.Fatal(err)
 		}
 		if err := st.ReplaceACL(ctx, f, []store.ACLEntry{{
@@ -195,6 +208,10 @@ func fabricsOfList(t *testing.T, v any) []uint8 {
 		for _, e := range x {
 			out = append(out, e.FabricIndex)
 		}
+	case []mattercore.NOCStruct:
+		for _, e := range x {
+			out = append(out, e.FabricIndex)
+		}
 	default:
 		t.Fatalf("value %T is not a fabric-scoped list this test knows", v)
 	}
@@ -202,9 +219,11 @@ func fabricsOfList(t *testing.T, v any) []uint8 {
 }
 
 // TestFabricScopedReadFailureAnswersFailure fails, one at a time, every
-// store call a request's read of Acl, Extension, GroupKeyMap, GroupTable
-// and Fabrics makes, fabric-filtered and not, from fabric 1: each answers
-// FAILURE, and none answers the entries of the request-free read.
+// store call a request's read of Acl, Extension, GroupKeyMap, GroupTable,
+// Fabrics and NOCs makes, fabric-filtered and not, from fabric 1: each
+// answers FAILURE, and none answers the entries of the request-free read
+// (review II, R2-P4-fr-sec-04: the NOCs read's GetIdentity of each fabric
+// included).
 func TestFabricScopedReadFailureAnswersFailure(t *testing.T) {
 	t.Parallel()
 	st := twoFabricStore(t)
@@ -218,6 +237,7 @@ func TestFabricScopedReadFailureAnswersFailure(t *testing.T) {
 		{"GroupKeyMap", 0x003F, 0x0000},
 		{"GroupTable", 0x003F, 0x0001},
 		{"Fabrics", 0x003E, 0x0001},
+		{"NOCs", 0x003E, 0x0000},
 	} {
 		for _, filtered := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s fabricFiltered=%v", tc.name, filtered), func(t *testing.T) {
