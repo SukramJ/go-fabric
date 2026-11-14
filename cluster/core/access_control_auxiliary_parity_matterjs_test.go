@@ -207,6 +207,34 @@ func TestAccessControlAuxiliarySplitsProviderEntries(t *testing.T) {
 	}
 }
 
+// TestAccessControlAuxiliarySplitsByTheConfiguredLimits pins that the split
+// follows the limits the server is configured with — the ones its
+// SubjectsPerAccessControlEntry and TargetsPerAccessControlEntry
+// advertise — not the defaults: matter.js captures the state's limits as
+// auxiliaryEntryLimits (AccessControlServer.ts:67-70 at db021da0) and
+// #auxiliaryAclFor splits by them (:671, :681-682).
+func TestAccessControlAuxiliarySplitsByTheConfiguredLimits(t *testing.T) {
+	t.Parallel()
+	acl, err := core.NewAccessControl(newFakeStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	acl.SetLimits(core.AccessControlLimits{SubjectsPerEntry: 8, TargetsPerEntry: 8})
+	src := &auxSource{fabrics: []uint8{1}}
+	acl.RegisterAuxiliaryProvider(context.Background(), src)
+
+	src.emit(auxEntry(1, []uint16{1, 2, 3, 4, 5, 6}, 1, 2, 3, 4, 5, 6))
+
+	v, ok := acl.MatterRead(0x0007)
+	if !ok {
+		t.Fatal("AuxiliaryAcl unreadable")
+	}
+	got := v.([]core.AccessControlAuxiliaryEntryStruct)
+	if len(got) != 1 || len(got[0].Entry.Subjects) != 6 || len(got[0].Entry.Targets) != 6 {
+		t.Fatalf("AuxiliaryAcl under limits of 8 = %d entries %+v, want one of 6 subjects and 6 targets", len(got), got)
+	}
+}
+
 // auxDevice is a commissioned fabrictest pair — matter.js's
 // createOnline(AuxiliaryRoot) plus addFabric, or addCommissionedPair for
 // the controller cases. The Go node serves AccessControl with Extension and
