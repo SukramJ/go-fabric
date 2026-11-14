@@ -377,8 +377,34 @@ func TestHostGroups(t *testing.T) {
 // TestLastFabricReopenWaitsForTheFailSafe: with a fail-safe armed when the
 // last fabric goes, the own window stays closed until the fail-safe ends —
 // matter.js #resetWhenIdle waits for it (CommissioningServer.ts:183-188),
-// since a commissioning under it may still add a fabric.
+// since a commissioning under it may still add a fabric. The fail-safe is
+// a commissioner's armed over PASE: one the removed fabric armed itself
+// expires with the fabric (review II, R2-P3-admin-06), and its own window
+// then reopens at once (TestFailSafeOfTheLastFabricEndsWithIt).
 func TestLastFabricReopenWaitsForTheFailSafe(t *testing.T) {
+	ctx := context.Background()
+	adv := mdns.NewNoop()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.Advertiser = adv
+	n, c, _ := commissioned(t, cfg)
+	if err := n.Root().GeneralCommissioning.ArmFailSafeFor(ctx, 60, 0); err != nil {
+		t.Fatalf("arm the fail-safe over PASE: %v", err)
+	}
+	if err := n.RemoveFabric(ctx, c.FabricIndex()); err != nil {
+		t.Fatalf("RemoveFabric: %v", err)
+	}
+	time.Sleep(4 * 250 * time.Millisecond)
+	if n.Bridge().CommissioningWindow().IsOpen() {
+		t.Fatal("the own window reopened while a fail-safe was armed")
+	}
+	n.Root().GeneralCommissioning.ExpireFailSafe(ctx)
+	waitRecord(t, adv, "own window after the fail-safe ended", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
+}
+
+// TestFailSafeOfTheLastFabricEndsWithIt: a fail-safe the last fabric armed
+// over CASE expires with the fabric (review II, R2-P3-admin-06), so the own
+// window reopens without waiting for it.
+func TestFailSafeOfTheLastFabricEndsWithIt(t *testing.T) {
 	ctx := context.Background()
 	adv := mdns.NewNoop()
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
@@ -391,10 +417,8 @@ func TestLastFabricReopenWaitsForTheFailSafe(t *testing.T) {
 	if err := n.RemoveFabric(ctx, c.FabricIndex()); err != nil {
 		t.Fatalf("RemoveFabric: %v", err)
 	}
-	time.Sleep(4 * 250 * time.Millisecond)
-	if n.Bridge().CommissioningWindow().IsOpen() {
-		t.Fatal("the own window reopened while a fail-safe was armed")
+	if n.Root().GeneralCommissioning.FailSafeArmed() {
+		t.Fatal("the fail-safe the removed fabric armed is still armed")
 	}
-	n.Root().GeneralCommissioning.ExpireFailSafe(ctx)
-	waitRecord(t, adv, "own window after the fail-safe ended", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
+	waitRecord(t, adv, "own window after the last fabric's removal", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
 }
