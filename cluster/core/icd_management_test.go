@@ -489,3 +489,42 @@ func TestICDManagementInstructionServedOnlyWhenSet(t *testing.T) {
 		}
 	}
 }
+
+// TestICDRegisterClientHoldsClientTypeToItsEnum: a RegisterClient whose
+// ClientType ClientTypeEnum does not define is refused with
+// CONSTRAINT_ERROR and registers nothing, an existing entry included.
+// matter.js does not refuse the value in the request (its request schema
+// holds an enum to its type only, packages/types/src/tlv/TlvOfModel.ts:221-223
+// at db021da0); the refusal comes when the entry enters the
+// RegisteredClients state (IcdManagementServer.ts:572-583,
+// ListManager.ts:379-386 and :428-432, the enum validator
+// ValueValidator.ts:167-179: Status.ConstraintError).
+func TestICDRegisterClientHoldsClientTypeToItsEnum(t *testing.T) {
+	t.Parallel()
+	s := newICDServer(t, core.ICDManagementConfig{
+		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
+		ClientsSupportedPerFabric: 2, Store: icdStore(t),
+	})
+	admin := icdInvokeCtx(1, privAdminister)
+	reg := func(node uint64, ct icddef.ClientTypeEnum) error {
+		_, err := s.MatterInvoke(admin, icddef.CmdRegisterClient, icddef.RegisterClientRequest{
+			CheckInNodeId: node, MonitoredSubject: node, Key: icdKey(1), ClientType: ct,
+		})
+		return err
+	}
+	if err := reg(0x10, 7); icdStatus(err) != im.StatusConstraintError {
+		t.Fatalf("RegisterClient with ClientType 7 = %v, want CONSTRAINT_ERROR", err)
+	}
+	if got := s.Registrations(1); len(got) != 0 {
+		t.Fatalf("registrations after the refusal = %+v, want none", got)
+	}
+	if err := reg(0x10, icddef.ClientTypeEphemeral); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg(0x10, 2); icdStatus(err) != im.StatusConstraintError {
+		t.Fatalf("re-registration with ClientType 2 = %v, want CONSTRAINT_ERROR", err)
+	}
+	if got := s.Registrations(1); len(got) != 1 || uint8(got[0].ClientType) != uint8(icddef.ClientTypeEphemeral) {
+		t.Fatalf("registrations after the refused update = %+v, want the Ephemeral entry unchanged", got)
+	}
+}
