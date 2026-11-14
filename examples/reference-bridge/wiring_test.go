@@ -27,6 +27,7 @@ import (
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -50,6 +51,10 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, root *nod
 // the CSR (and, in the real flow, the installed fabric index) the finished
 // commissioning left behind. Left pending, that index is what a lapsed
 // auto-armed window reverts — deleting the committed fabric.
+//
+// AddNOC checks the trusted root before the CSR (matter.js's order), so
+// the new fail-safe context is given a root first: without one AddNOC
+// answers "no trusted root" whether or not the CSR survived.
 func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	_, root := testRootClusters(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -85,6 +90,16 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 		t.Fatalf("the PASE arm: %v", err)
 	}
 
+	// A root for the new context, so that AddNOC's root check passes and
+	// its CSR check is the one that answers.
+	authority, err := ca.New(ca.Config{})
+	if err != nil {
+		t.Fatalf("ca.New: %v", err)
+	}
+	if _, err := root.OperationalCredentials.MatterInvoke(ctx, 0x0B, mattercore.AddTrustedRootCertificateRequest{RootCACertificate: authority.RootCert()}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+
 	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})
 	if err != nil {
 		t.Fatalf("AddNOC: %v", err)
@@ -95,7 +110,8 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	}
 	if resp.StatusCode != mattercore.NOCStatusMissingCsr {
 		t.Fatalf("AddNOC after CommissioningComplete = status %d (%q), want MissingCsr (%d): the finished "+
-			"commissioning's pending state survived Complete — SetOnCommissioningComplete is not wired to ClearPendingState",
+			"commissioning's CSR survived Complete and the next fail-safe's start — neither SetFailSafeCommit "+
+			"(CommitFailSafe) nor SetOnFailSafeStarting (PrepareFreshFailSafe) dropped the pending state",
 			resp.StatusCode, resp.DebugText, mattercore.NOCStatusMissingCsr)
 	}
 }
