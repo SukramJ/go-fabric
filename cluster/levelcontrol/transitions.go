@@ -173,9 +173,16 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // QuietEvent's QuietObservable, ServerBehaviorBacking.ts:251-259): at
 // once from or to null and otherwise at most once a second, the end of a
 // transition flushing the last value — a report the quieter defers
-// carries the origin of the last change before it. On the hand-off path
-// the host's own notifier is the wire's ([Server.OnMatterValueChanged]),
-// so the listeners alone are told.
+// carries the origin of the last change before it. Under the engine each
+// change advances the server's DataVersion once, a transition's step as
+// much as a command's level: matter.js advances the version on every
+// commit that changed a value (Datasource.ts:1456-1457 at db021da0), and
+// its quiet emit adds no advance for currentLevel (advanceVersionFor,
+// ServerBehaviorBacking.ts:259, advances only for a dynamic property,
+// Datasource.ts:679-688). On the hand-off path the host's own notifier is
+// the wire's ([Server.OnMatterValueChanged]) and advances the version, a
+// command's change advances it in [Server.finish], so the listeners alone
+// are told.
 func (s *Server) observeLevel(origin contract.Origin) {
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
@@ -185,6 +192,9 @@ func (s *Server) observeLevel(origin contract.Origin) {
 	s.mu.Unlock()
 	if !changed {
 		return
+	}
+	if s.engine != nil {
+		s.tracker().Bump()
 	}
 	s.changes.ChangedFrom(origin, AttrCurrentLevel)
 	if s.quiet != nil {

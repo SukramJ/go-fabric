@@ -274,6 +274,44 @@ func TestMoveToLevelTransitionReadsPartWay(t *testing.T) {
 	})
 }
 
+// TestEveryLevelChangeAdvancesTheDataVersionOnce: under the engine each
+// change of CurrentLevel — a transition's step as much as a level a
+// command applies at once — advances the server's DataVersion once, and
+// a command adds no advance of its own. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (every commit that changed a value advances the version; a
+// step writes currentLevel in a commit of its own); the quiet emit's
+// advanceVersionFor (ServerBehaviorBacking.ts:258-260) advances only for a
+// dynamic property (Datasource.ts:679-688), which currentLevel is not.
+func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := newDevice(50, true)
+		srv := engineServer(d, nil)
+		r := observe(t, srv)
+		before := srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200, TransitionTime: u16(300)}); err != nil {
+			t.Fatal(err)
+		}
+		sleep(35 * time.Second)
+		levels, _ := r.snapshot()
+		if len(levels) < 2 || level(t, srv) != 200 {
+			t.Fatalf("the transition reported %v, want several steps ending at 200", levels)
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)) {
+			t.Errorf("%d level changes advanced the DataVersion by %d, want one each", len(levels), got)
+		}
+
+		before = srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 100, TransitionTime: u16(0)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if got := srv.MatterDataVersion() - before; got != 1 || level(t, srv) != 100 {
+			t.Errorf("a MoveToLevel applied at once advanced the DataVersion by %d (level %d), want 1", got, level(t, srv))
+		}
+	})
+}
+
 // TestMoveAndStop is TC-LVL-4.1 / TC-LVL-6.1 (Test_TC_LVL_4_1.yaml,
 // Test_TC_LVL_6_1.yaml): Move up at 5/s from 50 reads ~100 after 10 s; a
 // Stop after 5 s leaves it at 64-86 and RemainingTime at 0; Rate 0 is

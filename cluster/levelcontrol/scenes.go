@@ -114,9 +114,10 @@ func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]u
 			tenths := float64(transitionMs) / 100
 			rateFrom = func(current float64) float64 { return (float64(level) - current) / tenths * 10 }
 		}
+		// Each change of CurrentLevel advanced the DataVersion
+		// ([Server.observeLevel]).
 		if err := s.transition(ctx, float64(level), 0, rateFrom, false, OptionExecuteIfOff); err == nil {
 			s.invalidateScenes()
-			s.bumpIfMoved(before)
 		}
 		return
 	}

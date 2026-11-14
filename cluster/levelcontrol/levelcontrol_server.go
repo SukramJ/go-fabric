@@ -885,18 +885,22 @@ func (s *Server) forward(name string, executes bool, before levelReading, call f
 }
 
 // finish turns a port result into the (response, error) pair the
-// dispatcher expects. The DataVersion advances when the command changed
-// CurrentLevel from before — the one attribute of this cluster's state a
-// command changes (RemainingTime is computed, as matter.js's virtual
-// remainingTime is, LevelControlServer.ts:805-822 at db021da0) — and a
-// refusal keeps it where it was. Mirrors matter.js
+// dispatcher expects. On the hand-off path the DataVersion advances when
+// the command changed CurrentLevel from before — the one attribute of
+// this cluster's state a command changes (RemainingTime is computed, as
+// matter.js's virtual remainingTime is, LevelControlServer.ts:805-822 at
+// db021da0) — and a refusal keeps it where it was. Under the engine every
+// change of CurrentLevel advanced it already ([Server.observeLevel]).
+// Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
 // db021da0 (a commit advances the version only `if (changes)`).
 func (s *Server) finish(name string, err error, before levelReading) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("levelcontrol: %s: %w", name, err)
 	}
-	s.bumpIfMoved(before)
+	if s.engine == nil {
+		s.bumpIfMoved(before)
+	}
 	return nil, nil
 }
 
