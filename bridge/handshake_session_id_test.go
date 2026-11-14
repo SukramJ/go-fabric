@@ -20,6 +20,27 @@ import (
 // (packages/protocol/src/securechannel/SecureChannelProtocol.ts:129, :146 at
 // db021da0) and reserves no id before the session
 // (SessionManager.ts:581-598).
+//
+// Such a message is acknowledged and no more: no StatusReport, no counted
+// PASE failure (review II, R2-P4-cert-02, owner decision 70). matter.js hands
+// every other opening message to the base handler, which throws
+// (SecureChannelProtocol.ts:152-153, :43-50 at db021da0), and the exchange
+// manager only logs the error (ExchangeManager.ts:494, :538-549); chip has
+// no unsolicited handler for the type and sends the standalone
+// acknowledgement only (src/messaging/ExchangeMgr.cpp:437 at 6170af84).
+
+// requireAcknowledgedOnly fails t unless the message on exchangeID was
+// acknowledged and no more: its acknowledgement is still owed — no reply
+// carried it — and nothing on the exchange waits for the peer's.
+func requireAcknowledgedOnly(t *testing.T, b *Bridge, exchangeID uint16, what string) {
+	t.Helper()
+	if !b.ackTracker.Owes(0, exchangeID, false) {
+		t.Fatalf("%s on exchange %#x: no acknowledgement owed — a reply carried it", what, exchangeID)
+	}
+	if got := pendingOnUnsecuredExchange(b, exchangeID); got != 0 {
+		t.Fatalf("%s on exchange %#x: %d reliable replies sent, want none", what, exchangeID, got)
+	}
+}
 
 func TestCASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
 	t.Parallel()
@@ -38,6 +59,10 @@ func TestCASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
 	if got := built.Load(); got != 0 {
 		t.Fatalf("CASE adapters built for Sigma3 / Sigma2_Resume on exchanges without a Sigma1: %d, want 0", got)
 	}
+	for i := range 32 {
+		requireAcknowledgedOnly(t, r.b, uint16(0x4000+i), "a Sigma3 without a Sigma1")
+		requireAcknowledgedOnly(t, r.b, uint16(0x5000+i), "a Sigma2_Resume without a Sigma1")
+	}
 }
 
 func TestPASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
@@ -55,10 +80,10 @@ func TestPASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
 	if got := built.Load(); got != 0 {
 		t.Fatalf("PASE adapters built for Pake1 / Pake3 without a PBKDFParamRequest: %d, want 0", got)
 	}
-	// Each still fails as a pairing attempt: answered and counted.
-	peer.recv(mrp.SCOpcodeStatusReport, "the Pake1's failure report")
-	if got := r.b.paseFailures.Load(); got != 2 {
-		t.Fatalf("PASE failures = %d, want 2", got)
+	requireAcknowledgedOnly(t, r.b, 0x4000, "a Pake1 without a PBKDFParamRequest")
+	requireAcknowledgedOnly(t, r.b, 0x4001, "a Pake3 without a PBKDFParamRequest")
+	if got := r.b.paseFailures.Load(); got != 0 {
+		t.Fatalf("PASE failures = %d, want 0: no pairing began", got)
 	}
 }
 

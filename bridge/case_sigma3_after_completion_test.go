@@ -212,7 +212,7 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 // handshake completed, the success report is sent again only for the
 // Sigma3 that completed it — the same bytes — arriving over the route it
 // completed on; a Sigma3 of other bytes, or the same bytes from another
-// address, is answered as a Sigma3 of a handshake that never began, and
+// address, is answered with the failure report, and
 // takes nothing from the retransmission that follows (review II,
 // R2-P3-rr-dev-01).
 func TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute(t *testing.T) {
