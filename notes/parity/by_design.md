@@ -92,18 +92,19 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-BooleanStateConfiguration-RulesInServer | `BooleanStateConfigurationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/boolean-state-configuration/BooleanStateConfigurationServer.ts` | `"export class BooleanStateConfigurationServer extends BooleanStateConfigurationBehavior {}"` | connectedhomeip | no |
 | BD-chip-WaterHeaterManagement-RulesInServer | `WaterHeaterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/water-heater-management/WaterHeaterManagementServer.ts` | `"export class WaterHeaterManagementServer extends WaterHeaterManagementBehavior {}"` | connectedhomeip | no |
 | BD-chip-AlarmBase-RulesInServer | `DishwasherAlarmServer.ts:14`, `RefrigeratorAlarmServer.ts:14`, `TemperatureAlarmServer.ts:17` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/dishwasher-alarm/DishwasherAlarmServer.ts`<br>`packages/node/src/behaviors/refrigerator-alarm/RefrigeratorAlarmServer.ts`<br>`packages/node/src/behaviors/temperature-alarm/TemperatureAlarmServer.ts` | `"export class DishwasherAlarmServer extends DishwasherAlarmBehavior {}"`<br>`"export class RefrigeratorAlarmServer extends RefrigeratorAlarmBehavior {}"`<br>`"export class TemperatureAlarmServer extends TemperatureAlarmBehavior {}"` | connectedhomeip | no |
-| BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip | no |
+| BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip; the model's write check is relaxed for LaundryWasherControls NumberOfRinses, which `src/app/clusters/laundry-washer-controls-server/LaundryWasherControlsCluster.cpp:132-145` at `6170af84` answers INVALID_IN_STATE when SupportedRinses does not list it (owner decision 69) | no |
 | BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip | no |
 | BD-chip-EVSE-TargetsServerHeld | `CommandInvokeResponse.ts:484-487` validates the request against the model before the invoker (presence), and `EnergyEvseServer.ts:14` is the empty subclass (absence: the class line) | `packages/protocol/src/action/server/CommandInvokeResponse.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"            if (!skipValidation) {\n                requestTlv.validate(request);\n            }"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip `src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp` at `6170af84` (`ValidateTargets` :564-565), case `src/python_testing/TC_EEVSE_2_3.py` step 19 (:411-439) | no |
 | BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip | no |
 | BD-chip-Thermostat-Schedules | `ThermostatServer.ts:82`, the class doc lists the feature unimplemented (presence; :126-128 warns when it is enabled) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"MatterScheduleConfiguration: This feature is not implemented yet."` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp` at `645b267a` (`SetActiveSchedule` :741, `AppendPendingSchedule` :795, `ValidateScheduleTransitions` :292, `ValidateTransitionsPerDay` :457, the atomic hooks :620-663, `PrecommitSchedules` :1000) | yes |
-| BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81`, the class doc's list of the features it does not implement (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1782 lines at `db021da0`) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
+| BD-chip-Thermostat-Suggestions | `ThermostatServer.ts:81-85`, the class doc's whole list of what it does not implement, quoted so that any change to the list trips the check (presence, as `BD-chip-Thermostat-Schedules`'; absence: no suggestion text anywhere in the file, 1782 lines at `db021da0`) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"We implement all features beside the following:\n * * MatterScheduleConfiguration: This feature is not implemented yet.\n * * ScheduleConfiguration: This feature is deprecated and not allowed to be enabled.\n * * Setback: This feature is considered deprecated.\n * * The use of the \"setpointHoldExpiryTimestamp\" attribute is currently not supported.\n *\n"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp` at `6170af84` (`RemoveExpiredSuggestions` :41, `RemoveFromThermostatSuggestionsList` :69, `AddThermostatSuggestion` :160, `RemoveThermostatSuggestion` :249, `ReEvaluateCurrentSuggestion` :271), the reference delegate `examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp` (`GetUniqueID` :169, `ReEvaluateCurrentSuggestion` :234) | yes |
+| BD-Matter-Thermostat-Hold-ReachesHost | `ThermostatServer.ts:381` at `db021da0`: the reaction to a change of TemperatureSetpointHold is commented out, its handler in a comment from `:385` (presence: the commented-out line) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"//this.maybeReactTo(this.events.temperatureSetpointHold$Changed, this.#handleTemperatureSetpointHoldChange);"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterHold.cpp` at `6170af84` (`:76-93`: a write of the attribute goes to the hold delegate, whose status answers it) | no |
 | BD-chip-Chime-RulesInServer | `ChimeServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/chime/ChimeServer.ts` | `class ChimeServer` | connectedhomeip `src/app/clusters/chime-server/ChimeCluster.cpp` at `6170af84` (`IsSupportedChimeID` :176, `SetSelectedChime` :215, `SetEnabled` :228, `HandlePlayChimeSound` :258, `GenerateChimeStartedPlayingEvent` :291), tests `tests/TestChimeCluster.cpp` | no |
 | BD-chip-CameraAvSettings-RulesInServer | `CameraAvSettingsUserLevelManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-settings-user-level-management/CameraAvSettingsUserLevelManagementServer.ts` | `class CameraAvSettingsUserLevelManagementServer` | connectedhomeip `src/app/clusters/camera-av-settings-user-level-management-server/CameraAvSettingsUserLevelManagementLogic.cpp` at `6170af84` (the handlers :721-1261, `OnPhysicalMovementComplete` :1265, the limit setters :339-407, the DPTZ streams :469-591), tests `tests/TestCameraAvSettingsUserLevelManagementCluster.cpp` | no |
 | BD-chip-CameraAvStreamManagement-RulesInServer | `CameraAvStreamManagementServer.ts:18` is the empty subclass (absence: the class body, 18 lines in all) | `packages/node/src/behaviors/camera-av-stream-management/CameraAvStreamManagementServer.ts` | `class CameraAvStreamManagementServer` | connectedhomeip `src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp` at `6170af84` (`Init` :76, the reference counts :486-557, `SetViewport` :1137, the handlers :2065-2669, `IsResourceAvailableForStreamAllocation` :2717), `CameraAVStreamManagementCluster.h` (the delegate :159-372, `ValidateStreamForModifyOrDeallocateImpl` :794), tests `tests/TestCameraAVStreamManagementCluster.cpp` | no |
 | BD-chip-ZoneManagement-RulesInServer | `ZoneManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/zone-management/ZoneManagementServer.ts` | `class ZoneManagementServer` | connectedhomeip `src/app/clusters/zone-management-server/ZoneManagementCluster.cpp` at `6170af84` (`ValidateConfiguration` :85, the Sensitivity write :259-284, the handlers :462-659, the events :701-733), `zone-geometry.h` (`IsZoneSelfIntersecting` :158), tests `tests/TestZoneManagementCluster.cpp`, `tests/TestZonePolygon.cpp` | no |
 | BD-chip-WebRtcTransportProvider-RulesInServer | `WebRtcTransportProviderServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/web-rtc-transport-provider/WebRtcTransportProviderServer.ts` | `class WebRtcTransportProviderServer` | connectedhomeip `src/app/clusters/webrtc-transport-provider-server/WebRTCTransportProviderCluster.cpp` at `6170af84` (the validators :133-209, :400-592, the session table :295-398, the handlers :595-1213), the camera app's stream answers `examples/camera-app/linux/src/clusters/camera-avstream-mgmt/camera-av-stream-manager.cpp` and its signals to the requestor `examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp` (FindOrEstablishSession :860-942, SendOfferCommand :1093, SendAnswerCommand :1189, SendICECandidatesCommand :1221, SendEndCommand :1301), tests `tests/TestWebRTCTransportProviderCluster.cpp` | no |
-| BD-chip-PushAvStreamTransport-RulesInServer | `PushAvStreamTransportServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/push-av-stream-transport/PushAvStreamTransportServer.ts` | `class PushAvStreamTransportServer` | connectedhomeip `src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp` at `6170af84` (`ValidateUrl` :293, `ValidateIncomingTransportOptions` :387, `ValidateStreamParameters` :665, the handlers :880-1603, the events :1903-2031), the camera app's answers `push-av-stream-manager.cpp`, tests `tests/TestPushAVStreamTransportCluster.cpp`, `tests/TestURLParsing.cpp` | no |
+| BD-chip-PushAvStreamTransport-RulesInServer | `PushAvStreamTransportServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/push-av-stream-transport/PushAvStreamTransportServer.ts` | `class PushAvStreamTransportServer` | connectedhomeip `src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp` at `6170af84` (`ValidateUrl` :293, `ValidateIncomingTransportOptions` :387, `ValidateStreamParameters` :665, the handlers :880-1603, the events :1903-2031), the camera app's answers `push-av-stream-manager.cpp`, tests `tests/TestPushAVStreamTransportCluster.cpp`, `tests/TestURLParsing.cpp`; the model's request check is relaxed for TransportOptionsStruct.VideoStreams and AudioStreams (`:672-678`) and TransportTriggerOptionsStruct.MotionSensitivity (`:571-577`), owner decision 69 | no |
 | BD-chip-TlsCertificateManagement-RulesInServer | `TlsCertificateManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-certificate-management/TlsCertificateManagementServer.ts` | `class TlsCertificateManagementServer` | connectedhomeip `src/app/clusters/tls-certificate-management-server/TLSCertificateManagementCluster.cpp` at `6170af84` (the constructor :61-73, the handlers :230-553, `OnFabricRemoved` :571-575), `CertificateTableImpl.cpp`, `IncrementingIdHelper.h`, the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-certificate-management-instance.cpp`, tests `tests/TestTLSCertificateManagementCluster.cpp`, `tests/FuzzTLSCertificateManagementPW.cpp` | no |
 | BD-chip-TlsClientManagement-RulesInServer | `TlsClientManagementServer.ts:14` is the empty subclass (absence: the class body, 14 lines in all) | `packages/node/src/behaviors/tls-client-management/TlsClientManagementServer.ts` | `class TlsClientManagementServer` | connectedhomeip `src/app/clusters/tls-client-management-server/TLSClientManagementCluster.cpp` at `6170af84` (the constructor :53-63, the handlers :177-271, `OnFabricRemoved` :272-275), the example delegate `examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp`, tests `tests/TestTLSClientManagementCluster.cpp` | no |
 | BD-chip-WiFiNetworkManagement-RulesInServer | `WiFiNetworkManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/wi-fi-network-management/WiFiNetworkManagementServer.ts` | `"export class WiFiNetworkManagementServer extends WiFiNetworkManagementBehavior {}"` | connectedhomeip `src/app/clusters/wifi-network-management-server/WiFiNetworkManagementCluster.cpp` at `6170af84` (`ClearNetworkCredentials` :62, `SetNetworkCredentials` :74, `ReadAttribute` :105, `InvokeCommand` :123) | no |
@@ -135,7 +136,6 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-OccupancySensing-HoldTimer | `OccupancySensingServer.ts:76-85` clears the HoldTime dependents (:93-104) when HoldTime is unset and arms no timer (absence: the whole class body, :21-91) | `packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts` | `class OccupancySensingServer` | connectedhomeip `src/app/clusters/occupancy-sensor-server/OccupancySensingCluster.cpp` at `6170af84` (`SetHoldTime` :206-275, `SetOccupancy` :277-297, `TimerFired` :299-302, the aliases :151-155, :170-181, `SetHoldTimeLimits` :333-351), tests `tests/TestOccupancySensingCluster.cpp` | no |
 | BD-Matter-VIDStatementVerification | `VendorIdVerification.ts:263-271` at `db021da0` accepts a VID Verification Statement without a VVSC ("TODO Fail if not available!"), and `:232-240` leaves the path of the VVSC to a trust anchor a TODO (presence) | `packages/node/src/behaviors/operational-credentials/VendorIdVerification.ts` | `"// TODO Fail if not available!"` | the specification's procedure as matter.js quotes it at `VendorIdVerification.ts:233-240`; connectedhomeip does not support the statement (`src/credentials/jcm/VendorIdVerificationClient.cpp:103-104` at `6170af84`) | no |
 | BD-Matter-Commissioner-TermsRequirementRead | `ControllerCommissioningFlow.ts:570` at `db021da0` leaves the terms-and-conditions consent a TODO after step 8.2 and the flow reads no TC attribute (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"// TODO Step 9: If device and Controller supports T&C Feature then User consent is handled"` | this module: connectedhomeip sends the acknowledgement as a parameter and reads no TC attribute either (`src/controller/CHIPDeviceController.cpp:2592-2603`, `:3946-3957` at `6170af84`); the device side it reads is its own TC server (`BD-chip-GeneralCommissioning-TermsAndConditions`) | no |
-| BD-matterjs-mdns-interface-allowlist | `MdnsServer.ts:211` at `db021da0` announces "on every multicast interface", one `InterfaceResponder` per listed interface (`:36-38`), with no list of interfaces to choose (presence); the one choice is `MdnsService`'s limit to a single named interface (`packages/protocol/src/mdns/MdnsService.ts:34`, `:56`, `:63`; `MdnsServer.ts:484-487`) | `packages/protocol/src/mdns/MdnsServer.ts` | `"Announce the named services, or all registered services if none are named, on every multicast interface."` | this module: an operator's allow-list by interface name within the default container filter (owner decision on issue 450); matter.js-based bridges offer the option at the host level | no |
 | BD-Matter-ProvenOperationalHost | `ServerAddressSet.ts:165-184` ranks an address by class, health and DNS priority and knows no host; `PeerDescriptor.ts:48` persists the operational address, not the host it belonged to (presence) | `packages/general/src/net/ServerAddressSet.ts` | `"export function compareDesirability(a: ServerAddress, b: ServerAddress) {"` | the session itself: the node answered from an address, and one discovered SRV target owns it (issue 478's capture: a border router answering a node's instance with its own host) | no |
 | BD-Matter-ControllerDiagnostics | `PeerSet.ts:218` at `db021da0` exposes the peers as a live set (`get peers()`) and `SessionManager.ts:376` the sessions (`get sessions()`); no snapshot, trace or finding type serves a host's diagnostics view (presence) | `packages/protocol/src/peer/PeerSet.ts` | `"    get peers() {"` | this module's node-side facade (`node.SessionDiagnostics`, `diagevent.Ring`, `mdns.Diagnose`) applied to the controller role; matterjs-server at `0bd06f2` serves only Thread diagnostics (`packages/ws-controller/src/server/WebSocketControllerHandler.ts:144`) | no |
 | BD-Matter-OnboardingCodeKept | `CommissioningClient.ts:959` ff. at `db021da0`: `State` persists the discriminator (:1046), vendor and product, and no passcode or pairing code; the passcode's only use is the hand-over to the commissioner (presence, :290-291) | `packages/node/src/behavior/system/commissioning/CommissioningClient.ts` | `"            passcode,\n            discoveryData: this.descriptor,"` | this module's own design (owner decision 2026-11-13); the long manual code of a non-standard flow follows connectedhomeip `src/setup_payload/ManualSetupPayloadGenerator.cpp:116` at `6170af84` | no |
@@ -238,7 +238,9 @@ speed-oriented write into one `fan.Settings` before the host sees it:
   at `6170af84`.
 - A null PercentSetting / SpeedSetting write succeeds and changes nothing
   (:86-87, :126); a FanMode the FanModeSequence does not offer is
-  CONSTRAINT_ERROR (:48-51, :62-63); the deprecated On maps to High and
+  CONSTRAINT_ERROR (:48-51, :62-63), where connectedhomeip answers
+  INVALID_IN_STATE under a TODO for the ConstraintError
+  (`FanControlCluster.cpp:394-398`); the deprecated On maps to High and
   Smart to Auto or High, as connectedhomeip does (`FanControlCluster.cpp:401-411`).
 - Step goes to a host `Stepper` when there is one; otherwise the server
   steps one unit of SpeedSetting (MultiSpeed) or one rung of the
@@ -693,19 +695,6 @@ interface left without advertised addresses therefore names the service
 records too, where matter.js's names the addresses alone.
 
 
-### BD-Matter-mDNSDeviceType — commissionable DT advertises RootNode, not Aggregator
-
-The commissionable `DT` TXT key + `_T<id>` subtype advertise RootNode
-(0x0016) rather than the Aggregator application device-type (0x000E) that
-connectedhomeip's `Dnssd.cpp` would emit (`cmd/openccu-loom/daemon.go`):
-`src/app/server/Dnssd.cpp:303-306` at `6170af84` advertises the device type
-id its platform configuration returns, when the commissionable device type
-is enabled; that a bridge's is the Aggregator's was not read (unverified).
-
-**Rationale:** empirical Apple-pairing observation — recorded here so the
-audit does not re-flag it (parity audit 2026-05-30 CHIP-mDNS F2). The wire
-diff that motivated it should be attached when next reproduced.
-
 ### BD-Matter-ButtonGroupCurrentPositionReporting — Switch.CurrentPosition answered on read, not proactively reported
 
 **Superseded 2026-10-19 (brief BK, PR #171).** The materialised
@@ -1021,7 +1010,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | D-9 | The matter.js model at `db021da0` (Matter 1.6.1) has no cluster 0x0024 (Schedules): none of the 135 clusters of `parity/schema.json` carries the id | `cluster/wire/schedules.go` exists (`SchedulesServer`, `:89-107`) and nothing in this module mounts it — no non-test file names `SchedulesServer` or `NewSchedulesServer` outside that file. Until 2026-11-13 this cell cited `internal/model/custom/climate/matter.go:190-199` as if it were this module's: that is the reference host's (OpenCCU-Loom's) climate projection, which does not mount the server either (review II, R2-P0-doc-B08) | Schedules Cluster ist pre-publication/draft/dropped. Apple Home's HAP service mapper rejectet Endpoint-Clusters, die nicht in matter.js stehen, mit `HAPErrorDomain Code=24`. Code bleibt für spätere Re-Aktivierung erhalten. |
 | chip-tool C6 / F3 Voll-Wildcard | matter.js / chip-tool akzeptiert `(cluster=0xFFFFFFFF, attr=0xFFFFFFFF, ep=0xFFFF)` | `bridge/subscribe.go` + `endpoint/dispatcher.go` emittieren ~3000 Reports problemlos | chip-tool exit=1 bei Voll-Wildcard ohne Bridge-side-Fehler. Vermutet UDP-fragment- oder chip-tool-internes Buffer-Limit gegen unsere Bridge-Größe. Workaround: Cluster-spezifische Wildcards (`(cluster=0x001D, attr=*, ep=*)` oder `(cluster=*, attr=*, ep=0)`) — die laufen sauber. Kein Bridge-Fix möglich; Drift ist commissioner-side. |
 | L3-PFAD-7 | `packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts` — `Fabrics`/`NOCs` attributes backed by in-memory fabric state | `cluster/core/operational_credentials.go` — live-reads from SQLite store on every attribute access | Avoids stale-read races when a second commissioner modifies the fabric list concurrently. Functionally equivalent: the spec requires the attribute to reflect the current fabric list; reading from the authoritative store (not a cache) guarantees freshness without an explicit invalidation mechanism. |
-| L4-PFAD-1 | `packages/node/src/endpoints/aggregator.ts` — `AggregatorEndpointDefinition.deviceType = 0xe`, device-type filter exposed via mDNS `_T14._sub._matterc._udp.local` | `mdns/service.go::BuildCommissionableService` — `DT` TXT key + `_T<deviceTypeID>` subtype hardcoded to `0x000E` (Aggregator) for the bridge | Apple Home's commissioning flow uses the `DT` hint to render a bridge-type icon in the pairing dialog. The bridged endpoints expose their own device types via Descriptor.DeviceTypeList after pairing; the commissionable record advertises the Aggregator (bridge top-level) type only. |
+| L4-PFAD-1 | `packages/node/src/behavior/system/product-description/ProductDescriptionServer.ts:93-126` at `db021da0` — the commissionable device type is inferred when the application sets none: the first device type of a simple-class endpoint below RootNode, BridgedNode or Aggregator; sent as `DT` and `_T<id>` (`CommissionableMdnsAdvertisement.ts:48`, `:87`) | `mdns/service.go` sends the `DeviceTypeID` it is given (`:791`, `:847`); `node` infers it as matter.js while the host sets none (`node/commissionable_device_type.go:40-66`) | No divergence since owner decision 72 (review II, 2026-11-14). Until then this row read "hardcoded to `0x000E` (Aggregator)", which review II did not find in the code: the default was RootNode. What is left is `BD-Matter-CommissionableDeviceType-RootNodeWithoutApplicationEndpoint`. |
 | L7-PFAD-1 | `packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts` — `windowStatus` derived from internal commissioning state machine | `cluster/wire/admincommissioning.go` + `bridge/commissioning_window.go` — `windowStatus` driven by a separate `Bridge.WindowController` | Decouples cluster read path from commissioning logic. The cluster server reads window state from the controller interface; the controller owns the timer and PASE verifier lifecycle. This is a Go-idiomatic separation of concerns (hexagonal architecture) that produces identical wire output. |
 | L5-Apple-Width | `packages/types/src/tlv/TlvCodec.ts::encodeTlv` — SubscriptionID and DataVersion encoded as `TypeUnsignedInt` with magnitude-driven byte width (1/2/4 bytes) | `tlv/encode.go::PutUint32` — always encodes as explicit 4-byte unsigned integer | Apple MTRDevice rejected the magnitude-driven 1-byte encoding of SubscriptionID values below 256, causing Subscribe-Initial to be dropped with no error. The 4-byte explicit form is valid per Matter Core Spec §A.7.1 Table 74 (`UInt32` tag) and accepted by all tested commissioners (Apple Home, chip-tool). Verified via pair-debug session. |
 | L3-FQ64-Decoder | `packages/types/src/tlv/TlvCodec.ts:175-176` — `default: throw new NotImplementedError("Unexpected tagControl …")` — FullyQualified64 (TagControl 7) falls to the default throw branch; matter.js never decodes FQ64 tags | `tlv/decode.go::readTag` — `case TagKindFullyQualified8:` reads vendor+profile+uint32 tag number per Matter Core Spec §A.7.3 | go-fabric is more spec-compliant than matter.js for this tag form. FullyQualified64 is a valid Matter TLV tag class and chip's TLVReader.cpp supports it. No live impact: no IM message in a standard bridge exchange uses FQ64 tags. By design: go-fabric mirrors the spec; matter.js omits it. |
@@ -1036,7 +1025,6 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-EndpointID-Persistent | matter.js `@matter/node` Storage-Layer persists endpoint IDs across restarts so commissioners can re-use cached subscription targets | `endpoint/assembler.go::assignOrReuseID` looks the (source-key → endpoint-id) record up in the `store.EndpointStore` (SQLite) and reuses the persisted ID; a fresh allocation only happens when no record exists for that source key | Audit drift L6-D01 ("Endpoint-IDs werden beim Reassemble potenziell neu vergeben … bootid-basiert") is a **false positive**. Endpoint IDs come from the persistent endpoint store (not from `bootid.Salt()` — that one only feeds the UniqueID hash, see `BD-Matter-UniqueID-Stable`). A reassemble that finds the same source key reuses the same endpoint ID, so Apple's HAP-Mapper does not see a topology shuffle. Cross-restart durability of those store rows additionally depends on the boot-time GC gate documented in `BD-Matter-EndpointGC-ModelCompleteGate` (next row): before that gate landed, boot-time assembly against not-yet-loaded centrals erased every persisted row, and endpoint-number stability held only accidentally via deterministic re-allocation. |
 | BD-Matter-EndpointGC-ModelCompleteGate | matter.js has no boot-time "empty model" window: `packages/node/src/storage/server/ServerEndpointStores.ts` pre-allocates every persisted endpoint number at `load()` (`:33-45`) and `assignNumber` reuses the stored number (`:109-130`); the only release path is `eraseStoreForEndpoint`, invoked from `packages/node/src/node/server/ServerEndpointInitializer.ts::eraseDescendant` (`:59-69`) on explicit endpoint deletion (at `862ad75f`) | **Closed in v0.13.0** (brief CM §6, owner decision 2026-10-25). The assembler collects no stored identity absent from a snapshot: a stored key keeps its endpoint number until `Forget` (Aggregator, Partition, Batch) or `RetirePartition` erases it, the counterpart of `eraseStoreForEndpoint`; `node.Aggregator.MarkComplete`, `endpoint.Snapshot.ModelComplete` and `endpoint.Snapshot.Retain` are removed (migration guide, "Removed or changed in v0.13.0") | History, kept because the entry is cited: from v0.3 the module assembled from asynchronous host snapshots, and the gate — `ModelComplete` per snapshot, since v0.10.2 per partition (#229), since v0.12.2 with `Retain` as a reservation (brief CK §2) — kept a boot-time assembly against a not-yet-loaded source from erasing every row. The one divergence it left was a stored key neither re-added nor removed after a restart, which `MarkComplete` collected where matter.js keeps the number; with the gate gone the facade mirrors matter.js in full, and a host that knows a device is gone for good says so with `Forget`. Pinned by `TestStoredNumbersSurviveAbsence`, `TestEndpointNumberReservationParityMatterJS` and `TestRetirePartitionCollectsItsRecords` (node). |
 | BD-Matter-EndpointNumber-Monotonic | matter.js `packages/node/src/storage/server/ServerEndpointStores.ts::assignNumber` allocates from the persisted `#nextNumber` (`NEXT_NUMBER_KEY`) and skips numbers held in `#allocatedNumbers` / `#preAllocatedNumbers`; `eraseStoreForEndpoint` drops a number from those sets but never rewinds the counter, so a released number is not preferentially reissued | `endpoint/sqlitestore/sqlitestore.go::allocate` allocates from the `next_endpoint_id` row of `matter_endpoint_allocation` (refreshed 2026-11-01, review W2-api-08), lifts the counter above every number `matter_endpoints` already holds, skips occupied numbers and wraps only past 65534 | Mechanism divergence, behaviour parity: the counter lives in SQLite instead of an in-process field, and the occupancy skip-set is read per transaction rather than held in memory, because two writers (assembly and the retrying upsert path) share one database. The former allocator returned the smallest unused number, so a number freed by `Assembler.gcVanished` — device unpaired, or exposure revoked — went to the next unrelated source. That is invisible on the wire: the Aggregator's `Descriptor.PartsList` set is identical before and after, so Apple Home / Google Home keep the cached DeviceTypeList and cluster set for that number and render the new device under the removed device's identity. Until v0.12.1 a source key removed and re-added later got a fresh number; since v0.12.2 (brief CK §2) the facade's Aggregator keeps the number of a removed key and its parts as a reservation in the settings table and hands it back on `Add` of the same key, as matter.js keeps a closed endpoint's reservation (`ServerEndpointStores.ts:20-22`, `:117-123`; `ServerEndpointInitializer.ts:67-69` at `862ad75f`); only `Forget` (Aggregator, Partition, Batch) and `RetirePartition` free it, the counterpart of `eraseStoreForEndpoint` (`ServerEndpointInitializer.ts:59-65`); since v0.13.0 (brief CM §6) no assembly collects a stored number either, `MarkComplete` being gone. The counter itself stays monotonic. Pinned by `TestEndpointNumberReservationParityMatterJS` (node), `TestRowAboveTheCounterIsNotReissued` (endpoint/sqlitestore) and `TestRemovedNumberIsNotReissued` (endpoint/memstore). |
-| BD-Matter-Reassemble-Closes-Removed | matter.js packages/protocol/src/interaction/SubscriptionHandler.ts — when a BridgedNode endpoint is removed from the Aggregator the `endpoint.lifecycle.remove()` path causes any subscription targeting that endpoint to be closed by the InteractionServer | `im/subscription/manager.go::CloseEndpoint` terminates only the subscriptions whose paths reference the removed endpoint ID (via `subReferencesEndpoint`) — subscriptions on the other 29 of 30 endpoints stay open | Audit drift L6-D08 ("Reassemble closes all subscriptions; matter.js does partial update") is a **false positive**: it conflates "all subscriptions targeting the removed endpoint" with "all subscriptions in the bridge". `CloseEndpoint(endpointID)` is targeted; the partial-update story holds. matter.js's "partielles Endpoint-Update" applies to attribute reports on existing endpoints, not to endpoint removal. |
 | BD-Matter-SetReachable-LockReleased | matter.js BridgedDeviceBasicInformationServer emits ReachableChanged through its async `events.reachableChanged.emit` EventEmitter pattern | `cluster/core/bridged_device_basic_information.go::SetReachable` releases the internal `b.mu` **before** calling `emitter.MatterEmitEvent` (lines 438-455) so the emit path cannot deadlock against a Subscribe-Manager mutex acquired downstream | Audit drift L10-D06 ("ReachableChanged-Event synchron emittiert; Deadlock-Risiko wenn unter Lock") is a **false positive**: the emit runs after the unlock; there is no nesting of `b.mu` and any downstream lock. The synchronous-vs-asynchronous distinction is purely an internal-dispatch shape; observable behaviour is identical. |
 | BD-Matter-DN-TXT-Set | matter.js emits the `DN` TXT key (the commissionable advertisement, `packages/protocol/src/advertisement/mdns/`; `MdnsBroadcaster.ts` is gone at `862ad75f`) when a device name is supplied | `mdns/service.go::BuildCommissionableService` emits `DN` when `cfg.DeviceName != ""`; `bridge/bridge.go:1156` sets `DeviceName: params.NodeLabel` so the bridge's NodeLabel surfaces as the DN value | Audit drift L7-D03 ("DN TXT-Key fehlt im commissionable Record") is a **false positive**: the DN key is already wired through the bridge's parameter pipe; an empty DeviceName (and therefore an omitted DN) only happens when the bridge is started without a NodeLabel, which is rejected by `Config.Validate()`. |
 | BD-Matter-PBKDF2-Documented | matter.js `PasePairing.ts` makes the PBKDF2 iteration count configurable; spec default is 1000 (Matter §3.10) | `example.config.yaml:240` documents `iterations: 1000` with the spec-mandated 1000..100000 range comment | Audit drift L5-D02 ("PBKDF2-Iterationsanzahl nicht in example.config.yaml dokumentiert") is a **false positive**: the annotated value is already present. `cluster/wire/admincommissioning.go:403-404` enforces the spec floor/ceiling at runtime. |
@@ -1048,7 +1036,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-CloseSession-FabricTeardownSilent | matter.js sends a CloseSession when a session's close emits `gracefulClose`, which a session marked peer-lost skips (`packages/protocol/src/session/NodeSession.ts:419-425`, `packages/protocol/src/protocol/ExchangeManager.ts:758` at `db021da0`). A fabric's `leave` and `replaced` run `initiateClose` on every session of the fabric (`packages/protocol/src/fabric/Fabric.ts:447-457`, `:432-439`), which defers the close of a session with an exchange in flight (`NodeSession.ts:367-377`); the force close that follows (`Fabric.ts:484-488`, `:437`) marks what is still open peer-lost (`NodeSession.ts:379-382`), so that session ends without a CloseSession. The fail-safe's PASE close and the node's shutdown are force closes and send none (`packages/protocol/src/common/FailsafeContext.ts:187-192`, `packages/protocol/src/session/SessionManager.ts:1113`) | The registry's fabric and PASE teardown — `operational.Manager.CloseFabric`, `CloseFabricExcept`, `ClosePASESessions` — sends nothing itself. For a fabric's removal and an UpdateNOC the bridge tells the fabric's other sessions with a CloseSession before it closes them (`Bridge.EmitFabricRemovedContext`, `Bridge.CloseFabricSessionsAfterUpdate`); the session that carried the command closes after its response, without one; a PASE close sends none. The registry's own farewell (`SetGracefulCloseNotifier`) covers the idle reap, the same-peer stale-CASE eviction, `ClosePeer` and the shutdown | The entry said before that every fabric teardown is silent; that describes the registry alone and predates the bridge's farewell on a fabric's sessions. With it the fabric and PASE paths follow matter.js, the invoking session included: a CloseSession ahead of its NOCResponse would race the reply. The one divergence left is the shutdown, which tells each peer where matter.js sends nothing: `BD-Matter-Shutdown-CloseSessionKept` (owner decision 49 of review II). |
 | BD-Matter-IdleSessionReaper | matter.js keeps established operational sessions indefinitely — reclaim happens only on same-peer replacement, explicit close, or session-id exhaustion (`packages/protocol/src/session/SessionManager.ts:564-572` `findOldestInactiveSession`, called when every session id is taken, `:591-598`, at `db021da0`) | go-fabric additionally runs a periodic idle reaper on the operational session manager (`node/security.go:550` starts it: `operational.SessionIdleTimeout`, 5 min, `secure/operational/manager.go:307`, swept every minute by `reapIdle`, `:1448`; until 2026-11-13 this cell named the reference host's daemon file, review II R2-P0-doc-A04); activity semantics mirror `packages/protocol/src/session/Session.ts:142-148` `notifyActivity` (at `db021da0`) exactly (refreshed on every authenticated receive including duplicates, and on every secure send), and reaped sessions ship the graceful CloseSession farewell | Headless long-running bridges accumulate dead CASE sessions from controllers that vanish without CloseSession. The TTL sits far above the subscription publisher heartbeat cadence, which `im/subscription/subscription.go` caps at `maxSendInterval` = 2 min (a deliberate divergence from matter.js, which needs no cap because it never reaps idle sessions; pinned by `TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout`). The idle reaper spares a session that carries a live subscription (`Manager.SetReapExemption`, wired by `bridge.AttachSessionRegistry` to the subscription manager; owner decision 43): a subscriber's MinIntervalFloor can hold back every report beyond the 5-minute timeout, and the floor is its rate limit, not shortened. The heartbeat cap keeps other subscribed sessions active anyway; a dead controller's session is reaped once the report retransmit cap has closed its last subscription. Pinned by `bridge:TestIdleReaperSparesASessionWithASubscription`. A session that never carried a message is reaped one idle timeout after its creation: for an unset `LastActivity()` `reapIdle` takes `CreatedAt()` (`idleSince`, `secure/operational/manager.go:1510-1519`), so a commissioning still in flight is inside the timeout. Until `d9a5ca68` such a session was exempt for good (review II, W1-sec-06). Pinned by `secure/operational:TestReapIdleTakesANeverUsedSessionAfterTheTimeout`. |
 | BD-mDNS-Goodbye-NoGap | matter.js `MdnsServer.ts:243-275` (`expireAnnouncements`) at `862ad75f` — the TTL-0 responses of several services go out 20–120 ms apart, as the announcements do (`:216-241`) | `mdns/announce.go::goodbyeLocked` sends the goodbyes of the services back to back; the announcements keep the gap (`broadcastAllLocked`) | A goodbye runs inside `Withdraw` and `Close`, which return once it is sent; a sleep under the responder's mutex would hold every other send. RFC 6762 §6 asks for the gap on multicast responses to queries, not on unsolicited goodbyes. |
-| L8-D03 | matter.js `packages/protocol/src/protocol/DeviceCommissioner.ts:309-314` at `db021da0` — the window a node without a fabric opens itself stays open for `MAXIMUM_COMMISSIONING_TIMEOUT`, 48 h (`packages/types/src/commissioning/CommissioningConstants.ts:11`); `AdministratorCommissioningServer.ts:283`, which this row named, is the 15-minute default of the command's cap (`:226-232`); chip `src/app/server/CommissioningWindowManager.cpp:318-326` at `6170af84` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — the node's own window takes 48 h without a fabric and 15 min with one (`OwnWindowTimeoutUncommissioned`, `:395-401`, `:482-486`); `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. |
+| L8-D03 | matter.js `packages/protocol/src/protocol/DeviceCommissioner.ts:309-314` at `db021da0` — the window a node without a fabric opens itself stays open for `MAXIMUM_COMMISSIONING_TIMEOUT`, 48 h (`packages/types/src/commissioning/CommissioningConstants.ts:11`); `AdministratorCommissioningServer.ts:283`, which this row named, is the 15-minute default of the command's cap (`:226-232`); chip `src/app/server/CommissioningWindowManager.cpp:318-326` at `6170af84` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — the node's own window takes 48 h without a fabric and 15 min with one (`OwnWindowTimeoutUncommissioned`, `:395-401`, `:482-486`); `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. Review II, phase 4 (2026-11-14): the 48 h cap on the *command* for a node without a fabric (`bridge/commissioning_window.go:663-671`, set at `cluster/wire/admincommissioning.go:471-474`) follows connectedhomeip's `MaxCommissioningTimeout` — 48 h with no fabric, under `CHIP_DEVICE_CONFIG_EXT_ADVERTISING` — and not matter.js, whose command cap is the 15-minute default of the first cell; the node's own window is the part that mirrors matter.js. Whether an OpenCommissioningWindow can arrive while the node has no fabric was not traced (unverified). |
 | L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). Revised 2026-10-06: the read path no longer falls back — a request from a session without a fabric (PASE before AddNOC) reads no fabric's entries, and `currentFabric` scopes only a read with no request behind it (`im.LookupFabricFilter`); the two commands keep the fallback, which a fabric-less request never reaches (`im.HandleInvokeRequest` refuses a fabric-scoped command without an accessing fabric). |
 | BD-Matter-Dispatcher-StringHeuristic | matter.js `InteractionServer.ts` and chip `WriteHandler.cpp` / `CommandHandler.cpp` map typed errors via `StatusCodeError` / `MatterClusterStatusError` interfaces only | `endpoint/dispatcher.go::writeErrorStatus` / `invokeErrorStatus` (lines ~447-509) keep a string-contains fallback for "read-only", "unknown attribute", "constraint", "resource exhausted", "unknown command", "invalid command argument" | The 2026-05-19 chip-audit drift M-DRIFT-02 / L4-D03 is a **defense-in-depth** entry: every production cluster server already returns typed errors that implement `im.StatusCodeError` (verified via `grep -rn 'errors.New(' cluster/` — zero hits in production paths; the matches in `tests/` and `endpoint/*_test.go` are intentional fake-server fixtures). The string heuristic survives so legacy fakes keep working; removing it would only break tests, not production wire behaviour. New cluster code is expected to return typed errors via the `StatusCodeError` pattern. |
 | BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | Since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md) the assembler mounts the real Groups server itself wherever a device type mandates it (`endpoint.Config.Groups`) and replaces a host-supplied Groups stub; the host still supplies the ScenesManagement stub. The record below is the reference host's former wiring: it mounted both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
@@ -1129,7 +1117,7 @@ commissioner uses matter.js's path.
 |---|---|---|---|
 | L5-D5 | LOW | **By-design** | Resumption store has no LRU cap per fabric. See detail below. |
 | L5-D6 | LOW | **Fixed** (2026-05-12) | `sigma1Replied` map pruned on TTL-reap via `PerExchangeCaseProvider.SetOnEvict` + `forgetSigma1Replied`. Regression tests: `TestSigma1Replied_PrunedOnSigma3`, `TestPerExchangeCaseProvider_OnEvictPrunesSigma1Replied`. |
-| L6-D04 | MED | **Fixed** (2026-05-12) | Subscriptions for removed endpoints reaped after reassemble via `Manager.CloseEndpoint`. Regression tests: `TestReassemble_ReapsSubscriptionsForRemovedEndpoints`, `TestCloseEndpoint_ClosesMatchingSubscriptions`. |
+| L6-D04 | MED | **Fixed** (2026-05-12), **withdrawn 2026-11-14** (review II, owner decision 61) | The reap went: matter.js ends no subscription when an endpoint goes (`packages/node/src/node/integration/ProtocolService.ts:216-220` at `db021da0`), and since 2026-11-14 a `Reassemble` ends none either (`bridge/bridge.go:1404-1409`; `Manager.CloseEndpoint` is deprecated, `im/subscription/manager.go:813-820`). Pinned by `bridge:TestReassembleRemovingAnEndpointEndsNoSubscription`; `TestCloseEndpoint_ClosesMatchingSubscriptions` still holds the deprecated method. |
 
 #### L5-D5 detail — Resumption store: SQLite upsert vs. in-memory LRU cap
 
@@ -1173,6 +1161,10 @@ Test: `TestScenesManagementInvokeContainsNoCommands`.
 
 **L01-D09** BooleanState non-nullable default fixed: returns `(false, true)` when
 unobserved. StateValue has no quality X per matter.js. Test: `TestBooleanStateServerUnobserved`.
+The same holds for OccupancySensing since review II (R2-P4-appclim-02): an unobserved
+source reads Occupancy 0, the attribute having no quality X
+(`occupancy-sensing.element.ts:34-36` at `db021da0`). Test:
+`TestOccupancySensingServer_MatterRead_Unobserved`.
 
 **L01-D10** OnOff MatterWrite nil guard fixed: `Switch.MatterWrite` no-ops on nil value
 preventing future panic if a scene controller writes nil.
@@ -1228,12 +1220,14 @@ Operational `_matter._tcp` record is fabric-specific (NodeID/CompressedFabricID 
 static per fabric). Topology changes do not require a new record; commissioners
 reconnect via the same record. No functional gap.
 
-**L06-D04 — Vanished endpoint: stale subscriptions reaped after reassemble. FIXED 2026-05-12.**
-`Bridge.reassembleLocked` now calls `Manager.CloseEndpoint(ep.ID)` for every endpoint present
-in the previous topology but absent in the new one. The new `CloseEndpoint` method in
-`im/subscription/manager.go` closes any subscription whose AttributePaths or EventPaths reference
-the removed endpoint. Regression tests: `TestReassemble_ReapsSubscriptionsForRemovedEndpoints`,
-`TestCloseEndpoint_ClosesMatchingSubscriptions`, `TestCloseEndpoint_EventPathAlsoMatches`.
+**L06-D04 — Vanished endpoint: stale subscriptions reaped after reassemble. FIXED 2026-05-12, withdrawn 2026-11-14.**
+The fix made `Bridge.reassembleLocked` call `Manager.CloseEndpoint(ep.ID)` for every endpoint of the
+previous topology the new one no longer carries. matter.js ends no subscription there
+(`ProtocolService.ts:216-220` at `db021da0`, `deleteEndpoint`), so the call went with owner decision 61
+of review II: the subscription lives on and its paths on the removed endpoint select nothing
+(`bridge/bridge.go:1404-1409`). `CloseEndpoint` stays, deprecated, with its tests
+`TestCloseEndpoint_ClosesMatchingSubscriptions` and `TestCloseEndpoint_EventPathAlsoMatches`; the
+rule is pinned by `bridge:TestReassembleRemovingAnEndpointEndsNoSubscription`.
 
 ### Systematic Parity Run #02 — PFAD-ASYMMETRIEN (2026-05-12)
 
@@ -1759,24 +1753,6 @@ This is by design: matter.js' own send-path (`TlvDataReportForSend`, `TlvInvokeR
 
 ---
 
-### BD-Matter-WindowCoveringPercentNonNull — deprecated CurrentPositionLiftPercentage projects 0 instead of null
-
-matter.js `window-covering-cluster.element.ts:47-49` marks the deprecated
-`CurrentPositionLiftPercentage` (0x0008) attribute `quality "X N"` (nullable)
-with `default: null`; go-fabric
-(`cluster/cover/windowcovering_server.go`) always returns
-a non-null scaled uint8 derived from the canonical
-`CurrentPositionLiftPercent100ths` (0x000E).
-
-By design: the bridge always has a concrete position once a HmIP cover reports
-LEVEL, so a null projection would only appear in the brief pre-first-report
-window. The deprecated 8-bit attribute is retained purely for legacy
-controllers; projecting it from the live 100ths value (rather than tracking a
-separate nullable lifecycle) keeps the two position attributes consistent and
-avoids a transient null that a legacy controller might mishandle. The modern
-100ths attribute carries the correct nullability. (Re-audit 2026-05-31, finding
-M2-10.)
-
 ### BD-Matter-EventBufferSizing — the event buffer follows matter.js' harvesting model at a tenth of its size
 
 matter.js `packages/protocol/src/events/OccurrenceManager.ts:458-462` (at `862ad75f`) sizes the
@@ -1900,8 +1876,10 @@ device stack (`transport/mrp`, `secure/channel`) and the controller
 stack (`client/exchange`) do not share a socket. A Matter initiator's
 source port is free; the responder answers the source. Report AO.
 
-By design. One stack per role; CASE resumption records of the client
-role live in memory (the store's row is the responder's — findings).
+By design. One stack per role. The CASE resumption records of the client
+role live in memory (the store's row is the responder's), which is not by
+design: the open row "The client role's CASE resumption records live in
+memory" of [`matter_behaviour_findings.md`](./matter_behaviour_findings.md).
 
 ### BD-Matter-BindingManager-Worker — resolutions and handlers run on one worker goroutine; dormancy is manager-wide
 
@@ -2218,6 +2196,17 @@ Start under a standing OperationalError answering UnableToStartOrResume
 (`oven-operational-state-delegate.cpp HandleStartStateCallback :139-146`;
 step 17) — `examples/reference-bridge/fleet_kitchen.go` (the cavity's Start rule and its OperationalStateList). Families
 MWOCTRL, MWOM, OTCCM, OVENOPSTATE pass (#46).
+
+Owner decision 69 (review II, R2-P4-cert-07): a NumberOfRinses write that
+SupportedRinses does not list is INVALID_IN_STATE whether or not the enum
+defines the value, as connectedhomeip's `NumberOfRinsesValidity` answers
+(`src/app/clusters/laundry-washer-controls-server/LaundryWasherControlsCluster.cpp:132-145`
+at `6170af84`; TC-WASHERCTRL-2.2 step 6), where the model's enum check would
+answer CONSTRAINT_ERROR for an undefined value first. The attribute is an
+entry of the relaxation table (`script/clustergen/relaxed.go:150-156`, section
+`cluster/appliance WasherServer`; `BD-Matter-RequestCheck-RelaxationTable`);
+pinned by `cluster/appliance:TestLaundryWasherControlsCertificationStep`, by
+unit test and not run against the certification case.
 
 Review II, phase 4 (2026-11-14): connectedhomeip's example delegate
 `oven-operational-state-delegate.h` and `.cpp` is outside the exports the
@@ -2845,15 +2834,9 @@ owner, the assembler, so that a device without the option is unchanged.
 `New` runs the materialiser once (endpoint id 0) to learn the cluster set
 (report T, question 5). The reference daemon's sensors use it.
 
-### BD-Matter-TCP-ExchangePayloadSize — an initiated exchange over TCP offers the message size, 4 bytes below matter.js's frame size
+### BD-Matter-TCP-ExchangePayloadSize — an exchange the bridge initiates over TCP takes the connection's maximum: no cap at the peer's MAX_TCP_MESSAGE_SIZE, and never below the UDP size
 
-matter.js hands an exchange over a TCP channel the channel's maximum
-payload including the length prefix (`MessageExchange.ts:449-452` at `862ad75f`); the
-bridge's initiated exchange reports the connection's message size, 4
-bytes smaller. The BDX block negotiation (`OtaSoftwareUpdateRequestorServer.ts:54-55`)
-asks for 8192 either way and both sides cap at what the transport
-carries, so the difference is in the bound, not in a block that crosses
-the wire. Mechanics of `transport/tcp`'s framing, not semantics.
+matter.js gives an exchange its channel's maximum payload less the message overhead (`packages/protocol/src/protocol/MessageExchange.ts:465-469` at `db021da0`). The channel it asks is the session's `MessageChannel`, which over TCP answers the smaller of the connection's maximum — the message without its 4-byte length prefix (`packages/protocol/src/transport/tcp/TcpChannel.ts:37-39`, `:47`) — and the MAX_TCP_MESSAGE_SIZE the peer announced, "because the peer closes the connection when it receives a larger message" (`packages/protocol/src/protocol/MessageChannel.ts:81-82`, `:86-92`; the peer's value counted as at least the UDP message size, `packages/protocol/src/session/Session.ts:237-239`). The exchange the bridge initiates — a BDX transfer, a command to a peer — takes the connection's maximum less the same overhead (`initiatedSecureExchange.MaxPayloadSize` and `routeMaxPayloadSize`, `bridge/ota_provider_link.go:636-654`; `tcp.Conn.MaxMessageSize`, `transport/tcp/conn.go:159-162`). Two differences follow: it does not read the size the peer announced, and it never answers less than the UDP exchange size, also when the connection's own maximum is smaller. The 4 bytes this entry recorded until 2026-11-14 are gone, both sides counting the message without its prefix. The reply path and the invoke context do apply the peer's value (`chunkLimitsFor`, `bridge/reply.go:459-480`; `invokeMaxPayloadSize`, `bridge/ota_provider_link.go:665-679`). Who sees it: a peer that announced a smaller MAX_TCP_MESSAGE_SIZE than the connection carries, on an exchange this node opened; whether another layer bounds that send was not traced (unverified). Open, not a decision (review II, phase 4): applying the peer's value as the reply path does would mirror matter.js and retire this entry.
 
 ### BD-Matter-OnOff-SceneHooksNoRollback — a refused sink in a scene path does not roll back the scene store
 
@@ -3525,6 +3508,17 @@ NetworkCommissioning with the `WI` feature in place of `ET`
 test seam of review 2026-11 W5-api-11 (`internal/nodeseam.UseWiFiCommissioning`)
 is gone. A reporter alone leaves the cluster on Ethernet, as before.
 
+On Ethernet the one network's Connected is InterfaceEnabled
+(`cluster/core/network_commissioning.go:214`): a write that changes
+InterfaceEnabled changes Networks with it, advances the DataVersion once and
+reports both (`:147`, `:165-166`). matter.js's `NetworkCommissioningServer`
+is the empty subclass
+(`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+at `db021da0`), so Networks is state of its own there that an
+InterfaceEnabled write does not touch — inferred from the empty class, not
+run. This module's rule (review II, R2-P4-cert-03): an interface the
+controller disabled is no connected network.
+
 ---
 
 ## Removed (built, tested, never wired)
@@ -3566,6 +3560,10 @@ names one of these IDs is stale.
 | BD-Matter-BDXInitiatorOverExchange | 2026-11-02 (review 2026-11 W6) | The premise does not hold at the pin: matter.js `bdxSessionInitiator(messenger: BdxMessenger, config)` (`packages/protocol/src/bdx/bdx-session-initiator.ts:33` at `862ad75f`) runs on a messenger its caller built, the shape of Go's `bdx.Send(ctx, m *Messenger, …)` and `bdx.Receive`. |
 | BD-Matter-Controller-InboundWithoutSourceNodeIDDropped | 2026-11-14 (review II, phase 4) | Not a divergence at the pin: matter.js refuses an unsecured unicast message with both or neither of source and destination node id when it decodes the header, "The CHIP SDK drops these too" (`packages/protocol/src/codec/MessageCodec.ts:234-238` at `db021da0`), and its exchange manager no longer keys such a request's session by `NodeId.UNSPECIFIED_NODE_ID` (`packages/protocol/src/protocol/ExchangeManager.ts:306-311`; the entry cited `:261-264` at `0ceb202d`). The module refuses the same header (`ErrUnsecuredNodeIDs`, `transport/message/message.go:341-342`; pin lift wave P1, [`pin-lifts.md`](./pin-lifts.md)), and `client/exchange` drops an initiating request without a source node id as before (`client/exchange/manager.go:883-887`). |
 | BD-Matter-Mdns-ReannounceLoop | 2026-11-14 (review II, phase 4) | Closed with the L7-D07 row above: the loop the entry described went with issue #362 — `mdns.Zeroconf`, `StartReannounceLoop` and the facade's re-announce interval are removed (`CHANGELOG.md`, the removals of issue #362), and the responder announces on matter.js's `DefaultBroadcastSchedule` (`mdns/announce.go`). What is left, `Node.TriggerReannounce` (`node/reannounce.go:13-26`), forwards to `Responder.TriggerReannounce`, which is matter.js `MdnsServer.broadcast` with no service named (`mdns/responder.go:410-426`; `packages/protocol/src/mdns/MdnsServer.ts:210-223` at `db021da0`). The entry's matter.js line was not the quarter-TTL rule either: `MdnsServer.ts:158-164` is `#refresh` at the pin, and the rule is `packages/protocol/src/mdns/InterfaceResponder.ts:352-354`. |
+| BD-Matter-Reassemble-Closes-Removed | 2026-11-14 (review II, phase 4, owner decision 61) | Not matter.js's behaviour: the row gave the end of every subscription that names a removed endpoint as matter.js's, citing `packages/protocol/src/interaction/SubscriptionHandler.ts`, a file the tree at `db021da0` does not hold. matter.js's `deleteEndpoint` drops the endpoint from the protocol's collections and ends no subscription at these lines (`packages/node/src/node/integration/ProtocolService.ts:216-220`, called at `:314`). The module follows it: a `Reassemble` that removes an endpoint ends no subscription, the paths that name the endpoint select nothing from then on and the others go on being reported (`bridge/bridge.go:1404-1409`); `Manager.CloseEndpoint` is deprecated (`im/subscription/manager.go:813-820`). Pinned by `bridge:TestReassembleRemovingAnEndpointEndsNoSubscription`. The audit row L6-D04 and its paragraph L06-D04 record the reap as withdrawn. |
+| BD-Matter-mDNSDeviceType | 2026-11-14 (review II, phase 4, owner decision 72) | Closed: the entry compared with connectedhomeip only. matter.js infers the commissionable device type when the application sets none — the first device type of an endpoint of the simple class found below RootNode, BridgedNode or Aggregator (`packages/node/src/behavior/system/product-description/ProductDescriptionServer.ts:43-63`, `:93-126` at `db021da0`) — and sends it as `DT` and as the `_T<id>` subtype (`packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts:48`, `:87`). `node` infers the same way while `ProductDescription.DeviceType` is zero, and a type the host sets wins (`node/commissionable_device_type.go:40-66`). Pinned by `node:TestParityMatterJS_CommissionableDeviceType`. What is left — RootNode while no application endpoint is served — is `BD-Matter-CommissionableDeviceType-RootNodeWithoutApplicationEndpoint`; the audit row L4-PFAD-1 was rewritten with it. |
+| BD-Matter-WindowCoveringPercentNonNull | 2026-11-14 (review II, phase 4, owner decision 73) | Closed: an axis whose position is unknown reads null on CurrentPosition…Percent100ths, on the deprecated CurrentPosition…Percentage and on TargetPosition…Percent100ths until the host reports a position or a command moves it — matter.js's model defaults (`packages/model/src/standard/elements/window-covering-cluster.element.ts:47-48`, `:51-52`, `:59-64`, `:71-72`, `:75-76` at `db021da0`), and its server passes a null position through to the percentage (`packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:237-240`, `:255-258`). `cover.Config.InitialPositionUnknown` and `InitialTiltPositionUnknown` start an axis so (`cluster/cover/windowcovering_server.go:200-211`), and the device kit starts a covering whose `Initial` states no position that way. Pinned by `cluster/cover:TestParityMatterJS_WindowCoveringUnknownPosition` and `device:TestWindowCoveringDefaultUnknownPosition`. The entry's sentence that the 100ths attribute "carries the correct nullability" did not hold: neither attribute read null. |
+| BD-Matter-OTAProvider-ACLEveryFabric | 2026-11-14 (review II, phase 4, owner decision 74) | Closed: the entry read `fabricAuthority.fabrics[0]` as "the first fabric". It is the first fabric the node's own authority controls, by root certificate (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:116-124`; `packages/protocol/src/fabric/FabricAuthority.ts:112-114`, `:126-128` at `db021da0`), matter.js writes the provider's Operate/CASE entry into that fabric's ACL only (`OtaSoftwareUpdateProviderServer.ts:126-154`), and into none while there is none. The node no longer writes the entry into every fabric; what it does instead is `BD-Matter-OTAProvider-ACLGrantedFabrics`. |
 
 ### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
 
@@ -3603,13 +3601,18 @@ matter.js extends the request schema before it validates — its
 PakePasscodeVerifier, Iterations, Salt and Discriminator constraints to
 "none" so the behavior answers PakeParameterError (cluster status 0x03) for
 the PAKE parameters and INVALID_COMMAND for a discriminator above 0xFFF
-(`:92-97`) rather than the interaction layer answering CONSTRAINT_ERROR. The
-generated decoder carries the element file's constraints without that
-extension; the hand-written one enforces only CommissioningTimeout's width,
-as matter.js does, and leaves the PAKE and discriminator checks to the
-server. The server also accepts the
-generated `OpenCommissioningWindowRequest` in process. Retire when the
-generator can apply a behavior's schema extension.
+(`:92-97`) rather than the interaction layer answering CONSTRAINT_ERROR. Since
+2026-11-14 (review II, owner decision 64) the generated definition carries
+that extension: the four fields are entries of the relaxation table
+(`script/clustergen/relaxed.go:71-79`), written into the definition as
+`spec.Field.Relaxed`, and the request is held to the definition's request
+check before the hand-written decoder reads it (`heldByDefinition`,
+`bridge/fields_reader.go:88-101`) — a missing mandatory field is
+INVALID_COMMAND — and the PAKE and discriminator checks stay with the
+server. The server also
+accepts the generated `OpenCommissioningWindowRequest` in process. What is
+left of this entry is the first reason, the port's `OpenWindowParams`. Retire
+when the `WindowController` port takes the generated request.
 
 ### BD-Matter-Commissioning-HandDecoders — the commissioning and group requests keep their hand-written decoders
 
@@ -3624,8 +3627,22 @@ field sets), which run ahead of the generated decoders in
 table and the scene table are written against; re-pointing the servers at
 the generated structs is a rewrite of the commissioning and scene logic,
 not a codec swap, and the CGEN, G and S families hold the readers' statuses
-as they are. Registering the definitions changes no decoding: every request
-they define is answered by a hand-written reader first. Retire per server
+as they are. Every request they define is still decoded by a hand-written
+reader, but since 2026-11-14 (review II, owner decision 64, R2-P4-coresec-04,
+-07) each is first held to its definition's request check (`heldByDefinition`,
+`bridge/fields_reader.go:88-101`), so the statuses are those of matter.js's
+request schema — a field outside its constraint is CONSTRAINT_ERROR, a missing
+mandatory field INVALID_COMMAND, before the server runs
+(`packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487` at
+`db021da0`) — with the servers' relaxations of `script/clustergen/relaxed.go`
+(OperationalCredentials' nonces, OpenCommissioningWindow's PAKE fields and
+Discriminator, Groups' AddGroup fields, ScenesManagement's SceneId,
+TransitionTime and SceneName; `:65-98`). One hand reader departs:
+SetRegulatoryConfig's hands the server an empty CountryCode whatever was
+sent, kept after an Apple Home pairing regression
+(`bridge/fields_reader.go:358-371`), so the server sees none although the
+definition has checked the one on the wire. Pinned by
+`bridge:TestHandDecodedRequestsAreHeldByTheirDefinition`. Retire per server
 when its logic is moved onto the generated request structs.
 
 ### BD-Matter-FixedWidthStructs — DeviceTypeList and BasicCommissioningInfo keep their fixed-width encoders
@@ -3690,6 +3707,18 @@ Report AR.
 
 By design (ADR 0022). The list bound and the fabric scope come from the
 model; the lifecycle has no reference and is the host's.
+
+The fields' fabric sensitivity is matter.js's and is applied on every read:
+each field of MessageStruct but FabricIndex is access "S"
+(`packages/model/src/standard/elements/messages.element.ts:121-133` at
+`db021da0`), and matter.js withholds such a field from a session of another
+fabric and from one without a fabric (`mayRead`,
+`packages/protocol/src/action/server/AccessControl.ts:342-356`). A read
+without a fabric filter therefore serves another fabric's message as its
+FabricIndex alone (`cluster/core/messages.go:176-196`; review II, phase 4).
+Pinned by `cluster/core:TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields`
+and, for every fabric-scoped list a node serves, by
+`node:TestFabricSensitiveFieldsWithheldFromOtherFabrics`.
 
 Review II, phase 4 (2026-11-14): the tv-app's `MessagesManager.cpp` of
 connectedhomeip is outside the exports the review read and was not re-read;
@@ -3942,6 +3971,21 @@ By design. Rebuilding is how every in-memory state a reset erases — the
 root servers' values, Wi-Fi networks, scenes, the validator — goes for
 certain, without a reset path in each server.
 
+The order of the reset follows connectedhomeip (review II, R2-P4-cert-06):
+the fabrics leave while the node is still online — each through the
+RemoveFabric fan-out, which sends what the fabric's subscriptions owe, the
+Leave event included, and tells the fabric's sessions with a CloseSession
+(`node/factory_reset.go:61-75`; `bridge/bridge.go:1679-1722`) — and the node
+stops after, as connectedhomeip deletes all fabrics, "and emit[s] Leave
+event", before the server shuts down (`src/app/server/Server.cpp:893-902` at
+`6170af84`). matter.js goes offline first ("Go offline before performing
+reset", `packages/node/src/node/ServerNode.ts:165-173` at `db021da0`) and
+clears the sessions and fabrics then (`resetStorage`, `:243-257`). Who sees
+it: a controller subscribed at a factory reset gets the Leave event and a
+CloseSession here before the node goes; what reaches it from matter.js on
+that path was not traced (unverified). By design: a controller that is told
+its fabric left does not have to find the node gone by its timeouts.
+
 ### BD-Matter-EndpointNumberAfterWrap — after the wrap the store takes the lowest free number on every allocation
 
 matter.js `ServerEndpointStores.assignNumber` keeps its counter after the
@@ -3957,16 +4001,6 @@ included. `endpoint:TestEndpointNumberWrapParityMatterJS` pins it. Phase 31.
 By design. The lift is what keeps a number a row placed above the counter
 from being reissued (BD-Matter-EndpointNumber-Monotonic); the reuse begins
 only after 65 533 allocations.
-
-### BD-Matter-OTAProvider-ACLEveryFabric — the OTA provider's ACL entry goes on every fabric
-
-matter.js adds the provider's Operate/CASE entry on the first fabric only
-(`OtaSoftwareUpdateProviderServer.ts:116-158`, `fabricAuthority.fabrics[0]`
-at `:118`), so a requestor on a second fabric of a multi-admin bridge cannot
-query. `Node.ensureOTAProviderACL` adds it on each fabric. Report AX §8.
-
-By design. Multi-admin is the norm for a bridge; the entry grants the same
-narrow access (Operate, the provider's cluster on its endpoint) per fabric.
 
 ### BD-Matter-OTA-MirroredQuirks — consent reset, userConsentNeeded and TC-SU-2.7 follow matter.js
 
@@ -4023,8 +4057,9 @@ generated decoder does not enforce the list bound and its handler counts
 the targets: `EnergyEvseCluster.cpp:564-565` answers RESOURCE_EXHAUSTED,
 which TC-EEVSE-2.3 step 19 expects (`TC_EEVSE_2_3.py:411-439`). The
 generated `ChargingTargetScheduleStruct` decoder drops the bound
-(`script/clustergen/relaxed.go` `serverJudgedStructFields`; the definition
-keeps `max 10` verbatim), so `cluster/energy/evse.go`'s
+(the relaxation table of `script/clustergen/relaxed.go`, section
+`cluster/energy EvseServer`, `:116-123`, written into the definition as
+`spec.Field.Relaxed`; the definition keeps `max 10` verbatim), so `cluster/energy/evse.go`'s
 `evseMaxTargetsPerDay` check answers on the wire; pinned by
 `bridge/fields_evse_targets_test.go`.
 
@@ -4036,10 +4071,15 @@ and matter.js serves no EnergyEvse logic of its own to mirror.
 CountdownTime is reported as matter.js reports it (QuietEvent), not by the
 specification's list, which matter.js does not implement either.
 TC-EEVSE-2.3 left this entry for `BD-chip-EVSE-TargetsServerHeld`
-(owner decision 2026-11-03). GroupKeyMulticastPolicy stays as the snapshot gates it, and
-ColorControl's XY → HS conversion stays mirrored
-(`BD-Matter-ColorControl-XYToHS`). chip's 33/66 FanMode split
-(`FanControlCluster.cpp:84-166`) is not ported; matter.js's mapping is.
+(owner decision 2026-11-03). GroupKeyMulticastPolicy stays as the snapshot gates it.
+ColorControl's XY → HS conversion departs from matter.js, which hands x and y
+to `hsvToXy` (`ColorControlServer.ts:1493` at `db021da0`); the module converts
+with `xyToHsv` (`BD-Matter-ColorControl-XYToHS`). The FanMode a speed maps to
+is left to the device (`BD-Matter-FanControlCouplingInServer`): neither chip's
+33/66 split (`FanControlCluster.cpp:84-166`) nor a matter.js mapping, of which
+there is none — matter.js's `FanControlServer` only defaults FanMode to Off
+(`FanControlServer.ts:13-19`). Corrected 2026-11-14 (review II,
+R2-P4-applight-09): the entry called both mirrored from matter.js.
 Report AY §2, §5, §9, §12.
 
 By design. matter.js is the gold standard where a case and the model
@@ -5148,13 +5188,22 @@ file, not against theft of the whole store, which holds the sealing key.
 
 ### BD-Matter-ICD-ZeroBackoffIsIdleDuration — a zero `MaximumCheckInBackoff` in the facade means IdleModeDuration
 
-matter.js's state carries `maximumCheckInBackoff` with the schema default
-(IdleModeDuration, `icd-management.element.ts`) and a host that leaves it
-gets that value. Go's `node.ICDConfig` is a plain struct, so its zero value
-has to mean something: `node/icd.go` (where the configuration is resolved) turns a zero
-`MaximumCheckInBackoff` to the configured IdleModeDuration, the same default
-by another route. Reasoning: a Go zero value is not "unset" in a schema
-sense; mapping it to the schema default keeps the wire identical.
+matter.js's default of `maximumCheckInBackoff` is the literal 1, as
+IdleModeDuration's is (`packages/model/src/standard/elements/icd-management.element.ts:31-32`,
+`:68-69` at `db021da0`), and its server refuses at initialisation a backoff
+below IdleModeDuration
+(`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:196-200`):
+a host that sets IdleModeDuration above one second and leaves the backoff
+alone gets an error. `cluster/core` keeps both, the default and the refusal
+(`cluster/core/icd_management.go:132`, `:158-160`). The facade is more
+lenient: `node.ICDConfig` turns a zero `MaximumCheckInBackoff` into the
+configured IdleModeDuration (`node/icd.go:125-129`), so that configuration
+starts here and serves MaximumCheckInBackoff equal to IdleModeDuration. By
+design, a convenience of the facade: a Go zero value cannot say "unset", and
+the smallest backoff the rule admits is what a host that states none can
+mean. Corrected 2026-11-14 (review II, R2-P4-coresys-09): the entry gave
+IdleModeDuration as matter.js's schema default and called the wire
+identical, which holds only for an IdleModeDuration of one second.
 
 ### BD-Matter-ICD-ActivityNotedOnReceipt — inbound activity extends the active window when a message arrives, not when the exchange ends
 
@@ -5543,7 +5592,7 @@ says of it is unverified.
 matter.js's `ThermostatServer` initialises the hold's companions and
 nothing else: its reaction to a hold change is commented out
 (`ThermostatServer.ts:381`, `#handleTemperatureSetpointHoldChange` at
-`:385`, at `862ad75f`), and connectedhomeip hands a write of the
+`:385`, at `db021da0`), and connectedhomeip hands a write of the
 attribute to its hold delegate, whose status answers it
 (`src/app/clusters/thermostat-server/ThermostatClusterHold.cpp:76-93` at
 `6170af84`; an optional attribute, `ThermostatClusterBase.cpp:357-358`). `cluster/thermo` serves the hold on
@@ -5557,7 +5606,10 @@ as written (`ThermostatServer.ts:365-369`), `SetpointHoldExpiryTimestamp`
 stays unserved (`:372-379`), and no hold timer runs. Reasoning: a device
 that follows a week program must learn that a controller asked it to hold
 or to resume, and the Sink is where every other admitted write reaches the
-host (brief CO, issue #273).
+host (brief CO, issue #273). Register row above since 2026-11-14 (review
+II, phase 4): matter.js implements no reaction and connectedhomeip is the
+source, workflow step 5's case; the row closes when matter.js enables the
+commented-out reaction.
 
 ### BD-chip-Chime-RulesInServer — the Chime rules are connectedhomeip's; matter.js has none
 
@@ -6234,6 +6286,18 @@ deallocation (:1216, :357-385) although the field is an epoch value; the
 server mirrors chip, the authority where matter.js has no logic. Pinned by
 `pushtransport_chip_test.go` (7 of chip's 9 logic cases, 17 of 33 URL
 cases; the storage cases are chip's buffers) and `pushtransport_rules_test.go`.
+Owner decision 69 (review II, R2-P4-cert-07): an empty VideoStreams or
+AudioStreams list and a MotionSensitivity are the server's to judge, as
+connectedhomeip judges them — an empty list counts as no stream field
+(`:672-678`), a MotionSensitivity where none is expected is INVALID_COMMAND
+(`:571-577`) — where matter.js's request check would answer the model's
+"1 to 16" (`push-av-stream-transport.element.ts:266`, `:270` at `db021da0`)
+and the sensitivity's range with CONSTRAINT_ERROR first. The three fields
+are entries of the relaxation table (`script/clustergen/relaxed.go:124-139`,
+`BD-Matter-RequestCheck-RelaxationTable`); pinned by
+`cluster/camera:TestPushTransportCertificationSteps` (TC-PAVST-2.3 step 25,
+2.4 step 5, 2.6 step 8, 2.11 step 21a — by unit test, not run against the
+certification cases).
 
 ### BD-matterjs-server-CameraStreamManagement — the controller manages a camera's streams and WebRTC sessions, ahead of matter.js
 
@@ -6797,7 +6861,11 @@ projections in `cluster/measurement` add the materialisers, not rules).
 BooleanState, which this list named, is not one of them at `db021da0`:
 `BooleanStateServer.ts:19-28` emits StateChange on a change of StateValue
 under the ChangeEvent feature, and `measurement.HeldBooleanState` is the
-port of that (`cluster/measurement/booleanstate_held.go:26-63`).
+port of that (`cluster/measurement/booleanstate_held.go:26-63`). matter.js
+turns that feature on by default (`BooleanStateServer.ts:11-13`), and so does
+the device kit when a host's declarations select no BooleanState feature
+(`serverEnabledFeatures`, `device/device.go:546-554`; review II, phase 4;
+pinned by `device:TestClusterBehaviorFeaturesParityMatterJS`).
 Reasoning: the generated server enforces the model's constraints and
 conformance (ADR 0017); a rule that no reference implementation has is not
 a gap. Two findings came out of the same audit and are register entries,
@@ -6915,8 +6983,13 @@ offer the same choice to operators at the host level. Owner decisions
 untouched. Pinned by `TestMDNSInterfacesFilter`, `TestMDNSInterfacesValidate`,
 `TestDiagnoseMDNSNamesUnknownInterface` (`node/mdns_interfaces_test.go`),
 `TestDiagnoseInterfaces` and `TestAllowListAdvertisesOnNamedInterfaceOnly`
-(`mdns/diagnose_interfaces_test.go`). Retire when matter.js's server takes
-a choice of interfaces (the marker goes).
+(`mdns/diagnose_interfaces_test.go`). An ordinary divergence — one named
+interface there, a list of names here — and no longer a row of the Ahead
+register (re-filed 2026-11-14, review II, phase 4): the register is for
+behaviour matter.js implements none of, and the row's marker, the doc
+sentence "…on every multicast interface." (`MdnsServer.ts:211`), stood beside
+the working choice of one interface. Retire when matter.js's server takes a
+list of interfaces.
 
 ### BD-matterjs-mdns-JoinsLateInterfaces — the mDNS responder joins the group on interfaces that come up after it started
 
@@ -7360,9 +7433,10 @@ recorded message under 1000 forged source node ids, a changed counter,
 payload or tag, a key the node does not hold under a session id it does, a
 key set no group is mapped to). **Open:** a bound that does not reopen the
 replay. R2-P0-bound-A07 = R2-P0-bound-E02 asked for a bound and
-R2-P0-rv-B01 showed what the one taken costs; the design is a question of
-phase 3 of review II and is put to the owner, and this entry changes with
-that decision.
+R2-P0-rv-B01 showed what the one taken costs; owner decision 22 placed the
+design in phase 3 of review II, phase 3 did not produce it, and it stands
+for phase 6 (review II, phase 4 re-read). This entry changes with that
+decision.
 
 ### BD-Matter-UnsecuredRetransmitEviction — the unsecured session's retransmit table holds 16 messages, evicts the one tracked first and never refuses a reply
 
@@ -7602,7 +7676,9 @@ path.
 matter.js keeps a timed interaction as a timer on its exchange
 (`packages/protocol/src/protocol/MessageExchange.ts:272`, `:1066-1084` at
 `db021da0`): a second TimedRequest on the same exchange is refused
-(`:1067-1070`), and nothing counts the exchanges of a session that hold
+(`:1067-1070`) — as the bridge refuses it since review II, INVALID_ACTION
+with the running window ended (`bridge/receive_dispatch.go:882-892`,
+R2-P4-imwrite-16) — and nothing counts the exchanges of a session that hold
 one. matter.js does bound the open exchanges of a secure session, at 30,
 and closes the least recently active one beyond it
 (`packages/protocol/src/protocol/ExchangeManager.ts:63`, `:551-566`,
@@ -7977,8 +8053,8 @@ the two keys are in `docs/guides/persistence.md`.
 
 ### BD-Matter-ArmOverDueWindowEndedSession — an arm that rolls back a due fail-safe itself arms nothing when that rollback ended its own session
 
-This module's own rule; no reference was read for it (matter.js and
-connectedhomeip: unverified). A fail-safe window past its deadline whose
+This module's own rule: neither reference answers as it does (the
+findings row named at the end). A fail-safe window past its deadline whose
 expiry has not run yet is expired by the ArmFailSafe that finds it: the
 arm runs that rollback, or waits for one in flight, before it judges the
 fail-safe fresh (`cluster/core/general_commissioning_rollback.go`; review
@@ -7992,8 +8068,11 @@ session that no longer exists could only run out. Pinned by
 `TestGencomm_ArmOverADueWindowFromASurvivingSessionArms`,
 `TestGencomm_ArmOverADueWindowRollsItBack` and
 `TestGencomm_ArmInTheExpiryGapWaitsForTheRollback`. Phase 4 of review II
-reads both references for it; the entry then becomes parity, a divergence
-with its lines, or a finding.
+read both references and found three answers, matter.js's, connectedhomeip's
+and this one: they are the open row "An ArmFailSafe during the rollback of
+an expired fail-safe" of
+[`matter_behaviour_findings.md`](./matter_behaviour_findings.md), an owner
+decision pending, and this entry changes with it.
 
 ### BD-Matter-Controller-UnsecuredSessionsBounded — the controller holds at most 256 sessions that unauthenticated peers opened
 
@@ -8679,14 +8758,20 @@ one class for a secure session in either role (`NodeSession.create` takes
 `isInitiator`, `NodeSession.ts:73-74`, `:88-89`), so its deferral holds on a
 device as well; this module's device closes at once after its flush and its
 CloseSession and does not wait for the session's exchanges in flight
-(`bridge/reply.go`). What that costs was not traced: whether a reliable reply
-that still waits for its acknowledgement is lost with the session, and whether
-another exchange in flight on it ends unanswered (unverified). The difference
-is recorded, not decided (review II, R2-P2-rr-ctl-02). The two differences
+(`endSessionAtRollover`, `bridge/reply.go:90-120`). By design (owner decision
+75, 2026-11-14; review II, R2-P4-cert-05): the close comes once a session's
+outbound counter has passed 0xFFFFFFFF less 100 000
+(`secure/channel/session.go:168-184`), which from a start between 1 and 2^28
+(`transport/mrp/counter.go:33-46`) is more than four thousand million messages
+on one session, and the device keeps no account of a session's exchanges in
+flight and gets none for this case. What the close costs such an exchange was
+not traced: whether a reliable reply that still waits for its acknowledgement
+is lost with the session, and whether another exchange in flight on it ends
+unanswered (unverified). The two differences
 this entry recorded at `114dee6d` — no flush before the close, and the device
 side only — are closed (review II, R2-P2-dr-req-07, R2-P2-ctr-08), and the
 controller's close no longer ends its exchanges in flight (R2-P2-rr-ctl-02).
-What is left besides the device's close is form, not a decision: a goroutine
+What is left besides the device's close is form: a goroutine
 where matter.js starts a timer, and no flush in the client stack's close —
 whether a peer can hold a subscription on a session of the client stack was
 not traced (unverified). connectedhomeip was not read (unverified). Review II,
@@ -8695,8 +8780,7 @@ R2-P2-ctr-08. Pinned by
 `TestRolloverCloseFlushesTheSessionsSubscriptions`,
 `client/exchange:TestSessionClosedWhenItsCounterNearsExhaustion`,
 `TestRolloverCloseWaitsForTheExchangesInFlight` and
-`secure/channel:TestRolloverDueOnceNearExhaustion`. Phase 4 of review II
-decides whether the entry leaves the list of divergences.
+`secure/channel:TestRolloverDueOnceNearExhaustion`.
 
 ### BD-Matter-OTARequestor-BDXSizeCap — an OTA image downloaded over BDX is capped at 256 MiB, and a transfer past the cap is not tried again
 
@@ -8803,3 +8887,55 @@ matter.js holds a CASE handshake's state in the exchange it runs on: `onNewExcha
 ### BD-Matter-BLE-CentralWithoutPASEGivenUp — a BLE central without a secure session or a PASE handshake in flight is disconnected at the handshake bound
 
 matter.js gives the BTP handshake 15 s — `BTP_CONN_RSP_TIMEOUT` (`packages/protocol/src/ble/BleConsts.ts:56` at `db021da0`) — and a PASE pairing 60 s (`PASE_PAIRING_TIMEOUT`, `packages/protocol/src/session/pase/PaseServer.ts:33`). What either reference does with a central that completes the BTP handshake and then starts no PASE was not read (unverified); connectedhomeip closes its BLE connections with the window (`BD-chip-BLE-WindowEndDisconnectsCentral`). Here (`bridge/ble.go`, `watchBLEPASE`, `connPASEState`) a central's connection is looked at `btp.ConnRspTimeout` = 15 s after its BTP handshake and at every 15 s step after: one that carries neither a secure session nor a PASE handshake in flight is disconnected (`matter.ble.central_dropped`), with or without an open commissioning window. A PASE handshake older than `pasePairingTimeout` = 60 s is not in flight — its claim on the single PASE place has expired too — so a central that abandoned its PASE gives the place up at the next step (R2-P3-rr-dev-02). The watch ends with the connection's first secure session; a central whose session closes later is not watched again. The two numbers are the references' constants (connectedhomeip's `BTP_CONN_RSP_TIMEOUT_MS`, 15000, `src/ble/BleConfig.h:215`, and `kPASESessionEstablishmentTimeout`, 60 s, `src/app/server/CommissioningWindowManager.cpp:200` at `6170af84`, beside matter.js's two above); the rule they are applied to is this module's, and so is the repetition every 15 s, the fix agent's reading of it. Who sees it: a central that connects and starts no PASE, or abandons one, which is disconnected and may connect again; a commissioner whose PASE is under way keeps its place. Reason: the peripheral serves one central at a time, and between two windows, or after a failed PASE attempt, nothing else ended the connection of one that never armed a fail-safe. Review II, R2-P3-dr-net-03, R2-P3-rr-dev-02. Pinned by `bridge:TestBLECentralWithoutPASEIsDroppedAfterTheHandshakeBound`, `TestBLECentralKeepsItsPlaceWhilePASERuns` and `TestBLECentralWithAnAbandonedPASEGivesUpItsPlace`; the limit is in `docs/guides/limits.md`. No register row, as for the window's end. Retires when matter.js bounds a central without PASE.
+
+### BD-chip-GroupWrite-ListAppendApplied — a group write that appends to a list is applied, as connectedhomeip applies it; matter.js writes no group ADD
+
+A group WriteRequest whose path carries a null ListIndex (ADD) is applied on every member endpoint as an append (`HandleGroupWriteRequest`, `im/group.go:192-207`), as connectedhomeip applies a group write's list operation on each endpoint the group maps to (`ProcessGroupAttributeDataIBs`, `src/app/WriteHandler.cpp:434`, the write at `:559` at `6170af84`); its Busy rule for an ADD that does not follow its attribute stands in the unicast loop only (`:364-371`). matter.js writes no group ADD: it takes an ADD only after a write to the same attribute (`packages/node/src/node/server/InteractionServer.ts:511-531` at `db021da0`), remembers that attribute for a concrete path only (`:535-537`; a path without an endpoint is not concrete, `:82-84`), and so answers a group ADD Busy, an answer a suppressed response never sends (`:550-553`). By design (owner decision 63; review II, R2-P4-imwrite-09): a controller that chunks a list into a REPLACE and ADDs, as matter.js's own client does by default (`chunkLists = true`, `packages/protocol/src/action/request/Write.ts:65`, `:155-166`), would otherwise leave the list empty on this node. Who sees it: a controller that group-writes a list in chunks finds the list filled here and, by the lines above, empty on a matter.js node (read, not run).
+
+### BD-Matter-Transitions-CyclicAtBound — a cyclic property without a target starts at its bound and wraps
+
+matter.js `Transitions.start` takes a cyclic transition into its cyclic branch only when it has a target (`packages/node/src/behavior/Transitions.ts:152-164` at `db021da0`). One without — a hue moved by MoveHue or by a colour loop (`moveHueLogic`, `packages/node/src/behaviors/color-control/ColorControlServer.ts:485`; `startColorLoopLogic`, `:1201-1204`; the hue properties are `cyclic`, `:1679`, `:1684`) — falls into the bounded branch, whose check does not start it at the minimum moving down or at the maximum moving up (`:165-169`). `cluster/transition` applies that check to bounded properties only, so a hue at its bound moves on and wraps (`cluster/transition/transition.go:47-54`). By design (owner decision 66; review II, R2-P4-applight-03): on a wheel a bound is no end, and matter.js's check reads as unintended there. Who sees it: a controller that sends MoveHue Up at the top of the wheel, or starts a colour loop there — the hue turns here and, by the lines above, stands in matter.js (read, not run).
+
+### BD-Matter-Scenes-FabricSceneInfoForEveryFabric — FabricSceneInfo holds an entry for every fabric of the node from the start
+
+matter.js builds FabricSceneInfo from the fabrics known when the server initialises (`#initializeFabricSceneInfo`, `packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:977-999` at `db021da0`) and adds an entry only when a fabric's scene count is updated (`:1002-1023`); the fabric event it reacts to at `:190` is `deleting`. A fabric commissioned after the start therefore has no entry until its first scene or a restart — inferred from these lines, not run; matter.js's own snapshot of a node holds `fabricSceneInfo: []` (`packages/node/test/node/ClientNodeTest.ts:5111`). `cluster/core.ScenesManagement` serves an entry for every fabric of the node, also one that never stored a scene (`cluster/core/scenes_management.go:514-524`). By design (owner decision 66; review II, R2-P4-applight-05): what a fabric reads does not depend on when it was commissioned relative to the last restart. connectedhomeip was not read (unverified).
+
+### BD-Matter-LevelControl-HandOffSceneInvalidation — on the hand-off path every plain level command the host's port accepts ends the current scene
+
+matter.js ends the current scene only past its own ExecuteIfOff gate: MoveToLevel, Move, Step and Stop return before `#invalidateScenes` when the options do not allow execution (`packages/node/src/behaviors/level-control/LevelControlServer.ts:269-276`, `:354-359`, `:421-426`, `:482-487` at `db021da0`). `levelcontrol.Server` does the same under the transition engine and over the module's `NativeSource`, whose gate it can ask (`cluster/levelcontrol/scenes.go:32-41`, `:54-77`). On the hand-off path a host's `LevelSource` applies the gate where the server cannot see it, so every plain command the port accepts counts as executed and ends the scene (`handOffExecutes`, `:67-80`). By design (review II, R2-P4-applight-01): the port reports no "gated" result, and the contract stays as it is. Who sees it: a controller reading FabricSceneInfo's SceneValid after a plain level command the host's own gate turned into a no-op — false here, still true in matter.js. Pinned by `cluster/levelcontrol:TestHandOffCommandsInvalidateTheScene` and `TestCommandsInvalidateTheSceneAfterTheGate`.
+
+### BD-Matter-Invoke-HoldsHostReports — while a command runs against a cluster instance, the host's change reports on it are held and leave with the command's one DataVersion
+
+While a command runs against a cluster instance, the change reports of its servers on that instance are held, a change the host reports through a `ChangeNotifier` included; when the command ends the DataVersion advances once and the held attributes are marked together with those the command changed, and two commands that overlap on one instance share one commit (`invokeCommitTable`, `bridge/receive_dispatch.go:980-1055`). In matter.js a write takes the datasource's lock for its transaction: `#startWrite` adds the resource and calls `beginSync` (`packages/node/src/behavior/state/managed/Datasource.ts:1345-1350` at `db021da0`), which locks with `acquireLocksSync` (`packages/general/src/transaction/Tx.ts:260-279`) and throws `SynchronousTransactionConflictError` on a resource another transaction holds (`packages/general/src/transaction/ResourceSet.ts:82-106`); the host's API, `Endpoint.set` and `setStateOf`, begins its transaction and awaits `tx.addResources` (`packages/node/src/endpoint/Endpoint.ts:256-273`, `:325-339`), which waits in `acquireLocks` until the command's transaction is done (`Tx.ts:194-203`; `ResourceSet.ts:51-75`), and each transaction then advances the version on its own commit (`Datasource.ts:1456-1457`). Who sees it: a subscriber gets the host's change and the command's under one version here and under two in matter.js; a read in between returns the host's value here already, where in matter.js it is not written before the command commits (read from the lines, not run). By design: one version for a command's commit, without a lock that would make a host's notifier wait on an interaction. Review II, R2-P4-cert-12, R2-P2-dr-req-03. Pinned by `bridge:TestCommandAdvancesTheDataVersionOnce`.
+
+### BD-Matter-CommissionableDeviceType-RootNodeWithoutApplicationEndpoint — a node that serves no application endpoint advertises RootNode and stays commissionable
+
+matter.js infers the commissionable device type from its endpoints (`packages/node/src/behavior/system/product-description/ProductDescriptionServer.ts:43-63`, `:93-126` at `db021da0`) and, while none yields one, does not advertise as commissionable (`packages/node/src/behavior/system/commissioning/CommissioningServer.ts:280-283`) and refuses to enter commissionable mode, "you must add an endpoint or set the device type" (`:309-314`). The module infers the same way (`inferDeviceType`, `node/commissionable_device_type.go:54-66`) and advertises RootNode (0x0016) while nothing is found (`resolve`, `:40-53`). By design (review II, phase 4, with owner decision 72): a bridge started before its host's devices arrive stays commissionable, and the facade's own window has no counterpart to an application that opens the window later. One difference in timing beside it: matter.js fixes the type at the first change of its endpoint tree that yields one (`:55-62`), the module at the first announcement of a window that finds one, so a host that adds one device, removes it and adds another before the first window advertises the first one's type in matter.js and the second one's here. Who sees it: a commissioner that browses `_T22` or reads `DT=22` on a node without application endpoints, where a matter.js node shows no commissionable record. Pinned by `node:TestParityMatterJS_CommissionableDeviceType`.
+
+### BD-Matter-OTAProvider-ACLGrantedFabrics — the OTA provider's ACL entry goes into the fabrics the host grants, and into none unasked
+
+matter.js writes the provider's Operate/CASE entry into the ACL of `fabricAuthority.fabrics[0]`, the first fabric whose root certificate is its own authority's, and into none while there is none (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:116-154`; `packages/protocol/src/fabric/FabricAuthority.ts:112-114`, `:126-128` at `db021da0`). A `node.Node` has no authority of its own, so the set of such fabrics is empty and it writes into no fabric unasked; `OTAProviderConfig.GrantFabric` names, per fabric, the ones a host opens the provider to, asked at Start and after each CommissioningComplete, nil granting none (`node/ota_provider.go:43-55`, `:208-219`). By design (owner decision 74, which retired `BD-Matter-OTAProvider-ACLEveryFabric`): a node writes into a fabric's ACL only what that fabric's administrator or the host asked for. Who sees it: a requestor on a fabric the host did not grant is refused by the access check until that fabric's administrator writes the entry. Pinned by `node:TestOTAProviderACLNotWrittenUnasked` and `TestOTAProviderACLOnGrantedFabrics`.
+
+### BD-chip-ElectricalEnergy-CumulativeEventOnChange — the projected ElectricalEnergyMeasurement emits CumulativeEnergyMeasured when the cumulative energy changes, not with every measurement
+
+matter.js emits CumulativeEnergyMeasured with every `setMeasurement` call that carries a cumulative value, an unchanged one included (`packages/node/src/behaviors/electrical-energy-measurement/ElectricalEnergyMeasurementServer.ts:44-62` at `db021da0`). connectedhomeip emits it for a value whose set reports a change (`CumulativeEnergySnapshot`, `src/app/clusters/electrical-energy-measurement-server/ElectricalEnergyMeasurementCluster.cpp:442-469` at `6170af84`). The measurement projection has no `setMeasurement` call — the host notifies a change, and the projected server is rebuilt on every dispatch — so the bridge observes the notification and emits the event when CumulativeEnergyImported changes to a value (`electricalEnergyEvents`, `bridge/subscribe.go:2775-2786`). By design (review II, R2-P4-nv-05a): "on change" is the one point the projection has, and it is connectedhomeip's. Who sees it: a subscriber to the event gets one per change here, one per measurement call in matter.js. Pinned by `bridge:TestCumulativeEnergyMeasuredEvent`.
+
+### BD-Matter-AttributeOrder-ModelOrder — a cluster's attributes are reported in the model's member order; a server's own reordering and the order of endpoints and clusters are not mirrored (undecided)
+
+Mirrored (owner decision 62; review II, R2-P4-imread-12): every report lists a cluster's attributes in the order of matter.js's cluster model, `Scope.membersOf` — the model's members, then the globals the cluster does not define in `GLOBAL_IDS` order 0xFFFD, 0xFFFC, 0xFFFB, 0xFFFA, 0xFFF9, 0xFFF8 (`packages/model/src/logic/Scope.ts:17`, `:167`, `:339-358` at `db021da0`). matter.js builds a cluster's attribute list by iterating it (`packages/node/src/node/integration/ProtocolService.ts:449-451`) and a wildcard walks the list as built (`packages/protocol/src/action/server/AttributeReadResponse.ts:378-380`). The snapshot carries the order (`attributeOrder` per cluster and `globalAttributeOrder`, `parity/schema.json`) and `im.CompareAttributeIDs` applies it to a Read, a priming report and a change report alike (`im/read_expansion.go:301-320`); an attribute the order does not list comes first, ascending — the module's rule, since the order in which a server's schema adds members is not in the snapshot. Not mirrored, and not decided — two questions that are still the owner's: (1) a server's own order. Review II's order probe ran a matter.js node at `db021da0` (Dimmable Light, On/Off Plug-in Unit, Temperature Sensor, Window Covering) through a full wildcard read: 22 of the 30 clusters served came in the model's order, 8 did not — BasicInformation (UniqueID first; its server extends the schema, `packages/node/src/behaviors/basic-information/BasicInformationServer.ts:155-158`), LevelControl on the Dimmable Light (CurrentLevel, MinLevel, MaxLevel first; the device type's `.alter()`, `packages/node/src/devices/dimmable-light.ts:59-67`), and Groups and ScenesManagement on three endpoints each (FeatureMap before ClusterRevision; the cause was not traced, unverified). The run is the probe's and was not repeated for this entry. The module serves the model's order for these clusters too. (2) the order of endpoints and of an endpoint's clusters. matter.js sorts nothing in a read: a wildcard walks the node's endpoints and an endpoint's clusters as they were added (`AttributeReadResponse.ts:183-185`, `:337-339`); the probe measured endpoint 0 as 0x001F, 0x0028, 0x0030, 0x0033, 0x003C, 0x003E, 0x003F, 0x0065 and 0x001D last. The module reports ascending endpoint and cluster ids, which its comment explains by Apple Home needing the Descriptor before the clusters it names (`bridge/subscribe_dispatch.go:55-66`). Who sees either: a controller that depends on the order of a wildcard report's items. Pinned, for the mirrored part, by `im:TestCompareAttributeIDsOnOffIsMatterJSsOrder`, `TestCompareAttributeIDsFollowsTheSnapshotOrder` and `TestCompareAttributeIDsUnlistedMembersFirst`.
+
+### BD-Matter-ACLRemovedEventEntry — AccessControlEntryChanged(Removed) carries the entry the write removed
+
+For each entry a shorter ACL write removes, matter.js runs `j` over the writing fabric's old entries but reads `latestValue: oldValue[j]`, an index into the unfiltered list of every fabric (`oldFabricAcls` at `packages/node/src/behaviors/access-control/AccessControlServer.ts:305`, the loop at `:328-336`, at `db021da0`), so with more than one fabric its Removed event can carry another fabric's entry under the writing fabric's FabricIndex (read from the lines, not run). The module emits the writing fabric's own removed entry (`emit(AccessControlChangeTypeRemoved, oldEntries[j])`, `cluster/core/access_control.go:926`). By design (review II, R2-P4-coresec-11): the index is a defect in matter.js, not a behaviour to mirror, and the event names what was removed. Who sees it: an administrator subscribed to AccessControlEntryChanged on a node with several fabrics.
+
+### BD-Matter-Invoke-OversizedResponseResourceExhausted — a lone invoke response too large for a message is answered RESOURCE_EXHAUSTED for its path
+
+An invoke response that does not fit a message on its own — above `reportChunkHardCap`, the datagram size less 200, over UDP (`bridge/reply.go:435`) — is replaced, after the command ran, by a CommandStatusIB RESOURCE_EXHAUSTED for its path (`chunkInvokeResponse`, `oversizedInvokeEntry`, `bridge/receive_dispatch.go:1199-1206`, `:1254-1261`). matter.js has no such answer: it sends the message whatever its size, with a warning over UDP and a `MessageTooLargeError` over TCP (`packages/protocol/src/protocol/MessageChannel.ts:104-116` at `db021da0`); that its invoke path adds no bound of its own before that was the fix agent's reading of `InteractionServer.ts:1123-1151` and was not repeated (unverified). By design (review II, R2-P4-imwrite-13): the UDP listener here refuses a datagram above its cap, so without the replacement the controller would get no answer at all.
+
+### BD-Matter-RequestCheck-RelaxationTable — every relaxation of the model's request and write check is one entry of clustergen's table, written into the definition
+
+matter.js validates a request against the model before the invoker runs (`packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487` at `db021da0`), and a server that wants to judge a field itself extends its schema with the constraint "none" or sets a `Supervision` on a command. The module holds every request and every written value to the generated definition — the request decoder (`spec.Command.DecodeRequest`; the bridge's hand-decoded requests pass it first, `bridge/fields_reader.go:88-101`) and `spec.CheckWritten` in the dispatcher's write entry, before any server runs (owner decision 64) — and states every departure in one table, `script/clustergen/relaxed.go:51-157`, one section per server, each entry with its reference line; the generator writes it into the definition (`spec.Field.Relaxed`, `spec.Attribute.Relaxed`, `spec.Command.Check`) beside the model's constraint, which stays verbatim. The sections that mirror matter.js: ICDManagement's VerificationKey (`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:65-74`), OperationalCredentials' AttestationNonce and CsrNonce (`OperationalCredentialsServer.ts:62-66`), OpenCommissioningWindow's PAKE fields and Discriminator (`AdministratorCommissioningServer.ts:33-44`), Groups' AddGroup and AddGroupIfIdentifying (`GroupsServer.ts:31-42`), ScenesManagement's scene ids, TransitionTime and SceneName (`ScenesManagementServer.ts:140-159`), DoorLock — unchecked as a whole, since a server with a command configuration skips the generic validation (`packages/node/src/node/integration/ProtocolService.ts:343-348`), with INVALID_COMMAND for the ten commands of `DoorLockServer.ts:1493-1511` — and Thermostat's Presets and Schedules, whose written value goes to the atomic write's pending state (`packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:252-264`) for the server to judge (the presets at `ThermostatServer.ts:1367-1375`). The sections that follow connectedhomeip under an owner decision: EnergyEvse's ChargingTargets (`BD-chip-EVSE-TargetsServerHeld`), PushAvStreamTransport's stream lists and MotionSensitivity (`BD-chip-PushAvStreamTransport-RulesInServer`) and LaundryWasherControls' NumberOfRinses (`BD-chip-Appliance-RulesInServer`), decision 69. Two things the check does not do, as matter.js: it holds an enum in a request to its type only (`packages/types/src/tlv/TlvOfModel.ts:221-223`), and a deprecated enum value stays writable — matter.js compiles a bare "D" as optional, which is the fix's reading and was not repeated (unverified). By design: the mechanism is one table instead of a schema extension in each server, because the definitions are generated (ADR 0013) and a relaxation has to survive the regeneration; the behaviour is matter.js's except in the three sections named. Pinned by `script/clustergen:TestRelaxationTableResolves`, `cluster/spec:TestRequestCheckParityMatterJS`, `bridge:TestHandDecodedRequestsAreHeldByTheirDefinition` and `endpoint:TestWrittenValueIsHeldByTheDefinition`.
+
+### BD-Matter-WindowCovering-UnknownPositionTravelStopped — a simulated travel from an unknown position reads Stopped, where matter.js's test node keeps Opening or Closing
+
+With `Config.MoveStep`, the server's simulated travel and the counterpart of matter.js's CHIP test node, a movement command on an axis whose position is unknown does not travel and the axis reads Stopped (`cluster/cover/windowcovering_server.go:930-937`), `#computeOperationalState`'s answer for a null position (`packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:273-275` at `db021da0`). matter.js's test node does not travel either — "Current position is not set" (`support/chip-testing/src/cluster/TestWindowCoveringServer.ts:55-62`) — but leaves the Opening or Closing the server set when the movement began (`WindowCoveringServer.ts:412-420`). Recorded with owner decision 73 (review II, phase 4): the difference is to a test fixture, not to matter.js's server, and a covering that does not move is not opening. Who sees it: a controller reading OperationalStatus after UpOrOpen or DownOrClose on a simulated covering whose position is unknown.
