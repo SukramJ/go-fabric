@@ -15,7 +15,7 @@ import (
 // attribute values one node's image holds, in their stored form. Module's
 // own (review II, R2-P3-ctl-dev-02, owner decision 54): matter.js bounds
 // neither what a peer's reports store nor their sum
-// (ClientStructure.ts:568-611, :1147-1199 at db021da0). The value is
+// (ClientStructure.ts:568-611, :1147-1193 at db021da0). The value is
 // chosen, sixteen times interaction.DefaultMaxReportBytesPerSession; a
 // node's own image is far below it.
 const DefaultMaxImageBytesPerNode = 32 << 20
