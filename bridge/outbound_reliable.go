@@ -453,6 +453,47 @@ func (t *outboundReliableTracker) AbandonUnsecuredExchange(exchangeID uint16) in
 	return cleared
 }
 
+// errOutboundSessionClosed wakes a [outboundReliableTracker.WaitForAck]
+// caller whose entry went with its session ([outboundReliableTracker.DropSession]).
+var errOutboundSessionClosed = errors.New("bridge: outbound retransmit: the session closed")
+
+// DropSession drops every entry of the secure session sessionID — the
+// session closed, so nothing it sent is retransmitted or acknowledged any
+// more — and wakes any [outboundReliableTracker.WaitForAck] caller blocked
+// on one with errOutboundSessionClosed. It returns the number of entries
+// dropped. Session 0 (the unsecured session) is left alone: its entries
+// belong to handshakes, which end on their own clock. matter.js stops
+// retransmitting when the send fails with SessionClosedError
+// (MessageExchange.ts:975-981 at 862ad75f, cited at [outboundReliableTracker.Tick]);
+// review II, R2-P2-sess-06.
+func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
+	if t == nil || sessionID == 0 {
+		return 0
+	}
+	t.mu.Lock()
+	dropped := 0
+	var wakers []chan error
+	for key := range t.pending {
+		if key.sessionID != sessionID {
+			continue
+		}
+		t.dropLocked(key)
+		dropped++
+	}
+	for key, ch := range t.waiters {
+		if key.sessionID == sessionID {
+			delete(t.waiters, key)
+			wakers = append(wakers, ch)
+		}
+	}
+	t.mu.Unlock()
+	for _, ch := range wakers {
+		ch <- errOutboundSessionClosed // buffered (WaitForAck); one send per channel
+		close(ch)
+	}
+	return dropped
+}
+
 // Ack removes the pending entry for (sessionID, acked). Returns true
 // when an entry was found, false on stray / duplicate ACK. Wakes any
 // [WaitForAck] caller blocked on the same key. sessionID comes from
