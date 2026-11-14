@@ -1,6 +1,6 @@
 # Phase 2 — the dispositions
 
-The commit ids below are those of the phase 2 pull request's branch
+The commit ids below are those of the phase 2 pull request's branch (#526)
 (`review2/p2`, `a9134e81..540cb0eb`, 154 commits). If that pull request
 merges squashed, as the two before it did, its single commits stay
 retrievable through the pull request's reference. Items that are still open
