@@ -147,6 +147,14 @@ type ServerSubscriptions interface {
 type Settings interface {
 	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
 	SetSetting(ctx context.Context, key, value string) error
+	// SetSettings writes every key of values or none: one change that
+	// spans several keys lands whole or not at all. A reader sees the
+	// keys as they stood before the call or as they stand after it, never
+	// some of each, and a crash at any point leaves all of the old values
+	// or all of the new ones. An error means nothing was written. An
+	// empty (or nil) map is a no-op that returns nil. The map is the
+	// caller's; the store keeps no reference to it.
+	SetSettings(ctx context.Context, values map[string]string) error
 	GetMetadataCounter(ctx context.Context, key string) (value uint64, ok bool, err error)
 	SetMetadataCounter(ctx context.Context, key string, value uint64) error
 }

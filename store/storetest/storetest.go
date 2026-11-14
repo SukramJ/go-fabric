@@ -69,6 +69,7 @@ var cases = []testCase{
 	{"resumption", resumptionCase},
 	{"server-subscriptions", serverSubscriptionsCase},
 	{"settings", settingsCase},
+	{"settings/set-settings", setSettingsCase},
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
@@ -575,6 +576,31 @@ func settingsCase(ctx context.Context, t *testing.T, p store.Port) {
 	}
 	if v, _, err := p.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); err != nil || v != 1<<62 {
 		t.Fatalf("a refused counter write changed the counter to %d (%v)", v, err)
+	}
+}
+
+// setSettingsCase is the atomic multi-key write: every key lands, an
+// existing key is overwritten, an empty value is a value, an empty or nil
+// map writes nothing, and the map stays the caller's. That a failing write
+// leaves none of the keys behind needs a provoked failure, which only an
+// implementation's own test can arrange (store: TestSetSettingsAllOrNothing).
+func setSettingsCase(ctx context.Context, t *testing.T, p store.Port) {
+	must(t, p.SetSettings(ctx, nil))
+	must(t, p.SetSettings(ctx, map[string]string{}))
+	for _, k := range []string{"multi.a", "multi.b", "multi.c"} {
+		if _, ok, err := p.GetSetting(ctx, k); err != nil || ok {
+			t.Fatalf("an empty SetSettings wrote %q: ok=%v err=%v", k, ok, err)
+		}
+	}
+	must(t, p.SetSetting(ctx, "multi.a", "old"))
+	values := map[string]string{"multi.a": "1", "multi.b": "", "multi.c": "3"}
+	must(t, p.SetSettings(ctx, values))
+	values["multi.a"] = "mutated"
+	delete(values, "multi.c")
+	for k, want := range map[string]string{"multi.a": "1", "multi.b": "", "multi.c": "3"} {
+		if v, ok, err := p.GetSetting(ctx, k); err != nil || !ok || v != want {
+			t.Errorf("GetSetting(%q) after SetSettings = %q, %v, %v; want %q", k, v, ok, err, want)
+		}
 	}
 }
 

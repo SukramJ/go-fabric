@@ -667,6 +667,17 @@ func (s *Store) SetSetting(_ context.Context, key, value string) error {
 	return nil
 }
 
+// SetSettings implements [store.Settings]: every key is written under the
+// one mutex, so a reader sees all of them or none.
+func (s *Store) SetSettings(_ context.Context, values map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, v := range values {
+		s.settings[k] = v
+	}
+	return nil
+}
+
 // GetMetadataCounter implements [store.Settings].
 func (s *Store) GetMetadataCounter(_ context.Context, key string) (value uint64, ok bool, err error) {
 	s.mu.Lock()

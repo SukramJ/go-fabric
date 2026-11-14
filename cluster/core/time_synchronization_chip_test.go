@@ -82,6 +82,21 @@ func (s *tsSettings) SetSetting(_ context.Context, key, value string) error {
 	return nil
 }
 
+func (s *tsSettings) SetSettings(_ context.Context, values map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fail {
+		return errors.New("storage full")
+	}
+	if s.m == nil {
+		s.m = map[string]string{}
+	}
+	for k, v := range values {
+		s.m[k] = v
+	}
+	return nil
+}
+
 func (s *tsSettings) GetMetadataCounter(context.Context, string) (value uint64, ok bool, err error) {
 	return 0, false, nil
 }

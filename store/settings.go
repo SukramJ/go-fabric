@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 )
 
 // Setting keys for persisted writable cluster attributes. Matter
@@ -64,6 +66,31 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 INSERT INTO matter_settings (key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
 		return fmt.Errorf("store: set setting %q: %w", key, err)
+	}
+	return nil
+}
+
+// SetSettings implements [Settings]: every key of values is upserted in one
+// transaction, in ascending key order, so a failure on any key rolls back
+// the ones before it and the call leaves none of them written.
+func (s *Store) SetSettings(ctx context.Context, values map[string]string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: set settings: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, k := range slices.Sorted(maps.Keys(values)) {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO matter_settings (key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, values[k]); err != nil {
+			return fmt.Errorf("store: set settings: %q: %w", k, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: set settings: commit: %w", err)
 	}
 	return nil
 }
