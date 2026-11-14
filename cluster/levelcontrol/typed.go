@@ -135,11 +135,13 @@ func setUint8(v any) *uint8 {
 }
 
 // Handle implements [spec.CommandRegistrar]: fn replaces the server's own
-// handling of cmdID — the request's checks, the options gate, the
-// transition and the scene invalidation included — nil hands it back, and a command the server does
-// not accept is refused with [spec.ErrNotAccepted]. A matter.js host
-// overrides the command's logic method instead (moveToLevelLogic,
-// LevelControlServer.ts:256-261), keeping the checks.
+// handling of cmdID — the request's checks, the options gate and the
+// transition included — nil hands it back, and a command the server does
+// not accept is refused with [spec.ErrNotAccepted]. A command fn accepts
+// ends the current scene, as one the server runs past its gate does
+// ([Server.MatterInvoke]). A matter.js host overrides the command's logic
+// method instead (moveToLevelLogic, LevelControlServer.ts:256-261),
+// keeping the checks and the command method's scene invalidation.
 func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.inst, cmdID, fn)
 }

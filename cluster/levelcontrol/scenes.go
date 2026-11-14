@@ -38,7 +38,8 @@ func (s *Server) SetScenes(sc onoff.Scenes) {
 // "with On/Off" one always ends it. On the hand-off path the gate of a
 // [NativeSource] is the module's and is honoured the same way; a host's
 // port applies its gate where the server cannot see it, so every
-// command the port accepts ends the scene.
+// command the port accepts ends the scene, as does every command a
+// handler the host registered through [Server.Handle] accepts.
 func (s *Server) MatterInvalidatesScenes() bool { return s.scenes.Load() != nil }
 
 // invalidateScenes is matter.js #invalidateScenes

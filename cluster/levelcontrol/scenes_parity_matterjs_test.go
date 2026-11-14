@@ -5,6 +5,7 @@ package levelcontrol_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -148,6 +149,47 @@ func TestHandOffCommandsInvalidateTheScene(t *testing.T) {
 	}
 	if n := port.take(); n != 1 {
 		t.Errorf("a Stop the host's port accepted invalidated the scene %d times, want 1", n)
+	}
+}
+
+// TestReplacedCommandInvalidatesTheScene: a command the host replaced
+// through Handle ends the current scene when its handler succeeds, so the
+// server's claim to invalidate (MatterInvalidatesScenes, which keeps the
+// endpoint's own invalidation off) holds for it too; a refused one leaves
+// the scene valid. matter.js invalidates in the command method before it
+// calls the logic a host overrides (moveToLevel :276 before
+// moveToLevelLogic :277, packages/node/src/behaviors/level-control/LevelControlServer.ts
+// at db021da0); Handle drops the gate with the checks, so, as for a
+// host's port, a command the handler accepts counts as executed.
+func TestReplacedCommandInvalidatesTheScene(t *testing.T) {
+	srv := engineServer(newDevice(100, true), nil)
+	port := &scenesPort{}
+	srv.SetScenes(port)
+	if !srv.MatterInvalidatesScenes() {
+		t.Fatal("with a scenes port the server does not claim the invalidation")
+	}
+	refusal := errors.New("not now")
+	var refuse bool
+	if err := srv.Handle(levelcontrol.CmdMoveToLevel, func(context.Context, any) (any, error) {
+		if refuse {
+			return nil, refusal
+		}
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 50, TransitionTime: u16(0)}); err != nil {
+		t.Fatal(err)
+	}
+	if n := port.take(); n != 1 {
+		t.Errorf("a MoveToLevel the host's handler accepted invalidated the scene %d times, want 1", n)
+	}
+	refuse = true
+	if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60, TransitionTime: u16(0)}); !errors.Is(err, refusal) {
+		t.Fatalf("the handler's refusal: %v", err)
+	}
+	if n := port.take(); n != 0 {
+		t.Errorf("a MoveToLevel the host's handler refused invalidated the scene %d times, want 0", n)
 	}
 }
 

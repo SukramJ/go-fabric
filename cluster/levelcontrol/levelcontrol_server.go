@@ -744,8 +744,19 @@ func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWrite
 //
 // The DataVersion advances only after a command that succeeded and moved
 // CurrentLevel ([Server.finish]).
+//
+// A command the host replaced through [Server.Handle] ends the current
+// scene when its handler succeeds: matter.js invalidates in the command
+// method before it calls the logic a host overrides
+// (packages/node/src/behaviors/level-control/LevelControlServer.ts:276-277,
+// :293-294, :359-360, :373-374, :426-427, :442-443, :487-488, :498 at
+// db021da0), and the handler applies its own gate, as a host's port does
+// ([Server.handOffExecutes]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		if err == nil {
+			s.invalidateScenes()
+		}
 		return resp, err
 	}
 	switch cmdID {
