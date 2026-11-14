@@ -9,6 +9,7 @@ import (
 	"time"
 
 	core "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/contract"
@@ -124,6 +125,36 @@ func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
 	if n := reports("the same list again"); n != 0 {
 		t.Fatalf("an unchanged LabelList reported %d times, want none", n)
 	}
+}
+
+// TestUnchangedWriteOverTheWireIsNotReported: a WriteRequest that writes
+// the value the server holds advances no DataVersion and reaches no
+// subscriber, and one that writes a new value advances it once and is
+// reported once — the record the write handler attaches
+// (endpoint.WithWriteChanges) carries the server's verdict from the
+// dispatcher to the report. matter.js advances the version only for a
+// commit that changed a value and broadcasts only the changed properties
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457, an
+// equal value no change at :1479, at db021da0).
+func TestUnchangedWriteOverTheWireIsNotReported(t *testing.T) {
+	t.Parallel()
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, Bridged: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: 0x0100, servers: []contract.ClusterServer{srv}})
+	epID := h.endpoints[0x0100]
+	w := watchCluster(t, h, epID, onoff.ClusterID)
+	write := func(v uint64) func() {
+		return func() {
+			if st := h.writeAttribute(epID, onoff.ClusterID, onoff.AttrOnTime, uintValue(v)); st != 0 {
+				t.Fatalf("OnTime write: status 0x%02X", st)
+			}
+		}
+	}
+	w.expect("a new OnTime", write(50), onoff.AttrOnTime, 1, 1)
+	w.expect("the OnTime the server holds", write(50), onoff.AttrOnTime, 0, 0)
+	w.expect("another new OnTime", write(60), onoff.AttrOnTime, 1, 1)
 }
 
 // invokeChangeDispatcher is an im.Dispatcher whose Breadcrumb moves when
