@@ -65,3 +65,17 @@ func IsFabricScopedWrite(clusterID, attributeID uint32) bool {
 	_, ok := fabricScopedWritePaths[clusterID][attributeID]
 	return ok
 }
+
+// IsFabricScopedRead reports whether the (cluster, attribute) pair is a
+// readable attribute whose effective access is fabric-scoped ("F") or
+// fabric-sensitive ("S") — matter.js's limits.fabricScoped
+// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0) on
+// an attribute with limits.readable: what a request reads of it depends on
+// the accessing fabric (packages/node/src/behavior/state/managed/values/
+// ListManager.ts:609-616 at db021da0, createProxy). fabricScopedReadPaths
+// (attribute_access_gen.go) is generated from each attribute's effective
+// access in parity/schema.json.
+func IsFabricScopedRead(clusterID, attributeID uint32) bool {
+	_, ok := fabricScopedReadPaths[clusterID][attributeID]
+	return ok
+}

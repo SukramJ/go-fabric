@@ -65,3 +65,60 @@ func TestFabricScopedWriteMatchesSnapshot(t *testing.T) {
 		t.Error("BasicInformation.NodeLabel is not fabric-scoped")
 	}
 }
+
+// TestFabricScopedReadMatchesSnapshot holds fabricScopedReadPaths against
+// the model it is generated from: IsFabricScopedRead answers true for
+// exactly the attributes whose effective access in parity/schema.json is
+// readable (an rw other than "W", matter.js Access.readable) and
+// fabric-scoped or fabric-sensitive (matter.js limits.fabricScoped,
+// packages/protocol/src/action/server/AccessControl.ts:524 at db021da0),
+// across every cluster of the snapshot. A stale attribute_access_gen.go
+// fails here.
+func TestFabricScopedReadMatchesSnapshot(t *testing.T) {
+	t.Parallel()
+	var snap struct {
+		Clusters []struct {
+			ID         uint32 `json:"id"`
+			Name       string `json:"name"`
+			Attributes []struct {
+				ID        uint32 `json:"id"`
+				Name      string `json:"name"`
+				Effective *struct {
+					Access struct {
+						RW     string `json:"rw"`
+						Fabric string `json:"fabric"`
+					} `json:"access"`
+				} `json:"effective"`
+			} `json:"attributes"`
+		} `json:"clusters"`
+	}
+	if err := json.Unmarshal(parity.SchemaJSON(), &snap); err != nil {
+		t.Fatalf("parse snapshot: %v", err)
+	}
+	scoped := 0
+	for _, c := range snap.Clusters {
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				t.Fatalf("%s.%s: the snapshot carries no effective layer", c.Name, a.Name)
+			}
+			acc := a.Effective.Access
+			want := acc.RW != "W" && (acc.Fabric == "F" || acc.Fabric == "S")
+			if want {
+				scoped++
+			}
+			if got := schema.IsFabricScopedRead(c.ID, a.ID); got != want {
+				t.Errorf("%s (0x%04X) %s (0x%04X), rw %q fabric %q: IsFabricScopedRead = %v, want %v",
+					c.Name, c.ID, a.Name, a.ID, acc.RW, acc.Fabric, got, want)
+			}
+		}
+	}
+	if scoped == 0 {
+		t.Fatal("the snapshot names no readable fabric-scoped attribute: the test compares nothing")
+	}
+	if !schema.IsFabricScopedRead(0x003E, 0x0001) {
+		t.Error("OperationalCredentials.Fabrics is fabric-scoped")
+	}
+	if schema.IsFabricScopedRead(0x003E, 0x0002) {
+		t.Error("OperationalCredentials.SupportedFabrics is not fabric-scoped")
+	}
+}

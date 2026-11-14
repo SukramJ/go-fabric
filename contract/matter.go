@@ -101,6 +101,14 @@ type FabricScopedReader interface {
 	// [im.FabricFilterFromContext]; implementations extract it and, when
 	// filtered=true and fabricIndex != 0, return only the entries that
 	// belong to fabricIndex.
+	//
+	// (nil, false) hands the attribute to MatterRead — except on an
+	// Interaction Model request for an attribute whose access is
+	// fabric-scoped ("F" or "S" in the cluster's schema): MatterRead has
+	// no request behind it, so the dispatcher never lets it stand in for
+	// one. There (nil, false) means the scoped read failed, and the
+	// request answers FAILURE, or UNSUPPORTED_ATTRIBUTE for an attribute
+	// the server's [ClusterAttributeLister] does not list.
 	MatterReadFiltered(ctx context.Context, attrID uint32) (value any, ok bool)
 }
 

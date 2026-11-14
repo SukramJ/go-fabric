@@ -871,7 +871,9 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // fabric-sensitive lists (e.g. OperationalCredentials.Fabrics) to
 // the requesting fabric. Mirrors matter.js InteractionServer.ts
 // #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
-// (:306-326 at 862ad75f).
+// (:306-326 at 862ad75f). A reader's (nil, false) hands the attribute to
+// MatterRead, except on a request for a fabric-scoped attribute
+// ([fabricScopedReadFailed]).
 //
 // DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
 // is stamped on the ReadResult with HasDataVersion. The IM layer uses
@@ -889,9 +891,12 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 			}
 			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
-		// FabricScopedReader returned (nil, false) — fall through to
-		// the universal MatterRead path so non-fabric attributes on
-		// the same server are still served.
+		if status, failed := fabricScopedReadFailed(ctx, srv, path.Attribute); failed {
+			return im.ReadResult{Path: path, Status: status}
+		}
+		// FabricScopedReader returned (nil, false) for an attribute it
+		// does not scope — fall through to the universal MatterRead path
+		// so non-fabric attributes on the same server are still served.
 	}
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
@@ -910,6 +915,33 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
+}
+
+// fabricScopedReadFailed decides a [contract.FabricScopedReader]'s
+// (nil, false) on a request — a context [im.LookupFabricFilter] finds a
+// filter in — for an attribute whose access is fabric-scoped
+// ([schema.IsFabricScopedRead]). The reader is the only read such a request
+// may get: MatterRead has no request behind it and answers what a local
+// actor sees, every fabric's entries whole. So the request answers FAILURE
+// when the server lists the attribute — its scoped read failed — and
+// UNSUPPORTED_ATTRIBUTE when the server's [contract.ClusterAttributeLister]
+// leaves it out; a server without a lister answers FAILURE. Every other
+// (nil, false) — an attribute that is not fabric-scoped, or a read with no
+// request behind it — reports failed=false and is MatterRead's to answer.
+//
+// Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:425-459 at
+// db021da0 (InteractionServerMessenger.handleRequest: a read that throws
+// is answered with Status.Failure, no other read stands in for it). There
+// the whole interaction answers it; here the attribute's path does.
+func fabricScopedReadFailed(ctx context.Context, srv contract.ClusterServer, attrID uint32) (im.StatusCode, bool) {
+	if _, _, request := im.LookupFabricFilter(ctx); !request || !schema.IsFabricScopedRead(srv.MatterClusterID(), attrID) {
+		return im.StatusSuccess, false
+	}
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok && !slices.Contains(lister.MatterAttributes(), attrID) {
+		return im.StatusUnsupportedAttribute, true
+	}
+	return im.StatusFailure, true
 }
 
 // synthesizeGlobalRead returns the default value for a Matter global

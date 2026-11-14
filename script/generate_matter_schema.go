@@ -13,7 +13,9 @@
 //     attributeReadPrivileges (attributes whose effective read privilege is
 //     above View), changesOmittedAttributes,
 //     fabricScopedWritePaths (writable attributes whose effective access
-//     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
+//     is fabric-scoped or fabric-sensitive), fabricScopedReadPaths
+//     (readable attributes whose effective access is fabric-scoped or
+//     fabric-sensitive) and readOnlyAttributes (every
 //     attribute below the global range that matter.js does not let a remote
 //     party write)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
@@ -730,6 +732,45 @@ func writeAccessFile(clusters []snapshotCluster) error {
 				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
 			}
 			if p == 0 {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	// fabricScopedReadPaths: matter.js's limits.fabricScoped
+	// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0,
+	// fabric "F" or "S") on an attribute that is readable — the attributes
+	// whose value a remote read gets scoped to its session (ListManager.ts
+	// createProxy, :609-616 at db021da0).
+	buf.WriteString("// fabricScopedReadPaths lists every readable attribute whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or\n")
+	buf.WriteString("// fabric-sensitive (\"S\"): what a request reads of it depends on the\n")
+	buf.WriteString("// accessing fabric.\n")
+	buf.WriteString("var fabricScopedReadPaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			switch acc.Fabric {
+			case "":
+				continue
+			case "F", "S":
+			default:
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			if acc.RW == "W" {
 				continue
 			}
 			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
