@@ -1316,10 +1316,27 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	if fresh {
 		g.failSafeOverPASE = fabricIndex == 0
 	}
+	now := g.clock.Now()
+	// An arm from the disarmed state — the PASE auto-arm included — starts
+	// the new context's cumulative limit, as the wire arm does: connectedhomeip
+	// FailSafeContext::ArmFailSafe starts the max-cumulative timer whenever
+	// it arms from disarmed (src/app/FailSafeContext.cpp:112-115 at
+	// 6170af84), the arm on PASE establishment among them
+	// (src/app/server/CommissioningWindowManager.cpp:236); matter.js builds
+	// a new ServerNodeFailsafeContext with maxCumulativeFailsafe
+	// (GeneralCommissioningServer.ts:100-106 at db021da0), whose timer
+	// starts with it (packages/protocol/src/common/FailsafeTimer.ts:33-35).
+	// Before, a chain of PASE sessions re-armed without a limit (review II,
+	// R2-P3-pase-02).
+	if fresh || !g.failSafeCumulativeStarted {
+		g.failSafeCumulativeStarted = true
+		g.failSafeCumulativeDeadline = now.Add(time.Duration(g.cumulativeFailSafeMaxSec) * time.Second)
+	}
 	g.failSafeArmed = true
-	g.failSafeExpiresAt = g.clock.Now().Add(time.Duration(seconds) * time.Second)
-	// A re-arm stays within the cumulative limit, as the wire arm does.
-	if !fresh && g.failSafeCumulativeStarted && g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
+	g.failSafeExpiresAt = now.Add(time.Duration(seconds) * time.Second)
+	// No arm carries the deadline past the cumulative limit, as the wire
+	// arm's does not.
+	if g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
 		g.failSafeExpiresAt = g.failSafeCumulativeDeadline
 	}
 	// The PASE auto-arm (forSession) keeps the Breadcrumb, fresh or not, as
