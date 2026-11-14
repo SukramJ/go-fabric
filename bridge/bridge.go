@@ -500,6 +500,10 @@ type Bridge struct {
 	// wiring that finds it moved while it registered was overtaken and
 	// detaches what it registered ([Bridge.rewireMeasurementListeners]).
 	listenerGeneration uint64
+	// listenerManager is the subscription manager the latest wiring read
+	// ([Bridge.rewireMeasurementListeners]); Start wires again when the
+	// manager attached since its initial assembly is another one.
+	listenerManager *subscription.Manager
 	// switchUnsubscribers holds the unsubscribe closures returned by
 	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
 	// matterSwitchSubscribable assertion) and by a position source's
@@ -1033,6 +1037,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.serveDone = done
 	b.started = true
 	committed = true
+	// A manager attached while Start ran found the run not started and
+	// left the wiring to it; the initial assembly wired the manager it
+	// saw then (review II, R2-P2-dr-req-05). An attach from here on finds
+	// the run started and wires by itself.
+	rewire := b.subManager != b.listenerManager
+	run := b.runGen
 	// Spawn the ACK pump only when an AckTracker has been wired
 	// (daemon's [Bridge.AttachAckTracker] call). Test setups that
 	// skip the wiring leave the pump dormant, which is fine — the
@@ -1043,6 +1053,15 @@ func (b *Bridge) Start(ctx context.Context) error {
 	b.setBLERunning(true)
 	if pumpTracker != nil {
 		b.startAckPump()
+	}
+	if rewire {
+		generation := b.rewireMeasurementListeners()
+		b.mu.RLock()
+		ended := b.runEndedLocked(&run)
+		b.mu.RUnlock()
+		if ended {
+			b.detachListenersOfGeneration(generation)
+		}
 	}
 
 	// Join the multicast group of every group with a member endpoint, and

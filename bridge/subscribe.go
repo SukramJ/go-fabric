@@ -143,7 +143,9 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	// the next Start's assembly wires them (review II, R2-P2-sess-09,
 	// N-bridge2-4). A Stop that sets in after the wiring detaches what it
 	// finds; one that set in before the wiring was installed missed it,
-	// so it goes again here — as in Reassemble.
+	// so it goes again here — as in Reassemble. An attach while Start
+	// runs is wired by Start once the run is started (review II,
+	// R2-P2-dr-req-05).
 	if started {
 		generation := b.rewireMeasurementListeners()
 		b.mu.RLock()
@@ -1778,6 +1780,7 @@ func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	b.listenerGeneration++
 	generation = b.listenerGeneration
 	mgr, topology := b.subManager, b.topology
+	b.listenerManager = mgr
 	b.mu.Unlock()
 	runUnsubscribers(stale)
 	if mgr == nil || topology == nil {

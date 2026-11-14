@@ -309,3 +309,48 @@ func TestAttachSubscriptionManagerAfterStopWiresNoHostListeners(t *testing.T) {
 		t.Fatal("the attached manager was not stored")
 	}
 }
+
+// heldLoadStore is a SubscriptionStore whose load — the step of Start
+// between its initial assembly and the run's start — waits for release.
+type heldLoadStore struct {
+	*memSubscriptionStore
+	entered, release chan struct{}
+}
+
+func (s *heldLoadStore) LoadServerSubscriptions(ctx context.Context) ([][]byte, error) {
+	close(s.entered)
+	<-s.release
+	return s.memSubscriptionStore.LoadServerSubscriptions(ctx)
+}
+
+// TestAttachSubscriptionManagerDuringStartIsWired (review II,
+// R2-P2-dr-req-05): a subscription manager attached while Start runs —
+// after its initial assembly wired the host's listeners without a
+// manager, before the run counts as started — is wired once Start
+// completes, so the host's value changes mark the subscriptions dirty
+// without waiting for the next Reassemble.
+func TestAttachSubscriptionManagerDuringStartIsWired(t *testing.T) {
+	t.Parallel()
+	snap := newHeldSnapshotter(t, 0)
+	b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := &heldLoadStore{memSubscriptionStore: newMemSubscriptionStore(), entered: make(chan struct{}), release: make(chan struct{})}
+	b.AttachSubscriptionStore(st)
+	started := make(chan error, 1)
+	go func() { started <- b.Start(t.Context()) }()
+	<-st.entered
+	if got := snap.src.live.Load(); got != 0 {
+		t.Fatalf("%d host listeners after an assembly without a manager, want 0", got)
+	}
+	b.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, nil, nil))
+	close(st.release)
+	if err := <-started; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+	if got := snap.src.live.Load(); got == 0 {
+		t.Fatal("a manager attached while Start ran wired no host listener")
+	}
+}
