@@ -147,9 +147,21 @@ func (c *completedCase) expectReport(t *testing.T, p *pipelinePeer, want uint16,
 
 // expectAcknowledgedOnly fails t unless the Sigma3 just sent on the
 // handshake's exchange was acknowledged and no more: its acknowledgement is
-// still owed — no reply carried it — and no reply was added to those
-// waiting for the peer's acknowledgement before it.
+// still owed — no reply carried it — and the replies waiting for the peer's
+// acknowledgement are the ones that waited before it, none sent and none
+// taken away.
 func (c *completedCase) expectAcknowledgedOnly(t *testing.T, pendingBefore int, what string) {
+	t.Helper()
+	c.expectNoReply(t, pendingBefore, what)
+	if got := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange); got != pendingBefore {
+		t.Fatalf("%s: %d replies wait for the peer's acknowledgement, %d before — one was taken away", what, got, pendingBefore)
+	}
+}
+
+// expectNoReply fails t unless the Sigma3 just sent on the handshake's
+// exchange went unanswered: its acknowledgement is still owed and no reply
+// was added to those waiting for the peer's acknowledgement before it.
+func (c *completedCase) expectNoReply(t *testing.T, pendingBefore int, what string) {
 	t.Helper()
 	if !c.r.b.ackTracker.Owes(0, completedCaseExchange, false) {
 		t.Fatalf("%s: no acknowledgement owed — a reply carried it", what)
@@ -157,6 +169,20 @@ func (c *completedCase) expectAcknowledgedOnly(t *testing.T, pendingBefore int, 
 	if got := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange); got > pendingBefore {
 		t.Fatalf("%s: %d replies wait for the peer's acknowledgement, %d before — a reply was sent", what, got, pendingBefore)
 	}
+}
+
+// successReportPending reports whether the success report that completed
+// the handshake still waits for the controller's acknowledgement.
+func (c *completedCase) successReportPending() bool {
+	tr := c.r.b.outboundReliable
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	for key, e := range tr.pending {
+		if key.sessionID == 0 && e.exchangeID == completedCaseExchange && e.dest != nil && e.dest.String() == c.controller.conn.LocalAddr().String() {
+			return true
+		}
+	}
+	return false
 }
 
 // TestSigma3AfterCompletionChangesNothingAboutTheSession: once a CASE
@@ -177,6 +203,10 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 	}{
 		{"through a provider", true, false},
 		{"through the singleton handler", false, false},
+		// The success report is no longer pending here, and the Sigma2
+		// the same Sigma1 sent again is: a Sigma3 of the handshake drops
+		// a Sigma2 waiting for its acknowledgement before its handler
+		// runs (dispatchSigma3), so only "no reply sent" is checked.
 		{"the record begun again by the same Sigma1", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -203,13 +233,23 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 				}
 				other.recv(mrp.SCOpcodeSigma2, "the cached Sigma2")
 			}
+			if !tc.rebegin && !c.successReportPending() {
+				t.Fatal("the success report is not waiting for the controller's acknowledgement")
+			}
 			for _, payload := range [][]byte{{0x15, 0x18}, c.sigma3} {
 				other := c.otherPeer(t)
 				pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
 				if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, payload, nil); err != nil {
 					t.Fatal(err)
 				}
-				c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
+				if tc.rebegin {
+					c.expectNoReply(t, pending, "a Sigma3 from another sender")
+				} else {
+					c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
+					if !c.successReportPending() {
+						t.Fatalf("a Sigma3 of %d bytes from another sender took the success report from the retransmission", len(payload))
+					}
+				}
 				if got := c.route(t); got != controllerRoute {
 					t.Fatalf("a Sigma3 of %d bytes after completion moved the session's route from %s to %s", len(payload), controllerRoute, got)
 				}
@@ -253,6 +293,9 @@ func TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
+	if !c.successReportPending() {
+		t.Fatal("a Sigma3 that is not the completing one took the success report from the retransmission")
+	}
 
 	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
 		t.Fatal(err)
