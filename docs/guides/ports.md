@@ -321,7 +321,7 @@ Host ports of the root servers, reached through `node.Config` or
 | Port | What it does |
 | --- | --- |
 | `core.WiFiReporter` | the Wi-Fi link values; the module ships no reporter |
-| `core.OtaApplier` | the host's part of an OTA update |
+| `core.OtaApplier` | the host's part of an OTA update. Before `ApplyUpdate` the requestor has checked the image's header syntax, that its payload has the size the header states, and its version (the offered one, or newer than the running one) — not the payload digest, not the header's vendor and product IDs, and no signature. Those are the applier's: the facade's own applier verifies the digest and compares vendor and product with the node's (`node/ota.go`) |
 | `core.OtaHTTPClient` | the GET of an HTTPS OTA download; `*http.Client` implements it, so a host restricts egress there |
 | `core.OTAImageSource`, `core.OTAConsent`, `core.OTAApplyPolicy` | the provider's catalogue, user consent, and apply decision |
 | `core.CommissioningApprover`, `core.ReverseCommissioner` | CommissionerControl's approval, and the commissioning of the approved node |
