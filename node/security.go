@@ -229,6 +229,41 @@ func (c *caseIdentities) forget(fabricIndex uint8) (compressedID [8]byte, nodeID
 	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
 }
 
+// errCASEFabricRemoved refuses the session of a CASE handshake whose
+// fabric was removed while it ran.
+var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was removed during its handshake")
+
+// admitSession opens the session of a completed CASE handshake on
+// fabricIndex with open — unless the fabric was removed while the
+// handshake ran. The responder keeps the identity it resolved at Sigma1,
+// and the initiator the one it started with; a removal that ran between
+// Sigma1 and the handshake's end swept the fabric's sessions before this
+// one existed, which would then live on the removed index with nothing to
+// end it (review II, R2-P2-sess-05, R2-P2-fabric-09). Ahead of matter.js,
+// whose CaseServer creates the session with the fabric it resolved; a
+// candidate for the Ahead of matter.js register.
+//
+// The identity is checked before and after the open. The removal forgets
+// the identity first and closes the fabric's sessions afterwards
+// (node.fabricRemoved: forget, then the bridge's EmitFabricRemovedContext),
+// so a removal that lands between the two checks either finds this session
+// open and closes it, or leaves the second check without the identity, and
+// the session is closed here.
+func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex uint8, open func() (*operational.Entry, error)) (*operational.Entry, error) {
+	if _, ok := c.forFabric(fabricIndex); !ok {
+		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
+	}
+	entry, err := open()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := c.forFabric(fabricIndex); !ok {
+		_ = sessions.Close(entry.SessionID)
+		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
+	}
+	return entry, nil
+}
+
 // current returns the most recently installed identity, or nil before the
 // first AddNOC.
 func (c *caseIdentities) current() *caseFabric {
@@ -563,7 +598,9 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			Initiator:          initiator,
 			CompressedFabricID: fabric.identity.CompressedFabricID,
 			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
-				entry, err := sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				entry, err := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
+					return sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				})
 				if err != nil {
 					return err
 				}
@@ -740,7 +777,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				fabricIndex, localNodeID = fi, nid
 			}
 		}
-		entry, openErr := sessions.OpenFromSigmaWithID(effectiveID, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+		entry, openErr := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
+			return sessions.OpenFromSigmaWithID(effectiveID, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+		})
 		if openErr != nil {
 			sessions.ReleaseID(effectiveID)
 			return openErr
