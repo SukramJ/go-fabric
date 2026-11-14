@@ -41,11 +41,13 @@ type DataVersionReader interface {
 // (permissive default — preserves v1.0 behaviour for callers that have not
 // wired an ACL store).
 //
-// Mirrors connectedhomeip/src/access/AccessControl.cpp:415-560 and matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts FabricAccessControl
-// forRequest gate. chip src/app/WriteHandler.cpp:780 enforces "Execute the
-// ACL Access Granting Algorithm before existence checks" — the IM gate calls
-// this BEFORE attribute dispatch.
+// Mirrors connectedhomeip/src/access/AccessControl.cpp:415-560 and the
+// access passes of matter.js at db021da0 — a write's
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:215-218 and
+// :236-241, an invoke's CommandInvokeResponse.ts:257-260 and :273-279. chip
+// src/app/WriteHandler.cpp:770 at 6170af84 says "Execute the ACL Access
+// Granting Algorithm before existence checks" — the IM gate calls this
+// BEFORE attribute dispatch.
 type ACLChecker interface {
 	// CheckACL returns [StatusUnsupportedAccess] when the requesting fabric
 	// does not hold the required privilege for (endpoint, clusterID) on

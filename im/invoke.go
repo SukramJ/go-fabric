@@ -155,7 +155,8 @@ type CommandInvocation struct {
 	// [HandleInvokeRequest] answers the command with that status instead
 	// of invoking it — the per-command outcome matter.js produces when
 	// requestTlv.validate throws (packages/protocol/src/action/server/
-	// CommandInvokeResponse.ts:446-448, :472-496).
+	// CommandInvokeResponse.ts:484-487 at db021da0, the failure the
+	// command's status :509-546).
 	DecodeStatus StatusCode
 }
 
@@ -480,7 +481,7 @@ type InvokeResponseEntry struct {
 // Matter §8.8.3.2.1 a SuppressResponse invoke still ships a response when a
 // CommandDataIB is generated; when the response carries only status entries
 // the server sends nothing. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:1043-1074
+// packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
 // (`suppressedBuffer` is flushed on the first `cmd-response`; otherwise the
 // invoke returns without sending).
 func (ir InvokeResponse) HasCommandData() bool {
@@ -496,11 +497,12 @@ func (ir InvokeResponse) HasCommandData() bool {
 // violate when it packs more than one CommandDataIB into a single
 // InvokeRequest. Returns StatusInvalidAction on the first offending command,
 // else StatusSuccess. A single-command invoke always passes. Mirrors matter.js
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:64-92,171-185
-// (CommandInvokeResponse.process / #processConcrete):
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:68-99 at
+// db021da0 (CommandInvokeResponse.process) and :196-212 (the duplicate
+// checks of #processConcrete):
 //   - the batch must not exceed [DefaultMaxPathsPerInvoke] paths, checked
 //     before any per-command validation or dispatch (matter.js
-//     packages/node/src/node/server/InteractionServer.ts:950-955
+//     packages/node/src/node/server/InteractionServer.ts:1017-1022
 //     `if (invokeRequests.length > this.#maxPathsPerInvoke) throw
 //     new StatusResponseError(..., Status.InvalidAction)`);
 //   - a wildcard-endpoint path is illegal in a batch (matter.js "Wildcard path
@@ -619,10 +621,12 @@ func pathStatusEntry(inv CommandInvocation, status StatusCode) InvokeResponseEnt
 // HandleInvokeRequest dispatches a parsed InvokeRequest through d and
 // returns the assembled InvokeResponse.
 //
-// ACL gate: mirrors matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts
-// FabricAccessControl.forRequest and chip src/app/CommandHandler.cpp
-// "Execute the ACL Access Granting Algorithm before existence checks".
+// ACL gate: mirrors matter.js's access passes of an invoke,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:257-260 (the
+// Operate pass before existence) and :273-279 (the command's privilege) at
+// db021da0, and connectedhomeip's order,
+// src/app/InteractionModelEngine.cpp:1810-1851 at 6170af84
+// (ValidateCommandCanBeDispatched).
 // When d implements [ACLChecker], the requesting fabric's privilege is
 // verified before each command path is dispatched. The required
 // privilege for a plain Invoke is Operate (3) per Matter §9.10.4.4;
@@ -655,7 +659,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 
 	var ir InvokeResponse
 	// The InvokeResponseMessage.SuppressResponse field is deprecated and matter.js
-	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:987-988
+	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:1111-1112
 	// `emptyInvokeResponse.suppressResponse: false`). The controller's suppress-response
 	// intent governs whether the bridge sends the InvokeResponse at all (handled at the
 	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
@@ -686,7 +690,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// Fields the reader rejected never reach the cluster server: the
 		// command owes the status the reader attached (ConstraintError for
 		// an out-of-range value), the way matter.js answers a failed
-		// requestTlv.validate (CommandInvokeResponse.ts:472-496).
+		// requestTlv.validate (CommandInvokeResponse.ts:484-487, :509-546).
 		if !inv.DecodeStatus.IsSuccess() {
 			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue

@@ -645,7 +645,7 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 // Timed interactions, as matter.js splits them: the interaction-level gate
 // compares the request's own Timed flag with the exchange's timed window
 // (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
-// TIMEOUT — InteractionServer.ts:940-950), and a command marked "T" in the
+// TIMEOUT — InteractionServer.ts:993-1004 at db021da0), and a command marked "T" in the
 // matter.js model (the resolved server's contract.TimedCommander, else
 // schema.IsTimedInvoke) invoked outside a timed interaction answers
 // NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
@@ -659,8 +659,8 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// CommandRef, or a duplicate concrete path) is rejected up front with a
 	// top-level StatusResponse(InvalidAction) instead of dispatching any
 	// command. Mirrors matter.js
-	// packages/protocol/src/action/server/CommandInvokeResponse.ts:64-92
-	// (process/#processConcrete), whose StatusResponseError(InvalidAction)
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:68-99 at
+	// db021da0 (process) and :196-212 (#processConcrete), whose StatusResponseError(InvalidAction)
 	// aborts the whole invoke before a producer runs. Runs after the timed gate
 	// because matter.js validates the timed window first (InteractionServer.ts
 	// handleInvokeRequest).
@@ -741,7 +741,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// SuppressResponse handling per Matter §8.8.3.2.1: a suppress-response invoke
 	// still ships its InvokeResponse when a CommandDataIB was generated, but sends
 	// nothing when the response carries only CommandStatusIB entries. Mirrors
-	// matter.js packages/node/src/node/server/InteractionServer.ts:1043-1074
+	// matter.js packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
 	// (the held `suppressedBuffer` is discarded — no message sent — when no
 	// cmd-response is produced). The command side-effects already ran inside
 	// HandleInvokeRequest; we only elide the wire reply and discharge the owed
@@ -1150,11 +1150,20 @@ func readCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[u
 
 // chunkInvokeResponse encodes an InvokeResponse into one message, or — when
 // its responses do not fit one — into as many as needed, every one but the
-// last carrying MoreChunkedMessages. Responses are never split; a single
-// response too large for a message on its own is replaced by a
-// ResourceExhausted status for its path, as matter.js answers a response it
-// cannot send. Mirrors matter.js InteractionServer invoke chunking (the
-// InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
+// last carrying MoreChunkedMessages. Responses are never split. Mirrors
+// matter.js InteractionServer invoke chunking (the InvokeResponse split by
+// maxPayloadSize between responses,
+// packages/node/src/node/server/InteractionServer.ts:1123-1151 at db021da0).
+//
+// A single response too large for a message on its own (hardCap, from
+// udp.MaxDatagramSize over UDP) is replaced by a ResourceExhausted status
+// for its path — after the command ran. That is this module's own answer:
+// matter.js has none, it pushes a lone response whatever its size and sends
+// the oversized message over UDP with a warning ("This only works if both
+// nodes support it"), throwing MessageTooLargeError over TCP
+// (packages/protocol/src/protocol/MessageChannel.ts:106-116); here the UDP
+// listener refuses a datagram above its cap, so the controller would get
+// nothing at all. Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
 func chunkInvokeResponse(resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one

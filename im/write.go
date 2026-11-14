@@ -40,10 +40,10 @@ type WriteRequest struct {
 	// MoreChunkedMessages signals that further WriteRequest chunks
 	// follow on the same exchange (Matter §10.6.5 tag 3). Each chunk
 	// is answered with its own WriteResponse — matter.js
-	// InteractionServer.ts:521-532 sends a per-chunk WriteResponse
-	// and then reads the next chunk. The flag is invalid in
+	// InteractionServer.ts:563-575 at db021da0 sends a per-chunk
+	// WriteResponse and then reads the next chunk. The flag is invalid in
 	// combination with SuppressResponse or a timed interaction
-	// (InteractionServer.ts:397/:408 → InvalidAction).
+	// (InteractionServer.ts:410-415, :419-424 → InvalidAction).
 	MoreChunkedMessages bool
 }
 
@@ -268,17 +268,19 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // returns the assembled WriteResponse.
 //
 // DataVersion mismatch check: mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts DataVersion check
-// before write dispatch, and chip src/app/WriteHandler.cpp
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:254-257 at
+// db021da0 (the DataVersion check before the value is written), and chip
+// src/app/WriteHandler.cpp
 // AttributeAccessInterface DataVersion verification. When the caller
 // supplies a DataVersion in an AttributeDataIB (0 included) and d implements
 // [DataVersionReader], the cluster's current version is queried; a mismatch
 // returns StatusDataVersionMismatch (0x92) instead of dispatching the write.
 //
-// ACL gate: mirrors matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts
-// FabricAccessControl.forRequest and chip src/app/WriteHandler.cpp:780
-// "Execute the ACL Access Granting Algorithm before existence checks". When
+// ACL gate: mirrors matter.js's access passes of a write,
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:215-218 (the
+// View pass before existence) and :236-241 (the write privilege) at
+// db021da0, and chip src/app/WriteHandler.cpp:770 at 6170af84 "Execute the
+// ACL Access Granting Algorithm before existence checks". When
 // d implements [ACLChecker], the requesting fabric's privilege is verified
 // before each write path is dispatched, at the location the path resolves
 // to. The required privilege for a plain Write is Operate (3) per Matter
@@ -551,8 +553,8 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			// When a cluster-specific status is conveyed, the outer global
 			// status MUST be FAILURE (not a more specific global code).
 			// Mirrors matter.js
-			// packages/protocol/src/action/server/AttributeWriteResponse.ts:32
-			// (#3988, Matter §7.10.7).
+			// packages/protocol/src/action/server/AttributeWriteResponse.ts:387-390
+			// at db021da0 (#3988, Matter §7.10.7).
 			if res.HasClusterStatus && res.Status != StatusSuccess {
 				res.Status = StatusFailure
 			}

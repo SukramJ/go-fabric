@@ -426,16 +426,16 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// through unchanged.
 				// An attribute the cluster does not implement answers
 				// UNSUPPORTED_ATTRIBUTE before its writability is
-				// considered — matter.js AttributeWriteResponse.ts:225-226
+				// considered — matter.js AttributeWriteResponse.ts:227-229
 				// (`if (!attribute) … Status.UnsupportedAttribute`), ahead of
-				// the UnsupportedWrite check at :229-231. Found by the CHIP
+				// the UnsupportedWrite check at :231-234. Found by the CHIP
 				// Python harness (TC-IDM-3.2 step 3 writes a spec attribute
 				// the DUT does not list).
 				// The global attributes (GeneratedCommandList … ClusterRevision)
 				// exist on every cluster and are never writable: UNSUPPORTED_WRITE
 				// on a concrete path, skipped on a wildcard one — matter.js
 				// models them read-only like any other attribute
-				// (AttributeWriteResponse.ts:229-231). They used to reach the
+				// (AttributeWriteResponse.ts:231-234). They used to reach the
 				// cluster server, which answered Failure or
 				// UNSUPPORTED_ATTRIBUTE (TC-ACE-2.2).
 				if isGlobalAttribute(attrID) {
@@ -453,7 +453,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				if writable, known := schema.AttributeWritable(cPath.Cluster, attrID); known && !writable {
 					// "Concrete" means endpoint AND cluster AND attribute are
 					// all named — the split matter.js makes before it picks a
-					// write path (AttributeWriteResponse.ts:65). A wildcard
+					// write path (AttributeWriteResponse.ts:68). A wildcard
 					// endpoint is a wildcard path even with a concrete
 					// attribute, and reporting a status per resolved endpoint
 					// would both diverge from the spec and enumerate which
