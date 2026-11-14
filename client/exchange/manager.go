@@ -146,7 +146,10 @@ type Manager struct {
 	// ([inboundUnsecuredAckWaitLimit]).
 	inboundOrder []*Session
 	ackWaits     []ackWait
-	exchanges    map[uint32]*Exchange
+	// exchanges is the open exchanges by session and index: two peers
+	// may use the same exchange id at once (matter.js
+	// ExchangeManager.ts:103 at db021da0, a map per session).
+	exchanges map[exchangeKey]*Exchange
 	// channels and channelAddrs are the attached channels by the address
 	// that names them and back (channel.go).
 	channels       map[*net.UDPAddr]Channel
@@ -185,7 +188,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
 		unsecured:    make(map[uint64]*Session),
-		exchanges:    make(map[uint32]*Exchange),
+		exchanges:    make(map[exchangeKey]*Exchange),
 		handlers:     make(map[uint16]ProtocolHandler),
 		channels:     make(map[*net.UDPAddr]Channel),
 		channelAddrs: make(map[Channel]*net.UDPAddr),
@@ -618,19 +621,40 @@ func (m *Manager) closeAll() {
 	}
 }
 
+// exchangeKey is an exchange's place in the table: its session and its
+// index.
+type exchangeKey struct {
+	s     *Session
+	index uint32
+}
+
 // Initiate opens an exchange on s for protocol — matter.js
 // ExchangeManager.ts:145-156 (initiateExchangeForSession): the exchange id
 // is the next value of a counter that starts at random and wraps at
-// 0xFFFF (:729-743), and the exchange is indexed apart from received ones.
+// 0xFFFF (:729-743), skipping an id an open exchange this node started on
+// s still holds (#freeExchangeIdFor, :189-199 at db021da0), and the
+// exchange is indexed apart from received ones.
 func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange, error) {
 	if s.IsClosed() {
 		return nil, ErrSessionClosed
 	}
 	m.mu.Lock()
-	m.exchangeID++
-	id := m.exchangeID
+	var id uint16
+	free := false
+	for range 0x10000 {
+		m.exchangeID++
+		id = m.exchangeID
+		if _, taken := m.exchanges[exchangeKey{s, uint32(id) | initiatedExchangeFlag}]; !taken {
+			free = true
+			break
+		}
+	}
+	if !free {
+		m.mu.Unlock()
+		return nil, errors.New("exchange: every exchange id is in use on the session")
+	}
 	x := newExchange(m, s, id, protocol, true, opts)
-	m.exchanges[x.index] = x
+	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
 	s.addExchange(x)
 	m.cleanupSessionExchanges(s)
@@ -640,8 +664,8 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 // removeExchange drops x from the table if the index still maps to it.
 func (m *Manager) removeExchange(x *Exchange) {
 	m.mu.Lock()
-	if m.exchanges[x.index] == x {
-		delete(m.exchanges, x.index)
+	if key := (exchangeKey{x.session, x.index}); m.exchanges[key] == x {
+		delete(m.exchanges, key)
 	}
 	m.mu.Unlock()
 	x.session.deleteExchange(x)
@@ -912,11 +936,8 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		idx |= initiatedExchangeFlag
 	}
 	m.mu.Lock()
-	x := m.exchanges[idx]
+	x := m.exchanges[exchangeKey{s, idx}]
 	m.mu.Unlock()
-	if x != nil && x.session != s {
-		x = nil
-	}
 	if x != nil {
 		if x.considerClosed() && !msg.isStandaloneAck() {
 			// ExchangeManager.ts:359-378: acknowledge, then close.
@@ -1159,7 +1180,7 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
 	m.mu.Lock()
-	m.exchanges[x.index] = x
+	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
 	s.addExchange(x)
 	m.cleanupSessionExchanges(s)

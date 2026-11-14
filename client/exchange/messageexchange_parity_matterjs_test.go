@@ -474,7 +474,7 @@ func TestMessageExchangeCloseNotification(t *testing.T) {
 			t.Error("Done reopened")
 		}
 		e.m.mu.Lock()
-		registered := e.m.exchanges[x.index] != nil
+		registered := e.m.exchanges[exchangeKey{x.session, x.index}] != nil
 		e.m.mu.Unlock()
 		if registered {
 			t.Error("exchange still registered")
