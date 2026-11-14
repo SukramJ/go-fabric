@@ -89,3 +89,57 @@ func TestWriteNumericListIndexParity(t *testing.T) {
 		t.Errorf("group: status %v after %d writes, want INVALID_ACTION after none", st, srv.writes)
 	}
 }
+
+// TestWriteOtherNodeParity: a write path naming a node other than this one
+// is not written. A concrete path answers UNSUPPORTED_NODE before any other
+// check (AttributeWriteResponse.ts:171-173 at db021da0); a wildcard or group
+// path is dropped without a status (:121-123). The node is this node's id
+// on the session's fabric (packages/protocol/src/action/server/DataResponse.ts:54-63).
+func TestWriteOtherNodeParity(t *testing.T) {
+	t.Parallel()
+	const local, other = uint64(0x2222), uint64(0xDEADBEEF)
+	onNode := func(p im.ConcreteAttributePath, node uint64) im.ConcreteAttributePath {
+		p.Node, p.HasNode = node, true
+		return p
+	}
+	wildcard := im.ConcreteAttributePath{Cluster: gateOnOff, Attribute: gateOnTime, HasCluster: true, HasAttribute: true}
+	stamped := im.WithLocalNodeID(caseCtx(false), local)
+	for _, c := range []struct {
+		name       string
+		ctx        context.Context
+		path       im.ConcreteAttributePath
+		want       []im.StatusCode
+		wantWrites int
+	}{
+		{"concrete, another node", stamped, onNode(concreteAttrPath(2, gateOnOff, gateOnTime), other), []im.StatusCode{im.StatusUnsupportedNode}, 0},
+		{"concrete, another node, endpoint absent: the node first", stamped, onNode(concreteAttrPath(42, gateOnOff, gateOnTime), other), []im.StatusCode{im.StatusUnsupportedNode}, 0},
+		{"wildcard endpoint, another node", stamped, onNode(wildcard, other), nil, 0},
+		{"concrete, this node", stamped, onNode(concreteAttrPath(2, gateOnOff, gateOnTime), local), []im.StatusCode{im.StatusSuccess}, 1},
+		{"concrete, no node id stamped: not looked at", caseCtx(false), onNode(concreteAttrPath(2, gateOnOff, gateOnTime), other), []im.StatusCode{im.StatusSuccess}, 1},
+	} {
+		srv := onTimeServer()
+		d := gateDispatcher(t, store.PrivilegeAdminister, srv)
+		resp := im.HandleWriteRequest(c.ctx, d, im.WriteRequest{Writes: []im.AttributeWrite{writeOf(c.path, uint16(7))}})
+		if len(resp.Responses) != len(c.want) {
+			t.Errorf("%s: responses %+v, want %v", c.name, resp.Responses, c.want)
+		} else {
+			for i, r := range resp.Responses {
+				if r.Status.Status != c.want[i] {
+					t.Errorf("%s: response %d status %v, want %v", c.name, i, r.Status.Status, c.want[i])
+				}
+			}
+		}
+		if srv.writes != c.wantWrites {
+			t.Errorf("%s: %d writes, want %d", c.name, srv.writes, c.wantWrites)
+		}
+	}
+
+	// A group write takes the wildcard path: dropped without a status.
+	srv := onTimeServer()
+	d := NewTopologyDispatcher(makeTopology(&Endpoint{ID: 2, Source: gateSource{srvs: []contract.ClusterServer{srv}}}))
+	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{groupEntry(1, store.PrivilegeManage, nil, nil)}})
+	gctx := im.WithLocalNodeID(im.WithGroupSubject(im.WithFabricFilter(context.Background(), true, 1), im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{2}}), local)
+	if st := im.HandleGroupWriteRequest(gctx, d, im.WriteRequest{SuppressResponse: true, Writes: []im.AttributeWrite{writeOf(onNode(wildcard, other), uint16(7))}}); st != im.StatusSuccess || srv.writes != 0 {
+		t.Errorf("group, another node: status %v after %d writes, want Success after none", st, srv.writes)
+	}
+}

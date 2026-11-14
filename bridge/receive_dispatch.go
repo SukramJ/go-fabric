@@ -510,6 +510,9 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	writeSubjectNodeID, writeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	writeCtx := im.WithFabricFilter(ctx, false, writeFabricIndex)
 	writeCtx = im.WithSubject(writeCtx, writeSubjectNodeID, writeSubjectCATs)
+	// A path naming another node is not written ([im.HandleWriteRequest]),
+	// against this node's id on the session's fabric, as for a read.
+	writeCtx = im.WithLocalNodeID(writeCtx, b.localNodeIDFor(requestHdr.SessionID, writeFabricIndex))
 	// The ACL write Apple sends right after AddNOC still travels the PASE
 	// channel; without this stamp it is evaluated as fabric N / node-id 0
 	// and denied.

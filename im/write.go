@@ -342,6 +342,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	}
 	lastWritten := tx.lastWritten
 	defer func() { tx.lastWritten = lastWritten }()
+	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
 	var wr WriteResponse
 	for _, w := range req.Writes {
 		// The interaction's BUSY checks come first (busyBefore).
@@ -363,6 +364,19 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		if w.Path.WildcardPathFlags != 0 {
 			wr.Status = StatusInvalidAction
 			break
+		}
+		// A path that names another node is not written. A wildcard path
+		// — one without its endpoint, cluster or attribute — is dropped
+		// without a status (matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:121-123
+		// at db021da0, #processWildcard); a concrete one answers
+		// UnsupportedNode below, once the interaction has accepted it.
+		// The node is this node's id on the session's fabric
+		// ([WithLocalNodeID]; DataResponse.ts:54-63); without the stamp the
+		// field is not looked at.
+		otherNode := hasLocalNodeID && w.Path.HasNode && w.Path.Node != localNodeID
+		if otherNode && (!w.Path.HasEndpoint || !w.Path.HasCluster || !w.Path.HasAttribute) {
+			continue
 		}
 		// A write path MUST name a concrete cluster and attribute. Matter
 		// reserves wildcards for Read/Subscribe; a wildcard-attribute write
@@ -387,6 +401,15 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// InteractionServer.ts:533-537 at db021da0); it is held only once
 		// the access checks below have granted the write ([WriteTransaction.hold]).
 		tx.accept(w.Path, fabricIndex)
+		// A concrete path naming another node: UnsupportedNode, the first
+		// check of #writeConcrete (AttributeWriteResponse.ts:171-173).
+		if otherNode {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusUnsupportedNode},
+			})
+			continue
+		}
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
 		// BasicInformation.NodeLabel → Manage) rather than a flat Operate,

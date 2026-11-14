@@ -193,3 +193,32 @@ func TestWriteNumericListIndexEndsTheInteractionParity(t *testing.T) {
 		t.Fatalf("%d writes, want 0", n)
 	}
 }
+
+// TestWriteOtherNodeParity: a concrete write path naming a node other than
+// this node's id on the session's fabric (none over PASE before AddNOC:
+// UNSPECIFIED_NODE_ID) answers UNSUPPORTED_NODE and is not written
+// (AttributeWriteResponse.ts:171-173, DataResponse.ts:54-63 at db021da0).
+func TestWriteOtherNodeParity(t *testing.T) {
+	t.Parallel()
+	b, srv := onTimeBridge(t)
+	p := newIMPeer(t, b)
+	other := onTimePath()
+	other.Node, other.HasNode = 0xDEADBEEF, true
+	p.send(0x4103, im.OpcodeWriteRequest, writeRequestBytes(t, im.WriteRequest{Writes: []im.AttributeWrite{
+		{Path: other, Value: im.AttributeValue{Value: uint16(7)}},
+	}}))
+	proto, body, ok := p.next(2 * time.Second)
+	if !ok || proto.Opcode != im.OpcodeWriteResponse {
+		t.Fatalf("reply %+v (ok %t), want a WriteResponse", proto, ok)
+	}
+	resp, err := im.UnmarshalWriteResponseTLV(tlv.NewDecoder(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Responses) != 1 || resp.Responses[0].Status.Status != im.StatusUnsupportedNode {
+		t.Fatalf("responses %+v, want one UNSUPPORTED_NODE", resp.Responses)
+	}
+	if n := srv.writes(); n != 0 {
+		t.Fatalf("%d writes, want 0", n)
+	}
+}

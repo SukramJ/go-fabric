@@ -202,6 +202,7 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	tx := writeTransactionFromContext(ctx)
 	_, fabricIndex := FabricFilterFromContext(ctx)
+	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
 	for _, w := range req.Writes {
 		// WildcardPathFlags belong to Read and Subscribe: the element
 		// ends the interaction with InvalidAction, after the writes
@@ -209,6 +210,15 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 		// element of process() runs first).
 		if w.Path.WildcardPathFlags != 0 {
 			return StatusInvalidAction
+		}
+		// A wildcard path naming another node is dropped without a status
+		// (matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:121-123
+		// at db021da0, #processWildcard); a concrete one ends the group
+		// interaction below whatever node it names (:75-78).
+		concrete := w.Path.HasEndpoint && w.Path.HasCluster && w.Path.HasAttribute
+		if !concrete && hasLocalNodeID && w.Path.HasNode && w.Path.Node != localNodeID {
+			continue
 		}
 		if w.Path.HasEndpoint {
 			return StatusInvalidAction
