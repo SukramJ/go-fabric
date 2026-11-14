@@ -573,8 +573,11 @@ type CommissionableServiceConfig struct {
 	//   1 = standard commissioning,
 	//   2 = enhanced commissioning.
 	CommissioningMode uint8
-	// DeviceTypeID is the bridge's primary device type for UI hint
-	// (`DT` TXT key). Aggregator = 0x000E.
+	// DeviceTypeID is the device type the node advertises as a hint for
+	// a commissioner's UI: the `DT` TXT key and the `_T<id>` subtype
+	// (matter.js CommissionableMdnsAdvertisement.ts:48, :87 at db021da0).
+	// The node facade states it, or infers it from its endpoints
+	// (node.ProductDescription.DeviceType).
 	DeviceTypeID uint32
 	// DeviceName is the operator-visible name (`DN` TXT key, max 32
 	// utf-8 bytes).

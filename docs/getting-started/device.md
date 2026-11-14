@@ -199,7 +199,7 @@ Defaults worth knowing:
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `BasicInformation.NodeLabel` | `BasicInformation.ProductName` |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
-| `ProductDescription.DeviceType` | RootNode (0x0016) |
+| `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |

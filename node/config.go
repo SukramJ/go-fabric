@@ -502,8 +502,15 @@ type ProductDescription struct {
 	// Name is the advertised device name; empty is
 	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
 	Name string
-	// DeviceType is the advertised device type; 0 is RootNode (0x0016),
-	// as the daemon advertises (main.go:290 at b4ea1f96^).
+	// DeviceType is the device type the commissionable advertisement
+	// carries (the DT key and the _T<id> subtype). 0 infers it from the
+	// endpoints the node serves when it advertises, as matter.js's
+	// ProductDescriptionServer does (ProductDescriptionServer.ts:43-63,
+	// :93-126 at db021da0): the first device type of the first endpoint of
+	// a simple device type below the root and the Aggregator — a bridged
+	// device's type. The first type found stays for the node's lifetime;
+	// while no such endpoint is served the node advertises RootNode
+	// (0x0016).
 	DeviceType uint16
 	// VendorID and ProductID are the node's identity; both mandatory.
 	VendorID, ProductID uint16

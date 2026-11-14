@@ -437,6 +437,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
+		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
@@ -562,7 +563,9 @@ func (n *Node) closeOwnedDB() {
 
 // advertisement is the commissionable record of the node's own window
 // (main.go:329-347 at b4ea1f96^): CM=1, the configured discriminator, the product
-// description's name and device type.
+// description's name and device type — zero when the host states none,
+// which the window infers each time it advertises
+// (commissionableDeviceType).
 func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	var instanceID [8]byte
 	if _, err := rand.Read(instanceID[:]); err != nil {
@@ -572,10 +575,6 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	name := pd.Name
 	if name == "" {
 		name = bi.NodeLabel
-	}
-	deviceType := uint32(pd.DeviceType)
-	if deviceType == 0 {
-		deviceType = deviceTypeRootNode
 	}
 	return bridge.CommissioningAdvertisement{
 		InstanceID:    instanceID,
@@ -587,7 +586,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 			mdns.DeriveUniqueIDFromIdentity(pd.VendorID, pd.ProductID, bi.SerialNumber, bi.NodeLabel), 0,
 		),
 		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
-		DeviceTypeID:      deviceType,
+		DeviceTypeID:      uint32(pd.DeviceType),
 	}, nil
 }
 
