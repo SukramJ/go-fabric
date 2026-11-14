@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -100,7 +102,33 @@ type CASEServer struct {
 	mu     sync.Mutex
 	closed bool
 	wg     sync.WaitGroup
+
+	// seen are the initiator randoms of the Sigma1s that started a
+	// handshake, pending those of the Sigma1s being checked
+	// ([CASEServer.claim]); guarded by seenMu. pending holds one entry per
+	// handshake in flight, so the manager's inbound sessions bound it.
+	seenMu    sync.Mutex
+	seen      map[[sigma.RandomSize]byte]time.Duration
+	seenOrder [][sigma.RandomSize]byte
+	pending   map[[sigma.RandomSize]byte]bool
+	clock     clock.Clock
 }
+
+// Bounds of the initiator randoms the responder remembers (review II,
+// R2-P3-ctl-lan-02; module's own — neither matter.js's CaseServer nor
+// connectedhomeip's CASESession remembers them). The lifetime is the
+// longest an inbound unsecured session lives and so the longest a
+// handshake a Sigma1 opened can hold its slot (client/exchange/manager.go
+// inboundUnsecuredLifetime = 60 s); the count is the number of such
+// sessions the manager holds at once (maxInboundUnsecuredSessions = 256).
+const (
+	seenSigma1Lifetime = 60 * time.Second
+	seenSigma1Limit    = 256
+)
+
+// errRepeatedSigma1 ends a handshake whose Sigma1 started one before: it
+// is answered with nothing.
+var errRepeatedSigma1 = errors.New("handshake: a Sigma1 with this initiator random started a handshake before")
 
 // NewCASEServer returns the responder over mgr. [CASEServer.Register]
 // installs it.
@@ -113,7 +141,61 @@ func NewCASEServer(mgr *exchange.Manager, cfg CASEServerConfig) (*CASEServer, er
 		log = slog.Default()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &CASEServer{mgr: mgr, cfg: cfg, log: log, ctx: ctx, cancel: cancel}, nil
+	return &CASEServer{
+		mgr: mgr, cfg: cfg, log: log, ctx: ctx, cancel: cancel,
+		seen: map[[sigma.RandomSize]byte]time.Duration{}, pending: map[[sigma.RandomSize]byte]bool{}, clock: clock.System{},
+	}, nil
+}
+
+// claim takes random for a Sigma1 about to be checked, false when a Sigma1
+// with it is being checked or started a handshake within
+// [seenSigma1Lifetime]. A Sigma1 is fresh for its initiator: each
+// handshake draws a new random (matter.js CaseClient.ts:120 at db021da0,
+// connectedhomeip CASESession.cpp:750-752 at 6170af84), and a retransmission
+// rides the session it came on, whose duplicate detection answers it. So
+// a repeat under another source node id is a copy, and the work of a
+// Sigma2 for it would hold a session for nobody. The claim ends with
+// [CASEServer.remember] or [CASEServer.release].
+func (c *CASEServer) claim(random [sigma.RandomSize]byte) bool {
+	now := clock.MonotonicOf(c.clock)
+	c.seenMu.Lock()
+	defer c.seenMu.Unlock()
+	if at, ok := c.seen[random]; c.pending[random] || ok && now-at < seenSigma1Lifetime {
+		return false
+	}
+	c.pending[random] = true
+	return true
+}
+
+// release ends a claim whose Sigma1 started no handshake: a Sigma1 that
+// addressed none of our fabrics costs nothing and is not remembered, so
+// it cannot crowd out the randoms that did.
+func (c *CASEServer) release(random [sigma.RandomSize]byte) {
+	c.seenMu.Lock()
+	defer c.seenMu.Unlock()
+	delete(c.pending, random)
+}
+
+// remember ends a claim whose Sigma1 started a handshake: random is
+// remembered, the oldest forgotten beyond [seenSigma1Limit] or past
+// [seenSigma1Lifetime].
+func (c *CASEServer) remember(random [sigma.RandomSize]byte) {
+	now := clock.MonotonicOf(c.clock)
+	c.seenMu.Lock()
+	defer c.seenMu.Unlock()
+	delete(c.pending, random)
+	for len(c.seenOrder) > 0 {
+		oldest := c.seenOrder[0]
+		if len(c.seenOrder) < seenSigma1Limit && now-c.seen[oldest] < seenSigma1Lifetime {
+			break
+		}
+		delete(c.seen, oldest)
+		c.seenOrder = c.seenOrder[1:]
+	}
+	if _, ok := c.seen[random]; !ok {
+		c.seenOrder = append(c.seenOrder, random)
+	}
+	c.seen[random] = now
 }
 
 // Register installs the responder as the manager's Secure Channel handler,
@@ -157,6 +239,10 @@ func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 	defer c.wg.Done()
 	err := c.handleSigma1(c.ctx, x, first)
 	if err == nil {
+		return
+	}
+	if errors.Is(err, errRepeatedSigma1) {
+		c.log.Debug("matter.controller.case_server.failed", slog.Any("err", err))
 		return
 	}
 	c.log.Info("matter.controller.case_server.failed", slog.Any("err", err))
@@ -255,6 +341,18 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 	if (len(sigma1.ResumptionID) == 0) != (len(sigma1.InitiatorResumeMIC) == 0) {
 		return fmt.Errorf("%w: Sigma1 must carry both resumptionId and initiatorResumeMic or neither", ErrUnexpectedData)
 	}
+	// A Sigma1 that started a handshake before, or is being checked, is
+	// answered with nothing, before any work for it (review II,
+	// R2-P3-ctl-lan-02).
+	if !c.claim(sigma1.InitiatorRandom) {
+		return errRepeatedSigma1
+	}
+	started := false
+	defer func() {
+		if !started {
+			c.release(sigma1.InitiatorRandom)
+		}
+	}()
 	// The record the resumption id names, if any (:113-116).
 	var record *ResumptionRecord
 	if len(sigma1.ResumptionID) > 0 && c.cfg.Resumption != nil {
@@ -292,6 +390,10 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 	if err != nil {
 		return err
 	}
+	// The Sigma1 addressed one of our fabrics (or a record of ours): its
+	// handshake starts.
+	started = true
+	c.remember(sigma1.InitiatorRandom)
 	if result.IsResume() {
 		return c.resume(ctx, x, responder, fabrics, record, sigma1, result)
 	}
