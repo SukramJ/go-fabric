@@ -260,8 +260,10 @@ type subTarget struct {
 	// abort, when it closes, ends the wait for the peer's answer to a
 	// chunk of the report being sent ([errChunkWaitAborted]). The ongoing
 	// reporters set it to their context's Done on the copy they send
-	// with — the subscription engine's stop — and it is never stored in
-	// the routing table. Nil: the wait ends with its answer or its timer.
+	// with — the subscription engine's stop — the flush reporter to its
+	// flush's ctx (Stop's budget, a fabric removal), and it is never
+	// stored in the routing table. Nil: the wait ends with its answer or
+	// its timer.
 	abort <-chan struct{}
 }
 
@@ -726,6 +728,11 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		return
 	}
 	target.flush = true
+	// ctx ends every chunk's wait, not only the last one's
+	// (awaitFlushedReport): Stop's stopSessionCloseBudget and a fabric
+	// removal's ctx bound the whole flush however many chunks it takes
+	// (review II, R2-P2-dr-req-01).
+	target.abort = ctx.Done()
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
