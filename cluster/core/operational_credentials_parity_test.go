@@ -445,10 +445,12 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 // envelope and drops the entire Subscribe stream on schema mismatch
 // (Bug I).
 //
-// Source-Origin: derived from matter.js packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts — the pending
-// root is surfaced on a TrustedRootCertificates read between
-// AddTrustedRootCertificate and AddNOC. Mirrors chip
+// The pending root is the last entry, after the installed fabrics' roots.
+//
+// Mirrors matter.js db021da0 packages/node/src/behaviors/
+// operational-credentials/OperationalCredentialsServer.ts:470-472 —
+// `fabrics.map(fabric => fabric.rootCert)`, then
+// `trustedRootCertificates.push(rootCaCertificate)`. Mirrors chip
 // operational-credentials-server.cpp PendingFabric::mPendingRootCert
 // being included in the TrustedRoots attribute response.
 func TestParityOpcreds_PendingRootAppearsInTrustedRoots(t *testing.T) {
@@ -473,12 +475,30 @@ func TestParityOpcreds_PendingRootAppearsInTrustedRoots(t *testing.T) {
 		t.Errorf("TrustedRootCertificates before install: len=%d, want 0", len(listBefore))
 	}
 
-	// Install a synthetic RCAC TLV. AddTrustedRootCertificate decodes via
-	// mattercert.Decode which requires a valid Matter RCAC TLV; constructing
-	// a valid RCAC from scratch needs a test-key generator that is not yet
-	// available in this package. Skip the post-install assertion and record
-	// the gap so the full list-extension contract is tracked.
-	t.Skip("FixMe: go-fabric gap — AddTrustedRootCertificate requires a valid Matter RCAC TLV blob; a test-key generator fixture is needed to complete the pending-root list-extension parity test")
+	// One installed fabric, then a second commissioner's pending root.
+	ctx := context.Background()
+	installed := newFabricForTest(1)
+	installed.RootCert = []byte("root of fabric 1")
+	if _, err := s.AddFabric(ctx, installed); err != nil {
+		t.Fatal(err)
+	}
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingRoot := buildCoreSignedCert(t, rootPriv, true, rootPriv)
+	oc.SetFailSafe(armedFailSafe(0))
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: pendingRoot}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+	v, ok := oc.MatterRead(0x0004)
+	if !ok {
+		t.Fatal("TrustedRootCertificates after install: ok=false")
+	}
+	got := v.([][]byte)
+	if len(got) != 2 || !bytes.Equal(got[0], installed.RootCert) || !bytes.Equal(got[1], pendingRoot) {
+		t.Fatalf("TrustedRootCertificates = %q, want [root of fabric 1, the pending root]", got)
+	}
 }
 
 // TestParityOpcreds_AddNOCReservedAdminVendorIDIsInvalidCommand verifies

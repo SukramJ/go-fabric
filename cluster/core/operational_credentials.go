@@ -1168,10 +1168,11 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		// Include the pending root (set by AddTrustedRootCertificate but not
 		// yet committed by AddNOC) so a second commissioner reading 0x0004
 		// between AddTrustedRootCertificate and AddNOC sees the same view as
-		// matter.js. matter.js reference: OperationalCredentialsServer.ts:471-474
-		// pushes rootCaCertificate into state.trustedRootCertificates
-		// immediately; go-fabric mirrors by prepending pendingTrustRootDER
-		// to the live list when it is non-nil.
+		// matter.js: the installed fabrics' roots, then the pending one.
+		// Mirrors matter.js db021da0 packages/node/src/behaviors/
+		// operational-credentials/OperationalCredentialsServer.ts:470-472
+		// (`fabrics.map(fabric => fabric.rootCert)`, then
+		// `push(rootCaCertificate)`).
 		fabrics, err := o.store.ListFabrics(ctx)
 		if err != nil {
 			return nil, false
@@ -1180,16 +1181,16 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		pending := o.pendingTrustRootDER
 		o.mu.RUnlock()
 		out := make([][]byte, 0, len(fabrics)+1)
-		// Prepend pending root (pre-AddNOC window) per matter.js semantics.
-		if len(pending) > 0 {
-			out = append(out, append([]byte(nil), pending...))
-		}
 		for i := range fabrics {
 			f := &fabrics[i]
 			if len(f.RootCert) == 0 {
 				continue
 			}
 			out = append(out, append([]byte(nil), f.RootCert...))
+		}
+		// The pending root (pre-AddNOC window) last, per matter.js.
+		if len(pending) > 0 {
+			out = append(out, append([]byte(nil), pending...))
 		}
 		return out, true
 	case opcredsAttrCurrentFabricIndex:
