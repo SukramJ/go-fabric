@@ -779,6 +779,25 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 			return status
 		}
 	}
+	// Existence after the access check and before the command's flag
+	// gates and the payload check: matter.js answers UnsupportedEndpoint /
+	// UnsupportedCluster / UnsupportedCommand right after the Operate pass
+	// and before the command privilege, the fabric scope and the timed
+	// quality (packages/protocol/src/action/server/CommandInvokeResponse.ts:263-271
+	// at db021da0; connectedhomeip the same,
+	// src/app/InteractionModelEngine.cpp:1846-1851 at 6170af84,
+	// ValidateCommandCanBeDispatched returns the existence status before
+	// CheckCommandFlags). The access check above uses the
+	// Operate floor for a path that does not resolve
+	// (CommandInvokePrivilegeProvider), so it discloses no more than
+	// matter.js's Operate pass. A payload a generated decoder refused on a
+	// cluster the endpoint does not serve still answers UnsupportedCluster
+	// (TC-IDM-1.2).
+	if g.hasPathChecker && inv.Path.HasEndpoint {
+		if status := g.pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
+			return status
+		}
+	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
 	// session without one — PASE before AddNOC, or a session whose fabric
 	// the caller could not resolve ([HasAccessingFabric]) — it answers
@@ -794,19 +813,6 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 	// fabric checks — matter.js CommandInvokeResponse.ts:292-295.
 	if g.timedKnown && !g.timed && g.isTimed(inv.Path) {
 		return StatusNeedsTimedInteraction
-	}
-	// Existence before the payload check: matter.js
-	// CommandInvokeResponse.ts #processConcrete answers
-	// UnsupportedEndpoint / UnsupportedCluster / UnsupportedCommand
-	// before it validates the request, so a payload a generated decoder
-	// refused on a cluster the endpoint does not serve still answers
-	// UnsupportedCluster (TC-IDM-1.2). matter.js checks existence ahead
-	// of the fabric-scope and timed gates above too; those keep their
-	// place here, pinned by the bridge's timed conformance tests.
-	if g.hasPathChecker && inv.Path.HasEndpoint {
-		if status := g.pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
-			return status
-		}
 	}
 	return StatusSuccess
 }
