@@ -99,6 +99,38 @@ func TestImageKeepsWhatTheStructureNamesOrTheReadAskedFor(t *testing.T) {
 	}
 }
 
+// TestImageKeepsAnAttributeTheReadAskedForOnEveryEndpoint: a read whose
+// path names only an attribute asks for it on every endpoint and cluster,
+// so the image keeps those values on endpoints no PartsList names yet; an
+// other attribute there is not asked for and is dropped.
+func TestImageKeepsAnAttributeTheReadAskedForOnEveryEndpoint(t *testing.T) {
+	t.Parallel()
+	st := &MemoryStore{}
+	n, _, logs := testNode(t, st)
+	sc := newScope([]im.ConcreteAttributePath{{Attribute: spec.AttrClusterRevision, HasAttribute: true}}, false)
+	b := &report{}
+	b.attr(0, clBasicInfo, spec.AttrClusterRevision, uintNode(3), 1)
+	b.attr(1, onoff.ClusterID, spec.AttrClusterRevision, uintNode(6), 1)
+	b.attr(2, onoff.ClusterID, spec.AttrClusterRevision, uintNode(6), 1)
+	b.attr(2, onoff.ClusterID, 0, boolNode(true), 1)
+	n.apply(sc, &b.r, true)
+	for _, ep := range []uint16{1, 2} {
+		e := n.s.endpoints[ep]
+		if e == nil || e.clusters[onoff.ClusterID] == nil {
+			t.Fatalf("endpoint %d's ClusterRevision, which the read asked for, is not in the image", ep)
+		}
+		if _, ok := e.clusters[onoff.ClusterID].cache.values[spec.AttrClusterRevision]; !ok {
+			t.Errorf("endpoint %d's ClusterRevision, which the read asked for, is not in the image", ep)
+		}
+	}
+	if _, ok := n.s.endpoints[2].clusters[onoff.ClusterID].cache.values[0]; ok {
+		t.Error("an attribute the read did not ask for, on an endpoint no PartsList names, is in the image")
+	}
+	if got := logs.count("matter.controller.client.report_path_dropped"); got != 1 {
+		t.Errorf("the dropped path was logged %d times; want once", got)
+	}
+}
+
 // TestImageQuotaRefusesAReportBeyondIt: a report that would raise the
 // image above the node's configured quota is refused whole and the image
 // stays as it was; reports within it are kept.

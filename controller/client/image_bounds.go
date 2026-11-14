@@ -77,8 +77,9 @@ func structureNames(list descriptorList) func(ep uint16, cluster uint32) bool {
 //   - a path the peer's structure names ([structureNames], judged on the
 //     report's own Descriptor lists where it carries them, else the
 //     image's, so a priming report keeps the data that precedes its
-//     Descriptor) or the request asked for ([scope].asks); any other is
-//     dropped, logged once per node;
+//     Descriptor) or the request asked for ([scope].asks, and per
+//     attribute [scope].asksAttribute); any other is dropped, logged once
+//     per node;
 //   - a report whose kept values would raise the image above the node's
 //     quota, and above its present size, is refused whole: nothing of it
 //     is applied, logged once per node.
@@ -133,7 +134,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 			keep = sc.asks(at.ep, at.cluster) || names(at.ep, at.cluster)
 			decided[at] = keep
 		}
-		if !keep {
+		if !keep && !sc.asksAttribute(a.Path.Attribute) {
 			if !s.droppedLogged {
 				s.droppedLogged = true
 				s.log.Warn("matter.controller.client.report_path_dropped", slog.Int("endpoint", int(at.ep)),

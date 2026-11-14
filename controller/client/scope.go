@@ -21,9 +21,14 @@ type scope struct {
 	// asks: a path of the request names the endpoint or the cluster (or
 	// both) and matches; the full wildcard names neither. The image keeps
 	// what the request asked for beside what the peer's structure names
-	// ([structure.admission]; review II, R2-P3-ctl-dev-02, owner decision
+	// ([structure.admit]; review II, R2-P3-ctl-dev-02, owner decision
 	// 54). Module's own: matter.js's ReadScope has no such tester.
 	asks func(ep uint16, cluster uint32) bool
+	// asksAttribute: a path of the request names the attribute and neither
+	// an endpoint nor a cluster, so it asks for that attribute on every
+	// endpoint and cluster (review II, R2-P3-dr-ctl-04). Module's own, as
+	// asks.
+	asksAttribute func(attr uint32) bool
 }
 
 // newScope is the scope of a read of paths — ReadScope(read)
@@ -34,7 +39,19 @@ func newScope(paths []im.ConcreteAttributePath, noFabricFilter bool) scope {
 		isWildcard:     scopeTester(paths, true),
 		fabricFiltered: !noFabricFilter,
 		asks:           askTester(paths),
+		asksAttribute:  attributeAskTester(paths),
 	}
+}
+
+// attributeAskTester is scope.asksAttribute over paths.
+func attributeAskTester(paths []im.ConcreteAttributePath) func(attr uint32) bool {
+	attrs := map[uint32]bool{}
+	for _, p := range paths {
+		if p.HasAttribute && !p.HasEndpoint && !p.HasCluster {
+			attrs[p.Attribute] = true
+		}
+	}
+	return func(attr uint32) bool { return attrs[attr] }
 }
 
 // askTester is scope.asks over paths.
