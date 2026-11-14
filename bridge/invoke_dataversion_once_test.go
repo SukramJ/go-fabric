@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -125,5 +126,67 @@ func TestCommandAdvancesTheDataVersionOnce(t *testing.T) {
 				t.Fatalf("a change outside a command advanced the DataVersion by %d, want 1", after-before)
 			}
 		})
+	}
+}
+
+// brokenAfterCommandServer reports its own change inside its command, then
+// panics, and leaves itself in a state in which its next read panics once
+// too.
+type brokenAfterCommandServer struct {
+	notifyingCounterServer
+	readPanics atomic.Bool
+}
+
+func (s *brokenAfterCommandServer) MatterRead(attrID uint32) (any, bool) {
+	if s.readPanics.Swap(false) {
+		panic("read after the failed command")
+	}
+	return s.notifyingCounterServer.MatterRead(attrID)
+}
+
+func (s *brokenAfterCommandServer) MatterInvoke(context.Context, uint32, any) (any, error) {
+	s.n.Add(1)
+	s.fire(contract.OriginCommand)
+	s.readPanics.Store(true)
+	panic("command")
+}
+
+// TestCommandWhoseReadPanicsEndsItsCommit (review II, R2-P2-rr-dev-04): a
+// command panics and so does the read after it that the comparison makes.
+// The commit the command opened still ends — what the server reported
+// while it ran is reported with one DataVersion advance — and the
+// server's later reports advance the version again, one each; before, the
+// commit stayed open and held every later report of the cluster.
+func TestCommandWhoseReadPanicsEndsItsCommit(t *testing.T) {
+	t.Parallel()
+	srv := &brokenAfterCommandServer{}
+	h := newSecureHarnessWith(t, func(*store.Store, uint8) (Snapshotter, []contract.ClusterServer) {
+		return nil, []contract.ClusterServer{srv}
+	})
+	h.allowAll()
+	h.bridge.AttachSubscriptionManager(subscription.NewManager(subscription.Config{}, (&reachAttrReporterSpy{}).report, nil))
+	root := h.bridge.Topology().FindByID(0)
+	cluster := srv.MatterClusterID()
+	before := root.ClusterDataVersion(cluster)
+	func() {
+		defer func() { _ = recover() }() // transport/udp's safeDispatch
+		h.invoke(0, cluster, 0, nil)
+	}()
+	h.bridge.invokeCommits.mu.Lock()
+	open := len(h.bridge.invokeCommits.open)
+	h.bridge.invokeCommits.mu.Unlock()
+	if open != 0 {
+		t.Fatalf("%d commit(s) open after the command ended", open)
+	}
+	if after := root.ClusterDataVersion(cluster); after-before != 1 {
+		t.Fatalf("the command's reported change advanced the DataVersion by %d, want 1", after-before)
+	}
+	before = root.ClusterDataVersion(cluster)
+	for range 3 {
+		srv.n.Add(1)
+		srv.fire(contract.OriginHostSet)
+	}
+	if after := root.ClusterDataVersion(cluster); after-before != 3 {
+		t.Fatalf("three changes after the command advanced the DataVersion by %d, want 3", after-before)
 	}
 }

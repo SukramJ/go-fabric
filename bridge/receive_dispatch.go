@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -983,9 +984,29 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 		return
 	}
 	topo := b.Topology()
+	// Each commit ends after its cluster's read, so a report between the
+	// two is returned by end, not taken twice. A read that panics still
+	// ends every commit not ended yet — its own and those after it — and
+	// what their servers reported while the command ran is reported without
+	// the comparison: an open commit would hold every later report of its
+	// cluster (review II, R2-P2-rr-dev-04).
+	ended := make(map[invokedCluster]bool, len(before))
+	defer func() {
+		held := make(map[invokedCluster][]uint32)
+		for key := range before {
+			if !ended[key] {
+				ended[key] = true
+				held[key] = b.invokeCommits.end(key)
+			}
+		}
+		for key, changed := range held {
+			reportCommandChange(topo, mgr, key, changed)
+		}
+	}()
 	for key, old := range before {
 		now := readCluster(ctx, d, key)
 		changed := b.invokeCommits.end(key)
+		ended[key] = true
 		selfReported := selfReportedAttributes(topo, key)
 		for attr, v := range now {
 			if attr >= 0xFFF8 || selfReported[attr] {
@@ -998,20 +1019,26 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 				changed = append(changed, attr)
 			}
 		}
-		if len(changed) == 0 {
-			continue
+		reportCommandChange(topo, mgr, key, changed)
+	}
+}
+
+// reportCommandChange advances key's DataVersion once and marks changed
+// dirty; nothing changed moves nothing.
+func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32) {
+	if len(changed) == 0 {
+		return
+	}
+	if topo != nil {
+		if ep := topo.FindByID(key.endpoint); ep != nil {
+			ep.BumpDataVersionOf(key.cluster)
 		}
-		if topo != nil {
-			if ep := topo.FindByID(key.endpoint); ep != nil {
-				ep.BumpDataVersionOf(key.cluster)
-			}
-		}
-		for _, attr := range changed {
-			mgr.OnAttributeChanged(im.ConcreteAttributePath{
-				Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
-				HasEndpoint: true, HasCluster: true, HasAttribute: true,
-			})
-		}
+	}
+	for _, attr := range changed {
+		mgr.OnAttributeChanged(im.ConcreteAttributePath{
+			Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+		})
 	}
 }
 
