@@ -261,13 +261,13 @@ var errNoCommands = spec.Errorf(im.StatusUnsupportedCommand, "measurement: clust
 // with the spec NULL sentinel (0x8000).
 //
 // TemperatureServer embeds [cluster.DataVersionTracker] and implements
-// [contract.ClusterDataVersion] so the IM dispatcher stamps a
-// per-cluster monotonic DataVersion on every AttributeDataIB. Apple
-// Home's MTRDevice cache persists cluster state only when the
-// DataVersion is non-uniform across clusters — a constant 1 (the
-// no-tracker fallback) causes "Storing cluster information count: 3"
-// log lines and forces a full re-read on every reconnect. See
-// [cluster.DataVersionTracker] for the full rationale.
+// [contract.ClusterDataVersion]: on the root or the Aggregator the IM
+// dispatcher stamps that tracker's version on every AttributeDataIB; on a
+// bridged endpoint, and for a server without a tracker, the endpoint
+// keeps the cluster's version and advances it on every change it sees
+// (endpoint/dispatcher.go clusterDataVersionFor). Either way every
+// cluster has a version of its own. See [cluster.DataVersionTracker] for
+// the rationale.
 type TemperatureServer struct {
 	cluster.DataVersionTracker
 	src contract.FloatMeasurementSource

@@ -154,8 +154,9 @@ type ClusterCommandLister interface {
 // startReadInteraction DataVersion stamping on AttributeReportPayload.
 type ClusterDataVersion interface {
 	// MatterDataVersion returns the current per-cluster monotonic counter.
-	// Matter §10.6.5: "A DataVersion of zero is reserved for absent or
-	// invalid"; implementations MUST return ≥ 1.
+	// Every value is a version, 0 included: a DataVersionFilter and a
+	// write's DataVersion are compared with it whatever it is (review II,
+	// decision 46). [DataVersionTracker] skips 0 when it wraps.
 	MatterDataVersion() uint32
 }
 
