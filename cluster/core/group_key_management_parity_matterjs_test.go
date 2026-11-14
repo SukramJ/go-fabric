@@ -107,6 +107,13 @@ func TestGroupKeyManagementParityMatterJS(t *testing.T) {
 			{"duplicate group id", 0, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 1}, {GroupID: 5, GroupKeySetID: 2}}, im.StatusConstraintError},
 			{"more groups than maxGroupsPerFabric", 1, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 1}, {GroupID: 6, GroupKeySetID: 1}}, im.StatusResourceExhausted},
 			{"application group ids within the cap", 2, []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 1}, {GroupID: 0xFEFF, GroupKeySetID: 1}}, im.StatusSuccess},
+			// GroupKeyMapStruct.GroupKeySetId carries "1 to 65535"
+			// (group-key-management.element.ts:109); matter.js validates
+			// every entry as the list accepts it (ListManager.ts:379-386),
+			// before the $Changing reactor runs #validateGroupKeyMap, so the
+			// key set's ConstraintError wins over the other entries' rules.
+			{"key set 0 (the IPK) cannot be mapped", 0, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 0}}, im.StatusConstraintError},
+			{"key set constraint before the group id rule", 0, []core.GroupKeyMapStruct{{GroupID: 0, GroupKeySetID: 1}, {GroupID: 5, GroupKeySetID: 0}}, im.StatusConstraintError},
 		}
 		for _, tc := range cases {
 			fs := newFakeStore()
@@ -120,6 +127,19 @@ func TestGroupKeyManagementParityMatterJS(t *testing.T) {
 			if got := gkmStatus(t, gkm.MatterWrite(ctx, 0x0000, tc.list)); got != tc.want {
 				t.Errorf("%s: status %v, want %v", tc.name, got, tc.want)
 			}
+		}
+	})
+
+	// GroupcastServer #setGroupKeyMapping writes groupKeyMap, so the entry
+	// meets the same "1 to 65535" constraint (group-key-management.element.ts:109).
+	t.Run("a Groupcast binding to key set 0 is refused", func(t *testing.T) {
+		t.Parallel()
+		gkm, _ := core.NewGroupKeyManagement(newFakeStore(), core.GroupKeyMgmtConfig{})
+		if got := gkmStatus(t, gkm.CheckGroupKeyMapping(ctx, 1, 5, 0)); got != im.StatusConstraintError {
+			t.Fatalf("binding to key set 0 = %v, want ConstraintError", got)
+		}
+		if got := gkmStatus(t, gkm.CheckGroupKeyMapping(ctx, 1, 5, 1)); got != im.StatusSuccess {
+			t.Fatalf("binding to key set 1 = %v, want Success", got)
 		}
 	})
 }

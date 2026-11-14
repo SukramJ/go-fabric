@@ -592,7 +592,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 	if !inTable && len(joinTarget(req, existing.Endpoints)) > 0 && len(table) >= g.groups.MaxGroupsPerFabric() {
 		return groupcastErr(im.StatusResourceExhausted, "Too many groups for fabric %d, maximum is %d", fabric, g.groups.MaxGroupsPerFabric())
 	}
-	if err := g.gkm.checkGroupKeyMapping(ctx, fabric, req.GroupID); err != nil {
+	if err := g.gkm.checkGroupKeyMapping(ctx, fabric, req.GroupID, req.KeySetID); err != nil {
 		return err
 	}
 

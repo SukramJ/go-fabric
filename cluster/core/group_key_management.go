@@ -552,6 +552,16 @@ var _ im.StatusCodeError = gkmStatusError{}
 // packages/types/src/datatype/GroupId.ts:isApplicationGroupId.
 func isApplicationGroupID(id uint16) bool { return id >= 0x0001 && id <= 0xFEFF }
 
+// checkMappedKeySet holds a GroupKeyMap entry's GroupKeySetId to its model
+// constraint "1 to 65535": key set 0 is the fabric's IPK and is never
+// mapped to a group.
+func checkMappedKeySet(id uint16) error {
+	if id == 0 {
+		return gkmStatusError{im.StatusConstraintError, "GroupKeyMap: GroupKeySetId 0 (the IPK) cannot be mapped to a group"}
+	}
+	return nil
+}
+
 // validateGroupKeyMap applies the checks matter.js runs before a
 // GroupKeyMap write is accepted: every GroupId must be an Application
 // Group ID (InvalidAction), a GroupId may appear once per fabric
@@ -561,7 +571,22 @@ func isApplicationGroupID(id uint16) bool { return id >= 0x0001 && id <= 0xFEFF 
 // mapped key set is deliberately not required to exist — matter.js leaves
 // that check commented out because certification tests write it first.
 // Mirrors GroupKeyManagementServer.ts:#validateGroupKeyMap.
+//
+// Before those rules every entry meets its field constraint: GroupKeySetId
+// is "1 to 65535", so key set 0 (the IPK) cannot be mapped
+// (ConstraintError). Mirrors matter.js
+// packages/model/src/standard/elements/group-key-management.element.ts:109
+// at db021da0, enforced per entry as the list accepts it
+// (packages/node/src/behavior/state/managed/values/ListManager.ts:379-386,
+// #acceptEntry), before the groupKeyMap$Changing reactor
+// (GroupKeyManagementServer.ts:96); connectedhomeip 6170af84 refuses it
+// the same way, src/app/clusters/group-key-mgmt-server/GroupKeyManagementCluster.cpp:199-200.
 func (g *GroupKeyManagement) validateGroupKeyMap(list []GroupKeyMapStruct) error {
+	for _, m := range list {
+		if err := checkMappedKeySet(m.GroupKeySetID); err != nil {
+			return err
+		}
+	}
 	seen := make(map[uint16]struct{}, len(list))
 	for _, m := range list {
 		if !isApplicationGroupID(m.GroupID) {
@@ -988,12 +1013,16 @@ func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabri
 }
 
 // checkGroupKeyMapping applies the GroupKeyMap validation a Groupcast
-// binding of groupID passes through before it is written: an application
-// group id (InvalidAction) and no more than MaxGroupsPerFabric bindings on
-// the fabric (ResourceExhausted). Mirrors matter.js GroupcastServer
-// #setGroupKeyMapping, whose groupKeyMap write runs
-// GroupKeyManagementServer #validateGroupKeyMap.
-func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric uint8, groupID uint16) error {
+// binding of groupID to keySetID passes through before it is written: a
+// key set other than 0 (ConstraintError, the entry's field constraint), an
+// application group id (InvalidAction) and no more than MaxGroupsPerFabric
+// bindings on the fabric (ResourceExhausted). Mirrors matter.js
+// GroupcastServer #setGroupKeyMapping, whose groupKeyMap write validates
+// the entry and runs GroupKeyManagementServer #validateGroupKeyMap.
+func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
+	if err := checkMappedKeySet(keySetID); err != nil {
+		return err
+	}
 	if !isApplicationGroupID(groupID) {
 		return gkmStatusError{im.StatusInvalidAction, fmt.Sprintf("GroupKeyMap: GroupId 0x%04X is not an operational group id", groupID)}
 	}
@@ -1019,7 +1048,7 @@ func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric ui
 // Mirrors matter.js GroupcastServer #setGroupKeyMapping /
 // #syncOperationalKeyMap.
 func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
-	if err := g.checkGroupKeyMapping(ctx, fabric, groupID); err != nil {
+	if err := g.checkGroupKeyMapping(ctx, fabric, groupID, keySetID); err != nil {
 		return err
 	}
 	if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: fabric, GroupID: groupID, GroupKeySetID: keySetID}); err != nil {
