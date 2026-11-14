@@ -117,6 +117,11 @@ type Manager struct {
 	localAdditional time.Duration
 	localFixed      time.Duration
 
+	// lifetime ends when the manager closes: the context of the work the
+	// manager starts by itself (the rollover close's farewell).
+	lifetime       context.Context
+	cancelLifetime context.CancelFunc
+
 	// inflight counts the messages delivered to an exchange whose reader
 	// has not finished with them (internal/inflight ExchangeDelivered):
 	// the group the clock carries, nil outside a fabrictest site.
@@ -198,6 +203,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		sessionIDLimit: sessionIDUpperBound,
 	}
 	m.nextSessionID = binary.LittleEndian.Uint16(seed[2:4])%sessionIDUpperBound + 1
+	m.lifetime, m.cancelLifetime = context.WithCancel(context.Background())
 	if cfg.LocalParameters != nil {
 		m.local = *cfg.LocalParameters
 	}
@@ -599,6 +605,7 @@ func (m *Manager) goWork(fn func()) bool {
 
 // closeAll marks the manager closed and closes every session.
 func (m *Manager) closeAll() {
+	m.cancelLifetime()
 	m.mu.Lock()
 	m.closed = true
 	all := make([]*Session, 0, len(m.sessions)+len(m.unsecured))
@@ -1106,10 +1113,28 @@ func (m *Manager) seal(s *Session, proto message.ProtocolHeader, payload []byte,
 	}
 	hdr := message.Header{SessionID: s.peer}
 	sealed, err := s.secure.Encrypt(&hdr, hdr.SecurityFlags(), plain)
+	if s.secure.RolloverDue() {
+		m.endSessionAtRollover(s)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w: %w", ErrSessionClosed, err)
 	}
 	return append(hdr.Marshal(), sealed.Ciphertext...), sealed.Counter, nil
+}
+
+// endSessionAtRollover ends the secure session s whose outbound counter
+// nears exhaustion ([channel.Session.RolloverDue]): the peer is told with
+// a CloseSession while the keys still seal, then the session closes, so
+// the peer's next exchange establishes a new one. Mirrors matter.js
+// packages/protocol/src/session/NodeSession.ts:398-412
+// (#scheduleRolloverClose → initiateClose), which runs on a timer rather
+// than on the stack of the send that consumed the counter; here it runs
+// on a goroutine of the manager for the same reason (the sender holds its
+// exchange's lock). The device side is bridge/reply.go
+// endSessionAtRollover. A closed manager closed the session already.
+func (m *Manager) endSessionAtRollover(s *Session) {
+	m.log.Info("matter.controller.session.rollover_close", slog.Int("session_id", int(s.id)))
+	m.goWork(func() { m.CloseSession(m.lifetime, s) })
 }
 
 // reportPeerLost calls the PeerLost hook once for a secure session that
