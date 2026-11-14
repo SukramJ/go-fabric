@@ -17,7 +17,7 @@ import (
 // its own acknowledgement. matter.js acts on an acknowledgement inside the
 // exchange the message belongs to (packages/protocol/src/protocol/MessageExchange.ts:521-537
 // at db021da0), found in the unsecured session of the initiator the message
-// names (ExchangeManager.ts:306-308 and :398-401).
+// names (ExchangeManager.ts:306-312 and :398-401).
 func TestUnsecuredAckReachesItsOwnHandshakeOnly(t *testing.T) {
 	t.Parallel()
 	const exchange = uint16(0x0505)

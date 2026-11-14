@@ -581,7 +581,7 @@ func (t *outboundReliableTracker) ack(key outboundKey, belongs func(*outboundEnt
 // ([Bridge.nextUnsecuredCounter]), so the counter alone names no
 // handshake. matter.js acts on an acknowledgement inside the exchange of
 // the unsecured session the message names
-// (packages/protocol/src/protocol/ExchangeManager.ts:306-308 and :398-401,
+// (packages/protocol/src/protocol/ExchangeManager.ts:306-312 and :398-401,
 // MessageExchange.ts:521-537 at db021da0); an acknowledgement of another
 // handshake's counter is stray there and is here.
 func (t *outboundReliableTracker) AckUnsecured(hk HandshakeKey, acked uint32) bool {

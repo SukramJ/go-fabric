@@ -76,7 +76,7 @@ func responderDatagram(counter uint32, destNodeID uint64, proto message.Protocol
 // session and does not reach it. matter.js finds the unsecured session of
 // a response by the destination node id it carries, "Responses include our
 // ephemeral initiator nodeId as destNodeId"
-// (packages/protocol/src/protocol/ExchangeManager.ts:306-308 at db021da0),
+// (packages/protocol/src/protocol/ExchangeManager.ts:306-312 at db021da0),
 // and the exchange inside that session (:398-401); the responder side has
 // the same rule ([HandshakeKey], review II R2-P3-lan-dev-01).
 func TestInitiatedHandshakeTakesRepliesOfItsPeerOnly(t *testing.T) {

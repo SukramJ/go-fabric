@@ -226,7 +226,7 @@ type initiatedExchange struct {
 // initiator is not this handshake's — matter.js finds the unsecured session
 // of a response by that destination node id ("Responses include our
 // ephemeral initiator nodeId as destNodeId",
-// packages/protocol/src/protocol/ExchangeManager.ts:306-308 at db021da0) and
+// packages/protocol/src/protocol/ExchangeManager.ts:306-312 at db021da0) and
 // the exchange inside it (:398-401), as the responder side does here.
 func (b *Bridge) deliverInitiatedSecureChannel(hdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
 	if proto.Initiator || hdr.SessionID != 0 || proto.Opcode == mrp.StandaloneAckOpcode {
