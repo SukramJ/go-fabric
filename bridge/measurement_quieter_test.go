@@ -209,6 +209,31 @@ func TestQuieterChangeInTheRewiringGapIsReportedAtAttach(t *testing.T) {
 	r.step(t, "a re-wiring with nothing changed", v0, 2, false)
 }
 
+// TestQuieterChangesInTheRewiringGapAdvanceTheirClusterOnce: two quieter
+// paths of one cluster that changed while no wiring served them —
+// ActivePower and Voltage — advance the cluster's DataVersion once when the
+// next wiring takes them up, as one notification of both does and as one
+// matter.js commit advances a cluster's version once for every property it
+// changed (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457
+// at db021da0). Review II, R2-P4-fr-im-04.
+func TestQuieterChangesInTheRewiringGapAdvanceTheirClusterOnce(t *testing.T) {
+	t.Parallel()
+	r := newQuietMeterRig(t, epmActivePower)
+	v0 := r.version()
+	r.src.mu.Lock()
+	r.src.power, r.src.powered = 10, true
+	r.src.voltage, r.src.volted = 230, true
+	r.src.mu.Unlock()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := r.b.Reassemble(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.version(); got != v0+1 {
+		t.Fatalf("the re-wiring that takes up two changed quieter paths of one cluster: DataVersion %d, want %d", got, v0+1)
+	}
+}
+
 // TestStoppedBridgeQuieterPathIsSilent: once the bridge stopped, a
 // notification that still reaches the listener of its last wiring — a
 // host that delivers one while the bridge detaches — moves neither the

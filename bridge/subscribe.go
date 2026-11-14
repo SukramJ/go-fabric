@@ -2181,6 +2181,11 @@ type listenerSet struct {
 	// values holds the last values of each endpoint's paths of the
 	// wiring ([listenerSet.pathValuesFor]).
 	values map[uint16]*pathMemory
+	// reclaimed holds, per endpoint, the clusters whose DataVersion the
+	// wiring advanced for a quieter path it took up changed
+	// ([listenerSet.quietPathFor]): the changes of the gap are one
+	// commit per cluster, as a notification's are.
+	reclaimed map[uint16]map[uint32]struct{}
 }
 
 // pathValuesFor returns a pathValues of paths over the set's memory of
@@ -2677,7 +2682,17 @@ func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *end
 	}
 	qp.attach(ep, mgr, fresh)
 	if !fresh {
-		qp.check(make(map[uint32]struct{}, 1))
+		// One advance per cluster for the changes of the gap, however
+		// many of its quieter paths moved (review II, R2-P4-fr-im-04).
+		bumped, ok := l.reclaimed[ep.ID]
+		if !ok {
+			bumped = make(map[uint32]struct{}, 1)
+			if l.reclaimed == nil {
+				l.reclaimed = make(map[uint16]map[uint32]struct{})
+			}
+			l.reclaimed[ep.ID] = bumped
+		}
+		qp.check(bumped)
 	}
 	if l.quiet == nil {
 		l.quiet = make(map[im.ConcreteAttributePath]*quietPath)
