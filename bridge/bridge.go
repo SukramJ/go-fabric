@@ -496,6 +496,10 @@ type Bridge struct {
 	// cleanup) or point at stale topology entries (cleanup but no
 	// re-bind).
 	measurementUnsubscribers []func()
+	// listenerWiring is the wiring measurementUnsubscribers detach: its
+	// memory of the notifiers' last values, which a controller's write
+	// brings up to date ([Bridge.settleWrite]).
+	listenerWiring *listenerSet
 	// quietParked holds the quiet paths a torn-down wiring parked for the
 	// next one to take up ([Bridge.parkQuietPath]); guarded by quietMu, a
 	// leaf lock.
@@ -703,6 +707,11 @@ type Bridge struct {
 	// command runs against their cluster, so the command advances the
 	// cluster's DataVersion once ([invokeCommitTable]).
 	invokeCommits invokeCommitTable
+
+	// writeHolds holds the changes a host's notifier reports while a
+	// controller's write is applied to their endpoint, so the write
+	// advances each cluster's DataVersion once ([writeHoldTable]).
+	writeHolds writeHoldTable
 
 	// commissioningInstanceName remembers the mDNS instance name the
 	// bridge published via [Bridge.AnnounceCommissioning] so the

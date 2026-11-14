@@ -2060,9 +2060,9 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // The bridge runs this through [Bridge.rewireMeasurementListeners] on
 // every reassemble (topology may add or remove bridged endpoints) and
 // whenever a fresh subscription manager is attached. It calls the host's
-// notifiers, so the caller holds no bridge lock; it returns the
-// unsubscribe closures of what it registered.
-func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *endpointpkg.Topology) []func() {
+// notifiers, so the caller holds no bridge lock; it returns the wiring,
+// with the unsubscribe closures of what it registered.
+func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *endpointpkg.Topology) *listenerSet {
 	set := &listenerSet{}
 	b.wireRootNotifiers(set, mgr, topology)
 	b.wireAttributeNotifiers(set, mgr, topology)
@@ -2168,7 +2168,7 @@ func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *e
 	for _, qp := range set.quiet {
 		set.unsubs = append(set.unsubs, func() { b.parkQuietPath(qp) })
 	}
-	return set.unsubs
+	return set
 }
 
 // listenerSet collects the unsubscribe closures of one wiring of the
@@ -2189,7 +2189,7 @@ type listenerSet struct {
 func (l *listenerSet) pathValuesFor(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
 	mem, ok := l.values[ep.ID]
 	if !ok {
-		mem = &pathMemory{last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}
+		mem = &pathMemory{ep: ep, last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}
 		if l.values == nil {
 			l.values = make(map[uint16]*pathMemory)
 		}
@@ -2222,6 +2222,7 @@ func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	b.mu.Lock()
 	stale := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
+	b.listenerWiring = nil
 	b.listenerGeneration++
 	generation = b.listenerGeneration
 	mgr, topology := b.subManager, b.topology
@@ -2231,11 +2232,13 @@ func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	if mgr == nil || topology == nil {
 		return generation
 	}
-	unsubs := b.wireMeasurementListeners(mgr, topology)
+	set := b.wireMeasurementListeners(mgr, topology)
+	unsubs := set.unsubs
 	b.mu.Lock()
 	overtaken := b.listenerGeneration != generation
 	if !overtaken {
 		b.measurementUnsubscribers = unsubs
+		b.listenerWiring = set
 	}
 	b.mu.Unlock()
 	if overtaken {
@@ -2256,6 +2259,7 @@ func (b *Bridge) detachListenersOfGeneration(generation uint64) {
 	}
 	unsubs := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
+	b.listenerWiring = nil
 	b.listenerGeneration++
 	b.mu.Unlock()
 	runUnsubscribers(unsubs)
@@ -2271,6 +2275,7 @@ func (b *Bridge) detachHostListeners() {
 	measurements := b.measurementUnsubscribers
 	switches := b.switchUnsubscribers
 	b.measurementUnsubscribers = nil
+	b.listenerWiring = nil
 	b.switchUnsubscribers = nil
 	b.listenerGeneration++ // a wiring still registering detaches itself
 	b.mu.Unlock()
@@ -2557,6 +2562,10 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 		changed = slices.DeleteFunc(changed, func(p im.ConcreteAttributePath) bool {
 			return b.invokeCommits.hold(epID, p.Cluster, []uint32{p.Attribute})
 		})
+		// A controller's write being applied to the endpoint settles
+		// them when it ends (writeHoldTable): the memory holds the new
+		// values already.
+		changed = b.writeHolds.holdPaths(ep, mgr, changed)
 		bumped := make(map[uint32]struct{}, 1)
 		for _, p := range changed {
 			if _, done := bumped[p.Cluster]; !done {
@@ -2568,7 +2577,7 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 			mgr.OnAttributeChanged(p)
 		}
 		for _, qp := range quiet {
-			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) {
+			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) && !b.writeHolds.holdQuiet(epID, qp) {
 				qp.check(bumped)
 			}
 		}
@@ -2799,6 +2808,18 @@ func (qp *quietPath) check(bumped map[uint32]struct{}) {
 		bumped[qp.path.Cluster] = struct{}{}
 	}
 	qp.q.Changed(wasNull, isNull)
+}
+
+// refresh reads the value of a bound quietPath again without telling the
+// throttle: a controller's write changed it and was reported
+// ([Bridge.settleWrite]).
+func (qp *quietPath) refresh() {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+	if qp.ep == nil {
+		return // parked: the next wiring compares with the value
+	}
+	qp.last, qp.had = qp.read()
 }
 
 // sameNotifier reports whether a and b are the same notifier — the
@@ -3204,13 +3225,35 @@ type pathValues struct {
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0).
 type pathMemory struct {
-	// mu guards last and orders the readings (check, changed).
+	// ep is the endpoint whose paths the memory holds.
+	ep *endpointpkg.Endpoint
+	// mu guards last and orders the readings (check, changed, refresh).
 	mu   sync.Mutex
 	last map[im.ConcreteAttributePath]attributeReading
 }
 
 func newPathValues(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
-	return newPathValuesIn(&pathMemory{last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}, ep, paths)
+	return newPathValuesIn(&pathMemory{ep: ep, last: make(map[im.ConcreteAttributePath]attributeReading, len(paths))}, ep, paths)
+}
+
+// refresh reads p again into the memory when the memory holds a value of
+// it: a controller's write changed it and was reported
+// ([Bridge.settleWrite]), so the next notification compares with the
+// written value.
+func (m *pathMemory) refresh(p im.ConcreteAttributePath) {
+	key := im.ConcreteAttributePath{
+		Endpoint: p.Endpoint, Cluster: p.Cluster, Attribute: p.Attribute,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, held := m.last[key]; !held || m.ep == nil {
+		return
+	}
+	now := (&pathValues{ep: m.ep, paths: []im.ConcreteAttributePath{key}}).read()
+	if v, ok := now[key]; ok {
+		m.last[key] = v
+	}
 }
 
 // newPathValuesIn is a pathValues over mem: it remembers the current

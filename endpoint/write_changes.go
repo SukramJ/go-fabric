@@ -70,6 +70,39 @@ func (w *WriteChanges) Unchanged(p im.ConcreteAttributePath) bool {
 	return written && !changed
 }
 
+// Changed reports whether a successful write of p in the interaction
+// changed the cluster, by its server's verdict. A path no write was
+// recorded for, or whose every write changed nothing, is not changed.
+func (w *WriteChanges) Changed(p im.ConcreteAttributePath) bool {
+	if w == nil {
+		return false
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.changed[writtenAt(p)]
+}
+
+// ChangedAttributes returns, in no defined order, the concrete path of
+// every attribute a successful write in the interaction changed
+// ([WriteChanges.Changed]).
+func (w *WriteChanges) ChangedAttributes() []im.ConcreteAttributePath {
+	if w == nil {
+		return nil
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]im.ConcreteAttributePath, 0, len(w.changed))
+	for a, changed := range w.changed {
+		if changed {
+			out = append(out, im.ConcreteAttributePath{
+				Endpoint: a.endpoint, Cluster: a.cluster, Attribute: a.attribute,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+	}
+	return out
+}
+
 type writeChangesKey struct{}
 
 // WithWriteChanges attaches w to ctx: the write interaction ctx carries

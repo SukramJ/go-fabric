@@ -126,3 +126,25 @@ func TestWriteChangesChangedWins(t *testing.T) {
 		t.Fatal("a nil record holds a path unchanged")
 	}
 }
+
+// TestWriteChangesChangedAttributes: Changed and ChangedAttributes name
+// exactly the paths some write of the interaction changed — not one
+// written without a change, not one never written.
+func TestWriteChangesChangedAttributes(t *testing.T) {
+	t.Parallel()
+	w := &WriteChanges{}
+	changed := concreteAttrPath(2, 0x0006, 0x4001)
+	unchanged := concreteAttrPath(2, 0x0006, 0x4002)
+	w.record(changed, true)
+	w.record(unchanged, false)
+	if !w.Changed(changed) || w.Changed(unchanged) || w.Changed(concreteAttrPath(2, 0x0006, 0x4003)) {
+		t.Fatal("Changed names a path no write changed, or misses the one a write changed")
+	}
+	if got := w.ChangedAttributes(); len(got) != 1 || got[0] != changed {
+		t.Fatalf("ChangedAttributes = %+v, want exactly %+v", got, changed)
+	}
+	var none *WriteChanges
+	if none.Changed(changed) || none.ChangedAttributes() != nil {
+		t.Fatal("a nil record names a changed path")
+	}
+}

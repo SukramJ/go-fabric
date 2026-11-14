@@ -580,10 +580,12 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
 	// The dispatcher records which written attributes changed nothing
-	// (endpoint.WriteChanges); their report is left out.
+	// (endpoint.WriteChanges); their report is left out. A host notifier's
+	// changes of the endpoints written meanwhile are settled against the
+	// same record when the write ends ([Bridge.applyWriteHeld]).
 	changes := &endpointpkg.WriteChanges{}
 	writeCtx = endpointpkg.WithWriteChanges(writeCtx, changes)
-	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
+	resp := b.applyWriteHeld(writeCtx, dispatcher, req, changes)
 	// An interaction that ended at a data element (im.WriteResponse.Status)
 	// ends the transaction: the elements before it were written and are
 	// reported, and the controller gets the StatusResponse — matter.js's
