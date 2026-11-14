@@ -1047,7 +1047,6 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 		if b.logger != nil {
 			b.logger.Debug("matter.tx.subscribe."+op,
 				slog.Int("subscription_id", int(subID)),
-				slog.Uint64("report", seq),
 				slog.String("hint", "report overlapped an update already counted; not counted again"),
 				slog.Any("err", err))
 		}
