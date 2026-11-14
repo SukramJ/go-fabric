@@ -888,6 +888,14 @@ func pinnableACL(l endpointpkg.ACLLister) endpointpkg.ACLLister {
 // wildcard flags do not skip — and returns the attribute reports the
 // subscribing subject may read, under the identity captured on target.
 // Shared by the ongoing report and the flush.
+//
+// A change report carries values only: a changed path whose read no longer
+// succeeds — its endpoint removed, an attribute no longer served — is left
+// out (review II, R2-P4-imread-09). Mirrors matter.js
+// packages/protocol/src/action/server/AttributeSubscriptionResponse.ts:91-93
+// at db021da0 (addStatus suppressed "For Filtered responses"), through which
+// packages/node/src/node/server/ServerSubscription.ts:860-868 builds every
+// update.
 func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription, paths []im.ConcreteAttributePath) []im.AttributeReport {
 	// Authorize + fabric-project every ongoing report against the
 	// identity captured at Subscribe time, so a CASE subject cannot
@@ -902,14 +910,10 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 	var reports []im.AttributeReport
 	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
 		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
-			rep := im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion}
 			if rr.Status != im.StatusSuccess {
-				rep.IsStatus = true
-				rep.Status = im.StatusIB{Status: rr.Status}
-			} else {
-				rep.Value = rr.Value
+				continue
 			}
-			reports = append(reports, rep)
+			reports = append(reports, im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, Value: rr.Value})
 		}
 	}
 	return reports
