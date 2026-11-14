@@ -142,7 +142,9 @@ func (e *GeneralCommissioningError) Unwrap() error {
 // TCAcknowledgementsRequired is true, and [Options.TermsAndConditions] is
 // nil or its Version below the device's TCMinRequiredVersion. The flow
 // reads the requirement in step 0.1 and returns this right after it,
-// before ArmFailSafe and AddNOC, so a caller can obtain the user's
+// before it arms the fail-safe or sends AddNOC — it expires only the
+// fail-safe the device armed with the PASE session, so the device accepts
+// the next PASE at once — so a caller can obtain the user's
 // consent and commission again with the acknowledgement. Neither
 // matter.js nor connectedhomeip reads the requirement (register row
 // BD-Matter-Commissioner-TermsRequirementRead). It unwraps to a

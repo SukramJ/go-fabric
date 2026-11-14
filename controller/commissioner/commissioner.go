@@ -333,6 +333,7 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 		id, ok := opts.ClaimNodeIDAfterPASE()
 		if !ok {
 			err := newError(ErrCommissioning, "Commissioning cancelled: another device was already successfully connected", nil)
+			c.disarmPASE(ctx, session, opts.Channel)
 			c.closePASE(session, opts.Channel, err)
 			return Result{}, err
 		}
@@ -346,6 +347,39 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 	}
 	c.closePASE(session, opts.Channel, &CommissioningTransitionError{Message: "Commissioning over PASE completed"})
 	return result, nil
+}
+
+// disarmPASE expires the fail-safe the device armed when the PASE session
+// s was established, for a commissioning that gives up after PASE and
+// before its flow runs: the device's rollback ends the PASE session
+// (matter.js packages/protocol/src/common/FailsafeContext.ts:277-279 at
+// db021da0), and until it ends the device accepts no new PASE exchange
+// (PaseServer.ts:80-82 at db021da0). The flow's own failures disarm
+// themselves (flow.disarmAfterFailure, which says why, and
+// flow.disarmAfterAbort). It sends the flow's request (flow.expireFailsafe)
+// with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
+// ctx and the exchange's response timeout or, ctx having ended, by
+// abortDisarmTimeout as after an abort; nothing on a closed session, a
+// failure logged. Ahead of matter.js, whose commission only force-closes
+// the session on a failure (ControllerCommissioner.ts:304-306, :313-319
+// at db021da0).
+func (c *Commissioner) disarmPASE(ctx context.Context, s *exchange.Session, ch Channel) {
+	if s.IsClosed() {
+		return
+	}
+	mgr := c.ctx.Exchanges
+	if ch != nil {
+		mgr = ch.Exchanges()
+	}
+	if ctx.Err() != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), abortDisarmTimeout)
+		defer cancel()
+	}
+	path := im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafe}
+	if _, err := c.sessionInteraction(mgr, s).Invoke(ctx, path, gencomm.ArmFailSafeRequest{Breadcrumb: initialBreadcrumb}, interaction.InvokeOptions{}); err != nil {
+		c.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.Any("err", err))
+	}
 }
 
 // closePASESession ends the PASE session as matter.js's initiateForceClose
@@ -558,6 +592,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 	}
 	address, err := c.determineAddress(opts.Fabric, opts.NodeID)
 	if err != nil {
+		c.disarmPASE(ctx, pase, opts.Channel)
 		return Result{}, err
 	}
 	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node_id", address.NodeID), slog.Uint64("fabric_id", opts.Fabric.FabricID))

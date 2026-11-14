@@ -207,7 +207,8 @@ func TestFlowCumulativeTimeout(t *testing.T) {
 
 // TestFlowErrorClasses: a CommissioningError disarms and is returned as
 // is; an IM status error disarms and is repacked as a CommissioningError
-// (:437-462); any other error is returned without a disarm (:463-465); a
+// (:437-462); any other error is returned as is (:463-465) and, ahead of
+// matter.js, which does not reset then, disarms too (disarmAfterFailure); a
 // recoverable error is logged and the next step runs (:431-436); Stop ends
 // the loop (:426-428).
 func TestFlowErrorClasses(t *testing.T) {
@@ -225,7 +226,7 @@ func TestFlowErrorClasses(t *testing.T) {
 			var ce *CommissioningError
 			return errors.As(e, &ce) && ce.Kind == ErrCommissioning && errors.Is(e, status) //nolint:errorlint // the identity of the kind
 		}, true},
-		{"other error", boom, func(e error) bool { return e == boom }, false}, //nolint:errorlint // returned as is
+		{"other error", boom, func(e error) bool { return e == boom }, true}, //nolint:errorlint // returned as is
 	}
 	for _, r := range rows {
 		dev := &failsafeDevice{info: gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}}
@@ -321,7 +322,7 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 		return step{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }}
 	}
 
-	t.Run("before the fail-safe is armed nothing is sent", func(t *testing.T) {
+	t.Run("before the flow arms, the fail-safe armed with the PASE session is expired", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		f, _ := newTestFlow(t, dev.handle)
@@ -329,8 +330,8 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 		defer cancel()
 		f.steps = []step{abortStep(0, cancel), arm(f)}
 		err := f.execute(ctx)
-		if err != context.Canceled || len(dev.armed()) != 0 { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, arms %v, want context.Canceled and no ArmFailSafe", err, dev.armed())
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{0}) || f.failsafeMayBeArmed() { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [0]", err, dev.armed())
 		}
 	})
 
@@ -529,7 +530,7 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 		}
 	})
 
-	t.Run("the read before the first ArmFailSafe in flight: nothing is sent", func(t *testing.T) {
+	t.Run("the read before the first ArmFailSafe in flight: the disarm alone", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -544,8 +545,8 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 		})
 		f.steps = []step{arm(f)}
 		err := f.execute(ctx)
-		if err != context.Canceled || len(dev.armed()) != 0 || f.failsafeMayBeArmed() { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, arms %v, want context.Canceled and no ArmFailSafe", err, dev.armed())
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{0}) || f.failsafeMayBeArmed() { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [0]: no arm, the PASE session's fail-safe expired", err, dev.armed())
 		}
 	})
 

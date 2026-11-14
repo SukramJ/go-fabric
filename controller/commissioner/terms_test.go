@@ -6,6 +6,7 @@ package commissioner
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 
@@ -21,13 +22,15 @@ type termsValue func(e *tlv.Encoder, tag tlv.Tag)
 func (v termsValue) EncodeTLV(e *tlv.Encoder, tag tlv.Tag) { v(e, tag) }
 
 // termsDevice serves the root GeneralCommissioning's FeatureMap and, with
-// the TC feature, its three requirement attributes to every read, and
-// counts the commands it is sent.
+// the TC feature, its three requirement attributes to every read, counts
+// the commands it is sent and records the expiries of the ArmFailSafe
+// among them, answering only those.
 type termsDevice struct {
 	termsConfig
 
 	mu       sync.Mutex
 	invokes  int
+	arms     []uint16
 	readPath []im.ConcreteAttributePath
 }
 
@@ -36,8 +39,16 @@ func (d *termsDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bo
 	case im.OpcodeInvokeRequest:
 		d.mu.Lock()
 		d.invokes++
+		expiry, arm := armRequest(req)
+		if arm {
+			d.arms = append(d.arms, expiry)
+		}
 		d.mu.Unlock()
-		return 0, nil, false
+		if !arm {
+			return 0, nil, false
+		}
+		path := im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse}
+		return im.OpcodeInvokeResponse, invokeResponseOf(path, gencomm.ArmFailSafeResponse{}), true
 	case im.OpcodeReadRequest:
 	default:
 		return 0, nil, false
@@ -173,8 +184,10 @@ func TestTermsRequirementReadPaths(t *testing.T) {
 }
 
 // TestTermsRequiredBeforeArmFailSafe: the flow ends with the requirement
-// right after step 0.1 — no ArmFailSafe, no command at all reaches the
-// device — and reports step 0.1 failed with it.
+// right after step 0.1 — nothing armed, no command reaches the device but
+// the one ArmFailSafe with expiry 0 that expires the fail-safe the device
+// armed with the PASE session (disarmAfterFailure) — and reports step 0.1
+// failed with it.
 func TestTermsRequiredBeforeArmFailSafe(t *testing.T) {
 	t.Parallel()
 	dev := &termsDevice{termsConfig: termsConfig{tc: true, min: 1, required: true}}
@@ -192,10 +205,10 @@ func TestTermsRequiredBeforeArmFailSafe(t *testing.T) {
 		t.Fatalf("execute: %v, want a *TermsRequiredError of version 1", err)
 	}
 	dev.mu.Lock()
-	invokes := dev.invokes
+	invokes, arms := dev.invokes, slices.Clone(dev.arms)
 	dev.mu.Unlock()
-	if invokes != 0 {
-		t.Fatalf("%d commands sent before the requirement ended the flow, want 0", invokes)
+	if invokes != 1 || !slices.Equal(arms, []uint16{0}) {
+		t.Fatalf("%d commands sent, ArmFailSafe expiries %v, want the one disarm [0]", invokes, arms)
 	}
 	if len(failed) != 1 || failed[0].Number != 0 || failed[0].Sub != 1 || !errors.As(failed[0].Err, &te) {
 		t.Fatalf("failed steps %+v, want step 0.1 with the requirement", failed)
