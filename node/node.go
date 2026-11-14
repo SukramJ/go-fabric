@@ -201,6 +201,10 @@ type Node struct {
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
 	stopBegun bool
+	// rolledBackReported: Start ran the removal consequences of the
+	// fabrics construction rolled back (reportRolledBackFabrics); a Start
+	// after a failed one does not run them again. Under lifecycle.
+	rolledBackReported bool
 }
 
 // New builds the node: everything the reference daemon builds before
@@ -807,7 +811,39 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		info.CompressedFabricID = f.identity.CompressedFabricID
 		info.RootPublicKey = append([]byte(nil), f.rootPublicKey...)
 	}
-	n.fabricRemoved(ctx, fabricIndex)
+	n.fabricRemovedWith(ctx, info)
+}
+
+// reportRolledBackFabrics runs, once, the removal consequences of every
+// fabric OperationalCredentials rolled back at construction: an AddNOC
+// of the previous run that no CommissioningComplete committed before the
+// node went down. That run announced the fabric (OnFabricAdded) and the
+// commissioner may have written fabric-scoped state for it outside the
+// rows its removal cascades — a binding, a trusted time source, an
+// Extension entry — so the node runs its fabric-removed fan-out and the
+// host's OnFabricRemoved for it, with the identity the row carried, before
+// it serves. connectedhomeip does the same after its start-up rollback:
+// FabricTable::Init remembers the deleted index
+// (src/credentials/FabricTable.cpp:1129-1140) and Server::Init schedules
+// the fail-safe cleanup for it once everything is initialised
+// (src/app/server/Server.cpp:662-685 at 6170af84). Review II,
+// R2-P2-comm-03. The lifecycle slot is held.
+func (n *Node) reportRolledBackFabrics(ctx context.Context) {
+	if n.rolledBackReported {
+		return
+	}
+	n.rolledBackReported = true
+	recs := n.root.OperationalCredentials.RolledBackFabrics()
+	for i := range recs {
+		n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(recs[i].FabricIndex)))
+		n.fabricRemovedWith(ctx, fabricInfoOf(recs[i]))
+	}
+}
+
+// fabricRemovedWith is the facade's fabricRemoved for info's fabric, then
+// the host's OnFabricRemoved with info.
+func (n *Node) fabricRemovedWith(ctx context.Context, info FabricInfo) {
+	n.fabricRemoved(ctx, info.FabricIndex)
 	for _, o := range n.observerList() {
 		if fn := o.OnFabricRemoved; fn != nil {
 			observe(n.logger, "fabric_removed", func() { fn(info) })
@@ -950,6 +986,9 @@ func (n *Node) startLocked(ctx context.Context) error {
 	if err := attachPartsListProviders(n.br); err != nil {
 		return err
 	}
+	// The fabrics construction rolled back go before anything is served
+	// (R2-P2-comm-03).
+	n.reportRolledBackFabrics(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
 	if err := n.br.Start(ctx); err != nil {

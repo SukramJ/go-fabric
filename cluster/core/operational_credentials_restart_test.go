@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"path/filepath"
@@ -416,5 +417,120 @@ func TestOpcreds_RemoveFabricStoreFailureAfterLeaving(t *testing.T) {
 	}
 	if _, err := st.GetFabric(ctx, idx); err != nil {
 		t.Fatalf("the fabric is gone although its removal failed: %v", err)
+	}
+}
+
+// legacyMarker is the JSON a release before v8 wrote under
+// operational_credentials.pending_noc[_update] (operational_credentials_pending.go).
+type legacyMarker struct {
+	Op            string `json:"op"`
+	FabricIndex   uint8  `json:"fabric_index,omitempty"`
+	FabricID      uint64 `json:"fabric_id"`
+	RootPublicKey []byte `json:"root_public_key"`
+	NOC           []byte `json:"noc,omitempty"`
+	ICAC          []byte `json:"icac,omitempty"`
+	PrivateKey    []byte `json:"private_key,omitempty"`
+	IPK           []byte `json:"ipk,omitempty"`
+	NodeID        uint64 `json:"node_id,omitempty"`
+	VendorID      uint16 `json:"vendor_id,omitempty"`
+}
+
+// TestOpcreds_LegacyMarkerRolledBackAtStart pins the one path left for a
+// database a release before v8 wrote in the middle of a commissioning
+// (owner decision 36): the upgrade marked every fabric row committed, and
+// the old marker names what was not. A start rolls back exactly what that
+// release's start rolled back — an AddNOC's fabric by its index (reported
+// by RolledBackFabrics), an intent-only AddNOC marker's fabric only when it
+// has no identity, an UpdateNOC's replaced credentials — and clears the
+// key.
+func TestOpcreds_LegacyMarkerRolledBackAtStart(t *testing.T) {
+	t.Parallel()
+	const addKey, updateKey = "operational_credentials.pending_noc", "operational_credentials.pending_noc_update"
+	write := func(t *testing.T, st restartStore, key string, m legacyMarker) {
+		t.Helper()
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SetSetting(context.Background(), key, string(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commissioned := func(t *testing.T, st restartStore) (*core.OperationalCredentials, *ecdsa.PrivateKey, mstore.FabricRecord) {
+		t.Helper()
+		oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, rootPriv, idx := commissionTestFabric(context.Background(), t, oc)
+		commitForTest(t, oc)
+		fab, err := st.GetFabric(context.Background(), idx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return oc, rootPriv, fab
+	}
+	for name, open := range restartStores {
+		t.Run(name+"/add", func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			st := open(t)
+			_, _, fab := commissioned(t, st)
+			write(t, st, addKey, legacyMarker{Op: "add", FabricIndex: fab.FabricIndex, FabricID: fab.FabricID, RootPublicKey: fab.RootPublicKey})
+			oc := restartOpcreds(t, st)
+			if _, err := st.GetFabric(ctx, fab.FabricIndex); !errors.Is(err, mstore.ErrFabricNotFound) {
+				t.Fatalf("the fabric the legacy AddNOC marker names survived the start: %v", err)
+			}
+			if rb := oc.RolledBackFabrics(); len(rb) != 1 || rb[0].FabricIndex != fab.FabricIndex {
+				t.Fatalf("RolledBackFabrics = %+v, want fabric %d", rb, fab.FabricIndex)
+			}
+			if v, _, _ := st.GetSetting(ctx, addKey); v != "" {
+				t.Fatalf("the start left the legacy marker %s", v)
+			}
+		})
+		t.Run(name+"/intent with identity", func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			st := open(t)
+			_, _, fab := commissioned(t, st)
+			write(t, st, addKey, legacyMarker{Op: "add", FabricID: fab.FabricID, RootPublicKey: fab.RootPublicKey})
+			oc := restartOpcreds(t, st)
+			if _, err := st.GetFabric(ctx, fab.FabricIndex); err != nil {
+				t.Fatalf("an intent-only marker removed a fabric with an identity: %v", err)
+			}
+			if rb := oc.RolledBackFabrics(); len(rb) != 0 {
+				t.Fatalf("RolledBackFabrics = %+v, want none", rb)
+			}
+		})
+		t.Run(name+"/update", func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			st := open(t)
+			oc, rootPriv, fab := commissioned(t, st)
+			before, err := st.GetIdentity(ctx, fab.FabricIndex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fabCtx := im.WithFabricFilter(ctx, true, fab.FabricIndex)
+			nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, testDefaultNodeID+7)
+			if resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw}); err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+				t.Fatalf("UpdateNOC: %+v, %v", resp, err)
+			}
+			commitForTest(t, oc) // the upgrade marked the row committed
+			write(t, st, updateKey, legacyMarker{
+				Op: "update", FabricIndex: fab.FabricIndex, FabricID: fab.FabricID, RootPublicKey: fab.RootPublicKey,
+				NOC: before.NOC, ICAC: before.ICAC, PrivateKey: before.PrivateKey, IPK: before.IPK,
+				NodeID: fab.NodeID, VendorID: fab.VendorID,
+			})
+			restartOpcreds(t, st)
+			after, _ := st.GetIdentity(ctx, fab.FabricIndex)
+			got, _ := st.GetFabric(ctx, fab.FabricIndex)
+			if !bytes.Equal(after.NOC, before.NOC) || got.NodeID != fab.NodeID {
+				t.Fatalf("after the start: node 0x%X, NOC restored %v; want node 0x%X and the replaced NOC", got.NodeID, bytes.Equal(after.NOC, before.NOC), fab.NodeID)
+			}
+			if v, _, _ := st.GetSetting(ctx, updateKey); v != "" {
+				t.Fatalf("the start left the legacy marker %s", v)
+			}
+		})
 	}
 }
