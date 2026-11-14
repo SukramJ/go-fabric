@@ -34,7 +34,9 @@ const (
 )
 
 // controllerRoleCases are matter.js's certification cases with its
-// controller as the DUT (support/chip-testing/test/cert, 862ad75f) that the
+// controller as the DUT (support/chip-testing/test/cert at the snapshot's
+// pin, checkMatterJSCertCases; their files are the same at db021da0 as at
+// 862ad75f, where the lines below were read) that the
 // Go controller does not run as the DUT, each with its class and reason;
 // the DD onboarding-payload cases, TC-ICDM-6.1, TC-ICDB-1.3 run since phase
 // 29b-1 (gocert_dddut_test.go, gocert_icd_test.go), TC-BR-4 since 29b-2
@@ -68,7 +70,7 @@ func pythonDriven(script string) gap {
 // serves the WebRtcTransportRequestor (phase 37, controller.Config.Camera):
 // matter.js runs these with chip's camera-app as TH_SERVER and the DUT as
 // the requestor (support/chip-testing/test/cert/tc-webrtcr-support.ts:142-148
-// at 862ad75f) through the prompt-driven Python runner; that runner is the
+// at db021da0) through the prompt-driven Python runner; that runner is the
 // harness's follow-up, so the gap is the harness's (class (c)).
 func requestorServed(script string) gap {
 	return gap{class: classHarness, reason: "controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (" + script + ")"}

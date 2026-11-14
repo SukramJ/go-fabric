@@ -78,11 +78,17 @@ kernel modules and stay weekly, outside that gate.
   matter.js at the commit the schema snapshot pins
   (`parity/schema.json` `matter.sourceCommit`) and fails if the leg skips.
 - **The Go controller as TH** (`make chiptool-gocert`, part of
-  `make chiptool-test`, `GOFABRIC_GOCERT=IDM,SC` narrows): matter.js automated
-  68 certification cases in `support/chip-testing/test/cert/TC-*.test.ts`, and
+  `make chiptool-test`, `GOFABRIC_GOCERT=IDM,SC` narrows): matter.js automates
+  its certification cases in `support/chip-testing/test/cert/TC-*.test.ts`, and
   in most of them its own controller is the DUT and a device app the TH. Those
   are the controller halves of the CHIP test plans, which CHIP's harness runs
-  as manual cases — the "manual" rows below. The Go-TH leg reads the TS files
+  as manual cases. Every case of that directory at the snapshot's pin is
+  accounted for in the status block — run by the leg, or classified with what
+  a port needs ("matter.js certification cases not run"), never as a generic
+  manual row — and `TestCertifiabilityDocument` fails on one that is neither,
+  so a pin lift that adds cases fails until each is run or classified. The
+  case list is `internal/chiptool/testdata/matterjs-cert-cases.json`, generated
+  from the pinned commit. The Go-TH leg reads the TS files
   mirrored: the reference daemon is the DUT, the module's own controller
   performs the TS file's controller actions, and the TS file's TH-side
   expectations are what the daemon has to satisfy. Each case cites its TS
@@ -318,11 +324,11 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | ACL/2.11 | (b) not supported | not applicable: the case's PICS `ACL.S.F01` is false for the reference DUT |
 | ACT/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| ALOGIN/12.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ALOGIN/12.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-ALOGIN-12.2.test.ts:28); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends GetSetupPIN, Login and Logout, timed to the daemon's `--media` content app (ALOGIN.S.C00.Rsp, C02.Rsp, C03.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | ALOGIN/12.3 | (b) not supported | not applicable: the case's PICS `ALOGIN.S & ALOGIN.S.F00` is false for the reference DUT |
 | APPOBSERVER/13.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| AUDIOOUTPUT/7.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| AUDIOOUTPUT/7.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| AUDIOOUTPUT/7.3 | (c) harness | matter.js automates it at the snapshot's pin (TC-AUDIOOUTPUT-7.3.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SelectOutput to the daemon's `--media` video player (AUDIOOUTPUT.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| AUDIOOUTPUT/7.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-AUDIOOUTPUT-7.4.test.ts:21); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends RenameOutput to the daemon's `--media` video player (AUDIOOUTPUT.S.F00, C01.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -337,14 +343,14 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | BRBINFO/3.1 | (b) not supported | not applicable: the case's PICS `BRBINFO.S.A0014` is false for the reference DUT |
 | BRBINFO/3.2 | (b) not supported | not applicable: the case's PICS `BRBINFO.S & BRBINFO.S.A.A0018 & BRBINFO.S.M.DeviceConfigurationChange` is false for the reference DUT |
 | BRBINFO/4.1 | (b) not supported | TC-BRBINFO-4.1 exercises KeepActive of a bridged ICD (BridgedICDSupport, PICS BRBINFO.S.F00=0) against a LIT ICD test app the case starts itself (${LIT_ICD_APP}); the case carries no PICS gate, so it runs regardless (matter.js test/core/BRBINFO.test.ts excludes it for the same reason) |
-| CADMIN/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CADMIN/1.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-CADMIN-1.1.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH plays the case's three controllers (administrator behaviour) against the daemon with an enhanced window (CADMIN.S.C00.Rsp), with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go) |
 | CADMIN/1.12 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.18 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CADMIN/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CADMIN/1.18 | (c) harness | matter.js automates it at the snapshot's pin (TC-CADMIN-1.18.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH plays the case's three controllers (fabric removal) against the daemon with a basic window (CADMIN.S.F00, C01.Rsp), with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go) |
+| CADMIN/1.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-CADMIN-1.2.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH plays the case's three controllers (administrator behaviour) against the daemon with a basic window (CADMIN.S.F00, C01.Rsp), with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go) |
+| CADMIN/1.7 | (c) harness | matter.js automates it at the snapshot's pin (TC-CADMIN-1.7.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH plays the case's three controllers (window handling) against the daemon with an enhanced window (CADMIN.S.C00.Rsp), with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go) |
+| CADMIN/1.8 | (c) harness | matter.js automates it at the snapshot's pin (TC-CADMIN-1.8.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH plays the case's three controllers (window handling) against the daemon with a basic window (CADMIN.S.F00, C01.Rsp), with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go) |
 | CC/3.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
 | CC/4.5.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
 | CC/5.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
@@ -362,9 +368,9 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CGEN/2.7 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.8 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.9 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
-| CHANNEL/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CHANNEL/5.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CHANNEL/5.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CHANNEL/5.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.4.test.ts:23); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ChangeChannel to the daemon's `--media` video player (CHANNEL.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| CHANNEL/5.5 | (c) harness | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.5.test.ts:24); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ChangeChannelByNumber to the daemon's `--media` video player (CHANNEL.S.C02.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| CHANNEL/5.6 | (c) harness | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.6.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SkipChannel to the daemon's `--media` video player (CHANNEL.S.C03.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | CLCTRL/4.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000` is false for the reference DUT |
 | CLCTRL/7.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F00 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
 | CLCTRL/7.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
@@ -384,8 +390,8 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CNET/4.15 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.16 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.2 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
-| CNET/4.20 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CNET/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CNET/4.20 | (c) harness | matter.js automates it at the snapshot's pin (TC-CNET-4.20.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ScanNetworks, ArmFailSafe, AddOrUpdateWiFiNetwork, ConnectNetwork, ReorderNetwork and RemoveNetwork (tc-cnet-support.ts) to the daemon with `--wifi-sim`, the CNETWIFI row's composition (CNET.S.F00=1) |
+| CNET/4.21 | (c) harness | matter.js automates it at the snapshot's pin (TC-CNET-4.21.test.ts:9); the Go-TH leg does not run it, so the module is unmeasured here — needs a daemon composition with Thread NetworkCommissioning (`core.ThreadNetworkCommissioning`, ADR 0027), which the reference daemon does not mount |
 | CNET/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.23 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials; the Ethernet composition has no Wi-Fi feature (CNET.S.F00=0) and the case skips itself; the Wi-Fi composition runs it as CNETWIFI/4.25, where it skips itself (no per-device credentials) (runs, and skips itself) |
@@ -414,32 +420,32 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | CNETWIFI/4.3 | (b) not supported | not applicable: the case's PICS `CNET.S.F02` is false for the reference DUT |
 | CNETWIFI/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CONTENTLAUNCHER/10.10 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.A0003` is false for the reference DUT |
-| CONTENTLAUNCHER/10.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CONTENTLAUNCHER/10.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CONTENTLAUNCHER/10.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CONTENTLAUNCHER-10.4.test.ts:24); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends LaunchContent to the daemon's `--media` video player (CONTENTLAUNCHER.S.F00, C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| CONTENTLAUNCHER/10.6 | (c) harness | matter.js automates it at the snapshot's pin (TC-CONTENTLAUNCHER-10.6.test.ts:27); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends LaunchURL to the daemon's `--media` video player (CONTENTLAUNCHER.S.F01, C01.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | CONTENTLAUNCHER/10.8 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.F05` is false for the reference DUT |
 | CONTENTLAUNCHER/10.9 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.F06 & CONTENTLAUNCHER.S.C01.Rsp` is false for the reference DUT |
 | DA/1.10 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | DA/1.11 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
 | DA/1.12 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C00.Rsp & OPCREDS.S.C01.Tx & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | DA/1.13 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
-| DA/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DA/1.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DA/1.3 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.3.test.ts:101); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT commissioning the daemon twice, each AttestationNonce observable: matter.js reads it from its TH's log; the daemon logs none, and the controller's nonce reaches only controller/attestation's validation input (validate.go:40-41) |
+| DA/1.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.4.test.ts:458); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :279): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) and serves a fixed product id (main.go:71, :503) |
 | DA/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DA/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DA/1.8 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.8.test.ts:200); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :105): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) and serves a fixed product id (main.go:71, :503) |
 | DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-DA-1.9.test.ts:32 TC_DA_1_9.py) |
 | DD/1.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/1.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DD/1.9 | (c) harness | matter.js automates it at the snapshot's pin (TC-DD-1.9.test.ts:23); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go controller as DUT commissions the daemon from its Manual Pairing Code and gives up on a code no device advertises, with the DD DUT machinery of DD/3.15 to 3.17 (gocert_dddut_test.go) |
 | DD/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DD/2.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-DD-2.2.test.ts:25); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go controller as DUT finds the daemon over DNS-SD, the case's IP leg; matter.js runs its BLE and Wi-Fi PAF legs as not applicable (:9-24) |
 | DD/3.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.19 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.22 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DD/3.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DD/3.5 | (c) harness | matter.js automates it at the snapshot's pin (TC-DD-3.5.test.ts:152); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go controller as DUT commissions the daemon; each stage's evidence is a daemon log line or a state read, where matter.js reads its TH's log |
 | DD/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -466,7 +472,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | DRLK/2.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.11 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F00 & DRLK.S.F01 & DRLK.S.F02` is false for the reference DUT |
 | DRLK/2.13 | (b) not supported | not applicable: the case's PICS `DRLK.S.F0d` is false for the reference DUT |
-| DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DRLK/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-DRLK-3.2.test.ts:80); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's door lock commands — door, schedule and user commands — to the daemon's lock (DRLK.S.F04, F08 and every command's .Rsp are 1) |
 | ECOINFO/2.1 | (c) harness | TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | ECOINFO/2.2 | (c) harness | TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | EEM/2.3 | (b) not supported | not applicable: the case's PICS `EEM.S & EEM.S.F02 & EEM.S.F01` is false for the reference DUT |
@@ -482,7 +488,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | G/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | GRPKEY/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | I/2.4 | (c) harness | TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts) |
-| I/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| I/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-I-3.2.test.ts:55); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends Identify and TriggerEffect to a daemon endpoint (I.S.C00.Rsp, I.S.C40.Rsp) |
 | ICDM/2.1 | (b) not supported | not applicable: the case's PICS `ICDM.S` is false for the reference DUT |
 | ICDM/3.1 | (b) not supported | not applicable: the case's PICS `ICDM.S` is false for the reference DUT |
 | ICDM/3.2 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F00` is false for the reference DUT |
@@ -504,24 +510,24 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | JFDS/2.3 | (c) harness | TC-JFDS-2.3 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_3.py:99-120; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
 | JFDS/2.4 | (c) harness | TC-JFDS-2.4 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_4.py:108-130; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
 | JFDS/2.5 | (c) harness | TC-JFDS-2.5 drives the administrator through chip's jf-control-app and the administrator app's pigweed RPC JointFabric service (TC_JFDS_2_5.py:124-162; examples/common/pigweed/protos/joint_fabric_service.proto at the harness pin): with the CI PICS it starts chip's own jf-admin-app as the DUT and never reaches the daemon, without them it needs the DUT's RPC server (dut_rpc_server_ip/_port); the daemon serves no pigweed RPC, an SDK test interface outside Matter |
-| KEYPADINPUT/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| LOWPOWER/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| KEYPADINPUT/3.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-KEYPADINPUT-3.1.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SendKey to the daemon's `--media` video player (KEYPADINPUT.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| LOWPOWER/2.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-LOWPOWER-2.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends Sleep to the daemon's `--media` video player (LOWPOWER.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | LVL/7.1 | (b) not supported | not applicable: the case's PICS `LVL.S & LVL.S.F02` is false for the reference DUT |
-| MEDIAINPUT/3.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| MEDIAINPUT/3.15 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| MEDIAINPUT/3.16 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| MEDIAINPUT/3.17 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| MEDIAPLAYBACK/6.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAINPUT/3.14 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAINPUT-3.14.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SelectInput to the daemon's `--media` video player (MEDIAINPUT.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| MEDIAINPUT/3.15 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAINPUT-3.15.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ShowInputStatus to the daemon's `--media` video player (MEDIAINPUT.S.C01.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| MEDIAINPUT/3.16 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAINPUT-3.16.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends HideInputStatus to the daemon's `--media` video player (MEDIAINPUT.S.C02.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| MEDIAINPUT/3.17 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAINPUT-3.17.test.ts:21); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends RenameInput to the daemon's `--media` video player (MEDIAINPUT.S.F00, C03.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| MEDIAPLAYBACK/6.10 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAPLAYBACK-6.10.test.ts:25); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ActivateAudioTrack, ActivateTextTrack and DeactivateTextTrack to the daemon's `--media` video player (MEDIAPLAYBACK.S.F02 TextTracks, F03 AudioTracks), and the TS file's TH-side check, the command's success, is the daemon's |
 | MEDIAPLAYBACK/6.11 | (b) not supported | not applicable: the case's PICS `MEDIAPLAYBACK.S & MEDIAPLAYBACK.S.A000b` is false for the reference DUT |
 | MEDIAPLAYBACK/6.12 | (b) not supported | not applicable: the case's PICS `MEDIAPLAYBACK.S & MEDIAPLAYBACK.S.A000c` is false for the reference DUT |
-| MEDIAPLAYBACK/6.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| MEDIAPLAYBACK/6.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAPLAYBACK/6.5 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAPLAYBACK-6.5.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends Play, Pause and Stop to the daemon's `--media` video player (MEDIAPLAYBACK.S.C00.Rsp to C02.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| MEDIAPLAYBACK/6.7 | (c) harness | matter.js automates it at the snapshot's pin (TC-MEDIAPLAYBACK-6.7.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends Play, StartOver, Next, Previous, SkipForward and SkipBackward to the daemon's `--media` video player (MEDIAPLAYBACK.S.C00.Rsp, C03.Rsp to C05.Rsp, C08.Rsp, C09.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | MEDIAPLAYBACK/6.8 | (c) harness | TC-MEDIAPLAYBACK-6.8 step 1 (and the reads after DeactivateTextTrack) expects ActiveTextTrack to read a TrackStruct with an empty ID and a null TrackAttributes (Test_TC_MEDIAPLAYBACK_6_8.yaml:26-31), the tv-app's empty track under chip's revision 3; the model at the pin makes TrackAttributes mandatory and not nullable (matter.js media-playback.element.ts:206-208) and ActiveTextTrack itself nullable (:71-74), so the daemon reads null while no text track is active |
 | MESS/1.1 | (b) not supported | TC-MESS-1.1 runs only on an endpoint with SpokenMessages or AudioMessages (TC_MESS_1_1.py:76, TC_MESSTestBase.py:42-50); the player's Messages, like the tv-app's (featureMap 0, tv-app.matter:4419), has neither, and the case skips itself (runs, and skips itself) |
 | MESS/3.1 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F04` is false for the reference DUT |
 | MESS/3.2 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F05` is false for the reference DUT |
 | MESS/3.3 | (b) not supported | not applicable: the case's PICS `MESS.S & MESS.S.F05 & MESS.S.E03` is false for the reference DUT |
-| MOD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MOD/2.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-MOD-2.2.test.ts:47); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH reads SupportedModes and sends ChangeToMode to the daemon's ModeSelect (MOD.S.A0002, MOD.S.C00.Rsp) |
 | MOD/2.3 | (b) not supported | not applicable: the case's PICS `MOD.S & S.S` is false for the reference DUT |
 | MOD/3.1 | (b) not supported | not applicable: the case's PICS `MOD.S.A0005` is false for the reference DUT |
 | MOD/3.2 | (b) not supported | not applicable: the case's PICS `MOD.S.A0004` is false for the reference DUT |
@@ -569,7 +575,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
 | TCTL/3.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
-| TGTNAV/8.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| TGTNAV/8.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-TGTNAV-8.2.test.ts:20); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends NavigateTarget to the daemon's `--media` video player (TGTNAV.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
 | TIMESYNC/2.10 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.11 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.12 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
@@ -584,7 +590,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | TLSCERT/2.2 | (a) defect | TC-TLSCERT-2.2 step 5: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate |
 | TLSCERT/2.9 | (a) defect | TC-TLSCERT-2.9 step 13: the module's reads of ProvisionedRootCertificates and ProvisionedClientCertificates serve the full certificates on every transport (BD-chip-TlsCertificateManagement-RulesInServer, owner decision 2026-10-28, after matter.js's generated behaviour); chip encodes the ids alone outside a large-payload transport (TLSCertificateManagementCluster.cpp:136-166 at the harness pin), and the case reads over MRP expecting no certificate; two such client certificates exceed one MRP message, so the read answers RESOURCE_EXHAUSTED |
 | TMP/2.2 | (c) harness | TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
-| TSTAT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| TSTAT/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-TSTAT-3.2.test.ts:49); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SetpointRaiseLower to a daemon thermostat (TSTAT.S.C00.Rsp) |
 | TSTAT/4.4 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F0b` is false for the reference DUT |
 | WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
@@ -686,6 +692,34 @@ the harness image lists; those a family lists carry the same reason on their row
 | WEBRTCR/2.5 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.5.test.ts:30 TC_WEBRTCR_2_5.py) |
 | WEBRTCR/2.6 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.6.test.ts:19 TC_WEBRTCR_2_6.py) |
 | WEBRTCR/2.7 | (c) harness | controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (TC-WEBRTCR-2.7.test.ts:18 TC_WEBRTCR_2_7.py) |
+
+### matter.js certification cases not run
+
+matter.js automates 120 certification cases at `db021da06bafe6766cd1a05d505cea03b9ec5081` (`support/chip-testing/test/cert/TC-*.test.ts`,
+the snapshot's pin, listed in `internal/chiptool/testdata/matterjs-cert-cases.json`). The Go controller
+runs 58 of them, as TH or as DUT (above); 10 controller-role cases carry their reason under "Controller role",
+and 52 are not run yet: the module is unmeasured against them, and each names what a port needs. Those a
+family lists carry the same row under "Cases not run"; this table lists the others.
+
+| Case | Class | Reason |
+| --- | --- | --- |
+| APPLAUNCHER/3.7.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-APPLAUNCHER-3.7.1.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends LaunchApp to the daemon's `--media` video player (APPLAUNCHER.S.C00.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| APPLAUNCHER/3.8.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-APPLAUNCHER-3.8.1.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends StopApp to the daemon's `--media` video player (APPLAUNCHER.S.C01.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| APPLAUNCHER/3.9.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-APPLAUNCHER-3.9.1.test.ts:17); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends HideApp to the daemon's `--media` video player (APPLAUNCHER.S.C02.Rsp), and the TS file's TH-side check, the command's success, is the daemon's |
+| CC/3.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-3.4.test.ts:13); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the HueSaturation (CC.S.F00) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CC/4.5 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-4.5.test.ts:13); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the HueSaturation (CC.S.F00) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CC/5.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-5.4.test.ts:13); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the XY (CC.S.F03) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CC/6.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-6.4.test.ts:37); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the ColorTemperature (CC.S.F04) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CC/7.5 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-7.5.test.ts:13); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the EnhancedHue (CC.S.F01) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CC/9.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-CC-9.4.test.ts:33); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends the case's commands of the ColorLoop and EnhancedHue (CC.S.F02, F01) feature to the daemon's extended color light and reads the attributes it names (the light declares every ColorControl feature) |
+| CHANNEL/5.8 | (b) not supported | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.8.test.ts:24); the Go-TH leg does not run it, so the module is unmeasured here — needs Channel's ElectronicGuide and RecordProgram features (GetProgramGuide, RecordProgram, CancelRecordProgram): the module serves them to a host port that implements ChannelGuide and ChannelRecorder (cluster/media/channel.go:42-51), the daemon's video player implements neither (CHANNEL.S.F02=0, CHANNEL.S.F03=0) |
+| DGETH/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGETH-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetCounts, which the module's EthernetNetworkDiagnostics does not offer, with neither PacketCounts nor ErrorCounts (cluster/core/ethernet_network_diagnostics.go:39-42; DGETH.S.C00.Rsp=0): a port would record its only step skipped |
+| DGSW/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGSW-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetWatermarks: the module serves the Watermarks feature to a host that supplies a WatermarkReporter (cluster/core/software_diagnostics.go:29-37), the reference daemon supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0) |
+| DGTHREAD/3.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DGTHREAD-3.4.test.ts:27); the Go-TH leg does not run it, so the module is unmeasured here — needs the daemon's Thread variant (`--otbr` against a live OTBR REST API, the DGTHREAD family's composition, run by otbr-virtual.yml), which the Go-TH leg does not start |
+| DGWIFI/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-DGWIFI-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends ResetCounts to the root's WiFiNetworkDiagnostics, which every harness daemon serves with `--wifi` (DGWIFI.S.C00.Rsp) |
+| OO/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-OO-3.2.test.ts:60); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends Off, On, Toggle, OffWithEffect, OnWithRecallGlobalScene and OnWithTimedOff to a daemon light with the Lighting feature (OO.S.F00, OO.S.C40.Rsp to C42.Rsp) |
+| WNCV/6.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-WNCV-6.1.test.ts:25); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends UpOrOpen, DownOrClose and StopMotion to the daemon's window covering (WNCV.S.C00.Rsp to C02.Rsp) |
+| WNCV/7.1 | (c) harness | matter.js automates it at the snapshot's pin (TC-WNCV-7.1.test.ts:37); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends GoToLiftPercentage (WNCV.S.C05.Rsp); the GoToTiltPercentage step's mirrored PICS WNCV.S.C08.Rsp is 0, so it is recorded skipped |
 
 ### Cases that pass with a recorded gap
 
@@ -806,7 +840,8 @@ evaluates a device type's cluster conformance with
 Player's `[Rev >= v2]` term for Messages is false and the cluster is
 reported disallowed on a revision-2 player — the tv-app's own composition
 (`tv-app.matter:4385`, `:4407`, revision 3) would be judged the same. The image lists the media cases whose every step is disabled as
-manual, recorded as class (c); TC-MEDIAPLAYBACK-6.8 expects an inactive
+manual, recorded as class (c) — those matter.js automates with their own
+row, which names what a port needs; TC-MEDIAPLAYBACK-6.8 expects an inactive
 text track to read as a track with an empty ID, which the model at the pin
 cannot carry (null is its inactive track), and is excluded as class (c);
 the Python media cases gate on PICS codes the model at the pin

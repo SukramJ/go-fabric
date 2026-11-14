@@ -71,6 +71,8 @@ func TestCertifiabilityDocument(t *testing.T) {
 	if err := json.Unmarshal(data, &g); err != nil {
 		t.Fatal(err)
 	}
+	ts := loadMatterJSCertCases(t)
+	checkMatterJSCertCases(t, g, ts)
 
 	var unclassified []string
 	inFamily := map[string]bool{}
@@ -117,7 +119,7 @@ func TestCertifiabilityDocument(t *testing.T) {
 			"the family's exclude with its class and reason", id)
 	}
 
-	block := renderCertifiability(g)
+	block := renderCertifiability(g, ts)
 	root := filepath.Join("..", "..")
 	file := filepath.Join(root, certDocPath)
 	doc, err := os.ReadFile(file) //nolint:gosec // a fixed repository path
@@ -176,7 +178,7 @@ func passedIn(g docGolden, id string) bool {
 	return n > 0
 }
 
-func renderCertifiability(g docGolden) string {
+func renderCertifiability(g docGolden, ts matterJSCertCases) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Harness image: `%s`.\n\n", g.Image)
 	b.WriteString("| Family | Cases | Passed | of which with a recorded gap | (a) defect | (b) not supported | (c) harness | (d) out of scope |\n")
@@ -221,8 +223,15 @@ func renderCertifiability(g docGolden) string {
 			}
 			if why, hs := g.HostSkipped[id]; hs {
 				if _, ex := fam.gapFor(n); !ex {
-					counts[classHarness]++
-					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | %s |", id, classHarness, mdCell(why)))
+					// A case matter.js automates carries its own class and
+					// reason (matterJSCasesNotRun), whatever the harness
+					// image calls it.
+					class := classHarness
+					if gp, ok := matterJSCasesNotRun[id]; ok {
+						class, why = gp.class, gp.reason
+					}
+					counts[class]++
+					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | %s |", id, class, mdCell(why)))
 					continue
 				}
 			}
@@ -329,6 +338,7 @@ func renderCertifiability(g docGolden) string {
 		gp := controllerRoleCases[id]
 		fmt.Fprintf(&b, "| %s | %s | %s |\n", id, gp.class, mdCell(gp.reason))
 	}
+	renderMatterJSNotRun(&b, g, ts)
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")
 	b.WriteString("another problem appears or a recorded one disappears.\n\n")
@@ -338,6 +348,39 @@ func renderCertifiability(g docGolden) string {
 		b.WriteString(l + "\n")
 	}
 	return b.String()
+}
+
+// renderMatterJSNotRun is the account of matter.js's certification cases at
+// the snapshot's pin (testdata/matterjs-cert-cases.json): how many the Go
+// controller runs, and the row of each case not run that no family lists.
+func renderMatterJSNotRun(b *strings.Builder, g docGolden, ts matterJSCertCases) {
+	run := 0
+	for _, file := range ts.Cases {
+		for _, c := range g.GoCert {
+			if c.Source == file {
+				run++
+				break
+			}
+		}
+	}
+	b.WriteString("\n### matter.js certification cases not run\n\n")
+	fmt.Fprintf(b, "matter.js automates %d certification cases at `%s` (`support/chip-testing/test/cert/TC-*.test.ts`,\n", len(ts.Cases), ts.Commit)
+	b.WriteString("the snapshot's pin, listed in `internal/chiptool/testdata/matterjs-cert-cases.json`). The Go controller\n")
+	fmt.Fprintf(b, "runs %d of them, as TH or as DUT (above); %d controller-role cases carry their reason under \"Controller role\",\n", run, len(controllerRoleCases))
+	fmt.Fprintf(b, "and %d are not run yet: the module is unmeasured against them, and each names what a port needs. Those a\n", len(matterJSCasesNotRun))
+	b.WriteString("family lists carry the same row under \"Cases not run\"; this table lists the others.\n\n")
+	b.WriteString("| Case | Class | Reason |\n| --- | --- | --- |\n")
+	ids := make([]string, 0, len(matterJSCasesNotRun))
+	for id := range matterJSCasesNotRun {
+		if !inFamilies(g, id) {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		gp := matterJSCasesNotRun[id]
+		fmt.Fprintf(b, "| %s | %s | %s |\n", id, gp.class, mdCell(gp.reason))
+	}
 }
 
 // inFamilies reports whether a case id is in the case list of a family

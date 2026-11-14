@@ -36,9 +36,16 @@ import (
 )
 
 // The Go-TH leg: the certification cases matter.js automated in
-// support/chip-testing/test/cert/TC-*.test.ts (862ad75f), read mirrored and
+// support/chip-testing/test/cert/TC-*.test.ts, read mirrored and
 // run with the module's own controller as the test harness against the
 // reference daemon as the DUT.
+//
+// Which cases those are is held to the snapshot's pin (parity/schema.json
+// matter.sourceCommit) by TestCertifiabilityDocument: testdata/
+// matterjs-cert-cases.json lists them at the pin, and each is run here or
+// classified (controllerRoleCases, matterJSCasesNotRun). The ports' line
+// citations were read at [goCertReadAt]; a case file that moved since is
+// re-read when its port is next touched.
 //
 // In matter.js's cert suite the DUT is, in most cases, a controller — its
 // own CommissioningController — and the TH a device app
@@ -66,6 +73,11 @@ import (
 // step — the DUT controller's return value or error, a state read on the
 // daemon, or a daemon log line — because matter.js proves its DUT by the
 // TH device's log, which a Go TH does not print.
+
+// goCertReadAt is the matter.js commit the ports' TS line citations were
+// read at; the case list itself is the snapshot pin's
+// (testdata/matterjs-cert-cases.json).
+const goCertReadAt = "862ad75f"
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
 const goCertEnv = "GOFABRIC_GOCERT"
@@ -315,9 +327,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	case c.origin != "":
 		t.Logf("%s: %s (the Go controller is the DUT)", c.tc, c.origin)
 	case c.role == roleDUT:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line, goCertReadAt)
 	default:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line, goCertReadAt)
 	}
 	if expr := strings.Join(c.pics, " & "); expr != "" {
 		if missing := th.undeclared(expr); len(missing) > 0 {

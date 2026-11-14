@@ -933,10 +933,14 @@ func (f family) deviceTypeOf(name string) uint32 {
 const matterPort = 5540
 
 // manualReason is the status page's reason for a manual case: a
-// controller-role case's own (controllerRoleCases), the generic one
-// otherwise.
+// controller-role case's own (controllerRoleCases), that of a case matter.js
+// automates and the Go-TH leg does not run yet (matterJSCasesNotRun), the
+// generic one otherwise.
 func manualReason(id string) string {
 	if g, ok := controllerRoleCases[id]; ok {
+		return g.reason
+	}
+	if g, ok := matterJSCasesNotRun[id]; ok {
 		return g.reason
 	}
 	return "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate"
