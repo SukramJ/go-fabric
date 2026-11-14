@@ -84,3 +84,37 @@ func TestRestartRollsBackAnUncommittedFabricWithItsRemoval(t *testing.T) {
 		t.Fatalf("OnFabricRemoved after the restart: %+v; want once, for fabric 0x%X node 0x%X", removed, testFabricID, testNodeID)
 	}
 }
+
+// TestWiFiNetworkListIsStoredBeforeTheFabricCommit pins review II
+// R2-P2-store-01: a Wi-Fi node stores its network list before
+// CommissioningComplete commits the fabric, and a store that refuses the
+// list fails CommissioningComplete with nothing committed — a restart
+// finds no fabric — instead of a fabric committed on a node whose network
+// is gone after its next restart.
+func TestWiFiNetworkListIsStoredBeforeTheFabricCommit(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "node.db")
+	db := openDB(t, path)
+	cfg := minimalConfig(db)
+	cfg.Network.WiFi = &node.WiFi{Driver: joinLab{}}
+	n := newNode(t, cfg)
+	if err := n.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	for _, stmt := range []string{
+		`CREATE TRIGGER refuse_networks_insert BEFORE INSERT ON matter_settings WHEN NEW.key = 'netcomm.wifi.networks' BEGIN SELECT RAISE(ABORT, 'test: disk full'); END`,
+		`CREATE TRIGGER refuse_networks_update BEFORE UPDATE ON matter_settings WHEN NEW.key = 'netcomm.wifi.networks' BEGIN SELECT RAISE(ABORT, 'test: disk full'); END`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), commissionerOptions())
+	if _, err := c.Commission(context.Background()); err == nil {
+		t.Fatal("Commission succeeded although the node could not store its network list")
+	}
+	again := newNode(t, minimalConfig(openDB(t, path)))
+	if fabrics, err := again.FabricInfos(context.Background()); err != nil || len(fabrics) != 0 {
+		t.Fatalf("fabrics after the restart: %+v, %v; want none — the commissioning answered FAILURE", fabrics, err)
+	}
+}

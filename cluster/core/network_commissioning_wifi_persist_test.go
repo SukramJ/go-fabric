@@ -173,3 +173,36 @@ func TestWiFiNetworkCommissioningStoredValueRules(t *testing.T) {
 		t.Fatalf("MaxNetworks 1 loaded %v, want a", n)
 	}
 }
+
+// TestWiFiStoreNetworksAheadOfTheCommit pins review II R2-P2-store-01:
+// StoreNetworks writes the staged list before the fabric's commit and
+// leaves the list in force alone; its restore, for a fabric commit that
+// failed, writes the committed list back; after a commit that landed,
+// OnCommissioningComplete commits the stored list in memory.
+func TestWiFiStoreNetworksAheadOfTheCommit(t *testing.T) {
+	ctx := context.Background()
+	st := memstore.New()
+	w := wifiOn(t, st, &simDriver{})
+	if _, err := w.MatterInvoke(ctx, netcommdef.CmdAddOrUpdateWiFiNetwork, netcommdef.AddOrUpdateWiFiNetworkRequest{Ssid: []byte("lab"), Credentials: []byte("secret12")}); err != nil {
+		t.Fatal(err)
+	}
+	restore, err := w.StoreNetworks(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := wifiNetworks(t, wifiOn(t, st, &simDriver{})); len(n) != 1 {
+		t.Fatalf("after StoreNetworks a restart finds %v, want lab", n)
+	}
+	restore(ctx)
+	if n := wifiNetworks(t, wifiOn(t, st, &simDriver{})); len(n) != 0 {
+		t.Fatalf("after the restore a restart finds %v, want the committed (empty) list", n)
+	}
+	if _, err := w.StoreNetworks(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w.OnCommissioningComplete(ctx)
+	w.OnFailSafeExpired()
+	if n := wifiNetworks(t, w); len(n) != 1 {
+		t.Fatalf("after the commit and a later expiry Networks = %v, want lab committed", n)
+	}
+}

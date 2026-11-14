@@ -63,7 +63,11 @@ type WiFiNetworkCommissioning struct {
 	// RevertConfiguration).
 	networks  []wifiNetwork
 	committed []wifiNetwork
-	busy      bool
+	// stored is the list StoreNetworks wrote ahead of the fabric's
+	// commit, which OnCommissioningComplete then commits in memory without
+	// a second write; nil when none is outstanding.
+	stored []wifiNetwork
+	busy   bool
 	// link is the SSID the driver last joined; a network's connected flag
 	// is derived from it, as chip's Linux driver reports the network the
 	// link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
@@ -205,22 +209,61 @@ func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetw
 }
 
 // saveCommittedLocked stores the committed networks (CommitConfiguration,
-// :135-167); w.mu is held.
+// :135-167); w.mu is held. A failure is logged.
 func (w *WiFiNetworkCommissioning) saveCommittedLocked(ctx context.Context) {
-	if w.store == nil {
-		return
+	if err := w.saveLocked(ctx, w.committed); err != nil {
+		w.log().Warn("netcomm.wifi.save_failed", slog.Any("err", err))
 	}
-	stored := make([]storedWiFiNetwork, 0, len(w.committed))
-	for _, n := range w.committed {
+}
+
+// saveLocked writes list as the stored committed networks; nil without a
+// store. w.mu is held.
+func (w *WiFiNetworkCommissioning) saveLocked(ctx context.Context, list []wifiNetwork) error {
+	if w.store == nil {
+		return nil
+	}
+	stored := make([]storedWiFiNetwork, 0, len(list))
+	for _, n := range list {
 		stored = append(stored, storedWiFiNetwork{SSID: n.ssid, Credentials: n.credentials})
 	}
 	raw, err := json.Marshal(stored)
-	if err == nil {
-		err = w.store.SetSetting(ctx, wifiNetworksKey, string(raw))
-	}
 	if err != nil {
-		w.log().Warn("netcomm.wifi.save_failed", slog.Any("err", err))
+		return fmt.Errorf("core: WiFiNetworkCommissioning: encode the networks: %w", err)
 	}
+	if err := w.store.SetSetting(ctx, wifiNetworksKey, string(raw)); err != nil {
+		return fmt.Errorf("core: WiFiNetworkCommissioning: store the networks: %w", err)
+	}
+	return nil
+}
+
+// StoreNetworks writes the staged networks as the stored committed list,
+// ahead of the fabric's commit: CommissioningComplete runs it inside its
+// durable commit ([GeneralCommissioning.SetFailSafeCommit]), before the
+// commit of the fabric row, so a store that refuses the list fails
+// CommissioningComplete with nothing committed, and the window that
+// remains — a crash after this write and before the fabric's — leaves a
+// node on its network whose fabric the next start rolls back, not a
+// fabric on a node without a stored network (review II, R2-P2-store-01;
+// connectedhomeip commits the network after the fabric and ignores the
+// result, NetworkCommissioningCluster.cpp:984-990 at 6170af84 — the order
+// is this module's own). The list in force is not changed:
+// OnCommissioningComplete commits it. restore writes the committed list
+// back, for a commit that fails after this write; its own failure is
+// logged.
+func (w *WiFiNetworkCommissioning) StoreNetworks(ctx context.Context) (restore func(ctx context.Context), err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	staged := slices.Clone(w.networks)
+	if err := w.saveLocked(ctx, staged); err != nil {
+		return nil, err
+	}
+	w.stored = staged
+	return func(ctx context.Context) {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		w.stored = nil
+		w.saveCommittedLocked(ctx)
+	}, nil
 }
 
 func (w *WiFiNetworkCommissioning) log() *slog.Logger {
@@ -746,9 +789,16 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 // (CommitConfiguration, NetworkCommissioningCluster.cpp:984-990; the Linux
 // driver's KVS put, NetworkCommissioningWiFiDriver.cpp:135-167). ctx is the
 // CommissioningComplete request's context; the store write runs under it.
+//
+// When StoreNetworks wrote the list ahead of the fabric's commit, the
+// stored list is committed in memory and not written again.
 func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.stored != nil {
+		w.committed, w.stored = w.stored, nil
+		return
+	}
 	w.committed = slices.Clone(w.networks)
 	w.saveCommittedLocked(ctx)
 }
@@ -760,6 +810,7 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
 	w.expiries++
+	w.stored = nil
 	w.networks = slices.Clone(w.committed)
 	for j := range w.networks {
 		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)
