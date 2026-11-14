@@ -473,7 +473,7 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 // HandleReadRequest dispatches a parsed ReadRequest through d and
 // returns the assembled ReportData. The caller marshals the result.
 // Wildcard expansion is the Dispatcher's responsibility; this layer
-// only routes paths.
+// only routes paths, one at a time ([AttributeExpansion]).
 //
 // DataVersionFilter evaluation: for each (endpoint, cluster) pair in
 // req.DataVersionFilters, if the cluster's current DataVersion matches
@@ -500,96 +500,13 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 // packages/protocol/src/action/server/AttributeReadResponse.ts:238-274
 // (addConcrete → error status) and readAttributeForWildcard (bare return).
 func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) ReportData {
-	_, fabricIndex := FabricFilterFromContext(ctx)
-	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
-	// A PASE session keeps its implicit Administer grant after AddNOC
-	// adopted it onto the new fabric, so the gate is keyed on the auth
-	// mode, not on the fabric: fabric 0 without PASE is checked, and
-	// refused.
-	pase := IsPASEFromContext(ctx)
-	aclChecker, hasACL := d.(ACLChecker)
-	privProvider, hasPrivProvider := d.(AttributeReadPrivilegeProvider)
-
-	// readPrivilege returns the minimum privilege needed to read the given
-	// (endpoint, cluster, attribute) triplet. Falls back to View (1) when
-	// no AttributeReadPrivilegeProvider is wired or the attribute has no
-	// elevated requirement.
-	readPrivilege := func(endpoint uint16, clusterID, attrID uint32) uint8 {
-		if hasPrivProvider {
-			return privProvider.MinReadPrivilege(endpoint, clusterID, attrID)
-		}
-		return 1
-	}
-
+	// The gates run per result in [ReadReports]; this is its drained
+	// form. A responder that sends the reports chunk by chunk pulls them
+	// from [NewReadReports] instead (review II, decision 44).
 	var rd ReportData
-	for _, path := range DedupAttributePaths(req.AttributeRequests) {
-		// A fully-concrete path (endpoint + cluster + attribute all named)
-		// returns an explicit AttributeStatusIB(UnsupportedAccess) on ACL
-		// denial; a wildcard path silently omits the results the subject may
-		// not read (Matter §8.4.3.2 — a wildcard read discloses only
-		// authorized paths). Mirrors matter.js AttributeReadResponse.ts
-		// addConcrete (error status) vs readAttributeForWildcard (omit).
-		concretePath := path.HasEndpoint && path.HasCluster && path.HasAttribute
-
-		results := ApplyWildcardPathFlags(ctx, d, path, d.Read(ctx, path))
-		var filtered []AttributeReport
-		for _, r := range results {
-			// Per-RESULT ACL check at the RESOLVED concrete (endpoint,
-			// cluster) using the resolved attribute's read privilege — run
-			// for EVERY expanded result, including a wildcard-endpoint +
-			// concrete-cluster read (previously authorized only against
-			// endpoint 0, then expanded to every endpoint with no per-endpoint
-			// recheck). Mirrors matter.js
-			// packages/protocol/src/action/server/AttributeReadResponse.ts:
-			// 238-274 — each resolved location is authorized with the resolved
-			// attribute's readLevel AFTER path resolution. PASE
-			// bypasses — commissioning reads must succeed pre-AddNOC, and
-			// after it while the commissioner still drives the same PASE
-			// channel.
-			// No fabric and not PASE fails closed (checkSubjectACL).
-			if hasACL && !pase {
-				priv := readPrivilege(r.Path.Endpoint, r.Path.Cluster, r.Path.Attribute)
-				if status := checkSubjectACL(ctx, aclChecker, fabricIndex, subjectNodeID, subjectCATs, r.Path.Endpoint, r.Path.Cluster, priv); !status.IsSuccess() {
-					if concretePath {
-						filtered = append(filtered, AttributeReport{
-							Path:     r.Path,
-							IsStatus: true,
-							Status:   StatusIB{Status: status},
-						})
-					}
-					// Wildcard-expanded denial: omit, never disclose.
-					continue
-				}
-			}
-
-			// Check if the controller's cached DataVersion matches the
-			// cluster's current DataVersion — if so, skip this cluster.
-			//
-			// Sentinel guard (>1, not !=0): clusters without per-instance
-			// tracking report DataVersion=0 and the wire encoder substitutes
-			// the §10.6.1.4 floor of 1. A controller that cached the
-			// sentinel-1 and replays it MUST NOT cause the whole cluster to
-			// be omitted — that collapses the bridged-endpoint topology in
-			// Apple's cache. Mirrors the Subscribe-initial guard in
-			// bridge/subscribe.go.
-			if len(req.DataVersionFilters) > 0 && r.Status == StatusSuccess {
-				if cached, ok := matchDataVersionFilter(req.DataVersionFilters, r.Path.Endpoint, r.Path.Cluster); ok {
-					if cached == r.DataVersion && r.DataVersion > 1 {
-						// Controller cache is fresh — omit this cluster.
-						continue
-					}
-				}
-			}
-			rep := AttributeReport{Path: r.Path, DataVersion: r.DataVersion}
-			if r.Status != StatusSuccess {
-				rep.IsStatus = true
-				rep.Status = StatusIB{Status: r.Status}
-			} else {
-				rep.Value = r.Value
-			}
-			filtered = append(filtered, rep)
-		}
-		rd.Reports = append(rd.Reports, filtered...)
+	reports := NewReadReports(ctx, d, req)
+	for rep, ok := reports.Next(); ok; rep, ok = reports.Next() {
+		rd.Reports = append(rd.Reports, rep)
 	}
 	// A plain (non-subscribe) Read's ReportData carries SuppressResponse=true:
 	// the controller answers the final chunk with only a Standalone MRP-Ack, not
@@ -978,10 +895,11 @@ func ValidateReadPaths(attrs []ConcreteAttributePath, events []ConcreteEventPath
 // DedupAttributePaths returns paths with every repeat of an earlier
 // AttributePathIB removed, first occurrence first. A repeated path
 // expands to exactly the results the first one did, so reading it again
-// only duplicates the report; dropping it bounds the materialised report
-// by the node's own attribute count rather than by how many copies of a
-// path fit into one request. Returns the input slice when nothing
-// repeats.
+// only duplicates the report. It drops byte-identical repeats only: paths
+// that differ in a field the expansion ignores, and overlapping
+// wildcards, are each expanded — what bounds the memory of a response is
+// that it is generated chunk by chunk ([AttributeExpansion]), not this.
+// Returns the input slice when nothing repeats.
 func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath {
 	if len(paths) < 2 {
 		return paths

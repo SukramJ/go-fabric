@@ -532,13 +532,31 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 	// A wildcard path's WildcardPathFlags skip their paths in the
 	// subscription's reports as in a read (AttributeReadResponse.ts:149-197).
 	results := im.ApplyWildcardPathFlags(im.WithElementQualities(ctx, specElementQualities{}), dispatcher, path, dispatcher.Read(ctx, path))
+	allow := readResultAuthorizer(ctx, dispatcher)
+	if allow == nil {
+		return results
+	}
+	authorized := make([]im.ReadResult, 0, len(results))
+	for _, rr := range results {
+		if allow(rr) {
+			authorized = append(authorized, rr)
+		}
+	}
+	return authorized
+}
+
+// readResultAuthorizer is the gate [Bridge.readAuthorizedResults] applies
+// to each result, for the subject ctx carries: nil when every result
+// passes (PASE, or a dispatcher without an ACL), else a func reporting
+// whether the subject may read the result's attribute.
+func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im.ReadResult) bool {
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if im.IsPASEFromContext(ctx) {
-		return results // PASE — commissioning channel, implicit Administer
+		return nil // PASE — commissioning channel, implicit Administer
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
-		return results
+		return nil
 	}
 	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
@@ -549,22 +567,18 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 		// either, as at every gate of im: the filter does not rest on the
 		// access-control source knowing that index (review II,
 		// R2-P0-rv-A08).
-		return nil
+		return func(im.ReadResult) bool { return false }
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
-	authorized := make([]im.ReadResult, 0, len(results))
-	for _, rr := range results {
+	return func(rr im.ReadResult) bool {
 		var priv uint8 = 1 // View default
 		if hasPriv {
 			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		}
-		if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv); !status.IsSuccess() {
-			continue // subject not permitted to read this attribute — drop
-		}
-		authorized = append(authorized, rr)
+		// A subject not permitted to read this attribute — drop.
+		return aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv).IsSuccess()
 	}
-	return authorized
 }
 
 // reportSubscription assembles + ships a ReportData for sub. Called
@@ -1352,9 +1366,10 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 // Orchestrates the Subscribe flow in four steps — each extracted into
 // its own method in subscribe_dispatch.go (mirrors the ADR 0031 pattern
 // for handleIMOpcode → receive_dispatch.go):
-//  1. buildInitialReport — read all requested paths + events, sort.
-//  2. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
-//  3. streamInitialReportChunks — chunked ReportData send with per-chunk ack wait.
+//  1. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
+//  2. primingMatches — reject a Subscribe that matches nothing.
+//  3. streamPrimingChunks — the priming report, generated chunk by chunk
+//     (newPrimingSource, primingEvents), with a per-chunk ack wait.
 //  4. sendSubscribeResponse — SubscribeResponse with piggyback ack + TouchLastReport.
 //
 // abandonPrimingSubscription closes a subscription whose priming report
@@ -1382,7 +1397,18 @@ func (b *Bridge) handleSubscribeRequest(
 			slog.String("src", srcString(src)))
 		return nil
 	}
+	return b.subscribeWith(ctx, dispatcher, src, requestHdr, proto, req)
+}
 
+// subscribeWith is [Bridge.handleSubscribeRequest] against dispatcher.
+func (b *Bridge) subscribeWith(
+	ctx context.Context,
+	dispatcher im.Dispatcher,
+	src net.Addr,
+	requestHdr *message.Header,
+	proto message.ProtocolHeader,
+	req im.SubscribeRequest,
+) error {
 	// Reject illegal paths up front with a top-level InvalidAction
 	// StatusResponse (wildcard cluster + concrete non-global attribute, or
 	// wildcard cluster + concrete event), and a request beyond the path
@@ -1475,18 +1501,30 @@ func (b *Bridge) handleSubscribeRequest(
 	// W2-wire-05).
 	primingReq := req
 	primingReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, subFabricIndex))
-	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, primingReq)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
 	// ServerSubscription.ts:610-614 rejects it with InvalidAction, after
-	// the admission above as there. The matched count is taken BEFORE
+	// the admission above as there. The match is taken BEFORE
 	// DataVersionFilter suppression, so a legitimately quiet re-subscribe
-	// (all clusters cached) still establishes.
-	if matchedPaths == 0 {
+	// (all clusters cached) still establishes. It is decided before the
+	// first chunk, by an expansion that stops at the first match.
+	if !b.primingMatches(subCtx, dispatcher, primingReq) {
 		b.abandonPrimingSubscription(subID)
 		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "no_match")
 	}
-	initialReport.HasSubscription, initialReport.SubscriptionID = stamp.HasSubscription, stamp.SubscriptionID
+	// The priming report is generated chunk by chunk (review II, decision
+	// 44): attribute reports in request-path order, then the events.
+	attributes := b.newPrimingSource(subCtx, dispatcher, primingReq)
+	var primed im.ReportData
+	var events func() []im.EventReport
+	if len(primingReq.EventRequests) > 0 {
+		events = func() []im.EventReport {
+			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq)
+			return primed.EventReports
+		}
+	}
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunker := newReportChunker(stamp, limits.budget, limits.hardCap, attributes.next, events)
 	// The priming report waits for the peer's StatusResponse per chunk,
 	// which arrives on this session: hand its turn on. The wait ends with
 	// the subscription too — a KeepSubscriptions=false request that
@@ -1494,11 +1532,14 @@ func (b *Bridge) handleSubscribeRequest(
 	abort := b.primingAbort(subID)
 	defer b.forgetPrimingAbort(subID)
 	leaveSessionOrder(ctx)
-	if err := b.streamInitialReportChunks(ctx, abort, src, requestHdr, proto, subID, initialReport); err != nil {
+	if err := b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}
-	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport); err != nil {
+	b.logger.Debug("matter.tx.subscribe.initial_reports",
+		slog.Int("subscription_id", int(subID)),
+		slog.Int("initial_reports", attributes.reports))
+	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, primed); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err
 	}

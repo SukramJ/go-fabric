@@ -443,100 +443,211 @@ func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, er
 	if len(probe) <= budget {
 		return []im.ReportData{rd}, nil
 	}
-
+	c := newReportChunker(rd, budget, hardCap, sliceAttributeReports(rd.Reports), func() []im.EventReport { return rd.EventReports })
 	chunks := make([]im.ReportData, 0, 4)
-	current := im.ReportData{
-		HasSubscription: rd.HasSubscription,
-		SubscriptionID:  rd.SubscriptionID,
+	for {
+		chunk, ok, err := c.next()
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return chunks, nil
+		}
+		chunks = append(chunks, chunk)
 	}
+}
 
-	var addAttributeReport func(rep im.AttributeReport) error
-	addAttributeReport = func(rep im.AttributeReport) error {
-		if parts, ok := splitListAttributeReport(rd, rep, budget); ok {
-			if oversized, err := anyPartOversized(rd, parts, hardCap); err != nil {
+// attributeReportSource yields a report's attribute reports one at a
+// time; ok is false once they are exhausted.
+type attributeReportSource func() (im.AttributeReport, bool)
+
+// sliceAttributeReports is the source over reports already built.
+func sliceAttributeReports(reports []im.AttributeReport) attributeReportSource {
+	i := 0
+	return func() (im.AttributeReport, bool) {
+		if i >= len(reports) {
+			return im.AttributeReport{}, false
+		}
+		i++
+		return reports[i-1], true
+	}
+}
+
+// reportChunker is [chunkReportData]'s greedy fill, fed one report at a
+// time: it pulls attribute reports from a source, then the event reports
+// events returns — called only once the attribute reports are exhausted —
+// and hands out each chunk as soon as it is full, so a responder sends
+// chunk N and waits for the peer's answer before chunk N+1 is generated.
+// What it holds between two calls of next is the chunk being filled, the
+// chunks a split list completed and not yet handed out, and the source's
+// own cursor. Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:470-512 at
+// db021da0 (sendDataReport fills a message from its payload iterator — the
+// read response's generator, AttributeReadResponse.ts:64 — and
+// sendAndResetReport awaits sendDataReportMessage, :510, before it pulls
+// further).
+//
+// Every chunk but the last carries MoreChunkedMessages; only the last
+// carries the template's SuppressResponse (Matter §10.6.6). A report
+// without any entry is one empty chunk, the template itself.
+type reportChunker struct {
+	template        im.ReportData
+	budget, hardCap int
+	attributes      attributeReportSource
+	events          func() []im.EventReport
+	eventReports    []im.EventReport
+	eventsTaken     bool
+	current         im.ReportData
+	pending         []im.ReportData
+	emitted, done   bool
+}
+
+// newReportChunker chunks the reports of template's subscription (its
+// HasSubscription, SubscriptionID and SuppressResponse; its report arrays
+// are ignored) drawn from attributes and then events (nil: none).
+func newReportChunker(template im.ReportData, budget, hardCap int, attributes attributeReportSource, events func() []im.EventReport) *reportChunker {
+	template.Reports, template.EventReports, template.MoreChunkedMessages = nil, nil, false
+	c := &reportChunker{template: template, budget: budget, hardCap: hardCap, attributes: attributes, events: events}
+	c.current = c.fresh()
+	return c
+}
+
+// fresh is an empty intermediate chunk of the template's subscription.
+func (c *reportChunker) fresh() im.ReportData {
+	return im.ReportData{HasSubscription: c.template.HasSubscription, SubscriptionID: c.template.SubscriptionID}
+}
+
+// next returns the next chunk; ok is false once the last went out.
+func (c *reportChunker) next() (chunk im.ReportData, ok bool, err error) {
+	for len(c.pending) == 0 && !c.done {
+		if rep, more := c.nextAttribute(); more {
+			if err := c.addAttributeReport(rep); err != nil {
+				return im.ReportData{}, false, err
+			}
+			continue
+		}
+		if ev, more := c.nextEvent(); more {
+			if err := c.addEventReport(ev); err != nil {
+				return im.ReportData{}, false, err
+			}
+			continue
+		}
+		c.done = true
+		last := c.current
+		if len(last.Reports) > 0 || len(last.EventReports) > 0 || !c.emitted {
+			if !c.emitted {
+				// Nothing at all: the empty report still closes the
+				// interaction as one ReportDataMessage.
+				last.HasSubscription, last.SubscriptionID = c.template.HasSubscription, c.template.SubscriptionID
+			}
+			last.SuppressResponse = c.template.SuppressResponse
+			c.pending = append(c.pending, last)
+		}
+		c.current = im.ReportData{}
+	}
+	if len(c.pending) == 0 {
+		return im.ReportData{}, false, nil
+	}
+	chunk = c.pending[0]
+	c.pending = c.pending[1:]
+	if len(c.pending) == 0 {
+		c.pending = nil
+	}
+	c.emitted = true
+	return chunk, true, nil
+}
+
+func (c *reportChunker) nextAttribute() (im.AttributeReport, bool) {
+	if c.attributes == nil {
+		return im.AttributeReport{}, false
+	}
+	rep, ok := c.attributes()
+	if !ok {
+		c.attributes = nil
+	}
+	return rep, ok
+}
+
+func (c *reportChunker) nextEvent() (im.EventReport, bool) {
+	if !c.eventsTaken {
+		c.eventsTaken = true
+		if c.events != nil {
+			c.eventReports = c.events()
+		}
+	}
+	if len(c.eventReports) == 0 {
+		c.eventReports = nil
+		return im.EventReport{}, false
+	}
+	ev := c.eventReports[0]
+	c.eventReports = c.eventReports[1:]
+	return ev, true
+}
+
+// closeCurrent hands out the chunk being filled — more follows: the entry
+// that did not fit it — and starts the next with seed.
+func (c *reportChunker) closeCurrent(seed im.ReportData) {
+	full := c.current
+	full.MoreChunkedMessages = true
+	c.pending = append(c.pending, full)
+	c.current = seed
+}
+
+func (c *reportChunker) addAttributeReport(rep im.AttributeReport) error {
+	if parts, ok := splitListAttributeReport(c.template, rep, c.budget); ok {
+		if oversized, err := anyPartOversized(c.template, parts, c.hardCap); err != nil {
+			return err
+		} else if oversized {
+			return c.addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
+		}
+		for _, part := range parts {
+			if err := c.addAttributeReport(part); err != nil {
 				return err
-			} else if oversized {
-				return addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
 			}
-			for _, part := range parts {
-				if err := addAttributeReport(part); err != nil {
-					return err
-				}
-			}
-			return nil
 		}
-		rep, err := capOversizedAttributeReport(rd, rep, hardCap)
-		if err != nil {
-			return err
-		}
-		candidate := current
-		candidate.Reports = append(candidate.Reports, rep)
-		body, err := EncodeReportData(candidate)
-		if err != nil {
-			return err
-		}
-		if len(body) > budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
-			chunks = append(chunks, current)
-			current = im.ReportData{
-				HasSubscription: rd.HasSubscription,
-				SubscriptionID:  rd.SubscriptionID,
-				Reports:         []im.AttributeReport{rep},
-			}
-			return nil
-		}
-		current = candidate
 		return nil
 	}
-	addEventReport := func(ev im.EventReport) error {
-		ev, err := capOversizedEventReport(rd, ev, hardCap)
-		if err != nil {
-			return err
-		}
-		candidate := current
-		candidate.EventReports = append(candidate.EventReports, ev)
-		body, err := EncodeReportData(candidate)
-		if err != nil {
-			return err
-		}
-		if len(body) > budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
-			chunks = append(chunks, current)
-			current = im.ReportData{
-				HasSubscription: rd.HasSubscription,
-				SubscriptionID:  rd.SubscriptionID,
-				EventReports:    []im.EventReport{ev},
-			}
-			return nil
-		}
-		current = candidate
+	rep, err := capOversizedAttributeReport(c.template, rep, c.hardCap)
+	if err != nil {
+		return err
+	}
+	current := c.current
+	candidate := current
+	candidate.Reports = append(candidate.Reports, rep)
+	body, err := EncodeReportData(candidate)
+	if err != nil {
+		return err
+	}
+	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
+		seed := c.fresh()
+		seed.Reports = []im.AttributeReport{rep}
+		c.closeCurrent(seed)
 		return nil
 	}
+	c.current = candidate
+	return nil
+}
 
-	for _, rep := range rd.Reports {
-		if err := addAttributeReport(rep); err != nil {
-			return nil, err
-		}
+func (c *reportChunker) addEventReport(ev im.EventReport) error {
+	ev, err := capOversizedEventReport(c.template, ev, c.hardCap)
+	if err != nil {
+		return err
 	}
-	for _, ev := range rd.EventReports {
-		if err := addEventReport(ev); err != nil {
-			return nil, err
-		}
+	current := c.current
+	candidate := current
+	candidate.EventReports = append(candidate.EventReports, ev)
+	body, err := EncodeReportData(candidate)
+	if err != nil {
+		return err
 	}
-	if len(current.Reports) > 0 || len(current.EventReports) > 0 {
-		chunks = append(chunks, current)
+	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
+		seed := c.fresh()
+		seed.EventReports = []im.EventReport{ev}
+		c.closeCurrent(seed)
+		return nil
 	}
-	if len(chunks) == 0 {
-		// Empty input still surfaces as a single (empty) chunk so the
-		// receiver sees a valid ReportDataMessage close out the read.
-		chunks = []im.ReportData{rd}
-	}
-
-	for i := range chunks[:len(chunks)-1] {
-		chunks[i].MoreChunkedMessages = true
-	}
-	if rd.SuppressResponse {
-		chunks[len(chunks)-1].SuppressResponse = true
-	}
-	return chunks, nil
+	c.current = candidate
+	return nil
 }
 
 // rawListValue is a list attribute value carried as the TLV encodings of

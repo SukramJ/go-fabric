@@ -217,12 +217,31 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	if readPASE {
 		readCtx = im.WithAuthModePASE(readCtx)
 	}
-	report := im.HandleReadRequest(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
+	// The response is generated chunk by chunk (review II, decision 44):
+	// chunk N+1 is pulled from the reports only once chunk N went out and
+	// the peer answered it, so what the read holds across a chunk wait is
+	// the expansion's cursor and the chunk in flight, not the whole
+	// response. Mirrors matter.js
+	// packages/protocol/src/action/server/AttributeReadResponse.ts:64 at
+	// db021da0 (*process, a generator) and its consumer,
+	// InteractionMessenger.ts:470-512 (sendDataReport).
+	reports := im.NewReadReports(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, req)
+	attributeReports := 0
+	attributes := func() (im.AttributeReport, bool) {
+		rep, ok := reports.Next()
+		if ok {
+			b.logReadAttributeReport(attributeReports, rep)
+			attributeReports++
+		}
+		return rep, ok
+	}
 	// Evaluate EventRequests against the persistent event log so
 	// chip-tool `read-event-by-id` and Apple MTRDevice liveness
 	// checks return the buffered StartUp / BootReason / etc. events.
 	// Matter §10.6.6: a ReadRequest may carry both AttributeRequests
-	// and EventRequests; the bridge merges both into one ReportData.
+	// and EventRequests; the bridge merges both into one ReportData,
+	// the events after the attributes — read once the attributes are
+	// out.
 	//
 	// Gate the event reads by ACL + fabric-sensitive filtering the same
 	// way HandleReadRequest gates attribute reads: a wildcard event read
@@ -230,111 +249,131 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// non-Administer subject must not read AccessControl events (Matter
 	// §8.4.3.2 / §9.10.7.1). Mirrors matter.js EventReadResponse.ts
 	// #readAllowedEvents.
+	var events func() []im.EventReport
 	if len(req.EventRequests) > 0 {
-		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
-		// One EventFilterIB applies: the first for this node (matter.js
-		// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
-		eventReq := req
-		eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
-		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
-			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
+		events = func() []im.EventReport {
+			auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
+			// One EventFilterIB applies: the first for this node (matter.js
+			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
+			eventReq := req
+			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, b.localNodeIDFor(requestHdr.SessionID, readFabricIndex))
+			evs := append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
+				im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
+			if len(evs) > 0 {
+				b.logger.Debug("matter.tx.im.read_event_reports",
+					slog.Int("event_reports", len(evs)))
+			}
+			return evs
+		}
 	}
-	b.logReadReport(report)
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
+	// A plain Read's response suppresses the answer to its last chunk
+	// (see [im.HandleReadRequest]).
+	chunker := newReportChunker(im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
+	chunk, have, err := chunker.next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
 	}
 	// A read that waits for the peer's answer to a chunk takes one of the
 	// session's [maxChunkWaitsPerSession] claims; beyond them it is
-	// answered Busy (review II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks(chunks))
+	// answered Busy (review II, R2-P1-req2-01). Its first chunk tells: only
+	// the last chunk suppresses the answer.
+	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_chunk_waits", im.StatusBusy)
 	}
 	defer release()
-	for i, chunk := range chunks {
-		body, err := EncodeReportData(chunk)
-		if err != nil {
-			debugReplyError(b.logger, "encode_report", src, err)
+	chunks := 0
+	for i := 0; have; i++ {
+		if err := b.sendReadChunk(ctx, src, requestHdr, proto, i, chunk); err != nil {
 			return err
 		}
-		// Mirror the Subscribe path's per-chunk IM:StatusResponse wait
-		// so Apple Home's MTRDevice processes each ReportData frame on
-		// the IM layer before the next arrives. matter.js's
-		// InteractionMessenger acks every non-final chunk on the IM layer
-		// (not just MRP); without the wait go-fabric
-		// burst-fires all chunks back-to-back and Apple's
-		// `ProcessReadResponse` state machine drops late chunks.
-		//
-		// A chunk carrying SuppressResponse=true (only the terminal chunk
-		// of a plain Read — see [im.HandleReadRequest]) expects nothing but
-		// a Standalone MRP-Ack, so the controller never emits an IM
-		// StatusResponse for it; waiting would only run out the exchange timeout.
-		// Mirrors matter.js
-		// packages/protocol/src/interaction/InteractionMessenger.ts:679,701
-		// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
-		// wait). Reliable delivery of the final chunk is still guaranteed by
-		// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
-		var waitCh <-chan im.StatusCode
-		if !chunk.SuppressResponse {
-			waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		}
-		// Piggyback the latest peer-sent counter on this chunk's
-		// AckCounter. Without this rewrite every chunk carries
-		// the stale ReadRequest counter, and python-matter-server's
-		// ReliableMessaging drops chunk N+1 after the peer has
-		// StatusResponse-acked chunk N — "Dropping message without
-		// piggyback ack when we are waiting for an ack". Mirrors
-		// the symmetric fix in the Subscribe-Initial loop.
-		chunkHdr := *requestHdr
-		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
-		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
-			if waitCh != nil {
-				b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			}
-			debugReplyError(b.logger, "send_report", src, err)
+		chunks++
+		if chunk, have, err = chunker.next(); err != nil {
+			debugReplyError(b.logger, "chunk_report", src, err)
 			return err
 		}
-		if waitCh != nil {
-			leaveSessionOrder(ctx) // the answer arrives on this session
-			if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
-				return err
-			}
-		}
-		b.logger.Debug("matter.rx.im.read.chunk",
-			slog.String("src", srcString(src)),
-			slog.Int("chunk", i),
-			slog.Int("of", len(chunks)),
-			slog.Int("bytes", len(body)),
-			slog.Bool("more", chunk.MoreChunkedMessages))
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	b.logger.Debug("matter.rx.im.read",
 		slog.String("src", srcString(src)),
-		slog.Int("attribute_reports", len(report.Reports)),
-		slog.Int("chunks", len(chunks)))
+		slog.Int("attribute_reports", attributeReports),
+		slog.Int("chunks", chunks))
 	return nil
 }
 
-// logReadReport is the read's diagnostic: what it returns per path.
-func (b *Bridge) logReadReport(report im.ReportData) {
-	for i, r := range report.Reports {
-		b.logger.Debug("matter.tx.im.read_report",
-			slog.Int("path_index", i),
-			slog.Any("endpoint", r.Path.Endpoint),
-			slog.Any("cluster", r.Path.Cluster),
-			slog.Any("attribute", r.Path.Attribute),
-			slog.Bool("status", r.IsStatus),
-			slog.Any("status_code", r.Status.Status),
-			slog.String("value_type", fmt.Sprintf("%T", r.Value.Value)),
-			slog.Any("value", r.Value.Value))
+// sendReadChunk sends chunk i of a read's response and, unless the chunk
+// suppresses the answer, waits for the peer's StatusResponse to it.
+func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, i int, chunk im.ReportData) error {
+	body, err := EncodeReportData(chunk)
+	if err != nil {
+		debugReplyError(b.logger, "encode_report", src, err)
+		return err
 	}
-	if len(report.EventReports) > 0 {
-		b.logger.Debug("matter.tx.im.read_event_reports",
-			slog.Int("event_reports", len(report.EventReports)))
+	// Mirror the Subscribe path's per-chunk IM:StatusResponse wait
+	// so Apple Home's MTRDevice processes each ReportData frame on
+	// the IM layer before the next arrives. matter.js's
+	// InteractionMessenger acks every non-final chunk on the IM layer
+	// (not just MRP); without the wait go-fabric
+	// burst-fires all chunks back-to-back and Apple's
+	// `ProcessReadResponse` state machine drops late chunks.
+	//
+	// A chunk carrying SuppressResponse=true (only the terminal chunk
+	// of a plain Read — see [im.HandleReadRequest]) expects nothing but
+	// a Standalone MRP-Ack, so the controller never emits an IM
+	// StatusResponse for it; waiting would only run out the exchange timeout.
+	// Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:679,701
+	// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
+	// wait). Reliable delivery of the final chunk is still guaranteed by
+	// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
+	var waitCh <-chan im.StatusCode
+	if !chunk.SuppressResponse {
+		waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	}
+	// Piggyback the latest peer-sent counter on this chunk's
+	// AckCounter. Without this rewrite every chunk carries
+	// the stale ReadRequest counter, and python-matter-server's
+	// ReliableMessaging drops chunk N+1 after the peer has
+	// StatusResponse-acked chunk N — "Dropping message without
+	// piggyback ack when we are waiting for an ack". Mirrors
+	// the symmetric fix in the Subscribe-Initial loop.
+	chunkHdr := *requestHdr
+	b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
+	if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
+		if waitCh != nil {
+			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		}
+		debugReplyError(b.logger, "send_report", src, err)
+		return err
+	}
+	if waitCh != nil {
+		leaveSessionOrder(ctx) // the answer arrives on this session
+		if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+			return err
+		}
+	}
+	b.logger.Debug("matter.rx.im.read.chunk",
+		slog.String("src", srcString(src)),
+		slog.Int("chunk", i),
+		slog.Int("bytes", len(body)),
+		slog.Bool("more", chunk.MoreChunkedMessages))
+	return nil
+}
+
+// logReadAttributeReport is the read's diagnostic: what it returns per
+// path, as each report is generated.
+func (b *Bridge) logReadAttributeReport(i int, r im.AttributeReport) {
+	b.logger.Debug("matter.tx.im.read_report",
+		slog.Int("path_index", i),
+		slog.Any("endpoint", r.Path.Endpoint),
+		slog.Any("cluster", r.Path.Cluster),
+		slog.Any("attribute", r.Path.Attribute),
+		slog.Bool("status", r.IsStatus),
+		slog.Any("status_code", r.Status.Status),
+		slog.String("value_type", fmt.Sprintf("%T", r.Value.Value)),
+		slog.Any("value", r.Value.Value))
 }
 
 // readWaitsForChunks reports whether the chunk loop of a read waits for

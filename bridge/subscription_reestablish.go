@@ -256,33 +256,36 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 
 	readCtx := im.WithFabricFilter(ctx, rec.IsFabricFiltered, fabricIndex)
 	readCtx = im.WithSubject(readCtx, subjectNodeID, subjectCATs)
-	report, matched := b.buildInitialReport(readCtx, dispatcher, im.SubscribeRequest{
+	primingReq := im.SubscribeRequest{
 		MinIntervalFloor:   rec.MinIntervalFloor,
 		MaxIntervalCeiling: rec.MaxIntervalCeiling,
 		AttributeRequests:  rec.AttributeRequests,
 		EventRequests:      rec.EventRequests,
 		FabricFiltered:     rec.IsFabricFiltered,
-	})
-	if matched == 0 {
+	}
+	if !b.primingMatches(readCtx, dispatcher, primingReq) {
 		// matter.js #processAttributesAndEventsReport: "Subscription
 		// failed because no attributes or events are matching the query".
 		_ = m.Release(sub.ID)
 		return &chunkStatusError{status: im.StatusInvalidAction}
 	}
-	// `suppressStatusReports`: re-establishment simulates a subscription
-	// that never went away, so per-path errors are not reported again.
-	kept := report.Reports[:0]
-	for _, r := range report.Reports {
-		if !r.IsStatus {
-			kept = append(kept, r)
+	// The report is generated chunk by chunk, as a Subscribe's priming
+	// report (review II, decision 44). `suppressStatusReports`:
+	// re-establishment simulates a subscription that never went away, so
+	// per-path errors are not reported again.
+	attributes := b.newPrimingSource(readCtx, dispatcher, primingReq)
+	attributes.suppressStatuses = true
+	var report im.ReportData
+	var events func() []im.EventReport
+	if len(primingReq.EventRequests) > 0 {
+		events = func() []im.EventReport {
+			report.EventReports = b.primingEvents(readCtx, dispatcher, primingReq)
+			return report.EventReports
 		}
 	}
-	report.Reports = kept
-	report.HasSubscription = true
-	report.SubscriptionID = sub.ID
-	report.SuppressResponse = false
-
-	if err := b.sendPrimingReport(target, report); err != nil {
+	limits := b.chunkLimitsFor(target.src, target.sessionID)
+	chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: sub.ID}, limits.budget, limits.hardCap, attributes.next, events)
+	if err := b.sendPrimingReport(target, chunker); err != nil {
 		_ = m.Release(sub.ID)
 		return err
 	}
@@ -302,18 +305,18 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	return nil
 }
 
-// sendPrimingReport streams report on target's exchange, one chunk at a
-// time, waiting for the peer's IM StatusResponse to each — matter.js
+// sendPrimingReport streams the chunks chunker generates on target's
+// exchange, one at a time — the next generated only once the peer
+// answered the last — waiting for the peer's IM StatusResponse to each — matter.js
 // InteractionMessenger.sendDataReport with its default waitForAck. Each
 // chunk after the first piggybacks the acknowledgement of the peer's
 // previous StatusResponse.
-func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error {
-	limits := b.chunkLimitsFor(target.src, target.sessionID)
-	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
+func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) error {
+	chunk, have, err := chunker.next()
 	if err != nil {
 		return err
 	}
-	for i, chunk := range chunks {
+	for i := 0; have; i++ {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			return err
@@ -343,6 +346,9 @@ func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error
 		case <-timer.C():
 			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
 			return fmt.Errorf("%w: chunk %d unanswered after %s", errPeerGone, i, timeout)
+		}
+		if chunk, have, err = chunker.next(); err != nil {
+			return err
 		}
 	}
 	return nil

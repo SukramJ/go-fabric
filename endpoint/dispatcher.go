@@ -198,6 +198,7 @@ var (
 	_ im.DataVersionReader              = (*TopologyDispatcher)(nil)
 	_ im.AttributeReadPrivilegeProvider = (*TopologyDispatcher)(nil)
 	_ im.ACLChecker                     = (*TopologyDispatcher)(nil)
+	_ im.EndpointExpander               = (*TopologyDispatcher)(nil)
 	_ im.AuthorizingWriter              = (*TopologyDispatcher)(nil)
 	_ im.AuthorizingInvoker             = (*TopologyDispatcher)(nil)
 )
@@ -231,38 +232,69 @@ func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttribute
 	wildcardEndpoint := !path.HasEndpoint
 	var results []im.ReadResult
 	for _, ep := range endpoints {
-		ePath := path
-		ePath.Endpoint = ep.ID
-		ePath.HasEndpoint = true
+		results = d.readAt(ctx, ep, path, wildcardEndpoint, results)
+	}
+	return results
+}
 
-		servers := d.serversFor(ep, path)
-		if len(servers) == 0 {
-			// Wildcard endpoint expansion (Matter §4.5.4 "Path
-			// Generation"): paths that match no concrete cluster on
-			// this endpoint are SILENTLY SKIPPED, not surfaced as
-			// UnsupportedCluster — the spec says the generator only
-			// emits paths where the cluster/attribute actually
-			// exists. Concrete endpoints (operator named the EP
-			// explicitly) keep the error surface so callers see why
-			// their read returned nothing.
-			if wildcardEndpoint {
-				continue
-			}
-			results = append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
-			continue
+// ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
+// endpoints [TopologyDispatcher.Read] visits for path, in its order.
+func (d *TopologyDispatcher) ExpansionEndpoints(path im.ConcreteAttributePath) []uint16 {
+	endpoints := d.resolveEndpoints(path)
+	ids := make([]uint16, len(endpoints))
+	for i, ep := range endpoints {
+		ids[i] = ep.ID
+	}
+	return ids
+}
+
+// ReadAtEndpoint implements [im.EndpointExpander]: what
+// [TopologyDispatcher.Read] returns for path, a path naming no endpoint,
+// at endpointID alone — nothing when that endpoint is not in the
+// topology.
+func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.ConcreteAttributePath, endpointID uint16) []im.ReadResult {
+	ep := d.topology.FindByID(endpointID)
+	if ep == nil {
+		return nil
+	}
+	return d.readAt(ctx, ep, path, true, nil)
+}
+
+// readAt appends to results what path reads at ep: one result per
+// attribute of each matching cluster server. A concrete endpoint lacking
+// the cluster answers UnsupportedCluster; under a wildcard endpoint it is
+// skipped.
+func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
+	ePath := path
+	ePath.Endpoint = ep.ID
+	ePath.HasEndpoint = true
+
+	servers := d.serversFor(ep, path)
+	if len(servers) == 0 {
+		// Wildcard endpoint expansion (Matter §4.5.4 "Path
+		// Generation"): paths that match no concrete cluster on
+		// this endpoint are SILENTLY SKIPPED, not surfaced as
+		// UnsupportedCluster — the spec says the generator only
+		// emits paths where the cluster/attribute actually
+		// exists. Concrete endpoints (operator named the EP
+		// explicitly) keep the error surface so callers see why
+		// their read returned nothing.
+		if wildcardEndpoint {
+			return results
 		}
-		for _, srv := range servers {
-			cPath := ePath
-			cPath.Cluster = srv.MatterClusterID()
-			cPath.HasCluster = true
+		return append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
+	}
+	for _, srv := range servers {
+		cPath := ePath
+		cPath.Cluster = srv.MatterClusterID()
+		cPath.HasCluster = true
 
-			attrs := d.attributesFor(srv, path)
-			for _, attrID := range attrs {
-				aPath := cPath
-				aPath.Attribute = attrID
-				aPath.HasAttribute = true
-				results = append(results, readOne(ctx, ep, srv, aPath))
-			}
+		attrs := d.attributesFor(srv, path)
+		for _, attrID := range attrs {
+			aPath := cPath
+			aPath.Attribute = attrID
+			aPath.HasAttribute = true
+			results = append(results, readOne(ctx, ep, srv, aPath))
 		}
 	}
 	return results
