@@ -1,13 +1,14 @@
 # Phase 3 — the dispositions
 
-The commit ids below are those of the branch of this phase's pull request
-(`review2/p3`, `8c9088ee..46109272`, 107 commits). If that pull request merges
-squashed, as the three before it did, its single commits stay retrievable
-through the pull request's reference. Items that are still open after this
-branch and describe a weakness a party on the network could use are held back
-with their text until the pull request that fixes them (owner decision 25);
-the table carries their id, severity and phase only, and "Counts" says how
-many. What this branch fixed is public as what the code does now.
+The commit ids below are those of the branch of this phase's pull request,
+#527 (`review2/p3`, `8c9088ee..46109272`, 107 commits). If that pull request
+merges squashed, as the three before it did, its single commits stay
+retrievable through the pull request's reference. Items that are still open
+after this branch and describe a weakness a party on the network could use are
+held back with their text until the pull request that fixes them (owner
+decision 25); the table carries their id, severity and phase only, and
+"Counts" says how many. What this branch fixed is public as what the code does
+now.
 
 Phase 3 was the adversarial review: seven reviewers each took one attacker's
 place (owner decision 50) — an unauthenticated host on the device's link
