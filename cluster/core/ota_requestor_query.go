@@ -718,9 +718,10 @@ func (w *otaHTTPSWriter) Write(p []byte) (int, error) {
 
 // handleBdxDownload mirrors #handleBdxDownload (:959-1006): up to three
 // attempts of a receiver-driven transfer into the download location, in
-// 8192-byte blocks over TCP and 1024-byte blocks otherwise (:962-963,
-// [bdxMaxBlockSize]); the last failure becomes an otaDownloadError with the
-// BDX status code, or UpdateState Unknown's value (0) for any other error.
+// 8192-byte blocks over TCP and 1024-byte blocks otherwise (:975-976 at
+// db021da0, [bdxMaxBlockSize]); the last failure becomes an
+// otaDownloadError with the BDX status code, or UpdateState Unknown's value
+// (0) for any other error.
 // Beyond matter.js, a transfer that passes the size cap
 // ([otaBdxMaxImageSize]) fails with LengthTooLarge, reported to the
 // provider, and ends the attempts: the image will not shrink.
@@ -782,7 +783,7 @@ func (s *otaBdxCappedSink) Write(p []byte) (int, error) {
 
 // bdxMaxBlockSize is the block size the requestor asks for on ex:
 // OTA_BDX_MAX_BLOCK_SIZE_TCP when the exchange's channel is TCP,
-// OTA_BDX_MAX_BLOCK_SIZE_NON_TCP otherwise (:962-963). The transfer still
+// OTA_BDX_MAX_BLOCK_SIZE_NON_TCP otherwise (:975-976). The transfer still
 // caps it at what one message of the exchange carries (bdx).
 func bdxMaxBlockSize(ex bdx.Exchange) uint16 {
 	if re, ok := ex.(reliableExchange); ok && re.Reliable() {

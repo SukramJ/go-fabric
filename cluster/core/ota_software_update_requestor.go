@@ -592,7 +592,8 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 	// A write that changes nothing reports nothing and schedules nothing:
 	// matter.js reacts to defaultOtaProviders$Changed
 	// (OtaSoftwareUpdateRequestorServer.ts:188), which a commit emits only
-	// for a changed value (Datasource.ts:1440-1441).
+	// for a changed value (Datasource.ts:1476-1492 at db021da0,
+	// #noteIfChanged).
 	if slices.Equal(before, next) {
 		return nil
 	}
