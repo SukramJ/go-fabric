@@ -338,7 +338,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// A concrete path this interaction accepts becomes the marker a
 		// following ADD is checked against (matter.js
 		// InteractionServer.ts:533-537 at db021da0); it is held only once
-		// the access checks below have granted the write (holdGranted).
+		// the access checks below have granted the write ([WriteTransaction.hold]).
 		tx.accept(w.Path, fabricIndex)
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
