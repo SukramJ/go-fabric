@@ -10,8 +10,10 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -681,10 +683,15 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 		b.deferReportsFor(invokeCtx, dispatcher, req)
 	}
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
-	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
-	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
-	b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
-	b.reportInvokeChanges(invokeCtx, dispatcher, before)
+	var resp im.InvokeResponse
+	func() {
+		// Deferred, so a command that panics still ends the commits
+		// snapshotInvokedClusters opened.
+		defer b.reportInvokeChanges(invokeCtx, dispatcher, before)
+		resp = im.HandleInvokeRequest(invokeCtx, dispatcher, req)
+		b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
+		b.closePASESessionsOnCommissioningComplete(invokeCtx, resp)
+	}()
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
 	}
@@ -852,9 +859,10 @@ type invokedCluster struct {
 }
 
 // snapshotInvokedClusters reads every attribute of each cluster a
-// concrete invoke path names, before the commands run. A subscription
-// manager is required for the comparison to matter; without one this is a
-// no-op.
+// concrete invoke path names, before the commands run, and opens the
+// commit of each ([invokeCommitTable]) that [Bridge.reportInvokeChanges]
+// ends. A subscription manager is required for the comparison to matter;
+// without one this is a no-op.
 func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]attributeReading {
 	if b.subscriptionManagerLocked() == nil {
 		return nil
@@ -869,11 +877,90 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 			out[key] = readCluster(ctx, d, key)
 		}
 	}
+	for key := range out {
+		b.invokeCommits.begin(key)
+	}
 	return out
 }
 
+// invokeCommitTable makes a command one commit with one DataVersion
+// advance (review II, R2-P2-dr-req-03). A cluster server that reports its
+// own changes — [contract.AttributeChangeNotifier], [contract.ChangeNotifier]
+// — would advance the version on each report, and the before/after
+// comparison of [Bridge.reportInvokeChanges] once more. While a command
+// runs against a cluster instance, its servers' reports are held here
+// instead of advancing the version and marking the attributes dirty; the
+// command's end advances once and marks the held attributes with the
+// compared ones (matter.js Datasource.ts:1440-1448, advanceVersion once
+// per commit). A report outside a command is not held. Nothing is reported
+// before the version moves, so no report carries the command's change at
+// the version before it.
+type invokeCommitTable struct {
+	mu   sync.Mutex
+	open map[invokedCluster]*invokeCommit
+}
+
+// invokeCommit is one cluster instance's open commit: the commands
+// running against it and the attributes its servers reported meanwhile.
+type invokeCommit struct {
+	running int
+	held    []uint32
+}
+
+// begin opens (or joins) the commit of key for one command.
+func (t *invokeCommitTable) begin(key invokedCluster) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.open == nil {
+		t.open = make(map[invokedCluster]*invokeCommit)
+	}
+	c, ok := t.open[key]
+	if !ok {
+		c = &invokeCommit{}
+		t.open[key] = c
+	}
+	c.running++
+}
+
+// hold records attrs as changed in the commit of (endpoint, cluster) and
+// reports true when one is open; false leaves the change to the caller.
+func (t *invokeCommitTable) hold(endpoint uint16, cluster uint32, attrs []uint32) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	c, ok := t.open[invokedCluster{endpoint, cluster}]
+	if !ok {
+		return false
+	}
+	for _, attr := range attrs {
+		if !slices.Contains(c.held, attr) {
+			c.held = append(c.held, attr)
+		}
+	}
+	return true
+}
+
+// end ends one command's part in the commit of key and returns the
+// attributes held so far; the commit closes with its last command.
+func (t *invokeCommitTable) end(key invokedCluster) []uint32 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	c, ok := t.open[key]
+	if !ok {
+		return nil
+	}
+	held := c.held
+	c.held = nil
+	c.running--
+	if c.running <= 0 {
+		delete(t.open, key)
+	}
+	return held
+}
+
 // reportInvokeChanges marks dirty every attribute whose value a command
-// changed, after advancing a bridged cluster's DataVersion. A command is a
+// changed or whose server reported it changed while the command ran
+// ([invokeCommitTable]), after advancing the cluster's DataVersion once,
+// and ends the commits [Bridge.snapshotInvokedClusters] opened. A command is a
 // state change like a write: matter.js commits whatever the command handler
 // assigned to the behavior's state, and its Datasource advances the version
 // and reports the changed properties (Datasource.ts). Root servers here
@@ -884,15 +971,21 @@ func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, r
 // Breadcrumb and arms the fail-safe). The comparison is by value
 // ([attributeReading]), as matter.js's Datasource deep-compares.
 func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]attributeReading) {
+	if len(before) == 0 {
+		return
+	}
 	mgr := b.subscriptionManagerLocked()
-	if mgr == nil || len(before) == 0 {
+	if mgr == nil {
+		for key := range before {
+			b.invokeCommits.end(key)
+		}
 		return
 	}
 	topo := b.Topology()
 	for key, old := range before {
 		now := readCluster(ctx, d, key)
+		changed := b.invokeCommits.end(key)
 		selfReported := selfReportedAttributes(topo, key)
-		bumped := false
 		for attr, v := range now {
 			if attr >= 0xFFF8 || selfReported[attr] {
 				continue
@@ -900,12 +993,19 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 			if prev, ok := old[attr]; ok && prev.equal(v) {
 				continue
 			}
-			if !bumped && topo != nil {
-				if ep := topo.FindByID(key.endpoint); ep != nil {
-					ep.BumpDataVersionOf(key.cluster)
-				}
-				bumped = true
+			if !slices.Contains(changed, attr) {
+				changed = append(changed, attr)
 			}
+		}
+		if len(changed) == 0 {
+			continue
+		}
+		if topo != nil {
+			if ep := topo.FindByID(key.endpoint); ep != nil {
+				ep.BumpDataVersionOf(key.cluster)
+			}
+		}
+		for _, attr := range changed {
 			mgr.OnAttributeChanged(im.ConcreteAttributePath{
 				Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
 				HasEndpoint: true, HasCluster: true, HasAttribute: true,

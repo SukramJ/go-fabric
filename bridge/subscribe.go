@@ -1865,7 +1865,13 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 			})
 		}
 		clusterID := srv.MatterClusterID()
+		attrs := srv.MatterReportable()
 		set.add(notifier.OnMatterValueChanged(func() {
+			// A command running against the cluster advances the
+			// version once when it ends (invokeCommitTable).
+			if b.invokeCommits.hold(root.ID, clusterID, attrs) {
+				return
+			}
 			// The version first, so the report carries the post-change
 			// one: the endpoint-held tracker of a server that keeps none
 			// of its own (review II, decision 46).
@@ -1929,6 +1935,15 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 				if len(attrIDs) == 0 {
 					return
 				}
+				// A command running against the cluster advances the
+				// version once when it ends (invokeCommitTable); a
+				// controller's write keeps its own commit.
+				if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
+					if hook := b.onAttributeChange.Load(); hook != nil {
+						(*hook)(ep.ID, clusterID, change)
+					}
+					return
+				}
 				// A controller's write is one commit with one advance:
 				// the dispatcher's (endpoint/dispatcher.go WriteAuthorized),
 				// so the change the write itself reports does not advance
@@ -1979,6 +1994,11 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 				slog.Int("paths", len(pathSet)),
 				slog.Int("changed", len(changed)))
 		}
+		// A command running against a cluster advances its version
+		// once when it ends (invokeCommitTable): its paths are held.
+		changed = slices.DeleteFunc(changed, func(p im.ConcreteAttributePath) bool {
+			return b.invokeCommits.hold(epID, p.Cluster, []uint32{p.Attribute})
+		})
 		bumped := make(map[uint32]struct{}, 1)
 		for _, p := range changed {
 			if _, done := bumped[p.Cluster]; !done {

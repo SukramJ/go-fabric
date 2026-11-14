@@ -659,6 +659,11 @@ type Bridge struct {
 	// MessageReceptionState.
 	unsecuredWindows unsecuredWindowTable
 
+	// invokeCommits holds the changes cluster servers report while a
+	// command runs against their cluster, so the command advances the
+	// cluster's DataVersion once ([invokeCommitTable]).
+	invokeCommits invokeCommitTable
+
 	// commissioningInstanceName remembers the mDNS instance name the
 	// bridge published via [Bridge.AnnounceCommissioning] so the
 	// matching [Bridge.WithdrawCommissioning] call can target the
