@@ -150,9 +150,13 @@ const testparityPlannedRatchet = 2
 // subscription after repeated MRP exhaustion, leaving the session alone"
 // (bridge) and ListManagerTest.ts's masking of another fabric's sensitive
 // fields (cluster/core, by meaning) ported: 939 missing.
+// Review II, phase 4, wave 3 (R2-P4-nw-07b): GroupcastServerTest.ts's
+// eight cases on the testing events of a rejected message (cluster/core,
+// bridge) and SecureSessionTest.ts's eleven of "GroupKeyMap check" and the
+// round trip without privacy (groups) ported: 920 missing.
 const (
 	testparityPortedRatchet  = 162
-	testparityMissingRatchet = 939
+	testparityMissingRatchet = 920
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
