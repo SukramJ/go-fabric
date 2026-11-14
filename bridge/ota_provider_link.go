@@ -125,13 +125,16 @@ type PeerSession struct {
 
 // largeMessageLink is the session a command with the Large Message quality
 // goes over: the link itself when its route carries large messages,
-// otherwise the newest live session of the peer whose route does. Mirrors
-// matter.js Peer.connect with a required transport
+// otherwise the live session of the peer with the highest id whose route
+// does. Mirrors matter.js Peer.connect with a required transport
 // (packages/protocol/src/peer/Peer.ts:374-375 at db021da0, "transport
 // explicitly required"; :439-448, newestSession of that transport, never
 // another), which ClientInteraction asks for when the request is a large
 // message (packages/protocol/src/action/client/ClientInteraction.ts:716-719,
-// :1235). matter.js then establishes a session over TCP when none is open;
+// :1235). The pick differs: matter.js's newestSession takes the session
+// last heard from (Peer.ts:582-601, the highest activeTimestamp at :596),
+// while the highest id is the one opened last only until the session-id
+// allocator wraps. matter.js then establishes a session over TCP when none is open;
 // this node opens no TCP connection of its own, so none is
 // [ErrLargeMessageTransport].
 func (s *PeerSession) largeMessageLink() (peerLink, error) {
