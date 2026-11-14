@@ -14,8 +14,9 @@ Where matter.js keeps a constant, the value is a constant here too.
 `node.Limits` existed and stay where they were, on `node.Config`, so no
 host has to change its configuration in a patch release.
 "Module's own" marks a limit matter.js does not have, with the reason the
-module keeps it. The matter.js references are at the pin
-`862ad75f`, the one the parity tests and `make cite-check` read.
+module keeps it. The matter.js references were read at `862ad75f`; the
+parity tests and `make cite-check` read the snapshot's pin, `db021da0`
+(`parity/schema.json`), and cite-check does not read this page.
 
 ## Sessions and pairing
 
