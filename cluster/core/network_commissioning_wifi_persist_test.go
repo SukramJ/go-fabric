@@ -16,7 +16,9 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
@@ -30,6 +32,8 @@ func wifiOn(t *testing.T, st store.Settings, d *simDriver) *WiFiNetworkCommissio
 	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
 		Driver: d, IsFailSafeArmed: func() bool { return true }, Store: st,
 		SetBreadcrumb: func(v uint64) { t.Errorf("breadcrumb %d written outside a command", v) },
+		// A held clock: a rejoin the server arms stays armed.
+		Clock: clocktest.New(time.Unix(0, 0)),
 	})
 	if err != nil {
 		t.Fatal(err)

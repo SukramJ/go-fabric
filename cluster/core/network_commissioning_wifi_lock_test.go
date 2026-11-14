@@ -6,7 +6,9 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 )
 
@@ -91,6 +93,8 @@ func TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped(t *testing.T) {
 	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
 		Driver: d, IsFailSafeArmed: func() bool { return armed },
 		SetBreadcrumb: func(v uint64) { crumbs = append(crumbs, v) },
+		// A held clock: the rejoin the expiry arms stays armed.
+		Clock: clocktest.New(time.Unix(0, 0)),
 	})
 	if err != nil {
 		t.Fatal(err)

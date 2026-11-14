@@ -16,7 +16,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
@@ -53,6 +55,9 @@ func newWiFiNC(t *testing.T, armed *bool, crumbs *[]uint64) (*WiFiNetworkCommiss
 	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
 		Driver: d, IsFailSafeArmed: func() bool { return *armed },
 		SetBreadcrumb: func(v uint64) { *crumbs = append(*crumbs, v) },
+		// A held clock: the rejoin a revert arms stays armed, so the
+		// commands below meet no join of their own.
+		Clock: clocktest.New(time.Unix(0, 0)),
 	})
 	if err != nil {
 		t.Fatal(err)

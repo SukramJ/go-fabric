@@ -1121,10 +1121,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.camerasOnline(ctx)
 	// The committed Wi-Fi network is rejoined before the fabrics'
 	// subscriptions and records go out ([Network].WiFi's Driver): chip's
-	// link comes back with the device (WiFiNetworkCommissioning.Start).
+	// link comes back with the device (WiFiNetworkCommissioning.Start). A
+	// rejoin that fails is retried for the node's lifetime (review II,
+	// R2-P3-net-01).
 	if wifi := n.root.WiFiNetworkCommissioning; wifi != nil {
 		work.pause()
-		wifi.Start(ctx)
+		wifi.Start(n.life) //nolint:contextcheck // the rejoin is retried for the node's lifetime, not the call's
 		work.resume()
 	}
 

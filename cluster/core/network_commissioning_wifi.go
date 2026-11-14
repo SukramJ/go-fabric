@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
@@ -56,6 +57,7 @@ type WiFiNetworkCommissioning struct {
 	connectMax    uint8
 	store         store.Settings
 	logger        *slog.Logger
+	clk           clock.Clock
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -68,10 +70,20 @@ type WiFiNetworkCommissioning struct {
 	// a second write; nil when none is outstanding.
 	stored []wifiNetwork
 	busy   bool
-	// link is the SSID the driver last joined; a network's connected flag
-	// is derived from it, as chip's Linux driver reports the network the
-	// link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
+	// link is the SSID the driver last joined, nil after a join that
+	// failed (the cluster cannot tell where the radio is then); a network's
+	// connected flag is derived from it, as chip's Linux driver reports the
+	// network the link is on (WiFiNetworkIterator::Next, NetworkCommissioningWiFiDriver.cpp:275-310).
 	link []byte
+	// life is Start's context, the server's lifetime: the rejoin of the
+	// committed network runs under it ([WiFiNetworkCommissioning.rejoin]).
+	// rejoinTimer is the armed retry, rejoinDelay the backoff of the next
+	// one (0 before the first failure), rejoining set while an attempt
+	// runs.
+	life        context.Context
+	rejoinTimer clock.Timer
+	rejoinDelay time.Duration
+	rejoining   bool
 	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
 	// ConnectNetwork whose driver call outlives the window that admitted it
 	// sees it moved and drops its result.
@@ -119,6 +131,9 @@ type WiFiNetworkCommissioningConfig struct {
 	Store store.Settings
 	// Logger logs a store failure; nil is slog.Default().
 	Logger *slog.Logger
+	// Clock is the clock the rejoin of the committed network backs off
+	// on; nil is [clock.System].
+	Clock clock.Clock
 }
 
 // wifiNetworksKey is the setting the committed networks are stored under.
@@ -162,7 +177,8 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	w := &WiFiNetworkCommissioning{
 		driver: cfg.Driver, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		maxNetworks: cfg.MaxNetworks, scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
-		store: cfg.Store, logger: cfg.Logger, interfaceEnabled: true,
+		store: cfg.Store, logger: cfg.Logger, clk: clock.Or(cfg.Clock), interfaceEnabled: true,
+		life: context.Background(),
 	}
 	if w.maxNetworks == 0 {
 		w.maxNetworks = 1
@@ -273,6 +289,18 @@ func (w *WiFiNetworkCommissioning) log() *slog.Logger {
 	return slog.Default()
 }
 
+// Rejoin backoff: the first retry after a failed join of the committed
+// network waits wifiRejoinFirstDelay — connectedhomeip's
+// CHIP_DEVICE_CONFIG_WIFI_STATION_RECONNECT_INTERVAL, 5000 ms, "the
+// interval at which the chip platform will attempt to reconnect to the
+// configured WiFi network" (src/include/platform/CHIPDeviceConfig.h:406-414
+// at 6170af84); each further one doubles the wait, up to
+// wifiRejoinMaxDelay (this module's number).
+const (
+	wifiRejoinFirstDelay = 5 * time.Second
+	wifiRejoinMaxDelay   = 5 * time.Minute
+)
+
 // Start reconnects to the first committed network when the node starts.
 // chip's Linux driver loads its network at Init (:77-128) and the link,
 // which the committed configuration brings back up (CommitConfig, :164),
@@ -283,34 +311,172 @@ func (w *WiFiNetworkCommissioning) log() *slog.Logger {
 // and its result recorded the same way, the network marked connected on
 // success. Without a committed network Start does nothing; no breadcrumb
 // is written.
+//
+// ctx is the server's lifetime: a join that fails is tried again on the
+// Clock with a backoff (wifiRejoinFirstDelay doubling to
+// wifiRejoinMaxDelay) until one succeeds or ctx ends, each attempt
+// recorded as the first — as is the rejoin a fail-safe expiry or a
+// CommissioningComplete starts when the link is on no committed network.
+// An attempt waits while a fail-safe is armed or a command runs. chip
+// leaves the reconnect to wpa_supplicant, which holds the network it
+// saved (CommitConfig, :1118-1135 of
+// ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp); this
+// module saves none there (BD-chip-WpaSupplicantDriver), so the retry is
+// the cluster's (review II, R2-P3-net-01).
 func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 	w.mu.Lock()
+	w.life = ctx
+	context.AfterFunc(ctx, w.stopRejoin)
 	if len(w.committed) == 0 {
 		w.mu.Unlock()
 		return
 	}
 	target := w.committed[0]
+	w.rejoining = true
 	w.mu.Unlock()
+	ok := w.joinCommitted(ctx, target)
+	w.mu.Lock()
+	w.rejoining = false
+	if !ok {
+		w.backoffLocked()
+	}
+	w.mu.Unlock()
+}
+
+// joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
+// records the result as Start does; it reports whether the join
+// succeeded. A failed join leaves the link unknown: no network reads as
+// connected.
+func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wifiNetwork) bool {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
 	defer cancel()
 	code, _, errValue := w.driver.ConnectNetwork(ctx, target.ssid, target.credentials)
 	status := netcommdef.NetworkCommissioningStatusEnum(code)
+	ok := statusOK(status)
 	w.mu.Lock()
-	if statusOK(status) {
+	if ok {
 		w.lastConnectErr = nil
 		w.link = bytes.Clone(target.ssid)
-		for j := range w.networks {
-			w.networks[j].connected = bytes.Equal(w.networks[j].ssid, target.ssid)
-		}
 	} else {
 		v := errValue
 		w.lastConnectErr = &v
+		w.link = nil
 	}
+	w.markConnectedLocked()
 	w.lastNetworkID = bytes.Clone(target.ssid)
 	w.setStatusLocked(status)
 	w.dataVersion.Bump()
 	w.mu.Unlock()
 	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
+	return ok
+}
+
+// markConnectedLocked derives each network's connected flag from the
+// link. w.mu is held.
+func (w *WiFiNetworkCommissioning) markConnectedLocked() {
+	for j := range w.networks {
+		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)
+	}
+}
+
+// offCommittedLocked reports whether there is a committed network and the
+// link is on none of them. w.mu is held.
+func (w *WiFiNetworkCommissioning) offCommittedLocked() bool {
+	if len(w.committed) == 0 {
+		return false
+	}
+	return len(w.link) == 0 || !slices.ContainsFunc(w.committed, func(n wifiNetwork) bool { return bytes.Equal(n.ssid, w.link) })
+}
+
+// rejoinNowLocked arms an attempt at once on the clock, the backoff from
+// its beginning, when the link is on no committed network. w.mu is held.
+func (w *WiFiNetworkCommissioning) rejoinNowLocked() {
+	if !w.offCommittedLocked() || w.life.Err() != nil {
+		return
+	}
+	w.rejoinDelay = 0
+	w.armRejoinLocked(0)
+}
+
+// backoffLocked arms the next attempt, the wait doubled from
+// wifiRejoinFirstDelay up to wifiRejoinMaxDelay. w.mu is held.
+func (w *WiFiNetworkCommissioning) backoffLocked() {
+	if w.rejoinDelay == 0 {
+		w.rejoinDelay = wifiRejoinFirstDelay
+	} else {
+		w.rejoinDelay = min(2*w.rejoinDelay, wifiRejoinMaxDelay)
+	}
+	w.armRejoinLocked(w.rejoinDelay)
+}
+
+// armRejoinLocked arms an attempt after d on the clock, replacing an
+// armed one. w.mu is held.
+func (w *WiFiNetworkCommissioning) armRejoinLocked(d time.Duration) {
+	if w.life.Err() != nil {
+		return
+	}
+	if w.rejoinTimer != nil {
+		w.rejoinTimer.Stop()
+	}
+	w.rejoinTimer = w.clk.AfterFunc(d, w.rejoin)
+}
+
+// stopRejoin disarms the retry once the lifetime ended.
+func (w *WiFiNetworkCommissioning) stopRejoin() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.rejoinTimer != nil {
+		w.rejoinTimer.Stop()
+		w.rejoinTimer = nil
+	}
+}
+
+// rejoin is one attempt to bring the link back onto the first committed
+// network: none once the link is on a committed network or the lifetime
+// ended, or another attempt runs; while a fail-safe is armed or a command
+// runs, the attempt is armed again after the same wait — the administrator's
+// network change decides then, and its fail-safe's expiry starts a rejoin
+// of its own. A failed attempt arms the next with the backoff.
+func (w *WiFiNetworkCommissioning) rejoin() {
+	armed := w.anyFailSafeArmed() // GeneralCommissioning's lock, not under w.mu
+	w.mu.Lock()
+	w.rejoinTimer = nil
+	life := w.life
+	switch {
+	case life.Err() != nil || !w.offCommittedLocked():
+		w.rejoinDelay = 0
+		w.mu.Unlock()
+		return
+	case w.rejoining:
+		// The running attempt arms the next one when it fails.
+		w.mu.Unlock()
+		return
+	case armed || w.busy:
+		w.armRejoinLocked(max(w.rejoinDelay, wifiRejoinFirstDelay))
+		w.mu.Unlock()
+		return
+	}
+	target := w.committed[0]
+	w.busy, w.rejoining = true, true
+	w.mu.Unlock()
+	ok := w.joinCommitted(life, target)
+	w.mu.Lock()
+	w.busy, w.rejoining = false, false
+	if ok {
+		w.rejoinDelay = 0
+	} else {
+		w.backoffLocked()
+	}
+	w.mu.Unlock()
+}
+
+// anyFailSafeArmed reports whether a fail-safe is armed, for any fabric.
+func (w *WiFiNetworkCommissioning) anyFailSafeArmed() bool {
+	if w.failSafe != nil {
+		_, armed := w.failSafe()
+		return armed
+	}
+	return w.failSafeArmed != nil && w.failSafeArmed()
 }
 
 var (
@@ -782,14 +948,18 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	if statusOK(status) {
 		w.lastConnectErr = nil
 		w.link = bytes.Clone(req.NetworkId)
-		for j := range w.networks {
-			w.networks[j].connected = bytes.Equal(w.networks[j].ssid, req.NetworkId)
-		}
 	} else {
 		resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
 		v := errValue
 		w.lastConnectErr = &v
+		if i >= 0 {
+			// The driver's join failed: where the radio is now is not
+			// known here, so no network reads as connected (review II,
+			// R2-P3-net-02).
+			w.link = nil
+		}
 	}
+	w.markConnectedLocked()
 	w.lastNetworkID = bytes.Clone(req.NetworkId)
 	w.setStatusLocked(status)
 	w.dataVersion.Bump()
@@ -807,9 +977,13 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 //
 // When StoreNetworks wrote the list ahead of the fabric's commit, the
 // stored list is committed in memory and not written again.
+//
+// A link on none of the committed networks starts their rejoin
+// ([WiFiNetworkCommissioning.Start]).
 func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	defer w.rejoinNowLocked()
 	if w.stored != nil {
 		w.committed, w.stored = w.stored, nil
 		return
@@ -822,19 +996,28 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 // :992-1014), each connected when the link is on it; with none left the
 // last status, network id and connect error are cleared. The change is
 // reported ([WiFiNetworkCommissioning.OnAttributeChange]).
+//
+// The radio is restored as well: when the link is on none of the
+// committed networks — a join under the fail-safe failed, or joined a
+// network the revert removed — the first committed network is rejoined
+// at once and, while that fails, with the backoff of
+// [WiFiNetworkCommissioning.Start]. connectedhomeip's Linux driver
+// restores its record only (RevertConfiguration,
+// src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:168-172 at
+// 6170af84); the Thread server here restores its dataset
+// (network_commissioning_thread.go) (review II, R2-P3-net-02).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
 	w.expiries++
 	w.stored = nil
 	w.networks = slices.Clone(w.committed)
-	for j := range w.networks {
-		w.networks[j].connected = len(w.link) > 0 && bytes.Equal(w.networks[j].ssid, w.link)
-	}
+	w.markConnectedLocked()
 	w.busy = false
 	if len(w.networks) == 0 {
 		w.lastNetworkID, w.lastConnectErr, w.lastStatus = nil, nil, nil
 	}
 	w.dataVersion.Bump()
+	w.rejoinNowLocked()
 	w.mu.Unlock()
 	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 }

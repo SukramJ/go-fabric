@@ -159,15 +159,28 @@ The host's part:
   on the interface; an IPv4 or global address is the host's affair;
 - wpa_supplicant's configuration file stays untouched: the committed
   network lives in the node's store, so the credential is kept in one
-  place, and the node rejoins it at start.
+  place, and the node rejoins it at start and whenever a join left it off
+  that network.
 
 The credential is never logged, nor part of a debug text or an error. An
 SSID that is valid UTF-8 goes to wpa_supplicant as a string, any other as
 its bytes; a credential of exactly 64 hex digits is the raw PSK, any other
-a passphrase. Empty credentials join an open network. A join that does not
+a passphrase. Empty credentials join an open network. A join keeps the
+network the interface was on until it has ended: one that does not
 succeed removes the network it added, so wpa_supplicant does not keep
-trying it. The rejoin at `Node.Start` holds `Start` for up to the connect
-timeout when the network is out of range. The driver resolves the
+trying it, and selects the earlier network again; one that succeeds
+removes the earlier network. A network that was joined stays configured
+in wpa_supplicant; reconnecting it after a lost link is left to
+wpa_supplicant. The rejoin at
+`Node.Start` holds `Start` for up to the connect timeout when the network
+is out of range; when it fails, the node tries again after 5 s, the wait
+doubling up to 5 minutes, for its lifetime, on its clock
+(`Config.Clock`). A fail-safe expiry that leaves the link on none of the
+committed networks starts the same rejoin at once, and so does a
+`CommissioningComplete`. An attempt waits while a fail-safe is armed or a
+NetworkCommissioning command runs, and each one sets
+`LastNetworkingStatus`. After a join that failed, `Networks` reads no
+network as connected. The driver resolves the
 interface once, at `New`: after a wpa_supplicant restart the host builds a
 new driver. When the system-bus connection itself is lost, every later scan
 and join fails at once with UnknownError and the debug text "the driver's

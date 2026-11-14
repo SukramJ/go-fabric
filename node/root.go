@@ -287,7 +287,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			// The committed network survives a restart, as chip's driver
 			// keeps it (NetworkCommissioningWiFiDriver.cpp:135-167);
 			// Node.Start reconnects to it.
-			Store: d.st, Logger: d.logger,
+			Store: d.st, Logger: d.logger, Clock: cfg.Clock,
 			SetBreadcrumb: func(v uint64) {
 				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
 			},
