@@ -205,6 +205,13 @@ type Node struct {
 	// fabrics construction rolled back (reportRolledBackFabrics); a Start
 	// after a failed one does not run them again. Under lifecycle.
 	rolledBackReported bool
+
+	// announcedMu guards announced: the fabrics the host may know of —
+	// stored when the node started, or installed in this process
+	// (OnFabricAdded's hook ran). The row of an AddNOC that failed is in
+	// neither, so its rollback does not reach the host's OnFabricRemoved.
+	announcedMu sync.Mutex
+	announced   map[uint8]bool
 }
 
 // New builds the node: everything the reference daemon builds before
@@ -791,6 +798,7 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 // host's OnFabricAdded with what the AddNOC hook carries.
 func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte) {
 	n.fabricInstalled(ctx, fabricIndex, fabricID, nodeID, rootPublicKey)
+	n.setAnnounced(fabricIndex, true)
 	obs := n.observerList()
 	if !slices.ContainsFunc(obs, func(o Observers) bool { return o.OnFabricAdded != nil }) {
 		return
@@ -811,6 +819,13 @@ func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, f
 // fires, so its identity is read from the CASE identity the facade holds
 // until its own handler forgets it.
 func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
+	if !n.setAnnounced(fabricIndex, false) {
+		// The rolled-back row of an AddNOC that failed: the host never
+		// saw it added, so it is not told of a removal; the facade's
+		// cleanup runs all the same.
+		n.fabricRemoved(ctx, fabricIndex)
+		return
+	}
 	info := FabricInfo{FabricIndex: fabricIndex}
 	if f, ok := n.caseIDs.forFabric(fabricIndex); ok {
 		info.FabricID = f.identity.FabricID
@@ -819,6 +834,39 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		info.RootPublicKey = append([]byte(nil), f.rootPublicKey...)
 	}
 	n.fabricRemovedWith(ctx, info)
+}
+
+// loadStoredFabrics loads the CASE identity of every fabric stored when
+// the node starts and returns those it loaded; every stored fabric counts
+// as one the host may know of.
+func (n *Node) loadStoredFabrics(ctx context.Context, fabrics []store.FabricRecord) []store.FabricRecord {
+	loaded := make([]store.FabricRecord, 0, len(fabrics))
+	for i := range fabrics {
+		n.setAnnounced(fabrics[i].FabricIndex, true)
+		if err := n.caseIDs.load(ctx, n.st, fabrics[i].FabricIndex); err != nil {
+			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
+			continue
+		}
+		loaded = append(loaded, fabrics[i])
+	}
+	return loaded
+}
+
+// setAnnounced records whether the host may know of fabricIndex and
+// returns whether it could before.
+func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
+	n.announcedMu.Lock()
+	defer n.announcedMu.Unlock()
+	was := n.announced[fabricIndex]
+	if known {
+		if n.announced == nil {
+			n.announced = map[uint8]bool{}
+		}
+		n.announced[fabricIndex] = true
+	} else {
+		delete(n.announced, fabricIndex)
+	}
+	return was
 }
 
 // reportRolledBackFabrics runs, once, the removal consequences of every
@@ -1054,14 +1102,7 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// only on a node already marked commissioned; marking it at the end
 	// would mark it again from this stale count.
 	n.commissioned.Store(err == nil && stored > 0)
-	loaded := make([]store.FabricRecord, 0, stored)
-	for i := range fabrics {
-		if err := n.caseIDs.load(ctx, n.st, fabrics[i].FabricIndex); err != nil {
-			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
-			continue
-		}
-		loaded = append(loaded, fabrics[i])
-	}
+	loaded := n.loadStoredFabrics(ctx, fabrics)
 	work.pause()
 	n.br.ReestablishFormerSubscriptions(ctx)
 	work.resume()
