@@ -1100,7 +1100,9 @@ type reannounceTriggerSetter interface {
 // inbound-CloseSession and shutdown paths, it self-wires the reverse
 // hooks when the registry supports them: the graceful-close notifier
 // (outbound CloseSession StatusReport before key zeroise) and the
-// mDNS reannounce trigger. Pass nil to detach.
+// mDNS reannounce trigger, the PASE close hook and the idle reaper's
+// exemption for a session that carries a live subscription. Pass nil to
+// detach.
 //
 // The registry's own close hook is the host's to wire (it also feeds the
 // subscription manager): the host calls [Bridge.SessionClosed] from it,
@@ -1127,6 +1129,7 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	if setter, ok := reg.(paseCloseNotifierSetter); ok {
 		setter.SetOnPaseSessionClose(b.triggerCommissioningReannounce)
 	}
+	b.wireReapExemption(reg)
 }
 
 // paseCloseNotifierSetter is the session registry's hook for a closed

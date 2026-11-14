@@ -427,6 +427,38 @@ func (b *Bridge) closeConnRoute(r *connRoute) {
 	_ = c.Close()
 }
 
+// reapExemptionSetter is the session registry's idle-reaper exemption
+// (secure/operational Manager.SetReapExemption).
+type reapExemptionSetter interface {
+	SetReapExemption(fn func(sessionID uint16) bool)
+}
+
+// wireReapExemption hands reg, when it has an idle reaper, the bridge's
+// answer to whether a session may be reaped: not while it carries a live
+// subscription ([Bridge.sessionHoldsSubscription]). Called from
+// [Bridge.AttachSessionRegistry] beside the registry's other reverse hooks
+// (review II, R2-P2-sess-02, owner decision 43).
+func (b *Bridge) wireReapExemption(reg SessionRegistry) {
+	if setter, ok := reg.(reapExemptionSetter); ok {
+		setter.SetReapExemption(b.sessionHoldsSubscription)
+	}
+}
+
+// sessionHoldsSubscription reports whether sessionID carries a live
+// subscription — the idle reaper spares such a session: a subscriber's
+// MinIntervalFloor can hold back every report, and with them the
+// session's only traffic, beyond the reaper's idle timeout. The
+// subscription's own liveness (its report sends failing, the peer's MRP
+// exhaustion) ends a session whose peer is gone, and the reaper takes it
+// once its last subscription has closed.
+func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
+	m := b.subscriptionManagerLocked()
+	if m == nil {
+		return false
+	}
+	return m.CountBySession()[sessionID] > 0
+}
+
 // SessionClosed tells the bridge that secure session sessionID is gone.
 // The host calls it from the session registry's close hook — the hook
 // that also cascades into the subscription manager
