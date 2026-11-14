@@ -5,6 +5,8 @@ package bridge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -709,17 +711,19 @@ type subjectAccess struct {
 	passedACL []store.ACLEntry
 	passedGen uint64
 	// refused: a first observation found every path refused under
-	// refusedACL and refusedGen; a second one under the same ends the
-	// subscription.
-	refused    bool
-	refusedACL []store.ACLEntry
-	refusedGen uint64
+	// refusedACL, the paths the node served then fingerprinted by
+	// refusedServed; a second one under the same ends the subscription.
+	refused       bool
+	refusedACL    []store.ACLEntry
+	refusedServed [sha256.Size]byte
 }
 
 // subjectReadsNothing reports whether the subscription's subject is
 // refused every attribute and every event cluster its paths resolve to,
 // at least one of them, at two consecutive observations of one unchanged
-// ACL of its fabric and one served topology — one observation is not
+// ACL of its fabric and one set of the subscription's paths the node
+// serves — not a count of reassemblies, which moves without a change
+// (review II, R2-P3-rr-dev-03) — one observation is not
 // enough, since a list write of the ACL stores its REPLACE before its
 // appends and an observation between them finds the entries missing
 // (review II, R2-P3-dr-dev-01). It decides nothing while a chunked write
@@ -761,7 +765,7 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 	if st.passed && st.passedGen == gen && reflect.DeepEqual(st.passedACL, entries) {
 		return false
 	}
-	refused := b.subjectRefusedEveryPath(withPinnedACL(ctx, target.fabricIndex, entries), checker, dispatcher, target, sub)
+	refused, served := b.subjectRefusedEveryPath(withPinnedACL(ctx, target.fabricIndex, entries), checker, dispatcher, target, sub)
 	if ctx.Err() != nil {
 		return false
 	}
@@ -770,11 +774,11 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 		st.refused, st.refusedACL = false, nil
 		return false
 	}
-	if st.refused && st.refusedGen == gen && reflect.DeepEqual(st.refusedACL, entries) && !b.aclWriteInProgress(target.fabricIndex) {
+	if st.refused && st.refusedServed == served && reflect.DeepEqual(st.refusedACL, entries) && !b.aclWriteInProgress(target.fabricIndex) {
 		return true
 	}
 	st.passed, st.passedACL = false, nil
-	st.refused, st.refusedACL, st.refusedGen = true, entries, gen
+	st.refused, st.refusedACL, st.refusedServed = true, entries, served
 	return false
 }
 
@@ -794,12 +798,22 @@ const (
 
 // subjectRefusedEveryPath walks the subscription's paths, as ctx's subject
 // under its pinned ACL, and reports whether at least one is refused and
-// none may be read; it stops at the first path the subject may read.
-func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) bool {
+// none may be read; it stops at the first path the subject may read. For
+// a refusal, served fingerprints the paths the walk found served — every
+// concrete attribute path and event cluster it judged, in walk order.
+func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) (refused bool, served [sha256.Size]byte) {
+	digest := sha256.New()
+	note := func(kind byte, endpoint uint16, cluster, attribute uint32) {
+		var rec [11]byte
+		rec[0] = kind
+		binary.BigEndian.PutUint16(rec[1:], endpoint)
+		binary.BigEndian.PutUint32(rec[3:], cluster)
+		binary.BigEndian.PutUint32(rec[7:], attribute)
+		digest.Write(rec[:])
+	}
 	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
 	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
-	refused := false
 	exp := im.NewAttributeExpansion(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
 	for {
 		_, rr, ok := exp.Next()
@@ -814,8 +828,9 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		}
 		if checker.CheckACL(readCtx, target.fabricIndex, target.subjectNodeID, target.subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv) != im.StatusUnsupportedAccess {
-			return false
+			return false, served
 		}
+		note('a', rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		refused = true
 	}
 	auth := b.eventReadAuthorizer(dispatcher, target.fabricIndex, false, target.subjectNodeID, target.subjectCATs)
@@ -830,12 +845,14 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 				continue
 			}
 			if auth.Allows(readCtx, rr.Path.Endpoint, rr.Path.Cluster) {
-				return false
+				return false, served
 			}
+			note('e', rr.Path.Endpoint, rr.Path.Cluster, 0)
 			refused = true
 		}
 	}
-	return refused
+	digest.Sum(served[:0])
+	return refused, served
 }
 
 // notServed reports whether a read result's status says that its path

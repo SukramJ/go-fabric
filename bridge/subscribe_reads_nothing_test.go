@@ -207,3 +207,57 @@ func TestSubjectReadsNothingWalksOnlyAfterAChange(t *testing.T) {
 	}
 	observe(3, "after a change of the served topology")
 }
+
+// countingLevel is countingOnOff served as LevelControl.
+type countingLevel struct{ countingOnOff }
+
+func (*countingLevel) MatterClusterID() uint32 { return 0x0008 }
+
+// TestSubjectReadsNothingIsDecidedAcrossAnUnchangedReassembly: what the
+// refusal is judged by is the fabric's ACL and which of the subscription's
+// paths the node serves, not the count of reassemblies: a host that
+// reassembles an unchanged topology between two observations does not keep
+// a subject that reads nothing subscribed, and a reassembly that makes one
+// more of the subscription's paths served starts the count again (review
+// II, R2-P3-rr-dev-03).
+func TestSubjectReadsNothingIsDecidedAcrossAnUnchangedReassembly(t *testing.T) {
+	t.Parallel()
+	t.Run("an unchanged topology", func(t *testing.T) {
+		t.Parallel()
+		acl := &switchableACL{}
+		acl.set(otherAdminEntry(0xA0AD))
+		b := readsNothingBridge(t, acl, &countingOnOff{})
+		target, sub := readsNothingSubscription(rootOnOffPath())
+		if b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub) {
+			t.Fatal("the subject reads nothing after one observation, want a second one first")
+		}
+		if err := b.Reassemble(t.Context()); err != nil {
+			t.Fatalf("Reassemble: %v", err)
+		}
+		if !b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub) {
+			t.Fatal("the subject refused every path at two observations of one ACL and one served set of paths, a reassembly of the unchanged topology between them, is not found to read nothing")
+		}
+	})
+	t.Run("one more path served", func(t *testing.T) {
+		t.Parallel()
+		acl := &switchableACL{}
+		acl.set(otherAdminEntry(0xA0AD))
+		b := readsNothingBridge(t, acl, &countingOnOff{})
+		level := rootOnOffPath()
+		level.Cluster = 0x0008
+		target, sub := readsNothingSubscription(rootOnOffPath(), level)
+		if b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub) {
+			t.Fatal("the subject reads nothing after one observation, want a second one first")
+		}
+		b.AttachRootClusters([]contract.ClusterServer{&countingOnOff{}, &countingLevel{}})
+		if err := b.Reassemble(t.Context()); err != nil {
+			t.Fatalf("Reassemble: %v", err)
+		}
+		if b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub) {
+			t.Fatal("the subject reads nothing at the first observation after one more of its paths became served, want the count started again")
+		}
+		if !b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub) {
+			t.Fatal("the subject refused every path at two observations of one ACL and one served set of paths is not found to read nothing")
+		}
+	})
+}
