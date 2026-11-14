@@ -382,7 +382,15 @@ func (b *Bridge) registerSubscriptionAt(
 			EvictAtQuota:            evictAtQuota,
 		})
 		if err != nil {
-			b.logger.Warn("matter.rx.im.subscribe.manager",
+			// At the quota without eviction the caller decides what
+			// follows — the eviction that admits the request, or the
+			// refusal it logs itself ([Bridge.handleSubscribeRequest]) —
+			// so that first attempt is no refusal of its own.
+			log := b.logger.Warn
+			if !evictAtQuota && errors.Is(err, subscription.ErrFabricQuotaExceeded) {
+				log = b.logger.Debug
+			}
+			log("matter.rx.im.subscribe.manager",
 				slog.String("src", srcString(src)),
 				slog.Any("err", err))
 			return 0, err
