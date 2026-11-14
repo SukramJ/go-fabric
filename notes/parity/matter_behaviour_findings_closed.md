@@ -294,6 +294,41 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   `node.Commissioning.BasicCommissioning` serves the feature, the
   `CommissioningWindowLifetimeTest.ts` case is ported.
 
+- **Keep-alive reports suppress the response.** An empty max-interval
+  DataReport goes out with `SuppressResponse = true`
+  (`bridge/subscribe.go`, `reportSubscription`); matter.js now sends it with
+  `suppressResponse: false` so the peer's INVALID_SUBSCRIPTION (Core § 8.5)
+  is read on every transport (`ServerSubscription.ts:913-914` at `862ad75f`,
+  #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
+  `SuppressResponse = false`, wait for the status, end the subscription on
+  INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
+  reports. Re-read at `db021da0` (review II, phase 0): the keep-alive is the
+  branch at `packages/node/src/node/server/ServerSubscription.ts:909-920`,
+  `suppressResponse: false` at `:914` under the comment "Requested so the
+  peer's INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
+  transport". The comment over the Go code (`bridge/subscribe.go:556-559`)
+  still says matter.js ships empty DataReports with SuppressResponse=true
+  and cites `ServerSubscription.ts:782`; at the pin that line is
+  `await this.#cancel(flushViaSession, currentExchange);`. The citation is
+  stale and goes with the fix. (Triage 2026-10-29: wave H1, the device IM
+  and write path.)
+  Closed 2026-11-14 (review II, phase 4, `8e35331f`): the keep-alive goes
+  out with `SuppressResponse = false` (`reportSubscription`,
+  `bridge/subscribe.go:639-652`), as matter.js
+  `packages/node/src/node/server/ServerSubscription.ts:909-920` at
+  `db021da0` (`suppressResponse: false`, `:914`). The peer's answer takes
+  the path of any ongoing report's answer: an error status,
+  INVALID_SUBSCRIPTION included, ends the subscription
+  (`closeSubscriptionByExchange`, `bridge/subscribe.go:1323`; matter.js
+  `:938-950`), and a keep-alive that is never acknowledged is one failed
+  update (`noteReportUndelivered`, `:1252`; owner decision 60). The stale
+  citation (`:782`) went with the fix. What is left — the update counts as
+  delivered on the acknowledgement, not on the peer's StatusResponse — is
+  the open row F-db021da0-36 of
+  [`matter_behaviour_findings.md`](./matter_behaviour_findings.md). Pinned
+  by `bridge:TestKeepAliveStatusParity` (ServerSubscriptionTest.ts
+  "keep-alive status").
+
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
@@ -436,11 +471,15 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   compared by the fix with a matter.js node run at `db021da0`. What is
   not mirrored — a server's own reordering, and the order of a wildcard's
   endpoints and of an endpoint's clusters, which stays ascending where
-  matter.js walks its collections as they were filled — is recorded,
-  undecided, in `BD-Matter-AttributeOrder-ModelOrder`
+  matter.js walks its collections as they were filled — is recorded as a
+  divergence (owner decision 83) in `BD-Matter-AttributeOrder-ModelOrder`
   ([`by_design.md`](./by_design.md)). Pinned by
   `im:TestCompareAttributeIDsOnOffIsMatterJSsOrder` and
   `TestCompareAttributeIDsFollowsTheSnapshotOrder`.
+
+- **F-db021da0-24: an ArmFailSafe during the rollback of an expired fail-safe gets three different answers — owner decision pending.** connectedhomeip: the expiry marks the context busy before it schedules the disarm (`src/app/FailSafeContext.cpp:84`, `:103` at `6170af84`), `ArmFailSafe` refuses while busy (`:106-108`), and the command answers BusyWithOtherAdmin (`src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:419-420`, `:446-449`). matter.js: while its context exists an arm goes to `extend` (`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:89-94` at `db021da0`; the context is dropped only once destroyed, `packages/protocol/src/protocol/DeviceCommissioner.ts:162-171`); `extend` re-arms through `this.#failsafe?.reArm` (`packages/protocol/src/common/FailsafeContext.ts:90-92`), a no-op once `close` has cleared `#failsafe` before it rolls back (`:198-201`); the breadcrumb is then stored because the commissioner still reads as armed (`GeneralCommissioningServer.ts:117-120`), and the answer is SUCCESS with no fail-safe armed. That follows from the lines; that `extend`'s wait on the construction returns without an error in that span is the fix agent's trace and was not repeated (unverified), and nothing was run. `reArm`'s "FailSafe already expired." (`packages/protocol/src/common/FailsafeTimer.ts:48-51`), which the catch would turn into BusyWithOtherAdmin (`GeneralCommissioningServer.ts:121-128`), is not reached on that path. This module waits for the rollback and then arms a fresh fail-safe, or answers FAILURE when the rollback ended the arming session (`BD-Matter-ArmOverDueWindowEndedSession`). Who sees it: an administrator that arms while an expired window is being rolled back. matter.js's answer looks unintended, a success that arms nothing, so the owner decides: Busy as connectedhomeip, matter.js's answer, or this module's kept as a divergence. Found in review II, phase 4 (the `by_design` re-read). Closed 2026-11-14 (owner decision 77): this module's answer stays — the arm waits for the rollback and then arms a fresh fail-safe — as a recorded divergence from both references, `BD-Matter-ArmDuringRollbackWaits` ([`by_design.md`](./by_design.md)).
+- **F-db021da0-25: a Wi-Fi InterfaceEnabled write of false is accepted whatever the driver can do.** connectedhomeip answers INVALID_ACTION when the driver cannot disable the interface: the write calls `SetInterfaceEnabled` and maps `CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE` to it, quoting "If not supported, a write to this attribute with a value of false SHALL fail with a status of INVALID_ACTION" (`src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1120-1132` at `6170af84`), and the base driver's `SetEnabled` returns that error (`src/include/platform/NetworkCommissioning.h:225-228`). matter.js has no Wi-Fi server logic (the Ahead row of `BD-chip-WiFiNetworkCommissioningServer`). The module's Wi-Fi server accepts the write (`setInterfaceEnabledLocked`, `cluster/core/network_commissioning_wifi.go:514`), and the driver port has no way to say whether it can disable the radio. Fix: an optional enable method on the driver port and INVALID_ACTION for a write of false without it — a port extension, phase 5 of review II — or an owner decision to keep the accepted write as a divergence. That the certification cases only read the attribute was the fix's reading of TC_CNET_4_1 to 4_3 and was not repeated (unverified). Found in review II, phase 4 (R2-P4-cert-04). Closed 2026-11-14 (review II, phase 4, owner decision 80, `6aace1cd`, `c1a235c7`): the driver port has the optional `contract.WiFiInterfaceSwitcher` (`contract/wifi.go:49-60`); a write of false without it, or to a driver that answers `errors.ErrUnsupported`, is INVALID_ACTION, and with it the interface is switched before the attribute takes the value (`switchInterface`, `cluster/core/network_commissioning_wifi.go:746-769`). What still differs from connectedhomeip — true accepted without the switch, an unchanged write calling no driver — is `BD-chip-WiFiInterfaceEnabled-DriverSwitch` ([`by_design.md`](./by_design.md)). Pinned by `cluster/core:TestWiFiInterfaceEnabledWithoutASwitch` and `TestWiFiInterfaceEnabledSwitchesTheInterface`.
+- **F-db021da0-26: a fabric whose ACL is empty gets no Administer entry at start.** matter.js gives every fabric without an ACL entry an Administer/CASE entry for `fabric.rootNodeId` on the whole node when the node comes online, "Backward compatibility to Matter.js before 0.9.1" (`packages/node/src/behaviors/access-control/AccessControlServer.ts:83-103` at `db021da0`). Here an empty ACL stays empty across a restart. Mirroring needs the administrator's node id per fabric — the AddNOC CaseAdminSubject, by the fix's reading, not repeated (unverified) — which `store.FabricRecord` does not keep (`store/fabric.go`): a store migration. Not decided: the fix recommends a `by_design` entry instead, the shim migrating matter.js's own older data, and a grant at every start undoing an administrator who emptied the ACL on purpose. Who sees it: an administrator that removed every ACL entry of its fabric and restarts the node. Found in review II, phase 4 (R2-P4-coresec-08). Closed 2026-11-14 (owner decision 79): not mirrored — the module grants no privilege unasked; recorded as `BD-Matter-ACL-NoAdministerEntryAtStart` ([`by_design.md`](./by_design.md)).
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 
