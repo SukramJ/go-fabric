@@ -139,7 +139,9 @@ func TestGencomm_CommissioningCompleteOnADueWindowCommitsNothing(t *testing.T) {
 // now (matter.js GeneralCommissioningServer.ts #handleAddedPaseSessions →
 // #armFailSafe → failsafeContext.extend at db021da0) — while a fail-safe
 // an administrator armed over CASE is left as it is (extend refuses
-// another fabric). Check and arm are one step.
+// another fabric). Check and arm are one step. The re-arm keeps the
+// Breadcrumb, as matter.js re-arms with the current one
+// (GeneralCommissioningServer.ts:65, :117-119 at db021da0).
 func TestGencomm_PASEAutoArmReArmsThePASEFailSafe(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -155,11 +157,14 @@ func TestGencomm_PASEAutoArmReArmsThePASEFailSafe(t *testing.T) {
 			t.Parallel()
 			clk := clocktest.New(time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC))
 			gc := newGencomm(t, core.GeneralCommissioningConfig{Clock: clk})
-			if resp, err := gc.MatterInvoke(c.ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 900}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+			if resp, err := gc.MatterInvoke(c.ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 900, Breadcrumb: 7}); err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
 				t.Fatalf("ArmFailSafe: %+v, %v", resp, err)
 			}
 			defer func() { _ = gc.ArmFailSafeFor(context.Background(), 0, 0) }()
 			gc.AutoArmOnPaseEstablished(context.Background())
+			if v, _ := gc.MatterRead(0x0000); v.(uint64) != 7 {
+				t.Fatalf("Breadcrumb after a new PASE session's arm = %v, want 7 (kept)", v)
+			}
 			clk.StepWall(61 * time.Second)
 			fabric, armed := gc.FailSafeFabric()
 			if armed != c.wantArmed || fabric != c.wantFabric {
