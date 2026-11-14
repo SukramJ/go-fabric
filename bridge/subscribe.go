@@ -2065,7 +2065,6 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *endpointpkg.Topology) *listenerSet {
 	set := &listenerSet{}
 	b.wireRootNotifiers(set, mgr, topology)
-	b.wireAttributeNotifiers(set, mgr, topology)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
@@ -2153,6 +2152,10 @@ func (b *Bridge) wireMeasurementListeners(mgr *subscription.Manager, topology *e
 			b.wireMeasurementNotifier(set, mgr, ep, subNotifier, subPaths)
 		}
 	}
+	// The servers' own change notifiers last: each settles its changes
+	// against the memory of the change notifications wired above
+	// ([listenerSet.settlerFor]), which is complete by now.
+	b.wireAttributeNotifiers(set, mgr, topology)
 	if b.logger != nil {
 		b.logger.Info("matter.bridge.measurement_listeners_wired",
 			slog.Int("examined", examined),
@@ -2398,8 +2401,9 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 			// The change listener first: a change told to both views at
 			// once advances the version before its report marks it dirty.
 			// The report advances nothing ([Bridge.quieterChanged]).
+			settle := set.settlerFor(ep, clusterID)
 			set.add(notifier.OnAttributeChange(func(change contract.Change) {
-				b.quieterChanged(ep, clusterID, change)
+				b.quieterChanged(ep, clusterID, change, settle)
 			}))
 			set.add(r.OnAttributeReport(func(change contract.Change) {
 				b.reportServerChange(mgr, ep, clusterID, change, false)
@@ -2459,14 +2463,73 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 // the version when it ends, whether or not the change's report went out
 // inside it, and the report waits for the throttle (review II,
 // R2-P4-fr-im-02). A controller's write advanced it already.
-func (b *Bridge) quieterChanged(ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change) {
+//
+// A change a notification of the endpoint's source, or of a server that
+// forwards its port's, saw already advanced the version there; settle
+// ([listenerSet.settlerFor]) tells it, and remembers a change it did not
+// see, so that notification does not advance or report it again — one
+// change of a value, one advance (Datasource.ts:1456-1457 at db021da0).
+func (b *Bridge) quieterChanged(ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change, settle func([]uint32) bool) {
 	if len(change.Attributes) == 0 || change.Origin == contract.OriginControllerWrite {
 		return
 	}
 	if b.invokeCommits.advanceAtEnd(ep.ID, clusterID) {
 		return
 	}
+	if settle != nil && !settle(change.Attributes) {
+		return
+	}
 	ep.BumpDataVersionOf(clusterID)
+}
+
+// settlerFor returns how a server's own change of attributes of cluster
+// on ep is settled against the memory of the change notifications the
+// wiring covers its paths with ([listenerSet.quietPathFor],
+// [listenerSet.pathValuesFor]): the memory takes the current value of
+// each named path it holds, and the answer is whether the change is new
+// to it — a path it holds moved since its last reading, or a path it does
+// not hold. A false answer means a notification read every named value
+// already and advanced the version for it. nil when the wiring covers no
+// path of the cluster. Called after the notifications are wired: the
+// memory it reads is complete and no longer grows.
+func (l *listenerSet) settlerFor(ep *endpointpkg.Endpoint, cluster uint32) func([]uint32) bool {
+	mem := l.values[ep.ID]
+	quiet := map[uint32]*quietPath{}
+	for p, qp := range l.quiet {
+		if p.Endpoint == ep.ID && p.Cluster == cluster {
+			quiet[p.Attribute] = qp
+		}
+	}
+	covered := len(quiet) > 0
+	if mem != nil && !covered {
+		mem.mu.Lock()
+		for p := range mem.last {
+			if p.Cluster == cluster {
+				covered = true
+				break
+			}
+		}
+		mem.mu.Unlock()
+	}
+	if !covered {
+		return nil
+	}
+	return func(attrs []uint32) bool {
+		moved := false
+		for _, attr := range attrs {
+			if qp, ok := quiet[attr]; ok {
+				moved = qp.settle() || moved
+				continue
+			}
+			if mem == nil || mem.settle(im.ConcreteAttributePath{
+				Endpoint: ep.ID, Cluster: cluster, Attribute: attr,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			}) {
+				moved = true
+			}
+		}
+		return moved
+	}
 }
 
 // advanceAtEnd records in the open commit of (endpoint, cluster) that it
@@ -2797,6 +2860,26 @@ func (qp *quietPath) check(bumped map[uint32]struct{}) {
 		bumped[qp.path.Cluster] = struct{}{}
 	}
 	qp.q.Changed(wasNull, isNull)
+}
+
+// settle reads the value of a bound quietPath into its memory without
+// telling the throttle, and reports whether it moved since the last
+// reading: the server reports the change itself ([Bridge.quieterChanged]).
+// A parked path counts as moved.
+func (qp *quietPath) settle() bool {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+	if qp.ep == nil {
+		return true
+	}
+	cur, ok := qp.read()
+	wasNull := !qp.had || qp.last.raw == nil
+	isNull := !ok || cur.raw == nil
+	if (wasNull && isNull) || (ok && qp.had && qp.last.equal(cur)) {
+		return false
+	}
+	qp.last, qp.had = cur, ok
+	return true
 }
 
 // refresh reads the value of a bound quietPath again without telling the
@@ -3243,6 +3326,27 @@ func (m *pathMemory) refresh(p im.ConcreteAttributePath) {
 	if v, ok := now[key]; ok {
 		m.last[key] = v
 	}
+}
+
+// settle reads p into the memory and reports whether it moved since the
+// last reading; a path the memory holds no value of counts as moved and
+// stays unheld, so the notifications that cover it compare as before.
+func (m *pathMemory) settle(p im.ConcreteAttributePath) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	prev, held := m.last[p]
+	if !held || m.ep == nil {
+		return true
+	}
+	now := (&pathValues{ep: m.ep, paths: []im.ConcreteAttributePath{p}}).read()
+	cur, ok := now[p]
+	if ok && prev.equal(cur) {
+		return false
+	}
+	if ok {
+		m.last[p] = cur
+	}
+	return true
 }
 
 // newPathValuesIn is a pathValues over mem: it remembers the current

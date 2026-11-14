@@ -260,30 +260,16 @@ func (s *Server) listen(unsub func()) (unsubscribe func()) {
 	}
 	s.mu.Lock()
 	s.listeners++
-	subscribe := s.listeners == 1
 	s.mu.Unlock()
-	if subscribe {
-		if n, ok := s.src.(contract.ChangeNotifier); ok && n != nil {
-			stop := n.OnMatterValueChanged(func() { s.observeLevel(s.sourceOrigin()) })
-			s.mu.Lock()
-			s.unsubSrc = stop
-			s.mu.Unlock()
-		}
-	}
+	s.reconcileHost()
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			unsub()
 			s.mu.Lock()
 			s.listeners--
-			var stop func()
-			if s.listeners == 0 {
-				stop, s.unsubSrc = s.unsubSrc, nil
-			}
 			s.mu.Unlock()
-			if stop != nil {
-				stop()
-			}
+			s.reconcileHost()
 		})
 	}
 }

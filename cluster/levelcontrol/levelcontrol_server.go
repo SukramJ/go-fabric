@@ -98,6 +98,7 @@ package levelcontrol
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -423,10 +424,16 @@ type Server struct {
 	levelKnown bool
 	// coupling is what the running transition couples to.
 	coupling coupling
-	// listeners counts the change listeners; the host's notifier is
-	// subscribed while there is one.
-	listeners int
-	unsubSrc  func()
+	// listeners counts the change listeners and forwards holds the
+	// callbacks [Server.OnMatterValueChanged] forwards the host's
+	// notifications to, in registration order; the host's notifier is
+	// subscribed once while either has one ([Server.reconcileHost]).
+	listeners  int
+	forwards   []forward
+	forwardSeq uint64
+	unsubSrc   func()
+	// subMu serialises subscribing to and leaving the host's notifier.
+	subMu sync.Mutex
 	// wasOn is the OnOff a held server last saw (followOnOff).
 	wasOn bool
 
@@ -537,12 +544,54 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 //
 // Under the engine the server reports CurrentLevel itself (see
 // [Server.OnAttributeChange]) and this hop stays silent.
+//
+// A host notification reaches every forwarded callback before the server
+// observes CurrentLevel for its change listeners ([Server.observeLevel]):
+// a notifier wiring that compares the values it reads sees the change
+// first, and the change the listeners are told of after is one it saw —
+// the bridge advances the cluster's DataVersion once for it, not again
+// for the listeners' change (bridge quieterChanged).
 func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	n, ok := s.src.(contract.ChangeNotifier)
 	if !ok || n == nil || s.engine != nil {
 		return func() {}
 	}
-	return n.OnMatterValueChanged(func() {
+	s.mu.Lock()
+	id := s.forwardSeq
+	s.forwardSeq++
+	s.forwards = append(s.forwards, forward{id: id, cb: cb})
+	s.mu.Unlock()
+	s.reconcileHost()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			s.forwards = slices.DeleteFunc(s.forwards, func(f forward) bool { return f.id == id })
+			s.mu.Unlock()
+			s.reconcileHost()
+		})
+	}
+}
+
+// forward is one callback [Server.OnMatterValueChanged] forwards to.
+type forward struct {
+	id uint64
+	cb func()
+}
+
+// onHost is the server's one subscription to the host's notifier: the
+// forwarded callbacks first, each after the version moved, then, while a
+// change listener is registered, the server's own observation of
+// CurrentLevel.
+func (s *Server) onHost() {
+	s.mu.Lock()
+	cbs := make([]func(), len(s.forwards))
+	for i, f := range s.forwards {
+		cbs[i] = f.cb
+	}
+	follow := s.listeners > 0
+	s.mu.Unlock()
+	for _, cb := range cbs {
 		level, known := s.sourceLevel()
 		s.noteMu.Lock()
 		s.noted = levelReading{level, known, s.noted.notified + 1}
@@ -551,7 +600,38 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 		if cb != nil {
 			cb()
 		}
-	})
+	}
+	if follow {
+		s.observeLevel(s.sourceOrigin())
+	}
+}
+
+// reconcileHost subscribes to the host's notifier while a change listener
+// or a forwarded callback is registered and leaves it when neither is.
+func (s *Server) reconcileHost() {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return
+	}
+	s.subMu.Lock()
+	defer s.subMu.Unlock()
+	s.mu.Lock()
+	need := s.listeners > 0 || len(s.forwards) > 0
+	have := s.unsubSrc != nil
+	s.mu.Unlock()
+	switch {
+	case need && !have:
+		stop := n.OnMatterValueChanged(s.onHost)
+		s.mu.Lock()
+		s.unsubSrc = stop
+		s.mu.Unlock()
+	case !need && have:
+		s.mu.Lock()
+		stop := s.unsubSrc
+		s.unsubSrc = nil
+		s.mu.Unlock()
+		stop()
+	}
 }
 
 // Revision returns the cluster revision of the generated definition.
