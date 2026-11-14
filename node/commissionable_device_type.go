@@ -60,9 +60,11 @@ func (c *commissionableDeviceType) resolve() uint32 {
 // list is the endpoint's Descriptor DeviceTypeList as it is served, the
 // parts are its direct parts in the order its PartsList serves them, and
 // the class is the snapshot's classification of the endpoint's device type
-// (matter.js's EndpointType deviceClass, EndpointType.ts:31 — Simple
-// unless the endpoint type states another, as the utility and node types
-// do).
+// (matter.js's EndpointType deviceClass, EndpointType.ts:31 at db021da0 —
+// Simple unless the endpoint type states another, as the utility and node
+// types of packages/node/src/endpoints/ do, the ones the snapshot
+// classifies "utility" and "node"). A device type the snapshot does not
+// hold states no class, so its endpoint is of the simple class.
 func inferDeviceType(topo *endpoint.Topology) (uint32, bool) {
 	infos := endpointInfos(topo)
 	if len(infos) == 0 {
@@ -78,7 +80,7 @@ func inferDeviceType(topo *endpoint.Topology) (uint32, bool) {
 		simple := false
 		if ep := topo.FindByID(info.Endpoint); ep != nil {
 			def, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(ep.DeviceType))
-			simple = ok && def.Classification == "simple"
+			simple = !ok || def.Classification == "simple"
 		}
 		recurse := false
 		for _, dt := range info.DeviceTypes {

@@ -122,6 +122,21 @@ func TestParityMatterJS_CommissionableDeviceType(t *testing.T) {
 		}
 	})
 
+	// The class is the endpoint type's, Simple unless the type states
+	// another (EndpointType.ts:31, `options.deviceClass ??
+	// DeviceClassification.Simple`; only the node and utility types of
+	// packages/node/src/endpoints/ state one): an endpoint whose device
+	// type the snapshot does not hold is of the simple class, and its type
+	// is the answer (ProductDescriptionServer.ts:109-112).
+	t.Run("a device type outside the snapshot is advertised", func(t *testing.T) {
+		t.Parallel()
+		const unlisted = 0x0FF1 // no device type of parity/schema.json
+		_, adv := startAdvertising(t, config(t), newTypedDevice(t, "custom:1", unlisted), newTypedDevice(t, "light:1", onoff.DeviceTypeOnOffLight))
+		if dt := advertisedDeviceType(t, adv); dt != unlisted {
+			t.Errorf("DT %d, want %d (the first bridged device, of the simple class)", dt, unlisted)
+		}
+	})
+
 	// A device type the host states is not replaced (:44-46).
 	t.Run("the host's type wins", func(t *testing.T) {
 		t.Parallel()

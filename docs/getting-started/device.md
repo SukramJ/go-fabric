@@ -202,7 +202,7 @@ Defaults worth knowing:
 | `OTAProvider.GrantFabric` | with `OTAProvider` set: the provider's ACL entry is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics it opens the provider to |
 | `BasicInformation.NodeLabel` | `BasicInformation.ProductName` |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
-| `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
+| `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type — or of a device type outside the schema snapshot, which matter.js also treats as simple — below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
