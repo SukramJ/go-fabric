@@ -256,7 +256,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | I | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
 | LVL | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | LWM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| WASHERCTRL | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| WASHERCTRL | 2 | 1 | 0 | 1 | 0 | 0 | 0 |
 | DRYERCTRL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | MOD | 8 | 2 | 0 | 0 | 5 | 1 | 0 |
 | OCC | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
@@ -307,7 +307,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | AVSM | 19 | 19 | 0 | 0 | 0 | 0 | 0 |
 | AVSUM | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | ZONEMGMT | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
-| PAVST | 15 | 10 | 0 | 0 | 1 | 4 | 0 |
+| PAVST | 15 | 10 | 0 | 4 | 1 | 0 | 0 |
 | PAVSTI | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | CHIME | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
 | JFADMIN | 5 | 1 | 0 | 0 | 0 | 4 | 0 |
@@ -315,7 +315,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | TBRM | 5 | 3 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **839** | **564** | **0** | **2** | **135** | **138** | **0** |
+| **all** | **839** | **564** | **0** | **7** | **135** | **133** | **0** |
 
 ### Cases not run
 
@@ -541,11 +541,11 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | OPCREDS/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | OPCREDS/3.9 | (b) not supported | not applicable: the case's PICS `OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
-| PAVST/2.11 | (c) harness | TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479), which the field's constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:270 at 862ad75f; CONSTRAINT_ERROR) before the stream check the case is after; chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
+| PAVST/2.11 | (a) defect | TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479); the module checks the field's model constraint first ("1 to 16", matter.js push-av-stream-transport.element.ts:270 at db021da0) and answers CONSTRAINT_ERROR before the stream check the case is after, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step |
 | PAVST/2.15 | (b) not supported | TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at 862ad75f lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND |
-| PAVST/2.3 | (c) harness | TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects chip's INVALID_COMMAND (TC_PAVST_2_3.py:435-443, PushAVStreamTransportLogic.cpp:573-574); the module validates the request's fields first, as matter.js does, and answers CONSTRAINT_ERROR — matter.js answers a constraint and a conformance violation alike with CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at 862ad75f) |
-| PAVST/2.4 | (c) harness | TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
-| PAVST/2.6 | (c) harness | TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294), which the fields' constraint refuses ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680) |
+| PAVST/2.3 | (a) defect | TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects INVALID_COMMAND (TC_PAVST_2_3.py:435-443), as connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), answers (PushAVStreamTransportLogic.cpp:573-574 at 6170af84); the module validates the request's fields against the model first, as matter.js validates a request, and answers CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at db021da0) — the module's answer, not the case, fails the step |
+| PAVST/2.4 | (a) defect | TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204); the module checks the fields' model constraint first ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at db021da0), as matter.js validates a request, and answers CONSTRAINT_ERROR, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step |
+| PAVST/2.6 | (a) defect | TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294); the module checks the fields' model constraint first ("1 to 16", matter.js push-av-stream-transport.element.ts:266, :270 at db021da0) and answers CONSTRAINT_ERROR, where connectedhomeip, this server's stated behavioural authority (BD-chip-PushAvStreamTransport-RulesInServer), chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84) — the module's answer, not the case, fails the step |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
 | PSCFG/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -592,7 +592,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea
 | TMP/2.2 | (c) harness | TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | TSTAT/3.2 | (c) harness | matter.js automates it at the snapshot's pin (TC-TSTAT-3.2.test.ts:49); the Go-TH leg does not run it, so the module is unmeasured here — portable now: the Go TH sends SetpointRaiseLower to a daemon thermostat (TSTAT.S.C00.Rsp) |
 | TSTAT/4.4 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F0b` is false for the reference DUT |
-| WASHERCTRL/2.2 | (c) harness | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does |
+| WASHERCTRL/2.2 | (a) defect | TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at db021da0), and this module answers as matter.js does — the module's answer, not the case, fails the step |
 | WNCV/6.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WNCV/7.1.Simulated | (b) not supported | not applicable: the case's PICS `WNCV.C` is false for the reference DUT |
 | WebRTCP/2.1 | (b) not supported | not applicable: the case's PICS `WEBRTCP.S & WEBRTCP.S.A0000 & WEBRTCP.S.C00.Rsp & WEBRTCP.S.C01.Tx & AVSM.S & AVSM.S.F00 & AVSM.S.F01 & PS.S.F01` is false for the reference DUT |
