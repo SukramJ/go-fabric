@@ -158,7 +158,7 @@ func kitOf[T contract.ClusterServer]() reflect.Type { return reflect.TypeFor[T](
 // lists name the kit methods Set / Get reach or that are wiring.
 var hostCases = map[uint32]hostCase{
 	h_onoff.ClusterID: {kit: kitOf[*onoff.Server](), covered: []string{"OnOff", "Set", "SetScenes"}},
-	h_level.ClusterID: {kit: kitOf[*levelcontrol.Server]()},
+	h_level.ClusterID: {kit: kitOf[*levelcontrol.Server](), covered: []string{"SetScenes"}},
 	// Binding: Persist and RemoveFabric are the node's wiring.
 	h_binding.ClusterID: {kit: kitOf[*core.Binding](), host: hostOf[h_binding.Host](h_binding.Wrap), covered: []string{"Persist", "RemoveFabric"}},
 	h_switch.ClusterID:  {kit: kitOf[*switchserver.Server](), host: hostOf[h_switch.Host](h_switch.Wrap), covered: []string{"CurrentPosition", "Endpoint"}},

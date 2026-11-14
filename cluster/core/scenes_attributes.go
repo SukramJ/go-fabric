@@ -6,9 +6,7 @@ package core
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -277,8 +275,8 @@ func asUint64(v any) (uint64, bool) {
 // cluster registers its own #applySceneValues. values holds the scene's
 // non-null values by attribute id (matter.js passes them as a struct and
 // each apply function tests `typeof value === "number"`); transitionMs is
-// the scene's transition in milliseconds. light.ColorControlServer and
-// onoff.Server implement it.
+// the scene's transition in milliseconds. light.ColorControlServer,
+// levelcontrol.Server and onoff.Server implement it.
 type SceneValuesApplier interface {
 	MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32)
 }
@@ -286,9 +284,12 @@ type SceneValuesApplier interface {
 // SceneInvalidator is the optional capability of a scene-able cluster
 // server that invalidates the current scene from its own command logic, as
 // matter.js's OnOffServer does only when OnOff actually changes
-// (OnOffServer.ts:97-100, :119-122). MatterInvalidatesScenes reports
-// whether it does so now; the endpoint then leaves the invalidation after
-// that server's commands to it. cluster/onoff's Server implements it.
+// (OnOffServer.ts:97-100, :119-122) and its LevelControlServer and
+// ColorControlServer only past the ExecuteIfOff gate.
+// MatterInvalidatesScenes reports whether it does so now; the endpoint
+// then leaves the invalidation after that server's commands to it.
+// onoff.Server, levelcontrol.Server and light.ColorControlServer implement
+// it.
 type SceneInvalidator interface {
 	MatterInvalidatesScenes() bool
 }
@@ -304,13 +305,13 @@ func presentValues(cv SceneClusterValues) map[uint32]uint64 {
 	return out
 }
 
-// applyValues recalls a scene through the clusters' own commands, as
-// matter.js's per-cluster apply functions do (OnOffServer, LevelControlServer
-// and ColorControlServer #applySceneValues): OnOff On/Off, LevelControl
-// MoveToLevel with ExecuteIfOff, ColorControl MoveToColorTemperature or
-// MoveToHueAndSaturation for the stored color mode — unless the server
-// recalls its values itself ([SceneValuesApplier]). transitionMs is the
-// scene's transition in milliseconds; the commands take tenths of a second.
+// applyValues recalls a scene through the servers' own apply functions
+// ([SceneValuesApplier]), as matter.js's per-cluster #applySceneValues do
+// (OnOffServer, LevelControlServer and ColorControlServer). An OnOff or
+// ColorControl server without one is driven through its commands: OnOff
+// On/Off, ColorControl MoveToColorTemperature or MoveToHueAndSaturation
+// for the stored color mode. transitionMs is the scene's transition in
+// milliseconds; the commands take tenths of a second.
 func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneClusterValues, transitionMs uint32) {
 	if s.cfg.Siblings == nil {
 		return
@@ -349,12 +350,6 @@ func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneCluste
 					cmd = 0x01 // On
 				}
 				_, _ = srv.MatterInvoke(ctx, cmd, nil)
-			}
-		case 0x0008:
-			if v, ok := get(cv, 0x0000); ok && !v.Null {
-				_, _ = srv.MatterInvoke(ctx, lvldef.CmdMoveToLevel, lvldef.MoveToLevelRequest{
-					Level: uint8(v.Unsigned), TransitionTime: spec.ValueOf(tenths), OptionsMask: 1, OptionsOverride: 1, //nolint:gosec // bounded by 254
-				})
 			}
 		case 0x0300:
 			mode, hasMode := get(cv, 0x4001)

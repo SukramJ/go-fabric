@@ -9,17 +9,23 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// sceneLevel is a LevelControl server recording MoveToLevel.
+// sceneLevel is a LevelControl server recording the scene values it is
+// to apply ([core.SceneValuesApplier], as levelcontrol.Server).
 type sceneLevel struct {
-	level *uint8
-	moved []lvldef.MoveToLevelRequest
+	level   *uint8
+	applied []map[uint32]uint64
+	ms      []uint32
+}
+
+func (s *sceneLevel) MatterApplySceneValues(_ context.Context, values map[uint32]uint64, transitionMs uint32) {
+	s.applied = append(s.applied, values)
+	s.ms = append(s.ms, transitionMs)
 }
 
 func (s *sceneLevel) MatterClusterID() uint32 { return 0x0008 }
@@ -38,10 +44,8 @@ func (s *sceneLevel) MatterRead(a uint32) (any, bool) {
 func (s *sceneLevel) MatterWrite(context.Context, uint32, any) error { return nil }
 func (s *sceneLevel) MatterReportable() []uint32                     { return []uint32{0, 4} }
 func (s *sceneLevel) MatterAttributes() []uint32                     { return []uint32{0, 4} }
-func (s *sceneLevel) MatterInvoke(_ context.Context, _ uint32, f any) (any, error) {
-	if r, ok := f.(lvldef.MoveToLevelRequest); ok {
-		s.moved = append(s.moved, r)
-	}
+
+func (s *sceneLevel) MatterInvoke(context.Context, uint32, any) (any, error) {
 	return nil, nil
 }
 
@@ -106,7 +110,9 @@ func scenesStatus(t *testing.T, err error) im.StatusCode {
 // TestScenesCaptureAndRecallLevelAndColor pins the per-cluster recall of
 // matter.js LevelControlServer and ColorControlServer #applySceneValues:
 // a stored scene carries CurrentLevel / CurrentFrequency and the color
-// attributes, and RecallScene drives MoveToLevel (ExecuteIfOff) and
+// attributes, and RecallScene hands the LevelControl server its non-null
+// values and the transition in milliseconds (its own #applySceneValues),
+// and drives a ColorControl server without one through
 // MoveToColorTemperature for a CT scene, MoveToHueAndSaturation for a
 // hue/saturation one.
 func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
@@ -127,8 +133,8 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
 		t.Fatalf("RecallScene: %v", err)
 	}
-	if len(level.moved) != 1 || level.moved[0].Level != 77 || level.moved[0].OptionsMask != 1 || level.moved[0].TransitionTime != spec.ValueOf(uint16(15)) {
-		t.Fatalf("MoveToLevel %+v, want level 77, ExecuteIfOff, 15 tenths", level.moved)
+	if len(level.applied) != 1 || level.applied[0][lvldef.AttrCurrentLevel] != 77 || level.ms[0] != 1500 {
+		t.Fatalf("applied %+v over %v ms, want CurrentLevel 77 over 1500 ms", level.applied, level.ms)
 	}
 	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToColorTemperature {
 		t.Fatalf("color commands %v, want MoveToColorTemperature", color.cmds)
@@ -137,7 +143,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	// A hue/saturation scene recalls through MoveToHueAndSaturation, and a
 	// null CurrentLevel is captured as null and not recalled.
 	color.mode, color.cmds = 0, nil
-	level.level, level.moved = nil, nil
+	level.level, level.applied, level.ms = nil, nil, nil
 	s.MatterInvoke(ctx, 0x04, core.SceneRef{SceneID: 2})
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 2}); err != nil {
 		t.Fatal(err)
@@ -145,8 +151,11 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToHueAndSaturation {
 		t.Fatalf("color commands %v, want MoveToHueAndSaturation", color.cmds)
 	}
-	if len(level.moved) != 0 {
-		t.Fatalf("a null level was recalled: %+v", level.moved)
+	if len(level.applied) != 1 {
+		t.Fatalf("applied %d times, want 1", len(level.applied))
+	}
+	if _, ok := level.applied[0][lvldef.AttrCurrentLevel]; ok {
+		t.Fatalf("a null level was recalled: %+v", level.applied)
 	}
 }
 

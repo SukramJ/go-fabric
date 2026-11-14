@@ -334,7 +334,7 @@ func (s *Server) runMoveToLevel(ctx context.Context, req wire.MoveToLevelRequest
 		tenths := float64(*tt)
 		rateFrom = func(current float64) float64 { return (level - current) / tenths * 10 }
 	}
-	return s.transition(ctx, level, 0, rateFrom, withOnOff, options)
+	return s.transitionAndInvalidate(ctx, level, 0, rateFrom, withOnOff, options)
 }
 
 // runMove is matter.js move / moveWithOnOff and moveLogic: towards the
@@ -357,7 +357,7 @@ func (s *Server) runMove(ctx context.Context, req wire.MoveRequest, withOnOff bo
 	if req.Rate != nil {
 		rate = float64(*req.Rate) * sign
 	}
-	return s.transition(ctx, target, rate, nil, withOnOff, options)
+	return s.transitionAndInvalidate(ctx, target, rate, nil, withOnOff, options)
 }
 
 // runStep is matter.js step / stepWithOnOff and stepLogic: StepSize from
@@ -382,7 +382,7 @@ func (s *Server) runStep(ctx context.Context, req wire.StepRequest, withOnOff bo
 	if tt := req.TransitionTime; tt != nil {
 		rate = float64(req.StepSize) / float64(*tt) * 10 * sign
 	}
-	return s.transition(ctx, float64(current)+float64(req.StepSize)*sign, rate, nil, withOnOff, options)
+	return s.transitionAndInvalidate(ctx, float64(current)+float64(req.StepSize)*sign, rate, nil, withOnOff, options)
 }
 
 // runStop is matter.js stop / stopWithOnOff and stopLogic: the transition
@@ -395,6 +395,21 @@ func (s *Server) runStop(req wire.StopRequest, withOnOff bool) error {
 		return nil
 	}
 	s.engine.CancelAll()
+	s.invalidateScenes()
+	return nil
+}
+
+// transitionAndInvalidate is [Server.transition] for a command past its
+// ExecuteIfOff gate, which then ends the current scene. matter.js
+// invalidates before the logic runs (LevelControlServer.ts:276, :293,
+// :359, :373, :426, :442 at db021da0), inside the command's transaction,
+// which a failing command rolls back: the scene ends when the command
+// succeeds.
+func (s *Server) transitionAndInvalidate(ctx context.Context, target, rate float64, rateFrom func(current float64) float64, withOnOff bool, options uint8) error {
+	if err := s.transition(ctx, target, rate, rateFrom, withOnOff, options); err != nil {
+		return err
+	}
+	s.invalidateScenes()
 	return nil
 }
 

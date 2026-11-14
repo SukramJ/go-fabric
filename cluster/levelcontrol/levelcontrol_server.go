@@ -412,6 +412,10 @@ type Server struct {
 	unsubSrc  func()
 	// wasOn is the OnOff a held server last saw (followOnOff).
 	wasOn bool
+
+	// scenes is the endpoint's ScenesManagement ([Server.SetScenes]); nil
+	// without one.
+	scenes atomic.Pointer[scenesRef]
 }
 
 // Compile-time assertions.
@@ -772,7 +776,8 @@ func (s *Server) invokeMoveToLevel(ctx context.Context, cmdID uint32, fields any
 	if cmdID == CmdMoveToLevelWithOnOff {
 		call = s.src.MoveToLevelWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdMoveToLevelWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, func() error { return call(ctx, req) })
 }
 
 // invokeMove handles Move (0x1) and MoveWithOnOff (0x5), which share a
@@ -801,7 +806,8 @@ func (s *Server) invokeMove(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdMoveWithOnOff {
 		call = s.src.MoveWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdMoveWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, func() error { return call(ctx, req) })
 }
 
 // invokeStep handles Step (0x2) and StepWithOnOff (0x6), which share a
@@ -825,7 +831,8 @@ func (s *Server) invokeStep(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdStepWithOnOff {
 		call = s.src.StepWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdStepWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, func() error { return call(ctx, req) })
 }
 
 // invokeStop handles Stop (0x3) and StopWithOnOff (0x7), which share a
@@ -846,19 +853,25 @@ func (s *Server) invokeStop(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdStopWithOnOff {
 		call = s.src.StopWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdStopWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, func() error { return call(ctx, req) })
 }
 
 // forward runs a command on the hand-off path — call hands it to the
 // port — and reports the level the port moved, from the command
 // ([Server.observeLevel]); a change the host's notifier reports while
-// call runs is the command's too.
-func (s *Server) forward(name string, call func() error) (any, error) {
+// call runs is the command's too. A command that executes
+// ([Server.handOffExecutes]) and that the port accepted ends the current
+// scene ([Server.MatterInvalidatesScenes]).
+func (s *Server) forward(name string, executes bool, call func() error) (any, error) {
 	s.forwarding.Add(1)
 	err := call()
 	s.forwarding.Add(-1)
 	if err == nil {
 		s.observeLevel(contract.OriginCommand)
+		if executes {
+			s.invalidateScenes()
+		}
 	}
 	return s.finish(name, err)
 }
