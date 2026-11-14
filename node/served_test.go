@@ -216,7 +216,7 @@ func (l *listedServer) MatterAttributes() []uint32 { return l.listed }
 // the failure as its error. A controller's wildcard read of the same
 // cluster reports the same values and no status: a status answers a fully
 // concrete path only (review II, R2-P4-imread-03; matter.js
-// AttributeReadResponse.ts:418-423 at db021da0 skips an attribute without
+// AttributeReadResponse.ts:419-424 at db021da0 skips an attribute without
 // a value).
 func TestReadClusterReportsFailedAttributes(t *testing.T) {
 	t.Parallel()

@@ -46,7 +46,7 @@ type OTAProviderConfig struct {
 	// fabric may then invoke the provider. nil writes it into no fabric.
 	// matter.js writes it only into the first fabric its node's own
 	// controller administers, by root certificate
-	// (OtaSoftwareUpdateProviderServer.ts:116-124 at db021da0;
+	// (OtaSoftwareUpdateProviderServer.ts:116-158 at db021da0;
 	// FabricAuthority.ts:112-114, :126-128), and a [Node] has no controller
 	// of its own, so no fabric gets it unasked: the fabric's administrator
 	// grants the access, or the host returns true here for the fabrics it
@@ -216,7 +216,7 @@ func (n *Node) otaProviderEndpointID() (uint16, bool) {
 // and cluster — added once to each fabric [OTAProviderConfig].GrantFabric
 // grants whose ACL has none, and to no fabric without GrantFabric.
 // matter.js adds it to the first fabric its own controller administers
-// (OtaSoftwareUpdateProviderServer.ts:116-124 at db021da0,
+// (OtaSoftwareUpdateProviderServer.ts:116-158 at db021da0,
 // fabricAuthority.fabrics[0]; FabricAuthority.ts:112-114, :126-128: the
 // fabrics whose root certificate is its CA's), which a [Node] does not
 // have. The facade calls it at Start and after each CommissioningComplete.

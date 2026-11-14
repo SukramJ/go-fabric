@@ -194,7 +194,7 @@ func otaProviderACLFabrics(t *testing.T, adjust func(*node.OTAProviderConfig)) (
 // TestOTAProviderACLNotWrittenUnasked: without
 // OTAProviderConfig.GrantFabric no fabric's ACL gets the provider's entry.
 // matter.js writes it only into the first fabric its own controller
-// administers (OtaSoftwareUpdateProviderServer.ts:116-124 at db021da0,
+// administers (OtaSoftwareUpdateProviderServer.ts:116-158 at db021da0,
 // FabricAuthority.ts:112-114, :126-128), and a node has no controller of
 // its own.
 func TestOTAProviderACLNotWrittenUnasked(t *testing.T) {
