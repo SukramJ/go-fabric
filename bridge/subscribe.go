@@ -435,6 +435,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// (ExchangeManager.ts:496-507 at db021da0), which the MRP layer here
 	// would then mistake for delivery. Ongoing server reports are always
 	// fresh server-initiated exchanges (ServerSubscription.ts:900).
+	seq := b.beginUpdate(sub.ID)
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Owe the same events and attribute changes again, so the next
@@ -449,10 +450,10 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		if errors.Is(err, errChunkWaitAborted) {
 			return // the engine stopped; the peer did nothing wrong
 		}
-		b.noteSubscriptionSendError(sub.ID, "event_report", err)
+		b.noteSubscriptionSendError(sub.ID, seq, "event_report", err)
 		return
 	}
-	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{paths: paths, eventsFrom: events[0].Number, hasEvents: true})
+	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{seq: seq, paths: paths, eventsFrom: events[0].Number, hasEvents: true})
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.event_report",
@@ -640,6 +641,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		report.SuppressResponse = true
 	}
 
+	seq := b.beginUpdate(sub.ID)
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		// Mark the drained paths dirty again, so the next report
@@ -651,10 +653,10 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		if errors.Is(err, errChunkWaitAborted) {
 			return // the engine stopped; the peer did nothing wrong
 		}
-		b.noteSubscriptionSendError(sub.ID, "report", err)
+		b.noteSubscriptionSendError(sub.ID, seq, "report", err)
 		return
 	}
-	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{paths: paths})
+	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{seq: seq, paths: paths})
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.report",
@@ -963,6 +965,7 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	// removal's ctx bound the whole flush however many chunks it takes
 	// (review II, R2-P2-dr-req-01).
 	target.abort = ctx.Done()
+	seq := b.beginUpdate(sub.ID)
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
@@ -977,13 +980,13 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 			// II, R2-P2-rr-dev-05).
 			return
 		}
-		b.noteSubscriptionSendError(sub.ID, "flush", err)
+		b.noteSubscriptionSendError(sub.ID, seq, "flush", err)
 		return
 	}
 	// The flushed chunks are untracked, so no counter comes back and no
 	// counter→subscription entry is owed: nothing retransmits them, and
 	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
-	b.resetFailedUpdates(sub.ID)
+	b.noteUpdateDelivered(sub.ID, seq)
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.flush",
@@ -1014,14 +1017,43 @@ const sendErrorRetryLimit = 2
 // fails at once, and a report the peer never acknowledges
 // ([Bridge.noteReportUndelivered]).
 //
+// seq is the report's number from [Bridge.beginUpdate]; zero counts the
+// failure whatever went before it. A report begun before the last outcome
+// taken for the subscription — the last counted failure, or a delivered
+// report of a later number — overlapped that outcome, and its failure is
+// not counted again: matter.js sends no next update while one is in
+// progress (packages/node/src/node/server/ServerSubscription.ts:520-529 at
+// db021da0, #triggerSendUpdate returns while #currentUpdatePromise is
+// set) and an update lasts until its message is acknowledged or given up
+// (:553-557 awaits #sendUpdateMessage), so the reports this engine sends
+// meanwhile are part of the next update there, and three failed updates
+// take three retransmission windows one after the other (:563-603). What
+// such a report carried is owed again all the same.
+//
 // op names the reporter for the log line ("report" / "event_report").
-func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
+func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, err error) {
 	if _, live := b.routing.subTargets.Load(subID); !live {
 		// Closed while the report was being sent: nothing is left to
 		// count against.
 		return
 	}
 	b.subUpdateMu.Lock()
+	order := b.subUpdateSeq[subID]
+	if seq != 0 && order != nil && seq <= order.resolved {
+		b.subUpdateMu.Unlock()
+		if b.logger != nil {
+			b.logger.Debug("matter.tx.subscribe."+op,
+				slog.Int("subscription_id", int(subID)),
+				slog.Uint64("report", seq),
+				slog.String("hint", "report overlapped an update already counted; not counted again"),
+				slog.Any("err", err))
+		}
+		return
+	}
+	if order != nil {
+		// Every report begun so far overlapped this failed update.
+		order.resolved = order.started
+	}
 	var failures int
 	if raw, ok := b.subSendErrorCount.Load(subID); ok {
 		if n, ok := raw.(int); ok {
@@ -1033,6 +1065,7 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 		b.subSendErrorCount.Store(subID, failures)
 	} else {
 		b.subSendErrorCount.Delete(subID)
+		delete(b.subUpdateSeq, subID)
 	}
 	b.subUpdateMu.Unlock()
 	if failures <= sendErrorRetryLimit {
@@ -1061,15 +1094,61 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 	}
 }
 
-// resetFailedUpdates starts subID's count of failed updates again: a
-// delivered update, or the subscription's end. Every change of the count
-// is taken under subUpdateMu, so a reset is never overwritten by a failed
-// update counted from another goroutine at the same moment — the
+// resetFailedUpdates drops subID's count of failed updates and the
+// numbering of its reports: the subscription ended. Every change of the
+// count is taken under subUpdateMu, so a reset is never overwritten by a
+// failed update counted from another goroutine at the same moment — the
 // reporter, the ACK pump and the inbound acknowledgement each change it.
 func (b *Bridge) resetFailedUpdates(subID uint32) {
 	b.subUpdateMu.Lock()
 	b.subSendErrorCount.Delete(subID)
+	delete(b.subUpdateSeq, subID)
 	b.subUpdateMu.Unlock()
+}
+
+// updateOrder numbers a subscription's ongoing reports
+// ([Bridge.beginUpdate]) so that their outcomes, which arrive from the
+// reporter, the ACK pump and the inbound acknowledgement in any order, are
+// counted as matter.js counts its updates ([Bridge.noteSubscriptionSendError]).
+type updateOrder struct {
+	// started is the number of the last report begun.
+	started uint64
+	// resolved is the highest number whose outcome is taken: a failure
+	// counted for a report sets it to started, a delivered report to its
+	// own number when that is higher. A report numbered up to it
+	// overlapped that outcome.
+	resolved uint64
+}
+
+// beginUpdate numbers the ongoing report of subID about to be sent; the
+// first is 1.
+func (b *Bridge) beginUpdate(subID uint32) uint64 {
+	b.subUpdateMu.Lock()
+	defer b.subUpdateMu.Unlock()
+	if b.subUpdateSeq == nil {
+		b.subUpdateSeq = make(map[uint32]*updateOrder)
+	}
+	order := b.subUpdateSeq[subID]
+	if order == nil {
+		order = &updateOrder{}
+		b.subUpdateSeq[subID] = order
+	}
+	order.started++
+	return order.started
+}
+
+// noteUpdateDelivered takes report seq of subID as delivered: the count of
+// failed updates starts again — matter.js ServerSubscription.ts:554-557 at
+// db021da0 resets #sendUpdateErrorCounter once #sendUpdateMessage returns,
+// after the report's acknowledgement — and a failure of an earlier report
+// is no longer counted.
+func (b *Bridge) noteUpdateDelivered(subID uint32, seq uint64) {
+	b.subUpdateMu.Lock()
+	defer b.subUpdateMu.Unlock()
+	b.subSendErrorCount.Delete(subID)
+	if order := b.subUpdateSeq[subID]; order != nil && seq > order.resolved {
+		order.resolved = seq
+	}
 }
 
 // owedReport is what an ongoing report owes its subscription until the
@@ -1078,6 +1157,7 @@ func (b *Bridge) resetFailedUpdates(subID uint32) {
 // Recorded in [Bridge.reportCounterOwner] under that message's counter.
 type owedReport struct {
 	subID      uint32
+	seq        uint64 // the report's number ([Bridge.beginUpdate])
 	paths      []im.ConcreteAttributePath
 	eventsFrom uint64
 	hasEvents  bool
@@ -1098,7 +1178,7 @@ type owedReport struct {
 // db021da0; review II, R2-P4-nv-07).
 func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uint16, counters []uint32, owed owedReport) {
 	if len(counters) == 0 {
-		b.resetFailedUpdates(subID)
+		b.noteUpdateDelivered(subID, owed.seq)
 		return
 	}
 	last := counters[len(counters)-1]
@@ -1157,6 +1237,9 @@ func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 	if !ok || owed.subID == 0 {
 		return
 	}
+	// Counted before the data is owed again: the report the requeue
+	// starts is begun after this failure, the next update.
+	b.noteSubscriptionSendError(owed.subID, owed.seq, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		if sub, err := m.Get(owed.subID); err == nil {
 			if owed.hasEvents {
@@ -1165,7 +1248,6 @@ func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 			sub.RequeueAttributes(owed.paths)
 		}
 	}
-	b.noteSubscriptionSendError(owed.subID, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
 }
 
 // rememberReportExchange records that subID's latest ongoing report
@@ -1257,7 +1339,7 @@ func (b *Bridge) releaseReportCounter(sessionID uint16, counter uint32) {
 		return
 	}
 	if owed, ok := raw.(*owedReport); ok {
-		b.resetFailedUpdates(owed.subID)
+		b.noteUpdateDelivered(owed.subID, owed.seq)
 	}
 }
 

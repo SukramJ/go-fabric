@@ -35,7 +35,7 @@ func TestFailedUpdateCountIsOneStep(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Go(func() {
 			<-start
-			b.noteSubscriptionSendError(subID, "report", errSend)
+			b.noteSubscriptionSendError(subID, 0, "report", errSend)
 		})
 		wg.Go(func() {
 			<-start

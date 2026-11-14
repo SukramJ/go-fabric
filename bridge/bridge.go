@@ -600,11 +600,15 @@ type Bridge struct {
 	// closed via the existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
 	// subUpdateMu guards every change of subSendErrorCount
-	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates]):
-	// the reporter, the ACK pump and the inbound acknowledgement change a
-	// subscription's count from their own goroutines. A leaf lock: nothing
-	// is called while it is held.
+	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates])
+	// and subUpdateSeq: the reporter, the ACK pump and the inbound
+	// acknowledgement change a subscription's count from their own
+	// goroutines. A leaf lock: nothing is called while it is held.
 	subUpdateMu sync.Mutex
+	// subUpdateSeq numbers each subscription's ongoing reports, for their
+	// outcomes to be counted as matter.js counts updates
+	// ([Bridge.beginUpdate]); guarded by subUpdateMu.
+	subUpdateSeq map[uint32]*updateOrder
 
 	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
 	// last found: the ACL and topology the subject last read a path

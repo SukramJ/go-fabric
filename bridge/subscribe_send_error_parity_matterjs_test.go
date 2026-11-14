@@ -306,3 +306,105 @@ func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 	}
 	r.sessionsKept(t, "after a delivered and four failed updates")
 }
+
+// inFlight counts the subscription's report messages that wait for the
+// peer's acknowledgement.
+func (r *undeliveredReportRig) inFlight() int {
+	r.outbound.mu.Lock()
+	defer r.outbound.mu.Unlock()
+	n := 0
+	for key := range r.outbound.pending {
+		if key.sessionID == r.reportSID {
+			n++
+		}
+	}
+	return n
+}
+
+// TestOverlappingUndeliveredReportsAreOneFailedUpdateParity: reports sent
+// while an earlier one still waits for its acknowledgement belong to the
+// update that earlier one is part of — matter.js sends no next update
+// while one is in progress (packages/node/src/node/server/ServerSubscription.ts:520-529
+// at db021da0, #triggerSendUpdate returns while #currentUpdatePromise is
+// set), and an update ends only when its message is acknowledged or given
+// up (:553-557 awaits #sendUpdateMessage). Three reports that run out of
+// retransmissions in one window are one failed update, and the
+// subscription ends at the third failed update in a row, three windows
+// one after the other (:563-603).
+func TestOverlappingUndeliveredReportsAreOneFailedUpdateParity(t *testing.T) {
+	t.Parallel()
+	r := newUndeliveredReportRig(t, 0x1601)
+	for want := 1; want <= 3; want++ {
+		r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		waitFor(t, fmt.Sprintf("%d reports in flight", want), func() bool { return r.inFlight() >= want })
+	}
+	r.exhaust()
+	if _, err := r.dev.subs.Get(r.sub.ID); err != nil {
+		t.Fatalf("subscription ended by three reports given up in one window: %v", err)
+	}
+	if raw, _ := r.dev.br.subSendErrorCount.Load(r.sub.ID); raw != 1 {
+		t.Fatalf("failed updates counted after one window: %v, want 1", raw)
+	}
+	r.sessionsKept(t, "after one window")
+}
+
+// TestFailedUpdatesCountedInSequenceParity: the outcomes of a
+// subscription's reports are counted as matter.js counts updates, which
+// follow one another (ServerSubscription.ts:520-529, :553-603 at
+// db021da0). A failure of a report begun before the last counted failure
+// is part of that failed update; a failure of a report older than a
+// delivered one is no failed update in a row; a delivered report starts
+// the count again; the third failure in a row, each of a report begun
+// after the one before was counted, ends the subscription.
+func TestFailedUpdatesCountedInSequenceParity(t *testing.T) {
+	t.Parallel()
+	const (
+		subID     = uint32(31)
+		sessionID = uint16(7)
+	)
+	b := &Bridge{}
+	b.routing.subTargets.Store(subID, subTarget{})
+	var counter uint32
+	send := func() uint32 {
+		counter++
+		b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), &owedReport{subID: subID, seq: b.beginUpdate(subID)})
+		return counter
+	}
+	counted := func(when string, want int) {
+		t.Helper()
+		raw, ok := b.subSendErrorCount.Load(subID)
+		got := 0
+		if ok {
+			got, _ = raw.(int)
+		}
+		if got != want {
+			t.Fatalf("%s: %d failed updates counted, want %d", when, got, want)
+		}
+		if _, live := b.routing.subTargets.Load(subID); !live {
+			t.Fatalf("%s: subscription ended", when)
+		}
+	}
+
+	overlapping := []uint32{send(), send(), send()}
+	for _, c := range overlapping {
+		b.noteReportUndelivered(sessionID, c)
+	}
+	counted("three reports given up in one window", 1)
+
+	b.noteReportUndelivered(sessionID, send())
+	counted("a report begun after the first failure given up", 2)
+
+	older, newer := send(), send()
+	b.releaseReportCounter(sessionID, newer)
+	counted("a later report delivered", 0)
+	b.noteReportUndelivered(sessionID, older)
+	counted("a report older than a delivered one given up", 0)
+
+	b.noteReportUndelivered(sessionID, send())
+	b.noteReportUndelivered(sessionID, send())
+	counted("two failed updates in a row", 2)
+	b.noteReportUndelivered(sessionID, send())
+	if _, live := b.routing.subTargets.Load(subID); live {
+		t.Fatal("subscription open after the third failed update in a row")
+	}
+}
