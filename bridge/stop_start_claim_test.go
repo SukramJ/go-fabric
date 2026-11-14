@@ -52,7 +52,8 @@ func (h heldPaseHandler) ProcessPBKDFParamRequest([]byte) (opcode uint8, payload
 
 // TestStartDuringStopIsRefused: a Stop that is still waiting for the
 // handlers in flight has not stopped the bridge, and a Start in that
-// window is refused with ErrAlreadyStarted. Before review II Stop gave the
+// window is refused — with ErrStopped since a bridge is single-run
+// (R2-P2-stop-05), with ErrAlreadyStarted before. Before review II Stop gave the
 // start claim back first and went on to tear down afterwards — the host's
 // value and switch listeners, the advertiser, the servers' transitions,
 // the commissioning window's timer — so a Start in between had the run it
@@ -121,11 +122,11 @@ func TestStartDuringStopIsRefused(t *testing.T) {
 	if err := <-stopped; err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
-	if !errors.Is(startErr, ErrAlreadyStarted) {
+	if !errors.Is(startErr, ErrStopped) {
 		b.mu.RLock()
 		started := b.started
 		b.mu.RUnlock()
-		t.Errorf("Start while Stop was waiting: %v, want ErrAlreadyStarted (the bridge is started: %v, with %d host listeners)", startErr, started, src.live.Load())
+		t.Errorf("Start while Stop was waiting: %v, want ErrStopped (the bridge is started: %v, with %d host listeners)", startErr, started, src.live.Load())
 	}
 	if got := src.live.Load(); got != 0 {
 		t.Errorf("%d host listeners registered after Stop returned, want 0", got)

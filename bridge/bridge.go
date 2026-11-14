@@ -14,7 +14,9 @@
 //
 // Lifecycle: [New] → [Start] → (optional) [Reassemble] → [Stop].
 // Start is idempotent (returns ErrAlreadyStarted on a second call).
-// Stop is idempotent and safe to call after a failed Start.
+// Stop is idempotent and safe to call after a failed Start. A bridge is
+// single-run, as node.Node is: Start after Stop returns [ErrStopped], and
+// a host that comes back builds a new bridge.
 //
 // Transports: Start binds the UDP socket and, when [Config].TCP.Incoming
 // is set, a TCP listener on the same port (matter.js
@@ -267,6 +269,9 @@ var (
 	// ErrAlreadyStarted surfaces from a second [Start] call on the
 	// same bridge instance.
 	ErrAlreadyStarted = errors.New("bridge: already started")
+	// ErrStopped is returned by [Bridge.Start] after [Bridge.Stop]: a
+	// bridge is not restarted; a host builds a new one.
+	ErrStopped = errors.New("bridge: stopped")
 )
 
 // Snapshotter supplies the endpoint topology the bridge serves.
@@ -708,6 +713,9 @@ type Bridge struct {
 	// b.mu across that, concurrent reads (Topology, Dispatcher)
 	// would block on the listener's bind latency.
 	startClaim atomic.Bool
+	// stopBegun: a Stop was called; Start is refused from then on with
+	// ErrStopped — the bridge is single-run (review II, R2-P2-stop-05).
+	stopBegun atomic.Bool
 	// lifecycle runs Start and Stop one at a time: a Stop that arrives
 	// while a Start is running waits for it and then stops the run,
 	// instead of finding nothing started and letting the bridge come up
@@ -893,8 +901,10 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 // call [Stop]) to tear everything down.
 //
 // Calling Start a second time on the same instance returns
-// [ErrAlreadyStarted], and so does a Start while a [Bridge.Stop] of the
-// run before has not returned: the bridge has not stopped until then.
+// [ErrAlreadyStarted]. A bridge is single-run: from the first
+// [Bridge.Stop] on, Start returns [ErrStopped] — Stop closes what the
+// bridge holds, the advertiser among them, and a host that comes back
+// builds a new bridge. A Start that failed leaves the bridge startable.
 //
 //nolint:contextcheck // serve/ack-pump goroutines run in a fresh context torn down explicitly via the stored serveCancel (Stop); rooting them in the caller ctx would race listener teardown
 func (b *Bridge) Start(ctx context.Context) error {
@@ -1060,6 +1070,9 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 // a Stop holds it — and then the lifecycle slot; the claim is given back
 // when the slot cannot be had.
 func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
+	if b.stopBegun.Load() {
+		return nil, ErrStopped
+	}
 	if !b.startClaim.CompareAndSwap(false, true) {
 		return nil, ErrAlreadyStarted
 	}
@@ -1067,6 +1080,12 @@ func (b *Bridge) claimStart(ctx context.Context) (release func(), err error) {
 	if err != nil {
 		b.startClaim.Store(false)
 		return nil, err
+	}
+	// A Stop that began while this Start waited for the lifecycle slot.
+	if b.stopBegun.Load() {
+		release()
+		b.startClaim.Store(false)
+		return nil, ErrStopped
 	}
 	return release, nil
 }
@@ -2048,8 +2067,8 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // [stopSessionCloseBudget]), closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
-// no-op. Safe to call after a failed [Start]. The bridge counts as
-// started until Stop returns: a [Bridge.Start] before that is refused.
+// no-op. Safe to call after a failed [Start]. The bridge is single-run:
+// from the first Stop on, [Bridge.Start] returns [ErrStopped].
 // A Stop that overlaps a Start waits for it, until ctx ends, and then
 // stops its run; only that wait can make Stop return an error, and then
 // it has torn nothing down. A Stop with a context already done when no
@@ -2059,7 +2078,8 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 //nolint:funlen // one teardown sequence; its order is the contract, and split up it is no longer visible in one place
 func (b *Bridge) Stop(ctx context.Context) error {
 	// A Start still running finishes first; Stop then stops its run
-	// (review II, R2-P1-req2-05).
+	// (review II, R2-P1-req2-05). No Start is let in from here on.
+	b.stopBegun.Store(true)
 	release, err := b.enterLifecycle(ctx)
 	if err != nil {
 		return err
@@ -2101,8 +2121,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	b.serveDone = nil
 	// handlerCtx stays: the serve context, cancelled below. A handler
 	// the ordered pool still dispatches after this point runs under a
-	// cancelled context instead of one that never ends; the next Start
-	// replaces it.
+	// cancelled context instead of one that never ends.
 	b.pumpCancel = nil
 	b.pumpDone = nil
 	b.started = false

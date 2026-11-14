@@ -166,7 +166,8 @@ func TestReassembleOverlappingStopLeavesNoHostListeners(t *testing.T) {
 // whose context is already done when no Start or Stop is running still
 // tears the run down — only its waits are bounded by ctx — on every call,
 // not on the half of them a select between the free lifecycle slot and
-// ctx.Done() picks the slot. Every Start binds the same port, so each one
+// ctx.Done() picks the slot. A bridge is single-run (R2-P2-stop-05), so
+// every run is a new bridge; each binds the same port, so each Start
 // succeeding shows the Stop before it released the socket.
 func TestStopWithDoneContextTearsDown(t *testing.T) {
 	t.Parallel()
@@ -179,14 +180,14 @@ func TestStopWithDoneContextTearsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	snap := newHeldSnapshotter(t, 0)
-	b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: addr}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
 	done, cancel := context.WithCancel(t.Context())
 	cancel()
 	const runs = 200
 	for i := range runs {
+		b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: addr}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := b.Start(t.Context()); err != nil {
 			t.Fatalf("run %d: Start on %s: %v", i, addr, err)
 		}
@@ -223,10 +224,12 @@ func (s *gatedContact) OnMatterValueChanged(fn func()) func() {
 
 // TestReassembleStraddlingARestartKeepsTheNewRunsListeners (review II,
 // R2-P1-dr-req-05): a Reassemble that blocks in a host notifier's
-// registration while the bridge is stopped and started again does not,
-// when it resumes and finds its run over, detach the listeners the new
-// run wired — it removes only what it wired itself. Before, it detached
-// whatever the bridge held, and the new run served without its value
+// registration while the bridge is stopped, and resumes to find its run
+// over, leaves no listener behind — it removes what it wired itself. A
+// bridge is single-run since R2-P2-stop-05: the Start attempted in
+// between is refused with ErrStopped, so no new run's listeners exist
+// for the resumed Reassemble to keep. Before R2-P1-dr-req-05 it detached
+// whatever the bridge held, and a new run served without its value
 // listeners until the next Reassemble (the state R2-P0-rv-A06 was fixed
 // for).
 func TestReassembleStraddlingARestartKeepsTheNewRunsListeners(t *testing.T) {
@@ -261,15 +264,12 @@ func TestReassembleStraddlingARestartKeepsTheNewRunsListeners(t *testing.T) {
 	if err := b.Stop(ctx); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
-	if err := b.Start(ctx); err != nil {
-		t.Fatalf("the second Start: %v", err)
-	}
-	if got := src.live.Load(); got != 1 {
-		t.Fatalf("%d listeners after the second Start, want 1 (the new run's)", got)
+	if err := b.Start(ctx); !errors.Is(err, ErrStopped) {
+		t.Fatalf("the second Start = %v, want ErrStopped", err)
 	}
 	close(src.release)
 	<-reassembled
-	if got := src.live.Load(); got != 1 {
-		t.Fatalf("%d listeners once the Reassemble of the former run returned, want 1: the new run's were detached", got)
+	if got := src.live.Load(); got != 0 {
+		t.Fatalf("%d listeners once the Reassemble of the stopped run returned, want 0", got)
 	}
 }
