@@ -475,21 +475,25 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 			slog.String("value_type", fmt.Sprintf("%T", w.Value.Value)))
 	}
 	// A chunked write may not suppress the response — matter.js
-	// InteractionServer.ts:397-402 rejects the combination with
-	// InvalidAction before any timed-interaction handling.
+	// packages/node/src/node/server/InteractionServer.ts:410-415 at
+	// db021da0 rejects the combination with InvalidAction before any
+	// timed-interaction handling.
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_suppress", im.StatusInvalidAction)
 	}
+	// A write inside a running timed window may not be chunked, whatever
+	// its own Timed flag says, and this is judged before the timed gate —
+	// matter.js InteractionServer.ts:417-424 at db021da0
+	// (`receivedWithinTimedInteraction && moreChunkedMessages`, "Write
+	// Request action that is part of a Timed Write Interaction SHALL NOT
+	// be chunked"). The window goes with the refusal, as the exchange does
+	// in matter.js.
+	if req.MoreChunkedMessages && b.timedWindowRunning(requestHdr.SessionID, proto.ExchangeID) {
+		b.routing.timedDeadlines.Delete(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID})
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
+	}
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write", status)
-	}
-	// A write inside a timed interaction may not be chunked — matter.js
-	// InteractionServer.ts:408-413 ("Write Request action that is part
-	// of a Timed Write Interaction SHALL NOT be chunked"). The gate
-	// above passed, so a set TimedRequest flag means the timed window
-	// existed and was valid.
-	if req.TimedRequest && req.MoreChunkedMessages {
-		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
 	}
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
@@ -809,6 +813,17 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	// (src/app/InteractionModelEngine.cpp:963-973 at 6170af84).
 	if b.routing.pendingTimedRequests(requestHdr.SessionID, proto.ExchangeID, now) >= maxPendingTimedRequests {
 		return b.replyTimedStatus(src, requestHdr, proto, "too_many_pending", im.StatusBusy)
+	}
+	// A TimedRequest on an exchange whose timed window still runs ends
+	// that window and is answered InvalidAction. Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:1066-1070 at
+	// db021da0 (startTimedInteraction stops the running timer and throws
+	// "Timed interaction already running for this exchange"); connectedhomeip
+	// src/app/TimedHandler.cpp:91-96 at 6170af84 answers anything but the
+	// timed action InvalidAction. A window that expired is replaced.
+	if b.timedWindowRunning(requestHdr.SessionID, proto.ExchangeID) {
+		b.routing.timedDeadlines.Delete(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID})
+		return b.replyTimedStatus(src, requestHdr, proto, "already_running", im.StatusInvalidAction)
 	}
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot

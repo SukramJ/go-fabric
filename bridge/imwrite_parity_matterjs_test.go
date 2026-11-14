@@ -222,3 +222,85 @@ func TestWriteOtherNodeParity(t *testing.T) {
 		t.Fatalf("%d writes, want 0", n)
 	}
 }
+
+func timedRequestBytes(t *testing.T, ms uint16) []byte {
+	t.Helper()
+	enc := tlv.NewEncoder()
+	im.TimedRequest{TimeoutMs: ms}.MarshalTLV(enc)
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// TestSecondTimedRequestParity: a TimedRequest on an exchange whose timed
+// window still runs is answered INVALID_ACTION and ends the window
+// (packages/protocol/src/protocol/MessageExchange.ts:1066-1070 at db021da0;
+// connectedhomeip src/app/TimedHandler.cpp:91-96 at 6170af84 answers anything but
+// the timed action InvalidAction), so a following timed Invoke mismatches.
+func TestSecondTimedRequestParity(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.AttachRootClusters([]contract.ClusterServer{&noopCluster{id: 0x003C}})
+	p := newIMPeer(t, b)
+	const x = 0x4201
+	p.send(x, im.OpcodeTimedRequest, timedRequestBytes(t, 30000))
+	if got := p.status(); got != im.StatusSuccess {
+		t.Fatalf("first TimedRequest: %v, want SUCCESS", got)
+	}
+	p.send(x, im.OpcodeTimedRequest, timedRequestBytes(t, 30000))
+	if got := p.status(); got != im.StatusInvalidAction {
+		t.Fatalf("second TimedRequest: %v, want INVALID_ACTION", got)
+	}
+	p.send(x, im.OpcodeInvokeRequest, encodeTimedTestInvokeRequest(t, true, im.ConcreteCommandPath{
+		Endpoint: 0, Cluster: 0x003C, Command: 0x02, HasEndpoint: true, HasCluster: true, HasCommand: true,
+	}))
+	if got := p.status(); got != im.StatusTimedRequestMismatch {
+		t.Fatalf("timed Invoke after the refused TimedRequest: %v, want TIMED_REQUEST_MISMATCH", got)
+	}
+}
+
+// TestExpiredTimedWindowParity: a timed window that expired answers the
+// Write or Invoke that follows it TIMEOUT whatever the request's Timed
+// flag says (InteractionServer.ts:426-429 write, :994-997 invoke at
+// db021da0, both before the mismatch check; connectedhomeip
+// src/app/TimedHandler.cpp:61-72 at 6170af84).
+func TestExpiredTimedWindowParity(t *testing.T) {
+	t.Parallel()
+	for _, flag := range []bool{false, true} {
+		b := &Bridge{}
+		b.routing.timedDeadlines.Store(timedKey{sessionID: 4, exchangeID: 21}, time.Now().Add(-time.Millisecond))
+		status, gated := b.checkTimedGate(flag, 4, 21)
+		if !gated || status != im.StatusTimeout {
+			t.Errorf("timed flag %t: gated %t status %v, want TIMEOUT", flag, gated, status)
+		}
+		if _, ok := b.routing.timedDeadlines.Load(timedKey{sessionID: 4, exchangeID: 21}); ok {
+			t.Errorf("timed flag %t: the expired window is still present", flag)
+		}
+	}
+}
+
+// TestChunkedWriteInTimedWindowParity: a chunked write inside a running
+// timed window is INVALID_ACTION whatever its Timed flag says — matter.js
+// tests the window, not the flag, and before the timed gate
+// (InteractionServer.ts:417-424 at db021da0).
+func TestChunkedWriteInTimedWindowParity(t *testing.T) {
+	t.Parallel()
+	b, srv := onTimeBridge(t)
+	p := newIMPeer(t, b)
+	const x = 0x4202
+	p.send(x, im.OpcodeTimedRequest, timedRequestBytes(t, 30000))
+	if got := p.status(); got != im.StatusSuccess {
+		t.Fatalf("TimedRequest: %v", got)
+	}
+	p.send(x, im.OpcodeWriteRequest, writeRequestBytes(t, im.WriteRequest{MoreChunkedMessages: true, Writes: []im.AttributeWrite{
+		{Path: onTimePath(), Value: im.AttributeValue{Value: uint16(7)}},
+	}}))
+	if got := p.status(); got != im.StatusInvalidAction {
+		t.Fatalf("chunked write, Timed flag clear, in a running window: %v, want INVALID_ACTION", got)
+	}
+	if n := srv.writes(); n != 0 {
+		t.Fatalf("%d writes, want 0", n)
+	}
+}

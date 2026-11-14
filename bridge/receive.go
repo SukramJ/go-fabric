@@ -790,53 +790,48 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 // checkTimedGate enforces the Matter §8.7 timed-interaction rules on
 // a Write / Invoke. It returns (status, true) when the request must
 // be rejected — caller emits StatusResponse(status) instead of
-// processing — or (0, false) when the request can proceed (the
-// deadline, if any, has been consumed and removed from the map).
+// processing — or (0, false) when the request can proceed. The
+// exchange's deadline, if any, is consumed either way, so a duplicate
+// Write/Invoke re-tests as "no prior TimedRequest".
 //
-//   - timedFlag=false, no prior TimedRequest      → proceed (untimed).
-//   - timedFlag=false, prior TimedRequest pending → reject with
-//     TIMED_REQUEST_MISMATCH (0xC9). A TimedRequest preceded this
-//     Write/Invoke yet the request's own Timed flag is clear — the
-//     two disagree, which the spec forbids in BOTH directions.
-//   - timedFlag=true,  no prior TimedRequest      → reject with
-//     NEEDS_TIMED_INTERACTION (0xC6).
-//   - timedFlag=true,  prior expired              → reject with
-//     TIMEOUT (0x94); deadline cleared so a retry would re-prime.
-//   - timedFlag=true,  prior valid                → proceed; deadline
-//     cleared so a duplicate Write/Invoke after this re-tests as
-//     "no prior TimedRequest".
+//   - a window that expired             → TIMEOUT (0x94), whatever the
+//     request's Timed flag says;
+//   - Timed flag set, no window         → TIMED_REQUEST_MISMATCH (0xC9);
+//   - Timed flag clear, a running window → TIMED_REQUEST_MISMATCH (0xC9);
+//   - otherwise                          → proceed.
 //
-// Mirrors chip src/app/WriteHandler.cpp:669-673 (and the matching
-// CommandHandler path): a Write/Invoke whose own Timed flag is clear
-// while a TimedRequest preceded it is a TIMED_REQUEST_MISMATCH — the
-// two disagree, which the spec forbids. The inverse half (Timed flag
-// set, no prior TimedRequest) stays NEEDS_TIMED_INTERACTION.
+// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts at
+// db021da0: `exchange.hasExpiredTimedInteraction()` → Status.Timeout
+// first (:426-429 write, :994-997 invoke), then `timedRequest !==
+// exchange.hasTimedInteraction()` → Status.TimedRequestMismatch in both
+// directions (:431-436, :999-1004); connectedhomeip
+// src/app/TimedHandler.cpp:61-72 at 6170af84 answers Timeout before it
+// looks at the message. The mismatch for a set flag without a window was
+// found by the CHIP Python harness (TC-IDM-1.2 step 8).
 func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (im.StatusCode, bool) {
-	raw, ok := b.routing.timedDeadlines.LoadAndDelete(timedKey{sessionID: sessionID, exchangeID: exchangeID})
-	if !timedFlag {
-		if ok {
-			// A TimedRequest opened a window but this request's Timed flag
-			// is clear: the two disagree → mismatch. LoadAndDelete already
-			// cleared the stale deadline.
-			return im.StatusTimedRequestMismatch, true
+	raw, window := b.routing.timedDeadlines.LoadAndDelete(timedKey{sessionID: sessionID, exchangeID: exchangeID})
+	if window {
+		if deadline, isTime := raw.(time.Time); !isTime || b.clk().Now().After(deadline) {
+			return im.StatusTimeout, true
 		}
-		// No prior deadline: a plain untimed request, proceed.
-		return 0, false
 	}
-	if !ok {
-		// The request claims a timed interaction the exchange never
-		// opened: TIMED_REQUEST_MISMATCH, as matter.js answers
-		// `timedRequest !== exchange.hasTimedInteraction()`
-		// (InteractionServer.ts:409-412 write, :945-948 invoke). Found by
-		// the CHIP Python harness (TC-IDM-1.2 step 8), which sends exactly
-		// that.
+	if timedFlag != window {
 		return im.StatusTimedRequestMismatch, true
 	}
-	deadline, isTime := raw.(time.Time)
-	if !isTime || b.clk().Now().After(deadline) {
-		return im.StatusTimeout, true
-	}
 	return 0, false
+}
+
+// timedWindowRunning reports whether the exchange has a timed window that
+// has not expired, without consuming it — matter.js
+// exchange.hasActiveTimedInteraction()
+// (packages/protocol/src/protocol/MessageExchange.ts:1101-1103 at db021da0).
+func (b *Bridge) timedWindowRunning(sessionID, exchangeID uint16) bool {
+	raw, ok := b.routing.timedDeadlines.Load(timedKey{sessionID: sessionID, exchangeID: exchangeID})
+	if !ok {
+		return false
+	}
+	deadline, isTime := raw.(time.Time)
+	return isTime && !b.clk().Now().After(deadline)
 }
 
 // NotifyDeviceReachable fires the §9.13.6 BridgedDeviceBasicInformation

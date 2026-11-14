@@ -50,9 +50,12 @@ var (
 // requires to be timed (e.g. door-lock unlocks). The bridge replies
 // with a [StatusResponse]{Success} and stamps a per-exchange
 // deadline; the matching follow-up Write/Invoke is then gated by
-// `Bridge.checkTimedGate` per Matter §8.7 — late or missing
-// follow-ups get rejected with TIMEOUT (0x94) or
-// NEEDS_TIMED_INTERACTION (0xC6).
+// `Bridge.checkTimedGate` per Matter §8.7 — a follow-up after the
+// window expired is rejected with TIMEOUT (0x94), one whose Timed flag
+// disagrees with the window (set without one, clear within one) with
+// TIMED_REQUEST_MISMATCH (0xC9), as matter.js answers
+// (packages/node/src/node/server/InteractionServer.ts:426-436 write,
+// :994-1004 invoke at db021da0).
 type TimedRequest struct {
 	// TimeoutMs is the maximum number of milliseconds the bridge
 	// must wait between this TimedRequest and the follow-up
