@@ -541,8 +541,11 @@ settings key.
    `Store.Path`.
 
 `Stop` is idempotent and safe without `Start`. A stopped node does not
-restart: `Start` after `Stop` returns `node.ErrStopped`. To restart, build a
-new node on the same store.
+restart: `Start` after `Stop` returns `node.ErrStopped`, and so do
+`OpenOwnWindow`, `OpenBasicWindow` and `CloseWindow` from the moment `Stop`
+begins. To restart, build a new node on the same store. The bridge under
+it is single-run in the same way: `bridge.Bridge.Start` after `Stop`
+returns `bridge.ErrStopped`.
 
 `New` already starts the subscription engine and the session reapers. Call
 `Stop` on every node that `New` returned, including one you never started.
