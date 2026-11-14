@@ -71,10 +71,12 @@ func TestDecryptIfNeeded_UnsecuredNoSourceNodeID(t *testing.T) {
 	}
 }
 
-// TestResetPaseFailures_ClearsUnsecuredWindows verifies the window-boundary
-// reset also clears the dedup state, so a counter seen in a previous window
-// is fresh again after a new PASE acceptor is installed.
-func TestResetPaseFailures_ClearsUnsecuredWindows(t *testing.T) {
+// TestResetPaseFailures_KeepsUnsecuredWindows verifies the window-boundary
+// reset leaves the dedup state alone: a source's window lives with its
+// handshake ([unsecuredWindowTable]), not with the commissioning window, so a
+// retransmission of a handshake that is still in progress stays a duplicate
+// when a new PASE acceptor is installed.
+func TestResetPaseFailures_KeepsUnsecuredWindows(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	const src = uint64(0x1122_3344)
@@ -87,9 +89,8 @@ func TestResetPaseFailures_ClearsUnsecuredWindows(t *testing.T) {
 	if _, dup, _ := b.decryptIfNeeded(&h, body); !dup {
 		t.Fatal("retransmit counter=7 should be duplicate before reset")
 	}
-	// New window boundary (fresh PASE acceptor) clears the dedup windows.
 	b.AttachPaseHandler(nil)
-	if _, dup, _ := b.decryptIfNeeded(&h, body); dup {
-		t.Fatal("counter=7 should be fresh again after the window-boundary reset")
+	if _, dup, _ := b.decryptIfNeeded(&h, body); !dup {
+		t.Fatal("counter=7 should stay a duplicate across the window-boundary reset")
 	}
 }

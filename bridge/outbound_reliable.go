@@ -392,6 +392,19 @@ func (t *outboundReliableTracker) dropLocked(key outboundKey) {
 	}
 }
 
+// holdsUnsecuredExchange reports whether a message of the unsecured
+// session's exchangeID still waits for its acknowledgement.
+func (t *outboundReliableTracker) holdsUnsecuredExchange(exchangeID uint16) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, key := range t.unsecured {
+		if e, ok := t.pending[key]; ok && e.exchangeID == exchangeID {
+			return true
+		}
+	}
+	return false
+}
+
 // Untrack drops a message Track registered whose send then failed: there is
 // nothing on the wire to retransmit or to wait for.
 func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {

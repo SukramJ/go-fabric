@@ -648,19 +648,12 @@ type Bridge struct {
 	paseInFlightSince    time.Time
 
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
-	// detector for unsecured (SessionID==0, PASE) traffic, so a
-	// retransmitted Pake1/Pake3 is acked without re-invoking the handshake
-	// handler. Keyed by SourceNodeID (uint64) → *mrp.Window. Cleared on
-	// each PASE-acceptor swap (a commissioning-window boundary) so it stays
-	// bounded to the current window's transient commissioners. Mirrors
-	// matter.js UnsecuredSession's MessageReceptionState.
-	unsecuredWindows sync.Map
-	// unsecuredWindowCount tracks the live entry count of unsecuredWindows so
-	// creation can be capped at [maxUnsecuredWindows]: SourceNodeID is
-	// attacker-controlled in unsecured PASE traffic, and within a single open
-	// commissioning window a spoofed-source flood would otherwise grow the map
-	// without bound. Reset to 0 alongside the Clear at each window boundary.
-	unsecuredWindowCount atomic.Int64
+	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
+	// retransmitted handshake message is acked without re-invoking the
+	// handshake handler. A window lives as long as the handshake it serves
+	// — see [unsecuredWindowTable]. Mirrors matter.js UnsecuredSession's
+	// MessageReceptionState.
+	unsecuredWindows unsecuredWindowTable
 
 	// commissioningInstanceName remembers the mDNS instance name the
 	// bridge published via [Bridge.AnnounceCommissioning] so the

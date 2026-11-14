@@ -509,12 +509,13 @@ func (b *Bridge) dispatchPase(
 const paseMaxErrors = 20
 
 // maxUnsecuredWindows caps the number of per-SourceNodeID duplicate-detection
-// windows tracked for unsecured PASE traffic within one commissioning window.
-// SourceNodeID is attacker-controlled and unauthenticated at this stage, so
-// without a cap a spoofed-source flood grows unsecuredWindows without bound.
-// A real commissioning window sees only a handful of commissioners; 256 is far
-// above that. Past the cap a new source is treated as fresh — the PASE
-// handshake handler's own state-replay guard still rejects a genuine replay.
+// windows held for unsecured traffic at one time. SourceNodeID is
+// attacker-controlled and unauthenticated at this stage. A window lives only
+// as long as the handshake it serves ([unsecuredWindowTable]), so the windows
+// held are those of the handful of live handshakes; only sources whose
+// messages name the exchange of a live handshake can reach the cap. Past it a
+// new source is treated as fresh — the PASE handshake handler's own
+// state-replay guard still rejects a genuine replay.
 const maxUnsecuredWindows = 256
 
 // pasePairingTimeout bounds how long a single PASE handshake may hold
@@ -700,12 +701,12 @@ func (b *Bridge) paseLockedOut() bool {
 }
 
 // resetPaseFailures clears the per-window PASE state — the failure counter,
-// any active lockout and its backoff streak, and the unsecured
-// duplicate-detection windows. Called when a fresh PASE acceptor is
-// installed ([Bridge.AttachPaseHandler] /
+// any active lockout and its backoff streak. Called when a fresh PASE
+// acceptor is installed ([Bridge.AttachPaseHandler] /
 // [Bridge.AttachPaseHandlerProvider]) — a commissioning-window boundary —
-// so each window gets its own [paseMaxErrors] budget, an unlocked PASE
-// path and a clean set of per-source dedup windows.
+// so each window gets its own [paseMaxErrors] budget and an unlocked PASE
+// path. The unsecured duplicate-detection windows are not window state:
+// each lives with its handshake ([unsecuredWindowTable]).
 //
 // Exception: when the brute-force cap's own RevokeWindow drives the
 // re-attach (preserveLockoutOnReset is raised), an in-force lockout and its
@@ -724,8 +725,6 @@ func (b *Bridge) resetPaseFailures() {
 		b.paseLockoutStreak = 0
 	}
 	b.mu.Unlock()
-	b.unsecuredWindows.Clear()
-	b.unsecuredWindowCount.Store(0)
 }
 
 // handlePase + handleCase share the handler-invocation + reply-send
