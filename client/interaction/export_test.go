@@ -111,4 +111,4 @@ func (r *networkRecorder) maxPathsPerInvoke() int {
 
 // MaxAssemblyBytesPerSession is the report bytes a session's interactions
 // may hold while their chunks arrive.
-const MaxAssemblyBytesPerSession = maxAssemblyBytesPerSession
+const MaxAssemblyBytesPerSession = DefaultMaxReportBytesPerSession

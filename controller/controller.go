@@ -246,6 +246,17 @@ type Config struct {
 	// ([Controller.DiagnosticEvents]); the zero value keeps
 	// diag.DefaultDiagnosticsCapacity events.
 	Diagnostics diag.Diagnostics
+	// MaxReportBytesPerSession bounds the report chunks (message payload
+	// bytes) the interactions of one session hold while the rest of their
+	// chunks arrive — reads, subscription reports and invoke responses of
+	// the paired nodes together: the chunk that would pass it is answered
+	// ResourceExhausted and the call returns interaction.ErrReportTooLarge.
+	// 0 is interaction.DefaultMaxReportBytesPerSession (2 MiB); a negative
+	// bound is [ErrConfiguration]. It holds for every interaction with a
+	// paired node, the reads a pairing makes once the node is commissioned
+	// included; the commissioning steps themselves, over PASE and the CASE
+	// session they open, keep the default.
+	MaxReportBytesPerSession int
 	// Metrics receives the controller's named counters and gauges
 	// (controller/metrics.go: sessions.open, mrp.retransmits,
 	// pair.failures, case.unresponsive, reachability.probes,
@@ -340,6 +351,20 @@ type Controller struct {
 	stopDiscover func()
 }
 
+// checkRequired refuses a configuration without its required fields or
+// with a negative report bound.
+func checkRequired(cfg *Config) error {
+	switch {
+	case cfg.DB == nil:
+		return fmt.Errorf("%w: DB is required", ErrConfiguration)
+	case cfg.Attestation == nil:
+		return fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
+	case cfg.MaxReportBytesPerSession < 0:
+		return fmt.Errorf("%w: MaxReportBytesPerSession %d is negative", ErrConfiguration, cfg.MaxReportBytesPerSession)
+	}
+	return nil
+}
+
 // New builds the controller over cfg.DB: the fabric is created on the
 // first run (a random fabric ID and node ID, saved) and loaded
 // afterwards; then the socket, DNS-SD, the peers, the commissioner and
@@ -352,11 +377,8 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 			_ = cfg.Listener.Close()
 		}
 	}()
-	switch {
-	case cfg.DB == nil:
-		return nil, fmt.Errorf("%w: DB is required", ErrConfiguration)
-	case cfg.Attestation == nil:
-		return nil, fmt.Errorf("%w: Attestation is required (attestation.TestStore() for development devices)", ErrConfiguration)
+	if err := checkRequired(&cfg); err != nil {
+		return nil, err
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -422,7 +444,11 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if cfg.OTA != nil {
 		c.armer = peer.NewRebootResubscribeArmer(c.armerContext())
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk, ReportStarted: c.reportStarted})
+	// The registry carries the report bound to every node interaction
+	// bound to it (commissioner.Interaction).
+	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{
+		Logger: log, Clock: clk, ReportStarted: c.reportStarted, MaxReportBytesPerSession: cfg.MaxReportBytesPerSession,
+	})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,

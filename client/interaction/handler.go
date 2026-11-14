@@ -49,7 +49,7 @@ func (r *Subscriptions) Register(mgr *exchange.Manager) {
 // The chunks are acknowledged as readDataReports does
 // (InteractionMessenger.ts:938-972).
 func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Message) {
-	m := &messenger{x: x}
+	m := &messenger{x: x, maxReport: r.maxReport}
 	ctx := r.readingCtx
 	if s := r.serverFor(first.Opcode); s != nil {
 		// A request for the endpoints this stack serves itself
