@@ -482,10 +482,24 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// A wildcard write skips, silently, an attribute another
 		// interaction's chunked write holds (matter.js
 		// AttributeWriteResponse.ts:355-358 isHeldByOtherWrite).
+		//
+		// A path with a numeric ListIndex is never written: where its
+		// value would be written — past every other gate, the dispatcher's
+		// included — the interaction ends with InvalidAction
+		// ([listIndexGate]).
 		var results []WriteResult
+		var indexGate listIndexGate
+		numericIndex := w.Path.HasListIndex && !w.Path.ListAppend
 		switch {
+		case w.Path.HasEndpoint && numericIndex && hasAuthWriter:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(nil))
+		case numericIndex && !hasAuthWriter:
+			// No dispatcher gate to wait for: the element ends here.
+			indexGate.reached = true
 		case w.Path.HasEndpoint:
 			results = d.Write(ctx, w.Path, w.Value)
+		case hasAuthWriter && numericIndex:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(authorizeWildcard))
 		case hasAuthWriter:
 			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, authorizeWildcard)
 		case !aclActive:
@@ -500,6 +514,10 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				Status: StatusIB{Status: StatusUnsupportedAccess},
 			})
 			continue
+		}
+		if indexGate.reached {
+			wr.Status = StatusInvalidAction
+			break
 		}
 		lastWritten = nil
 		if w.Path.HasEndpoint && len(results) > 0 && allSucceeded(results) {
@@ -533,6 +551,31 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		tx.releaseHolds(nil)
 	}
 	return wr
+}
+
+// listIndexGate ends a write whose path carries a numeric ListIndex at the
+// point its value would be written. matter.js answers such a path in
+// writeValue, after the existence, writability, access, timed and
+// DataVersion checks and outside the try that turns errors into a path
+// status, so the interaction ends with StatusResponse(InvalidAction) and
+// nothing is written for the path (packages/protocol/src/action/server/
+// AttributeWriteResponse.ts:419-424 at db021da0, "Unsupported Write path
+// provided: listIndex"); on a wildcard or group path the first endpoint
+// that reaches writeValue ends it (:360).
+type listIndexGate struct{ reached bool }
+
+// wrap returns the authorizer the dispatcher asks where the value would be
+// written: inner's verdict first, then the end of the interaction.
+func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
+	return func(endpoint uint16, clusterID, attrID uint32) StatusCode {
+		if inner != nil {
+			if status := inner(endpoint, clusterID, attrID); !status.IsSuccess() {
+				return status
+			}
+		}
+		g.reached = true
+		return StatusInvalidAction
+	}
 }
 
 // namesStaleDataVersion is the DataVersion gate of [HandleWriteRequest],

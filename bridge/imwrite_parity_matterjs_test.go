@@ -173,3 +173,23 @@ func TestWriteWildcardPathFlagsEndsTheInteractionParity(t *testing.T) {
 		t.Fatalf("OnTime %v after %d writes, want 7 after one", v, srv.writes())
 	}
 }
+
+// TestWriteNumericListIndexEndsTheInteractionParity: a write path with a
+// numeric ListIndex is answered StatusResponse(INVALID_ACTION) and not
+// written (AttributeWriteResponse.ts:419-424 at db021da0).
+func TestWriteNumericListIndexEndsTheInteractionParity(t *testing.T) {
+	t.Parallel()
+	b, srv := onTimeBridge(t)
+	p := newIMPeer(t, b)
+	indexed := onTimePath()
+	indexed.HasListIndex, indexed.ListIndex = true, 3
+	p.send(0x4102, im.OpcodeWriteRequest, writeRequestBytes(t, im.WriteRequest{Writes: []im.AttributeWrite{
+		{Path: indexed, Value: im.AttributeValue{Value: uint16(7)}},
+	}}))
+	if got := p.status(); got != im.StatusInvalidAction {
+		t.Fatalf("status %v, want INVALID_ACTION", got)
+	}
+	if n := srv.writes(); n != 0 {
+		t.Fatalf("%d writes, want 0", n)
+	}
+}

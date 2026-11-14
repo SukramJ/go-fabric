@@ -219,7 +219,7 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 		if len(subject.Endpoints) == 0 {
 			continue // "No endpoints mapped to group, skipping"
 		}
-		writer.WriteAuthorized(ctx, w.Path, w.Value, func(endpoint uint16, clusterID, attrID uint32) StatusCode {
+		groupAuthorize := func(endpoint uint16, clusterID, attrID uint32) StatusCode {
 			// A group write skips an attribute a chunked write holds
 			// (matter.js AttributeWriteResponse.ts:355-358).
 			if tx.heldByOther(fabricIndex, endpoint, clusterID, attrID) {
@@ -230,7 +230,18 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 				priv = privProvider.MinWritePrivilege(endpoint, clusterID, attrID)
 			}
 			return authorize(endpoint, clusterID, priv)
-		})
+		}
+		// A numeric ListIndex ends the interaction where the value would be
+		// written ([listIndexGate]).
+		if w.Path.HasListIndex && !w.Path.ListAppend {
+			var indexGate listIndexGate
+			writer.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(groupAuthorize))
+			if indexGate.reached {
+				return StatusInvalidAction
+			}
+			continue
+		}
+		writer.WriteAuthorized(ctx, w.Path, w.Value, groupAuthorize)
 	}
 	return StatusSuccess
 }
