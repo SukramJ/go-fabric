@@ -395,6 +395,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
 	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	n.setNetworkInterfaceRules()
 	// DiagnosticLogs hands logs over BDX on the requesting session
 	// (ADR 0021).
 	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
@@ -1475,6 +1476,21 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 // its store at the first boot (or, once bootid.EnableRotation ran in the
 // process, this boot's value).
 func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
+
+// setNetworkInterfaceRules states GeneralDiagnostics NetworkInterfaces'
+// rules: the root's network type for every entry, and the interfaces the
+// node's own advertiser is restricted to as the operational ones (matter.js
+// GeneralDiagnosticsServer.ts:477-503 at db021da0; cluster/core
+// enumerateNetworkInterfaces). A host's advertiser restricts nothing the
+// node knows of.
+func (n *Node) setNetworkInterfaceRules() {
+	if n.cfg.Network.WiFi != nil {
+		n.root.GeneralDiagnostics.SetNetworkInterfaceType(mattercore.InterfaceTypeWiFi)
+	}
+	if n.ownsAdvertiser && !n.cfg.Network.MDNS.Off {
+		n.root.GeneralDiagnostics.SetAdvertisedInterfaces(n.cfg.Network.MDNS.Interfaces)
+	}
+}
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built
 // with — the value [Node.Start]'s EmitBootReason reports. The device layer

@@ -11,42 +11,29 @@ import (
 	"testing"
 )
 
-// TestClassifyInterface_AllBranches exercises every named case in the
-// classifyInterface heuristic.
-func TestClassifyInterface_AllBranches(t *testing.T) {
+// TestNetworkInterfaceRules: every entry carries the root's network type,
+// Ethernet by default, whatever its name; without an advertiser
+// restriction every interface is operational, with one the advertised
+// ones alone (GeneralDiagnosticsServer.ts:477-503 at db021da0).
+func TestNetworkInterfaceRules(t *testing.T) {
 	t.Parallel()
-
-	type tc struct {
-		name string
-		want uint8
+	var zero networkInterfaceRules
+	for _, name := range []string{"eth0", "wlan0", "br0", "bond0", "awdl0"} {
+		if got := zero.typeOf(); got != InterfaceTypeEthernet {
+			t.Errorf("%s: default type %d, want Ethernet", name, got)
+		}
+		if !zero.operational(name) {
+			t.Errorf("%s: not operational without a restriction", name)
+		}
 	}
-	cases := []tc{
-		// loopback
-		{"lo", InterfaceTypeUnspecified},
-		{"lo0", InterfaceTypeUnspecified},
-		// WiFi
-		{"wlan0", InterfaceTypeWiFi},
-		{"wlo1", InterfaceTypeWiFi},
-		{"wifi0", InterfaceTypeWiFi},
-		// Thread
-		{"thread0", InterfaceTypeThread},
-		{"trel0", InterfaceTypeThread},
-		// Ethernet
-		{"eth0", InterfaceTypeEthernet},
-		{"en0", InterfaceTypeEthernet},
-		{"en1", InterfaceTypeEthernet},
-		// Unknown → Unspecified
-		{"docker0", InterfaceTypeUnspecified},
-		{"vpn0", InterfaceTypeUnspecified},
+	wifi := networkInterfaceRules{interfaceType: InterfaceTypeWiFi, advertised: []string{"br0", "wlan0"}}
+	if got := wifi.typeOf(); got != InterfaceTypeWiFi {
+		t.Errorf("type %d, want WiFi", got)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			got := classifyInterface(tc.name)
-			if got != tc.want {
-				t.Errorf("classifyInterface(%q) = %d, want %d", tc.name, got, tc.want)
-			}
-		})
+	for name, want := range map[string]bool{"br0": true, "wlan0": true, "eth0": false} {
+		if got := wifi.operational(name); got != want {
+			t.Errorf("%s: operational %v, want %v", name, got, want)
+		}
 	}
 }
 

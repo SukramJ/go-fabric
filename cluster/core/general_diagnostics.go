@@ -12,7 +12,6 @@ import (
 	"math"
 	"net"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,8 +35,9 @@ type NetworkInterfaceStruct struct {
 	// Name is a non-empty UTF-8 label (max 32 chars). Matches the OS
 	// interface name ("en0", "eth0", …).
 	Name string
-	// IsOperational is true when the interface is up and carrying
-	// traffic.
+	// IsOperational is true for an interface the node is reached on: every
+	// one, or the advertised ones when the advertiser is restricted
+	// ([GeneralDiagnostics.SetAdvertisedInterfaces]).
 	IsOperational bool
 	// OffPremiseServicesReachableIPv4 / IPv6 are nullable booleans
 	// (nil = "unknown" / "no DNS/HTTP probe done"). go-fabric does
@@ -176,6 +176,44 @@ type GeneralDiagnostics struct {
 	// interfaces lists the interfaces NetworkInterfaces is selected
 	// from; nil is the host's (enumerateNetworkInterfaces). A test seam.
 	interfaces func() []NetworkInterfaceStruct
+	// ifaceRules is how a host interface becomes an entry of
+	// NetworkInterfaces ([GeneralDiagnostics.SetNetworkInterfaceType],
+	// [GeneralDiagnostics.SetAdvertisedInterfaces]); nil is the zero
+	// rules. Not under mu: MatterRead lists the interfaces holding it.
+	// rulesMu serialises the two setters.
+	ifaceRules atomic.Pointer[networkInterfaceRules]
+	rulesMu    sync.Mutex
+}
+
+// SetNetworkInterfaceType sets the InterfaceType every entry of
+// NetworkInterfaces carries: the type of the root's NetworkCommissioning
+// server (InterfaceTypeWiFi for one with the Wi-Fi feature,
+// InterfaceTypeThread for Thread); the default is InterfaceTypeEthernet.
+// Call it before the node is served.
+func (g *GeneralDiagnostics) SetNetworkInterfaceType(t uint8) {
+	g.updateInterfaceRules(func(r *networkInterfaceRules) { r.interfaceType = t })
+}
+
+// SetAdvertisedInterfaces names the host interfaces the node's DNS-SD
+// advertiser is restricted to: an entry of NetworkInterfaces is
+// IsOperational when its name is one of them, and every entry is when
+// names is empty (the default). Call it before the node is served.
+func (g *GeneralDiagnostics) SetAdvertisedInterfaces(names []string) {
+	names = slices.Clone(names)
+	g.updateInterfaceRules(func(r *networkInterfaceRules) { r.advertised = names })
+}
+
+// updateInterfaceRules replaces the interface rules with a copy that set
+// changed.
+func (g *GeneralDiagnostics) updateInterfaceRules(set func(*networkInterfaceRules)) {
+	g.rulesMu.Lock()
+	defer g.rulesMu.Unlock()
+	var r networkInterfaceRules
+	if cur := g.ifaceRules.Load(); cur != nil {
+		r = *cur
+	}
+	set(&r)
+	g.ifaceRules.Store(&r)
 }
 
 // BootReason values per Matter §11.12.5.4.
@@ -1061,19 +1099,24 @@ const (
 // at db021da0 skips an interface without addresses and an internal one),
 // projected into a [NetworkInterfaceStruct]. A failed listing is nil.
 //
+// InterfaceType and IsOperational follow matter.js's
+// GeneralDiagnosticsServer.ts #updateNetworkList at db021da0: every entry
+// carries the root's network type, Ethernet unless the root's
+// NetworkCommissioning has the Wi-Fi or Thread feature (:477-494, :527 —
+// the platform's own type comes first there, and Node.js's
+// NodeJsNetwork.ts:195-202 sets none but a configured one); an entry is
+// operational when the advertiser is not restricted to interfaces or is
+// restricted to it (:496-503, :521, mdnsService.limitedToNetInterface,
+// one name there and a list here, BD-matterjs-mdns-interface-allowlist).
+//
 // What this server decides without matter.js:
 //
-//   - InterfaceType is Ethernet for any name starting with "en" or
-//     "eth"; WiFi for "wl" prefixes; Thread for "tr"; Unspecified
-//     otherwise. The server does not probe link technology, so a macOS
-//     "en0" (which can be either WiFi or Ethernet) is Ethernet.
-//   - IsOperational is the interface's up flag.
 //   - An interface whose hardware address is not 6 or 8 bytes long is
 //     skipped: the field is a hwadr, and Go reports no address at all
 //     for an interface without one.
 //   - IPv4 addresses are emitted as the raw 4-byte form, IPv6 addresses
 //     as the raw 16-byte form; link-local (fe80::/10) addresses are kept.
-func enumerateNetworkInterfaces() []NetworkInterfaceStruct {
+func enumerateNetworkInterfaces(rules networkInterfaceRules) []NetworkInterfaceStruct {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
@@ -1092,8 +1135,8 @@ func enumerateNetworkInterfaces() []NetworkInterfaceStruct {
 		}
 		entry := NetworkInterfaceStruct{
 			Name:            iface.Name,
-			IsOperational:   iface.Flags&net.FlagUp != 0,
-			InterfaceType:   classifyInterface(iface.Name),
+			IsOperational:   rules.operational(iface.Name),
+			InterfaceType:   rules.typeOf(),
 			HardwareAddress: append([]byte(nil), iface.HardwareAddr...),
 		}
 		for _, a := range addrs {
@@ -1114,6 +1157,32 @@ func enumerateNetworkInterfaces() []NetworkInterfaceStruct {
 		out = append(out, entry)
 	}
 	return out
+}
+
+// networkInterfaceRules is how a host interface becomes an entry of
+// NetworkInterfaces. The zero value types every entry Ethernet and calls
+// every entry operational.
+type networkInterfaceRules struct {
+	// interfaceType is InterfaceType for every entry; zero is Ethernet.
+	interfaceType uint8
+	// advertised are the interfaces the advertiser is restricted to;
+	// empty is every interface.
+	advertised []string
+}
+
+// typeOf is the InterfaceType of every entry.
+func (r networkInterfaceRules) typeOf() uint8 {
+	if r.interfaceType == InterfaceTypeUnspecified {
+		return InterfaceTypeEthernet
+	}
+	return r.interfaceType
+}
+
+// operational reports whether the interface name is operational: every
+// one while the advertiser is not restricted, the advertised ones
+// otherwise.
+func (r networkInterfaceRules) operational(name string) bool {
+	return len(r.advertised) == 0 || slices.Contains(r.advertised, name)
 }
 
 // unassignedMAC is the hardware address matter.js reads as "no address
@@ -1147,25 +1216,6 @@ func selectNetworkInterfaces(candidates []NetworkInterfaceStruct) []NetworkInter
 		out = out[:maxNetworkInterfaces]
 	}
 	return out
-}
-
-// classifyInterface maps an OS interface name to a Matter
-// InterfaceType enum: Ethernet for the common Linux/macOS prefixes (en0,
-// eth0). A loopback name should never reach this function (the caller
-// filters it out), but guard with Unspecified just in case.
-func classifyInterface(name string) uint8 {
-	n := strings.ToLower(name)
-	switch {
-	case strings.HasPrefix(n, "lo"):
-		return InterfaceTypeUnspecified
-	case strings.HasPrefix(n, "wl") || strings.HasPrefix(n, "wlan") || strings.HasPrefix(n, "wifi"):
-		return InterfaceTypeWiFi
-	case strings.HasPrefix(n, "tr") || strings.HasPrefix(n, "thread"):
-		return InterfaceTypeThread
-	case strings.HasPrefix(n, "en") || strings.HasPrefix(n, "eth"):
-		return InterfaceTypeEthernet
-	}
-	return InterfaceTypeUnspecified
 }
 
 // OnAttributeChange implements [contract.AttributeChangeNotifier]: cb sees
@@ -1235,7 +1285,11 @@ func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
 	if g.interfaces != nil {
 		return selectNetworkInterfaces(g.interfaces())
 	}
-	return selectNetworkInterfaces(enumerateNetworkInterfaces())
+	var rules networkInterfaceRules
+	if r := g.ifaceRules.Load(); r != nil {
+		rules = *r
+	}
+	return selectNetworkInterfaces(enumerateNetworkInterfaces(rules))
 }
 
 // interfaceSnapshot describes each listed interface by its hardware

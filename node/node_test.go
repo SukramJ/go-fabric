@@ -739,3 +739,42 @@ func TestAggregatorAfterStop(t *testing.T) {
 		t.Errorf("RetirePartition after Stop: %v, want ErrStopped", err)
 	}
 }
+
+// TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser: every entry of
+// GeneralDiagnostics NetworkInterfaces carries the root's network type —
+// Ethernet, WiFi for a Wi-Fi node — and IsOperational holds for the
+// interfaces the node's advertiser is restricted to, every interface
+// without a restriction (matter.js GeneralDiagnosticsServer.ts:477-503 at
+// db021da0). Read over the host's own interfaces.
+func TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser(t *testing.T) {
+	t.Parallel()
+	read := func(t *testing.T, n *node.Node) []mattercore.NetworkInterfaceStruct {
+		t.Helper()
+		v, ok := n.Root().GeneralDiagnostics.MatterRead(0x0000)
+		if !ok {
+			t.Fatal("NetworkInterfaces is not served")
+		}
+		return v.([]mattercore.NetworkInterfaceStruct)
+	}
+	t.Run("an Ethernet node without a restriction", func(t *testing.T) {
+		t.Parallel()
+		n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+		for _, e := range read(t, n) {
+			if e.InterfaceType != mattercore.InterfaceTypeEthernet || !e.IsOperational {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want Ethernet, operational", e.Name, e.InterfaceType, e.IsOperational)
+			}
+		}
+	})
+	t.Run("a Wi-Fi node advertising on an interface the host lacks", func(t *testing.T) {
+		t.Parallel()
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		cfg.Network.WiFi = &node.WiFi{Reporter: wifiLink{}}
+		cfg.Network.MDNS = node.MDNS{Interfaces: []string{"gf-absent0"}}
+		n := newNode(t, cfg)
+		for _, e := range read(t, n) {
+			if e.InterfaceType != mattercore.InterfaceTypeWiFi || e.IsOperational {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want WiFi, not operational", e.Name, e.InterfaceType, e.IsOperational)
+			}
+		}
+	})
+}
