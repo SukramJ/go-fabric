@@ -56,9 +56,13 @@ func refusedSigma1s(t *testing.T, ipk [16]byte, dest [32]byte) map[string]struct
 // its session id, takes no id from the renewer, and its initiator's Sigma3
 // completes it; a finished handshake keeps its session keys and its state,
 // and its Sigma3 retransmission is still accepted (review II,
-// R2-P4-fr-sec-03). matter.js changes nothing about the handshake in
-// progress: the message never reaches its CASE server on the live exchange
-// (packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0).
+// R2-P4-fr-sec-03). In matter.js the message changes nothing about a
+// handshake whose Sigma2 is unacknowledged: it never reaches the CASE
+// server on the live exchange
+// (packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0);
+// once the Sigma2 was acknowledged matter.js ends the handshake for it
+// (packages/protocol/src/securechannel/SecureChannelMessenger.ts:95-98),
+// where this responder keeps it.
 func TestRefusedSigma1LeavesTheResponderAsItWas(t *testing.T) {
 	t.Parallel()
 	ipk := fabricIPK()

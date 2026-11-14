@@ -584,11 +584,11 @@ type Bridge struct {
 	// replay step (its entry points are onNewExchange and #handleSigma1,
 	// packages/protocol/src/session/case/CaseServer.ts:61-63, :102-146
 	// at db021da0). A retransmitted Sigma1 meets its exchange layer,
-	// where a duplicate is acknowledged or the pending message's
-	// retransmission kicked
-	// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and a
-	// message whose id the pending reply acknowledges gets that reply
-	// again (:512-520).
+	// where a duplicate is acknowledged
+	// (packages/protocol/src/protocol/MessageExchange.ts:501-511; the
+	// retransmission sent in the acknowledgement's place is for BDX
+	// alone, :580-583), and a message whose id the pending reply
+	// acknowledges gets that reply again (:512-520).
 	sigma1Replied map[HandshakeKey]sigma1Record
 	// sigma1Seq numbers the Sigma1 records in the order they were made,
 	// for the oldest to lose its place past [maxCaseHandshakes]; guarded

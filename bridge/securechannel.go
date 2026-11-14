@@ -512,11 +512,11 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// points are onNewExchange and #handleSigma1,
 		// packages/protocol/src/session/case/CaseServer.ts:61-63,
 		// :102-146 at db021da0); a retransmission meets its exchange
-		// layer, where a duplicate is acknowledged or the pending
-		// message's retransmission kicked
-		// (packages/protocol/src/protocol/MessageExchange.ts:501-511),
-		// and a message whose id the pending reply acknowledges gets
-		// that reply again (:512-520).
+		// layer, where a duplicate is acknowledged
+		// (packages/protocol/src/protocol/MessageExchange.ts:501-511;
+		// the retransmission sent in the acknowledgement's place is
+		// for BDX alone, :580-583), and a message whose id the pending
+		// reply acknowledges gets that reply again (:512-520).
 		key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 		h := sha256.Sum256(payload)
 		replay, overRecord := b.markSigma1Replied(key, h)
@@ -1611,14 +1611,21 @@ func (b *Bridge) sigma1RecordHeld(key HandshakeKey) bool {
 //     Sigma1 answered ([Bridge.handleSigma1]) — ends: the success report or
 //     the Sigma2_Resume was acknowledged or given up, and the
 //     retransmission the record serves is over (review II, R2-P4-rr-sec-02,
-//     R2-P4-fr-sec-02). matter.js lets go of the handshake's unsecured
-//     session, its reception state included, at the same point: the CASE
-//     server sends the success report, or Sigma2_Resume, and waits for its
-//     acknowledgement (packages/protocol/src/session/case/CaseServer.ts:332,
-//     :216; packages/protocol/src/protocol/MessageExchange.ts:830, given up
-//     at :973-976 and thrown at :840 at db021da0), and then detaches and
+//     R2-P4-fr-sec-02). For a handshake Sigma3 completed matter.js lets
+//     go of the handshake's unsecured session, its reception state
+//     included, at the same point: the CASE server sends the success
+//     report and waits for its acknowledgement
+//     (packages/protocol/src/session/case/CaseServer.ts:332;
+//     packages/protocol/src/protocol/MessageExchange.ts:830, given up at
+//     :973-976 and thrown at :840 at db021da0), and then detaches and
 //     closes that session (CaseServer.ts:95-98), which leaves the manager's
 //     table (packages/protocol/src/session/UnsecuredSession.ts:94-102).
+//     For a resumption matter.js holds the session longer: its
+//     Sigma2_Resume sent and acknowledged (CaseServer.ts:196-201), it
+//     waits for the initiator's success report (:216) and lets go when
+//     that arrives or the wait runs out; the record here ends with the
+//     Sigma2_Resume's acknowledgement, which that report is when it
+//     carries it.
 //   - A handshake whose Sigma2 was acknowledged waits for its Sigma3 for
 //     [Bridge.caseSigma3Wait] from that acknowledgement and ends then
 //     (R2-P4-fr-sec-02): matter.js's CASE server reads Sigma3 once

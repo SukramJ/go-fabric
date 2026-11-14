@@ -779,11 +779,11 @@ func sealResumeMIC(key []byte, nonceStr string) ([]byte, error) {
 // progress ([Responder.processSigma1Locked]) and is this module's own:
 // matter.js's CASE server keeps no Sigma2 to send again
 // (packages/protocol/src/session/case/CaseServer.ts:102-146 at
-// db021da0); its exchange layer acknowledges a duplicate or kicks the
-// pending message's retransmission
-// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and
-// answers a message whose id the pending reply acknowledges with that
-// reply again (:512-520).
+// db021da0); its exchange layer acknowledges a duplicate
+// (packages/protocol/src/protocol/MessageExchange.ts:501-511; the
+// retransmission it sends in the acknowledgement's place is for BDX
+// alone, :580-583), and answers a message whose id the pending reply
+// acknowledges with that reply again (:512-520).
 func (r *Responder) ProcessSigma1(sigma1Bytes []byte) (Sigma2, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -801,12 +801,18 @@ func (r *Responder) ProcessSigma1(sigma1Bytes []byte) (Sigma2, error) {
 // it any more: a Sigma1 that is refused, or whose step fails, leaves
 // the responder exactly as it was, the state, the cached Sigma2 and the
 // keys of a handshake in progress or finished included (review II,
-// R2-P4-fr-sec-03). matter.js changes nothing about a handshake in
-// progress for such a message: it never reaches the CASE server on the
-// handshake's live exchange
+// R2-P4-fr-sec-03). In matter.js such a message changes nothing about a
+// handshake whose Sigma2 is unacknowledged: it never reaches the CASE
+// server on the handshake's live exchange
 // (packages/protocol/src/protocol/MessageExchange.ts:521-534 at
 // db021da0), and a Sigma1 that opens an exchange runs a CASE server of
 // its own (packages/protocol/src/session/case/CaseServer.ts:61-63).
+// Once the Sigma2 was acknowledged matter.js hands the message to the
+// CASE server's read of Sigma3, which refuses its type and ends the
+// handshake (packages/protocol/src/session/case/CaseMessenger.ts:35-36,
+// packages/protocol/src/securechannel/SecureChannelMessenger.ts:95-98,
+// CaseServer.ts:65-99); this responder keeps the handshake there too,
+// the module's own rule (BD-Matter-CASE-Sigma1OverCompletedAcknowledgedOnly).
 func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error) { //nolint:funlen // single-purpose SIGMA-1 processing with many crypto/validation branches
 	if r.state == responderStateSigma2Sent && bytes.Equal(r.sigma1Bytes, sigma1Bytes) && r.sigma2Bytes != nil {
 		// Idempotent replay while the handshake is in progress: Apple
@@ -817,10 +823,11 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 		// the Sigma3 would AES-CCM-fail against our last-derived keys.
 		// The cache is this module's own: matter.js answers the
 		// retransmission on the exchange layer — a duplicate is
-		// acknowledged, or the pending message's retransmission kicked
+		// acknowledged
 		// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at
-		// db021da0), and a message whose id the pending reply
-		// acknowledges gets that reply again (:512-520).
+		// db021da0; the retransmission sent in the acknowledgement's
+		// place is for BDX alone, :580-583), and a message whose id the
+		// pending reply acknowledges gets that reply again (:512-520).
 		return r.sigma2, nil
 	}
 	// Any other Sigma1 — a different one, or any once the handshake
@@ -1004,10 +1011,10 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 // this module's own: matter.js's CASE server reads Sigma3 once
 // (packages/protocol/src/session/case/CaseServer.ts:279 at db021da0),
 // and a retransmission meets its exchange layer, where a duplicate is
-// acknowledged or the pending message's retransmission kicked
-// (packages/protocol/src/protocol/MessageExchange.ts:501-511), and a
-// message whose id the pending reply acknowledges gets that reply again
-// (:512-520).
+// acknowledged (packages/protocol/src/protocol/MessageExchange.ts:501-511;
+// the retransmission sent in the acknowledgement's place is for BDX
+// alone, :580-583), and a message whose id the pending reply
+// acknowledges gets that reply again (:512-520).
 //
 // Once the handshake finished, only the bytes of the Sigma3 that finished
 // it are accepted again; any other Sigma3 — and every Sigma3 after a
