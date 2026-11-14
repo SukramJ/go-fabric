@@ -86,7 +86,7 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4276,
+    "line": 4287,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
@@ -107,7 +107,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 828,
+    "line": 814,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }

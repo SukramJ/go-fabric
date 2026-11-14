@@ -321,7 +321,7 @@
   },
   {
     "file": "bridge/fields_reader.go",
-    "line": 233,
+    "line": 249,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -479,7 +479,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1999,
+    "line": 2006,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -488,7 +488,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2143,
+    "line": 2150,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
