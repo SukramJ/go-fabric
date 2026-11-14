@@ -723,11 +723,27 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 // bridge routing.
 func (m *Manager) AllocateID() (uint16, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	id, err := m.allocateIDLocked()
+	// Every id held by a live session — one fabric's administrator can
+	// open them for as many node ids as it issues NOCs: the least recently
+	// active session is closed and its id reused, as matter.js closes
+	// findOldestInactiveSession's session and takes its id
+	// (packages/protocol/src/session/SessionManager.ts:590-598, :564-572
+	// at db021da0). Its close runs below, outside the lock (review II,
+	// R2-P3-admin-05).
+	var evicted *Entry
+	if errors.Is(err, ErrSessionExhausted) {
+		if evicted = m.leastRecentlyActiveLocked(); evicted != nil {
+			delete(m.sessions, evicted.SessionID)
+			id, err = evicted.SessionID, nil
+		}
+	}
 	if err != nil {
+		m.mu.Unlock()
 		return 0, err
 	}
+	defer m.closeEvicted(evicted)
+	defer m.mu.Unlock()
 	// Stake a placeholder so concurrent allocators do not hand the
 	// same id out twice; OpenFromSigmaWithID overwrites it. The stamp
 	// is what lets the reaper tell an in-flight handshake from one
@@ -737,6 +753,41 @@ func (m *Manager) AllocateID() (uint16, error) {
 	m.placeholders = append(m.placeholders, placeholderRef{id: id, e: e})
 	m.compactPlaceholdersLocked()
 	return id, nil
+}
+
+// leastRecentlyActiveLocked returns the live session with the least recent
+// traffic, any fabric, PASE or CASE, as matter.js's findOldestInactiveSession
+// filters none (SessionManager.ts:564-572, #leastRecentlyUsedSession
+// :553-562 at db021da0); nil when no live session exists. The order is
+// [lessRecentlyActive]'s. Caller holds m.mu.
+func (m *Manager) leastRecentlyActiveLocked() *Entry {
+	var oldest *Entry
+	for _, e := range m.sessions {
+		if e.Session == nil {
+			continue
+		}
+		if oldest == nil || lessRecentlyActive(e, oldest) {
+			oldest = e
+		}
+	}
+	return oldest
+}
+
+// closeEvicted closes the session [Manager.AllocateID] took the id of,
+// outside the manager's lock, as every local close does: the peer is told
+// with a CloseSession (matter.js initiateClose on the evicted session,
+// SessionManager.ts:594-596; "A final exchange will be opened to notify the
+// peer of closure unless the peer is marked as lost", NodeSession.ts:365 at
+// db021da0), then the keys go and the hooks fire. Nil is nothing to close.
+func (m *Manager) closeEvicted(e *Entry) {
+	if e == nil {
+		return
+	}
+	victims := []*Entry{e}
+	m.notifyGracefulClose(victims, time.Time{})
+	closeStaleEntries(victims)
+	m.fireOnSessionClose(victims)
+	m.fireReannounceIfPeerGone(victims)
 }
 
 // placeholderRef is one id [Manager.AllocateID] staked and the entry it
@@ -1398,22 +1449,29 @@ func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	// them; a session that never carried traffic sorts before every one
 	// that did; the lower session id breaks a tie so the eviction order
 	// is deterministic.
-	sort.Slice(claimants, func(i, j int) bool {
-		ti, oki := claimants[i].lastActivityMonotonic()
-		tj, okj := claimants[j].lastActivityMonotonic()
-		switch {
-		case oki != okj:
-			return !oki
-		case ti != tj:
-			return ti < tj
-		}
-		return claimants[i].SessionID < claimants[j].SessionID
-	})
+	sort.Slice(claimants, func(i, j int) bool { return lessRecentlyActive(claimants[i], claimants[j]) })
 	evicted := claimants[:excess]
 	for _, entry := range evicted {
 		delete(m.sessions, entry.SessionID)
 	}
 	return evicted
+}
+
+// lessRecentlyActive orders a before b when a was active less recently, on
+// the monotonic reading, so a wall-clock step between two sessions' traffic
+// does not reorder them; a session that never carried traffic sorts before
+// every one that did; the lower session id breaks a tie so the order is
+// deterministic.
+func lessRecentlyActive(a, b *Entry) bool {
+	ta, oka := a.lastActivityMonotonic()
+	tb, okb := b.lastActivityMonotonic()
+	switch {
+	case oka != okb:
+		return !oka
+	case ta != tb:
+		return ta < tb
+	}
+	return a.SessionID < b.SessionID
 }
 
 // closeStaleEntries shuts down each session outside any lock. Safe
@@ -1626,8 +1684,9 @@ func GenerateResumptionID() ([]byte, error) {
 // (`getNextAvailableSessionId` falls back to `findOldestInactiveSession`
 // and reuses its id). We stop at placeholders and never evict a live
 // session here: closing one has to run its graceful-close cascade
-// outside this lock — see notes/parity/by_design.md
-// BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly.
+// outside this lock, so [Manager.AllocateID] does that after this returns
+// [ErrSessionExhausted] (review II, R2-P3-admin-05); see
+// notes/parity/by_design.md BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly.
 func (m *Manager) allocateIDLocked() (uint16, error) {
 	const maxID = uint16(SessionIDSpace)
 	// The table holds ids 1..maxID only, so below that size an id is free
