@@ -110,13 +110,50 @@ func resolveThreadNetworkName(t *ThreadNetwork, log *slog.Logger) (string, error
 	return t.NetworkName, nil
 }
 
-// decodeNetworks decodes a Networks attribute value.
+// decodeNetworks decodes a reported Networks attribute value by its shape;
+// its constraints are not checked. matter.js decodes an attribute of a
+// data report with decodeAttributeValueWithSchema
+// (packages/protocol/src/action/client/InputChunk.ts:299-303 at db021da0),
+// which hands the value to the schema's decodeTlv
+// (packages/protocol/src/interaction/AttributeDataDecoder.ts:333-335), and
+// decodeTlv does not validate (packages/types/src/tlv/TlvSchema.ts:64-66):
+// an octet string is read at any length (TlvString.ts:57-71), a field the
+// struct does not define is skipped and a missing one is left unset
+// (TlvObject.ts:205-251).
+// A chip Linux app that finds no Ethernet interface reports one connected
+// entry with an empty NetworkID (connectedhomeip
+// src/platform/Linux/NetworkCommissioningEthernetDriver.cpp:39-46,
+// NetworkCommissioningDriver.h:210-232 at 6170af84), which the generated
+// NetworkInfoStruct decoder, holding NetworkID to 1..32 bytes, refused.
 func decodeNetworks(n spec.Node) ([]netcomm.NetworkInfoStruct, error) {
-	return spec.DecodeList(func(e spec.Node) (netcomm.NetworkInfoStruct, error) {
-		var v netcomm.NetworkInfoStruct
-		err := v.DecodeTLV(e)
-		return v, err
-	})(n)
+	networksType := spec.Type{Kind: spec.KindList, Entry: &spec.Field{Type: spec.Type{Kind: spec.KindStruct, Struct: netcomm.NetworkInfoStructDef}}}
+	v, err := spec.DecodeValue(networksType, n)
+	if err != nil {
+		return nil, err
+	}
+	entries, ok := v.([]any)
+	if !ok {
+		return nil, errors.New("commissioner: the list is null")
+	}
+	out := make([]netcomm.NetworkInfoStruct, 0, len(entries))
+	for i, e := range entries {
+		fields, ok := e.(map[uint32]any)
+		if !ok {
+			return nil, fmt.Errorf("commissioner: entry %d is null", i)
+		}
+		var info netcomm.NetworkInfoStruct
+		for j := range netcomm.NetworkInfoStructDef.Fields {
+			f := &netcomm.NetworkInfoStructDef.Fields[j]
+			switch f.Name {
+			case "NetworkId":
+				info.NetworkId, _ = fields[f.ID].([]byte)
+			case "Connected":
+				info.Connected, _ = fields[f.ID].(bool)
+			}
+		}
+		out = append(out, info)
+	}
+	return out, nil
 }
 
 // rootNetwork is the root endpoint's NetworkCommissioning FeatureMap and
