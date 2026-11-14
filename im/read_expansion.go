@@ -34,7 +34,9 @@ type EndpointExpander interface {
 // when the dispatcher is an [EndpointExpander]. What it holds between two
 // calls of [AttributeExpansion.Next] is the deduplicated path list, where
 // it is in it, and the results of the current endpoint (or, without an
-// [EndpointExpander], of the current path) not yet taken. A path's
+// [EndpointExpander], of the current path) until the last of them was
+// taken — the slice the dispatcher returned, which it reads and never
+// writes, or its sorted copy under [AttributeExpansion.Ascending]. A path's
 // WildcardPathFlags are applied as [ApplyWildcardPathFlags] does. When ctx
 // carries this node's id ([WithLocalNodeID]), a path naming another node
 // selects nothing, or, a concrete one, yields one UnsupportedNode result.
@@ -95,8 +97,9 @@ func (e *AttributeExpansion) Ascending() *AttributeExpansion {
 func (e *AttributeExpansion) Next() (requested ConcreteAttributePath, result ReadResult, ok bool) {
 	for {
 		for e.pos < len(e.batch) {
+			// The batch stays the dispatcher's: nothing is written into
+			// it (review II, R2-P2-dr-req-04).
 			r := e.batch[e.pos]
-			e.batch[e.pos] = ReadResult{} // the value is the caller's now
 			e.pos++
 			if e.flags != 0 && wildcardPathSkipped(r.Path, e.flags, e.qualities) {
 				continue
@@ -157,19 +160,27 @@ func (e *AttributeExpansion) fill() bool {
 	}
 }
 
+// setBatch makes results the batch Next hands out. Under Ascending an
+// unsorted batch is sorted on a copy: the slice a [Dispatcher] or
+// [EndpointExpander] returned is not the expansion's to write (review II,
+// R2-P2-dr-req-04).
 func (e *AttributeExpansion) setBatch(results []ReadResult) {
-	if e.ascending {
-		slices.SortStableFunc(results, func(a, b ReadResult) int {
-			if c := cmp.Compare(a.Path.Endpoint, b.Path.Endpoint); c != 0 {
-				return c
-			}
-			if c := cmp.Compare(a.Path.Cluster, b.Path.Cluster); c != 0 {
-				return c
-			}
-			return cmp.Compare(a.Path.Attribute, b.Path.Attribute)
-		})
+	if e.ascending && !slices.IsSortedFunc(results, compareReadResultPaths) {
+		results = slices.Clone(results)
+		slices.SortStableFunc(results, compareReadResultPaths)
 	}
 	e.batch, e.pos = results, 0
+}
+
+// compareReadResultPaths orders results by (endpoint, cluster, attribute).
+func compareReadResultPaths(a, b ReadResult) int {
+	if c := cmp.Compare(a.Path.Endpoint, b.Path.Endpoint); c != 0 {
+		return c
+	}
+	if c := cmp.Compare(a.Path.Cluster, b.Path.Cluster); c != 0 {
+		return c
+	}
+	return cmp.Compare(a.Path.Attribute, b.Path.Attribute)
 }
 
 // ReadReports is the attribute half of a Read's response, generated one

@@ -6,6 +6,7 @@ package im
 import (
 	"context"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -115,5 +116,61 @@ func TestAttributeExpansionAscendingSortsEachPath(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ascending expansion order = %v, want %v", got, want)
+	}
+}
+
+// retainedDispatcher answers every read with the one slice it keeps, as a
+// host's cache may.
+type retainedDispatcher struct {
+	fakeDispatcher
+	results []ReadResult
+}
+
+func (d *retainedDispatcher) Read(context.Context, ConcreteAttributePath) []ReadResult {
+	return d.results
+}
+
+// TestAttributeExpansionLeavesTheDispatchersSlice (review II,
+// R2-P2-dr-req-04): the expansion reads the slice [Dispatcher.Read]
+// returns and writes nothing into it — neither clears the entries it hands
+// out nor sorts it in place under Ascending — so a dispatcher that keeps
+// and returns the same slice answers every read alike. The Dispatcher
+// contract does not hand the slice over.
+func TestAttributeExpansionLeavesTheDispatchersSlice(t *testing.T) {
+	t.Parallel()
+	for _, ascending := range []bool{false, true} {
+		path := func(attr uint32) ConcreteAttributePath {
+			return ConcreteAttributePath{Endpoint: 3, Cluster: 6, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+		}
+		d := &retainedDispatcher{results: []ReadResult{
+			{Path: path(2), Value: AttributeValue{Value: true}, Status: StatusSuccess},
+			{Path: path(1), Value: AttributeValue{Value: false}, Status: StatusSuccess},
+		}}
+		want := slices.Clone(d.results)
+		request := []ConcreteAttributePath{{Endpoint: 3, Cluster: 6, HasEndpoint: true, HasCluster: true}}
+		for read := range 2 {
+			e := NewAttributeExpansion(context.Background(), d, request)
+			if ascending {
+				e.Ascending()
+			}
+			var got []ReadResult
+			for {
+				_, r, ok := e.Next()
+				if !ok {
+					break
+				}
+				got = append(got, r)
+			}
+			wantOrder := want
+			if ascending {
+				wantOrder = []ReadResult{want[1], want[0]}
+			}
+			if !reflect.DeepEqual(got, wantOrder) {
+				t.Fatalf("ascending=%v read %d: results %+v, want %+v", ascending, read, got, wantOrder)
+			}
+			if !reflect.DeepEqual(d.results, want) {
+				t.Fatalf("ascending=%v read %d: the dispatcher's slice became %+v, want it untouched %+v", ascending, read, d.results, want)
+			}
+		}
 	}
 }
