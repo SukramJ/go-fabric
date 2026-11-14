@@ -617,6 +617,9 @@ func (s *structure) synchronizeServerList(ep *Endpoint, v spec.Node, clustersWit
 // (EndpointNumber.isValid, 0 to 0xFFFE) gets this endpoint as a claimant,
 // claims on parts no longer named are withdrawn, and the root's list erases
 // every endpoint it no longer names unless it holds one it does (:971-1008).
+// A list naming the root or the endpoint itself claims nothing there: the
+// root has no owner and an endpoint is not its own part (review II,
+// R2-P2-alloc-01; [structure.closesCycle] refuses the longer cycles).
 func (s *structure) synchronizePartsList(ep *Endpoint, v spec.Node) {
 	named := map[uint16]bool{}
 	used := map[uint64]bool{}
@@ -630,6 +633,9 @@ func (s *structure) synchronizePartsList(ep *Endpoint, v spec.Node) {
 		}
 		partNo := uint16(e.El.Uint)
 		named[partNo] = true
+		if partNo == 0 || partNo == ep.number {
+			continue
+		}
 		part := s.endpointFor(partNo)
 		s.addClaim(part, ep)
 	}
@@ -658,11 +664,21 @@ func (s *structure) synchronizePartsList(ep *Endpoint, v spec.Node) {
 	}
 }
 
-// visitBelow calls f for every installed endpoint below ep.
+// visitBelow calls f for every installed endpoint below ep, each once:
+// the walk does not rely on the tree being acyclic (review II,
+// R2-P2-alloc-01).
 func (s *structure) visitBelow(ep *Endpoint, f func(*Endpoint)) {
+	s.visitBelowOnce(ep, f, map[*Endpoint]bool{ep: true})
+}
+
+func (s *structure) visitBelowOnce(ep *Endpoint, f func(*Endpoint), seen map[*Endpoint]bool) {
 	for _, c := range ep.partsLocked() {
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
 		f(c)
-		s.visitBelow(c, f)
+		s.visitBelowOnce(c, f, seen)
 	}
 }
 
@@ -746,10 +762,20 @@ func (s *structure) ownerOf(ep *Endpoint) *Endpoint {
 }
 
 // erase removes an endpoint that left the peer, and what it holds
-// (:1130-1161, Endpoint.delete closing its parts).
+// (:1130-1161, Endpoint.delete closing its parts). Each endpoint is erased
+// once: the walk does not rely on the tree being acyclic (review II,
+// R2-P2-alloc-01).
 func (s *structure) erase(ep *Endpoint) {
+	s.eraseOnce(ep, map[*Endpoint]bool{})
+}
+
+func (s *structure) eraseOnce(ep *Endpoint, seen map[*Endpoint]bool) {
+	if seen[ep] {
+		return
+	}
+	seen[ep] = true
 	for _, part := range ep.partsLocked() {
-		s.erase(part)
+		s.eraseOnce(part, seen)
 	}
 	if s.endpoints[ep.number] == ep {
 		delete(s.endpoints, ep.number)
@@ -869,6 +895,13 @@ func (s *structure) resolvePartClaims() {
 			if owner == nil || !s.isPlaced(owner) {
 				continue
 			}
+			if s.closesCycle(part, owner) {
+				s.log.Warn("matter.controller.client.part_cycle_refused", slog.Int("parent", int(owner.number)), slog.Int("part", int(part.number)),
+					slog.String("reason", "the part holds its claimant"))
+				s.removeClaimant(part, owner)
+				placed = true
+				continue
+			}
 			s.deleteClaims(part)
 			if !s.isOnTheNode(part) {
 				continue
@@ -888,6 +921,24 @@ func (s *structure) resolvePartClaims() {
 			placed = true
 		}
 	}
+}
+
+// closesCycle: owning part would make it a child of its own descendant —
+// part is the root, owner itself, or on owner's chain of owners, installed
+// or pending. The walk is bounded by the number of endpoints, so an image
+// that is already cyclic ends it too (review II, R2-P2-alloc-01).
+func (s *structure) closesCycle(part, owner *Endpoint) bool {
+	if part.number == 0 {
+		return true
+	}
+	steps := 0
+	for a := owner; a != nil; a = s.ownerOf(a) {
+		if a == part || steps > len(s.endpoints) {
+			return true
+		}
+		steps++
+	}
+	return false
 }
 
 // isPlaced: the root, or an endpoint with an owner, installed or pending
