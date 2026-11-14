@@ -981,8 +981,8 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		return
 	}
 	// A new exchange on a closing session is declined
-	// (ExchangeManager.ts:386-389).
-	if s.IsClosed() || s.IsPeerLost() {
+	// (ExchangeManager.ts:386-389; :441-444 at db021da0).
+	if s.IsClosing() {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session_id", int(s.id)))
 		return
 	}
@@ -1151,18 +1151,33 @@ func (m *Manager) seal(s *Session, proto message.ProtocolHeader, payload []byte,
 }
 
 // endSessionAtRollover ends the secure session s whose outbound counter
-// nears exhaustion ([channel.Session.RolloverDue]): the peer is told with
-// a CloseSession while the keys still seal, then the session closes, so
-// the peer's next exchange establishes a new one. Mirrors matter.js
+// nears exhaustion ([channel.Session.RolloverDue]): the session turns
+// closing at once, so it takes no new exchange and the next interaction
+// establishes a new one; the exchanges in flight, the one whose send
+// consumed the counter included, end normally; when the last has ended
+// the peer is told with a CloseSession while the keys still seal, and the
+// session closes ([Session.closeIfDeferred]). Mirrors matter.js
 // packages/protocol/src/session/NodeSession.ts:398-412
-// (#scheduleRolloverClose → initiateClose), which runs on a timer rather
-// than on the stack of the send that consumed the counter; here it runs
-// on a goroutine of the manager for the same reason (the sender holds its
-// exchange's lock). The device side is bridge/reply.go
-// endSessionAtRollover. A closed manager closed the session already.
+// (#scheduleRolloverClose → initiateClose) with :367-376 and :384-391 at
+// db021da0: the close is deferred while exchanges are active, and no
+// timer bounds the wait — an exchange ends by its own MRP retransmission
+// limit, its receive timeout or its caller's context. The device side is
+// bridge/reply.go endSessionAtRollover.
 func (m *Manager) endSessionAtRollover(s *Session) {
+	if !s.deferClose() {
+		return
+	}
 	m.log.Info("matter.controller.session.rollover_close", slog.Int("session_id", int(s.id)))
-	m.goWork(func() { m.CloseSession(m.lifetime, s) })
+	s.closeIfDeferred()
+}
+
+// closeGracefully sends s a CloseSession and closes it on a goroutine of
+// the manager ([Manager.CloseSession]); a closed manager closed the
+// session already.
+func (m *Manager) closeGracefully(s *Session) {
+	if !m.goWork(func() { m.CloseSession(m.lifetime, s) }) {
+		s.Close()
+	}
 }
 
 // reportPeerLost calls the PeerLost hook once for a secure session that

@@ -382,10 +382,27 @@ func (s *Session) IsPeerLost() bool {
 }
 
 // Closing is closed once the session begins to close — [Session.Close],
-// [Manager.CloseSession] or a peer loss — matter.js Session.closing
+// [Manager.CloseSession], a peer loss or its outbound counter nearing
+// exhaustion ([Session.IsClosing]) — matter.js Session.closing
 // (Session.ts:70, emitted at :299), which a peer watches to drop the
 // session (Peer.ts:169-174).
 func (s *Session) Closing() <-chan struct{} { return s.closing }
+
+// IsClosing reports whether the session has begun to close: closed, lost,
+// or wound down at counter rollover until its last exchange ends. A
+// closing session takes no new exchange. Mirrors matter.js
+// Session.isClosing (packages/protocol/src/session/Session.ts:190-191 at
+// db021da0, closing or deferredClose), which ExchangeManager.ts:441-444
+// consults to decline an exchange the peer opens and Peer.ts:572-573 and
+// :587-590 to choose a session.
+func (s *Session) IsClosing() bool {
+	select {
+	case <-s.closing:
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Session) markClosing() {
 	s.closingOnce.Do(func() { close(s.closing) })
@@ -427,13 +444,47 @@ func (s *Session) handlePeerLoss(cause error, current *Exchange) {
 	s.closeIfDeferred()
 }
 
-// closeIfDeferred closes a lost session whose last exchange ended.
+// deferClose marks the session closing and its close deferred until its
+// last exchange ends ([Session.closeIfDeferred]); it reports false for a
+// session closed, lost or deferred already. Mirrors matter.js
+// NodeSession.initiateClose (packages/protocol/src/session/NodeSession.ts:367-376
+// at db021da0: closing is emitted, Session.ts:311, and deferredClose is
+// set while exchanges are active).
+func (s *Session) deferClose() bool {
+	s.mu.Lock()
+	if s.closed || s.peerLost || s.deferredClose {
+		s.mu.Unlock()
+		return false
+	}
+	s.deferredClose = true
+	s.mu.Unlock()
+	s.markClosing()
+	return true
+}
+
+// closeIfDeferred closes a session whose close waits for its last
+// exchange once that exchange ended (NodeSession.ts:384-391 at db021da0):
+// a lost session at once, without a CloseSession; any other with a
+// CloseSession first ([Manager.CloseSession]), as matter.js's close emits
+// the graceful close only for a peer not lost (:419-424). The CloseSession
+// goes out on a goroutine of the manager: this runs on the stack of the
+// exchange that ended or of the send that consumed the counter.
 func (s *Session) closeIfDeferred() {
 	s.mu.Lock()
 	ready := s.deferredClose && len(s.exchanges) == 0
-	s.mu.Unlock()
 	if ready {
+		// Cleared first, as NodeSession.ts:388 does: the CloseSession's own
+		// exchange ends before the session closes.
+		s.deferredClose = false
+	}
+	lost := s.peerLost
+	s.mu.Unlock()
+	switch {
+	case !ready:
+	case lost:
 		s.Close()
+	default:
+		s.m.closeGracefully(s)
 	}
 }
 
