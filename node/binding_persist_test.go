@@ -14,13 +14,15 @@ import (
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestNodeBindingPersisted: the Binding list of a switch is kept across a
 // restart on the node's database (the attribute is nonvolatile,
 // binding.element.ts:21-25): a write is restored by the next node.New on
 // the database, before the binding manager attaches the server; a removed
-// fabric's entries stay removed.
+// fabric's entries stay removed. Fabrics 1 and 2 are in the table: the
+// node drops the entries of a fabric it does not hold at start.
 func TestNodeBindingPersisted(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -43,6 +45,12 @@ func TestNodeBindingPersisted(t *testing.T) {
 	}
 
 	n, b := boot()
+	for i := range 2 {
+		rec := store.FabricRecord{FabricIndex: uint8(i + 1), FabricID: uint64(0x0A00 + i), NodeID: uint64(0x0B00 + i), VendorID: 0xFFF1, RootPublicKey: make([]byte, 65), CompressedID: [8]byte{byte(i + 1)}}
+		if _, err := n.Store().AddFabric(ctx, rec); err != nil {
+			t.Fatal(err)
+		}
+	}
 	entries := []mattercore.TargetStruct{
 		{Node: 2, Endpoint: 3, Cluster: 6, FabricIndex: 1},
 		{Group: 0x0101, FabricIndex: 1},

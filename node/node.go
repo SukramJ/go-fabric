@@ -607,13 +607,17 @@ func (n *Node) fabricLeaving(ctx context.Context, fabricIndex uint8) {
 }
 
 // fabricRemoved is OperationalCredentials' OnFabricRemoved
-// (main.go:362-385 at b4ea1f96^): the OTA providers, the CASE identity and
-// record, the sessions, and the node's own window once the last fabric
-// is gone; the Leave event went out in [Node.fabricLeaving].
+// (main.go:362-385 at b4ea1f96^), the one function that runs every
+// consequence of a fabric's removal once the store no longer holds it:
+// first every server's state for the fabric, through the removal
+// contract on the root, the Aggregator and every endpoint
+// ([Node.dropFabricState]); then what is no cluster server's state — the
+// CASE identity and record, the bridge's subscriptions, window, groups,
+// scenes, sessions and the host's hook, the event log, the participants,
+// the terms-and-conditions acceptance and the node's own window once the
+// last fabric is gone. The Leave event went out in [Node.fabricLeaving].
 func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
-	if n.root.OTARequestor != nil {
-		n.root.OTARequestor.FabricRemoved(fabricIndex)
-	}
+	n.dropFabricState(ctx, fabricIndex)
 	if compressedID, nodeID, ok := n.caseIDs.forget(fabricIndex); ok {
 		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
 	}
@@ -623,17 +627,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}
-	n.removeFabricBindings(fabricIndex)
 	n.fabricRemovedParticipants(ctx, fabricIndex)
-	if srv := n.root.ICDManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
-	// The removed fabric's trusted time source goes, with
-	// MissingTrustedTimeSource (TimeSynchronizationCluster.cpp:1020-1028
-	// at 6170af84).
-	if srv := n.root.TimeSynchronization; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
 	// The last fabric's removal resets the terms-and-conditions acceptance
 	// (GeneralCommissioningCluster.cpp:357-374 at 6170af84).
 	if srv := n.root.GeneralCommissioning; srv != nil {
@@ -645,15 +639,6 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 				n.logger.Warn("node.terms.reset", slog.Any("err", err))
 			}
 		}
-	}
-	// The root's TLS tables drop the fabric's entries
-	// (TLSCertificateManagementCluster.cpp:571-575,
-	// TLSClientManagementCluster.cpp:272-275 at 6170af84).
-	if srv := n.root.TLSClientManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
-	}
-	if srv := n.root.TLSCertificateManagement; srv != nil {
-		srv.FabricRemoved(ctx, fabricIndex)
 	}
 	n.reopenIfDecommissionedWhenIdle(ctx)
 }

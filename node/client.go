@@ -249,6 +249,9 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		n.persistBindings(ctx, t)
 		n.persistUserLabels(ctx, t)
 		n.persistNonVolatile(ctx, t)
+		// What the servers restored for a fabric the table no longer
+		// holds goes before the topology is served (fabric_state.go).
+		n.reconcileFabricState(ctx, t)
 		n.attachFailSafe(ctx, t)
 		n.attachTLS(t)
 		n.attachNodeServices(t)
@@ -339,20 +342,6 @@ func (n *Node) syncBindings(t *endpoint.Topology) {
 	}
 	for ep, b := range want {
 		n.bindings.Attach(ep, b)
-	}
-}
-
-// removeFabricBindings drops a removed fabric's Binding entries from every
-// Binding server (FabricScopedDataHandler.ts:109-122).
-func (n *Node) removeFabricBindings(fabricIndex uint8) {
-	n.bindSync.mu.Lock()
-	t := n.bindSync.topo
-	n.bindSync.mu.Unlock()
-	if t == nil {
-		t = n.br.Topology()
-	}
-	for _, b := range bindingServers(t) {
-		b.RemoveFabric(fabricIndex)
 	}
 }
 

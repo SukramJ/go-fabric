@@ -110,6 +110,7 @@ var (
 	_ spec.CommandRegistrar                   = (*ClientManagement)(nil)
 	_ tcldef.Host                             = (*ClientManagement)(nil)
 	_ DependencyChecker                       = (*ClientManagement)(nil)
+	_ contract.FabricScopedState              = (*ClientManagement)(nil)
 	_ CertificateLookup                       = (*CertificateManagement)(nil)
 )
 
@@ -430,20 +431,43 @@ func (m *ClientManagement) MatterFabricRemoved(fabricIndex uint8) {
 	m.FabricRemoved(context.Background(), fabricIndex)
 }
 
-// FabricRemoved is [ClientManagement.MatterFabricRemoved] on ctx, the
-// node's call inside RemoveFabric.
+// FabricRemoved is [ClientManagement.MatterFabricRemoved] on ctx.
 func (m *ClientManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
+	_ = m.MatterDropFabric(ctx, fabricIndex)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]: the fabric's
+// endpoints leave ([ClientManagement.MatterFabricRemoved]); the error is
+// the store's.
+func (m *ClientManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	m.mu.Lock()
 	prev := cloneEndpoints(m.rec)
 	m.rec.Endpoints = slices.DeleteFunc(m.rec.Endpoints, func(e endpointEntry) bool { return e.Fabric == fabricIndex })
-	changed := len(prev.Endpoints) != len(m.rec.Endpoints)
-	if changed {
-		_ = m.commitLocked(ctx, prev)
+	if len(prev.Endpoints) == len(m.rec.Endpoints) {
+		m.mu.Unlock()
+		return nil
 	}
+	// A refused save keeps the table as it was (commitLocked); the next
+	// reconcile drops it again.
+	err := m.commitLocked(ctx, prev)
 	m.mu.Unlock()
-	if changed {
-		m.publish()
+	if err != nil {
+		return err
 	}
+	m.publish()
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the provisioned endpoints.
+func (m *ClientManagement) MatterHeldFabrics() []uint8 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []uint8
+	for _, e := range m.rec.Endpoints {
+		out = appendFabric(out, e.Fabric)
+	}
+	return out
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

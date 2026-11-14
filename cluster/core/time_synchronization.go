@@ -192,6 +192,7 @@ var (
 	_ contract.ClusterEventLister      = (*TimeSynchronization)(nil)
 	_ contract.EventReceiver           = (*TimeSynchronization)(nil)
 	_ contract.AttributeChangeNotifier = (*TimeSynchronization)(nil)
+	_ contract.FabricScopedState       = (*TimeSynchronization)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].

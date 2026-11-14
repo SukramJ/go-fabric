@@ -311,6 +311,7 @@ var (
 	_ contract.FabricScopedReader      = (*ICDManagement)(nil)
 	_ contract.AttributeChangeNotifier = (*ICDManagement)(nil)
 	_ contract.ClusterDataVersion      = (*ICDManagement)(nil)
+	_ contract.FabricScopedState       = (*ICDManagement)(nil)
 )
 
 // NewICDManagement returns the server of a validated configuration
@@ -870,6 +871,28 @@ func (s *ICDManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 		s.notify(icddef.AttrRegisteredClients)
 	}
 	s.operatingModeChanged(changed)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]:
+// [ICDManagement.FabricRemoved].
+func (s *ICDManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	s.FabricRemoved(ctx, fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// with a registration or an operational registration view.
+func (s *ICDManagement) MatterHeldFabrics() []uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := fabricsOf(s.clients, func(c icdClient) uint8 { return c.fabricIndex })
+	for f := range s.fabrics {
+		if !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // MatterClusterID implements [contract.ClusterServer].

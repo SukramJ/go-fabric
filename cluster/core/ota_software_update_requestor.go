@@ -362,6 +362,7 @@ var (
 	_ contract.FabricScopedReader             = (*OTASoftwareUpdateRequestor)(nil)
 	_ contract.AttributeChangeNotifier        = (*OTASoftwareUpdateRequestor)(nil)
 	_ contract.EventReceiver                  = (*OTASoftwareUpdateRequestor)(nil)
+	_ contract.FabricScopedState              = (*OTASoftwareUpdateRequestor)(nil)
 )
 
 // OtaRequestorDeviceType is the OtaRequestor device type the requestor's
@@ -795,6 +796,21 @@ func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
 	if changed {
 		r.changed(otadef.AttrDefaultOtaProviders)
 	}
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]:
+// [OTASoftwareUpdateRequestor.FabricRemoved].
+func (r *OTASoftwareUpdateRequestor) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	r.FabricRemoved(fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the DefaultOTAProviders entries.
+func (r *OTASoftwareUpdateRequestor) MatterHeldFabrics() []uint8 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return fabricsOf(r.defaults, func(d otadef.ProviderLocation) uint8 { return d.FabricIndex })
 }
 
 // SetUpdatePossible changes UpdatePossible, which starts or stops the

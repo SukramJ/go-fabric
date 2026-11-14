@@ -204,6 +204,7 @@ var (
 	_ contract.FabricScopedReader      = (*Binding)(nil)
 	_ contract.EventReceiver           = (*Binding)(nil)
 	_ contract.AttributeChangeNotifier = (*Binding)(nil)
+	_ contract.FabricScopedState       = (*Binding)(nil)
 	_ spec.AttributeSetter             = (*Binding)(nil)
 	_ spec.CommandRegistrar            = (*Binding)(nil)
 	_ spec.EventEmitting               = (*Binding)(nil)
@@ -465,6 +466,12 @@ func (b *Binding) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, val
 // whether or not the save succeeds, so a failed save still drops the
 // entries here (the Save function reports its own failure).
 func (b *Binding) RemoveFabric(fabricIndex uint8) {
+	_ = b.MatterDropFabric(context.Background(), fabricIndex)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]:
+// [Binding.RemoveFabric], answering the persisted list's save error.
+func (b *Binding) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	b.writeMu.Lock()
 	b.mu.Lock()
 	before := b.bindings
@@ -472,15 +479,27 @@ func (b *Binding) RemoveFabric(fabricIndex uint8) {
 	if len(after) == len(before) {
 		b.mu.Unlock()
 		b.writeMu.Unlock()
-		return
+		return nil
 	}
 	b.bindings = after
 	b.mu.Unlock()
+	var err error
 	if b.save != nil {
-		_ = b.save(slices.Clone(after))
+		if serr := b.save(slices.Clone(after)); serr != nil {
+			err = fmt.Errorf("core: Binding: save after dropping fabric %d: %w", fabricIndex, serr)
+		}
 	}
 	b.writeMu.Unlock()
 	b.notify(contract.OriginUnknown, before, after)
+	return err
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the entries.
+func (b *Binding) MatterHeldFabrics() []uint8 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return fabricsOf(b.bindings, func(t TargetStruct) uint8 { return t.FabricIndex })
 }
 
 // bindingWriteList converts a written value into the server's entries.

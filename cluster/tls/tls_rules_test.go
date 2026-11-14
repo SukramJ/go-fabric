@@ -247,8 +247,18 @@ func TestDependencyAndFabricRemoval(t *testing.T) {
 	if v, _ := certs.MatterReadFiltered(peer(testFabric), tcmdef.AttrProvisionedRootCertificates); len(v.(spec.List[tcmdef.TLSCertStruct])) != 1 {
 		t.Fatal("the fabric's own read")
 	}
+	// The removal contract names the fabric each server holds state for.
+	if got := m.MatterHeldFabrics(); len(got) != 1 || got[0] != testFabric {
+		t.Fatalf("client held %v, want [%d]", got, testFabric)
+	}
+	if got := certs.MatterHeldFabrics(); len(got) != 1 || got[0] != testFabric {
+		t.Fatalf("certificates held %v, want [%d]", got, testFabric)
+	}
 	m.MatterFabricRemoved(testFabric)     // TLSClientManagementCluster.cpp:272-275
 	certs.MatterFabricRemoved(testFabric) // TLSCertificateManagementCluster.cpp:571-575
+	if len(m.MatterHeldFabrics()) != 0 || len(certs.MatterHeldFabrics()) != 0 {
+		t.Fatal("a server still holds the removed fabric")
+	}
 	if len(readAs[[]tcldef.TLSEndpointStruct](t, m.MatterRead, tcldef.AttrProvisionedEndpoints)) != 0 ||
 		len(readAs[[]tcmdef.TLSCertStruct](t, certs.MatterRead, tcmdef.AttrProvisionedRootCertificates)) != 0 ||
 		len(readAs[[]tcmdef.TLSClientCertificateDetailStruct](t, certs.MatterRead, tcmdef.AttrProvisionedClientCertificates)) != 0 {

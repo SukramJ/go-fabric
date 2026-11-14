@@ -307,6 +307,31 @@ func (st *ScenesState) RemoveScenesForFabric(fabric uint8) {
 	}
 }
 
+// ForgetFabric drops everything the table holds for a removed fabric: its
+// scenes ([ScenesState.RemoveScenesForFabric]) and its scene info entry,
+// so a later fabric with the same index starts without a current scene.
+func (st *ScenesState) ForgetFabric(fabric uint8) {
+	st.RemoveScenesForFabric(fabric)
+	st.mu.Lock()
+	delete(st.info, fabric)
+	st.mu.Unlock()
+}
+
+// Fabrics lists the fabrics the table holds scenes or a scene info entry
+// for, ascending.
+func (st *ScenesState) Fabrics() []uint8 {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	out := fabricsOf(st.table, func(e SceneEntry) uint8 { return e.FabricIndex })
+	for f := range st.info {
+		if !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // InvalidateCurrentScene is matter.js makeAllFabricSceneInfoEntriesInvalid:
 // a command that changes a scene-able attribute ends the current scene's
 // validity.
@@ -358,6 +383,7 @@ var (
 	_ contract.FabricScopedReader            = (*ScenesManagement)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*ScenesManagement)(nil)
 	_ contract.AttributeChangeNotifier       = (*ScenesManagement)(nil)
+	_ contract.FabricScopedState             = (*ScenesManagement)(nil)
 )
 
 // The global scene: matter.js GLOBAL_SCENE_ID in UNDEFINED_GROUP
@@ -438,6 +464,18 @@ func (s *ScenesManagement) OnAttributeChange(cb func(change contract.Change)) (u
 
 // MatterClusterID implements [contract.ClusterServer].
 func (s *ScenesManagement) MatterClusterID() uint32 { return ScenesManagementClusterID }
+
+// MatterDropFabric implements [contract.FabricScopedState]: the endpoint's
+// table forgets the fabric ([ScenesState.ForgetFabric]); a persisted table
+// is saved through its Persist callback, which reports its own failure.
+func (s *ScenesManagement) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	s.cfg.State.ForgetFabric(fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]
+// ([ScenesState.Fabrics]).
+func (s *ScenesManagement) MatterHeldFabrics() []uint8 { return s.cfg.State.Fabrics() }
 
 // MatterRead implements [contract.ClusterServer] (unfiltered).
 func (s *ScenesManagement) MatterRead(attrID uint32) (any, bool) {

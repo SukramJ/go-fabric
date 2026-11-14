@@ -118,6 +118,7 @@ var (
 	_ contract.FabricScopedReader             = (*CertificateManagement)(nil)
 	_ spec.CommandRegistrar                   = (*CertificateManagement)(nil)
 	_ tcmdef.Host                             = (*CertificateManagement)(nil)
+	_ contract.FabricScopedState              = (*CertificateManagement)(nil)
 )
 
 // NewCertificateManagement builds a TlsCertificateManagement server on
@@ -669,9 +670,38 @@ func (c *CertificateManagement) MatterFabricRemoved(fabricIndex uint8) {
 	c.FabricRemoved(context.Background(), fabricIndex)
 }
 
-// FabricRemoved is [CertificateManagement.MatterFabricRemoved] on ctx, the
-// node's call inside RemoveFabric.
+// FabricRemoved is [CertificateManagement.MatterFabricRemoved] on ctx.
 func (c *CertificateManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
+	_ = c.MatterDropFabric(ctx, fabricIndex)
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the root and client certificates.
+func (c *CertificateManagement) MatterHeldFabrics() []uint8 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []uint8
+	for _, e := range c.rec.Roots {
+		out = appendFabric(out, e.Fabric)
+	}
+	for _, e := range c.rec.Clients {
+		out = appendFabric(out, e.Fabric)
+	}
+	return out
+}
+
+// appendFabric appends f to fabrics unless it is there already.
+func appendFabric(fabrics []uint8, f uint8) []uint8 {
+	if slices.Contains(fabrics, f) {
+		return fabrics
+	}
+	return append(fabrics, f)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]: the fabric's
+// certificates and their keys leave ([CertificateManagement.MatterFabricRemoved]);
+// the error is the store's.
+func (c *CertificateManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	c.mu.Lock()
 	prev := cloneRecord(c.rec)
 	var dropped []uint16
@@ -682,18 +712,22 @@ func (c *CertificateManagement) FabricRemoved(ctx context.Context, fabricIndex u
 	}
 	c.rec.Roots = slices.DeleteFunc(c.rec.Roots, func(e rootEntry) bool { return e.Fabric == fabricIndex })
 	c.rec.Clients = slices.DeleteFunc(c.rec.Clients, func(e clientEntry) bool { return e.Fabric == fabricIndex })
-	changed := len(prev.Roots) != len(c.rec.Roots) || len(dropped) > 0
-	if changed {
-		_ = c.commitLocked(ctx, prev)
+	if len(prev.Roots) == len(c.rec.Roots) && len(dropped) == 0 {
+		c.mu.Unlock()
+		return nil
 	}
+	// A refused save keeps the tables as they were (commitLocked); the
+	// next reconcile drops them again.
+	err := c.commitLocked(ctx, prev)
 	c.mu.Unlock()
-	if !changed {
-		return
+	if err != nil {
+		return err
 	}
 	for _, id := range dropped {
 		c.port.RemoveClientKey(ctx, fabricIndex, id)
 	}
 	c.publish()
+	return nil
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

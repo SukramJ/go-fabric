@@ -65,7 +65,13 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   ACL, resumption records, default OTA providers and ICD registrations. Server
   subscriptions, presets, lock records, settings and counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
-  fabric the store does not hold is refused.
+  fabric the store does not hold is refused. What a cluster server keeps
+  for a fabric under its own settings key — the AccessControl Extension
+  entry, Binding lists, scene tables, the TLS tables, the trusted time
+  source — the server drops itself when the node removes the fabric
+  (`contract.FabricScopedState`), and the node drops what is stored for a
+  fabric the table no longer holds before it serves a topology: at start
+  and whenever an endpoint joins.
 - **The fabric row carries its commit state.** `FabricRecord.Pending`
   is `FabricCommitted`, `FabricPendingAdd` (an AddNOC that
   CommissioningComplete has not committed; `AddFabric` takes it) or
