@@ -491,6 +491,19 @@ func (b *Bridge) dispatchPase(
 	payload []byte,
 ) error {
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
+	if proto.Opcode != mrp.SCOpcodePBKDFParamRequest && b.paseHandshakeOfAnother(key) {
+		// A pairing is in progress and this Pake1 / Pake3 is not of it:
+		// ignored before a handler is resolved and before anything is
+		// counted, as matter.js ignores every new exchange while a pairing
+		// is in progress (PaseServer.ts:80-86 at db021da0) and counts only
+		// the errors of the pairing it accepted (:94-95). The MRP layer has
+		// already acknowledged the datagram.
+		b.logger.Debug("matter.rx.sc.pase_other_handshake",
+			slog.String("src", srcString(src)),
+			slog.Int("opcode", int(proto.Opcode)),
+			slog.Int("exchange_id", int(proto.ExchangeID)))
+		return nil
+	}
 	switch proto.Opcode {
 	case mrp.SCOpcodePBKDFParamRequest:
 		if !b.claimPaseInFlight(key) {
@@ -613,6 +626,15 @@ func (b *Bridge) claimPaseInFlight(key HandshakeKey) bool {
 		b.abandonHandshakeReplies(expired)
 	}
 	return true
+}
+
+// paseHandshakeOfAnother reports whether the single-active-PASE slot is
+// held, within [pasePairingTimeout], by a handshake other than key's.
+func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return !b.paseInFlightSince.IsZero() && b.paseInFlight != key &&
+		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
 }
 
 // abandonHandshakeReplies drops the replies of the handshake key names
