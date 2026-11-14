@@ -76,7 +76,10 @@ import (
 // 413 after review II, phase 0: four citations re-cited at the pin with
 // their fixes (bridge/im_gate.go, endpoint/dispatcher.go, node/node.go and
 // its parity test) and one new one left on the ratchet.
-const citecheckDriftRatchet = 413
+//
+// 410 after review II, phase 1: the citations the phase's fixes touched
+// were re-read and re-cited at the pin (41 comments in 29 files).
+const citecheckDriftRatchet = 410
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
