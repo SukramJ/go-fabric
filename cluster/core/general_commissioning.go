@@ -408,8 +408,11 @@ func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
 // SetOnCommissioningComplete replaces the commissioning-complete hook after
 // construction. It runs after a successful CommissioningComplete has
 // committed ([GeneralCommissioning.SetFailSafeCommit]) and disarmed the
-// fail-safe. Mirrors chip FailSafeContext::Reset() called from the success
-// path in CommissioningWindowManager::OnCommissioningComplete.
+// fail-safe. Mirrors chip's CommissioningComplete handler, which commits
+// the pending fabric, disarms the fail-safe and then posts the
+// commissioning-complete event
+// (src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:545,
+// :559-560 at 6170af84).
 func (g *GeneralCommissioning) SetOnCommissioningComplete(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onCommissioningComplete = fn

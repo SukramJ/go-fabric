@@ -546,12 +546,16 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 
 // rollbackPendingAtStart rolls back every fabric row a previous run left
 // pending: the node went down inside a fail-safe window, after an AddNOC
-// or UpdateNOC and before CommissioningComplete. Both references come back
-// from such a restart without the uncommitted fabric: chip keeps it
-// pending until CommissioningComplete (OperationalCredentialsCluster.cpp:507
-// AddNewPendingFabricWithOperationalKeystore at 6170af84) and matter.js
-// persists it only in completeCommission (FailsafeContext.ts:141-143 at
-// db021da0). A rolled-back add is kept for [OperationalCredentials.RolledBackFabrics].
+// or UpdateNOC and before CommissioningComplete. Neither reference stores
+// an added fabric with its AddNOC: chip keeps it pending until
+// CommissioningComplete (OperationalCredentialsCluster.cpp:507
+// AddNewPendingFabricWithOperationalKeystore at 6170af84); matter.js adds
+// it to its fabric table without a write (FailsafeContext.ts:256,
+// FabricManager.ts:202-218) and writes the table in completeCommission
+// (FailsafeContext.ts:141-143 at db021da0) — and wherever else it writes
+// the table inside the window, which holds every fabric it has
+// (FabricManager.ts:187-200); what a matter.js restart does with such a
+// fabric was not traced. A rolled-back add is kept for [OperationalCredentials.RolledBackFabrics].
 func (o *OperationalCredentials) rollbackPendingAtStart(ctx context.Context) error {
 	fabrics, err := o.store.ListFabrics(ctx)
 	if err != nil {
@@ -717,7 +721,7 @@ func (o *OperationalCredentials) ClearPendingState() {
 // rollback could not remove) is rolled back best-effort — a start would
 // remove it — and the CSR key and pending root go. Mirrors matter.js
 // FailsafeContext.completeCommission, which persists the fabric and
-// closes the context (FailsafeContext.ts:141-143 at db021da0).
+// closes the context (FailsafeContext.ts:141-143, :155 at db021da0).
 func (o *OperationalCredentials) CommitFailSafe(ctx context.Context, complete func(commit func(ctx context.Context) error)) {
 	var added, updated []store.FabricRecord
 	o.nocMu.Lock()
@@ -854,7 +858,7 @@ func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (add
 // the host re-reads the fabric (onFabricUpdated: CASE identity,
 // operational record). before is the row as the update left it. Mirrors
 // matter.js FailsafeContext rollback, which restores the fabric the update
-// replaced (FailsafeContext.ts:298-301 at db021da0).
+// replaced (FailsafeContext.ts:299-305 at db021da0).
 func (o *OperationalCredentials) reportUpdateRolledBack(ctx context.Context, before *store.FabricRecord) {
 	after, err := o.store.GetFabric(context.WithoutCancel(ctx), before.FabricIndex)
 	o.mu.RLock()
@@ -2191,7 +2195,7 @@ func nocCertifiesPendingKey(nocPub *ecdsa.PublicKey, priv *ecdsa.PrivateKey) boo
 // (fabricID, root public key) identity pair. A fabric is identified by
 // exactly this pair; AddNOC must reject a duplicate install with
 // FabricConflict BEFORE the store INSERT. Mirrors matter.js
-// FailsafeContext.ts:244-248 — the builder's globalId (hash over fabricId +
+// FailsafeContext.ts:243-249 — the builder's globalId (hash over fabricId +
 // root public key) checked against the installed set →
 // MatterFabricConflictError.
 func fabricInstalled(fabrics []store.FabricRecord, fabricID uint64, rootPub []byte) bool {
@@ -2383,7 +2387,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// Track a NodeID change on the operational mDNS instance. The old
 	// <compressedID>-<oldNodeID> record must be withdrawn explicitly — a
 	// republish alone leaves it answering until TTL. Mirrors matter.js
-	// Fabric.ts:548 (nodeId lifted from the new NOC) +
+	// Fabric.ts:602-605, :636 (nodeId lifted from the new NOC) +
 	// DeviceAdvertiser.ts:96-107 (close the fabric's advertisement when
 	// nodeId changed, then re-advertise).
 	if noc.Subject.MatterNodeID != fab.NodeID {
