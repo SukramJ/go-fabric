@@ -246,8 +246,13 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		case outbound == nil:
 		case hdr.SessionID == 0:
 			// On the unsecured session an acknowledgement is its
-			// handshake's: the initiator and the exchange it names.
-			outbound.AckUnsecured(handshakeKeyOf(&hdr, proto.ExchangeID), proto.AckCounter)
+			// handshake's: the initiator and the exchange it names. A
+			// record that ends with it ends here
+			// ([Bridge.unsecuredReplyAcknowledged]).
+			hk := handshakeKeyOf(&hdr, proto.ExchangeID)
+			if outbound.AckUnsecured(hk, proto.AckCounter) {
+				b.unsecuredReplyAcknowledged(hk)
+			}
 		case outbound.Ack(hdr.SessionID, proto.AckCounter):
 			b.releaseReportCounter(hdr.SessionID, proto.AckCounter)
 		}
@@ -497,7 +502,10 @@ func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 // for and whose handshake holds no state any more: a handshake whose last
 // reply was acknowledged, given up or evicted after its source's last
 // message. The liveness of each exchange is read outside the table's lock.
+// The CASE records whose handshake is over end first, those of exchanges no
+// window is bound to included ([Bridge.endOverSigma1Records]).
 func (b *Bridge) sweepUnsecuredWindows() {
+	b.endOverSigma1Records()
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	idle := make(map[HandshakeKey]bool)
@@ -540,7 +548,7 @@ func (b *Bridge) sweepUnsecuredWindows() {
 // single-active-PASE claim within [pasePairingTimeout], or the CASE
 // responder's Sigma1 record that ends with a failed Sigma3, the host's
 // reaper ([Bridge.ForgetSigma1Replied]) or — for a handshake the singleton
-// handler completed — its success report ([Bridge.sigma1RecordHeld]).
+// handler runs — its own end ([Bridge.sigma1RecordOver]).
 func (b *Bridge) unsecuredExchangeLive(key HandshakeKey) bool {
 	if b.sigma1RecordHeld(key) {
 		return true

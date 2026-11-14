@@ -91,7 +91,7 @@ func TestSigma1OverARecordIsJudgedOnce(t *testing.T) {
 	b.mu.RLock()
 	rec := b.sigma1Replied[key]
 	b.mu.RUnlock()
-	if rec.hash != first || rec.judging {
+	if rec.hash != first || rec.judged != nil {
 		t.Fatalf("after a Sigma1 that began nothing the record is %+v, want the first Sigma1's, unmarked", rec)
 	}
 	if replay, over := b.markSigma1Replied(key, other); replay || !over {
