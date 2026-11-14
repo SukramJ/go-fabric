@@ -199,6 +199,10 @@ type Exchange struct {
 	initiator        bool
 	index            uint32
 	done             chan struct{}
+	// handshake marks the exchange a Sigma1 opened on an inbound unsecured
+	// session; set before the session holds it, guarded by the session's
+	// lock after.
+	handshake bool
 
 	// mu guards the exchange's state: every field below it except
 	// addressOverride, which newExchange fixes and dest reads without it.

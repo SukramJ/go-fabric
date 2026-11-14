@@ -75,8 +75,11 @@ type Session struct {
 	// (clock.MonotonicOf): what the active threshold and the newest-session
 	// order are judged on, so a wall-clock step cannot flip them — matter.js
 	// keeps the stamps on Time.nowUs (Session.ts:141-151 at 862ad75f).
-	activeMono    time.Duration
-	exchanges     map[*Exchange]struct{}
+	activeMono time.Duration
+	exchanges  map[*Exchange]struct{}
+	// handshakes counts the exchanges in exchanges a Sigma1 opened on an
+	// inbound unsecured session ([maxInboundUnsecuredHandshakes]).
+	handshakes    int
 	closed        bool
 	peerLost      bool
 	deferredClose bool
@@ -440,8 +443,26 @@ func (s *Session) addExchange(x *Exchange) {
 	s.mu.Unlock()
 }
 
+// addHandshake adds x, the exchange a Sigma1 opened, unless the session
+// holds [maxInboundUnsecuredHandshakes] such exchanges already — in one
+// step, so two Sigma1 received at once cannot both pass.
+func (s *Session) addHandshake(x *Exchange) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.handshakes >= maxInboundUnsecuredHandshakes {
+		return false
+	}
+	x.handshake = true
+	s.handshakes++
+	s.exchanges[x] = struct{}{}
+	return true
+}
+
 func (s *Session) deleteExchange(x *Exchange) {
 	s.mu.Lock()
+	if _, held := s.exchanges[x]; held && x.handshake {
+		s.handshakes--
+	}
 	delete(s.exchanges, x)
 	s.mu.Unlock()
 }

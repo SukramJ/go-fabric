@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -124,6 +125,58 @@ func TestInboundUnsecuredSessionsAreBounded(t *testing.T) {
 		}
 		if first != nil || closed != 1 {
 			t.Fatalf("the oldest session was kept (closed %d)", closed)
+		}
+	})
+}
+
+// TestInboundUnsecuredSessionHoldsOneHandshake: a session a peer opened
+// without authenticating holds one exchange a Sigma1 opened, as one
+// handshake needs; a further Sigma1 is acknowledged and dropped while it
+// is open, so one source cannot hold handlers beyond the session bound. Once
+// the handshake ended and its session closed, the source's next Sigma1
+// opens a session and reaches the handler again (review II,
+// R2-P2-dr-ctl-04). Before, every Sigma1 with a fresh exchange id started
+// a handler on the one session.
+func TestInboundUnsecuredSessionHoldsOneHandshake(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		m, conn, _ := newTestManager(t, Config{})
+		release := make(chan struct{})
+		end := sync.OnceFunc(func() { close(release) })
+		defer end()
+		h, calls := recordingHandler(release)
+		m.SetProtocolHandler(mrp.SecureChannelProtocolID, h)
+		const sigma1s = 8
+		for i := range uint16(sigma1s) {
+			unsecuredRequest(m, 0xAAAA, uint32(i)+1, 0x6300+i, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, []byte{0x15, 0x18})
+		}
+		synctest.Wait()
+		first := waitHandled(t, calls)
+		if n := len(calls); n != 0 {
+			t.Fatalf("%d further handlers run on the session, want none", n)
+		}
+		m.mu.Lock()
+		held := len(m.exchanges)
+		m.mu.Unlock()
+		if held != 1 || countInbound(m) != 1 {
+			t.Fatalf("%d exchanges on %d inbound sessions, want 1 on 1", held, countInbound(m))
+		}
+		// Every dropped Sigma1 is acknowledged.
+		for i := range uint16(sigma1s - 1) {
+			ack := decodeUnsecured(t, conn.next(t).bytes)
+			if ack.proto.Opcode != mrp.StandaloneAckOpcode || ack.proto.ExchangeID != 0x6301+i || ack.hdr.DestNodeID != 0xAAAA {
+				t.Fatalf("dropped Sigma1 %d: answer %+v / %+v, want its acknowledgement", i+1, ack.hdr, ack.proto)
+			}
+		}
+		// The handshake ends; the source's next Sigma1 is served.
+		end()
+		synctest.Wait()
+		if !first.x.Session().IsClosed() || countInbound(m) != 0 {
+			t.Fatal("the session outlived its handshake")
+		}
+		unsecuredRequest(m, 0xAAAA, sigma1s+1, 0x6400, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, []byte{0x15, 0x18})
+		if next := waitHandled(t, calls); next.x.ID() != 0x6400 {
+			t.Fatalf("the next handshake ran on exchange %#x", next.x.ID())
 		}
 	})
 }

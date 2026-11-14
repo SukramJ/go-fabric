@@ -896,6 +896,24 @@ const (
 	// unsecuredEntryLifetime, matter.js's PASE_PAIRING_TIMEOUT at
 	// PaseServer.ts:33 as cited there).
 	inboundUnsecuredLifetime = 60 * time.Second
+	// maxInboundUnsecuredHandshakes is how many exchanges a Sigma1 opened
+	// an inbound unsecured session holds at once; a further Sigma1 on a
+	// new exchange is acknowledged and dropped while they are open, so the
+	// session bound bounds the CASE handlers too (review II,
+	// R2-P2-dr-ctl-04). One, because a session carries one handshake: the
+	// CASE responder closes the session when its handshake ends
+	// (client/handshake/server.go:148, CaseServer.ts:95-99 as cited
+	// there). An ICD Check-In's exchange, which ends with its message, and
+	// a refused PBKDFParamRequest's, whose answer's wait
+	// inboundUnsecuredAckWaitLimit bounds, are not counted. The rule is
+	// the device side's for a second PASE handshake while one is in
+	// progress (bridge/securechannel.go:456-464, matter.js
+	// PaseServer.ts:80-86 as cited there): the new attempt is ignored, the
+	// running one kept. A device whose Sigma1 opens a second exchange on
+	// its source's session, while its earlier handshake still runs, sees
+	// the acknowledgement and no Sigma2; its retry after that handshake
+	// ended (its session lives inboundUnsecuredLifetime at most) is served.
+	maxInboundUnsecuredHandshakes = 1
 )
 
 // ackWait is a message on an inbound unsecured session that waits for its
@@ -1047,6 +1065,16 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 // starts no handler and closes the exchange.
 func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	x := m.accept(s, msg)
+	if x == nil {
+		// An inbound unsecured session holds its one handshake
+		// ([maxInboundUnsecuredHandshakes]): acknowledged, then dropped.
+		m.log.Warn("matter.controller.unsecured_handshake_refused", slog.Uint64("node_id", s.nodeID), slog.Int("exchange_id", int(msg.ExchangeID)),
+			slog.String("reason", "the session of an unauthenticated peer holds a handshake already"))
+		if msg.RequiresAck {
+			m.sendAck(s, msg, 0)
+		}
+		return
+	}
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
 	if !m.goWork(func() {
@@ -1215,13 +1243,21 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 
 // accept registers the exchange the peer opened with msg — matter.js
 // MessageExchange.fromInitialMessage and #addExchange
-// (ExchangeManager.ts:423-434, :494-508).
+// (ExchangeManager.ts:423-434, :494-508). A Sigma1 on an inbound
+// unsecured session that holds [maxInboundUnsecuredHandshakes] handshakes
+// already registers none and returns nil.
 func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
+	handshake := s.inbound && s.secure == nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Opcode == mrp.SCOpcodeSigma1
+	if handshake && !s.addHandshake(x) {
+		return nil
+	}
 	m.mu.Lock()
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	s.addExchange(x)
+	if !handshake {
+		s.addExchange(x)
+	}
 	m.cleanupSessionExchanges(s)
 	return x
 }
