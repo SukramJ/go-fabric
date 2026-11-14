@@ -60,8 +60,8 @@ func (l *Listener) connSet() map[*Conn]bool {
 
 // TestListenerHoldsAtMostMaxInboundConnections: whatever the number of
 // source addresses, the listener holds at most MaxInboundConnections
-// inbound connections; once each has delivered a message, a further one
-// is closed and the ones held stay open.
+// inbound connections; once each has delivered a message within the idle
+// grace, a further one is closed and the ones held stay open.
 func TestListenerHoldsAtMostMaxInboundConnections(t *testing.T) {
 	t.Parallel()
 	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64})

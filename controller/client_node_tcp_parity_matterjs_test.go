@@ -49,14 +49,25 @@ type tcpPair struct {
 
 func newTCPPair(t *testing.T, ctl fabrictest.ControllerOptions, deviceTCP bool) *tcpPair {
 	t.Helper()
+	var tcp *node.TCPConfig
+	if deviceTCP {
+		tcp = &node.TCPConfig{Incoming: true, Outgoing: true}
+	}
+	return newTCPPairWith(t, ctl, tcp)
+}
+
+// newTCPPairWith is newTCPPair with the device's TCP configuration, nil
+// for TCP off.
+func newTCPPairWith(t *testing.T, ctl fabrictest.ControllerOptions, deviceTCP *node.TCPConfig) *tcpPair {
+	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true})
 	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("ep1"), Name: "ep1"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{light}, Configure: func(cfg *node.Config) {
-		if deviceTCP {
-			cfg.Network.TCP = node.TCPConfig{Incoming: true, Outgoing: true}
+		if deviceTCP != nil {
+			cfg.Network.TCP = *deviceTCP
 		}
 	}})
 	cfg := site.ControllerConfig(ctl)

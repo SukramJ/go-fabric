@@ -29,12 +29,14 @@ type TCPConfig struct {
 	Outgoing bool
 	// MaxInboundConnections is the most inbound connections the TCP
 	// listener holds in all, whatever their source addresses; at the
-	// bound a new connection takes the place of the oldest one that has
-	// delivered no complete message yet, or is closed when every held one
-	// has. Zero is the device's default, tcp.MaxInboundConnections (4,
-	// connectedhomeip's CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS); a
-	// negative value is refused by [New]. A bridge that several
-	// controllers reach over TCP may raise it.
+	// bound a new connection takes the place of the held one idle longest
+	// (no message received or sent for the longest time) among those that
+	// carried no traffic within the secure session's idle timeout (5
+	// minutes), or is closed when every held one did. Zero is the
+	// device's default, tcp.MaxInboundConnections (4, connectedhomeip's
+	// CHIP_CONFIG_MAX_ACTIVE_TCP_CONNECTIONS); a negative value is refused
+	// by [New]. A bridge that several controllers reach over TCP may raise
+	// it.
 	MaxInboundConnections int
 }
 
