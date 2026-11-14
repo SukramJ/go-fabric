@@ -657,3 +657,33 @@ func TestBLECentralKeepsItsPlaceWhilePASERuns(t *testing.T) {
 		t.Fatal("a central whose PASE handshake ended without a secure session still holds the BLE place")
 	}
 }
+
+// TestBLECentralWithAnAbandonedPASEGivesUpItsPlace: a PASE hold older than
+// pasePairingTimeout — the handshake begun and never continued — is no
+// handshake in flight: the central gives up the BLE place at the first
+// bound after it (review II, R2-P3-rr-dev-02).
+func TestBLECentralWithAnAbandonedPASEGivesUpItsPlace(t *testing.T) {
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	h, p := newBLEHarness(t, clk)
+	c := dialRadioWith(t, p, btp.Options{TimeSource: clk})
+	var conn *btp.Conn
+	waitFor(t, "the BTP connection opened", func() bool {
+		h.bridge.ble.mu.Lock()
+		defer h.bridge.ble.mu.Unlock()
+		conn, _ = h.bridge.ble.centralConn.(*btp.Conn)
+		return conn != nil
+	})
+	r, _ := h.bridge.routeFor(conn).(*connRoute)
+	h.bridge.routeBindMu.Lock()
+	r.handshakes = map[uint16]handshakeHold{0x40: {pase: true, since: clk.Now()}}
+	h.bridge.routeBindMu.Unlock()
+
+	advanceBy(clk, pasePairingTimeout+btp.ConnRspTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-c.conn.Disconnected():
+	case <-ctx.Done():
+		t.Fatalf("a central whose only PASE hold is older than pasePairingTimeout (%v) still holds the BLE place", pasePairingTimeout)
+	}
+}

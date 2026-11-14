@@ -300,7 +300,10 @@ func (b *Bridge) watchBLEPASE(c contract.BLEConnection, conn *btp.Conn) {
 }
 
 // connPASEState reports whether a secure session is bound to c and
-// whether a PASE handshake is in flight on it (nil: neither).
+// whether a PASE handshake is in flight on it (nil: neither). A PASE hold
+// older than [pasePairingTimeout] is not in flight: its handshake was
+// abandoned, as the single-active-PASE claim it took has expired
+// ([connRoute.liveHandshakesLocked]; review II, R2-P3-rr-dev-02).
 func (b *Bridge) connPASEState(c transport.Conn) (session, pase bool) {
 	if c == nil {
 		return false, false
@@ -313,8 +316,10 @@ func (b *Bridge) connPASEState(c transport.Conn) (session, pase bool) {
 	if r == nil {
 		return false, false
 	}
+	now := b.clk().Now()
 	b.routeBindMu.Lock()
 	defer b.routeBindMu.Unlock()
+	r.liveHandshakesLocked(now)
 	for _, h := range r.handshakes {
 		if h.pase {
 			pase = true
