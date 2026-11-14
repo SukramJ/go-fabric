@@ -188,6 +188,22 @@ func (c *central) learnAddress(path dbus.ObjectPath, props map[string]dbus.Varia
 	return addr
 }
 
+// forgetDeviceLocked drops what the central keeps of a device object
+// BlueZ removed: its address and its last advertisement, which a later
+// discovery callback is no longer handed (review II, R2-P3-ble-04). The
+// caller holds c.mu.
+func (c *central) forgetDeviceLocked(path dbus.ObjectPath) {
+	addr, ok := c.addresses[path]
+	if !ok {
+		return
+	}
+	delete(c.addresses, path)
+	if c.devices[addr] == path {
+		delete(c.devices, addr)
+		delete(c.discovered, addr)
+	}
+}
+
 func hasKey(m map[string]dbus.Variant, k string) bool { _, ok := m[k]; return ok }
 
 // SetDiscoveryCallback implements ble.Central: the peripherals discovered
@@ -314,13 +330,15 @@ func (c *central) handle(sig *dbus.Signal) {
 			return
 		}
 		for _, i := range ifaces {
-			if i == ifaceDevice {
-				c.mu.Lock()
-				conn := c.conns[path]
-				c.mu.Unlock()
-				if conn != nil {
-					conn.markGone()
-				}
+			if i != ifaceDevice {
+				continue
+			}
+			c.mu.Lock()
+			conn := c.conns[path]
+			c.forgetDeviceLocked(path)
+			c.mu.Unlock()
+			if conn != nil {
+				conn.markGone()
 			}
 		}
 	case sigPropsChanged:
