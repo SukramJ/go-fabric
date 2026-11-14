@@ -146,9 +146,13 @@ const testparityPlannedRatchet = 2
 // Review II (core2): AttestationCertificateProfileTest.ts's "VendorID and
 // ProductID in the distinguished name" ported but for its invalid-UTF-8
 // case: 941 missing.
+// Review II, phase 4: ServerSubscriptionTest.ts's "abandons the
+// subscription after repeated MRP exhaustion, leaving the session alone"
+// (bridge) and ListManagerTest.ts's masking of another fabric's sensitive
+// fields (cluster/core, by meaning) ported: 939 missing.
 const (
 	testparityPortedRatchet  = 162
-	testparityMissingRatchet = 941
+	testparityMissingRatchet = 939
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
