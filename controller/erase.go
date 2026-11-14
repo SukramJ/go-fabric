@@ -25,7 +25,7 @@ import (
 // them would come back. Erase waits for those stops within ctx — a node's
 // second Close does — and when ctx ends first it returns ctx's error with
 // the database untouched; an Erase called again once the hook returned
-// completes the reset.
+// completes the reset. Concurrent Erase calls run one after the other.
 //
 // An error that wraps [store.ErrScrubIncomplete] is a completed reset whose
 // scrub of the file did not finish (another connection's reader holds its
@@ -43,6 +43,8 @@ import (
 // the node store).
 func (c *Controller) Erase(ctx context.Context) error {
 	errs := []error{c.Close(ctx)}
+	c.eraseMu.Lock()
+	defer c.eraseMu.Unlock()
 	// Node.Stop's rule: Erase does nothing after a Stop that failed
 	// (controller/client/node.go, Node.Stop). A second Registry.Close waits
 	// within ctx for the stops the first could not wait for.

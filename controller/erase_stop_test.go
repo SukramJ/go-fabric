@@ -97,3 +97,78 @@ func TestEraseWaitsForTheNodesStop(t *testing.T) {
 		t.Fatalf("erased node rows came back: %v (%v)", ids, err)
 	}
 }
+
+// TestConcurrentErasesOfAStoppingNode (review II, rework of R2-P1-ctl-02):
+// two Erase calls that run at once after a Close left a node stopping run
+// one after the other — the registry Close left is read and cleared under
+// a lock — and both return nil; the node's rows are gone. Before, both
+// read and cleared it unguarded (a data race under -race) and their store
+// erases ran at once (one scrub blocked by the other's reader).
+func TestConcurrentErasesOfAStoppingNode(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	var nodes *sqlstore.Store
+	site, dev, c, _ := sitePair(t, fabrictest.Topology{}, func(cfg *controller.Config) {
+		nodes = sqlstore.New(cfg.DB)
+		cfg.Node.FlushInterval = time.Hour
+		cfg.HooksFor = func(string) client.Hooks {
+			return client.Hooks{Changed: func() {
+				if !armed.Load() {
+					return
+				}
+				select {
+				case entered <- struct{}{}:
+					<-release
+				default:
+				}
+			}}
+		}
+	})
+	t.Cleanup(releaseOnce)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	armed.Store(true)
+	if err := dev.Act(func(n *node.Node) error {
+		return n.Root().BasicInformation.SetSoftwareVersion(77, "77")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		select {
+		case <-entered:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}); err != nil {
+		t.Fatalf("the report's hook never ran: %v", err)
+	}
+	// A Close that cannot wait leaves the node stopping.
+	ended, end := context.WithCancel(t.Context())
+	end()
+	if err := c.Close(ended); err == nil {
+		t.Fatal("Close with the node still stopping returned nil")
+	}
+	releaseOnce()
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		errs := make(chan error, 2)
+		for range 2 {
+			go func() { errs <- c.Erase(ctx) }()
+		}
+		for range 2 {
+			if err := <-errs; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("concurrent Erase: %v", err)
+	}
+	if ids, err := nodes.NodeIDs(); err != nil || len(ids) != 0 {
+		t.Fatalf("stored nodes after the Erases: %v (%v), want none", ids, err)
+	}
+}

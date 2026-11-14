@@ -290,8 +290,11 @@ type Controller struct {
 	// stopping is the registry a Close left with nodes still stopping —
 	// report jobs and the store's final flush queued behind a hook that
 	// outlasted Close's ctx ([client.Node.Stop]). Erase waits for it
-	// before it deletes a row (review II, R2-P1-ctl-02).
+	// before it deletes a row (review II, R2-P1-ctl-02). eraseMu guards
+	// it and serialises Erase: concurrent Erases wait and erase one after
+	// the other.
 	stopping *client.Registry
+	eraseMu  sync.Mutex
 	udp      *udp.Listener
 	stop     func()
 	// stopTCP closes the TCP listener (tcp.go); tcpAddr is its address;
@@ -607,6 +610,14 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	return nil
 }
 
+// keepStopping records reg as the registry a Close left with nodes still
+// stopping, for Erase to wait for.
+func (c *Controller) keepStopping(reg *client.Registry) {
+	c.eraseMu.Lock()
+	c.stopping = reg
+	c.eraseMu.Unlock()
+}
+
 // Close tears the stack down in the reverse order of [New], once no
 // request for the endpoints the controller serves is dispatched any more
 // and the one in flight has returned: the update manager and the OTA
@@ -650,7 +661,7 @@ func (c *Controller) Close(ctx context.Context) error {
 	if c.reg != nil {
 		if err := c.reg.Close(ctx); err != nil {
 			errs = append(errs, err)
-			c.stopping = c.reg
+			c.keepStopping(c.reg)
 		}
 		c.reg = nil
 	}
