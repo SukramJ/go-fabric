@@ -159,11 +159,12 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-Controller-DnssdCacheBounded | `DnssdNames.ts:43` at `db021da0`: the collected names are a map with no size limit (presence); only the address records staged for hosts without a name are bounded, at 250 hosts (`:21`, `:141-143`) | `packages/general/src/net/dns-sd/DnssdNames.ts` | `"    readonly #names = new Map<string, DnssdName>();"` | this module's own rule (review II, R2-P2-alloc-03, owner decision 45): 8192 records, a number chosen without a source; past it the record installed or refreshed longest ago is deleted as an expiry deletes it. connectedhomeip was not read (unverified) | no |
 | BD-Matter-Controller-DnssdTTLCeiling | `DnssdName.ts:152` at `db021da0`: a record expires at its TTL times the grace factor (presence); a TTL below the minimum of 15 s is raised (`DnssdNames.ts:196-197`, `:551`) and nothing at these lines lowers one | `packages/general/src/net/dns-sd/DnssdName.ts` | `"expiresAt: at + Millis(Math.round(record.ttl * this.#context.ttlGraceFactor)),"` | this module's own rule (review II, R2-P2-alloc-03, owner decision 45): a record is cached for at most 4500 s, RFC 6762 §10's recommended TTL for records other than a host's (the RFC was not re-read: unverified). connectedhomeip was not read (unverified) | no |
 | BD-Matter-Controller-ReportAssemblyBounded | `InteractionMessenger.ts:1224` and `:1233` at `db021da0`: the chunks of an invoke response are collected in one array until the chunk without MoreChunkedMessages, with no count or size over it (presence); a read's reports are handed on chunk by chunk instead (`readDataReports`, `:1012-1053`) | `packages/protocol/src/interaction/InteractionMessenger.ts` | `"                allInvokeResponses.push(...response.invokeResponses);"` | this module's own rule (review II, R2-P2-alloc-05, owner decision 45): the report chunks the interactions of one session hold are bounded, by default at 2 MiB of message payload — a number chosen without a source, which a host replaces with `controller.Config.MaxReportBytesPerSession` (owner decision 48); the chunk beyond is answered ResourceExhausted. connectedhomeip was not read (unverified) | no |
-| BD-Matter-Controller-DclListingBounded | `DclClient.ts:70-86` at `db021da0`: `#fetchPaginatedJson` appends every page's items to one array for as long as the answer names a next key, with no count of pages and no size over the items (presence) | `packages/protocol/src/dcl/DclClient.ts` | `"                allItems.push(...items);"` | this module's own rule (review II, R2-P2-alloc-08): the items of one listing are bounded at 64 MiB, a number chosen without a source, beside the bounds on one answer and on the pages. connectedhomeip was not read (unverified) | no |
+| BD-Matter-Controller-DclListingBounded | `DclClient.ts:70-86` at `db021da0`: `#fetchPaginatedJson` appends every page's items to one array for as long as the answer names a next key, with no count of pages, no size over the items and no count of them (presence) | `packages/protocol/src/dcl/DclClient.ts` | `"                allItems.push(...items);"` | this module's own rule (review II, R2-P2-alloc-08, R2-P2-dr-ctl-03): one listing holds at most 64 MiB of its items' wire bytes and at most 65 536 items, both numbers chosen without a source, beside the bounds on one answer and on the pages. connectedhomeip was not read (unverified) | no |
 | BD-Matter-BDX-BlockPastLengthRefusedBeforeWrite | `InboundFlow.ts:78-93` at `db021da0`: `writeDataChunk` enqueues the block (`:78`) before it counts it against the bytes left (`:80-82`), and compares the two only at BlockEof (`:87-93`) (presence) | `packages/protocol/src/bdx/flow/InboundFlow.ts` | `"        // Enqueue the received data chunk into the writing stream\n        writeController.enqueue(data);"` | this module's own rule (review II, R2-P2-alloc-06): a block longer than the bytes left of a definite length is refused with LengthTooLarge before the sink sees it. connectedhomeip was not read (unverified) | no |
 | BD-Matter-CASE-RemovedFabricRefusedAtCompletion | `CaseServer.ts:239` at `db021da0` resolves the fabric while it answers Sigma1 — a fabric being deleted is refused there (`FabricManager.ts:331-333`) — and `:316-328` creates the session with that fabric after Sigma3's checks, with no look at the fabric's state in between (presence: the signature check followed by the session's creation, `:309-311`) | `packages/protocol/src/session/case/CaseServer.ts` | `"        await crypto.verifyEcdsa(PublicKey(peerPublicKey), peerSignatureData, new EcdsaSignature(peerSignature));\n\n        // All good! Create a secure session"` | this module's own rule (review II, R2-P2-sess-05, R2-P2-fabric-09): the session of a CASE handshake whose fabric was removed while it ran is not opened, as responder or initiator. connectedhomeip was not read (unverified) | no |
 | BD-Matter-Camera-FabricRemovalEndsStreams | `WebRtcTransportProviderServer.ts:14` and `PushAvStreamTransportServer.ts:14` at `db021da0` are empty subclasses (absence: the class lines), and `WebRtcTransportRequestorServer.ts:42-183` reacts to no fabric's deletion (absence: the whole class body); the node strips a removed fabric's entries from the three fabric-sensitive lists (`FabricScopedDataHandler.ts:41-73`, on `fabrics.events.deleting`, `ServerEnvironment.ts:188-195`) and tells no stream | `packages/node/src/behaviors/web-rtc-transport-provider/WebRtcTransportProviderServer.ts`<br>`packages/node/src/behaviors/push-av-stream-transport/PushAvStreamTransportServer.ts`<br>`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts` | `"export class WebRtcTransportProviderServer extends WebRtcTransportProviderBehavior {}"`<br>`"export class PushAvStreamTransportServer extends PushAvStreamTransportBehavior {}"`<br>`class WebRtcTransportRequestorServer` | this module's own rule (review II, R2-P2-fabric-04): a removed fabric's WebRTC sessions and push transports end through the host's ports, a session with the end reason UnknownReason (12), a value chosen because no reference names one. connectedhomeip at `6170af84`: a search of its three servers' directories finds no fabric-removal handler; an application's delegate was not read (unverified) | no |
 | BD-Matter-OTARequestor-BDXSizeCap | `OtaSoftwareUpdateRequestorServer.ts:971-977` at `db021da0`: the BDX receiver is built from the two designators, the driver mode and the block size, with no size limit among its options (presence: the whole call), and a transfer that fails is tried up to three times whatever the failure (`:965`, `:991-1004`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"                const bdx = BdxClient.asReceiver(messenger, {\n                    transferFileDesignator: fileDesignator, // We need to use the original designator here for transfer\n                    fileDesignator: await this.getDownloadLocation(), // But we store in a different location\n                    preferredDriverModes: [Flow.DriverMode.ReceiverDrive],\n                    maxBlockSize:\n                        messenger.channel.type === \"tcp\" ? OTA_BDX_MAX_BLOCK_SIZE_TCP : OTA_BDX_MAX_BLOCK_SIZE_NON_TCP,\n                });"` | this module's own rule (review II, rework of R2-P2-ctl): a BDX download takes at most 256 MiB, the default of the HTTPS path's cap; the block beyond is refused with LengthTooLarge and the transfer is not tried again. connectedhomeip was not read (unverified) | no |
+| BD-Matter-Controller-UnsecuredSessionOneHandshake | `SecureChannelProtocol.ts:146-148` at `db021da0`: every Sigma1 that opens an exchange is handed to the CASE server (presence), which starts a handshake for it without a look at what its session already carries (`CaseServer.ts:61-64`); the PASE server ignores a new exchange while a pairing is in progress (`PaseServer.ts:80-86`) | `packages/protocol/src/securechannel/SecureChannelProtocol.ts` | `"            case SecureMessageType.Sigma1:\n                await this.#caseCommissioner.onNewExchange(exchange);"` | this module's own rule (review II, R2-P2-dr-ctl-04, owner decision 45): a session an unauthenticated peer opened on the controller holds one exchange that a Sigma1 opened, and a further one is acknowledged and dropped while it runs — the device side's rule for a second PASE handshake. connectedhomeip was not read (unverified) | no |
 
 ---
 
@@ -7752,7 +7753,13 @@ CommissioningComplete commits the row with one write, its last
 the head of the next AddNOC or UpdateNOC and every start roll back each row
 still pending. A start hands the adds it rolled back to the node, which runs
 their removal consequences before it serves (`RolledBackFabrics`), as
-connectedhomeip does. The two settings keys this entry described before
+connectedhomeip does, and the updates it rolled back (`RolledBackUpdates`),
+for which the node removes the fabric's resumption records, ends the client
+stack's sessions to its peers and tells the host (`OnFabricUpdated`), as the
+rollback of an update at run time does (R2-P2-dr-noc-05); no reference was
+read for that half (unverified). A fresh arm rolls back before it is recorded,
+so an arm from the fabric that rollback removes answers FAILURE and arms
+nothing (R2-P2-dr-noc-04). The two settings keys this entry described before
 (`operational_credentials.pending_noc`,
 `operational_credentials.pending_noc_update`) are only read: a start rolls
 back and clears what an earlier build left under them
@@ -7866,6 +7873,48 @@ R2-P2-alloc-02. Pinned by
 `docs/guides/limits.md`. Register row above; the row closes when matter.js
 bounds how long an unsecured session a peer opened lives.
 
+### BD-Matter-Controller-UnsecuredSessionOneHandshake — a session an unauthenticated peer opened on the controller holds one CASE handshake
+
+matter.js opens an exchange for every initiator message, not a duplicate,
+whose exchange id its session does not hold, and calls the protocol handler
+for it (`packages/protocol/src/protocol/ExchangeManager.ts:478-492` at
+`db021da0`); the unsecured session is the one of the initiator node id the
+message names (`:308-312`). The secure-channel handler hands every such Sigma1
+to the CASE server
+(`packages/protocol/src/securechannel/SecureChannelProtocol.ts:146-148`),
+which starts a handshake for it without a look at what its session already
+carries (`packages/protocol/src/session/case/CaseServer.ts:61-64`) and closes
+the unsecured session when that handshake ends, however it ends (`:95-99`).
+For PASE it has the rule this entry takes: a new exchange is ignored while a
+pairing is in progress
+(`packages/protocol/src/session/pase/PaseServer.ts:80-86`). On the controller
+a session that an unauthenticated peer opened holds at most
+`maxInboundUnsecuredHandshakes` = 1 exchange that a Sigma1 opened
+(`client/exchange/manager.go`): a further Sigma1 that opens another exchange
+on that session while the first runs is acknowledged and dropped, with the
+warning `matter.controller.unsecured_handshake_refused`. An ICD Check-In's
+exchange, which ends with its message, and a refused PBKDFParamRequest's are
+not counted. The number is this module's choice and has two sources in the
+module: a session carries one handshake, because the CASE responder closes the
+session when its handshake ends (`client/handshake/server.go`, which mirrors
+`CaseServer.ts:95-99`), and the device side ignores a second PASE handshake
+while one is in progress (`bridge/securechannel.go`, which mirrors
+`PaseServer.ts:80-86`). Who reaches the bound: a peer whose Sigma1 opens
+another exchange under a source node id whose handshake still runs. A
+legitimate device does so only when it starts over on a new exchange under the
+same source node id before its earlier handshake ended: it sees the
+acknowledgement and no Sigma2, and its retry after that handshake ended — the
+session lives 60 s at most (`BD-Matter-Controller-UnsecuredSessionLifetime`) —
+is served. Whether real devices keep the source node id across a retry was not
+measured, and no run against the production CASE responder with a valid Sigma1
+was made (unverified); connectedhomeip was not read (unverified). Reason: the
+bound on the sessions (`BD-Matter-Controller-UnsecuredSessionsBounded`) is a
+bound on the CASE handlers only when a session carries one. Review II,
+R2-P2-dr-ctl-04, owner decision 45. Pinned by
+`client/exchange:TestInboundUnsecuredSessionHoldsOneHandshake`; the limit is
+in `docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds the handshakes one unsecured session carries.
+
 ### BD-Matter-UnauthenticatedIntervalsClamped — the MRP intervals an unauthenticated peer states time a handshake with at most one hour each, on the controller and on the device
 
 matter.js bounds the intervals it advertises at one hour and says of the
@@ -7969,21 +8018,33 @@ end. Review II, R2-P2-alloc-05, owner decision 45. Pinned by
 `docs/guides/limits.md`. Register row above; the row closes when matter.js
 bounds the chunks of a response it collects.
 
-### BD-Matter-Controller-DclListingBounded — the items of one paginated DCL listing are bounded at 64 MiB
+### BD-Matter-Controller-DclListingBounded — one paginated DCL listing is bounded at 64 MiB of wire bytes and at 65 536 items
 
-matter.js appends every page's items to one array for as long as the
-answer names a next key, with no count of pages and no size over the items
-(`packages/protocol/src/dcl/DclClient.ts:70-86` at `db021da0`,
-`#fetchPaginatedJson`). `controller/dcl` reads at most `maxPages` = 1000
-pages of at most `maxResponseBody` = 16 MiB each and holds at most
-`maxListingBytes` = 64 MiB of items for one listing
-(`controller/dcl/client.go`); a listing that passes a bound fails with an
-error. The 64 MiB are chosen, with no source: four answers' worth of the
-bound on one answer. connectedhomeip was not read (unverified). Reason:
-the bound on the pages alone left one listing a thousand times the bound
-on an answer. Review II, R2-P2-alloc-08. Pinned by
-`controller/dcl:TestListingBound`. Register row above; the row closes when
-matter.js bounds a paginated listing.
+matter.js appends every page's items to one array for as long as the answer
+names a next key, with no count of pages, no size over the items and no count
+of them (`packages/protocol/src/dcl/DclClient.ts:70-86` at `db021da0`,
+`#fetchPaginatedJson`); each answer is read whole (`response.json()`, `:108`).
+`controller/dcl` reads at most `maxPages` = 1000 pages of at most
+`maxResponseBody` = 16 MiB each and holds, for one listing, at most
+`maxListingBytes` = 64 MiB of its items' wire bytes and at most
+`maxListingItems` = 65 536 items, decoded one at a time, the listing refused
+before the item past the bound is decoded (`controller/dcl/client.go`); a
+listing that passes a bound fails with an error. Both numbers are chosen, with
+no source. The 64 MiB are four answers' worth of the bound on one answer. The
+65 536 are there because the bytes bound the wire and not the memory: an item
+of three wire bytes decodes to a whole struct, so 64 MiB of items could be
+some 22 million of them. The fix's reasoning for the number is that the
+production ledger's listings are far smaller, which it did not measure and
+this entry does not either (unverified). The memory ceiling of one decoded
+listing is therefore 65 536 structs — about 9 MiB at the 144 bytes the fix
+gives for the larger item type, not re-measured here — and the strings of at
+most 64 MiB of wire bytes. connectedhomeip was not read (unverified). Reason:
+the bound on the pages alone left one listing a thousand times the bound on an
+answer, and the bound on the bytes alone left its decoded size open. Review
+II, R2-P2-alloc-08, R2-P2-dr-ctl-03. Pinned by
+`controller/dcl:TestListingBound` and `TestListingItemBound`; the limits are
+in `docs/guides/limits.md`. Register row above; the row closes when matter.js
+bounds a paginated listing.
 
 ### BD-Matter-BDX-BlockPastLengthRefusedBeforeWrite — a BDX block that would pass the transfer's definite length is refused before it is written
 
@@ -8029,28 +8090,44 @@ R2-P2-fabric-09. Pinned by
 above; the row closes when matter.js checks the fabric before it creates
 the session.
 
-### BD-Matter-NonVolatileWrite-StoredBeforeApplied — a nonvolatile attribute's write is stored before the server takes it, and undone when the server refuses it
+### BD-Matter-NonVolatileWrite-StoredBeforeApplied — a controller's write of a nonvolatile attribute is stored before the server takes it; every other change is stored after the server committed it
 
-matter.js commits state and storage together: commit phase one hands a
-transaction's changed values to the store
-(`packages/node/src/behavior/state/managed/Datasource.ts:1227-1262` at
-`db021da0`), a failure there rolls every participant back
-(`packages/general/src/transaction/Tx.ts:933-974`), only phase two makes
-the working values canonical (`Datasource.ts:1267-1281`), and a rollback
-puts the canonical values back (`:1331-1332`). Where in that sequence a
-value the behaviour refuses is stopped was not traced (unverified). What
-it stores is every nonvolatile member and every writable or fabric-scoped
-attribute
+matter.js commits state and storage together, whoever made the change: commit
+phase one notes each changed value, collects the persistent ones and hands
+them to the store
+(`packages/node/src/behavior/state/managed/Datasource.ts:1225-1262` at
+`db021da0`: `commit1`, the store's `set` at `:1261`; the changed names at
+`:1442-1454`), a failure there rolls every participant back
+(`packages/general/src/transaction/Tx.ts:933-974`), only phase two makes the
+working values canonical (`Datasource.ts:1267-1281`), the change events are
+emitted after it (`postCommit`, `:1286-1326`), and a rollback puts the
+canonical values back (`:1331-1332`). So at these lines no value is canonical
+or announced before it was handed to the store. Where in that sequence a value
+the behaviour refuses is stopped was not traced (unverified). What it stores
+is every nonvolatile member and every writable or fabric-scoped attribute
 (`packages/node/src/behavior/supervision/RootSupervisor.ts:160-173`). This
-module has no transaction over a server's state: a server checks and
-commits a write inside one `MatterWrite`. The node's persister
-(`node/nonvolatile.go`, through `endpoint.WritePersister`) therefore
-stores the written value after the dispatcher's gates and before the
-server sees it, and puts the previous stored value back when the server
-refuses the write; a store that refuses answers FAILURE, and the server
-never sees the write. It keeps the attributes whose generated definition
-carries the N quality and write access, not fabric-scoped, of a server
-the module holds (owner decision 38 of review II) — not every writable
+module has no transaction over a server's state: a server checks and commits
+inside one `MatterWrite`, one command or one `Set` of the host. The node's
+persister (`node/nonvolatile.go`) therefore has two orders. A controller's
+write is stored before the server sees it (through `endpoint.WritePersister`,
+after the dispatcher's gates): a store that refuses answers FAILURE and the
+server never sees the write; when the server refuses the write, the previous
+stored value is put back; and once the server applied it, the value the server
+then holds replaces the written one where the two differ (`storeHeld`:
+WindowCovering's Mode, a companion the write moved), so the stored form is the
+served one, not the written one. Every other change — a command, a companion
+attribute the server moves, the host's `Set` — is stored after the server
+committed it, from the server's own change notification (`spec.ChangesOf`), as
+the value the server then holds. That is the divergence from matter.js's
+order, in which the store comes before the value is canonical and before the
+notification: on these paths the store cannot refuse the change. A store that
+refuses is logged (`nonvolatile.persist`), the value stays in effect, and the
+key is owed: it is written again at the attribute's next change, when the node
+stops and when the host forgets the device. The persister keeps the attributes
+whose generated definition carries the N quality and write access, not
+fabric-scoped, of a server the module holds (owner decision 38 of review II) —
+the root's own servers, not one the host mounts there (`Config.RootServers`),
+and on a bridged endpoint a server its device built — not every writable
 attribute, and none a host port carries. It leaves out every fabric-scoped
 attribute, which matter.js's `persistentKeys` takes whatever its quality
 (`RootSupervisor.ts:168-169`): the state of a fabric is stored by the server
@@ -8058,19 +8135,29 @@ that holds it — the store's fabric, ACL and group rows, the AccessControl
 Extension entry, Binding, DefaultOTAProviders — and leaves with its fabric
 (`contract.FabricScopedState`), which a value under a `nonvolatile.` key would
 not; whether every fabric-scoped attribute the module serves is stored by its
-server was not checked here (unverified). Two things follow from the
-order: a crash between the store's write and the undo of a refused value
-leaves the refused value stored — the restore hands it to the server's
-checks, which refuse it again, logged as `nonvolatile.restore` — and the
-stored form is the written value, not the committed one where a server
-changes it on the way (WindowCovering's Mode). Reason: the value is never
-in effect without being stored, through one seam at the dispatcher instead
-of a pre-commit step in every server. Review II, R2-P2-store-04,
-R2-P2-store-07. Pinned by `node:TestNonVolatileWriteSurvivesARestart`,
-`TestNonVolatileWriteRefusedByTheStore` and
-`TestNonVolatileWriteRefusedByTheServer`. Retire when a server's write can
-be checked without being committed, so that the store sees only a value
-the server took.
+server was not checked here (unverified). What a crash leaves follows from the
+two orders. Between a server's commit of such a change and its store write:
+the value stored before the change, which the restart serves, so a controller
+may have read a value that does not survive. Between a write's store and the
+undo of a value the server refused: the refused value — the restore hands it
+to the server's checks, which refuse it again, logged as
+`nonvolatile.restore`. Between a write's store and the store of the form the
+server committed: the written form; what the restore's write of it leaves in
+the server was not traced (unverified). Reason: a controller's write is never
+in effect without being stored, through one seam at the dispatcher instead of
+a pre-commit step in every server; a command and a host's `Set` change the
+server with no seam ahead of its commit, so there the store follows the commit
+and what it refused is owed. Review II, R2-P2-store-04, R2-P2-store-07,
+R2-P2-dr-node-01, R2-P2-dr-node-05. Pinned by
+`node:TestNonVolatileWriteSurvivesARestart`,
+`TestNonVolatileWriteRefusedByTheStore`,
+`TestNonVolatileWriteRefusedByTheServer`,
+`TestNonVolatileStoresTheCommittedValue`,
+`TestNonVolatileChangeSurvivesARestart`,
+`TestNonVolatileChangeOwedWhileTheStoreRefuses` and
+`TestNonVolatileHostRootServerIsTheHosts`. Retire when a server's change can
+be checked without being committed on every path, so that the store sees a
+value the server took before it is in effect.
 
 ### BD-Matter-RevokeCommissioning-PASEArmedFailSafeOnly — RevokeCommissioning expires only the fail-safe that was armed over a PASE session
 
@@ -8092,16 +8179,30 @@ condition is that the fail-safe was armed over PASE:
 expires a fail-safe that a PASE session armed from the disarmed state — the
 mark stays through its re-arms and through the AddNOC that re-stamps it onto
 the new fabric, and goes when the fail-safe ends — and leaves one that an
-administrator armed over CASE. The conditions part in two cases: with a PASE
-session open and another administrator's fail-safe armed over CASE both
-references expire that fail-safe and this module does not; with a PASE-armed
-fail-safe running and its PASE session already gone connectedhomeip expires
-nothing and this module expires it. Reason (owner decision 42 of review II): a
-fail-safe an administrator armed over CASE — an UpdateNOC, a step of another
-fabric's commissioning — is not the commissioning the revoke aborts, and
-expiring it rolls back another fabric's work. Review II, R2-P2-comm-08. Pinned
-by `bridge:TestCommissioningWindow_RevokeExpiresOnlyThePASEFailSafe`. Retire
-when both references narrow the expiry to the fail-safe a PASE session armed.
+administrator armed over CASE. Of the other ends of a window, one expires the
+same way and one expires nothing: a host's block that finds a window open
+(`CommissioningWindow.SetBlocked`) revokes it through `RevokeWindow`, so it
+closes the PASE sessions and expires a PASE-armed fail-safe as
+RevokeCommissioning does; the PASE lockout does not revoke — it closes the
+window as the end of commissioning closes it
+(`CommissioningWindow.EndCommissioning`, called from
+`bridge/securechannel.go`), expires no fail-safe and closes no PASE session,
+as matter.js's handler of too many PASE errors calls `endCommissioning`
+(`packages/protocol/src/protocol/DeviceCommissioner.ts:78-82`), whose
+`#closeWindow` stops the window's timer, removes the PASE commissioner and
+leaves commissioning mode (`:283-299`, `:319-324`); until the rework of review
+II's phase 2 the lockout revoked (R2-P2-dr-noc-01). The conditions part in two
+cases: with a PASE session open and another administrator's fail-safe armed
+over CASE both references expire that fail-safe and this module does not; with
+a PASE-armed fail-safe running and its PASE session already gone
+connectedhomeip expires nothing and this module expires it. Reason (owner
+decision 42 of review II): a fail-safe an administrator armed over CASE — an
+UpdateNOC, a step of another fabric's commissioning — is not the commissioning
+the revoke aborts, and expiring it rolls back another fabric's work. Review
+II, R2-P2-comm-08. Pinned by
+`bridge:TestCommissioningWindow_RevokeExpiresOnlyThePASEFailSafe`, and
+`TestBridge_PaseLockoutClosesOnlyTheWindow` for the lockout. Retire when both
+references narrow the expiry to the fail-safe a PASE session armed.
 
 ### BD-Matter-Shutdown-CloseSessionKept — the node's shutdown tells each peer with a CloseSession, where matter.js ends its sessions without one
 
@@ -8130,14 +8231,46 @@ before the restart, and its request failed only once MRP gave up — after about
 49 s in six restart tests, by the fix's measurement, not repeated here; with
 the farewell a controller drops the session at once and establishes CASE
 again. The decision also has the controller hardened to recover from a peer
-that went away without a farewell, as after a power loss; that is not in the
-tree at `114dee6d`. Review II, R2-P2-sess-03. Pinned by
-`bridge:TestStop_DrainsSessionsGracefully` for the farewell and
-`TestStopFlushesTheSubscriptionsBeforeTheSessionsEnd` and
+that went away without a farewell, as after a power loss: the interaction that
+finds the peer gone gives up the session it ran on, and the next one
+establishes CASE again (`BD-Matter-PeerLoss-OwnSessionAtTheSameInstant`).
+Review II, R2-P2-sess-03. Pinned by `bridge:TestStop_DrainsSessionsGracefully`
+for the farewell and `TestStopFlushesTheSubscriptionsBeforeTheSessionsEnd` and
 `node:TestStopFlushesTheShutDownEventToItsSubscribers` for the flush. Retire
 when the owner reopens the decision — the controller's recovery from a silent
-peer is its precondition — or when matter.js resolves its TODO for the
-farewell.
+peer, its precondition, is in the tree — or when matter.js resolves its TODO
+for the farewell.
+
+### BD-Matter-PeerLoss-OwnSessionAtTheSameInstant — the session of the exchange that found its peer gone is given up even when it is no older than the exchange
+
+matter.js reports a peer as lost when a send fails with a transient, timeout
+or network error (`packages/protocol/src/protocol/MessageExchange.ts:643-650`
+at `db021da0`) and hands the loss to the session manager with `asOf`, the
+instant the exchange's context was created
+(`packages/protocol/src/protocol/ExchangeManager.ts:613-614`, `:621-644`); the
+manager gives up every session of the peer except those created at or after
+`asOf` (`packages/protocol/src/session/SessionManager.ts:727-746`, the cutoff
+at `:740-742`; `createdAt`, `packages/protocol/src/session/Session.ts:60`, on
+the same clock, `packages/general/src/time/Time.ts:63-65`). The cutoff spares
+a session established while the failing exchange ran. By its letter it also
+spares the failing exchange's own session when the two instants are equal;
+whether matter.js's clock ever yields that was not measured (unverified).
+`client/exchange` mirrors the chain and the cutoff (`handlePeerLoss`,
+`client/exchange/manager.go`) with one exception: the session the failing
+exchange ran on is always given up, whatever its creation instant — it existed
+before its exchange by construction. Reason (owner decision 49 of review II):
+on a clock that did not move between a session's creation and its exchange's —
+a test's fake clock, a coarse one — the cutoff kept the session of a peer that
+had restarted, and the next interaction failed on it the same way (the fix's
+measurement under a fake clock, not repeated here); with the exception the
+failed interaction returns its transient error once and the next one
+establishes CASE again. Nothing else of the recovery departs, by the fix's
+reading of matter.js, which was not re-read for this entry (unverified): the
+failed interaction is not retried, the next one connects again, and a
+sustained subscription comes back on a new session. Pinned by
+`client/exchange:TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant` and
+`fabrictest:TestControllerRecoversFromASilentRestart`. Retire when matter.js
+exempts the failing exchange's session from its cutoff.
 
 ### BD-Matter-Camera-FabricRemovalEndsStreams — a removed fabric's camera sessions and push transports end through the host's ports
 
@@ -8243,7 +8376,7 @@ hands an index out again only once its counter has wrapped past 254
 connectedhomeip. No test pins the kept index after a removal (none was found;
 unverified).
 
-### BD-Matter-SessionRolloverClose — a secure session is closed 100 000 messages before its counter runs out, without a flush and on the device side only
+### BD-Matter-SessionRolloverClose — a secure session is closed 100 000 messages before its counter runs out, on the device after a flush of its subscriptions, and on the controller
 
 matter.js winds a secure session down before its message counter rolls over:
 the counter calls the session's handler when it reaches its maximum less
@@ -8252,22 +8385,32 @@ the counter calls the session's handler when it reaches its maximum less
 `db021da0`; wired at `packages/protocol/src/session/NodeSession.ts:123`), and
 `#scheduleRolloverClose` then runs `initiateClose` with
 `closeSubscriptions(true)` on a timer, off the stack of the send that consumed
-the counter (`NodeSession.ts:398-412`): the subscriptions are flushed and the
-session closes with a CloseSession. The number here is that constant
-(`rolloverInfoDifference`, `secure/channel/session.go`): `Session.RolloverDue`
-reports, once, that the outbound counter has passed 0xFFFFFFFF less 100 000 or
-is used up, and the bridge then tells the peer with a CloseSession and closes
-the session through the registry, on a goroutine of its own
-(`endSessionAtRollover`, `bridge/reply.go`). Two differences, neither of them
-a decision: the close does not first report what the session's subscriptions
-owe — they end with the session — and only the bridge's sessions are wound
-down: the client stack (`client/exchange`) does not ask `RolloverDue`, so a
-session it holds sends until its counter is used up
-(`mrp.ErrCounterExhausted`). connectedhomeip was not read (unverified). Review
-II, R2-P2-ctr-08. Pinned by
-`bridge:TestSecureSessionClosedWhenItsCounterNearsExhaustion` and
+the counter (`NodeSession.ts:398-412`; the flush through the session,
+`:312-323`): the subscriptions are flushed first
+(`packages/protocol/src/session/Session.ts:304-320`) and the session then
+closes with a CloseSession (`NodeSession.ts:419-425`,
+`packages/protocol/src/protocol/ExchangeManager.ts:758`). The number here is
+that constant (`rolloverInfoDifference`, `secure/channel/session.go`):
+`Session.RolloverDue` reports, once, that the outbound counter has passed
+0xFFFFFFFF less 100 000 or is used up. The bridge then reports what the
+session's subscriptions owe (`subscription.Manager.FlushSession`), tells the
+peer with a CloseSession and closes the session through the registry, on a
+goroutine of its own (`endSessionAtRollover`, `bridge/reply.go`). The client
+stack asks `RolloverDue` when it seals a message and closes its session with a
+CloseSession on a goroutine of its manager, so the next interaction
+establishes a new one (`endSessionAtRollover`, `client/exchange/manager.go`).
+The two differences this entry recorded at `114dee6d` — no flush before the
+close, and the device side only — are closed (review II, R2-P2-dr-req-07,
+R2-P2-ctr-08). What is left is form, not a decision: a goroutine where
+matter.js starts a timer, and no flush in the client stack's close — whether a
+peer can hold a subscription on a session of the client stack was not traced
+(unverified). connectedhomeip was not read (unverified). Review II,
+R2-P2-ctr-08. Pinned by
+`bridge:TestSecureSessionClosedWhenItsCounterNearsExhaustion`,
+`TestRolloverCloseFlushesTheSessionsSubscriptions`,
+`client/exchange:TestSessionClosedWhenItsCounterNearsExhaustion` and
 `secure/channel:TestRolloverDueOnceNearExhaustion`. Phase 4 of review II
-closes the two differences or records each as a finding.
+decides whether the entry leaves the list of divergences.
 
 ### BD-Matter-OTARequestor-BDXSizeCap — an OTA image downloaded over BDX is capped at 256 MiB, and a transfer past the cap is not tried again
 
