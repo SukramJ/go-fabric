@@ -239,9 +239,15 @@ var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was remov
 // and the initiator the one it started with; a removal that ran between
 // Sigma1 and the handshake's end swept the fabric's sessions before this
 // one existed, which would then live on the removed index with nothing to
-// end it (review II, R2-P2-sess-05, R2-P2-fabric-09). Ahead of matter.js,
-// whose CaseServer creates the session with the fabric it resolved; a
-// candidate for the Ahead of matter.js register.
+// end it (review II, R2-P2-sess-05, R2-P2-fabric-09). Ahead of matter.js
+// (BD-Matter-CASE-RemovedFabricRefusedAtCompletion): its CaseServer
+// resolves the fabric while it answers Sigma1
+// (packages/protocol/src/session/case/CaseServer.ts:239 at db021da0),
+// where a fabric that is being deleted is refused
+// (packages/protocol/src/fabric/FabricManager.ts:331-333), and creates
+// the session with that fabric once Sigma3 is verified (:316-328);
+// CaseServer.ts itself does not look at the fabric's state again in
+// between.
 //
 // The identity is checked before and after the open. The removal forgets
 // the identity first and closes the fabric's sessions afterwards
