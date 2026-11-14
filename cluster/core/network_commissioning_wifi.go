@@ -736,7 +736,7 @@ func netcommStatus(code im.StatusCode, format string, args ...any) error {
 // the command waits for it to end, then takes its turn: neither
 // reference's commissioner retries a failed command at the network step —
 // matter.js's flow terminates commissioning on a StatusResponseError
-// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:437-461 at
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:437-462 at
 // db021da0), connectedhomeip completes the AddOrUpdateWiFiNetwork stage
 // with the failure (OnBasicFailure, src/controller/CHIPDeviceController.cpp:2157-2162,
 // :4287 at 6170af84) and AutoCommissioner goes to kCleanup on any error
