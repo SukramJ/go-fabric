@@ -91,7 +91,7 @@ type Manager struct {
 	// fired by [Manager.CloseAllGraceful]: matter.js kicks off the
 	// advertiser shutdown before removing sessions precisely to prevent
 	// re-announces during teardown (packages/node/src/behavior/system/
-	// network/ServerNetworkRuntime.ts:427).
+	// network/ServerNetworkRuntime.ts:450-453 at db021da0).
 	onReannounce func(fabricIndex uint8)
 
 	// reapExempt, when non-nil, is asked by the idle reaper for every
@@ -1093,9 +1093,9 @@ func (m *Manager) Close(sessionID uint16) error {
 // remaining peers are closed locally without a wire notification so a
 // daemon shutdown never blocks on the network. The reannounce trigger
 // deliberately does not fire — the caller is shutting the bridge down
-// and matter.js likewise kicks off the advertiser shutdown before
-// removing sessions "to prevent re-announces when removing sessions"
-// (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:427).
+// and matter.js likewise kicks off the advertiser shutdown before removing
+// sessions "to prevent re-announces when removing sessions" (at db021da0,
+// packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:450-453).
 //
 // The CloseSession per session departs from matter.js at db021da0, whose
 // shutdown flushes each session's subscriptions and then force-closes the
