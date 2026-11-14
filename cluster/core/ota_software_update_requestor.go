@@ -72,8 +72,8 @@ type OTASoftwareUpdateRequestor struct {
 	// nothing and the stores land in the order the writes commit (matter.js
 	// holds the datasource across a write's change and the commit's
 	// comparison, packages/node/src/behavior/state/managed/
-	// Datasource.ts:1446-1457 at db021da0). It is taken before mu, never
-	// under it, and the store is called under it.
+	// Datasource.ts:1345-1350 and :1446-1457 at db021da0). It is taken
+	// before mu, never under it, and the store is called under it.
 	writeMu sync.Mutex
 	// mu guards the emitter, the endpoint, the attribute state, the
 	// persisted state and the query state: every field below it up to

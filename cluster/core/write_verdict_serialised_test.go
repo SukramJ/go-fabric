@@ -114,8 +114,8 @@ func interleave(t *testing.T, gate *storeGate, held, other func() (bool, error))
 // last advance of the version was taken for. The read, the comparison and
 // the store of one write are one step, as matter.js holds the datasource
 // across the change and the commit's comparison
-// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
-// :1476-1492 at db021da0, #noteIfChanged).
+// (packages/node/src/behavior/state/managed/Datasource.ts:1345-1350,
+// :1446-1457, :1476-1492 at db021da0, #noteIfChanged).
 func TestACLWriteVerdictIsTheWritesOwnUnderAConcurrentWrite(t *testing.T) {
 	t.Parallel()
 	a := []core.AccessControlEntryStruct{{Privilege: 5, AuthMode: 2, Subjects: []uint64{112233}, FabricIndex: 1}}

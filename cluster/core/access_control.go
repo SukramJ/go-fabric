@@ -48,9 +48,9 @@ type AccessControl struct {
 	// step, so a write that answers unchanged has stored nothing and a
 	// concurrent write's change is never undone under it (matter.js holds
 	// the datasource across a write's change and the commit's comparison,
-	// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
-	// db021da0). It is taken before mu, never under it, and the store is
-	// called under it.
+	// packages/node/src/behavior/state/managed/Datasource.ts:1345-1350 and
+	// :1446-1457 at db021da0). It is taken before mu, never under it, and
+	// the store is called under it.
 	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric and the cached
 	// ACL state the handlers read; the store is not called under it.

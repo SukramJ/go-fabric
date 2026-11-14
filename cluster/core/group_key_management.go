@@ -43,9 +43,9 @@ type GroupKeyManagement struct {
 	// concurrent write's change is never undone under it, and two writes
 	// never leave a mixture of both lists (matter.js holds the datasource
 	// across a write's change and the commit's comparison,
-	// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
-	// db021da0). It is taken before mu, never under it, and the store is
-	// called under it.
+	// packages/node/src/behavior/state/managed/Datasource.ts:1345-1350 and
+	// :1446-1457 at db021da0). It is taken before mu, never under it, and
+	// the store is called under it.
 	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric, the limits and
 	// the cached key-set state.
