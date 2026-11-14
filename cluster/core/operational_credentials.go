@@ -1813,6 +1813,14 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// request draws and the CSR it records belong to one fail-safe context,
 	// so a context that ends, or an AddNOC that consumes the pair, either
 	// precedes the request or follows its record.
+	//
+	// The attestation material is asked for before that lock: the host's
+	// provider runs with nothing of this cluster held but attestationMu, and
+	// may call back into it. Its error is answered after the fail-safe and
+	// NOC checks, where matter.js asks for the certification
+	// (OperationalCredentialsServer.ts:132-140 at db021da0: the fail-safe
+	// context, then getCertification).
+	attestationErr := o.resolveAttestation(ctx)
 	o.nocMu.Lock()
 	o.mu.RLock()
 	nocInvoked := o.pendingFabric != 0
@@ -1830,9 +1838,9 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 		o.nocMu.Unlock()
 		return nil, opcredsConstraintErr{msg: "core: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
-	if err := o.resolveAttestation(ctx); err != nil {
+	if attestationErr != nil {
 		o.nocMu.Unlock()
-		return nil, err
+		return nil, attestationErr
 	}
 	// The operational key pair belongs to the fail-safe context: the first
 	// CSRRequest draws it, every later one signs a CSR over the same pair
