@@ -70,22 +70,77 @@ type attributeHolder interface {
 // and holds the state of — the root's own servers (not one the host
 // mounts there, Config.RootServers), and on a bridged endpoint
 // a server its device built itself and no host port takes the attribute's
-// writes of (device.Device.HoldsAttribute). A controller's write is
-// stored before the server takes it ([endpoint.WritePersister]); the
-// stored value is restored before the bridge serves the endpoint, over
-// the declaration's Initial. matter.js persists every nonvolatile
-// attribute and every writable or fabric-scoped one
-// (RootSupervisor.ts:160-175 at db021da0, persistentKeys).
+// writes of (device.Device.HoldsAttribute). Every change of such an
+// attribute is stored, whatever made it: a controller's write before the
+// server takes it ([endpoint.WritePersister]), a command, a companion the
+// server moves or the host's Set after the server committed it, from the
+// server's own change notification (spec.ChangesOf), as the value the
+// server then holds. The stored value is restored before the bridge
+// serves the endpoint, over the declaration's Initial, once per server.
+// matter.js persists every nonvolatile attribute and every writable or
+// fabric-scoped one (RootSupervisor.ts:160-175 at db021da0,
+// persistentKeys), each change whoever made it (Datasource.ts:1442-1453,
+// handed to store.set at :1262).
 type nonVolatile struct {
 	n *Node
-	// mu serialises a stored write: the store write, the server's write
-	// and the undo of a refused one ([endpoint.WritePersister]).
+	// mu guards the maps and stopped; it is never held across a store
+	// call or a server's code.
 	mu sync.Mutex
-	// metMu guards met: the servers whose values were restored, so a
-	// server met again in a reassembly is not restored over its newer
-	// state (persistUserLabels does the same).
-	metMu sync.Mutex
-	met   map[contract.ClusterServer]bool
+	// keys are the state of each settings key the persister wrote or
+	// restored; an entry is never removed, so a hook keeps its pointer.
+	keys map[string]*nvKey
+	// servers are the servers met, each restored once: one met again
+	// after it left the topology keeps its state and its subscription.
+	servers map[contract.ClusterServer]*nvServer
+	// slots are the server met last for each endpoint key and cluster
+	// (nonVolatileSlot): another server in its place releases it.
+	slots   map[string]contract.ClusterServer
+	stopped bool
+}
+
+// nvKey is the persister's state of one settings key.
+type nvKey struct {
+	// write serialises a controller's writes of the attribute: the store
+	// write, the server's write (the host's veto included) and the
+	// settlement ([endpoint.WritePersister]); a write of another
+	// attribute does not wait for it.
+	write sync.Mutex
+	// store guards the fields below and each store call of the key; it
+	// is held across no server write and no host code.
+	store sync.Mutex
+	// writing: a controller's write is between PersistWrite and done;
+	// dirty: a change was reported meanwhile, which done stores.
+	writing, dirty bool
+	// stored is what the store holds for the key, when known; owed: the
+	// store refused the held value, written again at the next change
+	// and when the node stops.
+	stored      string
+	known, owed bool
+	// srv and attrID are where the held value is read.
+	srv    contract.ClusterServer
+	attrID uint32
+	// label: a bridged LabelList, kept in persistUserLabels' form.
+	label bool
+}
+
+// nvServer is a server met: its change subscription.
+type nvServer struct {
+	unsubscribe func()
+}
+
+// keyState is key's state, made on first use.
+func (v *nonVolatile) keyState(key string) *nvKey {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	k := v.keys[key]
+	if k == nil {
+		if v.keys == nil {
+			v.keys = map[string]*nvKey{}
+		}
+		k = &nvKey{label: strings.HasPrefix(key, bridgedUserLabelKeyRoot)}
+		v.keys[key] = k
+	}
+	return k
 }
 
 var _ endpoint.WritePersister = (*nonVolatile)(nil)
@@ -137,16 +192,26 @@ func nonVolatileWritable(clusterID, attrID uint32) bool {
 
 // nonVolatileKey is the settings key of clusterID's attrID on ep.
 func nonVolatileKey(ep *endpoint.Endpoint, clusterID, attrID uint32) string {
+	return fmt.Sprintf("%s.%04x", nonVolatileSlot(ep, clusterID), attrID)
+}
+
+// nonVolatileSlot is the part of clusterID's keys on ep before the
+// attribute: one server holds it at a time.
+func nonVolatileSlot(ep *endpoint.Endpoint, clusterID uint32) string {
 	at, ok := keyString(ep.SourceKey)
 	if !ok {
 		at = "@" + strconv.FormatUint(uint64(ep.ID), 10)
 	}
-	return fmt.Sprintf("%s%s.%04x.%04x", nonVolatileKeyRoot, at, clusterID, attrID)
+	return fmt.Sprintf("%s%s.%04x", nonVolatileKeyRoot, at, clusterID)
 }
 
 // PersistWrite implements [endpoint.WritePersister]: the value as TLV,
 // hex-encoded, under the attribute's key; for a bridged endpoint's
-// UserLabel list the JSON persistUserLabels restores.
+// UserLabel list the JSON persistUserLabels restores. Only the writes of
+// the same attribute wait for one another. After the server applied the
+// write, done stores the value the server holds when it differs (a server
+// may commit a normalised form: WindowCovering clears CalibrationMode
+// under MaintenanceMode), or one a change reported meanwhile.
 func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (func(applied bool), error) {
 	key, stored, ok := v.storedForm(ep, srv, attrID, value)
 	if !ok {
@@ -154,20 +219,34 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	}
 	st := v.n.persisted.st
 	ctx = context.WithoutCancel(ctx)
-	v.mu.Lock()
+	k := v.keyState(key)
+	k.write.Lock()
+	k.store.Lock()
 	prev, had, err := st.GetSetting(ctx, key)
 	if err == nil {
 		err = st.SetSetting(ctx, key, stored)
 	}
 	if err != nil {
-		v.mu.Unlock()
+		k.store.Unlock()
+		k.write.Unlock()
 		v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
 		return nil, fmt.Errorf("node: persist %s: %w", key, err)
 	}
+	k.stored, k.known, k.owed = stored, true, false
+	k.srv, k.attrID = srv, attrID
+	k.writing, k.dirty = true, false
+	k.store.Unlock()
 	return func(applied bool) {
-		defer v.mu.Unlock()
+		defer k.write.Unlock()
+		k.store.Lock()
+		defer k.store.Unlock()
+		dirty := k.dirty
+		k.writing, k.dirty = false, false
+		if !k.label && (applied || dirty) {
+			v.storeHeld(ctx, k, key)
+			return
+		}
 		if applied {
-			v.storeCommitted(ctx, srv, attrID, key, stored)
 			return
 		}
 		// The server refused the value: the store holds what it held.
@@ -178,38 +257,67 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		}
 		if err := st.SetSetting(ctx, key, prev); err != nil {
 			v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
+			k.owed = true
+			return
 		}
+		k.stored = prev
 	}, nil
 }
 
-// storeCommitted stores the value srv holds after it committed a write
-// stored as stored under key, when it differs: a server may commit a
-// normalised form of the written value (WindowCovering clears
-// CalibrationMode under MaintenanceMode), and a restart serves what is
-// stored. The write already answered, so a refused store write is logged;
-// the store then keeps the written value. A bridged LabelList, kept in
-// its own form, is not re-read.
-func (v *nonVolatile) storeCommitted(ctx context.Context, srv contract.ClusterServer, attrID uint32, key, stored string) {
-	if strings.HasPrefix(key, bridgedUserLabelKeyRoot) {
+// storeHeld stores the value k's server holds under key when the store
+// does not hold it already; a store that refuses it is logged and the key
+// owed (written again at the next change and when the node stops). The
+// caller holds k.store. A crash before it ran leaves the value stored
+// before the change.
+func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
+	if k.label || k.srv == nil {
 		return
 	}
-	val, ok := srv.MatterRead(attrID)
+	val, ok := k.srv.MatterRead(k.attrID)
 	if !ok {
 		return
 	}
 	b, err := bridge.AttributeValueTLV(val)
 	if err != nil {
-		// A form the codec does not take: the written value stays.
+		// A form the codec does not take: what is stored stays.
 		v.n.logger.Debug("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
 		return
 	}
-	committed := hex.EncodeToString(b)
-	if committed == stored {
+	held := hex.EncodeToString(b)
+	if k.known && !k.owed && held == k.stored {
 		return
 	}
-	if err := v.n.persisted.st.SetSetting(ctx, key, committed); err != nil {
+	if err := v.n.persisted.st.SetSetting(ctx, key, held); err != nil {
 		v.n.logger.Warn("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
+		k.owed = true
+		return
 	}
+	k.stored, k.known, k.owed = held, true, false
+}
+
+// changed stores each attribute of keys that c reports, from the server's
+// change notification: a controller's write in progress of the attribute
+// stores it in its done.
+func (v *nonVolatile) changed(ctx context.Context, keys map[uint32]nvAttr, c contract.Change) {
+	for _, id := range c.Attributes {
+		a, ok := keys[id]
+		if !ok {
+			continue
+		}
+		a.k.store.Lock()
+		if a.k.writing {
+			a.k.dirty = true
+		} else {
+			v.storeHeld(ctx, a.k, a.key)
+		}
+		a.k.store.Unlock()
+	}
+}
+
+// nvAttr is one attribute of a server met: its key and the key's state.
+type nvAttr struct {
+	key string
+	k   *nvKey
 }
 
 // storedForm is the key and the settings value of a write the persister
@@ -251,47 +359,113 @@ func (v *nonVolatile) bridgedUserLabel(ep *endpoint.Endpoint, value im.Attribute
 }
 
 // restore sets every attribute of srv on ep the persister keeps to the
-// value stored for it, once per server.
+// value stored for it and stores each later change of them, once per
+// server: a server met before — also one that left the topology and came
+// back — keeps the state it holds. A different server in the place of one
+// met before (the same endpoint key and cluster) releases that one.
 func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv contract.ClusterServer) {
-	v.metMu.Lock()
-	met := v.met[srv]
-	if v.met == nil {
-		v.met = map[contract.ClusterServer]bool{}
-	}
-	v.met[srv] = true
-	v.metMu.Unlock()
-	if met {
-		return
-	}
 	def := spec.Lookup(srv.MatterClusterID())
 	if def == nil {
+		return
+	}
+	keys := map[uint32]nvAttr{}
+	for i := range def.Attributes {
+		if key, kept := v.key(ep, srv, def.Attributes[i].ID); kept {
+			keys[def.Attributes[i].ID] = nvAttr{key: key, k: v.keyState(key)}
+		}
+	}
+	if len(keys) == 0 {
+		return
+	}
+	slot := nonVolatileSlot(ep, srv.MatterClusterID())
+	v.mu.Lock()
+	if _, met := v.servers[srv]; met || v.stopped {
+		v.mu.Unlock()
+		return
+	}
+	var release func()
+	if old, ok := v.slots[slot]; ok {
+		release = v.servers[old].unsubscribe
+		delete(v.servers, old)
+	}
+	rec := &nvServer{unsubscribe: func() {}}
+	if v.servers == nil {
+		v.servers, v.slots = map[contract.ClusterServer]*nvServer{}, map[string]contract.ClusterServer{}
+	}
+	v.servers[srv], v.slots[slot] = rec, srv
+	v.mu.Unlock()
+	if release != nil {
+		release()
+	}
+	restored := map[uint32]any{}
+	for _, id := range slices.Sorted(maps.Keys(keys)) {
+		a := keys[id]
+		raw, found, err := v.n.persisted.st.GetSetting(ctx, a.key)
+		a.k.store.Lock()
+		a.k.srv, a.k.attrID = srv, id
+		if err == nil {
+			a.k.stored, a.k.known = raw, true
+		}
+		a.k.store.Unlock()
+		if err != nil {
+			v.n.logger.Warn("nonvolatile.restore", slog.String("key", a.key), slog.Any("err", err))
+			continue
+		}
+		if !found || raw == "" {
+			continue
+		}
+		val, err := decodeNonVolatile(def.Attribute(id), raw)
+		if err != nil {
+			v.n.logger.Warn("nonvolatile.restore", slog.String("key", a.key), slog.Any("err", err))
+			continue
+		}
+		restored[id] = val
+	}
+	// Subscribed before the values are set: a companion the restore moves
+	// is stored as well.
+	unsubscribe := spec.ChangesOf(srv, func(c contract.Change) { v.changed(ctx, keys, c) })
+	v.mu.Lock()
+	stopped := v.stopped
+	if !stopped {
+		rec.unsubscribe = unsubscribe
+	}
+	v.mu.Unlock()
+	if stopped {
+		unsubscribe()
 		return
 	}
 	setter, ok := srv.(spec.AttributeSetter)
 	if !ok {
 		return
 	}
-	for i := range def.Attributes {
-		a := &def.Attributes[i]
-		key, kept := v.key(ep, srv, a.ID)
-		if !kept {
-			continue
+	for _, id := range slices.Sorted(maps.Keys(restored)) {
+		if err := setter.SetAttributes(map[uint32]any{id: restored[id]}); err != nil {
+			v.n.logger.Warn("nonvolatile.restore", slog.String("key", keys[id].key), slog.Any("err", err))
 		}
-		raw, found, err := v.n.persisted.st.GetSetting(ctx, key)
-		if err != nil {
-			v.n.logger.Warn("nonvolatile.restore", slog.String("key", key), slog.Any("err", err))
-			continue
+	}
+}
+
+// stop ends the persister: no change is stored from here on, and every
+// key the store refused a change of is written once more.
+func (v *nonVolatile) stop(ctx context.Context) {
+	ctx = context.WithoutCancel(ctx)
+	v.mu.Lock()
+	v.stopped = true
+	unsubscribes := make([]func(), 0, len(v.servers))
+	for _, rec := range v.servers {
+		unsubscribes = append(unsubscribes, rec.unsubscribe)
+	}
+	keys := maps.Clone(v.keys)
+	v.mu.Unlock()
+	for _, unsubscribe := range unsubscribes {
+		unsubscribe()
+	}
+	for key, k := range keys {
+		k.store.Lock()
+		if k.owed {
+			v.storeHeld(ctx, k, key)
 		}
-		if !found || raw == "" {
-			continue
-		}
-		val, err := decodeNonVolatile(a, raw)
-		if err == nil {
-			err = setter.SetAttributes(map[uint32]any{a.ID: val})
-		}
-		if err != nil {
-			v.n.logger.Warn("nonvolatile.restore", slog.String("key", key), slog.Any("err", err))
-		}
+		k.store.Unlock()
 	}
 }
 
@@ -303,7 +477,6 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 func (n *Node) persistNonVolatile(ctx context.Context, t *endpoint.Topology) {
 	t.Persister = n.nonVolatile
 	ctx = context.WithoutCancel(ctx)
-	current := map[contract.ClusterServer]bool{}
 	for _, ep := range t.Endpoints {
 		var servers []contract.ClusterServer
 		switch {
@@ -315,14 +488,8 @@ func (n *Node) persistNonVolatile(ctx context.Context, t *endpoint.Topology) {
 		}
 		for _, srv := range servers {
 			n.nonVolatile.restore(ctx, ep, srv)
-			current[srv] = true
 		}
 	}
-	// A server that left the topology is forgotten; one that comes back
-	// is restored again, as a new one is.
-	n.nonVolatile.metMu.Lock()
-	maps.DeleteFunc(n.nonVolatile.met, func(srv contract.ClusterServer, _ bool) bool { return !current[srv] })
-	n.nonVolatile.metMu.Unlock()
 }
 
 // decodeNonVolatile reads a stored value the way the bridge decodes a

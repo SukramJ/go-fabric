@@ -4,16 +4,180 @@
 package node_test
 
 import (
+	"context"
+	"encoding/hex"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/endpoint"
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store/memstore"
 )
+
+// nvHeat is the kit Thermostat with heating and no Sink: the module holds
+// its setpoints (device/held.go).
+var nvHeat = nvCase{key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating}), cluster: thermostatdef.ClusterID, attr: thermostatdef.AttrOccupiedHeatingSetpoint}
+
+// nvRaise invokes SetpointRaiseLower(Heat, +1 °C) on ep.
+func nvRaise(t *testing.T, n *node.Node, ep uint16) {
+	t.Helper()
+	res := endpoint.NewTopologyDispatcher(n.Bridge().Topology()).Invoke(t.Context(),
+		im.ConcreteCommandPath{Endpoint: ep, Cluster: thermostatdef.ClusterID, Command: thermostatdef.CmdSetpointRaiseLower, HasEndpoint: true},
+		thermostatdef.SetpointRaiseLowerRequest{Mode: thermostatdef.SetpointRaiseLowerModeHeat, Amount: 10})
+	if res.Status != im.StatusSuccess {
+		t.Fatalf("SetpointRaiseLower: %v", res.Status)
+	}
+}
+
+// nvStoredTLV is v as the persister stores it.
+func nvStoredTLV(t *testing.T, v any) string {
+	t.Helper()
+	b, err := bridge.AttributeValueTLV(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hex.EncodeToString(b)
+}
+
+// TestNonVolatileChangeSurvivesARestart: a nonvolatile attribute the
+// module holds that changes by a command, a host's Set or a companion move
+// is served after a restart as it was served before it (R2-P2-dr-node-01).
+func TestNonVolatileChangeSurvivesARestart(t *testing.T) {
+	t.Parallel()
+	heat := func(ep uint16) im.ConcreteAttributePath {
+		return attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	}
+	cool := func(ep uint16) im.ConcreteAttributePath {
+		return attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedCoolingSetpoint)
+	}
+	auto := nvCase{key: "thermo", build: nvDevice(device.NewThermostat, thermostatdef.Declare{Features: thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeatureAutoMode})}
+	cases := map[string]struct {
+		tc     nvCase
+		change func(t *testing.T, n *node.Node, ep uint16)
+		paths  []func(uint16) im.ConcreteAttributePath
+	}{
+		"command": {tc: nvHeat, paths: []func(uint16) im.ConcreteAttributePath{heat}, change: func(t *testing.T, n *node.Node, ep uint16) {
+			t.Helper()
+			if st := dispatchWrite(t, n, heat(ep), int64(2100)); st != im.StatusSuccess {
+				t.Fatalf("write: %v", st)
+			}
+			nvRaise(t, n, ep)
+		}},
+		"host set": {tc: nvHeat, paths: []func(uint16) im.ConcreteAttributePath{heat}, change: func(t *testing.T, n *node.Node, ep uint16) {
+			t.Helper()
+			if st := dispatchWrite(t, n, heat(ep), int64(2100)); st != im.StatusSuccess {
+				t.Fatalf("write: %v", st)
+			}
+			srv := n.Bridge().Topology().FindByID(ep).Source.(*device.Device).Server(thermostatdef.ClusterID)
+			if err := srv.(spec.AttributeSetter).SetAttributes(map[uint32]any{thermostatdef.AttrOccupiedHeatingSetpoint: int16(2250)}); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		"companion": {tc: auto, paths: []func(uint16) im.ConcreteAttributePath{heat, cool}, change: func(t *testing.T, n *node.Node, ep uint16) {
+			t.Helper()
+			if st := dispatchWrite(t, n, heat(ep), int64(2300)); st != im.StatusSuccess {
+				t.Fatalf("write heat: %v", st)
+			}
+			if st := dispatchWrite(t, n, cool(ep), int64(2400)); st != im.StatusSuccess {
+				t.Fatalf("write cool: %v", st)
+			}
+		}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cfg := minimalConfig(nil)
+			cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+			n, ep := nvRun(t, cfg, c.tc)
+			c.change(t, n, ep)
+			served := make([]string, len(c.paths))
+			for i, p := range c.paths {
+				served[i] = dispatchRead(t, n, p(ep))
+			}
+			if err := n.Stop(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			again, ep := nvRun(t, cfg, c.tc)
+			for i, p := range c.paths {
+				if got := dispatchRead(t, again, p(ep)); got != served[i] {
+					t.Errorf("attribute 0x%04x after the restart %s, served %s before it", p(ep).Attribute, got, served[i])
+				}
+			}
+		})
+	}
+}
+
+// TestNonVolatileRejoinKeepsTheServedValue: a Device the host removes and
+// adds again keeps what it served, also after a controller's write that a
+// command then moved on (R2-P2-dr-node-01).
+func TestNonVolatileRejoinKeepsTheServedValue(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+	dev := nvHeat.build(t, nvHeat.key)
+	n := newNode(t, cfg)
+	if err := n.Aggregator().Add(ctx, dev); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ep, _ := endpointOf(t, n, nvHeat.key)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	if st := dispatchWrite(t, n, path, int64(2100)); st != im.StatusSuccess {
+		t.Fatalf("write: %v", st)
+	}
+	nvRaise(t, n, ep)
+	served := dispatchRead(t, n, path)
+	if err := n.Aggregator().Remove(ctx, endpoint.StringKey(nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Aggregator().Add(ctx, dev); err != nil {
+		t.Fatal(err)
+	}
+	ep, ok := endpointOf(t, n, nvHeat.key)
+	if !ok {
+		t.Fatal("the device is not served after the Add")
+	}
+	if got := dispatchRead(t, n, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)); got != served {
+		t.Errorf("after the rejoin %s, served %s before it", got, served)
+	}
+}
+
+// TestNonVolatileChangeOwedWhileTheStoreRefuses: a change the store
+// refuses is written when the node stops, so the restart serves it
+// (R2-P2-dr-node-01).
+func TestNonVolatileChangeOwedWhileTheStoreRefuses(t *testing.T) {
+	t.Parallel()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"nonvolatile."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	if s := dispatchWrite(t, n, path, int64(2100)); s != im.StatusSuccess {
+		t.Fatalf("write: %v", s)
+	}
+	st.refuse.Store(true)
+	nvRaise(t, n, ep)
+	st.refuse.Store(false)
+	if err := n.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	key := "nonvolatile.thermo.0201.0012"
+	if v, ok, err := st.GetSetting(t.Context(), key); err != nil || !ok || v != nvStoredTLV(t, int64(2200)) {
+		t.Errorf("stored %q (found %v, %v) after the stop, want 2200's TLV %q", v, ok, err, nvStoredTLV(t, int64(2200)))
+	}
+}
 
 // TestNonVolatileHostRootServerIsTheHosts: a server the host mounts on the
 // root (Config.RootServers) keeps its own state: a controller's write of
@@ -53,5 +217,63 @@ func TestNonVolatileHostRootServerIsTheHosts(t *testing.T) {
 	again, _ := nvRun(t, c, nvCase{})
 	if got := dispatchRead(t, again, path); got != before {
 		t.Errorf("the host's FanMode after the restart %s, its Initial %s", got, before)
+	}
+}
+
+// TestNonVolatileWriteNotHeldBehindAnotherAttributesVeto: a host's OnWrite
+// veto that takes its time holds up only the writes of its own attribute,
+// not a nonvolatile write of another endpoint (R2-P2-dr-node-04).
+func TestNonVolatileWriteNotHeldBehindAnotherAttributesVeto(t *testing.T) {
+	t.Parallel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	slow := nvDevice(device.NewDimmableLight, levelcontroldef.Declare{OnWrite: func(context.Context, levelcontroldef.State, uint32) error {
+		close(entered)
+		<-release
+		return nil
+	}})
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+	n := newNode(t, cfg)
+	ctx := t.Context()
+	for key, build := range map[string]func(*testing.T, string) node.Endpoint{"slow": slow, "quick": nvDevice(device.NewDimmableLight)} {
+		if err := n.Aggregator().Add(ctx, build(t, key)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	slowEP, _ := endpointOf(t, n, "slow")
+	quickEP, _ := endpointOf(t, n, "quick")
+	write := func(ep uint16, level uint64, out chan<- im.StatusCode) {
+		res := endpoint.NewTopologyDispatcher(n.Bridge().Topology()).Write(ctx, attrPath(ep, levelcontroldef.ClusterID, levelcontroldef.AttrStartUpCurrentLevel), im.AttributeValue{Value: level})
+		status := im.StatusFailure
+		if len(res) == 1 {
+			status = res[0].Status
+		}
+		out <- status
+	}
+	slowDone, quickDone := make(chan im.StatusCode, 1), make(chan im.StatusCode, 1)
+	go write(slowEP, 10, slowDone)
+	<-entered
+	go write(quickEP, 20, quickDone)
+	// The test's own deadline: the quick write takes no time of its own.
+	wait, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	select {
+	case s := <-quickDone:
+		if s != im.StatusSuccess {
+			t.Errorf("the other endpoint's write: %v", s)
+		}
+	case <-wait.Done():
+		t.Error("the other endpoint's write waited for the slow veto")
+		close(release)
+		<-quickDone
+		<-slowDone
+		return
+	}
+	close(release)
+	if s := <-slowDone; s != im.StatusSuccess {
+		t.Errorf("the vetoed write: %v", s)
 	}
 }

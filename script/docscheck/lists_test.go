@@ -245,7 +245,7 @@ var variableKeySites = map[string][]string{
 		"nonvolatile.<key>.<cluster>.<attribute>", "nonvolatile.@<endpoint>.<cluster>.<attribute>", "bridged_user_label.<key>",
 	},
 	// PersistWrite's key, never a bridged_user_label one
-	"node/nonvolatile.go:nonVolatile.storeCommitted": {
+	"node/nonvolatile.go:nonVolatile.storeHeld": {
 		"nonvolatile.<key>.<cluster>.<attribute>", "nonvolatile.@<endpoint>.<cluster>.<attribute>",
 	},
 	// bindingKeyRoot + key, or + "@" + the endpoint number

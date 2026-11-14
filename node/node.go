@@ -1250,6 +1250,8 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()
+	// A nonvolatile change the store refused is written once more.
+	n.nonVolatile.stop(ctx)
 	n.closeOwnedDB()
 	return nil
 }
