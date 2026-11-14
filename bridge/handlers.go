@@ -889,9 +889,11 @@ func caseFailureProtocolCode(err error) uint16 {
 //
 // Once the handshake established its session, a Sigma3 of the same bytes
 // as the one that established it is answered with the success report
-// again, and any other Sigma3 with StatusReport(FAILURE, InvalidParameter);
-// neither reaches the responder or changes the session (review II,
-// R2-P3-rr-dev-01).
+// again, and any other Sigma3 is not answered — it is acknowledged, as the
+// router acknowledges a Sigma3 of a completed handshake that is not the
+// completing one ([Bridge.handleSigma3OfCompleted]); neither reaches the
+// responder or changes the session (review II, R2-P3-rr-dev-01,
+// R2-P4-nv-03).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	opcode, respPayload, _, err = a.processSigma3(payload)
 	return opcode, respPayload, err
@@ -908,8 +910,8 @@ const (
 	sigma3Established
 	// sigma3OfCompleted: the handshake had established its session
 	// before; the Sigma3 changed nothing (answered with the success
-	// report when it is the accepted Sigma3's retransmission, refused
-	// otherwise).
+	// report when it is the accepted Sigma3's retransmission, not
+	// answered otherwise).
 	sigma3OfCompleted
 )
 
@@ -934,7 +936,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		if retransmitted {
 			return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3OfCompleted, nil
 		}
-		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3OfCompleted, nil
+		return 0, nil, sigma3OfCompleted, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
 		a.mu.Unlock()

@@ -145,6 +145,20 @@ func (c *completedCase) expectReport(t *testing.T, p *pipelinePeer, want uint16,
 	}
 }
 
+// expectAcknowledgedOnly fails t unless the Sigma3 just sent on the
+// handshake's exchange was acknowledged and no more: its acknowledgement is
+// still owed — no reply carried it — and no reply was added to those
+// waiting for the peer's acknowledgement before it.
+func (c *completedCase) expectAcknowledgedOnly(t *testing.T, pendingBefore int, what string) {
+	t.Helper()
+	if !c.r.b.ackTracker.Owes(0, completedCaseExchange, false) {
+		t.Fatalf("%s: no acknowledgement owed — a reply carried it", what)
+	}
+	if got := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange); got > pendingBefore {
+		t.Fatalf("%s: %d replies wait for the peer's acknowledgement, %d before — a reply was sent", what, got, pendingBefore)
+	}
+}
+
 // TestSigma3AfterCompletionChangesNothingAboutTheSession: once a CASE
 // handshake completed, a Sigma3 under its initiator node id and exchange —
 // any payload, the accepted one included, from another address — leaves
@@ -190,10 +204,18 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 			}
 			for _, payload := range [][]byte{{0x15, 0x18}, c.sigma3} {
 				other := c.otherPeer(t)
+				pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
 				if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, payload, nil); err != nil {
 					t.Fatal(err)
 				}
-				other.recv(mrp.SCOpcodeStatusReport, "the report to the other sender")
+				if len(payload) == len(c.sigma3) && (!tc.viaProvider || tc.rebegin) {
+					// The accepted bytes reach the adapter, which answers
+					// them as their retransmission: only the router knows
+					// the route they completed on.
+					other.recv(mrp.SCOpcodeStatusReport, "the report to the other sender")
+				} else {
+					c.expectAcknowledgedOnly(t, pending, "a Sigma3 from another sender")
+				}
 				if got := c.route(t); got != controllerRoute {
 					t.Fatalf("a Sigma3 of %d bytes after completion moved the session's route from %s to %s", len(payload), controllerRoute, got)
 				}
@@ -212,23 +234,31 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 // handshake completed, the success report is sent again only for the
 // Sigma3 that completed it — the same bytes — arriving over the route it
 // completed on; a Sigma3 of other bytes, or the same bytes from another
-// address, is answered with the failure report, and
-// takes nothing from the retransmission that follows (review II,
-// R2-P3-rr-dev-01).
+// address, is acknowledged and not answered, and takes nothing from the
+// retransmission that follows (review II, R2-P3-rr-dev-01, R2-P4-nv-03).
+// Neither reference answers it: in matter.js it is a duplicate on the
+// handshake's live exchange, an error that is only logged, or an opening
+// message SecureChannel does not take (packages/protocol/src/protocol/
+// MessageExchange.ts:501-511 and :522-534, ExchangeManager.ts:436-444 and
+// :491-494, packages/protocol/src/securechannel/
+// SecureChannelProtocol.ts:152-153 at db021da0); connectedhomeip takes only
+// Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54 at
+// 6170af84) and acknowledges the rest (src/messaging/ExchangeMgr.cpp:437).
 func TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute(t *testing.T) {
 	t.Parallel()
 	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), true)
 
+	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
 	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, append([]byte(nil), c.sigma3[:len(c.sigma3)-1]...), nil); err != nil {
 		t.Fatal(err)
 	}
-	c.expectReport(t, c.controller, mrp.SCStatusGeneralFailure, "other bytes over the completing route")
+	c.expectAcknowledgedOnly(t, pending, "other bytes over the completing route")
 
 	other := c.otherPeer(t)
 	if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
 		t.Fatal(err)
 	}
-	c.expectReport(t, other, mrp.SCStatusGeneralFailure, "the same bytes from another address")
+	c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
 
 	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
 		t.Fatal(err)
