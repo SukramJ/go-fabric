@@ -8,6 +8,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/im"
@@ -51,6 +52,11 @@ func TestRequestCheckParityMatterJS(t *testing.T) {
 	// A server held to the model: OnOff's OnTime "max 65534".
 	if _, err := decodeRequest(t, onoffdef.ClusterID, onoffdef.CmdOnWithTimedOff, onoffdef.OnWithTimedOffRequest{OnTime: 65535}); status(err) != im.StatusConstraintError {
 		t.Errorf("OnWithTimedOff OnTime 65535: %v, want CONSTRAINT_ERROR", err)
+	}
+	// A list over its count: EnergyEvse SetTargets' ChargingTargetSchedules
+	// "max 7".
+	if _, err := decodeRequest(t, evsedef.ClusterID, evsedef.CmdSetTargets, evsedef.SetTargetsRequest{ChargingTargetSchedules: make([]evsedef.ChargingTargetScheduleStruct, 8)}); status(err) != im.StatusConstraintError {
+		t.Errorf("SetTargets with 8 schedules: %v, want CONSTRAINT_ERROR", err)
 	}
 	// DoorLock, a refusal command: a UserName over "max 10" is
 	// INVALID_COMMAND.

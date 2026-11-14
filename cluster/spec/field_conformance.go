@@ -146,7 +146,12 @@ type confLocation struct {
 // values) is held to it, a controller's write ([Instance.ValidateWrite])
 // is not — matter.js enforces it only where no remote subject authored
 // the value (state/validation/ValueValidator.ts:284-305 at 862ad75f, hasLocalActor).
+//
+// written marks a controller's written value ([CheckWritten]): the
+// FabricIndex field of its structs is the accessing fabric's, assigned
+// before validation, and is not judged.
 type nameScope struct {
+	written     bool
 	peers       Peers
 	outer       func(name string) (any, bool)
 	conformance bool
@@ -202,6 +207,12 @@ func fieldOfStruct(v reflect.Value, name string) reflect.Value {
 		return reflect.Value{}
 	}
 	t := v.Type()
+	if m, ok := mappedType(t); ok {
+		if goName, ok := m[name]; ok {
+			return v.FieldByName(goName)
+		}
+		return reflect.Value{}
+	}
 	for n := range t.NumField() {
 		if sf := t.Field(n); sf.IsExported() && sameName(sf.Name, name) {
 			return v.Field(n)

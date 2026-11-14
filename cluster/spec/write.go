@@ -455,7 +455,13 @@ func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScop
 	}
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
-		fv := rv.FieldByName(goFieldName(f.Name))
+		if scope.written && f.ID == fabricIndexFieldID {
+			continue
+		}
+		fv, mapped := mappedField(rv, f.Name)
+		if !mapped {
+			continue
+		}
 		if !fv.IsValid() {
 			return Errorf(im.StatusConstraintError, "%s: %s has no field %s", i.def.Name, name, f.Name)
 		}

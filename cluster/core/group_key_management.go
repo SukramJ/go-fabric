@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
@@ -235,6 +236,16 @@ type GroupKeyMapStruct struct {
 	GroupID       uint16
 	GroupKeySetID uint16
 	FabricIndex   uint8
+}
+
+// The Go fields of a GroupKeyMap write's entries (the bridge decodes the
+// write into GroupKeyMapStruct), so the dispatcher's check of a written
+// value against the definition reads them (spec.MapFields; owner decision
+// 64).
+func init() {
+	spec.MapFields[GroupKeyMapStruct](gkmdef.GroupKeyMapStructDef, spec.FieldMap{
+		"GroupId": "GroupID", "GroupKeySetId": "GroupKeySetID", "FabricIndex": "FabricIndex",
+	})
 }
 
 // GroupInfoMapStruct mirrors Matter §11.2.10.4.2.

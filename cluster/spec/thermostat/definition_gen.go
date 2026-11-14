@@ -2007,6 +2007,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true, Atomic: true},
 			Constraint:  spec.Constraint{Text: "max numberOfPresets", Max: &spec.Bound{Ref: "numberOfPresets"}},
+			Relaxed:     "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0",
 			Decode:      decodeAttrPresets,
 		},
 		{
@@ -2016,6 +2017,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true, Atomic: true},
 			Constraint:  spec.Constraint{Text: "max numberOfSchedules", Max: &spec.Bound{Ref: "numberOfSchedules"}},
+			Relaxed:     "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0",
 			Decode:      decodeAttrSchedules,
 		},
 		{

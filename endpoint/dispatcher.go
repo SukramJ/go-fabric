@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -369,7 +370,7 @@ type WritePersister interface {
 // wildcard-endpoint write can be authorized, since the requested path
 // names no endpoint. authorize may be nil, which dispatches without a
 // gate.
-func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
+func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit,funlen // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
@@ -510,6 +511,16 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// only the last element is new (AccessControl reports
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
+				}
+				// The written value against the cluster's definition,
+				// before any server runs (owner decision 64): what
+				// matter.js validates as the value enters the behavior's
+				// state (packages/node/src/behavior/state/managed/Datasource.ts:667-676
+				// at db021da0), for every server with a generated
+				// definition, the hand-written ones included.
+				if status := writtenHeld(srv, attrID, value); !status.IsSuccess() {
+					results = append(results, im.WriteResult{Path: aPath, Status: status})
+					continue
 				}
 				res := d.writeStored(writeCtx, ep, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
@@ -1011,6 +1022,32 @@ func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.Con
 	res := writeOne(ctx, srv, path, value)
 	applied = res.Status == im.StatusSuccess
 	return res
+}
+
+// writtenHeld is the status the definition of srv's cluster answers a
+// controller's written value of attrID with ([spec.CheckWritten]): the
+// server's FeatureMap selects the enum values and conformance, its
+// attributes resolve the ones a constraint names. Success for a cluster
+// without a registered definition.
+func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeValue) im.StatusCode {
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return im.StatusSuccess
+	}
+	var features uint32
+	if v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap); ok {
+		if fm, ok := v.(uint32); ok {
+			features = fm
+		}
+	}
+	v := value.Value
+	if value.IsNull {
+		v = nil
+	}
+	if err := spec.CheckWritten(def, features, attrID, v, srv.MatterRead); err != nil {
+		return spec.StatusOf(err)
+	}
+	return im.StatusSuccess
 }
 
 // writeOne dispatches a single Write against srv. Errors are mapped

@@ -137,6 +137,16 @@ var serverRelaxations = []struct {
 		// 1 to 10 itself (CONSTRAINT_ERROR, :556-569).
 		{kind: relaxStructField, key: "PushAvStreamTransport.TransportTriggerOptionsStruct.MotionSensitivity", ref: "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:571-577 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"},
 	}},
+	{"cluster/thermo ThermostatServer", []relaxation{
+		// A value written inside an atomic write goes to the pending state,
+		// which matter.js does not validate against the model at the write;
+		// the server's $AtomicChanging reactor judges it
+		// (#validatePresetWriteRequest, ThermostatServer.ts:1367-1375:
+		// RESOURCE_EXHAUSTED over NumberOfPresets), so the list's count is
+		// the server's — as Schedules' is (BD-chip-Thermostat-Schedules).
+		{kind: relaxAttribute, key: "Thermostat.Presets", ref: thermostatAtomic},
+		{kind: relaxAttribute, key: "Thermostat.Schedules", ref: thermostatAtomic},
+	}},
 	{"cluster/appliance WasherServer", []relaxation{
 		// matter.js answers a NumberOfRinses its enum does not define with
 		// CONSTRAINT_ERROR; chip judges every value against
@@ -150,6 +160,7 @@ const (
 	adminCommRelaxed = "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"
 	groupsRelaxed    = "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"
 	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:126-159 at db021da0"
+	thermostatAtomic = "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0"
 	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"
 	pavstEmptyLists  = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"
 )

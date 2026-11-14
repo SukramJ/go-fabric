@@ -98,6 +98,20 @@ func TestHandDecodedRequestsAreHeldByTheirDefinition(t *testing.T) {
 			want: im.StatusInvalidCommand,
 		},
 		{
+			// A list over its count on a hand-written server: Endpoints
+			// "1 to 20" (the Groupcast definition).
+			name: "Groupcast LeaveGroup with 21 endpoints", cluster: 0x0065, cmd: 0x01,
+			body: func(e *tlv.Encoder) {
+				e.PutUint(tlv.ContextTag(0), 1)
+				e.StartArray(tlv.ContextTag(1))
+				for n := range 21 {
+					e.PutUint(tlv.AnonymousTag(), uint64(n+1))
+				}
+				_ = e.EndContainer()
+			},
+			want: im.StatusConstraintError,
+		},
+		{
 			// CsrNonce relaxed (OperationalCredentialsServer.ts:53-66): the
 			// server answers the length.
 			name: "CSRRequest with a nonce of 31 bytes", cluster: 0x003E, cmd: 0x04,
