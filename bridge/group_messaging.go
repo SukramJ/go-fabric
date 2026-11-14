@@ -349,6 +349,10 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 		}
 		gctx := im.WithGroupSubject(im.WithFabricFilter(ctx, true, msg.FabricIndex), subject)
 		gctx = im.WithWriteTransaction(gctx, im.NewWriteTransaction(&b.routing.writeHolds))
+		// A path naming another node writes nothing: this node's id on
+		// the group's fabric, as the unicast write stamps it (review II,
+		// R2-P4-imwrite-02).
+		gctx = im.WithLocalNodeID(gctx, msg.LocalNodeID)
 		status = im.HandleGroupWriteRequest(gctx, dispatcher, req)
 	default:
 		return nil

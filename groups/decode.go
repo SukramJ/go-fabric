@@ -74,6 +74,12 @@ type Message struct {
 	GroupID uint16
 	// SourceNodeID is the sender.
 	SourceNodeID uint64
+	// LocalNodeID is this node's operational node id on FabricIndex — the
+	// id a path of the message that names a node is compared with
+	// (matter.js DataResponse.nodeId, the node's id on the session's
+	// fabric, packages/protocol/src/action/server/DataResponse.ts:57-62 at
+	// db021da0).
+	LocalNodeID uint64
 	// KeySetID is the key set that authenticated the message.
 	KeySetID uint16
 	// HasValidMapping reports whether the key that authenticated the
@@ -267,6 +273,7 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 	msg.KeySetID = c.keySetID
 
 	m.mu.RLock()
+	msg.LocalNodeID = c.fabric.nodeID
 	if mappedID, ok := c.fabric.idMap[msg.GroupID]; ok {
 		if ks, ok := c.fabric.keySets[mappedID]; ok {
 			msg.HasValidMapping = slices.ContainsFunc(ks.epochs, func(e epochKey) bool { return slices.Equal(e.key, c.epoch.key) })
