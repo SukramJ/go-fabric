@@ -91,9 +91,44 @@ const (
 
 // answerState is the engine's memory between queries: the truncated
 // queries waiting for their continuation, by transaction id, interface and
-// source, at most [maxTruncatedQueries]. The Responder's mutex guards it.
+// source, at most [maxTruncatedQueries]; and when each source was last
+// answered by unicast, per interface and service, at most
+// [maxUnicastSources]. The Responder's mutex guards it.
 type answerState struct {
 	truncated map[string]*truncatedQuery
+	unicastAt map[string]time.Time
+}
+
+// unicastInterval is the least time between two unicast answers with one
+// service's records to one source: RFC 6762 §6's one second between
+// multicasts of a record, applied to the destination of a unicast answer,
+// so QU queries whose source is spoofed are not each reflected to it.
+// matter.js answers every QU query by unicast while the quarter-TTL rule
+// allows (InterfaceResponder.ts:352-354 at db021da0); within the interval
+// this responder answers by multicast instead, which the one-second rule
+// paces (review II, R2-P3-lan-dev-06).
+const unicastInterval = time.Second
+
+// maxUnicastSources bounds the sources answered by unicast within
+// unicastInterval; past it a query is answered by multicast. It follows
+// maxTruncatedQueries, this file's bound on another per-source table.
+const maxUnicastSources = maxTruncatedQueries
+
+// unicastAllowed reports whether src may get a unicast answer with the
+// records of service on ifIndex now, and if so counts it. Entries older
+// than unicastInterval are dropped first.
+func (a *answerState) unicastAllowed(ifIndex int, src *net.UDPAddr, service string, now time.Time) bool {
+	for k, at := range a.unicastAt {
+		if now.Sub(at) >= unicastInterval {
+			delete(a.unicastAt, k)
+		}
+	}
+	k := strconv.Itoa(ifIndex) + "|" + src.IP.String() + "|" + service
+	if _, ok := a.unicastAt[k]; ok || len(a.unicastAt) >= maxUnicastSources {
+		return false
+	}
+	a.unicastAt[k] = now
+	return true
 }
 
 // truncatedQuery is a truncated query gathered so far: its transaction id,
@@ -135,7 +170,7 @@ func (t *truncatedQuery) absorb(msg *dns.Msg, records []dns.RR) bool {
 }
 
 func newAnswerState() answerState {
-	return answerState{truncated: map[string]*truncatedQuery{}}
+	return answerState{truncated: map[string]*truncatedQuery{}, unicastAt: map[string]time.Time{}}
 }
 
 // linkRecords are the record sets of every published service on one
@@ -415,7 +450,7 @@ func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAd
 		now := r.clock.Load().Now()
 		unicast := allUnicast && src != nil && !slices.ContainsFunc(answers, func(rr dns.RR) bool {
 			return st.sinceCachedMulticast(rr, now) > time.Duration(rr.Header().Ttl)*time.Second/4
-		})
+		}) && r.answers.unicastAllowed(ifIndex, src, key, now)
 		sentAnswers, sentAdditional := answers, additional
 		if !unicast {
 			packet := append(slices.Clone(answers), additional...)
