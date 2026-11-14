@@ -923,7 +923,16 @@ func (o *OperationalCredentials) rollbackPendingLocked(ctx context.Context) (add
 // operational record). before is the row as the update left it. Mirrors
 // matter.js FailsafeContext rollback, which restores the fabric the update
 // replaced (FailsafeContext.ts:299-305 at db021da0).
+//
+// The invoke session ctx names is passed on only when it is the rolled-back
+// fabric's: the node's hook closes that session after its response
+// (bridge.CloseFabricSessionsAfterUpdate), and a fresh start, a settle or a
+// commit that rolls back another fabric's orphan update runs in an invoke
+// of a session the update never touched (review II, R2-P2-rr-dev-06).
 func (o *OperationalCredentials) reportUpdateRolledBack(ctx context.Context, before *store.FabricRecord) {
+	if _, accessing := im.FabricFilterFromContext(ctx); accessing != before.FabricIndex && InvokeSessionIDFromContext(ctx) != 0 {
+		ctx = WithInvokeSessionID(ctx, 0)
+	}
 	after, err := o.store.GetFabric(context.WithoutCancel(ctx), before.FabricIndex)
 	o.mu.RLock()
 	withdraw := o.onFabricWithdraw

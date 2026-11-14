@@ -674,6 +674,68 @@ func TestRow_CommissioningCompleteCommitsTheRowOfItsFabric(t *testing.T) {
 	}
 }
 
+// TestRow_FreshStartReportsAnotherFabricsUpdateWithoutTheArmingSession is
+// R2-P2-rr-dev-06: fabric 1's UpdateNOC was left pending by a rollback
+// that failed at its fail-safe's end; an ArmFailSafe of another
+// administrator rolls it back at the fresh start. The rolled-back update is
+// reported without the arming session, which belongs to the other fabric
+// (the node's fabric-updated hook closes the session the context names
+// after its response, bridge.CloseFabricSessionsAfterUpdate); an arm from
+// fabric 1's own session reports it with that session, as before.
+func TestRow_FreshStartReportsAnotherFabricsUpdateWithoutTheArmingSession(t *testing.T) {
+	t.Parallel()
+	const armingSession = 0x77
+	for _, c := range []struct {
+		name string
+		// arming: the arm comes from the updated fabric (1) or the other.
+		ownFabric   bool
+		wantSession uint16
+	}{
+		{"another administrator arms", false, 0},
+		{"the updated fabric's administrator arms", true, armingSession},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			st := newRowStore(memstore.New())
+			r := newRowRig(t, st, nil)
+			first, firstRoot := r.commission(ctx, t)
+			second, _ := r.commission(ctx, t)
+			_, oldNode := credentialsOf(ctx, t, st, first)
+			r.armOver(ctx, t, first, 60)
+			if resp := r.updateNOC(ctx, t, first, firstRoot, oldNode+1); resp.StatusCode != core.NOCStatusOK {
+				t.Fatalf("UpdateNOC: %+v", resp)
+			}
+			st.setFault(failOn("RollbackFabric"))
+			r.armOver(ctx, t, first, 0) // the fail-safe ends; its rollback fails
+			st.setFault(nil)
+
+			type report struct {
+				fabric  uint8
+				session uint16
+			}
+			var reports []report
+			r.oc.SetOnFabricUpdated(func(ctx context.Context, fabricIndex uint8) {
+				reports = append(reports, report{fabricIndex, core.InvokeSessionIDFromContext(ctx)})
+			})
+			arming := second
+			if c.ownFabric {
+				arming = first
+			}
+			armCtx := core.WithInvokeSessionID(im.WithFabricFilter(ctx, true, arming), armingSession)
+			if _, err := r.gc.MatterInvoke(armCtx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil {
+				t.Fatalf("ArmFailSafe over fabric %d: %v", arming, err)
+			}
+			if len(reports) != 1 || reports[0].fabric != first {
+				t.Fatalf("fabric-updated reports %+v, want one for fabric %d", reports, first)
+			}
+			if reports[0].session != c.wantSession {
+				t.Fatalf("fabric %d's rolled-back update reported with session %#x, want %#x", first, reports[0].session, c.wantSession)
+			}
+		})
+	}
+}
+
 // TestRow_TermsAcceptanceIsNotCommittedWithoutTheFabric is R2-P2-comm-07:
 // a CommissioningComplete whose fabric commit fails leaves the terms
 // acceptance of the window uncommitted — in the store too — so the
