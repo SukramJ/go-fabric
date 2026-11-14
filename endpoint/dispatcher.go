@@ -500,13 +500,22 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				}
 
 				writeCtx := ctx
+				// The value written at this location: the request's own
+				// value, or for an ADD this location's list with the
+				// request's element appended. Every resolved location
+				// starts from the request's value — a group ADD appends
+				// the same element on every member endpoint, as
+				// connectedhomeip gives every mapped endpoint a fresh
+				// reader over the request's data
+				// (src/app/WriteHandler.cpp:555-559 at 6170af84).
+				v := value
 				if path.ListAppend {
 					merged, status := appendListValue(ctx, srv, attrID, value)
 					if status != im.StatusSuccess {
 						results = append(results, im.WriteResult{Path: aPath, Status: status})
 						continue
 					}
-					value = merged
+					v = merged
 					// The server sees the whole list; the mark tells it
 					// only the last element is new (AccessControl reports
 					// just that one as Added).
@@ -518,11 +527,11 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// state (packages/node/src/behavior/state/managed/Datasource.ts:667-676
 				// at db021da0), for every server with a generated
 				// definition, the hand-written ones included.
-				if status := writtenHeld(srv, attrID, value); !status.IsSuccess() {
+				if status := writtenHeld(srv, attrID, v); !status.IsSuccess() {
 					results = append(results, im.WriteResult{Path: aPath, Status: status})
 					continue
 				}
-				res := d.writeStored(writeCtx, ep, srv, aPath, value)
+				res := d.writeStored(writeCtx, ep, srv, aPath, v)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
