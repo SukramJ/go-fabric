@@ -10,6 +10,7 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -757,5 +758,33 @@ func TestParityOpcreds_UpdateFabricLabelConflictsOnTheEmptyLabel(t *testing.T) {
 	}
 	if rec, _ := s.GetFabric(ctx, idx2); rec.Label != "two" {
 		t.Fatalf("label after the conflict = %q, want %q", rec.Label, "two")
+	}
+}
+
+// TestParityOpcreds_CSRRequestKeepsTheFailSafeKeyPair pins that the
+// operational key pair belongs to the fail-safe context: every CSRRequest
+// in one context signs a CSR over the same public key, and a fresh context
+// draws a new one.
+//
+// Mirrors matter.js db021da0 packages/protocol/src/common/FailsafeContext.ts:61
+// (FabricBuilder.create once, as the context is constructed), :176-185
+// (createCertificateSigningRequest signs with the builder's key pair) and
+// packages/protocol/src/fabric/Fabric.ts:537-539 (create draws the pair),
+// :549-551 (the CSR over that pair).
+func TestParityOpcreds_CSRRequestKeepsTheFailSafeKeyPair(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := issueCSRPendingPubKey(ctx, t, oc, false)
+	second := issueCSRPendingPubKey(ctx, t, oc, false)
+	if !bytes.Equal(first, second) {
+		t.Fatal("a second CSRRequest in the same fail-safe context carries another public key")
+	}
+	oc.ClearPendingState() // a fresh fail-safe context
+	if third := issueCSRPendingPubKey(ctx, t, oc, false); bytes.Equal(first, third) {
+		t.Fatal("a CSRRequest in a fresh fail-safe context carries the earlier context's public key")
 	}
 }

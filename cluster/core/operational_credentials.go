@@ -63,7 +63,7 @@ type OperationalCredentials struct {
 	pendingTrustRoot    []byte            // last AddTrustedRootCertificate decoded as the 65-byte EC-P256 pubkey; consumed by AddNOC for CASE lookups + CompressedFabricID HKDF
 	pendingTrustRootDER []byte            // last AddTrustedRootCertificate full Matter RCAC TLV bytes (verbatim); served by TrustedRootCertificates read — Apple validates per-entry, see Bug-I memory
 	pendingCSRNonce     []byte            // for binding AttestationRequest → CSRResponse
-	pendingPrivKey      *ecdsa.PrivateKey // private key generated for next AddNOC
+	pendingPrivKey      *ecdsa.PrivateKey // the fail-safe context's operational key pair, drawn by its first CSRRequest
 	currentFabric       uint8             // FabricIndex of the fabric the current request runs against
 	devAttestKey        *ecdsa.PrivateKey // DAC private key (loaded from config)
 	dacBytes            []byte            // Device Attestation Certificate (X.509 DER)
@@ -1819,9 +1819,16 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	if err := o.resolveAttestation(ctx); err != nil {
 		return nil, err
 	}
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// The operational key pair belongs to the fail-safe context: the first
+	// CSRRequest draws it, every later one signs a CSR over the same pair
+	// until the context ends (clearPendingState) or a NOC command consumes
+	// it. Mirrors matter.js db021da0
+	// packages/protocol/src/common/FailsafeContext.ts:61 (FabricBuilder.create
+	// once per context) and :176-185 (createCertificateSigningRequest over
+	// the builder's pair, packages/protocol/src/fabric/Fabric.ts:549-551).
+	priv, err := o.failSafeKeyPair()
 	if err != nil {
-		return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+		return nil, err
 	}
 	csr, err := buildPKCS10CSR(priv)
 	if err != nil {
@@ -1854,6 +1861,21 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 		NOCSRElements:        nocsrElements,
 		AttestationSignature: sig,
 	}, nil
+}
+
+// failSafeKeyPair returns the fail-safe context's pending operational key
+// pair, drawing it on the context's first CSRRequest.
+func (o *OperationalCredentials) failSafeKeyPair() (*ecdsa.PrivateKey, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.pendingPrivKey == nil {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+		}
+		o.pendingPrivKey = priv
+	}
+	return o.pendingPrivKey, nil
 }
 
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
