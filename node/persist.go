@@ -180,16 +180,15 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	// SetOnPersistentWrite): the host's SetNodeLabel returns it, a
 	// controller's write answers FAILURE. The write uses New's context
 	// without its cancellation, so a caller's cancelled context does not
-	// abort a store write already begun.
+	// abort a store write already begun. Both keys go in one write
+	// (store.Settings.SetSettings): a refused write leaves neither changed,
+	// so a label that answered FAILURE is not served after a restart.
 	b.SetOnPersistentWrite(func(nodeLabel, location string) error {
-		var errs []error
-		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
-			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
-				p.logger.Warn("label.persist", slog.Any("err", err))
-				errs = append(errs, err)
-			}
+		err := p.st.SetSettings(context.WithoutCancel(ctx), map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location})
+		if err != nil {
+			p.logger.Warn("label.persist", slog.Any("err", err))
 		}
-		return errors.Join(errs...)
+		return err
 	})
 }
 
