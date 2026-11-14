@@ -104,6 +104,12 @@ type Config struct {
 	// Topology set the node builds the provider ([Node.OTAProvider]) and
 	// the host mounts it.
 	OTAProvider *OTAProviderConfig
+	// WebRTCRequestor is the node's part of the WebRtcTransportRequestor
+	// servers its topology mounts (camera.Requestor, the default of
+	// device.NewCameraController): the fabrics whose ACL gets the entry
+	// that lets a camera of the fabric invoke them
+	// ([WebRTCRequestorConfig].GrantFabric). nil grants none.
+	WebRTCRequestor *WebRTCRequestorConfig
 	// CommissionerControl mounts the CommissionerControl server on the
 	// Aggregator (ADR 0020 stage 6); nil mounts none. The reference daemon
 	// mounts none.

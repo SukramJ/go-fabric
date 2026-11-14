@@ -473,6 +473,12 @@ func cameraPair(t *testing.T, r *camera.Requestor) (*fabrictest.Site, *fabrictes
 			Bridged: []node.Endpoint{fabrictest.Endpoint("camera-controller", deviceTypeCameraController, r)},
 			Configure: func(cfg *node.Config) {
 				cfg.Network.TCP = node.TCPConfig{Incoming: true, Outgoing: true}
+				// matter.js's test creates its fabric through the node's own
+				// FabricAuthority (WebRtcTransportRequestorServerTest.ts
+				// :561-568 at db021da0), the fabric the requestor's ACL
+				// entry goes into; the site's one fabric stands for it,
+				// opened to the requestor explicitly.
+				cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
 			},
 		},
 		Controller: fabrictest.ControllerOptions{TCP: controller.TCPConfig{Outgoing: true}},
@@ -515,8 +521,8 @@ func requestorEntries(t *testing.T, pair *fabrictest.Pair, ep uint16) int {
 }
 
 // TestParityMatterJS_RequestorACLInstall is "ACL install" (:550-604): the
-// node installs the Operate entry when the first fabric arrives, and once
-// only. The repeated online event of :586-603 is a restart of the device,
+// node installs the Operate entry when a fabric its host grants
+// (node.WebRTCRequestorConfig.GrantFabric) arrives, and once only. The repeated online event of :586-603 is a restart of the device,
 // which runs the installation again with the fabric present.
 func TestParityMatterJS_RequestorACLInstall(t *testing.T) {
 	t.Run("ACL install adds one entry on first online", func(t *testing.T) { // :570

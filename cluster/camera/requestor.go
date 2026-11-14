@@ -56,8 +56,10 @@ type RequestorConfig struct {
 // initiates a stream, so the peer's commands for it are accepted, and
 // removes it with [Requestor.RemoveSession] when it tears the stream down;
 // End removes it on the peer's side. The node installs the Operate entry
-// the peer needs on the first fabric (node/webrtc_requestor_acl.go,
-// :56-94).
+// the peer needs in the fabrics its host grants
+// (node.WebRTCRequestorConfig.GrantFabric, node/webrtc_requestor_acl.go;
+// matter.js WebRtcTransportRequestorServer.ts:56-94 writes it into the
+// first fabric its own controller administers).
 type Requestor struct {
 	*spec.Instance
 	// SelfHeld is the typed server's command handlers, event path and

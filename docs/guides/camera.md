@@ -74,13 +74,21 @@ TCP; one that arrives over UDP or BLE answers `INVALID_TRANSPORT_TYPE` and
 does not run, as in matter.js. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
 sessions only.
 
-**The ACL entry.** The node installs the access the camera needs. At
-`Start` and after each commissioning, on the first fabric, it adds one
-Operate entry for CASE with no subject, targeting the requestor's
-endpoint and cluster. It adds the entry only when the fabric's ACL does
-not hold it yet. This follows matter.js `#nodeOnline`. The node emits no
-AccessControlEntryChanged event for the entry, because matter.js emits
-none for a change without a remote actor.
+**The ACL entry.** The camera needs Operate access to the requestor. The
+node writes that entry only into the fabrics the host grants through
+`node.Config.WebRTCRequestor.GrantFabric`, and into no fabric by default.
+At `Start` and after each commissioning the node asks `GrantFabric` for each
+of its fabrics. Into each granted one it adds one Operate entry for CASE
+with no subject, targeting the requestor's endpoint and cluster, unless the
+fabric's ACL holds it already. Without a grant the fabric's administrator
+writes the access itself. matter.js's `#nodeOnline` writes the entry into
+the first fabric its node's own controller administers; a `Node` has no
+controller of its own, so it asks the host. A grant only adds: an entry
+written while a grant stood, or by a version that wrote it into the first
+fabric, stays when the grant goes, until the fabric's administrator writes
+the ACL without it. The node emits no AccessControlEntryChanged event for
+the entry, because matter.js emits none for a change without a remote
+actor.
 
 ### The camera's signals
 
@@ -121,7 +129,8 @@ A session id `CurrentSessions` does not hold is `camera.ErrUnknownSession`.
 The peer's refusal comes back as an error carrying its status
 (`im.StatusCodeError`): `NOT_FOUND` when the requestor holds no session of
 that id from this node, `UNSUPPORTED_ACCESS` when its ACL lacks the Operate
-entry (the node installs it on its own requestors, see above). The
+entry (the node installs it on its own requestors in the fabrics its
+host grants, see above). The
 signals are large messages: each goes over a TCP session with the peer
 only, as matter.js's client sends such a command, and connectedhomeip
 establishes a TCP session for them
