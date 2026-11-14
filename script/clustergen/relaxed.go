@@ -38,6 +38,29 @@ var serverJudgedStructFields = map[string]serverJudged{
 		at:  "src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565",
 		why: "owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld",
 	},
+	// matter.js answers an empty VideoStreams or AudioStreams list with
+	// the model's "1 to 16" (CONSTRAINT_ERROR); chip's server treats an
+	// empty list as no stream field, which TC-PAVST-2.4 step 5,
+	// TC-PAVST-2.6 step 8 and TC-PAVST-2.11 step 21a expect. More than 16
+	// stays CONSTRAINT_ERROR, the server's (cluster/camera/pushtransport.go
+	// maxPushStreams).
+	"PushAvStreamTransport.TransportOptionsStruct.VideoStreams": {
+		at:  "src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678",
+		why: "owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer",
+	},
+	"PushAvStreamTransport.TransportOptionsStruct.AudioStreams": {
+		at:  "src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678",
+		why: "owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer",
+	},
+	// matter.js answers MotionSensitivity 11 with the model's "1 to 10";
+	// chip's server answers INVALID_COMMAND on a camera with PERZONESENS,
+	// where the field is not expected whatever its value, which
+	// TC-PAVST-2.3 step 25 expects; without PERZONESENS it judges 1 to 10
+	// itself (CONSTRAINT_ERROR, :556-569).
+	"PushAvStreamTransport.TransportTriggerOptionsStruct.MotionSensitivity": {
+		at:  "src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:571-577",
+		why: "owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer",
+	},
 }
 
 // serverJudged names the chip line whose handler judges a struct field and

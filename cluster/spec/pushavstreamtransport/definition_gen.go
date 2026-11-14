@@ -391,8 +391,10 @@ func (v *TransportOptionsStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(6, "IngestMethod", true, &v.IngestMethod, spec.DecodeUint[IngestMethodsEnum](8)),
 		spec.Bind(7, "ContainerOptions", true, &v.ContainerOptions, spec.DecodeStruct[ContainerOptionsStruct]),
 		spec.Bind(8, "ExpiryTime", false, &v.ExpiryTime, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
-		spec.Bind(9, "VideoStreams", false, &v.VideoStreams, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[VideoStreamStruct], 1, 16))),
-		spec.Bind(10, "AudioStreams", false, &v.AudioStreams, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AudioStreamStruct], 1, 16))),
+		// VideoStreams: the constraint "1 to 16" is the server's to judge, as chip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 does (owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer).
+		spec.Bind(9, "VideoStreams", false, &v.VideoStreams, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[VideoStreamStruct]))),
+		// AudioStreams: the constraint "1 to 16" is the server's to judge, as chip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 does (owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer).
+		spec.Bind(10, "AudioStreams", false, &v.AudioStreams, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[AudioStreamStruct]))),
 	)
 }
 
@@ -461,7 +463,8 @@ func (v *TransportTriggerOptionsStruct) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "TransportTriggerOptionsStruct",
 		spec.Bind(0, "TriggerType", true, &v.TriggerType, spec.DecodeUint[TransportTriggerTypeEnum](8)),
 		spec.Bind(1, "MotionZones", false, &v.MotionZones, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeList(spec.DecodeStruct[TransportZoneOptionsStruct])))),
-		spec.Bind(2, "MotionSensitivity", false, &v.MotionSensitivity, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUintIn[uint8](8, 1, 10)))),
+		// MotionSensitivity: the constraint "1 to 10" is the server's to judge, as chip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:571-577 does (owner decision 69 (2026-11-14), BD-chip-PushAvStreamTransport-RulesInServer).
+		spec.Bind(2, "MotionSensitivity", false, &v.MotionSensitivity, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint8](8)))),
 		spec.Bind(3, "MotionTimeControl", false, &v.MotionTimeControl, spec.DecodeOptional(spec.DecodeStruct[TransportMotionTriggerTimeControlStruct])),
 		spec.Bind(4, "MaxPreRollLen", false, &v.MaxPreRollLen, spec.DecodeOptional(spec.DecodeUint[uint16](16))),
 	)
