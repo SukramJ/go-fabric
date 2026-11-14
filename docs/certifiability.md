@@ -807,7 +807,16 @@ Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
 ICDM cases are not applicable through the device's own PICS (`ICDM.S=0`).
 The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
-automated SU cases run. The image lists
+automated SU cases run, against a daemon in harness mode: the suite starts
+every daemon with `--ota-harness` (TESTING ONLY, `internal/chiptool/bridge_test.go`
+startBridgeWith), under which the example applier consents to an update and
+reports a downloaded image's version as running at once, without a restart,
+running the requestor's start-up path in place (VersionApplied,
+NotifyUpdateApplied; `node/ota.go`). That is what the SU cases that read
+SoftwareVersion and the VersionApplied event pass on. Without the flag the
+applier keeps the old version running and the requestor reports a failed
+update after the next restart; a product's applier and its restart into the
+new image are the product's, and these cases do not test them. The image lists
 the DLOG case, the BIND cases and the SU YAML cases as manual, so the
 status block records them as class (c); on substance BIND tests the binding
 client (`BIND.C`, a controller-side role, (d) — proven in-repo since wave 21), and the SU provider cases an
