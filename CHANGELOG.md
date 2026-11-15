@@ -152,6 +152,12 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `cluster/spec`: `Instance.CheckRequest`; a hand-written definition is a supported input (review II, owner decision 113).
 - `contract.EndpointReceiver`; `cluster/spec`: `Server.SetEndpoint`, `Server.EmitEvent`, `ErrNotMounted`, `SelfHeld.EmitEvent`, `SelfHeld.SetEndpoint`, `Events.SetEndpoint`, `Events.EmitEvent`, `Hooks.SetEndpoint`, `Hooks.EmitEvent`; `EmitEvent` on the OperationalState, Pump, Valve, SmokeCoAlarm and Thermostat servers; generated `<cluster>def.Server.Record<Event>` (review II, R2-P5-apispec-07).
 - generated `<cluster>def.Declare.NoFeatures`; `thermostatdef.Host` (`SetMeasuredTemperature`, `SetOccupied`) and `Server.Host` (review II, R2-P5-apidev-04, R2-P5-apidev-06).
+- `im`: a command with the Large Message quality on a session that carries no large messages answers InvalidTransportType, and a wildcard or group path leaves it out; `im.WithLargeMessageSession` / `LargeMessageSessionFromContext` carry the session fact, which the bridge and a client stack's server state (review II, R2-P4-imwrite-01, F-db021da0-29).
+- `bridge`: `PeerSessionRequirement`, `Bridge.LivePeerSession` (a live session of any opener that meets the requirement, newest by the peer's activity, never a handshake), `PeerSession.LastActivityMonotonic`; `Bridge.ElementQualities` and `Bridge.Codec` (the bridge's wildcard qualities and IM codec, for a server of its tree on another stack) (review II, owner decision 115).
+- `secure/operational`: `Entry.LastPeerActivity`, `Entry.LastPeerActivityMonotonic`, `Manager.NewestSessionForPeer`, `Manager.PersistResumptionRecord` (review II, R2-P5-port-07, F-db021da0-34).
+- `client/exchange.BDXExchange`; `client/handshake.StoreResumption` (the store's one resumption record per peer for the CASE client); `client/interaction.ServerConfig.Dispatch` and `.RequestContext` (review II, F-db021da0-19).
+- `cluster/core`: `WithInvokeSession` / `InvokeSessionFromContext` (an opaque session identity beside the bridge's id), `OTAProviderConfig.SessionActivity` (review II, F-db021da0-27); `cluster/camera.ErrNoLargeMessageTransport`.
+- `docs`: ADR 0032, the device side's peer path; ADR 0019 superseded in part (review II, owner decision 115).
 
 ### Changed
 
@@ -323,6 +329,13 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `cluster/spec`: `EmitEvent` answers `ErrNotMounted` before the endpoint is known and after the bridge withdrew the emitter of a server that left the served topology (`bridge`) (review II).
 - clustergen: a struct attribute without a default of its own starts at its mandatory fields' scalar defaults (OperationalState's OperationalError `{ErrorStateId: 0}`, BasicInformation's CapabilityMinima `{3, 3}`) (review II).
 - `switch.Config.Endpoint` (non-zero) mounts the store's EmitEvent; `cluster/core`: a NetworkInterfaces name is cut to 32 bytes; `cluster/energy`: EvseServer and DeviceEnergyManagementServer forward `OnAttributeReport` and `MatterQuiesce` (review II, R2-P5-apispec-11).
+- `node`: a node reaches its OTA provider and its camera's WebRTC requestor over its peer path: a live session of either stack that carries the command — TCP for a Large Message command, every WebRTC signal — else one its client stack establishes; with `Config.Client` nil the node builds that stack on demand. A camera signal no TCP session can carry fails with `camera.ErrNoLargeMessageTransport` before anything is sent; give the node `Network.TCP.Outgoing` (review II, owner decision 115).
+- `node`: a node serves its endpoint tree on the sessions its client stack opens, with the bridge's dispatcher, gates and codec; not yet there: subscriptions, events in a read, write holds and chunked writes, per-session bounds (review II).
+- `node`, `controller`: the node's client stack dials TCP with `Network.TCP.Outgoing`, states the node's own session parameters, and keeps its CASE resumption records in the store; a restarted node or controller resumes with a peer instead of a full CASE. A node's CASE responder keeps the peer's session parameters in its record, and a resumed session keeps the record's (review II, F-db021da0-19).
+- `bridge`: a peer's session is reused by the peer's last activity, not the highest session id; the OTA provider judges a second QueryImage by the two sessions' activity when the node knows both (review II, F-db021da0-27, F-db021da0-34).
+- `cluster/core`: AddNOC consumes the CSR only on the session that issued it, whichever stack holds it; UpdateNOC binds no session, as matter.js (review II).
+- `node`: UpdateNOC and RemoveFabric invoked on a client-stack session are answered before that session closes; on fabric removal and UpdateNOC the client stacks are swept after the identity changed, and UpdateNOC ends a client-stack handshake in flight (review II).
+- `controller`: a controller that takes over its former own node's fabric row drops that node's resumption records, before its socket opens (review II).
 
 ### Deprecated
 
@@ -344,6 +357,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` → `Set` / `MarkChanged` / `MarkQuietChanged`; `cluster/spec.Server.Emit`, `cluster/spec.EmitOn` → `Server.EmitEvent`; `cluster/spec.ServerConfig.BeforeWrite` → `ServerConfig.WriteRule` (the author's rule) or `SetBeforeWrite` / `OnWrite` (the host's veto).
 - ``<cluster>def.Server.Emit<Event>(endpoint, …)`` → `Record<Event>`.
 - `cluster/wire.ScenesManagement` → `cluster/core.ScenesManagement`; `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, `SchedulesClusterID`, `SchedulesClusterRevision`, `SchedulesAttrScheduleProgrammingHandle`, `SchedulesAttrNumberOfSchedules`, `SchedulesAttrNumberOfScheduleTransitions`, `SchedulesAttrNumberOfScheduleTransitionsPerDay`, `SchedulesAttrNextScheduleHandle`, `SchedulesAttrSchedules`, `SchedulesAttrFeatureMap`, `SchedulesAttrClusterRevision` → the Thermostat server's schedules.
+- `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` → a node uses its peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session (review II, owner decision 115).
 
 ### Removed
 
