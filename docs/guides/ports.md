@@ -101,7 +101,7 @@ in the module.
 | `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
 | `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
-| `Topology` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
+| `Snapshotter` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
 | `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` (inline) and `Node.ObserveAsync` (queued) register more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's panic is logged, never returned |
 | `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |
@@ -122,7 +122,7 @@ Setting a cluster hook that the facade wires itself, such as
 OperationalCredentials `SetOnFabricRemoved`, replaces the facade's wiring.
 Use `Observers` instead.
 
-*Source: `node/config.go:37-205`, `node/config.go:221-281`, `node/config.go:367-415`, `node/client.go:29-51`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-71`, `node/persist.go:57-77`, `node/root.go:392-403`, `node/root.go:536-540`, `node/doc.go:49-64`, `bridge/bridge.go:2168-2180`.*
+*Source: `node/config.go:37-205`, `node/config.go:221-281`, `node/config.go:367-415`, `node/client.go:29-51`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-71`, `node/persist.go:57-77`, `node/root.go:392-403`, `node/root.go:536-540`, `node/doc.go:49-64`, `bridge/bridge.go` (`Bridge.Stop`).*
 
 ## `controller.Config`: the controller's ports added in v0.13.0
 
@@ -175,6 +175,7 @@ the next `Reassemble`.
 | --- | --- | --- |
 | `AttachRootClusters`, then `AttachAggregatorClusters` | silent for wildcards | a wildcard read skips the empty endpoint, so the bridge looks present and empty |
 | `AttachRootPartsListProvider`, `AttachAggregatorPartsListProvider` | silent | must follow their cluster call. They return false when no Descriptor is mounted, and PartsList stays frozen |
+| `AttachCommissioningWindow` | silent; fails open on ArmFailSafe | wired into the root's GeneralCommissioning whichever of it and `AttachRootClusters` comes second. Without it the window stays open after a commissioning completes, until its timeout; ArmFailSafe over CASE is not answered BusyWithOtherAdmin while a window is open; a revoke closes the PASE sessions only through a host-wired `PaseSessionCloser`; WindowStatus, AdminFabricIndex and AdminVendorId changes reach no subscriber |
 
 ### Group communication
 
@@ -187,7 +188,6 @@ the next `Reassemble`.
 
 | Port | What a skip costs |
 | --- | --- |
-| `AttachCommissioningWindow` | only `Bridge.CommissioningWindow()` returns nothing |
 | `AttachCaseInitiatorProvider`, `AttachOperationalResolver` (+ `ReestablishFormerSubscriptions`) | former subscriptions are dropped at restart (silent) |
 | `AttachBDXResponder` | BDX exchanges are dropped; an OTA download fails (fails closed) |
 | `AttachDiagnosticEvents` | `Bridge.DiagnosticEvents` stays empty |
@@ -210,7 +210,7 @@ command a server leaves unimplemented is `endpoint.ViolationUnimplemented`:
 logged in warn and off, refused in strict. A mode that is none of the three
 fails `node.New`.
 
-*Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
+*Source: the `bridge` package doc (`bridge/bridge.go`), `bridge/bridge.go` (`AttachCommissioningWindow`, `wireCommissioned`), `bridge/securechannel.go` (`AttachSessionRegistry`), `bridge/ackpump.go`.*
 
 ### Capabilities the bridge looks for on what is attached
 
@@ -231,12 +231,18 @@ method with exactly this signature, or the bridge silently does without.
 | the registry | `Sessions() []operational.SessionInfo` | the bridge cannot tell which sessions are PASE: none is cleared after CommissioningComplete, when the fail-safe expires or when the window is revoked |
 | the registry | `CloseFabric(fabricIndex uint8)` | a removed fabric's sessions are not closed by the bridge |
 | the registry | `CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16)` | a fabric's other sessions are not closed while the session that carries the command stays open to answer it |
+| the registry | `PASESessionIDs() []uint16` | the bridge sees no established PASE session, so a new PASE is accepted while one is established (fails open) |
+| the registry | `SetReapExemption(fn func(sessionID uint16) bool)` | a session that carries a live subscription can be reaped as idle (silent) |
+| the registry, or the `AttachSessionLookup` table | `AdoptFabricIndex(sessionID uint16, fabricIndex uint8) error` | the PASE session an AddNOC succeeded on stays without a fabric, so a CommissioningComplete sent over it is refused with UnsupportedAccess (fails closed) |
+| the registry | `ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int` | when the bridge gives up on a message of an exchange it opened, only that session is closed, not the lost peer's other sessions (silent) |
+| a host's own PASE or CASE handler | `PeerSessionParams() *sessionparams.Parameters` | the handshake's replies retransmit at the default MRP intervals, not at the ones the initiator stated |
+| a PASE or CASE handler | `establishedSession() (sessionID uint16, ok bool)` — unexported, so only the module's `PaseAdapter` and `CaseAdapter` have it | the session the handshake established is bound to the connection or address it came over only with its first message, and the `sessions.open` gauge is not updated when the handshake ends |
 | a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
 | a cluster server on a bridged endpoint | `MatterFabricRemoved(fabricIndex uint8)` | the server is not told of a removed fabric and keeps what it holds for that fabric's peers |
 | an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
 | an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
 
-*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 
 ## `<cluster>def.Host`: the kit server's host methods
 
@@ -279,6 +285,7 @@ the kit server implements for host inputs: the switch's.
 | WebRtcTransportProvider | `UpsertSession`, `RemoveSession` (by the session id) |
 | WebRtcTransportRequestor | `UpsertSession`, `RemoveSession` (by `webrtctransportrequestordef.SessionKey`) |
 | WiFiNetworkManagement | `SetNetworkCredentials`, `ClearNetworkCredentials`, `Passphrase` |
+| ZoneManagement | `ZoneTriggered`, `ZoneStopped` |
 
 *Source: `script/clustergen/hosts.go`; the decision on every method of
 every kit server is `device/host_methods_test.go`.*

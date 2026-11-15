@@ -72,9 +72,8 @@ func isNotFound(err error) bool {
 // updates propagate automatically on the next codegen run without
 // requiring manual edits here.
 //
-// A small customDeviceTypeRevision fallback handles bridge-specific
-// overrides — currently only the Apple-Home RootNode bypass documented
-// in notes/parity/by_design.md task #66. Unknown device-type IDs fall
+// A small customDeviceTypeRevision fallback is the place for
+// bridge-specific overrides; no override is active. Unknown device-type IDs fall
 // back to revision 1 so the function never breaks an exposure for a
 // custom or vendor-specific type the schema does not yet cover.
 //

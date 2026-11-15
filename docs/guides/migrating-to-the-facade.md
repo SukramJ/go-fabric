@@ -24,7 +24,7 @@ still held there. Each row names the facade route, or the section of
 | `store` | `FabricRecord` (`internal/north/rest/handlers/matter.go:231`) | `Node.FabricInfos`: `FabricInfo` carries index, fabric and node id, root public key, compressed fabric id, `VendorID` and `Label` |
 | `store` | `SettingUniqueID` (`daemon_matter.go:520`, a comment) | `Node.UniqueID` |
 | `secure/setup` | `IsValidSetupPIN` (`daemon_matter.go:277`, `internal/config/validate.go:167`), `MaxDiscriminator` (`validate.go:158`) | `node.ValidateSetupPIN`, `node.MaxDiscriminator`; `Config.Validate` checks both. A validator that runs without a node (a configuration package, a CLI) stays on `secure/setup`: [`secure/…`](advanced-seams.md#secure) |
-| `secure/setup` | `Payload`, `QRCode`, `ManualCode`, `DiscoveryOnIP` (`matter_window_adapter.go:176-187`) | `Node.PairingCodesFor(WindowCredentials)` for a window opened with the host's credentials; `Node.PairingCodes` for the configured ones |
+| `secure/setup` | `Payload`, `QRCode`, `ManualCode`, `DiscoveryOnIP` (`matter_window_adapter.go:176-187`) | `Node.PairingCodesFor(WindowCredentials)` for a window opened with the host's credentials; `Node.SetupPayload()` (`.QR`, `.Manual`) for the configured ones |
 | `secure/setup` | the same (`internal/north/rest/handlers/matter.go:60-72`, without a node) | stays: [`secure/…`](advanced-seams.md#secure) |
 | `secure/spake2` | `PBKDFMinSaltSize`, `PBKDFMaxSaltSize` (`daemon_matter.go:289`), `IterationsMin`, `IterationsMax` (`internal/config/validate.go:163`, `internal/config/config.go:1087`) | `node.PBKDFSaltMin`, `node.PBKDFSaltMax`, `node.PBKDFIterationsMin`, `node.PBKDFIterationsMax`; a validator that runs without a node stays on `secure/spake2`: [`secure/…`](advanced-seams.md#secure) |
 | `secure/operational` | `Manager` (`daemon_matter.go:153`, `:1193`) | `node.SessionManager` (the same type) |
@@ -555,7 +555,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 | --- | --- |
 | `node.Node.Fabrics` (`[]store.FabricRecord`) | `Node.FabricInfos` (`[]node.FabricInfo`; the compressed fabric id is `CompressedFabricID`) |
 | `controller/ble.ErrScannerClosed` | none needed: a discovery on a closed scanner returns the stored devices without an error, so nothing returned it |
-| `store.SettingUniqueIDRotated` and the node's one-time migration of a flagged unique id (issue #122) | none: the migration ended (owner, 2026-10-21). A store that never booted on v0.5.0 or later serves its salted unique id after this release; `Config.BasicInformation.UniqueID` pins another, `Config.BootID.RotateUniqueIDs` still rotates per boot |
+| `store.SettingUniqueIDRotated` and the node's one-time migration of a flagged unique id (issue #122) | none: the migration ended (owner, 2026-10-21). A store that never booted on v0.5.0 or later serves its salted unique id after this release; `Config.BasicInformation.UniqueID` pins another, `bootid.EnableRotation()` (once, before `node.New`) still rotates per boot |
 | `store.DiagnosticsRecord`, `Store.LoadDiagnostics`, `Store.SaveDiagnostics` | the node facade keeps RebootCount and the operational hours in the settings table; the `matter_diagnostics` table stays, created and seeded, read by nothing |
 | `transport/mrp.Retransmitter`, `NewRetransmitter`, `SendFunc`, `TickResult` | none in `mrp`: reliability is the bridge's per-session tracker (`bridge/outbound_reliable.go`); `mrp.BackoffDuration` and `MaxRetransmissions` give the schedule |
 | `cluster/modeselect.ModeOptionFieldLabel`, `ModeOptionFieldMode`, `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode`, `SemanticTagFieldValue` | the generated codec, `msdef.ModeOptionStruct.EncodeTLV` / `msdef.SemanticTagStruct.EncodeTLV` in `cluster/spec/modeselect`, carries the field ids |
@@ -575,11 +575,10 @@ groups follow the deprecation table the README carried until `v0.9.x`.
    relied on it declares `Features: lock.FeatureUBOLT`; without it the
    lock loses UnboltDoor and the FeatureMap bit.
 5. **A store on the host's own handle** ([`store`](advanced-seams.md#store)):
-   a host that carries the schema in its own migrations adds the tables
-   the schema gained since `v0.6.0` — `matter_thermostat_presets`
-   (schema version 5, `v0.8.3`) and `matter_doorlock_users`,
-   `matter_doorlock_credentials`, `matter_doorlock_schedules` (version 6,
-   `v0.8.4`).
+   a host that carries the schema in its own migrations adds what the
+   schema gained since `v0.6.0`: versions 5 to 8, the tables and columns
+   and the `store.Upgrade` call after `v8` that
+   [the store's seam](advanced-seams.md#store) lists.
 
 ## Verify
 
