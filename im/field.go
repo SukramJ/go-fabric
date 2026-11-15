@@ -34,7 +34,7 @@ func (e *FieldError) MatterStatusCode() StatusCode { return e.Status }
 
 // ErrMissingField is the error a request decoder returns, wrapped with
 // the field's name, when a mandatory field is absent; it answers
-// InvalidAction. matter.js packages/types/src/tlv/TlvObject.ts:258
+// InvalidAction. matter.js packages/types/src/tlv/TlvObject.ts:261
 // throws ValidationMandatoryFieldMissingError (InvalidAction,
 // packages/types/src/common/ValidationError.ts:45-48); chip's parsers
 // return CHIP_END_OF_TLV, which src/app/ReadHandler.cpp:208-214 answers
@@ -82,10 +82,12 @@ func boolField(el tlv.Element) (bool, error) {
 // TlvInvokeRequest.ts:19, :22, TlvWriteRequest.ts:18, :21, :25 (under
 // packages/types/src/protocol/messages/), TlvAttributePath.ts:21 and
 // TlvEventPath.ts:22 (under packages/types/src/protocol/types/). The
-// response decoders keep [boolField].
+// response decoders keep [boolField], except the event path, which
+// readEventPathFields shares with the request side: the client's
+// DataReport decoding reads a received EventPathIB's IsUrgent here too.
 func requestBoolField(el tlv.Element, name string) (bool, error) {
 	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
-		return false, fmt.Errorf("%s (tag %d) not a boolean: TLV type 0x%02X", name, fieldTag(el), uint8(el.Type))
+		return false, fmt.Errorf("im: %s (tag %d) not a boolean: TLV type 0x%02X", name, fieldTag(el), uint8(el.Type))
 	}
 	return el.Bool, nil
 }
