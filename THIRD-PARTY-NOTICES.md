@@ -101,9 +101,14 @@ each copyright line is quoted verbatim from it.
 
 ### Linked into a build that imports this module
 
-Measured with `go list -deps` over every package outside `script/`. The
-first four are the direct runtime dependencies in `go.mod`; the rest are
-reached through them. `modernc.org/sqlite` is the pure-Go SQLite driver:
+Measured with `go list -deps` over every package outside `script/`,
+`internal/` and `examples/`, as the union over linux (amd64, arm64, arm,
+386), darwin (arm64, amd64) and windows (amd64) with `CGO_ENABLED=0`
+(`script/docscheck`, `TestNoticesListEveryLinkedModule`). The set differs
+by platform: a linux build does not link `github.com/mattn/go-isatty` and
+`github.com/ncruces/go-strftime`, a windows build does not link
+`github.com/google/uuid`. The first four are the direct runtime
+dependencies in `go.mod`; the rest are reached through them. `modernc.org/sqlite` is the pure-Go SQLite driver:
 `store.OpenSQLite` (`store/sqlite.go`) imports it, and the node
 (`Config.Store.Path`) and the controller (`controller.OpenDB`) open their
 databases with it, so a build that imports `node` or `controller` links it
