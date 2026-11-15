@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -518,5 +519,130 @@ func TestNonVolatileRestoreStoresNoValueNobodyChose(t *testing.T) {
 	defer st.mu.Unlock()
 	if len(st.writes) != 0 {
 		t.Errorf("the restore wrote %v", st.writes)
+	}
+}
+
+// readCountingStore records the settings keys read while counting is
+// armed.
+type readCountingStore struct {
+	store.Port
+	counting atomic.Bool
+	mu       sync.Mutex
+	read     []string
+}
+
+func (s *readCountingStore) GetSetting(ctx context.Context, key string) (string, bool, error) {
+	if s.counting.Load() {
+		s.mu.Lock()
+		s.read = append(s.read, key)
+		s.mu.Unlock()
+	}
+	return s.Port.GetSetting(ctx, key)
+}
+
+// TestForgetErasesEveryKeyedRoot pins review II R2-P5-port-02: a device
+// forgotten (Aggregator.Forget) and Added again under its key starts from
+// its declaration — the NodeLabel a controller wrote, the scene table,
+// the Binding list, the ConfigurationVersion and the surface stored under
+// the key are erased with its nonvolatile values — and the erasure reads
+// none of the keys it deletes (N-finp-1): of the forgotten key's settings
+// Forget reads only the endpoint-number reservation that names its parts. matter.js erases the persisted
+// data of an endpoint it deletes (Endpoint.ts:984-992 at db021da0).
+func TestForgetErasesEveryKeyedRoot(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	st := &readCountingStore{Port: memstore.New()}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	const bdbi, nodeLabel, configVersion = 0x0039, 0x0005, 0x0018
+	declared := dispatchRead(t, n, attrPath(ep, bdbi, nodeLabel))
+	if s := dispatchWrite(t, n, attrPath(ep, bdbi, nodeLabel), "written"); s != im.StatusSuccess {
+		t.Fatalf("NodeLabel write: %v", s)
+	}
+	keyed := map[string]string{
+		"bridged_node_label.thermo":            "written",
+		"bridged_configuration_version.thermo": "7",
+		"scenes.thermo":                        `[{"FabricIndex":1,"GroupID":1,"SceneID":1}]`,
+		"binding.thermo":                       `[{"node":5,"fabricIndex":1}]`,
+		"bridged_surface_digest.thermo":        `{"digest":"00"}`,
+	}
+	if err := st.SetSettings(ctx, keyed); err != nil {
+		t.Fatal(err)
+	}
+	st.counting.Store(true)
+	if err := n.Aggregator().Forget(ctx, endpoint.StringKey(nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	st.counting.Store(false)
+	st.mu.Lock()
+	for _, key := range st.read {
+		if strings.Contains(key, nvHeat.key) && !strings.HasPrefix(key, "endpoint_number_reserved.") {
+			t.Errorf("Forget read %q; want none of the keys it erases read", key)
+		}
+	}
+	st.mu.Unlock()
+	for key := range keyed {
+		if v, ok, err := st.GetSetting(ctx, key); err != nil || ok {
+			t.Errorf("%s = %q (found %v, %v) after Forget; want it erased", key, v, ok, err)
+		}
+	}
+	if err := n.Aggregator().Add(ctx, nvHeat.build(t, nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	again, ok := endpointOf(t, n, nvHeat.key)
+	if !ok {
+		t.Fatal("the device is not served after the Add")
+	}
+	if got := dispatchRead(t, n, attrPath(again, bdbi, nodeLabel)); got != declared {
+		t.Errorf("NodeLabel after Forget and Add = %s; want the declaration's %s", got, declared)
+	}
+	if got := dispatchRead(t, n, attrPath(again, bdbi, configVersion)); got != "1" {
+		t.Errorf("ConfigurationVersion after Forget and Add = %s; want 1, from scratch", got)
+	}
+}
+
+// writeCountingStore counts the writes of one settings key.
+type writeCountingStore struct {
+	store.Port
+	key    string
+	writes atomic.Int32
+}
+
+func (s *writeCountingStore) SetSetting(ctx context.Context, key, value string) error {
+	if key == s.key {
+		s.writes.Add(1)
+	}
+	return s.Port.SetSetting(ctx, key, value)
+}
+
+func (s *writeCountingStore) SetSettings(ctx context.Context, values map[string]string) error {
+	if _, ok := values[s.key]; ok {
+		s.writes.Add(1)
+	}
+	return s.Port.SetSettings(ctx, values)
+}
+
+// TestNonVolatileWriteOfTheStoredValueStoresNothing pins review II
+// R2-P5-write-04: a controller's write of the value the store already
+// holds for a nonvolatile attribute writes nothing again — the second of
+// two equal writes leaves the store's write count at one.
+func TestNonVolatileWriteOfTheStoredValueStoresNothing(t *testing.T) {
+	t.Parallel()
+	st := &writeCountingStore{Port: memstore.New(), key: "nonvolatile.thermo.0201.0012"}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	for range 2 {
+		if s := dispatchWrite(t, n, path, int64(2100)); s != im.StatusSuccess {
+			t.Fatalf("write: %v", s)
+		}
+	}
+	if w := st.writes.Load(); w != 1 {
+		t.Errorf("the store took %d writes of the key for two equal writes; want 1", w)
+	}
+	if v, ok, err := st.GetSetting(t.Context(), st.key); err != nil || !ok || v != nvStoredTLV(t, int64(2100)) {
+		t.Errorf("stored %q (found %v, %v); want 2100's TLV", v, ok, err)
 	}
 }

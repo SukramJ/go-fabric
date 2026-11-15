@@ -38,6 +38,34 @@ const (
 	legacyOperationalHoursSetting = "gendiag.operational_hours"
 )
 
+// keyedSettingRoots are the settings roots the node keeps a bridged
+// endpoint's state under by its stable key, one key per endpoint: the root
+// and the key's String(). [Aggregator.Forget] erases each of them for a
+// forgotten key (nonVolatile.forget); the nonvolatile attribute values,
+// one key per attribute, are erased beside them (nonVolatileCandidates).
+// A root added here is erased with the rest; one kept elsewhere fails
+// TestKeyedSettingRootsAreForgotten.
+var keyedSettingRoots = []string{
+	endpointLabelKeyRoot,
+	endpointConfigVersionKey,
+	scenesKeyRoot,
+	bindingKeyRoot,
+	bridgedUserLabelKeyRoot,
+	endpointSurfaceKey,
+}
+
+// keyedSettingKeys are the keys of every keyed setting root at
+// endpointKeys.
+func keyedSettingKeys(endpointKeys []string) []string {
+	keys := make([]string, 0, len(keyedSettingRoots)*len(endpointKeys))
+	for _, root := range keyedSettingRoots {
+		for _, key := range endpointKeys {
+			keys = append(keys, root+key)
+		}
+	}
+	return keys
+}
+
 // persisted keeps the controller-written state of the node's endpoints in
 // the store's settings table: a bridged endpoint's NodeLabel and
 // ConfigurationVersion under its stable key, its scene table, and the

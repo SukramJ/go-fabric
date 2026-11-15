@@ -62,6 +62,15 @@ func (s *refusingKeys) SetSetting(ctx context.Context, key, value string) error 
 	return s.Port.SetSetting(ctx, key, value)
 }
 
+func (s *refusingKeys) DeleteSettings(ctx context.Context, keys ...string) error {
+	for _, k := range keys {
+		if s.refused(k) {
+			return errKeyRefused
+		}
+	}
+	return s.Port.DeleteSettings(ctx, keys...)
+}
+
 func (s *refusingKeys) SetSettings(ctx context.Context, values map[string]string) error {
 	for k := range values {
 		if s.refused(k) {
