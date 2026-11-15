@@ -31,7 +31,8 @@ type OTAImage = mattercore.OTAImage
 type OTAFileDesignator = bdx.FileDesignator
 
 // OTABlob is what [OTAImageSource].Open returns: the bytes of an offered
-// image, read at offsets as the BDX transfer asks ([bdx.Blob]).
+// image, read at offsets as the BDX transfer asks ([bdx.Blob]); one that
+// implements io.Closer is closed when the transfer ends.
 type OTABlob = bdx.Blob
 
 // The consent states an [OTAConsent] answers (matter.js

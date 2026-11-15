@@ -13,7 +13,9 @@ import (
 // Blob is a stored file an outbound transfer reads: its size and its bytes
 // at any offset. It is the Go form of the Blob matter.js's
 // PersistedFileDesignator.openBlob returns (PersistedFileDesignator.ts:60-70);
-// *bytes.Reader and *os.File (through a size wrapper) satisfy it.
+// *bytes.Reader and *os.File (through a size wrapper) satisfy it. A blob
+// that also implements io.Closer is closed by [Serve] when the transfer
+// that opened it ends.
 type Blob interface {
 	io.ReaderAt
 	Size() int64
@@ -32,7 +34,9 @@ type ServeOptions struct {
 	TransferFileDesignator FileDesignator
 	// Open returns the file a ReceiveInit asks for; an error wrapping
 	// fs.ErrNotExist is FileDesignatorUnknown (bdx-session-initiator.ts:
-	// 67-74). Needed for a ReceiveInit.
+	// 67-74). Needed for a ReceiveInit. A returned blob that implements
+	// io.Closer is closed once when the transfer ends — completed,
+	// refused after the open, aborted by the peer or failed.
 	Open func(ctx context.Context) (Blob, error)
 	// Sink receives the bytes a SendInit announces. Needed for a SendInit.
 	Sink Sink
@@ -134,6 +138,7 @@ func determineAccept(m *Messenger, modes []DriverMode, opts ServeOptions) (tc Tr
 // 67-102).
 func serveSender(ctx context.Context, m *Messenger, modes []DriverMode, opts ServeOptions) (Result, error) {
 	f := &outboundFlow{m: m, counter: -1}
+	defer f.closeBlob()
 	res, err := negotiateSender(ctx, f, modes, opts)
 	if err != nil {
 		return res, f.fail(ctx, err)
@@ -162,6 +167,9 @@ func negotiateSender(ctx context.Context, f *outboundFlow, modes []DriverMode, o
 			return Result{}, newError(StatusFileDesignatorUnknown, "File designator %s does not point to an existing file in the storage to send data", opts.TransferFileDesignator.Text())
 		}
 		return Result{}, err
+	}
+	if c, ok := blob.(io.Closer); ok {
+		f.blobCloser = c
 	}
 	var startOffset uint64
 	if opts.Init.StartOffset != nil {

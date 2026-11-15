@@ -99,7 +99,8 @@ type OTAImageSource interface {
 	QueryImage(ctx context.Context, peer OTAPeer, req provdef.QueryImageRequest) (OTAImage, bool, error)
 	// Open returns the bytes of an image QueryImage offered, named by its
 	// FileDesignator text; an error wrapping fs.ErrNotExist is answered
-	// FileDesignatorUnknown on the BDX exchange.
+	// FileDesignatorUnknown on the BDX exchange. A returned blob that
+	// implements io.Closer is closed when the transfer ends.
 	Open(ctx context.Context, file string) (bdx.Blob, error)
 }
 

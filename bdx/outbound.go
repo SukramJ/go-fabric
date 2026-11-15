@@ -47,6 +47,9 @@ type outboundFlow struct {
 	// (OutboundFlow.initTransfer, OutboundFlow.ts:30-65).
 	data      io.Reader
 	blockSize int
+	// blobCloser closes the blob a served transfer reads, nil when the
+	// blob has no Close or the flow sends a caller's reader ([Serve]).
+	blobCloser io.Closer
 
 	counter      int64 // last block counter used; -1 before the first (Flow.ts:18)
 	finalCounter uint32
@@ -379,4 +382,12 @@ func (f *outboundFlow) fail(ctx context.Context, err error) error {
 	}
 	f.cancel()
 	return err
+}
+
+// closeBlob closes the served blob once, when the transfer has ended.
+func (f *outboundFlow) closeBlob() {
+	if c := f.blobCloser; c != nil {
+		f.blobCloser = nil
+		_ = c.Close()
+	}
 }
