@@ -130,7 +130,19 @@ func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, p.SetMetadataCounter(ctx, "erase.counter", 7))
 
 	must(t, p.Erase(ctx))
+	wantNodeTablesErased(ctx, t, p, rec.ResumptionID)
 
+	again := addFabric(ctx, t, p, 3)
+	wantEqual(t, "first fabric index after erase", again, uint8(1))
+	wantEqual(t, "the new fabric reuses the erased one's index", again, idx)
+	wantFabricTablesErased(ctx, t, p, again)
+}
+
+// wantNodeTablesErased: after Erase no fabric, setting, counter,
+// subscription, resumption record, OTA provider or state, ICD registration
+// or counter, thermostat presets or door-lock auth is read back.
+func wantNodeTablesErased(ctx context.Context, t *testing.T, p store.Port, resumptionID []byte) {
+	t.Helper()
 	fabrics, err := p.ListFabrics(ctx)
 	must(t, err)
 	wantEqual(t, "fabrics after erase", len(fabrics), 0)
@@ -143,7 +155,7 @@ func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
 	subs, err := p.LoadServerSubscriptions(ctx)
 	must(t, err)
 	wantEqual(t, "subscriptions after erase", len(subs), 0)
-	if _, err := p.GetResumptionByID(ctx, rec.ResumptionID); !errors.Is(err, store.ErrResumptionNotFound) {
+	if _, err := p.GetResumptionByID(ctx, resumptionID); !errors.Is(err, store.ErrResumptionNotFound) {
 		t.Fatalf("GetResumptionByID after erase = %v, want ErrResumptionNotFound", err)
 	}
 	if got, err := p.ListDefaultOTAProviders(ctx); err != nil || len(got) != 0 {
@@ -164,10 +176,13 @@ func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
 	if auth, saved, err := p.LoadDoorLockAuth(ctx, "erase.lock"); err != nil || saved || !reflect.DeepEqual(auth, store.DoorLockAuth{}) {
 		t.Fatalf("LoadDoorLockAuth after erase = %+v, %v, %v", auth, saved, err)
 	}
+}
 
-	again := addFabric(ctx, t, p, 3)
-	wantEqual(t, "first fabric index after erase", again, uint8(1))
-	wantEqual(t, "the new fabric reuses the erased one's index", again, idx)
+// wantFabricTablesErased: a fabric added after Erase, under the erased
+// fabric's index, holds no identity, ACL, key set, key map, group table,
+// groupcast group or resumption record.
+func wantFabricTablesErased(ctx context.Context, t *testing.T, p store.Port, again uint8) {
+	t.Helper()
 	if _, err := p.GetIdentity(ctx, again); !errors.Is(err, store.ErrIdentityNotFound) {
 		t.Fatalf("GetIdentity after erase = %v, want ErrIdentityNotFound", err)
 	}

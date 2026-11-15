@@ -21,16 +21,22 @@ import (
 // malformed request does, and counts the calls.
 type failingPaseHandler struct{ calls *atomic.Int32 }
 
-func (h failingPaseHandler) fail() (uint8, []byte, error) {
+func (h failingPaseHandler) fail() (opcode uint8, reply []byte, err error) {
 	h.calls.Add(1)
 	return 0, nil, errors.New("refused by the test")
 }
 
-func (h failingPaseHandler) ProcessPBKDFParamRequest([]byte) (uint8, []byte, error) { return h.fail() }
+func (h failingPaseHandler) ProcessPBKDFParamRequest([]byte) (opcode uint8, reply []byte, err error) {
+	return h.fail()
+}
 
-func (h failingPaseHandler) ProcessPake1([]byte) (uint8, []byte, error) { return h.fail() }
+func (h failingPaseHandler) ProcessPake1([]byte) (opcode uint8, reply []byte, err error) {
+	return h.fail()
+}
 
-func (h failingPaseHandler) ProcessPake3([]byte) (uint8, []byte, error) { return h.fail() }
+func (h failingPaseHandler) ProcessPake3([]byte) (opcode uint8, reply []byte, err error) {
+	return h.fail()
+}
 
 // pbkdfParamRequest is an unsecured PBKDFParamRequest from source node src
 // on exchange xid; its body does not matter to a handler that refuses it.

@@ -1912,9 +1912,35 @@ func (g *generator) test() ([]byte, error) {
 	w.p("\tt.Parallel()")
 	w.p("\tspectest.CheckDefinition(t, Definition)")
 	w.p("}")
-	// The round trips are collected first: a cluster with no struct, no
-	// payload and no struct-typed attribute gets no TestCodecsRoundTrip,
-	// rather than one whose body cannot fail (review II, R2-P5-tassert-04).
+	trips := g.roundTrips()
+	if len(trips) > 0 {
+		w.p("")
+		w.p("// TestCodecsRoundTrip encodes a populated value of every generated")
+		w.p("// struct and payload and decodes it back.")
+		w.p("func TestCodecsRoundTrip(t *testing.T) {")
+		w.p("\tt.Parallel()")
+		for _, line := range trips {
+			w.p("%s", line)
+		}
+		w.p("}")
+	}
+	if g.definitionOnly {
+		g.stateTest(w)
+	} else {
+		g.serverTest(w)
+	}
+	out, err := format.Source(w.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())
+	}
+	return out, nil
+}
+
+// roundTrips is the body of the generated TestCodecsRoundTrip, one line
+// per struct, payload and struct-typed attribute. A cluster with none of
+// them gets no TestCodecsRoundTrip, rather than one whose body cannot fail
+// (review II, R2-P5-tassert-04).
+func (g *generator) roundTrips() []string {
 	var trips []string
 	var structs []*payload
 	for _, di := range g.dataList {
@@ -1947,27 +1973,7 @@ func (g *generator) test() ([]byte, error) {
 		}
 		trips = append(trips, fmt.Sprintf("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample))
 	}
-	if len(trips) > 0 {
-		w.p("")
-		w.p("// TestCodecsRoundTrip encodes a populated value of every generated")
-		w.p("// struct and payload and decodes it back.")
-		w.p("func TestCodecsRoundTrip(t *testing.T) {")
-		w.p("\tt.Parallel()")
-		for _, line := range trips {
-			w.p("%s", line)
-		}
-		w.p("}")
-	}
-	if g.definitionOnly {
-		g.stateTest(w)
-	} else {
-		g.serverTest(w)
-	}
-	out, err := format.Source(w.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())
-	}
-	return out, nil
+	return trips
 }
 
 // sample is a Go expression of a populated value of p: every optional
