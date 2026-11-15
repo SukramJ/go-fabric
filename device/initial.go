@@ -18,8 +18,9 @@ import (
 )
 
 // InitialRequirement is an attribute a device's kit server lists and has
-// no value for: neither the model nor the kit gives it a default, so the
-// host states it in the cluster's declaration ([Type.RequiredInitial]).
+// no value for, one matter.js requires a value of when the server
+// initialises: the host states it in the cluster's declaration, or [New]
+// refuses the device ([Type.RequiredInitial]).
 type InitialRequirement struct {
 	// Cluster and ClusterName name the cluster.
 	Cluster     uint32
@@ -32,14 +33,23 @@ type InitialRequirement struct {
 	Declare string
 }
 
+// initialError is New's refusal of a device whose kit servers leave an
+// attribute without the value matter.js requires at initialisation.
+func initialError(t *Type, refused []InitialRequirement) error {
+	parts := make([]string, len(refused))
+	for i, m := range refused {
+		parts[i] = m.String()
+	}
+	return fmt.Errorf("%w: %s: %s", ErrConfiguration, t.Name, strings.Join(parts, "; "))
+}
+
 // String names the attribute and the declaration that states it.
 func (r InitialRequirement) String() string {
 	return fmt.Sprintf("%s (0x%04X) attribute %s (0x%04X) has no value; state it with %s", r.ClusterName, r.Cluster, r.AttributeName, r.Attribute, r.Declare)
 }
 
-// RequiredInitial lists the attributes a device of the type serves with no
-// value unless the host's declarations state one: listed in the cluster's
-// AttributeList, a read of each answers UNSUPPORTED_ATTRIBUTE. A
+// RequiredInitial lists the attributes [New] refuses a device of the type
+// for unless the host's declarations state them ([InitialRequirement]): a
 // data-driven host checks its configuration against it before it builds a
 // device. It measures the
 // type's default servers, built without declarations; a type whose
@@ -54,11 +64,111 @@ func (t *Type) RequiredInitial() []InitialRequirement {
 	s.key = "device.RequiredInitial:" + t.Name
 	s.logger = slog.New(slog.DiscardHandler)
 	s.clock = &deviceClock{}
+	s.skipInitialCheck = true
 	d, err := buildDevice(t.clone(), Options{StableKey: endpoint.StringKey(s.key)}, s)
 	if d == nil || err != nil {
 		return nil
 	}
-	return d.missingInitial()
+	return d.refusedInitial()
+}
+
+// refusedInitial is the part of missingInitial matter.js refuses at a
+// server's initialisation: the attributes a host must state.
+func (d *Device) refusedInitial() []InitialRequirement {
+	var out []InitialRequirement
+	for _, r := range d.missingInitial() {
+		def := spec.Lookup(r.Cluster)
+		if def == nil {
+			continue
+		}
+		if a := def.Attribute(r.Attribute); a != nil && refusedAtInit(a.Type, a.Quality, a.Constraint, a.Default) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// refusedAtInit reports whether matter.js refuses a server whose state
+// holds no value of its own for an attribute of type t, quality q,
+// constraint c and stated default def (decision 17, "refuses, as matter.js
+// does"). matter.js validates the whole cluster state once a server
+// behaviour initialised (packages/node/src/behavior/internal/
+// ServerBehaviorBacking.ts:46-63 at db021da0). Before that a served member
+// without a value gets the model default, else the datatype fallback —
+// null when nullable, 0 for an integer or float, false, {} for a bitmap or
+// struct, [] for a list; none for an enum, a string or an octet string
+// (packages/model/src/logic/SelectDefaultValue.ts:144-176); a struct is
+// built from the defaults its children state (DefaultValue.ts:153-179).
+// conformance-compiler.ts:717-721 then refuses a conformant, non-nullable
+// member that is still undefined — an enum, string or octet string, or a
+// struct's mandatory non-nullable child without a default — and the same
+// validation refuses a list whose minimum length is above 0 and an integer
+// whose constraint excludes 0 (inferred from the dispatch at
+// constraint.ts:112-113). A stated default that the runtime does not
+// resolve (spec.UnresolvedDefault) counts as none.
+func refusedAtInit(t spec.Type, q spec.Quality, c spec.Constraint, def any) bool {
+	if q.Nullable {
+		return false
+	}
+	if def != nil {
+		if _, unresolved := def.(spec.UnresolvedDefault); !unresolved {
+			return false
+		}
+	}
+	switch t.Kind {
+	case spec.KindEnum, spec.KindString, spec.KindBytes:
+		return true
+	case spec.KindStruct:
+		if t.Struct == nil {
+			return false
+		}
+		for i := range t.Struct.Fields {
+			f := &t.Struct.Fields[i]
+			if f.Mandatory() && !f.Quality.Nullable && f.Default == nil {
+				return true
+			}
+		}
+		return false
+	case spec.KindList:
+		return excludesZero(c)
+	case spec.KindUint, spec.KindInt, spec.KindFloat32, spec.KindFloat64:
+		return excludesZero(c)
+	case spec.KindAny, spec.KindBool, spec.KindBitmap:
+		// false, {} — and a value of no known shape — always validate.
+		return false
+	}
+	return false
+}
+
+// excludesZero reports whether constraint c leaves out 0 — a value, or a
+// list's or string's length: a minimum above 0, an exact value other than
+// 0, alternatives none of which admits it. A bound that names another
+// element or an expression admits it (it is not known here).
+func excludesZero(c spec.Constraint) bool {
+	if len(c.Parts) > 0 {
+		for _, p := range c.Parts {
+			if !excludesZero(p) {
+				return false
+			}
+		}
+		return true
+	}
+	literal := func(b *spec.Bound) (int64, bool) {
+		if b == nil || b.Ref != "" || b.Expr != "" {
+			return 0, false
+		}
+		return b.Int, true
+	}
+	if v, ok := literal(c.Value); ok {
+		return v != 0
+	}
+	if v, ok := literal(c.Min); ok && v > 0 {
+		return true
+	}
+	if v, ok := literal(c.Max); ok && v < 0 {
+		return true
+	}
+	return false
 }
 
 // missingInitial lists the attributes the device's kit servers list and

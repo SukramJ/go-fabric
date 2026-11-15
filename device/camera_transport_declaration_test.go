@@ -100,15 +100,14 @@ func TestCameraServesTheKitTransports(t *testing.T) {
 	tp := transportPorts{}
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView}
 	maxZones, sensMax := uint8(4), uint8(5)
-	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-transports"), Name: "cam"},
+	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-transports"), Name: "cam"}, required("Camera",
 		csdef.Declare{
 			Initial:         csdef.Patch{SupportedStreamUsages: &usages},
 			VideoStreamPort: p, AudioStreamPort: p, SnapshotStreamPort: p, SnapshotCapturePort: p,
 		},
 		zmdef.Declare{Initial: zmdef.Patch{MaxZones: &maxZones, SensitivityMax: &sensMax}, ZonePort: tp},
 		wpdef.Declare{ProviderPort: tp},
-		padef.Declare{PushTransportPort: tp},
-	)
+		padef.Declare{PushTransportPort: tp})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +126,7 @@ func TestCameraServesTheKitTransports(t *testing.T) {
 		t.Fatalf("PushAvStreamTransport is %T", d.Server(padef.ClusterID))
 	}
 
-	bare, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-bare"), Name: "cam"})
+	bare, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-bare"), Name: "cam"}, required("Camera")...)
 	if err != nil {
 		t.Fatal(err)
 	}

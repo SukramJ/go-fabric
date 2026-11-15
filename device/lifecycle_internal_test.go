@@ -197,12 +197,12 @@ func TestKitOptionsAndPorts(t *testing.T) {
 		t.Errorf("a declared LevelSource mounts %T", d.Server(lvldef.ClusterID))
 	}
 	ch := &fakeModes{}
-	w, err := NewLaundryWasher(testOptions("washer"), lwmdef.Declare{ModeChanger: ch, Initial: lwmdef.Patch{
+	w, err := NewLaundryWasher(testOptions("washer"), req("LaundryWasher", lwmdef.Declare{ModeChanger: ch, Initial: lwmdef.Patch{
 		SupportedModes: modes(func(l string, m uint8, tag uint16) lwmdef.ModeOptionStruct {
 			return lwmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []lwmdef.ModeTagStruct{{Value: lwmdef.ModeTag(tag)}}}
 		}, modebase.LaundryTagNormal, modebase.LaundryTagHeavy),
 		CurrentMode: new(uint8(0)),
-	}})
+	}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,14 +219,14 @@ func TestKitOptionsAndPorts(t *testing.T) {
 // take refuses the device.
 func TestPortConfigurationAndHookRefusal(t *testing.T) {
 	t.Parallel()
-	d, err := NewFan(testOptions("fan"), fandef.Declare{
+	d, err := NewFan(testOptions("fan"), req("Fan", fandef.Declare{
 		StateSource: &fakeFan{},
 		Features:    fandef.FeatureMultiSpeed | fandef.FeatureRocking | fandef.FeatureWind,
 		Initial: fandef.Patch{
 			FanModeSequence: new(fandef.FanModeSequenceOffLowMedHigh), SpeedMax: new(uint8(10)),
 			RockSupport: new(fandef.RockRockLeftRight), WindSupport: new(fandef.WindSleepWind),
 		},
-	})
+	})...)
 	if err != nil {
 		t.Fatal(err)
 	}

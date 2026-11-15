@@ -167,6 +167,10 @@ type settings struct {
 	// (compose).
 	measured map[uint32]bool
 	cut      surfaceCut
+	// skipInitialCheck builds the device without New's refusal of an
+	// attribute matter.js requires a value of ([Type.RequiredInitial]
+	// measures them).
+	skipInitialCheck bool
 }
 
 func newSettings() *settings {

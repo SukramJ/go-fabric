@@ -73,13 +73,16 @@ type fixture struct {
 	tolerate map[string]string // "<kind> <requirement>" → reason
 }
 
-// testWith returns the options a host gives a device of the named type.
+// testWith returns the options a host gives a device of the named type:
+// the fixture's, and the values of the attributes New requires
+// (initialFor).
 func testWith(t *testing.T, name string) []Declaration {
 	t.Helper()
+	var out []Declaration
 	if f, ok := fixtures[name]; ok && f.with != nil {
-		return f.with(t)
+		out = append(out, f.with(t)...)
 	}
-	return nil
+	return append(out, initialFor(name)...)
 }
 
 // refusesFixture reports whether the named type refuses even the host's
@@ -108,7 +111,7 @@ func part(t *testing.T, owner *Device, name string, conds []string, with ...Decl
 	ty := typeByName(name)
 	opts := testOptions(fmt.Sprintf("%s/%s#%d", owner.Type().Name, name, len(owner.Parts())))
 	opts.Conditions = conds
-	p, err := New(ty, opts, with...)
+	p, err := New(ty, opts, append(slices.Clone(with), initialFor(name)...)...)
 	if err != nil {
 		t.Fatalf("part %s: %v", name, err)
 	}
@@ -149,6 +152,9 @@ var (
 	// states PA (device_energy_management requirements of the composing
 	// type).
 	adjustable = feat(0x0098, demdef.FeaturePowerAdjustment|demdef.FeaturePowerForecastReporting)
+	// PowerAdjustment requires OptOutState (decision 17): test input, no
+	// reference value.
+	optOutState = withInitial(0x0098, map[uint32]any{demdef.AttrOptOutState: demdef.OptOutStateNoOptOut})
 )
 
 // meteredSensor is an ElectricalSensor part as an ESA's composition asks
@@ -180,8 +186,11 @@ var fixtures = map[string]fixture{
 				withElements(0x002F, spec.Options{Attributes: []uint32{
 					psdef.AttrBatVoltage, psdef.AttrBatPercentRemaining, psdef.AttrBatTimeRemaining, psdef.AttrActiveBatFaults,
 					psdef.AttrBatCapacity, psdef.AttrBatTimeToFullCharge, psdef.AttrBatChargingCurrent, psdef.AttrActiveBatChargeFaults,
-				}}))
-			part(t, d, "DeviceEnergyManagement", nil, adjustable)
+				}}),
+				// BatChargeState is required (decision 17): test input, no
+				// reference value.
+				withInitial(0x002F, map[uint32]any{psdef.AttrBatChargeState: psdef.BatChargeStateUnknown}))
+			part(t, d, "DeviceEnergyManagement", nil, adjustable, optOutState)
 		},
 		tolerate: map[string]string{
 			"instanceCount device:ElectricalSensor#1": tagListReason, "instanceCount device:ElectricalSensor#2": tagListReason,
@@ -223,7 +232,7 @@ var fixtures = map[string]fixture{
 		parts: func(t *testing.T, d *Device) {
 			t.Helper()
 			part(t, d, "PowerSource", nil, wired)
-			part(t, d, "DeviceEnergyManagement", nil, adjustable)
+			part(t, d, "DeviceEnergyManagement", nil, adjustable, optOutState)
 			part(t, d, "ElectricalSensor", nil, meteredSensor(t, uint32(epmdef.FeatureAlternatingCurrent))...)
 		},
 		tolerate: map[string]string{"instanceCount device:PowerSource#1": tagListReason, "missing device:HeatPump/PowerSource": tagListReason},
@@ -303,6 +312,11 @@ func TestEveryTypeConstructsAndConforms(t *testing.T) {
 			t.Parallel()
 			_, err := New(ty, testOptions(ty.Name))
 			want, refused := refusedDefaults[ty.Name]
+			if !refused && len(ty.RequiredInitial()) > 0 {
+				// An attribute matter.js requires a value of: the host
+				// states it (decision 17; initial_values_test.go).
+				want, refused = "has no value; state it with", true
+			}
 			switch {
 			case refused && err == nil:
 				t.Fatalf("constructs with defaults, but refusedDefaults says %q", want)

@@ -235,6 +235,12 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	for id := range s.servers {
 		d.hosted[id] = true
 	}
+	// An attribute matter.js requires a value of when the server
+	// initialises, which neither the model nor the kit gives one, is the
+	// host's to state (decision 17, R2-P5-apidev-10).
+	if refused := d.refusedInitial(); len(refused) > 0 && !s.skipInitialCheck {
+		return nil, initialError(t, refused)
+	}
 
 	d.ports = maps.Clone(s.ports)
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
@@ -414,15 +420,20 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
+		// The self-held server consumes the values it takes; a server
+		// that then declines the selection leaves the generated one the
+		// whole Initial (review II, R2-P5-apidev-10: the media and camera
+		// kit servers dropped it before).
+		heldInitial := maps.Clone(initial)
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
-			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
+			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: heldInitial,
 		})
 		if err == nil {
 			err = checkSelection(r.Name, srv, opts)
 		}
 		if err == nil {
-			err = applyInitial(r.Name, srv, initial)
+			err = applyInitial(r.Name, srv, heldInitial)
 		}
 		switch {
 		case err == nil:

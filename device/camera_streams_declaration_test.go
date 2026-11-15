@@ -46,10 +46,10 @@ func TestCameraServesTheKitAvStream(t *testing.T) {
 	t.Parallel()
 	p := streamPorts{}
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, csdef.StreamUsageRecording}
-	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-streams"), Name: "cam"}, csdef.Declare{
+	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-streams"), Name: "cam"}, required("Camera", csdef.Declare{
 		Initial:         csdef.Patch{SupportedStreamUsages: &usages},
 		VideoStreamPort: p, AudioStreamPort: p, SnapshotStreamPort: p, SnapshotCapturePort: p,
-	})
+	})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestCameraServesTheKitAvStream(t *testing.T) {
 	if got := a.StreamUsagePriorities(); len(got) != 2 || got[0] != csdef.StreamUsageLiveView {
 		t.Fatalf("StreamUsagePriorities %v", got)
 	}
-	plain, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-plain"), Name: "cam"})
+	plain, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-plain"), Name: "cam"}, required("Camera")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,9 +74,9 @@ func TestCameraServesTheKitAvStream(t *testing.T) {
 func TestCameraServesTheKitZones(t *testing.T) {
 	t.Parallel()
 	maxZones, sensMax := uint8(3), uint8(4)
-	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-zones"), Name: "cam"}, zmdef.Declare{
+	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("cam-zones"), Name: "cam"}, required("Camera", zmdef.Declare{
 		Initial: zmdef.Patch{MaxZones: &maxZones, SensitivityMax: &sensMax}, ZonePort: zonePort{},
-	})
+	})...)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -96,9 +96,10 @@ func TestBridgedDeviceDeclaresPowerSource(t *testing.T) {
 // without the declaration.
 func TestElectricalSensorDeclaresPowerSource(t *testing.T) {
 	_, err := device.NewElectricalSensor(device.Options{StableKey: device.StringKey("store"), Name: "store"},
-		ptdef.Declare{Features: ptdef.FeatureNodeTopology},
-		epmdef.Declare{Features: epmdef.FeatureAlternatingCurrent},
-		psdef.Declare{Features: psdef.FeatureBattery | psdef.FeatureRechargeable})
+		required("ElectricalSensor", ptdef.Declare{Features: ptdef.FeatureNodeTopology}, epmdef.Declare{Features: epmdef.FeatureAlternatingCurrent},
+			// BatChargeState is required (decision 17): test input, no
+			// reference value.
+			psdef.Declare{Features: psdef.FeatureBattery | psdef.FeatureRechargeable, Initial: psdef.Patch{BatChargeState: new(psdef.BatChargeStateUnknown)}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,9 +172,8 @@ func (b *notifyingBattery) set(level float64) {
 func TestMeasurementBatteryReportsItsChanges(t *testing.T) {
 	bat := &notifyingBattery{level: 50}
 	sensor, err := device.NewElectricalSensor(device.Options{StableKey: device.StringKey("store"), Name: "store"},
-		ptdef.Declare{Features: ptdef.FeatureNodeTopology},
-		epmdef.Declare{Features: epmdef.FeatureAlternatingCurrent},
-		device.Measurement(bat))
+		required("ElectricalSensor", ptdef.Declare{Features: ptdef.FeatureNodeTopology}, epmdef.Declare{Features: epmdef.FeatureAlternatingCurrent},
+			device.Measurement(bat))...)
 	if err != nil {
 		t.Fatal(err)
 	}

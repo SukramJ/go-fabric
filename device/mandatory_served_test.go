@@ -23,13 +23,14 @@ import (
 )
 
 // unserved lists, for every committed device type the kit builds with its
-// defaults alone, the attributes a server lists in its AttributeList that
-// a read answers UnsupportedAttribute for, as "Cluster/Attribute".
+// defaults and the values New requires (device.InitialFor, decision 17),
+// the attributes a server lists in its AttributeList that a read answers
+// UnsupportedAttribute for, as "Cluster/Attribute".
 func unserved(t *testing.T) []string {
 	t.Helper()
 	var out []string
 	for _, typ := range device.Types() {
-		d, err := device.New(typ, device.Options{StableKey: device.StringKey("k")})
+		d, err := device.New(typ, device.Options{StableKey: device.StringKey("k")}, device.InitialFor(typ.Name)...)
 		if err != nil {
 			continue // a type whose default selection the host must make
 		}
@@ -58,47 +59,23 @@ func unserved(t *testing.T) []string {
 	return slices.Compact(out)
 }
 
-// hostSupplied are the listed attributes no default fills: matter.js has
-// none either — SelectDefaultValue gives an enum, a string, a struct and a
-// list with a minimum no fallback (packages/model/src/logic/SelectDefaultValue.ts:137-169
-// at 862ad75f), and its default server's initialize sets none of them —
-// so the host's Initial or its Set states them.
+// hostSupplied are the listed attributes no default fills once the
+// required values are stated: the OperationalError of the two operational
+// state clusters. matter.js builds {errorStateId: 0} from the struct's
+// child default (Fable read 5b-d17: operational-state.element.ts:110-111,
+// DefaultValue.ts:153-179 at db021da0), so New does not refuse it; the Go
+// generator renders no struct default composed from child defaults — a
+// gap of script/clustergen, not a host obligation.
 var hostSupplied = []string{
-	"AirQuality/AirQuality",
-	"ApplicationBasic/Application",
-	"ApplicationBasic/ApplicationName",
-	"ApplicationBasic/ApplicationVersion",
-	"ApplicationBasic/Status",
-	"CameraAvStreamManagement/MicrophoneCapabilities",
-	"CameraAvStreamManagement/MinViewportResolution",
-	"CameraAvStreamManagement/VideoSensorParams",
-	"CameraAvStreamManagement/Viewport",
-	"Chime/InstalledChimeSounds",
-	"EnergyEvseMode/SupportedModes",
-	"FanControl/FanModeSequence",
-	"JointFabricDatastore/AdminList",
-	"JointFabricDatastore/AnchorRootCa",
-	"JointFabricDatastore/FriendlyName",
-	"JointFabricDatastore/GroupKeySetList",
-	"JointFabricDatastore/GroupList",
-	"JointFabricDatastore/Status",
-	"MediaPlayback/CurrentState",
-	"ModeSelect/Description",
-	"OperationalState/OperationalState",
-	"RvcOperationalState/OperationalState",
-	"RvcRunMode/SupportedModes",
-	"SoilMeasurement/SoilMoistureMeasurementLimits",
-	"ThreadBorderRouterManagement/BorderAgentId",
-	"ThreadBorderRouterManagement/BorderRouterName",
-	"WaterHeaterManagement/BoostState",
-	"WaterHeaterMode/SupportedModes",
+	"OperationalState/OperationalError",
+	"RvcOperationalState/OperationalError",
 }
 
 // TestEveryListedAttributeHasAValue: with its defaults alone, every
 // committed device type serves every attribute its servers list — the
 // SelectDefaultValue fallbacks and the default servers' initialize
-// values of matter.js — but the ones the host must state
-// ([hostSupplied]). A new gap fails here.
+// values of matter.js, beside the values New requires — but the
+// generator's gap ([hostSupplied]). A new gap fails here.
 func TestEveryListedAttributeHasAValue(t *testing.T) {
 	t.Parallel()
 	got := unserved(t)
@@ -117,8 +94,8 @@ func TestMandatoryDefaultsOnTheWire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fan, err := device.NewFan(device.Options{StableKey: device.StringKey("f"), Name: "f"},
-		fandef.Declare{Initial: fandef.Patch{FanModeSequence: new(fandef.FanModeSequenceOffLowMedHigh)}})
+	fan, err := device.NewFan(device.Options{StableKey: device.StringKey("f"), Name: "f"}, required("Fan",
+		fandef.Declare{Initial: fandef.Patch{FanModeSequence: new(fandef.FanModeSequenceOffLowMedHigh)}})...)
 	if err != nil {
 		t.Fatal(err)
 	}

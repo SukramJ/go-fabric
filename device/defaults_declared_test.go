@@ -137,25 +137,25 @@ func declaredCases() []struct {
 		want    any
 	}{
 		{pumpdef.ClusterID, func() (*Device, error) {
-			return New(PumpType(), testOptions("pump"), pumpdef.Declare{Features: pumpdef.FeatureConstantPressure, StateSource: fakePump{}})
+			return newWith(PumpType(), testOptions("pump"), pumpdef.Declare{Features: pumpdef.FeatureConstantPressure, StateSource: fakePump{}})
 		}, (*pump.Server)(nil)},
 		{valvedef.ClusterID, func() (*Device, error) {
 			return New(WaterValveType(), testOptions("valve"), valvedef.Declare{StateSource: fakeValve{}})
 		}, (*valve.Server)(nil)},
 		{msdef.ClusterID, func() (*Device, error) {
-			return New(ModeSelectType(), testOptions("ms"), msdef.Declare{ModeSource: fakeModes2{}})
+			return newWith(ModeSelectType(), testOptions("ms"), msdef.Declare{ModeSource: fakeModes2{}})
 		}, (*modeselect.Server)(nil)},
 		{sadef.ClusterID, func() (*Device, error) {
-			return New(RoboticVacuumCleanerType(), testOptions("sa"), sadef.Declare{Selector: fakeArea{}})
+			return newWith(RoboticVacuumCleanerType(), testOptions("sa"), sadef.Declare{Selector: fakeArea{}})
 		}, (*servicearea.Server)(nil)},
 		{ccldef.ClusterID, func() (*Device, error) {
-			return New(ClosureType(), testOptions("cc"), ccldef.Declare{
+			return newWith(ClosureType(), testOptions("cc"), ccldef.Declare{
 				Features: ccldef.FeaturePositioning | ccldef.FeatureVentilation, Mover: fakeMover{},
 			})
 		}, (*closure.ControlServer)(nil)},
 		{cddef.ClusterID, func() (*Device, error) {
 			res, step := uint16(100), uint16(1000)
-			return New(ClosurePanelType(), testOptions("cd"), cddef.Declare{
+			return newWith(ClosurePanelType(), testOptions("cd"), cddef.Declare{
 				Features: cddef.FeaturePositioning | cddef.FeatureTranslation, DimensionHandler: fakePanel{},
 				Initial: cddef.Patch{Resolution: &res, StepValue: &step},
 			})
@@ -167,24 +167,24 @@ func declaredCases() []struct {
 			})
 		}, (*thermo.TemperatureControlServer)(nil)},
 		{mwocdef.ClusterID, func() (*Device, error) {
-			return New(MicrowaveOvenType(), testOptions("mwoc"), mwocdef.Declare{
+			return newWith(MicrowaveOvenType(), testOptions("mwoc"), mwocdef.Declare{
 				Features: mwocdef.FeaturePowerAsNumber, Oven: fakeOven{}, Initial: mwocdef.Patch{MaxCookTime: &maxCook, PowerSetting: &power},
 			})
 		}, (*appliance.MicrowaveServer)(nil)},
 		{mwomdef.ClusterID, func() (*Device, error) {
-			return New(MicrowaveOvenType(), testOptions("mwom"), mwocdef.Declare{Features: mwocdef.FeaturePowerAsNumber},
+			return newWith(MicrowaveOvenType(), testOptions("mwom"), mwocdef.Declare{Features: mwocdef.FeaturePowerAsNumber},
 				mwomdef.Declare{Initial: mwomdef.Patch{SupportedModes: &normal}})
 		}, (*modebase.Server)(nil)},
 		{whmgdef.ClusterID, func() (*Device, error) {
-			return New(WaterHeaterType(), testOptions("whmg"), withFeatures(0x0201, 1),
+			return newWith(WaterHeaterType(), testOptions("whmg"), withFeatures(0x0201, 1),
 				whmgdef.Declare{Booster: fakeBoost{}, Initial: whmgdef.Patch{HeaterTypes: &heater}})
 		}, (*energy.WaterHeaterManagementServer)(nil)},
 		{demdef.ClusterID, func() (*Device, error) {
-			return New(DeviceEnergyManagementType(), testOptions("dem"),
+			return newWith(DeviceEnergyManagementType(), testOptions("dem"),
 				demdef.Declare{Features: demdef.FeaturePowerForecastReporting, DemManager: energy.NopDemManager{}})
 		}, (*energy.DeviceEnergyManagementServer)(nil)},
 		{ldcdef.ClusterID, func() (*Device, error) {
-			return New(LaundryDryerType(), testOptions("ldc"), ldcdef.Declare{Initial: ldcdef.Patch{SupportedDrynessLevels: &levels}})
+			return newWith(LaundryDryerType(), testOptions("ldc"), ldcdef.Declare{Initial: ldcdef.Patch{SupportedDrynessLevels: &levels}})
 		}, (*appliance.DryerServer)(nil)},
 		{smokedef.ClusterID, func() (*Device, error) {
 			return New(SmokeCoAlarmType(), testOptions("smoke"), smokedef.Declare{Features: smokedef.FeatureSmokeAlarm, StateSource: fakeSmoke{}})

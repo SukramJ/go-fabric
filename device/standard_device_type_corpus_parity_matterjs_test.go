@@ -8,9 +8,11 @@
 //
 // matter.js adds each generated endpoint type to a node's root (a
 // BridgedNode under an Aggregator, RootNode as the node's own root) with
-// the per-type state of its fixtures table (:52-172); here each committed
-// kit type is built with the host's statements of the device package's
-// fixtures (conformance_test.go, the same state in Go form) but without
+// the per-type state of its fixtures table (the shared state :52-169, the
+// table :171-273 at db021da0); here each committed kit type is built with
+// the host's statements of the device package's fixtures
+// (conformance_test.go, and the required values of initial_values_test.go,
+// each cited to its line of that table) but without
 // the parts those fixtures add — the corpus judges a type as generated,
 // its components the developer's — assembled as a bridged device below
 // the Aggregator, and judged (endpoint.ValidateDeviceTypes). The
@@ -184,7 +186,7 @@ func TestStandardDeviceTypeCorpusParityMatterJS(t *testing.T) {
 		// validator refuses the endpoint, a warn-mode one reports it. With the
 		// tags matter.js's fixture gives it (ClosureTag.Door) nothing is owed.
 		t.Run("refuses a Closure endpoint without the tags its Descriptor TagList requires", func(t *testing.T) {
-			bare, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:bare"), Name: "bare"}, testWith(t, "Closure")...)
+			bare, err := newWith(ClosureType(), Options{StableKey: endpoint.StringKey("test:bare"), Name: "bare"}, testWith(t, "Closure")...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +208,7 @@ func TestStandardDeviceTypeCorpusParityMatterJS(t *testing.T) {
 				t.Errorf("warn-mode validation refused: %v", err)
 			}
 
-			tagged, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:tagged"), Name: "tagged", Tags: []SemanticTag{closureDoorTag}}, testWith(t, "Closure")...)
+			tagged, err := newWith(ClosureType(), Options{StableKey: endpoint.StringKey("test:tagged"), Name: "tagged", Tags: []SemanticTag{closureDoorTag}}, testWith(t, "Closure")...)
 			if err != nil {
 				t.Fatal(err)
 			}

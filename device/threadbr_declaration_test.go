@@ -38,9 +38,9 @@ func fakeBorderRouter(t *testing.T) *otbr.BorderRouter {
 func TestThreadBorderRouterDeclaresTheThreadbrServers(t *testing.T) {
 	t.Parallel()
 	br := fakeBorderRouter(t)
-	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"},
+	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"}, required("ThreadBorderRouter",
 		tbrmdef.Declare{BorderRouter: br, Features: tbrmdef.FeaturePanChange},
-		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})
+		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestThreadBorderRouterDeclaresTheThreadbrServers(t *testing.T) {
 		t.Errorf("diagnostics FeatureMap %v", fm)
 	}
 
-	plain, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("plain"), Name: "plain"})
+	plain, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("plain"), Name: "plain"}, required("ThreadBorderRouter")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,9 +78,9 @@ func TestThreadBorderRouterDeclaresTheThreadbrServers(t *testing.T) {
 // (threadbr.DiagnosticsFeatures, chip's camera-app root FeatureMap 0x000F).
 func TestThreadBorderRouterServesTheFourCounts(t *testing.T) {
 	t.Parallel()
-	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"},
+	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey("tbr"), Name: "tbr"}, required("ThreadBorderRouter",
 		tbrmdef.Declare{BorderRouter: fakeBorderRouter(t)},
-		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})
+		tnddef.Declare{Features: threadbr.DiagnosticsFeatures})...)
 	if err != nil {
 		t.Fatal(err)
 	}

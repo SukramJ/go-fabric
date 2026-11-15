@@ -85,14 +85,14 @@ func TestFromSpecBuildsParts(t *testing.T) {
 		t.Errorf("FromSpec refuses with %v, the constructor with %v", err, ctorErr)
 	}
 	_, err = device.FromSpec(device.Spec{Type: device.FloodlightCameraID, Options: opts("flood"), Parts: []device.Spec{
-		{Type: device.CameraID, Options: opts("flood/camera")},
+		{Type: device.CameraID, Options: opts("flood/camera"), Declarations: device.InitialFor("Camera")},
 	}})
 	if !errors.Is(err, device.ErrComposition) || !strings.Contains(err.Error(), "needs its components OnOffLight") {
 		t.Errorf("FromSpec without the OnOffLight component = %v", err)
 	}
 	flood, err := device.FromSpec(device.Spec{Type: device.FloodlightCameraID, Options: opts("flood"), Parts: []device.Spec{
 		{Type: device.OnOffLightID, Options: opts("flood/light")},
-		{Type: device.CameraID, Options: opts("flood/camera")},
+		{Type: device.CameraID, Options: opts("flood/camera"), Declarations: device.InitialFor("Camera")},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -117,12 +117,21 @@ func TestRequiredInitial(t *testing.T) {
 		req[0].Declare != "airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: …}}" {
 		t.Fatalf("AirQualitySensor RequiredInitial = %+v", req)
 	}
+	// OperationalError has a model default matter.js builds from the
+	// struct's child default: not required (decision 17).
+	if req := device.DishwasherType().RequiredInitial(); len(req) != 1 || req[0].Attribute != 0x0004 {
+		t.Errorf("Dishwasher RequiredInitial = %+v, want OperationalState alone", req)
+	}
+	if _, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq-bare"), Name: "aq"}); !errors.Is(err, device.ErrConfiguration) ||
+		!strings.Contains(err.Error(), "airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: …}}") {
+		t.Errorf("a bare AirQualitySensor = %v, want the refusal naming the declaration", err)
+	}
 	if req := device.DimmableLightType().RequiredInitial(); len(req) != 0 {
 		t.Errorf("DimmableLight RequiredInitial = %+v, want none", req)
 	}
 	q := airqualitydef.AirQualityGood
-	d, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq"), Name: "aq"},
-		airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: &q}})
+	d, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq"), Name: "aq"}, required("AirQualitySensor",
+		airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: &q}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +151,7 @@ func mustLight(t *testing.T, o device.Options) *device.OnOffLight {
 
 func mustCamera(t *testing.T, o device.Options) *device.Camera {
 	t.Helper()
-	d, err := device.NewCamera(o)
+	d, err := device.NewCamera(o, required("Camera")...)
 	if err != nil {
 		t.Fatal(err)
 	}

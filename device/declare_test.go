@@ -159,7 +159,7 @@ func TestDeclareOnAnyServer(t *testing.T) {
 	if _, err := srv.MatterInvoke(ctx, onoffdef.CmdOn, onoffdef.OnRequest{}); err != nil || !handled {
 		t.Errorf("On on the host's server: %v, handled %v; want the declared handler", err, handled)
 	}
-	purifier, err := device.NewAirPurifier(device.Options{StableKey: endpoint.StringKey("air")}, groupsdef.Declare{})
+	purifier, err := device.NewAirPurifier(device.Options{StableKey: endpoint.StringKey("air")}, required("AirPurifier", groupsdef.Declare{})...)
 	if err != nil {
 		t.Fatal(err)
 	}

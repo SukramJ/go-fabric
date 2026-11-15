@@ -76,7 +76,7 @@ func mediaCases() []struct {
 } {
 	p := mediaPort{}
 	player := func(key string, decls ...Declaration) func() (*Device, error) {
-		return func() (*Device, error) { return New(CastingVideoPlayerType(), testOptions(key), decls...) }
+		return func() (*Device, error) { return newWith(CastingVideoPlayerType(), testOptions(key), decls...) }
 	}
 	inputs := []inputdef.InputInfoStruct{{Index: 1, InputType: inputdef.InputTypeHdmi, Name: "HDMI"}}
 	outputs := []outputdef.OutputInfoStruct{{Index: 1, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"}}
@@ -103,7 +103,7 @@ func mediaCases() []struct {
 		{woldef.ClusterID, player("wol", woldef.Declare{}), (*media.WakeOnLanServer)(nil)},
 		{ccdef.ClusterID, player("cc", ccdef.Declare{ContentControl: p}), (*media.ContentControlServer)(nil)},
 		{basicdef.ClusterID, func() (*Device, error) {
-			return New(ContentAppType(), testOptions("ab"), basicdef.Declare{Initial: basicdef.Patch{
+			return newWith(ContentAppType(), testOptions("ab"), basicdef.Declare{Initial: basicdef.Patch{
 				Application: &basicdef.ApplicationStruct{CatalogVendorId: 123, ApplicationId: "exampleid"}, AllowedVendorList: &vendors,
 			}})
 		}, (*media.AppBasicServer)(nil)},
@@ -119,7 +119,7 @@ func TestMediaDefaultsFromTheDeclaration(t *testing.T) {
 	t.Parallel()
 	inputs := []inputdef.InputInfoStruct{{Index: 1, Name: "HDMI"}, {Index: 2, Name: "HDMI"}}
 	current := uint8(1)
-	d, err := NewCastingVideoPlayer(testOptions("player"), inputdef.Declare{Inputs: selectingInputs{}, Initial: inputdef.Patch{InputList: &inputs, CurrentInput: &current}})
+	d, err := NewCastingVideoPlayer(testOptions("player"), req("CastingVideoPlayer", inputdef.Declare{Inputs: selectingInputs{}, Initial: inputdef.Patch{InputList: &inputs, CurrentInput: &current}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,10 +137,10 @@ func TestMediaDefaultsFromTheDeclaration(t *testing.T) {
 		t.Errorf("MediaInput state %+v after the command", st)
 	}
 
-	if _, err := NewCastingVideoPlayer(testOptions("bare"), inputdef.Declare{Inputs: selectingInputs{}}); !errors.Is(err, ErrConfiguration) || !errors.Is(err, media.ErrMissingState) {
+	if _, err := NewCastingVideoPlayer(testOptions("bare"), req("CastingVideoPlayer", inputdef.Declare{Inputs: selectingInputs{}})...); !errors.Is(err, ErrConfiguration) || !errors.Is(err, media.ErrMissingState) {
 		t.Errorf("a port without InputList: %v, want ErrConfiguration wrapping media.ErrMissingState", err)
 	}
-	app, err := NewContentApp(testOptions("app"))
+	app, err := NewContentApp(testOptions("app"), req("ContentApp")...)
 	if err != nil {
 		t.Fatal(err)
 	}
