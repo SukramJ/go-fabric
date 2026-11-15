@@ -690,6 +690,28 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | WNCV/6.1 | 4 | 0 | Go controller as TH, after matter.js `TC-WNCV-6.1.test.ts` |
 | WNCV/7.1 | 2 | 1 | Go controller as TH, after matter.js `TC-WNCV-7.1.test.ts` |
 
+#### Go-TH cases the families list under no case of that id
+
+matter.js automates these cases under the test plan's id; chip's families carry the plan's steps under
+other ids (`X.Simulated`, `3.7`), and no correspondence between the two is asserted here. Each case passed
+with the Go controller as TH and is counted in no family.
+
+| Case | Steps run | Steps skipped | Source |
+| --- | ---: | ---: | --- |
+| APPLAUNCHER/3.7.1 | 2 | 0 | after matter.js `TC-APPLAUNCHER-3.7.1.test.ts` |
+| APPLAUNCHER/3.8.1 | 2 | 0 | after matter.js `TC-APPLAUNCHER-3.8.1.test.ts` |
+| APPLAUNCHER/3.9.1 | 2 | 0 | after matter.js `TC-APPLAUNCHER-3.9.1.test.ts` |
+| CC/3.4 | 9 | 0 | after matter.js `TC-CC-3.4.test.ts` |
+| CC/4.5 | 11 | 0 | after matter.js `TC-CC-4.5.test.ts` |
+| CC/5.4 | 5 | 0 | after matter.js `TC-CC-5.4.test.ts` |
+| CC/6.4 | 10 | 0 | after matter.js `TC-CC-6.4.test.ts` |
+| CC/7.5 | 11 | 0 | after matter.js `TC-CC-7.5.test.ts` |
+| CC/9.4 | 7 | 0 | after matter.js `TC-CC-9.4.test.ts` |
+| DGWIFI/3.2 | 2 | 0 | after matter.js `TC-DGWIFI-3.2.test.ts` |
+| OO/3.2 | 7 | 0 | after matter.js `TC-OO-3.2.test.ts` |
+| WNCV/6.1 | 4 | 0 | after matter.js `TC-WNCV-6.1.test.ts` |
+| WNCV/7.1 | 2 | 1 | after matter.js `TC-WNCV-7.1.test.ts` |
+
 ### Controller role
 
 matter.js's certification cases in their own direction: the module's controller is the DUT and the
