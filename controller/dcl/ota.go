@@ -77,6 +77,7 @@ type OTAVersions struct {
 	// Client asks the production ledger; nil asks none.
 	Client *Client
 	// TestClient asks the test-net ledger; nil asks none.
+	// softwareupdate.Images downloads a test-net record through it.
 	TestClient *Client
 	// Logger receives the lookups' log; nil discards it.
 	Logger *slog.Logger
@@ -249,10 +250,12 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 
 // Download writes the image of the ledger record u to w —
 // downloadUpdate's network half (:667-709): an https OTA URL only, the GET
-// bounded by [DefaultDownloadTimeout] and sent through the production
-// client's download client: the host's [Client].HTTPClient, else the
-// guarded client, which connects to public addresses only
-// ([Client].AllowPrivateDestinations). An OTA URL the host supplies
+// bounded by [DefaultDownloadTimeout] and sent through the download
+// client of o.Client: the host's [Client].HTTPClient, else the guarded
+// client, which connects to public addresses only
+// ([Client].AllowPrivateDestinations). For a test-net record the caller
+// passes an OTAVersions whose Client is the test-net client, as
+// softwareupdate.Images does. An OTA URL the host supplies
 // itself is [OTAVersions.DownloadHostURL]'s. The caller verifies the
 // image ([VerifyImage]) before it serves it. When the record states the image's size
 // (OTAFileSize), at most that many bytes are copied: a longer answer is an

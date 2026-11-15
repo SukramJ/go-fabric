@@ -70,4 +70,13 @@ func TestImagesDownloadByOrigin(t *testing.T) {
 	if name, err := hosted.DownloadUpdate(ctx, httpsInfo, true); err != nil || name != "fff1.8000.prod.3" {
 		t.Fatalf("DownloadUpdate through a host client: %q, err %v", name, err)
 	}
+	// A test-net update takes the test-net client: its host client here,
+	// while the production client has none.
+	testInfo := httpsInfo
+	testInfo.Source = SourceTest
+	split := hostLedger(0)
+	split.Client = &dcl.Client{BaseURL: "https://" + noLedgerHost}
+	if name, err := NewImages(ImagesConfig{Ledger: split, Logger: quietLog()}).DownloadUpdate(ctx, testInfo, true); err != nil || name != "fff1.8000.test.3" {
+		t.Fatalf("DownloadUpdate of a test-net update through the test-net client: %q, err %v", name, err)
+	}
 }

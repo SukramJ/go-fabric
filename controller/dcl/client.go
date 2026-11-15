@@ -228,9 +228,9 @@ func (g *destinationGuard) refusedHost(u *url.URL) error {
 	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
 		return fmt.Errorf("%w: %s names localhost (Client.AllowPrivateDestinations admits it)", errDestination, u.Redacted())
 	}
-	a, err := netip.ParseAddr(host)
-	if err != nil {
-		return nil
+	a, perr := netip.ParseAddr(host)
+	if perr != nil {
+		return nil //nolint:nilerr // a host name: the dial checks it, or the proxy resolves it
 	}
 	port := u.Port()
 	if port == "" {

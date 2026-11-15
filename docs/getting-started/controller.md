@@ -936,18 +936,28 @@ record's image is fetched over `https:` only and, unless the `dcl.Client`
 carries the host's own `HTTPClient`, from a public address only: a
 loopback, private, link-local, unspecified or multicast destination is
 refused when it is dialled, for the URL and each redirect hop
-(`dcl.Client.AllowPrivateDestinations` admits them for a lab; under a proxy
-from the environment the guard dials the proxy, and what lies behind it is
-the proxy's to check). A ledger record must also state the image's
-whole-file checksum: `DownloadUpdate` refuses one without it — production
-or test-net ledger — with `softwareupdate.ErrOTA` and the warning
-`dcl.ota.no_checksum` before it downloads anything, and does not reuse a
-stored image of that update (the file is kept).
-`ImagesConfig.AllowUnverifiedLedgerImages` admits such records and logs
-each admission (`dcl.ota.no_checksum_admitted`). An image the host names
-itself — `UpdateInfoFromURL` (`dcl.OTAVersions.DownloadHostURL`), or
-`UpdateInfoFromImage` — may come over `http:` from any address and needs
-no checksum.
+(`dcl.Client.AllowPrivateDestinations` admits them for a lab; a test-net
+record is downloaded through the ledger's `TestClient`, so that client's
+`HTTPClient` and switch apply). The environment's proxy stays in use: a URL
+or redirect hop whose host is `localhost` or an IP address of those classes
+is refused before it is handed to the proxy, and a host name sent through
+the proxy is the proxy's to resolve and connect to. A ledger image must
+also be bound to the record's whole-file checksum: `DownloadUpdate` refuses
+a record without one — production or test-net ledger — with
+`softwareupdate.ErrOTA` and the warning `dcl.ota.no_checksum` before it
+downloads anything. The store keeps each stored image's provenance (a
+`.origin` record beside it: the host, or the ledger with the checksum the
+image was checked against), and a stored prod or test image that is not
+bound to a checksum — stored from a record without one, or stored before
+the store kept provenance — is not offered by `CheckForUpdate`, reused by
+`DownloadUpdate` or opened for a transfer; the file is kept. Such an image
+without a record is bound, without a new download, the first time a ledger
+update with the checksum reuses it. `ImagesConfig.AllowUnverifiedLedgerImages`
+admits these images and logs each admission
+(`dcl.ota.no_checksum_admitted`). An image the host supplies itself —
+`UpdateInfoFromURL` (`dcl.OTAVersions.DownloadHostURL`),
+`UpdateInfoFromImage`, a local image, or `Images.Store` without a ledger
+record — may come over `http:` from any address and needs no checksum.
 
 *Source: `controller/dcl/ota.go` (`OTAVersions.Download`, `OTAVersions.DownloadHostURL`), `controller/dcl/client.go` (`Client.AllowPrivateDestinations`, `newGuardedClient`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`, `ImagesConfig.AllowUnverifiedLedgerImages`).*
 

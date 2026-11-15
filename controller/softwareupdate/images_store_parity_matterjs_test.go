@@ -127,6 +127,7 @@ const noLedgerHost = "ledger.test"
 func hostLedger(maxImageSize int64) *dcl.OTAVersions {
 	return &dcl.OTAVersions{
 		Client:       &dcl.Client{BaseURL: "https://" + noLedgerHost, HTTPClient: &http.Client{Transport: hostTransport()}},
+		TestClient:   &dcl.Client{BaseURL: "https://" + noLedgerHost, HTTPClient: &http.Client{Transport: hostTransport()}},
 		MaxImageSize: maxImageSize,
 	}
 }
