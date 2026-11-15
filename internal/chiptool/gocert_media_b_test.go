@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
+	"github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 	"github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -45,6 +47,7 @@ import (
 func init() {
 	for _, c := range []func() goCertCase{
 		caseKEYPADINPUT31,
+		caseLOWPOWER22,
 	} {
 		registerGoCert(c)
 	}
@@ -197,6 +200,42 @@ func caseKEYPADINPUT31() goCertCase {
 				run: r.mediaBSend(keypadinput.ClusterID, keypadinput.CmdSendKey, "SendKey Up",
 					keypadinput.SendKeyRequest{KeyCode: keyCodeUp}, true, nil),
 			},
+		},
+	}
+}
+
+// caseLOWPOWER22 mirrors TC-LOWPOWER-2.2: Sleep. chip's all-clusters app
+// puts LowPower on endpoint 1 (:14-15); the daemon serves it on the video
+// player, as chip's tv-app does (tv-app.matter:4506 at 6170af84, inside
+// endpoint 1), so the case runs there.
+func caseLOWPOWER22() goCertCase {
+	r := &mediaBRun{}
+	return goCertCase{
+		tc: "TC-LOWPOWER-2.2", line: 19, pics: []string{"LOWPOWER.C"}, at: "LOWPOWER.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 27, title: "Preconditions: the DUT commissions the TH.", run: r.commission},
+			{n: "1", line: 30, pics: "LOWPOWER.C.C00.Tx", title: "DUT sends Sleep command to TH", run: func(th *goTH) error {
+				if r.n == nil {
+					return errors.New("step 0 did not commission the daemon")
+				}
+				// The TS's TH-log check (:38, "Sleep carries no parameters")
+				// mirrored onto the daemon's log: its LowPower delegate logs
+				// the Sleep it handled (examples/reference-bridge/media.go
+				// tvSleep, after chip's LowPowerManager.cpp:21-26).
+				offset := len(th.dut.snapshotStderr())
+				if _, err := th.invoke(r.n, cmdPath(th.ep, lowpower.ClusterID, lowpower.CmdSleep), lowpower.SleepRequest{}, false, client.InvokeOptions{}); err != nil {
+					return err
+				}
+				deadline := time.Now().Add(5 * time.Second)
+				for time.Now().Before(deadline) {
+					if strings.Contains(th.dut.snapshotStderr()[offset:], "msg=media.lowpower.sleep") {
+						th.note("Sleep on endpoint %d: Success; the daemon logged media.lowpower.sleep", th.ep)
+						return nil
+					}
+					time.Sleep(20 * time.Millisecond)
+				}
+				return fmt.Errorf("Sleep on endpoint %d succeeded, but the daemon logged no media.lowpower.sleep", th.ep)
+			}},
 		},
 	}
 }
