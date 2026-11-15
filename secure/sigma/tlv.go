@@ -144,10 +144,10 @@ func sessionIDOf(v sigmaValue) (uint16, error) {
 	switch v.elemType {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
 	default:
-		return 0, fmt.Errorf("session id: TLV type 0x%02X, want an unsigned integer", uint8(v.elemType))
+		return 0, fmt.Errorf("sigma: session id: TLV type 0x%02X, want an unsigned integer", uint8(v.elemType))
 	}
 	if v.u > 0xFFFF {
-		return 0, fmt.Errorf("session id: value %d exceeds 16 bits", v.u)
+		return 0, fmt.Errorf("sigma: session id: value %d exceeds 16 bits", v.u)
 	}
 	return uint16(v.u & 0xFFFF), nil
 }
@@ -161,7 +161,7 @@ func sessionIDOf(v sigmaValue) (uint16, error) {
 // :55).
 func sessionParamsOf(dec *sigmaDecoder, v sigmaValue) (SessionParameters, error) {
 	if v.elemType != tlv.TypeStructure {
-		return SessionParameters{}, fmt.Errorf("session parameters: TLV type 0x%02X, want a structure", uint8(v.elemType))
+		return SessionParameters{}, fmt.Errorf("sigma: session parameters: TLV type 0x%02X, want a structure", uint8(v.elemType))
 	}
 	return parseSessionParameters(dec)
 }
