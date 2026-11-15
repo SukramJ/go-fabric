@@ -8,11 +8,13 @@ package chiptool
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -35,7 +37,7 @@ import (
 // (goCertCase.at).
 
 func init() {
-	for _, c := range []func() goCertCase{caseMOD22, caseTSTAT32} {
+	for _, c := range []func() goCertCase{caseMOD22, caseTSTAT32, caseWNCV61, caseWNCV71} {
 		registerGoCert(c)
 	}
 }
@@ -152,6 +154,133 @@ func caseTSTAT32() goCertCase {
 			}},
 			{n: "1", line: 53, title: "DUT raises the setpoint with SetpointRaiseLower", pics: "TSTAT.C.C00.Tx", run: raiseLower(amount)},
 			{n: "2", line: 66, title: "DUT lowers the setpoint with SetpointRaiseLower", pics: "TSTAT.C.C00.Tx", run: raiseLower(-amount)},
+		},
+	}
+}
+
+// wncvPreconditions mirrors tc-wncv-support.ts windowCoveringPreconditions
+// (:24-63): the DUT commissions the TH and reads its WindowCovering
+// FeatureMap, and unmet names a precondition its features do not meet.
+func wncvPreconditions(n **client.Node, unmet func(th *goTH, fm uint64) string) func(th *goTH) error {
+	return func(th *goTH) error {
+		var err error
+		if _, *n, err = th.commission("dut"); err != nil {
+			return err
+		}
+		v, err := th.readValue(*n, attrPath(th.ep, windowcovering.ClusterID, 0xFFFC))
+		if err != nil {
+			return err
+		}
+		if v.El.IsNull || !isUnsigned(v) {
+			return fmt.Errorf("FeatureMap is %s, which names no features", describeNode(v))
+		}
+		if why := unmet(th, v.El.Uint); why != "" {
+			return fmt.Errorf("FeatureMap=0x%X: %s", v.El.Uint, why)
+		}
+		th.note("FeatureMap=0x%X", v.El.Uint)
+		return nil
+	}
+}
+
+// wncvSends is a step that sends cmd with fields and expects Success.
+func wncvSends(n **client.Node, name string, cmd uint32, fields spec.Encodable) func(th *goTH) error {
+	return func(th *goTH) error {
+		if _, err := commandSucceeds(th, *n, windowcovering.ClusterID, cmd, fields, -1); err != nil {
+			return err
+		}
+		th.note("%s: Success", name)
+		return nil
+	}
+}
+
+func hasFeatures(fm uint64, f ...windowcovering.Feature) bool {
+	for _, b := range f {
+		if fm&uint64(b) == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// caseWNCV61 mirrors TC-WNCV-6.1: UpOrOpen, DownOrClose and StopMotion.
+func caseWNCV61() goCertCase {
+	var n *client.Node
+	return goCertCase{
+		tc: "TC-WNCV-6.1", line: 25, pics: []string{"WNCV.C"}, at: "WNCV.S",
+		steps: []goStep{
+			{
+				n: "0", line: 26, title: "the DUT commissions the TH, which supports Lift and/or Tilt",
+				run: wncvPreconditions(&n, func(_ *goTH, fm uint64) string {
+					// :29-31.
+					if hasFeatures(fm, windowcovering.FeatureLift) || hasFeatures(fm, windowcovering.FeatureTilt) {
+						return ""
+					}
+					return "the TH supports neither Lift nor Tilt"
+				}),
+			},
+			// sendsCommand (:14-23): no parameters.
+			{n: "1a", line: 38, title: "DUT sends UpOrOpen command to TH", pics: "WNCV.C.C00.Tx", run: wncvSends(&n, "UpOrOpen", windowcovering.CmdUpOrOpen, windowcovering.UpOrOpenRequest{})},
+			{n: "2a", line: 42, title: "DUT sends DownOrClose command to TH", pics: "WNCV.C.C01.Tx", run: wncvSends(&n, "DownOrClose", windowcovering.CmdDownOrClose, windowcovering.DownOrCloseRequest{})},
+			{n: "3a", line: 46, title: "DUT sends a StopMotion command to TH", pics: "WNCV.C.C02.Tx", run: wncvSends(&n, "StopMotion", windowcovering.CmdStopMotion, windowcovering.StopMotionRequest{})},
+		},
+	}
+}
+
+// caseWNCV71 mirrors TC-WNCV-7.1: GoToLiftPercentage and
+// GoToTiltPercentage to 50 %.
+//
+// Step 0's TS requires both position-aware axes (:43-47), stricter than the
+// plan's "and/or" because the TS's THs are fixed and the plan defines no
+// outcome for the other axis's command (:41-42). Read mirrored, a step
+// whose axis the daemon does not serve is gated by its mirrored PICS
+// (WNCV.S.C05.Rsp, WNCV.S.C08.Rsp) and recorded skipped, so the outcome is
+// defined for every step that runs: the port holds each axis whose
+// GoTo…Percentage command the daemon declares to its position-aware
+// features, and at least one axis to be there.
+func caseWNCV71() goCertCase {
+	var n *client.Node
+	const halfOpen = 5000 // HALF_OPEN (:11-12)
+	return goCertCase{
+		tc: "TC-WNCV-7.1", line: 37, pics: []string{"WNCV.C"}, at: "WNCV.S",
+		steps: []goStep{
+			{
+				n: "0", line: 38, title: "the DUT commissions the TH, which supports position-aware Lift and position-aware Tilt",
+				run: wncvPreconditions(&n, func(th *goTH, fm uint64) string {
+					var unmet []string
+					axes := 0
+					for _, a := range []struct {
+						name, pics string
+						f          []windowcovering.Feature
+					}{
+						{"position-aware Lift", "WNCV.S.C05.Rsp", []windowcovering.Feature{windowcovering.FeatureLift, windowcovering.FeaturePositionAwareLift}},
+						{"position-aware Tilt", "WNCV.S.C08.Rsp", []windowcovering.Feature{windowcovering.FeatureTilt, windowcovering.FeaturePositionAwareTilt}},
+					} {
+						declared, err := th.picsHolds(a.pics, th.ep)
+						if err != nil {
+							return err.Error()
+						}
+						if !declared {
+							continue
+						}
+						axes++
+						if !hasFeatures(fm, a.f...) {
+							unmet = append(unmet, fmt.Sprintf("%s is declared but the TH lacks %s", a.pics, a.name))
+						}
+					}
+					if axes == 0 {
+						unmet = append(unmet, "the TH lacks position-aware Lift or position-aware Tilt")
+					}
+					return strings.Join(unmet, "; ")
+				}),
+			},
+			{
+				n: "1a", line: 54, title: "DUT sends GoToLiftPercentage command with 50% to TH", pics: "WNCV.C.C05.Tx",
+				run: wncvSends(&n, "GoToLiftPercentage 5000", windowcovering.CmdGoToLiftPercentage, windowcovering.GoToLiftPercentageRequest{LiftPercent100thsValue: halfOpen}),
+			},
+			{
+				n: "2a", line: 65, title: "DUT sends GoToTiltPercentage command with 50% to TH", pics: "WNCV.C.C08.Tx",
+				run: wncvSends(&n, "GoToTiltPercentage 5000", windowcovering.CmdGoToTiltPercentage, windowcovering.GoToTiltPercentageRequest{TiltPercent100thsValue: halfOpen}),
+			},
 		},
 	}
 }
