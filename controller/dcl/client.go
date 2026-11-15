@@ -329,13 +329,18 @@ func ipv4Legacy(host string, octal bool) (netip.Addr, bool) {
 }
 
 // connectTarget is the transport's GetProxyConnectHeader: it sees the
-// target of a CONNECT as the transport writes it — the host mapped to
-// ASCII as net/http maps it (canonicalAddr) — before the proxy is asked,
-// and refuses it as refusedHostPort does.
+// target of a CONNECT as the transport writes it (canonicalAddr) before
+// the proxy is asked, and refuses it as refusedHostPort does. net/http
+// maps a host to ASCII where it can; a host it cannot map reaches here
+// unmapped and is refused, as a non-ASCII host is for a SOCKS proxy — a
+// valid international name arrives as its xn-- form.
 func (g *destinationGuard) connectTarget(_ context.Context, _ *url.URL, target string) (http.Header, error) {
 	host, port, err := net.SplitHostPort(target)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", errDestination, target, err)
+	}
+	if !isASCII(host) {
+		return nil, fmt.Errorf("%w: %q: a host net/http could not map to ASCII", errDestination, host)
 	}
 	if err := g.refusedHostPort(host, port); err != nil {
 		return nil, err
