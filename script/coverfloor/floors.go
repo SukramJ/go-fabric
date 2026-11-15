@@ -144,7 +144,7 @@ var floors = []packageFloor{
 	// exercises rather than this module's own tests. The floor records
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
-	{pkg: "github.com/SukramJ/go-fabric/contract", min: 87, why: "the host-facing vocabulary; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/contract", min: 97, why: "the host-facing vocabulary; see the note above this entry. Review II phase 5b wave A2: 97.1 once TestAccessingFabric, TestEligibilityStateString and TestMetricNames cover the request's fabric, the eligibility tokens and the metric names (81.2 with WithAccessingFabric/AccessingFabric added untested, 87 before)"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/client/exchange",
 		min: 92,
@@ -172,8 +172,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 77,
-		why: "wave W8 (#457): measured 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
+		min: 81,
+		why: "Review II phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
@@ -246,6 +246,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam (phase 32): a function variable client/exchange installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, unmeasurable: true, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
+	{pkg: "github.com/SukramJ/go-fabric/internal/facadeseam", min: 0, unmeasurable: true, why: "function variables only: cluster/core and bridge install them, package node calls them (Review II phase 5b, R2-P5-apinode-07)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/netwatch", min: 92},
