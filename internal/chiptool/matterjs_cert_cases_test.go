@@ -236,29 +236,8 @@ func btoi(b bool) int {
 // and the line of its certTest (or case-builder) call at the pin, and the
 // PICS codes are the daemon's generated ones (testdata/pics/).
 var matterJSCasesNotRun = map[string]gap{
-	// Media client cases (support file tc-tv-client-support.ts): the DUT
-	// sends one command to the tv TH, which answers success.
-	"ALOGIN/12.2":          tvClient("TC-ALOGIN-12.2.test.ts:28", "GetSetupPIN, Login and Logout, timed", "content app", "ALOGIN.S.C00.Rsp, C02.Rsp, C03.Rsp"),
-	"APPLAUNCHER/3.7.1":    tvClient("TC-APPLAUNCHER-3.7.1.test.ts:17", "LaunchApp", "video player", "APPLAUNCHER.S.C00.Rsp"),
-	"APPLAUNCHER/3.8.1":    tvClient("TC-APPLAUNCHER-3.8.1.test.ts:17", "StopApp", "video player", "APPLAUNCHER.S.C01.Rsp"),
-	"APPLAUNCHER/3.9.1":    tvClient("TC-APPLAUNCHER-3.9.1.test.ts:17", "HideApp", "video player", "APPLAUNCHER.S.C02.Rsp"),
-	"AUDIOOUTPUT/7.3":      tvClient("TC-AUDIOOUTPUT-7.3.test.ts:20", "SelectOutput", "video player", "AUDIOOUTPUT.S.C00.Rsp"),
-	"AUDIOOUTPUT/7.4":      tvClient("TC-AUDIOOUTPUT-7.4.test.ts:21", "RenameOutput", "video player", "AUDIOOUTPUT.S.F00, C01.Rsp"),
-	"CHANNEL/5.4":          tvClient("TC-CHANNEL-5.4.test.ts:23", "ChangeChannel", "video player", "CHANNEL.S.C00.Rsp"),
-	"CHANNEL/5.5":          tvClient("TC-CHANNEL-5.5.test.ts:24", "ChangeChannelByNumber", "video player", "CHANNEL.S.C02.Rsp"),
-	"CHANNEL/5.6":          tvClient("TC-CHANNEL-5.6.test.ts:20", "SkipChannel", "video player", "CHANNEL.S.C03.Rsp"),
-	"CONTENTLAUNCHER/10.4": tvClient("TC-CONTENTLAUNCHER-10.4.test.ts:24", "LaunchContent", "video player", "CONTENTLAUNCHER.S.F00, C00.Rsp"),
-	"CONTENTLAUNCHER/10.6": tvClient("TC-CONTENTLAUNCHER-10.6.test.ts:27", "LaunchURL", "video player", "CONTENTLAUNCHER.S.F01, C01.Rsp"),
-	"KEYPADINPUT/3.1":      tvClient("TC-KEYPADINPUT-3.1.test.ts:20", "SendKey", "video player", "KEYPADINPUT.S.C00.Rsp"),
-	"LOWPOWER/2.2":         tvClient("TC-LOWPOWER-2.2.test.ts:19", "Sleep", "video player", "LOWPOWER.S.C00.Rsp"),
-	"MEDIAINPUT/3.14":      tvClient("TC-MEDIAINPUT-3.14.test.ts:20", "SelectInput", "video player", "MEDIAINPUT.S.C00.Rsp"),
-	"MEDIAINPUT/3.15":      tvClient("TC-MEDIAINPUT-3.15.test.ts:17", "ShowInputStatus", "video player", "MEDIAINPUT.S.C01.Rsp"),
-	"MEDIAINPUT/3.16":      tvClient("TC-MEDIAINPUT-3.16.test.ts:17", "HideInputStatus", "video player", "MEDIAINPUT.S.C02.Rsp"),
-	"MEDIAINPUT/3.17":      tvClient("TC-MEDIAINPUT-3.17.test.ts:21", "RenameInput", "video player", "MEDIAINPUT.S.F00, C03.Rsp"),
-	"MEDIAPLAYBACK/6.5":    tvClient("TC-MEDIAPLAYBACK-6.5.test.ts:17", "Play, Pause and Stop", "video player", "MEDIAPLAYBACK.S.C00.Rsp to C02.Rsp"),
-	"MEDIAPLAYBACK/6.7":    tvClient("TC-MEDIAPLAYBACK-6.7.test.ts:20", "Play, StartOver, Next, Previous, SkipForward and SkipBackward", "video player", "MEDIAPLAYBACK.S.C00.Rsp, C03.Rsp to C05.Rsp, C08.Rsp, C09.Rsp"),
-	"MEDIAPLAYBACK/6.10":   tvClient("TC-MEDIAPLAYBACK-6.10.test.ts:25", "ActivateAudioTrack, ActivateTextTrack and DeactivateTextTrack", "video player", "MEDIAPLAYBACK.S.F02 TextTracks, F03 AudioTracks"),
-	"TGTNAV/8.2":           tvClient("TC-TGTNAV-8.2.test.ts:20", "NavigateTarget", "video player", "TGTNAV.S.C00.Rsp"),
+	// A media client case (support file tc-tv-client-support.ts): the DUT
+	// sends commands to the tv TH, which answers success.
 	"CHANNEL/5.8": notPorted(classNotSupported, "TC-CHANNEL-5.8.test.ts:24", "needs Channel's ElectronicGuide and RecordProgram "+
 		"features (GetProgramGuide, RecordProgram, CancelRecordProgram): the module serves them to a host port that implements "+
 		"ChannelGuide and ChannelRecorder (cluster/media/channel.go:42-51), the daemon's video player implements neither "+
@@ -266,21 +245,6 @@ var matterJSCasesNotRun = map[string]gap{
 
 	// Client cases of a device cluster: the DUT invokes the TH's server,
 	// read mirrored as TC-IDM-1.1's and TC-LVL-8.1's ports are.
-	"OO/3.2": portableNow("TC-OO-3.2.test.ts:60", "the Go TH sends Off, On, Toggle, OffWithEffect, OnWithRecallGlobalScene "+
-		"and OnWithTimedOff to a daemon light with the Lighting feature (OO.S.F00, OO.S.C40.Rsp to C42.Rsp)"),
-	"I/3.2":      portableNow("TC-I-3.2.test.ts:55", "the Go TH sends Identify and TriggerEffect to a daemon endpoint (I.S.C00.Rsp, I.S.C40.Rsp)"),
-	"MOD/2.2":    portableNow("TC-MOD-2.2.test.ts:47", "the Go TH reads SupportedModes and sends ChangeToMode to the daemon's ModeSelect (MOD.S.A0002, MOD.S.C00.Rsp)"),
-	"TSTAT/3.2":  portableNow("TC-TSTAT-3.2.test.ts:49", "the Go TH sends SetpointRaiseLower to a daemon thermostat (TSTAT.S.C00.Rsp)"),
-	"WNCV/6.1":   portableNow("TC-WNCV-6.1.test.ts:25", "the Go TH sends UpOrOpen, DownOrClose and StopMotion to the daemon's window covering (WNCV.S.C00.Rsp to C02.Rsp)"),
-	"WNCV/7.1":   portableNow("TC-WNCV-7.1.test.ts:37", "the Go TH sends GoToLiftPercentage (WNCV.S.C05.Rsp); the GoToTiltPercentage step's mirrored PICS WNCV.S.C08.Rsp is 0, so it is recorded skipped"),
-	"DRLK/3.2":   portableNow("TC-DRLK-3.2.test.ts:80", "the Go TH sends the case's door lock commands — door, schedule and user commands — to the daemon's lock (DRLK.S.F04, F08 and every command's .Rsp are 1)"),
-	"DGWIFI/3.2": portableNow("TC-DGWIFI-3.2.test.ts:19", "the Go TH sends ResetCounts to the root's WiFiNetworkDiagnostics, which every harness daemon serves with `--wifi` (DGWIFI.S.C00.Rsp)"),
-	"CC/3.4":     colorClient("TC-CC-3.4.test.ts:13", "HueSaturation (CC.S.F00)"),
-	"CC/4.5":     colorClient("TC-CC-4.5.test.ts:13", "HueSaturation (CC.S.F00)"),
-	"CC/5.4":     colorClient("TC-CC-5.4.test.ts:13", "XY (CC.S.F03)"),
-	"CC/6.4":     colorClient("TC-CC-6.4.test.ts:37", "ColorTemperature (CC.S.F04)"),
-	"CC/7.5":     colorClient("TC-CC-7.5.test.ts:13", "EnhancedHue (CC.S.F01)"),
-	"CC/9.4":     colorClient("TC-CC-9.4.test.ts:33", "ColorLoop and EnhancedHue (CC.S.F02, F01)"),
 	"DGETH/3.2": notPorted(classNotSupported, "TC-DGETH-3.2.test.ts:19", "needs ResetCounts, which the module's "+
 		"EthernetNetworkDiagnostics does not offer, with neither PacketCounts nor ErrorCounts "+
 		"(cluster/core/ethernet_network_diagnostics.go:39-42; DGETH.S.C00.Rsp=0): a port would record its only step skipped"),
@@ -289,29 +253,11 @@ var matterJSCasesNotRun = map[string]gap{
 		"supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0)"),
 	"DGTHREAD/3.4": notPorted(classHarness, "TC-DGTHREAD-3.4.test.ts:27", "needs the daemon's Thread variant (`--otbr` against "+
 		"a live OTBR REST API, the DGTHREAD family's composition, run by otbr-virtual.yml), which the Go-TH leg does not start"),
-	"CNET/4.20": portableNow("TC-CNET-4.20.test.ts:9", "the Go TH sends ScanNetworks, ArmFailSafe, AddOrUpdateWiFiNetwork, "+
-		"ConnectNetwork, ReorderNetwork and RemoveNetwork (tc-cnet-support.ts) to the daemon with `--wifi-sim`, the CNETWIFI row's "+
-		"composition (CNET.S.F00=1)"),
 	"CNET/4.21": notPorted(classHarness, "TC-CNET-4.21.test.ts:9", "needs a daemon composition with Thread "+
 		"NetworkCommissioning (`core.ThreadNetworkCommissioning`, ADR 0027), which the reference daemon does not mount"),
 
-	// Administrator commissioning: three controllers and the TH device
-	// (tc-cadmin-support.ts, tc-cadmin-window-support.ts), read mirrored
-	// as the TC-CADMIN-1.17 port is.
-	"CADMIN/1.1":  cadminClient("TC-CADMIN-1.1.test.ts:9", "administrator behaviour", "an enhanced window (CADMIN.S.C00.Rsp)"),
-	"CADMIN/1.2":  cadminClient("TC-CADMIN-1.2.test.ts:9", "administrator behaviour", "a basic window (CADMIN.S.F00, C01.Rsp)"),
-	"CADMIN/1.7":  cadminClient("TC-CADMIN-1.7.test.ts:9", "window handling", "an enhanced window (CADMIN.S.C00.Rsp)"),
-	"CADMIN/1.8":  cadminClient("TC-CADMIN-1.8.test.ts:9", "window handling", "a basic window (CADMIN.S.F00, C01.Rsp)"),
-	"CADMIN/1.18": cadminClient("TC-CADMIN-1.18.test.ts:9", "fabric removal", "a basic window (CADMIN.S.F00, C01.Rsp)"),
-
 	// Commissioner cases: in matter.js's own direction (the Go controller as
 	// the DUT, the daemon as the TH device), as the DD and ICD DUT ports run.
-	"DD/1.9": portableNow("TC-DD-1.9.test.ts:23", "the Go controller as DUT commissions the daemon from its Manual Pairing "+
-		"Code and gives up on a code no device advertises, with the DD DUT machinery of DD/3.15 to 3.17 (gocert_dddut_test.go)"),
-	"DD/2.2": portableNow("TC-DD-2.2.test.ts:25", "the Go controller as DUT finds the daemon over DNS-SD, the case's IP leg; "+
-		"matter.js runs its BLE and Wi-Fi PAF legs as not applicable (:9-24)"),
-	"DD/3.5": portableNow("TC-DD-3.5.test.ts:152", "the Go controller as DUT commissions the daemon; each stage's evidence is a "+
-		"daemon log line or a state read, where matter.js reads its TH's log"),
 	"DA/1.3": notPorted(classHarness, "TC-DA-1.3.test.ts:101", "needs, with the Go controller as DUT commissioning the daemon "+
 		"twice, each AttestationNonce observable: matter.js reads it from its TH's log; the daemon logs none, and the "+
 		"controller's nonce reaches only controller/attestation's validation input (validate.go:40-41)"),
@@ -329,25 +275,6 @@ func notPorted(class gapClass, at, why string) gap {
 // portableNow is a case whose clusters and harness support exist: status
 // "not ported yet" (owner decision 82), held by checkNotPortedYet.
 func portableNow(at, how string) gap { return notPorted(classNotPortedYet, at, "portable now: "+how) }
-
-// tvClient is a media client case against the daemon's `--media` pair.
-func tvClient(at, commands, where, pics string) gap {
-	return portableNow(at, "the Go TH sends "+commands+" to the daemon's `--media` "+where+" ("+pics+
-		"), and the TS file's TH-side check, the command's success, is the daemon's")
-}
-
-// colorClient is a ColorControl client case against the daemon's extended
-// color light (tc-cc-support.ts: commands sent, attributes read back).
-func colorClient(at, feature string) gap {
-	return portableNow(at, "the Go TH sends the case's commands of the "+feature+" feature to the daemon's extended color "+
-		"light and reads the attributes it names (the light declares every ColorControl feature)")
-}
-
-// cadminClient is a multi-controller administrator commissioning case.
-func cadminClient(at, what, window string) gap {
-	return portableNow(at, "the Go TH plays the case's three controllers ("+what+") against the daemon with "+window+
-		", with the multi-controller machinery of the TC-CADMIN-1.17 port (gocert_app_test.go)")
-}
 
 // daDUT is a device attestation case whose TH starts from each of chip's
 // DAC-provider test vectors; args is the line that passes them.

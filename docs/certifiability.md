@@ -113,7 +113,14 @@ kernel modules and stay weekly, outside that gate.
   two exceptions are named under the DUT role); a step's PICS is the TS's
   mirrored onto the server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
-  the expression. The leg needs the daemon and the host's multicast, not the
+  the expression. One port holds a precondition looser than its TS file:
+  TC-WNCV-7.1's step 0 requires position-aware Lift *and* position-aware
+  Tilt (`TC-WNCV-7.1.test.ts:43-47`, stricter than the plan's "and/or" by its
+  own comment, `:41-42`), and the daemon's window covering serves Lift only;
+  the port follows the plan, requires each axis whose GoTo…Percentage command
+  the daemon declares and one axis at least, and records the tilt step
+  skipped by its PICS (`WNCV.S.C08.Rsp`), so its row below measures the lift
+  axis alone. The leg needs the daemon and the host's multicast, not the
   harness image; its cases appear below as passed, with their step counts and
   the TS file they follow. The BDX receiver, SU requestor
   and BIND cases run the device as DUT in matter.js too: their PICS are
