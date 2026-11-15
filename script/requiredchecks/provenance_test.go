@@ -65,9 +65,10 @@ func TestProvenanceRequiredCI(t *testing.T) {
 // of the answers: a pending non-required job does not block (DR5a-ci-04),
 // and an answer that is no count fails closed (DR5a-ci-05).
 func TestProvenanceVerdict(t *testing.T) {
+	t.Parallel()
 	bash := lookBash(t)
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not found")
+		t.Fatalf("git, which this check runs, is not on PATH: %v", err)
 	}
 	out, err := exec.Command(bash, provenanceScript, "--required-ci").Output() //nolint:gosec // the repository's own script
 	if err != nil {
@@ -179,11 +180,13 @@ func scratchRepo(t *testing.T) string {
 	return dir
 }
 
+// lookBash finds bash; the scripts it runs are what release.yml runs, and a
+// host without bash would make this guard pass by not running.
 func lookBash(t *testing.T) string {
 	t.Helper()
 	bash, err := exec.LookPath("bash")
 	if err != nil {
-		t.Skip("bash not found")
+		t.Fatalf("bash, which the release scripts need, is not on PATH: %v", err)
 	}
 	return bash
 }

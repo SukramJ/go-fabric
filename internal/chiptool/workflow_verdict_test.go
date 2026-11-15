@@ -4,6 +4,7 @@
 package chiptool
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,7 +79,7 @@ func runStepScript(t *testing.T, script string, env []string) int {
 	t.Helper()
 	bash, err := exec.LookPath("bash")
 	if err != nil {
-		t.Skip("bash not found")
+		t.Fatalf("bash, which runs the workflow's steps, is not on PATH: %v", err)
 	}
 	f := filepath.Join(t.TempDir(), "step.sh")
 	if err := os.WriteFile(f, []byte(script), 0o600); err != nil {
@@ -90,7 +91,8 @@ func runStepScript(t *testing.T, script string, env []string) int {
 	if err == nil {
 		return 0
 	}
-	if ee, ok := err.(*exec.ExitError); ok {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
 		t.Logf("exit %d: %s", ee.ExitCode(), strings.TrimSpace(string(out)))
 		return ee.ExitCode()
 	}
@@ -204,7 +206,7 @@ func TestWorkflowGateVerdict(t *testing.T) {
 // the suites stayed off (DR5a-ci-10).
 func TestWorkflowFilterVerdict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not found")
+		t.Fatalf("git, which the filter step runs, is not on PATH: %v", err)
 	}
 	script := runBlockAfter(t, chiptoolWorkflow(t), "- id: filter")
 	dir := t.TempDir()
