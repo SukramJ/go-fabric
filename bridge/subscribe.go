@@ -1509,16 +1509,37 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 	if target.flush {
 		op = "subscribe.flush"
 	}
+	leg := chunkLeg{
+		op: op, src: target.src,
+		sessionID: target.sessionID, exchangeID: target.exchangeID, role: ourRole,
+		send: func(i int, body []byte) (uint32, error) {
+			if i > 0 {
+				// Chunk N+1 piggybacks the ack of the peer's StatusResponse
+				// to chunk N. chip's ReliableMessageMgr drops it otherwise
+				// ("Dropping message without piggyback ack when we are
+				// waiting for an ack") — the same rule a reply's chunks
+				// honour ([Bridge.replyChunkLeg]). matter.js gets it for
+				// free: its MessageExchange piggybacks the pending ack on
+				// the next send (packages/protocol/src/protocol/MessageExchange.ts:679 send).
+				target = b.piggybackOwedAck(target, ourRole)
+			}
+			return b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
+		},
+		abort: target.abort,
+	}
+	if target.flush {
+		leg.timeout = flushStatusResponseTimeout
+	}
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
 			return nil, nil, err
 		}
-		var waitCh <-chan im.StatusCode
+		wait := chunkNoWait
 		switch {
 		case chunk.MoreChunkedMessages:
-			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			wait = chunkWaitHere
 		case armFinal:
 			// The last chunk's answer is awaited too, by the caller:
 			// matter.js's sendDataReportMessage waits for the Success to
@@ -1527,38 +1548,19 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			// interaction/InteractionMessenger.ts:799-844, :844 at
 			// db021da0). Armed before the send, so the answer cannot land
 			// before the waiter exists.
-			finalWait = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			wait = chunkWaitCaller
 		}
-		if i > 0 {
-			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
-			// to chunk N. chip's ReliableMessageMgr drops it otherwise
-			// ("Dropping message without piggyback ack when we are
-			// waiting for an ack") — the same rule
-			// [Bridge.streamInitialReportChunks] honours through
-			// refreshAckCounter. matter.js gets it for free: its
-			// MessageExchange piggybacks the pending ack on the next send
-			// (packages/protocol/src/protocol/MessageExchange.ts:679 send).
-			target = b.piggybackOwedAck(target, ourRole)
-		}
-		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
-		if err != nil {
-			if waitCh != nil || finalWait != nil {
-				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
-			}
+		res, err := b.sendChunk(leg, i, body, chunk, wait)
+		if !res.sent {
 			return nil, nil, err
 		}
-		if counter != 0 {
-			counters = append(counters, counter)
+		if res.counter != 0 {
+			counters = append(counters, res.counter)
 		}
-		if waitCh != nil {
-			timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
-			if target.flush {
-				timeout = flushStatusResponseTimeout
-			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, nil, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
-				return counters, nil, err
-			}
+		if err != nil {
+			return counters, nil, err
 		}
+		finalWait = res.armed
 	}
 	return counters, finalWait, nil
 }

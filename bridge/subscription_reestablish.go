@@ -297,7 +297,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	}
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: sub.ID}, limits.budget, limits.hardCap, attributes.next, events)
-	if err := b.sendPrimingReport(target, chunker); err != nil {
+	if err := b.sendPrimingReport(ctx, target, chunker); err != nil {
 		_ = m.Release(sub.ID)
 		return err
 	}
@@ -321,9 +321,23 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 // exchange, one at a time — the next generated only once the peer
 // answered the last — waiting for the peer's IM StatusResponse to each — matter.js
 // InteractionMessenger.sendDataReport with its default waitForAck. Each
-// chunk after the first piggybacks the acknowledgement of the peer's
-// previous StatusResponse.
-func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) error {
+// chunk piggybacks the acknowledgement the bridge owes on the exchange.
+// A send that fails, a chunk left unanswered and a wait the session's
+// close disarmed are [errPeerGone]; an error status is a
+// [chunkStatusError]; ctx's end aborts the wait ([errChunkWaitAborted]).
+func (b *Bridge) sendPrimingReport(ctx context.Context, target subTarget, chunker *reportChunker) error {
+	leg := chunkLeg{
+		op: "subscribe.reestablish", src: target.src,
+		sessionID: target.sessionID, exchangeID: target.exchangeID, role: true,
+		send: func(_ int, body []byte) (uint32, error) {
+			chunkTarget := target
+			if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, true); ok {
+				chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
+			}
+			return b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body)
+		},
+		done: ctx.Done(),
+	}
 	chunk, have, err := chunker.Next()
 	if err != nil {
 		return err
@@ -333,31 +347,18 @@ func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) err
 		if err != nil {
 			return err
 		}
-		chunkTarget := target
-		if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, true); ok {
-			chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
-		}
-		waitCh := b.armStatusResponseWait(target.sessionID, target.exchangeID, true)
-		if _, err := b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body); err != nil {
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
+		res, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere)
+		var rejected *chunkRejectedError
+		switch {
+		case err == nil:
+		case !res.sent:
 			return fmt.Errorf("%w: %w", errPeerGone, err)
-		}
-		timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
-		timer := b.clk().NewTimer(timeout)
-		select {
-		case status, ok := <-waitCh:
-			timer.Stop()
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
-			if !ok {
-				// Disarmed without an answer: the session closed.
-				return fmt.Errorf("%w: chunk %d: session closed", errPeerGone, i)
-			}
-			if !status.IsSuccess() {
-				return &chunkStatusError{status: status}
-			}
-		case <-timer.C():
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
-			return fmt.Errorf("%w: chunk %d unanswered after %s", errPeerGone, i, timeout)
+		case errors.As(err, &rejected):
+			return &chunkStatusError{status: rejected.status}
+		case errors.Is(err, errChunkUnanswered), errors.Is(err, errChunkWaitDisarmed):
+			return fmt.Errorf("%w: chunk %d: %w", errPeerGone, i, err)
+		default:
+			return err
 		}
 		if chunk, have, err = chunker.Next(); err != nil {
 			return err
