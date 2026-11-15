@@ -412,7 +412,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 593,
+    "line": 594,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -422,7 +422,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 622,
+    "line": 623,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -431,7 +431,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 664,
+    "line": 665,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -1517,7 +1517,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 263,
+    "line": 305,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1526,7 +1526,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 386,
+    "line": 428,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1535,7 +1535,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1710,
+    "line": 1752,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
