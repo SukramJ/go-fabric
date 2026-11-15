@@ -44,7 +44,7 @@ func integerFieldRequest(t *testing.T, body func(enc *tlv.Encoder, end func())) 
 // ConstraintError (packages/types/src/common/ValidationError.ts:16-29).
 func TestRequestIntegerFieldOfAnotherTypeAnsweredFailure(t *testing.T) {
 	t.Parallel()
-	attrPath := func(enc *tlv.Encoder, end func(), endpoint func()) {
+	attrPath := func(enc *tlv.Encoder, end, endpoint func()) {
 		enc.StartList(tlv.AnonymousTag())
 		endpoint()
 		enc.PutUint(tlv.ContextTag(3), 0x0028)
