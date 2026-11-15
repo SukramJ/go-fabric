@@ -89,6 +89,10 @@ func TestTypedServer(t *testing.T) {
 	})
 	srv.SetMatterEventEmitter(rec)
 	typed := opdef.Wrap(srv)
+	// Record<Event> before the endpoint is known: ErrNotMounted.
+	if err := typed.RecordOperationCompletion(opdef.OperationCompletionEvent{}); !errors.Is(err, spec.ErrNotMounted) {
+		t.Errorf("RecordOperationCompletion before mounting: %v, want ErrNotMounted", err)
+	}
 
 	one, sixty := uint8(1), uint32(60)
 	label := "lid open"
