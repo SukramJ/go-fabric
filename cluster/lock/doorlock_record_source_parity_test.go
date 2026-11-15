@@ -18,8 +18,9 @@ import (
 // credential the host seeded (DoorLockConfig.Initial) answer both null; a
 // Matter change to the seeded user answers its last modifier and keeps the
 // creator null; a user and a credential a Matter command added answer
-// both. connectedhomeip sets the two indexes only for a record made
-// through Matter IM (src/app/clusters/door-lock-server/
+// both. Each index follows its own source: connectedhomeip sets the
+// creator only when the creation, and the last modifier only when the last
+// modification, came through Matter IM (src/app/clusters/door-lock-server/
 // CodegenIntegration.cpp:570-578, :967-974 at 6170af84).
 func TestParity_DoorLock_RecordSource(t *testing.T) {
 	t.Parallel()

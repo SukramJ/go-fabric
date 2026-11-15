@@ -282,8 +282,10 @@ func (s *DoorLockServer) getUserLocked(req lockdef.GetUserRequest) (any, error) 
 // fabricThroughMatter is a record's creator or last-modifier fabric as
 // GetUser and GetCredentialStatus answer it (R2-P5-port-08): the index
 // when a Matter command made the creation or the change, null for a record
-// the host seeded (DoorLockConfig.Initial), which no fabric made.
-// connectedhomeip sets both only for a record made through Matter IM
+// the host seeded (DoorLockConfig.Initial), which no fabric made. Each
+// index follows its own source: connectedhomeip sets the creator only when
+// the creation, and the last modifier only when the last modification,
+// came through Matter IM
 // (src/app/clusters/door-lock-server/CodegenIntegration.cpp:570-578,
 // :967-974 at 6170af84).
 func fabricThroughMatter(throughMatter bool, fabricIndex uint8) spec.Nullable[uint8] {
