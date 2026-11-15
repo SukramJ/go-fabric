@@ -6,17 +6,22 @@ package dcl
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -80,13 +85,37 @@ func IsNotFound(err error) bool {
 type Client struct {
 	// BaseURL is the ledger; empty is [ProductionURL].
 	BaseURL string
-	// HTTPClient sends the requests; nil is http.DefaultClient.
+	// HTTPClient sends the requests; nil is http.DefaultClient for the
+	// ledger's own requests and, for the download of a URL a ledger
+	// record names (an OTA image, a CRL distribution point), the module's
+	// guarded client: it connects to public addresses only (see
+	// AllowPrivateDestinations). A host's HTTPClient is the host's policy
+	// for those downloads too: the destination guard does not apply to
+	// it, only the refusal of a redirect away from https does.
 	HTTPClient *http.Client
+	// AllowPrivateDestinations lets the download of a URL a ledger
+	// record names connect to any address. Without it, when HTTPClient
+	// is nil, the connection to a loopback, private, link-local,
+	// unspecified or multicast address (IPv4 and IPv6, an IPv4-mapped
+	// IPv6 address as its IPv4 address) is refused when it is dialled —
+	// for the URL itself and for every redirect hop, after the name is
+	// resolved. A lab whose ledger names hosts on the local network sets
+	// it.
+	//
+	// The guard checks the address it connects to. Under a proxy the
+	// environment names (HTTPS_PROXY, HTTP_PROXY, honoured as net/http
+	// honours them), that is the proxy's, which the guard admits; the
+	// destination behind the proxy is then not checked by it.
+	AllowPrivateDestinations bool
 	// Timeout bounds each request; 0 is [DefaultTimeout].
 	Timeout time.Duration
 	// Logger receives the client's debug and warning lines; nil discards
 	// them.
 	Logger *slog.Logger
+
+	// guard is the guarded client of the ledger-named downloads; nil is
+	// the module's (sharedGuard). A test seam.
+	guard *http.Client
 }
 
 // NewClient returns a client of the ledger at baseURL.
@@ -105,6 +134,130 @@ func (c *Client) httpClient() *http.Client {
 	}
 	return http.DefaultClient
 }
+
+// ledgerURLClient is the client of the download of a URL a ledger
+// record names: the host's HTTPClient, else the guarded client unless
+// AllowPrivateDestinations; each with the redirect rule of
+// downloadClient.
+func (c *Client) ledgerURLClient() *http.Client {
+	switch {
+	case c != nil && c.HTTPClient != nil:
+		return downloadClient(c.HTTPClient)
+	case c != nil && c.AllowPrivateDestinations:
+		return downloadClient(http.DefaultClient)
+	case c != nil && c.guard != nil:
+		return downloadClient(c.guard)
+	}
+	return downloadClient(sharedGuard())
+}
+
+// hostURLClient is the client of the download of a URL the host supplied
+// ([OTAVersions.DownloadHostURL]): the host's HTTPClient or
+// http.DefaultClient, with the redirect rule of downloadClient and no
+// destination guard.
+func (c *Client) hostURLClient() *http.Client {
+	if c != nil && c.HTTPClient != nil {
+		return downloadClient(c.HTTPClient)
+	}
+	return downloadClient(http.DefaultClient)
+}
+
+// errDestination is a ledger-named download refused at the dial: the
+// address it would connect to is not public.
+var errDestination = errors.New("dcl: destination refused")
+
+// publicDestination reports whether a ledger-named download may connect
+// to a: not loopback, private, link-local, unspecified or multicast, an
+// IPv4-mapped IPv6 address judged as its IPv4 address.
+func publicDestination(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsValid() && !a.IsLoopback() && !a.IsPrivate() && !a.IsLinkLocalUnicast() &&
+		!a.IsLinkLocalMulticast() && !a.IsInterfaceLocalMulticast() && !a.IsMulticast() && !a.IsUnspecified()
+}
+
+// guardConfig configures newGuardedClient. Its zero value is the
+// module's guard; the fields are test seams.
+type guardConfig struct {
+	// resolver resolves the names; nil is net.DefaultResolver.
+	resolver *net.Resolver
+	// admit, when it reports true, admits an address the guard refuses.
+	admit func(netip.AddrPort) bool
+	// proxy is the transport's proxy; nil is http.ProxyFromEnvironment.
+	proxy func(*http.Request) (*url.URL, error)
+	// tls is the transport's TLS configuration; nil is net/http's.
+	tls *tls.Config
+}
+
+// destinationGuard refuses, at the dial, an address that is not public;
+// a dial to a proxy its transport was handed is not checked.
+type destinationGuard struct {
+	admit   func(netip.AddrPort) bool
+	proxy   func(*http.Request) (*url.URL, error)
+	proxies sync.Map // the proxies' dial addresses, host:port
+}
+
+// control is the dialer's Control: it sees the resolved address of
+// every connection attempt, so a name that resolves to a refused address
+// is refused whatever it resolved to before.
+func (g *destinationGuard) control(_, address string, _ syscall.RawConn) error {
+	ap, err := netip.ParseAddrPort(address)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", errDestination, address, err)
+	}
+	if g.admit != nil && g.admit(ap) {
+		return nil
+	}
+	if !publicDestination(ap.Addr()) {
+		return fmt.Errorf("%w: %s is not a public address (Client.AllowPrivateDestinations admits it)", errDestination, ap.Addr())
+	}
+	return nil
+}
+
+// proxyFor is the transport's Proxy: the proxy the environment names for
+// req, whose dial address it records so that the dial to it is not
+// checked.
+func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
+	p, err := g.proxy(req)
+	if p != nil {
+		port := p.Port()
+		if port == "" {
+			port = map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}[strings.ToLower(p.Scheme)]
+		}
+		g.proxies.Store(net.JoinHostPort(p.Hostname(), port), struct{}{})
+	}
+	return p, err
+}
+
+// newGuardedClient is the client of a ledger-named download when the
+// host supplies none: net/http's default transport settings, with a
+// dialer that refuses a non-public address.
+func newGuardedClient(cfg guardConfig) *http.Client {
+	g := &destinationGuard{admit: cfg.admit, proxy: cfg.proxy}
+	if g.proxy == nil {
+		g.proxy = http.ProxyFromEnvironment
+	}
+	guarded := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver, Control: g.control}
+	direct := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver}
+	return &http.Client{Transport: &http.Transport{
+		Proxy: g.proxyFor,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if _, ok := g.proxies.Load(addr); ok {
+				return direct.DialContext(ctx, network, addr)
+			}
+			return guarded.DialContext(ctx, network, addr)
+		},
+		TLSClientConfig:       cfg.tls,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}}
+}
+
+// sharedGuard is the module's guarded client, one for the process so
+// that its connections are reused.
+var sharedGuard = sync.OnceValue(func() *http.Client { return newGuardedClient(guardConfig{}) })
 
 // downloadClient is hc for the download of a URL a ledger record names —
 // an OTA image, a CRL: a redirect away from https is refused, so the

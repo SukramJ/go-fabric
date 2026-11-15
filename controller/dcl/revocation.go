@@ -373,7 +373,7 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, data
 	if err != nil {
 		return nil, err
 	}
-	resp, err := downloadClient(s.opts.Client.httpClient()).Do(req)
+	resp, err := s.opts.Client.ledgerURLClient().Do(req)
 	if err != nil {
 		return nil, err
 	}

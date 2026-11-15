@@ -247,10 +247,14 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 	return current >= v.MinApplicableSoftwareVersion && current <= v.MaxApplicableSoftwareVersion
 }
 
-// Download writes the image of u to w — downloadUpdate's network half
-// (:667-709): an http or https OTA URL only, the GET bounded by
-// [DefaultDownloadTimeout]. The caller verifies the image ([VerifyImage])
-// before it serves it. When the record states the image's size
+// Download writes the image of the ledger record u to w —
+// downloadUpdate's network half (:667-709): an https OTA URL only, the GET
+// bounded by [DefaultDownloadTimeout] and sent through the production
+// client's download client: the host's [Client].HTTPClient, else the
+// guarded client, which connects to public addresses only
+// ([Client].AllowPrivateDestinations). An OTA URL the host supplies
+// itself is [OTAVersions.DownloadHostURL]'s. The caller verifies the
+// image ([VerifyImage]) before it serves it. When the record states the image's size
 // (OTAFileSize), at most that many bytes are copied: a longer answer is an
 // OTAError, not an image held in full. matter.js streams the answer to
 // storage without a bound (DclOtaUpdateService.ts:703, :571) and checks
@@ -271,6 +275,22 @@ func (o *OTAVersions) IsApplicable(v SoftwareVersion, current uint32) bool {
 // storage — where this module's callers hold the image in memory
 // (controller/softwareupdate, Images.DownloadUpdate and UpdateInfoFromURL).
 func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writer) error {
+	return o.download(ctx, u, w, false)
+}
+
+// DownloadHostURL writes the image at the OTA URL of u, a URL the host
+// supplied (as softwareupdate.Images.UpdateInfoFromURL does), to w: an
+// http or https URL, through the production client's [Client].HTTPClient
+// or http.DefaultClient, with no destination guard —
+// the host is the source of the URL, so a test server on the local
+// network is reachable. Otherwise it is [OTAVersions.Download]: the same
+// timeout, size bound and redirect rule.
+func (o *OTAVersions) DownloadHostURL(ctx context.Context, u SoftwareVersion, w io.Writer) error {
+	return o.download(ctx, u, w, true)
+}
+
+// download is Download (hostURL false) and DownloadHostURL (true).
+func (o *OTAVersions) download(ctx context.Context, u SoftwareVersion, w io.Writer, hostURL bool) error {
 	if strings.TrimSpace(u.OTAURL) == "" {
 		return &OTAError{Message: "No OTA URL provided in update info"}
 	}
@@ -278,8 +298,11 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if err != nil || parsed.Scheme == "" {
 		return &OTAError{Message: "Invalid OTA URL: " + u.OTAURL}
 	}
-	if scheme := strings.ToLower(parsed.Scheme); scheme != "https" && scheme != "http" {
+	switch scheme := strings.ToLower(parsed.Scheme); {
+	case hostURL && scheme != "https" && scheme != "http":
 		return &OTAError{Message: fmt.Sprintf(`Unsupported protocol "%s:" in OTA URL. Only "https:", "http:" are supported`, scheme)}
+	case !hostURL && scheme != "https":
+		return &OTAError{Message: fmt.Sprintf(`Unsupported protocol "%s:" in OTA URL of a ledger record. Only "https:" is supported`, scheme)}
 	}
 	bound := o.maxImageSize()
 	if u.OTAFileSize > uint64(bound) { //nolint:gosec // bound is positive
@@ -299,11 +322,11 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if err != nil {
 		return fail(err)
 	}
-	hc := http.DefaultClient
-	if o.Client != nil {
-		hc = o.Client.httpClient()
+	hc := o.Client.ledgerURLClient()
+	if hostURL {
+		hc = o.Client.hostURLClient()
 	}
-	resp, err := downloadClient(hc).Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		return fail(err)
 	}

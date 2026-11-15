@@ -294,12 +294,19 @@ func (i *Images) isHidden(name string) bool {
 	return i.hidden[name] > 0
 }
 
-// fetch downloads the ledger image v into w.
-func (i *Images) fetch(ctx context.Context, v dcl.SoftwareVersion, w io.Writer) error {
+// fetch downloads the image of info, which carries its record, into w:
+// a ledger update's (mode prod or test) through [dcl.OTAVersions.Download],
+// whose URL must be https and, without a host client, public; an image
+// the host named by URL (mode local, [Images.UpdateInfoFromURL]) through
+// [dcl.OTAVersions.DownloadHostURL], which admits http and any address.
+func (i *Images) fetch(ctx context.Context, info UpdateInfo, w io.Writer) error {
 	if i.download != nil {
-		return i.download(ctx, v, w)
+		return i.download(ctx, *info.ledger, w)
 	}
-	return i.ledger.Download(ctx, v, w)
+	if modeOf(info.Source) == ModeLocal {
+		return i.ledger.DownloadHostURL(ctx, *info.ledger, w)
+	}
+	return i.ledger.Download(ctx, *info.ledger, w)
 }
 
 // fileName is #fileName (:534-536).
@@ -774,7 +781,7 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return name, nil
 	}
 	var buf bytes.Buffer
-	if err := i.fetch(ctx, *info.ledger, &buf); err != nil {
+	if err := i.fetch(ctx, info, &buf); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
 	if _, err := dcl.VerifyImage(bytes.NewReader(buf.Bytes()), *info.ledger, i.log); err != nil {
@@ -800,7 +807,7 @@ func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, 
 	if err != nil {
 		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
-	if err := i.fetch(ctx, *info.ledger, w); err != nil {
+	if err := i.fetch(ctx, info, w); err != nil {
 		_ = w.Abort()
 		return fmt.Errorf("%w: %w", ErrOTA, err)
 	}
@@ -888,7 +895,10 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 // downloads it from that URL into [ModeLocal] — matter.js
 // createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
 // Another scheme is refused (a local file is [UpdateInfoFromImage]'s), and
-// so is every URL offline, without a fetch.
+// so is every URL offline, without a fetch. The host names the URL, so
+// both downloads take [dcl.OTAVersions.DownloadHostURL]: http and a
+// server on the local network are admitted, which a ledger record's URL
+// is not.
 func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts LocalImageOptions) (UpdateInfo, error) {
 	scheme, _, _ := strings.Cut(fileURL, ":")
 	if scheme = strings.ToLower(scheme); scheme != "https" && scheme != "http" {
@@ -898,7 +908,7 @@ func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts Loc
 		return UpdateInfo{}, fmt.Errorf("%w: cannot read OTA image from %s: the service is offline, use UpdateInfoFromImage instead", ErrOTA, fileURL)
 	}
 	var buf bytes.Buffer
-	if err := i.ledger.Download(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
+	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
 		return UpdateInfo{}, fmt.Errorf("%w: failed to read OTA image from %s: %w", ErrOTA, fileURL, err)
 	}
 	u, err := UpdateInfoFromImage(&buf, opts)
