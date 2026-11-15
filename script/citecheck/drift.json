@@ -394,7 +394,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 221,
+    "line": 227,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -403,7 +403,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 277,
+    "line": 283,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "protocolId",
@@ -1517,7 +1517,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 305,
+    "line": 312,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1526,7 +1526,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 428,
+    "line": 435,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1535,7 +1535,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1752,
+    "line": 1759,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
