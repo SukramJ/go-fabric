@@ -173,3 +173,22 @@ func TestInvokeLargeMessageGateOrder(t *testing.T) {
 		t.Errorf("wildcard with access refused answered %+v, want nothing", resp.Responses)
 	}
 }
+
+// TestGroupInvokeLeavesALargeMessageCommandOut: a group session carries no
+// large messages, so a group invoke of a Large Message command runs on no
+// member endpoint, after the authority check; a command without the
+// quality runs on every member (review II, Fable P-1; matter.js runs a
+// group invoke through the wildcard expansion, CommandInvokeResponse.ts
+// :136-160 at db021da0, and #wildcardTargetOf leaves it out, :384-386).
+func TestGroupInvokeLeavesALargeMessageCommandOut(t *testing.T) {
+	t.Parallel()
+	d := &lmGateDispatcher{}
+	HandleGroupInvoke(groupCtx(2, 3), d, InvokeRequest{Invokes: []CommandInvocation{wildcardInvoke(lmProviderCluster, lmProvideOffer)}}, nil)
+	if len(d.invoked) != 0 {
+		t.Fatalf("a Large Message command ran on %v over a group session", d.invoked)
+	}
+	HandleGroupInvoke(groupCtx(2, 3), d, InvokeRequest{Invokes: []CommandInvocation{wildcardInvoke(lmOnOffCluster, lmToggle)}}, nil)
+	if len(d.invoked) != 2 {
+		t.Fatalf("a plain command ran on %v, want both members", d.invoked)
+	}
+}

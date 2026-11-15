@@ -6,6 +6,8 @@ package im
 import (
 	"context"
 	"slices"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // GroupSubject is the Incoming Subject Descriptor of a group message: the
@@ -130,7 +132,18 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 		if timedRequired != nil && timedRequired(clusterID, commandID) {
 			return StatusNeedsTimedInteraction
 		}
-		return authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID))
+		if status := authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID)); !status.IsSuccess() {
+			return status
+		}
+		// A group session carries no large messages: a Large Message
+		// command is left out after the authority check, as a wildcard
+		// path leaves it out — matter.js runs a group invoke through the
+		// wildcard expansion (CommandInvokeResponse.ts:136-160 at db021da0)
+		// and #wildcardTargetOf (:384-386).
+		if schema.CommandLargeMessage(clusterID, commandID) {
+			return StatusInvalidTransportType
+		}
+		return StatusSuccess
 	}
 	if !inv.DecodeStatus.IsSuccess() {
 		// Fields that do not decode fail the command on every endpoint
