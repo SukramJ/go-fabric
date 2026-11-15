@@ -55,6 +55,13 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, root *nod
 // AddNOC checks the trusted root before the CSR (matter.js's order), so
 // the new fail-safe context is given a root first: without one AddNOC
 // answers "no trusted root" whether or not the CSR survived.
+//
+// The answer here is the combined one: the arm of the next fail-safe runs
+// the fresh-fail-safe hook after Complete's commit, so either alone
+// passes it. The node holds each clearing path on its own — the commit,
+// on an Ethernet and on a Wi-Fi node, the fresh fail-safe's start and the
+// expiry — with the others unwired (node:TestEachPathClearsThePendingCredentialState,
+// review II, N4-fixex-1).
 func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	_, root := testRootClusters(t)
 	ctx, cancel := context.WithCancel(context.Background())

@@ -166,6 +166,11 @@ type Config struct {
 	// internal/nodeseam.UseSpecificationVersion: a test stands in for a
 	// node of an older release.
 	specificationVersion uint32
+	// withoutFailSafeHooks leaves the named fail-safe hooks between
+	// GeneralCommissioning and OperationalCredentials unwired. TESTING
+	// ONLY, set through export_test.go: a test sees each path that clears
+	// the pending credential state on its own (review II, N4-fixex-1).
+	withoutFailSafeHooks failSafeHooks
 	// Surface are the surface policies the node's devices are composed
 	// under (package surface, ADR 0030). A device carries the digest of the
 	// policies it was built with (device.Options.Surface), and

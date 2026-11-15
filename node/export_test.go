@@ -44,3 +44,19 @@ func CommissionerReachReports(ctx context.Context, n *Node, fabricIndex uint8, n
 // fail-safe was armed and how many sessions were active. It is set before
 // the removal that starts the reopen.
 func OnReopenCheck(n *Node, fn func(armed bool, sessions int)) { n.reopenChecked = fn }
+
+// The fail-safe hooks a test can leave unwired (WithoutFailSafeHooks):
+// CommissioningComplete's commit, a fresh fail-safe's start and the
+// fail-safe's expiry, the three paths that clear OperationalCredentials'
+// pending state.
+const (
+	FailSafeHookCommit   = failSafeHookCommit
+	FailSafeHookStarting = failSafeHookStarting
+	FailSafeHookExpiry   = failSafeHookExpiry
+)
+
+// WithoutFailSafeHooks makes the node built from cfg leave hooks unwired.
+func WithoutFailSafeHooks(cfg *Config, hooks failSafeHooks) { cfg.withoutFailSafeHooks = hooks }
+
+// FailSafeHooksForTest is the set WithoutFailSafeHooks takes.
+type FailSafeHooksForTest = failSafeHooks
