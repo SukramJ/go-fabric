@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8993,
+  "entry_points": 8997,
   "entry_packages": [
     ".",
     "bdx",
@@ -290,9 +290,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18744,
+    "total_exported": 18748,
     "reachable": 12601,
-    "whitelisted": 6143,
+    "whitelisted": 6147,
     "unreachable": 0
   },
   "by_package": [],
@@ -32318,6 +32318,20 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCustomFlowFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 31
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCustomFlowOpensAtStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 132
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDCLFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/dcl_test.go",
@@ -32833,6 +32847,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 314
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUserIntentCommissioningStartReportsTheNodesError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 161
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUserIntentFlowWaitsForThePipe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 102
     },
     {
       "package": "examples/reference-bridge",
