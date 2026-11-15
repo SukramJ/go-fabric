@@ -34,7 +34,8 @@ these interfaces does not drag the host's dependencies into the module.
 | --- | --- | --- | --- |
 | `EndpointSource` | a host device | device type and cluster servers of one bridged endpoint | the source is not an endpoint |
 | `ClusterServer` | every server | read, write, invoke; the reportable attributes | required |
-| `FabricScopedReader` | a server with fabric-scoped attributes | read with the FabricFiltered flag and the reading fabric | `MatterRead` answers with the full value |
+| `FabricScopedReader` | a server whose value depends on the reader beyond the fabric scope | read with the FabricFiltered flag and the reading fabric | `MatterRead` answers; either way the dispatcher scopes every fabric-scoped attribute of the model on a request — another fabric's entries filtered, their fabric-sensitive fields withheld — whatever the server returns |
+| `FabricScopeDeclarer` | a server of a cluster outside the schema snapshot with fabric-scoped lists (`spec.Instance` from its definition) | declares an attribute's fabric scope: fabric-sensitive, and its entry's fabric-sensitive fields | the cluster's lists are not scoped; for a cluster of the snapshot the generated table applies and the declaration is not asked |
 | `ClusterAttributeLister` | a server | the attribute set, for wildcard reads and AttributeList | a wildcard read returns only the global attributes |
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList, and which event paths exist on the cluster; an event the server emits is recorded as emitted, so it emits only events it lists | EventList is empty and no event path exists on the cluster: a read of an event on it is answered `UNSUPPORTED_EVENT`, and an event path on it selects nothing for a subscription (`endpoint/dispatcher.go`, `EventPathStatus`) |

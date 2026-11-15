@@ -109,9 +109,13 @@ type ClusterServer interface {
 // — the context carries the filter rather than propagating via a
 // separate call-stack argument.
 //
-// Cluster servers that do NOT implement FabricScopedReader return their
-// full attribute value from MatterRead — the safe default that matches
-// the FabricFiltered=false path.
+// The dispatcher scopes every fabric-scoped attribute of the model,
+// whatever the server returns: on a request it filters a fabric-scoped
+// list's entries and withholds another fabric's fabric-sensitive fields
+// ([FabricScope]; for a cluster outside the model, [FabricScopeDeclarer]).
+// A server returns every fabric's entries whole, from MatterRead or from
+// MatterReadFiltered alike. FabricScopedReader is for a value that depends
+// on the reader in another way than that projection.
 type FabricScopedReader interface {
 	// MatterReadFiltered resolves an attribute value with awareness of
 	// the FabricFiltered flag. ctx carries the filter, which
