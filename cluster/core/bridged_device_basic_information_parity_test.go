@@ -272,8 +272,9 @@ func TestParityMatterJS_BridgedServer_NodeLabelWritePreservedAcrossRead(t *testi
 	}
 	initial := v0.(string)
 	if initial == newLabel {
-		// Adjust test value so we always exercise a real transition.
-		t.Skip("initial label already matches test value — adjust validBridgedConfig to differ")
+		// The fixture must differ from the test value, or the write below
+		// exercises no transition (review II, R2-P5-tassert-10).
+		t.Fatal("initial label already matches the test value — adjust validBridgedConfig to differ")
 	}
 
 	if err := b.MatterWrite(context.Background(), 0x0005, newLabel); err != nil {
