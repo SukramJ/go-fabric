@@ -296,6 +296,7 @@ type Server struct {
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16
+	mounted  bool // the endpoint is known ([Server.SetEndpoint])
 }
 
 // Compile-time assertions.
@@ -655,8 +656,22 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 // calls it at assembly); [Server.Endpoint] reads it back.
 func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
-	s.endpoint = endpoint
+	s.endpoint, s.mounted = endpoint, true
 	s.mu.Unlock()
+}
+
+// EmitEvent emits eventID on the endpoint the server is mounted on — the
+// call the typed Record<Event> makes: an event the selection does not
+// emit is refused as [Server.Emit] refuses it, one while the server is not
+// in the topology (no endpoint or no emitter) is [spec.ErrNotMounted].
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	s.mu.Lock()
+	endpoint, mounted := s.endpoint, s.mounted && s.emitter != nil
+	s.mu.Unlock()
+	if s.inst.Emits(eventID) && !mounted {
+		return fmt.Errorf("%w: PumpConfigurationAndControl event 0x%02X", spec.ErrNotMounted, eventID)
+	}
+	return s.Emit(endpoint, eventID, data)
 }
 
 // Endpoint returns the endpoint the server is mounted on, as stamped by

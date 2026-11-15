@@ -30,6 +30,7 @@ func TestTypedCommodityPriceServer(t *testing.T) {
 	}
 	em := &emitter{}
 	srv.SetMatterEventEmitter(em)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	s := cp.Wrap(srv)
 	changes := 0
 	defer s.OnChanged(func(cp.State, contract.Change) { changes++ })()
@@ -59,7 +60,8 @@ func TestTypedCommodityPriceServer(t *testing.T) {
 	if _, err := srv.MatterInvoke(context.Background(), cp.CmdGetDetailedPriceRequest, cp.GetDetailedPriceRequestRequest{}); err != nil || called != 1 {
 		t.Errorf("host handler: %v, called %d", err, called)
 	}
-	if err := s.EmitPriceChange(3, cp.PriceChangeEvent{CurrentPrice: spec.NullOf[cp.CommodityPriceStruct]()}); err != nil { //nolint:staticcheck // the deprecated emit under test
+	srv.SetEndpoint(3) // Record<Event> emits on the endpoint the server is mounted on
+	if err := s.RecordPriceChange(cp.PriceChangeEvent{CurrentPrice: spec.NullOf[cp.CommodityPriceStruct]()}); err != nil {
 		t.Fatal(err)
 	}
 	if evs := em.take(); len(evs) != 1 || evs[0].endpoint != 3 {
@@ -80,6 +82,7 @@ func TestTypedGridConditionsServer(t *testing.T) {
 	}
 	em := &emitter{}
 	srv.SetMatterEventEmitter(em)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	s := egc.Wrap(srv)
 	c := egc.ElectricalGridConditionsStruct{PeriodStart: 1, PeriodEnd: spec.NullOf[uint32](), GridCarbonLevel: egc.ThreeLevelHigh}
 	if err := s.Set(egc.Patch{CurrentConditions: &c, LocalGenerationAvailable: typedPtr(true)}); err != nil {

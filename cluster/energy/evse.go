@@ -5,6 +5,7 @@ package energy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -996,7 +997,9 @@ func (s *EvseServer) emitFaultLocked(fault EvseFault) {
 }
 
 func (s *EvseServer) emitLocked(eventID uint32, data any) error {
-	if err := s.srv.Emit(s.endpoint, eventID, data); err != nil { //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	// A server not in the topology (spec.ErrNotMounted) has no event log
+	// to record in: the state change stands, the event is dropped.
+	if err := s.srv.EmitEvent(eventID, data); err != nil && !errors.Is(err, spec.ErrNotMounted) {
 		return fmt.Errorf("energy: %w", err)
 	}
 	return nil
@@ -1387,6 +1390,7 @@ func (s *EvseServer) SetEndpoint(endpoint uint16) {
 		s.quiesced = false
 		s.scheduleEnabledCheckLocked()
 	}
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the enabled-until timer.

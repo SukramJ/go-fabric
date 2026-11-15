@@ -342,6 +342,7 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Supported returns the fixed Supported bitmap.
@@ -435,12 +436,14 @@ func (s *Server) setState(origin contract.Origin, state uint32, ignoreLatch bool
 	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{AttrState: state}); err != nil {
 		return fmt.Errorf("alarmbase: %w", err)
 	}
-	s.mu.Lock()
-	endpoint := s.endpoint
-	s.mu.Unlock()
 	// Notify: became active, became inactive, the new State, the Mask
 	// (AlarmBaseCluster.cpp:75-80).
-	return s.srv.Emit(endpoint, EventNotify, s.v.notify(state&^current, current&^state, state, mask)) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	// A server not in the topology (spec.ErrNotMounted) has no event log
+	// to record in: the state change stands, the event is dropped.
+	if err := s.srv.EmitEvent(EventNotify, s.v.notify(state&^current, current&^state, state, mask)); !errors.Is(err, spec.ErrNotMounted) {
+		return err
+	}
+	return nil
 }
 
 // handleReset is chip's HandleReset (AlarmBaseCluster.cpp:162-175).

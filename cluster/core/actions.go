@@ -152,25 +152,20 @@ func (a *Actions) SetEndpoint(endpoint uint16) {
 	a.mu.Lock()
 	a.endpoint = endpoint
 	a.mu.Unlock()
-}
-
-func (a *Actions) eventEndpoint() uint16 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.endpoint
+	a.Server.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // EmitStateChanged emits StateChanged for actionID with the InvokeID the
 // command carried (Matter: 0 when it carried none).
 func (a *Actions) EmitStateChanged(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventStateChanged, actionsdef.StateChangedEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return a.EmitEvent(actionsdef.EventStateChanged, actionsdef.StateChangedEvent{
 		ActionId: actionID, InvokeId: invokeID, NewState: state,
 	})
 }
 
 // EmitActionFailed emits ActionFailed for actionID.
 func (a *Actions) EmitActionFailed(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum, cause actionsdef.ActionErrorEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return a.EmitEvent(actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{
 		ActionId: actionID, InvokeId: invokeID, NewState: state, Error: cause,
 	})
 }

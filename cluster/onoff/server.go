@@ -774,7 +774,7 @@ func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 // Emit implements [spec.EventEmitting]. OnOff defines no event, so every
 // event is refused with [spec.ErrNotEmitted].
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.srv.Emit(endpoint, eventID, data) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return s.srv.Emit(endpoint, eventID, data) //nolint:staticcheck // implements EventEmitting for the deprecated spec.EmitOn
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].

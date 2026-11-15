@@ -117,7 +117,7 @@ func TestThermostatTypedEmitAndOnWrite(t *testing.T) {
 	ctx := context.Background()
 	s := typedThermostat(t)
 	// The server serves none of the event feature TEVT's events.
-	if err := s.EmitSystemModeChange(1, tdef.SystemModeChangeEvent{}); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
+	if err := s.RecordSystemModeChange(tdef.SystemModeChangeEvent{}); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event outside EventList: %v", err)
 	}
 	refusal := errors.New("the boiler is in service")

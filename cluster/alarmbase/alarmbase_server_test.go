@@ -275,6 +275,7 @@ func TestRefrigeratorNotify(t *testing.T) {
 	}
 	em := &emitter{}
 	srv.SetMatterEventEmitter(em)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	if err := srv.SetState(open); err != nil {
 		t.Fatal(err)
 	}

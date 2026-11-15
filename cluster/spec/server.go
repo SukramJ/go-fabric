@@ -773,8 +773,8 @@ func (s *Server) dispatch(ctx context.Context, cmdID uint32, fields any) (any, e
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver]; nil withdraws
-// the emitter: [Server.EmitEvent] answers ErrNotMounted after it, the
-// deprecated [Server.Emit] drops the event.
+// the emitter: [Server.EmitEvent] answers ErrNotMounted after it, and
+// [Server.Emit] drops the event.
 func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter

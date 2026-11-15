@@ -40,6 +40,14 @@ func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
 	return s.hooks.Emit(endpoint, eventID, data)
 }
 
+// EmitEvent emits eventID on the endpoint the server is mounted on
+// ([spec.Hooks.EmitEvent]) — the call the typed Record<Event> makes.
+func (s *Server) EmitEvent(eventID uint32, data any) error { return s.hooks.EmitEvent(eventID, data) }
+
+// SetEndpoint implements contract.EndpointReceiver: the endpoint
+// [Server.EmitEvent] emits on.
+func (s *Server) SetEndpoint(endpoint uint16) { s.hooks.SetEndpoint(endpoint) }
+
 // SetMatterEventEmitter implements contract.EventReceiver: the emitter
 // [Server.Emit] emits through.
 func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {

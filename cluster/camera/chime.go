@@ -233,7 +233,7 @@ func (c *Chime) playChimeSound(ctx context.Context, fields any) (any, error) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "Chime: PlayChimeSound payload %T", fields)
 	}
 	c.mu.Lock()
-	enabled, id, endpoint := c.enabled, c.selected, c.endpoint
+	enabled, id := c.enabled, c.selected
 	c.mu.Unlock()
 	if !enabled { // :263-266
 		return nil, nil
@@ -248,7 +248,7 @@ func (c *Chime) playChimeSound(ctx context.Context, fields any) (any, error) {
 		return nil, portError("PlayChimeSound", err)
 	}
 	if c.Emits(chimedef.EventChimeStartedPlaying) { // :283-287
-		_ = c.srv.Emit(endpoint, chimedef.EventChimeStartedPlaying, chimedef.ChimeStartedPlayingEvent{ChimeId: id}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+		_ = c.srv.EmitEvent(chimedef.EventChimeStartedPlaying, chimedef.ChimeStartedPlayingEvent{ChimeId: id})
 	}
 	return nil, nil
 }
@@ -292,6 +292,7 @@ func (c *Chime) SetEndpoint(endpoint uint16) {
 	c.mu.Lock()
 	c.endpoint = endpoint
 	c.mu.Unlock()
+	c.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // portError maps a port's refusal onto the answer: an error naming its

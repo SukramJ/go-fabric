@@ -126,13 +126,14 @@ func TestTypedServer(t *testing.T) {
 	}
 
 	// Events.
-	if err := typed.EmitOperationCompletion(3, opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}); err != nil { //nolint:staticcheck // the deprecated emit under test
+	srv.SetEndpoint(3) // Record<Event> emits on the endpoint the server is mounted on
+	if err := typed.RecordOperationCompletion(opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}); err != nil {
 		t.Errorf("EmitOperationCompletion: %v", err)
 	}
 	if evs := rec.all(); len(evs) != 2 || evs[1].event != opdef.EventOperationCompletion || evs[1].endpoint != 3 {
 		t.Errorf("events: %+v, want an OperationCompletion on endpoint 3", evs)
 	}
-	if err := typed.EmitOperationCompletion(3, opdef.OperationCompletionEvent{CompletionErrorCode: 0x7F}); !errors.Is(err, opstate.ErrUnknownError) { //nolint:staticcheck // the deprecated emit under test
+	if err := typed.RecordOperationCompletion(opdef.OperationCompletionEvent{CompletionErrorCode: 0x7F}); !errors.Is(err, opstate.ErrUnknownError) {
 		t.Errorf("EmitOperationCompletion with an unknown code: %v, want ErrUnknownError", err)
 	}
 

@@ -773,7 +773,12 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
+	s.hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 }
+
+// EmitEvent emits eventID on the endpoint the server is mounted on
+// ([spec.Hooks.EmitEvent]) — the call the typed Record<Event> makes.
+func (s *Server) EmitEvent(eventID uint32, data any) error { return s.hooks.EmitEvent(eventID, data) }
 
 // AlarmSeverityEvent is the payload of the SmokeAlarm, CoAlarm,
 // LowBattery, InterconnectSmokeAlarm and InterconnectCoAlarm events: one

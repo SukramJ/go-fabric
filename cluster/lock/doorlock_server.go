@@ -1366,11 +1366,8 @@ func (s *DoorLockServer) emit(events []queuedEvent) {
 	if len(events) == 0 {
 		return
 	}
-	s.mu.Lock()
-	endpoint := s.endpoint
-	s.mu.Unlock()
 	for _, e := range events {
-		_ = s.Emit(endpoint, e.id, e.payload) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store; an event outside the selection's EventList is dropped
+		_ = s.EmitEvent(e.id, e.payload) // an event outside the selection's EventList is dropped
 	}
 }
 

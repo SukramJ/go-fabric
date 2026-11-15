@@ -94,9 +94,37 @@ func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any, pee
 // hands it ([contract.EventReceiver]) and the emission of its cluster's
 // events with the definition's priority.
 type Events struct {
-	// mu guards emitter.
-	mu      sync.Mutex
-	emitter contract.EventEmitter
+	// mu guards emitter, endpoint and mounted.
+	mu       sync.Mutex
+	emitter  contract.EventEmitter
+	endpoint uint16
+	mounted  bool
+}
+
+// SetEndpoint stores the endpoint the server is mounted on, which
+// [Events.EmitEvent] emits on.
+func (e *Events) SetEndpoint(endpoint uint16) {
+	e.mu.Lock()
+	e.endpoint, e.mounted = endpoint, true
+	e.mu.Unlock()
+}
+
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on at the priority inst's definition gives it, as [Server.EmitEvent]: an
+// event outside inst's EventList is [ErrNotEmitted], one while the server
+// is not in the topology — no endpoint or no emitter — [ErrNotMounted].
+func (e *Events) EmitEvent(inst *Instance, eventID uint32, data any) error {
+	if !inst.Emits(eventID) {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, inst.def.Name, eventID)
+	}
+	e.mu.Lock()
+	emitter, endpoint, mounted := e.emitter, e.endpoint, e.mounted
+	e.mu.Unlock()
+	if !mounted || emitter == nil {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotMounted, inst.def.Name, eventID)
+	}
+	emitter.MatterEmitEvent(endpoint, inst.def.ID, eventID, data, inst.EventPriority(eventID))
+	return nil
 }
 
 // SetEmitter stores the endpoint's emitter.

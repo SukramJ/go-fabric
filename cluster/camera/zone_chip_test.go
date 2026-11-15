@@ -277,6 +277,7 @@ func TestChipZoneManagement(t *testing.T) { //nolint:funlen // one subtest per c
 		z, _ := newChipZones(t, 0)
 		em := &zoneEvents{}
 		z.SetMatterEventEmitter(em)
+		z.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 		if err := z.ZoneTriggered(7, zmdef.ZoneEventTriggeredReasonMotion); err != nil {
 			t.Fatal(err)
 		}

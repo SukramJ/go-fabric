@@ -114,7 +114,7 @@ func (c opCycle) HandleOperationalCommand(_ context.Context, cmd uint32) (opdef.
 
 // opCycleOn is the cycle of the OperationalState server *srv points to
 // once the device is built.
-func opCycleOn(name string, dev **device.Device, srv **opdef.Server) opCycle {
+func opCycleOn(name string, srv **opdef.Server) opCycle {
 	return opCycle{cycle{
 		name: name,
 		state: func() (uint8, uint8) {
@@ -126,7 +126,7 @@ func opCycleOn(name string, dev **device.Device, srv **opdef.Server) opCycle {
 			return (*srv).Set(opdef.Patch{OperationalState: &st})
 		},
 		complete: func() error {
-			return (*srv).EmitOperationCompletion(endpointOf(*dev), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
+			return mountedOnly((*srv).RecordOperationCompletion(opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}))
 		},
 	}}
 }
@@ -158,7 +158,7 @@ func (d *demoDishwasher) device(opts device.Options) (*device.Dishwasher, error)
 	supported, latch, mask := dishwasherAlarms, dishwasherLatch, dishwasherAlarms
 	dev, err := device.NewDishwasher(opts,
 		opdef.Declare{
-			CommandHandler: opCycleOn(d.name, &d.dev, &d.ops),
+			CommandHandler: opCycleOn(d.name, &d.ops),
 			Commands:       []uint32{opdef.CmdStart, opdef.CmdStop},
 			Initial:        opdef.Patch{OperationalStateList: cycleStates(), OperationalState: &stopped},
 		},
@@ -313,10 +313,7 @@ func (c *demoOvenCavity) cycle() cycle {
 		},
 		set: func(state uint8) error { return c.setState(ovendef.OperationalStateEnum(state)) },
 		complete: func() error {
-			c.mu.Lock()
-			dev := c.dev
-			c.mu.Unlock()
-			return c.server().EmitOperationCompletion(endpointOf(dev), ovendef.OperationCompletionEvent{CompletionErrorCode: uint8(ovendef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
+			return mountedOnly(c.server().RecordOperationCompletion(ovendef.OperationCompletionEvent{CompletionErrorCode: uint8(ovendef.ErrorStateNoError)}))
 		},
 	}
 }
@@ -504,7 +501,7 @@ func (m *demoMicrowave) HandleOperationalCommand(_ context.Context, cmd uint32) 
 		stopped := opdef.OperationalStateStopped
 		err = ops.Set(opdef.Patch{OperationalState: &stopped, Null: []uint32{opdef.AttrCountdownTime}})
 		if err == nil && running {
-			err = ops.EmitOperationCompletion(endpointOf(m.oven().Device), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
+			err = mountedOnly(ops.RecordOperationCompletion(opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}))
 		}
 	default:
 		return opdef.ErrorStateStruct{ErrorStateId: opdef.ErrorStateCommandInvalidInState}, nil
@@ -535,7 +532,7 @@ func (d *demoDryer) device(opts device.Options) (*device.LaundryDryer, error) {
 	normal := ldcdef.DrynessLevelNormal
 	dev, err := device.NewLaundryDryer(opts,
 		opdef.Declare{
-			CommandHandler: opCycleOn(d.name, &d.dev, &d.ops),
+			CommandHandler: opCycleOn(d.name, &d.ops),
 			Commands:       []uint32{opdef.CmdStart, opdef.CmdStop},
 			Initial:        opdef.Patch{OperationalStateList: cycleStates(), OperationalState: &stopped},
 		},

@@ -201,6 +201,7 @@ func (s *ThermostatServer) emit(ctx context.Context, eventID uint32, data any) {
 // moved Matter time does (review II, R2-P1-dr-rest-03).
 func (s *ThermostatServer) SetEndpoint(endpoint uint16) {
 	s.endpoint.Store(uint32(endpoint))
+	s.events.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 	s.mu.Lock()
 	back := s.suggest.quiesced
 	s.suggest.quiesced = false

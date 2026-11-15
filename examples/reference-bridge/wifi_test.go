@@ -88,6 +88,7 @@ func TestWiFiFlag(t *testing.T) {
 
 	log := &wifiEventLog{}
 	srv.SetMatterEventEmitter(log)
+	srv.SetEndpoint(1) // mounted, as the bridge mounts it
 	reason, cause, status, conn := uint16(7), uint8(3), uint16(17), uint8(0)
 	for _, cmd := range []pipeCommand{
 		{Name: "WiFiDiagnostics", Action: "Disconnection", ReasonCode: &reason},

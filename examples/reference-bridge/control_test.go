@@ -186,6 +186,7 @@ func TestWasherStopReportsTheCycleTimes(t *testing.T) {
 		}
 		events := &eventCapture{}
 		w.ops.Underlying().(contract.EventReceiver).SetMatterEventEmitter(events)
+		w.ops.Underlying().(contract.EndpointReceiver).SetEndpoint(1) // mounted, as the bridge mounts it
 		ctx := context.Background()
 		if got, err := w.HandleOperationalCommand(ctx, opdef.CmdStart); err != nil || got.ErrorStateId != opdef.ErrorStateNoError {
 			t.Fatalf("Start = %+v, %v", got, err)

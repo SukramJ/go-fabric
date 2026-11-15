@@ -182,6 +182,7 @@ func TestTimersRunOnTheSystemClock(t *testing.T) {
 	}
 	got := make(chan uint32, 4)
 	s.SetMatterEventEmitter(emitFunc(func(id uint32) { got <- id }))
+	s.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	if err := s.SetCurrentPosition(1); err != nil {
 		t.Fatal(err)
 	}

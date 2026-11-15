@@ -65,7 +65,7 @@ func NewAccountLogin(cfg AccountLoginConfig) (*AccountLoginServer, error) {
 // EmitLoggedOut emits LoggedOut (event 0x00, critical; :21-24), which the
 // server emits when cfg.Events lists it.
 func (s *AccountLoginServer) EmitLoggedOut(ev logindef.LoggedOutEvent) error {
-	return s.Emit(s.endpoint(), logindef.EventLoggedOut, ev) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return s.EmitEvent(logindef.EventLoggedOut, ev)
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the

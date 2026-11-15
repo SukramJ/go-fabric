@@ -376,6 +376,12 @@ func (s *ThermostatServer) Emit(endpoint uint16, eventID uint32, data any) error
 	return s.events.Emit(s.inst, endpoint, eventID, data)
 }
 
+// EmitEvent emits eventID on the endpoint the server is mounted on
+// ([spec.Events.EmitEvent]) — the call the typed Record<Event> makes.
+func (s *ThermostatServer) EmitEvent(eventID uint32, data any) error {
+	return s.events.EmitEvent(s.inst, eventID, data)
+}
+
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *ThermostatServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.events.SetEmitter(emitter)

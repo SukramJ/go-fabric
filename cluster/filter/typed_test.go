@@ -51,7 +51,7 @@ func TestTypedFilterServer(t *testing.T) {
 	if _, err := srv.MatterInvoke(context.Background(), hepa.CmdResetCondition, nil); err != nil || host != 1 || h.resets != 0 {
 		t.Errorf("host ResetCondition: %v, host %d, resetter %d", err, host, h.resets)
 	}
-	if err := spec.EmitOn(srv, 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
+	if err := srv.Emit(1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event the cluster does not define: %v", err)
 	}
 

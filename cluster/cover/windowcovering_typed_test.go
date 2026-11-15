@@ -119,7 +119,7 @@ func TestWindowCoveringTypedEmitAndOnWrite(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	s := typedCovering(t)
-	if err := spec.EmitOn(s.Underlying(), 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
+	if err := s.Underlying().(spec.EventEmitting).Emit(1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event of a cluster without events: %v", err)
 	}
 	refusal := errors.New("the installer locked the mode")

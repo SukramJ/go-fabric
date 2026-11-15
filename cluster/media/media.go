@@ -447,9 +447,3 @@ func (e *events) SetEndpoint(endpoint uint16) {
 	e.ep = endpoint
 	e.epMu.Unlock()
 }
-
-func (e *events) endpoint() uint16 {
-	e.epMu.Lock()
-	defer e.epMu.Unlock()
-	return e.ep
-}

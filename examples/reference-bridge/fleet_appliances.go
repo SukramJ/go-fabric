@@ -39,11 +39,14 @@ import (
 // errNotBuilt reports an appliance whose device is not built yet.
 var errNotBuilt = errors.New("the device is not built yet")
 
-// endpointOf is the endpoint number d is served under; 0 before the node
-// numbered it (an event emitted then has no emitter to reach anyway).
-func endpointOf(d *device.Device) uint16 {
-	n, _ := d.EndpointNumber()
-	return n
+// mountedOnly drops spec.ErrNotMounted: an appliance whose device is not
+// mounted (yet, or any more) has no event log to record its completion
+// in, and its cycle runs on without it.
+func mountedOnly(err error) error {
+	if errors.Is(err, spec.ErrNotMounted) {
+		return nil
+	}
+	return err
 }
 
 // elapsed is an OperationCompletion time in whole seconds.
@@ -232,14 +235,13 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd uint32) (op
 	if cmd == opdef.CmdStart || next == opdef.OperationalStateStopped {
 		w.remaining = washCycleSeconds
 	}
-	dev := w.dev
 	w.mu.Unlock()
 	ops := w.server()
 	if err := ops.Set(opdef.Patch{OperationalState: &next}); err != nil {
 		return opdef.ErrorStateStruct{}, err
 	}
 	if completion != nil {
-		if err := ops.EmitOperationCompletion(endpointOf(dev.Device), *completion); err != nil { //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
+		if err := mountedOnly(ops.RecordOperationCompletion(*completion)); err != nil {
 			return opdef.ErrorStateStruct{}, err
 		}
 	}
@@ -353,9 +355,8 @@ func (w *demoWasher) reportCompletion() error {
 	w.stopCountdown()
 	w.mu.Lock()
 	w.running = false
-	dev := w.dev
 	w.mu.Unlock()
-	if err := ops.EmitOperationCompletion(endpointOf(dev.Device), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}); err != nil { //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
+	if err := mountedOnly(ops.RecordOperationCompletion(opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)})); err != nil {
 		return err
 	}
 	if err := ops.Set(opdef.Patch{OperationalError: &opdef.ErrorStateStruct{ErrorStateId: opdef.ErrorStateNoError}}); err != nil {
@@ -532,8 +533,8 @@ func (c rvcRunChanger) ChangeToMode(_ context.Context, newMode uint8) (status ui
 		// requirement on RvcOperationalState; matter.js's RVC test node
 		// enables the event, TestRvcOperationalStateServer.ts).
 		d := v.device()
-		if err := d.RvcOperationalState().EmitOperationCompletion(endpointOf(d.Device), //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
-			rvcopdef.OperationCompletionEvent{CompletionErrorCode: uint8(rvcopdef.ErrorStateNoError)}); err != nil {
+		if err := mountedOnly(d.RvcOperationalState().RecordOperationCompletion(
+			rvcopdef.OperationCompletionEvent{CompletionErrorCode: uint8(rvcopdef.ErrorStateNoError)})); err != nil {
 			return uint8(rvcrdef.ModeChangeStatusGenericFailure), "", err
 		}
 	}

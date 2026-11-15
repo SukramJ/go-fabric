@@ -196,13 +196,13 @@ func (s *ContentControlServer) SetAttributes(values map[uint32]any) error {
 // EmitRemainingScreenTimeExpired emits RemainingScreenTimeExpired (event
 // 0x00, info, ScreenTime; :75).
 func (s *ContentControlServer) EmitRemainingScreenTimeExpired() error {
-	return s.Emit(s.endpoint(), ccdef.EventRemainingScreenTimeExpired, ccdef.RemainingScreenTimeExpiredEvent{}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return s.EmitEvent(ccdef.EventRemainingScreenTimeExpired, ccdef.RemainingScreenTimeExpiredEvent{})
 }
 
 // EmitEnteringBlockContentTimeWindow emits EnteringBlockContentTimeWindow
 // (event 0x01, info, BlockContentTimeWindow; :76).
 func (s *ContentControlServer) EmitEnteringBlockContentTimeWindow() error {
-	return s.Emit(s.endpoint(), ccdef.EventEnteringBlockContentTimeWindow, ccdef.EnteringBlockContentTimeWindowEvent{}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return s.EmitEvent(ccdef.EventEnteringBlockContentTimeWindow, ccdef.EnteringBlockContentTimeWindowEvent{})
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the

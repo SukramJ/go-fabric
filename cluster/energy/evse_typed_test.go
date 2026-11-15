@@ -46,7 +46,7 @@ func TestTypedEvseServer(t *testing.T) {
 	if _, err := srv.MatterInvoke(context.Background(), evsedef.CmdDisable, nil); err != nil || disabled != 1 {
 		t.Errorf("host Disable: %v, %d", err, disabled)
 	}
-	if err := s.EmitRfid(2, evsedef.RfidEvent{Uid: []byte{1}}); err == nil { //nolint:staticcheck // the deprecated emit under test
+	if err := s.RecordRfid(evsedef.RfidEvent{Uid: []byte{1}}); err == nil {
 		t.Error("an Rfid event without the RFID feature went out")
 	}
 

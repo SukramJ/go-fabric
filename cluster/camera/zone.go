@@ -595,19 +595,13 @@ func (z *Zones) removeTrigger(ctx context.Context, fields any) (any, error) {
 // ZoneTriggered emits the ZoneTriggered event the host reports for a
 // zone. Mirrors chip GenerateZoneTriggeredEvent (:701-716).
 func (z *Zones) ZoneTriggered(zoneID uint16, reason ZoneTriggeredReason) error {
-	z.mu.Lock()
-	endpoint := z.endpoint
-	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return z.srv.EmitEvent(zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason})
 }
 
 // ZoneStopped emits the ZoneStopped event the host reports for a zone.
 // Mirrors chip GenerateZoneStoppedEvent (:718-733).
 func (z *Zones) ZoneStopped(zoneID uint16, reason ZoneStoppedReason) error {
-	z.mu.Lock()
-	endpoint := z.endpoint
-	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return z.srv.EmitEvent(zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason})
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

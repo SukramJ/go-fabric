@@ -92,7 +92,7 @@ func (s *TargetsServer) SetAttributes(values map[uint32]any) error { return s.se
 // EmitTargetUpdated emits TargetUpdated (event 0x00, info; :31-39), which
 // the server emits when cfg.Events lists it.
 func (s *TargetsServer) EmitTargetUpdated(ev targetdef.TargetUpdatedEvent) error {
-	return s.Emit(s.endpoint(), targetdef.EventTargetUpdated, ev) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
+	return s.EmitEvent(targetdef.EventTargetUpdated, ev)
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the

@@ -192,7 +192,7 @@ func TestHeldTypedHandleEmitOnWrite(t *testing.T) {
 	if err := srv.Handle(0x7F, nil); !errors.Is(err, spec.ErrNotAccepted) {
 		t.Errorf("an unaccepted command: %v", err)
 	}
-	if err := spec.EmitOn(srv, 1, 0x00, nil); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
+	if err := srv.Emit(1, 0x00, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event LevelControl does not define: %v", err)
 	}
 

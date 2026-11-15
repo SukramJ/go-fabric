@@ -83,7 +83,7 @@ func TestTypedServer(t *testing.T) {
 	if err := typed.OnWrite(func(context.Context, rvcrunmode.State, uint32) error { return nil }); err != nil {
 		t.Errorf("OnWrite: %v", err)
 	}
-	if err := spec.EmitOn(srv, 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
+	if err := srv.Emit(1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("Emit of an event ModeBase does not define: %v, want ErrNotEmitted", err)
 	}
 }

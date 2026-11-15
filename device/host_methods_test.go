@@ -333,7 +333,9 @@ func kitMethods(kit, host reflect.Type) []string {
 	if kit == reflect.TypeFor[*spec.Server]() {
 		return nil // the generated server, whose methods are the typed layer's
 	}
-	skip := map[string]bool{"SetEndpoint": true}
+	// SetEndpoint is the bridge's; EmitEvent the typed layer's
+	// Record<Event> (R2-P5-apispec-07).
+	skip := map[string]bool{"SetEndpoint": true, "EmitEvent": true}
 	for _, it := range typedLayer {
 		if !kit.Implements(it) {
 			continue
