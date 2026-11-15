@@ -758,27 +758,15 @@ func (m *Manager) noteAttestedIdentity(p Peer, rec client.Record, vid, pid uint1
 // only with AllowTestImages), highest first; a requestor that can consent
 // gets the first, flagged consent-required unless the manager holds its
 // consent; one that cannot only a version the manager holds a consent
-// for.
+// for. A stored image the store would not serve ([Images.Open]: a prod or
+// test image not bound to a ledger checksum, unless
+// [ImagesConfig].AllowUnverifiedLedgerImages) is no candidate.
 func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.QueryImageRequest) (AvailableDetails, bool) {
 	if !m.validatePeerDetails(p, req.SoftwareVersion, req.VendorId, req.ProductId) {
 		m.log.Info("ota.manager.peer_details_mismatch", slog.String("node", peerString(p)))
 		return AvailableDetails{}, false
 	}
-	vid, pid, version := req.VendorId, req.ProductId, req.SoftwareVersion
-	var candidates []StoredImage
-	for _, st := range m.cfg.Images.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid}) {
-		lo, hi := uint32(0), version
-		if st.MinApplicable != nil {
-			lo = *st.MinApplicable
-		}
-		if st.MaxApplicable != nil {
-			hi = *st.MaxApplicable
-		}
-		if version < st.SoftwareVersion && version >= lo && version <= hi && (st.Mode == ModeProd || m.cfg.AllowTestImages) {
-			candidates = append(candidates, st)
-		}
-	}
-	slices.SortStableFunc(candidates, func(a, b StoredImage) int { return cmp.Compare(b.SoftwareVersion, a.SoftwareVersion) })
+	candidates := m.storedCandidates(ctx, req.VendorId, req.ProductId, req.SoftwareVersion)
 	if len(candidates) == 0 {
 		return AvailableDetails{}, false
 	}
@@ -811,6 +799,28 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 		NewSoftwareVersion: chosen.SoftwareVersion, NewSoftwareVersionString: chosen.SoftwareVersionString,
 		Filename: chosen.Filename, ConsentRequired: required,
 	}, true
+}
+
+// storedCandidates are UpdateExistsFor's candidates: the stored images
+// of vid/pid applicable over version, prod ones and test ones only with
+// AllowTestImages, that the store serves, highest version first.
+func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version uint32) []StoredImage {
+	var candidates []StoredImage
+	for _, st := range m.cfg.Images.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid}) {
+		lo, hi := uint32(0), version
+		if st.MinApplicable != nil {
+			lo = *st.MinApplicable
+		}
+		if st.MaxApplicable != nil {
+			hi = *st.MaxApplicable
+		}
+		if version < st.SoftwareVersion && version >= lo && version <= hi && (st.Mode == ModeProd || m.cfg.AllowTestImages) &&
+			m.cfg.Images.servable(ctx, st.Filename) {
+			candidates = append(candidates, st)
+		}
+	}
+	slices.SortStableFunc(candidates, func(a, b StoredImage) int { return cmp.Compare(b.SoftwareVersion, a.SoftwareVersion) })
+	return candidates
 }
 
 // CheckForUpdates checks every node for updates, stored images included,

@@ -375,11 +375,24 @@ func originOf(info *UpdateInfo) string {
 }
 
 // recordOrigin records the provenance of the stored image name, stored
-// for info. A failure is logged: without the record a prod or test image
-// counts as unbound to a ledger checksum, the stricter side.
+// for info. A failed write is logged and the former record removed, so
+// that the image counts as unbound to a ledger checksum. The record is
+// also removed before an image is written (Store, downloadInto). A
+// record therefore names the bytes it was written for, unless a removal
+// fails as well — a store failure, logged — or the files are changed
+// outside the store.
 func (i *Images) recordOrigin(ctx context.Context, name string, info *UpdateInfo) {
 	if err := i.blobs.Put(ctx, name+originSuffix, []byte(originOf(info))); err != nil {
 		i.log.Warn("ota.images.origin_not_recorded", slog.String("file", name), slog.Any("err", err))
+		i.forgetOrigin(ctx, name)
+	}
+}
+
+// forgetOrigin removes the provenance record of name; a failure other
+// than a missing record is logged.
+func (i *Images) forgetOrigin(ctx context.Context, name string) {
+	if err := i.blobs.Delete(ctx, name+originSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		i.log.Warn("ota.images.origin_not_removed", slog.String("file", name), slog.Any("err", err))
 	}
 }
 
@@ -434,6 +447,7 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 		}
 	}
 	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
+	i.forgetOrigin(ctx, name)
 	if err := i.blobs.Put(ctx, name, image); err != nil {
 		return StoredImage{}, fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
@@ -958,6 +972,7 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 // version info carries is recorded as Store records it.
 func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
 	defer i.hide(name)()
+	i.forgetOrigin(ctx, name)
 	w, err := s.CreateBlob(ctx, name)
 	if err != nil {
 		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)

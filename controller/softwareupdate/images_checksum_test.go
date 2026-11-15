@@ -246,3 +246,68 @@ func TestImagesTakeTheLedgerPathUnlessHostSupplied(t *testing.T) {
 		t.Fatalf("%d request(s) over http; want none", n)
 	}
 }
+
+// TestManagerOffersOnlyServableStoredImages: the provider's candidates
+// (UpdateExistsFor) are the stored images the store serves — a stored
+// prod image not bound to a ledger checksum does not mask a lower one the
+// host stored; AllowUnverifiedLedgerImages admits it as the store does.
+func TestManagerOffersOnlyServableStoredImages(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, admit := range []bool{false, true} {
+		blobs := &MemoryBlobs{}
+		imgs := NewImages(ImagesConfig{Blobs: blobs, Logger: quietLog(), AllowUnverifiedLedgerImages: admit})
+		if _, err := imgs.Store(ctx, createOtaImage(t, 0xfff1, 0x8000, 3), ModeProd, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := blobs.Put(ctx, "fff1.8000.prod.4", createOtaImage(t, 0xfff1, 0x8000, 4)); err != nil {
+			t.Fatal(err)
+		}
+		r := newManagerRig(t, func(c *Config) { c.Images = imgs })
+		candidates := r.m.storedCandidates(ctx, 0xfff1, 0x8000, 2)
+		got := make([]uint32, 0, len(candidates))
+		for _, c := range candidates {
+			got = append(got, c.SoftwareVersion)
+		}
+		want := []uint32{3}
+		if admit {
+			want = []uint32{4, 3}
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("AllowUnverifiedLedgerImages %v: candidates %v; want %v", admit, got, want)
+		}
+	}
+}
+
+// failOriginPut fails every write of a provenance record.
+type failOriginPut struct{ *MemoryBlobs }
+
+func (f failOriginPut) Put(ctx context.Context, name string, data []byte) error {
+	if strings.HasSuffix(name, originSuffix) {
+		return errors.New("no room")
+	}
+	return f.MemoryBlobs.Put(ctx, name, data)
+}
+
+// TestImagesProvenanceNamesItsBytes: a stored image's former provenance
+// record does not vouch for bytes written after it — it is removed before
+// the image is written, and a record that cannot be written leaves none.
+func TestImagesProvenanceNamesItsBytes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mem := &MemoryBlobs{}
+	img := createOtaImage(t, 0xfff1, 0x8000, 3)
+	if _, err := NewImages(ImagesConfig{Blobs: mem, Logger: quietLog()}).Store(ctx, img, ModeProd, nil); err != nil {
+		t.Fatal(err)
+	}
+	imgs := NewImages(ImagesConfig{Blobs: failOriginPut{mem}, Logger: quietLog()})
+	if !imgs.vouched(ctx, "fff1.8000.prod.3") {
+		t.Fatal("the host-stored image is not vouched for")
+	}
+	if _, err := imgs.Store(ctx, img, ModeProd, nil); err != nil {
+		t.Fatal(err)
+	}
+	if imgs.vouched(ctx, "fff1.8000.prod.3") {
+		t.Fatal("the former record vouches for an image whose record could not be written")
+	}
+}
