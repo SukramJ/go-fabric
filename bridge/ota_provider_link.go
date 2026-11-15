@@ -67,12 +67,12 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 // of the session it would go over: over UDP [exchangeMaxPayloadSize], over
 // a TCP connection the connection's largest message, bounded by the
 // MaxTcpMessageSize the session's peer stated
-// ([initiatedSecureExchange.MaxPayloadSize]). connectedhomeip's
-// camera sends its WebRTC signals with TransportPayloadCapability::
-// kLargePayload, which establishes the session over TCP
-// (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
-// CASE over UDP only and reuses the newest live session of the peer, so a
-// large payload reaches the peer when the peer came in over TCP. It is
+// ([initiatedSecureExchange.MaxPayloadSize]); and a request for a session
+// that carries large messages ([PeerSessionRequirement]) on one that does
+// not. [Bridge.ConnectPeer] initiates CASE over UDP only and reuses the
+// newest live session of any transport, so a large payload reaches the
+// peer only when the peer came in over TCP; a node's peer path selects a
+// TCP session for a Large Message command (docs/adr/0032). It is
 // [camera.ErrPayloadTooLarge], the value a camera host — which signals
 // through camera.Provider — recognises with cluster/camera alone.
 var ErrPayloadTooLarge = camera.ErrPayloadTooLarge

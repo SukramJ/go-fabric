@@ -205,8 +205,12 @@
 //     controller's operational instance, opens CASE to it as the
 //     initiator, and re-sends the priming report. A skipped piece drops
 //     every former subscription; the controllers then recover through
-//     their liveness timeout, as without a store. This narrow initiator
-//     is the only one in the module (docs/adr/0008).
+//     their liveness timeout, as without a store. The bridge's own
+//     initiator serves this re-establishment (docs/adr/0008) and, until
+//     their removal, the deprecated ConnectPeer and ConnectOtaProvider; a
+//     node establishes every other peer session on its client stack and
+//     reuses this bridge's live ones through [Bridge.LivePeerSession],
+//     which never starts a handshake (docs/adr/0032).
 //   - AttachBDXResponder — fails closed. The responder (a *bdx.Responder)
 //     serves the BDX exchanges a peer opens on a secure session — an OTA
 //     requestor's ReceiveInit for the image a provider offered — on the

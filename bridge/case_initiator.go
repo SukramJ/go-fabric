@@ -17,12 +17,14 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// This file is the bridge's CASE *initiator*. It exists for exactly one
-// caller — re-establishing former subscriptions after a restart
+// This file is the bridge's CASE *initiator*. It exists for one caller —
+// re-establishing former subscriptions after a restart
 // ([Bridge.ReestablishFormerSubscriptions], docs/adr/0008) — and reaches
 // only a peer that already held a subscription here, on a fabric this node
 // is on. It is not a controller role: there is no API that opens a session
-// to an arbitrary node.
+// to an arbitrary node. Until their removal the deprecated
+// [Bridge.ConnectPeer] and [Bridge.ConnectOtaProvider] reach it too; a node
+// establishes its other peer sessions on its client stack (docs/adr/0032).
 
 // Errors of the initiator path.
 var (
@@ -57,8 +59,9 @@ type CaseInitiation struct {
 }
 
 // CaseInitiatorProvider prepares a CASE handshake towards peerNodeID on the
-// fabric at fabricIndex. It is consulted only to re-establish former
-// subscriptions; ctx bounds the attempt.
+// fabric at fabricIndex. It is consulted to re-establish former
+// subscriptions, and by the deprecated [Bridge.ConnectPeer] until its
+// removal; ctx bounds the attempt.
 type CaseInitiatorProvider func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error)
 
 // OperationalResolver finds the addresses of a peer's operational instance
