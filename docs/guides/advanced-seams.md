@@ -304,6 +304,13 @@ other query: nothing is refused on it. A node commissioned before the record
 kept these ids, or one whose failed attestation the policy accepted, is not
 judged.
 
+**Storage.** `ImagesConfig.Blobs` keeps the image files. A backend that
+also implements `softwareupdate.BlobStreamer` (`CreateBlob`, `OpenBlob`)
+receives a ledger download as it arrives and is read in place for every
+check and BDX transfer; one that does not passes each image through
+memory whole. A blob `OpenBlob` returns for a BDX transfer is not closed
+by the transfer.
+
 *Source: `controller/ota.go`, `controller/ota_provider.go`, `controller/softwareupdate/manager.go`, `controller/softwareupdate/provider.go`.*
 
 ## `controller/topology`

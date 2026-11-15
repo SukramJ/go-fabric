@@ -109,6 +109,38 @@ type Blobs interface {
 	List(ctx context.Context) ([]string, error)
 }
 
+// BlobStreamer is the optional streaming side of a [Blobs]. When the
+// store's Blobs implements it, [Images.DownloadUpdate] writes a ledger
+// image into it as the image arrives and verifies it by reading it back,
+// and every other read of an image ([Images.Find], [Images.Open], the
+// check of a stored image) reads the file in place; without it each image
+// passes through memory whole (Put, Get). [MemoryBlobs] implements it.
+type BlobStreamer interface {
+	// CreateBlob starts writing the file name. Nothing of it is visible
+	// under name before the writer's Commit, which replaces a file of the
+	// same name; Abort discards what was written.
+	CreateBlob(ctx context.Context, name string) (BlobWriter, error)
+	// OpenBlob opens the file name for reading at any offset; a missing
+	// file wraps fs.ErrNotExist. A blob that implements io.Closer is
+	// closed after the store's own reads; one [Images.Open] hands to a BDX
+	// transfer is not, as bdx.Blob has no Close.
+	OpenBlob(ctx context.Context, name string) (bdx.Blob, error)
+}
+
+// BlobWriter writes one file of a [BlobStreamer]. It is used by one
+// goroutine.
+type BlobWriter interface {
+	io.Writer
+	// Commit makes the written bytes the file's content.
+	Commit() error
+	// Abort discards the written bytes and leaves the file as it was; it
+	// does nothing after Commit.
+	Abort() error
+}
+
+// errBlobWriterDone is a write or Commit after Commit or Abort.
+var errBlobWriterDone = errors.New("softwareupdate: blob writer already committed or aborted")
+
 // MemoryBlobs keeps the files in memory. Safe for concurrent use.
 type MemoryBlobs struct {
 	mu    sync.Mutex
@@ -145,6 +177,61 @@ func (m *MemoryBlobs) Delete(_ context.Context, name string) error {
 	return nil
 }
 
+// CreateBlob implements [BlobStreamer]: the file is held once, in the
+// writer until Commit and in the store after it.
+func (m *MemoryBlobs) CreateBlob(_ context.Context, name string) (BlobWriter, error) {
+	return &memoryBlobWriter{m: m, name: name}, nil
+}
+
+// OpenBlob implements [BlobStreamer]: the held bytes, not a copy.
+func (m *MemoryBlobs) OpenBlob(_ context.Context, name string) (bdx.Blob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	b, ok := m.files[name]
+	if !ok {
+		return nil, fs.ErrNotExist
+	}
+	return bytes.NewReader(b), nil
+}
+
+// memoryBlobWriter is [MemoryBlobs]' [BlobWriter].
+type memoryBlobWriter struct {
+	m    *MemoryBlobs
+	name string
+	buf  bytes.Buffer
+	done bool
+}
+
+func (w *memoryBlobWriter) Write(p []byte) (int, error) {
+	if w.done {
+		return 0, errBlobWriterDone
+	}
+	return w.buf.Write(p)
+}
+
+func (w *memoryBlobWriter) Commit() error {
+	if w.done {
+		return errBlobWriterDone
+	}
+	w.done = true
+	w.m.mu.Lock()
+	defer w.m.mu.Unlock()
+	if w.m.files == nil {
+		w.m.files = map[string][]byte{}
+	}
+	// The buffer is not written again, so the store keeps its bytes.
+	w.m.files[w.name] = w.buf.Bytes()
+	return nil
+}
+
+func (w *memoryBlobWriter) Abort() error {
+	if !w.done {
+		w.done = true
+		w.buf = bytes.Buffer{}
+	}
+	return nil
+}
+
 // List implements [Blobs].
 func (m *MemoryBlobs) List(context.Context) ([]string, error) {
 	m.mu.Lock()
@@ -172,20 +259,29 @@ type Images struct {
 	ledger  *dcl.OTAVersions
 	offline bool
 	log     *slog.Logger
-	// download fetches a ledger image; nil is the ledger's Download.
-	download func(ctx context.Context, v dcl.SoftwareVersion) ([]byte, error)
+	// download fetches a ledger image into w; nil is the ledger's
+	// Download. A test seam.
+	download func(ctx context.Context, v dcl.SoftwareVersion, w io.Writer) error
+
+	// hiddenMu guards hidden: the names a streamed download has committed
+	// and not yet verified, which Find and Open do not offer meanwhile.
+	hiddenMu sync.Mutex
+	hidden   map[string]int
 }
 
 // ImagesConfig configures [NewImages].
 type ImagesConfig struct {
-	// Blobs keeps the files; nil is a [MemoryBlobs].
+	// Blobs keeps the files; nil is a [MemoryBlobs]. One that is also a
+	// [BlobStreamer] receives a ledger image as it downloads.
 	Blobs Blobs
 	// Ledger asks the production and test-net ledgers; nil asks none, as
 	// the service's offline option (:1283-1296): only stored images are
 	// found, and nothing is downloaded. Its MaxImageSize bounds every
 	// download of the store ([Images.DownloadUpdate],
-	// [Images.UpdateInfoFromURL]) — each is held in memory until it is
-	// verified — at [dcl.DefaultMaxImageSize] when it sets none.
+	// [Images.UpdateInfoFromURL]) at [dcl.DefaultMaxImageSize] when it
+	// sets none. UpdateInfoFromURL holds its image in memory, and so does
+	// DownloadUpdate until the image is verified unless Blobs is a
+	// [BlobStreamer].
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger
@@ -201,7 +297,61 @@ func NewImages(cfg ImagesConfig) *Images {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Images{blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log}
+	return &Images{blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log, hidden: map[string]int{}}
+}
+
+// openBlob opens the stored file name: in place through the backend's
+// [BlobStreamer], else its whole bytes. A missing file wraps
+// fs.ErrNotExist.
+func (i *Images) openBlob(ctx context.Context, name string) (bdx.Blob, error) {
+	if s, ok := i.blobs.(BlobStreamer); ok {
+		return s.OpenBlob(ctx, name)
+	}
+	b, err := i.blobs.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(b), nil
+}
+
+// closeBlob closes a blob the store opened for its own reads.
+func closeBlob(b bdx.Blob) {
+	if c, ok := b.(io.Closer); ok {
+		_ = c.Close()
+	}
+}
+
+// blobReader reads b from its start.
+func blobReader(b bdx.Blob) io.Reader { return io.NewSectionReader(b, 0, b.Size()) }
+
+// hide keeps name out of Find and Open until the returned func runs.
+func (i *Images) hide(name string) func() {
+	i.hiddenMu.Lock()
+	i.hidden[name]++
+	i.hiddenMu.Unlock()
+	return func() {
+		i.hiddenMu.Lock()
+		i.hidden[name]--
+		if i.hidden[name] <= 0 {
+			delete(i.hidden, name)
+		}
+		i.hiddenMu.Unlock()
+	}
+}
+
+// isHidden reports whether a streamed download is verifying name.
+func (i *Images) isHidden(name string) bool {
+	i.hiddenMu.Lock()
+	defer i.hiddenMu.Unlock()
+	return i.hidden[name] > 0
+}
+
+// fetch downloads the ledger image v into w.
+func (i *Images) fetch(ctx context.Context, v dcl.SoftwareVersion, w io.Writer) error {
+	if i.download != nil {
+		return i.download(ctx, v, w)
+	}
+	return i.ledger.Download(ctx, v, w)
 }
 
 // fileName is #fileName (:534-536).
@@ -325,11 +475,12 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 	if len(parts) != 4 {
 		return StoredImage{}, false
 	}
-	b, err := i.blobs.Get(ctx, name)
+	b, err := i.openBlob(ctx, name)
 	if err != nil {
 		return StoredImage{}, false
 	}
-	h, _, _, err := otaimage.ReadHeader(bytes.NewReader(b))
+	defer closeBlob(b)
+	h, _, _, err := otaimage.ReadHeader(blobReader(b))
 	if err != nil {
 		i.log.Warn("ota.images.unreadable", slog.String("file", name), slog.Any("err", err))
 		return StoredImage{}, false
@@ -339,7 +490,8 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 		SoftwareVersionString: h.SoftwareVersionString, MinApplicable: h.MinApplicableSoftwareVersion,
 		// A host-chosen "FFF1.8000.PROD.3" is the prod image: the pattern
 		// admits any case (:55), the Mode constants are lower case.
-		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: len(b),
+		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: int(b.Size()), //nolint:gosec // a stored file's size
+
 	}
 	st.SpecificationVersion = i.readMeta(ctx, name)
 	return st, true
@@ -354,7 +506,7 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 	}
 	var out []StoredImage
 	for _, name := range names {
-		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) {
+		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) || i.isHidden(name) {
 			continue
 		}
 		st, ok := i.entry(ctx, name)
@@ -478,11 +630,14 @@ func (i *Images) Open(ctx context.Context, filename string) (bdx.Blob, error) {
 	if !filenamePattern.MatchString(filename) {
 		return nil, fmt.Errorf("%w: invalid OTA filename format: %s: %w", ErrOTA, filename, fs.ErrNotExist)
 	}
-	b, err := i.blobs.Get(ctx, filename)
+	if i.isHidden(filename) {
+		return nil, fmt.Errorf("%w: OTA file not found: %s: %w", ErrOTA, filename, fs.ErrNotExist)
+	}
+	b, err := i.openBlob(ctx, filename)
 	if err != nil {
 		return nil, fmt.Errorf("%w: OTA file not found: %s: %w", ErrOTA, filename, err)
 	}
-	return bytes.NewReader(b), nil
+	return b, nil
 }
 
 // CheckOptions configure [Images.CheckForUpdate].
@@ -591,16 +746,16 @@ const (
 	storedUnreadable
 )
 
-// checkStored validates the stored image b (read with getErr) against info
+// checkStored validates the stored image b (opened with getErr) against info
 // as Store validates a new one — #checkStoredImage over #verifyUpdate
 // (:388-451): the ledger's whole-file checksum and size when info carries
 // them, the header's ids and version.
-func (i *Images) checkStored(name string, b []byte, getErr error, info UpdateInfo) storedCheck {
+func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateInfo) storedCheck {
 	if getErr != nil {
 		i.log.Info("ota.images.stored_unreadable", slog.String("file", name), slog.Any("err", getErr))
 		return storedUnreadable
 	}
-	h, err := otaimage.ValidateFile(bytes.NewReader(b), storeValidation(&info))
+	h, err := otaimage.ValidateFile(blobReader(b), storeValidation(&info))
 	if err == nil {
 		err = verifyHeader(h, info)
 	}
@@ -626,11 +781,14 @@ func (i *Images) checkStored(name string, b []byte, getErr error, info UpdateInf
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	mode := modeOf(info.Source)
 	name := fileName(info.VendorID, info.ProductID, mode, info.SoftwareVersion)
-	b, getErr := i.blobs.Get(ctx, name)
+	b, getErr := i.openBlob(ctx, name)
 	exists := !errors.Is(getErr, fs.ErrNotExist)
 	check := storedUnchecked
 	if exists && !force {
 		check = i.checkStored(name, b, getErr, info)
+	}
+	if getErr == nil {
+		closeBlob(b)
 	}
 	if check == storedValid {
 		i.log.Info("ota.images.reused", slog.String("file", name))
@@ -661,14 +819,14 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 	if info.ledger == nil {
 		return "", fmt.Errorf("%w: no OTA URL provided in update info for %s (%s)", ErrOTA, name, info.SoftwareVersionString)
 	}
-	var buf bytes.Buffer
-	if i.download != nil {
-		b, err := i.download(ctx, *info.ledger)
-		if err != nil {
-			return "", fmt.Errorf("%w: %w", ErrOTA, err)
+	if s, ok := i.blobs.(BlobStreamer); ok {
+		if err := i.downloadInto(ctx, s, name, info); err != nil {
+			return "", err
 		}
-		buf.Write(b)
-	} else if err := i.ledger.Download(ctx, *info.ledger, &buf); err != nil {
+		return name, nil
+	}
+	var buf bytes.Buffer
+	if err := i.fetch(ctx, *info.ledger, &buf); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
 	if _, err := dcl.VerifyImage(bytes.NewReader(buf.Bytes()), *info.ledger, i.log); err != nil {
@@ -678,6 +836,56 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return "", err
 	}
 	return name, nil
+}
+
+// downloadInto is DownloadUpdate's download through a [BlobStreamer]
+// (R2-P5-port-14): the ledger image is written into the file name as it
+// arrives, committed, and read back for the checks the buffered path runs
+// on its bytes before it stores them — the ledger's checksum and size
+// (dcl.VerifyImage), then [Images.Store]'s file and header checks — with
+// the same errors. A refused check removes the file and its record; until
+// the checks pass Find and Open do not offer it. The specification
+// version info carries is recorded as Store records it.
+func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
+	defer i.hide(name)()
+	w, err := s.CreateBlob(ctx, name)
+	if err != nil {
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	if err := i.fetch(ctx, *info.ledger, w); err != nil {
+		_ = w.Abort()
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	if err := w.Commit(); err != nil {
+		_ = w.Abort()
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	if err := i.verifyStored(ctx, s, name, info); err != nil {
+		_ = i.blobs.Delete(ctx, name)
+		_ = i.blobs.Delete(ctx, name+metaSuffix)
+		return err
+	}
+	i.recordMeta(ctx, name, info.SpecificationVersion)
+	i.log.Debug("ota.images.stored", slog.String("file", name))
+	return nil
+}
+
+// verifyStored reads the committed file name back and checks it against
+// info's ledger record and header as the buffered path checks its bytes.
+func (i *Images) verifyStored(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
+	b, err := s.OpenBlob(ctx, name)
+	if err != nil {
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	defer closeBlob(b)
+	if _, err := dcl.VerifyImage(blobReader(b), *info.ledger, i.log); err != nil {
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	h, err := otaimage.ValidateFile(blobReader(b), storeValidation(&info))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	return verifyHeader(h, info)
 }
 
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its

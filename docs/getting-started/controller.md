@@ -908,7 +908,11 @@ A store without a ledger offers stored images only. `ImagesConfig.Ledger`
 test-net ledger or both) turns the ledger lookups and the downloads on:
 `DownloadUpdate` fetches the image a ledger record names and
 `UpdateInfoFromURL` one a URL names, each into memory, verified before it
-is stored. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
+is stored — unless the store's `Blobs` is also a
+`softwareupdate.BlobStreamer` (`MemoryBlobs` is): `DownloadUpdate` then
+writes the image into the backend as it arrives, verifies it by reading it
+back, removes it when a check fails, and serves BDX transfers from the
+backend in place; the image is offered to no node before its checks pass. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
 `dcl.DefaultMaxImageSize`, 256 MiB. The size a ledger record announces is
 the vendor's statement and does not raise the bound: a record that
 announces more is refused before the request, an answer longer than its

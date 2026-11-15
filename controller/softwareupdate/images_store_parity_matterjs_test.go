@@ -18,6 +18,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 )
@@ -522,7 +523,8 @@ func TestImagesSpecificationVersionParity(t *testing.T) {
 
 // flakyBlobs fails the next read of a stored image (not of its record) —
 // the cases' failNextRead (:1949-1956), which fails the next openBlob of a
-// PersistedFileDesignator.
+// PersistedFileDesignator: a whole-slice Get, or an OpenBlob, as
+// MemoryBlobs streams ([BlobStreamer]).
 type flakyBlobs struct {
 	MemoryBlobs
 	mu   sync.Mutex
@@ -535,19 +537,30 @@ func (f *flakyBlobs) failNextRead(err error) {
 	f.mu.Unlock()
 }
 
-func (f *flakyBlobs) Get(ctx context.Context, name string) ([]byte, error) {
+// takeFailure is the pending failure for a read of name, consumed.
+func (f *flakyBlobs) takeFailure(name string) error {
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	err := f.fail
-	if err != nil && !strings.HasSuffix(name, metaSuffix) {
-		f.fail = nil
-	} else {
-		err = nil
+	if err == nil || strings.HasSuffix(name, metaSuffix) {
+		return nil
 	}
-	f.mu.Unlock()
-	if err != nil {
+	f.fail = nil
+	return err
+}
+
+func (f *flakyBlobs) Get(ctx context.Context, name string) ([]byte, error) {
+	if err := f.takeFailure(name); err != nil {
 		return nil, err
 	}
 	return f.MemoryBlobs.Get(ctx, name)
+}
+
+func (f *flakyBlobs) OpenBlob(ctx context.Context, name string) (bdx.Blob, error) {
+	if err := f.takeFailure(name); err != nil {
+		return nil, err
+	}
+	return f.MemoryBlobs.OpenBlob(ctx, name)
 }
 
 func TestImagesOfflineParity(t *testing.T) {
