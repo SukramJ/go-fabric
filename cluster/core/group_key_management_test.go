@@ -210,8 +210,10 @@ func TestGKM_KeySetRead_Miss(t *testing.T) {
 	gkm := newGKM(t)
 	gkm.SetCurrentFabric(1)
 	_, err := gkm.MatterInvoke(context.Background(), 0x01, core.KeySetReadRequest{GroupKeySetID: 9999})
-	if err == nil {
-		t.Fatal("expected error for KeySetRead miss, got nil")
+	// matter.js GroupKeyManagementServer.ts:388-398 (db021da0): NotFound
+	// (review II, W6-test-17).
+	if got := statusOf(err); got != im.StatusNotFound {
+		t.Fatalf("KeySetRead miss: %v (status 0x%02X), want NOT_FOUND", err, got)
 	}
 }
 
@@ -234,8 +236,8 @@ func TestGKM_KeySetRemove(t *testing.T) {
 
 	// Read after remove must miss.
 	_, err = gkm.MatterInvoke(ctx, 0x01, core.KeySetReadRequest{GroupKeySetID: 7})
-	if err == nil {
-		t.Fatal("expected error for KeySetRead after remove, got nil")
+	if got := statusOf(err); got != im.StatusNotFound {
+		t.Fatalf("KeySetRead after remove: %v (status 0x%02X), want NOT_FOUND", err, got)
 	}
 }
 

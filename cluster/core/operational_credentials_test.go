@@ -177,8 +177,10 @@ func TestOpcreds_AttestationRequest_BadNonce(t *testing.T) {
 	_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x00, core.AttestationRequest{
 		AttestationNonce: make([]byte, 16), // wrong length
 	})
-	if err == nil {
-		t.Fatal("expected error for bad nonce length, got nil")
+	// matter.js OperationalCredentialsServer.ts:98-99 (db021da0):
+	// InvalidCommand (review II, W6-test-17).
+	if got := statusOf(err); got != im.StatusInvalidCommand {
+		t.Fatalf("bad nonce length: %v (status 0x%02X), want INVALID_COMMAND", err, got)
 	}
 }
 
@@ -218,8 +220,10 @@ func TestOpcreds_CertChainRequest_InvalidType(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	_, err := oc.MatterInvoke(context.Background(), 0x02, core.CertificateChainRequest{CertificateType: 99})
-	if err == nil {
-		t.Fatal("expected error for invalid cert chain type, got nil")
+	// matter.js OperationalCredentialsServer.ts:155-163 (db021da0):
+	// InvalidCommand (review II, W6-test-17).
+	if got := statusOf(err); got != im.StatusInvalidCommand {
+		t.Fatalf("invalid cert chain type: %v (status 0x%02X), want INVALID_COMMAND", err, got)
 	}
 }
 
@@ -229,8 +233,10 @@ func TestOpcreds_CSRRequest_BadNonce(t *testing.T) {
 	_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{
 		CSRNonce: make([]byte, 16), // wrong length
 	})
-	if err == nil {
-		t.Fatal("expected error for bad CSRNonce, got nil")
+	// matter.js OperationalCredentialsServer.ts:121-122 (db021da0):
+	// InvalidCommand (review II, W6-test-17).
+	if got := statusOf(err); got != im.StatusInvalidCommand {
+		t.Fatalf("bad CSRNonce: %v (status 0x%02X), want INVALID_COMMAND", err, got)
 	}
 }
 
