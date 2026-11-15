@@ -1238,7 +1238,11 @@ func TestManager_ConcurrentOpenCloseGet(t *testing.T) {
 			defer wg.Done()
 			e, err := m.OpenFromSigma(uint8(idx%5+1), uint64(idx), uint64(idx+100), keys)
 			if err != nil {
-				return // session exhausted is theoretically possible but won't happen here
+				// 20 sessions are far below the table's capacity: an open
+				// that fails here leaves the race below nothing to race
+				// on (review II, R2-P5-tassert-05).
+				t.Errorf("OpenFromSigma(%d): %v", idx, err)
+				return
 			}
 			mu.Lock()
 			entries[idx] = e

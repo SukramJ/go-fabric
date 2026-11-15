@@ -7,6 +7,7 @@ package bridge
 // Lives in package bridge to access the functions directly.
 
 import (
+	"bytes"
 	"errors"
 	"log/slog"
 	"net"
@@ -19,10 +20,20 @@ import (
 
 func TestDebugReplyError_NilError_IsNoop(t *testing.T) {
 	t.Parallel()
-	// nil error → must not log, must not panic.
-	logger := slog.Default()
+	// nil error → must not log, must not panic (review II, R2-P5-tassert-05).
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	src := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
 	debugReplyError(logger, "test-stage", src, nil)
+	if buf.Len() != 0 {
+		t.Fatalf("a nil error logged %q", buf.String())
+	}
+	// The same logger records a real error, so the empty buffer above is
+	// the nil branch, not a silent handler.
+	debugReplyError(logger, "test-stage", src, errors.New("boom"))
+	if buf.Len() == 0 {
+		t.Fatal("a non-nil error logged nothing at debug level")
+	}
 }
 
 func TestDebugReplyError_NonNilError_DoesNotPanic(t *testing.T) {

@@ -1269,15 +1269,33 @@ func TestSubscribe_PostClampNoInversion_Succeeds(t *testing.T) {
 
 // ---- Start / Stop lifecycle ----
 
+// TestStartStop_Idempotent starts the engine twice and stops it twice:
+// both Stops return once the engine has drained, with the context still
+// live, so it is Stop that ends the tick loop (review II,
+// R2-P5-tassert-05).
 func TestStartStop_Idempotent(t *testing.T) {
 	t.Parallel()
-	m := newManager(subscription.Config{}, nil)
-	ctx := t.Context()
+	synctest.Test(t, func(t *testing.T) {
+		m := newManager(subscription.Config{}, nil)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
 
-	m.Start(ctx)
-	// Double Stop must not panic (sync.Once).
-	m.Stop()
-	m.Stop()
+		m.Start(ctx)
+		m.Start(ctx)
+		stopped := make(chan struct{})
+		go func() {
+			m.Stop()
+			m.Stop()
+			close(stopped)
+		}()
+		synctest.Wait()
+		select {
+		case <-stopped:
+		default:
+			cancel() // let the bubble drain before failing
+			t.Fatal("Stop did not return while the engine's context was live")
+		}
+	})
 }
 
 func TestStart_ContextCancel_RunGoroutineEnds(t *testing.T) {
