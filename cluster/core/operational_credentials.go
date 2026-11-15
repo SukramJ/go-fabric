@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"reflect"
 	"slices"
 	"sync"
 
@@ -82,10 +83,13 @@ type OperationalCredentials struct {
 	onAdminEntryInstalled  func(entry store.ACLEntry)
 
 	// pendingCSRSession is the session that issued the pending
-	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest, compared
-	// strictly in handleAddNOC and handleUpdateNOC — the matter.js
-	// csrSessionId !== session.id guard per Matter §11.18.7.5.5.
-	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0.
+	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest,
+	// compared strictly in handleAddNOC — the matter.js
+	// csrSessionId !== session.id guard of addNoc per Matter §11.18.7.5.5
+	// (OperationalCredentialsServer.ts:240-245 at db021da0). UpdateNOC
+	// compares no session: its CSR is consumed by any session of the
+	// fail-safe's fabric (matter.js updateNoc, :317-388, reads no
+	// csrSessionId; review II, Fable R3-1).
 	pendingCSRSession any
 
 	// pendingCSRForUpdate captures `IsForUpdateNOC` from the CSRRequest
@@ -259,7 +263,10 @@ type invokeSessionKeyCtxKey struct{}
 // bridge stamps its session, a node's client stack its *exchange.Session.
 // It sits beside [WithInvokeSessionID], whose uint16 names a session of the
 // bridge's registry only: a request on a client-stack session carries the
-// identity and no id. A nil key stamps nothing.
+// identity and no id. The key is a pointer — always comparable, and stable
+// for the session's life when the stack keeps one object per session; nil
+// or any other kind of key stamps nothing, and the request is bound by its
+// id alone (review II, Fable R3-1c).
 //
 // The CSR of a fail-safe is bound to it (OperationalCredentials): matter.js
 // binds the CSR to the requesting session whoever opened it
@@ -267,7 +274,7 @@ type invokeSessionKeyCtxKey struct{}
 // db021da0, compared at OperationalCredentialsServer.ts:240-245), its ids
 // drawn from one SessionManager for every session (SessionManager.ts:581-606).
 func WithInvokeSession(ctx context.Context, key any) context.Context {
-	if key == nil {
+	if key == nil || reflect.TypeOf(key).Kind() != reflect.Pointer || reflect.ValueOf(key).IsNil() {
 		return ctx
 	}
 	return context.WithValue(ctx, invokeSessionKeyCtxKey{}, key)
@@ -2575,15 +2582,6 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// same failsafe context", Status.ConstraintError)).
 	if !pendingForUpdate {
 		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
-	}
-	// As AddNOC, the CSR is consumed by the session that issued it alone,
-	// whichever stack holds it ([invokeSessionBinding]; review II, Fable
-	// R2-1).
-	o.mu.RLock()
-	pendingCSRSession := o.pendingCSRSession
-	o.mu.RUnlock()
-	if invokeSessionBinding(ctx) != pendingCSRSession {
-		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not found in failsafe context"}, nil
 	}
 	// A root added in this fail-safe (AddTrustedRootCertificate) belongs
 	// to an AddNOC: in-band MissingCsr, matter.js's certification
