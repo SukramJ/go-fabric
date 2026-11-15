@@ -1245,7 +1245,7 @@ func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-c
 	// (MessageExchange.ts:822-830 at db021da0) — the peer's retransmission
 	// term covers the time before it.
 	timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
-	if reportAnswerBoundForTests > 0 {
+	if reportAnswerBoundForTests > 0 && b.chunkStatusResponseTimeoutOverride == 0 {
 		timeout = reportAnswerBoundForTests
 	}
 	timer := b.clk().NewTimer(timeout)
