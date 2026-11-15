@@ -65,3 +65,28 @@ func TestPairingHintsAndDeprecatedHintExclusive(t *testing.T) {
 		t.Errorf("no hint: PH=%q, want the default %d", got, uint32(mdns.PairingHintsDefault))
 	}
 }
+
+// TestPairingHintsOutsideTheBitmapRefused: bits 23 to 31 of Hints name no
+// hint and fail Validate, alone and beside a valid one; bits 20 to 22,
+// outside matter.js's instruction set, take no PairingInstruction.
+func TestPairingHintsOutsideTheBitmapRefused(t *testing.T) {
+	t.Parallel()
+	for bit := 23; bit < 32; bit++ {
+		cfg := commissionableCfg()
+		cfg.Hints = mdns.PairingHints(1)<<bit | mdns.PairingHintPowerCycle
+		if err := cfg.Validate(); !errors.Is(err, mdns.ErrInvalidService) {
+			t.Errorf("bit %d: Validate() = %v, want ErrInvalidService", bit, err)
+		}
+	}
+	for _, hint := range []mdns.PairingHints{
+		mdns.PairingHintPressAndReleaseSetupButtonNumberOfTimes,
+		mdns.PairingHintPressButtonForNumberOfSecondsWithIndication,
+		mdns.PairingHintPowerCycleUntilIndication,
+	} {
+		cfg := commissionableCfg()
+		cfg.Hints, cfg.PairingInstruction = hint, "3"
+		if err := cfg.Validate(); !errors.Is(err, mdns.ErrInvalidService) {
+			t.Errorf("hint %#x with an instruction: Validate() = %v, want ErrInvalidService (not in the instruction set)", uint32(hint), err)
+		}
+	}
+}

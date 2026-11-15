@@ -521,7 +521,8 @@ type Commissioning struct {
 	// key): how a user puts the device into commissioning mode, every
 	// bit of [mdns.PairingHints]. Zero sends powerCycle | deviceManual
 	// ([mdns.PairingHintsDefault]). A commissioner built on
-	// connectedhomeip reads bits 0 to 15 only (see [mdns.PairingHints]).
+	// connectedhomeip reads a hint with any of bits 16 to 22 set as no
+	// hint at all (see [mdns.PairingHints]).
 	PairingHints mdns.PairingHints
 	// PairingInstruction is the record's `PI` key, the number or text a
 	// hint that needs one refers to. A hint and an instruction that do

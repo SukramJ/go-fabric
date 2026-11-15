@@ -634,15 +634,24 @@ type CommissionableServiceConfig struct {
 // `PH` key (Matter §4.3.1.6): bits 0 to 22, each one a way to put the
 // device into commissioning mode. matter.js models all 23 bits
 // (packages/protocol/src/advertisement/PairingHintBitmap.ts, the last
-// at :145 at db021da0); connectedhomeip keeps the hint in 16 bits
-// (src/lib/dnssd/Types.h:240 at 6170af84), so a commissioner built on
-// chip reads bits 0 to 15 only.
+// at :145 at db021da0). connectedhomeip keeps the hint in 16 bits
+// (src/lib/dnssd/Types.h:240 at 6170af84) and reads a PH value above
+// 65535 as 0 (MakeU16FromAsciiDecimal, src/lib/dnssd/TxtFields.cpp:104-108,
+// called at :195-198, stored at :274-275): a hint with any of bits 16 to
+// 22 set is no hint at all to a commissioner built on chip — not its low
+// 16 bits. Bits 23 to 31 are outside the bitmap and fail
+// [CommissionableServiceConfig.Validate].
 type PairingHints uint32
 
-// The pairing hints, one bit each, in the order of the bitmap. The
-// customInstruction hint and the hints that state a number or a light
-// need [CommissionableServiceConfig].PairingInstruction, and at most one
-// of them may be set ([CommissionableServiceConfig.Validate]).
+// The pairing hints, one bit each, in the order of the bitmap. The hints
+// of matter.js's instruction set (PAIRING_HINTS_REQUIRING_INSTRUCTION,
+// packages/protocol/src/mdns/MdnsConsts.ts:20-32 at db021da0: bits 4, 8
+// to 12 and 15 to 19) need [CommissionableServiceConfig].PairingInstruction,
+// and at most one of them may be set ([CommissionableServiceConfig.Validate]).
+// Bits 20 to 22 are not in that set, although matter.js's bitmap comments
+// say PairingInstruction carries their value too
+// (packages/protocol/src/advertisement/PairingHintBitmap.ts:128-145): as
+// matter.js, Validate refuses a PairingInstruction beside one of them alone.
 const (
 	PairingHintPowerCycle PairingHints = 1 << iota
 	PairingHintDeviceManufacturerURL
@@ -704,6 +713,9 @@ const PairingHintDefault uint16 = 0x21
 const pairingHintsRequiringInstruction uint32 = 1<<4 | 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 |
 	1<<15 | 1<<16 | 1<<17 | 1<<18 | 1<<19
 
+// pairingHintsAll are the bits of the bitmap, 0 to 22.
+const pairingHintsAll PairingHints = 1<<23 - 1
+
 // Validate checks that the pairing hint and the pairing instruction
 // belong together; a config that fails is not advertised
 // ([ErrInvalidService]). Mirrors matter.js
@@ -714,10 +726,15 @@ const pairingHintsRequiringInstruction uint32 = 1<<4 | 1<<8 | 1<<9 | 1<<10 | 1<<
 // and a hint at all. A zero hint is "no hint given" (the default
 // goes out), so matter.js's first refusal — a hint object with every
 // flag false — has no form here. Hints and the deprecated PairingHint
-// both set is refused too: one of them would be dropped.
+// both set is refused too: one of them would be dropped; and so is a
+// Hints bit above 22, which names no hint (Go's own: the bitmap ends at
+// bit 22).
 func (c CommissionableServiceConfig) Validate() error {
 	if c.Hints != 0 && c.PairingHint != 0 {
 		return fmt.Errorf("%w: Hints and the deprecated PairingHint are both set; set Hints only", ErrInvalidService)
+	}
+	if extra := c.Hints &^ pairingHintsAll; extra != 0 {
+		return fmt.Errorf("%w: pairing hint bits 0x%X are outside the bitmap (bits 0 to 22)", ErrInvalidService, uint32(extra))
 	}
 	hints := c.pairingHints()
 	if hints == 0 {
