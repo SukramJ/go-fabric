@@ -64,7 +64,7 @@ const (
 // (BlueZ up to 5.73) — connectedhomeip's note on the versions between
 // (src/platform/Linux/bluez/BluezConnection.cpp:220-223 at 6170af84)
 // applies here too.
-func NewPeripheral(adapter string) (contract.BLEPeripheral, error) {
+func NewPeripheral(adapter string) (contract.BLEPeripheral, error) { //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
 	if adapter == "" {
 		adapter = DefaultAdapter
 	}
@@ -117,7 +117,7 @@ type peripheral struct {
 	acquiredMu sync.Mutex
 }
 
-var _ contract.BLEPeripheral = (*peripheral)(nil)
+var _ contract.BLEPeripheral = (*peripheral)(nil) //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
 
 // newPeripheral is the peripheral over b: the adapter must exist.
 func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {

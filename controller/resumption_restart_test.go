@@ -4,6 +4,7 @@
 package controller_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -97,7 +98,8 @@ func TestControllerTakeOverDropsFormerResumptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := store.New(cfg.DB)
-	if _, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID); err != nil {
+	former, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID)
+	if err != nil {
 		t.Fatalf("no resumption record after the pairing: %v", err)
 	}
 	// The row as the former own node left it: its node id, not RootNodeID.
@@ -111,7 +113,15 @@ func TestControllerTakeOverDropsFormerResumptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = site.Run(context.WithoutCancel(ctx), c2.Close) })
-	if _, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID); !errors.Is(err, store.ErrResumptionNotFound) {
-		t.Fatalf("the former own node's resumption record after the take-over: %v, want gone", err)
+	// The new controller may establish a session of its own with the node
+	// at once and store a fresh record; what must be gone is the former
+	// node's — its resumption id never comes back.
+	got, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID)
+	switch {
+	case errors.Is(err, store.ErrResumptionNotFound):
+	case err != nil:
+		t.Fatal(err)
+	case bytes.Equal(got.ResumptionID, former.ResumptionID):
+		t.Fatalf("the former own node's resumption record survived the take-over (id %x)", got.ResumptionID)
 	}
 }
