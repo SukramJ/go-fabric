@@ -4,6 +4,7 @@
 package node
 
 import (
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -18,6 +19,16 @@ func init() {
 			c.Client = &ClientConfig{}
 		}
 		c.Client.open = open
+		return true
+	}
+	nodeseam.UsePeerClient = func(n any, names *discovery.Names, listen string, open func() (*udp.Listener, error)) bool {
+		node, ok := n.(*Node)
+		if !ok || node == nil {
+			return false
+		}
+		node.peerClient.mu.Lock()
+		node.peerClient.template = ClientConfig{Names: names, Listen: listen, open: open}
+		node.peerClient.mu.Unlock()
 		return true
 	}
 	nodeseam.UseOTAHarness = func(cfg any) bool {

@@ -131,10 +131,13 @@ type Node struct {
 	// Config.EndpointPersistence adapted, else persisted.
 	endpoints EndpointState
 	// groupTx is the socket group messages leave through (groupsend.go).
-	groupTx  *udp.Listener
-	client   *clientStack
-	bindings *binding.Manager
-	bindSync bindingSync
+	groupTx *udp.Listener
+	client  *clientStack
+	// peerClient is the peer path's own client stack when client is nil
+	// (client.go, peerStack).
+	peerClient peerClient
+	bindings   *binding.Manager
+	bindSync   bindingSync
 	// failSafe holds the topology's fail-safe participants (failsafe.go).
 	failSafe failSafeSync
 	// matterTime holds the topology's Matter time participants
@@ -384,7 +387,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// replaced in place).
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
 	if err := n.buildLevelledRoot(ctx, rootDeps{
-		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
+		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: peerPath{n},
 		wifiDriver:              n.wifiDriver(),
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
@@ -472,7 +475,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 
 	// --- the client stack and the binding manager (brief AO) -------------
 	if cfg.Client != nil {
-		if n.client, err = n.newClientStack(); err != nil { //nolint:contextcheck // the client stack runs for the node's lifetime, not New's call
+		if n.client, err = n.newClientStack(*cfg.Client); err != nil { //nolint:contextcheck // the client stack runs for the node's lifetime, not New's call
 			return nil, err
 		}
 		// The root's time client reads the trusted time source over the
@@ -1345,11 +1348,7 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	// Every live binding is removed before the client stack goes
 	// (BindingServer.ts:52, :160-163).
 	n.bindings.Close()
-	if n.client != nil {
-		work.pause()
-		n.client.close(ctx)
-		work.resume()
-	}
+	n.closeClientStacks(ctx, work)
 	n.sec.pase.Stop()
 	n.window.stop()
 	n.sec.casep.StopReaper()

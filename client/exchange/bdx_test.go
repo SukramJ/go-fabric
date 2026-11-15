@@ -36,7 +36,9 @@ func TestBDXExchangeCarriesATransfer(t *testing.T) {
 	ex.OnReceive(func(m bdx.Message) { notified <- m })
 
 	sendDone := make(chan error, 1)
-	go func() { sendDone <- ex.Send(context.Background(), bdx.ProtocolID, uint8(bdx.MessageReceiveInit), []byte{0x01}) }()
+	go func() {
+		sendDone <- ex.Send(context.Background(), bdx.ProtocolID, uint8(bdx.MessageReceiveInit), []byte{0x01})
+	}()
 	out := p.decode(t, conn.next(t).bytes)
 	if out.proto.ProtocolID != bdx.ProtocolID || out.proto.Opcode != uint8(bdx.MessageReceiveInit) || !out.proto.Initiator {
 		t.Fatalf("sent %+v, want a BDX ReceiveInit opening the exchange", out.proto)
@@ -49,16 +51,16 @@ func TestBDXExchangeCarriesATransfer(t *testing.T) {
 	if err := waitErr(t, sendDone); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	select {
 	case m := <-notified:
 		if m.Opcode != uint8(bdx.MessageReceiveAccept) {
 			t.Errorf("notified %+v", m)
 		}
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("the queue notifier saw nothing")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	got, err := ex.Receive(ctx)
 	if err != nil {
 		t.Fatalf("Receive: %v", err)

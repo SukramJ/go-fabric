@@ -121,6 +121,24 @@ func (f *liveFabric) commission(ctx context.Context, t *testing.T, n *node.Node,
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.dns.out <- f.operationalRecord(t, n, nodeID, host)
+	res, err := f.com.Commission(ctx, commissioner.Options{
+		Fabric: f.fab, Passcode: otaLivePasscode, NodeID: nodeID, Addresses: []*net.UDPAddr{addr}, OnAttestationFailure: attestation.Accept(),
+	})
+	if err != nil {
+		t.Fatalf("Commission %s: %v", host, err)
+	}
+	return f.com.Interaction(f.set.Get(res.Address))
+}
+
+// operationalRecord is the DNS-SD answer for n's operational instance as
+// nodeID on the fabric, on host at n's address.
+func (f *liveFabric) operationalRecord(t *testing.T, n *node.Node, nodeID uint64, host string) mdns.QueryResponse {
+	t.Helper()
+	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
 	op := discovery.OperationalQName(f.fab.Identity.CompressedFabricID, nodeID)
 	hdr := func(name string, typ uint16) dns.RR_Header {
 		return dns.RR_Header{Name: dns.Fqdn(name), Rrtype: typ, Class: dns.ClassINET | 0x8000, Ttl: 120}
@@ -136,14 +154,7 @@ func (f *liveFabric) commission(ctx context.Context, t *testing.T, n *node.Node,
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.dns.out <- mdns.QueryResponse{Msg: b}
-	res, err := f.com.Commission(ctx, commissioner.Options{
-		Fabric: f.fab, Passcode: otaLivePasscode, NodeID: nodeID, Addresses: []*net.UDPAddr{addr}, OnAttestationFailure: attestation.Accept(),
-	})
-	if err != nil {
-		t.Fatalf("Commission %s: %v", host, err)
-	}
-	return f.com.Interaction(f.set.Get(res.Address))
+	return mdns.QueryResponse{Msg: b}
 }
 
 // liveNode is a node.Node on loopback; edit amends its configuration.
@@ -178,13 +189,6 @@ func liveNode(t *testing.T, name string, edit func(*node.Config)) *node.Node {
 	}
 	t.Cleanup(func() { _ = n.Stop(context.Background()) })
 	return n
-}
-
-// staticOperational resolves every node to one address.
-type staticOperational struct{ addr *net.UDPAddr }
-
-func (s staticOperational) ResolveOperational(context.Context, [8]byte, uint64) ([]*net.UDPAddr, error) {
-	return []*net.UDPAddr{s.addr}, nil
 }
 
 // statusLog records the provider's update states.
@@ -251,13 +255,17 @@ func TestLiveOTAProvider(t *testing.T) {
 	f.commission(ctx, t, provider, 0x4321, "provider")
 	reqCtl := f.commission(ctx, t, requestor, 0x4322, "requestor")
 
-	// The requestor finds the provider through its operational resolver;
-	// the loopback test has no DNS-SD, so it is told the address.
-	provAddr, err := net.ResolveUDPAddr("udp", provider.Bridge().LocalAddr())
-	if err != nil {
-		t.Fatal(err)
+	// The requestor reaches the provider over its peer path, whose client
+	// stack finds the provider through DNS-SD (docs/adr/0032); the loopback
+	// test has none, so the stack's cache is handed the provider's
+	// operational record.
+	reqDNS := &groupLiveMDNS{out: make(chan mdns.QueryResponse, 64)}
+	reqNames := discovery.NewNames(reqDNS, slog.New(slog.DiscardHandler))
+	t.Cleanup(func() { _ = reqNames.Close() })
+	if !nodeseam.UsePeerClient(requestor, reqNames, "127.0.0.1:0", nil) {
+		t.Fatal("the requestor's peer client was not set")
 	}
-	requestor.Bridge().AttachOperationalResolver(staticOperational{addr: provAddr})
+	reqDNS.out <- f.operationalRecord(t, provider, 0x4321, "provider")
 
 	provEP := providerEndpoint(t, provider)
 	if provEP == nil {

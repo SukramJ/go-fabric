@@ -240,6 +240,7 @@ func (d *Device) startLocked(ctx context.Context) error {
 		}
 	}
 	n.Bridge().AttachOperationalResolver(siteResolver{d.site})
+	d.sitePeerClient(n)
 	if agg := n.Aggregator(); agg != nil {
 		for _, ep := range d.topo.Bridged {
 			if err := agg.Add(ctx, ep); err != nil {
@@ -371,6 +372,30 @@ func (d *Device) siteClient(cfg *node.Config) {
 	addr := hostAddr(d.index)
 	addr.Port = clientPort
 	nodeseam.UseClientListener(cfg, func() (*udp.Listener, error) { return nw.listen(addr, d.group) })
+}
+
+// sitePeerClient puts the client stack a node without a configured one
+// builds for its peer path (docs/adr/0032) onto the site, as siteClient
+// does for a configured one: its DNS-SD cache asks the site, its socket is
+// the device's client address on the in-memory network or a real socket on
+// [::1] on loopback.
+func (d *Device) sitePeerClient(n *node.Node) {
+	d.mu.Lock()
+	if d.names == nil {
+		d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
+		names := d.names
+		d.site.onClose(func() { _ = names.Close() })
+	}
+	names := d.names
+	d.mu.Unlock()
+	nw := d.site.net
+	if nw == nil {
+		nodeseam.UsePeerClient(n, names, "[::1]:0", nil)
+		return
+	}
+	addr := hostAddr(d.index)
+	addr.Port = clientPort
+	nodeseam.UsePeerClient(n, names, "", func() (*udp.Listener, error) { return nw.listen(addr, d.group) })
 }
 
 // Stop stops the node; its store and address stay the device's. A

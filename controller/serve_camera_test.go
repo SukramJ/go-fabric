@@ -8,9 +8,11 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -39,15 +41,17 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 	port := &testCameraPort{offered: make(chan wpdef.OfferArgs, 1)}
 	cam := newTestCamera(t, port)
 	// The SDP travels over TCP: a large-message command requires it
-	// (ClientInteraction.ts:1235 at 862ad75f). matterjs-server runs its
-	// controller with TCP (ControllerNode.ts:113-114 at 0bd06f2). The camera
-	// accepts TCP, the controller opens it.
+	// (ClientInteraction.ts:1235 at 862ad75f), and a requestor refuses one
+	// on any other session (InvalidTransportType). matterjs-server runs its
+	// controller with TCP (ControllerNode.ts:113-114 at 0bd06f2). Both take
+	// both roles: the controller opens TCP for its ProvideOffer, the camera
+	// for its signals once the controller's session is gone.
 	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{cam}, Configure: func(cfg *node.Config) {
-		cfg.Network.TCP = node.TCPConfig{Incoming: true}
+		cfg.Network.TCP = node.TCPConfig{Incoming: true, Outgoing: true}
 	}})
 	cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
 	cfg.Camera = &controller.CameraConfig{}
-	cfg.TCP = controller.TCPConfig{Outgoing: true}
+	cfg.TCP = controller.TCPConfig{Incoming: true, Outgoing: true}
 	run := func(fn func(ctx context.Context) error) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -147,7 +151,8 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 
 	// With the camera restarted — the node disabled so the registry does
 	// not reopen a session to it — the camera has no session with the
-	// controller and its next signal opens CASE to RootNodeID: the site
+	// controller and its next signal opens CASE over TCP to RootNodeID
+	// from the camera node's client stack (docs/adr/0032): the site
 	// answers the controller's operational record, the controller's CASE
 	// responder takes the session, and the Answer arrives on it — chip's
 	// camera-app fallback (OperationalSessionSetup.cpp:119,:138-142 at
@@ -159,14 +164,21 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 	if sig := awaitSignal(t, signals, "the camera's Answer over its own CASE session did not reach the requestor"); sig.Kind != controller.CameraSignalAnswer || sig.SDP != "v=0 answer again" {
 		t.Fatalf("signal %+v", sig)
 	}
+	// The controller's peer set adopts the session the camera opened as it
+	// is added, which may follow the Answer's delivery by a moment.
 	var inbound bool
-	for _, p := range c.Peers().Peers() {
-		for _, s := range p.Sessions() {
-			inbound = inbound || !c.Peers().Initiated(s)
+	for deadline := time.Now().Add(5 * time.Second); !inbound && time.Now().Before(deadline); {
+		for _, p := range c.Peers().Peers() {
+			for _, s := range p.Sessions() {
+				inbound = inbound || (!c.Peers().Initiated(s) && s.Transport() == exchange.TransportTCP)
+			}
+		}
+		if !inbound {
+			runtime.Gosched()
 		}
 	}
 	if !inbound {
-		t.Fatal("the camera's Answer did not come over a session the camera opened")
+		t.Fatal("the camera's Answer did not come over a TCP session the camera opened")
 	}
 	run(func(ctx context.Context) error { return provider.End(ctx, session, 1) })
 	if sig := awaitSignal(t, signals, "the camera's End did not reach the controller's requestor"); sig.Kind != controller.CameraSignalEnd || sig.Reason != 1 {

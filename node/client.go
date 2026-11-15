@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -58,8 +59,9 @@ type clientStack struct {
 	names     *discovery.Names
 	ownNames  bool
 	peers     *peer.Set
-	// resumption holds the peers' resumption records, in memory.
-	resumption *peer.MemoryResumptionStore
+	// resumption is the store's one resumption record per peer, which the
+	// CASE responder keeps too (handshake.StoreResumption).
+	resumption handshake.ResumptionStore
 	// subs is the registry of the subscriptions the node holds on its
 	// peers: a bound peer's interaction subscribes through it.
 	subs   *interaction.Subscriptions
@@ -69,8 +71,17 @@ type clientStack struct {
 
 // newClientStack opens the client socket, its exchange manager and the
 // peer set whose fabrics are the node's CASE identities.
-func (n *Node) newClientStack() (*clientStack, error) {
-	cfg := *n.cfg.Client
+//
+// The stack states the node's own session parameters — the ones its CASE
+// responder states (responderSessionParams): the MRP intervals of
+// [Config].Sessions, [Config].MaxPathsPerInvoke and the TCP roles of
+// [Config].Network — so a peer learns one set of parameters for this node
+// whichever side opened the session (review II, R2-P5-peer-02). With
+// Network.TCP.Outgoing it dials TCP for a connection that requires it, a
+// Large Message invoke above all (R2-P5-peer-01); the connections hand
+// their messages to the stack's exchanges, as the controller's do
+// (controller/tcp.go).
+func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 	listen := cfg.Listen
 	if listen == "" {
 		listen = "[::]:0"
@@ -94,7 +105,10 @@ func (n *Node) newClientStack() (*clientStack, error) {
 		cs.close(n.life)
 		return nil, err
 	}
-	cs.exchanges, err = exchange.NewManager(l, exchange.Config{Clock: n.cfg.Clock, Logger: n.logger, Retransmitted: n.retransmitted})
+	cs.exchanges, err = exchange.NewManager(l, exchange.Config{
+		Clock: n.cfg.Clock, Logger: n.logger, Retransmitted: n.retransmitted,
+		LocalParameters: responderSessionParams(n.cfg.Network.TCP, n.cfg.MaxPathsPerInvoke, n.cfg.Sessions),
+	})
 	if err != nil {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
 	}
@@ -110,14 +124,19 @@ func (n *Node) newClientStack() (*clientStack, error) {
 		}
 		cs.ownNames = true
 	}
-	// Resumption records stay in memory: the store's resumption table is
-	// the responder's, one row per peer, and holds neither the session
-	// parameters nor our CATs a client record carries.
-	cs.resumption = &peer.MemoryResumptionStore{}
-	cs.peers, err = peer.NewSet(peer.Context{
+	// One resumption record per peer for both roles: the store's, which
+	// the CASE responder reads and writes (review II, R2-P5-port-06,
+	// F-db021da0-19; matter.js SessionManager.ts:261, :896-908 at
+	// db021da0). A node restarted resumes with a bound peer.
+	cs.resumption = handshake.NewStoreResumption(n.st)
+	pctx := peer.Context{
 		Exchanges: cs.exchanges, Names: cs.names, Fabrics: n.clientFabric,
 		Resumption: cs.resumption, Logger: n.logger, Clock: n.cfg.Clock,
-	})
+	}
+	if n.cfg.Network.TCP.Outgoing {
+		pctx.DialTCP = dialTCP(cs.exchanges, n.logger)
+	}
+	cs.peers, err = peer.NewSet(pctx)
 	if err != nil {
 		return fail(fmt.Errorf("node: client peers: %w", err))
 	}
@@ -131,6 +150,106 @@ func (n *Node) newClientStack() (*clientStack, error) {
 		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
 	}()
 	return cs, nil
+}
+
+// dialTCP is the client stack's TCP dialer: each connection hands its
+// messages to the stack's exchanges, as the controller's does
+// (controller/tcp.go, dialTCP).
+func dialTCP(mgr *exchange.Manager, logger *slog.Logger) peer.DialTCP {
+	d := &tcp.Dialer{Logger: logger}
+	return func(ctx context.Context, addr *net.UDPAddr) (exchange.Channel, error) {
+		conn, err := d.Dial(ctx, addr.String(), func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) })
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	}
+}
+
+// peerClient is the client stack a node builds for its own peer path when
+// [Config].Client is nil (review II, wizard-2 peer Q2): built at the first
+// call that needs it, closed with the node. [Node.Peers] does not return
+// it and the binding manager does not use it.
+type peerClient struct {
+	mu     sync.Mutex
+	cs     *clientStack
+	closed bool
+	// template is the stack's configuration: the zero value (an ephemeral
+	// socket, a DNS-SD cache of its own) unless a site set it
+	// (internal/nodeseam.UsePeerClient).
+	template ClientConfig
+}
+
+// errNodeStopped is a peer call after the node stopped.
+var errNodeStopped = errors.New("node: stopped")
+
+// peerStack is the client stack the node's peer path establishes on: the
+// configured one ([Config].Client), else the node's own, built now when it
+// does not exist yet.
+func (n *Node) peerStack() (*clientStack, error) {
+	if n.client != nil {
+		return n.client, nil
+	}
+	n.peerClient.mu.Lock()
+	defer n.peerClient.mu.Unlock()
+	if n.peerClient.closed {
+		return nil, errNodeStopped
+	}
+	if n.peerClient.cs == nil {
+		cs, err := n.newClientStack(n.peerClient.template)
+		if err != nil {
+			return nil, err
+		}
+		n.peerClient.cs = cs
+	}
+	return n.peerClient.cs, nil
+}
+
+// existingPeerStack is the client stack the peer path would use, nil when
+// none was built: a lookup of live sessions builds nothing.
+func (n *Node) existingPeerStack() *clientStack {
+	if n.client != nil {
+		return n.client
+	}
+	n.peerClient.mu.Lock()
+	defer n.peerClient.mu.Unlock()
+	return n.peerClient.cs
+}
+
+// clientStacks is every client stack the node runs: the configured one and
+// the peer path's own.
+func (n *Node) clientStacks() []*clientStack {
+	var out []*clientStack
+	if n.client != nil {
+		out = append(out, n.client)
+	}
+	n.peerClient.mu.Lock()
+	if n.peerClient.cs != nil {
+		out = append(out, n.peerClient.cs)
+	}
+	n.peerClient.mu.Unlock()
+	return out
+}
+
+// closeClientStacks closes every client stack at Stop; none is built after.
+// work is Stop's in-flight unit, paused while a stack drains.
+func (n *Node) closeClientStacks(ctx context.Context, work *countedWork) {
+	n.peerClient.mu.Lock()
+	n.peerClient.closed = true
+	own := n.peerClient.cs
+	n.peerClient.cs = nil
+	n.peerClient.mu.Unlock()
+	if n.client == nil && own == nil {
+		return
+	}
+	work.pause()
+	if n.client != nil {
+		n.client.close(ctx)
+	}
+	if own != nil {
+		own.close(ctx)
+	}
+	work.resume()
 }
 
 // close releases the client stack: the peers, the exchanges, the socket
@@ -183,12 +302,11 @@ func (n *Node) clientFabric(addr handshake.PeerAddress) (handshake.Fabric, bool)
 // SessionManager deletes the fabric's resumption records
 // (SessionManager.ts:308-310, :537-552 at db021da0).
 func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
-	if n.client == nil {
-		return
-	}
-	for _, p := range n.client.peers.Peers() {
-		if p.Address().FabricIndex == fabricIndex {
-			p.Delete(ctx)
+	for _, cs := range n.clientStacks() {
+		for _, p := range cs.peers.Peers() {
+			if p.Address().FabricIndex == fabricIndex {
+				p.Delete(ctx)
+			}
 		}
 	}
 }
@@ -201,19 +319,18 @@ func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
 // SessionManager.deleteResumptionRecordsForFabric) with the fabric's
 // sessions, which every role registers with it (NodeSession.ts:153-156).
 func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8) {
-	if n.client == nil {
-		return
-	}
-	for _, p := range n.client.peers.Peers() {
-		addr := p.Address()
-		if addr.FabricIndex != fabricIndex {
-			continue
-		}
-		for _, s := range n.client.exchanges.SessionsFor(addr) {
-			n.client.exchanges.CloseSession(ctx, s)
-		}
-		if _, err := n.client.resumption.DeleteResumptionRecord(addr); err != nil {
-			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+	for _, cs := range n.clientStacks() {
+		for _, p := range cs.peers.Peers() {
+			addr := p.Address()
+			if addr.FabricIndex != fabricIndex {
+				continue
+			}
+			for _, s := range cs.exchanges.SessionsFor(addr) {
+				cs.exchanges.CloseSession(ctx, s)
+			}
+			if _, err := cs.resumption.DeleteResumptionRecord(addr); err != nil {
+				n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+			}
 		}
 	}
 }
