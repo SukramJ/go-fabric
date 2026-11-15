@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,7 +49,7 @@ import (
 
 func init() {
 	for _, c := range []func() goCertCase{
-		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118, caseCNET420,
+		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118, caseCNET420, caseDD19, caseDD22, caseDD35,
 	} {
 		registerGoCert(c)
 	}
@@ -1335,6 +1336,255 @@ func caseCNET420() goCertCase {
 				n: "6", line: 206, file: "tc-cnet-support.ts", title: "DUT sends the RemoveNetwork command to the TH", pics: "CNET.C.C04.Tx",
 				run: send(networkcommissioning.CmdRemoveNetwork, "removeNetwork", networkcommissioning.RemoveNetworkRequest{NetworkId: cnetWiFiSSID, Breadcrumb: bc(6)}),
 			},
+		},
+	}
+}
+
+// --- TC-DD-1.9 ----------------------------------------------------------------
+
+// caseDD19 is TC-DD-1.9 (TC-DD-1.9.test.ts:23-66), the Go controller as
+// the DUT: a manual code naming a short discriminator no device advertises
+// commissions nothing, the TH's printed manual code commissions it.
+func caseDD19() goCertCase {
+	d := &dutRun{}
+	return goCertCase{
+		tc: "TC-DD-1.9", line: 23, role: roleDUT, pics: ddDUTPICS("MCORE.DD.MANUAL_PC_COMMISSIONING"),
+		finalize: d.finalize,
+		steps: []goStep{
+			{n: "0", line: 28, title: "Precondition: the DUT uses the discriminator a Manual Pairing Code names", run: func(th *goTH) error {
+				p := thElevenDigitParts(th)
+				p.discriminator ^= ddDiscriminatorMSB // DISCRIMINATOR_MSB (tc-dd-support.ts:1152)
+				return d.giveUp(th, mustManual(th, p), "No device commissioned from a manual code naming a discriminator no device advertises")
+			}},
+			{n: "1", line: 47, title: "Provide the TH's Manual Pairing Code to the DUT", run: func(th *goTH) error {
+				// thPrintedManualCode (tc-dd-support.ts:1046-1061): the code the
+				// TH printed, the daemon's banner.
+				return d.commission(th, th.dut.info.manualCode)
+			}},
+		},
+	}
+}
+
+// --- TC-DD-2.2 ----------------------------------------------------------------
+
+// ddNoRadio is TC-DD-2.2's noRadio (TC-DD-2.2.test.ts:18-23), with the
+// leg's own fact.
+func ddNoRadio(transport string) string {
+	return noRadio(transport, "TC-DD-2.2.test.ts:18-23")
+}
+
+// caseDD22 is TC-DD-2.2 (TC-DD-2.2.test.ts:25-100), the Go controller as
+// the DUT: its DNS-SD discovery reports the TH with its onboarding values.
+func caseDD22() goCertCase {
+	return goCertCase{
+		tc: "TC-DD-2.2", line: 25, role: roleDUT, pics: []string{"MCORE.ROLE.COMMISSIONER"},
+		steps: []goStep{
+			{n: "1.a", line: 30, title: "TH starts matter announcement procedure using BLE transport", na: ddNoRadio("BLE")},
+			{n: "1.b", line: 34, title: "DUT starts BLE scan", na: ddNoRadio("BLE")},
+			{n: "2.a", line: 46, title: "DUT starts scan in background using BLE transport", na: ddNoRadio("BLE")},
+			{n: "2.b", line: 49, title: "TH starts matter announcement using BLE transport", na: ddNoRadio("BLE")},
+			{n: "2.c", line: 53, title: "(The plan states only the expected outcome for this step.)", na: ddNoRadio("BLE")},
+			{n: "3.a", line: 57, title: "TH publishes Wi-Fi PAF", na: ddNoRadio("Wi-Fi PAF")},
+			{n: "3.b", line: 70, title: "DUT starts Wi-Fi PAF scan", na: ddNoRadio("Wi-Fi PAF")},
+			{n: "6", line: 76, title: "DUT performs service discovery using DNS-SD", run: func(th *goTH) error {
+				// recordDiscoveredTh (tc-dd-support.ts:1288-1321): the DUT
+				// looks for the TH's long discriminator and must report a node
+				// with the TH's instance, discriminator, vendor and product.
+				qr, err := gocontroller.ParsePairingCode(thQR(th))
+				if err != nil {
+					return err
+				}
+				instances := commissionableInstances(th)
+				ctrl, err := th.controller("dut")
+				if err != nil {
+					return err
+				}
+				ctx, cancel := context.WithTimeout(th.ctx, ddMDNSTimeout)
+				defer cancel()
+				nodes, err := ctrl.DiscoverWith(ctx, discovery.ByLongDiscriminator(qr.Discriminator), 10*time.Second, gocontroller.DiscoverOptions{})
+				if err != nil {
+					return fmt.Errorf("DUT commissionable discovery failed: %w", err)
+				}
+				var reported []string
+				found := false
+				for i := range nodes {
+					n := &nodes[i]
+					vid, pid := vendorProduct(n)
+					reported = append(reported, fmt.Sprintf("%s (D=%d vendorId=%d productId=%d CM=%d)", n.InstanceID, n.D, vid, pid, n.CM))
+					if (len(instances) == 0 || slices.ContainsFunc(instances, func(s string) bool { return strings.EqualFold(s, n.InstanceID) })) &&
+						n.D == qr.Discriminator && vid == int(qr.VendorID) && pid == int(qr.ProductID) {
+						found = true
+					}
+				}
+				detail := fmt.Sprintf("DUT reported %v; the TH advertises as %v, its onboarding payload names D=%d vendorId=%d productId=%d",
+					reported, instances, qr.Discriminator, qr.VendorID, qr.ProductID)
+				if !found {
+					return errors.New(detail)
+				}
+				th.note("%s", detail)
+				// recordCommissionable (:1227-1234).
+				names, err := th.names()
+				if err != nil {
+					return err
+				}
+				if _, err := th.commissionable(names, th.dut.info.discriminator, th.dut.info.port, ddMDNSTimeout); err != nil {
+					return fmt.Errorf("TH advertising as commissionable: %w", err)
+				}
+				return nil
+			}},
+		},
+	}
+}
+
+var reCommissionableInstance = regexp.MustCompile(`msg=matter\.mdns\.commissioning_published .*?\binstance=(\S+)`)
+
+// commissionableInstances is thCommissionableInstanceNames: the instances
+// the TH logged publishing its commissionable record under
+// (bridge/bridge.go matter.mdns.commissioning_published).
+func commissionableInstances(th *goTH) []string {
+	var out []string
+	for _, m := range reCommissionableInstance.FindAllStringSubmatch(th.dut.snapshotStderr(), -1) {
+		if !slices.Contains(out, m[1]) {
+			out = append(out, m[1])
+		}
+	}
+	return out
+}
+
+// vendorProduct reads a commissionable record's VP key ("vendor+product").
+func vendorProduct(d *client.Device) (vid, pid int) {
+	if d.VP == nil {
+		return 0, 0
+	}
+	v, p, _ := strings.Cut(*d.VP, "+")
+	vid, _ = strconv.Atoi(v)
+	pid, _ = strconv.Atoi(p)
+	return vid, pid
+}
+
+// --- TC-DD-3.5 ----------------------------------------------------------------
+
+// ddStage is one STAGES entry of TC-DD-3.5 (TC-DD-3.5.test.ts:37-76): the
+// daemon's line for a commissioning stage, in the order § 5.5 runs them.
+var ddStages = map[string][]string{
+	// "Received pairing request": the PBKDFParamRequest the daemon took.
+	"discovered": {"msg=matter.rx.sc.pase ", " stage=pbkdf_param_req "},
+	"pase":       logPake3,
+	// ArmFailSafe answered; its ErrorCode is the commissioner's to judge,
+	// and the DUT's commissioning fails on any but OK.
+	"failSafe":    {"msg=matter.gencomm.cmd_ok command_name=ArmFailSafe "},
+	"regulatory":  {"msg=matter.gencomm.cmd_ok command_name=SetRegulatoryConfig "},
+	"csr":         {"msg=matter.opcreds.cmd_ok command_name=CSRRequest "},
+	"trustedRoot": {"msg=matter.opcreds.cmd_ok command_name=AddTrustedRootCertificate "},
+	"adminAcl":    {"msg=matter.opcreds.cmd_ok command_name=AddNOC "},
+	// The CASE session the Sigma3 established (node/security.go
+	// case.session_established).
+	"case":                  {"msg=case.session_established ", " fabric_index="},
+	"commissioningComplete": {logCommissioned},
+	// The daemon clears its PASE sessions after an OK CommissioningComplete
+	// (bridge/pase_close.go closePASESessionsOnCommissioningComplete) and
+	// logs no line for it: nothing stands in for matter.js's "Session
+	// ended" (TC-DD-3.5.test.ts:71-74).
+	"paseClosed": nil,
+}
+
+// caseDD35 is TC-DD-3.5 (TC-DD-3.5.test.ts:152-279), the Go controller as
+// the DUT commissioner: each commissioning stage is a daemon log line
+// after the stage the previous step found.
+func caseDD35() goCertCase {
+	d := &dutRun{}
+	var commissionedFrom, cursor int
+	started := false
+	stage := func(name, what string) func(th *goTH) error {
+		return func(th *goTH) error {
+			if !started {
+				return errors.New("step 2's commissioning did not start, so this stage cannot be checked")
+			}
+			parts := ddStages[name]
+			if len(parts) == 0 {
+				return fmt.Errorf("%s: the TH logs no line for this stage, so it cannot be checked", what)
+			}
+			line, err := awaitTHLine(th, cursor, certLogTimeout, parts...)
+			if err != nil {
+				return fmt.Errorf("%s: %w", what, err)
+			}
+			cursor = strings.Index(th.dut.snapshotStderr()[cursor:], line) + cursor + len(line)
+			th.note("%s: %s", what, strings.TrimSpace(line))
+			return nil
+		}
+	}
+	onEthernet := "The TH is already on the operational network over Ethernet, so the Commissioner neither needs to configure network credentials nor to tell it to connect (TC-DD-3.5.test.ts:146-149)"
+	return goCertCase{
+		tc: "TC-DD-3.5", line: 152, role: roleDUT, pics: []string{"MCORE.ROLE.COMMISSIONER"},
+		finalize: d.finalize,
+		steps: []goStep{
+			{n: "1", line: 153, title: "Commissioner has regulatory and fabric information and accurate date, time and timezone", run: func(*goTH) error {
+				return goSkip("the date, time and timezone on the DUT need a person in front of the DUT; no adapter reads them (TC-DD-3.5.test.ts:157-162)")
+			}},
+			{n: "2", line: 166, title: "Commissioner and Commissionee discover each other and connect", run: func(th *goTH) error {
+				if err := d.setup(th); err != nil {
+					return err
+				}
+				if err := d.advertising(th); err != nil {
+					return err
+				}
+				commissionedFrom, cursor, started = mark(th), mark(th), true
+				if err := d.commission(th, th.dut.info.manualCode); err != nil {
+					return err
+				}
+				return stage("discovered", "the DUT connected to the TH")(th)
+			}},
+			{n: "3", line: 178, title: "Establish encryption keys with PASE", run: stage("pase", "the TH established PASE")},
+			{n: "4", line: 184, title: "Commissioner re-arms the Fail-safe timer", run: stage("failSafe", "the TH armed the fail-safe for the DUT")},
+			{n: "5", line: 191, title: "Commissioner configures regulatory information", run: func(th *goTH) error {
+				// notApplicableAtRun regulatoryNotRequired (:111-124): no
+				// NetworkCommissioning instance with Wi-Fi or Thread.
+				r, err := th.read(d.node, im.ConcreteAttributePath{Cluster: networkcommissioning.ClusterID, Attribute: spec.AttrFeatureMap, HasCluster: true, HasAttribute: true})
+				if err != nil {
+					return err
+				}
+				var maps []string
+				radio := false
+				for i := range r.Attributes {
+					a := &r.Attributes[i]
+					maps = append(maps, fmt.Sprintf("endpoint %d: %d", a.Path.Endpoint, a.Value.El.Uint))
+					if a.Value.El.Uint&0b11 != 0 {
+						radio = true
+					}
+				}
+				if !radio {
+					return goSkip("No Network Commissioning instance of the TH has Wi-Fi or Thread (%s), so the Commissioner need not configure regulatory information (Core § 5.5 step 8)", strings.Join(maps, "; "))
+				}
+				return stage("regulatory", "the TH set the regulatory configuration")(th)
+			}},
+			{n: "6", line: 200, title: "Commissioner requests the operational CSR", run: stage("csr", "the TH answered the CSRRequest")},
+			{n: "7", line: 206, title: "Commissioner configures operational credentials", run: stage("trustedRoot", "the TH installed the trusted root certificate")},
+			{n: "8", line: 212, title: "Commissioner configures itself as administrator in ACL", run: stage("adminAcl", "the TH created the administrator ACL entry")},
+			{n: "9", line: 218, title: "Commissioner configures operational network on TH", na: onEthernet},
+			{n: "10", line: 222, title: "Commissioner instructs Commissionee to connect to operational network", na: onEthernet},
+			{n: "12", line: 228, title: "Commissioner starts discovery of TH using Operational Discovery", run: func(th *goTH) error {
+				if d.node == nil {
+					return errors.New("the DUT holds no node; step 2 must run first")
+				}
+				addr, _ := d.node.PeerAddress()
+				instance := operationalInstance(d.ctrl.Fabric().Identity.CompressedFabricID, addr.NodeID)
+				if err := th.awaitOperational(d.names, instance, true, ddMDNSTimeout); err != nil {
+					return err
+				}
+				th.note("the TH advertises %s, the operational instance the DUT's discovery looks for", instance)
+				return nil
+			}},
+			{n: "13", line: 244, title: "Commissioner opens a CASE session with TH", run: stage("case", "the TH established CASE")},
+			{n: "14", line: 250, title: "Commissioner sends CommissioningComplete", run: func(th *goTH) error {
+				if err := stage("commissioningComplete", "the TH received CommissioningComplete")(th); err != nil {
+					return err
+				}
+				if _, err := awaitTHLine(th, commissionedFrom, ddCommissioningLogTimeout, logCommissioned); err != nil {
+					return fmt.Errorf("the TH completed the commissioning with success: %w", err)
+				}
+				return nil
+			}},
+			{n: "15", line: 271, title: "Commissioning channel between the Commissioner and Commissionee is terminated", run: stage("paseClosed", "the TH closed the PASE session")},
 		},
 	}
 }
