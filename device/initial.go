@@ -4,7 +4,6 @@
 package device
 
 import (
-	"context"
 	"fmt"
 	"go/token"
 	"log/slog"
@@ -188,7 +187,7 @@ func (d *Device) missingInitial() []InitialRequirement {
 		}
 		def := spec.Lookup(id)
 		for _, attr := range lister.MatterAttributes() {
-			if attr >= cluster.AttrGlobalGeneratedCommandList || answersRead(srv, attr) {
+			if attr >= cluster.AttrGlobalGeneratedCommandList || answersRead(srv, def, attr) {
 				continue
 			}
 			out = append(out, initialRequirement(def, id, attr))
@@ -197,11 +196,15 @@ func (d *Device) missingInitial() []InitialRequirement {
 	return out
 }
 
-// answersRead reports whether srv answers a read of attr, as the
-// dispatcher reads it: the fabric-scoped read first, MatterRead otherwise.
-func answersRead(srv contract.ClusterServer, attr uint32) bool {
-	if fsr, ok := srv.(contract.FabricScopedReader); ok {
-		if _, ok := fsr.MatterReadFiltered(context.Background(), attr); ok {
+// answersRead reports whether srv answers a read of attr outside a
+// request: MatterRead, and a fabric-scoped attribute of a
+// [contract.FabricScopedReader] counts as answered.
+func answersRead(srv contract.ClusterServer, def *spec.Cluster, attr uint32) bool {
+	if _, scoped := srv.(contract.FabricScopedReader); scoped && def != nil {
+		if a := def.Attribute(attr); a != nil && a.Access.Fabric != "" {
+			// A fabric-scoped attribute answers a request only (the
+			// dispatcher never lets MatterRead stand in for it); New has
+			// none to judge it by.
 			return true
 		}
 	}

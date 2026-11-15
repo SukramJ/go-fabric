@@ -93,7 +93,7 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	// does: the node's SetOnFailSafeStarting hook (PrepareFreshFailSafe)
 	// runs before the arm is recorded and drops what an earlier attempt
 	// left pending.
-	if err := root.GeneralCommissioning.ArmOnPaseEstablished(ctx); err != nil {
+	if err := root.GeneralCommissioning.ArmOnPaseSession(ctx, 1); err != nil {
 		t.Fatalf("the PASE arm: %v", err)
 	}
 
