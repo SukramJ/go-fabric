@@ -386,15 +386,27 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // it (matter.js Datasource.ts:1479 at db021da0: an equal value, a list
 // deep-equal to the one held included, is no change).
 func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	changed, err := s.MatterWriteCommit(ctx, attrID, value)
+	return len(changed) > 0, err
+}
+
+// MatterWriteCommit implements [contract.ChangeNamingWriter]: the write of
+// [Server.MatterWrite], and the attributes its store changed — attrID when
+// the stored value moved, none for a write of the value the server holds
+// (matter.js Datasource.ts:1476-1484 at db021da0: a name is noted only
+// when its value differs). The server's write stores only the written
+// attribute; one that moves another reports that change itself
+// ([Server.Set]).
+func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
 	v, err := s.ValidateWrite(attrID, value, s.peers)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	// A struct's fields are held to their conformance as well (matter.js
 	// validates the written state,
 	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
 	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
-		return false, err
+		return nil, err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	// The author's rule judges every write, the held value included:
@@ -405,7 +417,7 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 		if err := s.rule(ctx, attrID, v); err != nil {
 			// As given: its IM status when it carries one, FAILURE
 			// otherwise (the dispatcher reads no status from the text).
-			return false, err
+			return nil, err
 		}
 	}
 	// The value the server holds reaches no veto and no Sink and stores
@@ -418,19 +430,19 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	// the value, so a write it lets through at worst stores an equal value
 	// and answers unchanged.
 	if s.holds(attrID, v) {
-		return false, nil
+		return []uint32{}, nil
 	}
 	s.mu.Lock()
 	veto := s.beforeWrite
 	s.mu.Unlock()
 	if veto != nil {
 		if err := veto(ctx, attrID, v); err != nil {
-			return false, err
+			return nil, err
 		}
 	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
-			return false, err
+			return nil, err
 		}
 	}
 	return s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v}), nil
@@ -588,13 +600,13 @@ func defaultOf(t Type, d any) (any, bool) {
 }
 
 // store keeps values and reports the ones that changed, from origin; it
-// returns whether any changed. Any change advances the data version once,
+// returns the ids of those that changed, sorted, empty when none did. Any change advances the data version once,
 // now — a quieter attribute's too, as matter.js advances the version at
 // the commit for every noted property (Datasource.ts:1446-1457 at
 // db021da0). A change of a quieter attribute goes to the change listeners
 // at once and to the report listeners when its throttle emits
 // ([Server.quietReport]); every other change is reported at once.
-func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
+func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
 	type quietChange struct {
 		qa              *quietAttr
 		wasNull, isNull bool
@@ -620,14 +632,14 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 	}
 	s.mu.Unlock()
 	if len(changed) == 0 {
-		return false
+		return []uint32{}
 	}
 	slices.Sort(changed)
 	slices.Sort(plain)
 	s.tracker().Bump()
 	if len(quiets) == 0 {
 		s.AttributeChanges.NotifyFrom(origin, changed...)
-		return true
+		return changed
 	}
 	s.AttributeChanges.ChangedFrom(origin, changed...)
 	s.AttributeChanges.ReportFrom(origin, plain...)
@@ -636,7 +648,7 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 			c.qa.q.Changed(c.wasNull, c.isNull)
 		}
 	}
-	return true
+	return changed
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command

@@ -81,8 +81,9 @@ func TestUnchangedWriteKeepsTheDataVersionParity(t *testing.T) {
 			t.Fatalf("%s: no DataVersion", s.name)
 		}
 		changes := &WriteChanges{}
-		ctx := WithWriteChanges(caseCtx(false), changes)
-		resp := im.HandleWriteRequest(ctx, d, im.WriteRequest{Writes: s.writes})
+		ctx := WithWriteChanges(caseCtx(false), changes) //nolint:staticcheck // the deprecated record keeps its behaviour
+		out := im.HandleWrite(ctx, d, im.WriteRequest{Writes: s.writes})
+		resp := out.Response
 		if len(resp.Responses) != len(s.writes) {
 			t.Fatalf("%s: %+v", s.name, resp.Responses)
 		}
@@ -97,6 +98,21 @@ func TestUnchangedWriteKeepsTheDataVersionParity(t *testing.T) {
 		}
 		if unchanged := changes.Unchanged(path); unchanged == s.changed {
 			t.Errorf("%s: recorded unchanged %v, want %v", s.name, unchanged, !s.changed)
+		}
+		// The verdict in the results (im.WriteResult.Commit): every
+		// successful write carries one, naming the attribute only when it
+		// changed.
+		named := false
+		for _, r := range out.Results {
+			if r.Commit == nil {
+				t.Fatalf("%s: a successful write without a Commit: %+v", s.name, r)
+			}
+			for _, id := range r.Commit.Changed {
+				named = named || id == path.Attribute
+			}
+		}
+		if named != s.changed {
+			t.Errorf("%s: Commit names the written attribute %v, want %v", s.name, named, s.changed)
 		}
 	}
 }

@@ -370,6 +370,16 @@ migrations applies step `v9`.
 | `<cluster>def.Declare{Features: 0}` to select no feature (it kept the device type's default) | `Declare{NoFeatures: true}`; beside a non-zero `Features` it is `device.ErrConfiguration` |
 | a host handler (`Handle`, typed `Handle<Command>`) on LevelControl after which the server ended the current scene | the handler is the whole command: the server ends no scene for it, runs no gate and no transition; a scene recall reaches the server's logic, never the handler |
 
+## Changed after v0.22.2: the write verdict
+
+A write's verdict — which attributes it changed — travels in its result,
+not in the context.
+
+| Before | Now |
+| --- | --- |
+| `endpoint.WithWriteChanges(ctx, changes)` around `im.HandleWriteRequest`, then `changes.Unchanged(path)`, `Changed`, `ChangedAttributes()` | `out := im.HandleWrite(ctx, d, req)`; `out.Response` is the WriteResponse, each of `out.Results` carries `Commit` (`im.WriteCommit`): the ids of the attributes the write changed, empty for none, nil when the dispatcher gave no verdict |
+| a server whose write moves another attribute answering `MatterWriteChanged` true for the cluster (the written attribute is reported too) | implement `contract.ChangeNamingWriter` (`MatterWriteCommit`) and name the attributes that changed; only those are reported. `spec.Server` names its own |
+
 ## Changed after v0.22.2: fabric-scoped reads
 
 The dispatcher scopes every fabric-scoped attribute of the model on a

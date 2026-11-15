@@ -253,16 +253,16 @@ func TestKitWriteVerdictParity(t *testing.T) {
 				if !ok {
 					t.Fatalf("no DataVersion for 0x%04X on endpoint %d", path.Cluster, ep)
 				}
-				changes := &WriteChanges{}
-				resp := im.HandleWriteRequest(WithWriteChanges(caseCtx(false), changes), d, im.WriteRequest{Writes: []im.AttributeWrite{writeOf(path, c.value)}})
-				if len(resp.Responses) != 1 || resp.Responses[0].Status.Status != im.StatusSuccess {
-					t.Fatalf("write %d of %v: %+v", i+1, c.value, resp.Responses)
+				out := im.HandleWrite(caseCtx(false), d, im.WriteRequest{Writes: []im.AttributeWrite{writeOf(path, c.value)}})
+				if len(out.Results) != 1 || out.Results[0].Status != im.StatusSuccess || out.Results[0].Commit == nil {
+					t.Fatalf("write %d of %v: %+v", i+1, c.value, out.Results)
 				}
+				changed := len(out.Results[0].Commit.Changed) > 0
 				after, _ := d.CurrentDataVersion(context.Background(), ep, path.Cluster)
 				advances := after - before
-				if wantAdv := map[bool]uint32{true: 1, false: 0}[want]; advances != wantAdv || changes.Unchanged(path) == want {
-					t.Errorf("write %d of %v: DataVersion %d → %d, recorded unchanged %v; want changed %v (%d advance)",
-						i+1, c.value, before, after, changes.Unchanged(path), want, wantAdv)
+				if wantAdv := map[bool]uint32{true: 1, false: 0}[want]; advances != wantAdv || changed != want {
+					t.Errorf("write %d of %v: DataVersion %d → %d, Commit names %v; want changed %v (%d advance)",
+						i+1, c.value, before, after, out.Results[0].Commit.Changed, want, wantAdv)
 				}
 			}
 		})

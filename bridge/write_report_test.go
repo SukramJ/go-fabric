@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,10 +46,10 @@ func TestWrittenAttributeReachesASubscriber(t *testing.T) {
 
 	failed := nodeLabel
 	failed.Attribute = 0x0006
-	b.reportWrittenAttributes(im.WriteResponse{Responses: []im.AttributeStatus{
-		{Path: nodeLabel, Status: im.StatusIB{Status: im.StatusSuccess}},
-		{Path: failed, Status: im.StatusIB{Status: im.StatusConstraintError}},
-	}}, nil)
+	b.reportWrittenAttributes([]im.WriteResult{
+		{Path: nodeLabel, Status: im.StatusSuccess},
+		{Path: failed, Status: im.StatusConstraintError},
+	})
 
 	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
 	spy.mu.Lock()
@@ -99,18 +100,12 @@ func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
 	now := time.Now()
 	reports := func(name string) int {
 		t.Helper()
-		changes := &endpointpkg.WriteChanges{}
-		ctx := endpointpkg.WithWriteChanges(context.Background(), changes)
 		value := im.AttributeValue{Value: spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "hall"}}}
-		results := d.Write(ctx, labelList, value)
-		resp := im.WriteResponse{}
-		for _, r := range results {
-			resp.Responses = append(resp.Responses, im.AttributeStatus{Path: r.Path, Status: im.StatusIB{Status: r.Status}})
+		results := d.Write(context.Background(), labelList, value)
+		if len(results) != 1 || results[0].Status != im.StatusSuccess {
+			t.Fatalf("%s: %+v", name, results)
 		}
-		if len(resp.Responses) != 1 || resp.Responses[0].Status.Status != im.StatusSuccess {
-			t.Fatalf("%s: %+v", name, resp.Responses)
-		}
-		b.reportWrittenAttributes(resp, changes)
+		b.reportWrittenAttributes(results)
 		now = now.Add(2 * time.Second)
 		mgr.Tick(context.Background(), now)
 		spy.mu.Lock()
@@ -130,9 +125,8 @@ func TestUnchangedWrittenAttributeIsNotReported(t *testing.T) {
 // TestUnchangedWriteOverTheWireIsNotReported: a WriteRequest that writes
 // the value the server holds advances no DataVersion and reaches no
 // subscriber, and one that writes a new value advances it once and is
-// reported once — the record the write handler attaches
-// (endpoint.WithWriteChanges) carries the server's verdict from the
-// dispatcher to the report. matter.js advances the version only for a
+// reported once — the write's result (im.WriteResult.Commit) carries the
+// server's verdict from the dispatcher to the report. matter.js advances the version only for a
 // commit that changed a value and broadcasts only the changed properties
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457, the
 // changed names noted at :1484 and handed on at :1319, an equal value no
@@ -219,4 +213,83 @@ func TestCommandChangedAttributeReachesASubscriber(t *testing.T) {
 	if len(spy.calls) != 1 || len(spy.calls[0]) != 1 || spy.calls[0][0] != breadcrumb {
 		t.Fatalf("reported %+v, want exactly Breadcrumb (the only attribute the command changed)", spy.calls)
 	}
+}
+
+// siblingMovingOnOff is a hand-written OnOff server (Lighting) whose
+// OnTime write leaves OnTime as it holds it and moves OffWaitTime, and
+// names that change ([contract.ChangeNamingWriter]).
+type siblingMovingOnOff struct {
+	mu          sync.Mutex
+	offWaitTime uint16
+}
+
+func (*siblingMovingOnOff) MatterClusterID() uint32 { return onoff.ClusterID }
+
+func (s *siblingMovingOnOff) MatterRead(attrID uint32) (any, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch attrID {
+	case onoff.AttrOnOff:
+		return false, true
+	case onoff.AttrOnTime:
+		return uint16(0), true
+	case onoff.AttrOffWaitTime:
+		return s.offWaitTime, true
+	case 0xFFFC: // FeatureMap: Lighting
+		return uint32(onoff.FeatureLT), true
+	case 0xFFFD:
+		return uint16(6), true
+	}
+	return nil, false
+}
+
+func (s *siblingMovingOnOff) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteCommit(ctx, attrID, value)
+	return err
+}
+
+func (s *siblingMovingOnOff) MatterWriteCommit(_ context.Context, attrID uint32, _ any) ([]uint32, error) {
+	if attrID != onoff.AttrOnTime {
+		return nil, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.offWaitTime++
+	return []uint32{onoff.AttrOffWaitTime}, nil
+}
+
+func (*siblingMovingOnOff) MatterInvoke(context.Context, uint32, any) (any, error) {
+	return nil, nil
+}
+
+func (*siblingMovingOnOff) MatterReportable() []uint32 {
+	return []uint32{onoff.AttrOnOff, onoff.AttrOnTime, onoff.AttrOffWaitTime}
+}
+
+// TestWriteReportsTheAttributesItsCommitNames: a write that leaves the
+// written attribute as it was and moves a sibling advances the cluster's
+// DataVersion once and reports the sibling alone — the attributes its
+// server names (contract.ChangeNamingWriter, im.WriteResult.Commit), not
+// the written path. matter.js notes a name in a commit's change list only
+// when its value differs and hands the list on
+// (packages/node/src/behavior/state/managed/Datasource.ts:1476-1484 and
+// :1319 at db021da0), and advances the version once for a commit that
+// changed something (:1456-1457) (review II, R2-P5-write-02).
+func TestWriteReportsTheAttributesItsCommitNames(t *testing.T) {
+	t.Parallel()
+	srv := &siblingMovingOnOff{}
+	h := newAppHarness(t, appDevice{deviceType: 0x0100, servers: []contract.ClusterServer{srv}})
+	epID := h.endpoints[0x0100]
+	w := watchCluster(t, h, epID, onoff.ClusterID)
+	write := func() {
+		if st := h.writeAttribute(epID, onoff.ClusterID, onoff.AttrOnTime, uintValue(0)); st != 0 {
+			t.Fatalf("OnTime write: status 0x%02X", st)
+		}
+	}
+	advanced, onTime := w.step(write, onoff.AttrOnTime)
+	if advanced != 1 || onTime != 0 {
+		t.Errorf("DataVersion advanced %d, OnTime reported %d times; want 1 and 0", advanced, onTime)
+	}
+	// The sibling: one more write, counted on OffWaitTime.
+	w.expect("OffWaitTime, moved by the OnTime write", write, onoff.AttrOffWaitTime, 1, 1)
 }

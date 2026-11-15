@@ -222,6 +222,10 @@ type ClusterDataVersion interface {
 // A type that embeds a server implementing this and declares its own
 // MatterWrite declares its own MatterWriteChanged as well: the promoted
 // method would apply the write without the type's MatterWrite.
+//
+// The verdict is one for the cluster and is recorded under the written
+// attribute; a server whose write moves another attribute names what it
+// changed with [ChangeNamingWriter], which the dispatcher prefers.
 type ChangeReportingWriter interface {
 	// MatterWriteChanged applies the write as MatterWrite does and
 	// reports whether it changed any attribute of the cluster — the

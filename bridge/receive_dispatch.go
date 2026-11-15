@@ -580,13 +580,12 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
-	// The dispatcher records which written attributes changed nothing
-	// (endpoint.WriteChanges); their report is left out. A host notifier's
+	// Each result names the attributes its write changed
+	// ([im.WriteResult.Commit]); only those are reported. A host notifier's
 	// changes of the endpoints written meanwhile are settled against the
-	// same record when the write ends ([Bridge.applyWriteHeld]).
-	changes := &endpointpkg.WriteChanges{}
-	writeCtx = endpointpkg.WithWriteChanges(writeCtx, changes)
-	resp := b.applyWriteHeld(writeCtx, dispatcher, req, changes)
+	// same results when the write ends ([Bridge.applyWriteHeld]).
+	outcome := b.applyWriteHeld(writeCtx, dispatcher, req)
+	resp := outcome.Response
 	// An interaction that ended at a data element (im.WriteResponse.Status)
 	// ends the transaction: the elements before it were written and are
 	// reported, and the controller gets the StatusResponse — matter.js's
@@ -594,11 +593,11 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	// (InteractionMessenger.ts:431-460 at db021da0).
 	if !resp.Status.IsSuccess() {
 		b.endWriteInteraction(txKey)
-		b.reportWrittenAttributes(resp, changes)
+		b.reportWrittenAttributes(outcome.Results)
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
 	}
 	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
-	b.reportWrittenAttributes(resp, changes)
+	b.reportWrittenAttributes(outcome.Results)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
@@ -919,8 +918,8 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	return nil
 }
 
-// reportWrittenAttributes marks every successfully written attribute dirty
-// for the subscriptions that cover it. (The dispatcher has already advanced
+// reportWrittenAttributes marks every attribute a write changed dirty for
+// the subscriptions that cover it. (The dispatcher has already advanced
 // the cluster's DataVersion: endpoint/dispatcher.go WriteAuthorized for a
 // bridged endpoint, the server's own tracker for the root.) A write is a state change
 // like any other: matter.js commits it to the behavior's state, whose
@@ -931,29 +930,25 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 // BasicInformation.NodeLabel was never reported at all. Found by the CHIP
 // Python harness (TC-IDM-2.3 step 4).
 //
-// An attribute changes records as unchanged — every write of it in the
-// interaction left the cluster as it was, by its server's verdict
-// (contract.ChangeReportingWriter) — is not marked: matter.js broadcasts
-// only the properties a commit changed
+// The attributes marked are the ones each successful write's verdict names
+// ([im.WriteResult.Commit]): the written one only when it changed, and any
+// other the write moved with it; a write with no verdict marks its written
+// attribute. matter.js broadcasts only the properties a commit changed
 // (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
-// db021da0, onChange with the change list :1484 fills) and advances no
-// version for an equal value (:1456-1457, :1479), and the dispatcher left
-// the version as it was.
-func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse, changes *endpointpkg.WriteChanges) {
+// db021da0, onChange with the change list; a name noted only when its
+// value differs, :1476-1484) and advances no version for an equal value
+// (:1456-1457), and the dispatcher left the version as it was.
+func (b *Bridge) reportWrittenAttributes(results []im.WriteResult) {
 	mgr := b.subscriptionManagerLocked()
-	for _, r := range resp.Responses {
-		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
-			continue
-		}
-		if changes.Unchanged(r.Path) {
-			continue
-		}
-		if mgr != nil {
-			mgr.OnAttributeChanged(im.ConcreteAttributePath{
-				Endpoint: r.Path.Endpoint, Cluster: r.Path.Cluster, Attribute: r.Path.Attribute,
-				HasEndpoint: true, HasCluster: true, HasAttribute: true,
-			})
-		}
+	if mgr == nil {
+		return
+	}
+	rec := recordOf(results)
+	for _, p := range rec.changed {
+		mgr.OnAttributeChanged(p)
+	}
+	for _, p := range rec.unjudged {
+		mgr.OnAttributeChanged(p)
 	}
 }
 

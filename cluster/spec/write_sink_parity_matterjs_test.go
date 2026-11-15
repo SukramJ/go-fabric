@@ -66,3 +66,31 @@ func TestSinkHearsNoWriteOfTheHeldValue(t *testing.T) {
 		t.Errorf("with a Source answering 9, the Sink heard %#v; want both writes of 5", sk2.writes)
 	}
 }
+
+// TestWriteCommitNamesTheChangedAttribute: Server's change naming
+// (contract.ChangeNamingWriter) names the written attribute when its
+// stored value moved and nothing for a write of the held value, the same
+// verdict MatterWriteChanged gives; a refused write names nothing and
+// carries its error. matter.js notes a name in a commit's change list only
+// when its value differs (Datasource.ts:1476-1484 at db021da0).
+func TestWriteCommitNamesTheChangedAttribute(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := hepaServer(t, spec.ServerConfig{})
+	for i, c := range []struct {
+		value any
+		want  []uint32
+	}{
+		{uint64(1000), []uint32{hepa.AttrLastChangedTime}},
+		{uint32(1000), []uint32{}},
+		{nil, []uint32{hepa.AttrLastChangedTime}},
+	} {
+		got, err := srv.MatterWriteCommit(ctx, hepa.AttrLastChangedTime, c.value)
+		if err != nil || got == nil || !slices.Equal(got, c.want) {
+			t.Errorf("write %d of %#v: %v, %v; want %v", i+1, c.value, got, err, c.want)
+		}
+	}
+	if got, err := srv.MatterWriteCommit(ctx, hepa.AttrLastChangedTime, "not a number"); err == nil || len(got) != 0 {
+		t.Errorf("a refused write: %v, %v; want an error and no names", got, err)
+	}
+}

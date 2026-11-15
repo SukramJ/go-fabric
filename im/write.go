@@ -296,7 +296,30 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // [IsPASEFromContext] after it, mirroring matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
 // keys the implicit Administer grant on the session's auth mode.
-func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,gocognit,funlen // the write interaction's per-path gates in matter.js order
+func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse {
+	return HandleWrite(ctx, d, req).Response
+}
+
+// WriteOutcome is what [HandleWrite] returns: the response for the wire
+// and the dispatcher's results behind it.
+type WriteOutcome struct {
+	// Response is the WriteResponse [HandleWriteRequest] returns.
+	Response WriteResponse
+	// Results are the results the dispatcher returned for the request's
+	// writes, in the order it returned them, each with the status the
+	// response carries for it and the write's verdict
+	// ([WriteResult.Commit]). A path the interaction answered before the
+	// dispatcher was asked — BUSY, an access refusal, a stale
+	// DataVersion — is in Response only.
+	Results []WriteResult
+}
+
+// HandleWrite is [HandleWriteRequest] that returns the dispatcher's
+// results with the response: a transport that reports the written
+// attributes to its subscribers, or settles a host's notifications
+// against the write, reads which attributes changed from
+// [WriteResult.Commit].
+func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutcome { //nolint:gocyclo,gocognit,funlen // the write interaction's per-path gates in matter.js order
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
@@ -351,7 +374,10 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	lastWritten := tx.lastWritten
 	defer func() { tx.lastWritten = lastWritten }()
 	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
-	var wr WriteResponse
+	var (
+		wr      WriteResponse
+		applied []WriteResult
+	)
 	for _, w := range req.Writes {
 		// The interaction's BUSY checks come first (busyBefore).
 		if tx.busyBefore(w.Path, fabricIndex) {
@@ -564,6 +590,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			if res.HasClusterStatus && res.Status != StatusSuccess {
 				res.Status = StatusFailure
 			}
+			applied = append(applied, res)
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   res.Path,
 				Status: StatusIB{Status: res.Status, ClusterStatus: res.ClusterStatus, HasClusterStatus: res.HasClusterStatus},
@@ -581,7 +608,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	} else {
 		tx.releaseHolds(nil)
 	}
-	return wr
+	return WriteOutcome{Response: wr, Results: applied}
 }
 
 // listIndexGate ends a write whose path carries a numeric ListIndex at the

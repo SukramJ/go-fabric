@@ -227,6 +227,7 @@ becomes permissible in:
 | `cluster/core.GeneralCommissioning.SetOnFailSafeRolledBack` | `GeneralCommissioning.SetFailSafeSessionCloser` | `v0.23.0` |
 | `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
 | `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
+| `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
