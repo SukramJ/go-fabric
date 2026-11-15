@@ -302,7 +302,7 @@ changes are the rows marked *changed*.
 | Before | Now |
 | --- | --- |
 | an uncommissioned node always opens its own window | `Commissioning.WindowOnDemand`: the node opens none by itself; the host calls `Node.OpenOwnWindow` (a User-Intent product). `Commissioning.Flow` (`node.FlowStandard`, `FlowUserIntent`, `FlowCustom`) states the flow in the QR code and selects the long manual code |
-| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` (16 bits) | `Hints` (`mdns.PairingHints`, every bit of the bitmap); both set is `mdns.ErrInvalidService`. On the facade: `Commissioning.PairingHints`, `Commissioning.PairingInstruction` |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` (16 bits) | `Hints` (`mdns.PairingHints`, every bit of the bitmap); both set is `mdns.ErrInvalidService`, and so is a bit above 22. A commissioner built on connectedhomeip reads a hint with any of bits 16 to 22 set as no hint at all. On the facade: `Commissioning.PairingHints`, `Commissioning.PairingInstruction` |
 | *changed:* `Node.OpenOwnWindow`, `OpenBasicWindow`, `CloseWindow` before `Start` | return `node.ErrNotStarted` and open nothing; call them after `Start` |
 | *changed:* `Config.Advertiser` beside a `Network.MDNS` with `Off`, `HostName` or `Interfaces` | `Config.Validate` refuses the pair: `Network.MDNS` configures the node's own advertiser only — leave it zero beside a host advertiser |
 | *changed:* an advertised device name (`ProductDescription.Name`, else `BasicInformation.NodeLabel`) over 32 bytes | `Config.Validate` refuses it (decision 26); shorten it |
