@@ -66,7 +66,9 @@ func flowNode(t *testing.T, v uint) (*node.Node, *fleet, *mdns.Noop) {
 // commissionableMode is the published commissionable record's CM key,
 // ok false without such a record.
 func commissionableMode(adv *mdns.Noop) (mode uint64, ok bool) {
-	for _, svc := range adv.Active() {
+	services := adv.Active()
+	for i := range services {
+		svc := &services[i]
 		if svc.ServiceType != mdns.ServiceTypeCommissionable {
 			continue
 		}
