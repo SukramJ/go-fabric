@@ -81,10 +81,13 @@ const bareRefusalRatchet = 100
 // certificate-type refusals of OperationalCredentials and the two
 // KeySetRead misses of GroupKeyManagement name the status matter.js's
 // server throws. Of the ten left, six refuse a Go value of the wrong type
-// or a failing store, refusals matter.js has no counterpart for.
+// or a failing store, refusals matter.js has no counterpart for. 6 after
+// the three epoch-key length refusals (CONSTRAINT_ERROR, the request
+// schema's in matter.js) and the slot-ordering table (INVALID_COMMAND) of
+// GroupKeyManagement name theirs — the six above.
 var securityLeft = map[string]int{
 	"cluster/core/general_commissioning_tc_chip_test.go": 3,
-	"cluster/core/group_key_management_failure_test.go":  6,
+	"cluster/core/group_key_management_failure_test.go":  2,
 	"cluster/core/operational_credentials_test.go":       1,
 }
 
