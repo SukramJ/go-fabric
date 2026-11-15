@@ -37,9 +37,6 @@ import (
 // whose DUT is a cluster client (or a commissioner), read mirrored onto the
 // reference daemon's servers.
 
-// cadminSupport is the support file TC-CADMIN-1.17's steps are defined in.
-const cadminSupport = "tc-cadmin-support.ts"
-
 func init() {
 	for _, c := range []func() goCertCase{caseCADMIN117, caseACT32, caseG32, caseLVL81, caseS31, caseSWTCH32} {
 		registerGoCert(c)

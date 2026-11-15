@@ -57,7 +57,8 @@ func init() {
 	}
 }
 
-// The support files the CADMIN cases' steps are defined in at db021da0.
+// The support files the CADMIN cases' steps are defined in at db021da0;
+// cadminSupport serves TC-CADMIN-1.17 in gocert_app_test.go too.
 const (
 	cadminSupport       = "tc-cadmin-support.ts"
 	cadminWindowSupport = "tc-cadmin-window-support.ts"
@@ -1447,7 +1448,7 @@ func caseDD22() goCertCase {
 				if err != nil {
 					return err
 				}
-				instances := commissionableInstances(th)
+				instances := commissionableInstances(th, th.dut)
 				ctrl, err := th.controller("dut")
 				if err != nil {
 					return err
@@ -1487,21 +1488,6 @@ func caseDD22() goCertCase {
 			}},
 		},
 	}
-}
-
-var reCommissionableInstance = regexp.MustCompile(`msg=matter\.mdns\.commissioning_published .*?\binstance=(\S+)`)
-
-// commissionableInstances is thCommissionableInstanceNames: the instances
-// the TH logged publishing its commissionable record under
-// (bridge/bridge.go matter.mdns.commissioning_published).
-func commissionableInstances(th *goTH) []string {
-	var out []string
-	for _, m := range reCommissionableInstance.FindAllStringSubmatch(th.dut.snapshotStderr(), -1) {
-		if !slices.Contains(out, m[1]) {
-			out = append(out, m[1])
-		}
-	}
-	return out
 }
 
 // vendorProduct reads a commissionable record's VP key ("vendor+product").
