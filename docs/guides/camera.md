@@ -424,7 +424,7 @@ is not removed (EndpointInUse). Reads of the certificate lists serve the
 full certificates, as matter.js's generated behaviour; chip's id-only
 encoding outside a large-payload transport is not mirrored. The fingerprint of `Lookup…Certificate` is the
 certificate's SHA-256. A removed fabric takes its entries along
-(`MatterFabricRemoved`). The tables persist through any `store.Settings`
+(`MatterDropFabric`, `contract.FabricScopedState`). The tables persist through any `store.Settings`
 (the node's store) under the device's key.
 
 ## Persistence

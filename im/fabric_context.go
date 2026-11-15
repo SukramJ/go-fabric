@@ -3,20 +3,20 @@
 
 package im
 
-import "context"
+import (
+	"context"
 
-// fabricFilterContext carries the FabricFiltered flag + the operational
-// FabricIndex through the IM dispatcher to fabric-scoped cluster
-// servers. Mirrors matter.js's OnlineContext.{forFabricFilteredRead,
-// fabricIndex} (packages/protocol/src/interaction/InteractionServer.ts:
+	"github.com/SukramJ/go-fabric/contract"
+)
+
+// The FabricFiltered flag + the operational FabricIndex travel through
+// the IM dispatcher to fabric-scoped cluster servers in the context, under
+// contract's key ([contract.WithAccessingFabric], [contract.AccessingFabric])
+// so a host's server reads them without importing this package. Mirrors
+// matter.js's OnlineContext.{forFabricFilteredRead, fabricIndex}
+// (packages/protocol/src/interaction/InteractionServer.ts:
 // startReadInteraction). go-fabric threads via context.Context to
 // avoid breaking the Dispatcher.Read signature.
-type fabricFilterContext struct {
-	filtered    bool
-	fabricIndex uint8
-}
-
-type fabricFilterCtxKey struct{}
 
 // WithFabricFilter returns a derived context carrying the FabricFiltered
 // flag from the request and the operational FabricIndex resolved from
@@ -35,7 +35,7 @@ type fabricFilterCtxKey struct{}
 // `session.fabric`). [LookupFabricFilter] tells such a request apart
 // from a read with no request behind it.
 func WithFabricFilter(ctx context.Context, filtered bool, fabricIndex uint8) context.Context {
-	return context.WithValue(ctx, fabricFilterCtxKey{}, fabricFilterContext{filtered: filtered, fabricIndex: fabricIndex})
+	return contract.WithAccessingFabric(ctx, fabricIndex, filtered)
 }
 
 // FabricFilterFromContext extracts the FabricFiltered flag + FabricIndex
@@ -43,11 +43,8 @@ func WithFabricFilter(ctx context.Context, filtered bool, fabricIndex uint8) con
 // context is present — the safe default that yields the unfiltered
 // list (Matter §7.5.2).
 func FabricFilterFromContext(ctx context.Context) (filtered bool, fabricIndex uint8) {
-	v, ok := ctx.Value(fabricFilterCtxKey{}).(fabricFilterContext)
-	if !ok {
-		return false, 0
-	}
-	return v.filtered, v.fabricIndex
+	fabricIndex, filtered, _ = contract.AccessingFabric(ctx)
+	return filtered, fabricIndex
 }
 
 // LookupFabricFilter is [FabricFilterFromContext] that also reports
@@ -58,11 +55,8 @@ func FabricFilterFromContext(ctx context.Context) (filtered bool, fabricIndex ui
 // has no fabric yet; the two must not stand for one another, because the
 // first may see what the second may not.
 func LookupFabricFilter(ctx context.Context) (filtered bool, fabricIndex uint8, ok bool) {
-	v, ok := ctx.Value(fabricFilterCtxKey{}).(fabricFilterContext)
-	if !ok {
-		return false, 0, false
-	}
-	return v.filtered, v.fabricIndex, true
+	fabricIndex, filtered, ok = contract.AccessingFabric(ctx)
+	return filtered, fabricIndex, ok
 }
 
 // subjectContext carries the requesting peer's identity for ACL

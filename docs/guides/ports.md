@@ -216,9 +216,10 @@ fails `node.New`.
 
 Beside the ports, the bridge asks the session registry, a cluster server
 and an endpoint's measurement source for optional methods. It finds them
-by type assertion against interfaces that are not exported, so nothing in
-the API names them: a host with its own registry or source implements the
-method with exactly this signature, or the bridge silently does without.
+by type assertion — against the contract's switch-source ports, and for
+the rest against interfaces that are not exported: a host with its own
+registry or source implements the method with exactly this signature, or
+the bridge silently does without.
 `secure/operational.Manager` has every registry method.
 
 | On | Method | Without it |
@@ -238,11 +239,14 @@ method with exactly this signature, or the bridge silently does without.
 | a host's own PASE or CASE handler | `PeerSessionParams() *sessionparams.Parameters` | the handshake's replies retransmit at the default MRP intervals, not at the ones the initiator stated |
 | a PASE or CASE handler | `establishedSession() (sessionID uint16, ok bool)` — unexported, so only the module's `PaseAdapter` and `CaseAdapter` have it | the session the handshake established is bound to the connection or address it came over only with its first message, and the `sessions.open` gauge is not updated when the handshake ends |
 | a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
-| a cluster server on a bridged endpoint | `MatterFabricRemoved(fabricIndex uint8)` | the server is not told of a removed fabric and keeps what it holds for that fabric's peers |
-| an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
-| an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
+| an endpoint's `Measurement` | `contract.SwitchGestureSource` (`WireMatterSwitchHandler(contract.SwitchEventEmitter) func()`) | the source's press gestures do not reach the Switch server |
+| an endpoint's `Measurement` | `contract.SwitchPositionSource` (`WireMatterSwitchPositions(contract.SwitchPositionSink) func()`) | the source's positions do not reach the Switch server |
 
-*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
+A cluster server's state of a removed fabric goes through one port,
+`contract.FabricScopedState`, which the node calls on every server of
+every endpoint; the bridge has no second removal capability.
+
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 
 ## `<cluster>def.Host`: the kit server's host methods
 

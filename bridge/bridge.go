@@ -532,10 +532,10 @@ type Bridge struct {
 	// ([Bridge.rewireMeasurementListeners]); Start wires again when the
 	// manager attached since its initial assembly is another one.
 	listenerManager *subscription.Manager
-	// switchUnsubscribers holds the unsubscribe closures returned by
-	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
-	// matterSwitchSubscribable assertion) and by a position source's
-	// WireMatterSwitchPositions (matterSwitchPositionReporter) for every
+	// switchUnsubscribers holds the unsubscribe closures returned by a
+	// gesture source's WireMatterSwitchHandler (contract.SwitchGestureSource)
+	// and by a position source's WireMatterSwitchPositions
+	// (contract.SwitchPositionSource) for every
 	// bridged GenericSwitch endpoint. Drained at the start of each reassemble:
 	// the wiring registers update hooks on the underlying press DP(s),
 	// and without teardown the hooks would accumulate across
@@ -1656,42 +1656,18 @@ func (b *Bridge) SetOnEvent(fn func(im.EventRecord)) {
 // ([contract.EndpointReceiver]).
 type matterEndpointReceiver = contract.EndpointReceiver
 
-// matterSwitchSubscribable is the model-side surface of a press
-// source (the per-channel [generic.ButtonGroup], or a lone Button /
-// Action DP) that translates its CCU press updates into Matter §1.13
-// switch events.
-//
-// The parameter names [contract.SwitchEventEmitter] — the shared
-// port contract, which the model's own method signature names too (as
-// an alias). That sharing is the whole point: Go interface
-// satisfaction requires identical parameter types, so re-declaring an
-// emitter interface here, however faithful a copy, could never be
-// satisfied by the model types' method set. The assertion in the
-// reassemble wiring would then silently never match and no press
-// event would reach a commissioner — no compile error, no runtime
-// error, just a bridge that never reports a button. The behavioural
-// guard against that is
-// tests/contract/wiring_pins/matter_switch_press_wiring_test.go.
-//
-// The returned unsubscribe closure is retained in
+// matterSwitchSubscribable is [contract.SwitchGestureSource]: the port is
+// the contract's, so the host's method set and the bridge's assertion
+// name the same parameter type (an interface re-declared here could never
+// be satisfied, and no press would reach a commissioner — no compile
+// error, no runtime error). The returned closure is retained in
 // [Bridge.switchUnsubscribers] and drained on the next reassemble.
-type matterSwitchSubscribable interface {
-	WireMatterSwitchHandler(contract.SwitchEventEmitter) func()
-}
+type matterSwitchSubscribable = contract.SwitchGestureSource
 
-// matterSwitchPositionReporter is the model-side surface of a switch source
-// that knows its positions rather than its gestures: at every reassembly it
-// is handed the Switch server's position input ([contract.SwitchPositionSink],
-// cluster/switch.Server — matter.js SwitchServer.ts's rawPosition and
-// currentPosition) and reports each position there. The parameter names
-// the shared contract type for the reason [matterSwitchSubscribable] gives.
-//
-// The returned closure detaches the sink; it is retained in
-// [Bridge.switchUnsubscribers] and drained on the next reassemble, so a
-// source never reports into the server of a superseded topology.
-type matterSwitchPositionReporter interface {
-	WireMatterSwitchPositions(contract.SwitchPositionSink) func()
-}
+// matterSwitchPositionReporter is [contract.SwitchPositionSource], for the
+// reason [matterSwitchSubscribable] gives; its closure is drained the same
+// way.
+type matterSwitchPositionReporter = contract.SwitchPositionSource
 
 // SetOnFabricRemoved wires the post-RemoveFabric hook, nil-safe. Used by the daemon's
 // WS-event publisher; the operational + subscription manager
@@ -1700,13 +1676,6 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 	b.mu.Lock()
 	b.onFabricRemoved = fn
 	b.mu.Unlock()
-}
-
-// fabricRemovalObserver is the optional capability of a device's cluster
-// server to drop what it holds for a removed fabric's peers
-// (thermo.ThermostatServer: its atomic writes).
-type fabricRemovalObserver interface {
-	MatterFabricRemoved(fabricIndex uint8)
 }
 
 // fabricSessionCloser is the optional capability of a [SessionRegistry]
@@ -1930,16 +1899,10 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		for _, ep := range topo.Endpoints {
 			if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
 				ep.ForgetFabricScenes(fabricIndex) //nolint:contextcheck // parts included; a removal's consequence, which no request bounds (store/doc.go, store errors)
-				// And the state a device's cluster server keeps for the
-				// fabric's peers: the Thermostat's atomic writes (matter.js
-				// AtomicWriteHandler observes FabricManager.events.deleting,
-				// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:75,
-				// :378-388 at 862ad75f).
-				for _, srv := range endpoint.ClusterServers(ep) {
-					if o, ok := srv.(fabricRemovalObserver); ok {
-						o.MatterFabricRemoved(fabricIndex)
-					}
-				}
+				// The state a device's cluster server keeps for the
+				// fabric (the Thermostat's atomic writes, the TLS
+				// tables) goes through contract.FabricScopedState, the
+				// one removal path, which the node calls on every server.
 			}
 		}
 	}
