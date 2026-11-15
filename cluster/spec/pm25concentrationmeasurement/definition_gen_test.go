@@ -23,12 +23,6 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
-// TestCodecsRoundTrip encodes a populated value of every generated
-// struct and payload and decodes it back.
-func TestCodecsRoundTrip(t *testing.T) {
-	t.Parallel()
-}
-
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
