@@ -36,7 +36,9 @@ func TestCommissioningBlockedUncommissioned(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	time.Sleep(200 * time.Millisecond)
+	// Start decides on the own window and publishes its CM record before
+	// it returns (node.go, the own window at the end of Start); before
+	// review II, phase 5 a 200 ms sleep stood here (R2-P5-tassert-12).
 	if _, _, ok := commissionableRecord(adv); ok || n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("a blocked uncommissioned node opened its own window / advertised CM")
 	}
@@ -126,7 +128,7 @@ func TestStartDoesNotOpenWindowWhenStoredFabricsFailToLoad(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	time.Sleep(200 * time.Millisecond)
+	// Decided in Start, as in TestCommissioningBlockedUncommissioned.
 	if _, _, ok := commissionableRecord(adv); ok || n.Bridge().CommissioningWindow().IsOpen() {
 		t.Fatal("a node whose stored fabric failed to load opened its commissioning window")
 	}

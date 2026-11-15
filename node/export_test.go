@@ -38,3 +38,9 @@ func CommissionerReachReports(ctx context.Context, n *Node, fabricIndex uint8, n
 	errs = append(errs, err)
 	return reports, errs
 }
+
+// OnReopenCheck makes fn hear each check of a reopen after the last
+// fabric's removal that left the own window closed, with whether a
+// fail-safe was armed and how many sessions were active. It is set before
+// the removal that starts the reopen.
+func OnReopenCheck(n *Node, fn func(armed bool, sessions int)) { n.reopenChecked = fn }

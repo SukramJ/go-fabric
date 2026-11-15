@@ -160,6 +160,11 @@ type Node struct {
 	// reopenPending is set while a reopen after the last fabric waits for
 	// the node to become idle (reopenWhenIdle).
 	reopenPending atomic.Bool
+	// reopenChecked, set by a test before the reopen starts
+	// (export_test.go), hears each check of a pending reopen that left the
+	// window closed: whether a fail-safe was armed and how many sessions
+	// were active.
+	reopenChecked func(armed bool, sessions int)
 	// commissioned is matter.js's CommissioningServer state.commissioned
 	// (CommissioningServer.ts:148-165 at db021da0): true from a start
 	// with stored fabrics and from a committed CommissioningComplete, false
@@ -720,9 +725,13 @@ func (n *Node) reopenWhenIdle() {
 		defer tick.Stop()
 		for {
 			armed := n.root.GeneralCommissioning != nil && n.root.GeneralCommissioning.FailSafeArmed()
-			if !armed && n.sec.sessions.Active() == 0 {
+			sessions := n.sec.sessions.Active()
+			if !armed && sessions == 0 {
 				n.reopenUnlessStopping()
 				return
+			}
+			if checked := n.reopenChecked; checked != nil {
+				checked(armed, sessions)
 			}
 			select {
 			case <-n.life.Done():

@@ -489,9 +489,23 @@ func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	if err := b.Stop(stopCtx); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
+	// Stop withdrew the bridge's records; the advertiser holds one again
+	// (a host's shared advertiser may), so a re-announce would show.
+	if err := adv.Publish(ctx, mdns.Service{
+		InstanceName: "op-record",
+		ServiceType:  "_matter._tcp",
+		HostName:     "reannounce-test.local.",
+		Port:         5540,
+	}); err != nil {
+		t.Fatalf("Publish after Stop: %v", err)
+	}
 	after := adv.publishes()
 	b.triggerSessionReannounce(1)
-	time.Sleep(50 * time.Millisecond)
+	// A re-announce runs on a goroutine the trigger counts in
+	// reannounces; once that has none, a re-publish the trigger started
+	// has happened (before review II, phase 5 a 50 ms sleep stood here,
+	// R2-P5-tassert-12).
+	b.reannounces.Wait()
 	if adv.publishes() != after {
 		t.Errorf("trigger after Stop re-published records — must be a no-op during teardown")
 	}
