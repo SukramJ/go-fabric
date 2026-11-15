@@ -48,7 +48,7 @@ type Config struct {
 	// ScenesManagement server, in place of any a source supplies — as
 	// matter.js mounts ScenesManagementServer for those device types. nil
 	// keeps both for the life of the process (or hands them to the
-	// deprecated OnNodeLabelWritten and Scenes).
+	// older OnNodeLabelWritten and Scenes hooks).
 	Persistence Persistence
 	// OnNodeLabelWritten fires after a controller wrote a bridged
 	// endpoint's BridgedDeviceBasicInformation NodeLabel, with the
@@ -118,7 +118,7 @@ type ScenesStore interface {
 }
 
 // persistence is the Persistence c's endpoints use: Persistence, else the
-// deprecated OnNodeLabelWritten and Scenes adapted, else nil.
+// older OnNodeLabelWritten and Scenes hooks adapted, else nil.
 func (c Config) persistence() Persistence {
 	switch {
 	case c.Persistence != nil:

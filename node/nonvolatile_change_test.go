@@ -547,7 +547,7 @@ func (s *readCountingStore) GetSetting(ctx context.Context, key string) (value s
 // the key are erased with its nonvolatile values — and the erasure reads
 // none of the keys it deletes (N-finp-1): of the forgotten key's settings
 // Forget reads only the endpoint-number reservation that names its parts. matter.js erases the persisted
-// data of an endpoint it deletes (Endpoint.ts:984-992 at db021da0).
+// data of an endpoint it deletes (packages/node/src/endpoint/Endpoint.ts:984-992 at db021da0).
 func TestForgetErasesEveryKeyedRoot(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

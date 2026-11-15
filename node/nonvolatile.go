@@ -555,8 +555,8 @@ func (v *nonVolatile) restored(ctx context.Context, keys map[uint32]nvAttr, stop
 // scene table, Binding list, UserLabel list and surface) is erased, so a
 // device Added under such a key afterwards starts as a new one would —
 // from its declaration's Initial, label and lists. matter.js erases the
-// persisted data of an endpoint it deletes (Endpoint.ts:984-992 at
-// db021da0). A write
+// persisted data of an endpoint it deletes
+// (packages/node/src/endpoint/Endpoint.ts:984-992 at db021da0). A write
 // that reaches a released server is not stored. A removed endpoint
 // ([Aggregator.Remove]) is not forgotten: its servers keep their state,
 // subscription and stored values for the Add that brings it back. The
