@@ -509,8 +509,10 @@ the GitHub Pages site (`mkdocs.yml`, `.github/workflows/pages.yml`;
 `mkdocs build --strict` runs on every pull request that touches it).
 Write it for someone who embeds or evaluates the module: what it does,
 how to wire it, what it guarantees — every behavioural claim checkable
-against the code. A link from a page to a file outside `docs/` is an
-absolute GitHub URL (the strict build rejects relative ones). Planning
+against the code. A link from a page to a file outside `docs/` may be
+relative: the hook `script/mkdocs/repo_links.py` (`mkdocs.yml` → `hooks`)
+rewrites it to its GitHub URL when the target exists, and the strict build
+fails on one whose target does not. Planning
 concepts move to `docs/history/` once executed (not published); owner
 test plans, briefs, audits and parity registers live under `notes/`.
 A change that alters behaviour a page describes updates the page in the
