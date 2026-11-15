@@ -521,18 +521,23 @@ chiptool-families-update: chiptool-build ## the families run that rewrites its f
 		-run '^TestChipCertificationFamilies$$' ./internal/chiptool/... \
 		-args -update-chip-cases -update-certifiability-doc
 
+# What fmt and fmt-check hand gofumpt: every top-level directory and the
+# top-level .go files, but not .claude, whose worktrees hold other
+# branches' files (agent worktrees). `gofumpt -w .` rewrote them, and a
+# file there that does not parse failed fmt-check (review II, DR5a-ci-13).
+GOFUMPT_PATHS = $$(find . -mindepth 1 -maxdepth 1 \( -type d ! -name .claude ! -name .git \) -o \( -type f -name '*.go' \))
+
 .PHONY: fmt
 fmt: ## format with gofumpt
-	$(GOFUMPT) -w .
+	$(GOFUMPT) -w $(GOFUMPT_PATHS)
 
 .PHONY: fmt-check
 fmt-check: ## fail when gofumpt would reformat a file, or when gofumpt itself fails
-	@# .claude/worktrees holds agent worktrees: other branches' files, not this tree's.
-	@# gofumpt's own status is read before its list is filtered, so a
-	@# missing or failing formatter is a failure, not an empty list; no
-	@# temporary file, so concurrent runs do not share one.
-	@out=$$($(GOFUMPT) -l .) || { echo "gofumpt: '$(GOFUMPT) -l .' failed (installed? make setup)"; exit 1; }; \
-		out=$$(printf '%s\n' "$$out" | grep -v '^\.claude/' || true); \
+	@# gofumpt reads GOFUMPT_PATHS (no .claude). Its own status is read,
+	@# so a missing or failing formatter is a failure, not an empty list;
+	@# no temporary file, so concurrent runs do not share one.
+	@out=$$($(GOFUMPT) -l $(GOFUMPT_PATHS)) || \
+		{ echo "gofumpt: '$(GOFUMPT) -l' failed (installed? make setup)"; exit 1; }; \
 		test -z "$$out" || { printf '%s\n' "$$out"; echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
 
 .PHONY: lint
