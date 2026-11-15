@@ -27,9 +27,9 @@ func TestRecordEventWorksOnEveryMountedKitServer(t *testing.T) {
 	t.Parallel()
 	checked, built := 0, 0
 	for _, ty := range device.Types() {
-		dev, err := device.New(ty, device.Options{StableKey: device.StringKey("rec:" + ty.Name), Name: ty.Name, Logger: slog.New(slog.DiscardHandler)})
+		dev, err := device.New(ty, device.Options{StableKey: device.StringKey("rec:" + ty.Name), Name: ty.Name, Logger: slog.New(slog.DiscardHandler)}, device.InitialFor(ty.Name)...)
 		if err != nil {
-			continue // a type whose defaults need the host's declarations
+			continue // a type whose defaults need a feature selection or a port
 		}
 		built++
 		for _, srv := range dev.Servers() {

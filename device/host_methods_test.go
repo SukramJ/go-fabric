@@ -166,16 +166,12 @@ var hostCases = map[uint32]hostCase{
 	h_wc.ClusterID:      {kit: kitOf[*cover.WindowCoveringServer](), covered: []string{"SetCurrentPosition", "SetOperationalStatus", "SetTargetPosition"}},
 	// Thermostat and Valve: AttachMatterTime and RequiresMatterTime are the
 	// node's wiring.
-	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), covered: []string{
+	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), host: hostOf[h_thermostat.Host](h_thermostat.Wrap), covered: []string{
 		"ActivePresetHandle", "ActiveScheduleHandle", "AttachMatterTime", "CurrentSuggestion", "Presets", "RequiresMatterTime", "Schedules",
 		"SetAbsoluteSetpointLimit", "SetActivePresetHandle", "SetActiveScheduleHandle", "SetLocalTemperature",
-		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
+		"SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 		"Suggestions",
-	}, deferred: []string{
-		// The thermostatdef Host row (wave A, script/clustergen/hosts.go)
-		// takes it with SetOccupied (R2-P5-apidev-06).
-		"SetMeasuredTemperature",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},

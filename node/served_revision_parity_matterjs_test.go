@@ -148,10 +148,8 @@ const operationalCredentialsClusterID = 0x003E
 // with a type's bare defaults, as "<where> <cluster> <cluster id>:<attribute id>".
 // None since decision 17: device.New refuses a type whose server would
 // list an attribute matter.js requires a value of (device.Type.RequiredInitial),
-// and the generator gap that remains (OperationalError, a struct default
-// composed from its child's) is on the types it refuses bare; the device
-// package's TestEveryListedAttributeHasAValue holds it. The set is exact
-// in both directions: a new entry fails.
+// and the device package's TestEveryListedAttributeHasAValue holds the
+// rest. The set is exact in both directions: a new entry fails.
 var unansweredWithDefaults = map[string]bool{}
 
 // answersRead reports whether srv answers a read of attr on the path the

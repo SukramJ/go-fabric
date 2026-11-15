@@ -60,22 +60,15 @@ func unserved(t *testing.T) []string {
 }
 
 // hostSupplied are the listed attributes no default fills once the
-// required values are stated: the OperationalError of the two operational
-// state clusters. matter.js builds {errorStateId: 0} from the struct's
-// child default (Fable read 5b-d17: operational-state.element.ts:110-111,
-// DefaultValue.ts:153-179 at db021da0), so New does not refuse it; the Go
-// generator renders no struct default composed from child defaults — a
-// gap of script/clustergen, not a host obligation.
-var hostSupplied = []string{
-	"OperationalState/OperationalError",
-	"RvcOperationalState/OperationalError",
-}
+// required values are stated: none since the generator composes a struct
+// default from its children's (OperationalError, wave A).
+var hostSupplied = []string{}
 
 // TestEveryListedAttributeHasAValue: with its defaults alone, every
 // committed device type serves every attribute its servers list — the
 // SelectDefaultValue fallbacks and the default servers' initialize
-// values of matter.js, beside the values New requires — but the
-// generator's gap ([hostSupplied]). A new gap fails here.
+// values of matter.js, beside the values New requires ([hostSupplied]
+// is empty). A new gap fails here.
 func TestEveryListedAttributeHasAValue(t *testing.T) {
 	t.Parallel()
 	got := unserved(t)
