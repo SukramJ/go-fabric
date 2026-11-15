@@ -45,11 +45,18 @@ var DefaultGitHubConfig = GitHubConfig{
 // githubClient is matter.js's minimal GitHub client
 // (packages/general/src/util/Github.ts:19-159) over the git trees API.
 type githubClient struct {
-	cfg  GitHubConfig
-	http *http.Client
+	cfg GitHubConfig
+	// http asks the repository's tree at the configured APIURL; named
+	// fetches every URL an API answer names (a subtree, a file), foreign
+	// data as a URL a ledger record names is, so through the download
+	// client of a ledger-named URL ([Client].AllowPrivateDestinations).
+	http, named *http.Client
 }
 
-func newGitHubClient(cfg GitHubConfig, hc *http.Client) *githubClient {
+// newGitHubClient is the GitHub client of the store whose ledger client
+// is c: c's HTTP client for the configured APIURL, c's ledger-named
+// download client for the URLs the API's answers name.
+func newGitHubClient(cfg GitHubConfig, c *Client) *githubClient {
 	d := DefaultGitHubConfig
 	if cfg.APIURL == "" {
 		cfg.APIURL = d.APIURL
@@ -63,7 +70,7 @@ func newGitHubClient(cfg GitHubConfig, hc *http.Client) *githubClient {
 	if cfg.CDSignerCertPath == "" {
 		cfg.CDSignerCertPath = d.CDSignerCertPath
 	}
-	return &githubClient{cfg: cfg, http: hc}
+	return &githubClient{cfg: cfg, http: c.httpClient(), named: c.ledgerURLClient()}
 }
 
 // gitHubHTTPError is Github.HttpError (Github.ts:29-41).
@@ -92,6 +99,8 @@ type githubEntry struct {
 type githubDir struct {
 	g   *githubClient
 	url string
+	// named marks a directory whose URL an API answer named.
+	named bool
 
 	// mu guards contents.
 	mu       sync.Mutex
@@ -121,7 +130,7 @@ func (d *githubDir) cd(ctx context.Context, name string) (*githubDir, error) {
 		if e.Type != "tree" {
 			return nil, fmt.Errorf("dcl: path %q not a directory", p)
 		}
-		result = &githubDir{g: d.g, url: e.URL}
+		result = &githubDir{g: d.g, url: e.URL, named: true}
 	}
 	return result, nil
 }
@@ -134,7 +143,7 @@ func (d *githubDir) getBinary(ctx context.Context, name string) ([]byte, error) 
 	if e.Type != "blob" {
 		return nil, fmt.Errorf("dcl: path %q not a regular file", name)
 	}
-	return d.fetch(ctx, e.URL)
+	return d.fetch(ctx, e.URL, true)
 }
 
 func (d *githubDir) load(ctx context.Context) error {
@@ -144,7 +153,7 @@ func (d *githubDir) load(ctx context.Context) error {
 	if loaded {
 		return nil
 	}
-	body, err := d.fetch(ctx, d.url)
+	body, err := d.fetch(ctx, d.url, d.named)
 	if err != nil {
 		return err
 	}
@@ -180,8 +189,10 @@ func (d *githubDir) find(ctx context.Context, name string) (githubEntry, error) 
 }
 
 // fetch is Directory.doFetch (Github.ts:120-141): Accept
-// application/vnd.github.raw, any status but 200 an HTTP error.
-func (d *githubDir) fetch(ctx context.Context, url string) ([]byte, error) {
+// application/vnd.github.raw, any status but 200 an HTTP error. A URL an
+// API answer named (named) goes through the ledger-named download
+// client, the configured APIURL through the HTTP client.
+func (d *githubDir) fetch(ctx context.Context, url string, named bool) ([]byte, error) {
 	if timeout := d.g.cfg.Timeout; timeout >= 0 {
 		if timeout == 0 {
 			timeout = DefaultTimeout
@@ -195,7 +206,11 @@ func (d *githubDir) fetch(ctx context.Context, url string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github.raw")
-	resp, err := d.g.http.Do(req)
+	hc := d.g.http
+	if named {
+		hc = d.g.named
+	}
+	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -165,7 +165,7 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 		s.store = &MemoryStore{}
 	}
 	if opts.FetchTestCertificates && opts.FetchGitHubCertificates && opts.Client != nil {
-		s.github = newGitHubClient(opts.GitHub, opts.Client.httpClient())
+		s.github = newGitHubClient(opts.GitHub, opts.Client)
 	}
 	s.revocations = newRevocationCache(s)
 	if opts.Revocations != nil {

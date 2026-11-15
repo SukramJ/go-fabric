@@ -87,7 +87,8 @@ type Client struct {
 	BaseURL string
 	// HTTPClient sends the requests; nil is http.DefaultClient for the
 	// ledger's own requests and, for the download of a URL a ledger
-	// record names (an OTA image, a CRL distribution point), the module's
+	// record names (an OTA image, a CRL distribution point) or the GitHub
+	// API's answer names (the development-certificate mirror), the module's
 	// guarded client: it connects to public addresses only (see
 	// AllowPrivateDestinations). A host's HTTPClient is the host's policy
 	// for those downloads too: the destination guard does not apply to
@@ -99,7 +100,10 @@ type Client struct {
 	// unspecified or multicast address (IPv4 and IPv6, an IPv4-mapped
 	// IPv6 address as its IPv4 address) is refused when it is dialled —
 	// for the URL itself and for every redirect hop, after the name is
-	// resolved. A lab whose ledger names hosts on the local network sets
+	// resolved. Only those five classes are refused: other special-use
+	// ranges — shared address space 100.64.0.0/10, the NAT64 prefix
+	// 64:ff9b::/96, 6to4 2002::/16, Teredo 2001::/32 and the like — are
+	// not. A lab whose ledger names hosts on the local network sets
 	// it. The switch that counts is the one of the client whose download
 	// it is: softwareupdate.Images downloads a test-net record through
 	// [OTAVersions].TestClient, every other ledger-named URL through the

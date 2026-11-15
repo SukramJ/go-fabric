@@ -596,4 +596,65 @@ func TestGuardBehindAProxy(t *testing.T) {
 	}
 }
 
+// TestGitHubNamedURLsConnectToPublicDestinationsOnly: the URLs the
+// GitHub API's answers name (a subtree, a file) are fetched as a URL a
+// ledger record names: without a host client, a name resolving to a
+// private address, a loopback server and a private IP literal are
+// refused; a destination the guard admits (the test seam stands in for a
+// public address) is fetched. The configured APIURL is the host's.
+func TestGitHubNamedURLsConnectToPublicDestinationsOnly(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	var otherHits atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		otherHits.Add(1)
+		_, _ = w.Write([]byte("x"))
+	}))
+	t.Cleanup(other.Close)
+	api := httptest.NewUnstartedServer(nil)
+	self := "http://" + api.Listener.Addr().String()
+	api.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/project-chip/connectedhomeip/git/trees/master":
+			_, _ = fmt.Fprintf(w, `{"tree":[
+				{"path":"public","type":"blob","url":%q},
+				{"path":"loopback","type":"blob","url":%q},
+				{"path":"literal","type":"blob","url":"http://10.0.0.1/b"},
+				{"path":"named","type":"tree","url":"http://private.example/t"}]}`, self+"/b/public", other.URL+"/b")
+		case "/b/public":
+			_, _ = w.Write([]byte("der"))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	api.Start()
+	t.Cleanup(api.Close)
+	first := api.Listener.Addr().(*net.TCPAddr).AddrPort()
+	c := &Client{guard: newGuardedClient(guardConfig{
+		resolver: stubResolver(map[string][]netip.Addr{"private.example": {netip.MustParseAddr("10.1.2.3")}}),
+		admit: func(ap netip.AddrPort) bool {
+			return ap.Port() == first.Port() && ap.Addr().Unmap() == first.Addr().Unmap()
+		},
+	})}
+	repo := newGitHubClient(GitHubConfig{APIURL: self}, c).repo()
+	if b, err := repo.getBinary(ctx, "public"); err != nil || string(b) != "der" {
+		t.Fatalf("a named URL the guard admits: %q, err %v; want the file", b, err)
+	}
+	for _, name := range []string{"loopback", "literal"} {
+		if _, err := repo.getBinary(ctx, name); !errors.Is(err, errDestination) {
+			t.Fatalf("the named URL of %s: err %v; want the destination refused", name, err)
+		}
+	}
+	dir, err := repo.cd(ctx, "named")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dir.ls(ctx); !errors.Is(err, errDestination) {
+		t.Fatalf("a named subtree resolving to a private address: err %v; want the destination refused", err)
+	}
+	if n := otherHits.Load(); n != 0 {
+		t.Fatalf("%d request(s) reached the loopback server a named URL pointed at; want none", n)
+	}
+}
+
 func discardLog() *log.Logger { return log.New(io.Discard, "", 0) }
