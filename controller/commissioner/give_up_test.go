@@ -123,6 +123,20 @@ func TestPASESessionThatLostTheRaceIsFreed(t *testing.T) {
 	eventually(t, "the losing device's fail-safe to be expired", func() bool {
 		return !loserNode.Root().GeneralCommissioning.FailSafeArmed()
 	})
+	// The fail-safe reads as disarmed a moment before its end has closed
+	// the device's PASE session. A PBKDFParamRequest that arrives in
+	// between is ignored — the device runs one PASE at a time — and its
+	// retransmissions are duplicates of a message already seen, so that
+	// attempt waits out its whole exchange. The test asks for the next
+	// PASE once the session is gone, as node's waitNoPASE does.
+	eventually(t, "the losing device to hold no PASE session", func() bool {
+		for _, e := range loserNode.Sessions().Sessions() {
+			if e.IsPASE {
+				return false
+			}
+		}
+		return true
+	})
 	if _, _, err := c.com.EstablishPASE(ctx, PASEOptions{Addresses: []*net.UDPAddr{loserAddr}, Passcode: nodePasscode}); err != nil {
 		t.Fatalf("the next PASE to the device whose session lost: %v", err)
 	}
