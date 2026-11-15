@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/binary"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -85,4 +86,35 @@ func TestPBKDFParamRequestOnAClosedWindowIsAnsweredInvalidParam(t *testing.T) {
 			t.Fatalf("the handshake %+v holds no claim", key)
 		}
 	})
+}
+
+// paseListingRegistry is a session registry that lists one live PASE
+// session and closes nothing.
+type paseListingRegistry struct{ id uint16 }
+
+func (paseListingRegistry) Close(uint16) error             { return nil }
+func (paseListingRegistry) CloseAllGraceful(time.Time) int { return 0 }
+func (r paseListingRegistry) PASESessionIDs() []uint16     { return []uint16{r.id} }
+
+// TestPBKDFParamRequestOnAClosedWindowBesideALivePASESession: the window's
+// timer closes the window and leaves a PASE session alive; a
+// PBKDFParamRequest then meets the closed window first and is answered
+// InvalidParameter, as matter.js answers it with no PASE server set
+// whatever sessions remain (SecureChannelProtocol.ts:129-137 at db021da0).
+func TestPBKDFParamRequestOnAClosedWindowBesideALivePASESession(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	r.b.AttachCommissioningWindow(NewCommissioningWindow())
+	r.b.mu.Lock()
+	r.b.sessionRegistry = paseListingRegistry{id: 9}
+	r.b.mu.Unlock()
+	if !r.b.paseSessionExists() {
+		t.Fatal("the stub registry's PASE session is not seen")
+	}
+	peer := newPipelinePeer(t, r.b, 0xD00E)
+	_ = peer.send(mrp.SCOpcodePBKDFParamRequest, 0x3200, buildTestPBKDFParamRequest(t, bytes.Repeat([]byte{0x23}, 32)), nil)
+	body, _, _ := peer.recv(mrp.SCOpcodeStatusReport, "the window-closed StatusReport")
+	if len(body) < 8 || binary.LittleEndian.Uint16(body[6:8]) != mrp.SCStatusProtocolInvalidParameter {
+		t.Fatalf("StatusReport body %x, want InvalidParameter", body)
+	}
 }

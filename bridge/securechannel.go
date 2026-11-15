@@ -715,6 +715,14 @@ func (b *Bridge) dispatchPase(
 	proto message.ProtocolHeader,
 	payload []byte,
 ) error {
+	if proto.Opcode == mrp.SCOpcodePBKDFParamRequest && b.paseWindowClosed() {
+		// Before the PASE-session gate: the window's timer closes the
+		// window without closing a PASE session that is still alive
+		// (CommissioningWindow.closeLocked), and with no PASE server set
+		// matter.js answers whatever sessions remain
+		// (SecureChannelProtocol.ts:129-137 at db021da0).
+		return b.refusePaseWindowClosed(src, requestHdr, proto)
+	}
 	if b.paseSessionExists() {
 		// An established PASE session that is not closing: no new PASE
 		// exchange is accepted until it ends. matter.js ignores the
@@ -746,9 +754,6 @@ func (b *Bridge) dispatchPase(
 	}
 	switch proto.Opcode {
 	case mrp.SCOpcodePBKDFParamRequest:
-		if b.paseWindowClosed() {
-			return b.refusePaseWindowClosed(src, requestHdr, proto)
-		}
 		if !b.claimPaseInFlight(key) {
 			// Single-active-PASE (Matter §4.13.1): a second
 			// commissioner's PBKDFParamRequest while a handshake is in
