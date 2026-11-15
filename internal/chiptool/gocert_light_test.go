@@ -241,7 +241,14 @@ func caseCC54() goCertCase {
 }
 
 // caseCC64 mirrors TC-CC-6.4: the ColorTemperature commands, within the
-// physical range step 1 reads.
+// physical range step 1 reads. It runs on the daemon's extended color
+// light, not on the first light with ColorTemperature (the CT-only one):
+// the TS's TH light is the one at COLOR_CONTROL_ENDPOINT
+// (tc-cc-support.ts:35-36), whose ColorControl declares every feature —
+// HueSaturation, EnhancedHue, ColorLoop, XY and ColorTemperature in
+// matter.js's all-clusters TH (support/chip-testing/src/AllClustersTestInstance.ts:465-471
+// at db021da0), FeatureMap 0x1F in chip's (all-clusters-app.matter:8886 at
+// 6170af84) — the light every other CC port lands on.
 func caseCC64() goCertCase {
 	c := &ccClient{}
 	const (
@@ -258,7 +265,7 @@ func caseCC64() goCertCase {
 		return lo, hi, nil
 	}
 	return goCertCase{
-		tc: "TC-CC-6.4", line: 37, pics: []string{"CC.C", "CC.C.F04"}, at: ccEndpoint("CC.S.F04"),
+		tc: "TC-CC-6.4", line: 37, pics: []string{"CC.C", "CC.C.F04"}, at: ccEndpoint("CC.S.F00", "CC.S.F01", "CC.S.F02", "CC.S.F03", "CC.S.F04"),
 		steps: []goStep{
 			{n: "0", line: 38, title: "commission, TH OnOff On, the TH supports ColorTemperature", run: c.setup(ccColorTemperature)},
 			{n: "1", line: 48, title: "the TH's physical colour temperature range is reasonable", run: func(th *goTH) error {
