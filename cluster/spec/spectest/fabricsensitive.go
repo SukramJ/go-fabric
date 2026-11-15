@@ -17,13 +17,16 @@ import (
 // FabricIndex field (Core §7.13.6, the generated field ID 0xFE).
 const fabricIndexTag = 0xFE
 
-// FabricSensitiveList is a fabric-scoped list attribute of a cluster
-// definition whose entry struct has fabric-sensitive fields (access "S").
+// FabricSensitiveList is a list attribute of a cluster definition with
+// fabric-sensitive data: a fabric-scoped list whose entry struct has
+// fabric-sensitive fields (access "S"), or a list whose own access is
+// fabric-sensitive.
 type FabricSensitiveList struct {
 	Cluster   *spec.Cluster
 	Attribute *spec.Attribute
 	// Sensitive are the entry struct's fabric-sensitive fields, in
-	// definition order.
+	// definition order; none for a fabric-sensitive list whose entry
+	// struct marks none.
 	Sensitive []spec.Field
 }
 
@@ -33,9 +36,10 @@ func (l FabricSensitiveList) String() string {
 }
 
 // FabricSensitiveLists returns def's fabric-scoped list attributes ("F" or
-// "S") whose entry struct carries a fabric-sensitive field, in definition
+// "S") whose entry struct carries a fabric-sensitive field, and its list
+// attributes whose own access is fabric-sensitive ("S"), in definition
 // order — the attributes whose entries matter.js serves another fabric
-// without those fields.
+// without those fields, or not at all.
 func FabricSensitiveLists(def *spec.Cluster) []FabricSensitiveList {
 	var out []FabricSensitiveList
 	for i := range def.Attributes {
@@ -53,7 +57,7 @@ func FabricSensitiveLists(def *spec.Cluster) []FabricSensitiveList {
 				sensitive = append(sensitive, st.Fields[j])
 			}
 		}
-		if len(sensitive) > 0 {
+		if len(sensitive) > 0 || a.Access.Fabric == "S" {
 			out = append(out, FabricSensitiveList{Cluster: def, Attribute: a, Sensitive: sensitive})
 		}
 	}
