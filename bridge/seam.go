@@ -110,4 +110,14 @@ func init() {
 		br.mu.RUnlock()
 		return br.ackPumpTick(tracker, outbound, now), true
 	}
+
+	bridgeseam.SubscriptionPersistence = func(b any) (bool, int, bool) {
+		br, ok := b.(*Bridge)
+		if !ok || br == nil {
+			return false, 0, false
+		}
+		br.resumption.mu.Lock()
+		defer br.resumption.mu.Unlock()
+		return !br.resumption.disabled, len(br.resumption.former), true
+	}
 }

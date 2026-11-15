@@ -152,12 +152,13 @@
 //     (endpoint/dispatcher.go:155-169), so the bridge reads as present
 //     and empty rather than broken.
 //   - AttachRootPartsListProvider and AttachAggregatorPartsListProvider
-//     MUST follow their AttachRootClusters / AttachAggregatorClusters
-//     call: each walks the already-attached slice for the Descriptor
+//     are overrides: without them Start installs the live PartsList of
+//     both endpoints itself, from the bridge's own topology. When used,
+//     each MUST follow its AttachRootClusters / AttachAggregatorClusters
+//     call: it walks the already-attached slice for the Descriptor
 //     cluster (0x001D) and installs the provider on it. Called first, or
-//     with no Descriptor mounted, they return false and wire nothing —
-//     check the bool, because the only other symptom is a PartsList
-//     frozen at whatever the Descriptor was constructed with.
+//     with no Descriptor mounted, it returns false and wires nothing —
+//     check the bool.
 //   - AttachCommissioningWindow — silent, and fails open on one check.
 //     The window is wired into the root's GeneralCommissioning by
 //     whichever of this call and AttachRootClusters comes second: a
@@ -451,6 +452,11 @@ type Bridge struct {
 	// the bridge so [Bridge.Reassemble] can re-stamp them onto each
 	// freshly assembled root endpoint without the daemon re-attaching.
 	rootClusters []contract.ClusterServer
+	// rootPartsByHost and aggregatorPartsByHost record that the host
+	// attached its own PartsList provider (AttachRootPartsListProvider,
+	// AttachAggregatorPartsListProvider); without one, Start installs the
+	// bridge's own (installDefaultPartsListProviders).
+	rootPartsByHost, aggregatorPartsByHost bool
 	// aggregatorClusters carry the cluster servers attached to the
 	// Aggregator endpoint (EP 1) — Descriptor (mandatory) + optional
 	// Identify. Apple-bridge topology fix: EP 1 hosts the
@@ -1028,6 +1034,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// resolveSessionFabric: a session whose fabric cannot be named resolves
 	// to endpoint.FabricIndexUnresolvable rather than to 0, and CheckACL
 	// denies that instead of reading it as commissioning traffic.
+
+	// The live PartsList of the root and the Aggregator, unless the host
+	// attached its own (review II, R2-P5-apinode-13).
+	b.installDefaultPartsListProviders()
 
 	// --- Topology assembly ---
 	if err := b.reassembleLocked(ctx, nil); err != nil {
@@ -2099,11 +2109,23 @@ type PartsListProviderSetter interface {
 // AttachRootPartsListProvider walks the attached root clusters and
 // installs the live PartsList provider on the Descriptor cluster
 // (cluster ID 0x001D). Returns true when the provider was wired,
-// false when no Descriptor is mounted.
+// false when no Descriptor is mounted. It is an override: without it,
+// [Bridge.Start] installs the bridge's own provider, every endpoint of
+// the live topology but the root.
 func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, s := range b.rootClusters {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !setPartsListProvider(b.rootClusters, provider) {
+		return false
+	}
+	b.rootPartsByHost = true
+	return true
+}
+
+// setPartsListProvider installs provider on the Descriptor (0x001D) among
+// servers; false when none is mounted.
+func setPartsListProvider(servers []contract.ClusterServer, provider func() []uint16) bool {
+	for _, s := range servers {
 		if s.MatterClusterID() == 0x001D {
 			if setter, ok := s.(PartsListProviderSetter); ok {
 				setter.SetPartsListProvider(provider)
@@ -2112,6 +2134,47 @@ func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
 		}
 	}
 	return false
+}
+
+// installDefaultPartsListProviders gives the root's and the Aggregator's
+// Descriptor the live PartsList — both full-family, computed from the
+// bridge's own topology on every read — unless the host attached a
+// provider of its own. The Aggregator's list leaves out the root's other
+// children (an endpoint whose parent is the root, such as an OTA
+// provider's), which are the root's parts, not its. A Descriptor that is
+// not mounted gets nothing.
+func (b *Bridge) installDefaultPartsListProviders() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.rootPartsByHost {
+		setPartsListProvider(b.rootClusters, func() []uint16 {
+			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
+		})
+	}
+	if !b.aggregatorPartsByHost {
+		setPartsListProvider(b.aggregatorClusters, func() []uint16 {
+			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool {
+				return !ep.IsRoot() && !ep.IsAggregator() && (!ep.HasParentEndpointID || ep.ParentEndpointID != 0)
+			})
+		})
+	}
+}
+
+// liveEndpointIDs returns the ids of the live topology's endpoints that
+// pass keep, ascending; nil before the first assembly.
+func (b *Bridge) liveEndpointIDs(keep func(*endpoint.Endpoint) bool) []uint16 {
+	topology := b.Topology()
+	if topology == nil {
+		return nil
+	}
+	ids := make([]uint16, 0, len(topology.Endpoints))
+	for _, ep := range topology.Endpoints {
+		if ep != nil && keep(ep) {
+			ids = append(ids, ep.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 // AttachAggregatorClusters wires the cluster servers the dispatcher
@@ -2141,19 +2204,16 @@ func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 // clusters and installs the live PartsList provider on the Aggregator's
 // Descriptor cluster (cluster ID 0x001D on endpoint 1). Returns true
 // when the provider was wired, false when no Descriptor is mounted on
-// the Aggregator.
+// the Aggregator. It is an override: without it, [Bridge.Start] installs
+// the bridge's own provider, every bridged endpoint of the live topology.
 func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, s := range b.aggregatorClusters {
-		if s.MatterClusterID() == 0x001D {
-			if setter, ok := s.(PartsListProviderSetter); ok {
-				setter.SetPartsListProvider(provider)
-				return true
-			}
-		}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !setPartsListProvider(b.aggregatorClusters, provider) {
+		return false
 	}
-	return false
+	b.aggregatorPartsByHost = true
+	return true
 }
 
 // Stop tears down the bridge: reports what every subscription owes,
@@ -2873,7 +2933,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		DeviceTypeID:       params.DeviceTypeID,
 		DeviceName:         params.NodeLabel,
 		Hints:              params.Hints,
-		PairingHint:        params.PairingHint,
+		PairingHint:        params.PairingHint, //nolint:staticcheck // the deprecated field is forwarded until it is removed
 		PairingInstruction: params.PairingInstruction,
 		RotatingID:         params.RotatingID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
@@ -3010,6 +3070,9 @@ func (b *Bridge) diagRing() *diagevent.Ring {
 // [mrpRTTWindow] for why this stays off the cluster surface.
 //
 // Safe on a nil bridge (Matter disabled), which reports an empty summary.
+//
+// Deprecated: nothing reads it, and it has no replacement; removable in
+// the next minor release.
 func (b *Bridge) ControllerRTT() MRPRTTStats {
 	if b == nil {
 		return MRPRTTStats{}

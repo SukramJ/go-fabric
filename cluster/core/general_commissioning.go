@@ -148,6 +148,9 @@ type GeneralCommissioning struct {
 	// stays open for the full duration (typ. 180 s) and a second,
 	// unintended fabric can be admitted.
 	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
+	// facadeOnCommissioningComplete is the node facade's slot of the
+	// same hook (internal/facadeseam), run before the host's.
+	facadeOnCommissioningComplete func(ctx context.Context, fabricIndex uint8)
 	// failSafeCommit is CommissioningComplete's durable commit
 	// ([GeneralCommissioning.SetFailSafeCommit]); nil commits the terms
 	// acceptance only.
@@ -433,7 +436,9 @@ func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
 // the pending fabric, disarms the fail-safe and then posts the
 // commissioning-complete event
 // (src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:545,
-// :559-560 at 6170af84).
+// :559-560 at 6170af84). The node facade wires a handler of its own in a
+// separate slot, which runs first; this one is the host's and replacing it
+// leaves the facade's in place.
 func (g *GeneralCommissioning) SetOnCommissioningComplete(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onCommissioningComplete = fn
@@ -1220,7 +1225,7 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 	// success path and matter.js GeneralCommissioningServer.ts state mutation
 	// on CommissioningComplete.
 	g.dataVersion.Bump()
-	hook := g.onCommissioningComplete
+	hook := chainFabricHooks(g.facadeOnCommissioningComplete, g.onCommissioningComplete)
 	commissioned := g.onCommissioned
 	// The hooks run without the lock — they may take arbitrary locks
 	// (commissioning window mutex, mDNS unpublish, …) — and after the

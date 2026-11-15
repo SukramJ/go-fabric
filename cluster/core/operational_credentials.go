@@ -80,7 +80,11 @@ type OperationalCredentials struct {
 	rearmFailSafeForFabric func(fabricIndex uint8)
 	onFabricLeaving        func(ctx context.Context, fabricIndex uint8)
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
-	onAdminEntryInstalled  func(entry store.ACLEntry)
+	// facadeOnFabricRemoved and facadeOnFabricUpdated are the node
+	// facade's slots of the fabric-removed and fabric-updated hooks
+	// (internal/facadeseam), run before the host's.
+	facadeOnFabricRemoved, facadeOnFabricUpdated func(ctx context.Context, fabricIndex uint8)
+	onAdminEntryInstalled                        func(entry store.ACLEntry)
 
 	// pendingCSRSession is the session that issued the pending
 	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest,
@@ -203,6 +207,9 @@ type OperationalCredentials struct {
 // owns the cluster), so the hook cannot be passed via [OpcredsConfig]
 // at NewOperationalCredentials time. Idempotent — re-wiring (e.g. on
 // topology rebuild) replaces the closure cleanly. Pass nil to detach.
+// The node facade wires a handler of its own in a separate slot, which
+// runs first; this one is the host's and replacing it leaves the
+// facade's in place.
 func (o *OperationalCredentials) SetOnFabricRemoved(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricRemoved = hook
@@ -714,7 +721,9 @@ func (o *OperationalCredentials) failSafeRequired(ctx context.Context) bool {
 
 // SetOnFabricUpdated wires the fabric-updated hook after construction.
 // The daemon wires this once both the cluster and the session manager
-// are constructed. Idempotent. Pass nil to detach.
+// are constructed. Idempotent. Pass nil to detach. The node facade
+// wires a handler of its own in a separate slot, which runs first; this
+// one is the host's and replacing it leaves the facade's in place.
 func (o *OperationalCredentials) SetOnFabricUpdated(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricUpdated = hook
@@ -929,7 +938,7 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 		o.notifyFabricRemoved(f.FabricIndex)
 		o.notifyChanged()
 		o.mu.RLock()
-		hook := o.onFabricRemoved
+		hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
 		o.mu.RUnlock()
 		if hook != nil {
 			hook(ctx, f.FabricIndex)
@@ -1024,7 +1033,7 @@ func (o *OperationalCredentials) reportUpdateRolledBack(ctx context.Context, bef
 	after, err := o.store.GetFabric(context.WithoutCancel(ctx), before.FabricIndex)
 	o.mu.RLock()
 	withdraw := o.onFabricWithdraw
-	hook := o.onFabricUpdated
+	hook := chainFabricHooks(o.facadeOnFabricUpdated, o.onFabricUpdated)
 	o.mu.RUnlock()
 	if err == nil && after.NodeID != before.NodeID && withdraw != nil {
 		withdraw(ctx, before.CompressedID, before.NodeID)
@@ -2674,7 +2683,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	o.pendingFabric = idx
 	o.pendingPrivKey = nil
 	o.pendingCSRForUpdate = false
-	hook := o.onFabricUpdated
+	hook := chainFabricHooks(o.facadeOnFabricUpdated, o.onFabricUpdated)
 	o.mu.Unlock()
 	// Bump DataVersion after successful UpdateNOC — fabric list changed.
 	o.dataVersion.Bump()
@@ -2849,7 +2858,7 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	o.notifyFabricRemoved(fabricIndex)
 
 	o.mu.Lock()
-	hook := o.onFabricRemoved
+	hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
 	withdrawHook := o.onFabricWithdraw
 	o.mu.Unlock()
 

@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/internal/facadeseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -116,7 +117,9 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	window.SetFailSafeExpirer(h.root.GeneralCommissioning)
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
-	window.SetTransitionHook(func() {
+	// In the facade's own slot (internal/facadeseam): a host's
+	// SetTransitionHook adds to it.
+	facadeSlot(facadeseam.SetTransitionHook(window, func() {
 		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the node's lifetime
 		reopen := h.transition(ctx, window)
 		// The host's observer runs after the facade's handling.
@@ -128,7 +131,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 			// close, then open.
 			h.reopenIfDecommissioned(ctx, st) //nolint:contextcheck // as above
 		}
-	})
+	}), "commissioning window transition")
 }
 
 // transition is the facade's handling of a window transition: the PASE

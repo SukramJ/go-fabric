@@ -61,11 +61,12 @@
 // SetOnReassembled — reachable through [Node.Root] and [Node.Bridge]; a
 // fabric's installation reaches the host through Observers.OnFabricAdded. The fabric, commissioning-complete and window events reach
 // the host through [Config].Observers, chained after the facade's own
-// handlers; a host that set the cluster hooks the facade wires
-// (OperationalCredentials SetOnFabricRemoved / SetOnFabricUpdated,
-// GeneralCommissioning SetOnCommissioningComplete, the window's
-// SetTransitionHook, reached only through [Node.Bridge]) would replace the
-// facade's wiring. The window itself is the facade's: [Node.OpenOwnWindow]
+// handlers. The cluster hooks the facade wires (OperationalCredentials
+// SetOnFabricRemoved / SetOnFabricUpdated, GeneralCommissioning
+// SetOnCommissioningComplete, the window's SetTransitionHook, reached
+// through [Node.Root] and [Node.Bridge]) keep the facade's handler in a
+// slot of its own: a host that sets one adds its handler, which runs after
+// the facade's. The window itself is the facade's: [Node.OpenOwnWindow]
 // opens the node's own window with the configured credentials,
 // [Node.OpenBasicWindow] one with other credentials, [Node.CloseWindow]
 // closes the open window whoever opened it, [Node.Window] reads it and

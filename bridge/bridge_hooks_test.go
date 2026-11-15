@@ -225,3 +225,56 @@ func TestBridge_AttachRootClusters_NilClearsServers(t *testing.T) {
 		t.Error("AttachRootPartsListProvider should return false after clearing root clusters")
 	}
 }
+
+// TestBridge_StartInstallsTheLivePartsLists (R2-P5-apinode-13): a bridge
+// started without either Attach…PartsListProvider serves the live
+// PartsList on both Descriptors — the root's lists every endpoint but
+// itself, the Aggregator's every bridged one — and a provider the host
+// attached before Start is kept.
+func TestBridge_StartInstallsTheLivePartsLists(t *testing.T) {
+	t.Parallel()
+	t.Run("defaults", func(t *testing.T) {
+		t.Parallel()
+		b := newTestBridge(t)
+		root, agg := &fakeDescriptor{id: 0x001D}, &fakeDescriptor{id: 0x001D}
+		b.AttachRootClusters([]contract.ClusterServer{root})
+		b.AttachAggregatorClusters([]contract.ClusterServer{agg})
+		if err := b.Start(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = b.Stop(context.Background()) })
+		if root.currentProvider == nil || agg.currentProvider == nil {
+			t.Fatalf("Start left a Descriptor without a provider: root %v, aggregator %v", root.currentProvider != nil, agg.currentProvider != nil)
+		}
+		var want []uint16
+		for _, ep := range b.Topology().Endpoints {
+			if ep != nil && ep.ID != 0 {
+				want = append(want, ep.ID)
+			}
+		}
+		if got := root.currentProvider(); len(got) == 0 || len(got) != len(want) {
+			t.Errorf("root PartsList %v, want the live non-root endpoints %v", got, want)
+		}
+		for _, id := range agg.currentProvider() {
+			if id == 0 || id == 1 {
+				t.Errorf("the Aggregator's PartsList names endpoint %d", id)
+			}
+		}
+	})
+	t.Run("host override kept", func(t *testing.T) {
+		t.Parallel()
+		b := newTestBridge(t)
+		root := &fakeDescriptor{id: 0x001D}
+		b.AttachRootClusters([]contract.ClusterServer{root})
+		if !b.AttachRootPartsListProvider(func() []uint16 { return []uint16{42} }) {
+			t.Fatal("AttachRootPartsListProvider refused a mounted Descriptor")
+		}
+		if err := b.Start(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = b.Stop(context.Background()) })
+		if got := root.currentProvider(); len(got) != 1 || got[0] != 42 {
+			t.Errorf("root PartsList %v after Start, want the host's [42]", got)
+		}
+	})
+}

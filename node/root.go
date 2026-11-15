@@ -7,13 +7,11 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"runtime"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
@@ -24,9 +22,9 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/tls"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/internal/coreseam"
+	"github.com/SukramJ/go-fabric/internal/facadeseam"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/store"
@@ -257,7 +255,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			observer(ctx, fabricIndex)
 		}
 	}
-	generalCom.SetOnCommissioningComplete(commissioned)
+	facadeSlot(facadeseam.SetOnCommissioningComplete(generalCom, commissioned), "GeneralCommissioning commissioning complete")
 
 	r.AccessControl, err = mattercore.NewAccessControl(d.st) //nolint:contextcheck // the constructor takes no context; it reads the store once
 	if err != nil {
@@ -314,10 +312,10 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 			expired(ctx, fi)
 			wifiNC.OnFailSafeExpired()
 		})
-		generalCom.SetOnCommissioningComplete(func(ctx context.Context, fi uint8) {
+		facadeSlot(facadeseam.SetOnCommissioningComplete(generalCom, func(ctx context.Context, fi uint8) {
 			wifiNC.OnCommissioningComplete(ctx)
 			commissioned(ctx, fi)
-		})
+		}), "GeneralCommissioning commissioning complete")
 		// The network list is stored before the fabric row is committed,
 		// and written back when that commit fails (review II,
 		// R2-P2-store-01).
@@ -608,42 +606,6 @@ func clusterIDsOf(servers []contract.ClusterServer) func() []uint32 {
 		}
 		return ids
 	}
-}
-
-// attachPartsListProviders installs the two live PartsList providers,
-// both full-family (wiring.go:301-327 at b4ea1f96^; matter.js DescriptorServer.ts
-// #updatePartsList for the full-family RootNode and Aggregator).
-func attachPartsListProviders(br *bridge.Bridge) error {
-	if !br.AttachRootPartsListProvider(func() []uint16 {
-		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
-	}) {
-		return errors.New("node: root Descriptor missing: PartsList provider could not be attached")
-	}
-	if !br.AttachAggregatorPartsListProvider(func() []uint16 {
-		// The Aggregator's siblings — the OTA provider's endpoint — are
-		// the root's parts, not its.
-		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() && !ep.IsAggregator() && !isRootChild(ep) })
-	}) {
-		return errors.New("node: aggregator Descriptor missing: PartsList provider could not be attached")
-	}
-	return nil
-}
-
-// endpointIDs returns the ids of the live topology's endpoints that pass
-// keep, ascending; nil before the first assembly.
-func endpointIDs(br *bridge.Bridge, keep func(*endpoint.Endpoint) bool) []uint16 {
-	topology := br.Topology()
-	if topology == nil {
-		return nil
-	}
-	ids := make([]uint16, 0, len(topology.Endpoints))
-	for _, ep := range topology.Endpoints {
-		if ep != nil && keep(ep) {
-			ids = append(ids, ep.ID)
-		}
-	}
-	slices.Sort(ids)
-	return ids
 }
 
 // runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^).

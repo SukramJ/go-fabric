@@ -23,7 +23,7 @@ A host names none of the packages below for these:
 | DNS-SD | a nil `Config.Advertiser`: the module's mDNS responder, shaped by `Network.MDNS` (`Off`, `HostName`) and `Network.InterfaceCheck` (how often it and GeneralDiagnostics compare the host's interfaces; negative disables); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS`, `TriggerReannounce` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
 | Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
-| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` replaces the facade's own hook |
+| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` adds a host hook that runs after the facade's own |
 | Health | `Config.Health{Interval}`, `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` / `Node.ObserveAsync` for hooks registered on a running node |
 | The served surface | `Node.Surface()`: the policies' digest, level, profiles, extensions, the effective surface, every decision, the withheld elements and the announced changes; `Observers.OnSurfaceChanged` for each change as it is announced |
@@ -98,7 +98,12 @@ order with what a skip costs
 **Costs.** The facade attaches every port in the documented order. An
 `Attach…` call replaces what the facade attached for that port, and with
 it the facade's wiring behind it — the fabric fan-out, the window
-semantics, the persistence the facade threads through. A host that drives
+semantics, the persistence the facade threads through. Four hooks are
+the exception: the fabric-removed and fabric-updated hooks of
+`OperationalCredentials`, `GeneralCommissioning`'s commissioning-complete
+hook and the window's `SetTransitionHook` keep the facade's handler in a
+slot of its own, and a host's `Set…` adds a handler that runs after it. A
+host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 

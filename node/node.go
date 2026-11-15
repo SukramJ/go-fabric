@@ -28,6 +28,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/facadeseam"
 	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 	"github.com/SukramJ/go-fabric/mdns"
@@ -450,8 +451,10 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
 	n.root.OperationalCredentials.SetOnFabricLeaving(n.fabricLeaving)
-	n.root.OperationalCredentials.SetOnFabricRemoved(n.observedFabricRemoved)
-	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
+	// In the facade's own slot (internal/facadeseam): a host's
+	// SetOnFabricRemoved / SetOnFabricUpdated adds to them.
+	facadeSlot(facadeseam.SetOnFabricRemoved(n.root.OperationalCredentials, n.observedFabricRemoved), "OperationalCredentials fabric removed")
+	facadeSlot(facadeseam.SetOnFabricUpdated(n.root.OperationalCredentials, n.observedFabricUpdated), "OperationalCredentials fabric updated")
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
 	n.wireEventsUTC()
@@ -1134,12 +1137,8 @@ func (n *Node) startLocked(ctx context.Context) error {
 	if err := n.checkDataModelTest(); err != nil {
 		return err
 	}
-	// The root's and the Aggregator's PartsList providers read the live
-	// topology on each read; attaching them needs only the root servers,
-	// so it is checked before anything starts.
-	if err := attachPartsListProviders(n.br); err != nil {
-		return err
-	}
+	// The root's and the Aggregator's live PartsList are the bridge's own
+	// (bridge.Bridge.Start installs both providers).
 	// The fabric hooks the store owes run before anything is served
 	// (R2-P2-comm-03, R2-P5-port-18).
 	n.deliverOwedFabricEvents(ctx)
@@ -1647,4 +1646,13 @@ func (n *Node) checkDataModelTest() error {
 		return fmt.Errorf("node: %w", err)
 	}
 	return nil
+}
+
+// facadeSlot fails loudly when a facade seam did not take its handler: the
+// seam's setter is handed the server it serves, so false is a wiring
+// defect of this package, not a runtime condition.
+func facadeSlot(ok bool, what string) {
+	if !ok {
+		panic("node: the facade's slot of the " + what + " hook was not set")
+	}
 }

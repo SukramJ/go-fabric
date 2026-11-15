@@ -95,3 +95,9 @@ var ServeConn func(b any, c transport.Conn) (deliver func(msg []byte), closeConn
 // listener. Reports false when b is not a bridge, has started, or listens
 // on TCP (Config.TCP.Incoming), which the in-memory network does not carry.
 var UseListener func(b any, open func() (*udp.Listener, error)) bool
+
+// SubscriptionPersistence reads the subscription persistence's state:
+// whether it is on (Bridge.SetSubscriptionPersistence) and how many
+// subscriptions of the previous run wait for their re-establishment.
+// Reports ok false when b is not a bridge.
+var SubscriptionPersistence func(b any) (enabled bool, former int, ok bool)

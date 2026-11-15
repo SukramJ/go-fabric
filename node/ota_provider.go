@@ -193,12 +193,6 @@ func placeOTAProvider(topo *endpoint.Topology) {
 	}
 }
 
-// isRootChild reports whether ep hangs off the root directly — the
-// Aggregator's siblings, which are not in its PartsList.
-func isRootChild(ep *endpoint.Endpoint) bool {
-	return ep.HasParentEndpointID && ep.ParentEndpointID == 0
-}
-
 // otaProviderEndpointID returns the provider endpoint's number, false
 // before the first assembly.
 func (n *Node) otaProviderEndpointID() (uint16, bool) {

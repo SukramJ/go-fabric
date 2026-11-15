@@ -145,6 +145,10 @@ func (noopAckHandler) Discharge(uint16, uint16, bool) bool { return false }
 // initiator and exchange — comes from [Bridge.AttachPaseHandlerProvider]
 // instead, and when a provider is wired the singleton handler is
 // ignored.
+//
+// Deprecated: wire PASE through [Bridge.AttachPaseHandlerProvider]; a
+// provider that returns one handler for every handshake is this
+// method's shape. Removable in the next minor release.
 func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	// A fresh acceptor marks a commissioning-window boundary; give the new
 	// window its own PASE brute-force budget and a free
@@ -422,6 +426,10 @@ func (b *Bridge) dropHandshakeNotBegun(src net.Addr, proto message.ProtocolHeade
 // longer retransmitted, and its Sigma3 is acknowledged and not answered, as
 // one no Sigma1 began, instead of reaching a handler that never saw its
 // Sigma1 (review II, R2-P4-rr-sec-02).
+//
+// Deprecated: wire CASE through [Bridge.AttachCaseHandlerProvider]; a
+// provider that returns one handler for every handshake is this
+// method's shape. Removable in the next minor release.
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
 	var unfinished []HandshakeKey
 	b.mu.Lock()

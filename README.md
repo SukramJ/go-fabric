@@ -123,7 +123,7 @@ already draws that line for itself: `internal/` holds three kinds of
 package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
-`channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `fabrictestseam`,
+`channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
 `nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
 internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing

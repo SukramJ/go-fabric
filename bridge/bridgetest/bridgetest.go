@@ -221,3 +221,20 @@ func AckPumpTick(b *bridge.Bridge, now time.Time) (int, error) {
 	}
 	return emitted, nil
 }
+
+// SubscriptionPersistence reports whether b keeps its subscriptions for the
+// next run (bridge.Bridge.SetSubscriptionPersistence) and how many
+// subscriptions of the previous run wait for
+// bridge.Bridge.ReestablishFormerSubscriptions. It replaces the bridge's
+// SubscriptionPersistenceEnabled and FormerSubscriptionCount, which only
+// tests read.
+func SubscriptionPersistence(b *bridge.Bridge) (enabled bool, former int, err error) {
+	if b == nil {
+		return false, 0, ErrNoBridge
+	}
+	enabled, former, ok := bridgeseam.SubscriptionPersistence(b)
+	if !ok {
+		return false, 0, ErrNoBridge
+	}
+	return enabled, former, nil
+}
