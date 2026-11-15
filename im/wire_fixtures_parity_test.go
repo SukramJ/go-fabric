@@ -325,13 +325,14 @@ func TestIMWireFixtures_MarshalParity(t *testing.T) {
 				got = encodeInvokeResponse(t, rec.Fixture)
 			default:
 				// The client requests (ReadRequest, SubscribeRequest,
-				// WriteRequest, TimedRequest) are compared by
-				// TestParityClientRequestFixtures; InvokeRequest is recorded
-				// for documentation.
+				// WriteRequest, TimedRequest, InvokeRequest) go through the
+				// client encoder, as in TestParityClientRequestFixtures and
+				// TestInvokeClientRequestParityMatterJS. A fixture type no
+				// encoder knows fails: a skip here would drop a regenerated
+				// fixture unseen (review II, R2-P5-tassert-11).
 				var ok bool
 				if got, ok = encodeClientRequest(t, rec); !ok {
-					t.Skipf("type %q has no encoder exercised here", rec.Type)
-					return
+					t.Fatalf("fixture type %q has no encoder", rec.Type)
 				}
 			}
 

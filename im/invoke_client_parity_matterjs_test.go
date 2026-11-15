@@ -6,7 +6,6 @@ package im
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -22,32 +21,9 @@ func TestInvokeClientRequestParityMatterJS(t *testing.T) {
 		if rec.Type != "InvokeRequest" {
 			continue
 		}
-		var fx struct {
-			SuppressResponse bool `json:"suppressResponse"`
-			TimedRequest     bool `json:"timedRequest"`
-			InvokeRequests   []struct {
-				CommandPath struct {
-					EndpointID uint16 `json:"endpointId"`
-					ClusterID  uint32 `json:"clusterId"`
-					CommandID  uint32 `json:"commandId"`
-				} `json:"commandPath"`
-			} `json:"invokeRequests"`
-		}
-		if err := json.Unmarshal(rec.Fixture, &fx); err != nil {
-			t.Fatal(err)
-		}
-		req := InvokeRequest{SuppressResponse: fx.SuppressResponse, TimedRequest: fx.TimedRequest}
-		for _, r := range fx.InvokeRequests {
-			req.Invokes = append(req.Invokes, CommandInvocation{Path: ConcreteCommandPath{
-				Endpoint: r.CommandPath.EndpointID, Cluster: r.CommandPath.ClusterID, Command: r.CommandPath.CommandID,
-				HasEndpoint: true, HasCluster: true, HasCommand: true,
-			}})
-		}
-		enc := tlv.NewEncoder()
-		MarshalInvokeRequestTLV(enc, req, func(*tlv.Encoder, tlv.Tag, any) {})
-		got, err := enc.Bytes()
-		if err != nil {
-			t.Fatal(err)
+		got, ok := encodeClientRequest(t, rec)
+		if !ok {
+			t.Fatalf("%s: no client encoder for InvokeRequest", rec.Label)
 		}
 		want, _ := hex.DecodeString(rec.BytesHex)
 		if !bytes.Equal(got, want) {
