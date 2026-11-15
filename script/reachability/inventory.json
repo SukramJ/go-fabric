@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8767,
+  "entry_points": 8773,
   "entry_packages": [
     ".",
     "bdx",
@@ -287,9 +287,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18539,
+    "total_exported": 18540,
     "reachable": 12491,
-    "whitelisted": 6048,
+    "whitelisted": 6049,
     "unreachable": 0
   },
   "by_package": [],
@@ -9781,6 +9781,13 @@
       "line": 45
     },
     {
+      "package": "cluster/boolcfg",
+      "identifier": "WriteSensitivityThroughSink",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/boolcfg/export_test.go",
+      "line": 16
+    },
+    {
       "package": "cluster/camera",
       "identifier": "AudioStream",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -12522,14 +12529,14 @@
       "identifier": "TestElectricalPowerReportsItsServedReadings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 239
+      "line": 264
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestElectricalValuesDecodeThroughTheGeneratedCodecs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 115
+      "line": 140
     },
     {
       "package": "cluster/measurement",
@@ -12620,7 +12627,7 @@
       "identifier": "TestServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 63
+      "line": 64
     },
     {
       "package": "cluster/measurement",
@@ -12662,7 +12669,7 @@
       "identifier": "TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 172
+      "line": 197
     },
     {
       "package": "cluster/media",
@@ -13285,21 +13292,21 @@
       "identifier": "TestListValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/servicearea/typed_coverage_internal_test.go",
-      "line": 87
+      "line": 96
     },
     {
       "package": "cluster/servicearea",
       "identifier": "TestMatterWriteRunsTheVetoOnAWritableAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/servicearea/typed_coverage_internal_test.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "cluster/servicearea",
       "identifier": "TestSetAttributesRefusesAListOfAnotherType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/servicearea/typed_coverage_internal_test.go",
-      "line": 69
+      "line": 78
     },
     {
       "package": "cluster/spec",

@@ -74,19 +74,19 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1210,
+    "line": 1209,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2708,
+    "line": 2707,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4287,
+    "line": 4286,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
