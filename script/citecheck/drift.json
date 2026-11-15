@@ -340,7 +340,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 350,
+    "line": 362,
     "citation": "PaseServer.ts:155-157",
     "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
     "identifier": "SessionParameters",
@@ -349,7 +349,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 1154,
+    "line": 1166,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -469,7 +469,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2052,
+    "line": 2057,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -478,7 +478,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2196,
+    "line": 2201,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
@@ -524,7 +524,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 63,
+    "line": 68,
     "citation": "MRP.ts:100-108",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "at": "db021da0",
@@ -534,7 +534,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1437,
+    "line": 1473,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -543,7 +543,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2056,
+    "line": 2092,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -552,7 +552,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2132,
+    "line": 2168,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",

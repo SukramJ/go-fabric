@@ -156,8 +156,9 @@ func sessionIDOf(v sigmaValue) (uint16, error) {
 // it must be a structure — any other element, an array or a list
 // included, refuses the message, as matter.js refuses an element of
 // another type at a structure field (packages/types/src/tlv/TlvObject.ts:206-207
-// at db021da0; the field is TlvOptionalField(5, TlvSessionParameters),
-// packages/protocol/src/session/case/CaseMessages.ts:34, :46, :55).
+// at db021da0). The member is the messages' optional session-parameters
+// structure (packages/protocol/src/session/case/CaseMessages.ts:34, :46,
+// :55).
 func sessionParamsOf(dec *sigmaDecoder, v sigmaValue) (SessionParameters, error) {
 	if v.elemType != tlv.TypeStructure {
 		return SessionParameters{}, fmt.Errorf("session parameters: TLV type 0x%02X, want a structure", uint8(v.elemType))
