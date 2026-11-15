@@ -1668,8 +1668,8 @@ func (g *GeneralCommissioning) ArmOnPaseEstablished(ctx context.Context) error {
 // arm settled — one it ran over a due window, or one in flight it waited
 // for — closed sessionID, or when ctx ended while it waited. A rollback's
 // sessions are named by the session closer
-// ([GeneralCommissioning.SetFailSafeSessionCloser]); with only the
-// deprecated SetOnFailSafeRolledBack wired, which names none, any PASE
+// ([GeneralCommissioning.SetFailSafeSessionCloser]); with only the older
+// SetOnFailSafeRolledBack wired, which names none, any PASE
 // close refuses it, as ArmOnPaseEstablished. The caller closes the session
 // on an error.
 func (g *GeneralCommissioning) ArmOnPaseSession(ctx context.Context, sessionID uint16) error {

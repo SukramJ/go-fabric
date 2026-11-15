@@ -740,7 +740,7 @@ func (s *ThermostatServer) SetMeasuredTemperature(t *int16) {
 	v := int32(*t) + int32(calib)*10
 	if v < math.MinInt16 || v > math.MaxInt16 {
 		s.logger().Warn("matter.thermostat.measured_temperature_ignored",
-			slog.Int("measured", int(*t)), slog.Int("calibration", int(calib)), slog.Int("calibrated", int(v)))
+			slog.Int("value", int(*t)), slog.Int("result", int(v)))
 		return
 	}
 	c := int16(v)

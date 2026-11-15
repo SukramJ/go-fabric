@@ -675,8 +675,8 @@ func (r *connReceiver) close() {
 // wait waits for every delivered message's handler to return.
 func (r *connReceiver) wait() { r.wg.Wait() }
 
-// gattPeripheral is the host's peripheral: [Config].GATT, else the
-// deprecated [Config].BLE adapted to it, nil without either.
+// gattPeripheral is the host's peripheral: [Config].GATT, else the older
+// [Config].BLE adapted to it, nil without either.
 func (b *Bridge) gattPeripheral() contract.GATTPeripheral {
 	if b.cfg.GATT != nil {
 		return b.cfg.GATT

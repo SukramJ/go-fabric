@@ -41,7 +41,7 @@ func rollbackInFlight(t *testing.T, gc *core.GeneralCommissioning, closed []uint
 // TestArmOnPaseSessionAfterTheRollbacksClose (R2-P2-comm-11, R2-P5-port-11):
 // a PASE arm that waits for a rollback whose session closer closed other
 // sessions arms its own; one whose session the closer named is refused; the
-// deprecated unnamed arm is refused by any close, as before.
+// older unnamed arm is refused by any close, as before.
 func TestArmOnPaseSessionAfterTheRollbacksClose(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
