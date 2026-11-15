@@ -543,9 +543,10 @@ func (i *Instance) CheckSet(attrID uint32, value any, peers Peers) (any, error) 
 // defaultValue is the attribute's model default in its stored form: what
 // matter.js starts a behavior's state with (packages/model/src/logic/
 // DefaultValue.ts, SelectDefaultValue.ts). The generator renders a
-// default as a float64, bool or string, or [NullDefault] for null
-// (script/clustergen/gen.go defaultLiteral); one it does not render (a
-// list, an object) or one that does not fit the attribute's kind leaves
+// default as a float64, bool or string, [NullDefault] for null, or — for a
+// struct whose fields state defaults — the generated struct value
+// (script/clustergen/gen.go defaultLiteral, structDefault); one it does
+// not render (a list) or one that does not fit the attribute's kind leaves
 // the attribute without a value.
 func defaultValue(a *Attribute) (any, bool) { return defaultOf(a.Type, a.Default) }
 
@@ -573,6 +574,13 @@ func defaultOf(t Type, d any) (any, bool) {
 		}
 	case string:
 		if t.Kind == KindString {
+			return d, true
+		}
+	case UnresolvedDefault:
+	default:
+		// A struct default the generator built from its fields' defaults
+		// (script/clustergen structDefault): the generated struct value.
+		if t.Kind == KindStruct && d != nil && reflect.TypeOf(d).Kind() == reflect.Struct {
 			return d, true
 		}
 	}

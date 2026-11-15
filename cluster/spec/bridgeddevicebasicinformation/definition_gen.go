@@ -538,6 +538,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "X", Op: spec.ConfDisallowed},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
+			Default:     CapabilityMinimaStruct{CaseSessionsPerFabric: 3, SubscriptionsPerFabric: 3},
 			Decode:      decodeAttrCapabilityMinima,
 		},
 		{

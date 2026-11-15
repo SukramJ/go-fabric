@@ -1346,6 +1346,8 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	}
 	if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
+	} else if lit := structDefault(t); lit != "" {
+		w.p("\t\t\tDefault: %s,", lit)
 	}
 	if r := g.attrRelaxed[a.ID]; r != "" {
 		w.p("\t\t\tRelaxed: %q,", r)
@@ -2091,4 +2093,49 @@ func sortedClusterNames(s *snapshot) []string {
 		out = append(out, c.Name)
 	}
 	return out
+}
+
+// structDefault is the default of a struct-typed element that states none
+// of its own, built from the defaults its fields state: matter.js derives
+// an object's default from its children's
+// (packages/model/src/standard/elements/operational-state.element.ts:110-111
+// at db021da0: OperationalError, whose ErrorStateStruct.ErrorStateId has
+// `default: 0`, starts as {errorStateId: 0}). The literal is the generated
+// struct with each mandatory, non-nullable field whose stated default is a
+// number, a bool or a string set to it; empty when the type is no struct or
+// no such field states a default.
+func structDefault(t typeInfo) string {
+	if t.kind != kindStruct || t.dt == nil {
+		return ""
+	}
+	var parts []string
+	for _, f := range t.dt.fields {
+		if f.v == nil || !f.mandatory || f.nullable || len(f.v.Default) == 0 {
+			continue
+		}
+		var x any
+		if json.Unmarshal(f.v.Default, &x) != nil {
+			continue
+		}
+		switch d := x.(type) {
+		case float64:
+			switch f.t.kind {
+			case kindUint, kindInt, kindEnum, kindBitmap, kindFloat32, kindFloat64:
+				parts = append(parts, fmt.Sprintf("%s: %s", f.goName, strconv.FormatFloat(d, 'g', -1, 64)))
+			default:
+			}
+		case bool:
+			if f.t.kind == kindBool {
+				parts = append(parts, fmt.Sprintf("%s: %t", f.goName, d))
+			}
+		case string:
+			if f.t.kind == kindString {
+				parts = append(parts, fmt.Sprintf("%s: %q", f.goName, d))
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return t.dt.goName + "{" + strings.Join(parts, ", ") + "}"
 }

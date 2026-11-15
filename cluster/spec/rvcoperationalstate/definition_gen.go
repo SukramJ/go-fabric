@@ -426,6 +426,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     ErrorStateStruct{ErrorStateId: 0},
 			Decode:      decodeAttrOperationalError,
 		},
 	},
