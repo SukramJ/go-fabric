@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 	"github.com/SukramJ/go-fabric/cluster/spec/lowpower"
+	"github.com/SukramJ/go-fabric/cluster/spec/mediainput"
 	"github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -48,6 +49,7 @@ func init() {
 	for _, c := range []func() goCertCase{
 		caseKEYPADINPUT31,
 		caseLOWPOWER22,
+		caseMEDIAINPUT314, caseMEDIAINPUT315, caseMEDIAINPUT316, caseMEDIAINPUT317,
 	} {
 		registerGoCert(c)
 	}
@@ -236,6 +238,109 @@ func caseLOWPOWER22() goCertCase {
 				}
 				return fmt.Errorf("Sleep on endpoint %d succeeded, but the daemon logged no media.lowpower.sleep", th.ep)
 			}},
+		},
+	}
+}
+
+// caseMEDIAINPUT314 mirrors TC-MEDIAINPUT-3.14: SelectInput 2.
+func caseMEDIAINPUT314() goCertCase {
+	r := &mediaBRun{}
+	const index = 2 // INDEX (:16)
+	return goCertCase{
+		tc: "TC-MEDIAINPUT-3.14", line: 20, pics: []string{"MEDIAINPUT.C"}, at: "MEDIAINPUT.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 21, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 24, pics: "MEDIAINPUT.C.C00.Tx", title: "DUT sends SelectInput command to TH",
+				run: r.mediaBSend(mediainput.ClusterID, mediainput.CmdSelectInput, "SelectInput 2",
+					mediainput.SelectInputRequest{Index: index}, false, func(th *goTH, ep uint16) error {
+						// The payload: chip's HandleSelectInput makes the index
+						// current (MediaInputManager.cpp:57-71).
+						got, err := r.mediaBReadU8(th, ep, mediainput.ClusterID, mediainput.AttrCurrentInput)
+						if err != nil {
+							return err
+						}
+						if got != index {
+							return fmt.Errorf("CurrentInput reads %d after SelectInput %d", got, index)
+						}
+						th.note("CurrentInput %d", got)
+						return nil
+					}),
+			},
+		},
+	}
+}
+
+// caseMEDIAINPUT315 mirrors TC-MEDIAINPUT-3.15: ShowInputStatus.
+func caseMEDIAINPUT315() goCertCase {
+	r := &mediaBRun{}
+	return goCertCase{
+		tc: "TC-MEDIAINPUT-3.15", line: 17, pics: []string{"MEDIAINPUT.C"}, at: "MEDIAINPUT.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 18, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 21, pics: "MEDIAINPUT.C.C01.Tx", title: "DUT sends ShowInputStatus command to TH",
+				run: r.mediaBSend(mediainput.ClusterID, mediainput.CmdShowInputStatus, "ShowInputStatus",
+					mediainput.ShowInputStatusRequest{}, false, nil),
+			},
+		},
+	}
+}
+
+// caseMEDIAINPUT316 mirrors TC-MEDIAINPUT-3.16: HideInputStatus.
+func caseMEDIAINPUT316() goCertCase {
+	r := &mediaBRun{}
+	return goCertCase{
+		tc: "TC-MEDIAINPUT-3.16", line: 17, pics: []string{"MEDIAINPUT.C"}, at: "MEDIAINPUT.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 18, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 21, pics: "MEDIAINPUT.C.C02.Tx", title: "DUT sends HideInputStatus command to TH",
+				run: r.mediaBSend(mediainput.ClusterID, mediainput.CmdHideInputStatus, "HideInputStatus",
+					mediainput.HideInputStatusRequest{}, false, nil),
+			},
+		},
+	}
+}
+
+// caseMEDIAINPUT317 mirrors TC-MEDIAINPUT-3.17: RenameInput 1 "HDMI 1".
+func caseMEDIAINPUT317() goCertCase {
+	r := &mediaBRun{}
+	const (
+		index = 1        // INDEX (:16)
+		name  = "HDMI 1" // NAME (:17)
+	)
+	return goCertCase{
+		tc: "TC-MEDIAINPUT-3.17", line: 21, pics: []string{"MEDIAINPUT.C"}, at: "MEDIAINPUT.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 22, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 25, pics: "MEDIAINPUT.C.C03.Tx", title: "DUT sends RenameInput command to TH",
+				run: r.mediaBSend(mediainput.ClusterID, mediainput.CmdRenameInput, "RenameInput 1 \"HDMI 1\"",
+					mediainput.RenameInputRequest{Index: index, Name: name}, false, func(th *goTH, ep uint16) error {
+						// The payload: chip's HandleRenameInput stores the name
+						// on the input of that index (MediaInputManager.cpp:93-113).
+						v, err := th.readValue(r.n, attrPath(ep, mediainput.ClusterID, mediainput.AttrInputList))
+						if err != nil {
+							return err
+						}
+						for _, c := range v.Children {
+							var in mediainput.InputInfoStruct
+							if err := in.DecodeTLV(c); err != nil {
+								return err
+							}
+							if in.Index != index {
+								continue
+							}
+							if in.Name != name {
+								return fmt.Errorf("InputList's input %d is named %q after RenameInput %q", index, in.Name, name)
+							}
+							th.note("InputList's input %d is named %q", index, in.Name)
+							return nil
+						}
+						return fmt.Errorf("InputList lists no input %d: %s", index, describeNode(v))
+					}),
+			},
 		},
 	}
 }
