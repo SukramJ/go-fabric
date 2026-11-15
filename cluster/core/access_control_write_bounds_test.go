@@ -97,21 +97,21 @@ func TestACLExtensionDataBounds(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
-		data func(*testing.T) []byte
+		data []byte
 		ok   bool
 	}{
-		{"128 bytes", func(t *testing.T) []byte { return extensionList(t, 128) }, true},
-		{"129 bytes", func(t *testing.T) []byte { return extensionList(t, 129) }, false},
-		{"a structure, not a list", func(*testing.T) []byte { return []byte{0x15, 0x24, 0x01, 0x07, 0x18} }, false},
-		{"a list followed by a second element", func(*testing.T) []byte { return []byte{0x17, 0x24, 0x01, 0x07, 0x18, 0x04, 0x01} }, false},
-		{"an anonymous member after a tagged one", func(*testing.T) []byte { return []byte{0x17, 0x24, 0x01, 0x07, 0x04, 0x02, 0x18} }, false},
-		{"an anonymous member inside a tagged array", func(*testing.T) []byte { return []byte{0x17, 0x36, 0x01, 0x04, 0x02, 0x18, 0x24, 0x02, 0x07, 0x18} }, true},
+		{"128 bytes", extensionList(t, 128), true},
+		{"129 bytes", extensionList(t, 129), false},
+		{"a structure, not a list", []byte{0x15, 0x24, 0x01, 0x07, 0x18}, false},
+		{"a list followed by a second element", []byte{0x17, 0x24, 0x01, 0x07, 0x18, 0x04, 0x01}, false},
+		{"an anonymous member after a tagged one", []byte{0x17, 0x24, 0x01, 0x07, 0x04, 0x02, 0x18}, false},
+		{"an anonymous member inside a tagged array", []byte{0x17, 0x36, 0x01, 0x04, 0x02, 0x18, 0x24, 0x02, 0x07, 0x18}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ac := newAccessControl(t)
-			data := tc.data(t)
+			data := tc.data
 			err := ac.MatterWrite(im.WithFabricFilter(context.Background(), true, 1), 0x0001, []core.AccessControlExtensionEntry{{Data: data}})
 			switch {
 			case tc.ok && err != nil:
