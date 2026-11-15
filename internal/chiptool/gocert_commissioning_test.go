@@ -502,11 +502,11 @@ func windowLifetime(th *goTH, w cadminWindow) error {
 	return nil
 }
 
-// requireRefused is requireRefused (tc-cadmin-window-support.ts:279-317)
+// requireRefused is requireRefused (tc-cadmin-window-support.ts:261-298)
 // and TC-CADMIN-1.1/1.2 step 11 (tc-cadmin-support.ts:1298-1336): the
 // commissioner's attempt through the window ends in a give-up within
 // ABSENT_DEVICE_GIVE_UP (isGiveUpOrRefusedPase :285-288 over
-// isCommissioningGiveUp, tc-dd-support.ts:1218-1226: a DiscoveryError —
+// isCommissioningGiveUp, tc-dd-support.ts:1485-1495: a DiscoveryError —
 // the Go controller's gocontroller.ErrNoDevice, no candidate found — or a
 // DiscoveryAggregateError, a candidate tried and failed — the Go
 // controller's PASE step reported failed, controller/pair_race.go
@@ -979,7 +979,9 @@ func windowHandlingCase(tc string, basic bool) goCertCase {
 					return fmt.Errorf("TH received RevokeCommissioning: %w", err)
 				}
 				// REVOKE_WINDOW_NOT_OPEN (:93-100): the TH's invoke line
-				// carries the Failure (1) it answered.
+				// carries the Failure (1) it answered; the cluster status is
+				// held on the response; the daemon's line carries the status
+				// only.
 				if !strings.Contains(line, `resp="status=1 (path=ep=0 cl=0x003C cmd=0x2)"`) {
 					return fmt.Errorf("the TH's invoke line shows no Failure answer: %s", line)
 				}
@@ -1210,8 +1212,8 @@ func caseCADMIN118() goCertCase {
 // controller that took the device's Leave event refuses locally:
 // matter.js's NoCommissionedPeerError (client.ErrNotCommissioned) and
 // PeerCommunicationError, the Go client's
-// peer.UnreachableError and the exchange's transient and network errors
-// (client/exchange/errors.go ErrTransient, ErrNetwork). Anything else —
+// peer.UnreachableError and the exchange's transient error
+// (client/exchange/errors.go ErrTransient). Anything else —
 // the call still pending when POST_REMOVAL_TIMEOUT ran out included, which
 // matter.js's expectRejection fails as neither resolved nor rejected —
 // says nothing about the removal.
@@ -1227,11 +1229,17 @@ func postRemovalRefusal(err error) error {
 		return nil
 	}
 	// NoCommissionedPeerError: the controller deleted the peer on the
-	// device's Leave event, which its subscription delivered — an
-	// interaction the deletion overtook ends with the peer closed
-	// (peer.ErrClosed), a later one finds no commissioned node.
+	// device's Leave event, which its subscription delivered, and finds no
+	// commissioned node.
 	var unreachable *peer.UnreachableError
-	if errors.Is(err, client.ErrNotCommissioned) || errors.Is(err, peer.ErrClosed) || errors.As(err, &unreachable) || errors.Is(err, exchange.ErrTransient) || errors.Is(err, exchange.ErrNetwork) {
+	if errors.Is(err, client.ErrNotCommissioned) || errors.As(err, &unreachable) || errors.Is(err, exchange.ErrTransient) {
+		return nil
+	}
+	// Wider than isPostRemovalRefusal by peer.ErrClosed: peer.ErrClosed
+	// (matter.js ClosedError, general/src/MatterError.ts:386) is no
+	// PeerCommunicationError; the Go client surfaces it where matter.js
+	// surfaces a PeerCommunicationError.
+	if errors.Is(err, peer.ErrClosed) {
 		return nil
 	}
 	return fmt.Errorf("neither a status the removal explains nor a failure to reach the TH within %s: %w", postRemovalTimeout, err)

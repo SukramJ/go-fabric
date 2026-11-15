@@ -117,7 +117,7 @@ kernel modules and stay weekly, outside that gate.
   TC-WNCV-7.1's step 0 requires position-aware Lift *and* position-aware
   Tilt (`TC-WNCV-7.1.test.ts:43-47`, stricter than the plan's "and/or" by its
   own comment, `:41-42`), and the daemon's window covering serves Lift only;
-  the port follows the plan, requires each axis whose GoTo…Percentage command
+  the port reads the plan's "and/or" as: it requires each axis whose GoTo…Percentage command
   the daemon declares and one axis at least, and records the tilt step
   skipped by its PICS (`WNCV.S.C08.Rsp`), so its row below measures the lift
   axis alone. The leg needs the daemon and the host's multicast, not the

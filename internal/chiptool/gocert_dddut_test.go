@@ -172,7 +172,10 @@ func (d *dutRun) advertising(th *goTH) error {
 // giveUp is requireGiveUp (:836-873): the TH is seen advertising, then a
 // well-formed code naming a device that is not there ends in
 // gocontroller.ErrNoDevice once ABSENT_DEVICE_GIVE_UP passes; a payload
-// refusal is no give-up.
+// refusal is no give-up. Stricter than requireGiveUp: a candidate tried
+// and failed (DiscoveryAggregateError, tc-dd-support.ts:1485-1495) is not
+// accepted, and the TH must log no PASE attempt, which the TS does not
+// check.
 func (d *dutRun) giveUp(th *goTH, code, what string) error {
 	if err := d.setup(th); err != nil {
 		return err

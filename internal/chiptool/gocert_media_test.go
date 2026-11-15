@@ -50,7 +50,10 @@ import (
 // per step) or as the TS file names its effect (AudioOutput, Channel); for
 // Sleep, the daemon's log line; for a command without fields there is no
 // payload beyond the command itself, which the Go controller sends alone
-// in its request.
+// in its request. The read-back goes beyond the TS, which reads no
+// attribute: it holds the daemon's media model to chip's tv-app, and the
+// SkipForward/SkipBackward equality holds only for a model whose position
+// does not advance on its own.
 
 func init() {
 	for _, c := range []func() goCertCase{
@@ -558,7 +561,7 @@ func caseMEDIAINPUT317() goCertCase {
 			},
 			check: func(th *goTH, n *client.Node, ep uint16) error {
 				// The payload: chip's HandleRenameInput stores the name
-				// on the input of that index (MediaInputManager.cpp:93-113).
+				// on the input of that index (MediaInputManager.cpp:93-114).
 				v, err := th.readValue(n, attrPath(ep, mediainput.ClusterID, mediainput.AttrInputList))
 				if err != nil {
 					return err
