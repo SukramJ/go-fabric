@@ -981,10 +981,10 @@ func (b *Bridge) seedCounters() error {
 }
 
 // Start brings the bridge online: assembles the initial topology,
-// constructs the dispatcher, opens the UDP listener, and publishes
-// the operational mDNS record (when the topology has at least one
-// fabric — for v1.1 GA the operational record is emitted
-// unconditionally; commissioning-window logic lands in v1.1.x).
+// constructs the dispatcher and opens the UDP listener. It publishes
+// no operational mDNS record: that waits for a fabric identity, which
+// [Bridge.AnnounceFabric] publishes (publishOperationalRecord only logs
+// the deferral).
 //
 // Start blocks only on the synchronous setup steps; the receive loop
 // runs in a background goroutine. Returns immediately when the

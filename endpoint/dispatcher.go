@@ -226,12 +226,14 @@ var (
 //
 //   - HasEndpoint=false  → iterate every endpoint in the topology.
 //   - HasCluster=false   → iterate every cluster server on the endpoint.
-//   - HasAttribute=false → globals (FeatureMap + ClusterRevision)
-//     PLUS every attribute the cluster server advertises via the
-//     [contract.ClusterAttributeLister] optional interface.
-//     Cluster servers that do not implement that interface fall back
-//     to globals-only — that is the v1.1 baseline preserved for
-//     backwards compatibility.
+//   - HasAttribute=false → the global attributes GeneratedCommandList,
+//     AcceptedCommandList, AttributeList, FeatureMap and
+//     ClusterRevision (EventList left out, see attributesFor) PLUS
+//     every attribute the cluster server advertises via the
+//     [contract.ClusterAttributeLister] optional interface. A cluster
+//     server that does not implement that interface contributes its
+//     reportable attributes ([contract.ClusterServer.MatterReportable])
+//     instead.
 //
 // Concrete (non-wildcard) reads return exactly one ReadResult.
 //

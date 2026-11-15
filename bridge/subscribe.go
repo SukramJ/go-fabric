@@ -31,8 +31,9 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// Errors surfaced by the unsolicited-IM send path. They are logged
-// and dropped — best-effort delivery is the v1.1 mode.
+// Errors of the bridge's unsolicited sends: sendUnsolicitedIM returns
+// them to the report path that called it, and the OTA provider link, the
+// BDX responder and the CASE initiator return them for their own sends.
 var (
 	// ErrUnsolicitedListenerMissing is returned when the bridge has no
 	// UDP listener bound (Stop racing with a tick).

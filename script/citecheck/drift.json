@@ -534,7 +534,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 61,
+    "line": 62,
     "citation": "MRP.ts:100-108",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "at": "db021da0",
@@ -544,7 +544,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1435,
+    "line": 1436,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -553,7 +553,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2054,
+    "line": 2055,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -562,7 +562,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2130,
+    "line": 2131,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -2500,7 +2500,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 480,
+    "line": 482,
     "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",
@@ -2510,7 +2510,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 945,
+    "line": 947,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
