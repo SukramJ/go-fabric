@@ -481,6 +481,13 @@ func (s *Store) removeResumptions(fabricIndex uint8) {
 
 // UpsertIdentity implements [store.Identity].
 func (s *Store) UpsertIdentity(_ context.Context, rec store.IdentityRecord) error {
+	// store.Store's checkIdentity: a non-empty private key, a 16-byte IPK.
+	if len(rec.PrivateKey) == 0 {
+		return errors.New("memstore: upsert identity: empty private_key")
+	}
+	if len(rec.IPK) != identityIPKSize {
+		return fmt.Errorf("memstore: upsert identity: ipk length=%d (want %d)", len(rec.IPK), identityIPKSize)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.hasFabric(rec.FabricIndex) {
@@ -553,6 +560,18 @@ func (s *Store) ReplaceACL(_ context.Context, fabricIndex uint8, entries []store
 // UpsertGroupKeySet implements [store.GroupKeys]. An epoch start without
 // its key is not kept, as SQLite stores NULL for both.
 func (s *Store) UpsertGroupKeySet(_ context.Context, rec store.GroupKeySet) error {
+	// store.Store's checkGroupKeySet: EpochKey0 16 bytes, EpochKey1 and
+	// EpochKey2 16 bytes or absent, an empty one stored as absent.
+	if len(rec.EpochKey0) != epochKeySize {
+		return fmt.Errorf("memstore: upsert group key set: epoch_key_0 length=%d (want %d)", len(rec.EpochKey0), epochKeySize)
+	}
+	for i, k := range []*[]byte{&rec.EpochKey1, &rec.EpochKey2} {
+		if len(*k) == 0 {
+			*k = nil
+		} else if len(*k) != epochKeySize {
+			return fmt.Errorf("memstore: upsert group key set: epoch_key_%d length=%d (want %d)", i+1, len(*k), epochKeySize)
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.hasFabric(rec.FabricIndex) {
@@ -1046,6 +1065,13 @@ func (s *Store) SaveThermostatPresets(_ context.Context, endpointKey string, pre
 	s.presets[endpointKey] = presetRow{presets: bytes.Clone(presets), active: bytes.Clone(activeHandle)}
 	return nil
 }
+
+// identityIPKSize and epochKeySize are the key lengths store.Store
+// checks on write and on read; the two backends refuse the same records.
+const (
+	identityIPKSize = 16
+	epochKeySize    = 16
+)
 
 // --- DoorLocks ---
 

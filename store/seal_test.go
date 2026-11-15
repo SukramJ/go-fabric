@@ -604,9 +604,9 @@ func TestSealerErrorFailsTheWrite(t *testing.T) {
 	}
 	f.fail = true
 	for name, err := range map[string]error{
-		"UpsertIdentity":          s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: w.fabric, NOC: []byte{7}, PrivateKey: []byte{7}, IPK: []byte{7}}),
+		"UpsertIdentity":          s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: w.fabric, NOC: []byte{7}, PrivateKey: []byte{7}, IPK: randomSecret(16)}),
 		"UpdateFabricCredentials": s.UpdateFabricCredentials(ctx, w.fabric, store.FabricCredentials{NOC: []byte{7}, PrivateKey: []byte{7}, NodeID: 7}),
-		"UpsertGroupKeySet":       s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 3, EpochKey0: []byte{7}}),
+		"UpsertGroupKeySet":       s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 3, EpochKey0: randomSecret(16)}),
 		"UpsertResumption": s.UpsertResumption(ctx, store.ResumptionRecord{
 			FabricIndex: w.fabric, PeerNodeID: 9, ResumptionID: bytes.Repeat([]byte{1}, 16), SharedSecret: bytes.Repeat([]byte{1}, 32),
 		}),
@@ -853,5 +853,57 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 				t.Errorf("clear secrets on disk after NewSealed and Close: %v", hits)
 			}
 		})
+	}
+}
+
+// TestListGroupKeySetsLeavesAMalformedRowOut (Fable R2-1): a key set whose
+// stored epoch key has a length a write refuses — an earlier release's
+// row, or an edit of the file — does not take the fabric's other key sets
+// down: ListGroupKeySets lists the well-formed ones, the IPK's set 0 among
+// them, and GetGroupKeySet of the bad row returns the error.
+func TestListGroupKeySetsLeavesAMalformedRowOut(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s := store.New(db)
+	idx, err := s.AddFabric(ctx, newFabricRecord(0, 31))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []uint16{0, 1, 2} {
+		if err := s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: idx, GroupKeySetID: id, EpochKey0: randomSecret(16), EpochStart0: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_group_keys SET epoch_key_1 = X'0102', epoch_start_1 = 2 WHERE group_key_set_id = 1`); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.ListGroupKeySets(ctx, idx)
+	if err != nil || len(list) != 2 || list[0].GroupKeySetID != 0 || list[1].GroupKeySetID != 2 {
+		t.Errorf("ListGroupKeySets with a malformed set 1 = %+v, %v; want sets 0 and 2", list, err)
+	}
+	if _, err := s.GetGroupKeySet(ctx, idx, 1); err == nil || !strings.Contains(err.Error(), "epoch_key_1") {
+		t.Errorf("GetGroupKeySet of the malformed set = %v; want its length error", err)
+	}
+}
+
+// TestNewSealedClassifiesAClearICDRowUnderASealedKey (Fable R2-3): an ICD
+// row whose mark was flipped while the in-database ICD key is sealed fails
+// NewSealed with ErrUnseal — an edited file — not ErrNoSealer, which would
+// tell a host with the sealer to go and find one.
+func TestNewSealedClassifiesAClearICDRowUnderASealedKey(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	writeSecrets(t, store.New(db)) // the ICD key is created as a clear setting
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 7)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_icd_registrations SET sealed = 0`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := store.NewSealed(ctx, db, testSealer(t, 7))
+	if !errors.Is(err, store.ErrUnseal) || errors.Is(err, store.ErrNoSealer) {
+		t.Errorf("NewSealed over a flipped ICD row = %v; want ErrUnseal only", err)
 	}
 }

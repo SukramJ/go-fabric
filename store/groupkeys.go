@@ -38,8 +38,14 @@ type GroupKeySet struct {
 }
 
 // UpsertGroupKeySet inserts or replaces a key-set row. The fabric
-// must already exist (FK constraint).
+// must already exist (FK constraint). EpochKey0 must be 16 bytes;
+// EpochKey1 and EpochKey2 are 16 bytes or absent, an empty one stored as
+// absent — the lengths a read accepts ([checkGroupKeySet]).
 func (s *Store) UpsertGroupKeySet(ctx context.Context, rec GroupKeySet) error {
+	rec, err := checkGroupKeySet(rec)
+	if err != nil {
+		return fmt.Errorf("store: upsert group key set: %w", err)
+	}
 	var keys [3][]byte
 	for i, k := range [3][]byte{rec.EpochKey0, rec.EpochKey1, rec.EpochKey2} {
 		var err error
@@ -96,7 +102,11 @@ WHERE fabric_index = ? AND group_key_set_id = ?`, fabricIndex, groupKeySetID)
 }
 
 // ListGroupKeySets returns every key-set for fabricIndex ordered by
-// group_key_set_id ascending.
+// group_key_set_id ascending. A row holding an epoch key of a length a
+// write refuses — left by an earlier release or an edit of the file — is
+// left out, so one bad row does not take the fabric's other key sets (the
+// IPK's among them) down; [Store.GetGroupKeySet] of that row returns the
+// error. A sealed value that does not open still fails the list.
 func (s *Store) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]GroupKeySet, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT fabric_index, group_key_set_id, security_policy,
@@ -113,6 +123,9 @@ ORDER BY group_key_set_id ASC`, fabricIndex)
 	var out []GroupKeySet
 	for rows.Next() {
 		rec, err := s.scanGroupKeySet(rows)
+		if errors.Is(err, errMalformedKey) {
+			continue // GetGroupKeySet reports it; the fabric's other key sets stay usable
+		}
 		if err != nil {
 			return nil, fmt.Errorf("store: list group key sets: scan: %w", err)
 		}
@@ -266,6 +279,36 @@ ORDER BY group_id ASC`, fabricIndex)
 // read with another is refused.
 const epochKeySize = 16
 
+// errMalformedKey is a stored key of a length a write would have refused:
+// a row an earlier release, or an edit of the file, left.
+var errMalformedKey = errors.New("store: malformed key")
+
+// checkGroupKeySet is the write side of the epoch key lengths: EpochKey0
+// epochKeySize bytes, EpochKey1 and EpochKey2 epochKeySize bytes or absent;
+// an empty slot is normalised to absent (nil, its start 0), so a write and
+// its read agree in both backends (store/memstore copies the rule).
+func checkGroupKeySet(rec GroupKeySet) (GroupKeySet, error) {
+	if len(rec.EpochKey0) != epochKeySize {
+		return rec, fmt.Errorf("store: epoch_key_0 length=%d (want %d)", len(rec.EpochKey0), epochKeySize)
+	}
+	for i, k := range []*[]byte{&rec.EpochKey1, &rec.EpochKey2} {
+		if len(*k) == 0 {
+			*k = nil
+			continue
+		}
+		if len(*k) != epochKeySize {
+			return rec, fmt.Errorf("store: epoch_key_%d length=%d (want %d)", i+1, len(*k), epochKeySize)
+		}
+	}
+	if rec.EpochKey1 == nil {
+		rec.EpochStart1 = 0
+	}
+	if rec.EpochKey2 == nil {
+		rec.EpochStart2 = 0
+	}
+	return rec, nil
+}
+
 // groupEpochKeyColumns are the epoch key columns, by slot.
 var groupEpochKeyColumns = [3]string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}
 
@@ -309,7 +352,7 @@ func (s *Store) scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 			return GroupKeySet{}, err
 		}
 		if plain != nil && len(plain) != epochKeySize {
-			return GroupKeySet{}, fmt.Errorf("store: %s length=%d (want %d)", groupEpochKeyColumns[i], len(plain), epochKeySize)
+			return GroupKeySet{}, fmt.Errorf("%w: %s length=%d (want %d)", errMalformedKey, groupEpochKeyColumns[i], len(plain), epochKeySize)
 		}
 		*k = plain
 	}

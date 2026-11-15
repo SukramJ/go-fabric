@@ -120,14 +120,19 @@ func (a *AESGCMSealer) Open(sealed, aad []byte) ([]byte, error) {
 // without a sealer wrote — in one transaction, so a failure (a value that
 // does not open, a Seal error) leaves the database as it was; then it
 // rewrites the file and empties the -wal ([Scrub]), so the clear values do
-// not stay behind in free pages. A scrub that does not finish is
+// not stay behind in free pages — measured in WAL mode and in the rollback
+// journal's DELETE (SQLite's default) and TRUNCATE modes; in PERSIST mode
+// the kept -journal still holds clear pages, and copies taken before the
+// upgrade keep the clear values. A scrub that does not finish is
 // [ErrScrubIncomplete], and the next NewSealed tries again. A database
 // with no clear row is not written to.
 //
-// After that the store is strict: it writes no secret in clear, and a
-// secret row it reads without the seal mark — one whose mark was edited,
-// or a clear row planted or written by a Store without the sealer — is
-// refused with [ErrUnseal], never read as the secret. Every Store of one
+// After that, while the store is open, it is strict: it writes no secret
+// in clear, and a secret row it reads without the seal mark — one whose
+// mark was edited, or a clear row planted or written by a Store without
+// the sealer — is refused with [ErrUnseal], never read as the secret. A
+// later NewSealed adopts every clear row it finds: it cannot tell such a
+// row from one a Store without a sealer wrote, and seals it. Every Store of one
 // database needs the sealer; a concurrent writer without it on the same
 // database is not supported. A Store without the sealer reads a sealed
 // value as [ErrNoSealer] and refuses a write that would leave a sealed row
@@ -382,7 +387,8 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 		sealed += n
 	}
 	// The ICD keys before the settings: a clear row's key may be sealed
-	// under SettingICDKey, which readSetting opens either way.
+	// under SettingICDKey, which is still a clear setting here
+	// (sealClearICDRows reads it as a store without a sealer).
 	n, err := s.sealClearICDRows(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("store: NewSealed: matter_icd_registrations: %w", err)
@@ -512,6 +518,11 @@ WHERE sealed = 0`)
 				// Read as a store without a sealer: the key is a clear
 				// setting until sealClearSettings seals it below.
 				if aead, err = (&Store{}).icdAEAD(ctx, tx); err != nil {
+					if errors.Is(err, ErrNoSealer) {
+						// The key is sealed but this row is not: an edited
+						// file, not a missing sealer.
+						return 0, fmt.Errorf("%w: a clear ICD row under a sealed %s (%v)", ErrUnseal, SettingICDKey, err) //nolint:errorlint // one sentinel, ErrUnseal
+					}
 					return 0, err
 				}
 			}

@@ -80,6 +80,7 @@ var cases = []testCase{
 	{"group-keys", groupKeysCase},
 	{"group-keys/ordering", groupKeysOrdering},
 	{"group-keys/replace-mappings", groupKeysReplaceMappingsCase},
+	{"key-lengths", keyLengthsCase},
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
 	{"resumption/session-parameters", resumptionSessionParametersCase},
@@ -1295,4 +1296,56 @@ func constraintsCase(ctx context.Context, t *testing.T, p store.Port) {
 	}
 	// The same index for two users is two week-day schedules.
 	must(t, p.SaveDoorLockAuth(ctx, "lock", store.DoorLockAuth{WeekDaySchedules: []store.DoorLockWeekDaySchedule{{WeekDayIndex: 1, UserIndex: 1}, {WeekDayIndex: 1, UserIndex: 2}}}))
+}
+
+// keyLengthsCase: both backends refuse on write a key a read would refuse —
+// an IPK that is not 16 bytes, an empty private key, an epoch key that is
+// not 16 bytes, a resumption secret that is not 32 bytes — and store an
+// empty EpochKey1 / EpochKey2 as absent (nil, its start 0).
+func keyLengthsCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
+	ipk, key := bytes.Repeat([]byte{4}, 16), bytes.Repeat([]byte{3}, 32)
+	for name, rec := range map[string]store.IdentityRecord{
+		"a 15-byte IPK":  {FabricIndex: f, NOC: []byte{1}, PrivateKey: key, IPK: ipk[:15]},
+		"a 17-byte IPK":  {FabricIndex: f, NOC: []byte{1}, PrivateKey: key, IPK: append(bytes.Clone(ipk), 0)},
+		"an empty key":   {FabricIndex: f, NOC: []byte{1}, PrivateKey: []byte{}, IPK: ipk},
+		"no private key": {FabricIndex: f, NOC: []byte{1}, IPK: ipk},
+	} {
+		if err := p.UpsertIdentity(ctx, rec); err == nil {
+			t.Errorf("UpsertIdentity with %s succeeded", name)
+		}
+	}
+	if _, err := p.GetIdentity(ctx, f); !errors.Is(err, store.ErrIdentityNotFound) {
+		t.Errorf("a refused identity was stored: %v", err)
+	}
+	good := keySet(f, 1)
+	for name, ks := range map[string]store.GroupKeySet{
+		"a 15-byte EpochKey0": func() store.GroupKeySet { k := good; k.EpochKey0 = k.EpochKey0[:15]; return k }(),
+		"no EpochKey0":        func() store.GroupKeySet { k := good; k.EpochKey0 = nil; return k }(),
+		"a 2-byte EpochKey1":  func() store.GroupKeySet { k := good; k.EpochKey1, k.EpochStart1 = []byte{1, 2}, 5; return k }(),
+		"a 17-byte EpochKey2": func() store.GroupKeySet {
+			k := good
+			k.EpochKey2, k.EpochStart2 = bytes.Repeat([]byte{2}, 17), 6
+			return k
+		}(),
+	} {
+		if err := p.UpsertGroupKeySet(ctx, ks); err == nil {
+			t.Errorf("UpsertGroupKeySet with %s succeeded", name)
+		}
+	}
+	if _, err := p.GetGroupKeySet(ctx, f, 1); !errors.Is(err, store.ErrGroupKeySetNotFound) {
+		t.Errorf("a refused key set was stored: %v", err)
+	}
+	empty := good
+	empty.EpochKey1, empty.EpochStart1 = []byte{}, 7
+	must(t, p.UpsertGroupKeySet(ctx, empty))
+	got, err := p.GetGroupKeySet(ctx, f, 1)
+	if err != nil || got.EpochKey1 != nil || got.EpochStart1 != 0 || !bytes.Equal(got.EpochKey0, good.EpochKey0) {
+		t.Errorf("an empty EpochKey1 reads back %x (start %d), %v; want absent", got.EpochKey1, got.EpochStart1, err)
+	}
+	if err := p.UpsertResumption(ctx, store.ResumptionRecord{
+		FabricIndex: f, PeerNodeID: 5, ResumptionID: bytes.Repeat([]byte{1}, 16), SharedSecret: bytes.Repeat([]byte{1}, 31),
+	}); err == nil {
+		t.Error("UpsertResumption with a 31-byte secret succeeded")
+	}
 }

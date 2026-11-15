@@ -32,18 +32,36 @@ type IdentityRecord struct {
 }
 
 // ipkSize is the IPK's size, the length cluster/core's AddNOC accepts
-// (operational_credentials.go, IPKValue); GetIdentity refuses another.
+// (operational_credentials.go, IPKValue); UpsertIdentity and GetIdentity
+// refuse another.
 const ipkSize = 16
+
+// checkIdentity is the write side of the identity's lengths: a non-empty
+// private key and an ipkSize IPK, what GetIdentity accepts
+// (store/memstore copies the rule).
+func checkIdentity(rec IdentityRecord) error {
+	if len(rec.PrivateKey) == 0 {
+		return errors.New("store: empty private_key")
+	}
+	if len(rec.IPK) != ipkSize {
+		return fmt.Errorf("store: ipk length=%d (want %d)", len(rec.IPK), ipkSize)
+	}
+	return nil
+}
 
 // identityTable is the table the identity's secrets are sealed in.
 const identityTable = "matter_node_identities"
 
 // UpsertIdentity inserts or replaces the identity row for
-// rec.FabricIndex. The fabric must already exist (FK constraint). A
-// pending UpdateNOC's prior credentials stay. Without a sealer it refuses
+// rec.FabricIndex. The fabric must already exist (FK constraint). The
+// private key must not be empty and the IPK must be 16 bytes, what
+// GetIdentity accepts. A pending UpdateNOC's prior credentials stay. Without a sealer it refuses
 // a row a sealer sealed, whose prior key it would leave sealed under a
 // clear mark.
 func (s *Store) UpsertIdentity(ctx context.Context, rec IdentityRecord) error {
+	if err := checkIdentity(rec); err != nil {
+		return fmt.Errorf("store: upsert identity: %w", err)
+	}
 	if s.sealer != nil {
 		return s.inTx(ctx, "upsert identity", func(tx *sql.Tx) error { return s.upsertSealedIdentity(ctx, tx, rec) })
 	}

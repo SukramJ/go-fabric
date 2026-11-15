@@ -90,7 +90,9 @@ func (c *Controller) Groups() *groups.Manager {
 // groupID to it — what KeySetWrite and a GroupKeyMap write do on a
 // member node — so that [Groups] can send to the group. The caller writes
 // the same key set to the members. On a closed controller it writes
-// nothing and returns [ErrConfiguration].
+// nothing and returns [ErrConfiguration]. An invalid key set — EpochKey0
+// not 16 bytes, or EpochKey1 / EpochKey2 present and not 16 bytes — is
+// refused by the store and nothing is written.
 func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, groupID uint16) error {
 	// Close takes closeMu before it lets the group manager go, so the
 	// manager stays for the whole call (review II, R2-P1-ctl-06).
