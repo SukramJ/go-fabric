@@ -297,6 +297,13 @@ migrations applies step `v9`.
 | `node.Config.EndpointPersistence`, `node.NewEndpointPersistence(st, logger)` | `node.Config.EndpointState`, `node.NewEndpointState(st, logger)`; a host's own state implements `node.EndpointState` (`endpoint.Persistence` and `LoadNodeLabel`) |
 | `Node.Persistence()` | `Node.EndpointState()`: the host's `EndpointState` or the facade's own, as `endpoint.Config.Persistence` for a host's own assembler |
 | a store upgraded from a release before schema v8 that went down inside a fail-safe window | the removal of that window's AddNOC is owed in memory only: `OnFabricRemoved` reaches the host only if the first process on the upgraded store starts |
+| a host that carries the schema in its own migrations | applies `store/migrations/v10.up.sql` (the seal marks, the DoorLock records' source); a DoorLock record stored before v10 counts as made through Matter |
+| a host's own `store.Port` implementation | round-trips `DoorLockUser` / `DoorLockCredential` `CreatedThroughMatter` and `ModifiedThroughMatter` (storetest door-locks) and refuses the key lengths storetest `key-lengths` names |
+| `store.New(db)` with the keys in clear | optionally `store.Apply`, then `store.NewSealed(ctx, db, sealer)` and `node.Store{DB: db, Credentials: sealed}`; every store of the database then needs the sealer |
+| a host or test that stores an IPK or epoch key of another length, or an empty private key | stores 16-byte keys and a private key: the store refuses another length on write and on read |
+| `dcl.OTAVersions.Download` with an `http:` URL or a URL of the host's own | `dcl.OTAVersions.DownloadHostURL` |
+| a lab whose ledger names hosts on the local network | sets `dcl.Client.AllowPrivateDestinations` on that ledger's client (the TestClient for the test net), or passes its own `HTTPClient` |
+| prod and test OTA images stored before the upgrade | not served until a ledger update that carries the checksum re-binds them (no new download), or until `softwareupdate.ImagesConfig.AllowUnverifiedLedgerImages` is set; storing them again with `Images.Store` makes them host-supplied. A test ledger whose records carry no checksum needs the option too |
 
 ## Changed after v0.18.0: the exchange receive notifier
 
