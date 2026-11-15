@@ -182,8 +182,12 @@ func TestDecodeSkipsDeepNesting(t *testing.T) {
 // TestDecodeIsStrict: the session parameters are decoded as matter.js
 // decodes TlvSessionParameters (PaseMessages.ts:28-55 at db021da0). Refused:
 // a member without a context tag (TlvObject.ts:212-214), a known field of
-// another TLV type than an unsigned integer (TlvNumber.ts:124-131), a known
-// field whose value does not fit it (:145-155). Accepted: an unknown
+// another TLV type than an unsigned integer (TlvNumber.ts:124-131), a value
+// of fields 1-7 and 9 that does not fit its field (:145-155), and a bitmap
+// (field 8) value above 16 bits — the last as connectedhomeip
+// (src/protocols/secure_channel/PairingSession.cpp:247-248 at 6170af84),
+// not as matter.js, whose bitmap wrapper does not bound the wire value.
+// Accepted: an unknown
 // context tag of any type (TlvObject.ts:215-220), a wider encoding whose
 // value fits, a repeated field — the last value wins (:233).
 func TestDecodeIsStrict(t *testing.T) {

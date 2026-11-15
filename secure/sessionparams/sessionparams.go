@@ -181,8 +181,12 @@ func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 // TlvSessionParameters (PaseMessages.ts:28-55 at db021da0) without the
 // relaxed number checks: every member must carry a context tag
 // (TlvObject.ts:212-214); a known field must be an unsigned integer
-// (TlvNumber.ts:124-131) whose value fits the field (:145-155); any of these
-// refuses the whole structure. A member at an unknown context tag is
+// (TlvNumber.ts:124-131); a value of fields 1-7 and 9 must fit the field
+// (:145-155). Any of these refuses the whole structure. The bitmap, field
+// 8, is refused as well when its value does not fit 16 bits — the
+// module's own, as connectedhomeip reads it
+// (src/protocols/secure_channel/PairingSession.cpp:247-248 at 6170af84);
+// matter.js's bitmap wrapper does not bound the wire value. A member at an unknown context tag is
 // skipped, a container included (TlvObject.ts:215-220), so a future field
 // does not break the handshake; an encoding wider than the field whose
 // value fits is accepted; a repeated field keeps its last value (:233).
