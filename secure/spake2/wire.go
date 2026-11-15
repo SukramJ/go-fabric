@@ -128,7 +128,11 @@ func DecodePake2(payload []byte) (pB, cB []byte, err error) {
 		if el.IsEndContainer {
 			break
 		}
-		switch memberTag(el) {
+		tag, err := memberTag(el, "Pake2")
+		if err != nil {
+			return nil, nil, err
+		}
+		switch tag {
 		case tagPake2PB:
 			if pB, err = octetMember(el, "Pake2.pB"); err != nil {
 				return nil, nil, err
@@ -138,7 +142,7 @@ func DecodePake2(payload []byte) (pB, cB []byte, err error) {
 				return nil, nil, err
 			}
 		default:
-			if err := skipMember(dec, el); err != nil {
+			if err := skipMember(dec, el, "Pake2"); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -198,8 +202,12 @@ func decodeSingleOctet(payload []byte, wantTag uint8, msgName string) ([]byte, e
 		if el.IsEndContainer {
 			break
 		}
-		if memberTag(el) != wantTag {
-			if err := skipMember(dec, el); err != nil {
+		tag, err := memberTag(el, msgName)
+		if err != nil {
+			return nil, err
+		}
+		if tag != wantTag {
+			if err := skipMember(dec, el, msgName); err != nil {
 				return nil, err
 			}
 			continue
@@ -232,26 +240,38 @@ func isUnsignedInt(t tlv.ElementType) bool {
 	return t >= tlv.TypeUnsignedInt1 && t <= tlv.TypeUnsignedInt8
 }
 
-// noMember is the [memberTag] of an element that is not a context-tagged
-// member of the message: no PASE field is numbered 0.
-const noMember uint8 = 0
-
-// memberTag is el's context tag number, or [noMember] for an element
-// with a tag of another kind or a number no PASE field carries.
-func memberTag(el tlv.Element) uint8 {
-	if el.Tag.Kind != tlv.TagKindContext || el.Tag.Number > 0xFF {
-		return noMember
+// memberTag returns the context tag number of el, a member of the
+// structure named name. A member whose tag is not context-specific —
+// anonymous, common-profile or fully-qualified; an implicit-profile tag
+// never gets here, the tlv decoder refuses it — is [ErrWireMalformed]:
+// matter.js's TlvObject decode throws for it at the member's position,
+// before it looks the field up
+// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0). A context tag
+// the structure does not declare, 0 included, is the caller's to skip
+// ([skipMember]).
+func memberTag(el tlv.Element, name string) (uint8, error) {
+	if el.Tag.Kind != tlv.TagKindContext {
+		return 0, fmt.Errorf("%w: %s member with a tag that is not context-specific (tag control %d)", ErrWireMalformed, name, el.Tag.Kind)
 	}
-	return uint8(el.Tag.Number)
+	return uint8(el.Tag.Number), nil //nolint:gosec // G115: a context tag is one byte on the wire (tlv/decode.go readTag)
 }
 
-// skipMember consumes a member the message does not declare, whole: when
-// el opens a container, every element up to its own end is read and
-// dropped, so the members of an unknown container never count as the
-// message's fields and its end never ends the message — as matter.js's
-// TlvObject decode skips an unknown field
-// (packages/types/src/tlv/TlvObject.ts:216-219 at db021da0).
-func skipMember(dec *tlv.Decoder, el tlv.Element) error {
+// skipMember consumes a context-tagged member of the structure named
+// name that the structure does not declare, whole: when el opens a
+// container, every element up to its own end is read and dropped, so
+// the members of an unknown container never count as the message's
+// fields and its end never ends the message — as matter.js's TlvObject
+// decode skips a context-tagged field it does not declare
+// (packages/types/src/tlv/TlvObject.ts:216-219 at db021da0) and refuses a
+// member whose tag is not context-specific (:212-214, [memberTag]).
+// Inside the skipped member the tag forms are not looked at, as
+// matter.js's TlvAny reads them (packages/types/src/tlv/TlvAny.ts:87-90);
+// an implicit-profile tag is still refused by the tlv decoder.
+//
+// The walk is the one tlv's unexported skipContainer does (tlv/raw.go);
+// reusing it would export a skip from the public tlv package for this one
+// caller, so the loop stays here (R2-P5 RR5a-05).
+func skipMember(dec *tlv.Decoder, el tlv.Element, name string) error {
 	for depth := 0; el.IsContainer || depth > 0; {
 		switch {
 		case el.IsContainer:
@@ -264,7 +284,7 @@ func skipMember(dec *tlv.Decoder, el tlv.Element) error {
 		}
 		var err error
 		if el, err = dec.Next(); err != nil {
-			return fmt.Errorf("%w: %w", ErrWireMalformed, err)
+			return fmt.Errorf("%w: %s: unknown member: %w", ErrWireMalformed, name, err)
 		}
 	}
 	return nil
@@ -349,7 +369,11 @@ func DecodePBKDFParamRequest(payload []byte) (PBKDFParamRequest, error) {
 		if el.IsEndContainer {
 			break
 		}
-		switch memberTag(el) {
+		tag, err := memberTag(el, "PBKDFParamRequest")
+		if err != nil {
+			return req, err
+		}
+		switch tag {
 		case tagPBKDFReqInitiatorRandom:
 			if req.InitiatorRandom, err = octetMember(el, "PBKDFParamRequest.InitiatorRandom"); err != nil {
 				return req, err
@@ -382,7 +406,7 @@ func DecodePBKDFParamRequest(payload []byte) (PBKDFParamRequest, error) {
 			}
 			req.InitiatorSessionParams = &params
 		default:
-			if err := skipMember(dec, el); err != nil {
+			if err := skipMember(dec, el, "PBKDFParamRequest"); err != nil {
 				return req, err
 			}
 		}
@@ -522,7 +546,11 @@ func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 		if el.IsEndContainer {
 			break
 		}
-		switch memberTag(el) {
+		tag, err := memberTag(el, "PBKDFParamResponse")
+		if err != nil {
+			return resp, err
+		}
+		switch tag {
 		case tagPBKDFRespInitiatorRandom:
 			if resp.InitiatorRandom, err = octetMember(el, "PBKDFParamResponse.InitiatorRandom"); err != nil {
 				return resp, err
@@ -556,7 +584,7 @@ func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 			}
 			resp.ResponderSessionParams = &params
 		default:
-			if err := skipMember(dec, el); err != nil {
+			if err := skipMember(dec, el, "PBKDFParamResponse"); err != nil {
 				return resp, err
 			}
 		}
@@ -589,7 +617,11 @@ func decodePBKDFParameters(dec *tlv.Decoder) (PBKDFParameters, error) {
 		if el.IsEndContainer {
 			break
 		}
-		switch memberTag(el) {
+		tag, err := memberTag(el, "PBKDFParameters")
+		if err != nil {
+			return p, err
+		}
+		switch tag {
 		case tagPBKDFParamsIterations:
 			// TlvUInt32 (PaseMessages.ts:89-92): never masked into the
 			// bounds [PBKDFParameters.Validate] holds.
@@ -602,7 +634,7 @@ func decodePBKDFParameters(dec *tlv.Decoder) (PBKDFParameters, error) {
 				return p, err
 			}
 		default:
-			if err := skipMember(dec, el); err != nil {
+			if err := skipMember(dec, el, "PBKDFParameters"); err != nil {
 				return p, err
 			}
 		}

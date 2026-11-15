@@ -75,14 +75,22 @@ func encodeWire(t *testing.T, asList bool, members ...wireMember) []byte {
 
 // TestPASEDecodersAreStrictAboutShape holds the shape checks of the PASE
 // decoders a device runs on what a commissioner sends — PBKDFParamRequest,
-// Pake1, Pake3 — and of Pake2: the top level must be a structure (a list
-// with the same members is refused), and only context-tagged members
-// count, so a profile-tagged member, or a context member of another tag,
-// that shares a field's number is ignored rather than merged into the
-// field (R2-P5-tmut-16). A PBKDFParamRequest needs all four of its
-// mandatory members — matter.js's TlvPbkdfParamRequest declares tags 1-4
-// TlvFields (packages/protocol/src/session/pase/PaseMessages.ts:70-73 at
-// db021da0) — so one without PasscodeID or HasPBKDFParameters is refused.
+// Pake1, Pake3 — and of Pake2 and PBKDFParamResponse: the top level must
+// be a structure (a list with the same members is refused); a context
+// member of a tag the message does not declare is skipped rather than
+// merged into a field (R2-P5-tmut-16); and a member whose tag is not
+// context-specific — anonymous, common-profile, fully-qualified or
+// implicit, numbered like a field or not, before or after the declared
+// members, at the top level or inside the nested PBKDFParameters — is
+// refused, as matter.js's TlvObject decode throws for it
+// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0), while inside
+// a skipped unknown member the tag forms are not looked at
+// (packages/types/src/tlv/TlvAny.ts:87-90; an implicit-profile tag is
+// refused by the tlv decoder wherever it stands) (R2-P5 Fable F1). A
+// PBKDFParamRequest needs all four of its mandatory members — matter.js's
+// TlvPbkdfParamRequest declares tags 1-4 TlvFields
+// (packages/protocol/src/session/pase/PaseMessages.ts:70-73 at db021da0) —
+// so one without PasscodeID or HasPBKDFParameters is refused.
 func TestPASEDecodersAreStrictAboutShape(t *testing.T) {
 	t.Parallel()
 	b := func(n int) []byte { return bytes.Repeat([]byte{0x5A}, n) }
@@ -93,30 +101,93 @@ func TestPASEDecodersAreStrictAboutShape(t *testing.T) {
 	pake2 := func(raw []byte) error { _, _, err := spake2.DecodePake2(raw); return err }
 	pake3 := func(raw []byte) error { _, err := spake2.DecodePake3(raw); return err }
 	request := func(raw []byte) error { _, err := spake2.DecodePBKDFParamRequest(raw); return err }
+	response := func(raw []byte) error { _, err := spake2.DecodePBKDFParamResponse(raw); return err }
 	no := false
 	random, session, passcode, hasParams := wireMember{tag: ctx(1), octets: b(spake2.PBKDFRandomSize)}, wireMember{tag: ctx(2), u: 7}, wireMember{tag: ctx(3), u: 0}, wireMember{tag: ctx(4), flag: &no}
-	for _, tc := range []struct {
+	type tableCase struct {
 		name    string
 		decode  decoder
 		asList  bool
 		members []wireMember
 		ok      bool
-	}{
+	}
+	cases := []tableCase{
 		{"Pake1", pake1, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}}, true},
 		{"Pake1 as a list", pake1, true, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}}, false},
-		{"Pake1 with a profile-tagged member numbered 1", pake1, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: profile, octets: b(4)}}, true},
+		{"Pake1 with a profile-tagged member numbered 1", pake1, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: profile, octets: b(4)}}, false},
 		{"Pake1 with a context member of another tag", pake1, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(4)}}, true},
 		{"Pake3", pake3, false, []wireMember{{tag: ctx(1), octets: b(spake2.ConfirmTagSize)}}, true},
 		{"Pake3 as a list", pake3, true, []wireMember{{tag: ctx(1), octets: b(spake2.ConfirmTagSize)}}, false},
 		{"Pake2", pake2, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(spake2.ConfirmTagSize)}}, true},
 		{"Pake2 as a list", pake2, true, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(spake2.ConfirmTagSize)}}, false},
-		{"Pake2 with a profile-tagged member numbered 1", pake2, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(spake2.ConfirmTagSize)}, {tag: profile, octets: b(4)}}, true},
+		{"Pake2 with a profile-tagged member numbered 1", pake2, false, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(spake2.ConfirmTagSize)}, {tag: profile, octets: b(4)}}, false},
 		{"PBKDFParamRequest", request, false, []wireMember{random, session, passcode, hasParams}, true},
 		{"PBKDFParamRequest as a list", request, true, []wireMember{random, session, passcode, hasParams}, false},
-		{"PBKDFParamRequest with a profile-tagged member numbered 1", request, false, []wireMember{random, {tag: profile, octets: b(4)}, session, passcode, hasParams}, true},
+		{"PBKDFParamRequest with a profile-tagged member numbered 1", request, false, []wireMember{random, {tag: profile, octets: b(4)}, session, passcode, hasParams}, false},
+		{"PBKDFParamRequest with a context member numbered 0", request, false, []wireMember{random, session, passcode, hasParams, {tag: ctx(0), u: 1}}, true},
 		{"PBKDFParamRequest without HasPBKDFParameters", request, false, []wireMember{random, session, passcode}, false},
 		{"PBKDFParamRequest without PasscodeID and HasPBKDFParameters", request, false, []wireMember{random, session}, false},
-	} {
+	}
+
+	// Every tag form other than context-specific, at every declared
+	// position (R2-P5 Fable F1).
+	pbkdfParams := func(nested ...wireMember) wireMember {
+		return wireMember{tag: ctx(4), structure: true, nested: nested}
+	}
+	iterations := wireMember{tag: ctx(1), u: uint64(spake2.PBKDFMinIterations)}
+	salt := wireMember{tag: ctx(2), octets: b(spake2.PBKDFMinSaltSize)}
+	respFields := []wireMember{{tag: ctx(1), octets: b(spake2.PBKDFRandomSize)}, {tag: ctx(2), octets: b(spake2.PBKDFRandomSize)}, {tag: ctx(3), u: 9}}
+	messages := []struct {
+		name   string
+		decode decoder
+		fields []wireMember
+	}{
+		{"Pake1", pake1, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}}},
+		{"Pake2", pake2, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize)}, {tag: ctx(2), octets: b(spake2.ConfirmTagSize)}}},
+		{"Pake3", pake3, []wireMember{{tag: ctx(1), octets: b(spake2.ConfirmTagSize)}}},
+		{"PBKDFParamRequest", request, []wireMember{random, session, passcode, hasParams}},
+		{"PBKDFParamResponse", response, append(append([]wireMember(nil), respFields...), pbkdfParams(iterations, salt))},
+	}
+	forms := []struct {
+		name     string
+		tag      tlv.Tag
+		implicit bool // refused by the tlv decoder wherever it stands
+	}{
+		{"anonymous", tlv.AnonymousTag(), false},
+		{"common-profile 2-byte", tlv.CommonTag(1), false},
+		{"common-profile 4-byte", tlv.CommonTag(0x10001), false},
+		{"fully-qualified 6-byte", tlv.FullyQualifiedTag(0xFFF1, 1, 1), false},
+		{"fully-qualified 8-byte", tlv.FullyQualifiedTag(0xFFF1, 1, 0x10001), false},
+		{"implicit-profile 2-byte", tlv.ImplicitTag(1), true},
+		{"implicit-profile 4-byte", tlv.ImplicitTag(0x10001), true},
+	}
+	join := func(parts ...[]wireMember) []wireMember {
+		var out []wireMember
+		for _, p := range parts {
+			out = append(out, p...)
+		}
+		return out
+	}
+	generated := make([]tableCase, 0, (4*len(messages)+2)*len(forms))
+	for _, f := range forms {
+		scalar := wireMember{tag: f.tag, u: 1}
+		container := wireMember{tag: f.tag, structure: true, nested: []wireMember{{tag: ctx(1), u: 1}}}
+		unknown := wireMember{tag: ctx(9), structure: true, nested: []wireMember{scalar}}
+		for _, m := range messages {
+			generated = append(generated,
+				tableCase{m.name + " with a " + f.name + " member after the fields", m.decode, false, join(m.fields, []wireMember{scalar}), false},
+				tableCase{m.name + " with a " + f.name + " member before the fields", m.decode, false, join([]wireMember{scalar}, m.fields), false},
+				tableCase{m.name + " with a " + f.name + " structure after the fields", m.decode, false, join(m.fields, []wireMember{container}), false},
+				tableCase{m.name + " with a " + f.name + " member inside a skipped unknown structure", m.decode, false, join(m.fields, []wireMember{unknown}), !f.implicit},
+			)
+		}
+		generated = append(generated,
+			tableCase{"PBKDFParamResponse with a " + f.name + " member inside PBKDFParameters", response, false, join(respFields, []wireMember{pbkdfParams(iterations, scalar, salt)}), false},
+			tableCase{"PBKDFParamResponse with a " + f.name + " member inside a skipped unknown structure inside PBKDFParameters", response, false, join(respFields, []wireMember{pbkdfParams(iterations, salt, unknown)}), !f.implicit},
+		)
+	}
+
+	for _, tc := range append(cases, generated...) {
 		err := tc.decode(encodeWire(t, tc.asList, tc.members...))
 		switch {
 		case tc.ok && err != nil:
@@ -181,8 +252,8 @@ func TestPBKDFParamResponseFieldsAreTyped(t *testing.T) {
 
 // TestPASEDecodersSkipUnknownMembersWholeAndKeepTheLast holds the member
 // walk of every PASE decoder against matter.js's TlvObject decode
-// (packages/types/src/tlv/TlvObject.ts at db021da0): a member the
-// message does not declare is skipped whole, containers included
+// (packages/types/src/tlv/TlvObject.ts at db021da0): a context-tagged
+// member the message does not declare is skipped whole, containers included
 // (:216-219), so the members of an unknown structure never count as the
 // message's own fields and its end never ends the message; a declared
 // member that repeats keeps its last occurrence (:229-234) instead of
@@ -270,7 +341,7 @@ func TestPASEDecodersSkipUnknownMembersWholeAndKeepTheLast(t *testing.T) {
 		},
 		{
 			"request: a profile-tagged structure holding tag 2", request,
-			with(wellFormed, wireMember{tag: profile, structure: true, nested: inner[:1]}), "random=32×5a sid=42 pid=0",
+			with(wellFormed, wireMember{tag: profile, structure: true, nested: inner[:1]}), "",
 		},
 		// Fable D2: a repeated member keeps its last occurrence.
 		{
