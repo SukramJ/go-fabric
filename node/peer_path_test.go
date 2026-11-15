@@ -48,7 +48,7 @@ func newCameraPeers(ctx context.Context, t *testing.T, camTCP, ctlTCP *node.TCPC
 	t.Helper()
 	holdSite(t)
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Logger: slog.New(slog.DiscardHandler)})
-	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}
