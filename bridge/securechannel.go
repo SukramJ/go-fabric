@@ -344,6 +344,48 @@ func (b *Bridge) resolvePaseContinuation(key HandshakeKey) (h PaseHandler, begun
 	return b.resolvePaseHandler(key), true
 }
 
+// paseWindowClosed reports whether a PBKDFParamRequest meets a closed
+// commissioning window: a window is attached ([Bridge.AttachCommissioningWindow])
+// and closed, and no PASE acceptor is — neither a provider nor a singleton
+// handler, as a node detaches its acceptor when its window closes. A
+// bridge without a window, or with an acceptor attached, is not in that
+// state: an unattached PASE port stays the fail-closed noop, and an
+// attached acceptor runs the handshake.
+func (b *Bridge) paseWindowClosed() bool {
+	b.mu.RLock()
+	provider, singleton, win := b.paseProvider, b.paseHandler, b.commissioningWindow
+	b.mu.RUnlock()
+	if provider != nil || win == nil {
+		return false
+	}
+	if _, noop := singleton.(noopPaseHandler); !noop {
+		return false
+	}
+	return !win.IsOpen()
+}
+
+// refusePaseWindowClosed answers a PBKDFParamRequest that meets a closed
+// commissioning window ([Bridge.paseWindowClosed]) with a StatusReport
+// (GeneralFailure, InvalidParameter), as matter.js answers one with no PASE
+// server set (SecureChannelProtocol.ts:129-137 at db021da0; review II,
+// owner decision 97). It begins no handshake: the single-active-PASE claim
+// is not taken and no PASE failure is counted.
+func (b *Bridge) refusePaseWindowClosed(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
+	b.logger.Info("matter.rx.sc.pase_window_closed",
+		slog.String("src", srcString(src)),
+		slog.Int("exchange_id", int(proto.ExchangeID)))
+	body := mrp.EncodeStatusReport(
+		mrp.SCStatusGeneralFailure,
+		uint32(mrp.SecureChannelProtocolID),
+		mrp.SCStatusProtocolInvalidParameter,
+		nil,
+	)
+	if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
+		b.logger.Debug("matter.rx.sc.pase_window_closed.status_report_send_failed", slog.Any("err", err))
+	}
+	return nil
+}
+
 // dropHandshakeNotBegun ends the handling of a Pake1, Pake3, Sigma3 or
 // Sigma2_Resume whose handshake no PBKDFParamRequest or Sigma1 began: the
 // message is acknowledged — the MRP layer owes the acknowledgement already
@@ -704,6 +746,9 @@ func (b *Bridge) dispatchPase(
 	}
 	switch proto.Opcode {
 	case mrp.SCOpcodePBKDFParamRequest:
+		if b.paseWindowClosed() {
+			return b.refusePaseWindowClosed(src, requestHdr, proto)
+		}
 		if !b.claimPaseInFlight(key) {
 			// Single-active-PASE (Matter §4.13.1): a second
 			// commissioner's PBKDFParamRequest while a handshake is in
