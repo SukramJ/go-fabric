@@ -272,6 +272,38 @@ func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttribute
 	return results
 }
 
+// AttributePathStatus implements [im.AttributePathChecker]: the status
+// [TopologyDispatcher.Read] answers path, a fully concrete attribute path,
+// with, decided from the topology and the server's attribute set — an
+// endpoint the topology lacks is UnsupportedEndpoint, a cluster the
+// endpoint does not serve UnsupportedCluster — and Success for an
+// attribute the server lists ([contract.ClusterAttributeLister]) or a
+// global list the dispatcher synthesises, whose value is read at its
+// place. Any other attribute is read here, and its status is the read's:
+// the server's attribute set does not decide it.
+func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.ConcreteAttributePath) im.StatusCode {
+	if !path.HasEndpoint || !path.HasCluster || !path.HasAttribute {
+		return im.StatusSuccess
+	}
+	ep := d.topology.FindByID(path.Endpoint)
+	if ep == nil {
+		return im.StatusUnsupportedEndpoint
+	}
+	servers := d.serversFor(ep, path)
+	if len(servers) == 0 {
+		return im.StatusUnsupportedCluster
+	}
+	srv := servers[0]
+	switch path.Attribute {
+	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
+		return im.StatusSuccess
+	}
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok && slices.Contains(lister.MatterAttributes(), path.Attribute) {
+		return im.StatusSuccess
+	}
+	return readOne(ctx, ep, srv, path).Status
+}
+
 // ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
 // endpoints [TopologyDispatcher.Read] visits for path, in its order.
 func (d *TopologyDispatcher) ExpansionEndpoints(path im.ConcreteAttributePath) []uint16 {

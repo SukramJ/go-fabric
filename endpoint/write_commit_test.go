@@ -80,3 +80,32 @@ func TestWriteResultCarriesTheCommit(t *testing.T) {
 		}
 	}
 }
+
+// TestAttributePathStatusAnswersAsReadDoes: the status
+// TopologyDispatcher.AttributePathStatus gives a concrete path is the one
+// its Read answers the path with — decided from the topology and the
+// server's attribute set where those decide it, and by the read otherwise
+// (review II, R2-P5-write-06).
+func TestAttributePathStatusAnswersAsReadDoes(t *testing.T) {
+	t.Parallel()
+	srv := &gateServer{id: 0xFFF1FC04, attrs: []uint32{0x0000}, vals: map[uint32]any{0x0000: uint16(1), 0x0005: uint16(5)}}
+	d := gateDispatcher(t, store.PrivilegeAdminister, srv)
+	for _, c := range []struct {
+		name string
+		path im.ConcreteAttributePath
+		want im.StatusCode
+	}{
+		{"an endpoint the topology lacks", concreteAttrPath(9, srv.id, 0x0000), im.StatusUnsupportedEndpoint},
+		{"a cluster the endpoint lacks", concreteAttrPath(2, 0xFFF1FC05, 0x0000), im.StatusUnsupportedCluster},
+		{"a listed attribute", concreteAttrPath(2, srv.id, 0x0000), im.StatusSuccess},
+		{"AttributeList", concreteAttrPath(2, srv.id, 0xFFFB), im.StatusSuccess},
+		{"an attribute neither listed nor read", concreteAttrPath(2, srv.id, 0x0001), im.StatusUnsupportedAttribute},
+		{"an attribute the server reads without listing it", concreteAttrPath(2, srv.id, 0x0005), im.StatusSuccess},
+	} {
+		got := d.AttributePathStatus(caseCtx(false), c.path)
+		read := d.Read(caseCtx(false), c.path)
+		if got != c.want || len(read) != 1 || read[0].Status != got {
+			t.Errorf("%s: status %v, Read %+v; want %v from both", c.name, got, read, c.want)
+		}
+	}
+}
