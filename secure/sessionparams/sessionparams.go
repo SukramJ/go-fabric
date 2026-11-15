@@ -214,25 +214,27 @@ func DecodeFields(dec *tlv.Decoder) (Parameters, error) {
 		if el.Uint>>bits != 0 {
 			return p, fmt.Errorf("sessionparams: field %d value %d exceeds %d bits", el.Tag.Number, el.Uint, bits)
 		}
+		// The value fits its field (checked above); the masks only
+		// spell the width out for the conversion.
 		switch el.Tag.Number {
 		case 1:
-			p.SessionIdleInterval = uint32(el.Uint)
+			p.SessionIdleInterval = uint32(el.Uint & 0xFFFFFFFF)
 		case 2:
-			p.SessionActiveInterval = uint32(el.Uint)
+			p.SessionActiveInterval = uint32(el.Uint & 0xFFFFFFFF)
 		case 3:
-			p.SessionActiveThreshold = uint16(el.Uint)
+			p.SessionActiveThreshold = uint16(el.Uint & 0xFFFF)
 		case 4:
-			p.DataModelRevision = uint16(el.Uint)
+			p.DataModelRevision = uint16(el.Uint & 0xFFFF)
 		case 5:
-			p.InteractionModelRevision = uint16(el.Uint)
+			p.InteractionModelRevision = uint16(el.Uint & 0xFFFF)
 		case 6:
-			p.SpecificationVersion = uint32(el.Uint)
+			p.SpecificationVersion = uint32(el.Uint & 0xFFFFFFFF)
 		case 7:
-			p.MaxPathsPerInvoke = uint16(el.Uint)
+			p.MaxPathsPerInvoke = uint16(el.Uint & 0xFFFF)
 		case 8:
-			p.SupportedTransports = uint16(el.Uint)
+			p.SupportedTransports = uint16(el.Uint & 0xFFFF)
 		case 9:
-			p.MaxTCPMessageSize = uint32(el.Uint)
+			p.MaxTCPMessageSize = uint32(el.Uint & 0xFFFFFFFF)
 		}
 	}
 }
@@ -256,8 +258,9 @@ func isUnsigned(t tlv.ElementType) bool {
 	switch t {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // skipContainer consumes the elements of a container whose opening
