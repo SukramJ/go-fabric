@@ -100,7 +100,8 @@ func (d *Device) refusedInitial() []InitialRequirement {
 // built from the defaults its children state (DefaultValue.ts:153-179).
 // conformance-compiler.ts:717-721 then refuses a conformant, non-nullable
 // member that is still undefined — an enum, string or octet string, or a
-// struct's mandatory non-nullable child without a default — and the same
+// struct one of whose mandatory children stays undefined ([structRefused])
+// — and the same
 // validation refuses a list whose minimum length is above 0 and an integer
 // whose constraint excludes 0 (inferred from the dispatch at
 // constraint.ts:112-113). A stated default that the runtime does not
@@ -118,16 +119,7 @@ func refusedAtInit(t spec.Type, q spec.Quality, c spec.Constraint, def any) bool
 	case spec.KindEnum, spec.KindString, spec.KindBytes:
 		return true
 	case spec.KindStruct:
-		if t.Struct == nil {
-			return false
-		}
-		for i := range t.Struct.Fields {
-			f := &t.Struct.Fields[i]
-			if f.Mandatory() && !f.Quality.Nullable && f.Default == nil {
-				return true
-			}
-		}
-		return false
+		return structRefused(t.Struct, 0)
 	case spec.KindList:
 		return excludesZero(c)
 	case spec.KindUint, spec.KindInt, spec.KindFloat32, spec.KindFloat64:
@@ -135,6 +127,39 @@ func refusedAtInit(t spec.Type, q spec.Quality, c spec.Constraint, def any) bool
 	case spec.KindAny, spec.KindBool, spec.KindBitmap:
 		// false, {} — and a value of no known shape — always validate.
 		return false
+	}
+	return false
+}
+
+// structRefused reports whether matter.js leaves a mandatory field of a
+// struct built from its children's defaults undefined (DefaultValue.ts
+// buildObject, :153-179 at db021da0): a mandatory, non-nullable child
+// without a default of its own is undefined unless it is a list whose
+// constraint admits the empty list — matter.js gives such a child []
+// (DefaultValue.ts:130-143) — or a struct that is itself built from its
+// children's defaults. A struct of no known shape is not judged; depth
+// bounds a definition that nests without end.
+func structRefused(st *spec.Struct, depth int) bool {
+	if st == nil || depth > 16 {
+		return false
+	}
+	for i := range st.Fields {
+		f := &st.Fields[i]
+		if !f.Mandatory() || f.Quality.Nullable || f.Default != nil {
+			continue
+		}
+		switch f.Type.Kind {
+		case spec.KindList:
+			if excludesZero(f.Constraint) {
+				return true
+			}
+		case spec.KindStruct:
+			if structRefused(f.Type.Struct, depth+1) {
+				return true
+			}
+		default:
+			return true
+		}
 	}
 	return false
 }

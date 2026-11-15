@@ -13,7 +13,9 @@ import (
 // TestRefusedAtInitKinds walks every branch of refusedAtInit's rule with
 // hand-made elements: a nullable element and one with a resolved default
 // are never refused, an enum, string or octet string without one always,
-// a struct when a mandatory non-nullable child states no default, a number
+// a struct when a mandatory child stays undefined (a list child that
+// admits [] and a nested struct built from its children's defaults do
+// not), a number
 // or list when its constraint leaves out 0.
 func TestRefusedAtInitKinds(t *testing.T) {
 	t.Parallel()
@@ -41,6 +43,11 @@ func TestRefusedAtInitKinds(t *testing.T) {
 		{"struct, mandatory child with a default", structOf(spec.Field{Name: "a", Conformance: mandatory, Default: float64(0)}), spec.Quality{}, spec.Constraint{}, nil, false},
 		{"struct, nullable mandatory child", structOf(spec.Field{Name: "a", Conformance: mandatory, Quality: spec.Quality{Nullable: true}}), spec.Quality{}, spec.Constraint{}, nil, false},
 		{"struct, optional child", structOf(spec.Field{Name: "a", Conformance: spec.Conformance{Op: spec.ConfOptional}}), spec.Quality{}, spec.Constraint{}, nil, false},
+		{"struct, list child that admits []", structOf(spec.Field{Name: "a", Conformance: mandatory, Type: spec.Type{Kind: spec.KindList}}), spec.Quality{}, spec.Constraint{}, nil, false},
+		{"struct, list child of min 1", structOf(spec.Field{Name: "a", Conformance: mandatory, Type: spec.Type{Kind: spec.KindList}, Constraint: min1}), spec.Quality{}, spec.Constraint{}, nil, true},
+		{"struct, nested struct built from defaults", structOf(spec.Field{Name: "a", Conformance: mandatory, Type: structOf(spec.Field{Name: "b", Conformance: mandatory, Default: float64(0)})}), spec.Quality{}, spec.Constraint{}, nil, false},
+		{"struct, nested struct with an undefined child", structOf(spec.Field{Name: "a", Conformance: mandatory, Type: structOf(spec.Field{Name: "b", Conformance: mandatory, Type: spec.Type{Kind: spec.KindEnum}})}), spec.Quality{}, spec.Constraint{}, nil, true},
+		{"struct, nested struct of no known shape", structOf(spec.Field{Name: "a", Conformance: mandatory, Type: spec.Type{Kind: spec.KindStruct}}), spec.Quality{}, spec.Constraint{}, nil, false},
 		{"list, min 1", spec.Type{Kind: spec.KindList}, spec.Quality{}, min1, nil, true},
 		{"list", spec.Type{Kind: spec.KindList}, spec.Quality{}, spec.Constraint{}, nil, false},
 		{"uint, min 1", spec.Type{Kind: spec.KindUint}, spec.Quality{}, min1, nil, true},

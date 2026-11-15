@@ -158,7 +158,7 @@ var initialValues = map[string][]Declaration{
 		pumpdef.AttrEffectiveOperationMode: pumpdef.OperationModeNormal, pumpdef.AttrEffectiveControlMode: pumpdef.ControlModeConstantSpeed,
 	})},
 	"RoboticVacuumCleaner": { // :256-259
-		withInitial(rvcrundef.ClusterID, map[uint32]any{rvcrundef.AttrSupportedModes: spec.List[rvcrundef.ModeOptionStruct]{ // RVC_RUN_MODE_STATE :77-82
+		withInitial(rvcrundef.ClusterID, map[uint32]any{rvcrundef.AttrSupportedModes: spec.List[rvcrundef.ModeOptionStruct]{ // RVC_RUN_MODE_STATE :76-81
 			{Label: "Idle", Mode: 0, ModeTags: []rvcrundef.ModeTagStruct{{Value: rvcrundef.ModeTagIdle}}},
 			{Label: "Clean", Mode: 1, ModeTags: []rvcrundef.ModeTagStruct{{Value: rvcrundef.ModeTagCleaning}}},
 		}}),
