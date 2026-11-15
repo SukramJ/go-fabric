@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/internal/udpseam"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -23,11 +24,48 @@ import (
 
 // ownedSocket is a kernel UDP socket on 127.0.0.1 that a test hands the
 // bridge through its listener seam (openUDP): it counts the datagrams the
-// bridge writes and records the close.
+// bridge writes, records the close, and counts the datagrams read and
+// those whose handler returned (udpseam.Handled).
 type ownedSocket struct {
 	*net.UDPConn
-	writes atomic.Int32
-	closed atomic.Bool
+	writes  atomic.Int32
+	closed  atomic.Bool
+	reads   atomic.Int64
+	handled atomic.Int64
+	settled chan struct{} // a datagram's handler returned
+}
+
+func (s *ownedSocket) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	n, addr, err := s.UDPConn.ReadFromUDP(b)
+	if err == nil {
+		s.reads.Add(1)
+	}
+	return n, addr, err
+}
+
+// Handled implements udpseam.Handled: the listener calls it once the
+// handler of a datagram it read returned, or it dropped the datagram.
+func (s *ownedSocket) Handled() {
+	s.handled.Add(1)
+	select {
+	case s.settled <- struct{}{}:
+	default:
+	}
+}
+
+// waitHandled waits until the handler of every datagram the socket has
+// read so far returned.
+func (s *ownedSocket) waitHandled(t *testing.T) {
+	t.Helper()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for s.handled.Load() < s.reads.Load() {
+		select {
+		case <-s.settled:
+		case <-deadline.C:
+			t.Fatalf("%d of %d datagrams read are still being handled", s.reads.Load()-s.handled.Load(), s.reads.Load())
+		}
+	}
 }
 
 func (s *ownedSocket) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
@@ -52,7 +90,7 @@ func useOwnedSocket(t *testing.T, b *Bridge) func() *ownedSocket {
 		if err != nil {
 			return nil, err
 		}
-		s := &ownedSocket{UDPConn: conn}
+		s := &ownedSocket{UDPConn: conn, settled: make(chan struct{}, 1)}
 		sock.Store(s)
 		l, _ := udpseam.NewListener(s).(*udp.Listener)
 		return l, nil

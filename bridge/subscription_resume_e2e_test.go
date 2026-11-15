@@ -934,24 +934,21 @@ func TestSubscriptionResumption_DisabledRecordsNothing(t *testing.T) {
 	fab := newResumeFabric(t)
 	st := newMemSubscriptionStore()
 	ctrl := newFakeController(t, fab)
-	run1 := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) { br.SetSubscriptionPersistence(false) })
+	var socket func() *ownedSocket
+	run1 := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) {
+		br.SetSubscriptionPersistence(false)
+		socket = useOwnedSocket(t, br)
+	})
 	if run1.br.SubscriptionPersistenceEnabled() {
 		t.Fatal("switch did not take")
 	}
 	ctrl.setBridge(run1.addr(t))
 	_ = subscribeOverCASE(t, run1, ctrl)
 	// The bridge decides on the record after it sent the SubscribeResponse,
-	// still in the request's handler: once the handlers the listener
-	// dispatched have returned, the decision is made (before review II,
-	// phase 5 a 50 ms sleep stood here, R2-P5-tassert-12).
-	run1.br.mu.RLock()
-	listener := run1.br.listener
-	run1.br.mu.RUnlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := listener.WaitIdle(ctx); err != nil {
-		t.Fatalf("the subscribe request's handler did not return: %v", err)
-	}
+	// still in the request's handler: once the handler of every datagram
+	// the bridge read has returned, the decision is made (before review
+	// II, phase 5 a 50 ms sleep stood here, R2-P5-tassert-12).
+	socket().waitHandled(t)
 	if got := st.ids(); len(got) != 0 {
 		t.Fatalf("persistence disabled, store holds %v", got)
 	}
