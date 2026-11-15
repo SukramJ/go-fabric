@@ -2765,7 +2765,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 499,
+    "line": 501,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",
@@ -2858,7 +2858,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 509,
+    "line": 515,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",
