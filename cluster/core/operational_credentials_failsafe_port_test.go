@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -48,6 +49,61 @@ func TestOpCredsWithoutFailSafePortFailsClosed(t *testing.T) {
 			var sc statusCoder
 			if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusFailsafeRequired {
 				t.Fatalf("%s without a fail-safe port = %v, want FailsafeRequired (0xCA)", tc.name, err)
+			}
+		})
+	}
+}
+
+// TestOpCredsWithDisarmedFailSafePortFailsClosed is the wired half of the
+// test above: a fail-safe port that is present but reports "not armed"
+// must give the four commands FailsafeRequired as well — chip's guard
+// asks IsFailSafeArmed, not whether a port exists (the lines above). The
+// UpdateNOC case also leaves a CSR key for UpdateNOC in place from a
+// window that has since closed: without the armed check UpdateNOC would
+// go on to consume it (R2-P5-tmut-07).
+func TestOpCredsWithDisarmedFailSafePortFailsClosed(t *testing.T) {
+	t.Parallel()
+	type statusCoder interface{ MatterStatusCode() im.StatusCode }
+	for _, tc := range []struct {
+		name       string
+		command    uint32
+		fields     any
+		pendingCSR bool
+	}{
+		{"CSRRequest", 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}, false},
+		{"AddNOC", 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1}, false},
+		{"UpdateNOC", 0x07, core.UpdateNOCRequest{}, false},
+		{"UpdateNOC with a CSR key left from a closed window", 0x07, core.UpdateNOCRequest{}, true},
+		{"AddTrustedRootCertificate", 0x0B, core.AddTrustedRootCertificateRequest{}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var armed atomic.Bool
+			oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+				SupportedFabrics: 5,
+				FailSafe: func() (uint8, bool) {
+					if armed.Load() {
+						return 1, true
+					}
+					return 0, false
+				},
+			})
+			if err != nil {
+				t.Fatalf("NewOperationalCredentials: %v", err)
+			}
+			ctx := context.Background()
+			if tc.pendingCSR {
+				// A CSR for UpdateNOC is issued over CASE on the fabric the
+				// window was armed for.
+				ctx = core.WithInvokeSessionID(im.WithFabricFilter(ctx, true, 1), 100)
+				armed.Store(true)
+				issueCSRPendingPubKey(ctx, t, oc, true)
+				armed.Store(false)
+			}
+			_, err = oc.MatterInvoke(sessionChallengeCtx(ctx), tc.command, tc.fields)
+			var sc statusCoder
+			if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusFailsafeRequired {
+				t.Fatalf("%s with a disarmed fail-safe port = %v, want FailsafeRequired (0xCA)", tc.name, err)
 			}
 		})
 	}
