@@ -85,8 +85,14 @@ A device without a network at first boot is commissioned over Bluetooth LE:
 the commissioner finds it by its BLE advertisement, runs PASE over BTP,
 provisions the network (Wi-Fi credentials through NetworkCommissioning) and
 completes over CASE on the IP network. The node gets the radio as a host
-port, `node.Config.Network.BLE` (a `contract.BLEPeripheral`); on Linux that
-is `ble/bluez`, a nested module a host without BLE never pulls:
+port, `node.Config.Network.GATT` (a `contract.GATTPeripheral`): the node
+registers the Matter GATT service with `RegisterService` before it
+advertises, so a service the platform refuses keeps the node off the air
+instead of advertising a service that is not there. The older
+`contract.BLEPeripheral` (`Network.BLE`) is deprecated and still works: it
+registers inside `Serve`, which reports a refusal only in the log. On Linux
+the radio is `ble/bluez`, a nested module a host without BLE never pulls;
+until its next release it implements the older port:
 
 ```go
 radio, err := bluez.NewPeripheral("hci0") // "" is hci0
@@ -106,7 +112,7 @@ cfg.Network.BLE = radio
 | `Node.Stop` | off the radio |
 
 The QR code of `Node.SetupPayload` names BLE discovery beside the IP
-network only with `Network.BLE` set; the manual code carries no discovery
+network only with `Network.GATT` (or `Network.BLE`) set; the manual code carries no discovery
 bits. BTP is reliable, so MRP does not run over it; a lost BLE connection
 closes the sessions it carried. Whether a window is open or not, a
 central that has neither a secure session nor a PASE handshake in flight
