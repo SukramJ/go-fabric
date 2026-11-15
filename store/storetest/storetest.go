@@ -894,13 +894,15 @@ func doorLocksCase(ctx context.Context, t *testing.T, p store.Port) {
 			{
 				UserIndex: 2, UserName: "b", UserStatus: 1, UserType: 0, Credentials: []store.DoorLockCredentialRef{{Type: 1, Index: 1}},
 				CreatorFabricIndex: 1, LastModifiedFabricIndex: 2, ExpiringUserExpiresAt: &expires,
+				CreatedThroughMatter: true, ModifiedThroughMatter: true,
 			},
 			{UserIndex: 1, UserName: "a", UserUniqueID: u32(42), UserStatus: 1},
 		},
 		Credentials: []store.DoorLockCredential{
 			{Type: 2, Index: 1, Data: []byte{9}},
 			{Type: 1, Index: 3, Data: []byte{8}},
-			{Type: 1, Index: 1, Data: []byte{7}, CreatorFabricIndex: 1, LastModifiedFabricIndex: 1},
+			{Type: 1, Index: 1, Data: []byte{7}, CreatorFabricIndex: 1, LastModifiedFabricIndex: 1, ModifiedThroughMatter: true},
+			{Type: 1, Index: 2, Data: []byte{6}, CreatorFabricIndex: 2, LastModifiedFabricIndex: 2, CreatedThroughMatter: true, ModifiedThroughMatter: true},
 		},
 		WeekDaySchedules: []store.DoorLockWeekDaySchedule{
 			{WeekDayIndex: 2, UserIndex: 1, DaysMask: 3, StartHour: 8, EndHour: 17},
@@ -926,7 +928,7 @@ func doorLocksCase(ctx context.Context, t *testing.T, p store.Port) {
 			{UserIndex: 1, UserName: "a", UserUniqueID: u32(42), UserStatus: 1, Credentials: []store.DoorLockCredentialRef{}},
 			auth.Users[0],
 		},
-		Credentials:      []store.DoorLockCredential{auth.Credentials[2], auth.Credentials[1], auth.Credentials[0]},
+		Credentials:      []store.DoorLockCredential{auth.Credentials[2], auth.Credentials[3], auth.Credentials[1], auth.Credentials[0]},
 		WeekDaySchedules: []store.DoorLockWeekDaySchedule{auth.WeekDaySchedules[2], auth.WeekDaySchedules[0], auth.WeekDaySchedules[1]},
 		YearDaySchedules: []store.DoorLockYearDaySchedule{auth.YearDaySchedules[1], auth.YearDaySchedules[0]},
 		HolidaySchedules: []store.DoorLockHolidaySchedule{auth.HolidaySchedules[1], auth.HolidaySchedules[0]},

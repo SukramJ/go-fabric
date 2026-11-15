@@ -13,11 +13,15 @@ import (
 // [OpenSQLite] — and must already carry the schema.
 type Store struct {
 	db *sql.DB
+	// sealer seals the secret columns ([NewSealed]); nil stores them as
+	// they are.
+	sealer Sealer
 }
 
 // New returns a Store backed by db. The DB must already have the
 // matter_* tables: [Apply] creates them, or the host's migration tool
-// runs [Migrations].
+// runs [Migrations]. Its secrets are stored as they are; [NewSealed]
+// returns a Store that seals them.
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }

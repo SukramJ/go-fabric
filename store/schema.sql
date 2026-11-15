@@ -14,6 +14,13 @@
 -- Endpoint identity (matter_endpoints) is deliberately absent: its key is
 -- the host's own source identity, so it lives behind endpoint.Store and its
 -- SQLite implementation ships its own schema in endpoint/sqlitestore.
+--
+-- sealed (v10) is the seal mark of a row in every table that holds a
+-- secret: 1 when a store.Sealer sealed the row's secret columns
+-- (store.NewSealed), 0 when they are stored as they are. The mark is the
+-- row's because a clear key is random bytes that no value prefix could
+-- tell from a sealed one. In matter_settings it marks the secret settings
+-- only.
 
 -- matter_fabrics records the operational fabrics the bridge participates
 -- in. Mirrors the Fabric Descriptor from Matter Core Spec §11.18.5.
@@ -73,8 +80,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS matter_fabrics_id_root
 --
 -- prior_noc, prior_icac and prior_private_key (v8) hold, while the
 -- fabric's row is pending 2, the credentials an uncommitted UpdateNOC
--- replaced; NULL otherwise. prior_private_key is stored as private_key is,
--- as-is (store.IdentityRecord.PrivateKey).
+-- replaced; NULL otherwise. prior_private_key is stored as private_key is
+-- (store.IdentityRecord.PrivateKey): as it is, or sealed under the row's
+-- seal mark.
 CREATE TABLE IF NOT EXISTS matter_node_identities (
     fabric_index    INTEGER PRIMARY KEY,
     noc             BLOB    NOT NULL,
@@ -85,6 +93,7 @@ CREATE TABLE IF NOT EXISTS matter_node_identities (
     prior_noc BLOB,
     prior_icac BLOB,
     prior_private_key BLOB,
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 
@@ -102,6 +111,7 @@ CREATE TABLE IF NOT EXISTS matter_group_keys (
     epoch_start_1       INTEGER,
     epoch_key_2         BLOB,
     epoch_start_2       INTEGER,
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
     PRIMARY KEY(fabric_index, group_key_set_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
@@ -214,6 +224,7 @@ CREATE TABLE IF NOT EXISTS matter_resumption (
     max_paths_per_invoke INTEGER NOT NULL DEFAULT 0 CHECK(max_paths_per_invoke BETWEEN 0 AND 65535),
     supported_transports INTEGER NOT NULL DEFAULT 0 CHECK(supported_transports BETWEEN 0 AND 65535),
     max_tcp_message_size INTEGER NOT NULL DEFAULT 0 CHECK(max_tcp_message_size BETWEEN 0 AND 4294967295),
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
     PRIMARY KEY(fabric_index, peer_node_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
@@ -260,7 +271,8 @@ INSERT OR IGNORE INTO matter_metadata (key, value) VALUES ('next_fabric_index', 
 -- INTEGER for counters.
 CREATE TABLE IF NOT EXISTS matter_settings (
     key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+    value TEXT NOT NULL,
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1))
 );
 
 -- matter_persistent_subscriptions is the first attempt at subscription
@@ -350,6 +362,11 @@ CREATE TABLE IF NOT EXISTS matter_thermostat_presets (
 -- matter_fabrics. A user's credential references ride as JSON, the
 -- schedules of the three kinds in one table (user_index 0 for a holiday
 -- schedule, which belongs to no user). Migration v6.
+--
+-- created_through_matter and modified_through_matter (v10) say whether a
+-- Matter command created the record and made its last change
+-- (store.DoorLockUser.CreatedThroughMatter); a record the host seeded keeps
+-- both 0, and a row a release before v10 stored takes 1.
 CREATE TABLE IF NOT EXISTS matter_doorlock_users (
     endpoint_key               TEXT     NOT NULL,
     user_index                 INTEGER  NOT NULL CHECK(user_index BETWEEN 1 AND 65535),
@@ -362,6 +379,8 @@ CREATE TABLE IF NOT EXISTS matter_doorlock_users (
     creator_fabric_index       INTEGER  NOT NULL,
     last_modified_fabric_index INTEGER  NOT NULL,
     expiring_user_expires_at   INTEGER,
+    created_through_matter INTEGER NOT NULL DEFAULT 1 CHECK(created_through_matter IN (0, 1)),
+    modified_through_matter INTEGER NOT NULL DEFAULT 1 CHECK(modified_through_matter IN (0, 1)),
     PRIMARY KEY(endpoint_key, user_index)
 );
 
@@ -372,6 +391,9 @@ CREATE TABLE IF NOT EXISTS matter_doorlock_credentials (
     credential_data            BLOB     NOT NULL,
     creator_fabric_index       INTEGER  NOT NULL,
     last_modified_fabric_index INTEGER  NOT NULL,
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
+    created_through_matter INTEGER NOT NULL DEFAULT 1 CHECK(created_through_matter IN (0, 1)),
+    modified_through_matter INTEGER NOT NULL DEFAULT 1 CHECK(modified_through_matter IN (0, 1)),
     PRIMARY KEY(endpoint_key, credential_type, credential_index)
 );
 
@@ -404,6 +426,7 @@ CREATE TABLE IF NOT EXISTS matter_icd_registrations (
     monitored_subject   BLOB     NOT NULL,
     icd_key             BLOB     NOT NULL,
     client_type         INTEGER  NOT NULL CHECK(client_type BETWEEN 0 AND 255),
+    sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
     PRIMARY KEY(fabric_index, position),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );

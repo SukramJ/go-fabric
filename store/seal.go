@@ -1,0 +1,491 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package store
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// Sealer seals the secrets a [Store] made by [NewSealed] keeps at rest.
+// The host supplies it, and its key lives outside the database: in a file
+// of its own, the operating system's keychain, a TPM or a KMS. Only then
+// does sealing protect a copy of the database. SQLite rewrites a row on
+// every change and keeps the old page in its free list and in the -wal
+// until the page is reused, so an UpdateNOC's replaced key, a removed
+// fabric's IPK or a resumption secret overwritten an hour ago is still in
+// the file; a key kept in the same file would be in every copy beside the
+// values it seals. [AESGCMSealer] is a correct default; how the key is
+// provisioned and rotated is the host's (the store rotates nothing).
+//
+// Seal and Open are called with the same aad for one value: the table, the
+// column and the row's key, so a sealed value moved to another row or
+// column does not open. Both must be safe for concurrent use.
+type Sealer interface {
+	// Seal returns plain sealed and bound to aad.
+	Seal(plain, aad []byte) ([]byte, error)
+	// Open returns the plain value of a value Seal sealed under the same
+	// key and aad, and an error for every other value.
+	Open(sealed, aad []byte) ([]byte, error)
+}
+
+// AESGCMSealer is the stdlib [Sealer]: AES-256-GCM under the host's key,
+// with a random 96-bit nonce ahead of each sealed value. A node seals a
+// few values per commissioning, resumption and settings change, far below
+// the 2^32 messages a random GCM nonce is good for under one key.
+type AESGCMSealer struct {
+	aead cipher.AEAD
+}
+
+// aesGCMSealerKeySize is AES-256's key size.
+const aesGCMSealerKeySize = 32
+
+// NewAESGCMSealer returns an [AESGCMSealer] under key, which must be 32
+// bytes. The key is the host's: generated once (crypto/rand), kept outside
+// the database, never stored by the store.
+func NewAESGCMSealer(key []byte) (*AESGCMSealer, error) {
+	if len(key) != aesGCMSealerKeySize {
+		return nil, fmt.Errorf("store: AES-GCM sealer: key of %d bytes, want %d", len(key), aesGCMSealerKeySize)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("store: AES-GCM sealer: %w", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("store: AES-GCM sealer: %w", err)
+	}
+	return &AESGCMSealer{aead: aead}, nil
+}
+
+// Seal implements [Sealer]: the nonce, then the sealed value with its tag.
+func (a *AESGCMSealer) Seal(plain, aad []byte) ([]byte, error) {
+	n := a.aead.NonceSize()
+	out := make([]byte, n, n+len(plain)+a.aead.Overhead())
+	if _, err := rand.Read(out); err != nil {
+		return nil, fmt.Errorf("store: AES-GCM sealer: nonce: %w", err)
+	}
+	return a.aead.Seal(out, out, plain, aad), nil
+}
+
+// Open implements [Sealer].
+func (a *AESGCMSealer) Open(sealed, aad []byte) ([]byte, error) {
+	n := a.aead.NonceSize()
+	if len(sealed) < n+a.aead.Overhead() {
+		return nil, errors.New("store: AES-GCM sealer: sealed value too short")
+	}
+	plain, err := a.aead.Open(nil, sealed[:n], sealed[n:], aad)
+	if err != nil {
+		return nil, fmt.Errorf("store: AES-GCM sealer: %w", err)
+	}
+	return plain, nil
+}
+
+// NewSealed returns a Store backed by db, as [New] does, whose secret
+// columns s seals: the operational private keys (private_key, and
+// prior_private_key while an UpdateNOC is pending) and the IPK of
+// matter_node_identities, the epoch keys of matter_group_keys, the shared
+// secret of matter_resumption, the ICDToken keys of
+// matter_icd_registrations, the DoorLock credential data of
+// matter_doorlock_credentials, and these settings of matter_settings: the
+// Wi-Fi networks with their credentials (netcomm.wifi.networks), the
+// DoorLock credential key ([SettingDoorLockCredentialKey]), the ICD key
+// ([SettingICDKey]) and the two settings a release before schema v8 kept
+// an uncommitted AddNOC's or UpdateNOC's credentials in
+// (operational_credentials.pending_noc, …_update). Each row carries its
+// seal mark (the sealed column, schema v10), so a clear row and a sealed
+// one never pass for each other. Under s the ICD keys are sealed by s, not
+// under [SettingICDKey], and DoorLock credential data, which cluster/lock
+// encrypts under [SettingDoorLockCredentialKey] before the store sees it,
+// is sealed again, with that key sealed too.
+//
+// db must carry schema v10 ([Apply] or [Migrations]). Before NewSealed
+// returns it seals every row it finds in clear — a database a Store
+// without a sealer wrote — in one transaction, so a failure (a value that
+// does not open, a Seal error) leaves the database as it was; then it
+// rewrites the file and empties the -wal ([Scrub]), so the clear values do
+// not stay behind in free pages. A scrub that does not finish is
+// [ErrScrubIncomplete], and the next NewSealed tries again. A database
+// with no clear row is not written to.
+//
+// Every Store of one database needs the sealer. A Store without it reads a
+// sealed value as an error, never as the secret, and refuses a write that
+// would leave a sealed row half clear; the clear rows it writes are read
+// as they are and sealed by the next NewSealed. Migration v10's Down
+// refuses a database that holds a sealed row.
+func NewSealed(ctx context.Context, db *sql.DB, s Sealer) (*Store, error) {
+	if s == nil {
+		return nil, errors.New("store: NewSealed: nil Sealer")
+	}
+	st := &Store{db: db, sealer: s}
+	if err := st.sealClearRows(ctx); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+var (
+	// errSealedNoSealer is a sealed value a Store without a sealer met.
+	errSealedNoSealer = errors.New("store: the value is sealed and the store has no sealer (store.NewSealed)")
+	// errSealedOpen is a sealed value the sealer did not open: another
+	// key, or a value moved from another row or column.
+	errSealedOpen = errors.New("store: a sealed value does not open")
+)
+
+// sealAADPrefix opens every aad, naming the scheme and its version.
+const sealAADPrefix = "go-fabric/store/seal/v1"
+
+// sealAAD is the aad of one secret value: the table, the column and the
+// row's key, each length-prefixed and the key parts typed, so no two
+// cells share one. An integer key part is its 8-byte big-endian value; a
+// text or blob part its bytes.
+func sealAAD(table, column string, key ...any) []byte {
+	b := []byte(sealAADPrefix)
+	add := func(tag byte, p []byte) {
+		b = append(b, tag)
+		b = binary.AppendUvarint(b, uint64(len(p)))
+		b = append(b, p...)
+	}
+	add('t', []byte(table))
+	add('c', []byte(column))
+	for _, k := range key {
+		switch v := k.(type) {
+		case int64:
+			add('i', binary.BigEndian.AppendUint64(nil, uint64(v))) //nolint:gosec // a bit pattern, not a value
+		case uint8:
+			add('i', binary.BigEndian.AppendUint64(nil, uint64(v)))
+		case uint16:
+			add('i', binary.BigEndian.AppendUint64(nil, uint64(v)))
+		case string:
+			add('s', []byte(v))
+		case []byte:
+			add('b', v)
+		default:
+			panic(fmt.Sprintf("store: seal aad: key part of type %T", k))
+		}
+	}
+	return b
+}
+
+// sealColumn is the stored form of one secret value: sealed under the
+// store's sealer, or as it is without one. nil (SQL NULL) stays nil.
+func (s *Store) sealColumn(plain []byte, table, column string, key ...any) ([]byte, error) {
+	if plain == nil || s.sealer == nil {
+		return plain, nil
+	}
+	out, err := s.sealer.Seal(plain, sealAAD(table, column, key...))
+	if err != nil {
+		return nil, fmt.Errorf("store: seal %s.%s: %w", table, column, err)
+	}
+	return out, nil
+}
+
+// openColumn is the value of one stored secret: as it is when its row is
+// not sealed, opened when it is. A sealed value without a sealer, or one
+// that does not open, is an error.
+func (s *Store) openColumn(stored []byte, sealed bool, table, column string, key ...any) ([]byte, error) {
+	if stored == nil || !sealed {
+		return stored, nil
+	}
+	if s.sealer == nil {
+		return nil, fmt.Errorf("%w: %s.%s", errSealedNoSealer, table, column)
+	}
+	plain, err := s.sealer.Open(stored, sealAAD(table, column, key...))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s.%s: %w", errSealedOpen, table, column, err)
+	}
+	return plain, nil
+}
+
+// sealedSettings are the matter_settings keys a sealer seals: the values
+// that are secrets. The two cluster/core keys are its unexported
+// constants (network_commissioning_wifi.go wifiNetworksKey,
+// operational_credentials_pending.go pendingNOCSettingKey and
+// pendingNOCUpdateSettingKey); TestSealedSettingsNameClusterCoreKeys holds
+// the copies to them.
+var sealedSettings = map[string]bool{
+	SettingDoorLockCredentialKey:                 true,
+	SettingICDKey:                                true,
+	"netcomm.wifi.networks":                      true,
+	"operational_credentials.pending_noc":        true,
+	"operational_credentials.pending_noc_update": true,
+}
+
+// sealSetting is the stored form of a setting: a secret's sealed bytes in
+// base64 under a sealer (the column is TEXT), every other value as it is.
+func (s *Store) sealSetting(key, value string) (stored string, sealed bool, err error) {
+	if s.sealer == nil || !sealedSettings[key] {
+		return value, false, nil
+	}
+	out, err := s.sealColumn([]byte(value), "matter_settings", "value", key)
+	if err != nil {
+		return "", false, err
+	}
+	return base64.StdEncoding.EncodeToString(out), true, nil
+}
+
+// openSetting is the value of a stored setting.
+func (s *Store) openSetting(key, stored string, sealed bool) (string, error) {
+	if !sealed {
+		return stored, nil
+	}
+	if s.sealer == nil {
+		return "", fmt.Errorf("%w: matter_settings %q", errSealedNoSealer, key)
+	}
+	raw, err := base64.StdEncoding.DecodeString(stored)
+	if err != nil {
+		return "", fmt.Errorf("%w: matter_settings %q: %w", errSealedOpen, key, err)
+	}
+	plain, err := s.openColumn(raw, true, "matter_settings", "value", key)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
+}
+
+// readSetting reads one setting on q — the database or a transaction —
+// opened.
+func (s *Store) readSetting(ctx context.Context, q sqlExecQuerier, key string) (value string, ok bool, err error) {
+	var sealed bool
+	err = q.QueryRowContext(ctx, `SELECT value, sealed FROM matter_settings WHERE key = ?`, key).Scan(&value, &sealed)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if value, err = s.openSetting(key, value, sealed); err != nil {
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+// sealedTables are the tables with a seal mark; [NewSealed] needs it on
+// each.
+var sealedTables = []string{
+	"matter_node_identities", "matter_group_keys", "matter_resumption",
+	"matter_settings", "matter_doorlock_credentials", "matter_icd_registrations",
+}
+
+// metadataKeySealScrubOwed marks a sealing whose [Scrub] has not finished:
+// set in the sealing's transaction, deleted once the scrub ran.
+const metadataKeySealScrubOwed = "store.seal_scrub_owed"
+
+// sealClearRows is [NewSealed]'s upgrade: every clear row sealed in one
+// transaction, then the scrub that removes the clear values' old pages.
+func (s *Store) sealClearRows(ctx context.Context) error {
+	for _, table := range sealedTables {
+		var n int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'sealed'`, table).Scan(&n); err != nil {
+			return fmt.Errorf("store: NewSealed: inspect %s: %w", table, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("store: NewSealed: %s has no seal mark: the database needs schema v10 (store.Apply or store.Migrations)", table)
+		}
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: NewSealed: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	// A write first, so the transaction holds the write lock before it
+	// reads (UpdateFabricCredentials' reason).
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	}
+	sealed := 0
+	for _, t := range []struct {
+		table         string
+		keys, secrets []string
+	}{
+		{"matter_node_identities", []string{"fabric_index"}, []string{"private_key", "ipk", "prior_private_key"}},
+		{"matter_group_keys", []string{"fabric_index", "group_key_set_id"}, []string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}},
+		{"matter_resumption", []string{"fabric_index", "peer_node_id"}, []string{"shared_secret"}},
+		{"matter_doorlock_credentials", []string{"endpoint_key", "credential_type", "credential_index"}, []string{"credential_data"}},
+	} {
+		n, err := s.sealTable(ctx, tx, t.table, t.keys, t.secrets)
+		if err != nil {
+			return fmt.Errorf("store: NewSealed: %s: %w", t.table, err)
+		}
+		sealed += n
+	}
+	// The ICD keys before the settings: a clear row's key may be sealed
+	// under SettingICDKey, which readSetting opens either way.
+	n, err := s.sealClearICDRows(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("store: NewSealed: matter_icd_registrations: %w", err)
+	}
+	sealed += n
+	if n, err = s.sealClearSettings(ctx, tx); err != nil {
+		return fmt.Errorf("store: NewSealed: matter_settings: %w", err)
+	}
+	sealed += n
+	if sealed > 0 {
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
+			return fmt.Errorf("store: NewSealed: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: NewSealed: commit: %w", err)
+	}
+	if _, owed, err := s.GetMetadataCounter(ctx, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	} else if !owed {
+		return nil
+	}
+	if err := Scrub(ctx, s.db); err != nil {
+		return fmt.Errorf("store: NewSealed: the clear values are sealed: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	}
+	return nil
+}
+
+// sealTable seals the clear rows of one table: each non-NULL secret column
+// sealed under its row's key columns, and the row marked. It returns how
+// many rows it sealed. table and the columns are the package's constants.
+func (s *Store) sealTable(ctx context.Context, tx *sql.Tx, table string, keys, secrets []string) (int, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT `+strings.Join(keys, ", ")+`, `+strings.Join(secrets, ", ")+ //nolint:gosec // the package's constants
+		` FROM `+table+` WHERE sealed = 0`)
+	if err != nil {
+		return 0, err
+	}
+	type row struct {
+		key  []any
+		vals [][]byte
+	}
+	var plain []row
+	for rows.Next() {
+		r := row{key: make([]any, len(keys)), vals: make([][]byte, len(secrets))}
+		dest := make([]any, 0, len(keys)+len(secrets))
+		for i := range r.key {
+			dest = append(dest, &r.key[i])
+		}
+		for i := range r.vals {
+			dest = append(dest, &r.vals[i])
+		}
+		if err := rows.Scan(dest...); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		plain = append(plain, r)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return 0, err
+	}
+	set := make([]string, 0, len(secrets)+1)
+	for _, c := range secrets {
+		set = append(set, c+" = ?")
+	}
+	set = append(set, "sealed = 1")
+	where := make([]string, 0, len(keys))
+	for _, k := range keys {
+		where = append(where, k+" = ?")
+	}
+	update := `UPDATE ` + table + ` SET ` + strings.Join(set, ", ") + ` WHERE ` + strings.Join(where, " AND ") //nolint:gosec // the package's constants
+	for _, r := range plain {
+		args := make([]any, 0, len(secrets)+len(keys))
+		for i, c := range secrets {
+			v, err := s.sealColumn(r.vals[i], table, c, r.key...)
+			if err != nil {
+				return 0, err
+			}
+			args = append(args, v)
+		}
+		args = append(args, r.key...)
+		if _, err := tx.ExecContext(ctx, update, args...); err != nil {
+			return 0, err
+		}
+	}
+	return len(plain), nil
+}
+
+// sealClearICDRows seals the clear ICD registrations: each key opened from
+// the form the store keeps without a sealer (under [SettingICDKey], or 16
+// clear bytes from before v0.12.1) and sealed by the sealer.
+func (s *Store) sealClearICDRows(ctx context.Context, tx *sql.Tx) (int, error) {
+	rows, err := tx.QueryContext(ctx, `
+SELECT fabric_index, position, check_in_node_id, monitored_subject, icd_key FROM matter_icd_registrations
+WHERE sealed = 0`)
+	if err != nil {
+		return 0, err
+	}
+	type row struct {
+		fabric        uint8
+		position      int64
+		node, subject []byte
+		key           []byte
+	}
+	var plain []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.fabric, &r.position, &r.node, &r.subject, &r.key); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		plain = append(plain, r)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return 0, err
+	}
+	var aead cipher.AEAD
+	for _, r := range plain {
+		if len(r.node) != 8 || len(r.subject) != 8 {
+			return 0, fmt.Errorf("node id of %d, subject of %d bytes", len(r.node), len(r.subject))
+		}
+		key := r.key
+		if len(key) != icdKeySize {
+			if aead == nil {
+				if aead, err = s.icdAEAD(ctx, tx); err != nil {
+					return 0, err
+				}
+			}
+			if key, err = openICDKey(aead, key, icdAAD(r.fabric, binary.BigEndian.Uint64(r.node), binary.BigEndian.Uint64(r.subject))); err != nil {
+				return 0, fmt.Errorf("fabric %d position %d: %w", r.fabric, r.position, err)
+			}
+		}
+		sealed, err := s.sealColumn(key, "matter_icd_registrations", "icd_key", r.fabric, r.node, r.subject)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE matter_icd_registrations SET icd_key = ?, sealed = 1 WHERE fabric_index = ? AND position = ?`,
+			sealed, r.fabric, r.position); err != nil {
+			return 0, err
+		}
+	}
+	return len(plain), nil
+}
+
+// sealClearSettings seals the clear values of the secret settings.
+func (s *Store) sealClearSettings(ctx context.Context, tx *sql.Tx) (int, error) {
+	n := 0
+	for key := range sealedSettings {
+		var v string
+		err := tx.QueryRowContext(ctx, `SELECT value FROM matter_settings WHERE key = ? AND sealed = 0`, key).Scan(&v)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return 0, err
+		}
+		stored, _, err := s.sealSetting(key, v)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE matter_settings SET value = ?, sealed = 1 WHERE key = ?`, stored, key); err != nil {
+			return 0, err
+		}
+		n++
+	}
+	return n, nil
+}

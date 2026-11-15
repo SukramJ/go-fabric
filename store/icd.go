@@ -32,23 +32,29 @@ const metadataKeyICDCounter = "icd_management.counter"
 
 // ListICDRegistrations returns every fabric's registrations, by fabric and
 // then in the order they first registered, each key opened from its
-// sealed form (a key an earlier release stored in clear is read as it is).
+// sealed form (a key an earlier release stored in clear is read as it is):
+// the sealer's for a row it sealed ([NewSealed]), [SettingICDKey]'s
+// otherwise.
 func (s *Store) ListICDRegistrations(ctx context.Context) ([]ICDRegistration, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT fabric_index, check_in_node_id, monitored_subject, icd_key, client_type FROM matter_icd_registrations
+SELECT fabric_index, check_in_node_id, monitored_subject, icd_key, client_type, sealed FROM matter_icd_registrations
 ORDER BY fabric_index ASC, position ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list icd registrations: %w", err)
 	}
 	defer rows.Close() //nolint:errcheck // cleanup-only; the scan error is the actionable one
 
-	var out []ICDRegistration
+	var (
+		out    []ICDRegistration
+		sealed []bool
+	)
 	for rows.Next() {
 		var (
 			r             ICDRegistration
 			node, subject []byte
+			mark          bool
 		)
-		if err := rows.Scan(&r.FabricIndex, &node, &subject, &r.Key, &r.ClientType); err != nil {
+		if err := rows.Scan(&r.FabricIndex, &node, &subject, &r.Key, &r.ClientType, &mark); err != nil {
 			return nil, fmt.Errorf("store: list icd registrations: scan: %w", err)
 		}
 		if len(node) != 8 || len(subject) != 8 {
@@ -57,6 +63,7 @@ ORDER BY fabric_index ASC, position ASC`)
 		r.CheckInNodeID = binary.BigEndian.Uint64(node)
 		r.MonitoredSubject = binary.BigEndian.Uint64(subject)
 		out = append(out, r)
+		sealed = append(sealed, mark)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("store: list icd registrations: rows: %w", err)
@@ -67,11 +74,18 @@ ORDER BY fabric_index ASC, position ASC`)
 	var aead cipher.AEAD
 	for i := range out {
 		r := &out[i]
+		if sealed[i] {
+			if r.Key, err = s.openColumn(r.Key, true, "matter_icd_registrations", "icd_key",
+				r.FabricIndex, uint64ToBE(r.CheckInNodeID), uint64ToBE(r.MonitoredSubject)); err != nil {
+				return nil, fmt.Errorf("store: list icd registrations: fabric %d node %016X: %w", r.FabricIndex, r.CheckInNodeID, err)
+			}
+			continue
+		}
 		if len(r.Key) == icdKeySize {
 			continue
 		}
 		if aead == nil {
-			if aead, err = icdAEAD(ctx, s.db); err != nil {
+			if aead, err = s.icdAEAD(ctx, s.db); err != nil {
 				return nil, err
 			}
 		}
@@ -85,9 +99,10 @@ ORDER BY fabric_index ASC, position ASC`)
 // ReplaceICDRegistrations replaces fabricIndex's registrations with regs,
 // in order, leaving every other fabric's as they are. The entries'
 // FabricIndex is ignored: they belong to fabricIndex. A removed fabric
-// takes its registrations along. Each key is stored sealed under the
-// store's ICD key ([SettingICDKey], created on the first one), bound to its
-// fabric, check-in node and monitored subject.
+// takes its registrations along. Each key is stored sealed, bound to its
+// fabric, check-in node and monitored subject: by the store's sealer
+// ([NewSealed]), or without one under the store's ICD key ([SettingICDKey],
+// created on the first one).
 func (s *Store) ReplaceICDRegistrations(ctx context.Context, fabricIndex uint8, regs []ICDRegistration) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -99,16 +114,28 @@ func (s *Store) ReplaceICDRegistrations(ctx context.Context, fabricIndex uint8, 
 		return fmt.Errorf("store: replace icd registrations: delete: %w", err)
 	}
 	var aead cipher.AEAD
-	if len(regs) > 0 {
-		if aead, err = icdAEAD(ctx, tx); err != nil {
+	if len(regs) > 0 && s.sealer == nil {
+		if aead, err = s.icdAEAD(ctx, tx); err != nil {
 			return err
 		}
 	}
 	for i, r := range regs {
-		sealed := sealICDKey(aead, r.Key, icdAAD(fabricIndex, r.CheckInNodeID, r.MonitoredSubject))
+		node, subject := uint64ToBE(r.CheckInNodeID), uint64ToBE(r.MonitoredSubject)
+		var (
+			stored []byte
+			mark   bool
+		)
+		if s.sealer != nil {
+			if stored, err = s.sealColumn(r.Key, "matter_icd_registrations", "icd_key", fabricIndex, node, subject); err != nil {
+				return err
+			}
+			mark = true
+		} else {
+			stored = sealICDKey(aead, r.Key, icdAAD(fabricIndex, r.CheckInNodeID, r.MonitoredSubject))
+		}
 		if _, err := tx.ExecContext(ctx, `
-INSERT INTO matter_icd_registrations (fabric_index, position, check_in_node_id, monitored_subject, icd_key, client_type)
-VALUES (?, ?, ?, ?, ?, ?)`, fabricIndex, i, uint64ToBE(r.CheckInNodeID), uint64ToBE(r.MonitoredSubject), sealed, r.ClientType); err != nil {
+INSERT INTO matter_icd_registrations (fabric_index, position, check_in_node_id, monitored_subject, icd_key, client_type, sealed)
+VALUES (?, ?, ?, ?, ?, ?, ?)`, fabricIndex, i, node, subject, stored, r.ClientType, mark); err != nil {
 			return fmt.Errorf("store: replace icd registrations: insert %d: %w", i, err)
 		}
 	}

@@ -40,19 +40,17 @@ type sqlExecQuerier interface {
 
 // icdAEAD is the cipher of the ICD keys, under the key [SettingICDKey]
 // holds — created there when none is stored yet (INSERT OR IGNORE, then
-// read back, so two writers agree on one key).
-func icdAEAD(ctx context.Context, q sqlExecQuerier) (cipher.AEAD, error) {
-	read := func() (string, bool, error) {
-		var v string
-		err := q.QueryRowContext(ctx, `SELECT value FROM matter_settings WHERE key = ?`, SettingICDKey).Scan(&v)
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
-		return v, err == nil, err
-	}
+// read back, so two writers agree on one key). A store with a sealer
+// creates none: it seals the ICD keys itself and opens this cipher only
+// for a row a store without one wrote, whose key is then stored.
+func (s *Store) icdAEAD(ctx context.Context, q sqlExecQuerier) (cipher.AEAD, error) {
+	read := func() (string, bool, error) { return s.readSetting(ctx, q, SettingICDKey) }
 	v, ok, err := read()
 	if err != nil {
 		return nil, fmt.Errorf("store: icd key: %w", err)
+	}
+	if !ok && s.sealer != nil {
+		return nil, fmt.Errorf("store: icd key: %q is not stored", SettingICDKey)
 	}
 	if !ok {
 		key := make([]byte, icdKeySize)
@@ -124,8 +122,18 @@ func sealClearICDKeys(ctx context.Context, db *sql.DB) error {
 	if tables == 0 {
 		return nil // a database before migration v7 holds no ICD keys
 	}
+	// A row a Sealer sealed (v10's seal mark) is never a clear key,
+	// whatever its length.
+	var marked int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('matter_icd_registrations') WHERE name = 'sealed'`).Scan(&marked); err != nil {
+		return fmt.Errorf("store: seal icd keys: %w", err)
+	}
+	due := `length(icd_key) = ?`
+	if marked > 0 {
+		due += ` AND sealed = 0`
+	}
 	var n int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_icd_registrations WHERE length(icd_key) = ?`, icdKeySize).Scan(&n); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_icd_registrations WHERE `+due, icdKeySize).Scan(&n); err != nil { //nolint:gosec // due is one of two constants
 		return fmt.Errorf("store: seal icd keys: %w", err)
 	}
 	if n == 0 {
@@ -136,13 +144,13 @@ func sealClearICDKeys(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("store: seal icd keys: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	aead, err := icdAEAD(ctx, tx)
+	aead, err := (&Store{}).icdAEAD(ctx, tx)
 	if err != nil {
 		return err
 	}
 	rows, err := tx.QueryContext(ctx, `
 SELECT fabric_index, position, check_in_node_id, monitored_subject, icd_key FROM matter_icd_registrations
-WHERE length(icd_key) = ?`, icdKeySize)
+WHERE `+due, icdKeySize) //nolint:gosec // due is one of two constants
 	if err != nil {
 		return fmt.Errorf("store: seal icd keys: %w", err)
 	}

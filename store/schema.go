@@ -94,6 +94,10 @@ func Apply(ctx context.Context, db *sql.DB) error {
 //     v9, each one it lacks, with v9's statements, in one transaction; the
 //     schema's CREATE TABLE IF NOT EXISTS creates v9's
 //     matter_owed_fabric_events.
+//   - The tables that hold a secret gain the seal mark of migration v10,
+//     and the DoorLock users and credentials their record source, each
+//     column its table lacks, with v10's statements, in one transaction.
+//     Upgrade seals nothing: [NewSealed] seals the clear rows.
 func Upgrade(ctx context.Context, db *sql.DB) error {
 	if err := dropGroupKeyMapKeySetForeignKey(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
@@ -108,6 +112,9 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	if err := addMigrationColumns(ctx, db, "v9"); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
+	if err := addMigrationColumns(ctx, db, "v10"); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	return nil

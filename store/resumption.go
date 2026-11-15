@@ -42,30 +42,37 @@ type ResumptionRecord struct {
 }
 
 // resumptionColumns are the matter_resumption columns a record reads back,
-// in scanResumption's order.
+// in scanResumption's order, the seal mark last.
 const resumptionColumns = `fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags,
     session_idle_interval, session_active_interval, session_active_threshold,
     data_model_revision, interaction_model_revision, specification_version,
-    max_paths_per_invoke, supported_transports, max_tcp_message_size`
+    max_paths_per_invoke, supported_transports, max_tcp_message_size, sealed`
 
-// scanResumption reads one row of resumptionColumns.
-func scanResumption(r scanRow) (ResumptionRecord, error) {
+// scanResumption reads one row of resumptionColumns, its shared secret
+// opened.
+func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 	var (
 		rec      ResumptionRecord
 		nodeBlob []byte
 		catsJSON []byte
+		sealed   bool
 	)
 	p := &rec.SessionParameters
 	if err := r.Scan(&rec.FabricIndex, &nodeBlob, &rec.ResumptionID, &rec.SharedSecret, &catsJSON,
 		&p.SessionIdleInterval, &p.SessionActiveInterval, &p.SessionActiveThreshold,
 		&p.DataModelRevision, &p.InteractionModelRevision, &p.SpecificationVersion,
-		&p.MaxPathsPerInvoke, &p.SupportedTransports, &p.MaxTCPMessageSize); err != nil {
+		&p.MaxPathsPerInvoke, &p.SupportedTransports, &p.MaxTCPMessageSize, &sealed); err != nil {
 		return ResumptionRecord{}, err
 	}
 	if len(nodeBlob) != 8 {
 		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
 	}
 	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
+	secret, err := s.openColumn(rec.SharedSecret, sealed, "matter_resumption", "shared_secret", rec.FabricIndex, nodeBlob)
+	if err != nil {
+		return ResumptionRecord{}, err
+	}
+	rec.SharedSecret = secret
 	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
 		rec.CASEAuthTags = nil // tolerate corrupt rows
 	}
@@ -94,11 +101,16 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 		return fmt.Errorf("store: marshal case_authenticated_tags: %w", err)
 	}
 	p := rec.SessionParameters
+	peer := uint64ToBE(rec.PeerNodeID)
+	secret, err := s.sealColumn(rec.SharedSecret, "matter_resumption", "shared_secret", rec.FabricIndex, peer)
+	if err != nil {
+		return fmt.Errorf("store: upsert resumption: %w", err)
+	}
 	if _, err := s.db.ExecContext(
 		ctx, `
 INSERT INTO matter_resumption
     (`+resumptionColumns+`)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
     resumption_id              = excluded.resumption_id,
     shared_secret              = excluded.shared_secret,
@@ -112,11 +124,12 @@ ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
     max_paths_per_invoke       = excluded.max_paths_per_invoke,
     supported_transports       = excluded.supported_transports,
     max_tcp_message_size       = excluded.max_tcp_message_size,
+    sealed                     = excluded.sealed,
     last_used_at               = CURRENT_TIMESTAMP`,
-		rec.FabricIndex, uint64ToBE(rec.PeerNodeID), rec.ResumptionID, rec.SharedSecret, catsJSON,
+		rec.FabricIndex, peer, rec.ResumptionID, secret, catsJSON,
 		p.SessionIdleInterval, p.SessionActiveInterval, p.SessionActiveThreshold,
 		p.DataModelRevision, p.InteractionModelRevision, p.SpecificationVersion,
-		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize,
+		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize, s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
@@ -130,7 +143,7 @@ func (s *Store) GetResumptionByID(ctx context.Context, resumptionID []byte) (Res
 	if len(resumptionID) != 16 {
 		return ResumptionRecord{}, fmt.Errorf("store: resumption_id length=%d (want 16)", len(resumptionID))
 	}
-	rec, err := scanResumption(s.db.QueryRowContext(ctx, `
+	rec, err := s.scanResumption(s.db.QueryRowContext(ctx, `
 SELECT `+resumptionColumns+`
 FROM matter_resumption WHERE resumption_id = ?`, resumptionID))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -144,7 +157,7 @@ FROM matter_resumption WHERE resumption_id = ?`, resumptionID))
 
 // GetResumptionByPeer looks up by (fabric_index, peer_node_id).
 func (s *Store) GetResumptionByPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (ResumptionRecord, error) {
-	rec, err := scanResumption(s.db.QueryRowContext(ctx, `
+	rec, err := s.scanResumption(s.db.QueryRowContext(ctx, `
 SELECT `+resumptionColumns+`
 FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`,
 		fabricIndex, uint64ToBE(peerNodeID)))

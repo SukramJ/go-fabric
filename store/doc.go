@@ -35,20 +35,33 @@
 // Cascade-delete on fabric removal is handled at the schema level
 // (FOREIGN KEY ... ON DELETE CASCADE).
 //
-// The operational private key and the fabric records persist in clear,
-// and so do the group key sets, the shared secrets of the CASE resumption
-// records (matter_resumption) and, in the settings table, the committed
+// # Secrets at rest
+//
+// The store holds the node's secrets: the operational private key (and,
+// while an UpdateNOC is uncommitted, the key it replaced), the IPK, the
+// group epoch keys, the shared secrets of the CASE resumption records
+// (matter_resumption), the ICDToken keys of the ICD registrations, the
+// DoorLock credential data, and, in the settings table, the committed
 // Wi-Fi networks with their credentials, which cluster/core's Wi-Fi
-// NetworkCommissioning server writes under netcomm.wifi.networks. Whoever
-// can read the database, or a copy of it, reads them; file-system level
-// protection is the operator's responsibility. Two kinds of secret are
-// sealed at rest: the keys of the ICD registrations, which the store
-// seals under SettingICDKey (icd_cipher.go, ADR 0029), and DoorLock
+// NetworkCommissioning server writes under netcomm.wifi.networks.
+//
+// A Store from [New] keeps them as they are, except two kinds it or its
+// caller seals under a key kept as a setting of the same database: the ICD
+// keys, under [SettingICDKey] (icd_cipher.go, ADR 0029), and DoorLock
 // credential data, which cluster/lock encrypts before the store sees it
-// (SettingDoorLockCredentialKey). Both sealing keys are settings of the
-// same database. Whether the store should seal every secret uniformly is
-// an open architecture question of the 2026-11 review; this list is what
-// holds today.
+// ([SettingDoorLockCredentialKey]). That keeps them out of a read of one
+// table, not out of a copy of the file: whoever can read the database, or a
+// copy of it, reads every secret, and file-system level protection is the
+// operator's responsibility.
+//
+// A Store from [NewSealed] seals every secret column under a [Sealer] the
+// host supplies, whose key lives outside the database — only then are the
+// values a copy of the file holds, the old ones in its free pages and its
+// -wal included, unreadable without that key. Each sealed value is bound to
+// its table, column and row; each row carries its seal mark (schema v10).
+// [NewSealed] names the columns and the settings and seals a clear
+// database on the way in; [AESGCMSealer] is the stdlib sealer. The key's
+// provisioning and rotation are the host's.
 //
 // # Store errors
 //

@@ -40,14 +40,21 @@ type GroupKeySet struct {
 // UpsertGroupKeySet inserts or replaces a key-set row. The fabric
 // must already exist (FK constraint).
 func (s *Store) UpsertGroupKeySet(ctx context.Context, rec GroupKeySet) error {
+	var keys [3][]byte
+	for i, k := range [3][]byte{rec.EpochKey0, rec.EpochKey1, rec.EpochKey2} {
+		var err error
+		if keys[i], err = s.sealColumn(k, "matter_group_keys", groupEpochKeyColumns[i], rec.FabricIndex, rec.GroupKeySetID); err != nil {
+			return fmt.Errorf("store: upsert group key set: %w", err)
+		}
+	}
 	if _, err := s.db.ExecContext(
 		ctx, `
 INSERT INTO matter_group_keys
     (fabric_index, group_key_set_id, security_policy,
      epoch_key_0, epoch_start_0,
      epoch_key_1, epoch_start_1,
-     epoch_key_2, epoch_start_2)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     epoch_key_2, epoch_start_2, sealed)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(fabric_index, group_key_set_id) DO UPDATE SET
     security_policy = excluded.security_policy,
     epoch_key_0     = excluded.epoch_key_0,
@@ -55,11 +62,13 @@ ON CONFLICT(fabric_index, group_key_set_id) DO UPDATE SET
     epoch_key_1     = excluded.epoch_key_1,
     epoch_start_1   = excluded.epoch_start_1,
     epoch_key_2     = excluded.epoch_key_2,
-    epoch_start_2   = excluded.epoch_start_2`,
+    epoch_start_2   = excluded.epoch_start_2,
+    sealed          = excluded.sealed`,
 		rec.FabricIndex, rec.GroupKeySetID, uint8(rec.SecurityPolicy),
-		rec.EpochKey0, int64(rec.EpochStart0), //nolint:gosec // start time fits in int64 in practice; see #20
-		nullableBytes(rec.EpochKey1), nullableEpochStart(rec.EpochKey1, rec.EpochStart1),
-		nullableBytes(rec.EpochKey2), nullableEpochStart(rec.EpochKey2, rec.EpochStart2),
+		keys[0], int64(rec.EpochStart0), //nolint:gosec // start time fits in int64 in practice; see #20
+		nullableBytes(keys[1]), nullableEpochStart(rec.EpochKey1, rec.EpochStart1),
+		nullableBytes(keys[2]), nullableEpochStart(rec.EpochKey2, rec.EpochStart2),
+		s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert group key set: %w", err)
 	}
@@ -73,10 +82,10 @@ func (s *Store) GetGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeyS
 SELECT fabric_index, group_key_set_id, security_policy,
        epoch_key_0, epoch_start_0,
        epoch_key_1, epoch_start_1,
-       epoch_key_2, epoch_start_2
+       epoch_key_2, epoch_start_2, sealed
 FROM matter_group_keys
 WHERE fabric_index = ? AND group_key_set_id = ?`, fabricIndex, groupKeySetID)
-	rec, err := scanGroupKeySet(row)
+	rec, err := s.scanGroupKeySet(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupKeySet{}, ErrGroupKeySetNotFound
 	}
@@ -93,7 +102,7 @@ func (s *Store) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]Grou
 SELECT fabric_index, group_key_set_id, security_policy,
        epoch_key_0, epoch_start_0,
        epoch_key_1, epoch_start_1,
-       epoch_key_2, epoch_start_2
+       epoch_key_2, epoch_start_2, sealed
 FROM matter_group_keys WHERE fabric_index = ?
 ORDER BY group_key_set_id ASC`, fabricIndex)
 	if err != nil {
@@ -103,7 +112,7 @@ ORDER BY group_key_set_id ASC`, fabricIndex)
 
 	var out []GroupKeySet
 	for rows.Next() {
-		rec, err := scanGroupKeySet(rows)
+		rec, err := s.scanGroupKeySet(rows)
 		if err != nil {
 			return nil, fmt.Errorf("store: list group key sets: scan: %w", err)
 		}
@@ -252,7 +261,11 @@ ORDER BY group_id ASC`, fabricIndex)
 	return out, nil
 }
 
-func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
+// groupEpochKeyColumns are the epoch key columns, by slot.
+var groupEpochKeyColumns = [3]string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}
+
+// scanGroupKeySet reads one key set, its epoch keys opened.
+func (s *Store) scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 	var (
 		rec    GroupKeySet
 		policy uint8
@@ -261,12 +274,13 @@ func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 		start0 int64
 		start1 sql.NullInt64
 		start2 sql.NullInt64
+		sealed bool
 	)
 	if err := r.Scan(
 		&rec.FabricIndex, &rec.GroupKeySetID, &policy,
 		&rec.EpochKey0, &start0,
 		&key1, &start1,
-		&key2, &start2,
+		&key2, &start2, &sealed,
 	); err != nil {
 		return GroupKeySet{}, err
 	}
@@ -283,6 +297,13 @@ func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 	}
 	if start2.Valid {
 		rec.EpochStart2 = uint64(start2.Int64) //nolint:gosec // round-trip of stored value; see #20
+	}
+	for i, k := range [3]*[]byte{&rec.EpochKey0, &rec.EpochKey1, &rec.EpochKey2} {
+		plain, err := s.openColumn(*k, sealed, "matter_group_keys", groupEpochKeyColumns[i], rec.FabricIndex, rec.GroupKeySetID)
+		if err != nil {
+			return GroupKeySet{}, err
+		}
+		*k = plain
 	}
 	return rec, nil
 }

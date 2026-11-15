@@ -44,6 +44,13 @@ type DoorLockUser struct {
 	// created and last changed the user.
 	CreatorFabricIndex      uint8
 	LastModifiedFabricIndex uint8
+	// CreatedThroughMatter and ModifiedThroughMatter say whether a Matter
+	// command created the user and made its last change: GetUser answers
+	// CreatorFabricIndex and LastModifiedFabricIndex only when the flag is
+	// set, and null for a record the host seeded, which keeps both false
+	// (cluster/lock DoorLockConfig.Initial).
+	CreatedThroughMatter  bool
+	ModifiedThroughMatter bool
 	// ExpiringUserExpiresAt is the wall-clock deadline of an ExpiringUser
 	// in Unix milliseconds, set on its first use; nil until then.
 	ExpiringUserExpiresAt *int64
@@ -52,12 +59,17 @@ type DoorLockUser struct {
 // DoorLockCredential is one stored credential: matter.js
 // LockAuth.Credential (LockAuth.ts:87-102). Data is the credential data as
 // the DoorLock server encrypted it; this package never sees it in clear.
+// A [Store] made by [NewSealed] seals it again at rest.
 type DoorLockCredential struct {
 	Type                    uint8
 	Index                   uint16
 	Data                    []byte
 	CreatorFabricIndex      uint8
 	LastModifiedFabricIndex uint8
+	// CreatedThroughMatter and ModifiedThroughMatter are
+	// [DoorLockUser]'s, for GetCredentialStatus.
+	CreatedThroughMatter  bool
+	ModifiedThroughMatter bool
 }
 
 // DoorLockWeekDaySchedule is matter.js LockSchedule.WeekDay
@@ -130,7 +142,8 @@ func (s *Store) LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth 
 func (s *Store) loadDoorLockUsers(ctx context.Context, endpointKey string) ([]DoorLockUser, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT user_index, user_name, user_unique_id, user_status, user_type, credential_rule,
-       credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at
+       credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at,
+       created_through_matter, modified_through_matter
 FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpointKey)
 	if err != nil {
 		return nil, fmt.Errorf("store: load door lock users: %w", err)
@@ -145,7 +158,8 @@ FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpoint
 			creds   string
 		)
 		if err := rows.Scan(&u.UserIndex, &u.UserName, &unique, &u.UserStatus, &u.UserType, &u.CredentialRule,
-			&creds, &u.CreatorFabricIndex, &u.LastModifiedFabricIndex, &expires); err != nil {
+			&creds, &u.CreatorFabricIndex, &u.LastModifiedFabricIndex, &expires,
+			&u.CreatedThroughMatter, &u.ModifiedThroughMatter); err != nil {
 			return nil, fmt.Errorf("store: load door lock users: %w", err)
 		}
 		if unique.Valid {
@@ -169,7 +183,8 @@ FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpoint
 
 func (s *Store) loadDoorLockCredentials(ctx context.Context, endpointKey string) ([]DoorLockCredential, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index
+SELECT credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index,
+       created_through_matter, modified_through_matter, sealed
 FROM matter_doorlock_credentials WHERE endpoint_key = ? ORDER BY credential_type, credential_index`, endpointKey)
 	if err != nil {
 		return nil, fmt.Errorf("store: load door lock credentials: %w", err)
@@ -177,10 +192,19 @@ FROM matter_doorlock_credentials WHERE endpoint_key = ? ORDER BY credential_type
 	defer func() { _ = rows.Close() }()
 	var out []DoorLockCredential
 	for rows.Next() {
-		var c DoorLockCredential
-		if err := rows.Scan(&c.Type, &c.Index, &c.Data, &c.CreatorFabricIndex, &c.LastModifiedFabricIndex); err != nil {
+		var (
+			c      DoorLockCredential
+			sealed bool
+		)
+		if err := rows.Scan(&c.Type, &c.Index, &c.Data, &c.CreatorFabricIndex, &c.LastModifiedFabricIndex,
+			&c.CreatedThroughMatter, &c.ModifiedThroughMatter, &sealed); err != nil {
 			return nil, fmt.Errorf("store: load door lock credentials: %w", err)
 		}
+		data, err := s.openColumn(c.Data, sealed, doorLockCredentialTable, "credential_data", endpointKey, c.Type, c.Index)
+		if err != nil {
+			return nil, fmt.Errorf("store: load door lock credential %d/%d: %w", c.Type, c.Index, err)
+		}
+		c.Data = data
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -230,8 +254,12 @@ FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index,
 	return nil
 }
 
+// doorLockCredentialTable is the table the credential data is sealed in.
+const doorLockCredentialTable = "matter_doorlock_credentials"
+
 // SaveDoorLockAuth replaces the records of the lock endpoint endpointKey
-// with auth, in one transaction.
+// with auth, in one transaction; under a sealer the credential data is
+// sealed ([NewSealed]).
 func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth DoorLockAuth) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -258,19 +286,27 @@ func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth D
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO matter_doorlock_users
     (endpoint_key, user_index, user_name, user_unique_id, user_status, user_type, credential_rule,
-     credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at,
+     created_through_matter, modified_through_matter)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			endpointKey, u.UserIndex, u.UserName, unique, u.UserStatus, u.UserType, u.CredentialRule,
-			string(creds), u.CreatorFabricIndex, u.LastModifiedFabricIndex, expires); err != nil {
+			string(creds), u.CreatorFabricIndex, u.LastModifiedFabricIndex, expires,
+			u.CreatedThroughMatter, u.ModifiedThroughMatter); err != nil {
 			return fmt.Errorf("store: save door lock user %d: %w", u.UserIndex, err)
 		}
 	}
 	for _, c := range auth.Credentials {
+		data, err := s.sealColumn(c.Data, doorLockCredentialTable, "credential_data", endpointKey, c.Type, c.Index)
+		if err != nil {
+			return fmt.Errorf("store: save door lock credential %d/%d: %w", c.Type, c.Index, err)
+		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO matter_doorlock_credentials
-    (endpoint_key, credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index)
-VALUES (?, ?, ?, ?, ?, ?)`,
-			endpointKey, c.Type, c.Index, c.Data, c.CreatorFabricIndex, c.LastModifiedFabricIndex); err != nil {
+    (endpoint_key, credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index,
+     created_through_matter, modified_through_matter, sealed)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			endpointKey, c.Type, c.Index, data, c.CreatorFabricIndex, c.LastModifiedFabricIndex,
+			c.CreatedThroughMatter, c.ModifiedThroughMatter, s.sealer != nil); err != nil {
 			return fmt.Errorf("store: save door lock credential %d/%d: %w", c.Type, c.Index, err)
 		}
 	}

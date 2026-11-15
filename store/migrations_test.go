@@ -114,11 +114,11 @@ func TestMigrationsMatchApply(t *testing.T) {
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := store.Migrations()
-	if len(ms) != 9 {
-		t.Fatalf("len(Migrations()) = %d, want 9", len(ms))
+	if len(ms) != 10 {
+		t.Fatalf("len(Migrations()) = %d, want 10", len(ms))
 	}
-	if last := ms[len(ms)-1].Version; last != "v9" {
-		t.Errorf("last migration = %s, want v9", last)
+	if last := ms[len(ms)-1].Version; last != "v10" {
+		t.Errorf("last migration = %s, want v10", last)
 	}
 	seen := map[string]bool{}
 	for _, m := range ms {
@@ -134,7 +134,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "63c92351ef072e5dfa0f84f84b2ad8190cfb196b335e5c662a2cc3ff1f70b030"
+	const want = "94e47453a6bc73ead08d7b267fd41b7e18220b083d1e740a75ba273eeaaee015"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}
@@ -260,9 +260,7 @@ func TestMigrationV3RebuildKeepsRows(t *testing.T) {
 	applyUp(t, db, "v2")
 	s := store.New(db)
 	insertLegacyFabric(t, db, 1, 1)
-	if err := s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: 1, GroupKeySetID: 5, EpochKey0: epochKey(5), EpochStart0: 1}); err != nil {
-		t.Fatal(err)
-	}
+	insertLegacyKeySet(t, db, 1, 5)
 	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0101, GroupKeySetID: 5}); err != nil {
 		t.Fatal(err)
 	}

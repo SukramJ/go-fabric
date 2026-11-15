@@ -59,7 +59,12 @@ type Migration struct {
 //   - v8 — review II (decision 36): matter_fabrics' pending mark, VID
 //     verification data and prior values; matter_node_identities' prior
 //     credentials. Its Down rolls every pending fabric back first.
-var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}
+//   - v9 — review II (decisions 107 and 109): matter_resumption's session
+//     parameters, matter_owed_fabric_events.
+//   - v10 — review II (decision 108, R2-P5-port-08): the seal mark of every
+//     table that holds a secret ([NewSealed]) and the DoorLock records'
+//     source. Its Down refuses a database that holds a sealed row.
+var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"}
 
 // Migrations returns the schema's steps in order. Applied to an empty
 // database one after the other, they produce the schema [Apply] produces —

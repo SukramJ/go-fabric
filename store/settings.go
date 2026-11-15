@@ -49,23 +49,29 @@ const (
 const MetadataKeyEventNumber = "event_number_ceiling"
 
 // GetSetting returns the persisted string for key. ok=false when the
-// key has never been written (callers keep their configured default).
+// key has never been written (callers keep their configured default). A
+// sealed value is opened ([NewSealed]).
 func (s *Store) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
-	row := s.db.QueryRowContext(ctx, `SELECT value FROM matter_settings WHERE key = ?`, key)
-	if err := row.Scan(&value); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
+	value, ok, err = s.readSetting(ctx, s.db, key)
+	if err != nil {
 		return "", false, fmt.Errorf("store: get setting %q: %w", key, err)
 	}
-	return value, true, nil
+	return value, ok, nil
 }
 
-// SetSetting upserts the persisted string for key.
+// upsertSetting is the statement of SetSetting and SetSettings.
+const upsertSetting = `
+INSERT INTO matter_settings (key, value, sealed) VALUES (?, ?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value, sealed = excluded.sealed`
+
+// SetSetting upserts the persisted string for key, sealed when the store
+// has a sealer and the key holds a secret ([NewSealed]).
 func (s *Store) SetSetting(ctx context.Context, key, value string) error {
-	if _, err := s.db.ExecContext(ctx, `
-INSERT INTO matter_settings (key, value) VALUES (?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
+	stored, sealed, err := s.sealSetting(key, value)
+	if err != nil {
+		return fmt.Errorf("store: set setting %q: %w", key, err)
+	}
+	if _, err := s.db.ExecContext(ctx, upsertSetting, key, stored, sealed); err != nil {
 		return fmt.Errorf("store: set setting %q: %w", key, err)
 	}
 	return nil
@@ -84,9 +90,11 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, k := range slices.Sorted(maps.Keys(values)) {
-		if _, err := tx.ExecContext(ctx, `
-INSERT INTO matter_settings (key, value) VALUES (?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, values[k]); err != nil {
+		stored, sealed, err := s.sealSetting(k, values[k])
+		if err != nil {
+			return fmt.Errorf("store: set settings: %q: %w", k, err)
+		}
+		if _, err := tx.ExecContext(ctx, upsertSetting, k, stored, sealed); err != nil {
 			return fmt.Errorf("store: set settings: %q: %w", k, err)
 		}
 	}
