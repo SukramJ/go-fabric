@@ -1864,7 +1864,7 @@
   },
   {
     "file": "cluster/spec/written.go",
-    "line": 108,
+    "line": 119,
     "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:466-472",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",

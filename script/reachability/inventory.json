@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8773,
+  "entry_points": 8774,
   "entry_packages": [
     ".",
     "bdx",
@@ -287,9 +287,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18540,
-    "reachable": 12491,
-    "whitelisted": 6049,
+    "total_exported": 18542,
+    "reachable": 12492,
+    "whitelisted": 6050,
     "unreachable": 0
   },
   "by_package": [],
@@ -30478,6 +30478,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/binding_mount_test.go",
       "line": 104
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBindingEntryAppendedOverTheWireIsApplied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/binding_append_check_test.go",
+      "line": 26
     },
     {
       "package": "endpoint",
