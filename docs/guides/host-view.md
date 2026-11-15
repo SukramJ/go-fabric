@@ -268,8 +268,8 @@ Aggregator partition that holds it (`node.Scope`, `"node"`, for the
 default one, so `n.Aggregator().Partition(d.Scope)` gives the partition
 back; `Aggregator.Partitions()` lists them) — its `Tags`, the semantic
 tags its Descriptor serves as a controller reads them (none while the
-Descriptor serves no TagList — today every bridged endpoint's case, the
-feature Apple's stack refuses), and its `Labels`, the FixedLabel entries
+Descriptor serves no TagList — the default without `device.Options.Tags`,
+and this example's case; the feature Apple's stack refuses), and its `Labels`, the FixedLabel entries
 then the UserLabel entries (`User` set) it serves, as a controller reads
 them. `Added` is found in every partition.
 

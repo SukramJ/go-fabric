@@ -8,7 +8,7 @@ the fabric's registry. Another ecosystem's administrator joins through
 administrator's own fabric before it issues the NOC, and the host
 consents.
 
-matter.js has no Joint Fabric logic at its pin `862ad75f`:
+matter.js has no Joint Fabric logic at its pin `db021da0`:
 `JointFabricDatastoreServer.ts:14` and `JointFabricAdministratorServer.ts:14`
 are empty subclasses, and its commissioning flow has no JCM step. The
 module follows connectedhomeip at `6170af84`, ahead of matter.js. The

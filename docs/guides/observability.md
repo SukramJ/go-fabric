@@ -270,8 +270,11 @@ value: a device's typed `OnChanged` and a server's `Get` are the value
 route. It hears the servers that notify their own changes (every generated
 server among them); a host port that only signals
 `contract.ChangeNotifier` is the host's own and is not repeated. matter.js
-has no node-wide event — it emits `$Changed` per endpoint and behavior —
-so a UI that shows every change reads this hook.
+has the same node-wide path beside its per-behavior `$Changed` events:
+`ChangeNotificationService.change` reports each state update with the
+endpoint, the behavior, the data version and the property names, no values
+(`ChangeNotificationService.ts:79-94`). This hook is its counterpart, so a
+UI that shows every change reads it.
 
 ## Served values and events
 
