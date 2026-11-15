@@ -253,7 +253,7 @@ func (p *primingSource) next() (im.AttributeReport, bool) {
 			rep.IsStatus = true
 			rep.Status = im.StatusIB{Status: rr.Status}
 		} else {
-			rep.Value = rr.Value
+			rep.Value, rep.FabricScope = rr.Value, rr.FabricScope
 		}
 		p.log(rep)
 		p.reports++

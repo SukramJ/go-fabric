@@ -237,6 +237,13 @@ type ReadResult struct {
 	// Without it the result has no version: it is never left out for a
 	// DataVersionFilter, and its AttributeDataIB carries 0.
 	HasDataVersion bool
+	// FabricScope, when set, is the scope of a request's read of a
+	// fabric-scoped list attribute: Value is what the server returned,
+	// every fabric's entries whole, and the scope is applied to it when it
+	// is encoded ([MaskFabricScoped]; [AttributeReport.FabricScope]).
+	// endpoint.TopologyDispatcher sets it for every server on a request; a
+	// read with no request behind it has none and reads the value whole.
+	FabricScope *FabricScope
 }
 
 // WriteResult is one (path, status) pair produced by a Write.

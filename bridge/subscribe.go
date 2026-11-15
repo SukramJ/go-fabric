@@ -910,7 +910,7 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 			if rr.Status != im.StatusSuccess {
 				continue
 			}
-			reports = append(reports, im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, Value: rr.Value})
+			reports = append(reports, im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, Value: rr.Value, FabricScope: rr.FabricScope})
 		}
 	}
 	return reports

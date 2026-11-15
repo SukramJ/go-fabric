@@ -889,21 +889,28 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // MatterRead, except on a request for a fabric-scoped attribute
 // ([fabricScopedReadFailed]).
 //
+// On a request, the value of a fabric-scoped attribute carries its scope
+// ([fabricScopeFor]): the dispatcher scopes every fabric-scoped attribute
+// of the model, whatever the server returns — from MatterReadFiltered or
+// MatterRead alike — and the scope is applied where the value is encoded
+// ([im.MaskFabricScoped]). A read with no request behind it carries none.
+//
 // DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
 // is stamped on the ReadResult with HasDataVersion. The IM layer uses
 // this in HandleReadRequest for DataVersionFilter evaluation.
 // Mirrors matter.js InteractionServer.ts attributeReportPayload building.
 func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath) im.ReadResult {
 	dv, hasDV := clusterDataVersionFor(ep, srv)
+	scope := fabricScopeFor(ctx, srv, path.Attribute)
 	// Fabric-scoped attributes: prefer MatterReadFiltered when the
 	// cluster server opts in by implementing FabricScopedReader.
 	if fsr, ok := srv.(contract.FabricScopedReader); ok {
 		v, ok := fsr.MatterReadFiltered(ctx, path.Attribute)
 		if ok {
 			if v == nil {
-				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 			}
-			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 		}
 		if status, failed := fabricScopedReadFailed(ctx, srv, path.Attribute); failed {
 			return im.ReadResult{Path: path, Status: status}
@@ -915,9 +922,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
 		if v == nil {
-			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 		}
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
@@ -929,6 +936,43 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
+}
+
+// fabricScopeFor is the scope a request's read of srv's attrID carries,
+// nil for a read with no request behind it ([im.LookupFabricFilter]) and
+// for an attribute that is not fabric-scoped. For a cluster of the schema
+// snapshot the generated table is the whole answer
+// ([schema.AttributeFabricScope]) — whatever the server is, a host's own
+// or the module's, and whether or not it is a
+// [contract.FabricScopedReader]. A cluster outside the snapshot is scoped
+// as its server declares ([contract.FabricScopeDeclarer]; spec.Instance
+// declares its definition's), and not at all without a declaration.
+func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint32) *im.FabricScope {
+	filtered, fabric, request := im.LookupFabricFilter(ctx)
+	if !request {
+		return nil
+	}
+	clusterID := srv.MatterClusterID()
+	var sensitive bool
+	var fields []uint32
+	if _, standard := schema.ClusterRevision(clusterID); standard {
+		s, ok := schema.AttributeFabricScope(clusterID, attrID)
+		if !ok {
+			return nil
+		}
+		sensitive, fields = s.Sensitive, s.Fields
+	} else {
+		d, ok := srv.(contract.FabricScopeDeclarer)
+		if !ok {
+			return nil
+		}
+		s, ok := d.MatterFabricScope(attrID)
+		if !ok {
+			return nil
+		}
+		sensitive, fields = s.Sensitive, slices.Clone(s.Fields)
+	}
+	return &im.FabricScope{Fabric: fabric, Filtered: filtered, Sensitive: sensitive, Fields: fields}
 }
 
 // fabricScopedReadFailed decides a [contract.FabricScopedReader]'s

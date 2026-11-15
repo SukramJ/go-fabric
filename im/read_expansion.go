@@ -465,7 +465,7 @@ func (r *ReadReports) report(path ConcreteAttributePath, res ReadResult) (rep At
 		rep.IsStatus = true
 		rep.Status = StatusIB{Status: res.Status}
 	} else {
-		rep.Value = res.Value
+		rep.Value, rep.FabricScope = res.Value, res.FabricScope
 	}
 	return rep, true
 }

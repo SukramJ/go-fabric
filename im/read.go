@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -364,6 +365,12 @@ type AttributeReport struct {
 	// previous path's (InputChunk.ts:252-273). Set by
 	// [UnmarshalReportDataTLV]; the encoder ignores it.
 	TagCompression bool
+	// FabricScope is the [ReadResult.FabricScope] the report was built
+	// from: the encoder applies it to Value ([MaskFabricScoped]) and
+	// answers the path FAILURE when the value cannot be scoped. A sender
+	// that splits a list across messages applies it before the split and
+	// clears it. Never set on a received report.
+	FabricScope *FabricScope
 }
 
 // AttributeValueWriter is the function the Dispatcher's caller
@@ -439,6 +446,14 @@ func (r ReportData) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWrite
 }
 
 func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
+	var scoped []byte
+	if rep.FabricScope != nil && !rep.IsStatus {
+		var ok bool
+		if scoped, ok = scopeAttributeValue(rep.Value, *rep.FabricScope, valueWriter); !ok {
+			rep = AttributeReport{Path: rep.Path, IsStatus: true, Status: StatusIB{Status: StatusFailure}}
+			rep.Path.ListAppend, rep.Path.HasListIndex, rep.Path.ListIndex = false, false, 0
+		}
+	}
 	enc.StartStruct(tlv.AnonymousTag())
 	if rep.IsStatus {
 		enc.StartStruct(tlv.ContextTag(tagAttributeReportStatus))
@@ -465,7 +480,11 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 		// it, and HAP-service rebuild then failed with Code=24.
 		enc.PutUint32(tlv.ContextTag(tagAttributeDataDataVersion), dataVersion)
 		rep.Path.MarshalTLV(enc, tlv.ContextTag(tagAttributeDataPath))
-		valueWriter(enc, tlv.ContextTag(tagAttributeDataValue), rep.Value)
+		if scoped != nil {
+			_ = enc.PutRawElement(tlv.ContextTag(tagAttributeDataValue), scoped)
+		} else {
+			valueWriter(enc, tlv.ContextTag(tagAttributeDataValue), rep.Value)
+		}
 		_ = enc.EndContainer()
 	}
 	_ = enc.EndContainer()
@@ -709,23 +728,6 @@ func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
 	return BuildEventReports(req.EventRequests, log, req.EventFilters)
 }
 
-// matterAccessControlClusterID is the AccessControl cluster (Matter §9.10).
-// Its events (AccessControlEntryChanged) are fabric-sensitive: each carries a
-// FabricIndex, must never be disclosed across fabrics (§8.4.3.2 / §9.10.7.1),
-// and requires Administer to read.
-const matterAccessControlClusterID uint32 = 0x001F
-
-// matterGroupcastClusterID is the Groupcast cluster (Matter 1.6 §11.27).
-// Its one event, GroupcastTesting, carries access "S A" like
-// AccessControl's (groupcast.element.ts): fabric-sensitive, Administer to
-// read.
-const matterGroupcastClusterID uint32 = 0x0065
-
-// matterCommissionerControlClusterID is CommissionerControl (0x0751): its
-// CommissioningRequestResult event carries access "S M"
-// (commissioner-control.element.ts:28 at 0ceb202d) — fabric-sensitive, Manage.
-const matterCommissionerControlClusterID uint32 = 0x0751
-
 // EventReadAuthorizer bundles the accessing subject + ACL checker used to gate
 // event reads and subscriptions, mirroring the (fabricIndex, subject, CATs)
 // tuple the attribute read path threads through [HandleReadRequest]. PASE
@@ -765,12 +767,13 @@ type EventPathChecker interface {
 }
 
 // Allows reports whether the accessing subject may read the events of
-// (endpoint, cluster): the event read privilege — View, Administer for
-// AccessControl and Groupcast — checked against the ACL. A PASE session or
-// a missing checker allows, as AuthorizeEventReports does; a session
-// without an accessing fabric that is not PASE is denied.
+// (endpoint, cluster): the lowest read privilege among the cluster's events
+// in the model ([schema.ClusterEventScope]; View for a cluster it does not
+// hold) checked against the ACL. A PASE session or a missing checker
+// allows, as AuthorizeEventReports does; a session without an accessing
+// fabric that is not PASE is denied.
 func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
-	return a.allowsAt(ctx, endpoint, cluster, eventReadPrivilege(cluster))
+	return a.allowsAt(ctx, endpoint, cluster, schema.ClusterEventScope(cluster).ReadPrivilege)
 }
 
 // allowsAt is Allows at privilege.
@@ -794,21 +797,24 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 // session without an accessing fabric that is not PASE reads none. The
 // fabric-sensitive drop (b) applies to every session.
 //
-// (a) ACL gate: each event is gated at its read privilege — View by default,
+// (a) ACL gate: each event is gated at its read privilege — the event's
 //
-//	Administer for AccessControl (fabric-sensitive, Matter §9.10.7.1).
+//	effective read privilege in the model ([eventScope]).
 //	Mirrors matter.js packages/protocol/src/action/server/EventReadResponse.ts
 //	#addConcrete/#addEventForWildcard (authorize at event.limits.readLevel).
 //
-// (b) Fabric-sensitive drop: a fabric-sensitive record is disclosed only to the
+// (b) Fabric-sensitive drop: a record of an event whose access is
+//
+//	fabric-sensitive ("S" in the model, [eventScope]) is disclosed only to the
 //
 //	fabric that owns it, independent of the read's FabricFiltered flag and of
 //	the auth mode: the accessing fabric is auth.FabricIndex — 0 for a PASE
 //	session before AddNOC, the adopted fabric after it. Fails closed — a
 //	record whose fabric cannot be positively matched to the accessing fabric
 //	is never disclosed. Mirrors matter.js
-//	packages/protocol/src/action/server/EventReadResponse.ts:79 and :344-352
-//	at db021da0 — #accessingFabricIndex = session.fabric ?? NO_FABRIC,
+//	packages/protocol/src/action/server/EventReadResponse.ts:79, :331 and
+//	:344-352 at db021da0 — #accessingFabricIndex = session.fabric ??
+//	NO_FABRIC, and for an event whose limits are fabric-sensitive
 //	#readAllowedEvents skips a record whose payload.fabricIndex differs; the
 //	file has no auth-mode exception.
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
@@ -816,12 +822,12 @@ func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
 		if !aclBypass {
-			priv := eventReadPrivilege(ev.Path.Cluster)
+			priv := eventScope(ev.Path.Cluster, ev.Path.Event).ReadPrivilege
 			if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
 				continue // subject not permitted to read this event — omit
 			}
 		}
-		if isFabricSensitiveEventCluster(ev.Path.Cluster) {
+		if eventScope(ev.Path.Cluster, ev.Path.Event).Sensitive {
 			recFabric, ok := eventPayloadFabricIndex(ev.Data.Value)
 			if !ok || recFabric != auth.FabricIndex {
 				continue // fabric-sensitive record owned by another fabric — omit
@@ -832,47 +838,18 @@ func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events
 	return out
 }
 
-// eventReadPrivilege returns the minimum privilege required to read events on
-// clusterID: Administer for AccessControl (§9.10.7.1 fabric-sensitive events)
-// and Groupcast (GroupcastTesting, access "S A"), Manage for
-// CommissionerControl (CommissioningRequestResult, access "S M"), View for
-// every other cluster (the Matter default event read privilege).
-func eventReadPrivilege(clusterID uint32) uint8 {
-	switch clusterID {
-	case matterAccessControlClusterID, matterGroupcastClusterID, matterAccountLoginClusterID:
-		return 5 // Administer
-	case matterCommissionerControlClusterID:
-		return 4 // Manage
+// eventScope is the model's scope of the (cluster, event) pair: its read
+// privilege and whether it is fabric-sensitive, generated per event from
+// parity/schema.json ([schema.EventReadScope]). An event the model does
+// not hold takes its cluster's scope ([schema.ClusterEventScope]): a
+// cluster with a fabric-sensitive event treats an unknown one as
+// fabric-sensitive too, and a cluster outside the model is View.
+func eventScope(cluster, event uint32) schema.EventScope {
+	if s, ok := schema.EventReadScope(cluster, event); ok {
+		return s
 	}
-	return 1 // View
+	return schema.ClusterEventScope(cluster)
 }
-
-// isFabricSensitiveEventCluster reports whether clusterID's events carry a
-// FabricIndex and must be filtered to the accessing fabric regardless of the
-// read's FabricFiltered flag (Matter §8.4.3.2 / §9.10.7.1).
-//
-// The clusters are those whose events matter.js marks "S": AccessControl,
-// Groupcast, CommissionerControl, Messages (MessageQueued, MessagePresented,
-// MessageComplete "S V", packages/model/src/standard/elements/messages.element.ts:39-56
-// at 862ad75f) and AccountLogin (LoggedOut "S A",
-// account-login.element.ts:21-24). Messages and AccountLogin were missing:
-// their records went to every fabric.
-func isFabricSensitiveEventCluster(clusterID uint32) bool {
-	switch clusterID {
-	case matterAccessControlClusterID, matterGroupcastClusterID, matterCommissionerControlClusterID,
-		matterMessagesClusterID, matterAccountLoginClusterID:
-		return true
-	}
-	return false
-}
-
-// matterMessagesClusterID is Messages (0x0097), matterAccountLoginClusterID
-// AccountLogin (0x050E): fabric-sensitive events, see
-// [isFabricSensitiveEventCluster].
-const (
-	matterMessagesClusterID     uint32 = 0x0097
-	matterAccountLoginClusterID uint32 = 0x050E
-)
 
 // eventPayloadFabricIndex extracts the FabricIndex a fabric-sensitive event
 // payload carries (e.g. AccessControl.AccessControlEntryChanged sets it per

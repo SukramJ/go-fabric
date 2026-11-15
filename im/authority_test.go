@@ -172,15 +172,19 @@ func TestGroupInvokeReport(t *testing.T) {
 // carries access "S A" (groupcast.element.ts).
 func TestGroupcastEventsAreAdministerAndFabricSensitive(t *testing.T) {
 	t.Parallel()
-	if eventReadPrivilege(0x0065) != 5 || !isFabricSensitiveEventCluster(0x0065) {
+	if s := eventScope(0x0065, 0x00); s.ReadPrivilege != 5 || !s.Sensitive {
 		t.Error("Groupcast events are not gated like AccessControl's")
 	}
 	// CommissionerControl's CommissioningRequestResult is "S M"
 	// (commissioner-control.element.ts:28): fabric-sensitive, Manage.
-	if eventReadPrivilege(0x0751) != 4 || !isFabricSensitiveEventCluster(0x0751) {
+	if s := eventScope(0x0751, 0x00); s.ReadPrivilege != 4 || !s.Sensitive {
 		t.Error("CommissionerControl's event is not fabric-sensitive at Manage")
 	}
-	if eventReadPrivilege(0x0006) != 1 || isFabricSensitiveEventCluster(0x0006) {
+	if s := eventScope(0x0006, 0x00); s.ReadPrivilege != 1 || s.Sensitive {
 		t.Error("an ordinary cluster's events are gated")
+	}
+	// An event the model does not hold takes its cluster's scope.
+	if s := eventScope(0x001F, 0x7F); s.ReadPrivilege != 5 || !s.Sensitive {
+		t.Error("an unknown AccessControl event is not gated as the cluster's")
 	}
 }

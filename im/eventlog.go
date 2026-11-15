@@ -297,7 +297,7 @@ func (l *EventLog) DropFabric(fabricIndex uint8) int {
 	kept := l.occurrences[:0]
 	dropped := 0
 	for _, rec := range l.occurrences {
-		if isFabricSensitiveEventCluster(rec.Cluster) {
+		if eventScope(rec.Cluster, rec.EventID).Sensitive {
 			if owner, ok := eventPayloadFabricIndex(rec.Payload); ok && owner == fabricIndex {
 				dropped++
 				continue

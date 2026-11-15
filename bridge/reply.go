@@ -713,6 +713,7 @@ func (c *reportChunker) closeCurrent(seed im.ReportData) {
 }
 
 func (c *reportChunker) addAttributeReport(rep im.AttributeReport) error {
+	rep = applyFabricScope(rep)
 	if parts, ok := splitListAttributeReport(c.template, rep, c.budget); ok {
 		if oversized, err := anyPartOversized(c.template, parts, c.hardCap); err != nil {
 			return err
@@ -778,6 +779,41 @@ type (
 	rawListMember []byte
 )
 
+// applyFabricScope applies rep's fabric scope to its value before the
+// report is chunked, so a list split across messages is split into the
+// entries the reader receives: the value becomes the scoped list's encoded
+// members and the scope is cleared; a value that cannot be scoped answers
+// the attribute's path FAILURE ([im.MaskFabricScoped]). A report without a
+// scope, and a status, is returned as it is. [im.AttributeReport]'s encoder
+// applies a scope still set the same way.
+func applyFabricScope(rep im.AttributeReport) im.AttributeReport {
+	if rep.FabricScope == nil || rep.IsStatus {
+		return rep
+	}
+	scope := *rep.FabricScope
+	rep.FabricScope = nil
+	enc := tlv.NewEncoder()
+	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
+	encoded, err := enc.Bytes()
+	if err != nil {
+		return attributeStatus(rep, im.StatusFailure)
+	}
+	masked, ok := im.MaskFabricScoped(encoded, scope)
+	if !ok {
+		return attributeStatus(rep, im.StatusFailure)
+	}
+	if len(masked) == 1 && tlv.ElementType(masked[0]) == tlv.TypeNull {
+		rep.Value = im.AttributeValue{IsNull: true}
+		return rep
+	}
+	members, err := tlv.SplitArrayMembers(masked)
+	if err != nil {
+		return attributeStatus(rep, im.StatusFailure)
+	}
+	rep.Value = im.AttributeValue{Value: rawListValue(members)}
+	return rep
+}
+
 // splitListAttributeReport splits a list attribute whose report alone
 // does not fit budget into a REPLACE-ALL report carrying as many leading
 // members as fit, followed by one ListIndex=null append report per
@@ -798,8 +834,15 @@ func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget i
 	if rep.IsStatus || rep.Path.ListAppend || rep.Path.HasListIndex || rep.Value.IsNull || rep.Value.Value == nil {
 		return nil, false
 	}
-	switch rep.Value.Value.(type) {
-	case rawListValue, rawListMember, []byte, string:
+	switch v := rep.Value.Value.(type) {
+	case rawListValue:
+		// A list already carried as its members — a fabric-scoped value
+		// ([applyFabricScope]) or a split's head — splits again only while
+		// it holds more than one: a head of one member is final.
+		if len(v) < 2 {
+			return nil, false
+		}
+	case rawListMember, []byte, string:
 		return nil, false
 	}
 	size := func(r im.AttributeReport) int {
@@ -812,26 +855,31 @@ func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget i
 	if size(rep) <= budget {
 		return nil, false
 	}
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
-	encoded, err := enc.Bytes()
-	if err != nil {
-		return nil, false
+	members, ok := rep.Value.Value.(rawListValue)
+	if !ok {
+		enc := tlv.NewEncoder()
+		defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
+		encoded, err := enc.Bytes()
+		if err != nil {
+			return nil, false
+		}
+		if members, err = tlv.SplitArrayMembers(encoded); err != nil {
+			return nil, false
+		}
 	}
-	members, err := tlv.SplitArrayMembers(encoded)
-	if err != nil || len(members) == 0 {
+	if len(members) == 0 {
 		return nil, false
 	}
 	head := rep
 	n := 1
 	for n < len(members) {
-		head.Value = im.AttributeValue{Value: rawListValue(members[:n+1])}
+		head.Value = im.AttributeValue{Value: members[:n+1]}
 		if size(head) > budget {
 			break
 		}
 		n++
 	}
-	head.Value = im.AttributeValue{Value: rawListValue(members[:n])}
+	head.Value = im.AttributeValue{Value: members[:n]}
 	out := make([]im.AttributeReport, 0, 1+len(members)-n)
 	out = append(out, head)
 	for _, m := range members[n:] {
@@ -1099,14 +1147,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// returning `null` (the previous default-writer fall-through)
 		// surfaces as ACCESS_DENIED on every follow-up read and Apple
 		// tears the fabric down via RemoveFabric.
-		// An entry another fabric owns, on a non-fabric-filtered read,
-		// carries FabricIndex alone: fields 1-5 are fabric-sensitive
-		// (access-control.element.ts, access "S"), withheld as matter.js
-		// StructManager mayRead withholds them.
+		// The dispatcher withholds another fabric's fabric-sensitive
+		// fields from a request (im.MaskFabricScoped); an entry with the
+		// deprecated Redacted set is still written as its FabricIndex
+		// alone.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if e.Redacted {
+			if e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
 				_ = enc.EndContainer()
 				continue
@@ -1121,13 +1169,13 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		_ = enc.EndContainer()
 	case []mattercore.AccessControlAuxiliaryEntryStruct:
 		// AccessControl.AuxiliaryAcl (0x0007): AccessControlEntryStruct
-		// with [5] AuxiliaryType. A redacted entry — another fabric's on
-		// an unfiltered read — carries FabricIndex alone, every other
-		// field being fabric-sensitive (access-control.element.ts).
+		// with [5] AuxiliaryType. An entry with the deprecated Redacted
+		// set is written as its FabricIndex alone; the dispatcher scopes
+		// the fields (im.MaskFabricScoped).
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if !e.Redacted {
+			if !e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				encodeACLEntryFields(enc, e.Entry)
 				enc.PutUint(tlv.ContextTag(5), uint64(e.AuxiliaryType))
 			}
@@ -1238,12 +1286,12 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// without this case every read/subscribe of 0x001F:0x0001 fell
 		// through to `default:` and returned TLV null regardless of
 		// what AccessControl.MatterWrite had stored.
-		// Data is fabric-sensitive: another fabric's entry on an
-		// unfiltered read carries FabricIndex alone.
+		// An entry with the deprecated Redacted set is written without
+		// Data; the dispatcher scopes the fields (im.MaskFabricScoped).
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if !e.Redacted {
+			if !e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				enc.PutOctets(tlv.ContextTag(1), e.Data)
 			}
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
