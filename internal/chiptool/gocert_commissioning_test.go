@@ -1521,10 +1521,11 @@ var ddStages = map[string][]string{
 	"case":                  {"msg=case.session_established ", " fabric_index="},
 	"commissioningComplete": {logCommissioned},
 	// The daemon clears its PASE sessions after an OK CommissioningComplete
-	// (bridge/pase_close.go closePASESessionsOnCommissioningComplete) and
-	// logs no line for it: nothing stands in for matter.js's "Session
-	// ended" (TC-DD-3.5.test.ts:71-74).
-	"paseClosed": nil,
+	// and logs their ids as it does (bridge/pase_close.go
+	// closePASESessionsOnCommissioningComplete, matter.session.pase_close):
+	// what matter.js's "Session ended" and chip's "Released - Type:1 LSID"
+	// say (TC-DD-3.5.test.ts:71-74).
+	"paseClosed": {"msg=matter.session.pase_close ", " reason=commissioning_complete "},
 }
 
 // caseDD35 is TC-DD-3.5 (TC-DD-3.5.test.ts:152-279), the Go controller as
