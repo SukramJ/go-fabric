@@ -478,6 +478,18 @@ are what keeps that from doubling.
 - **Few turns in a long session.** A coordinator waits for several agents
   at once and integrates them together; a status message carries new
   information or is not sent; a phase starts in a fresh session.
+- **The assistant says when to clear the context.** Set by the owner on
+  2026-11-15. It does not wait to be asked: it proposes a fresh session
+  when a phase or a pull request is merged; when the context has been
+  summarised once and the work that remains is of another kind; or when
+  what it still needs fits in a short hand-over and the turns are mostly
+  waiting for agents or pipelines. It does NOT propose one while agents of
+  the session are running or a decision of the owner is open. The proposal
+  comes with the hand-over already written — the state, the open points
+  with where each goes, the next step, the lessons — into the memory file
+  and the notes (never only into the chat), and with the exact way to go
+  on: `/clear`, the model to switch to (`/model`), and the first message
+  to send, which names the files to read.
 - **The pipeline's guards before the pull request, not after.** The local
   guard set is the list of `make` targets CI runs (`.github/workflows/`),
   and a composition change of the reference daemon — `make surface` shows
