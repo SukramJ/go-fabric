@@ -18,7 +18,7 @@ gate for these paths.
 | Subscription engine tick | `Node.Start` | every 250 ms | `Node.Stop` |
 | One report per due subscription | the engine tick | at most one at a time per subscription | returns |
 | Session reaper | `Node.Start` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` (and waited for) |
-| PASE and CASE handler reapers | `Node.Start` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
+| PASE and CASE handler reapers | `Node.Start` | sweep every 30 s; evict handlers idle for a minute | `Node.Stop` |
 | Operational-time keeper | `Node.Start` | every minute | `Node.Stop` (and waited for) |
 | DNS-SD broadcast schedule | the first `Publish` of the node's `mdns.Responder` (timers, no goroutine; the two receive loops start with the sockets) | 1 s doubling to 90 s, until a CASE connection or two days | `Node.Stop` (the advertiser's `Close`) |
 | Session-triggered re-announce | a session teardown or a terminated subscription | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
@@ -53,7 +53,7 @@ no host holds counted work in hand and no goroutine of the process is
 working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:22-28`, `bridge/ackpump.go:317-376`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go` (`ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go`, `mdns/announce.go`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-130`, `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go` (`Listener.Serve`), `bridge/bridge.go` (`Bridge.Start`, `startAckPump`), `bridge/ackpump.go` (`ackPumpInterval`, `runAckPump`), `im/subscription/manager.go` (`DefaultTickInterval`, `Manager.Start`), `im/subscription/engine.go` (`Manager.tick`), `secure/operational/manager.go` (`SessionIdleTimeout`, `Manager.StartReaper`), `node/security.go` (`security.start`), `bridge/pase_provider.go` and `bridge/case_provider.go` (`StartReaper`), `node/node.go` (`operationalTimeInterval`, `ErrStopped`), `node/node.go` (`Node.observedFabricRemoved`), `node/reannounce.go`, `mdns/announce.go`, `bridge/securechannel.go` (`triggerSessionReannounce`), `bridge/bdx_responder.go` (`goResponder`), `binding/manager.go` (`Manager.startWorker`), `node/client.go` (`newClientStack`), `node/node.go` (the `Node` struct), `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/device.go` (`deviceClock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
@@ -82,7 +82,7 @@ taken is dropped, and the peer's MRP retransmits it. Per session, at most
 Between sessions there is no ordering. Two controllers act on the same
 server concurrently.
 
-*Source: `bridge/session_order.go:11-50`, `transport/message/message.go:284-303`, `controller/controller.go:471-484`, `node/client.go:121-128`, `transport/udp/ordered.go:13-126`, `transport/udp/listener.go:38-47`, `transport/udp/listener.go:233-249`, `transport/tcp/doc.go:24-35`.*
+*Source: `bridge/session_order.go` (`handleOrderedDatagram`, `leaveSessionOrder`), `transport/message/message.go` (`SessionOrderKey`), `controller/controller.go` (`Controller.openNetwork`), `node/client.go` (`newClientStack`), `transport/udp/ordered.go` (`Listener.ServeOrdered`, `maxOrderedBacklog`), `transport/udp/listener.go` (`maxConcurrentDispatch`, `Listener.Serve`), `transport/tcp/doc.go` (the package doc).*
 
 ## What a host callback may do
 
@@ -140,7 +140,7 @@ report to a channel.
 **`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:37-50`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:314`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go` (`TopologyDispatcher.Read`, `Write`, `Invoke`), `bridge/session_order.go` (`leaveSessionOrder`), `bridge/receive.go`, `bridge/ackpump.go` (`owedInboundAck`, `refreshAckCounter`), `transport/mrp/ack.go` (`DefaultStandaloneAckDelay`), `im/subscription/engine.go` (`Manager.tick`), `cluster/onoff/server.go` (`Sink`, `Server.Set`), `node/observers.go` (`Observers`), `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go` (`Subscriptions.handleReport`), `client/interaction/subscribe.go` (`SubscribeRequest.Updated`), `examples/reference-controller/cli/interact.go` (`cmdSubscribe`), `client/discovery/doc.go` (the package doc).*
 
 ## Changing the topology
 
@@ -155,7 +155,7 @@ and `Forget` from one goroutine, or serialise them yourself.
 The `Snapshotter` of a host with its own topology is called at `Start` and
 on every `Reassemble`, and its result is never cached.
 
-*Source: `node/aggregator.go:95-262`, `node/aggregator.go:345-353`, `bridge/bridge.go:908-933`, `bridge/bridge.go:218-232`.*
+*Source: `node/aggregator.go` (`Aggregator.Add`, `Remove`), `node/reserve.go` (`Aggregator.Forget`), `bridge/bridge.go` (`Snapshotter`, `Bridge.Reassemble`).*
 
 ## Contexts and shutdown
 
@@ -182,4 +182,4 @@ stop budget — runs on the node's clock (`clock.WithTimeout`): on the system
 clock it is `context.WithTimeout`, under a test's fake clock it expires when
 the fake is advanced.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `node/node.go` (`Node.Stop`), `bridge/bridge.go:1695-1801`, `bridge/bridge.go:1995-2002`, `transport/udp/listener.go:178-251`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `node/node.go` (`Node.Stop`), `bridge/bridge.go` (`Bridge.Stop`), `transport/udp/listener.go` (`Listener.Serve`).*
