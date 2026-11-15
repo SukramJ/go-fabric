@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 842,
+    "line": 838,
     "citation": "ExchangeManager.ts:480-486",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1768,
+    "line": 1764,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1770,
+    "line": 1766,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1807,
+    "line": 1803,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1830,
+    "line": 1826,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -225,16 +225,6 @@
     "identifier": "SecureChannel",
     "nearest": 694,
     "occurrences": 1
-  },
-  {
-    "file": "bridge/chunk_limits_test.go",
-    "line": 39,
-    "citation": "Session.ts:87",
-    "resolved": "packages/protocol/src/session/Session.ts",
-    "at": "db021da0",
-    "identifier": "MaxTcpMessageSize",
-    "nearest": 237,
-    "occurrences": 0
   },
   {
     "file": "bridge/conn.go",
@@ -350,7 +340,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 339,
+    "line": 350,
     "citation": "PaseServer.ts:155-157",
     "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
     "identifier": "SessionParameters",
@@ -359,7 +349,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 1120,
+    "line": 1154,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -479,7 +469,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2006,
+    "line": 2052,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -488,7 +478,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2150,
+    "line": 2196,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
@@ -525,7 +515,7 @@
   },
   {
     "file": "bridge/status_response_decode_test.go",
-    "line": 116,
+    "line": 122,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "waitForSuccess",
@@ -534,7 +524,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 62,
+    "line": 63,
     "citation": "MRP.ts:100-108",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "at": "db021da0",
@@ -544,7 +534,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1436,
+    "line": 1437,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -553,7 +543,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2055,
+    "line": 2056,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -562,7 +552,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2131,
+    "line": 2132,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -3430,7 +3420,7 @@
   },
   {
     "file": "secure/spake2/session_params_test.go",
-    "line": 16,
+    "line": 18,
     "citation": "PaseServer.ts:151",
     "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
     "identifier": "SessionParameters",

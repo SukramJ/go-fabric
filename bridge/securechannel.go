@@ -365,10 +365,10 @@ func (b *Bridge) paseWindowClosed() bool {
 }
 
 // refusePaseWindowClosed answers a PBKDFParamRequest that meets a closed
-// commissioning window ([Bridge.paseWindowClosed]) with a StatusReport
-// (GeneralFailure, InvalidParameter), as matter.js answers one with no PASE
-// server set (SecureChannelProtocol.ts:129-137 at db021da0; review II,
-// owner decision 97). It begins no handshake: the single-active-PASE claim
+// commissioning window ([Bridge.paseWindowClosed]) with a failure report
+// (GeneralFailure, InvalidParameter). matter.js sends InvalidParam when no
+// PASE server is set (SecureChannelProtocol.ts:129-137 at db021da0; review
+// II, owner decision 97). It begins no handshake: the single-active-PASE claim
 // is not taken and no PASE failure is counted.
 func (b *Bridge) refusePaseWindowClosed(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
 	b.logger.Info("matter.rx.sc.pase_window_closed",

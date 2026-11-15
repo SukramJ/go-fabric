@@ -14,10 +14,11 @@ import (
 
 // TestPBKDFParamRequestOnAClosedWindowIsAnsweredInvalidParam: a
 // PBKDFParamRequest that meets a closed commissioning window — a window
-// attached and closed, no PASE acceptor — is answered with a StatusReport
-// (GeneralFailure, InvalidParameter) and begins nothing: no claim, no
-// counted failure (review II, owner decision 97; matter.js
-// SecureChannelProtocol.ts:129-137 at db021da0). The controls: a bridge
+// attached and closed, no PASE acceptor — is answered with a failure
+// report (GeneralFailure, InvalidParameter) and begins nothing: no claim,
+// no counted failure. matter.js sends InvalidParam when no PASE server is
+// set (SecureChannelProtocol.ts:129-137 at db021da0; review II, owner
+// decision 97). The controls: a bridge
 // without a window, and one whose window is open without an acceptor, keep
 // the fail-closed noop (no answer); an acceptor attached while the window
 // is closed runs the handshake.

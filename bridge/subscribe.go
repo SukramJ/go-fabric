@@ -1128,9 +1128,9 @@ func (o *owedReport) requeue(sub *subscription.Subscription) {
 // number (:346-357, :392-394), which the next report takes whole
 // (:537-543, :610-622); #sendUpdateMessage sends with
 // `suppressResponse: false`, the keep-alive included (:913-914, :928),
-// and sendDataReport waits for the Success StatusResponse
+// and sendDataReport then awaits waitForSuccess
 // (packages/protocol/src/interaction/InteractionMessenger.ts:838-845,
-// waitForSuccess :221-227); an error status ends the subscription
+// :221-227); an error status ends the subscription
 // (ServerSubscription.ts:938-950), a missing answer is a failed update
 // (:558-608).
 func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target subTarget, report im.ReportData, owed *owedReport, op string) (exchangeID uint16, delivered bool) {

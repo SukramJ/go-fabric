@@ -9,9 +9,9 @@ package im
 // (ValidationOutOfBoundsError, ValidationError.ts:16-29); a value of
 // another TLV type, a signed integer included, is a Failure, as matter.js
 // throws UnexpectedDataError for it (TlvNumber.ts:124-131), which carries
-// no status, and InteractionMessenger.handleRequest answers that with
-// Failure (packages/protocol/src/interaction/InteractionMessenger.ts:425-460
-// at db021da0).
+// no status, and the request's catch answers that with Status.Failure
+// (packages/protocol/src/interaction/InteractionMessenger.ts:425-460 at
+// db021da0).
 
 import (
 	"errors"
