@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	"github.com/SukramJ/go-fabric/cluster/spec/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -37,7 +38,7 @@ import (
 // (goCertCase.at).
 
 func init() {
-	for _, c := range []func() goCertCase{caseMOD22, caseTSTAT32, caseWNCV61, caseWNCV71} {
+	for _, c := range []func() goCertCase{caseMOD22, caseTSTAT32, caseWNCV61, caseWNCV71, caseDRLK32} {
 		registerGoCert(c)
 	}
 }
@@ -280,6 +281,149 @@ func caseWNCV71() goCertCase {
 			{
 				n: "2a", line: 65, title: "DUT sends GoToTiltPercentage command with 50% to TH", pics: "WNCV.C.C08.Tx",
 				run: wncvSends(&n, "GoToTiltPercentage 5000", windowcovering.CmdGoToTiltPercentage, windowcovering.GoToTiltPercentageRequest{TiltPercent100thsValue: halfOpen}),
+			},
+		},
+	}
+}
+
+// caseDRLK32 mirrors TC-DRLK-3.2: the door, schedule, user and credential
+// commands, each answered with success.
+func caseDRLK32() goCertCase {
+	var n *client.Node
+	// USER_INDEX, SECOND_USER_INDEX, SCHEDULE_INDEX, LOCAL_START_TIME,
+	// LOCAL_END_TIME, PIN, PIN_CREDENTIAL (:21-37).
+	const (
+		userIndex       = 1
+		secondUserIndex = 2
+		scheduleIndex   = 1
+		localStartTime  = 1_893_456_000
+		localEndTime    = 1_893_542_400
+	)
+	pin := []byte("123456")
+	pinCredential := doorlock.CredentialStruct{CredentialType: doorlock.CredentialTypePin, CredentialIndex: 1}
+	// addUser (:40-50).
+	addUser := func(idx uint16) doorlock.SetUserRequest {
+		return doorlock.SetUserRequest{
+			OperationType:  doorlock.DataOperationTypeAdd,
+			UserIndex:      idx,
+			UserName:       spec.ValueOf("xxx"),
+			UserUniqueId:   spec.ValueOf(uint32(6452) + uint32(idx)),
+			UserStatus:     spec.ValueOf(doorlock.UserStatusOccupiedEnabled),
+			UserType:       spec.ValueOf(doorlock.UserTypeUnrestrictedUser),
+			CredentialRule: spec.ValueOf(doorlock.CredentialRuleSingle),
+		}
+	}
+	// sendsLockCommand (:58-74); statusTag is the Status field's tag in
+	// the command's response (definition_gen.go's response types), -1
+	// for a status-only answer or a response without one.
+	sends := func(name string, cmd uint32, fields spec.Encodable, statusTag int) func(th *goTH) error {
+		return func(th *goTH) error {
+			r, err := commandSucceeds(th, n, doorlock.ClusterID, cmd, fields, statusTag)
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			if r.HasFields {
+				th.note("%s: Success, response %s", name, describeNode(r.Fields))
+			} else {
+				th.note("%s: Success", name)
+			}
+			return nil
+		}
+	}
+	return goCertCase{
+		tc: "TC-DRLK-3.2", line: 80, pics: []string{"DRLK.C"}, at: "DRLK.S",
+		steps: []goStep{
+			{n: "0", line: 81, title: "commission TH to DUT", run: func(th *goTH) error {
+				var err error
+				_, n, err = th.commission("dut")
+				return err
+			}},
+			{
+				n: "0b", line: 84, title: "Precondition: DUT adds a user to the TH", pics: "DRLK.C.F08 & DRLK.C.C1a.Tx",
+				run: sends("SetUser", doorlock.CmdSetUser, addUser(userIndex), -1),
+			},
+			{n: "1", line: 88, title: "DUT sends LockDoor command to TH", pics: "DRLK.C.C00.Tx", run: sends("LockDoor", doorlock.CmdLockDoor, doorlock.LockDoorRequest{}, -1)},
+			{n: "2", line: 92, title: "DUT sends UnlockDoor command to TH", pics: "DRLK.C.C01.Tx", run: sends("UnlockDoor", doorlock.CmdUnlockDoor, doorlock.UnlockDoorRequest{}, -1)},
+			{
+				n: "3", line: 96, title: "DUT sends UnlockWithTimeout command to TH", pics: "DRLK.C.C03.Tx",
+				run: sends("UnlockWithTimeout", doorlock.CmdUnlockWithTimeout, doorlock.UnlockWithTimeoutRequest{Timeout: 60}, -1),
+			},
+			{
+				n: "4", line: 100, title: "DUT sends SetWeekDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C0b.Tx",
+				run: sends("SetWeekDaySchedule", doorlock.CmdSetWeekDaySchedule, doorlock.SetWeekDayScheduleRequest{
+					WeekDayIndex: scheduleIndex, UserIndex: userIndex, DaysMask: doorlock.DaysMaskMonday,
+					StartHour: 15, StartMinute: 45, EndHour: 16, EndMinute: 55,
+				}, -1),
+			},
+			{
+				n: "5", line: 114, title: "DUT sends GetWeekDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C0c.Tx",
+				run: sends("GetWeekDaySchedule", doorlock.CmdGetWeekDaySchedule,
+					doorlock.GetWeekDayScheduleRequest{WeekDayIndex: scheduleIndex, UserIndex: userIndex}, 2),
+			},
+			{
+				n: "6", line: 120, title: "DUT sends ClearWeekDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C0d.Tx",
+				run: sends("ClearWeekDaySchedule", doorlock.CmdClearWeekDaySchedule,
+					doorlock.ClearWeekDayScheduleRequest{WeekDayIndex: scheduleIndex, UserIndex: userIndex}, -1),
+			},
+			{
+				n: "7", line: 126, title: "DUT sends SetYearDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C0e.Tx",
+				run: sends("SetYearDaySchedule", doorlock.CmdSetYearDaySchedule, doorlock.SetYearDayScheduleRequest{
+					YearDayIndex: scheduleIndex, UserIndex: userIndex, LocalStartTime: localStartTime, LocalEndTime: localEndTime,
+				}, -1),
+			},
+			{
+				n: "8", line: 137, title: "DUT sends GetYearDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C0f.Tx",
+				run: sends("GetYearDaySchedule", doorlock.CmdGetYearDaySchedule,
+					doorlock.GetYearDayScheduleRequest{YearDayIndex: scheduleIndex, UserIndex: userIndex}, 2),
+			},
+			{
+				n: "9", line: 143, title: "DUT sends ClearYearDaySchedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C10.Tx",
+				run: sends("ClearYearDaySchedule", doorlock.CmdClearYearDaySchedule,
+					doorlock.ClearYearDayScheduleRequest{YearDayIndex: scheduleIndex, UserIndex: userIndex}, -1),
+			},
+			{
+				n: "10", line: 149, title: "DUT sends Set Holiday Day Schedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C11.Tx",
+				run: sends("SetHolidaySchedule", doorlock.CmdSetHolidaySchedule, doorlock.SetHolidayScheduleRequest{
+					HolidayIndex: scheduleIndex, LocalStartTime: localStartTime, LocalEndTime: localEndTime,
+					OperatingMode: doorlock.OperatingModeNormal,
+				}, -1),
+			},
+			{
+				n: "11", line: 160, title: "DUT sends Get Holiday Day Schedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C12.Tx",
+				run: sends("GetHolidaySchedule", doorlock.CmdGetHolidaySchedule, doorlock.GetHolidayScheduleRequest{HolidayIndex: scheduleIndex}, 1),
+			},
+			{
+				n: "12", line: 166, title: "DUT sends Clear Holiday Day Schedule command to TH", pics: "DRLK.C.F04 & DRLK.C.C13.Tx",
+				run: sends("ClearHolidaySchedule", doorlock.CmdClearHolidaySchedule, doorlock.ClearHolidayScheduleRequest{HolidayIndex: scheduleIndex}, -1),
+			},
+			{
+				n: "13", line: 172, title: "DUT sends SetUser command to TH", pics: "DRLK.C.F08 & DRLK.C.C1a.Tx",
+				run: sends("SetUser", doorlock.CmdSetUser, addUser(secondUserIndex), -1),
+			},
+			{
+				n: "14", line: 176, title: "DUT sends GetUser to TH", pics: "DRLK.C.F08 & DRLK.C.C1b.Tx",
+				run: sends("GetUser", doorlock.CmdGetUser, doorlock.GetUserRequest{UserIndex: secondUserIndex}, -1),
+			},
+			{
+				n: "15", line: 180, title: "DUT sends ClearUser command to TH", pics: "DRLK.C.F08 & DRLK.C.C1d.Tx",
+				run: sends("ClearUser", doorlock.CmdClearUser, doorlock.ClearUserRequest{UserIndex: secondUserIndex}, -1),
+			},
+			{
+				// A credential added to an existing user carries a null
+				// UserStatus and UserType (:187).
+				n: "16", line: 184, title: "DUT sends SetCredential command to TH", pics: "DRLK.C.F08 & DRLK.C.C22.Tx",
+				run: sends("SetCredential", doorlock.CmdSetCredential, doorlock.SetCredentialRequest{
+					OperationType: doorlock.DataOperationTypeAdd, Credential: pinCredential, CredentialData: pin,
+					UserIndex: spec.ValueOf(uint16(userIndex)), UserStatus: spec.NullOf[doorlock.UserStatusEnum](), UserType: spec.NullOf[doorlock.UserTypeEnum](),
+				}, 0),
+			},
+			{
+				n: "17", line: 198, title: "DUT sends GetCredentialStatus to TH", pics: "DRLK.C.F08 & DRLK.C.C24.Tx",
+				run: sends("GetCredentialStatus", doorlock.CmdGetCredentialStatus, doorlock.GetCredentialStatusRequest{Credential: pinCredential}, -1),
+			},
+			{
+				n: "18", line: 204, title: "DUT sends ClearCredential command to TH", pics: "DRLK.C.F08 & DRLK.C.C26.Tx",
+				run: sends("ClearCredential", doorlock.CmdClearCredential, doorlock.ClearCredentialRequest{Credential: spec.ValueOf(pinCredential)}, -1),
 			},
 		},
 	}
