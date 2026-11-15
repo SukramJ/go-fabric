@@ -158,6 +158,20 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `client/exchange.BDXExchange`; `client/handshake.StoreResumption` (the store's one resumption record per peer for the CASE client); `client/interaction.ServerConfig.Dispatch` and `.RequestContext` (review II, F-db021da0-19).
 - `cluster/core`: `WithInvokeSession` / `InvokeSessionFromContext` (an opaque session identity beside the bridge's id), `OTAProviderConfig.SessionActivity` (review II, F-db021da0-27); `cluster/camera.ErrNoLargeMessageTransport`.
 - `docs`: ADR 0032, the device side's peer path; ADR 0019 superseded in part (review II, owner decision 115).
+- `node.Commissioning.WindowOnDemand`: the node opens no commissioning window by itself; the host opens it (decision 96). (review II).
+- `node.Commissioning.Flow` (`node.CommissioningFlow`: `FlowStandard`, `FlowUserIntent`, `FlowCustom`), `node.SetupPayload.Flow`: the flow in the QR code and the long manual code. (review II).
+- `mdns.PairingHints` (bits 0-22, `mdns.PairingHint…`, `mdns.PairingHintsDefault`), `mdns.CommissionableServiceConfig.Hints`, `bridge.CommissioningAdvertisement.Hints`; `node.Commissioning.PairingHints`, `node.Commissioning.PairingInstruction`. A commissioner built on connectedhomeip reads a hint with any of bits 16-22 set as no hint. (review II).
+- `node.Limits.SupportedFabrics`, `node.Limits.MaxPathsPerInvoke`. (review II).
+- `node.ErrScrubIncomplete`, `node.ErrFabricNotFound`, `node.ErrOTAImageTooLarge`, `node.DCLDefaultMaxImageSize`. (review II).
+- `node.Store.Sealer`: the node opens its credential store with `store.NewSealed`. (review II).
+- `bridgetest.SubscriptionPersistence`. (review II).
+- `endpoint/endpointtest.AssertClusterServerContract`. (review II).
+- `contract.AccessingFabric`, `contract.WithAccessingFabric`; `contract.SwitchGestureSource`, `contract.SwitchPositionSource`; `contract.PrivilegeView/Operate/Manage/Administer`; `contract.StatusFailure`, `StatusInvalidCommand`, `StatusConstraintError`, `StatusUnsupportedWrite`, `StatusResourceExhausted`, `StatusNotFound`, `StatusBusy`, `StatusInvalidInState`. (review II).
+- `contract.GATTPeripheral`, `contract.GATTService`, `node.Network.GATT`, `bridge.Config.GATT`: the GATT service is registered before the node advertises; a refusal is `StartBLE`'s error (decision 114). (review II).
+- `contract.WiFiLinkWatcher`, `contract.WiFiLinkChange`, `contract.WiFiDisconnector`. (review II).
+- `cluster/core.FailSafeExpiry`, `GeneralCommissioning.SetOnFailSafeExpiry`, `GeneralCommissioning.SetFailSafeSessionCloser`, `GeneralCommissioning.ArmOnPaseSession`. (review II).
+- `device.Spec.Parts`; `device.InitialRequirement`, `(*device.Type).RequiredInitial`. (review II).
+- `thermo.ThermostatServer.SetMeasuredTemperature`, `ThermostatServer.MatterDropFabric`, `MatterHeldFabrics`. (review II).
 
 ### Changed
 
@@ -336,6 +350,23 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `cluster/core`: AddNOC consumes the CSR only on the session that issued it, whichever stack holds it; UpdateNOC binds no session, as matter.js (review II).
 - `node`: UpdateNOC and RemoveFabric invoked on a client-stack session are answered before that session closes; on fabric removal and UpdateNOC the client stacks are swept after the identity changed, and UpdateNOC ends a client-stack handshake in flight (review II).
 - `controller`: a controller that takes over its former own node's fabric row drops that node's resumption records, before its socket opens (review II).
+- **Breaking** — `device.New` refuses a device whose kit server lists an attribute matter.js requires a value of at initialisation (decision 17): built bare AirPurifier, AirQualitySensor, BasicVideoPlayer, Camera, CastingVideoPlayer, Chime, ContentApp, Dishwasher, EnergyEvse, ExtractorHood, Fan, Intercom, JointFabricAdministrator, LaundryDryer, LaundryWasher, ModeSelect, NetworkInfrastructureManager, RoboticVacuumCleaner, SoilSensor, ThreadBorderRouter, WaterHeater; FloodlightCamera and VideoDoorbell through their Camera; with a feature selection AudioDoorbell, Closure, ClosurePanel, DeviceEnergyManagement, ElectricalMeter, ElectricalSensor, MicrowaveOven, Pump, SecondaryNetworkInterface, PowerSource (Rechargeable/Replaceable). The error names the `<cluster>def.Declare{Initial: …}` field; `(*device.Type).RequiredInitial()` lists them. (review II).
+- `mdns.CommissionableServiceConfig.Validate` (and `node.Config.Validate`) refuse `Hints` bits above 22. (review II).
+- `store.NewSealed` opens one sealed value the database holds before it seals anything: a sealer under another key fails it — and `node.New` with `Store.Sealer` — with `store.ErrUnseal`. (review II).
+- A Wi-Fi network list the store cannot read (a sealed value that does not open) is no longer read as "no networks": the node serves none and refuses to store a list over it. (review II).
+- `Node.OpenOwnWindow`, `OpenBasicWindow`, `CloseWindow` return `node.ErrNotStarted` before `Start`. (review II).
+- `node.Config.Validate` refuses `Advertiser` beside a `Network.MDNS` with `Off`, `HostName` or `Interfaces`, a deprecated limit that differs from its `Limits` field, `Network.GATT` beside `Network.BLE`, and an advertised device name over 32 bytes (decision 26). (review II).
+- `Node.Start` and `Node.FactoryReset` wait for a lifecycle call in progress only until their context ends; `Node.Run`'s Stop after a failed Start is bounded by 5 s. (review II).
+- A later `controller.Controller.Close` waits for the nodes a first Close left stopping; `camera.Service.Close` is bounded by its context. (review II).
+- `client.Node.SetDefaultSubscription`: a failed initial read of a newly commissioned node replaces nothing. (review II).
+- A host's `SetOnFabricRemoved`, `SetOnFabricUpdated`, `SetOnCommissioningComplete` and the window's `SetTransitionHook` add to the node facade's handler instead of replacing it. (review II).
+- The node's fail-safe rollback runs through `SetOnFailSafeExpiry`. (review II).
+- `bridge.Bridge.Start` installs the live PartsList of the root and the Aggregator itself; the two `Attach…PartsListProvider` stay as overrides. (review II).
+- A bridge run without the node drops a removed fabric's `contract.FabricScopedState` on the bridged endpoints (the node does it on every endpoint). (review II).
+- The device-type registry is unreachable: `<Name>Type()`, `device.Lookup`, `device.Types`, `Device.Type` return copies and `device.New` copies its `Type` — compare types by `ID`. (review II).
+- `device.FromSpec` refuses a composite whose mandatory components are not among `Spec.Parts`. (review II).
+- A self-held kit server that declines the selection leaves the declaration's Initial to the generated server. (review II).
+- The handshake adapters' reaper looks every 15 s (was 30 s). (review II).
 
 ### Deprecated
 
@@ -358,6 +389,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - ``<cluster>def.Server.Emit<Event>(endpoint, …)`` → `Record<Event>`.
 - `cluster/wire.ScenesManagement` → `cluster/core.ScenesManagement`; `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, `SchedulesClusterID`, `SchedulesClusterRevision`, `SchedulesAttrScheduleProgrammingHandle`, `SchedulesAttrNumberOfSchedules`, `SchedulesAttrNumberOfScheduleTransitions`, `SchedulesAttrNumberOfScheduleTransitionsPerDay`, `SchedulesAttrNextScheduleHandle`, `SchedulesAttrSchedules`, `SchedulesAttrFeatureMap`, `SchedulesAttrClusterRevision` → the Thermostat server's schedules.
 - `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` → a node uses its peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session (review II, owner decision 115).
+- `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint`; `node.Config.SupportedFabrics`, `node.Config.MaxPathsPerInvoke`; `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured`; `bridge.Bridge.AttachPaseHandler`, `AttachCaseHandler`, `SubscriptionPersistenceEnabled`, `FormerSubscriptionCount`, `ControllerRTT`; `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE`; `cluster/core.GeneralCommissioning.SetOnFailSafeExpired`, `SetOnFailSafeRolledBack`, `ArmOnPaseEstablished`; `device.NewRootNode`. Removable in the next minor release. (These names are what `TestDeprecatedIdentifiersAreAnnounced` needs.)
 
 ### Removed
 
