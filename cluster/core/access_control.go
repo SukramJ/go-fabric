@@ -121,14 +121,19 @@ const (
 
 // AccessControlAuxiliaryEntryStruct is one entry of the AuxiliaryAcl
 // attribute: an AccessControlEntryStruct with its AuxiliaryType (field 5).
-// Every field but FabricIndex is fabric-sensitive (access "S"), so an
-// unfiltered read carries another fabric's entry Redacted: FabricIndex
-// alone. Mirrors matter.js StructManager, whose mayRead withholds a
-// fabric-sensitive field from a session of another fabric.
+// The server returns every entry whole; the dispatcher withholds another
+// fabric's fabric-sensitive fields from a request.
 type AccessControlAuxiliaryEntryStruct struct {
 	Entry         AccessControlEntryStruct
 	AuxiliaryType uint8
-	Redacted      bool
+	// Redacted, when set, makes the bridge's writer send the entry as its
+	// FabricIndex alone.
+	//
+	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
+	// the model from the schema, whatever the server returns; no server of
+	// this module sets it any more. Return the entry whole. Removable in
+	// the next minor release.
+	Redacted bool
 }
 
 // AuxiliaryAccessUpdatedEvent is the payload of AuxiliaryAccessUpdated
@@ -146,9 +151,13 @@ type AuxiliaryAccessUpdatedEvent struct {
 type AccessControlExtensionEntry struct {
 	Data        []byte
 	FabricIndex uint8
-	// Redacted marks another fabric's entry on a non-fabric-filtered
-	// read: Data is fabric-sensitive ("S", access-control.element.ts
-	// AccessControlExtensionStruct) and is left out.
+	// Redacted, when set, makes the bridge's writer send the entry
+	// without Data.
+	//
+	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
+	// the model from the schema, whatever the server returns; no server of
+	// this module sets it any more. Return the entry whole. Removable in
+	// the next minor release.
 	Redacted bool
 }
 
@@ -271,10 +280,13 @@ type AccessControlEntryStruct struct {
 	// entry never has one.
 	AuxiliaryType *uint8
 	FabricIndex   uint8
-	// Redacted marks another fabric's entry on a non-fabric-filtered
-	// read: it goes out with its FabricIndex alone, every other field
-	// being fabric-sensitive (access-control.element.ts
-	// AccessControlEntryStruct, access "S").
+	// Redacted, when set, makes the bridge's writer send the entry as its
+	// FabricIndex alone.
+	//
+	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
+	// the model from the schema, whatever the server returns; no server of
+	// this module sets it any more. Return the entry whole. Removable in
+	// the next minor release.
 	Redacted bool
 }
 
@@ -515,18 +527,13 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // has no Administer privilege" to it, and it tears the fabric down via
 // RemoveFabric.
 //
-// A non-fabric-filtered read returns every fabric's entries, another
-// fabric's redacted to its FabricIndex (see unfilteredFabrics).
+// A non-fabric-filtered read returns every fabric's entries whole (see
+// unfilteredFabrics); the dispatcher withholds another fabric's
+// fabric-sensitive fields from the request, as it scopes every
+// fabric-scoped attribute of the model.
 //
 // A request from a session with no fabric yet — PASE before AddNOC,
-// FabricIndex 0 — owns no entry: its fabric-filtered read is empty and
-// its unfiltered read carries every fabric's entries redacted to their
-// FabricIndex. matter.js gives such a session nothing fabric-sensitive:
-// ListManager's FabricFilteredListProxyHandler shows a fabric-filtered
-// session only the entries of `session.fabric`, and AccessControl.ts
-// mayRead refuses every fabric-sensitive field to a session without
-// `session.fabric` (packages/node/src/behavior/state/managed/values/
-// ListManager.ts, packages/protocol/src/action/server/AccessControl.ts).
+// FabricIndex 0 — owns no entry: its fabric-filtered read is empty.
 // A read with no request behind it ([im.LookupFabricFilter] reports no
 // filter) is a local one: every fabric's entries, whole
 // (localListRead). The two are not allowed to stand for one another,
@@ -563,7 +570,7 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 			return nil, false
 		}
 	}
-	return a.listRead(ctx, attrID, fabrics, fabricIndex, false)
+	return a.listRead(ctx, attrID, fabrics)
 }
 
 // localListRead is the Acl or Extension read of a local actor — a read
@@ -581,24 +588,17 @@ func (a *AccessControl) localListRead(ctx context.Context, attrID uint32) (any, 
 	if err != nil {
 		return nil, false
 	}
-	return a.listRead(ctx, attrID, fabrics, 0, true)
+	return a.listRead(ctx, attrID, fabrics)
 }
 
-// listRead lists the Acl or Extension entries of fabrics in their order;
-// unless whole, an entry of a fabric other than accessing goes out
-// redacted to its FabricIndex.
-func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []uint8, accessing uint8, whole bool) (any, bool) {
+// listRead lists the Acl or Extension entries of fabrics in their order,
+// each whole.
+func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []uint8) (any, bool) {
 	if attrID == accessControlAttrExtension {
 		out := []AccessControlExtensionEntry{}
 		a.mu.RLock()
 		for _, fabric := range fabrics {
-			for _, e := range a.extensions[fabric] {
-				e.Redacted = !whole && fabric != accessing
-				if e.Redacted {
-					e.Data = nil
-				}
-				out = append(out, e)
-			}
+			out = append(out, a.extensions[fabric]...)
 		}
 		a.mu.RUnlock()
 		return out, true
@@ -610,10 +610,6 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 			return nil, false
 		}
 		for _, e := range entries {
-			if !whole && fabric != accessing {
-				out = append(out, AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true})
-				continue
-			}
 			out = append(out, aclEntryStruct(e))
 		}
 	}
@@ -625,11 +621,8 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 // accessing one included. Acl and Extension are fabric-scoped ("F") but
 // not fabric-sensitive lists, so matter.js ListManager createProxy filters
 // them only for `session.fabricFiltered` — an unfiltered read sees every
-// fabric's entries — while StructManager hides each entry's
-// fabric-sensitive fields ("S": Privilege, AuthMode, Subjects, Targets,
-// AuxiliaryType; Data) from a session whose fabric does not own the entry
-// (protocol/src/action/server/AccessControl.ts mayRead), and
-// InteractionMessenger encodes the entry without them. A store that
+// fabric's entries — whose fabric-sensitive fields ("S") the dispatcher
+// withholds from a session whose fabric does not own the entry. A store that
 // cannot enumerate fabrics leaves the accessing one, as before. A session
 // without a fabric (accessing 0) adds none of its own.
 func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) ([]uint8, error) {

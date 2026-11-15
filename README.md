@@ -208,6 +208,7 @@ becomes permissible in:
 | `store.Store.DeleteSetting` | `Store.DeleteSettings`, which every `store.Settings` backend implements | `v0.23.0` |
 | `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.23.0` |
 | `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.23.0` |
+| `cluster/core.AccessControlEntryStruct.Redacted`, `AccessControlAuxiliaryEntryStruct.Redacted`, `AccessControlExtensionEntry.Redacted`, `SceneInfoStruct.Redacted` | none: return the entry whole; the dispatcher scopes every fabric-scoped attribute of the model | `v0.23.0` |
 | `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.23.0` |
 | `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.23.0` |
 | `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.23.0` |

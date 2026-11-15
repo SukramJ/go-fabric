@@ -189,7 +189,7 @@ func checkGroupcastAttributeFixture(t *testing.T, f groupcastWireFixture) {
 		for _, e := range fx {
 			entry := mattercore.AccessControlAuxiliaryEntryStruct{Entry: mattercore.AccessControlEntryStruct{FabricIndex: e.FabricIndex}}
 			if e.AuxiliaryType == nil {
-				entry.Redacted = true
+				entry.Redacted = true //nolint:staticcheck // SA1019: the writer's deprecated Redacted branch, held until its removal
 			} else {
 				entry.AuxiliaryType = *e.AuxiliaryType
 				entry.Entry.Privilege, entry.Entry.AuthMode, entry.Entry.Subjects = e.Privilege, e.AuthMode, e.Subjects
@@ -214,7 +214,7 @@ func checkGroupcastAttributeFixture(t *testing.T, f groupcastWireFixture) {
 		}
 		v := make([]mattercore.AccessControlExtensionEntry, 0, len(fx))
 		for _, e := range fx {
-			entry := mattercore.AccessControlExtensionEntry{FabricIndex: e.FabricIndex, Redacted: e.Data == nil}
+			entry := mattercore.AccessControlExtensionEntry{FabricIndex: e.FabricIndex, Redacted: e.Data == nil} //nolint:staticcheck // SA1019: the writer's deprecated Redacted branch, held until its removal
 			if e.Data != nil {
 				entry.Data = hexBytes(t, *e.Data)
 			}
@@ -283,7 +283,7 @@ func checkACLAttributeFixture(t *testing.T, f groupcastWireFixture) {
 	v := make([]mattercore.AccessControlEntryStruct, 0, len(fx))
 	for _, e := range fx {
 		if e.Privilege == nil {
-			v = append(v, mattercore.AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true})
+			v = append(v, mattercore.AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true}) //nolint:staticcheck // SA1019: the writer's deprecated Redacted branch, held until its removal
 			continue
 		}
 		entry := mattercore.AccessControlEntryStruct{Privilege: *e.Privilege, AuthMode: e.AuthMode, FabricIndex: e.FabricIndex}

@@ -79,14 +79,14 @@ func TestReadServedFabricScopedListsWhole(t *testing.T) {
 		switch list := v.(type) {
 		case []core.AccessControlEntryStruct:
 			for _, e := range list {
-				if e.Redacted || e.Privilege != 5 || len(e.Subjects) == 0 {
+				if e.Redacted || e.Privilege != 5 || len(e.Subjects) == 0 { //nolint:staticcheck // SA1019: a local read never sets the deprecated field
 					t.Errorf("%s Acl: the entry of fabric %d is not whole: %+v", how, e.FabricIndex, e)
 				}
 				got = append(got, e.FabricIndex)
 			}
 		case []core.AccessControlExtensionEntry:
 			for _, e := range list {
-				if e.Redacted || len(e.Data) == 0 {
+				if e.Redacted || len(e.Data) == 0 { //nolint:staticcheck // SA1019: a local read never sets the deprecated field
 					t.Errorf("%s Extension: the entry of fabric %d is not whole: %+v", how, e.FabricIndex, e)
 				}
 				got = append(got, e.FabricIndex)

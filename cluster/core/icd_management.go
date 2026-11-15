@@ -913,20 +913,10 @@ func (s *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader]: a
 // fabric-filtered read lists the accessing fabric's registrations; an
-// unfiltered one lists every fabric's, and an entry of another fabric than
-// the accessing one — every entry, for a session without a fabric — is
-// served without its fabric-sensitive fields (Core §7.13.6): CheckInNodeId,
-// MonitoredSubject and ClientType are "S" and Key "F"
-// (packages/model/src/standard/elements/icd-management.element.ts:145-152),
-// and matter.js's entry holds no Key
-// (packages/node/src/behaviors/icd-management/IcdManagementServer.ts:572-577
-// registerClient), so the entry is its FabricIndex alone
-// ([redactedEntry]). Mirrors matter.js at db021da0: a fabric-sensitive
-// field of another owning fabric reads undefined
-// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
-// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
-// mayRead) and the encoder leaves it out
-// (packages/types/src/tlv/TlvObject.ts:128-134).
+// unfiltered one lists every fabric's, whole — the dispatcher withholds
+// another fabric's fabric-sensitive fields from the request, as it scopes
+// every fabric-scoped attribute of the model. An entry holds no Key
+// ([icdClient.wire]).
 func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	filtered, fabric, request := im.LookupFabricFilter(ctx)
 	if attrID != icddef.AttrRegisteredClients || !request {
@@ -935,17 +925,7 @@ func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	if filtered {
 		return s.read(attrID, func(c icdClient) bool { return c.fabricIndex == fabric })
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make(spec.List[spec.Encodable], 0, len(s.clients))
-	for _, c := range s.clients {
-		if c.fabricIndex != fabric {
-			out = append(out, redactedEntry{fabricIndex: c.fabricIndex})
-			continue
-		}
-		out = append(out, c.wire())
-	}
-	return out, true
+	return s.MatterRead(attrID) //nolint:contextcheck // MatterRead is the cluster-interface read without a request; it takes no ctx by contract
 }
 
 func (c icdClient) wire() icddef.MonitoringRegistrationStruct {

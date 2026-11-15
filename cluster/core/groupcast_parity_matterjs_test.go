@@ -752,13 +752,19 @@ func TestGroupcastAuxiliaryACLParityMatterJS(t *testing.T) {
 		}
 	}
 	// Another fabric's read: filtered sees nothing, unfiltered the
-	// entries redacted to FabricIndex.
+	// entries whole — on the wire as their FabricIndex alone, the
+	// dispatcher withholding every fabric-sensitive field.
 	if v, _ := f.acl.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0007); len(v.([]core.AccessControlAuxiliaryEntryStruct)) != 0 {
 		t.Error("fabric 2's filtered read sees fabric 1's entries")
 	}
 	v, _ = f.acl.MatterReadFiltered(im.WithFabricFilter(ctx, false, 2), 0x0007)
-	if r := v.([]core.AccessControlAuxiliaryEntryStruct); len(r) != 2 || !r[0].Redacted {
-		t.Errorf("fabric 2's unfiltered read = %+v, want redacted entries", r)
+	if r := v.([]core.AccessControlAuxiliaryEntryStruct); len(r) != 2 || r[0].Redacted {
+		t.Errorf("fabric 2's unfiltered read = %+v, want the entries whole", r)
+	}
+	for _, e := range wireEntries(t, readWire(im.WithFabricFilter(ctx, false, 2), t, f.acl, 0x0007)) {
+		if !slices.Equal(e.tags, []uint32{0xFE}) {
+			t.Errorf("fabric 2's unfiltered read on the wire: fabric %d's entry carries %v, want its FabricIndex alone", e.fabric, e.tags)
+		}
 	}
 	if v, _ := f.acl.MatterReadFiltered(im.WithFabricFilter(ctx, true, 0), 0x0007); len(v.([]core.AccessControlAuxiliaryEntryStruct)) != 0 {
 		t.Error("a read without a fabric sees entries")
@@ -803,8 +809,13 @@ func TestGroupcastMembershipReadsAndSurfaceParityMatterJS(t *testing.T) {
 		t.Errorf("filtered = %+v", got)
 	}
 	got := read(false, 1)
-	if len(got) != 2 || got[0].KeySetID == nil || got[1].KeySetID != nil || got[1].GroupID != 2 || !slices.Equal(got[1].Endpoints, []uint16{4}) {
-		t.Errorf("unfiltered = %+v, want fabric 2's KeySetId (access S) withheld", got)
+	if len(got) != 2 || got[0].KeySetID == nil || got[1].KeySetID == nil || got[1].GroupID != 2 || !slices.Equal(got[1].Endpoints, []uint16{4}) {
+		t.Errorf("unfiltered = %+v, want both entries whole", got)
+	}
+	// On the wire the dispatcher withholds fabric 2's KeySetId (2, access S).
+	wire := wireEntries(t, readWire(im.WithFabricFilter(ctx, false, 1), t, f.gc, 0x0000))
+	if len(wire) != 2 || !slices.Contains(wire[0].tags, 2) || slices.Contains(wire[1].tags, 2) || !slices.Contains(wire[1].tags, 1) {
+		t.Errorf("unfiltered on the wire = %+v, want fabric 2's KeySetId withheld", wire)
 	}
 
 	// The surface matter.js derives from groupcast.element.ts with

@@ -144,10 +144,11 @@ func TestMessagesPerFabric(t *testing.T) {
 	if l := v.(spec.List[messagesdef.MessageStruct]); len(l) != 1 || l[0].MessageText != "two" {
 		t.Errorf("fabric 2 filtered read %+v", l)
 	}
-	// An unfiltered read lists both, fabric 1's without its
-	// fabric-sensitive fields (TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields).
+	// An unfiltered read lists both, whole; the dispatcher withholds
+	// fabric 1's fabric-sensitive fields from the request
+	// (TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields).
 	v, _ = m.MatterReadFiltered(msgCtx(2, false), messagesdef.AttrMessages)
-	if l := v.(spec.List[spec.Encodable]); len(l) != 2 {
+	if l := v.(spec.List[messagesdef.MessageStruct]); len(l) != 2 {
 		t.Errorf("unfiltered read %+v", l)
 	}
 	local, _ := m.MatterRead(messagesdef.AttrMessages)

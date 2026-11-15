@@ -1144,8 +1144,13 @@ func TestAccessControl_MatterReadFiltered_ACL_FabricZero(t *testing.T) {
 	if entries := read(im.WithFabricFilter(context.Background(), true, 0)); len(entries) != 0 {
 		t.Errorf("fabric-less filtered request: len(entries)=%d, want 0", len(entries))
 	}
-	if entries := read(im.WithFabricFilter(context.Background(), false, 0)); len(entries) != 1 || !entries[0].Redacted || entries[0].Subjects != nil {
-		t.Errorf("fabric-less unfiltered request: %+v, want the entry redacted", entries)
+	// The server returns the entry whole; the dispatcher withholds its
+	// fabric-sensitive fields from the request.
+	if entries := read(im.WithFabricFilter(context.Background(), false, 0)); len(entries) != 1 || entries[0].Redacted || len(entries[0].Subjects) != 1 {
+		t.Errorf("fabric-less unfiltered request: %+v, want the entry whole", entries)
+	}
+	if got := wireEntries(t, readWire(im.WithFabricFilter(context.Background(), false, 0), t, ac, 0x0000)); len(got) != 1 || !slices.Equal(got[0].tags, []uint32{0xFE}) {
+		t.Errorf("fabric-less unfiltered request on the wire: %+v, want the entry as its FabricIndex alone", got)
 	}
 }
 

@@ -370,6 +370,18 @@ migrations applies step `v9`.
 | `<cluster>def.Declare{Features: 0}` to select no feature (it kept the device type's default) | `Declare{NoFeatures: true}`; beside a non-zero `Features` it is `device.ErrConfiguration` |
 | a host handler (`Handle`, typed `Handle<Command>`) on LevelControl after which the server ended the current scene | the handler is the whole command: the server ends no scene for it, runs no gate and no transition; a scene recall reaches the server's logic, never the handler |
 
+## Changed after v0.22.2: fabric-scoped reads
+
+The dispatcher scopes every fabric-scoped attribute of the model on a
+request, whatever the server returns ([ports](ports.md)).
+
+| Before | Now |
+| --- | --- |
+| a server that withheld another fabric's fabric-sensitive fields itself (a `Redacted` entry, a field left nil, an entry reduced to its `FabricIndex`) | returns every fabric's entries whole from `MatterRead` and `MatterReadFiltered`; the `Redacted` fields of `cluster/core` are deprecated and still honoured by the bridge's writer |
+| a server of a vendor cluster with a fabric-scoped list | declares the scope with `contract.FabricScopeDeclarer`; a server built on a `spec.Instance` declares its definition's |
+| an entry of a fabric-scoped list without a `FabricIndex` (or index 0) | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
+| fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the

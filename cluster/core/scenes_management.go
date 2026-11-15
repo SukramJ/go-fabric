@@ -102,10 +102,13 @@ type SceneInfoStruct struct {
 	SceneValid        bool
 	RemainingCapacity uint8
 	FabricIndex       uint8
-	// Redacted marks another fabric's entry on a non-fabric-filtered
-	// read: CurrentScene, CurrentGroup and SceneValid are fabric-sensitive
-	// ("S", scenes-management.element.ts SceneInfoStruct) and are left
-	// out; SceneCount, RemainingCapacity and FabricIndex are served.
+	// Redacted, when set, makes the bridge's writer send the entry
+	// without CurrentScene, CurrentGroup and SceneValid.
+	//
+	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
+	// the model from the schema, whatever the server returns; no server of
+	// this module sets it any more. Return the entry whole. Removable in
+	// the next minor release.
 	Redacted bool
 }
 
@@ -634,18 +637,10 @@ func (s *ScenesManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader]:
 // FabricSceneInfo is fabric-scoped ("R F V"). A fabric-filtered read lists
-// the accessing fabric's entry; an unfiltered one every fabric's, and an
-// entry of another fabric than the accessing one — every entry, for a
-// session without a fabric — is served Redacted, without CurrentScene,
-// CurrentGroup and SceneValid, the fields that are "S"
-// (packages/model/src/standard/elements/scenes-management.element.ts:179-186).
-// A read without a request sees every entry whole. Mirrors matter.js at
-// db021da0, where FabricSceneInfo is plain behaviour state: a
-// fabric-sensitive field of another owning fabric reads undefined
-// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
-// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
-// mayRead) and the encoder leaves it out
-// (packages/types/src/tlv/TlvObject.ts:128-134).
+// the accessing fabric's entry; an unfiltered one every fabric's, each
+// whole — the dispatcher withholds the fabric-sensitive fields of another
+// fabric's entry from a request, as it scopes every fabric-scoped
+// attribute of the model.
 func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	st := s.cfg.State
 	switch attrID {
@@ -657,7 +652,7 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		// A table not loaded yet is loaded for the read; one the store
 		// still refuses reads as empty, and stays unloaded.
 		st.ready(ctx)
-		filtered, fabric, request := im.LookupFabricFilter(ctx)
+		filtered, fabric, _ := im.LookupFabricFilter(ctx)
 		// Every fabric of the node has an entry, created on read
 		// (infoFor), also one that never stored a scene. matter.js holds
 		// one for each fabric known when the server initialises and adds
@@ -682,11 +677,7 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 			if filtered && f != fabric {
 				continue
 			}
-			info := *st.infoFor(f)
-			if request && (f != fabric || fabric == 0) {
-				info = SceneInfoStruct{SceneCount: info.SceneCount, RemainingCapacity: info.RemainingCapacity, FabricIndex: info.FabricIndex, Redacted: true}
-			}
-			out = append(out, info)
+			out = append(out, *st.infoFor(f))
 		}
 		return out, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
