@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8792,
+  "entry_points": 8793,
   "entry_packages": [
     ".",
     "bdx",
@@ -289,9 +289,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18547,
+    "total_exported": 18548,
     "reachable": 12492,
-    "whitelisted": 6055,
+    "whitelisted": 6056,
     "unreachable": 0
   },
   "by_package": [],
@@ -4986,6 +4986,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_pase_wrongpasscode_test.go",
       "line": 256
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPaseConfirmedPake3EndsTheTranscript",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_transcript_after_refusal_test.go",
+      "line": 91
     },
     {
       "package": "bridge",

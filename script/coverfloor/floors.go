@@ -102,8 +102,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller",
-		min: 84,
-		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. Measures 84.6 since 2026-11-12 (six concurrent local runs; CI cannot measure more, it never heard the LAN). The earlier spread of 3 (CI 79.8-81.9 against local 80.9-85.2) had one cause left at that date: TestOperationalPortParityMatterJS opened the real DNS-SD socket, and a Thread border router announcing itself on a developer's LAN reached the border-router arm of watchDiscovery, which CI never hears; the test now runs on an offline Names, and the six profiles differ in no block",
+		min: 87,
+		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. Measures 87.2-87.3 since review II phase 5a (the port-pair retry of R2-P5-tassert-02 and its tests); 84.6 since 2026-11-12 (six concurrent local runs; CI cannot measure more, it never heard the LAN). The earlier spread of 3 (CI 79.8-81.9 against local 80.9-85.2) had one cause left at that date: TestOperationalPortParityMatterJS opened the real DNS-SD socket, and a Thread border router announcing itself on a developer's LAN reached the border-router arm of watchDiscovery, which CI never hears; the test now runs on an offline Names, and the six profiles differ in no block",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
@@ -298,7 +298,7 @@ var floors = []packageFloor{
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
-	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 55},
+	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 58},
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/fabricscopecheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover: the guard is the test"},

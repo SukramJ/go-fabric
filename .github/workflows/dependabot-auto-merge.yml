@@ -22,8 +22,14 @@ name: Dependabot auto-merge
 # release tag needs a commit with a ci run whose required checks passed
 # (script/release-provenance.sh), so such a commit is not tagged as is.
 
+# pull_request_target on purpose: Dependabot's pull requests get no write
+# token under pull_request. The risk zizmor's dangerous-triggers names —
+# the pull request's code run with the base repository's token — does not
+# arise here: no job checks out or runs anything of the pull request, and
+# the merge step acts only on a pull request whose author is Dependabot
+# (owner decision 98 of review II).
 # yamllint disable-line rule:truthy
-on: pull_request_target
+on: pull_request_target # zizmor: ignore[dangerous-triggers]
 
 permissions: {}
 
