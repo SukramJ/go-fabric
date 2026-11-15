@@ -6,11 +6,15 @@ package controller_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/transport/tcp"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // TestControllerTCPListenerHoldsTheConfiguredInboundBound: a controller
@@ -62,4 +66,92 @@ func TestTCPMaxInboundConnectionsNegativeIsRefused(t *testing.T) {
 		}
 		t.Fatalf("New with a negative TCP.MaxInboundConnections returned %v, want ErrConfiguration", err)
 	}
+}
+
+// takenTCPPorts makes the TCP binds New attempts fail as a port taken
+// for TCP (EADDRINUSE) — the first taken of them, or every one with
+// taken < 0 — and records the addresses they asked for.
+type takenTCPPorts struct {
+	taken int
+	mu    sync.Mutex
+	asked []string
+}
+
+func (p *takenTCPPorts) listen(cfg tcp.Config) (*tcp.Listener, error) {
+	p.mu.Lock()
+	p.asked = append(p.asked, cfg.LocalAddr)
+	n := len(p.asked)
+	p.mu.Unlock()
+	if p.taken < 0 || n <= p.taken {
+		return nil, fmt.Errorf("tcp: listen %s: %w", cfg.LocalAddr, syscall.EADDRINUSE)
+	}
+	return tcp.Listen(cfg)
+}
+
+func (p *takenTCPPorts) attempts() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.asked...)
+}
+
+// TestControllerRetriesAnAutoAssignedPortTakenForTCP (review II,
+// R2-P5-tassert-02): with TCP incoming, an auto-assigned port that is
+// taken for TCP is given up and the UDP and TCP pair bound again, as
+// matter.js's ServerNetworkRuntime.ts:212-231 does (db021da0); a port
+// the host chose — here a socket it gave — is tried once, and an
+// auto-assigned one at most ten times. Not parallel: the TCP constructor
+// it replaces is the package's.
+func TestControllerRetriesAnAutoAssignedPortTakenForTCP(t *testing.T) {
+	t.Run("taken once", func(t *testing.T) {
+		ports := &takenTCPPorts{taken: 1}
+		defer controller.SetTCPListen(ports.listen)()
+		cfg := config(openDB(t))
+		cfg.TCP = controller.TCPConfig{Incoming: true}
+		c, err := controller.New(t.Context(), cfg)
+		if err != nil {
+			t.Fatalf("New with the first auto-assigned port taken for TCP: %v (TCP binds %q)", err, ports.attempts())
+		}
+		t.Cleanup(func() { _ = c.Close(context.Background()) })
+		if got := ports.attempts(); len(got) != 2 {
+			t.Fatalf("TCP binds %q, want two: the taken port and the next pair's", got)
+		}
+		if c.TCPAddr().Port != c.Addr().Port {
+			t.Fatalf("TCP on %v beside UDP on %v, want one port", c.TCPAddr(), c.Addr())
+		}
+	})
+	t.Run("always taken", func(t *testing.T) {
+		ports := &takenTCPPorts{taken: -1}
+		defer controller.SetTCPListen(ports.listen)()
+		cfg := config(openDB(t))
+		cfg.TCP = controller.TCPConfig{Incoming: true}
+		if c, err := controller.New(t.Context(), cfg); !errors.Is(err, syscall.EADDRINUSE) {
+			if err == nil {
+				_ = c.Close(t.Context())
+			}
+			t.Fatalf("New with every auto-assigned port taken for TCP: %v, want EADDRINUSE", err)
+		}
+		if got := ports.attempts(); len(got) != 10 {
+			t.Fatalf("%d TCP binds, want 10 (MAX_PORT_ASSIGNMENT_RETRIES): %q", len(got), got)
+		}
+	})
+	t.Run("given socket", func(t *testing.T) {
+		ports := &takenTCPPorts{taken: -1}
+		defer controller.SetTCPListen(ports.listen)()
+		l, err := udp.New(udp.Config{LocalAddr: "127.0.0.1:0"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg := config(openDB(t))
+		cfg.Listener = l
+		cfg.TCP = controller.TCPConfig{Incoming: true}
+		if c, err := controller.New(t.Context(), cfg); !errors.Is(err, syscall.EADDRINUSE) {
+			if err == nil {
+				_ = c.Close(t.Context())
+			}
+			t.Fatalf("New on a given socket whose port is taken for TCP: %v, want EADDRINUSE", err)
+		}
+		if got := ports.attempts(); len(got) != 1 {
+			t.Fatalf("TCP binds %q on a given socket, want one", got)
+		}
+	})
 }

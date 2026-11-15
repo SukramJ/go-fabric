@@ -63,6 +63,7 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -566,19 +567,29 @@ func (c *Controller) openTransports(ctx context.Context, cfg Config, listen stri
 	if err := cfg.Sessions.validate(); err != nil {
 		return nil, err
 	}
-	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, exchange.Config{
+	l := cfg.Listener
+	var tl *tcp.Listener
+	if cfg.TCP.Incoming {
+		// The pair is bound before the exchanges take the UDP socket, so
+		// a port taken for TCP is retried with a fresh UDP socket.
+		if l, tl, err = c.bindTransports(listen, l); err != nil {
+			return nil, err
+		}
+	}
+	if err := c.openNetwork(ctx, listen, l, openNames, exchange.Config{
 		Logger: log, Clock: clk, LocalAdditionalMrpDelay: own.AdditionalMrpDelay, LocalParameters: localParameters(cfg.TCP, cfg.Sessions),
 		Retransmitted: c.retransmitted,
 	}); err != nil {
+		if tl != nil {
+			_ = tl.Close()
+		}
 		return nil, err
 	}
 	if !cfg.BorderRouters.Disabled {
 		c.brs = brdiscovery.New(c.names, brdiscovery.Config{Clock: clk, Logger: log})
 	}
-	if cfg.TCP.Incoming {
-		if err := c.listenTCP(ctx); err != nil {
-			return nil, err
-		}
+	if tl != nil {
+		c.serveTCP(ctx, tl)
 	}
 	if cfg.Advertise != nil {
 		if err := c.advertise(ctx, *cfg.Advertise, cfg.Advertiser, c.fabric.RootVendorID); err != nil {
