@@ -430,17 +430,29 @@ jobs:
       - name: pull the pinned CHIP image
         if: matrix.group == 'gocert-rest'
         run: make chiptool-image
-      # The leg skips itself without multicast; in CI that would be a
-      # silent green, so the run is checked for it. An entry of
-      # GOFABRIC_GOCERT that names no registered case fails the test.
+      # A skip is a case not run, and in CI it would be a silent green, so
+      # the run is checked for every one: the leg's own (no multicast for
+      # discovery) and a case's (TC-BIND-2.3 and TC-SC-5.3 send group
+      # messages and skip on a host whose LAN interfaces have no IPv6 —
+      # lanIPv6, the criterion the suite's group leg above fails on on the
+      # same runner image; no case skips legitimately here). The leg must
+      # also report its own PASS line: a -run that matches nothing passes
+      # with no test run. An entry of GOFABRIC_GOCERT that names no
+      # registered case fails the test. TestWorkflowGoCertStepVerdict runs
+      # this script against sample logs.
       - name: Go-TH cases
         env:
           GOFABRIC_GOCERT: ${{ matrix.families }}
         run: |
           set -o pipefail
           make chiptool-gocert CHIPTOOL_TIMEOUT=40m 2>&1 | tee /tmp/gocert.log
-          if grep -q -- "--- SKIP: TestGoCertificationCases " /tmp/gocert.log; then
-            echo "::error::the Go-TH certification leg skipped itself; the runner has no multicast"
+          if grep -q -- "--- SKIP: TestGoCertificationCases" /tmp/gocert.log; then
+            grep -- "--- SKIP: TestGoCertificationCases" /tmp/gocert.log
+            echo "::error::the Go-TH certification leg skipped itself or a case (above); the runner has no IPv6 multicast"
+            exit 1
+          fi
+          if ! grep -q -E -- "^--- PASS: TestGoCertificationCases \(" /tmp/gocert.log; then
+            echo "::error::the Go-TH certification leg reported no PASS line; no case ran"
             exit 1
           fi
       - name: upload logs
