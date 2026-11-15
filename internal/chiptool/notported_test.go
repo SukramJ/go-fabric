@@ -39,7 +39,7 @@ var runPendingEvidence = map[string]pendingRun{}
 // and whose certification run is pending: what is the step, the answer it
 // expects and how the module now gives it; id names the case's
 // runPendingEvidence, which the row names in turn.
-func runPending(id, what string) gap {
+func runPending(id, what string) gap { //nolint:unused // the row of the next run-pending case; none is pending now
 	ev := runPendingEvidence[id]
 	return gap{class: classNotPortedYet, reason: "run pending: " + what + ". `" + ev.test + "` (" + ev.dir +
 		") holds that answer by unit test; the family run runs the case, and no run has measured it with the fix yet"}

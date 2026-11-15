@@ -35384,7 +35384,7 @@
       "identifier": "TestNotPortedYetRowsAreHeld",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/notported_test.go",
-      "line": 190
+      "line": 188
     },
     {
       "package": "internal/chiptool",
