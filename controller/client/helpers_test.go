@@ -88,6 +88,17 @@ type msg struct {
 // gate 1).
 const scriptedHangBound = time.Minute
 
+// waitSignal waits for one signal on ch, failing with what after
+// scriptedHangBound: the wait names a hang, not a timing.
+func waitSignal(t *testing.T, ch <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(scriptedHangBound):
+		t.Fatal(what)
+	}
+}
+
 // next returns the next message the manager sent, skipping standalone
 // acknowledgements.
 func (s *scripted) next(t *testing.T) msg {

@@ -7,7 +7,6 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -58,11 +57,7 @@ func TestBlockingHookDoesNotDelayStatusResponse(t *testing.T) {
 	// The first alive starts the label reconciliation before the host's
 	// hook runs (Registry.hooksFor): received, it is the start the
 	// registry's work is waited for after (see client.WaitRegistry).
-	select {
-	case <-alive:
-	case <-time.After(scriptedHangBound):
-		t.Fatal("no SubscriptionAlive after the subscribe")
-	}
+	waitSignal(t, alive, "no SubscriptionAlive after the subscribe")
 	client.WaitRegistry(sr.reg)
 	armed.Store(true)
 
@@ -81,11 +76,7 @@ func TestBlockingHookDoesNotDelayStatusResponse(t *testing.T) {
 	if status.proto.Opcode != im.OpcodeStatusResponse || status.proto.ExchangeID != 0x7101 {
 		t.Fatalf("message 0x%02X on exchange 0x%04X, want the report's StatusResponse", status.proto.Opcode, status.proto.ExchangeID)
 	}
-	select {
-	case <-entered:
-	case <-time.After(scriptedHangBound):
-		t.Fatal("the Changed hook did not run")
-	}
+	waitSignal(t, entered, "the Changed hook did not run")
 	close(release)
 	if err := n.Stop(context.Background()); err != nil {
 		t.Fatal(err)
