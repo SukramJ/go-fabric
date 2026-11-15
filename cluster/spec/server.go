@@ -698,25 +698,38 @@ func underlying(v any) any {
 func stored(t Type, v any) any {
 	// The width check ran before (checkUnsigned / checkSigned), but the
 	// bound is stated here again so the narrowing is correct on its own: a
-	// value outside the width is returned unchanged, never truncated.
+	// value outside the width is returned unchanged, never truncated. Each
+	// bound stands directly around its conversion.
 	switch x := v.(type) {
 	case uint64:
 		switch {
-		case t.Bits > 0 && t.Bits <= 8 && x <= math.MaxUint8:
-			return uint8(x)
-		case t.Bits > 8 && t.Bits <= 16 && x <= math.MaxUint16:
-			return uint16(x)
-		case t.Bits > 16 && t.Bits <= 32 && x <= math.MaxUint32:
-			return uint32(x)
+		case t.Bits > 0 && t.Bits <= 8:
+			if x <= math.MaxUint8 {
+				return uint8(x)
+			}
+		case t.Bits > 8 && t.Bits <= 16:
+			if x <= math.MaxUint16 {
+				return uint16(x)
+			}
+		case t.Bits > 16 && t.Bits <= 32:
+			if x <= math.MaxUint32 {
+				return uint32(x)
+			}
 		}
 	case int64:
 		switch {
-		case t.Bits > 0 && t.Bits <= 8 && x >= math.MinInt8 && x <= math.MaxInt8:
-			return int8(x)
-		case t.Bits > 8 && t.Bits <= 16 && x >= math.MinInt16 && x <= math.MaxInt16:
-			return int16(x)
-		case t.Bits > 16 && t.Bits <= 32 && x >= math.MinInt32 && x <= math.MaxInt32:
-			return int32(x)
+		case t.Bits > 0 && t.Bits <= 8:
+			if x >= math.MinInt8 && x <= math.MaxInt8 {
+				return int8(x)
+			}
+		case t.Bits > 8 && t.Bits <= 16:
+			if x >= math.MinInt16 && x <= math.MaxInt16 {
+				return int16(x)
+			}
+		case t.Bits > 16 && t.Bits <= 32:
+			if x >= math.MinInt32 && x <= math.MaxInt32 {
+				return int32(x)
+			}
 		}
 	case float64:
 		if t.Kind == KindFloat32 {

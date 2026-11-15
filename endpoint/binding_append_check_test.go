@@ -37,7 +37,8 @@ func TestBindingEntryAppendedOverTheWireIsApplied(t *testing.T) {
 	// with the empty list, then the ADDs.
 	write := func(what string, entries ...mattercore.TargetStruct) []im.StatusCode {
 		t.Helper()
-		writes := []im.AttributeWrite{writeOf(list, []mattercore.TargetStruct{})}
+		writes := make([]im.AttributeWrite, 0, 1+len(entries))
+		writes = append(writes, writeOf(list, []mattercore.TargetStruct{}))
 		for _, e := range entries {
 			writes = append(writes, writeOf(item, []mattercore.TargetStruct{e}))
 		}
