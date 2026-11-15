@@ -119,7 +119,9 @@ NodeLabel, on every `Reassemble` — as
 the existing layer stays for it beside the device kit
 ([ADR 0018](../adr/0018-device-layer-and-node-facade.md)). It hands the
 facade's group state (`Node.Groups`) and endpoint persistence
-(`Node.Persistence`, or `node.NewEndpointPersistence`) to that assembler.
+(`node.NewEndpointState`, the facade's own over the node's store, or the
+host's own `node.EndpointState` in `Config.EndpointState`) to that
+assembler as `endpoint.Config.Persistence`.
 A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
@@ -129,7 +131,7 @@ the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 
-*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
+*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointState`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointState`).*
 
 ## `store`
 

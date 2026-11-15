@@ -278,6 +278,24 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.22.2: the store port and the endpoint state
+
+The persistence port grows by six methods (review II, decision 107), which
+a host's own backend adds; `store.Store` and `store/memstore` implement
+them and `store/storetest` holds each. A host that only uses those two
+changes nothing in its code; one that carries the schema in its own
+migrations applies step `v9`.
+
+| Before | Now |
+| --- | --- |
+| a host's own `store.Port` implementation | adds `Settings.DeleteSettings(ctx, keys...)` and `Settings.DeleteSettingsWithPrefix(ctx, prefix)` (atomic; a prefix ends in `.`), `GroupKeys.ReplaceGroupKeyMappings(ctx, fabricIndex, mappings)` (atomic, as `ReplaceACL`), `Fabrics.UpdateFabricVendorVerification(ctx, fabricIndex, store.FabricVendorUpdate)` (the vendor id and the VID data in one write), `Fabrics.OwedFabricEvents(ctx)` and `Fabrics.AckOwedFabricEvent(ctx, id)`; its `RollbackFabric` records the owed event (`store.OwedFabricEvent`) and, for a pending update, deletes the fabric's resumption records in the same write; `ResumptionRecord.SessionParameters` round-trips |
+| a host's own `cluster/core.StoreFacade` / `GroupStoreFacade` | adds `UpdateFabricVendorVerification`, `OwedFabricEvents`, `AckOwedFabricEvent` / `ReplaceGroupKeyMappings` |
+| a host that carries the schema in its own migrations | applies `store/migrations/v9.up.sql` (`matter_owed_fabric_events`, the resumption record's session-parameter columns) |
+| `(*store.Store).DeleteSetting(ctx, key)` | `DeleteSettings(ctx, key)` |
+| `OnFabricRemoved` / `OnFabricUpdated` heard once per rollback | heard at least once: a rollback's hook a crash interrupted runs again at the next `Start`, so a host may hear it twice |
+| `endpoint.Config{OnNodeLabelWritten: f, Scenes: s}` | `endpoint.Config{Persistence: p}` with an `endpoint.Persistence` (`SaveNodeLabel`, `LoadScenes`, `SaveScenes`, each with ctx and error): a refused save answers the controller FAILURE |
+| `node.Config.EndpointPersistence`, `node.NewEndpointPersistence(st, logger)` | `node.Config.EndpointState`, `node.NewEndpointState(st, logger)`; a host's own state implements `node.EndpointState` (`endpoint.Persistence` and `LoadNodeLabel`) |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the

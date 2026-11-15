@@ -19,14 +19,14 @@ module's consumers call:
 
 | Area | Holds | Consumers |
 | --- | --- | --- |
-| `store.Fabrics` | the fabric table; `AddFabric` allocates the index | OperationalCredentials, the node's CASE identities and commissioning window, the group manager |
+| `store.Fabrics` | the fabric table; `AddFabric` allocates the index; the hooks a rollback owes (`OwedFabricEvents`, `AckOwedFabricEvent`) | OperationalCredentials, the node's CASE identities, commissioning window and start, the group manager |
 | `store.Identity` | per fabric: NOC, ICAC, operational key, IPK | OperationalCredentials, the node's CASE identities |
 | `store.ACL` | the AccessControl list per fabric | AccessControl, the bridge's access checks |
-| `store.GroupKeys` | key sets and the GroupKeyMap | GroupKeyManagement, OperationalCredentials (the IPK set), the group manager |
+| `store.GroupKeys` | key sets and the GroupKeyMap; `ReplaceGroupKeyMappings` swaps a fabric's whole map at once | GroupKeyManagement, OperationalCredentials (the IPK set), the group manager |
 | `store.Groups` | the group table and the Groupcast groups (`groups.Store` embeds it) | the group manager |
-| `store.Resumption` | CASE resumption records | the operational session manager, the node's CASE initiator |
+| `store.Resumption` | CASE resumption records, one per (fabric, peer) for both roles; a record carries the peer's session parameters (zero is absent) | the operational session manager, the node's CASE initiator |
 | `store.ServerSubscriptions` | the subscriptions of active CASE sessions | the bridge's subscription persistence |
-| `store.Settings` | string settings and counters; `SetSettings` writes several keys at once, all or none | the facade, AccessControl's Extension, VID verification, the group counter, the event-number ceiling |
+| `store.Settings` | string settings and counters; `SetSettings` writes several keys at once and `DeleteSettings` deletes several, all or none; `DeleteSettingsWithPrefix` deletes every key under a root ending in `.` | the facade, AccessControl's Extension, the terms acceptance, the group counter, the event-number ceiling |
 | `store.OTA` | the OTA requestor's DefaultOTAProviders and state | the OTA requestor |
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
@@ -60,12 +60,21 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   `ReplaceDefaultOTAProviders`, `SaveDoorLockAuth`, `RemoveGroupKeySet`,
   `RemoveFabric`, …) applies whole or not at all, and a refused write
   changes nothing. The port has no transaction across methods; a change
-  that spans several settings keys is one `SetSettings` call, which writes
-  every key or none (the SQLite store in one transaction).
+  that spans several settings keys is one `SetSettings` or `DeleteSettings`
+  call, which writes every key or none (the SQLite store in one
+  transaction), a GroupKeyMap write is one `ReplaceGroupKeyMappings`, and
+  a SetVIDVerificationStatement one `UpdateFabricVendorVerification` (the
+  vendor id and the VID data together). `DeleteSettingsWithPrefix` refuses
+  a prefix that does not end in `.`, so `scenes.ab.` never takes
+  `scenes.abc.…`.
+- **A closed backend.** After the backend is closed every method returns
+  a non-nil error and changes nothing; the node and the controller call
+  no method after their `Stop` or `Close` returned.
 - **The fabric cascade.** `RemoveFabric` removes everything the fabric
   owns: its identity, key sets, key map, group table, Groupcast groups,
   ACL, resumption records, default OTA providers and ICD registrations. Server
-  subscriptions, presets, lock records, settings and counters stay; the
+  subscriptions, presets, lock records, owed fabric events, settings and
+  counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
   fabric the store does not hold is refused. What a cluster server keeps
   for a fabric under its own settings key — the AccessControl Extension
@@ -87,7 +96,14 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   marks the row; a second update before the commit keeps the first prior.
   `CommitFabric` commits and erases the prior values;
   `RollbackFabric` deletes a pending add with everything it owns, or moves
-  a pending update's prior values back, and returns the state it found.
+  a pending update's prior values back and deletes the fabric's resumption
+  records, and returns the state it found. In the same write it records
+  the hook the rollback owes — the fabric's removal or its update — with
+  the fabric's identity as the row held it (`store.OwedFabricEvent`);
+  `OwedFabricEvents` lists them by ID and `AckOwedFabricEvent` removes one.
+  The node runs the owed hooks at its start and acknowledges each after
+  them, so a crash between a rollback and its hooks delivers them at the
+  next start: at least once.
   While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
   and `UpdateFabricVIDVerification` change the live values only. Each of
   these is one atomic write, and the state is on disk with the row, so a
@@ -229,9 +245,27 @@ facade's own state.
 | `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key` |
 
 `<key>` is the endpoint's stable key in `String()` form, the same identity
-endpoint numbers are kept under. A host that keeps scenes and labels
-itself sets `Config.EndpointPersistence`, and the `scenes.` and
+endpoint numbers are kept under. `Aggregator.Forget` deletes, in one
+`DeleteSettings` write, every key above kept under a forgotten key — the
+NodeLabel, the ConfigurationVersion, the scene table, the Binding list,
+the UserLabel list, the surface digest and the nonvolatile values — so a
+device added under the key afterwards starts from its declaration. A host
+that keeps scenes and labels itself sets `Config.EndpointState`
+(`node.NewEndpointState` is the facade's own), and the `scenes.` and
 `bridged_node_label.` keys are then not written.
+
+### Store errors
+
+A change a controller causes is stored with the change: the store write
+comes first, and a refused store answers FAILURE and applies nothing — an
+attribute write, a scene command's change of the table, a bridged
+endpoint's NodeLabel. A scene table the store could not read stays
+unloaded: every scene command answers FAILURE and nothing is stored over
+the stored table until a read succeeds. The consequences of a change — the
+OTA requestor's progress, the scenes a group's or a fabric's removal takes
+along — are applied whatever the store answers, logged when it refuses,
+and stored with the next change. The rule is stated once, in the package
+documentation of `store`.
 
 A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
