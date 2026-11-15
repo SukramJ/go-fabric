@@ -308,8 +308,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		wifiNC := r.WiFiNetworkCommissioning
 		// The network list is committed with the commissioning and reverted
 		// with the failsafe (NetworkCommissioningCluster.cpp:984-1014).
-		generalCom.SetOnFailSafeExpired(func(ctx context.Context, fi uint8) { //nolint:staticcheck // the node's rollback takes the hook's one fabric; its move to SetOnFailSafeExpiry is a follow-up
-			expired(ctx, fi)
+		generalCom.SetOnFailSafeExpiry(func(ctx context.Context, e mattercore.FailSafeExpiry) {
+			expired(ctx, expiredFabric(e))
 			wifiNC.OnFailSafeExpired()
 		})
 		facadeSlot(facadeseam.SetOnCommissioningComplete(generalCom, func(ctx context.Context, fi uint8) {
@@ -730,8 +730,19 @@ func wireFailSafeHooks(generalCom *mattercore.GeneralCommissioning, opCreds *mat
 			participants(ctx, fi)
 		}
 	}
-	generalCom.SetOnFailSafeExpired(expired) //nolint:staticcheck // as above
+	generalCom.SetOnFailSafeExpiry(func(ctx context.Context, e mattercore.FailSafeExpiry) { expired(ctx, expiredFabric(e)) })
 	return expired
+}
+
+// expiredFabric is the fabric the expired fail-safe was armed for at its
+// end — the one an AddNOC under it added, else the one whose session armed
+// it (0 for PASE): the fabric OperationalCredentials' rollback and the
+// participants take.
+func expiredFabric(e mattercore.FailSafeExpiry) uint8 {
+	if e.AddedFabric != 0 {
+		return e.AddedFabric
+	}
+	return e.ArmedFabric
 }
 
 // failSafeHooks names fail-safe hooks between GeneralCommissioning and
