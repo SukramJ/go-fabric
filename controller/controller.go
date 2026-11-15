@@ -669,11 +669,17 @@ func (c *Controller) keepStopping(reg *client.Registry) {
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is
 // idempotent: a second Close waits for the first to return, within ctx
-// (ctx's error when ctx ends first), and returns nil.
+// (ctx's error when ctx ends first). When the first returned an error
+// with nodes still stopping, a later Close waits for those stops within
+// its own ctx and returns their error — nil once every node stopped, the
+// way a node's Stop finishes its work on the next call; nil otherwise.
 func (c *Controller) Close(ctx context.Context) error {
 	done, first := c.beginClose()
 	if !first {
-		return awaitClose(ctx, done)
+		if err := awaitClose(ctx, done); err != nil {
+			return err
+		}
+		return c.awaitStopping(ctx)
 	}
 	defer close(done)
 	var errs []error
@@ -756,6 +762,22 @@ func (c *Controller) Close(ctx context.Context) error {
 	// ends first): the gauge reads none once the stack is down.
 	c.gauge(MetricSessionsOpen, 0)
 	return errors.Join(errs...)
+}
+
+// awaitStopping waits, within ctx, for the nodes a Close left stopping
+// (keepStopping) and forgets them once they stopped; nil without any.
+func (c *Controller) awaitStopping(ctx context.Context) error {
+	c.eraseMu.Lock()
+	defer c.eraseMu.Unlock()
+	reg := c.stopping
+	if reg == nil {
+		return nil
+	}
+	if err := reg.Close(ctx); err != nil {
+		return fmt.Errorf("controller: nodes still stopping: %w", err)
+	}
+	c.stopping = nil
+	return nil
 }
 
 // beginClose sets closed under the gate. first is true for the Close
