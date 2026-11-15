@@ -16,7 +16,8 @@ import (
 // endpoint is ErrNotMounted and emits nothing — never on endpoint 0; after
 // SetEndpoint it emits on that endpoint, and the generated typed
 // Record<Event> goes the same way; an event outside EventList stays
-// ErrNotEmitted (R2-P5-apispec-07).
+// ErrNotEmitted; after the emitter is withdrawn it is ErrNotMounted again
+// (R2-P5-apispec-07, coordinator round 2 Q5).
 func TestEmitEventNeedsTheEndpoint(t *testing.T) {
 	t.Parallel()
 	srv, err := spec.NewServer(bsdef.Definition, spec.Options{Features: uint32(bsdef.FeatureChangeEvent)}, spec.ServerConfig{})
@@ -49,5 +50,18 @@ func TestEmitEventNeedsTheEndpoint(t *testing.T) {
 	held := spec.NewSelfHeld(srv)
 	if err := held.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{}); err != nil || len(em.events) != 2 {
 		t.Errorf("SelfHeld.EmitEvent: %v, %d events", err, len(em.events))
+	}
+	// Withdrawn (the server left the topology): ErrNotMounted, nothing
+	// emitted; the deprecated Emit keeps dropping it.
+	srv.SetMatterEventEmitter(nil)
+	if err := srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{}); !errors.Is(err, spec.ErrNotMounted) {
+		t.Errorf("EmitEvent after the emitter was withdrawn: %v, want ErrNotMounted", err)
+	}
+	if err := srv.Emit(4, bsdef.EventStateChange, bsdef.StateChangeEvent{}); err != nil { //nolint:staticcheck // the deprecated Emit's behaviour
+		t.Errorf("Emit after the emitter was withdrawn: %v", err)
+	}
+	srv.SetMatterEventEmitter(em)
+	if err := srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{}); err != nil || len(em.events) != 3 {
+		t.Errorf("EmitEvent with the emitter back: %v, %d events", err, len(em.events))
 	}
 }

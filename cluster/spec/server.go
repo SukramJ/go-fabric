@@ -37,8 +37,9 @@ var (
 	// ErrMissingHandler: a command the conformance makes mandatory for
 	// the feature selection has no handler in [ServerConfig.Handlers].
 	ErrMissingHandler = errors.New("spec: mandatory command has no handler")
-	// ErrNotMounted: an event emitted before the server knows the
-	// endpoint it is mounted on ([Server.SetEndpoint], [Server.EmitEvent]).
+	// ErrNotMounted: an event emitted while the server is not in the
+	// topology — before it knows its endpoint or has an emitter, or after
+	// the bridge withdrew its emitter ([Server.EmitEvent]).
 	ErrNotMounted = errors.New("spec: the server does not know its endpoint yet")
 )
 
@@ -760,7 +761,8 @@ func (s *Server) dispatch(ctx context.Context, cmdID uint32, fields any) (any, e
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver]; nil withdraws
-// the emitter, and an event emitted after it is dropped.
+// the emitter: [Server.EmitEvent] answers ErrNotMounted after it, the
+// deprecated [Server.Emit] drops the event.
 func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
@@ -778,11 +780,12 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 
 // EmitEvent emits eventID with data on the endpoint the server is mounted
 // on, with the priority the definition gives it. An event outside
-// EventList is an error ([ErrNotEmitted]), and so is one before the
-// server knows its endpoint ([ErrNotMounted]) — it is never emitted on
-// endpoint 0 in its place. Without an emitter — before mounting, or after
-// the bridge withdrew it from a server that left the topology — the event
-// is dropped.
+// EventList is an error ([ErrNotEmitted]), and so is one while the server
+// is not in the topology ([ErrNotMounted]): before it knows its endpoint
+// ([Server.SetEndpoint]) — it is never emitted on endpoint 0 in its place
+// — and while it has no emitter: before mounting, or after the bridge
+// withdrew it from a server that left the topology
+// (SetMatterEventEmitter(nil)).
 func (s *Server) EmitEvent(eventID uint32, data any) error {
 	if !s.Emits(eventID) {
 		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, s.def.Name, eventID)
@@ -790,12 +793,10 @@ func (s *Server) EmitEvent(eventID uint32, data any) error {
 	s.mu.Lock()
 	emitter, endpoint, mounted := s.emitter, s.endpoint, s.mounted
 	s.mu.Unlock()
-	if !mounted {
+	if !mounted || emitter == nil {
 		return fmt.Errorf("%w: %s event 0x%02X", ErrNotMounted, s.def.Name, eventID)
 	}
-	if emitter != nil {
-		emitter.MatterEmitEvent(endpoint, s.def.ID, eventID, data, s.EventPriority(eventID))
-	}
+	emitter.MatterEmitEvent(endpoint, s.def.ID, eventID, data, s.EventPriority(eventID))
 	return nil
 }
 

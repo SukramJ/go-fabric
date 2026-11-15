@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,8 +16,8 @@ import (
 // TestRemovedServerEmitsIntoNoEventLog (R2-P5-apispec-07 = R2-P5-apidev-07):
 // a spec.Server mounted on endpoint 7 learns its endpoint and emits its
 // event there; after a reassembly that drops the endpoint the bridge has
-// withdrawn its emitter, so an event it emits afterwards leaves the event
-// log as it was. A reassembly that brings it back gives the emitter back.
+// withdrawn its emitter, so EmitEvent answers ErrNotMounted, the deprecated
+// Emit drops the event, and the event log stays as it was. A reassembly that brings it back gives the emitter back.
 func TestRemovedServerEmitsIntoNoEventLog(t *testing.T) {
 	t.Parallel()
 	srv, err := spec.NewServer(bsdef.Definition, spec.Options{Features: uint32(bsdef.FeatureChangeEvent)}, spec.ServerConfig{})
@@ -40,8 +41,11 @@ func TestRemovedServerEmitsIntoNoEventLog(t *testing.T) {
 	if err := b.Reassemble(ctx); err != nil {
 		t.Fatalf("the Reassemble removing the server: %v", err)
 	}
-	if err := srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: false}); err != nil {
-		t.Fatalf("EmitEvent on the removed server: %v", err)
+	if err := srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: false}); !errors.Is(err, spec.ErrNotMounted) {
+		t.Fatalf("EmitEvent on the removed server: %v, want ErrNotMounted", err)
+	}
+	if err := srv.Emit(7, bsdef.EventStateChange, bsdef.StateChangeEvent{}); err != nil { //nolint:staticcheck // the deprecated Emit keeps its behaviour: dropped, nil
+		t.Fatalf("Emit on the removed server: %v", err)
 	}
 	if n := logged(); n != 1 {
 		t.Fatalf("event log holds %d events after the removed server emitted, want 1", n)
