@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -85,12 +84,10 @@ func commissionableMode(adv *mdns.Noop) (mode uint64, ok bool) {
 // awaitCommissionable waits for a commissionable record with CM=1.
 func awaitCommissionable(t *testing.T, adv *mdns.Noop, when string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if mode, ok := commissionableMode(adv); ok && mode == 1 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	// The window opens and its record is published before Start or the
+	// pipe command returns; no wait is needed.
+	if mode, ok := commissionableMode(adv); ok && mode == 1 {
+		return
 	}
 	t.Fatalf("%s: no commissionable record with CM=1 (published: %+v)", when, adv.Active())
 }
