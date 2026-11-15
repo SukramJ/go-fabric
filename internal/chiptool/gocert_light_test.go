@@ -35,7 +35,7 @@ import (
 // log is not matched.
 
 func init() {
-	for _, c := range []func() goCertCase{caseCC34, caseCC45, caseCC54, caseCC64, caseCC75, caseCC94, caseI32} {
+	for _, c := range []func() goCertCase{caseCC34, caseCC45, caseCC54, caseCC64, caseCC75, caseCC94, caseI32, caseOO32} {
 		registerGoCert(c)
 	}
 }
@@ -419,6 +419,50 @@ func caseI32() goCertCase {
 				th.note("TriggerEffect Breathe/Default on endpoint %d: Success", th.ep)
 				return nil
 			}},
+		},
+	}
+}
+
+// caseOO32 mirrors TC-OO-3.2: the OnOff commands of a Lighting light.
+func caseOO32() goCertCase {
+	var n *client.Node
+	const (
+		onTime      = 50 // ON_TIME (TC-OO-3.2.test.ts:27)
+		offWaitTime = 30 // OFF_WAIT_TIME (:28)
+	)
+	send := func(name string, cmd uint32, fields spec.Encodable) func(th *goTH) error {
+		return func(th *goTH) error {
+			if _, err := th.invoke(n, cmdPath(th.ep, onoff.ClusterID, cmd), fields, false, client.InvokeOptions{}); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			th.note("%s %+v on endpoint %d: Success", name, fields, th.ep)
+			return nil
+		}
+	}
+	return goCertCase{
+		// An OnOff cluster with the Lighting feature, which the last three
+		// commands need (:16-17).
+		tc: "TC-OO-3.2", line: 60, pics: []string{"OO.C"}, at: "OO.S & OO.S.F00",
+		steps: []goStep{
+			{n: "0", line: 61, title: "the DUT commissions the TH", run: func(th *goTH) error {
+				var err error
+				if _, n, err = th.commission("dut"); err != nil {
+					return err
+				}
+				th.note("commissioned; the steps run on endpoint %d", th.ep)
+				return nil
+			}},
+			{n: "1", line: 64, title: "Off", pics: "OO.C.C00.Tx", run: send("Off", onoff.CmdOff, onoff.OffRequest{})},
+			{n: "2", line: 68, title: "On", pics: "OO.C.C01.Tx", run: send("On", onoff.CmdOn, onoff.OnRequest{})},
+			{n: "3", line: 72, title: "Toggle", pics: "OO.C.C02.Tx", run: send("Toggle", onoff.CmdToggle, onoff.ToggleRequest{})},
+			// EFFECT_IDENTIFIER_DYING_LIGHT, EFFECT_VARIANT (:23-24).
+			{n: "4", line: 76, title: "OffWithEffect DyingLight, variant 0", pics: "OO.C.C40.Tx", run: send("OffWithEffect", onoff.CmdOffWithEffect,
+				onoff.OffWithEffectRequest{EffectIdentifier: onoff.EffectIdentifierDyingLight, EffectVariant: 0})},
+			{n: "5", line: 104, title: "OnWithRecallGlobalScene", pics: "OO.C.C41.Tx", run: send("OnWithRecallGlobalScene", onoff.CmdOnWithRecallGlobalScene,
+				onoff.OnWithRecallGlobalSceneRequest{})},
+			// AcceptOnlyWhenOn set (:118, :123).
+			{n: "6", line: 114, title: "OnWithTimedOff", pics: "OO.C.C42.Tx", run: send("OnWithTimedOff", onoff.CmdOnWithTimedOff,
+				onoff.OnWithTimedOffRequest{OnOffControl: onoff.OnOffControlAcceptOnlyWhenOn, OnTime: onTime, OffWaitTime: offWaitTime})},
 		},
 	}
 }
