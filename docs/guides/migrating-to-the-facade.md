@@ -305,6 +305,21 @@ migrations applies step `v9`.
 | a lab whose ledger names hosts on the local network | sets `dcl.Client.AllowPrivateDestinations` on that ledger's client (the TestClient for the test net), or passes its own `HTTPClient` |
 | prod and test OTA images stored before the upgrade | not served until a ledger update that carries the checksum re-binds them (no new download), or until `softwareupdate.ImagesConfig.AllowUnverifiedLedgerImages` is set; storing them again with `Images.Store` makes them host-supplied. A test ledger whose records carry no checksum needs the option too |
 
+## Changed after v0.22.2: the generated server's write hooks and events
+
+| Before | Now |
+| --- | --- |
+| a server's own write rule in `spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule`: it runs on every write, before the comparison with the held value, and no `SetBeforeWrite` / `OnWrite` replaces it |
+| a host veto (`OnWrite`, `SetBeforeWrite`) that heard a write of the held value | not called for it: the veto runs behind the comparison, a write of the held value changes nothing |
+| `srv.Notify(ids…)`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` on a `*spec.Server` | `srv.Set(id, v)` for a value the server holds; `srv.MarkChanged(ids…)` for one the host's `Source` answers, `srv.MarkQuietChanged(id)` for a quieter one |
+| `srv.Emit(endpoint, eventID, data)`, `spec.EmitOn(srv, endpoint, …)` | `srv.EmitEvent(eventID, data)`; the bridge tells the server its endpoint (`contract.EndpointReceiver`), `spec.ErrNotMounted` before it does |
+| `<cluster>def.Server.Emit<Event>(endpoint, data)` | `Record<Event>(data)` |
+| a host's `endpointOf` lookup before every emit | none: an event of a server that left the topology reaches no event log (the bridge withdraws its emitter) |
+| `cluster/wire.ScenesManagement{}` | `core.NewScenesManagement(core.ScenesConfig{…})` |
+| `cluster/wire.NewSchedulesServer(src)` and its types | the Thermostat server's schedules ([thermostat](thermostat.md)) |
+| `<cluster>def.Declare{Features: 0}` to select no feature (it kept the device type's default) | `Declare{NoFeatures: true}`; beside a non-zero `Features` it is `device.ErrConfiguration` |
+| a host handler (`Handle`, typed `Handle<Command>`) on LevelControl after which the server ended the current scene | the handler is the whole command: the server ends no scene for it, runs no gate and no transition; a scene recall reaches the server's logic, never the handler |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the
