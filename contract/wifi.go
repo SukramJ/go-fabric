@@ -12,7 +12,7 @@ import "context"
 // harness pin). The network list, its rules and the failsafe revert stay
 // in the cluster (cluster/core.WiFiNetworkCommissioning).
 //
-// With [BLEPeripheral] it is one of the two radios a device-side host
+// With [GATTPeripheral] it is one of the two radios a device-side host
 // supplies: a node commissioned over BLE joins its Wi-Fi network through
 // it. It is set as node.Network.WiFi's Driver; the module
 // github.com/SukramJ/go-fabric/wifi/wpasupplicant implements it over
@@ -66,6 +66,58 @@ type WiFiInterfaceSwitcher interface {
 	// ScanNetworks or ConnectNetwork runs. The driver bounds its own wait;
 	// ctx may carry no deadline.
 	SetInterfaceEnabled(ctx context.Context, enabled bool) error
+}
+
+// WiFiLinkWatcher is an optional extension of a [WiFiDriver]: it pushes
+// every change of the radio's link — a link lost, and one the radio
+// regained by itself (its own rejoin after a loss of connectivity) — so
+// the cluster's Networks connected flags and its LastNetworkingStatus,
+// LastNetworkID and LastConnectErrorValue follow the radio between the
+// joins the cluster asks for. connectedhomeip's driver contract has the
+// same push: a NetworkStatusChangeCallback handed to the driver at Init,
+// whose OnNetworkingStatusChange reports "autonomous connection after
+// loss of connectivity" (src/include/platform/NetworkCommissioning.h:
+// 188-202, :207 at 6170af84). The cluster starts no rejoin of its own on a
+// reported loss: the driver's radio rejoins by itself. Without it the
+// cluster learns of the link only from the joins it asks for.
+type WiFiLinkWatcher interface {
+	// WatchLink calls report for every change of the link until ctx ends,
+	// then returns. report is called one change at a time, never
+	// concurrently, and returns at once.
+	WatchLink(ctx context.Context, report func(WiFiLinkChange))
+}
+
+// WiFiLinkChange is one change a [WiFiLinkWatcher] reports.
+type WiFiLinkChange struct {
+	// SSID is the network the change is about: the one the radio is on
+	// when Connected, the one it lost otherwise (nil when unknown).
+	SSID []byte
+	// Connected is whether the radio is on SSID now.
+	Connected bool
+	// Status is the NetworkCommissioningStatusEnum value the cluster
+	// serves as LastNetworkingStatus (0 Success for a link that came up).
+	Status uint8
+	// ErrorValue is the interface's own error of a link that went down,
+	// served as LastConnectErrorValue; nil for none.
+	ErrorValue *int32
+}
+
+// WiFiDisconnector is an optional extension of a [WiFiDriver]: it takes the
+// radio off the network it is on. When the fail-safe expires, the cluster
+// reverts its network list; it calls DisconnectNetwork when no committed
+// network is left, and when the radio is on a network the revert removed
+// and the rejoin of the committed network failed — so the radio does not
+// stay on a network the node was never committed to. connectedhomeip's
+// driver has RevertConfiguration for the fail-safe's expiry and a
+// DisconnectFromNetwork that is itself conditional
+// (src/include/platform/NetworkCommissioning.h:255-259, :291-296 at
+// 6170af84), which is why the capability is optional here. Without it the
+// radio stays where the last join left it.
+type WiFiDisconnector interface {
+	// DisconnectNetwork leaves the network the radio is on; on none it
+	// does nothing. The driver bounds its own wait; ctx may carry no
+	// deadline.
+	DisconnectNetwork(ctx context.Context) error
 }
 
 // WiFiScanResult is one network a [WiFiDriver] scan found — Matter
