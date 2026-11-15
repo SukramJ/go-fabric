@@ -220,3 +220,33 @@ func TestEveryModuleIsScanned(t *testing.T) {
 		t.Errorf("GO_MODULES is %q, the tree's modules are %q", listed, found)
 	}
 }
+
+// lintToolPins are the tool versions the Makefile and ci.yml both pin; the
+// comments over both say "the same versions".
+var lintToolPins = []string{"GOFUMPT_VERSION", "GOLANGCI_LINT_VERSION", "ACTIONLINT_VERSION", "ZIZMOR_VERSION"}
+
+// TestLintToolPinsMatch: each of [lintToolPins] has one value in the
+// Makefile (`NAME ?= v`) and the same value in ci.yml's top-level env
+// (`NAME: "v"`). A drift passed every test, so the local `make lint` and
+// the pipeline could judge one tree differently (review II, DR5a-ci-09).
+func TestLintToolPinsMatch(t *testing.T) {
+	makefile, err := os.ReadFile(filepath.Join(repoRoot, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci := workflowFiles(t)["ci.yml"]
+	if ci == "" {
+		t.Fatal("no .github/workflows/ci.yml")
+	}
+	for _, name := range lintToolPins {
+		mk := regexp.MustCompile(`(?m)^`+name+`\s*\?=\s*(\S+)\s*$`).FindAllStringSubmatch(string(makefile), -1)
+		wf := regexp.MustCompile(`(?m)^  `+name+`: "([^"]+)"\s*$`).FindAllStringSubmatch(ci, -1)
+		if len(mk) != 1 || len(wf) != 1 {
+			t.Errorf("%s: %d pins in the Makefile, %d in ci.yml's env; want one each", name, len(mk), len(wf))
+			continue
+		}
+		if mk[0][1] != wf[0][1] {
+			t.Errorf("%s: the Makefile pins %s, ci.yml %s", name, mk[0][1], wf[0][1])
+		}
+	}
+}
