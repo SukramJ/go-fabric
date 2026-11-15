@@ -16,14 +16,18 @@ import (
 
 // ScenesManagement is a minimal stub for the Matter ScenesManagement
 // cluster (0x0062). Mandatory on every OnOffLight, DimmableLight, and
-// OnOffPlugInUnit device-type per matter.js. HM has no scene-management
-// concept; the stub advertises SceneTableSize=0 and an empty
-// FabricSceneInfo list, and rejects all writes / commands.
+// OnOffPlugInUnit device-type per matter.js. The stub advertises
+// SceneTableSize=0 and an empty FabricSceneInfo list, and rejects all
+// writes / commands.
 //
 // Mirrors matter.js packages/model/src/standard/elements/
 // scenes-management.element.ts — ClusterRevision = 1 (HEAD
 // @matter/model 0.16.11). Mandatory attributes: SceneTableSize uint16
 // at 0x0001, FabricSceneInfo list at 0x0002.
+//
+// Deprecated: the ScenesManagement server is cluster/core's
+// (core.ScenesManagement, built with core.NewScenesManagement), the one the
+// device kit mounts. Removable in the next minor release.
 type ScenesManagement struct{}
 
 // Cluster ID, revision and attribute ids, the generated definition's

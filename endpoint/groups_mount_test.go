@@ -208,7 +208,7 @@ func TestScenesServerReplacesTheStub(t *testing.T) {
 	mgr, _ := groups.NewManager(nopGroupStore{}, nil)
 	ep := &Endpoint{
 		ID: 7, DeviceType: 0x0100, FriendlyName: "Lamp", SourceKey: StringKey("lamp"),
-		Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{fakeServer{id: 0x0006}, wire.ScenesManagement{}}},
+		Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{fakeServer{id: 0x0006}, wire.ScenesManagement{}}}, //nolint:staticcheck // a deprecated wire stub kept for its window (R2-P5-apispec-13, -14)
 		groups: mgr,
 	}
 	servers := ClusterServers(ep)
