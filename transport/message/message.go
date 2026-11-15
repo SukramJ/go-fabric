@@ -271,9 +271,12 @@ func (h Header) NonceSecurityFlags() uint8 {
 // to its AEAD tag. When the header came off the wire ([Header.Raw]
 // populated by UnmarshalHeader) the exact received bytes are returned;
 // otherwise the header is re-encoded via Marshal. Mirrors matter.js
-// authenticating the raw received header bytes
-// (ExchangeManager.ts:196-197) while still letting the outbound path
-// bind against a freshly-marshaled header.
+// authenticating the raw received header bytes — the AAD is the received
+// datagram up to its application payload
+// (packages/protocol/src/protocol/ExchangeManager.ts:297 at db021da0),
+// handed to session.decode (:345) and decrypted with
+// (packages/protocol/src/session/NodeSession.ts:225) — while still letting
+// the outbound path bind against a freshly-marshaled header.
 func (h Header) AAD() []byte {
 	if len(h.Raw) > 0 {
 		return h.Raw

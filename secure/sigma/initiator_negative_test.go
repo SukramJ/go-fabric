@@ -91,8 +91,11 @@ func TestInitiatorRejectsSigma2WithForeignTranscriptSignature(t *testing.T) {
 // ErrSessionState). A Sigma2_Resume is an answer to this initiator's
 // Sigma1 and to nothing else: one that arrives before Sigma1, or a
 // second one after the session was resumed, must not run the key
-// schedule again (R2-P5-tmut-10). The Sigma2_Resume used is a genuine
-// one from the in-module responder, so only the state gate refuses it.
+// schedule again (R2-P5-tmut-10). "after completion" replays a genuine
+// Sigma2_Resume from the in-module responder, which would verify a second
+// time, so only the state gate refuses it; "before Sigma1" sends a
+// zero-filled one, which without the gate would fail its MIC check
+// (ErrUnauthenticated), not the state check asserted here.
 func TestInitiatorSigma2ResumeOutOfOrder(t *testing.T) {
 	t.Parallel()
 	f := newPeerFixture(t)
