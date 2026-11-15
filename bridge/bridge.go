@@ -1011,8 +1011,10 @@ func (b *Bridge) seedCounters() error {
 //
 // Start blocks only on the synchronous setup steps; the receive loop
 // runs in a background goroutine. Returns immediately when the
-// listener is bound and the goroutine is running. Cancel ctx (or
-// call [Stop]) to tear everything down.
+// listener is bound and the goroutine is running. ctx bounds those setup
+// steps only: the receive loop and the handlers run under the bridge's
+// own context, which [Bridge.Stop] ends — call Stop to tear everything
+// down.
 //
 // Calling Start a second time on the same instance returns
 // [ErrAlreadyStarted]. A bridge is single-run: from the first

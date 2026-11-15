@@ -297,7 +297,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	}
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: sub.ID}, limits.budget, limits.hardCap, attributes.next, events)
-	if err := b.sendPrimingReport(ctx, target, chunker); err != nil {
+	if err := b.sendPrimingReport(target, chunker); err != nil {
 		_ = m.Release(sub.ID)
 		return err
 	}
@@ -324,8 +324,12 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 // chunk piggybacks the acknowledgement the bridge owes on the exchange.
 // A send that fails, a chunk left unanswered and a wait the session's
 // close disarmed are [errPeerGone]; an error status is a
-// [chunkStatusError]; ctx's end aborts the wait ([errChunkWaitAborted]).
-func (b *Bridge) sendPrimingReport(ctx context.Context, target subTarget, chunker *reportChunker) error {
+// [chunkStatusError]. The wait lives as long as the bridge: it ends with
+// [errChunkWaitAborted] when the bridge's handler context ends — Stop
+// cancels it — and not with the context the re-establishment was called
+// under, which a host may bound to its start-up (node.Start derives the
+// node's lifetime from its ctx WithoutCancel).
+func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) error {
 	leg := chunkLeg{
 		op: "subscribe.reestablish", src: target.src,
 		sessionID: target.sessionID, exchangeID: target.exchangeID, role: true,
@@ -336,7 +340,7 @@ func (b *Bridge) sendPrimingReport(ctx context.Context, target subTarget, chunke
 			}
 			return b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body)
 		},
-		done: ctx.Done(),
+		done: b.handlerContext().Done(),
 	}
 	chunk, have, err := chunker.Next()
 	if err != nil {

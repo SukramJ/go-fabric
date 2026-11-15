@@ -241,18 +241,24 @@ func TestSubscriptionCloseEndsItsPrimingWait(t *testing.T) {
 // TestReestablishPrimingWaitEnds (review II, R2-P5-write-07): the priming
 // report of a re-established subscription waits for each chunk's answer
 // through the same chunk sender as the other legs, so its wait ends with
-// the context it runs under — an abort, no verdict on the peer — and with
-// its session's close, which says the peer is gone; neither runs out the
-// chunk bound.
+// the bridge's handler context — which Stop cancels; an abort, no verdict
+// on the peer — and with its session's close, which says the peer is
+// gone; neither runs out the chunk bound. The wait lives as long as the
+// bridge, not as long as the call that started the re-establishment.
 func TestReestablishPrimingWaitEnds(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		name string
-		end  func(b *Bridge, cancel context.CancelFunc, id uint16)
+		end  func(b *Bridge, id uint16)
 		want error
 	}{
-		{"the context ends", func(_ *Bridge, cancel context.CancelFunc, _ uint16) { cancel() }, errChunkWaitAborted},
-		{"the session closes", func(b *Bridge, _ context.CancelFunc, id uint16) { b.SessionClosed(id) }, errPeerGone},
+		{"the bridge's handler context ends", func(b *Bridge, _ uint16) {
+			b.mu.RLock()
+			cancel := b.serveCancel
+			b.mu.RUnlock()
+			cancel()
+		}, errChunkWaitAborted},
+		{"the session closes", func(b *Bridge, id uint16) { b.SessionClosed(id) }, errPeerGone},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -268,14 +274,12 @@ func TestReestablishPrimingWaitEnds(t *testing.T) {
 				}
 			}
 			chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: 9}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(reports), nil)
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
 			done := make(chan error, 1)
-			go func() { done <- b.sendPrimingReport(ctx, target, chunker) }()
+			go func() { done <- b.sendPrimingReport(target, chunker) }()
 			if _, _, ok := readOneIMDatagram(t, p.conn, p.sess, 3*time.Second); !ok {
 				t.Fatal("the priming report's first chunk did not reach the peer")
 			}
-			c.end(b, cancel, p.id)
+			c.end(b, p.id)
 			wait, stop := context.WithTimeout(t.Context(), 5*time.Second)
 			defer stop()
 			select {

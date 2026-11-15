@@ -353,11 +353,13 @@ it calls nothing, the server stores nothing, no DataVersion advances and
 no subscriber is told (`contract.ChangeReportingWriter`, above). A write
 that reaches a setter counts as a change whether or not the host's state
 shows the value when the setter returns, so a host that applies a write
-later is judged by what was written. A generated server's write veto
-(`spec.ServerConfig.BeforeWrite`, the typed server's `OnWrite`) runs before
-the comparison, for a write of the held value as well.
+later is judged by what was written. A generated server's own write rule
+(`spec.ServerConfig.WriteRule`) runs on every write, before the comparison
+with the held value; the host's veto (`Server.SetBeforeWrite`, the typed
+server's `OnWrite`) runs after the comparison, so a write of the held value
+reaches no veto.
 
-*Source: `contract/matter.go` (`ChangeReportingWriter`), `cluster/spec/server.go` (`MatterWriteChanged`, `holds`), `cluster/fan/fancontrol_server.go`, `cluster/pump/pump_server.go` and `cluster/alarm/smokecoalarm_server.go` (`MatterWriteChanged`), `cluster/levelcontrol/levelcontrol_server.go` (`writeOptions`, `writeOnLevel`), `cluster/core/bridged_device_basic_information.go` (`MatterWriteChanged`).*
+*Source: `contract/matter.go` (`ChangeReportingWriter`), `cluster/spec/server.go` (`MatterWriteCommit`, `holds`), `cluster/fan/fancontrol_server.go`, `cluster/pump/pump_server.go` and `cluster/alarm/smokecoalarm_server.go` (`MatterWriteChanged`), `cluster/levelcontrol/levelcontrol_server.go` (`writeOptions`, `writeOnLevel`), `cluster/core/bridged_device_basic_information.go` (`MatterWriteChanged`).*
 
 Host ports of the root servers, reached through `node.Config` or
 `Node.Root()`:
