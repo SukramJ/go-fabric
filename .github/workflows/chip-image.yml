@@ -14,18 +14,21 @@ name: chip-image
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
+permissions: {}
 
 jobs:
   build:
     name: build and push the harness image
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # push the harness image to ghcr.io
     # Four CHIP builds since wave 28c; 360 is a hosted runner's limit.
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # The CHIP source, its bootstrap and four app builds need more than
       # the runner's free disk: drop the toolchains this job does not use.
       - name: free disk
