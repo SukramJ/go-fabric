@@ -26,7 +26,8 @@ import (
 )
 
 // The Matter attestation DN attributes: matter-oid-vid and matter-oid-pid
-// (Matter §6.2.2.2), and X.520 commonName (2.5.4.3), whose value carries
+// (matter.js names them VendorID and ProductID, DistinguishedName.ts:244
+// at db021da0), and X.520 commonName (2.5.4.3), whose value carries
 // the `Mvid:`/`Mpid:` fallback.
 var (
 	OIDVendorID   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 1}
@@ -54,11 +55,11 @@ func (e *attributeError) Is(target error) bool { return target == ErrMalformedAt
 //
 //   - a matter-oid-vid or matter-oid-pid attribute must be exactly 4
 //     uppercase hex digits (parseMatterRdnHex, Certificate.ts:242-249,
-//     :341-349) and occur once (DistinguishedName.ts:261-270, :277-281).
+//     :341-353) and occur once (DistinguishedName.ts:261-270, :277-281).
 //     Without acceptMalformed either violation is an error wrapping
 //     [ErrMalformedAttribute], the first in DN order, an invalid value
 //     reported before a repetition; with acceptMalformed the id is read as
-//     absent, whatever the other attribute of its type says (:318-320);
+//     absent, whatever the other attribute of its type says (:258, :318-320);
 //   - the commonName fallback is read only when the DN carries neither
 //     attribute, a malformed one counting (Certificate.ts:343, :377-381):
 //     the first commonName, in DN order, that carries a VendorID or
