@@ -16,11 +16,12 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 )
 
-// streamOnlyBlobs streams ([BlobStreamer], MemoryBlobs' own) and refuses
-// every whole-slice Put or Get of an image, so a download that buffers the
-// image fails (R2-P5-port-14). A record (.meta) is small and still goes
-// through Put and Get. It counts its writers' Commits and Aborts, and runs
-// onVerify on the first OpenBlob of a name after its Commit.
+// streamOnlyBlobs is a backend that opts in to [BlobStreamer] on its own
+// type and refuses every whole-slice Put or Get of an image, so a download
+// that buffers the image fails (R2-P5-port-14). A record (.meta) is small
+// and still goes through Put and Get. Its files live in the embedded
+// MemoryBlobs; it counts its writers' Commits and Aborts, and runs onVerify
+// on the first OpenBlob of a name after its Commit.
 type streamOnlyBlobs struct {
 	MemoryBlobs
 	mu              sync.Mutex
@@ -45,12 +46,8 @@ func (s *streamOnlyBlobs) Get(ctx context.Context, name string) ([]byte, error) 
 	return s.MemoryBlobs.Get(ctx, name)
 }
 
-func (s *streamOnlyBlobs) CreateBlob(ctx context.Context, name string) (BlobWriter, error) {
-	w, err := s.MemoryBlobs.CreateBlob(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return &countingWriter{BlobWriter: w, s: s, name: name}, nil
+func (s *streamOnlyBlobs) CreateBlob(_ context.Context, name string) (BlobWriter, error) {
+	return &countingWriter{s: s, name: name}, nil
 }
 
 func (s *streamOnlyBlobs) OpenBlob(ctx context.Context, name string) (bdx.Blob, error) {
@@ -61,16 +58,33 @@ func (s *streamOnlyBlobs) OpenBlob(ctx context.Context, name string) (bdx.Blob, 
 	if verify {
 		s.onVerify(name)
 	}
-	return s.MemoryBlobs.OpenBlob(ctx, name)
+	b, err := s.MemoryBlobs.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(b), nil
 }
 
+// countingWriter buffers one file and stores it at Commit.
 type countingWriter struct {
-	BlobWriter
 	s    *streamOnlyBlobs
 	name string
+	buf  bytes.Buffer
+	done bool
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	if w.done {
+		return 0, errors.New("write after Commit or Abort")
+	}
+	return w.buf.Write(p)
 }
 
 func (w *countingWriter) Commit() error {
+	if w.done {
+		return errors.New("Commit after Commit or Abort")
+	}
+	w.done = true
 	w.s.mu.Lock()
 	w.s.commits++
 	if w.s.committed == nil {
@@ -78,14 +92,15 @@ func (w *countingWriter) Commit() error {
 	}
 	w.s.committed[w.name] = true
 	w.s.mu.Unlock()
-	return w.BlobWriter.Commit()
+	return w.s.MemoryBlobs.Put(context.Background(), w.name, w.buf.Bytes())
 }
 
 func (w *countingWriter) Abort() error {
 	w.s.mu.Lock()
 	w.s.aborts++
 	w.s.mu.Unlock()
-	return w.BlobWriter.Abort()
+	w.done = true
+	return nil
 }
 
 func (s *streamOnlyBlobs) counts() (commits, aborts int) {
@@ -231,6 +246,18 @@ func TestImagesStreamedImageHiddenUntilVerified(t *testing.T) {
 	}
 	if found := imgs.Find(ctx, FindOptions{}); len(found) != 1 || found[0].Filename != name {
 		t.Fatalf("Find after the checks: %+v", found)
+	}
+}
+
+// TestMemoryBlobsDoesNotStream: MemoryBlobs, and a type that embeds it
+// to override Get and Put, keep the buffered path — the capability is
+// opt-in on a backend's own type.
+func TestMemoryBlobsDoesNotStream(t *testing.T) {
+	t.Parallel()
+	for _, b := range []Blobs{&MemoryBlobs{}, &flakyBlobs{}} {
+		if _, ok := b.(BlobStreamer); ok {
+			t.Fatalf("%T is a BlobStreamer", b)
+		}
 	}
 }
 

@@ -114,7 +114,12 @@ type Blobs interface {
 // image into it as the image arrives and verifies it by reading it back,
 // and every other read of an image ([Images.Find], [Images.Open], the
 // check of a stored image) reads the file in place; without it each image
-// passes through memory whole (Put, Get). [MemoryBlobs] implements it.
+// passes through memory whole (Put, Get).
+//
+// A backend opts in by implementing it on its own type; [MemoryBlobs]
+// does not. Embedding a type that implements it promotes the capability:
+// the embedding type's own Put and Get are then no longer used for image
+// files.
 type BlobStreamer interface {
 	// CreateBlob starts writing the file name. Nothing of it is visible
 	// under name before the writer's Commit, which replaces a file of the
@@ -122,8 +127,9 @@ type BlobStreamer interface {
 	CreateBlob(ctx context.Context, name string) (BlobWriter, error)
 	// OpenBlob opens the file name for reading at any offset; a missing
 	// file wraps fs.ErrNotExist. A blob that implements io.Closer is
-	// closed after the store's own reads; one [Images.Open] hands to a BDX
-	// transfer is not, as bdx.Blob has no Close.
+	// closed after the store's own reads, and one [Images.Open] hands to a
+	// BDX transfer is closed by the server when that transfer ends
+	// ([bdx.ServeOptions].Open).
 	OpenBlob(ctx context.Context, name string) (bdx.Blob, error)
 }
 
@@ -137,9 +143,6 @@ type BlobWriter interface {
 	// does nothing after Commit.
 	Abort() error
 }
-
-// errBlobWriterDone is a write or Commit after Commit or Abort.
-var errBlobWriterDone = errors.New("softwareupdate: blob writer already committed or aborted")
 
 // MemoryBlobs keeps the files in memory. Safe for concurrent use.
 type MemoryBlobs struct {
@@ -174,61 +177,6 @@ func (m *MemoryBlobs) Delete(_ context.Context, name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.files, name)
-	return nil
-}
-
-// CreateBlob implements [BlobStreamer]: the file is held once, in the
-// writer until Commit and in the store after it.
-func (m *MemoryBlobs) CreateBlob(_ context.Context, name string) (BlobWriter, error) {
-	return &memoryBlobWriter{m: m, name: name}, nil
-}
-
-// OpenBlob implements [BlobStreamer]: the held bytes, not a copy.
-func (m *MemoryBlobs) OpenBlob(_ context.Context, name string) (bdx.Blob, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	b, ok := m.files[name]
-	if !ok {
-		return nil, fs.ErrNotExist
-	}
-	return bytes.NewReader(b), nil
-}
-
-// memoryBlobWriter is [MemoryBlobs]' [BlobWriter].
-type memoryBlobWriter struct {
-	m    *MemoryBlobs
-	name string
-	buf  bytes.Buffer
-	done bool
-}
-
-func (w *memoryBlobWriter) Write(p []byte) (int, error) {
-	if w.done {
-		return 0, errBlobWriterDone
-	}
-	return w.buf.Write(p)
-}
-
-func (w *memoryBlobWriter) Commit() error {
-	if w.done {
-		return errBlobWriterDone
-	}
-	w.done = true
-	w.m.mu.Lock()
-	defer w.m.mu.Unlock()
-	if w.m.files == nil {
-		w.m.files = map[string][]byte{}
-	}
-	// The buffer is not written again, so the store keeps its bytes.
-	w.m.files[w.name] = w.buf.Bytes()
-	return nil
-}
-
-func (w *memoryBlobWriter) Abort() error {
-	if !w.done {
-		w.done = true
-		w.buf = bytes.Buffer{}
-	}
 	return nil
 }
 
@@ -271,8 +219,8 @@ type Images struct {
 
 // ImagesConfig configures [NewImages].
 type ImagesConfig struct {
-	// Blobs keeps the files; nil is a [MemoryBlobs]. One that is also a
-	// [BlobStreamer] receives a ledger image as it downloads.
+	// Blobs keeps the files; nil is a [MemoryBlobs]. One that also
+	// implements [BlobStreamer] receives a ledger image as it downloads.
 	Blobs Blobs
 	// Ledger asks the production and test-net ledgers; nil asks none, as
 	// the service's offline option (:1283-1296): only stored images are
