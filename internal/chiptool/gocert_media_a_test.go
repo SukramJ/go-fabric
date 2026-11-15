@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
+	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -38,6 +39,7 @@ func init() {
 	for _, c := range []func() goCertCase{
 		caseAPPLAUNCHER371, caseAPPLAUNCHER381, caseAPPLAUNCHER391,
 		caseAUDIOOUTPUT73, caseAUDIOOUTPUT74,
+		caseCHANNEL54, caseCHANNEL55, caseCHANNEL56,
 	} {
 		registerGoCert(c)
 	}
@@ -217,6 +219,82 @@ func caseAUDIOOUTPUT74() goCertCase {
 				}
 			}
 			return fmt.Errorf("OutputList %s has no entry %d", describeNode(v), index)
+		}},
+	)
+}
+
+// --- Channel -----------------------------------------------------------------
+
+// mediaACurrentChannel reads Channel.CurrentChannel and holds it to want.
+func (th *goTH) mediaACurrentChannel(n *client.Node, ep, wantMajor, wantMinor uint16, after string) error {
+	v, err := th.readValue(n, attrPath(ep, channeldef.ClusterID, channeldef.AttrCurrentChannel))
+	if err != nil {
+		return err
+	}
+	if v.El.IsNull {
+		return fmt.Errorf("CurrentChannel reads null after %s", after)
+	}
+	var c channeldef.ChannelInfoStruct
+	if err := c.DecodeTLV(v); err != nil {
+		return err
+	}
+	if c.MajorNumber != wantMajor || c.MinorNumber != wantMinor {
+		return fmt.Errorf("CurrentChannel is %d.%d after %s, want %d.%d", c.MajorNumber, c.MinorNumber, after, wantMajor, wantMinor)
+	}
+	th.note("CurrentChannel %d.%d", wantMajor, wantMinor)
+	return nil
+}
+
+// caseCHANNEL54 mirrors TC-CHANNEL-5.4: ChangeChannel matching "PBS", "The
+// name of channel 9.1 on both THs" and no other key of a seeded channel
+// (:15-19).
+func caseCHANNEL54() goCertCase {
+	return mediaACase("TC-CHANNEL-5.4", 23, "CHANNEL.C", "CHANNEL.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 27, title: "DUT sends ChangeChannel command to TH", pics: "CHANNEL.C.C00.Tx", send: func(th *goTH, n *client.Node, ep uint16) error {
+			if _, err := th.mediaAInvoke(n, ep, channeldef.ClusterID, channeldef.CmdChangeChannel, "ChangeChannel",
+				channeldef.ChangeChannelRequest{Match: "PBS"}, true, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			return th.mediaACurrentChannel(n, ep, 9, 1, `ChangeChannel "PBS"`)
+		}},
+	)
+}
+
+// caseCHANNEL55 mirrors TC-CHANNEL-5.5: ChangeChannelByNumber to 9.2,
+// "seeded on both THs and not the one they start on" (:15-20).
+func caseCHANNEL55() goCertCase {
+	return mediaACase("TC-CHANNEL-5.5", 24, "CHANNEL.C", "CHANNEL.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 28, title: "DUT sends ChangeChannelByNumber command to TH", pics: "CHANNEL.C.C02.Tx", send: func(th *goTH, n *client.Node, ep uint16) error {
+			if _, err := th.mediaAInvoke(n, ep, channeldef.ClusterID, channeldef.CmdChangeChannelByNumber, "ChangeChannelByNumber",
+				channeldef.ChangeChannelByNumberRequest{MajorNumber: 9, MinorNumber: 2}, false, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			return th.mediaACurrentChannel(n, ep, 9, 2, "ChangeChannelByNumber 9.2")
+		}},
+	)
+}
+
+// caseCHANNEL56 mirrors TC-CHANNEL-5.6: SkipChannel by -1, "both THs wrap
+// to the last channel" (:15-16) — the last entry of ChannelList.
+func caseCHANNEL56() goCertCase {
+	return mediaACase("TC-CHANNEL-5.6", 20, "CHANNEL.C", "CHANNEL.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 24, title: "DUT sends SkipChannel command to TH", pics: "CHANNEL.C.C03.Tx", send: func(th *goTH, n *client.Node, ep uint16) error {
+			if _, err := th.mediaAInvoke(n, ep, channeldef.ClusterID, channeldef.CmdSkipChannel, "SkipChannel",
+				channeldef.SkipChannelRequest{Count: -1}, false, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			v, err := th.readValue(n, attrPath(ep, channeldef.ClusterID, channeldef.AttrChannelList))
+			if err != nil {
+				return err
+			}
+			if len(v.Children) == 0 {
+				return errors.New("ChannelList reads empty")
+			}
+			var last channeldef.ChannelInfoStruct
+			if err := last.DecodeTLV(v.Children[len(v.Children)-1]); err != nil {
+				return err
+			}
+			return th.mediaACurrentChannel(n, ep, last.MajorNumber, last.MinorNumber, "SkipChannel -1")
 		}},
 	)
 }
