@@ -212,6 +212,37 @@ func HasAccessingFabric(fabricIndex uint8) bool {
 
 // timedCtxKey carries whether an Invoke or a Write runs inside a valid timed
 // interaction.
+type largeMessageCtxKey struct{}
+
+// WithLargeMessageSession stamps whether the session the request arrived on
+// carries Large Messages — true on a TCP session, false on UDP and BLE. The
+// transport stamps it; [HandleInvokeRequest] then answers a command with the
+// Large Message quality ([schema.CommandLargeMessage]) on a session that
+// does not with InvalidTransportType for its path, and leaves such a command
+// out of a wildcard path's targets.
+//
+// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:281-285
+// at db021da0 (`limits.largeMessage && !this.session.largeMessage`), the
+// session's largeMessage being its channel's supportsLargeMessages
+// (packages/node/src/behavior/context/server/RemoteActorContext.ts:208;
+// packages/protocol/src/session/Session.ts:372-374), true on a TcpChannel
+// (packages/protocol/src/transport/tcp/TcpChannel.ts:45) and false on BLE
+// (packages/protocol/src/ble/Ble.ts:39); connectedhomeip
+// src/app/InteractionModelEngine.cpp:1875-1884 at 6170af84 (CheckCommandFlags),
+// a session allowing a large payload exactly when its peer address is TCP
+// (src/transport/SecureSession.h:163).
+func WithLargeMessageSession(ctx context.Context, largeMessage bool) context.Context {
+	return context.WithValue(ctx, largeMessageCtxKey{}, largeMessage)
+}
+
+// LargeMessageSessionFromContext reports the stamp of
+// [WithLargeMessageSession]; known is false when the caller stamped
+// nothing, in which case the Large Message check is the caller's.
+func LargeMessageSessionFromContext(ctx context.Context) (largeMessage, known bool) {
+	largeMessage, known = ctx.Value(largeMessageCtxKey{}).(bool)
+	return largeMessage, known
+}
+
 type timedCtxKey struct{}
 
 // WithTimedInteraction stamps whether the request runs inside a valid

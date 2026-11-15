@@ -729,8 +729,8 @@ func undecodedWildcardEntries(ctx context.Context, wild AuthorizingInvoker, g *i
 
 // DispatchEndpoints returns the endpoints req would dispatch a command to
 // in ctx: each concrete path that passes the checks [HandleInvokeRequest]
-// makes before dispatching (access, fabric scope, timed quality,
-// existence), and every endpoint a wildcard path expands to. A path that
+// makes before dispatching (access, existence, Large Message transport,
+// fabric scope, timed quality), and every endpoint a wildcard path expands to. A path that
 // fails a check contributes nothing, and nothing runs. It is matter.js's
 // dispatch-endpoint set, collected in CommandInvokeResponse's validation
 // pass and handed to its dispatch hook before any command runs
@@ -782,6 +782,9 @@ type invokeGate struct {
 	hasTimed        bool
 	timed           bool
 	timedKnown      bool
+	// largeMessage / largeKnown: [LargeMessageSessionFromContext].
+	largeMessage bool
+	largeKnown   bool
 }
 
 func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
@@ -794,7 +797,15 @@ func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
 	g.pathChecker, g.hasPathChecker = d.(CommandPathChecker)
 	g.timedProvider, g.hasTimed = d.(TimedCommandProvider)
 	g.timed, g.timedKnown = TimedInteractionFromContext(ctx)
+	g.largeMessage, g.largeKnown = LargeMessageSessionFromContext(ctx)
 	return g
+}
+
+// refusesLargeMessage reports whether the command carries the Large
+// Message quality and the session stated it does not carry such messages
+// ([WithLargeMessageSession]); an unstated session refuses nothing.
+func (g *invokeGate) refusesLargeMessage(clusterID, commandID uint32) bool {
+	return g.largeKnown && !g.largeMessage && schema.CommandLargeMessage(clusterID, commandID)
 }
 
 // isTimed reports whether the command needs a timed interaction: the
@@ -857,6 +868,17 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 			return status
 		}
 	}
+	// A Large Message command ("L") on a session that carries no large
+	// messages answers InvalidTransportType for its path, after the
+	// existence checks and the command's privilege and before the fabric
+	// scope and the timed quality — matter.js
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:281-285
+	// at db021da0 (existence :263-271, privilege :273-279, fabric scope
+	// :287-290, timed :292); connectedhomeip CheckCommandFlags
+	// (src/app/InteractionModelEngine.cpp:1875-1884 at 6170af84).
+	if g.refusesLargeMessage(inv.Path.Cluster, inv.Path.Command) {
+		return StatusInvalidTransportType
+	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
 	// session without one — PASE before AddNOC, or a session whose fabric
 	// the caller could not resolve ([HasAccessingFabric]) — it answers
@@ -877,8 +899,8 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 }
 
 // wildcardTarget is the [CommandAuthorizer] of a wildcard path's
-// endpoints: the command's privilege, its fabric scope and its timed
-// quality at the endpoint (#wildcardTargetOf,
+// endpoints: the command's privilege, its Large Message quality against the
+// session, its fabric scope and its timed quality at the endpoint (#wildcardTargetOf,
 // CommandInvokeResponse.ts:367-398 at db021da0).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
@@ -886,6 +908,12 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 		if status := checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, g.invokePrivilege(at)); !status.IsSuccess() {
 			return status
 		}
+	}
+	// A Large Message command on a session without large-message support
+	// is left out of the targets, after the authority check —
+	// CommandInvokeResponse.ts:378-386 at db021da0.
+	if g.refusesLargeMessage(clusterID, commandID) {
+		return StatusInvalidTransportType
 	}
 	// CommandInvokeResponse.ts:388 at db021da0, the same check at a
 	// wildcard path's endpoint.

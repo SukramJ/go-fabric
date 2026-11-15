@@ -728,6 +728,10 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	}
 	// The gate above passed, so a set Timed flag means a valid window.
 	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	// Whether the session carries Large Messages: it does exactly over a
+	// TCP connection ([routeCarriesLargeMessages]); the invoke path refuses
+	// a Large Message command otherwise ([im.WithLargeMessageSession]).
+	invokeCtx = im.WithLargeMessageSession(invokeCtx, routeCarriesLargeMessages(src))
 	// A server that sizes its response by the exchange (GeneralDiagnostics
 	// PayloadTestRequest) reads the largest payload one message of it
 	// carries ([Bridge.invokeMaxPayloadSize]).

@@ -103,6 +103,19 @@ func (b *Bridge) routeFor(c transport.Conn) net.Addr {
 	return r
 }
 
+// routeCarriesLargeMessages reports whether a session on route carries
+// Large Messages: a route over a reliable TCP connection does; a UDP
+// address, a BTP (BLE) connection and no route do not. The test is the one
+// [Bridge.connMessageLimit] makes for TCP.
+func routeCarriesLargeMessages(route net.Addr) bool {
+	r, ok := route.(*connRoute)
+	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+		return false
+	}
+	remote := r.conn.Remote()
+	return remote != nil && remote.Network() == "tcp"
+}
+
 // isNilRoute reports whether dst names no peer — nil, or a typed nil
 // held in the interface (a nil *net.UDPAddr a caller passed through).
 func isNilRoute(dst net.Addr) bool {

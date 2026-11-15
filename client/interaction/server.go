@@ -318,6 +318,10 @@ func (s *server) invoke(ctx context.Context, x *exchange.Exchange, req im.Invoke
 	}
 	ictx := s.requestContext(ctx, x, false)
 	ictx = im.WithTimedInteraction(ictx, timed)
+	// The session carries large messages exactly when it is bound to a TCP
+	// channel; the invoke path refuses a Large Message command otherwise
+	// ([im.WithLargeMessageSession]).
+	ictx = im.WithLargeMessageSession(ictx, x.Session().Transport() == exchange.TransportTCP)
 	after := &im.AfterResponse{}
 	defer after.Run()
 	ictx = im.WithAfterResponse(ictx, after)
