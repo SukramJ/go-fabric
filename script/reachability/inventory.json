@@ -26272,14 +26272,14 @@
       "identifier": "ApplyAsked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 226
+      "line": 237
     },
     {
       "package": "controller/client",
       "identifier": "ApplyBridge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 222
+      "line": 233
     },
     {
       "package": "controller/client",
@@ -26307,7 +26307,7 @@
       "identifier": "CacheFabricFiltered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 73
+      "line": 84
     },
     {
       "package": "controller/client",
@@ -26356,7 +26356,7 @@
       "identifier": "DeliverEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 92
+      "line": 103
     },
     {
       "package": "controller/client",
@@ -26377,7 +26377,7 @@
       "identifier": "EmitLeave",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 171
+      "line": 182
     },
     {
       "package": "controller/client",
@@ -26419,14 +26419,14 @@
       "identifier": "HoldOperation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 40
+      "line": 51
     },
     {
       "package": "controller/client",
       "identifier": "HoldsDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 178
+      "line": 189
     },
     {
       "package": "controller/client",
@@ -26440,7 +26440,7 @@
       "identifier": "ICDTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 96
+      "line": 107
     },
     {
       "package": "controller/client",
@@ -26475,21 +26475,21 @@
       "identifier": "KnownVersions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 65
+      "line": 76
     },
     {
       "package": "controller/client",
       "identifier": "MaxEventNumber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 85
+      "line": 96
     },
     {
       "package": "controller/client",
       "identifier": "NewWithImageQuota",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 215
+      "line": 226
     },
     {
       "package": "controller/client",
@@ -26503,7 +26503,7 @@
       "identifier": "PatchRemoveFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 156
+      "line": 167
     },
     {
       "package": "controller/client",
@@ -26524,7 +26524,7 @@
       "identifier": "RebaseICDPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 110
+      "line": 121
     },
     {
       "package": "controller/client",
@@ -26566,7 +26566,7 @@
       "identifier": "SaveSettingsAutoSubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 54
+      "line": 65
     },
     {
       "package": "controller/client",
@@ -26580,21 +26580,21 @@
       "identifier": "SetICDCounterStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 100
+      "line": 111
     },
     {
       "package": "controller/client",
       "identifier": "SetICDFedOffset",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 130
+      "line": 141
     },
     {
       "package": "controller/client",
       "identifier": "SetNewlyCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 144
+      "line": 155
     },
     {
       "package": "controller/client",
@@ -26615,7 +26615,7 @@
       "identifier": "Started",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 185
+      "line": 196
     },
     {
       "package": "controller/client",
@@ -26629,7 +26629,7 @@
       "identifier": "StoredDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 193
+      "line": 204
     },
     {
       "package": "controller/client",
@@ -27399,7 +27399,7 @@
       "identifier": "UpdateRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 81
+      "line": 92
     },
     {
       "package": "controller/client",
@@ -27413,7 +27413,7 @@
       "identifier": "WaitRegistry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 36
+      "line": 47
     },
     {
       "package": "controller/client",
