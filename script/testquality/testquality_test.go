@@ -27,11 +27,12 @@
 // Every t.Skip, Skipf and SkipNow call in a _test.go file is classified.
 // A skip that declares an unported case — the first statement of its
 // function, after t.Parallel or t.Helper — is not judged here (the FixMe
-// register and the parity register hold those). A skip whose reason or
-// condition names the environment — -short, the OS, a socket or multicast,
-// docker, chip-tool, an environment variable, the race detector, a
-// checkout of matter.js or connectedhomeip — is not judged either. Of the
-// rest, a skip lexically inside a range statement is G2a: a loop over
+// register and the parity register hold those). A skip whose reason — its
+// arguments and the conditions around it, never its file or function name
+// — names the environment (-short, the OS, a socket or multicast, docker,
+// chip-tool, an environment variable, the race detector, a checkout of
+// matter.js or connectedhomeip), or that stands in a live test file, is
+// not judged either, but it is listed ([environmentSkips]). Of the rest, a skip lexically inside a range statement is G2a: a loop over
 // loaded vectors or fixtures that skips an entry it does not know drops
 // that entry unseen (R2-P5-tassert-01, -11). Any other is G2b: a skip on a
 // fixture precondition, which turns a broken fixture into a pass
@@ -40,8 +41,9 @@
 // # The numbers
 //
 // Each class is exact, by site, in both directions: [cannotFailLeft],
-// [skipInRangeLeft] and [preconditionSkipsLeft] list what is left today
-// with the reason it is left. A new site fails, and a fixed one fails until
+// [skipInRangeLeft], [preconditionSkipsLeft] and [environmentSkips] list
+// what is left today with the reason it is left, and a row of
+// [cannotFailAllowed] that excuses nothing fails. A new site fails, and a fixed one fails until
 // its row goes in the same commit. The goal of each list is empty.
 //
 // The walk reads every .go file under the repository root, nested modules
@@ -75,7 +77,9 @@ var cannotFailLeft = map[string]string{
 }
 
 // cannotFailAllowed are Test functions that fail only under -race (make
-// race runs them) or only at compile time, as "<file>:<TestName>".
+// race runs them) or only at compile time, as "<file>:<TestName>". A row
+// that excuses no Test G1 counts fails, as a stale row of the other lists
+// does.
 var cannotFailAllowed = map[string]string{
 	"cluster/core/binding_test.go:TestBinding_ConcurrentReadWrite":                                                "race-only",
 	"cluster/core/network_commissioning_test.go:TestNetcomm_Concurrent_Race":                                      "race-only",
@@ -90,9 +94,12 @@ var skipInRangeLeft = map[string]int{
 	// The row's constraint is on the invoke path, where
 	// TestNegativeInvokeParity holds it.
 	"cluster/matter_negative_write_parity_test.go:TestNegativeWriteParity": 1,
-	// noFixture names, per device type, why no fixture builds it.
+	// noFixture names, per device type, why no fixture builds it; the
+	// corpus test also skips the types script/devicegen's excluded list
+	// names, each with its reason (devicegen's test fails on a type in
+	// neither list).
 	"device/conformance_test.go:TestEveryTypeConstructsAndConforms":                                         1,
-	"device/standard_device_type_corpus_parity_matterjs_test.go:TestStandardDeviceTypeCorpusParityMatterJS": 1,
+	"device/standard_device_type_corpus_parity_matterjs_test.go:TestStandardDeviceTypeCorpusParityMatterJS": 2,
 	// A parity declaration (skipCrash) in a loop over two variants.
 	"endpoint/runtime_validation_parity_matterjs_test.go:testNodeScopePasses": 1,
 	// No connectedhomeip checkout: the environment, with its reason in a
@@ -111,23 +118,121 @@ var preconditionSkipsLeft = map[string]int{
 	"secure/mattercert/verify_test.go:TestVerifyAndExtractPubKey_WrongSigLength": 1,
 }
 
+// environmentSkips are the G2 sites whose reason names the environment
+// ([envSkip], [envVar], [livePath]), as "<file>:<func>" with the number
+// of skips in it, grouped by the environment each skips on. They are not
+// judged; they are listed so that a new one is read, and so that a skip
+// on a fixture precondition does not pass as the environment by its
+// wording (R2-P5 DR5a-ci-06).
+var environmentSkips = map[string]int{
+	// The -short flag, the race detector, a tool not on PATH: a slow or
+	// tool-bound test outside its run.
+	"conformance/load_test.go:TestLoadSubscriptionFanout":                    1,
+	"endpoint/sqlitestore/allocation_test.go:TestFullTableIsExhausted":       1,
+	"script/clustergen/compile_test.go:TestEveryClusterGeneratesAndCompiles": 2,
+	"script/docscheck/notices_test.go:TestNoticesListEveryLinkedModule":      1,
+
+	// The host's network: multicast, IPv6, the mDNS sockets, its interfaces
+	// and its OS host name.
+	"bridge/group_messaging_e2e_test.go:TestGroupMessageArrivesOverRealMulticast":                                                           4,
+	"client/discovery/names_test.go:TestNames_Constructors":                                                                                 1,
+	"client/discovery/scanner_live_test.go:TestScanner_LiveFindsAnAdvertisedNode":                                                           4,
+	"client/peer/node_live_test.go:TestConnectLiveThroughMulticast":                                                                         3,
+	"client/peer/retention_test.go:TestIssue507_ZoneSpelledTwoWays":                                                                         1,
+	"cluster/core/general_diagnostics_network_interfaces_parity_matterjs_test.go:TestGeneralDiagnosticsNetworkInterfacesTypeAndOperational": 1,
+	"controller/commissioner/node_live_test.go:TestCommissionLiveThroughMulticast":                                                          3,
+	"controller/operational_port_parity_matterjs_test.go:TestOperationalPortParityMatterJS":                                                 1,
+	"mdns/hostname_policy_test.go:TestHostNamePolicy":                                                                                       1,
+	"mdns/operational_resolver_live_test.go:TestOperationalResolver_LiveMulticastRoundTrip":                                                 2,
+	"mdns/operational_resolver_live_test.go:TestResolution_ZonesLinkLocalByInterface":                                                       1,
+	"mdns/query_conn_test.go:TestOpenQueryConn":                                                                                             1,
+	"mdns/responder_advertiser_parity_matterjs_test.go:TestMdnsAdvertisementOSHostNameVerdict":                                              1,
+	"mdns/socket_live_test.go:TestJoinMcast4_Success":                                                                                       1,
+	"mdns/socket_live_test.go:TestJoinMcast6_ProbeAndClose":                                                                                 1,
+	"mdns/socket_live_test.go:TestOpenSocketsWithoutInterface":                                                                              2,
+	"mdns/socket_live_test.go:TestResponder_LiveHostAnswerV4":                                                                               3,
+	"mdns/socket_live_test.go:TestResponder_LiveHostAnswerV6":                                                                               4,
+	"mdns/socket_live_test.go:TestResponder_LiveOperationalRoundTrip":                                                                       2,
+	"mdns/socket_live_test.go:TestSockets_JoinNewInterfaces":                                                                                2,
+	"mdns/socket_live_test.go:TestSockets_Lifecycle":                                                                                        1,
+	"mdns/socket_live_test.go:TestSockets_ReceiveAfterJoinNew":                                                                              6,
+	"mdns/socket_live_test.go:livePublish":                                                                                                  1,
+	"mdns/socket_live_test.go:skipUnlessMulticastV4":                                                                                        2,
+	"transport/udp/multicast_test.go:TestJoinAndLeaveGroupOnLiveInterfaces":                                                                 2,
+	"transport/udp/multicast_test.go:TestJoinGroupRejectsNonMulticastAndClosedListeners":                                                    1,
+	"transport/udp/multicast_test.go:TestJoinGroupWithoutInterfaces":                                                                        1,
+	"transport/udp/multicast_test.go:TestSendMulticastReachesAJoinedListener":                                                               5,
+	"transport/udp/multicast_test.go:TestSendMulticastRefusals":                                                                             1,
+
+	// A checkout or tool that is not there: matter.js, connectedhomeip,
+	// chip-tool, git, node, and MATTERJS_DIR for the ahead-of register.
+	"conformance/chiptool_smoke_test.go:TestChipToolPairingOnNetworkLong":      1,
+	"internal/chipdm/crosscheck_test.go:chipModel":                             1,
+	"internal/chipdm/levels_test.go:TestChipDataModelLevels":                   1,
+	"internal/chiptool/controller_test.go:resolveChipTool":                     1,
+	"internal/chiptool/matterjs_test.go:startMatterJSController":               2,
+	"schema/fabric_scoped_test.go:TestFabricScopedInvokeMatchesMatterJS":       1,
+	"schema/invoke_privilege_test.go:TestInvokePrivilegeMatchesMatterJS":       1,
+	"schema/staleness_test.go:TestMatterJSSchemaStalenessAgainstLiveCheckout":  2,
+	"schema/timed_test.go:TestTimedInvokeParity":                               1,
+	"script/aheadcheck/aheadcheck_test.go:TestAheadcheckRegisterHoldsAtThePin": 2,
+	"script/aheadcheck/aheadcheck_test.go:newFixtureRepo":                      1,
+
+	// The CHIP harness: a leg that runs only on request (docker, its image,
+	// the radio), a case the harness classes itself (manual, excluded,
+	// self-skipped, PICS false, IPv6 multicast missing), and the Go-TH and
+	// Go-controller legs' multicast.
+	"internal/chiptool/blecases_test.go:TestChipToolBLECases":                           3,
+	"internal/chiptool/blewifi_test.go:TestChipToolBLEWiFi":                             2,
+	"internal/chiptool/familyrun_test.go:TestChipCertificationFamilies":                 1,
+	"internal/chiptool/familyrun_test.go:requireIPv6":                                   1,
+	"internal/chiptool/familyrun_test.go:runFamily":                                     3,
+	"internal/chiptool/familyrun_test.go:runPythonCase":                                 1,
+	"internal/chiptool/familyrun_test.go:skipNotApplicable":                             1,
+	"internal/chiptool/gocert_test.go:TestGoCertificationCases":                         1,
+	"internal/chiptool/gocert_test.go:runGoCertCase":                                    1,
+	"internal/chiptool/gocontroller_test.go:TestGoControllerCommissionsReferenceBridge": 2,
+	"internal/chiptool/gocontroller_test.go:TestGoControllerSubscribesReferenceBridge":  3,
+	"internal/chiptool/groups_proof_test.go:testGroupMessaging":                         1,
+
+	// The effective user and the file system: root, symlinks.
+	"examples/reference-bridge/fifo_unix_test.go:TestAppPipeExistingIsMadePrivate": 1,
+	"script/devicegen/coverage_test.go:TestNewGeneratorRefusesAnIncompleteRoot":    1,
+
+	// A live device an environment variable names: a border router, a
+	// wpa_supplicant.
+	"thread/otbr/live_test.go:TestLiveOTBR":                       1,
+	"wifi/wpasupplicant/live_linux_test.go:TestLiveWPASupplicant": 2,
+}
+
 // minTests is the floor on Test functions seen: fewer means the walk broke.
 const minTests = 5000
 
-// envSkip matches a skip reason or condition that names the environment:
-// the -short flag, the host's network (multicast, sockets, interfaces, its
+// envSkip matches a skip reason that names the environment: the -short
+// flag, the host's network (multicast, sockets, its interfaces, its
 // name), a tool or checkout that is not there (docker, chip-tool, git,
-// node, matter.js, connectedhomeip), the race detector, root, symlinks, and
-// the case classes of the CHIP harness — read in the skip's arguments, the
-// conditions of the if statements around it and its file's path (a
-// *_live_test.go is a live test). envVar matches an environment
-// variable's name; the two are kept apart because only envSkip ignores case.
+// node, a matter.js or connectedhomeip checkout), the race detector, the
+// effective user, symlinks, and the case classes of the CHIP harness. The
+// reason is the skip's arguments and the conditions of the if statements
+// around it — what the skip tests — never its file or function name.
+// envVar matches an environment variable: a lookup, a variable this
+// repository names (GOFABRIC_…, MATTERJS_…, CHIP…), or a Go name for one
+// (envX, xEnv); the two are kept apart because only envSkip ignores case.
+// livePath matches the path of a live test file (*_live_test.go,
+// live_*_test.go), whose skips are the host's by construction; it reads
+// the path only (R2-P5 DR5a-ci-06).
+//
+// Every site the three match is in [environmentSkips]: the class is exact,
+// like the other two, so a skip that only looks like the environment is
+// read once by a person.
 var (
-	envSkip = regexp.MustCompile(`(?i)testing short|-short|skipped in|skipped under|load test|goos|_live|live_|advertiser|` +
-		`multicast|ipv6|ipv4|socket|interface|loopback|host|udp 5353|mdns|dns-sd|` +
-		`docker|chip-?tool|chipToolErr|chipOnce|connectedhomeip|harness|matter\.js|checkout|on path|not installed|git |node is not|` +
-		`race detector|geteuid|root|symlink|pics|not applicable|selfSkip|manual|excluded|Env |border router`)
-	envVar = regexp.MustCompile(`\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|\benv[A-Z]\w*`)
+	envSkip = regexp.MustCompile(`(?i)testing short|-short|skipped in|skipped under|load test|goos|advertiser|` +
+		`multicast|ipv6|ipv4|socket|loopback|udp 5353|mdns|dns-sd|network interface|no interface|os host name|cannot run on this host|` +
+		`docker|chip-?tool|chipToolErr|chipOnce|connectedhomeip|harness|matter\.js checkout|checkout not present|behind the checkout|built matter\.js|` +
+		`on path|not installed|git |node is not|race detector|geteuid|symlink|` +
+		`not applicable|selfSkip|classHarness|classNotSupported|manualClass|goCertEnv|border router`)
+	envVar   = regexp.MustCompile(`\bGetenv\b|\bLookupEnv\b|\b(GOFABRIC|MATTERJS|CHIP[A-Z]*)_[A-Z0-9_]+\b|\benv[A-Z]\w*|[a-z]Env\b`)
+	livePath = regexp.MustCompile(`_live|live_`)
 )
 
 type fn struct {
@@ -232,6 +337,7 @@ type scan struct {
 	order        []string
 	inRange      []site
 	precondition []site
+	environment  []site
 	tests        int
 }
 
@@ -327,18 +433,18 @@ func (s *scan) classifySkips(fset *token.FileSet, rel string, fd *ast.FuncDecl) 
 			if _, ok := sel.X.(*ast.Ident); !ok {
 				return true
 			}
-			s.classifySkip(fset, key, call, stack, fd)
+			s.classifySkip(fset, rel, key, call, stack, fd)
 			return true
 		})
 	}
 	visit(fd.Body, nil)
 }
 
-func (s *scan) classifySkip(fset *token.FileSet, key string, call *ast.CallExpr, stack []ast.Node, fd *ast.FuncDecl) {
+func (s *scan) classifySkip(fset *token.FileSet, rel, key string, call *ast.CallExpr, stack []ast.Node, fd *ast.FuncDecl) {
 	if declaresCase(call, stack, fd) {
 		return
 	}
-	text := key + " " + exprText(call)
+	text := exprText(call)
 	inRange := false
 	for _, n := range stack {
 		switch x := n.(type) {
@@ -348,10 +454,11 @@ func (s *scan) classifySkip(fset *token.FileSet, key string, call *ast.CallExpr,
 			inRange = true
 		}
 	}
-	if envSkip.MatchString(text) || envVar.MatchString(text) {
+	st := site{key: key, line: fset.Position(call.Pos()).Line, text: text}
+	if livePath.MatchString(rel) || envSkip.MatchString(text) || envVar.MatchString(text) {
+		s.environment = append(s.environment, st)
 		return
 	}
-	st := site{key: key, line: fset.Position(call.Pos()).Line, text: text}
 	if inRange {
 		s.inRange = append(s.inRange, st)
 		return
@@ -412,8 +519,9 @@ func exprText(n ast.Node) string {
 	return b.String()
 }
 
-// cannotFail returns the Test functions G1 counts, as "<file>:<TestName>".
-func (s *scan) cannotFail(mods map[string]string) map[string]bool {
+// cannotFail returns the Test functions G1 counts, as "<file>:<TestName>",
+// and the rows of [cannotFailAllowed] that excused one.
+func (s *scan) cannotFail(mods map[string]string) (out, allowed map[string]bool) {
 	importDir := func(path string) string {
 		best := ""
 		for m := range mods {
@@ -554,7 +662,7 @@ func (s *scan) cannotFail(mods map[string]string) map[string]bool {
 			}
 		}
 	}
-	out := map[string]bool{}
+	out, allowed = map[string]bool{}, map[string]bool{}
 	for _, k := range s.order {
 		f := s.fns[k]
 		if can[k] || f.decl.Recv != nil || !strings.HasPrefix(f.name, "Test") || !strings.HasSuffix(f.file, "_test.go") {
@@ -565,11 +673,12 @@ func (s *scan) cannotFail(mods map[string]string) map[string]bool {
 		}
 		ref := f.file + ":" + f.name
 		if _, ok := cannotFailAllowed[ref]; ok {
+			allowed[ref] = true
 			continue
 		}
 		out[ref] = true
 	}
-	return out
+	return out, allowed
 }
 
 func countBy(sites []site) map[string]int {
@@ -615,7 +724,7 @@ func TestTestsCanFail(t *testing.T) {
 	}
 	list := os.Getenv("TESTQUALITY_LIST") != ""
 
-	g1 := s.cannotFail(modules(t, root))
+	g1, allowed := s.cannotFail(modules(t, root))
 	got := map[string]int{}
 	for ref := range g1 {
 		got[ref] = 1
@@ -625,14 +734,19 @@ func TestTestsCanFail(t *testing.T) {
 		want[ref] = 1
 	}
 	compare(t, "G1 cannot fail", got, want)
-	for ref := range cannotFailAllowed {
+	// A row that excused nothing is stale: its test was renamed or removed,
+	// or it can fail now on its own (R2-P5 DR5a-ci-15).
+	for _, ref := range sortedKeys(boolKeys(cannotFailAllowed)) {
 		if !strings.Contains(ref, ":Test") {
 			t.Errorf("cannotFailAllowed %q is not <file>:<TestName>", ref)
+		} else if !allowed[ref] {
+			t.Errorf("cannotFailAllowed %q excuses no Test G1 counts: renamed, removed or able to fail now — remove the row", ref)
 		}
 	}
 
 	compare(t, "G2a skip inside a range", countBy(s.inRange), skipInRangeLeft)
 	compare(t, "G2b skip on a fixture precondition", countBy(s.precondition), preconditionSkipsLeft)
+	compare(t, "G2 skip on the environment", countBy(s.environment), environmentSkips)
 
 	if list {
 		for _, ref := range sortedKeys(g1) {
@@ -644,7 +758,18 @@ func TestTestsCanFail(t *testing.T) {
 		for _, st := range s.precondition {
 			t.Logf("G2b %s (line %d): %s", st.key, st.line, st.text)
 		}
+		for _, st := range s.environment {
+			t.Logf("G2env %s (line %d): %s", st.key, st.line, st.text)
+		}
 	}
+}
+
+func boolKeys(m map[string]string) map[string]bool {
+	out := make(map[string]bool, len(m))
+	for k := range m {
+		out[k] = true
+	}
+	return out
 }
 
 func sortedKeys(m map[string]bool) []string {

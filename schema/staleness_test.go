@@ -156,6 +156,8 @@ func shortCommit(c string) string {
 //
 //   - ../matter.js absent -> Skip (a local tooling check; CI has no live
 //     checkout, only the pinned snapshot).
+//   - The checkout present but no revision parsed -> Fail (the parser or
+//     the element layout broke).
 //   - No cluster drifted -> Pass (the checkout is at the pin, or upstream
 //     moved no revision).
 //   - Drift found -> an advisory Skip listing exactly which clusters
@@ -180,7 +182,10 @@ func TestMatterJSSchemaStalenessAgainstLiveCheckout(t *testing.T) {
 		t.Fatalf("parse live matter.js element revisions: %v", err)
 	}
 	if len(live) == 0 {
-		t.Skipf("no cluster revisions parsed from %s — matter.js element layout may have changed", dir)
+		// The checkout is there and nothing parsed: the parser or the
+		// element layout broke, which the guard reports rather than
+		// passing (R2-P5 DR5a-ci-06).
+		t.Fatalf("no cluster revisions parsed from %s — matter.js element layout may have changed", dir)
 	}
 
 	pinnedRev, pinnedCommit := pinnedSnapshotProvenance()
