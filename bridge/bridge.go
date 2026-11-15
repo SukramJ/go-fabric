@@ -1914,8 +1914,12 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 				ep.ForgetFabricScenes(fabricIndex) //nolint:contextcheck // parts included; a removal's consequence, which no request bounds (store/doc.go, store errors)
 				// The state a device's cluster server keeps for the
 				// fabric (the Thermostat's atomic writes, the TLS
-				// tables) goes through contract.FabricScopedState, the
-				// one removal path, which the node calls on every server.
+				// tables): contract.FabricScopedState, the one removal
+				// path. The node calls it on every server as well; a
+				// second drop of a fabric a server holds nothing for
+				// changes nothing, and a host that runs the bridge without
+				// the node still has it (review II, R2-P5-apidev-09).
+				b.dropFabricState(context.WithoutCancel(ctx), ep, fabricIndex)
 			}
 		}
 	}
@@ -1924,6 +1928,21 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	b.mu.RUnlock()
 	if hook != nil {
 		hook(fabricIndex)
+	}
+}
+
+// dropFabricState drops fabricIndex from every server of ep that holds
+// state by fabric ([contract.FabricScopedState]); a server whose
+// persistence refused is logged — the next reconcile drops what it kept.
+func (b *Bridge) dropFabricState(ctx context.Context, ep *endpoint.Endpoint, fabricIndex uint8) {
+	for _, srv := range endpoint.ClusterServers(ep) {
+		if s, ok := srv.(contract.FabricScopedState); ok {
+			if err := s.MatterDropFabric(ctx, fabricIndex); err != nil {
+				b.logger.Warn("matter.fabric.drop_state",
+					slog.Int("endpoint", int(ep.ID)), slog.Uint64("cluster", uint64(srv.MatterClusterID())),
+					slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+			}
+		}
 	}
 }
 
