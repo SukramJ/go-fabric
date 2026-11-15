@@ -56,7 +56,10 @@ type Observers struct {
 	// ran (store.OwedFabricEvent), so it reaches the host at least once:
 	// after a crash between the rollback and this hook — or in the
 	// moment after the hook — the next Start runs it, and a host may hear
-	// the same removal twice.
+	// the same removal twice. One residual: a store upgraded from a release
+	// before schema v8 that went down inside a fail-safe window owes the
+	// removal of that window's AddNOC in memory only — it reaches the host
+	// only if the first process on the upgraded store starts.
 	OnFabricRemoved func(FabricInfo)
 	// OnFabricUpdated runs after an UpdateNOC (or the fail-safe rollback
 	// of one) changed a fabric's operational identity and the facade

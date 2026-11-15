@@ -60,7 +60,8 @@ import "context"
 // A rollback owes the fabric's observers a hook — removed or updated — and
 // the table keeps that debt beside the rows ([OwedFabricEvent]) until the
 // caller acknowledges it, so a crash between the rollback and the hook
-// does not lose it.
+// does not lose it. RemoveFabric does not remove owed events; a backend
+// must not cascade them.
 type Fabrics interface {
 	// AddFabric inserts rec and returns its index: the record's, or one
 	// allocated from the persisted next-fabric-index counter when the

@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -100,6 +101,7 @@ func TestEndpointPersistenceForHostTopology(t *testing.T) {
 	if got := n2.Bridge().Topology().FindByID(id2).NodeLabel(); got != "Kitchen" {
 		t.Errorf("NodeLabel after the restart %q, want Kitchen", got)
 	}
+	//nolint:staticcheck // the deprecated accessor, held until removed
 	for name, p := range map[string]node.EndpointPersistence{"host": ep2, "node": n2.Persistence()} {
 		if got := p.NodeLabel(ctx, key); got != "Kitchen" {
 			t.Errorf("%s NodeLabel %q", name, got)
@@ -107,6 +109,13 @@ func TestEndpointPersistenceForHostTopology(t *testing.T) {
 		if got := string(p.LoadScenes(key)); got != "scene-table" {
 			t.Errorf("%s scene table %q", name, got)
 		}
+	}
+	// The new accessor serves the same state, with the store's error.
+	if got, err := n2.EndpointState().LoadNodeLabel(ctx, key); err != nil || got != "Kitchen" {
+		t.Errorf("EndpointState NodeLabel %q, %v", got, err)
+	}
+	if got, err := n2.EndpointState().LoadScenes(ctx, key); err != nil || string(got) != "scene-table" {
+		t.Errorf("EndpointState scene table %q, %v", got, err)
 	}
 	// The keys stay the facade's (persist.go).
 	for k, want := range map[string]string{"bridged_node_label.plug:1": "Kitchen", "scenes.plug:1": "scene-table"} {
@@ -158,7 +167,7 @@ func TestEndpointPersistenceOverride(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 	cfg.EndpointPersistence = fake
 	n := newNode(t, cfg)
-	if n.Persistence() != node.EndpointPersistence(fake) {
+	if n.Persistence() != node.EndpointPersistence(fake) { //nolint:staticcheck // the deprecated accessor, held until removed
 		t.Error("Persistence is not the override")
 	}
 	if err := n.Aggregator().Add(ctx, newPlug(t, "plug:1")); err != nil {
@@ -177,5 +186,21 @@ func TestEndpointPersistenceOverride(t *testing.T) {
 	}
 	if _, ok, _ := n.Store().GetSetting(ctx, "bridged_node_label.plug:1"); ok {
 		t.Error("the facade's store was written beside the override")
+	}
+}
+
+// hostState is a host's own EndpointState (here the facade's, wrapped).
+type hostState struct{ node.EndpointState }
+
+// TestEndpointStateOverride: Config.EndpointState is what Node.EndpointState
+// returns, and what the facade's assembler saves a controller's label to.
+func TestEndpointStateOverride(t *testing.T) {
+	t.Parallel()
+	own := &hostState{node.NewEndpointState(memstore.New(), nil)}
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.EndpointState = own
+	n := newNode(t, cfg)
+	if n.EndpointState() != node.EndpointState(own) {
+		t.Error("EndpointState is not the override")
 	}
 }

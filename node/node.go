@@ -1539,12 +1539,23 @@ func (n *Node) BootReason() uint8 { return n.bootReason }
 // Store returns the credential store the node runs on.
 func (n *Node) Store() store.Port { return n.st }
 
+// EndpointState is the endpoint-level state (scene tables, bridged
+// NodeLabels) the facade's assembler uses: [Config].EndpointState when
+// set, the deprecated [Config].EndpointPersistence adapted when that is
+// set, else the facade's own over [Node.Store] — what a host with its own
+// assembler ([Config].Snapshotter) hands that assembler as
+// endpoint.Config.Persistence (issue #117).
+func (n *Node) EndpointState() EndpointState { return n.endpoints }
+
 // Persistence is the endpoint-level persistence (scene tables, bridged
 // NodeLabels) the facade's assembler uses, seen through the deprecated
 // [EndpointPersistence]: [Config].EndpointPersistence when it is the one
 // in use, else [Config].EndpointState or the facade's own over
 // [Node.Store] — what a host with its own assembler ([Config].Snapshotter)
 // hands that assembler (issue #117).
+//
+// Deprecated: use [Node.EndpointState], whose saves and loads report the
+// store's error. Removable in the next minor release.
 func (n *Node) Persistence() EndpointPersistence {
 	if h, ok := n.endpoints.(hostEndpoints); ok {
 		return h.p

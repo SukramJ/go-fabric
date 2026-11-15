@@ -208,6 +208,7 @@ becomes permissible in:
 | `store.Store.DeleteSetting` | `Store.DeleteSettings`, which every `store.Settings` backend implements | `v0.23.0` |
 | `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.23.0` |
 | `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.23.0` |
+| `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

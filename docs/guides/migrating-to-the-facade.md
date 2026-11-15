@@ -295,6 +295,8 @@ migrations applies step `v9`.
 | `OnFabricRemoved` / `OnFabricUpdated` heard once per rollback | heard at least once: a rollback's hook a crash interrupted runs again at the next `Start`, so a host may hear it twice |
 | `endpoint.Config{OnNodeLabelWritten: f, Scenes: s}` | `endpoint.Config{Persistence: p}` with an `endpoint.Persistence` (`SaveNodeLabel`, `LoadScenes`, `SaveScenes`, each with ctx and error): a refused save answers the controller FAILURE |
 | `node.Config.EndpointPersistence`, `node.NewEndpointPersistence(st, logger)` | `node.Config.EndpointState`, `node.NewEndpointState(st, logger)`; a host's own state implements `node.EndpointState` (`endpoint.Persistence` and `LoadNodeLabel`) |
+| `Node.Persistence()` | `Node.EndpointState()`: the host's `EndpointState` or the facade's own, as `endpoint.Config.Persistence` for a host's own assembler |
+| a store upgraded from a release before schema v8 that went down inside a fail-safe window | the removal of that window's AddNOC is owed in memory only: `OnFabricRemoved` reaches the host only if the first process on the upgraded store starts |
 
 ## Changed after v0.18.0: the exchange receive notifier
 
