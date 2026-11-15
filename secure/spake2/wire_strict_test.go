@@ -79,11 +79,12 @@ func encodeWire(t *testing.T, asList bool, members ...wireMember) []byte {
 // be a structure (a list with the same members is refused); a context
 // member of a tag the message does not declare is skipped rather than
 // merged into a field (R2-P5-tmut-16); and a member whose tag is not
-// context-specific — anonymous, common-profile, fully-qualified or
-// implicit, numbered like a field or not, before or after the declared
-// members, at the top level or inside the nested PBKDFParameters — is
-// refused, as matter.js's TlvObject decode throws for it
-// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0), while inside
+// context-specific — anonymous, common-profile or fully-qualified,
+// numbered like a field or not, before or after the declared members, at
+// the top level or inside the nested PBKDFParameters — is refused, as
+// matter.js's TlvObject decode throws for it
+// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0; an implicit
+// tag matter.js's codec already throws for, TlvCodec.ts:169-171), while inside
 // a skipped unknown member the tag forms are not looked at
 // (packages/types/src/tlv/TlvAny.ts:87-90; an implicit-profile tag is
 // refused by the tlv decoder wherever it stands) (R2-P5 Fable F1). A

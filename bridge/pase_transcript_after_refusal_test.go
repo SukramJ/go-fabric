@@ -51,6 +51,7 @@ func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 		{"singleton: a refused Pake1", false, []step{{mrp.SCOpcodePake1, badPake1}}, 1},
 		{"singleton: a refused Pake3", false, []step{{mrp.SCOpcodePake1, goodPake1}, {mrp.SCOpcodePake3, badPake3}}, 1},
 		{"singleton: a refused PBKDFParamRequest", false, []step{{mrp.SCOpcodePBKDFParamRequest, refusedRequest}}, 0},
+		{"singleton: a Pake3 without a Pake1", false, []step{{mrp.SCOpcodePake3, badPake3}}, 0},
 		{"provider: a refused Pake1", true, []step{{mrp.SCOpcodePake1, badPake1}}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,5 +81,29 @@ func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 				t.Fatalf("verifiers built = %d, want %d: the Pake1 after the refusal was computed against the ended handshake's transcript", got, tc.wantPake)
 			}
 		})
+	}
+}
+
+// TestPaseConfirmedPake3EndsTheTranscript: a confirmed Pake3 ends the
+// handshake as a refusal does — the PBKDFParamRequest/Response transcript
+// it captured is dropped with the verifier, so a later Pake1 on the
+// adapter has no context to run against (R2-P5 Fable F6).
+func TestPaseConfirmedPake3EndsTheTranscript(t *testing.T) {
+	t.Parallel()
+	a := newPaseAdapterWithVerifier(t)
+	if _, _, err := paseRoundTrip(t, a); err != nil {
+		t.Fatalf("PASE round-trip: %v", err)
+	}
+	a.mu.Lock()
+	req, resp, v := len(a.pbkdfReqBytes), len(a.pbkdfRespBytes), a.verifier
+	a.mu.Unlock()
+	if req != 0 || resp != 0 || v != nil {
+		t.Fatalf("after a confirmed Pake3: transcript %d+%d bytes, verifier %v; want none", req, resp, v != nil)
+	}
+	a.mu.Lock()
+	_, err := a.computePaseContextLocked()
+	a.mu.Unlock()
+	if err == nil {
+		t.Fatal("a Pake1 context could still be derived after the handshake ended")
 	}
 }

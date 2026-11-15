@@ -407,8 +407,9 @@ func (a *PaseAdapter) ProcessPake1(payload []byte) (opcode uint8, respPayload []
 	return mrp.SCOpcodePake2, spake2.EncodePake2(out), nil
 }
 
-// endHandshakeLocked drops the state of the handshake a refused step
-// ended: the verifier and the PBKDFParamRequest/Response transcript. The
+// endHandshakeLocked drops the state of the handshake a refused step — or
+// a confirmed Pake3 — ended: the verifier and the PBKDFParamRequest/Response
+// transcript. The
 // router ends the handshake on every refusal — failure report, count, the
 // single-active-PASE claim freed ([Bridge.handlePase]) — and hands the
 // singleton handler of [Bridge.AttachPaseHandler] the next Pake1 whatever
@@ -518,6 +519,10 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 	defer a.mu.Unlock()
 	v := a.verifier
 	if v == nil {
+		// A Pake3 without a preceding Pake1 is a refused step like any
+		// other: the router counts it and ends the handshake, so the
+		// transcript goes with it (R2-P5 Fable F5).
+		a.endHandshakeLocked()
 		return nil, nil, 0, errors.New("bridge: PaseAdapter Pake3 without preceding Pake1")
 	}
 	cA, err := spake2.DecodePake3(payload)
@@ -540,7 +545,10 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 	}
 	sharedSecret = v.SharedSecret()
 	peerSessionID = a.peerSessionID
-	a.verifier = nil
+	// A confirmed Pake3 ends the handshake too: the transcript has served
+	// its one context, and every exit of Pake3 drops it, so no later Pake1
+	// on this adapter runs against it (R2-P5 Fable F6).
+	a.endHandshakeLocked()
 	return a.onEstablished, sharedSecret, peerSessionID, nil
 }
 
