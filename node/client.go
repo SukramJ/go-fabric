@@ -118,6 +118,10 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 	// subscription); the reports reach the environment's subscriptions.
 	cs.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: n.cfg.Clock, Logger: n.logger})
 	cs.subs.Register(cs.exchanges)
+	// The node's endpoint tree is served on the sessions this stack opens,
+	// as on the bridge's: a peer sends its next request on the session it
+	// last received on, which may be one we opened (review II, Fable P-9).
+	cs.subs.Serve(n.clientServerConfig())
 	if cs.names == nil {
 		if cs.names, err = discovery.Open(n.logger); err != nil {
 			return fail(fmt.Errorf("node: client discovery: %w", err))
@@ -150,6 +154,42 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
 	}()
 	return cs, nil
+}
+
+// clientServerConfig serves the node's endpoint tree on a client stack's
+// sessions with the bridge's gates: the bridge's dispatcher of the moment
+// (its ACL, privilege, existence and timed sources; nil before Start, a
+// request then answers Failure), the bridge's element qualities and
+// MaxPathsPerInvoke, and a request context built from the session as the
+// bridge builds it for one of its own — fabric, subject with CATs and our
+// node id (the server's own stamps; a client-stack session is CASE, never
+// PASE), the timed interaction and the Large Message fact, the largest
+// payload of the session's messages and its attestation challenge.
+//
+// What the bridge's server adds beyond the gates is not on this path: no
+// session id is stamped (core.WithInvokeSessionID names a session of the
+// bridge's registry, whose id space the client stack does not share — a
+// session-bound flow treats the request as naming none), events are not
+// reported in a read, a SubscribeRequest answers InvalidAction, and a
+// write or invoke reaches the bridge's subscriptions through the servers'
+// own change notifications only.
+func (n *Node) clientServerConfig() interaction.ServerConfig {
+	maxPaths := int(n.cfg.MaxPathsPerInvoke)
+	if maxPaths == 0 {
+		maxPaths = im.DefaultMaxPathsPerInvoke
+	}
+	return interaction.ServerConfig{
+		Dispatch:          n.br.Dispatcher,
+		Qualities:         n.br.ElementQualities(),
+		MaxPathsPerInvoke: maxPaths,
+		RequestContext: func(ctx context.Context, s *exchange.Session) context.Context {
+			ctx = im.WithMaxPayloadSize(ctx, s.MaxPayloadSize())
+			if c := s.AttestationChallenge(); len(c) > 0 {
+				ctx = mattercore.WithInvokeAttestationChallenge(ctx, c)
+			}
+			return ctx
+		},
+	}
 }
 
 // dialTCP is the client stack's TCP dialer: each connection hands its

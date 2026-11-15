@@ -51,6 +51,16 @@ type ServerConfig struct {
 	ValueWriter  im.AttributeValueWriter
 	// ValueReader decodes a written value; nil is [wire.AttributeValueReader].
 	ValueReader im.AttributeValueReader
+	// Dispatch, when set, returns the dispatcher of each request in place of
+	// Dispatcher: a role whose endpoint tree is re-assembled serves the tree
+	// of the moment (a node's bridge, whose dispatcher each assembly
+	// replaces). A nil answer — no tree yet — answers the request Failure.
+	Dispatch func() im.Dispatcher
+	// RequestContext, when set, adds the role's own facts of the session to
+	// each request's context — what the role's own server stamps for a
+	// session of its own — on top of the server's fabric, subject, node id
+	// and qualities; the timed and Large Message stamps follow it.
+	RequestContext func(ctx context.Context, s *exchange.Session) context.Context
 }
 
 // server is the installed [ServerConfig].
@@ -66,7 +76,7 @@ type server struct {
 // publish no subscription). A nil Dispatcher uninstalls, back to the
 // report-only handler.
 func (r *Subscriptions) Serve(cfg ServerConfig) {
-	if cfg.Dispatcher == nil {
+	if cfg.Dispatcher == nil && cfg.Dispatch == nil {
 		r.server.Store(nil)
 		return
 	}
@@ -156,6 +166,15 @@ func (s *server) serve(ctx context.Context, x *exchange.Exchange, msg *exchange.
 	return im.StatusInvalidAction
 }
 
+// dispatcher is the dispatcher a request is served by
+// ([ServerConfig].Dispatch, else Dispatcher); nil when the role has no tree.
+func (s *server) dispatcher() im.Dispatcher {
+	if s.cfg.Dispatch != nil {
+		return s.cfg.Dispatch()
+	}
+	return s.cfg.Dispatcher
+}
+
 // requestContext is the context a served request runs under: the
 // session's fabric and subject, as the device-side bridge builds it
 // (bridge/receive_dispatch.go) — a client stack's sessions are CASE, so no
@@ -172,6 +191,9 @@ func (s *server) requestContext(ctx context.Context, x *exchange.Exchange, fabri
 	if s.cfg.Qualities != nil {
 		ctx = im.WithElementQualities(ctx, s.cfg.Qualities)
 	}
+	if s.cfg.RequestContext != nil {
+		ctx = s.cfg.RequestContext(ctx, sess)
+	}
 	return ctx
 }
 
@@ -185,8 +207,12 @@ func (s *server) read(ctx context.Context, x *exchange.Exchange, req im.ReadRequ
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		return status
 	}
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
 	rctx := s.requestContext(ctx, x, req.FabricFiltered)
-	report := im.HandleReadRequest(rctx, s.cfg.Dispatcher, req)
+	report := im.HandleReadRequest(rctx, d, req)
 	report.SuppressResponse = true
 	chunks := s.chunkReport(report, x.Session().MaxPayloadSize())
 	for i, chunk := range chunks {
@@ -282,9 +308,13 @@ func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRe
 	if req.TimedRequest != timed {
 		return im.StatusTimedRequestMismatch
 	}
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
 	wctx := s.requestContext(ctx, x, false)
 	wctx = im.WithTimedInteraction(wctx, timed)
-	resp := im.HandleWriteRequest(wctx, s.cfg.Dispatcher, req)
+	resp := im.HandleWriteRequest(wctx, d, req)
 	if !resp.Status.IsSuccess() && !req.SuppressResponse {
 		return resp.Status
 	}
@@ -325,7 +355,11 @@ func (s *server) invoke(ctx context.Context, x *exchange.Exchange, req im.Invoke
 	after := &im.AfterResponse{}
 	defer after.Run()
 	ictx = im.WithAfterResponse(ictx, after)
-	resp := im.HandleInvokeRequest(ictx, s.cfg.Dispatcher, req)
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
+	resp := im.HandleInvokeRequest(ictx, d, req)
 	for i := range resp.Responses {
 		wire.ResponseCommandOf(&resp.Responses[i])
 	}

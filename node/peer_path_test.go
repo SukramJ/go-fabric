@@ -20,11 +20,13 @@ import (
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/camera"
+	gcdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -131,13 +133,6 @@ func (cp *cameraPeers) answers() []string {
 
 var bothTCPRoles = &node.TCPConfig{Incoming: true, Outgoing: true}
 
-// The reuse of a TCP session the requestor opened (case a of design-peer
-// §5) is controller/TestControllerServesTheCameraRequestor: the camera dials
-// no TCP there, and its Answer reaches the controller over the TCP session
-// the controller opened. A node as the requestor cannot stand in for it:
-// its client stack serves no Interaction Model request on the sessions it
-// opens.
-
 // TestPeerPathEstablishesTCPBesideAUDPSession: the requestor's session to
 // the camera runs over UDP, which carries no large messages; the camera's
 // client stack establishes a TCP session and the signal goes over it (case
@@ -202,5 +197,38 @@ func TestPeerPathConcurrentSignalsShareOneHandshake(t *testing.T) {
 	}
 	if sessions := cp.camClientSessions(); len(sessions) != 1 {
 		t.Fatalf("the camera holds %d client sessions with the requestor, want 1", len(sessions))
+	}
+}
+
+// TestPeerPathServedOnTheRequestorsOwnSession: the requestor opened a TCP
+// session to the camera from its client stack; the camera's signal goes
+// back over it (the camera builds no client stack) and the requestor's node
+// serves it there, under its ACL — the requestor's Operate entry for its
+// WebRtcTransportRequestor admits the signal, and a command the entry does
+// not cover (GeneralCommissioning.ArmFailSafe, Administer) is refused
+// UnsupportedAccess on that session as on the server stack (review II,
+// Fable P-9; matter.js serves every session of the node whoever opened it,
+// ExchangeManager.ts:331, :446, :463-467 at db021da0).
+func TestPeerPathServedOnTheRequestorsOwnSession(t *testing.T) {
+	ctx := parityCtx(t)
+	cp := newCameraPeers(ctx, t, bothTCPRoles, bothTCPRoles)
+	cp.requestorOpens(ctx, t, exchange.TransportTCP)
+	if err := cp.site.Run(ctx, func(ctx context.Context) error { return cp.prov.Answer(ctx, 1, "v=0 answer") }); err != nil {
+		t.Fatalf("Answer on the requestor's own session: %v", err)
+	}
+	if got := cp.answers(); len(got) != 1 || got[0] != "v=0 answer" {
+		t.Fatalf("the requestor's answers: %q", got)
+	}
+	err := cp.site.Run(ctx, func(ctx context.Context) error {
+		_, err := node.PeerPathInvoke(ctx, cp.cam.Node(), cp.camFabric.FabricIndex, cp.ctlFabric.NodeID, 0,
+			gcdef.ClusterID, gcdef.CmdArmFailSafe, gcdef.ArmFailSafeRequest{ExpiryLengthSeconds: 60})
+		return err
+	})
+	var se im.StatusCodeError
+	if !errors.As(err, &se) || se.MatterStatusCode() != im.StatusUnsupportedAccess {
+		t.Fatalf("ArmFailSafe without Administer on the requestor's own session: %v, want UnsupportedAccess", err)
+	}
+	if node.PeerPathClientBuilt(cp.cam.Node()) {
+		t.Error("the camera built a client stack although the requestor's TCP session was live")
 	}
 }

@@ -4,8 +4,11 @@
 package node
 
 import (
+	"context"
+
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 )
 
 // PeerPathClientBuilt reports whether the node built a client stack for its
@@ -24,4 +27,10 @@ func PeerPathClientSessions(n *Node, fabricIndex uint8, nodeID uint64) []*exchan
 		return nil
 	}
 	return p.Sessions()
+}
+
+// PeerPathInvoke invokes one command on the node nodeID of the fabric
+// fabricIndex over n's peer path.
+func PeerPathInvoke(ctx context.Context, n *Node, fabricIndex uint8, nodeID uint64, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error) {
+	return peerPath{n}.to(fabricIndex, nodeID).Invoke(ctx, endpoint, clusterID, commandID, fields)
 }
