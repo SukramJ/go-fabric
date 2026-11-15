@@ -69,8 +69,9 @@ func writeSecrets(t *testing.T, s *store.Store) sealedSecrets {
 		"key 1": randomSecret(32), "key 2": randomSecret(32), "key 3": randomSecret(32),
 		"ipk": randomSecret(16), "epoch key 0": randomSecret(16), "epoch key 1": randomSecret(16),
 		"resumption secret": randomSecret(32), "icd key": randomSecret(16), "door lock data": randomSecret(24),
-		"door lock key":   []byte(hex.EncodeToString(randomSecret(16))),
-		"wifi passphrase": []byte(hex.EncodeToString(randomSecret(20))),
+		"door lock key":    []byte(hex.EncodeToString(randomSecret(16))),
+		"wifi passphrase":  []byte(hex.EncodeToString(randomSecret(20))),
+		"joint fabric key": []byte(hex.EncodeToString(randomSecret(16))),
 	}
 	idx, err := s.AddFabric(ctx, newFabricRecord(0, 7))
 	if err != nil {
@@ -89,6 +90,7 @@ func writeSecrets(t *testing.T, s *store.Store) sealedSecrets {
 	must("ReplaceICDRegistrations", s.ReplaceICDRegistrations(ctx, idx, []store.ICDRegistration{{CheckInNodeID: 7, MonitoredSubject: 8, Key: sec["icd key"]}}))
 	must("SaveDoorLockAuth", s.SaveDoorLockAuth(ctx, "lock", store.DoorLockAuth{Credentials: []store.DoorLockCredential{{Type: 1, Index: 1, Data: sec["door lock data"]}}}))
 	must("SetSetting wifi", s.SetSetting(ctx, "netcomm.wifi.networks", `[{"ssid":"home","credentials":"`+string(sec["wifi passphrase"])+`"}]`))
+	must("SetSetting joint fabric", s.SetSetting(ctx, "jointfabric.datastore:anchor", `{"groupKeySets":[{"epochKey0":"`+string(sec["joint fabric key"])+`"}]}`))
 	must("SetSettings door lock key", s.SetSettings(ctx, map[string]string{store.SettingDoorLockCredentialKey: string(sec["door lock key"]), "plain": "v"}))
 
 	must("UpdateFabricCredentials 2", s.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{2}, PrivateKey: sec["key 2"], NodeID: 9}))
@@ -152,6 +154,9 @@ func checkSecretsRead(t *testing.T, s *store.Store, w sealedSecrets) {
 	}
 	if v, ok, err := s.GetSetting(ctx, "plain"); err != nil || !ok || v != "v" {
 		t.Errorf("GetSetting plain = %q, %v, %v", v, ok, err)
+	}
+	if v, ok, err := s.GetSetting(ctx, "jointfabric.datastore:anchor"); err != nil || !ok || !strings.Contains(v, string(sec["joint fabric key"])) {
+		t.Errorf("GetSetting joint fabric = %q, %v, %v", v, ok, err)
 	}
 }
 
@@ -237,9 +242,13 @@ func TestSealedStoreWrongKeyOrNoSealer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSealed under another key on a sealed database: %v", err)
 	}
-	for name, st := range map[string]*store.Store{"another key": other, "no sealer": store.New(db)} {
-		if id, err := st.GetIdentity(ctx, w.fabric); err == nil || id.PrivateKey != nil {
-			t.Errorf("%s: GetIdentity = %x, %v; want an error and no key", name, id.PrivateKey, err)
+	for name, c := range map[string]struct {
+		st   *store.Store
+		want error
+	}{"another key": {other, store.ErrUnseal}, "no sealer": {store.New(db), store.ErrNoSealer}} {
+		st := c.st
+		if id, err := st.GetIdentity(ctx, w.fabric); !errors.Is(err, c.want) || id.PrivateKey != nil {
+			t.Errorf("%s: GetIdentity = %x, %v; want %v and no key", name, id.PrivateKey, err, c.want)
 		}
 		if _, err := st.GetGroupKeySet(ctx, w.fabric, 1); err == nil {
 			t.Errorf("%s: GetGroupKeySet opened", name)
@@ -374,8 +383,8 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		}
 	}
 	var settings int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 3 {
-		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key and the ICD key", settings, err)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 4 {
+		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key, the ICD key and the joint fabric record", settings, err)
 	}
 	// The pending update reads back and rolls back under the sealer.
 	if id, err := s.GetIdentity(ctx, w.fabric); err != nil || !bytes.Equal(id.PrivateKey, w.secrets["key 4"]) {
@@ -408,17 +417,21 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		t.Error("a second NewSealed sealed a sealed key again")
 	}
 
-	// A clear row a Store without the sealer adds is read as it is and
-	// sealed by the next NewSealed.
+	// A clear row a Store without the sealer adds is refused by the sealed
+	// store and sealed by the next NewSealed.
 	added := randomSecret(16)
 	if err := unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 2, EpochKey0: added, EpochStart0: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if ks, err := s.GetGroupKeySet(ctx, w.fabric, 2); err != nil || !bytes.Equal(ks.EpochKey0, added) {
-		t.Errorf("a clear row under the sealer = %x, %v", ks.EpochKey0, err)
+	if ks, err := s.GetGroupKeySet(ctx, w.fabric, 2); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a clear row under the sealer = %x, %v; want ErrUnseal", ks.EpochKey0, err)
 	}
-	if _, err := store.NewSealed(ctx, db, testSealer(t, 3)); err != nil {
+	next, err := store.NewSealed(ctx, db, testSealer(t, 3))
+	if err != nil {
 		t.Fatal(err)
+	}
+	if ks, err := next.GetGroupKeySet(ctx, w.fabric, 2); err != nil || !bytes.Equal(ks.EpochKey0, added) {
+		t.Errorf("the row after the next NewSealed = %x, %v", ks.EpochKey0, err)
 	}
 	var n int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_group_keys WHERE sealed = 0`).Scan(&n); err != nil || n != 0 {
@@ -523,21 +536,22 @@ func TestSealedStoreContract(t *testing.T) {
 	})
 }
 
-// TestSealedSettingsNameClusterCoreKeys: the setting keys the store seals
-// by name are cluster/core's unexported constants, copied; this holds the
-// copies to their source.
-func TestSealedSettingsNameClusterCoreKeys(t *testing.T) {
+// TestSealedSettingsNameTheirSources: the setting keys the store seals by
+// name are cluster/core's and cluster/jointfabric's unexported constants,
+// copied; this holds the copies to their source.
+func TestSealedSettingsNameTheirSources(t *testing.T) {
 	t.Parallel()
 	for file, decl := range map[string]string{
-		"network_commissioning_wifi.go":      `const wifiNetworksKey = "netcomm.wifi.networks"`,
-		"operational_credentials_pending.go": `const pendingNOCSettingKey = "operational_credentials.pending_noc"`,
+		"core/network_commissioning_wifi.go":      `const wifiNetworksKey = "netcomm.wifi.networks"`,
+		"core/operational_credentials_pending.go": `const pendingNOCSettingKey = "operational_credentials.pending_noc"`,
+		"jointfabric/datastore.go":                `const settingPrefix = "jointfabric.datastore:"`,
 	} {
-		b, err := os.ReadFile(filepath.Join("..", "cluster", "core", file))
+		b, err := os.ReadFile(filepath.Join("..", "cluster", filepath.FromSlash(file)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !bytes.Contains(b, []byte(decl)) {
-			t.Errorf("cluster/core/%s no longer declares %s: update store's sealedSettings", file, decl)
+			t.Errorf("cluster/%s no longer declares %s: update store's sealedSettings", file, decl)
 		}
 	}
 	b, err := os.ReadFile(filepath.Join("..", "cluster", "core", "operational_credentials_pending.go"))
@@ -628,115 +642,148 @@ func TestSealerErrorFailsTheWrite(t *testing.T) {
 	}
 }
 
-// TestSealedStoreOnClearRows: a sealed store writing over rows a store
-// without the sealer left clear seals the whole row — an UpdateNOC that
-// marks it, one that finds it pending, the rollback, an upsert keeping a
-// clear prior key — and reads a clear ICD row under the in-database key.
-func TestSealedStoreOnClearRows(t *testing.T) {
+// TestSealedStoreRefusesClearRows (Fable F1): after NewSealed the store
+// is strict — a secret row whose seal mark was flipped to 0, or a clear row
+// planted or written by a store without the sealer, is ErrUnseal on every
+// read and every write that reads the row; never the stored bytes.
+func TestSealedStoreRefusesClearRows(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	db := openTestDB(t)
-	unsealed := store.New(db)
 	s := sealedOver(t, db)
-	idx, err := unsealed.AddFabric(ctx, newFabricRecord(0, 21))
-	if err != nil {
-		t.Fatal(err)
-	}
-	k1, ipk := randomSecret(32), randomSecret(16)
-	identity := func(key []byte) {
+	w := writeSecrets(t, s)
+	flip := func(table string) {
 		t.Helper()
-		if err := unsealed.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: idx, NOC: []byte{1}, PrivateKey: key, IPK: ipk}); err != nil {
+		if _, err := db.ExecContext(ctx, `UPDATE `+table+` SET sealed = 0`); err != nil {
 			t.Fatal(err)
 		}
 	}
-	checkKey := func(what string, want []byte) {
-		t.Helper()
-		id, err := s.GetIdentity(ctx, idx)
-		if err != nil || !bytes.Equal(id.PrivateKey, want) || !bytes.Equal(id.IPK, ipk) {
-			t.Errorf("%s: GetIdentity = %x / %x, %v", what, id.PrivateKey, id.IPK, err)
+	flip("matter_node_identities")
+	if id, err := s.GetIdentity(ctx, w.fabric); !errors.Is(err, store.ErrUnseal) || id.PrivateKey != nil {
+		t.Errorf("GetIdentity of a flipped mark = %x, %v; want ErrUnseal and no key", id.PrivateKey, err)
+	}
+	if err := s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: w.fabric, NOC: []byte{8}, PrivateKey: randomSecret(32), IPK: randomSecret(16)}); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("UpsertIdentity over a flipped mark = %v; want ErrUnseal", err)
+	}
+	if err := s.UpdateFabricCredentials(ctx, w.fabric, store.FabricCredentials{NOC: []byte{8}, PrivateKey: randomSecret(32), NodeID: 8}); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("UpdateFabricCredentials over a flipped mark = %v; want ErrUnseal", err)
+	}
+	flip("matter_resumption")
+	if r, err := s.GetResumptionByPeer(ctx, w.fabric, 5); !errors.Is(err, store.ErrUnseal) || r.SharedSecret != nil {
+		t.Errorf("GetResumptionByPeer of a flipped mark = %x, %v; want ErrUnseal", r.SharedSecret, err)
+	}
+	flip("matter_group_keys")
+	if _, err := s.ListGroupKeySets(ctx, w.fabric); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("ListGroupKeySets of a flipped mark = %v; want ErrUnseal", err)
+	}
+	flip("matter_icd_registrations")
+	if _, err := s.ListICDRegistrations(ctx); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("ListICDRegistrations of a flipped mark = %v; want ErrUnseal", err)
+	}
+	flip("matter_doorlock_credentials")
+	if _, _, err := s.LoadDoorLockAuth(ctx, "lock"); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("LoadDoorLockAuth of a flipped mark = %v; want ErrUnseal", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_settings SET sealed = 0 WHERE key = 'netcomm.wifi.networks'`); err != nil {
+		t.Fatal(err)
+	}
+	if v, _, err := s.GetSetting(ctx, "netcomm.wifi.networks"); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("GetSetting of a flipped mark = %q, %v; want ErrUnseal", v, err)
+	}
+
+	// Planted clear rows: a store without the sealer writes them.
+	other := openTestDB(t)
+	sealed := sealedOver(t, other)
+	pw := writeSecrets(t, sealed)
+	unsealed := store.New(other)
+	for name, err := range map[string]error{
+		"UpsertGroupKeySet": unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: pw.fabric, GroupKeySetID: 1, EpochKey0: randomSecret(16), EpochStart0: 1}),
+		"SetSetting":        unsealed.SetSetting(ctx, store.SettingDoorLockCredentialKey, "00"),
+		"UpsertResumption": unsealed.UpsertResumption(ctx, store.ResumptionRecord{
+			FabricIndex: pw.fabric, PeerNodeID: 5, ResumptionID: bytes.Repeat([]byte{0xab}, 16), SharedSecret: randomSecret(32),
+		}),
+	} {
+		if err != nil {
+			t.Fatalf("plant %s: %v", name, err)
 		}
-		var mark bool
-		if err := db.QueryRowContext(ctx, `SELECT sealed FROM matter_node_identities WHERE fabric_index = ?`, idx).Scan(&mark); err != nil || !mark {
-			t.Errorf("%s: the row is not sealed: %v", what, err)
+	}
+	if _, err := sealed.GetGroupKeySet(ctx, pw.fabric, 1); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a planted key set = %v; want ErrUnseal", err)
+	}
+	if _, _, err := sealed.GetSetting(ctx, store.SettingDoorLockCredentialKey); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a planted secret setting = %v; want ErrUnseal", err)
+	}
+	if _, err := sealed.GetResumptionByID(ctx, bytes.Repeat([]byte{0xab}, 16)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a planted resumption record = %v; want ErrUnseal", err)
+	}
+	if v, ok, err := sealed.GetSetting(ctx, "plain"); err != nil || !ok || v != "v" {
+		t.Errorf("a setting that is no secret under the sealer = %q, %v, %v", v, ok, err)
+	}
+	// A planted clear identity row with a pending update is refused by the
+	// rollback too.
+	if _, err := other.ExecContext(ctx, `UPDATE matter_node_identities SET sealed = 0`); err != nil {
+		t.Fatal(err)
+	}
+	if err := unsealed.UpdateFabricCredentials(ctx, pw.fabric, store.FabricCredentials{NOC: []byte{10}, PrivateKey: randomSecret(32), NodeID: 10}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sealed.RollbackFabric(ctx, pw.fabric); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("RollbackFabric of a clear row under the sealer = %v; want ErrUnseal", err)
+	}
+}
+
+// TestReadSideLengthChecks: a secret of the wrong length is refused on
+// read, with or without a sealer — the lengths the write side enforces
+// (the resumption secret here, the IPK by AddNOC, the epoch keys by
+// KeySetWrite).
+func TestReadSideLengthChecks(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s := store.New(db)
+	w := writeSecrets(t, s)
+	for _, step := range []struct {
+		name, sql string
+		read      func() error
+	}{
+		{"shared_secret", `UPDATE matter_resumption SET shared_secret = X'01'`, func() error {
+			_, err := s.GetResumptionByPeer(ctx, w.fabric, 5)
+			return err
+		}},
+		{"ipk", `UPDATE matter_node_identities SET ipk = X'01'`, func() error {
+			_, err := s.GetIdentity(ctx, w.fabric)
+			return err
+		}},
+		{"private_key", `UPDATE matter_node_identities SET ipk = X'000102030405060708090a0b0c0d0e0f', private_key = X''`, func() error {
+			_, err := s.GetIdentity(ctx, w.fabric)
+			return err
+		}},
+		{"epoch_key_1", `UPDATE matter_group_keys SET epoch_key_1 = X'0102'`, func() error {
+			_, err := s.GetGroupKeySet(ctx, w.fabric, 1)
+			return err
+		}},
+	} {
+		if _, err := db.ExecContext(ctx, step.sql); err != nil {
+			t.Fatal(err)
+		}
+		if err := step.read(); err == nil || !strings.Contains(err.Error(), step.name) {
+			t.Errorf("%s of the wrong length read = %v; want an error naming it", step.name, err)
 		}
 	}
+}
 
-	identity(k1)
-	k2 := randomSecret(32)
-	if err := s.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{2}, PrivateKey: k2, NodeID: 2}); err != nil {
+// TestNewSealedRefusesACorruptKeyColumn (Fable F8): a row whose key column
+// holds a value of no key type fails NewSealed with an error, not a panic.
+func TestNewSealedRefusesACorruptKeyColumn(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	w := writeSecrets(t, store.New(db))
+	if _, err := db.ExecContext(ctx, `UPDATE matter_resumption SET peer_node_id = 1.5 WHERE fabric_index = ?`, w.fabric); err != nil {
 		t.Fatal(err)
 	}
-	checkKey("an update that marked a clear row", k2)
-	if was, err := s.RollbackFabric(ctx, idx); err != nil || was != store.FabricPendingUpdate {
-		t.Fatalf("RollbackFabric = %v, %v", was, err)
-	}
-	checkKey("the rollback", k1)
-
-	// A clear pending update: the unsealed store marks the row, the
-	// sealed one finds it pending (prior clear), then rolls it back.
-	if _, err := db.ExecContext(ctx, `UPDATE matter_node_identities SET sealed = 0, private_key = ?, ipk = ? WHERE fabric_index = ?`, k1, ipk, idx); err != nil {
-		t.Fatal(err)
-	}
-	if err := unsealed.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{3}, PrivateKey: randomSecret(32), NodeID: 3}); err != nil {
-		t.Fatal(err)
-	}
-	k4 := randomSecret(32)
-	if err := s.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{4}, PrivateKey: k4, NodeID: 4}); err != nil {
-		t.Fatal(err)
-	}
-	checkKey("an update of a clear pending row", k4)
-	if _, err := s.RollbackFabric(ctx, idx); err != nil {
-		t.Fatal(err)
-	}
-	checkKey("the rollback of a clear prior key", k1)
-
-	// Upsert over a clear row whose prior key is clear.
-	if _, err := db.ExecContext(ctx, `UPDATE matter_node_identities SET sealed = 0, private_key = ?, ipk = ? WHERE fabric_index = ?`, k1, ipk, idx); err != nil {
-		t.Fatal(err)
-	}
-	if err := unsealed.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{5}, PrivateKey: randomSecret(32), NodeID: 5}); err != nil {
-		t.Fatal(err)
-	}
-	k6 := randomSecret(32)
-	if err := s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: idx, NOC: []byte{6}, PrivateKey: k6, IPK: ipk}); err != nil {
-		t.Fatal(err)
-	}
-	checkKey("an upsert over a clear row", k6)
-	if _, err := s.RollbackFabric(ctx, idx); err != nil {
-		t.Fatal(err)
-	}
-	checkKey("the rollback to the clear prior key the upsert sealed", k1)
-
-	// A clear rollback without the sealer of a clear row restores it.
-	if _, err := db.ExecContext(ctx, `UPDATE matter_node_identities SET sealed = 0, private_key = ?, ipk = ? WHERE fabric_index = ?`, k1, ipk, idx); err != nil {
-		t.Fatal(err)
-	}
-	if err := unsealed.UpdateFabricCredentials(ctx, idx, store.FabricCredentials{NOC: []byte{7}, PrivateKey: randomSecret(32), NodeID: 7}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := unsealed.RollbackFabric(ctx, idx); err != nil {
-		t.Fatal(err)
-	}
-	if id, err := unsealed.GetIdentity(ctx, idx); err != nil || !bytes.Equal(id.PrivateKey, k1) {
-		t.Errorf("the clear rollback = %x, %v", id.PrivateKey, err)
-	}
-
-	// An ICD row the unsealed store sealed under the in-database key.
-	icd := randomSecret(16)
-	if err := unsealed.ReplaceICDRegistrations(ctx, idx, []store.ICDRegistration{{CheckInNodeID: 1, MonitoredSubject: 2, Key: icd}}); err != nil {
-		t.Fatal(err)
-	}
-	if regs, err := s.ListICDRegistrations(ctx); err != nil || len(regs) != 1 || !bytes.Equal(regs[0].Key, icd) {
-		t.Errorf("a clear ICD row under the sealer = %+v, %v", regs, err)
-	}
-	if err := unsealed.DeleteSettings(ctx, store.SettingICDKey); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.ListICDRegistrations(ctx); err == nil {
-		t.Error("a clear ICD row whose in-database key is gone opened")
-	}
-	if _, err := store.NewSealed(ctx, db, testSealer(t, 5)); err == nil {
-		t.Error("NewSealed sealed an ICD row whose in-database key is gone")
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 1)); err == nil || !strings.Contains(err.Error(), "key part") {
+		t.Errorf("NewSealed over a REAL peer_node_id = %v; want the aad's error", err)
 	}
 }
 
@@ -748,4 +795,63 @@ func sealedOver(t *testing.T, db *sql.DB) *store.Store {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4): the sealing
+// upgrade's residue claim in the journal modes it holds in — WAL
+// (TestNewSealedSealsAClearDatabase too) and the rollback journal's DELETE
+// (SQLite's default) and TRUNCATE forms: after NewSealed over a clear
+// database, no clear secret is in any file of the directory, the handle
+// open and after Close. journal_mode(PERSIST) is left out because the claim
+// does not hold there: measured, the kept -journal still holds clear
+// pre-images of the settings page after the scrub; the documentation limits
+// the claim to these modes.
+func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"", "journal_mode(DELETE)", "journal_mode(TRUNCATE)", walMode} {
+		name := mode
+		if name == "" {
+			name = "default"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			dir := t.TempDir()
+			var pragmas []string
+			if mode != "" {
+				pragmas = append(pragmas, mode)
+			}
+			db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), pragmas...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = db.Close() }()
+			if err := store.Apply(ctx, db); err != nil {
+				t.Fatal(err)
+			}
+			w := writeSecrets(t, store.New(db))
+			icdKey, _, err := store.New(db).GetSetting(ctx, store.SettingICDKey)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.secrets["in-database icd key"] = []byte(icdKey)
+			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) == 0 {
+				t.Fatal("before NewSealed no clear secret is on disk: the test does not see the clear form")
+			}
+			s, err := store.NewSealed(ctx, db, testSealer(t, 6))
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkSecretsRead(t, s, w)
+			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
+				t.Errorf("clear secrets on disk after NewSealed, handle open: %v", hits)
+			}
+			if err := db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
+				t.Errorf("clear secrets on disk after NewSealed and Close: %v", hits)
+			}
+		})
+	}
 }

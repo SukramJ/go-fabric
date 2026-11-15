@@ -261,6 +261,11 @@ ORDER BY group_id ASC`, fabricIndex)
 	return out, nil
 }
 
+// epochKeySize is an epoch key's size, the length cluster/core's
+// KeySetWrite accepts (group_key_management.go, epochKeyLen); a key set
+// read with another is refused.
+const epochKeySize = 16
+
 // groupEpochKeyColumns are the epoch key columns, by slot.
 var groupEpochKeyColumns = [3]string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}
 
@@ -302,6 +307,9 @@ func (s *Store) scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 		plain, err := s.openColumn(*k, sealed, "matter_group_keys", groupEpochKeyColumns[i], rec.FabricIndex, rec.GroupKeySetID)
 		if err != nil {
 			return GroupKeySet{}, err
+		}
+		if plain != nil && len(plain) != epochKeySize {
+			return GroupKeySet{}, fmt.Errorf("store: %s length=%d (want %d)", groupEpochKeyColumns[i], len(plain), epochKeySize)
 		}
 		*k = plain
 	}

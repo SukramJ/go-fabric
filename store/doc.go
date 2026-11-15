@@ -56,12 +56,17 @@
 //
 // A Store from [NewSealed] seals every secret column under a [Sealer] the
 // host supplies, whose key lives outside the database — only then are the
-// values a copy of the file holds, the old ones in its free pages and its
-// -wal included, unreadable without that key. Each sealed value is bound to
-// its table, column and row; each row carries its seal mark (schema v10).
-// [NewSealed] names the columns and the settings and seals a clear
-// database on the way in; [AESGCMSealer] is the stdlib sealer. The key's
-// provisioning and rotation are the host's.
+// secrets a copy of the file holds, the old ones in its free pages and its
+// -wal included, unreadable without that key; the non-secret columns stay
+// readable. Each sealed value is bound to its table, column and row; each
+// row carries its seal mark (schema v10), and a sealed store refuses a
+// secret row without it ([ErrUnseal]). Sealing protects the confidentiality
+// of a copy of the database; it gives no integrity or rollback protection —
+// an older sealed value of the same row, written back, opens. [NewSealed]
+// names the columns and the settings (the JointFabricDatastore record
+// under jointfabric.datastore: among them) and seals a clear database on
+// the way in; [AESGCMSealer] is the stdlib sealer. The key's provisioning
+// and rotation are the host's.
 //
 // # Store errors
 //

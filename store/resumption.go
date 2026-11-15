@@ -72,12 +72,19 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 	if err != nil {
 		return ResumptionRecord{}, err
 	}
+	if len(secret) != resumptionSecretSize {
+		return ResumptionRecord{}, fmt.Errorf("store: shared_secret length=%d (want %d)", len(secret), resumptionSecretSize)
+	}
 	rec.SharedSecret = secret
 	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
 		rec.CASEAuthTags = nil // tolerate corrupt rows
 	}
 	return rec, nil
 }
+
+// resumptionSecretSize is the shared secret's size, checked on every write
+// and every read.
+const resumptionSecretSize = 32
 
 // ErrResumptionNotFound is returned when a lookup misses.
 var ErrResumptionNotFound = errors.New("store: resumption record not found")
@@ -89,8 +96,8 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("store: resumption_id length=%d (want 16)", len(rec.ResumptionID))
 	}
-	if len(rec.SharedSecret) != 32 {
-		return fmt.Errorf("store: shared_secret length=%d (want 32)", len(rec.SharedSecret))
+	if len(rec.SharedSecret) != resumptionSecretSize {
+		return fmt.Errorf("store: shared_secret length=%d (want %d)", len(rec.SharedSecret), resumptionSecretSize)
 	}
 	cats := rec.CASEAuthTags
 	if cats == nil {

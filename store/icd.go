@@ -74,8 +74,8 @@ ORDER BY fabric_index ASC, position ASC`)
 	var aead cipher.AEAD
 	for i := range out {
 		r := &out[i]
-		if sealed[i] {
-			if r.Key, err = s.openColumn(r.Key, true, "matter_icd_registrations", "icd_key",
+		if sealed[i] || s.sealer != nil {
+			if r.Key, err = s.openColumn(r.Key, sealed[i], "matter_icd_registrations", "icd_key",
 				r.FabricIndex, uint64ToBE(r.CheckInNodeID), uint64ToBE(r.MonitoredSubject)); err != nil {
 				return nil, fmt.Errorf("store: list icd registrations: fabric %d node %016X: %w", r.FabricIndex, r.CheckInNodeID, err)
 			}

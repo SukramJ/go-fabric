@@ -31,6 +31,10 @@ type IdentityRecord struct {
 	IPK []byte
 }
 
+// ipkSize is the IPK's size, the length cluster/core's AddNOC accepts
+// (operational_credentials.go, IPKValue); GetIdentity refuses another.
+const ipkSize = 16
+
 // identityTable is the table the identity's secrets are sealed in.
 const identityTable = "matter_node_identities"
 
@@ -62,15 +66,15 @@ WHERE matter_node_identities.sealed = 0`,
 	if n, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("store: upsert identity: %w", err)
 	} else if n == 0 {
-		return fmt.Errorf("store: upsert identity: %w", errSealedNoSealer)
+		return fmt.Errorf("store: upsert identity: %w", ErrNoSealer)
 	}
 	return nil
 }
 
 // upsertSealedIdentity is UpsertIdentity under a sealer, in tx: the row's
-// secrets sealed, a clear prior key a store without a sealer left sealed
-// with them. Its first statement writes, so the transaction holds the
-// write lock before it reads.
+// secrets sealed, a sealed prior key kept; a row without the seal mark is
+// refused ([ErrUnseal]). Its first statement writes, so the transaction
+// holds the write lock before it reads.
 func (s *Store) upsertSealedIdentity(ctx context.Context, tx *sql.Tx, rec IdentityRecord) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE matter_node_identities SET sealed = sealed WHERE fabric_index = ?`, rec.FabricIndex); err != nil {
 		return err
@@ -80,13 +84,13 @@ func (s *Store) upsertSealedIdentity(ctx context.Context, tx *sql.Tx, rec Identi
 		sealed bool
 	)
 	err := tx.QueryRowContext(ctx, `SELECT prior_private_key, sealed FROM matter_node_identities WHERE fabric_index = ?`, rec.FabricIndex).Scan(&prior, &sealed)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		// a new identity
+	case err != nil:
 		return err
-	}
-	if !sealed {
-		if prior, err = s.sealColumn(prior, identityTable, "prior_private_key", rec.FabricIndex); err != nil {
-			return err
-		}
+	case !sealed:
+		return clearRowUnderSealer(identityTable)
 	}
 	key, err := s.sealColumn(rec.PrivateKey, identityTable, "private_key", rec.FabricIndex)
 	if err != nil {
@@ -137,6 +141,12 @@ WHERE fabric_index = ?`, fabricIndex).Scan(&rec.NOC, &icac, &rec.PrivateKey, &re
 	}
 	if rec.IPK, err = s.openColumn(rec.IPK, sealed, identityTable, "ipk", fabricIndex); err != nil {
 		return IdentityRecord{}, fmt.Errorf("store: get identity: %w", err)
+	}
+	if len(rec.PrivateKey) == 0 {
+		return IdentityRecord{}, errors.New("store: get identity: empty private_key")
+	}
+	if len(rec.IPK) != ipkSize {
+		return IdentityRecord{}, fmt.Errorf("store: get identity: ipk length=%d (want %d)", len(rec.IPK), ipkSize)
 	}
 	return rec, nil
 }

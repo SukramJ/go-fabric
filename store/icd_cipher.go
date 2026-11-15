@@ -40,17 +40,14 @@ type sqlExecQuerier interface {
 
 // icdAEAD is the cipher of the ICD keys, under the key [SettingICDKey]
 // holds — created there when none is stored yet (INSERT OR IGNORE, then
-// read back, so two writers agree on one key). A store with a sealer
-// creates none: it seals the ICD keys itself and opens this cipher only
-// for a row a store without one wrote, whose key is then stored.
+// read back, so two writers agree on one key). Only a store without a
+// sealer uses it — and NewSealed's upgrade, as one, for the rows such a
+// store left: a sealed store seals the ICD keys itself.
 func (s *Store) icdAEAD(ctx context.Context, q sqlExecQuerier) (cipher.AEAD, error) {
 	read := func() (string, bool, error) { return s.readSetting(ctx, q, SettingICDKey) }
 	v, ok, err := read()
 	if err != nil {
 		return nil, fmt.Errorf("store: icd key: %w", err)
-	}
-	if !ok && s.sealer != nil {
-		return nil, fmt.Errorf("store: icd key: %q is not stored", SettingICDKey)
 	}
 	if !ok {
 		key := make([]byte, icdKeySize)

@@ -981,7 +981,7 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 // groupcast, resumption, default OTA provider, ICD registration.
 func seedFabricRows(ctx context.Context, t *testing.T, p store.Port, f uint8) {
 	t.Helper()
-	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: bytes.Repeat([]byte{3}, 16)}))
 	must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
 	must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
 	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
