@@ -85,7 +85,7 @@ func (r *requestorStack) End(_ context.Context, _ wrdef.WebRTCSessionStruct, rea
 func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 	site := tcpSite(t)
 	ctx := parityCtx(t)
-	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 func TestCameraProviderLargeSignalOverTCP(t *testing.T) {
 	site := tcpSite(t)
 	ctx := parityCtx(t)
-	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}

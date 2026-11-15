@@ -36,4 +36,10 @@ var (
 	// SetTransitionHook sets the facade's slot of a
 	// *bridge.CommissioningWindow's transition hook.
 	SetTransitionHook func(window any, fn func()) bool
+	// OwnFabricState tells a *bridge.Bridge that the node drops the
+	// state of a removed fabric from every server itself
+	// (contract.FabricScopedState): the bridge's own drop, which serves a
+	// host without the node, then stands aside, so each server is asked
+	// once.
+	OwnFabricState func(bridge any) bool
 )

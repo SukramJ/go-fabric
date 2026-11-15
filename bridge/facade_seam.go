@@ -16,4 +16,12 @@ func init() {
 		w.mu.Unlock()
 		return true
 	}
+	facadeseam.OwnFabricState = func(bridge any) bool {
+		b, ok := bridge.(*Bridge)
+		if !ok || b == nil {
+			return false
+		}
+		b.fabricStateByNode.Store(true)
+		return true
+	}
 }

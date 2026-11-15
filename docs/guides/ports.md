@@ -244,9 +244,8 @@ the bridge silently does without.
 
 A cluster server's state of a removed fabric goes through one port,
 `contract.FabricScopedState`: the node calls it on every server of every
-endpoint, and the bridge's fabric removal on the servers of the bridged
-endpoints, so a host that runs the bridge without the node has it too (a
-second drop of a fabric a server holds nothing for changes nothing).
+endpoint; a host that runs the bridge without the node has the bridge's
+fabric removal call it on the servers of the bridged endpoints.
 
 *Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 

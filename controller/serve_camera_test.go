@@ -200,8 +200,20 @@ func newTestCamera(t *testing.T, port *testCameraPort) *device.Camera {
 	}}
 	cam, err := device.NewCamera(device.Options{StableKey: device.StringKey("camera"), Name: "Camera"},
 		csdef.Declare{
-			Features:        csdef.FeatureVideo | csdef.FeatureAudio | csdef.FeatureSnapshot,
-			Initial:         csdef.Patch{SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &streams},
+			Features: csdef.FeatureVideo | csdef.FeatureAudio | csdef.FeatureSnapshot,
+			Initial: csdef.Patch{
+				SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &streams,
+				// The state device.New requires (decision 17), matter.js's
+				// corpus values (StandardDeviceTypeCorpusTest.ts:132-143,
+				// :162, :166 at db021da0).
+				MicrophoneCapabilities: &csdef.AudioCapabilitiesStruct{
+					MaxNumberOfChannels: 1, SupportedCodecs: []csdef.AudioCodecEnum{csdef.AudioCodecOpus},
+					SupportedSampleRates: []uint32{48000}, SupportedBitDepths: []uint8{16},
+				},
+				VideoSensorParams:     &csdef.VideoSensorParamsStruct{SensorWidth: 1920, SensorHeight: 1080, MaxFps: 30},
+				MinViewportResolution: &csdef.VideoResolutionStruct{Width: 640, Height: 480},
+				Viewport:              &csdef.ViewportStruct{X1: 0, Y1: 0, X2: 1920, Y2: 1080},
+			},
 			VideoStreamPort: port, AudioStreamPort: port, SnapshotStreamPort: port, SnapshotCapturePort: port,
 		},
 		wpdef.Declare{ProviderPort: port},

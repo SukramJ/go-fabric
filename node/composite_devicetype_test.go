@@ -27,7 +27,7 @@ func TestCompositeDeviceTypesValidate(t *testing.T) {
 		}
 	}
 	camera := func(key string) *device.Camera {
-		c, err := device.NewCamera(opts(key))
+		c, err := device.NewCamera(opts(key), cameraRequired())
 		must(err)
 		return c
 	}

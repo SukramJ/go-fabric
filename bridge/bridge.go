@@ -462,6 +462,10 @@ type Bridge struct {
 	// the bridge so [Bridge.Reassemble] can re-stamp them onto each
 	// freshly assembled root endpoint without the daemon re-attaching.
 	rootClusters []contract.ClusterServer
+	// fabricStateByNode: the node facade drops a removed fabric's
+	// contract.FabricScopedState itself (internal/facadeseam), so the
+	// bridge's fabric removal does not (dropFabricState).
+	fabricStateByNode atomic.Bool
 	// rootPartsByHost and aggregatorPartsByHost record that the host
 	// attached its own PartsList provider (AttachRootPartsListProvider,
 	// AttachAggregatorPartsListProvider); without one, Start installs the
@@ -1915,11 +1919,12 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 				// The state a device's cluster server keeps for the
 				// fabric (the Thermostat's atomic writes, the TLS
 				// tables): contract.FabricScopedState, the one removal
-				// path. The node calls it on every server as well; a
-				// second drop of a fabric a server holds nothing for
-				// changes nothing, and a host that runs the bridge without
-				// the node still has it (review II, R2-P5-apidev-09).
-				b.dropFabricState(context.WithoutCancel(ctx), ep, fabricIndex)
+				// path — the node's fan-out when the node runs the
+				// bridge, here for a host that runs it without the node
+				// (review II, R2-P5-apidev-09).
+				if !b.fabricStateByNode.Load() {
+					b.dropFabricState(context.WithoutCancel(ctx), ep, fabricIndex)
+				}
 			}
 		}
 	}

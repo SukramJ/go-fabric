@@ -455,6 +455,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// In the facade's own slot (internal/facadeseam): a host's
 	// SetOnFabricRemoved / SetOnFabricUpdated adds to them.
 	facadeSlot(facadeseam.SetOnFabricRemoved(n.root.OperationalCredentials, n.observedFabricRemoved), "OperationalCredentials fabric removed")
+	// The node drops a removed fabric's state from every server itself
+	// (dropFabricState); the bridge's own drop stands aside.
+	facadeSlot(facadeseam.OwnFabricState(n.br), "bridge fabric state")
 	facadeSlot(facadeseam.SetOnFabricUpdated(n.root.OperationalCredentials, n.observedFabricUpdated), "OperationalCredentials fabric updated")
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 

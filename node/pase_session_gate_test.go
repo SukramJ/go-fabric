@@ -6,6 +6,7 @@ package node_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"net"
 	"testing"
 	"time"
@@ -74,7 +75,12 @@ func pbkdfParamRequestAnswered(t *testing.T, addr string) bool {
 	req = append(req, 0x15, 0x30, 0x01, 0x20)
 	req = append(req, initRand...)
 	req = append(req, 0x25, 0x02, 0x2A, 0x00, 0x25, 0x03, 0x00, 0x00, 0x28, 0x04, 0x18)
-	hdr := message.Header{MessageCounter: 77, HasSourceNodeID: true, SourceNodeID: 0xBAD0BAD0}
+	// A source node id and counter of its own per call: a second request
+	// of the same initiator and counter is a duplicate on the unsecured
+	// session, dropped before it is judged.
+	var ids [12]byte
+	_, _ = rand.Read(ids[:])
+	hdr := message.Header{MessageCounter: binary.BigEndian.Uint32(ids[:4]), HasSourceNodeID: true, SourceNodeID: binary.BigEndian.Uint64(ids[4:]) | 1}
 	proto := message.ProtocolHeader{
 		Initiator: true, NeedsAck: true, Opcode: mrp.SCOpcodePBKDFParamRequest,
 		ExchangeID: 0x7777, ProtocolID: mrp.SecureChannelProtocolID,

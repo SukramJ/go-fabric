@@ -77,7 +77,7 @@ func invokeOn(t *testing.T, srv contract.ClusterServer, cmd uint32, req any) (an
 // TLSEndpointID against them (brief 26-A3, owner decision 2026-10-28).
 func TestNodeServesTheTLSServers(t *testing.T) {
 	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam"), Name: "cam"},
-		padef.Declare{PushTransportPort: pushPort{}})
+		padef.Declare{PushTransportPort: pushPort{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}
