@@ -60,8 +60,11 @@ type WiFiNetworkCommissioning struct {
 	scanMax       uint8
 	connectMax    uint8
 	store         store.Settings
-	logger        *slog.Logger
-	clk           clock.Clock
+	// loadErr is the store's error reading the stored networks at
+	// construction; while set, no list is stored (saveLocked).
+	loadErr error
+	logger  *slog.Logger
+	clk     clock.Clock
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -202,7 +205,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	if w.connectMax == 0 {
 		w.connectMax = 20
 	}
-	w.committed = w.loadCommitted(context.Background()) //nolint:contextcheck // the constructor takes no context; it reads the store once
+	w.committed, w.loadErr = w.loadCommitted(context.Background()) //nolint:contextcheck // the constructor takes no context; it reads the store once
 	w.networks = slices.Clone(w.committed)
 	w.dataVersion.Bump()
 	return w, nil
@@ -210,22 +213,29 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 
 // loadCommitted reads the stored committed networks (Init, :77-128): none
 // without a store, a stored value or one that decodes; at most
-// MaxNetworks of them.
-func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetwork {
+// MaxNetworks of them. A store that cannot read the setting — a sealed
+// value that does not open (store.ErrUnseal), a store without the sealer
+// (store.ErrNoSealer), an I/O error — is its error: the server then
+// starts with no network in force and refuses to store a list
+// ([WiFiNetworkCommissioning.StoreNetworks]), so the stored value is
+// never overwritten with one built over a list it could not read (review
+// II, seal F5).
+func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) ([]wifiNetwork, error) {
 	if w.store == nil {
-		return nil
+		return nil, nil
 	}
 	raw, ok, err := w.store.GetSetting(ctx, wifiNetworksKey)
-	if err != nil || !ok {
-		if err != nil {
-			w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
-		}
-		return nil
+	if err != nil {
+		w.log().Error("netcomm.wifi.load_failed", slog.Any("err", err))
+		return nil, fmt.Errorf("core: WiFiNetworkCommissioning: read the stored networks: %w", err)
+	}
+	if !ok {
+		return nil, nil
 	}
 	var stored []storedWiFiNetwork
 	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
 		w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
-		return nil
+		return nil, nil
 	}
 	var list []wifiNetwork
 	for _, n := range stored {
@@ -234,7 +244,7 @@ func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetw
 		}
 		list = append(list, wifiNetwork{ssid: n.SSID, credentials: n.Credentials})
 	}
-	return list
+	return list, nil
 }
 
 // saveCommittedLocked stores the committed networks (CommitConfiguration,
@@ -250,6 +260,11 @@ func (w *WiFiNetworkCommissioning) saveCommittedLocked(ctx context.Context) {
 func (w *WiFiNetworkCommissioning) saveLocked(ctx context.Context, list []wifiNetwork) error {
 	if w.store == nil {
 		return nil
+	}
+	if w.loadErr != nil {
+		// The stored list could not be read: writing would replace it
+		// with one built without it (seal F5).
+		return fmt.Errorf("core: WiFiNetworkCommissioning: the stored networks could not be read, not overwriting them: %w", w.loadErr)
 	}
 	stored := make([]storedWiFiNetwork, 0, len(list))
 	for _, n := range list {
