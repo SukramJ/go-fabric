@@ -149,14 +149,12 @@ func TestDecodeSkipsUnknownAndNested(t *testing.T) {
 	}
 }
 
-// TestDecodeIgnoresNonContextTagsAndDeepNesting: an anonymous element
-// inside the structure is ignored, a doubly nested container is skipped
-// whole, and a container truncated mid-way is an error.
-func TestDecodeIgnoresNonContextTagsAndDeepNesting(t *testing.T) {
+// TestDecodeSkipsDeepNesting: a doubly nested container at an unknown tag
+// is skipped whole, and a container truncated mid-way is an error.
+func TestDecodeSkipsDeepNesting(t *testing.T) {
 	t.Parallel()
 	b := []byte{
 		0x35, 0x05,
-		0x04, 0x07, // anonymous uint8 7 — no context tag, ignored
 		0x35, 0x0B, 0x35, 0x01, 0x24, 0x01, 0x01, 0x18, 0x18, // [11]{ [1]{ [1]:1 } }
 		0x25, 0x07, 0x03, 0x00, // [7] 3
 		0x18,
@@ -172,12 +170,78 @@ func TestDecodeIgnoresNonContextTagsAndDeepNesting(t *testing.T) {
 	if p.MaxPathsPerInvoke != 3 {
 		t.Fatalf("decoded %+v", p)
 	}
-	dec = tlv.NewDecoder(b[:9]) // cut inside the nested container
+	dec = tlv.NewDecoder(b[:7]) // cut inside the nested container
 	if _, err := dec.Next(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := sessionparams.DecodeFields(dec); err == nil {
 		t.Fatal("truncated nested container decoded without error")
+	}
+}
+
+// TestDecodeIsStrict: the session parameters are decoded as matter.js
+// decodes TlvSessionParameters (PaseMessages.ts:28-55 at db021da0). Refused:
+// a member without a context tag (TlvObject.ts:212-214), a known field of
+// another TLV type than an unsigned integer (TlvNumber.ts:124-131), a known
+// field whose value does not fit it (:145-155). Accepted: an unknown
+// context tag of any type (TlvObject.ts:215-220), a wider encoding whose
+// value fits, a repeated field — the last value wins (:233).
+func TestDecodeIsStrict(t *testing.T) {
+	t.Parallel()
+	refused := []struct {
+		name   string
+		member []byte
+	}{
+		{"anonymous tag", []byte{0x04, 0x07}},
+		{"common-profile tag", []byte{0x44, 0x07, 0x00, 0x03}},
+		{"fully-qualified tag at an unknown number", []byte{0xC4, 0xF1, 0xFF, 0x01, 0x00, 0x0A, 0x00, 0x03}},
+		{"signed integer at [1]", []byte{0x20, 0x01, 0x05}},
+		{"string at [3]", []byte{0x2C, 0x03, 0x01, 'a'}},
+		{"boolean at [7]", []byte{0x28, 0x07}},
+		{"null at [8]", []byte{0x34, 0x08}},
+		{"float at [2]", []byte{0x2A, 0x02, 0x00, 0x00, 0x80, 0x3F}},
+		{"structure at [9]", []byte{0x35, 0x09, 0x18}},
+		{"array at [5]", []byte{0x36, 0x05, 0x18}},
+		{"uint32 0x10000 at the uint16 [3]", []byte{0x26, 0x03, 0x00, 0x00, 0x01, 0x00}},
+		{"uint64 1<<32 at the uint32 [1]", []byte{0x27, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}},
+		{"uint32 0x10000 at the uint16 bitmap [8]", []byte{0x26, 0x08, 0x00, 0x00, 0x01, 0x00}},
+	}
+	for _, c := range refused {
+		b := append(append([]byte{0x15}, c.member...), 0x18)
+		dec := tlv.NewDecoder(b)
+		if _, err := dec.Next(); err != nil {
+			t.Fatal(err)
+		}
+		if p, err := sessionparams.DecodeFields(dec); err == nil {
+			t.Errorf("%s: decoded %+v, want an error", c.name, p)
+		}
+	}
+	accepted := []struct {
+		name   string
+		member []byte
+		want   sessionparams.Parameters
+	}{
+		{"signed integer at the unknown [10]", []byte{0x20, 0x0A, 0x05}, sessionparams.Parameters{}},
+		{"string at the unknown [200]", []byte{0x2C, 0xC8, 0x01, 'a'}, sessionparams.Parameters{}},
+		{"uint64 holding 500 at the uint16 [3]", []byte{0x27, 0x03, 0xF4, 0x01, 0, 0, 0, 0, 0, 0}, sessionparams.Parameters{SessionActiveThreshold: 500}},
+		{"uint64 holding 0xFFFFFFFF at the uint32 [1]", []byte{0x27, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0}, sessionparams.Parameters{SessionIdleInterval: 0xFFFFFFFF}},
+		{"uint8 at the uint32 [9]", []byte{0x24, 0x09, 0x10}, sessionparams.Parameters{MaxTCPMessageSize: 0x10}},
+		{"repeated [7], last wins", []byte{0x24, 0x07, 0x02, 0x24, 0x07, 0x05}, sessionparams.Parameters{MaxPathsPerInvoke: 5}},
+	}
+	for _, c := range accepted {
+		b := append(append([]byte{0x15}, c.member...), 0x18)
+		dec := tlv.NewDecoder(b)
+		if _, err := dec.Next(); err != nil {
+			t.Fatal(err)
+		}
+		p, err := sessionparams.DecodeFields(dec)
+		if err != nil {
+			t.Errorf("%s: %v, want accepted", c.name, err)
+			continue
+		}
+		if p != c.want {
+			t.Errorf("%s: decoded %+v, want %+v", c.name, p, c.want)
+		}
 	}
 }
 

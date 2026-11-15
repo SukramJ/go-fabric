@@ -435,46 +435,12 @@ func peek(b []byte, n int) []byte {
 type SessionParameters = sessionparams.Parameters
 
 // parseSessionParameters reads a SessionParameters container the
-// decoder has just entered (Sigma1 initiatorSessionParams, tag 5).
-// Field tags mirror the encode side above; unknown tags are skipped
-// so future spec additions do not break the handshake.
+// decoder has just entered (Sigma1 initiatorSessionParams, Sigma2 and
+// Sigma2_Resume responderSessionParams) with the one decoder the PASE
+// messages use: decoded strictly, unknown tags skipped
+// ([sessionparams.DecodeFields]).
 func parseSessionParameters(dec *sigmaDecoder) (SessionParameters, error) {
-	var sp SessionParameters
-	for {
-		tag, val, end, err := dec.next()
-		if err != nil {
-			return sp, err
-		}
-		if end {
-			return sp, nil
-		}
-		if val.container {
-			if err := dec.skipContainer(); err != nil {
-				return sp, err
-			}
-			continue
-		}
-		switch tag {
-		case 1:
-			sp.SessionIdleInterval = uint32(val.u & 0xFFFFFFFF)
-		case 2:
-			sp.SessionActiveInterval = uint32(val.u & 0xFFFFFFFF)
-		case 3:
-			sp.SessionActiveThreshold = uint16(val.u & 0xFFFF)
-		case 4:
-			sp.DataModelRevision = uint16(val.u & 0xFFFF)
-		case 5:
-			sp.InteractionModelRevision = uint16(val.u & 0xFFFF)
-		case 6:
-			sp.SpecificationVersion = uint32(val.u & 0xFFFFFFFF)
-		case 7:
-			sp.MaxPathsPerInvoke = uint16(val.u & 0xFFFF)
-		case 8:
-			sp.SupportedTransports = uint16(val.u & 0xFFFF)
-		case 9:
-			sp.MaxTCPMessageSize = uint32(val.u & 0xFFFFFFFF)
-		}
-	}
+	return sessionparams.DecodeFields(dec.dec)
 }
 
 // encodeSessionParameters writes sp into `enc` as a context-tag-`outerTag`

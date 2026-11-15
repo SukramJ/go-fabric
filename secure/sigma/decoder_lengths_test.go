@@ -129,3 +129,45 @@ func TestSigmaDecodersRefuseWrongFieldLengths(t *testing.T) {
 		}
 	}
 }
+
+// TestSigma1RefusesMalformedSessionParameters: Sigma1's
+// initiatorSessionParams are decoded by the strict decoder the PASE
+// messages use ([sessionparams.DecodeFields]); a wrong-typed or
+// out-of-range field refuses the Sigma1 with ErrSessionState, as any
+// other malformed Sigma1 member, and a well-formed structure is read.
+func TestSigma1RefusesMalformedSessionParameters(t *testing.T) {
+	t.Parallel()
+	sigma1 := func(params func(e *tlv.Encoder)) []byte {
+		e := tlv.NewEncoder()
+		e.StartStruct(tlv.AnonymousTag())
+		e.PutOctets(tlv.ContextTag(1), make([]byte, RandomSize))
+		e.PutUint16(tlv.ContextTag(2), 7)
+		e.PutOctets(tlv.ContextTag(3), make([]byte, 32))
+		e.PutOctets(tlv.ContextTag(4), make([]byte, EphPubKeySize))
+		e.StartStruct(tlv.ContextTag(5))
+		params(e)
+		_ = e.EndContainer()
+		_ = e.EndContainer()
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	for name, params := range map[string]func(e *tlv.Encoder){
+		"signed SessionIdleInterval":       func(e *tlv.Encoder) { e.PutInt32(tlv.ContextTag(1), 500) },
+		"SessionActiveThreshold > 16 bits": func(e *tlv.Encoder) { e.PutUint32(tlv.ContextTag(3), 0x10000) },
+		"string MaxPathsPerInvoke":         func(e *tlv.Encoder) { e.PutUTF8(tlv.ContextTag(7), "1") },
+	} {
+		if _, err := UnmarshalSigma1(sigma1(params)); !errors.Is(err, ErrSessionState) {
+			t.Errorf("%s: err = %v, want ErrSessionState", name, err)
+		}
+	}
+	s, err := UnmarshalSigma1(sigma1(func(e *tlv.Encoder) { e.PutUint64(tlv.ContextTag(1), 500) }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.InitiatorSessionParams == nil || s.InitiatorSessionParams.SessionIdleInterval != 500 {
+		t.Fatalf("InitiatorSessionParams = %+v, want SessionIdleInterval 500", s.InitiatorSessionParams)
+	}
+}

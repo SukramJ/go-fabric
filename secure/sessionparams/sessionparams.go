@@ -176,10 +176,16 @@ func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 }
 
 // DecodeFields reads the fields of a structure whose opening element the
-// caller has already consumed, up to and including its end. Unknown tags
-// and nested containers are skipped so a future field does not break the
-// handshake; a value wider than its field is truncated to the field, as
-// the TLV integer rules allow for a value that fits.
+// caller has already consumed, up to and including its end. The session
+// parameters are decoded strictly, as matter.js decodes
+// TlvSessionParameters (PaseMessages.ts:28-55 at db021da0) without the
+// relaxed number checks: every member must carry a context tag
+// (TlvObject.ts:212-214); a known field must be an unsigned integer
+// (TlvNumber.ts:124-131) whose value fits the field (:145-155); any of these
+// refuses the whole structure. A member at an unknown context tag is
+// skipped, a container included (TlvObject.ts:215-220), so a future field
+// does not break the handshake; an encoding wider than the field whose
+// value fits is accepted; a repeated field keeps its last value (:233).
 func DecodeFields(dec *tlv.Decoder) (Parameters, error) {
 	var p Parameters
 	for {
@@ -190,36 +196,68 @@ func DecodeFields(dec *tlv.Decoder) (Parameters, error) {
 		if el.IsEndContainer {
 			return p, nil
 		}
-		if el.IsContainer {
-			if err := skipContainer(dec); err != nil {
-				return p, err
+		if el.Tag.Kind != tlv.TagKindContext {
+			return p, fmt.Errorf("sessionparams: member with a non-context tag (kind %d)", el.Tag.Kind)
+		}
+		bits, known := fieldBits(el.Tag.Number)
+		if !known {
+			if el.IsContainer {
+				if err := skipContainer(dec); err != nil {
+					return p, err
+				}
 			}
 			continue
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if !isUnsigned(el.Type) {
+			return p, fmt.Errorf("sessionparams: field %d has TLV type 0x%02X, want an unsigned integer", el.Tag.Number, uint8(el.Type))
+		}
+		if el.Uint>>bits != 0 {
+			return p, fmt.Errorf("sessionparams: field %d value %d exceeds %d bits", el.Tag.Number, el.Uint, bits)
 		}
 		switch el.Tag.Number {
 		case 1:
-			p.SessionIdleInterval = uint32(el.Uint & 0xFFFFFFFF)
+			p.SessionIdleInterval = uint32(el.Uint)
 		case 2:
-			p.SessionActiveInterval = uint32(el.Uint & 0xFFFFFFFF)
+			p.SessionActiveInterval = uint32(el.Uint)
 		case 3:
-			p.SessionActiveThreshold = uint16(el.Uint & 0xFFFF)
+			p.SessionActiveThreshold = uint16(el.Uint)
 		case 4:
-			p.DataModelRevision = uint16(el.Uint & 0xFFFF)
+			p.DataModelRevision = uint16(el.Uint)
 		case 5:
-			p.InteractionModelRevision = uint16(el.Uint & 0xFFFF)
+			p.InteractionModelRevision = uint16(el.Uint)
 		case 6:
-			p.SpecificationVersion = uint32(el.Uint & 0xFFFFFFFF)
+			p.SpecificationVersion = uint32(el.Uint)
 		case 7:
-			p.MaxPathsPerInvoke = uint16(el.Uint & 0xFFFF)
+			p.MaxPathsPerInvoke = uint16(el.Uint)
 		case 8:
-			p.SupportedTransports = uint16(el.Uint & 0xFFFF)
+			p.SupportedTransports = uint16(el.Uint)
 		case 9:
-			p.MaxTCPMessageSize = uint32(el.Uint & 0xFFFFFFFF)
+			p.MaxTCPMessageSize = uint32(el.Uint)
 		}
 	}
+}
+
+// fieldBits is the width of the field at context tag n
+// (PaseMessages.ts:28-55 at db021da0: 1, 2, 6, 9 TlvUInt32; 3, 4, 5, 7 and
+// the bitmap 8 TlvUInt16) and whether n is a field at all.
+func fieldBits(n uint32) (uint, bool) {
+	switch n {
+	case 1, 2, 6, 9:
+		return 32, true
+	case 3, 4, 5, 7, 8:
+		return 16, true
+	}
+	return 0, false
+}
+
+// isUnsigned reports whether t is one of the four unsigned-integer
+// element types.
+func isUnsigned(t tlv.ElementType) bool {
+	switch t {
+	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
+		return true
+	}
+	return false
 }
 
 // skipContainer consumes the elements of a container whose opening
