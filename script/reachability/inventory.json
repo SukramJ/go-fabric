@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8807,
+  "entry_points": 8821,
   "entry_packages": [
     ".",
     "bdx",
@@ -225,6 +225,7 @@
     "icd/checkin",
     "im",
     "im/subscription",
+    "internal/attestids",
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
@@ -289,9 +290,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18555,
-    "reachable": 12498,
-    "whitelisted": 6057,
+    "total_exported": 18576,
+    "reachable": 12507,
+    "whitelisted": 6069,
     "unreachable": 0
   },
   "by_package": [],
@@ -26965,7 +26966,7 @@
       "identifier": "TestNodeRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 241
+      "line": 284
     },
     {
       "package": "controller/client",
@@ -27147,42 +27148,49 @@
       "identifier": "TestRecordApplyPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 120
+      "line": 121
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordAttestedProduct",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 201
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordDecodeErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 198
+      "line": 241
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordIgnoresRetiredCATs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 287
+      "line": 330
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordOperationalHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 151
+      "line": 152
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "controller/client",
@@ -28922,6 +28930,13 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestImagesBufferedDownloadWithoutStreamer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 266
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestImagesDeleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
@@ -28961,6 +28976,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
       "line": 338
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedDownload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 128
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedDownloadRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 165
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedImageHiddenUntilVerified",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 225
     },
     {
       "package": "controller/softwareupdate",
@@ -29024,6 +29060,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
       "line": 155
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestMemoryBlobsDoesNotStream",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestNoteAttestedIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/attested_identity_test.go",
+      "line": 19
     },
     {
       "package": "controller/softwareupdate",
@@ -29101,6 +29151,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
       "line": 242
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestValidatePeerDetailsWithoutNodeIsUnchanged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/attested_identity_test.go",
+      "line": 71
     },
     {
       "package": "controller/topology",
@@ -35011,6 +35068,34 @@
       "line": 54
     },
     {
+      "package": "internal/attestids",
+      "identifier": "TestFallbackIDAndParseHexID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 131
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFromNamePolicies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 33
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFromNamePoliciesPartOnlyOnAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 86
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestOneDefinitionOfTheIDAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 154
+    },
+    {
       "package": "internal/channelseam",
       "identifier": "AnchorPeerCounter",
       "reason": "assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow",
@@ -36107,28 +36192,28 @@
       "identifier": "ActionRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 108
+      "line": 109
     },
     {
       "package": "node",
       "identifier": "Actions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 97
+      "line": 98
     },
     {
       "package": "node",
       "identifier": "ActionsConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 100
+      "line": 101
     },
     {
       "package": "node",
       "identifier": "ActionsHost",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "node",
@@ -36163,7 +36248,7 @@
       "identifier": "BasicInformationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 134
+      "line": 135
     },
     {
       "package": "node",
@@ -36198,21 +36283,21 @@
       "identifier": "DCLClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "node",
       "identifier": "DCLOTAVersions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 82
+      "line": 83
     },
     {
       "package": "node",
       "identifier": "DCLSoftwareVersion",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 86
+      "line": 87
     },
     {
       "package": "node",
@@ -36247,14 +36332,14 @@
       "identifier": "EcosystemDirectory",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 115
+      "line": 116
     },
     {
       "package": "node",
       "identifier": "EcosystemInformation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 120
+      "line": 121
     },
     {
       "package": "node",
@@ -36352,7 +36437,7 @@
       "identifier": "OTABlob",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "node",
@@ -36401,14 +36486,14 @@
       "identifier": "OTAImageHeader",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "node",
       "identifier": "OTAImageOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "node",
@@ -36436,7 +36521,7 @@
       "identifier": "OTARequestorServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 137
+      "line": 138
     },
     {
       "package": "node",
@@ -36464,7 +36549,7 @@
       "identifier": "PowerSourceConfigurationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 143
+      "line": 144
     },
     {
       "package": "node",
@@ -36947,7 +37032,7 @@
       "identifier": "WiFiNetworkDiagnosticsServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "node",
