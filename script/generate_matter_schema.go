@@ -13,11 +13,14 @@
 //     attributeReadPrivileges (attributes whose effective read privilege is
 //     above View), changesOmittedAttributes,
 //     fabricScopedWritePaths (writable attributes whose effective access
-//     is fabric-scoped or fabric-sensitive), fabricScopedReadPaths
-//     (readable attributes whose effective access is fabric-scoped or
-//     fabric-sensitive) and readOnlyAttributes (every
+//     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
 //     attribute below the global range that matter.js does not let a remote
 //     party write)
+//   - fabric_scope_gen.go — attributeFabricScopes (every readable attribute
+//     whose effective access is fabric-scoped or fabric-sensitive: whether
+//     it is sensitive, and the ids of its entry struct's fabric-sensitive
+//     fields) and eventScopes (every event: whether it is
+//     fabric-sensitive, and its read privilege)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
 //     type's requirement tree, conditions and composition: the device-type
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
@@ -79,6 +82,7 @@ const (
 	largeMsgFile    = "schema/large_message_gen.go"
 	namesFile       = "schema/element_names_gen.go"
 	orderFile       = "schema/attribute_order_gen.go"
+	fabricScopeFile = "schema/fabric_scope_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -116,6 +120,9 @@ type snapshotCluster struct {
 	Features       []snapshotFeature   `json:"features"`
 	Classification string              `json:"classification"`
 	Bindable       *bool               `json:"bindable"`
+	// Datatypes are the cluster's own datatypes: the structs an attribute's
+	// list entry names with scope "cluster".
+	Datatypes []snapshotDatatype `json:"datatypes"`
 	// AttributeOrder is the cluster's attribute ids in the order matter.js
 	// serves them in a wildcard read (the extractor's "Order layer").
 	AttributeOrder []uint32 `json:"attributeOrder"`
@@ -135,6 +142,38 @@ type snapshotFeature struct {
 type snapshotEvent struct {
 	ID   uint32 `json:"id"`
 	Name string `json:"name"`
+	// Effective carries the event's resolved access: its read privilege and
+	// its fabric flag ("S" for a fabric-sensitive event).
+	Effective *struct {
+		Access snapshotAccess `json:"access"`
+	} `json:"effective"`
+}
+
+// snapshotDatatype mirrors one datatype of parity/schema.json — a cluster's,
+// a shared definition's or a global one: its name and, for a struct, its
+// fields with their ids and access.
+type snapshotDatatype struct {
+	Name     string          `json:"name"`
+	Metatype string          `json:"metatype"`
+	Fields   []snapshotField `json:"fields"`
+}
+
+// snapshotField mirrors one field of a struct datatype: its id, its name
+// and its access, of which the fabric flag ("S") is read here.
+type snapshotField struct {
+	ID     uint32 `json:"id"`
+	Name   string `json:"name"`
+	Access *struct {
+		Fabric string `json:"fabric"`
+	} `json:"access"`
+}
+
+// snapshotDefinition mirrors one shared definition of parity/schema.json
+// (WebRtcTransportDefinitions): datatypes several clusters name as
+// "<definition>.<datatype>".
+type snapshotDefinition struct {
+	Name      string             `json:"name"`
+	Datatypes []snapshotDatatype `json:"datatypes"`
 }
 
 // snapshotAttribute mirrors one attribute of a cluster in parity/schema.json.
@@ -153,6 +192,15 @@ type snapshotAttribute struct {
 		Quality struct {
 			Fixed bool `json:"fixed"`
 		} `json:"quality"`
+		// Metatype is the attribute's resolved metatype ("array" for a
+		// list) and Entry the datatype of a list's entries, with the scope
+		// it is declared in.
+		Metatype string `json:"metatype"`
+		Entry    *struct {
+			Type     string `json:"type"`
+			Metatype string `json:"metatype"`
+			Scope    string `json:"scope"`
+		} `json:"entry"`
 	} `json:"effective"`
 }
 
@@ -282,6 +330,11 @@ type snapshot struct {
 	Clusters        []snapshotCluster    `json:"clusters"`
 	DeviceTypes     []snapshotDeviceType `json:"deviceTypes"`
 	BaseDeviceTypes []snapshotDeviceType `json:"baseDeviceTypes"`
+	// GlobalDatatypes and Definitions are the datatypes a cluster's
+	// attribute may name outside its own: the global ones and the shared
+	// definitions.
+	GlobalDatatypes []snapshotDatatype   `json:"globalDatatypes"`
+	Definitions     []snapshotDefinition `json:"definitions"`
 	// GlobalAttributeOrder is the order matter.js gives a cluster model
 	// that defines no attribute of its own.
 	GlobalAttributeOrder []uint32 `json:"globalAttributeOrder"`
@@ -352,6 +405,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", accessFile)
+
+	if err := writeFabricScopeFile(snap); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", fabricScopeFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", fabricScopeFile)
 
 	if err := writeTimedFile(snap.Clusters); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", timedFile, err)
@@ -746,45 +805,6 @@ func writeAccessFile(clusters []snapshotCluster) error {
 		buf.WriteString("\t},\n")
 	}
 	buf.WriteString("}\n\n")
-	// fabricScopedReadPaths: matter.js's limits.fabricScoped
-	// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0,
-	// fabric "F" or "S") on an attribute that is readable — the attributes
-	// whose value a remote read gets scoped to its session (ListManager.ts
-	// createProxy, :609-616 at db021da0).
-	buf.WriteString("// fabricScopedReadPaths lists every readable attribute whose effective\n")
-	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or\n")
-	buf.WriteString("// fabric-sensitive (\"S\"): what a request reads of it depends on the\n")
-	buf.WriteString("// accessing fabric.\n")
-	buf.WriteString("var fabricScopedReadPaths = map[uint32]map[uint32]struct{}{\n")
-	for _, c := range clusters {
-		var rows []string
-		for _, a := range c.Attributes {
-			if a.Effective == nil {
-				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
-			}
-			acc := a.Effective.Access
-			switch acc.Fabric {
-			case "":
-				continue
-			case "F", "S":
-			default:
-				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
-			}
-			if acc.RW == "W" {
-				continue
-			}
-			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
-		}
-		if len(rows) == 0 {
-			continue
-		}
-		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
-		for _, r := range rows {
-			buf.WriteString(r)
-		}
-		buf.WriteString("\t},\n")
-	}
-	buf.WriteString("}\n\n")
 	// readOnlyAttributes: the complement of matter.js's limits.writable
 	// (packages/protocol/src/action/server/AccessControl.ts:523 at db021da0,
 	// `access.writable && !fixed`), over every cluster of the snapshot. The
@@ -904,6 +924,159 @@ func writeTimedFile(clusters []snapshotCluster) error {
 		return err
 	}
 	return writeIfChanged(timedFile, out)
+}
+
+// writeFabricScopeFile emits attributeFabricScopes and eventScopes, the
+// table the dispatcher scopes a request's read by and the event gate reads.
+//
+// attributeFabricScopes: every readable attribute (an rw other than "W")
+// whose effective access names fabric "F" or "S" — matter.js's
+// limits.fabricScoped (packages/protocol/src/action/server/AccessControl.ts:524
+// at db021da0). A row states whether the attribute itself is "S" and the
+// ids of the fields of its list entry's struct whose access is "S". The
+// entry struct is looked up where the entry's scope names it: a
+// "<definition>.<name>" in the shared definitions, scope "cluster" in the
+// cluster's datatypes, else the global datatypes. An attribute that is no
+// list of structs, an entry struct the snapshot does not hold, and one
+// without a FabricIndex field (id 254) are errors: the generator states no
+// scope the snapshot does not carry.
+//
+// eventScopes: every event of the snapshot, whether its effective access
+// is "S" and its read privilege.
+func writeFabricScopeFile(snap snapshot) error {
+	globals := map[string]snapshotDatatype{}
+	for _, t := range snap.GlobalDatatypes {
+		globals[t.Name] = t
+	}
+	definitions := map[string]map[string]snapshotDatatype{}
+	for _, d := range snap.Definitions {
+		m := map[string]snapshotDatatype{}
+		for _, t := range d.Datatypes {
+			m[t.Name] = t
+		}
+		definitions[d.Name] = m
+	}
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	buf.WriteString("// attributeFabricScopes lists every readable attribute whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or fabric-sensitive\n")
+	buf.WriteString("// (\"S\"): Sensitive for \"S\", and Fields, the ids of the fields of the\n")
+	buf.WriteString("// list entry's struct whose access is \"S\".\n")
+	buf.WriteString("var attributeFabricScopes = map[uint32]map[uint32]FabricScope{\n")
+	for _, c := range snap.Clusters {
+		own := map[string]snapshotDatatype{}
+		for _, t := range c.Datatypes {
+			own[t.Name] = t
+		}
+		attrs := slices.Clone(c.Attributes)
+		sort.Slice(attrs, func(i, j int) bool { return attrs[i].ID < attrs[j].ID })
+		var rows []string
+		for _, a := range attrs {
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			switch acc.Fabric {
+			case "":
+				continue
+			case "F", "S":
+			default:
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			if acc.RW == "W" {
+				continue
+			}
+			entry := a.Effective.Entry
+			if a.Effective.Metatype != "array" || entry == nil || entry.Metatype != "object" {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): fabric %q on an attribute that is no list of structs", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			var st snapshotDatatype
+			var found bool
+			switch def, name, qualified := strings.Cut(entry.Type, "."); {
+			case qualified:
+				st, found = definitions[def][name]
+			case entry.Scope == "cluster":
+				st, found = own[entry.Type]
+			default:
+				st, found = globals[entry.Type]
+			}
+			if !found {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): entry struct %q (scope %q) is not in the snapshot", c.Name, c.ID, a.Name, a.ID, entry.Type, entry.Scope)
+			}
+			var fields []string
+			hasIndex := false
+			for _, f := range st.Fields {
+				if f.ID == 254 {
+					hasIndex = true
+				}
+				if f.Access != nil && f.Access.Fabric == "S" {
+					fields = append(fields, fmt.Sprintf("0x%02X", f.ID))
+				}
+			}
+			if !hasIndex {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): entry struct %q has no FabricIndex field (254)", c.Name, c.ID, a.Name, a.ID, entry.Type)
+			}
+			var fieldsOut []string
+			if acc.Fabric == "S" {
+				fieldsOut = append(fieldsOut, "Sensitive: true")
+			}
+			if len(fields) > 0 {
+				fieldsOut = append(fieldsOut, "Fields: []uint32{"+strings.Join(fields, ", ")+"}")
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {%s}, // %s %q, entry %s\n", a.ID, strings.Join(fieldsOut, ", "), a.Name, acc, entry.Type))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// eventScopes lists every event of parity/schema.json: Sensitive when its\n")
+	buf.WriteString("// effective access is fabric-sensitive (\"S\"), and its read privilege —\n")
+	buf.WriteString("// 1 View, 3 Operate, 4 Manage, 5 Administer.\n")
+	buf.WriteString("var eventScopes = map[uint32]map[uint32]EventScope{\n")
+	for _, c := range snap.Clusters {
+		events := slices.Clone(c.Events)
+		sort.Slice(events, func(i, j int) bool { return events[i].ID < events[j].ID })
+		var rows []string
+		for _, e := range events {
+			if e.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) event %s (0x%02X): the snapshot carries no effective layer", c.Name, c.ID, e.Name, e.ID)
+			}
+			acc := e.Effective.Access
+			var sensitive string
+			switch acc.Fabric {
+			case "":
+			case "S":
+				sensitive = "Sensitive: true, "
+			default:
+				return fmt.Errorf("%s (0x%04X) event %s (0x%02X): effective access fabric %q is not one this generator knows", c.Name, c.ID, e.Name, e.ID, acc.Fabric)
+			}
+			p, err := readPrivilege(acc)
+			if err != nil {
+				return fmt.Errorf("%s (0x%04X) event %s (0x%02X): %w", c.Name, c.ID, e.Name, e.ID, err)
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {%sReadPrivilege: %d}, // %s %q\n", e.ID, sensitive, p, e.Name, acc))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return writeIfChanged(fabricScopeFile, out)
 }
 
 // writeLargeMessageFile emits largeMessageCommands: every request command
