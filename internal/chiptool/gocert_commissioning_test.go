@@ -24,6 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	"github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
@@ -49,7 +50,8 @@ import (
 
 func init() {
 	for _, c := range []func() goCertCase{
-		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118, caseCNET420, caseDD19, caseDD22, caseDD35,
+		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118,
+		caseDGWIFI32, caseCNET420, caseDD19, caseDD22, caseDD35,
 	} {
 		registerGoCert(c)
 	}
@@ -1232,6 +1234,57 @@ func postRemovalRefusal(err error) error {
 		return nil
 	}
 	return fmt.Errorf("neither a status the removal explains nor a failure to reach the TH within %s: %w", postRemovalTimeout, err)
+}
+
+// --- TC-DGWIFI-3.2 ------------------------------------------------------------
+
+// caseDGWIFI32 mirrors TC-DGWIFI-3.2 (TC-DGWIFI-3.2.test.ts:19-43): the
+// Go TH commissions the daemon and sends ResetCounts to the root's
+// WiFiNetworkDiagnostics, which every harness daemon serves with --wifi.
+func caseDGWIFI32() goCertCase {
+	var node *client.Node
+	var ctrl *gocontroller.Controller
+	return goCertCase{
+		tc: "TC-DGWIFI-3.2", line: 19, pics: []string{"DGWIFI.C"},
+		finalize: func(th *goTH) {
+			if node != nil {
+				_ = ctrl.Registry().Decommission(th.ctx, node)
+			}
+		},
+		steps: []goStep{
+			{n: "1", line: 27, title: "Commission TH to DUT", run: func(th *goTH) error {
+				from := mark(th)
+				var err error
+				if ctrl, node, err = th.commission("dut"); err != nil {
+					return err
+				}
+				// commissionThStep through commissionChecked (tc-dd-support.ts
+				// :169-181): the TH's completion line.
+				if _, err := awaitTHLine(th, from, ddCommissioningLogTimeout, logCommissioned); err != nil {
+					return err
+				}
+				th.note("commissioned; the TH logged its CommissioningComplete answered")
+				return nil
+			}},
+			{n: "2", line: 30, title: "DUT sends ResetCounts command to TH", pics: "DGWIFI.C.C00.Tx", run: func(th *goTH) error {
+				from := mark(th)
+				if _, err := th.invoke(node, cmdPath(0, wifinetworkdiagnostics.ClusterID, wifinetworkdiagnostics.CmdResetCounts), nil, false, client.InvokeOptions{}); err != nil {
+					return err
+				}
+				// sendCommand's expectCommandPayload (tc-support.ts:1802-1816):
+				// the TH received the command, with no fields.
+				line, err := awaitTHLine(th, from, certLogTimeout, "msg=matter.rx.im.invoke ", `req_paths="ep=0 cl=0x0036 cmd=0x0"`)
+				if err != nil {
+					return fmt.Errorf("TH received ResetCounts: %w", err)
+				}
+				if !strings.Contains(line, `resp="status=0 (path=ep=0 cl=0x0036 cmd=0x0)"`) {
+					return fmt.Errorf("the TH's invoke line shows no Success answer: %s", line)
+				}
+				th.note("ResetCounts answered Success; the TH received it")
+				return nil
+			}},
+		},
+	}
 }
 
 // --- TC-CNET-4.20 -------------------------------------------------------------
