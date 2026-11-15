@@ -27,12 +27,8 @@ func TestServeDispatchOfTheMoment(t *testing.T) {
 		var current atomic.Pointer[fakeDispatcher]
 		var stamped atomic.Bool
 		reg.Serve(interaction.ServerConfig{
-			Dispatch: func() im.Dispatcher {
-				if d := current.Load(); d != nil {
-					return d
-				}
-				return nil
-			},
+			// No tree yet.
+			Dispatch:  func() im.Dispatcher { return nil },
 			Qualities: plainQualities{},
 			RequestContext: func(ctx context.Context, sess *exchange.Session) context.Context {
 				return context.WithValue(ctx, roleFactKey{}, sess.ID())
