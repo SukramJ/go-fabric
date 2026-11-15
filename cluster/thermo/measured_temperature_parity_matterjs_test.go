@@ -15,8 +15,10 @@ import (
 // F-db021da0-21): the measured input adds LocalTemperatureCalibration × 10
 // to a non-null value; the direct setter stores as given; a null measurement
 // sets the attribute null; with LTNE the attribute stays null — matter.js
-// ThermostatServer.ts:511-527 (:512-514, :516-519, :518, :523 at db021da0),
-// the handler of the external measurement (:497-501).
+// ThermostatServer.ts:511-527 at db021da0: the calibration :512-514, the
+// write unless LTNE :516-519 (the guard :517), a null measurement setting
+// the attribute null :518 and leaving the internal value :523; the handler
+// of the external measurement :497-501.
 func TestParityMatterJS_MeasuredTemperatureIsCalibrated(t *testing.T) {
 	t.Parallel()
 	read := func(srv *thermo.ThermostatServer) any {

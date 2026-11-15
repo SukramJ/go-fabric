@@ -245,7 +245,13 @@ the bridge silently does without.
 A cluster server's state of a removed fabric goes through one port,
 `contract.FabricScopedState`: the node calls it on every server of every
 endpoint; a host that runs the bridge without the node has the bridge's
-fabric removal call it on the servers of the bridged endpoints.
+fabric removal call it on the servers of the bridged endpoints only — the
+endpoints present at the removal. The root's and the Aggregator's servers
+(AccessControl, ICDManagement, TimeSynchronization,
+OTASoftwareUpdateRequestor, Messages, Binding among them), an endpoint
+absent at the removal, and the drop before a reused fabric index is
+announced again are the node's (`node/fabric_state.go`); without the node
+they are the host's.
 
 *Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 

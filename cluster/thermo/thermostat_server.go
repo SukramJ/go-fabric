@@ -724,8 +724,9 @@ func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 // thermostat/ThermostatServer.ts:497-501 at db021da0) and its handler
 // #handleMeasuredTemperatureChange (:511-527): the calibration added to a
 // non-null value (:512-514), the attribute written unless
-// LocalTemperatureNotExposed (:516-519, the attribute null :518), a null
-// measurement setting the attribute null (:523). The internal value that
+// LocalTemperatureNotExposed (:516-519; the guard :517), a null
+// measurement setting the attribute null (:518) and leaving the internal
+// value (:523). The internal value that
 // handler keeps beside the attribute (:522-526) feeds matter.js's
 // automatic mode handling, which this server does not implement, so the
 // server keeps none apart from the attribute.
