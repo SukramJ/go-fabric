@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 	"github.com/SukramJ/go-fabric/cluster/spec/mediainput"
 	"github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
+	"github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -51,6 +52,7 @@ func init() {
 		caseLOWPOWER22,
 		caseMEDIAINPUT314, caseMEDIAINPUT315, caseMEDIAINPUT316, caseMEDIAINPUT317,
 		caseMEDIAPLAYBACK65, caseMEDIAPLAYBACK67, caseMEDIAPLAYBACK610,
+		caseTGTNAV82,
 	} {
 		registerGoCert(c)
 	}
@@ -475,6 +477,35 @@ func caseMEDIAPLAYBACK610() goCertCase {
 				n: "3", line: 44, pics: "MEDIAPLAYBACK.C.C0e.Tx", title: "DUT sends DeactivateTextTrack command to TH",
 				run: r.mediaBSend(mediaplayback.ClusterID, mediaplayback.CmdDeactivateTextTrack, "DeactivateTextTrack",
 					mediaplayback.DeactivateTextTrackRequest{}, false, nil),
+			},
+		},
+	}
+}
+
+// caseTGTNAV82 mirrors TC-TGTNAV-8.2: NavigateTarget 2.
+func caseTGTNAV82() goCertCase {
+	r := &mediaBRun{}
+	const target = 2 // TARGET (:16)
+	return goCertCase{
+		tc: "TC-TGTNAV-8.2", line: 20, pics: []string{"TGTNAV.C"}, at: "TGTNAV.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 21, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 24, pics: "TGTNAV.C.C00.Tx", title: "DUT sends NavigateTarget command to TH",
+				run: r.mediaBSend(targetnavigator.ClusterID, targetnavigator.CmdNavigateTarget, "NavigateTarget 2",
+					targetnavigator.NavigateTargetRequest{Target: target}, true, func(th *goTH, ep uint16) error {
+						// The payload: chip's HandleNavigateTarget makes the
+						// target current (TargetNavigatorManager.cpp:58-74).
+						got, err := r.mediaBReadU8(th, ep, targetnavigator.ClusterID, targetnavigator.AttrCurrentTarget)
+						if err != nil {
+							return err
+						}
+						if got != target {
+							return fmt.Errorf("CurrentTarget reads %d after NavigateTarget %d", got, target)
+						}
+						th.note("CurrentTarget %d", got)
+						return nil
+					}),
 			},
 		},
 	}
