@@ -255,6 +255,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		return nil, err
 	}
 	cfg.BasicInformation.defaultNodeLabel()
+	cfg.foldLimits()
 	attestationErr, err := cfg.resolveAttestation()
 	if err != nil {
 		return nil, err
@@ -575,10 +576,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 		return bridge.CommissioningAdvertisement{}, fmt.Errorf("node: commissioning instance id: %w", err)
 	}
 	pd, bi := n.cfg.ProductDescription, n.cfg.BasicInformation
-	name := pd.Name
-	if name == "" {
-		name = bi.NodeLabel
-	}
+	name := n.cfg.advertisedName()
 	return bridge.CommissioningAdvertisement{
 		InstanceID:    instanceID,
 		Discriminator: n.cfg.Commissioning.Discriminator,
@@ -1494,7 +1492,7 @@ func (n *Node) Subscriptions() *SubscriptionManager { return n.sec.subs }
 // fabric is gone) followed by the host's OnFabricRemoved observer. matter.js
 // reaches it the same way from the host, Fabric.leave() (Fabric.ts:423-433),
 // the call the command itself makes (OperationalCredentialsServer.ts:425).
-// An unknown index is store.ErrFabricNotFound.
+// An unknown index is [ErrFabricNotFound].
 func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	return n.root.OperationalCredentials.RemoveFabric(ctx, fabricIndex)
 }

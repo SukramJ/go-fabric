@@ -554,8 +554,8 @@ func wireSecurity(
 func (s *security) start(ctx context.Context) {
 	s.subs.Start(ctx)
 	s.sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
-	s.pase.StartReaper(ctx, 30*time.Second, time.Minute)
-	s.casep.StartReaper(ctx, 30*time.Second, time.Minute)
+	s.pase.StartReaper(ctx, handshakeReapInterval, handshakeAdapterTTL)
+	s.casep.StartReaper(ctx, handshakeReapInterval, handshakeAdapterTTL)
 }
 
 // caseInitiatorProvider prepares the CASE handshakes the bridge opens to
@@ -935,3 +935,14 @@ func operationalResolver(logger *slog.Logger, c clock.Clock) *mdns.OperationalRe
 	r.SetClock(c)
 	return r
 }
+
+// handshakeAdapterTTL is how long an idle PASE or CASE handshake adapter
+// lives before the reaper drops it; handshakeReapInterval is how often the
+// reaper looks, a quarter of the TTL as the providers' StartReaper
+// recommends (bridge.PerExchangePaseProvider.StartReaper). Named so the
+// three reaper calls cannot swap the two durations (review II,
+// R2-P5-apinode-16).
+const (
+	handshakeAdapterTTL   = time.Minute
+	handshakeReapInterval = handshakeAdapterTTL / 4
+)

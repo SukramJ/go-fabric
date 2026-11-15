@@ -77,6 +77,14 @@ const (
 // NewDCLClient is a ledger client at baseURL ([dcl.NewClient]).
 func NewDCLClient(baseURL string) *DCLClient { return dcl.NewClient(baseURL) }
 
+// DCLDefaultMaxImageSize bounds an image download when
+// [DCLOTAVersions].MaxImageSize sets none ([dcl.DefaultMaxImageSize]).
+const DCLDefaultMaxImageSize = dcl.DefaultMaxImageSize
+
+// ErrOTAImageTooLarge is the cause of the error of a download the size
+// bound refused or cut ([dcl.ErrOTAImageTooLarge], the same value).
+var ErrOTAImageTooLarge = dcl.ErrOTAImageTooLarge
+
 // DCLOTAVersions looks a model's software versions up in the ledger: the
 // update for a current version, one version's record, its download
 // ([dcl.OTAVersions]). An OTA image source checks what it offers with it.

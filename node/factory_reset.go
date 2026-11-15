@@ -33,9 +33,11 @@ import (
 // records included — remain in it. A scrub that does not finish (another
 // connection's reader blocks the checkpoint, a full disk fails the VACUUM)
 // does not undo the reset: every other step completes, the fresh UniqueID
-// included, and the error wraps [store.ErrScrubIncomplete] — the rows are
+// included, and the error wraps [ErrScrubIncomplete] — the rows are
 // gone, their bytes may remain in the file until a later [store.Scrub] of
-// it succeeds.
+// it succeeds. A [Store].Endpoints override is erased row by row and
+// not scrubbed: when it keeps its records in a file of the host's own,
+// scrubbing that file is the host's ([store.Scrub]).
 //
 // A Go node is single-use — [Node.Stop] ends it, as [ErrStopped] says —
 // so the reset does not bring the node back: the host comes back by

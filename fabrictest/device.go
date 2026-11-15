@@ -328,6 +328,9 @@ func (d *Device) programConfig() node.Config {
 	cfg.Store = d.store
 	cfg.Network.Listen = "[::1]:0"
 	cfg.Network.TCP = node.TCPConfig{}
+	// The site's advertiser replaces the program's own, which its MDNS
+	// configured (node.Config.Advertiser excludes it).
+	cfg.Network.MDNS = node.MDNS{}
 	cfg.Advertiser = mdns.NewNoop()
 	if cfg.Logger == nil {
 		cfg.Logger = d.site.log

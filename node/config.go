@@ -65,7 +65,9 @@ type Config struct {
 	// Advertiser publishes the node over DNS-SD. nil is the node's own:
 	// the module's mDNS responder (mdns.NewResponder), configured by
 	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Off. [Node.Stop]
-	// closes it, the host's as the node's.
+	// closes it, the host's as the node's. [Network].MDNS configures the
+	// node's own advertiser only: with Advertiser set, an MDNS with Off,
+	// HostName or Interfaces set fails [Config.Validate].
 	Advertiser Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
@@ -187,11 +189,11 @@ type Config struct {
 	// [Aggregator.Add] refuses one whose digest is not this one's
 	// ([ErrPolicyMismatch]). The zero value is no policy.
 	Surface surface.Policies
-	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
-	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
-	// is 5, the facade's value before it was configurable. matter.js
-	// defaults it to 254 when unset (OperationalCredentialsServer.ts:
-	// 84-88 initialize), which cluster/core does too; the facade keeps 5.
+	// SupportedFabrics is [Limits].SupportedFabrics.
+	//
+	// Deprecated: set Limits.SupportedFabrics, where the node's other
+	// capacity limits are; removable in the next minor release. It keeps
+	// its meaning while Limits.SupportedFabrics is zero.
 	SupportedFabrics uint8
 	// TimeSynchronization is the root TimeSynchronization cluster
 	// (0x0038), mounted by default ([TimeSynchronization]); its Off
@@ -213,13 +215,11 @@ type Config struct {
 	// clear…Fault do (GeneralDiagnosticsServer.ts:296-411 at db021da0).
 	// nil serves neither the lists nor the events.
 	Faults contract.FaultSource
-	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
-	// the root BasicInformation advertises it, the PASE and CASE session
-	// parameters carry it and the invoke path refuses a larger batch with
-	// InvalidAction. 0 is im.DefaultMaxPathsPerInvoke (10), matter.js's
-	// DEFAULT_MAX_PATHS_PER_INVOKE. Mirrors matter.js
-	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
-	// enforces.
+	// MaxPathsPerInvoke is [Limits].MaxPathsPerInvoke.
+	//
+	// Deprecated: set Limits.MaxPathsPerInvoke, where the node's other
+	// capacity limits are; removable in the next minor release. It keeps
+	// its meaning while Limits.MaxPathsPerInvoke is zero.
 	MaxPathsPerInvoke uint16
 	// Sessions are the MRP intervals the node reports in its session
 	// parameters and its operational DNS-SD record ([SessionIntervals]);
@@ -436,8 +436,8 @@ func (c *Config) rootDeviceConditions() []string {
 
 // Commissioning is matter.js `commissioning` (the State of
 // CommissioningServer.ts:409-419 at db021da0: passcode, discriminator)
-// plus the SPAKE2+ PBKDF parameters the daemon configures (main.go:91-92
-// at b4ea1f96^).
+// plus the SPAKE2+ PBKDF parameters the daemon configures
+// (main.go:91-92 at b4ea1f96^).
 type Commissioning struct {
 	// Passcode is the setup passcode; it must pass setup.IsValidSetupPIN.
 	Passcode uint32
@@ -525,13 +525,15 @@ type Commissioning struct {
 type CommissioningFlow uint8
 
 const (
-	// FlowStandard: the device is commissionable when powered.
+	// FlowStandard is the standard flow: the device is commissionable when
+	// powered.
 	FlowStandard CommissioningFlow = iota
-	// FlowUserIntent: the user acts on the device (a button) before it
-	// is commissionable — commonly with [Commissioning].WindowOnDemand.
+	// FlowUserIntent is the user-intent flow: the user acts on the device
+	// (a button) before it is commissionable — commonly with
+	// [Commissioning].WindowOnDemand.
 	FlowUserIntent
-	// FlowCustom: the vendor's own steps, looked up by vendor and product
-	// id.
+	// FlowCustom is the custom flow: the vendor's own steps, looked up by
+	// vendor and product id.
 	FlowCustom
 )
 
@@ -574,6 +576,8 @@ func (t *TermsAndConditions) core() *mattercore.TermsAndConditionsConfig {
 type ProductDescription struct {
 	// Name is the advertised device name; empty is
 	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
+	// The name advertised — this one, or the NodeLabel standing in — is at
+	// most 32 bytes; a longer one fails [Config.Validate] (decision 26).
 	Name string
 	// DeviceType is the device type the commissionable advertisement
 	// carries (the DT key and the _T<id> subtype). 0 infers it from the
@@ -643,10 +647,20 @@ type Store struct {
 	// Path is a SQLite file the node opens (creating it on first use)
 	// with the pure-Go driver modernc.org/sqlite, foreign keys on and a
 	// 5 s busy timeout; [Node.Stop] closes it. It excludes DB.
-	Path        string
-	DB          *sql.DB
+	Path string
+	// DB is a SQLite database the host opened and keeps: the node applies
+	// both schemas to it and opens its stores on it; [Node.FactoryReset]
+	// scrubs it ([store.Scrub]) after the erase. It excludes Path.
+	DB *sql.DB
+	// Credentials overrides the credential store built from DB or Path.
+	// [Node.FactoryReset] erases it through [store.Eraser]; the erase of a
+	// SQLite store (store.New) scrubs the file it is on.
 	Credentials store.Port
-	Endpoints   endpoint.Store
+	// Endpoints overrides the endpoint-number store built from DB or Path.
+	// [Node.FactoryReset] erases its records row by row and does not scrub
+	// the file they live in: on the host's own database the deleted bytes
+	// may stay in it until the host runs [store.Scrub] on that file.
+	Endpoints endpoint.Store
 }
 
 // Attestation is the device attestation material.
@@ -734,6 +748,24 @@ const (
 	defaultSupportedFabrics = 5
 )
 
+// maxDeviceNameBytes bounds the commissionable record's `DN` key, the
+// advertised device name (mdns.CommissionableServiceConfig.DeviceName:
+// at most 32 UTF-8 bytes; decision 26).
+const maxDeviceNameBytes = 32
+
+// advertisedName is the device name the commissionable record carries:
+// ProductDescription.Name, else the NodeLabel, which defaults to the
+// ProductName (BasicInformation.defaultNodeLabel).
+func (c *Config) advertisedName() string {
+	switch {
+	case c.ProductDescription.Name != "":
+		return c.ProductDescription.Name
+	case c.BasicInformation.NodeLabel != "":
+		return c.BasicInformation.NodeLabel
+	}
+	return c.BasicInformation.ProductName
+}
+
 // maxUniqueIDBytes is the UniqueID attribute's length ceiling (Matter
 // §11.1.5.13, 32 UTF-8 bytes), the bound mattercore.NewBasicInformation
 // enforces too.
@@ -818,17 +850,14 @@ func (c *Config) Validate() error {
 	if cm.IndoorOnly && cm.LocationCapability != mattercore.RegulatoryIndoor {
 		errs = append(errs, fmt.Errorf("node: Commissioning.IndoorOnly excludes LocationCapability %d", cm.LocationCapability))
 	}
-	if err := (mdns.CommissionableServiceConfig{Hints: cm.PairingHints, PairingInstruction: cm.PairingInstruction}).Validate(); err != nil {
-		errs = append(errs, fmt.Errorf("node: Commissioning.PairingHints and PairingInstruction: %w", err))
-	}
-	if cm.Flow > FlowCustom {
-		errs = append(errs, fmt.Errorf("node: Commissioning.Flow %d is not a flow; it must be one of FlowStandard, FlowUserIntent, FlowCustom", cm.Flow))
-	}
+	errs = append(errs, cm.onboardingErrors()...)
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
-	if c.SupportedFabrics > maxSupportedFabrics {
-		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	errs = append(errs, c.limitsPairErrors()...)
+	errs = append(errs, c.advertisementErrors()...)
+	if f := max(c.SupportedFabrics, c.Limits.SupportedFabrics); f > maxSupportedFabrics { //nolint:staticcheck // the deprecated field is still honoured
+		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", f, maxSupportedFabrics))
 	}
 	errs = append(errs, c.Limits.validate()...)
 	errs = append(errs, c.Sessions.validate()...)
@@ -845,6 +874,35 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 	return nil
+}
+
+// onboardingErrors checks what the onboarding payload and the
+// commissionable record state: a known flow, a pairing hint and
+// instruction that belong together.
+func (c Commissioning) onboardingErrors() []error {
+	var errs []error
+	if err := (mdns.CommissionableServiceConfig{Hints: c.PairingHints, PairingInstruction: c.PairingInstruction}).Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("node: Commissioning.PairingHints and PairingInstruction: %w", err))
+	}
+	if c.Flow > FlowCustom {
+		errs = append(errs, fmt.Errorf("node: Commissioning.Flow %d is not a flow; it must be one of FlowStandard, FlowUserIntent, FlowCustom", c.Flow))
+	}
+	return errs
+}
+
+// advertisementErrors checks the advertiser's configuration: Network.MDNS
+// configures the node's own advertiser only, so beside a host's
+// Advertiser it would be silently ignored; and the advertised device name
+// fits the record's `DN` key.
+func (c *Config) advertisementErrors() []error {
+	var errs []error
+	if m := c.Network.MDNS; c.Advertiser != nil && (m.Off || m.HostName != "" || len(m.Interfaces) > 0) {
+		errs = append(errs, errors.New("node: Network.MDNS (Off, HostName, Interfaces) configures the node's own advertiser and excludes Advertiser"))
+	}
+	if name := c.advertisedName(); len(name) > maxDeviceNameBytes {
+		errs = append(errs, fmt.Errorf("node: the advertised device name %q is %d bytes, at most %d (ProductDescription.Name, else BasicInformation.NodeLabel)", name, len(name), maxDeviceNameBytes))
+	}
+	return errs
 }
 
 // optionalErrors checks the optional sub-systems a Config turns on: each

@@ -491,7 +491,7 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 	provider.SetClock(h.br.Clock())
 	// On the node's lifetime: a provider no restore stops ends with the
 	// node.
-	provider.StartReaper(h.life, 30*time.Second, time.Minute)
+	provider.StartReaper(h.life, handshakeReapInterval, handshakeAdapterTTL)
 
 	if h.active != nil {
 		h.active.Stop()

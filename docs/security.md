@@ -87,6 +87,9 @@ bytes may remain in the file until `store.Scrub` of it succeeds, which the
 host can run again once the reader is gone. Copies the module does not see — the
 flash controller's wear-levelled blocks, file-system snapshots, the free
 blocks of a deleted journal, backups — are outside what it can promise.
+An endpoint store the host supplies (`node.Config.Store.Endpoints`) on a
+database file of its own is erased row by row and not scrubbed: scrubbing
+that file is the host's (`store.Scrub`).
 
 ### Sealing at rest
 

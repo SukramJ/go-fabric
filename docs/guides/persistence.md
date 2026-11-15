@@ -41,7 +41,10 @@ wires every consumer, holds a `store.Port`.
 - `store.New(db)`, SQLite. `Config.Store.Path` and `Config.Store.DB` build
   it; `Config.Store.Credentials` takes one you built. The factory reset
   erases the stores the node used — an override as it is, whether the node
-  still runs or was stopped before.
+  still runs or was stopped before. An endpoint-store override
+  (`Config.Store.Endpoints`) is erased row by row and not scrubbed: when it
+  keeps its records in a database file of the host's own, scrubbing that
+  file is the host's (`store.Scrub`).
 - `memstore.New()` (`store/memstore`), in memory, for tests and for a small
   daemon that accepts losing its state on restart: a process that exits
   forgets every fabric, and each controller has to commission the node

@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // The names below are the lower packages' own, re-exported so a host that
@@ -76,10 +77,32 @@ var (
 	ErrCommissioningBlocked = bridge.ErrCommissioningBlocked
 	// ErrCommissioningWindowAlreadyOpen refuses a second window while one
 	// is open.
+	//
+	// Deprecated: no node method returns it; its only source is
+	// bridge.CommissioningWindowOpener, which the node does not use —
+	// compare with bridge.ErrCommissioningWindowAlreadyOpen there.
+	// Removable in the next minor release.
 	ErrCommissioningWindowAlreadyOpen = bridge.ErrCommissioningWindowAlreadyOpen
 	// ErrCommissioningWindowNotConfigured is the window's answer when no
 	// passcode is configured.
+	//
+	// Deprecated: no node method returns it; its only source is
+	// bridge.CommissioningWindowOpener, which the node does not use —
+	// compare with bridge.ErrCommissioningWindowNotConfigured there.
+	// Removable in the next minor release.
 	ErrCommissioningWindowNotConfigured = bridge.ErrCommissioningWindowNotConfigured
+)
+
+// The store errors node methods return, for errors.Is. They are the
+// store's values, not copies.
+var (
+	// ErrScrubIncomplete is wrapped by a [Node.FactoryReset] whose erase
+	// completed but whose scrub of the SQLite file did not finish
+	// (store.ErrScrubIncomplete).
+	ErrScrubIncomplete = store.ErrScrubIncomplete
+	// ErrFabricNotFound is [Node.RemoveFabric]'s answer for an index no
+	// fabric holds (store.ErrFabricNotFound).
+	ErrFabricNotFound = store.ErrFabricNotFound
 )
 
 // The commissioning bounds [Config.Validate] and [Node.OpenBasicWindow]
