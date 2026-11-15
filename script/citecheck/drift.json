@@ -359,7 +359,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 1112,
+    "line": 1120,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",

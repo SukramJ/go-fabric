@@ -107,7 +107,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 814,
+    "line": 813,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }
