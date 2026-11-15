@@ -44,6 +44,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
@@ -450,7 +451,12 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err != nil {
 		return nil, err
 	}
-	resumption := &peer.MemoryResumptionStore{}
+	// One resumption record per peer, kept in the database: a controller
+	// restarted resumes with a node instead of a full CASE (review II,
+	// R2-P5-port-06, F-db021da0-19). The records hang on the controller's
+	// own fabric row (openGroups, ensureFabricRow), written before any
+	// session is established.
+	resumption := handshake.NewStoreResumption(store.New(cfg.DB))
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
