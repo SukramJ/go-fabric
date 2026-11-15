@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"errors"
 
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
@@ -44,6 +45,17 @@ func (d reannouncingDriver) CurrentNetwork(ctx context.Context) (ssid []byte, kn
 		return r.CurrentNetwork(ctx)
 	}
 	return nil, false
+}
+
+// SetInterfaceEnabled forwards to the host's driver when it is a
+// [contract.WiFiInterfaceSwitcher], so a write of InterfaceEnabled
+// switches the interface; without one it answers errors.ErrUnsupported,
+// the cluster's INVALID_ACTION for a write of false.
+func (d reannouncingDriver) SetInterfaceEnabled(ctx context.Context, enabled bool) error {
+	if s, ok := d.WiFiDriver.(contract.WiFiInterfaceSwitcher); ok {
+		return s.SetInterfaceEnabled(ctx, enabled)
+	}
+	return errors.ErrUnsupported
 }
 
 // wifiDriver is [Network].WiFi's Driver wrapped for the cluster, nil

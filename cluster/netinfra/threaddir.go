@@ -663,24 +663,33 @@ func (s *ThreadDirectoryServer) MatterRead(attrID uint32) (any, bool) {
 // definition's checks and the host's veto, whose refusal puts the store
 // back; every other attribute is read-only (:97-106).
 func (s *ThreadDirectoryServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [ThreadDirectoryServer.MatterWrite] with the generated server's
+// verdict on the value it stores.
+func (s *ThreadDirectoryServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != tdir.AttrPreferredExtendedPanId {
-		return s.srv.MatterWrite(ctx, attrID, value)
+		return s.srv.MatterWriteChanged(ctx, attrID, value)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored, err := s.checkPreferredLocked(value)
 	if err != nil {
-		return err
+		return false, err
 	}
 	undo, err := s.savePreferredLocked(ctx, stored)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if err := s.srv.MatterWrite(ctx, attrID, stored); err != nil {
+	changed, err := s.srv.MatterWriteChanged(ctx, attrID, stored)
+	if err != nil {
 		undo()
-		return err
+		return false, err
 	}
-	return nil
+	return changed, nil
 }
 
 // MatterInvoke implements [contract.ClusterServer]: a host's handler

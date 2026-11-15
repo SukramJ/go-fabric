@@ -31,3 +31,18 @@ func (o *OperationalCredentials) OnRollbackWaitsForNOC(fn func()) {
 	o.nocContended = fn
 	o.mu.Unlock()
 }
+
+// CSRKeyPending reports whether the fail-safe context holds a CSR's
+// operational key pair (pendingPrivKey).
+func (o *OperationalCredentials) CSRKeyPending() bool {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.pendingPrivKey != nil
+}
+
+// CheckGroupKeyMapping exposes checkGroupKeyMapping to the external parity
+// tests: the GroupKeyMap check a Groupcast binding passes through, whose
+// key set id the Groupcast commands already hold to "min 1" before it.
+func (g *GroupKeyManagement) CheckGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
+	return g.checkGroupKeyMapping(ctx, fabric, groupID, keySetID)
+}

@@ -77,11 +77,17 @@ func TestTimedRequestsOfOneSessionAreBounded(t *testing.T) {
 		t.Errorf("pending timed requests after the refused one = %d, want %d — it must store nothing", n, maxPendingTimedRequests)
 	}
 
-	// A TimedRequest again on an exchange that already waits replaces its
-	// own deadline; another session's entries do not count.
+	// A TimedRequest again on an exchange that already waits is not
+	// counted against the bound: it is the one the exchange's own window
+	// answers InvalidAction, ending that window (matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:1066-1070 at
+	// db021da0); another session's entries do not count.
 	send(peerSess, sessionID, 0x3000, peerAddr)
-	if _, body, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second); !ok || decodeStatusResponsePayload(t, body) != im.StatusSuccess {
-		t.Error("a TimedRequest on an exchange that already waits was not answered Success")
+	if _, body, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second); !ok || decodeStatusResponsePayload(t, body) != im.StatusInvalidAction {
+		t.Error("a TimedRequest on an exchange that already waits was not answered InvalidAction")
+	}
+	if n := pending(sessionID); n != maxPendingTimedRequests-1 {
+		t.Errorf("pending timed requests after the refused second one = %d, want %d", n, maxPendingTimedRequests-1)
 	}
 	if n := b.routing.pendingTimedRequests(sessionID+1, 0, time.Now()); n != 0 {
 		t.Errorf("pending timed requests of another session = %d, want 0", n)

@@ -927,6 +927,12 @@ func (c *AmbientContext) MatterWrite(ctx context.Context, attrID uint32, value a
 	return c.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (c *AmbientContext) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return c.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke answers every command: the cluster has none.
 func (c *AmbientContext) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return spec.InvokeHeld(ctx, &c.SelfHeld, cmdID, fields)

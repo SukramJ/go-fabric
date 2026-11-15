@@ -31,10 +31,20 @@ const (
 	// reason names the scope decision. Bluetooth and Wi-Fi commissioning
 	// of the node left it with ADR 0031 (milestone 7).
 	classOutOfScope gapClass = "(d) out of scope"
+	// classNotPortedYet is no gap class but the page's fifth status beside
+	// passed and the four classes (owner decision 82): a case the module is
+	// unmeasured against that a port or a run can measure now. Either a
+	// matter.js certification case at the snapshot's pin that no registered
+	// Go-TH port runs (matterJSCasesNotRun), or a family case whose fix is
+	// in the tree and whose certification run is pending (an exclude row
+	// with runPendingEvidence). checkNotPortedYet holds both.
+	classNotPortedYet gapClass = "not ported yet"
 )
 
 // controllerRoleCases are matter.js's certification cases with its
-// controller as the DUT (support/chip-testing/test/cert, 862ad75f) that the
+// controller as the DUT (support/chip-testing/test/cert at the snapshot's
+// pin, checkMatterJSCertCases; their files are the same at db021da0 as at
+// 862ad75f, where the lines below were read) that the
 // Go controller does not run as the DUT, each with its class and reason;
 // the DD onboarding-payload cases, TC-ICDM-6.1, TC-ICDB-1.3 run since phase
 // 29b-1 (gocert_dddut_test.go, gocert_icd_test.go), TC-BR-4 since 29b-2
@@ -68,7 +78,7 @@ func pythonDriven(script string) gap {
 // serves the WebRtcTransportRequestor (phase 37, controller.Config.Camera):
 // matter.js runs these with chip's camera-app as TH_SERVER and the DUT as
 // the requestor (support/chip-testing/test/cert/tc-webrtcr-support.ts:142-148
-// at 862ad75f) through the prompt-driven Python runner; that runner is the
+// at db021da0) through the prompt-driven Python runner; that runner is the
 // harness's follow-up, so the gap is the harness's (class (c)).
 func requestorServed(script string) gap {
 	return gap{class: classHarness, reason: "controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (" + script + ")"}
@@ -875,12 +885,7 @@ var chipFamilies = []family{
 	},
 	{name: "LVL", deviceType: dtColorTempLight},
 	{name: "LWM", deviceType: dtLaundryWasher},
-	{
-		name: "WASHERCTRL", deviceType: dtLaundryWasher,
-		exclude: map[string]gap{
-			"2.2": {classHarness, "TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE: chip decodes it to kUnknownEnumValue and refuses it as not a supported rinse (LaundryWasherControlsCluster.cpp:132-145 at 6170af84). matter.js refuses an undefined enum value as CONSTRAINT_ERROR before any server logic (UnknownEnumValueError, packages/protocol/src/action/errors.ts:99-103, thrown by conformance-compiler.ts:859-862 at 862ad75f), and this module answers as matter.js does", false},
-		},
-	},
+	{name: "WASHERCTRL", deviceType: dtLaundryWasher},
 	{name: "DRYERCTRL", deviceType: dtLaundryDryer},
 	{
 		name: "MOD", deviceType: dtModeSelect,
@@ -1114,11 +1119,7 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
-			"2.3":  {classHarness, "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects chip's INVALID_COMMAND (TC_PAVST_2_3.py:435-443, PushAVStreamTransportLogic.cpp:573-574); the module validates the request's fields first, as matter.js does, and answers CONSTRAINT_ERROR — matter.js answers a constraint and a conformance violation alike with CONSTRAINT_ERROR (packages/protocol/src/action/errors.ts:77-118 at 862ad75f)", false},
-			"2.6":  {classHarness, "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_6.py:283-294), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
-			"2.11": {classHarness, "TC-PAVST-2.11 step 21a allocates with an empty AudioStreams list (TC_PAVST_2_11.py:470-479), which the field's constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:270 at 862ad75f; CONSTRAINT_ERROR) before the stream check the case is after; chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
-			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at 862ad75f lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
-			"2.4":  {classHarness, "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists (TC_PAVST_2_4.py:203-204), which the fields' constraint refuses (\"1 to 16\", matter.js push-av-stream-transport.element.ts:266, :270 at 862ad75f; CONSTRAINT_ERROR, as matter.js validates a request); chip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680)", false},
+			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
 		},
 	},
 	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},

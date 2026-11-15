@@ -6,7 +6,6 @@ package node_test
 import (
 	"context"
 	"errors"
-	"maps"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -212,10 +211,13 @@ type listedServer struct {
 func (l *listedServer) MatterAttributes() []uint32 { return l.listed }
 
 // TestReadClusterReportsFailedAttributes (issue #396): ReadCluster returns
-// every attribute the wildcard read reports, in its order, a failed one
-// with its status and no value — the per-path status a controller's
-// wildcard read of the same cluster receives — while ReadAttribute keeps
-// returning the failure as its error.
+// every attribute the wildcard read reports, in its order, and a failed
+// one with its status and no value, while ReadAttribute keeps returning
+// the failure as its error. A controller's wildcard read of the same
+// cluster reports the same values and no status: a status answers a fully
+// concrete path only (review II, R2-P4-imread-03; matter.js
+// AttributeReadResponse.ts:419-424 at db021da0 skips an attribute without
+// a value).
 func TestReadClusterReportsFailedAttributes(t *testing.T) {
 	t.Parallel()
 	const cluster, readable, unreadable = 0xFFF1FC01, 0x0000, 0x0001
@@ -256,8 +258,7 @@ func TestReadClusterReportsFailedAttributes(t *testing.T) {
 	}
 
 	// The controller's wildcard read of the cluster reports the same
-	// paths: the values in the same order, the failed one with the same
-	// status.
+	// values in the same order and no status.
 	var rep *fabrictest.Report
 	if err := site.Run(ctx, func(ctx context.Context) (err error) {
 		rep, err = fabrictest.ReadWith(ctx, pair, fabrictest.ReadRequest{Attributes: []fabrictest.AttributePath{client.ClusterAt(num, cluster)}})
@@ -282,7 +283,7 @@ func TestReadClusterReportsFailedAttributes(t *testing.T) {
 			facadeStatus[v.Attribute] = v.Status
 		}
 	}
-	if !slices.Equal(facadeValues, wireValues) || !maps.Equal(facadeStatus, wireStatus) {
+	if !slices.Equal(facadeValues, wireValues) || len(wireStatus) != 0 || facadeStatus[unreadable] != uint8(im.StatusUnsupportedAttribute) {
 		t.Fatalf("facade values %v statuses %v, wire values %v statuses %v", facadeValues, facadeStatus, wireValues, wireStatus)
 	}
 }

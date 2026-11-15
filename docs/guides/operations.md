@@ -187,9 +187,16 @@ NetworkCommissioning command runs, and each one sets
 `LastNetworkingStatus`; a NetworkCommissioning command that arrives while
 an attempt runs cancels it and runs once it ended, so a commissioner's
 network step is not answered `Busy`, and the cancelled attempt sets
-nothing but the link. While a controller has written `InterfaceEnabled`
-false no attempt runs, the start's included; writing it true again starts
-the rejoin at once. After a join that failed, the node asks a
+nothing but the link. A controller's write of `InterfaceEnabled` switches
+the interface through a driver that can (`contract.WiFiInterfaceSwitcher`;
+this driver cannot: none of the wpa_supplicant D-Bus calls it makes
+switches the interface): the attribute takes the value once the driver switched, and a
+driver's refusal answers the write and leaves the value. Without the
+switch `InterfaceEnabled` stays true — a write of false answers
+`INVALID_ACTION`, as connectedhomeip's Linux app does, and a false an
+earlier version stored is not restored (`nonvolatile.restore` logs it).
+While the interface is switched off no attempt runs, the start's
+included; switching it on again starts the rejoin at once. After a join that failed, the node asks a
 driver that reports its link (`contract.WiFiLinkReporter`, which this
 driver implements) where the radio is: `Networks` reads that network
 connected — the one the failed join went back to — and a fail-safe expiry
@@ -286,8 +293,9 @@ network with that network's address, the gateway relays the other
 network's answer as well, and the controllers cache two addresses for one
 host, one of them across the router. Advertising on the controllers'
 network alone keeps the second address out. matter.js publishes on every
-interface; the allow-list is this module's (*Ahead of matter.js*,
-`BD-matterjs-mdns-interface-allowlist`).
+interface, or on the one interface it is given by name; the allow-list is
+this module's, a recorded divergence
+(`BD-matterjs-mdns-interface-allowlist`).
 
 *Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
 [`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),

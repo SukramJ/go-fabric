@@ -21,7 +21,7 @@ import (
 // [Bridge.primingEvents]. Returns the assembled report with
 // HasSubscription=false plus the count of matched attribute/event paths —
 // taken BEFORE DataVersionFilter suppression, so a caller can reject a
-// zero-matching Subscribe (ServerSubscription.ts:610-614) without
+// zero-matching Subscribe (ServerSubscription.ts:707-711 at db021da0) without
 // misfiring on an all-cached re-subscribe. The Subscribe and the
 // re-establishment stream the same reports chunk by chunk instead
 // (review II, decision 44).
@@ -52,15 +52,18 @@ func (b *Bridge) buildInitialReport(
 // reports); each cluster the controller holds at its current DataVersion
 // left out.
 //
-// Reports go out in ascending (endpoint, cluster, attribute) order per
-// path. Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
+// The statuses of the concrete paths go out first, in request order; the
+// values follow in ascending (endpoint, cluster) order per path, a
+// cluster's attributes in matter.js's order (im.CompareAttributeIDs).
+// Apple Home's MTRDevice processes the wildcard Subscribe-Initial in
 // stream order and the HAP-Service-Mapper's topology builder needs
 // Descriptor (0x001D) cached BEFORE the cluster surfaces it references —
 // otherwise `_attributeValueDictionaryForAttributePath` reports "PartsList
 // absent from cache" and HAP-Build aborts with HAPErrorDomain Code=14 ~5s
-// after Subscribe-Initial. The ascending order is not read from matter.js,
-// which sorts nothing in a read at db021da0: a wildcard walks the node's
-// endpoints, an endpoint's clusters and a cluster's attributes
+// after Subscribe-Initial. The ascending endpoint and cluster order is not
+// read from matter.js, which sorts nothing in a read at db021da0: a
+// wildcard walks the node's endpoints, an endpoint's clusters and a
+// cluster's attributes
 // (packages/protocol/src/action/server/
 // AttributeReadResponse.ts:183-185, :337-339, :378-380) in the order each
 // was added to its Set or list (packages/node/src/node/integration/
@@ -74,9 +77,12 @@ func (b *Bridge) buildInitialReport(
 // the Subscribe path, generated as it pulls AttributeReadResponse.process
 // (:644-645).
 type primingSource struct {
-	b       *Bridge
-	exp     *im.AttributeExpansion
-	allow   func(im.ReadResult) bool
+	b     *Bridge
+	exp   *im.AttributeExpansion
+	allow func(im.ReadResult) bool
+	// denial is the status a fully concrete path answers when allow
+	// refuses its result ([readDenialStatus]).
+	denial  func(im.ReadResult) im.StatusCode
 	filters []im.DataVersionFilter
 	// suppressStatuses leaves every status report out: a re-established
 	// subscription reports no per-path error again.
@@ -97,18 +103,70 @@ type primingSource struct {
 // against dispatcher for the subject subCtx carries (fabric, subject,
 // auth mode, fabric filter).
 func (b *Bridge) newPrimingSource(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) *primingSource {
+	p := b.primingSourceInPathOrder(subCtx, dispatcher, req)
+	// Every status of a concrete path precedes the first value, as in a
+	// read: matter.js ServerSubscription.ts:643-671 at db021da0 emits
+	// AttributeReadResponse's reports, statuses first, and holds them back
+	// until the first value (review II, R2-P4-imread-06). The predicate
+	// sees fully concrete paths only, so a result the subject may not read
+	// is its path's denial status (R2-P4-nv-02).
+	p.exp.StatusesFirst(func(_ im.ConcreteAttributePath, rr im.ReadResult) bool {
+		switch {
+		case p.suppressStatuses:
+			return false
+		case rr.Status == im.StatusUnsupportedNode, !p.allow(rr):
+			return true
+		}
+		return rr.Status != im.StatusSuccess
+	})
+	return p
+}
+
+// primingSourceInPathOrder is [Bridge.newPrimingSource] with every result
+// at its path's place, the statuses of the concrete paths included: what
+// [primingSource.matches] asks, which reads the paths in turn up to the
+// first match, as the order of the statuses plays no part in its answer.
+func (b *Bridge) primingSourceInPathOrder(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) *primingSource {
 	allow := readResultAuthorizer(subCtx, dispatcher)
 	if allow == nil {
 		allow = func(im.ReadResult) bool { return true }
 	}
-	return &primingSource{
+	p := &primingSource{
 		b: b,
 		// A wildcard path's WildcardPathFlags skip their paths as in a
 		// read (AttributeReadResponse.ts:149-197).
 		exp:     im.NewAttributeExpansion(im.WithElementQualities(subCtx, specElementQualities{}), dispatcher, req.AttributeRequests).Ascending(),
 		allow:   allow,
+		denial:  func(rr im.ReadResult) im.StatusCode { return readDenialStatus(subCtx, dispatcher, rr) },
 		filters: primingDataVersionFilters(subCtx, req.DataVersionFilters),
 	}
+	return p
+}
+
+// readDenialStatus is the status a fully concrete path answers when
+// [readResultAuthorizer] refuses its result: the access check's own
+// status, UNSUPPORTED_ACCESS without an accessing fabric or a checker.
+// Mirrors matter.js AttributeReadResponse #addConcrete, which answers a
+// denied concrete path with #authorize's status at its View pass and at
+// its read-level pass
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:250-252,
+// :272-274, :462-484 at db021da0), as [im.ReadReports] answers it on a
+// Read (review II, R2-P4-nv-02).
+func readDenialStatus(ctx context.Context, dispatcher im.Dispatcher, rr im.ReadResult) im.StatusCode {
+	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	aclChecker, ok := dispatcher.(im.ACLChecker)
+	if !ok || !im.HasAccessingFabric(fabricIndex) {
+		return im.StatusUnsupportedAccess
+	}
+	var priv uint8 = 1 // View default, as readResultAuthorizer
+	if pp, ok := dispatcher.(im.AttributeReadPrivilegeProvider); ok {
+		priv = pp.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
+	}
+	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
+	if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, rr.Path.Endpoint, rr.Path.Cluster, priv); !status.IsSuccess() {
+		return status
+	}
+	return im.StatusUnsupportedAccess
 }
 
 // primingDataVersionFilters returns the DataVersionFilters that apply to
@@ -122,17 +180,24 @@ func primingDataVersionFilters(subCtx context.Context, filters []im.DataVersionF
 	return filters
 }
 
-// result returns the next result the subject may read.
+// result returns the next result the subject may read, or the denial
+// status of a fully concrete path it may not ([readDenialStatus]).
 func (p *primingSource) result() (im.ReadResult, bool) {
 	for {
-		_, rr, ok := p.exp.Next()
+		requested, rr, ok := p.exp.Next()
 		if !ok {
 			return im.ReadResult{}, false
 		}
 		// A path naming another node is refused before any access check
-		// (AttributeReadResponse.ts:205-208 at db021da0).
+		// (AttributeReadResponse.ts:205-208 at db021da0). A result the
+		// subject may not read is its concrete path's denial status, and
+		// left out of a wildcard's (AttributeReadResponse.ts:250-252,
+		// :272-274; review II, R2-P4-nv-02).
 		if rr.Status != im.StatusUnsupportedNode && !p.allow(rr) {
-			continue
+			if !requested.HasEndpoint || !requested.HasCluster || !requested.HasAttribute {
+				continue
+			}
+			return im.ReadResult{Path: rr.Path, Status: p.denial(rr)}, true
 		}
 		if rr.Status == im.StatusSuccess {
 			p.matched++
@@ -238,8 +303,23 @@ func (b *Bridge) primingEventAuthorizer(subCtx context.Context, dispatcher im.Di
 // with no_match and it could never receive the future press. matter.js
 // establishes an event subscription regardless of the priming log
 // (ServerSubscription.ts emits 0+ EventReports on Subscribe-Initial).
+//
+// A path naming another node counts for nothing ([eventPathsForThisNode]).
 func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) int {
-	return b.allowedEventPaths(subCtx, dispatcher, b.primingEventAuthorizer(subCtx, dispatcher), req.EventRequests)
+	return b.allowedEventPaths(subCtx, dispatcher, b.primingEventAuthorizer(subCtx, dispatcher), eventPathsForThisNode(subCtx, req.EventRequests))
+}
+
+// eventPathsForThisNode is [im.EventPathsForNode] for the node id ctx
+// carries ([im.WithLocalNodeID]); without one the paths' node is not
+// looked at. matter.js registers no path naming another node
+// (packages/protocol/src/action/server/EventReadResponse.ts:138-140,
+// :159-162 at db021da0), so it selects no event and counts as no existent
+// path (:104-110; review II, R2-P4-imread-07).
+func eventPathsForThisNode(ctx context.Context, paths []im.ConcreteEventPath) []im.ConcreteEventPath {
+	if localNodeID, ok := im.LocalNodeIDFromContext(ctx); ok {
+		return im.EventPathsForNode(paths, localNodeID)
+	}
+	return paths
 }
 
 // primingEvents returns the EventReports of a priming report.
@@ -265,7 +345,7 @@ func (b *Bridge) primingEventPaths(subCtx context.Context, dispatcher im.Dispatc
 // Mirrors matter.js EventReadResponse.ts #readAllowedEvents; subCtx
 // carries the requesting fabric + subject.
 func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) []im.EventReport {
-	raw := im.BuildEventReports(req.EventRequests, b.eventLog, req.EventFilters)
+	raw := im.BuildEventReports(eventPathsForThisNode(subCtx, req.EventRequests), b.eventLog, req.EventFilters)
 	auth := b.primingEventAuthorizer(subCtx, dispatcher)
 	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
 		im.AuthorizeEventReports(subCtx, auth, raw)...)
@@ -280,7 +360,7 @@ func (b *Bridge) primingMatches(subCtx context.Context, dispatcher im.Dispatcher
 	if len(req.EventRequests) > 0 && b.primingEventPaths(subCtx, dispatcher, req) > 0 {
 		return true
 	}
-	return b.newPrimingSource(subCtx, dispatcher, req).matches()
+	return b.primingSourceInPathOrder(subCtx, dispatcher, req).matches()
 }
 
 // registerSubscription registers the subscribe request in the subscription
@@ -352,8 +432,11 @@ func (b *Bridge) registerSubscriptionAt(
 			// any active subscription and was silently dropped.
 			// matter.js
 			// packages/protocol/src/action/server/EventReadResponse.ts
-			// always passes both path arrays.
-			EventPaths: req.EventRequests,
+			// always passes both path arrays. A path naming another
+			// node is left out and the node of one naming this node
+			// cleared, as for the attribute paths (review II,
+			// R2-P4-imread-07).
+			EventPaths: im.EventPathsForNode(req.EventRequests, b.localNodeIDFor(requestHdr.SessionID, fabricIndex)),
 			// Nothing is reported on it until the priming report and the
 			// SubscribeResponse have gone out (EndPriming below).
 			Priming: true,
@@ -362,10 +445,11 @@ func (b *Bridge) registerSubscriptionAt(
 			// SubscribeRequests on the same session can only arise when
 			// the peer's first attempt is racing a reconnect; keeping
 			// the older entry drains quota and causes duplicate reports.
-			// Applied only for CASE sessions (fabricIndex != 0) because
-			// PASE re-subscribe cleanup is handled by the
-			// KeepSubscriptions=false / CloseSession path above; the
-			// header's source node id has no say (R2-P1-req2-02).
+			// Applied only for CASE sessions (fabricIndex != 0): on a
+			// PASE session a KeepSubscriptions=false request replaces
+			// nothing, as matter.js tears nothing down without a fabric
+			// (InteractionServer.ts:647 at db021da0); the header's
+			// source node id has no say (R2-P1-req2-02).
 			//
 			// Gated on !req.KeepSubscriptions: a peer that sets
 			// KeepSubscriptions=true is explicitly asking for its existing
@@ -426,8 +510,8 @@ func (b *Bridge) releaseTargetOfClosed(m *subscription.Manager, subID uint32) bo
 // request refused afterwards (no path, an illegal path) has cancelled the
 // peer's subscriptions too, as matter.js InteractionServer.ts:647-665 at
 // db021da0 runs it before those refusals (F-db021da0-14, review II
-// R2-P2-sess-04). A no-op when the request keeps its subscriptions or no
-// manager is attached.
+// R2-P2-sess-04). A no-op when the request keeps its subscriptions, its
+// session has no fabric (PASE), or no manager is attached.
 func (b *Bridge) teardownForSubscribe(src net.Addr, requestHdr *message.Header, req im.SubscribeRequest) {
 	m := b.subscriptionManagerLocked()
 	if m == nil || req.KeepSubscriptions {
@@ -437,42 +521,28 @@ func (b *Bridge) teardownForSubscribe(src net.Addr, requestHdr *message.Header, 
 	subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
 	peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
 	// KeepSubscriptions=false teardown — Matter §10.6.5: when the
-	// commissioner clears `KeepSubscriptions`, the bridge MUST
-	// cancel every existing subscription owned by the same peer
-	// before admitting the new one.
+	// commissioner clears `KeepSubscriptions`, the bridge cancels
+	// every existing subscription owned by the same peer before
+	// admitting the new one.
 	//
 	// Mirrors matter.js packages/node/src/node/server/
-	// InteractionServer.ts:647-665 at db021da0 for a session with a
-	// fabric: it matches on the peer address, (fabric, peerNodeID).
-	// On a session without one (PASE) matter.js tears nothing down
-	// (`fabric !== undefined`, :647); the same-session teardown
-	// below is this module's own
-	// (notes/parity/matter_behaviour_findings.md F-db021da0-12). The
-	// previous guard
-	// `fabricIndex != 0 && SourceNodeID != 0` was too narrow — it
-	// silently skipped PASE re-subscriptions (fabricIndex=0) so a
-	// PASE subscriber that re-subscribes with KeepSubscriptions=false
-	// would accumulate stale subscriptions.
-	if fabricIndex != 0 && peerNodeID != 0 {
-		// CASE session — tear down by (fabric, peer) tuple. The
-		// peer is the session's subject, whatever source node id
-		// the frame's header claims (subscriptionPeerNodeID), as
-		// matter.js matches on session.peerAddress.
-		if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
-			b.logger.Info("matter.rx.im.subscribe.peer_teardown",
-				slog.String("src", srcString(src)),
-				slog.Int("fabric_index", int(fabricIndex)),
-				slog.Uint64("node_id", peerNodeID),
-				slog.Int("cleared", cleared))
-		}
-	} else {
-		// PASE session (fabricIndex=0) — tear down by SessionID so
-		// a re-subscribe on the same PASE exchange replaces, rather
-		// than accumulates, the prior subscription.
-		// This module's own: matter.js tears nothing down on a
-		// session without a fabric (InteractionServer.ts:647 at
-		// db021da0; findings F-db021da0-12).
-		m.CloseSession(requestHdr.SessionID)
+	// InteractionServer.ts:647-665 at db021da0: only on a session
+	// with a fabric (`fabric !== undefined && !keepSubscriptions`,
+	// :647), matching on the peer address, (fabric, peerNodeID) (the
+	// walk at :648-658). On a session without a fabric (PASE) nothing
+	// is torn down.
+	if fabricIndex == 0 {
+		return
+	}
+	// The peer is the session's subject, whatever source node id the
+	// frame's header claims (subscriptionPeerNodeID), as matter.js
+	// matches on session.peerAddress.
+	if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
+		b.logger.Info("matter.rx.im.subscribe.peer_teardown",
+			slog.String("src", srcString(src)),
+			slog.Int("fabric_index", int(fabricIndex)),
+			slog.Uint64("node_id", peerNodeID),
+			slog.Int("cleared", cleared))
 	}
 }
 
@@ -533,7 +603,7 @@ func subscriptionPeerNodeID(requestHdr *message.Header, subjectNodeID uint64) ui
 // status the controller gets back.
 //
 // Cadence violations are InvalidAction: matter.js
-// packages/node/src/node/server/InteractionServer.ts:665-682 raises
+// packages/node/src/node/server/InteractionServer.ts:701-718 at db021da0 raises
 // StatusResponseError(..., Status.InvalidAction) for every
 // minIntervalFloor / maxIntervalCeiling constraint it checks. A quota
 // rejection is ResourceExhausted — the request is well-formed, the
@@ -844,20 +914,38 @@ func (b *Bridge) allowedEventPaths(ctx context.Context, dispatcher im.Dispatcher
 // eventPathAllowed resolves p's endpoint and cluster through the data model
 // (a read of ClusterRevision, which every cluster instance has, expands the
 // wildcards) and reports whether any resolved cluster's events are readable
-// by the subject.
+// by the subject — for a path naming its event, whether that event exists
+// on the resolved cluster, for a path naming none, whether the cluster has
+// an event, as the dispatcher's [im.EventPathChecker] answers it (a
+// dispatcher without one takes every event to exist). Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts at db021da0:
+// #addConcrete answers UnsupportedEvent before it registers the path
+// (:216-218, :235), a wildcard endpoint or cluster registers a named event
+// only where the cluster has it (:286-291) and a wildcard event one path
+// per event of the cluster (:277-284), and only a registered path counts
+// as existent (:104-110) for ServerSubscription.ts:707-711 (review II,
+// R2-P4-imread-08).
 func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.EventReadAuthorizer, p im.ConcreteEventPath) bool {
 	if dispatcher == nil {
 		return true
 	}
+	events, _ := dispatcher.(im.EventPathChecker)
 	probe := im.ConcreteAttributePath{
 		Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
 		Cluster: p.Cluster, HasCluster: p.HasCluster,
 		Attribute: clusterRevisionAttributeID, HasAttribute: true,
 	}
 	for _, rr := range dispatcher.Read(ctx, probe) {
-		if rr.Status == im.StatusSuccess && auth.Allows(ctx, rr.Path.Endpoint, rr.Path.Cluster) {
-			return true
+		if rr.Status != im.StatusSuccess || !auth.Allows(ctx, rr.Path.Endpoint, rr.Path.Cluster) {
+			continue
 		}
+		if events != nil && !events.EventPathStatus(im.ConcreteEventPath{
+			Endpoint: rr.Path.Endpoint, Cluster: rr.Path.Cluster, Event: p.Event,
+			HasEndpoint: true, HasCluster: true, HasEvent: p.HasEvent,
+		}).IsSuccess() {
+			continue
+		}
+		return true
 	}
 	return false
 }

@@ -45,6 +45,9 @@ type NetworkCommissioning struct {
 	// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
 	// ember dirty-marking mechanism.
 	dataVersion cluster.DataVersionTracker
+	// changes reports Networks when a write of InterfaceEnabled moves its
+	// Connected ([NetworkCommissioning.OnAttributeChange]).
+	changes cluster.AttributeChanges
 
 	interfaceID         []byte
 	interfaceEnabled    bool
@@ -141,7 +144,7 @@ func NewNetworkCommissioning(cfg NetworkCommissioningConfig) *NetworkCommissioni
 	}
 	// Seed DataVersion at a non-zero sentinel so DataVersionFilter=0 from
 	// controllers does not falsely suppress the initial cluster report.
-	// Ethernet-only config is static at runtime so Bump() is only called here.
+	// A write that changes InterfaceEnabled bumps it again (MatterWrite).
 	n.dataVersion.Bump()
 	return n
 }
@@ -155,7 +158,16 @@ var (
 	_ contract.ClusterDataVersion             = (*NetworkCommissioning)(nil)
 	_ contract.ClusterAttributeReadPrivilege  = (*NetworkCommissioning)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*NetworkCommissioning)(nil)
+	_ contract.AttributeChangeNotifier        = (*NetworkCommissioning)(nil)
 )
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: a
+// write that changes InterfaceEnabled changes Networks with it (its one
+// entry's Connected), which the bridge, reporting the written attribute,
+// does not know of.
+func (n *NetworkCommissioning) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return n.changes.OnAttributeChange(cb)
+}
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 // Returns the per-cluster monotonic counter seeded at construction.
@@ -225,20 +237,40 @@ func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 }
 
 // MatterWrite handles InterfaceEnabled writes (Matter §11.9.6.4).
-// Other attributes are read-only.
-func (n *NetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
+// Other attributes are read-only. A write that changes the value advances
+// the DataVersion — the server keeps its own, so the dispatcher does not —
+// and reports Networks; an unchanged one does neither. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0 (a commit that changed a value calls advanceVersion).
+func (n *NetworkCommissioning) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := n.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [NetworkCommissioning.MatterWrite], changed when it moved
+// InterfaceEnabled — the comparison that advances the server's own
+// version.
+func (n *NetworkCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != netcommAttrInterfaceEnabled {
 		_, err := netcommInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return false, refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(bool)
 	if !ok {
-		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
+		return false, fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
 	n.mu.Lock()
+	changed := n.interfaceEnabled != v
 	n.interfaceEnabled = v
+	if changed {
+		n.dataVersion.Bump()
+	}
 	n.mu.Unlock()
-	return nil
+	if changed {
+		n.changes.NotifyFrom(contract.OriginFrom(ctx), netcommAttrNetworks)
+	}
+	return changed, nil
 }
 
 // SetAttributes implements [spec.AttributeSetter] for the one attribute

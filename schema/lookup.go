@@ -120,6 +120,27 @@ func AttributeName(cluster, attribute uint32) (string, bool) {
 	return name, ok
 }
 
+// AttributeOrder returns the place of attribute among the attributes of
+// cluster in the order matter.js serves them in a wildcard read (0 first),
+// or (0, false) when that order does not list it. For a cluster the
+// snapshot defines, the order is its model's members as matter.js's
+// Scope.membersOf yields them (attributeOrder in parity/schema.json): the
+// cluster's own attributes in definition order — ClusterRevision and
+// FeatureMap first where the model defines them — then the global
+// attributes it does not define. For a cluster the snapshot does not
+// define (a host's own), it is the global attributes in the order
+// matter.js appends them to a model that defines none
+// (globalAttributeOrder). An attribute of the cluster the order does not
+// list — a vendor attribute, a host cluster's own — has no place here.
+func AttributeOrder(cluster, attribute uint32) (int, bool) {
+	if order, ok := attributeOrder[cluster]; ok {
+		rank, listed := order[attribute]
+		return rank, listed
+	}
+	rank, ok := globalAttributeOrder[attribute]
+	return rank, ok
+}
+
 // CommandName returns the matter.js name of a cluster's request command —
 // one a client invokes, as AcceptedCommandList lists it — or ("", false)
 // for a command the snapshot does not name. A response command's id lives

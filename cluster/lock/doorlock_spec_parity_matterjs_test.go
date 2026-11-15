@@ -32,9 +32,10 @@ func TestRequestsTakeTheGeneratedStructs(t *testing.T) {
 	t.Parallel()
 	src := &stubSource{}
 	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: src})
-	pin := []byte("1234")
+	// No PINCode: the lock holds no PIN credential, and a PIN it carried
+	// would be refused as a wrong code (TestLockCommandPinIsCheckedWithoutCOTA).
 	for cmd, req := range map[uint32]any{
-		lockdef.CmdLockDoor:   lockdef.LockDoorRequest{PinCode: &pin},
+		lockdef.CmdLockDoor:   lockdef.LockDoorRequest{},
 		lockdef.CmdUnlockDoor: lockdef.UnlockDoorRequest{},
 		lockdef.CmdUnboltDoor: lockdef.UnboltDoorRequest{},
 	} {

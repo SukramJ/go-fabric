@@ -9,17 +9,23 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// sceneLevel is a LevelControl server recording MoveToLevel.
+// sceneLevel is a LevelControl server recording the scene values it is
+// to apply ([core.SceneValuesApplier], as levelcontrol.Server).
 type sceneLevel struct {
-	level *uint8
-	moved []lvldef.MoveToLevelRequest
+	level   *uint8
+	applied []map[uint32]uint64
+	ms      []uint32
+}
+
+func (s *sceneLevel) MatterApplySceneValues(_ context.Context, values map[uint32]uint64, transitionMs uint32) {
+	s.applied = append(s.applied, values)
+	s.ms = append(s.ms, transitionMs)
 }
 
 func (s *sceneLevel) MatterClusterID() uint32 { return 0x0008 }
@@ -38,10 +44,8 @@ func (s *sceneLevel) MatterRead(a uint32) (any, bool) {
 func (s *sceneLevel) MatterWrite(context.Context, uint32, any) error { return nil }
 func (s *sceneLevel) MatterReportable() []uint32                     { return []uint32{0, 4} }
 func (s *sceneLevel) MatterAttributes() []uint32                     { return []uint32{0, 4} }
-func (s *sceneLevel) MatterInvoke(_ context.Context, _ uint32, f any) (any, error) {
-	if r, ok := f.(lvldef.MoveToLevelRequest); ok {
-		s.moved = append(s.moved, r)
-	}
+
+func (s *sceneLevel) MatterInvoke(context.Context, uint32, any) (any, error) {
 	return nil, nil
 }
 
@@ -106,7 +110,9 @@ func scenesStatus(t *testing.T, err error) im.StatusCode {
 // TestScenesCaptureAndRecallLevelAndColor pins the per-cluster recall of
 // matter.js LevelControlServer and ColorControlServer #applySceneValues:
 // a stored scene carries CurrentLevel / CurrentFrequency and the color
-// attributes, and RecallScene drives MoveToLevel (ExecuteIfOff) and
+// attributes, and RecallScene hands the LevelControl server its non-null
+// values and the transition in milliseconds (its own #applySceneValues),
+// and drives a ColorControl server without one through
 // MoveToColorTemperature for a CT scene, MoveToHueAndSaturation for a
 // hue/saturation one.
 func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
@@ -127,8 +133,8 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
 		t.Fatalf("RecallScene: %v", err)
 	}
-	if len(level.moved) != 1 || level.moved[0].Level != 77 || level.moved[0].OptionsMask != 1 || level.moved[0].TransitionTime != spec.ValueOf(uint16(15)) {
-		t.Fatalf("MoveToLevel %+v, want level 77, ExecuteIfOff, 15 tenths", level.moved)
+	if len(level.applied) != 1 || level.applied[0][lvldef.AttrCurrentLevel] != 77 || level.ms[0] != 1500 {
+		t.Fatalf("applied %+v over %v ms, want CurrentLevel 77 over 1500 ms", level.applied, level.ms)
 	}
 	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToColorTemperature {
 		t.Fatalf("color commands %v, want MoveToColorTemperature", color.cmds)
@@ -137,7 +143,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	// A hue/saturation scene recalls through MoveToHueAndSaturation, and a
 	// null CurrentLevel is captured as null and not recalled.
 	color.mode, color.cmds = 0, nil
-	level.level, level.moved = nil, nil
+	level.level, level.applied, level.ms = nil, nil, nil
 	s.MatterInvoke(ctx, 0x04, core.SceneRef{SceneID: 2})
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 2}); err != nil {
 		t.Fatal(err)
@@ -145,8 +151,65 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToHueAndSaturation {
 		t.Fatalf("color commands %v, want MoveToHueAndSaturation", color.cmds)
 	}
-	if len(level.moved) != 0 {
-		t.Fatalf("a null level was recalled: %+v", level.moved)
+	if len(level.applied) != 1 {
+		t.Fatalf("applied %d times, want 1", len(level.applied))
+	}
+	if _, ok := level.applied[0][lvldef.AttrCurrentLevel]; ok {
+		t.Fatalf("a null level was recalled: %+v", level.applied)
+	}
+}
+
+// commandLevel is a host's own LevelControl server that implements no
+// [core.SceneValuesApplier]: it records the commands it receives.
+type commandLevel struct {
+	level  sceneLevel
+	cmds   []uint32
+	fields []any
+}
+
+func (s *commandLevel) MatterClusterID() uint32                        { return 0x0008 }
+func (s *commandLevel) MatterRead(a uint32) (any, bool)                { return s.level.MatterRead(a) }
+func (s *commandLevel) MatterWrite(context.Context, uint32, any) error { return nil }
+func (s *commandLevel) MatterReportable() []uint32                     { return s.level.MatterReportable() }
+
+func (s *commandLevel) MatterAttributes() []uint32 { return s.level.MatterAttributes() }
+
+func (s *commandLevel) MatterInvoke(_ context.Context, cmd uint32, fields any) (any, error) {
+	s.cmds = append(s.cmds, cmd)
+	s.fields = append(s.fields, fields)
+	return nil, nil
+}
+
+// TestScenesRecallDrivesAForeignLevelControlThroughMoveToLevel: a
+// LevelControl server that does not recall scene values itself has its
+// stored CurrentLevel recalled through MoveToLevel with ExecuteIfOff and
+// the scene's transition in tenths, as the OnOff and ColorControl
+// fallbacks drive theirs through their commands. Mirrors matter.js
+// packages/node/src/behaviors/level-control/LevelControlServer.ts:757 at
+// db021da0 (#applySceneValues recalls the level through moveToLevelLogic
+// with executeIfOff and the scene's transition in tenths).
+func TestScenesRecallDrivesAForeignLevelControlThroughMoveToLevel(t *testing.T) {
+	t.Parallel()
+	lvl := uint8(77)
+	level := &commandLevel{level: sceneLevel{level: &lvl}}
+	if _, ok := any(level).(core.SceneValuesApplier); ok {
+		t.Fatal("commandLevel must not implement SceneValuesApplier")
+	}
+	s, _ := scenesWith(t, level)
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	if r, _ := s.MatterInvoke(ctx, 0x04, core.SceneRef{SceneID: 1}); r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Fatalf("StoreScene: %+v", r)
+	}
+	tt := uint32(1500)
+	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
+		t.Fatalf("RecallScene: %v", err)
+	}
+	if len(level.cmds) != 1 || level.cmds[0] != lvldef.CmdMoveToLevel {
+		t.Fatalf("level commands %v, want one MoveToLevel", level.cmds)
+	}
+	req, ok := level.fields[0].(lvldef.MoveToLevelRequest)
+	if !ok || req.Level != 77 || req.TransitionTime.Null || req.TransitionTime.Value != 15 || req.OptionsMask != 1 || req.OptionsOverride != 1 {
+		t.Fatalf("MoveToLevel %+v, want level 77 over 15 tenths with ExecuteIfOff", level.fields[0])
 	}
 }
 
@@ -292,5 +355,58 @@ func TestScenesRecallThroughTheServersApplier(t *testing.T) {
 	}
 	if color.ms != 1500 || color.values[0x0007] != 300 || color.values[0x4001] != 2 || color.values[0x0001] != 100 || color.values[0x4000] != 0x2000 {
 		t.Fatalf("applied %v over %d ms", color.values, color.ms)
+	}
+}
+
+// TestScenesGroupZeroIsRefusedInAGroupSession holds every scene command to
+// matter.js packages/node/src/behaviors/scenes-management/
+// ScenesManagementServer.ts:225-234 at db021da0
+// (#assertSceneCommandParameter, which all eight commands call): a group
+// message whose GroupID is 0 fails with INVALID_COMMAND and changes
+// nothing — CopyScene for either of its groups (:491-499); a unicast
+// command on group 0 and a group message on a known group run.
+func TestScenesGroupZeroIsRefusedInAGroupSession(t *testing.T) {
+	t.Parallel()
+	light := &sceneOnOff{on: true}
+	s, _ := scenesWith(t, light)
+	unicast := im.WithFabricFilter(context.Background(), true, 1)
+	group := im.WithGroupSubject(unicast, im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{1}})
+	if r, err := s.MatterInvoke(unicast, 0x04, core.SceneRef{SceneID: 1}); err != nil || r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Fatalf("StoreScene on group 0 over unicast: %+v, %v", r, err)
+	}
+	light.on = false
+	for _, c := range []struct {
+		name   string
+		cmd    uint32
+		fields any
+	}{
+		{"AddScene", 0x00, core.AddSceneRequest{SceneID: 2}},
+		{"ViewScene", 0x01, core.SceneRef{SceneID: 1}},
+		{"RemoveScene", 0x02, core.SceneRef{SceneID: 1}},
+		{"RemoveAllScenes", 0x03, core.SceneGroupRequest{}},
+		{"StoreScene", 0x04, core.SceneRef{SceneID: 3}},
+		{"RecallScene", 0x05, core.RecallSceneRequest{SceneID: 1}},
+		{"GetSceneMembership", 0x06, core.SceneGroupRequest{}},
+		{"CopyScene from group 0", 0x40, core.CopySceneRequest{GroupFrom: 0, SceneFrom: 1, GroupTo: 0x0101, SceneTo: 1}},
+		{"CopyScene to group 0", 0x40, core.CopySceneRequest{GroupFrom: 0x0101, SceneFrom: 1, GroupTo: 0, SceneTo: 4}},
+	} {
+		_, err := s.MatterInvoke(group, c.cmd, c.fields)
+		if err == nil {
+			t.Errorf("%s with GroupID 0 in a group message succeeded", c.name)
+			continue
+		}
+		if got := scenesStatus(t, err); got != im.StatusInvalidCommand {
+			t.Errorf("%s with GroupID 0 in a group message: status 0x%02X, want INVALID_COMMAND", c.name, uint8(got))
+		}
+	}
+	if light.on {
+		t.Error("a refused RecallScene applied the scene")
+	}
+	r, _ := s.MatterInvoke(unicast, 0x06, core.SceneGroupRequest{})
+	if m := r.(core.GetSceneMembershipResponse); len(m.SceneList) != 1 || m.SceneList[0] != 1 {
+		t.Errorf("group 0 holds scenes %v after the refused commands, want [1]", m.SceneList)
+	}
+	if r, err := s.MatterInvoke(group, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 5}); err != nil || r.(core.SceneStatusResponse).Status != im.StatusSuccess {
+		t.Errorf("StoreScene on a known group in a group message: %+v, %v", r, err)
 	}
 }

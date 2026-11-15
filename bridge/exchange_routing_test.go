@@ -75,7 +75,7 @@ func TestExchangeRouting_TimedDeadlinesSessionScoped(t *testing.T) {
 
 // TestExchangeRouting_SubTargetsRoundTrip locks in the Store / Load /
 // Delete cycle [Bridge.captureSubTarget] / [Bridge.reportSubscription]
-// / [Bridge.closeSubscriptionByCounter] rely on to route ongoing
+// / [Bridge.noteSubscriptionSendError] rely on to route ongoing
 // reports back to the subscribing peer.
 func TestExchangeRouting_SubTargetsRoundTrip(t *testing.T) {
 	var r exchangeRouting

@@ -24,9 +24,9 @@
 // records the addition and its sources. The Percent Rules (§4.4.6.3.1)
 // and Speed Rules (§4.4.6.6.1) the resource refers to are not in the
 // matter.js tree; the two formulas used for them are the ones
-// connectedhomeip's fan-control-server applies, and are flagged as such
-// in notes/parity/matter_behaviour_findings.md until they are checked
-// against a connectedhomeip checkout.
+// connectedhomeip's FanControlCluster applies
+// (src/app/clusters/fan-control-server/FanControlCluster.cpp:197, :224
+// at 6170af84).
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // fancontrol, ADR 0013): ids, revision, the enums and bitmaps, the
@@ -217,6 +217,13 @@ type settings struct {
 // [ErrInvalidInState] (or an error wrapping it): the specification's
 // answer for "the fan is not in a state where this attribute can be
 // changed to the requested value" (resource :53-55, :87-88, :126-128).
+//
+// A controller's write reaches ApplyFanSettings (or the Rock, Wind and
+// Airflow setters) only when the written value differs from the one
+// FanState reads at that moment; a write of the held value reaches no
+// setter. A write that reaches a setter counts as a change — its
+// DataVersion advances and it is reported — whether or not FanState
+// shows it when the setter returns, so a host may apply it later.
 type StateSource = fandef.StateSource
 
 // source is the port the server drives internally (port.go carries a
@@ -444,52 +451,87 @@ func nullableCapped(v *uint8, ceiling uint8) (any, bool) {
 // served, writable, the type, "max 100", "max speedMax", the defined bits
 // of RockBitmap / WindBitmap, the AirflowDirectionEnum values; the rules
 // beyond it (FanMode's deprecated values and sequence, the Support masks,
-// the coupling) are the server's.
+// the coupling) are the server's. A value equal to the one the host holds
+// reaches no setter and leaves the DataVersion, as a null PercentSetting
+// or SpeedSetting does; any other value reaches the host's setter and
+// advances it once ([Server.MatterWriteChanged]).
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	var err error
-	if attrID == AttrFanMode {
-		err = s.writeFanMode(ctx, value)
-	} else {
-		err = s.writeChecked(ctx, attrID, value)
-	}
-	if err != nil {
-		return err
-	}
-	s.tracker().Bump()
-	return nil
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
 }
 
-// writeChecked applies a write the definition has checked.
-func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) error {
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when it reached the host's
+// setter. The written value, checked and resolved, is compared with the
+// one the host's state holds before the host is called: an equal value
+// reaches no setter and answers unchanged; a different one is applied and
+// answers changed, advancing the server's own version once, whatever the
+// host's state reads when the setter returns — a host that applies a
+// write later is judged by what was written, and a host's own change
+// around the write is never undone by a write that answers unchanged. A
+// host's setter is therefore called only for a value that differs from
+// what its state read. matter.js notes a change, and runs a reactor, only
+// for a value that differs from the held one
+// (packages/node/src/behavior/state/managed/Datasource.ts:1476-1492 at
+// db021da0, #noteIfChanged); its FanControlServer adds no behaviour to a
+// write (packages/node/src/behaviors/fan-control/FanControlServer.ts:13-19).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	var stored bool
+	var err error
+	if attrID == AttrFanMode {
+		stored, err = s.writeFanMode(ctx, value)
+	} else {
+		stored, err = s.writeChecked(ctx, attrID, value)
+	}
+	if err != nil || !stored {
+		return false, err
+	}
+	s.tracker().Bump()
+	return true, nil
+}
+
+// writeChecked applies a write the definition has checked; stored reports
+// whether it reached the host — a value equal to the held one does not.
+func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (stored bool, err error) {
 	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, attrID, storedForm(v)); err != nil {
-		return err
+		return false, err
 	}
 	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
 	switch attrID {
 	case AttrPercentSetting:
 		if !isNum {
-			return nil // null: "the attribute value shall NOT change" (resource :86-87)
+			return false, nil // null: "the attribute value shall NOT change" (resource :86-87)
 		}
-		return s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per ValidateWrite
+		if held := s.src.FanState().PercentSetting; held != nil && uint64(*held) == n {
+			return false, nil
+		}
+		return true, s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per ValidateWrite
 	case AttrSpeedSetting:
 		if !isNum {
-			return nil // null, as PercentSetting
+			return false, nil // null, as PercentSetting
 		}
-		return s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per ValidateWrite
+		if held := s.src.FanState().SpeedSetting; held != nil && uint64(*held) == n {
+			return false, nil
+		}
+		return true, s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per ValidateWrite
 	case AttrRockSetting:
 		return s.writeRockSetting(ctx, RockBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
 	case AttrWindSetting:
 		return s.writeWindSetting(ctx, WindBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
 	default: // AttrAirflowDirection, the last writable attribute
-		setter, _ := s.src.(airflowSetter)                                           // guaranteed by NewServer
-		if err := setter.SetAirflowDirection(ctx, AirflowDirection(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
-			return fmt.Errorf("fan: AirflowDirection write: %w", err)
+		dir := AirflowDirection(n) //nolint:gosec // an enum8 per ValidateWrite
+		if s.src.FanState().AirflowDirection == dir {
+			return false, nil
 		}
-		return nil
+		setter, _ := s.src.(airflowSetter) // guaranteed by NewServer
+		if err := setter.SetAirflowDirection(ctx, dir); err != nil {
+			return false, fmt.Errorf("fan: AirflowDirection write: %w", err)
+		}
+		return true, nil
 	}
 }
 
@@ -520,7 +562,7 @@ func (s *Server) supports(m FanMode) bool {
 // values the way connectedhomeip does: On becomes High, Smart becomes
 // Auto where the sequence offers Auto and High otherwise. Mirrors
 // connectedhomeip src/app/clusters/fan-control-server/
-// FanControlCluster.cpp:400-410 (SetFanMode) at the harness pin
+// FanControlCluster.cpp:401-411 (SetFanMode) at the harness pin
 // 6170af8461b10b1766044122ac83332c6d00ab20; matter.js's FanControlServer
 // adds no behaviour to the model (packages/node/src/behaviors/fan-control/
 // FanControlServer.ts). A value outside the enum, or one the sequence
@@ -573,7 +615,7 @@ func (s *Server) fanModeSettings(m FanMode) settings {
 
 // percentSettings is what a PercentSetting p resolves to: with
 // MultiSpeed, SpeedSetting = ceil(SpeedMax × p / 100); FanMode Off at 0.
-// Mirrors connectedhomeip FanControlCluster.cpp:180-201
+// Mirrors connectedhomeip FanControlCluster.cpp:179-202
 // (ApplyPercentSettingChanged: `(mSpeedMax * percent + 99) / 100`, Off at
 // 0) at the harness pin; the FanMode of a non-zero percentage stays the
 // device's (:136-166 is connectedhomeip's own 33/66 split).
@@ -592,7 +634,7 @@ func (s *Server) percentSettings(p uint8) settings {
 
 // speedSettings is what a SpeedSetting v resolves to: PercentSetting =
 // floor(v × 100 / SpeedMax); FanMode Off at 0. Mirrors connectedhomeip
-// FanControlCluster.cpp:203-228 (ApplySpeedSettingChanged:
+// FanControlCluster.cpp:204-228 (ApplySpeedSettingChanged:
 // `(speedSetting * 100) / mSpeedMax`, Off at 0) at the harness pin.
 func (s *Server) speedSettings(v uint8) settings {
 	percent := uint8(uint16(v) * 100 / uint16(s.cfg.SpeedMax)) //nolint:gosec // v ≤ SpeedMax: at most 100
@@ -611,15 +653,20 @@ func (s *Server) apply(ctx context.Context, what string, set settings) error {
 	return nil
 }
 
-func (s *Server) writeFanMode(ctx context.Context, value any) error {
+// writeFanMode applies a FanMode write; stored reports whether it reached
+// the host — the FanMode the host holds, written again, does not.
+func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err error) {
 	m, err := s.resolveFanMode(value)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
-		return err
+		return false, err
 	}
-	return s.apply(ctx, "FanMode write", s.fanModeSettings(m))
+	if s.src.FanState().FanMode == m {
+		return false, nil
+	}
+	return true, s.apply(ctx, "FanMode write", s.fanModeSettings(m))
 }
 
 // writeRockSetting: "Each bit shall only be set to 1, if the
@@ -628,27 +675,35 @@ func (s *Server) writeFanMode(ctx context.Context, value any) error {
 // Picking the lowest bit of a supported-but-impossible combination
 // (:166-168) needs to know which combinations the device runs, so the
 // host does that.
-func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) error {
+// The RockSetting the host holds, written again, reaches no setter
+// (stored false).
+func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) (stored bool, err error) {
 	if rock&^s.cfg.RockSupport != 0 {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting 0x%02X outside RockSupport 0x%02X", rock, s.cfg.RockSupport)}
+		return false, statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting 0x%02X outside RockSupport 0x%02X", rock, s.cfg.RockSupport)}
+	}
+	if s.src.FanState().RockSetting == rock {
+		return false, nil
 	}
 	setter, _ := s.src.(rockSetter) // guaranteed by NewServer
 	if err := setter.SetRockSetting(ctx, rock); err != nil {
-		return fmt.Errorf("fan: RockSetting write: %w", err)
+		return false, fmt.Errorf("fan: RockSetting write: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 // writeWindSetting is writeRockSetting for WindSetting (resource :186-188).
-func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) error {
+func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) (stored bool, err error) {
 	if wind&^s.cfg.WindSupport != 0 {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting 0x%02X outside WindSupport 0x%02X", wind, s.cfg.WindSupport)}
+		return false, statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting 0x%02X outside WindSupport 0x%02X", wind, s.cfg.WindSupport)}
+	}
+	if s.src.FanState().WindSetting == wind {
+		return false, nil
 	}
 	setter, _ := s.src.(windSetter) // guaranteed by NewServer
 	if err := setter.SetWindSetting(ctx, wind); err != nil {
-		return fmt.Errorf("fan: WindSetting write: %w", err)
+		return false, fmt.Errorf("fan: WindSetting write: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 // MatterInvoke dispatches Step.
@@ -672,14 +727,15 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if err != nil {
 		return nil, err
 	}
+	before := s.src.FanState()
 	if stepper, ok := s.src.(Stepper); ok {
 		if err := stepper.Step(ctx, stepRequestOf(req)); err != nil {
 			return nil, fmt.Errorf("fan: Step: %w", err)
 		}
-		s.tracker().Bump()
+		s.bumpIfChanged(before)
 		return nil, nil
 	}
-	st := s.src.FanState()
+	st := before
 	var set settings
 	if s.has(FeatureMultiSpeed) {
 		current := st.SpeedCurrent
@@ -693,8 +749,31 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if err := s.apply(ctx, "Step", set); err != nil {
 		return nil, err
 	}
-	s.tracker().Bump()
+	s.bumpIfChanged(before)
 	return nil, nil
+}
+
+// bumpIfChanged advances the DataVersion when the fan the host reports
+// differs from before: a Step that left the fan as it was changes no
+// attribute. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1481 at db021da0 (#noteIfChanged returns for an equal value; the
+// version advances only when the commit changed something).
+func (s *Server) bumpIfChanged(before fanState) {
+	if sameFanState(before, s.src.FanState()) {
+		return
+	}
+	s.tracker().Bump()
+}
+
+// sameFanState reports whether a and b observe the same fan, the nullable
+// settings compared by value.
+func sameFanState(a, b fanState) bool {
+	sameNullable := func(x, y *uint8) bool { return (x == nil) == (y == nil) && (x == nil || *x == *y) }
+	return a.FanMode == b.FanMode && sameNullable(a.PercentSetting, b.PercentSetting) &&
+		a.PercentCurrent == b.PercentCurrent && sameNullable(a.SpeedSetting, b.SpeedSetting) &&
+		a.SpeedCurrent == b.SpeedCurrent && a.RockSetting == b.RockSetting &&
+		a.WindSetting == b.WindSetting && a.AirflowDirection == b.AirflowDirection
 }
 
 // stepValue moves current one unit along [lowest, ceiling].

@@ -4,15 +4,20 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	mstore "github.com/SukramJ/go-fabric/store"
 )
 
 func newGKM(t *testing.T) *core.GroupKeyManagement {
@@ -55,7 +60,7 @@ func TestGKM_NewGroupKeyManagement_NilStore(t *testing.T) {
 func TestGKM_MaxGroupsPerFabric_Default(t *testing.T) {
 	t.Parallel()
 	// cfg value 0 → matter.js default 22
-	// (GroupKeyManagementServer.ts:616 override maxGroupsPerFabric = 22).
+	// (GroupKeyManagementServer.ts:614 at db021da0, override maxGroupsPerFabric = 22).
 	gkm, err := core.NewGroupKeyManagement(newFakeStore(), core.GroupKeyMgmtConfig{MaxGroupsPerFabric: 0})
 	if err != nil {
 		t.Fatalf("NewGroupKeyManagement: %v", err)
@@ -326,7 +331,7 @@ func TestGKM_WriteGroupKeyMap(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap: %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -342,10 +347,10 @@ func TestGKM_WriteGroupKeyMap(t *testing.T) {
 //
 // matter.js injects the accessing fabric into every fabric-scoped struct
 // before the behaviour sees it
-// (packages/protocol/src/action/server/AttributeWriteResponse.ts:461-467
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:466-472
 // "We always inject the current fabricIndex for writes", overwriting via
-// packages/types/src/tlv/TlvObject.ts:306-310), and
-// GroupKeyManagementServer.ts:181-236 #validateGroupKeyMap never
+// packages/types/src/tlv/TlvObject.ts:309-313), and
+// GroupKeyManagementServer.ts:170-226 at db021da0 #validateGroupKeyMap never
 // compares an entry's fabricIndex with the session. AccessControl in this
 // package stamps the writer's fabric for the same reason
 // (access_control.go MatterWrite). A chip-derived controller omits the
@@ -365,7 +370,7 @@ func TestGKM_WriteGroupKeyMap_StampsTheAccessingFabric(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap with client-supplied FabricIndex: %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 1), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -818,9 +823,8 @@ func TestGKM_MatterReadFiltered_GroupKeyMap_FabricScoped(t *testing.T) {
 }
 
 // TestGKM_MatterRead_GroupKeyMap_FabricZeroFallback verifies that
-// MatterRead (no fabric context) falls back to g.currentFabric=0 and
-// returns an empty list for fabric 0. This is acceptable for test paths
-// that do not stamp the IM context.
+// MatterRead (no request behind it) covers every fabric the store holds
+// and, with none, returns an empty list.
 func TestGKM_MatterRead_GroupKeyMap_FabricZeroFallback(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
@@ -916,7 +920,7 @@ func TestGKM_WriteGroupKeyMapRemovesDroppedBindings(t *testing.T) {
 		t.Fatalf("MatterWrite GroupKeyMap (shortened): %v", err)
 	}
 
-	v, ok := gkm.MatterRead(0x0000)
+	v, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if !ok {
 		t.Fatal("GroupKeyMap: ok=false after write")
 	}
@@ -929,8 +933,57 @@ func TestGKM_WriteGroupKeyMapRemovesDroppedBindings(t *testing.T) {
 	if err := gkm.MatterWrite(ctx, 0x0000, []core.GroupKeyMapStruct{}); err != nil {
 		t.Fatalf("MatterWrite GroupKeyMap (empty): %v", err)
 	}
-	v, _ = gkm.MatterRead(0x0000)
+	v, _ = gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 2), 0x0000)
 	if got := v.([]core.GroupKeyMapStruct); len(got) != 0 {
 		t.Fatalf("GroupKeyMap after empty write = %+v, want empty", got)
+	}
+}
+
+// TestGKM_StoredMappingToKeySet0_DroppedAtConstruction: a GroupKeyMap entry
+// that maps a group to key set 0 — the fabric's IPK, outside the entry's
+// "1 to 65535" (group-key-management.element.ts:109 at db021da0) — that
+// the store holds when the server is constructed is removed and logged:
+// it is not served, and an appended entry is judged with the fabric's
+// valid entries only. matter.js validates a behavior's state as it
+// initialises (ServerBehaviorBacking.ts:60-63 at db021da0), so it serves
+// no such entry either.
+func TestGKM_StoredMappingToKeySet0_DroppedAtConstruction(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	fabric, err := fs.AddFabric(ctx, mstore.FabricRecord{FabricID: 0x0A, NodeID: 0x0B, VendorID: 0xFFF1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []mstore.GroupKeyMapping{
+		{FabricIndex: fabric, GroupID: 0x0102, GroupKeySetID: 0},
+		{FabricIndex: fabric, GroupID: 0x0103, GroupKeySetID: 5},
+	} {
+		if err := fs.SetGroupKeyMapping(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var logs bytes.Buffer
+	gkm, err := core.NewGroupKeyManagement(fs, core.GroupKeyMgmtConfig{Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fctx := im.WithFabricFilter(ctx, true, fabric)
+	v, _ := gkm.MatterReadFiltered(fctx, 0x0000)
+	if got, want := v.([]core.GroupKeyMapStruct), []core.GroupKeyMapStruct{{GroupID: 0x0103, GroupKeySetID: 5, FabricIndex: fabric}}; !slices.Equal(got, want) {
+		t.Errorf("GroupKeyMap %+v, want %+v (the mapping to key set 0 is not served)", got, want)
+	}
+	if !strings.Contains(logs.String(), "group_id=258") || !strings.Contains(logs.String(), "fabric_index="+strconv.Itoa(int(fabric))) {
+		t.Errorf("no log line names the dropped mapping: %q", logs.String())
+	}
+	// An append: the dispatcher writes the fabric's entries as read plus
+	// the new one.
+	appended := append(v.([]core.GroupKeyMapStruct), core.GroupKeyMapStruct{GroupID: 0x0104, GroupKeySetID: 5})
+	if err := gkm.MatterWrite(fctx, 0x0000, appended); err != nil {
+		t.Fatalf("append after the restart: %v", err)
+	}
+	stored, _ := fs.ListGroupKeyMappings(ctx, fabric)
+	if slices.ContainsFunc(stored, func(m mstore.GroupKeyMapping) bool { return m.GroupKeySetID == 0 }) {
+		t.Errorf("the store still maps a group to key set 0: %+v", stored)
 	}
 }

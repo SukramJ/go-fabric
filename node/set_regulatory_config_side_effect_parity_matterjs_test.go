@@ -8,8 +8,10 @@
 //
 // matter.js invokes on a MockServerNode in a command context without
 // fabric; the port invokes over a PASE session (fabrictest
-// Controller.PASE) to an uncommissioned node, whose LocationCapability is
-// Indoor (node.Commissioning.LocationCapability's zero value).
+// Controller.PASE) to an uncommissioned node whose LocationCapability is
+// Indoor (node.Commissioning.IndoorOnly), as matter.js's
+// IndoorOnlyCommissioning sets it (SetRegulatoryConfigSideEffectTest.ts:12-14
+// at db021da0).
 package node_test
 
 import (
@@ -18,6 +20,7 @@ import (
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 func TestSetRegulatoryConfigSideEffectParity(t *testing.T) {
@@ -25,7 +28,9 @@ func TestSetRegulatoryConfigSideEffectParity(t *testing.T) {
 	t.Run("does not write BasicInformation.location when newRegulatoryConfig validation fails", func(t *testing.T) {
 		t.Parallel()
 		site := quietSite(t)
-		u := site.UncommissionedPair(fabrictest.PairOptions{})
+		u := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
+			cfg.Commissioning.IndoorOnly = true
+		}}})
 		ctx := parityCtx(t)
 		p, err := u.Controller.PASE(ctx, u.Device)
 		if err != nil {

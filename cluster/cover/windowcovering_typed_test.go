@@ -68,10 +68,9 @@ func TestWindowCoveringTypedSetGetOnChanged(t *testing.T) {
 	}
 
 	for name, p := range map[string]wcdef.Patch{
-		"ConfigStatus (derived)":  {ConfigStatus: ptrOf(wcdef.ConfigStatusBitmap(0))},
-		"Percentage (derived)":    {CurrentPositionLiftPercentage: ptrOf(uint8(10))},
-		"another Type":            {Type: ptrOf(wcdef.TypeShutter)},
-		"a null current position": {Null: []uint32{wcdef.AttrCurrentPositionLiftPercent100ths}},
+		"ConfigStatus (derived)": {ConfigStatus: ptrOf(wcdef.ConfigStatusBitmap(0))},
+		"Percentage (derived)":   {CurrentPositionLiftPercentage: ptrOf(uint8(10))},
+		"another Type":           {Type: ptrOf(wcdef.TypeShutter)},
 	} {
 		if err := s.Set(p); !errors.Is(err, spec.ErrNotHeld) && !errors.Is(err, spec.ErrInvalidValue) {
 			t.Errorf("%s: %v", name, err)

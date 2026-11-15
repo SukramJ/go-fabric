@@ -256,9 +256,13 @@ func encodeScenesResponse(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		for _, s := range x {
 			enc.StartStruct(tlv.AnonymousTag())
 			enc.PutUint(tlv.ContextTag(0), uint64(s.SceneCount))
-			enc.PutUint(tlv.ContextTag(1), uint64(s.CurrentScene))
-			enc.PutUint(tlv.ContextTag(2), uint64(s.CurrentGroup))
-			enc.PutBool(tlv.ContextTag(3), s.SceneValid)
+			// Another fabric's entry on an unfiltered read carries no
+			// fabric-sensitive field (SceneInfoStruct.Redacted).
+			if !s.Redacted {
+				enc.PutUint(tlv.ContextTag(1), uint64(s.CurrentScene))
+				enc.PutUint(tlv.ContextTag(2), uint64(s.CurrentGroup))
+				enc.PutBool(tlv.ContextTag(3), s.SceneValid)
+			}
 			enc.PutUint(tlv.ContextTag(4), uint64(s.RemainingCapacity))
 			enc.PutUint(tlv.ContextTag(0xFE), uint64(s.FabricIndex))
 			_ = enc.EndContainer()

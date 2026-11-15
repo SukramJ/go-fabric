@@ -120,7 +120,10 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 	if err := srv.MatterWrite(ctx, tfldef.AttrActiveCalendarType, uint64(tfldef.CalendarTypeBuddhist)); statusOf(err) != im.StatusConstraintError {
 		t.Errorf("Buddhist, not supported: %v, want CONSTRAINT_ERROR", err)
 	}
-	if want := []write{{tfldef.AttrHourFormat, 0}, {tfldef.AttrActiveCalendarType, 4}}; !slices.Equal(written, want) {
+	// Gregorian is the held ActiveCalendarType: its write reaches no Sink
+	// and persists nothing (matter.js observes and stores no equal field,
+	// Datasource.ts:1406-1407, :1447-1451 and :1479 at db021da0).
+	if want := []write{{tfldef.AttrHourFormat, 0}}; !slices.Equal(written, want) {
 		t.Errorf("persisted %v, want %v", written, want)
 	}
 	if _, err := NewTimeFormatLocalization(TimeFormatLocalizationConfig{

@@ -104,7 +104,8 @@ type ICDManagementConfig struct {
 	// MaximumCheckInBackoff is in seconds, at least IdleModeDuration.
 	MaximumCheckInBackoff uint32
 	// UserActiveModeTriggerHint and UserActiveModeTriggerInstruction are
-	// served with the UserActiveModeTrigger feature.
+	// served with the UserActiveModeTrigger feature, the instruction only
+	// when it is not empty.
 	UserActiveModeTriggerHint        icddef.UserActiveModeTriggerBitmap
 	UserActiveModeTriggerInstruction string
 	// OperatingMode is the initial OperatingMode, mandatory with
@@ -323,7 +324,13 @@ func NewICDManagement(cfg ICDManagementConfig) (*ICDManagement, error) {
 	}
 	cfg = cfg.withDefaults()
 	opts := spec.Options{Features: uint32(cfg.Features), Commands: []uint32{icddef.CmdStayActiveRequest}}
-	if cfg.has(icddef.FeatureUserActiveModeTrigger) {
+	// UserActiveModeTriggerInstruction is served when the host gave one: its
+	// conformance is "desc" without a default, and matter.js lists an
+	// attribute whose state holds no value as no element of the endpoint
+	// (packages/model/src/standard/elements/icd-management.element.ts:62-65,
+	// packages/node/src/behavior/cluster/ValidatedElements.ts:247-279 at
+	// db021da0).
+	if cfg.has(icddef.FeatureUserActiveModeTrigger) && cfg.UserActiveModeTriggerInstruction != "" {
 		opts.Attributes = []uint32{icddef.AttrUserActiveModeTriggerInstruction}
 	}
 	inst, err := spec.New(icddef.Definition, opts)
@@ -906,8 +913,20 @@ func (s *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader]: a
 // fabric-filtered read lists the accessing fabric's registrations; an
-// unfiltered one lists every fabric's, another fabric's entry with its
-// fabric-sensitive fields left out (Core §7.13.6).
+// unfiltered one lists every fabric's, and an entry of another fabric than
+// the accessing one — every entry, for a session without a fabric — is
+// served without its fabric-sensitive fields (Core §7.13.6): CheckInNodeId,
+// MonitoredSubject and ClientType are "S" and Key "F"
+// (packages/model/src/standard/elements/icd-management.element.ts:145-152),
+// and matter.js's entry holds no Key
+// (packages/node/src/behaviors/icd-management/IcdManagementServer.ts:572-577
+// registerClient), so the entry is its FabricIndex alone
+// ([redactedEntry]). Mirrors matter.js at db021da0: a fabric-sensitive
+// field of another owning fabric reads undefined
+// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
+// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
+// mayRead) and the encoder leaves it out
+// (packages/types/src/tlv/TlvObject.ts:128-134).
 func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	filtered, fabric, request := im.LookupFabricFilter(ctx)
 	if attrID != icddef.AttrRegisteredClients || !request {
@@ -918,10 +937,10 @@ func (s *ICDManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make(spec.List[icddef.MonitoringRegistrationStruct], 0, len(s.clients))
+	out := make(spec.List[spec.Encodable], 0, len(s.clients))
 	for _, c := range s.clients {
 		if c.fabricIndex != fabric {
-			out = append(out, icddef.MonitoringRegistrationStruct{FabricIndex: c.fabricIndex})
+			out = append(out, redactedEntry{fabricIndex: c.fabricIndex})
 			continue
 		}
 		out = append(out, c.wire())
@@ -986,6 +1005,12 @@ func (s *ICDManagement) read(attrID uint32, keep func(icdClient) bool) (any, boo
 func (s *ICDManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := s.inst.ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("core: ICDManagement attribute 0x%04X is read-only", attrID), status: err}
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ICDManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke implements [contract.ClusterServer]: RegisterClient,
@@ -1069,6 +1094,16 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 		}
 	} else if err := assertMayModify(ctx, stored, req.VerificationKey); err != nil {
 		return icddef.RegisterClientResponse{}, err
+	}
+	// The entry enters RegisteredClients only with a ClientType its enum
+	// defines: matter.js validates the entry as it enters the list state
+	// (IcdManagementServer.ts:572-583 at db021da0, ListManager.ts:379-386 and
+	// :428-432, the enum validator packages/node/src/behavior/state/validation/
+	// ValueValidator.ts:167-179 —
+	// Status.ConstraintError); its request schema holds the field to its
+	// type only (packages/types/src/tlv/TlvOfModel.ts:221-223).
+	if !s.inst.EnumSupported(icddef.ClientTypeEnumDef, uint64(req.ClientType)) {
+		return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusConstraintError, "core: ICD ClientType %d is not defined in ClientTypeEnum", req.ClientType)
 	}
 
 	entry := icdClient{

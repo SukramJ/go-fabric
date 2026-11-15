@@ -93,6 +93,9 @@ type fieldInfo struct {
 	v         *value
 	mandatory bool
 	nullable  bool
+	// relaxed is the reference line of the relaxation table's entry for
+	// the field (relaxed.go), empty when none.
+	relaxed string
 }
 
 // dataInfo is a datatype the package declares.
@@ -113,6 +116,16 @@ type payload struct {
 	response *element // set on a response command payload
 	command  *element // set on a command payload
 	event    *element // set on an event payload
+	// check is the relaxation table's departure from the request check
+	// for a request payload (relaxed.go); nil when none.
+	check *requestCheck
+}
+
+// requestCheck is a request command's entry of the relaxation table.
+type requestCheck struct {
+	unchecked bool
+	refusal   uint8
+	ref       string
 }
 
 type generator struct {
@@ -125,6 +138,9 @@ type generator struct {
 	payloads []*payload
 	anon     []*payload
 	attrType map[uint32]typeInfo
+	// attrRelaxed is the relaxation table's reference line per relaxed
+	// attribute (relaxed.go).
+	attrRelaxed map[uint32]string
 	// definitionOnly: the cluster is in the definitionOnly list — a
 	// definition and a typed state, no generated server and no Declare
 	// (a hand-written server in this module serves it).
@@ -149,12 +165,15 @@ func generate(snap *snapshot, name string) (out *output, err error) {
 	g := &generator{
 		snap: snap, c: c, pkg: packageName(c.Name),
 		used: map[string]string{}, data: map[string]*dataInfo{}, attrType: map[uint32]typeInfo{},
-		definitionOnly: slices.Contains(definitionOnly, c.Name),
+		attrRelaxed: map[uint32]string{}, definitionOnly: slices.Contains(definitionOnly, c.Name),
 	}
 	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap", "WrapOn", "Declare"} {
 		g.used[id] = "package identifier"
 	}
 	if err := g.collect(); err != nil {
+		return nil, fmt.Errorf("%s: %w", c.Name, err)
+	}
+	if err := g.relax(); err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
 	src, err := g.source()
@@ -1003,25 +1022,20 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 		w.p("\treturn spec.DecodeFields(n, %q,", p.what)
 		for _, f := range p.fields {
 			dec := decExpr(f)
-			if p.command != nil && p.response == nil {
-				if at, ok := relaxedRequestFields[g.c.Name+"."+p.what+"."+f.name]; ok {
-					// The server judges the value, as matter.js's server
-					// relaxes the field's constraint (relaxedRequestFields).
-					unbounded := *f
-					unbounded.v = nil
-					dec = decExpr(&unbounded)
-					w.p("\t\t// %s: the constraint %q is the server's to judge, as matter.js %s relaxes it.", f.name, f.v.Constraint.Text, at)
-				}
-			}
-			if p.command == nil && p.response == nil {
-				if sj, ok := serverJudgedStructFields[g.c.Name+"."+p.what+"."+f.name]; ok {
-					// The server judges the value, as chip's handler does
-					// (serverJudgedStructFields).
-					unbounded := *f
-					unbounded.v = nil
-					dec = decExpr(&unbounded)
-					w.p("\t\t// %s: the constraint %q is the server's to judge, as chip %s does (%s).", f.name, f.v.Constraint.Text, sj.at, sj.why)
-				}
+			switch {
+			case f.relaxed != "":
+				// The server judges the value (the relaxation table,
+				// relaxed.go); the decoder holds the type's width only.
+				unbounded := *f
+				unbounded.v = nil
+				dec = decExpr(&unbounded)
+				w.p("\t\t// %s: the constraint %q is the server's to judge (%s).", f.name, constraintText(f), f.relaxed)
+			case p.check != nil && p.check.unchecked && p.command != nil && p.response == nil:
+				// The request is not held to its constraints (the
+				// relaxation table's unchecked cluster).
+				unbounded := *f
+				unbounded.v = nil
+				dec = decExpr(&unbounded)
 			}
 			if !f.mandatory {
 				dec = "spec.DecodeOptional(" + dec + ")"
@@ -1244,28 +1258,7 @@ func (g *generator) writeDefinition(w *writer) {
 	if len(attrs) > 0 {
 		w.p("\tAttributes: []spec.Attribute{")
 		for _, a := range attrs {
-			v := &a.Effective.value
-			t := g.attrType[a.ID]
-			w.p("\t\t{")
-			w.p("\t\t\tID: Attr%s, Name: %q,", exportName(a.Name), a.Name)
-			w.p("\t\t\tType: %s,", g.typeLiteral(t, v))
-			w.p("\t\t\tConformance: %s,", confLiteral(v.Conformance))
-			if lit := accessLiteral(v.Access); lit != "" {
-				w.p("\t\t\tAccess: %s,", lit)
-			}
-			if lit := qualityLiteral(v.Quality); lit != "" {
-				w.p("\t\t\tQuality: %s,", lit)
-			}
-			if lit := constraintLiteral(v.Constraint, v.Type, v.Metatype); lit != "" {
-				w.p("\t\t\tConstraint: %s,", lit)
-			}
-			if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
-				w.p("\t\t\tDefault: %s,", lit)
-			}
-			if g.attrDecoder(a) != "" {
-				w.p("\t\t\tDecode: decodeAttr%s,", exportName(a.Name))
-			}
-			w.p("\t\t},")
+			g.writeAttribute(w, a)
 		}
 		w.p("\t},")
 	}
@@ -1289,6 +1282,9 @@ func (g *generator) writeDefinition(w *writer) {
 			}
 			if len(p.fields) > 0 {
 				w.p("\t\t\tFields: %s,", g.fieldsLiteral(p.fields))
+			}
+			if lit := p.check.literal(); lit != "" {
+				w.p("\t\t\tCheck: %s,", lit)
 			}
 			w.p("\t\t\tDecode: decode%s,", p.goName)
 			w.p("\t\t},")
@@ -1316,6 +1312,35 @@ func (g *generator) writeDefinition(w *writer) {
 	}
 	w.p("}")
 	w.p("")
+}
+
+// writeAttribute writes one attribute of the definition.
+func (g *generator) writeAttribute(w *writer, a *element) {
+	v := &a.Effective.value
+	t := g.attrType[a.ID]
+	w.p("\t\t{")
+	w.p("\t\t\tID: Attr%s, Name: %q,", exportName(a.Name), a.Name)
+	w.p("\t\t\tType: %s,", g.typeLiteral(t, v))
+	w.p("\t\t\tConformance: %s,", confLiteral(v.Conformance))
+	if lit := accessLiteral(v.Access); lit != "" {
+		w.p("\t\t\tAccess: %s,", lit)
+	}
+	if lit := qualityLiteral(v.Quality); lit != "" {
+		w.p("\t\t\tQuality: %s,", lit)
+	}
+	if lit := constraintLiteral(v.Constraint, v.Type, v.Metatype); lit != "" {
+		w.p("\t\t\tConstraint: %s,", lit)
+	}
+	if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
+		w.p("\t\t\tDefault: %s,", lit)
+	}
+	if r := g.attrRelaxed[a.ID]; r != "" {
+		w.p("\t\t\tRelaxed: %q,", r)
+	}
+	if g.attrDecoder(a) != "" {
+		w.p("\t\t\tDecode: decodeAttr%s,", exportName(a.Name))
+	}
+	w.p("\t\t},")
 }
 
 func priorityLiteral(p string) string {
@@ -1395,6 +1420,9 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		if lit := defaultLiteral(f.v.Default, f.v.Type, f.v.Metatype); lit != "" {
 			parts = append(parts, "Default: "+lit)
 		}
+	}
+	if f.relaxed != "" {
+		parts = append(parts, fmt.Sprintf("Relaxed: %q", f.relaxed))
 	}
 	return "spec.Field{" + strings.Join(parts, ", ") + "}"
 }

@@ -393,9 +393,18 @@ func (p *PushTransport) validateContainer(c padef.ContainerOptionsStruct) error 
 // null deprecated id selects the usage's stream (INVALID_IN_STATE without
 // one), an id must be allocated (InvalidStream). It returns the options to
 // store: the deprecated ids become one-stream lists named "video" and
-// "audio" (:822-872).
+// "audio" (:822-872), and an empty list is stored absent
+// (push-av-stream-transport-storage.h:436-462, :501-511, :545-556 at
+// 6170af84: TransportOptionsStorage copies a list stream by stream and
+// clears one with no stream).
 func (p *PushTransport) validateStreams(o TransportOptions) (TransportOptions, error) {
 	out := o
+	if out.VideoStreams != nil && len(*out.VideoStreams) == 0 {
+		out.VideoStreams = nil
+	}
+	if out.AudioStreams != nil && len(*out.AudioStreams) == 0 {
+		out.AudioStreams = nil
+	}
 	hasNew := (o.VideoStreams != nil && len(*o.VideoStreams) > 0) || (o.AudioStreams != nil && len(*o.AudioStreams) > 0) // :675-677
 	hasOld := o.VideoStreamId != nil || o.AudioStreamId != nil
 	switch {
@@ -1026,6 +1035,12 @@ func (p *PushTransport) MatterReadFiltered(ctx context.Context, attrID uint32) (
 // writable attribute.
 func (p *PushTransport) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	return p.srv.MatterWrite(ctx, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (p *PushTransport) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return p.srv.MatterWriteChanged(ctx, attrID, value)
 }
 
 // MatterInvoke dispatches an accepted command; a host's handler runs in

@@ -246,8 +246,13 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		case outbound == nil:
 		case hdr.SessionID == 0:
 			// On the unsecured session an acknowledgement is its
-			// handshake's: the initiator and the exchange it names.
-			outbound.AckUnsecured(handshakeKeyOf(&hdr, proto.ExchangeID), proto.AckCounter)
+			// handshake's: the initiator and the exchange it names. A
+			// record that ends with it ends here
+			// ([Bridge.unsecuredReplyAcknowledged]).
+			hk := handshakeKeyOf(&hdr, proto.ExchangeID)
+			if outbound.AckUnsecured(hk, proto.AckCounter) {
+				b.unsecuredReplyAcknowledged(hk)
+			}
 		case outbound.Ack(hdr.SessionID, proto.AckCounter):
 			b.releaseReportCounter(hdr.SessionID, proto.AckCounter)
 		}
@@ -497,7 +502,10 @@ func (b *Bridge) releaseUnsecuredWindow(hdr *message.Header) {
 // for and whose handshake holds no state any more: a handshake whose last
 // reply was acknowledged, given up or evicted after its source's last
 // message. The liveness of each exchange is read outside the table's lock.
+// The CASE records whose handshake is over end first, those of exchanges no
+// window is bound to included ([Bridge.endOverSigma1Records]).
 func (b *Bridge) sweepUnsecuredWindows() {
+	b.endOverSigma1Records()
 	t := &b.unsecuredWindows
 	t.mu.Lock()
 	idle := make(map[HandshakeKey]bool)
@@ -538,16 +546,19 @@ func (b *Bridge) sweepUnsecuredWindows() {
 // handshake key names on the unsecured session — that initiator's, on that
 // exchange: a reply that waits for its acknowledgement, the
 // single-active-PASE claim within [pasePairingTimeout], or the CASE
-// responder's Sigma1 record that ends with Sigma3 or the host's reaper
-// ([Bridge.ForgetSigma1Replied]).
+// responder's Sigma1 record that ends with a failed Sigma3, the host's
+// reaper ([Bridge.ForgetSigma1Replied]) or — for a handshake the singleton
+// handler runs — its own end ([Bridge.sigma1RecordOver]).
 func (b *Bridge) unsecuredExchangeLive(key HandshakeKey) bool {
+	if b.sigma1RecordHeld(key) {
+		return true
+	}
 	b.mu.RLock()
 	tracker := b.outboundReliable
-	_, sigma1 := b.sigma1Replied[key]
 	pase := !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
 		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
 	b.mu.RUnlock()
-	if sigma1 || pase {
+	if pase {
 		return true
 	}
 	return tracker != nil && tracker.holdsUnsecuredExchange(key)
@@ -703,6 +714,9 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	b.count(contract.MetricIMReceived)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType, requestHdr.SessionID) {
 	case imGateProceed:
+		if b.unsolicitedRequest(src, requestHdr, proto) {
+			return nil
+		}
 		// fall through to decode + dispatch below
 	case imGateAbsorbStatusResp:
 		return b.absorbStatusResponse(src, requestHdr, proto, payload)
@@ -787,56 +801,74 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	return nil
 }
 
+// unsolicitedRequest reports, and logs, an IM request that is not an
+// initiator message. Such a request reaches handleIMOpcode only on an
+// exchange this node did not open ([Bridge.deliverInitiatedSecure] claims
+// the others): it is acknowledged at once — the ack owed since receipt
+// ([Bridge.ackUnansweredRequest]) — and not served. Mirrors matter.js
+// packages/protocol/src/protocol/ExchangeManager.ts:462-467 at db021da0 (an
+// exchange for a protocol handler only for
+// `message.payloadHeader.isInitiatorMessage`) and :496-507 (an unsolicited
+// message that requires an ack is acknowledged and ignored; :502 sends the
+// standalone acknowledgement before the exchange closes, not after a
+// piggyback window).
+func (b *Bridge) unsolicitedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) bool {
+	if proto.Initiator {
+		return false
+	}
+	b.ackUnansweredRequest(requestHdr, proto)
+	b.logger.Debug("matter.rx.im.unsolicited",
+		slog.String("src", srcString(src)),
+		slog.Int("opcode", int(proto.Opcode)),
+		slog.Int("exchange_id", int(proto.ExchangeID)))
+	return true
+}
+
 // checkTimedGate enforces the Matter §8.7 timed-interaction rules on
 // a Write / Invoke. It returns (status, true) when the request must
 // be rejected — caller emits StatusResponse(status) instead of
-// processing — or (0, false) when the request can proceed (the
-// deadline, if any, has been consumed and removed from the map).
+// processing — or (0, false) when the request can proceed. The
+// exchange's deadline, if any, is consumed either way, so a duplicate
+// Write/Invoke re-tests as "no prior TimedRequest".
 //
-//   - timedFlag=false, no prior TimedRequest      → proceed (untimed).
-//   - timedFlag=false, prior TimedRequest pending → reject with
-//     TIMED_REQUEST_MISMATCH (0xC9). A TimedRequest preceded this
-//     Write/Invoke yet the request's own Timed flag is clear — the
-//     two disagree, which the spec forbids in BOTH directions.
-//   - timedFlag=true,  no prior TimedRequest      → reject with
-//     NEEDS_TIMED_INTERACTION (0xC6).
-//   - timedFlag=true,  prior expired              → reject with
-//     TIMEOUT (0x94); deadline cleared so a retry would re-prime.
-//   - timedFlag=true,  prior valid                → proceed; deadline
-//     cleared so a duplicate Write/Invoke after this re-tests as
-//     "no prior TimedRequest".
+//   - a window that expired             → TIMEOUT (0x94), whatever the
+//     request's Timed flag says;
+//   - Timed flag set, no window         → TIMED_REQUEST_MISMATCH (0xC9);
+//   - Timed flag clear, a running window → TIMED_REQUEST_MISMATCH (0xC9);
+//   - otherwise                          → proceed.
 //
-// Mirrors chip src/app/WriteHandler.cpp:669-673 (and the matching
-// CommandHandler path): a Write/Invoke whose own Timed flag is clear
-// while a TimedRequest preceded it is a TIMED_REQUEST_MISMATCH — the
-// two disagree, which the spec forbids. The inverse half (Timed flag
-// set, no prior TimedRequest) stays NEEDS_TIMED_INTERACTION.
+// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts at
+// db021da0: `exchange.hasExpiredTimedInteraction()` → Status.Timeout
+// first (:426-429 write, :994-997 invoke), then `timedRequest !==
+// exchange.hasTimedInteraction()` → Status.TimedRequestMismatch in both
+// directions (:431-436, :999-1004); connectedhomeip
+// src/app/TimedHandler.cpp:61-72 at 6170af84 answers Timeout before it
+// looks at the message. The mismatch for a set flag without a window was
+// found by the CHIP Python harness (TC-IDM-1.2 step 8).
 func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (im.StatusCode, bool) {
-	raw, ok := b.routing.timedDeadlines.LoadAndDelete(timedKey{sessionID: sessionID, exchangeID: exchangeID})
-	if !timedFlag {
-		if ok {
-			// A TimedRequest opened a window but this request's Timed flag
-			// is clear: the two disagree → mismatch. LoadAndDelete already
-			// cleared the stale deadline.
-			return im.StatusTimedRequestMismatch, true
+	raw, window := b.routing.timedDeadlines.LoadAndDelete(timedKey{sessionID: sessionID, exchangeID: exchangeID})
+	if window {
+		if deadline, isTime := raw.(time.Time); !isTime || b.clk().Now().After(deadline) {
+			return im.StatusTimeout, true
 		}
-		// No prior deadline: a plain untimed request, proceed.
-		return 0, false
 	}
-	if !ok {
-		// The request claims a timed interaction the exchange never
-		// opened: TIMED_REQUEST_MISMATCH, as matter.js answers
-		// `timedRequest !== exchange.hasTimedInteraction()`
-		// (InteractionServer.ts:409-412 write, :945-948 invoke). Found by
-		// the CHIP Python harness (TC-IDM-1.2 step 8), which sends exactly
-		// that.
+	if timedFlag != window {
 		return im.StatusTimedRequestMismatch, true
 	}
-	deadline, isTime := raw.(time.Time)
-	if !isTime || b.clk().Now().After(deadline) {
-		return im.StatusTimeout, true
-	}
 	return 0, false
+}
+
+// timedWindowRunning reports whether the exchange has a timed window that
+// has not expired, without consuming it — matter.js
+// exchange.hasActiveTimedInteraction()
+// (packages/protocol/src/protocol/MessageExchange.ts:1101-1103 at db021da0).
+func (b *Bridge) timedWindowRunning(sessionID, exchangeID uint16) bool {
+	raw, ok := b.routing.timedDeadlines.Load(timedKey{sessionID: sessionID, exchangeID: exchangeID})
+	if !ok {
+		return false
+	}
+	deadline, isTime := raw.(time.Time)
+	return isTime && !b.clk().Now().After(deadline)
 }
 
 // NotifyDeviceReachable fires the §9.13.6 BridgedDeviceBasicInformation
@@ -1029,13 +1061,30 @@ func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src net.Addr, reques
 }
 
 // suppressStatus ends a suppressed request's transaction without a
-// StatusResponse, discharging the owed acknowledgement.
+// StatusResponse; the acknowledgement it owes goes out
+// ([Bridge.ackUnansweredRequest]).
 func (b *Bridge) suppressStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
-	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.ackUnansweredRequest(requestHdr, proto)
 	b.logger.Debug("matter.rx.im.status_suppressed",
 		slog.String("src", srcString(src)),
 		slog.String("stage", stage),
 		slog.String("status", status.String()))
+}
+
+// ackUnansweredRequest sends now the acknowledgement owed for a request
+// whose exchange ends without a reply to carry it — a Write or Invoke whose
+// SuppressResponse elides the answer. Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:462 at
+// db021da0 (the exchange closed after the handler) and
+// packages/protocol/src/protocol/MessageExchange.ts:1150-1156 (close sends
+// the standalone acknowledgement of the message still owed one, at once).
+// Left to the pump's grace window instead, the peer retransmits first;
+// discharged, it is never sent and the peer retransmits until the
+// duplicate is acknowledged. No-op when nothing is owed or no tracker is
+// wired.
+func (b *Bridge) ackUnansweredRequest(requestHdr *message.Header, proto message.ProtocolHeader) {
+	b.expediteDuplicateAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.RunAckPumpOnce(b.clk().Now())
 }
 
 func (b *Bridge) replyTimedStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {

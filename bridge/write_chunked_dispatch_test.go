@@ -31,8 +31,8 @@ import (
 // encodeWriteChunkedTestRequest encodes a WriteRequestMessage with
 // explicit SuppressResponse, TimedRequest, and MoreChunkedMessages
 // flags for exercising the two chunked-write InvalidAction rules
-// (Matter §10.6.5; matter.js InteractionServer.ts:397-402 and
-// :408-413). Tag layout mirrors the production decoder
+// (Matter §10.6.5; matter.js InteractionServer.ts:410-415 and
+// :419-424 at db021da0). Tag layout mirrors the production decoder
 // (im.UnmarshalWriteRequestTLV's tagWriteReq{SuppressResponse,
 // TimedRequest,WriteRequests,MoreChunked}). Each path in writes gets
 // a bool payload so the production attributeValueReader decodes it
@@ -110,7 +110,7 @@ func decodeWriteChunkedStatusResponse(t *testing.T, got []byte) im.StatusCode {
 }
 
 // TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently mirrors
-// matter.js InteractionServer.ts:397-402: a WriteRequest that sets both
+// matter.js InteractionServer.ts:410-415 at db021da0: a WriteRequest that sets both
 // MoreChunkedMessages and SuppressResponse is rejected with InvalidAction
 // before any timed-interaction handling or dispatch — and since matter.js
 // 4bf21e80 (#4570, the CHIP SDK 1.6.1 behaviour) that error status is
@@ -161,7 +161,7 @@ func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently(t *testing
 }
 
 // TestDispatchWriteRequest_TimedWithMoreChunked_RejectsInvalidActionAndConsumesWindow
-// mirrors matter.js InteractionServer.ts:408-413 ("Write Request
+// mirrors matter.js InteractionServer.ts:419-424 at db021da0 ("Write Request
 // action that is part of a Timed Write Interaction SHALL NOT be
 // chunked"): a WriteRequest inside a valid timed window that also
 // sets MoreChunkedMessages must be rejected with
@@ -199,7 +199,7 @@ func TestDispatchWriteRequest_TimedWithMoreChunked_RejectsInvalidActionAndConsum
 // is the positive control: an untimed WriteRequest with
 // MoreChunkedMessages set but SuppressResponse clear is a legal chunk
 // of a multi-chunk write and must dispatch normally, answered by its
-// own WriteResponse. Mirrors matter.js InteractionServer.ts:521-532,
+// own WriteResponse. Mirrors matter.js InteractionServer.ts:563-584 at db021da0,
 // which sends a per-chunk WriteResponse and then reads the next
 // chunk.
 func TestDispatchWriteRequest_ChunkedUntimedNotSuppressed_DispatchesAndRepliesWriteResponse(t *testing.T) {

@@ -36,9 +36,16 @@ import (
 )
 
 // The Go-TH leg: the certification cases matter.js automated in
-// support/chip-testing/test/cert/TC-*.test.ts (862ad75f), read mirrored and
+// support/chip-testing/test/cert/TC-*.test.ts, read mirrored and
 // run with the module's own controller as the test harness against the
 // reference daemon as the DUT.
+//
+// Which cases those are is held to the snapshot's pin (parity/schema.json
+// matter.sourceCommit) by TestCertifiabilityDocument: testdata/
+// matterjs-cert-cases.json lists them at the pin, and each is run here or
+// classified (controllerRoleCases, matterJSCasesNotRun). The ports' line
+// citations were read at [goCertReadAt]; a case file that moved since is
+// re-read when its port is next touched.
 //
 // In matter.js's cert suite the DUT is, in most cases, a controller — its
 // own CommissioningController — and the TH a device app
@@ -66,6 +73,11 @@ import (
 // step — the DUT controller's return value or error, a state read on the
 // daemon, or a daemon log line — because matter.js proves its DUT by the
 // TH device's log, which a Go TH does not print.
+
+// goCertReadAt is the matter.js commit the ports' TS line citations were
+// read at; the case list itself is the snapshot pin's
+// (testdata/matterjs-cert-cases.json).
+const goCertReadAt = "862ad75f"
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
 const goCertEnv = "GOFABRIC_GOCERT"
@@ -237,6 +249,18 @@ func registerGoCert(build func() goCertCase) {
 	goCertCases[id] = build
 }
 
+// Hands the registry to the untagged guard (checkMatterJSCertCases), so a
+// golden goCert entry counts as run only for a registered port.
+func init() {
+	goCertRegistry = func() map[string]string {
+		ports := make(map[string]string, len(goCertCases))
+		for id, build := range goCertCases {
+			ports[id] = build().source()
+		}
+		return ports
+	}
+}
+
 // goCertID is "TC-IDM-1.1" → "IDM/1.1".
 func goCertID(tc string) string {
 	s := strings.TrimPrefix(tc, "TC-")
@@ -315,9 +339,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	case c.origin != "":
 		t.Logf("%s: %s (the Go controller is the DUT)", c.tc, c.origin)
 	case c.role == roleDUT:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line, goCertReadAt)
 	default:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js 862ad75f, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line, goCertReadAt)
 	}
 	if expr := strings.Join(c.pics, " & "); expr != "" {
 		if missing := th.undeclared(expr); len(missing) > 0 {
@@ -1114,7 +1138,8 @@ func checkGoCertCounts(t *testing.T, id string, got goCertCounts) {
 
 // writeGoCertGolden records the passing cases' counts under
 // -update-chip-cases, and drops their manual rows: a case the leg runs is
-// no longer one nobody automates.
+// no longer one nobody automates. An entry whose id no registered port
+// has (a port deleted or renamed) is dropped too.
 func writeGoCertGolden(t *testing.T, ran map[string]goCertCounts) {
 	t.Helper()
 	if !*updateChipCases || len(ran) == 0 {
@@ -1129,6 +1154,11 @@ func writeGoCertGolden(t *testing.T, ran map[string]goCertCounts) {
 	for id, c := range ran {
 		g.GoCert[id] = c
 		delete(g.HostSkipped, id)
+	}
+	for id := range g.GoCert {
+		if _, registered := goCertCases[id]; !registered {
+			delete(g.GoCert, id)
+		}
 	}
 	saveGolden(t, g)
 }

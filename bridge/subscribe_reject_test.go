@@ -6,8 +6,8 @@
 // all, or whose (possibly wildcard) paths match zero attributes and
 // zero events, must be rejected with a top-level
 // StatusResponse(InvalidAction) rather than establishing an empty
-// subscription. Mirrors matter.js InteractionServer.ts:628-633 (no
-// attributes/events requested) and ServerSubscription.ts:610-614 (zero
+// subscription. Mirrors matter.js InteractionServer.ts:667-672 (no
+// attributes/events requested) and ServerSubscription.ts:707-711 at db021da0 (zero
 // matched paths). This file lives in package bridge so it can call
 // [Bridge.handleSubscribeRequest] directly — the method's own doc
 // comment notes it is exposed precisely so tests can drive it with
@@ -91,7 +91,8 @@ func decodeSubscribeStatusResponse(t *testing.T, got []byte) im.StatusCode {
 // that a SubscribeRequest with no AttributeRequests and no
 // EventRequests is rejected with StatusResponse(InvalidAction) and
 // never reaches the subscription manager. Mirrors matter.js
-// InteractionServer.ts:628-633 ("No attributes or events requested").
+// InteractionServer.ts:667-672 at db021da0 ("No attributes or events
+// requested").
 func TestHandleSubscribeRequest_EmptyRequest_RejectsInvalidAction(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
@@ -114,7 +115,7 @@ func TestHandleSubscribeRequest_EmptyRequest_RejectsInvalidAction(t *testing.T) 
 // TestHandleSubscribeRequest_NoMatchingPaths_RejectsInvalidAction
 // verifies that a Subscribe whose sole path matches zero attributes is
 // rejected with StatusResponse(InvalidAction) and never registers.
-// Mirrors matter.js ServerSubscription.ts:610-614.
+// Mirrors matter.js ServerSubscription.ts:707-711 at db021da0.
 //
 // The path uses a wildcard endpoint (HasEndpoint=false) with a concrete
 // cluster ID no endpoint in the topology hosts: the dispatcher's
@@ -166,7 +167,7 @@ func TestHandleSubscribeRequest_NoMatchingPaths_RejectsInvalidAction(t *testing.
 // explaining why.
 //
 // Status mapping mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:665-682 (cadence
+// packages/node/src/node/server/InteractionServer.ts:701-718 at db021da0 (cadence
 // constraints → InvalidAction); a quota rejection is ResourceExhausted
 // per Matter §8.10.
 func TestHandleSubscribeRequest_ManagerRejection_SendsStatusResponse(t *testing.T) {

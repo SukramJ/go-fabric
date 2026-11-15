@@ -7,6 +7,8 @@ import (
 	"cmp"
 	"context"
 	"slices"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // EndpointExpander is the optional [Dispatcher] interface that lets an
@@ -41,6 +43,18 @@ type EndpointExpander interface {
 // carries this node's id ([WithLocalNodeID]), a path naming another node
 // selects nothing, or, a concrete one, yields one UnsupportedNode result.
 //
+// A status answers only a fully concrete request path (endpoint, cluster
+// and attribute named): a result that is not Success is handed out for
+// such a path alone, whatever the [Dispatcher] returned — a path with a
+// wildcard yields what exists and nothing else (review II,
+// R2-P4-imread-02, -03). Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at
+// db021da0: a path missing an endpoint, cluster or attribute goes to
+// addWildcard (:88-94), which installs nothing for a named endpoint the
+// node lacks (:190-191) and skips a named cluster (:341) or attribute
+// (:386-387) that is absent; addStatus (:489) is reached from addConcrete
+// and #authorize only.
+//
 // Mirrors matter.js packages/protocol/src/action/server/
 // AttributeReadResponse.ts at db021da0: *process (:64) registers one
 // producer per request path (:88-94) and runs them in request order
@@ -66,6 +80,20 @@ type AttributeExpansion struct {
 	nextEndpoint int
 	batch        []ReadResult
 	pos          int
+
+	// isStatus, early, earlyPos, held and prepared serve
+	// [AttributeExpansion.StatusesFirst].
+	isStatus func(requested ConcreteAttributePath, result ReadResult) bool
+	early    []expandedResult
+	earlyPos int
+	held     map[int][]ReadResult
+	prepared bool
+}
+
+// expandedResult is a result with the request path it was expanded from.
+type expandedResult struct {
+	requested ConcreteAttributePath
+	result    ReadResult
 }
 
 // NewAttributeExpansion returns the expansion of paths against d under
@@ -83,24 +111,96 @@ func NewAttributeExpansion(ctx context.Context, d Dispatcher, paths []ConcreteAt
 }
 
 // Ascending makes the expansion visit each path's results in ascending
-// (endpoint, cluster, attribute) order — the endpoints of a wildcard path
-// in ascending id order, each endpoint's results sorted — instead of the
-// dispatcher's order. The paths themselves keep the request's order. Call
+// (endpoint, cluster) order, a cluster's attributes in [CompareAttributeIDs]
+// order — the endpoints of a wildcard path in ascending id order, each
+// endpoint's results sorted — instead of the dispatcher's order. The paths themselves keep the request's order. Call
 // it before the first [AttributeExpansion.Next].
 func (e *AttributeExpansion) Ascending() *AttributeExpansion {
 	e.ascending = true
 	return e
 }
 
+// StatusesFirst makes the expansion hand out, before any other result,
+// every result of a fully concrete path that isStatus — the consumer's own
+// gate, which may also turn a result into a status (an access denial) —
+// reports as a status, the paths in request order; such a result is not
+// handed out again at its path's place. The other results keep their
+// order. Each concrete path is read once up front for it; one without a
+// status is read again at its place, so that its value is as current as
+// the rest of the report. Call it before the first
+// [AttributeExpansion.Next].
+//
+// Mirrors matter.js packages/protocol/src/action/server/
+// AttributeReadResponse.ts at db021da0: process registers every request
+// path first (:88-94); addConcrete adds a failing path's status to the
+// chunk at once (:202-274, addStatus :489-501) while a resolving path only
+// installs a producer (:283-308); the producers run afterwards (:96-100),
+// so every status of the request precedes every value (review II,
+// R2-P4-imread-06).
+func (e *AttributeExpansion) StatusesFirst(isStatus func(requested ConcreteAttributePath, result ReadResult) bool) *AttributeExpansion {
+	e.isStatus = isStatus
+	return e
+}
+
+// prepare reads every concrete path once and sets aside the results
+// isStatus reports as statuses, in request order; a path with such a
+// result keeps its other results for its place.
+func (e *AttributeExpansion) prepare() {
+	e.prepared = true
+	for i, p := range e.paths {
+		if !isConcreteAttributePath(p) {
+			continue
+		}
+		var rest []ReadResult
+		statuses := false
+		for _, r := range e.concreteResults(p) {
+			if e.isStatus(p, r) {
+				e.early = append(e.early, expandedResult{requested: p, result: r})
+				statuses = true
+				continue
+			}
+			rest = append(rest, r)
+		}
+		if statuses {
+			if e.held == nil {
+				e.held = make(map[int][]ReadResult)
+			}
+			e.held[i] = rest
+		}
+	}
+}
+
+// concreteResults returns what a fully concrete path reads: one
+// UnsupportedNode result for a path naming another node, else the
+// dispatcher's answer.
+func (e *AttributeExpansion) concreteResults(p ConcreteAttributePath) []ReadResult {
+	if p.HasNode && e.hasLocalNodeID && p.Node != e.localNodeID {
+		return []ReadResult{{Path: p, Status: StatusUnsupportedNode}}
+	}
+	return e.d.Read(e.ctx, p)
+}
+
 // Next returns the next result and the request path it was expanded
 // from; ok is false once every path is expanded.
 func (e *AttributeExpansion) Next() (requested ConcreteAttributePath, result ReadResult, ok bool) {
+	if e.isStatus != nil && !e.prepared {
+		e.prepare()
+	}
+	if e.earlyPos < len(e.early) {
+		x := e.early[e.earlyPos]
+		e.early[e.earlyPos] = expandedResult{}
+		e.earlyPos++
+		return x.requested, x.result, true
+	}
 	for {
 		for e.pos < len(e.batch) {
 			// The batch stays the dispatcher's: nothing is written into
 			// it (review II, R2-P2-dr-req-04).
 			r := e.batch[e.pos]
 			e.pos++
+			if r.Status != StatusSuccess && !isConcreteAttributePath(e.path) {
+				continue
+			}
 			if e.flags != 0 && wildcardPathSkipped(r.Path, e.flags, e.qualities) {
 				continue
 			}
@@ -129,6 +229,14 @@ func (e *AttributeExpansion) fill() bool {
 		}
 		e.path = e.paths[e.nextPath]
 		e.nextPath++
+		if rest, held := e.held[e.nextPath-1]; held {
+			// A concrete path whose status went first: what is left of
+			// its results, unread again.
+			delete(e.held, e.nextPath-1)
+			e.flags = 0
+			e.setBatch(rest)
+			return true
+		}
 		if e.path.HasNode && e.hasLocalNodeID && e.path.Node != e.localNodeID {
 			// A path naming another node: a concrete one is answered
 			// UnsupportedNode before any access check, a wildcard one
@@ -144,8 +252,8 @@ func (e *AttributeExpansion) fill() bool {
 		}
 		e.flags = effectiveWildcardPathFlags(e.ctx, e.d, e.path)
 		if !e.path.HasEndpoint && e.expander != nil {
-			// No endpoint to visit: Read answers the path whole (an
-			// empty node's UnsupportedEndpoint).
+			// No endpoint to visit: Read answers the path whole (a status
+			// it returns is not handed out: the path is a wildcard).
 			if eps := e.expander.ExpansionEndpoints(e.path); len(eps) > 0 {
 				if e.ascending {
 					eps = slices.Clone(eps)
@@ -160,6 +268,12 @@ func (e *AttributeExpansion) fill() bool {
 	}
 }
 
+// isConcreteAttributePath reports whether p names an endpoint, a cluster
+// and an attribute.
+func isConcreteAttributePath(p ConcreteAttributePath) bool {
+	return p.HasEndpoint && p.HasCluster && p.HasAttribute
+}
+
 // setBatch makes results the batch Next hands out. Under Ascending an
 // unsorted batch is sorted on a copy: the slice a [Dispatcher] or
 // [EndpointExpander] returned is not the expansion's to write (review II,
@@ -172,7 +286,8 @@ func (e *AttributeExpansion) setBatch(results []ReadResult) {
 	e.batch, e.pos = results, 0
 }
 
-// compareReadResultPaths orders results by (endpoint, cluster, attribute).
+// compareReadResultPaths orders results by endpoint, cluster and then the
+// cluster's attribute order ([CompareAttributeIDs]).
 func compareReadResultPaths(a, b ReadResult) int {
 	if c := cmp.Compare(a.Path.Endpoint, b.Path.Endpoint); c != 0 {
 		return c
@@ -180,7 +295,40 @@ func compareReadResultPaths(a, b ReadResult) int {
 	if c := cmp.Compare(a.Path.Cluster, b.Path.Cluster); c != 0 {
 		return c
 	}
-	return cmp.Compare(a.Path.Attribute, b.Path.Attribute)
+	return CompareAttributeIDs(a.Path.Cluster, a.Path.Attribute, b.Path.Attribute)
+}
+
+// CompareAttributeIDs orders two attributes of cluster as every report of
+// this module lists a cluster's attributes — a Read's wildcard expansion,
+// a priming report and a subscription's change report alike. It is the one
+// place that order is decided, and it is matter.js's: the order of the
+// cluster model's members ([schema.AttributeOrder]) — ClusterRevision,
+// FeatureMap, the cluster's own attributes as the model defines them, then
+// AttributeList, AcceptedCommandList and GeneratedCommandList for OnOff.
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:449-522
+// at db021da0 — clusterTypeProtocolOf builds a cluster's attribute list in
+// Scope.membersOf order — and AttributeReadResponse.ts:378-380, which walks
+// that list as built (review II, R2-P4-imread-12).
+//
+// An attribute that order does not list comes before the listed ones,
+// ascending by id among its kind. matter.js lists the members a server's
+// schema adds to a cluster's model before the model's own (findAllMembers
+// visits the extending schema before its base,
+// packages/model/src/logic/Scope.ts:287-333 at db021da0), in the order the
+// extension defines them; that order is not known here, so ascending id
+// among them is this module's rule.
+func CompareAttributeIDs(cluster, a, b uint32) int {
+	rankA, listedA := schema.AttributeOrder(cluster, a)
+	rankB, listedB := schema.AttributeOrder(cluster, b)
+	switch {
+	case listedA && listedB:
+		return cmp.Compare(rankA, rankB)
+	case listedA:
+		return 1
+	case listedB:
+		return -1
+	}
+	return cmp.Compare(a, b)
 }
 
 // ReadReports is the attribute half of a Read's response, generated one
@@ -222,6 +370,12 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 	r.subjectNodeID, r.subjectCATs = SubjectFromContext(ctx)
 	r.aclChecker, r.hasACL = d.(ACLChecker)
 	r.privProvider, r.hasPriv = d.(AttributeReadPrivilegeProvider)
+	// Every status of a concrete path precedes the first value
+	// ([AttributeExpansion.StatusesFirst]).
+	r.exp.StatusesFirst(func(path ConcreteAttributePath, res ReadResult) bool {
+		rep, keep := r.report(path, res)
+		return keep && rep.IsStatus
+	})
 	return r
 }
 

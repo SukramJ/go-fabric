@@ -2386,7 +2386,10 @@
       "go": [
         "cluster/core:TestFabricFilteredFabricsRead",
         "bridge:TestAccessControlUnfilteredReadsRedactOtherFabrics",
-        "cluster/core:TestBindingFabricScopedWrite"
+        "cluster/core:TestBindingFabricScopedWrite",
+        "cluster/core:TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields",
+        "cluster/core:TestParityMatterJS_FabricSceneInfoOfAnotherFabricWithoutSensitiveFields",
+        "cluster/core:TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields"
       ],
       "missing": [
         "basic get/set with primitive datatype",
@@ -2423,7 +2426,6 @@
         "leaves the list unchanged when a pushed entry is rejected",
         "leaves the list unchanged when a splice inserts an entry without a value",
         "leaves the list unchanged when an inserted entry is rejected",
-        "masks another fabric",
         "passes a sort comparator one copy per entry",
         "refuses a change a sort comparator makes to an entry",
         "refuses a length that is not a non-negative integer",
@@ -2454,7 +2456,7 @@
         "stores a separate copy when copyWithin() duplicates an entry the transaction changed",
         "treats a key that is not a canonical number as no index"
       ],
-      "reason": "The managed list proxy; its fabric-filtered read and fabric-preserving write are Matter-visible and covered on the Go read/write paths, its array-proxy and fabricIndex-supply cases are not.",
+      "reason": "The managed list proxy; its fabric-filtered read and fabric-preserving write are Matter-visible and covered on the Go read/write paths, its array-proxy and fabricIndex-supply cases are not; the masking of another fabric's sensitive fields on a read that is not fabric-filtered is ported by meaning onto the servers that hold such lists (cluster/core/fabric_sensitive_parity_matterjs_test.go), without the sort comparator the matter.js case reaches it through.",
       "snapshotSha": "a617489e440896989b68542eae7c3da834701d31"
     },
     {
@@ -3528,21 +3530,14 @@
         "node:TestGroupcastFabricRemovalParityMatterJS",
         "node:TestGroupcastDerivedMembershipReloadParityMatterJS",
         "node:TestGroupcastPersistenceParityMatterJS",
-        "node:TestGroupcastAuxiliaryAccessUpdatedAdminParityMatterJS"
+        "node:TestGroupcastAuxiliaryAccessUpdatedAdminParityMatterJS",
+        "bridge:TestGroupcastTestingReportsRejectionsOnTheFabricUnderTest"
       ],
       "missing": [
         "removes a group a wildcard request empties without the Sender feature",
-        "creates the GKM groupTable entry without a GroupName",
-        "derives the arrival address from the fabric that owns the group id",
-        "derives the arrival address of an unauthenticated plain header group id from the fabric under test",
-        "does not use the fabric under test",
-        "drops authenticated messages of another fabric",
-        "reports a message without candidate key on the fabric under test although another fabric",
-        "reports a received datagram that a key of another group authenticated as failed authentication",
-        "reports failed authentication only to a fabric whose key was a candidate",
-        "uses the shared IANA address when the fabric that owns the group id no longer exists"
+        "creates the GKM groupTable entry without a GroupName"
       ],
-      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing, M4: findings entry \"The Groupcast server has no Listener-only configuration\": \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it).",
+      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events — the testing events of a rejected message on two fabrics among them, which bridge/groupcast_rejection_test.go also runs through the bridge's receive path — and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing, M4: findings entry \"The Groupcast server has no Listener-only configuration\": \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it).",
       "snapshotSha": "fb7d4176bc75633d542d455b5f37794f3a10de5c"
     },
     {
@@ -4641,12 +4636,13 @@
         "im:TestRead_DataVersionFilterMatching_SkipsCluster",
         "endpoint:TestRead_UnknownEndpoint",
         "endpoint:TestRead_AttributeNotImplemented",
-        "node:TestAttributeReadResponseParity"
+        "node:TestAttributeReadResponseParity",
+        "endpoint:TestAttributeReadResponseWildcardStatusParity"
       ],
       "missing": [
         "reads attributeList global Attribute full wildcard excluding attributerList via WildcardPath Filter"
       ],
-      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave; that a wildcard path yields no status for what it does not select is also held at the dispatcher (endpoint:TestAttributeReadResponseWildcardStatusParity).",
       "snapshotSha": "a8a94c17d633ea6c6aa79b8ebb98c021443867b2"
     },
     {
@@ -5580,9 +5576,11 @@
       "path": "packages/node/test/node/EventReadResponseTest.ts",
       "status": "ported",
       "go": [
-        "node:TestEventReadResponseParity"
+        "node:TestEventReadResponseParity",
+        "im:TestEventReadParity_FabricSensitiveFilteredToAccessingFabric",
+        "bridge:TestAllowedEventPathsCountsExistingEvents"
       ],
-      "reason": "Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive.",
+      "reason": "Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive; the two fabric-sensitive cases also on a PASE session with and without a fabric (im:TestEventReadParity_FabricSensitiveFilteredToAccessingFabric), and the non-existent concrete event as a Subscribe's event path (bridge:TestAllowedEventPathsCountsExistingEvents).",
       "snapshotSha": "4021d5971f674ff584362f0a46db84fb4c9c916f"
     },
     {
@@ -6018,7 +6016,9 @@
         "im/subscription:TestServerSubscriptionParity",
         "node:TestServerSubscriptionLITParity",
         "im/subscription:TestSessionShutdownParityMatterJS",
-        "im/subscription:TestSlowReportParityMatterJS"
+        "im/subscription:TestSlowReportParityMatterJS",
+        "bridge:TestUndeliveredReportIsOneFailedUpdateParity",
+        "bridge:TestKeepAliveStatusParity"
       ],
       "missing": [
         "terminates when the peer refuses a report sent during a shutdown close",
@@ -6026,7 +6026,6 @@
         "ends the subscription when the peer answers INVALID_SUBSCRIPTION on a session without MRP",
         "waits for the status and keeps the subscription when the peer answers SUCCESS on a session without MRP",
         "closes subscription even when in-flight exchange close throws",
-        "abandons the subscription after repeated MRP exhaustion, leaving the session alone",
         "completes a flushing close triggered from inside an in-flight update",
         "flushes a report queued behind a report being sent on close despite a deferral",
         "completes session force-close triggered from inside an in-flight update",
@@ -6084,7 +6083,7 @@
           "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
         }
       ],
-      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION (over the wire, with the SUCCESS answer that keeps the subscription, in bridge:TestKeepAliveStatusParity), endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go), and repeated MRP exhaustion as one failed update each, the subscription ended at the third and the sessions kept (bridge/subscribe_send_error_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
       "snapshotSha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820"
     },
     {
@@ -8749,34 +8748,24 @@
         "secure/channel:TestSecureSessionDecrypt",
         "secure/channel:TestSecureSessionEncrypt",
         "groups:TestSecureSessionGroupPrivacy",
-        "bridge:TestGroupMessageOutcomes"
+        "bridge:TestGroupMessageOutcomes",
+        "groups:TestSecureSessionGroupKeyMapCheck"
       ],
       "missing": [
         "conveys the initiating exchange to its subscriptions",
         "sends a cached group session's messages as the node ID of the current fabric object",
         "${reason === undefined ? ",
-        "accepts a key that the destination group",
-        "accepts a key whose key set GroupKeyMap maps the destination group to",
         "authenticates a privacy message with message extensions",
-        "does not name a fabric whose key set is not mapped as a candidate",
         "fails a key mapped to another group without parsing its payload",
         "fails a mapped key whose authenticated payload does not parse",
         "lets a crypto error other than a failed authentication escape",
         "lets an error other than a parse failure of the payload escape",
         "logs and uses the default when the peer announces zero",
-        "names a fabric once when several of its keys were candidates",
-        "names every fabric whose key was a candidate when no key passes",
-        "names the plain header group id without a fabric when no key authenticates",
         "passes the largest unicast payload on to decryption",
         "refuses a unicast payload over the limit before it decrypts",
-        "rejects a key whose key set GroupKeyMap maps only to another group",
-        "rejects a key whose key set holds other key material than the key set of the destination group",
-        "reports a key that GroupKeyMap maps only to another group as failed authentication",
-        "round-trips a group message without privacy and reports the plain header group id",
-        "tries the next candidate after one fails the GroupKeyMap check",
         "uses the default silently when the peer announces no size"
       ],
-      "reason": "The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the unmapped-key report, the send address, the cached-session key, the privacy flag) are ported; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate).",
+      "reason": "The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the failure of an unmapped key set, the describe \"GroupKeyMap check\" in groups:TestSecureSessionGroupKeyMapCheck, the send address, the cached-session key, the privacy flag) are ported; of that describe the two cases on an authenticated payload that does not parse, the two on an error that escapes the candidate loop and the privacy message with message extensions are not — groups.Decode does not parse the payload (the bridge does, after it) and takes no injected crypto; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate).",
       "snapshotSha": "f736c901abc4ab113280135ebfc84d25398add4f"
     },
     {
@@ -10494,11 +10483,6 @@
       "reason": "The asynchronous MockServerNode lifecycle has no unit-level counterpart; the PartsList lifecycle is ported in the DescriptorServer tests the register names."
     },
     {
-      "test": "cluster/core:TestParityOpcreds_PendingRootAppearsInTrustedRoots",
-      "source": "chip operational-credentials-server.cpp",
-      "reason": "Needs a valid RCAC TLV fixture from a test-key generator to drive AddTrustedRootCertificate."
-    },
-    {
       "test": "im/subscription:TestHandlerParity_SKIP_SendAlreadyInProgress_Deferred",
       "source": "matter.js packages/node/src/node/server/ServerSubscription.ts:429-437",
       "reason": "The engine's Tick is synchronous and holds no in-flight send state; concurrent sends are exercised by the engine's race test."
@@ -10506,7 +10490,7 @@
     {
       "test": "im/subscription:TestHandlerParity_SKIP_SendUpdateRetryCount",
       "source": "matter.js packages/node/src/node/server/ServerSubscription.ts:460-521",
-      "reason": "The send-error retry count lives in the layer that sends the report, above the engine's Reporter callback."
+      "reason": "The send-error retry count lives in the layer that sends the report, above the engine's Reporter callback; held there by bridge:TestUndeliveredReportIsOneFailedUpdateParity and bridge:TestFailedReportRetriesTheSameDataParity."
     },
     {
       "test": "im:TestMessengerParity_ReportDataSuppressResponseFlag",

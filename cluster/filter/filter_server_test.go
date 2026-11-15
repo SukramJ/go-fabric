@@ -191,6 +191,54 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+// TestWriteVerdict: MatterWriteChanged answers a new LastChangedTime
+// changed — the host's writer hears it, a read returns it, the version
+// advances — the same time again unchanged without the writer or a
+// version, and a refused write with MatterWrite's status, unchanged.
+func TestWriteVerdict(t *testing.T) {
+	t.Parallel()
+	h := &host{}
+	srv := full(t, h)
+	ctx := context.Background()
+	before := srv.MatterDataVersion()
+	changed, err := srv.MatterWriteChanged(ctx, hepa.AttrLastChangedTime, uint64(1000))
+	if !changed || err != nil || len(h.written) != 1 || srv.MatterDataVersion() == before {
+		t.Fatalf("write 1000: changed %v, %v, writer heard %d, version moved %v; want changed, heard once, moved",
+			changed, err, len(h.written), srv.MatterDataVersion() != before)
+	}
+	if v, _ := srv.MatterRead(hepa.AttrLastChangedTime); v != uint32(1000) {
+		t.Errorf("LastChangedTime %v after the write, want 1000", v)
+	}
+	before = srv.MatterDataVersion()
+	changed, err = srv.MatterWriteChanged(ctx, hepa.AttrLastChangedTime, uint64(1000))
+	if changed || err != nil || len(h.written) != 1 || srv.MatterDataVersion() != before {
+		t.Errorf("write 1000 again: changed %v, %v, writer heard %d, version moved %v; want unchanged, unheard",
+			changed, err, len(h.written), srv.MatterDataVersion() != before)
+	}
+	for _, c := range []struct {
+		attr   uint32
+		value  any
+		status im.StatusCode
+	}{
+		{hepa.AttrLastChangedTime, uint64(0xFFFFFFFF), im.StatusConstraintError},
+		{hepa.AttrCondition, uint8(1), im.StatusUnsupportedWrite},
+		{0x30, uint8(1), im.StatusUnsupportedAttribute},
+	} {
+		changed, err := srv.MatterWriteChanged(ctx, c.attr, c.value)
+		if changed || statusOf(err) != c.status || statusOf(srv.MatterWrite(ctx, c.attr, c.value)) != c.status {
+			t.Errorf("write 0x%04X = %v: changed %v, %v; want unchanged and %v as MatterWrite", c.attr, c.value, changed, err, c.status)
+		}
+	}
+	h.writeErr = errors.New("flash")
+	changed, err = srv.MatterWriteChanged(ctx, hepa.AttrLastChangedTime, uint64(5))
+	if changed || !errors.Is(err, h.writeErr) {
+		t.Errorf("a write the host refuses: changed %v, %v; want unchanged and its error", changed, err)
+	}
+	if v, _ := srv.MatterRead(hepa.AttrLastChangedTime); v != uint32(1000) {
+		t.Errorf("LastChangedTime %v after a refused write, want 1000 kept", v)
+	}
+}
+
 func TestResetCondition(t *testing.T) {
 	t.Parallel()
 	h := &host{}

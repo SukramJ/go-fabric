@@ -234,6 +234,9 @@ func TestLiveOTAProvider(t *testing.T) {
 				img:   mattercore.OTAImage{FileDesignator: bdx.FileDesignator("fff1-8001-v2.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"},
 				bytes: image,
 			},
+			// The requestor is a node of the provider's fabric: the
+			// fabric is opened to the provider explicitly.
+			GrantFabric: func(node.FabricInfo) bool { return true },
 		}
 	})
 	provider.OnOTAProviderStatus(statuses.add)

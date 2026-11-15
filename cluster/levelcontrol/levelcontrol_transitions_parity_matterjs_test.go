@@ -274,6 +274,93 @@ func TestMoveToLevelTransitionReadsPartWay(t *testing.T) {
 	})
 }
 
+// TestEveryLevelChangeAdvancesTheDataVersionOnce: under the engine each
+// change of CurrentLevel — a transition's step as much as a level a
+// command applies at once — advances the server's DataVersion once, each
+// report of RemainingTime advances it once more, and a command adds no
+// advance of its own. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (every commit that changed a value advances the version; a
+// step writes currentLevel in a commit of its own); the quiet emit's
+// advanceVersionFor (ServerBehaviorBacking.ts:258-259) advances only for a
+// dynamic property (Datasource.ts:679-688), which currentLevel is not and
+// remainingTime is (LevelControlServer.ts:806-822, served from
+// Val.properties).
+func TestEveryLevelChangeAdvancesTheDataVersionOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := newDevice(50, true)
+		srv := engineServer(d, nil)
+		r := observe(t, srv)
+		before := srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200, TransitionTime: u16(300)}); err != nil {
+			t.Fatal(err)
+		}
+		sleep(35 * time.Second)
+		levels, times := r.snapshot()
+		if len(levels) < 2 || level(t, srv) != 200 {
+			t.Fatalf("the transition reported %v, want several steps ending at 200", levels)
+		}
+		if len(times) == 0 {
+			t.Fatal("the transition reported no RemainingTime")
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)+len(times)) { //nolint:gosec // a test's count of reports
+			t.Errorf("%d level changes and %d RemainingTime reports advanced the DataVersion by %d, want one each", len(levels), len(times), got)
+		}
+
+		before = srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 100, TransitionTime: u16(0)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if got := srv.MatterDataVersion() - before; got != 1 || level(t, srv) != 100 {
+			t.Errorf("a MoveToLevel applied at once advanced the DataVersion by %d (level %d), want 1", got, level(t, srv))
+		}
+	})
+}
+
+// TestRemainingTimeReportAdvancesTheDataVersion: a report of RemainingTime
+// alone — at the start of a transition that has not moved CurrentLevel
+// yet, and at the Stop that cancels it — advances the server's
+// DataVersion once per report. Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261 at
+// db021da0 (the quiet observer of a "Q" attribute runs advanceVersionFor
+// before it broadcasts), Datasource.ts:679-688 (advanceVersionFor advances
+// for a dynamic property) and LevelControlServer.ts:806-822 (remainingTime
+// is served from Val.properties, a dynamic property).
+func TestRemainingTimeReportAdvancesTheDataVersion(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := newDevice(10, true)
+		srv := engineServer(d, nil)
+		r := observe(t, srv)
+		before := srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 11, TransitionTime: u16(60000)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		levels, times := r.snapshot()
+		if len(times) == 0 || remaining(t, srv) == 0 {
+			t.Fatalf("the transition's start reported RemainingTime %v (now %d), want a report of a non-zero value", times, remaining(t, srv))
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(len(levels)+len(times)) { //nolint:gosec // a test's count of reports
+			t.Errorf("the start reported %d levels and %d RemainingTime values and advanced the DataVersion by %d, want one each", len(levels), len(times), got)
+		}
+
+		before = srv.MatterDataVersion()
+		if err := invoke(t, srv, levelcontrol.CmdStop, wire.StopRequest{}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		levelsAfter, timesAfter := r.snapshot()
+		newLevels, newTimes := len(levelsAfter)-len(levels), len(timesAfter)-len(times)
+		if newTimes == 0 || remaining(t, srv) != 0 {
+			t.Fatalf("the Stop reported %d RemainingTime values (now %d), want a report of 0", newTimes, remaining(t, srv))
+		}
+		if got := srv.MatterDataVersion() - before; got != uint32(newLevels+newTimes) { //nolint:gosec // a test's count of reports
+			t.Errorf("the Stop reported %d levels and %d RemainingTime values and advanced the DataVersion by %d, want one each", newLevels, newTimes, got)
+		}
+	})
+}
+
 // TestMoveAndStop is TC-LVL-4.1 / TC-LVL-6.1 (Test_TC_LVL_4_1.yaml,
 // Test_TC_LVL_6_1.yaml): Move up at 5/s from 50 reads ~100 after 10 s; a
 // Stop after 5 s leaves it at 64-86 and RemainingTime at 0; Rate 0 is
@@ -732,4 +819,49 @@ func TestQuiesceAndRefusal(t *testing.T) {
 			t.Errorf("Step from a null level = %v, want FAILURE", err)
 		}
 	})
+}
+
+// TestRatedMoveAtANullLevel holds the engine path to matter.js
+// LevelControlServer.ts:388-404 at db021da0 (moveLogic hands transition()
+// the rate as a number) and :535-538 (transition() reads the currentLevel
+// getter, which fails a null level, only for a rate function — the one
+// moveToLevelLogic passes): a Move with a Rate at a null CurrentLevel
+// answers SUCCESS. Without managed transitions the bound in the direction
+// of travel is applied at once (Transitions.ts:133-147); with them the
+// transition ends at its first step and the level stays null
+// (Transitions.ts:461-464). A Step and a MoveToLevel with a TransitionTime
+// keep their FAILURE: both read the level (:478, :336-338).
+func TestRatedMoveAtANullLevel(t *testing.T) {
+	for _, tc := range []struct {
+		managed bool
+		mode    lvldef.MoveModeEnum
+		want    any
+	}{
+		{false, lvldef.MoveModeUp, uint8(254)},
+		{false, lvldef.MoveModeDown, uint8(1)},
+		{true, lvldef.MoveModeUp, nil},
+	} {
+		srv, err := levelcontrol.New(levelcontrol.HeldConfig{Features: levelcontrol.FeatureLighting, ManageTransitions: tc.managed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := invoke(t, srv, lvldef.CmdMove, lvldef.MoveRequest{MoveMode: tc.mode, Rate: spec.ValueOf(uint8(10))}); err != nil {
+			t.Errorf("managed=%v mode %d: Move with Rate 10 at a null level = %v, want SUCCESS", tc.managed, tc.mode, err)
+		}
+		if got, _ := srv.MatterRead(lvldef.AttrCurrentLevel); got != tc.want {
+			t.Errorf("managed=%v mode %d: CurrentLevel = %v, want %v", tc.managed, tc.mode, got, tc.want)
+		}
+		srv.MatterQuiesce()
+	}
+	srv, err := levelcontrol.New(levelcontrol.HeldConfig{Features: levelcontrol.FeatureLighting})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st im.StatusCodeError
+	if err := invoke(t, srv, lvldef.CmdStep, lvldef.StepRequest{StepMode: lvldef.StepModeUp, StepSize: 10, TransitionTime: spec.ValueOf(uint16(10))}); !errors.As(err, &st) || st.MatterStatusCode() != im.StatusFailure {
+		t.Errorf("Step at a null level = %v, want FAILURE", err)
+	}
+	if err := invoke(t, srv, lvldef.CmdMoveToLevel, lvldef.MoveToLevelRequest{Level: 100, TransitionTime: spec.ValueOf(uint16(10))}); !errors.As(err, &st) || st.MatterStatusCode() != im.StatusFailure {
+		t.Errorf("MoveToLevel over a TransitionTime at a null level = %v, want FAILURE", err)
+	}
 }

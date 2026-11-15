@@ -241,3 +241,44 @@ func TestDecodeRequest(t *testing.T) {
 		t.Error("re-register")
 	}
 }
+
+// TestReadContainerRefusesATaggedArrayElement: an array's elements are
+// anonymous; one with a tag refuses the tree, at any depth, after the
+// container was read through to its end — as matter.js's array schema
+// (packages/types/src/tlv/TlvArray.ts:77-78 at db021da0) and
+// connectedhomeip's reader (src/lib/core/TLVReader.cpp:873-875 at
+// 6170af84) refuse it.
+func TestReadContainerRefusesATaggedArrayElement(t *testing.T) {
+	t.Parallel()
+	for name, raw := range map[string][]byte{
+		// {1: [ctx2: 5], 3: 7}
+		"an element": {0x15, 0x36, 0x01, 0x24, 0x02, 0x05, 0x18, 0x24, 0x03, 0x07, 0x18},
+		// {1: [[ctx2: 5]], 3: 7}
+		"an element of a nested array": {0x15, 0x36, 0x01, 0x16, 0x24, 0x02, 0x05, 0x18, 0x18, 0x24, 0x03, 0x07, 0x18},
+		// {1: [ctx2: {}], 3: 7}
+		"a container element": {0x15, 0x36, 0x01, 0x35, 0x02, 0x18, 0x18, 0x24, 0x03, 0x07, 0x18},
+	} {
+		dec := tlv.NewDecoder(raw)
+		open, err := dec.Next()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		n, err := spec.ReadContainer(dec, open)
+		if !errors.Is(err, spec.ErrArrayElementTag) {
+			t.Fatalf("%s: err = %v, want ErrArrayElementTag", name, err)
+		}
+		if len(n.Children) != 2 {
+			t.Errorf("%s: the tree holds %d members, want both read", name, len(n.Children))
+		}
+		if next, err := dec.Next(); err == nil {
+			t.Errorf("%s: the stream holds %+v behind the container", name, next)
+		}
+	}
+	// An array of anonymous elements, and a structure's tagged members,
+	// are read as before.
+	dec := tlv.NewDecoder([]byte{0x15, 0x36, 0x01, 0x04, 0x05, 0x18, 0x24, 0x03, 0x07, 0x18})
+	open, _ := dec.Next()
+	if _, err := spec.ReadContainer(dec, open); err != nil {
+		t.Fatalf("an array of anonymous elements: %v", err)
+	}
+}

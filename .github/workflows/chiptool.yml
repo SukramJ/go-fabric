@@ -523,8 +523,12 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chip-fixtures-${{ matrix.group }}
+          # The variants' slices too (testdata/pics-<variant>/): a family
+          # that runs against a daemon variant rewrites that directory, and
+          # a composition change on the root moves every variant's ep0.
           path: |
             internal/chiptool/testdata/pics
+            internal/chiptool/testdata/pics-*
             internal/chiptool/testdata/chip-cases.golden.json
             docs/certifiability.md
           if-no-files-found: error

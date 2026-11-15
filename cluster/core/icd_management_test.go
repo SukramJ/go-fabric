@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
+	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -249,14 +250,19 @@ func TestICDManagementRegistrationLifecycle(t *testing.T) {
 		}
 
 		// The fabric-filtered read lists one fabric, the unfiltered one every
-		// fabric with another fabric's entry reduced to its index.
+		// fabric with another fabric's entry reduced to its index
+		// (TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields).
 		filtered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 2), icddef.AttrRegisteredClients)
 		if l := filtered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 1 || l[0].CheckInNodeId != 0x20 {
 			t.Fatalf("filtered %+v", l)
 		}
 		unfiltered, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 2), icddef.AttrRegisteredClients)
-		if l := unfiltered.(spec.List[icddef.MonitoringRegistrationStruct]); len(l) != 3 || l[0].CheckInNodeId != 0 || l[0].FabricIndex != 1 || l[2].CheckInNodeId != 0x20 {
+		l := unfiltered.(spec.List[spec.Encodable])
+		if len(l) != 3 || !bytes.Equal(spectest.Encode(t, l[0]), []byte{0x15, 0x24, 0xFE, 0x01, 0x18}) {
 			t.Fatalf("unfiltered %+v", l)
+		}
+		if own, ok := l[2].(icddef.MonitoringRegistrationStruct); !ok || own.CheckInNodeId != 0x20 {
+			t.Fatalf("unfiltered, fabric 2's own entry %+v", l[2])
 		}
 
 		// A wake sends one Check-In per Permanent client, post-increment.
@@ -452,5 +458,74 @@ func TestICDVerificationKeyLengthIsTheHandlersToJudge(t *testing.T) {
 	}
 	if _, err := s.MatterInvoke(admin, icddef.CmdUnregisterClient, icddef.UnregisterClientRequest{CheckInNodeId: 0x10, VerificationKey: &short}); err != nil {
 		t.Errorf("Administer with a 5-byte VerificationKey = %v, want the key ignored", err)
+	}
+}
+
+// TestICDManagementInstructionServedOnlyWhenSet: with the
+// UserActiveModeTrigger feature, UserActiveModeTriggerInstruction is in
+// AttributeList and readable only when the host gave an instruction.
+// Mirrors matter.js packages/model/src/standard/elements/
+// icd-management.element.ts:62-65 at db021da0 (conformance "desc", no
+// default) and packages/node/src/behavior/cluster/ValidatedElements.ts:
+// 247-279 (an attribute whose state holds no value, :252, is not an element
+// of the endpoint).
+func TestICDManagementInstructionServedOnlyWhenSet(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		instruction string
+		served      bool
+	}{{"", false}, {"Press the button", true}} {
+		s := newICDServer(t, core.ICDManagementConfig{
+			Features:                         icddef.FeatureCheckInProtocolSupport | icddef.FeatureUserActiveModeTrigger,
+			UserActiveModeTriggerHint:        icddef.UserActiveModeTriggerPowerCycle,
+			UserActiveModeTriggerInstruction: tc.instruction,
+		})
+		if got := slices.Contains(s.MatterAttributes(), icddef.AttrUserActiveModeTriggerInstruction); got != tc.served {
+			t.Errorf("instruction %q: AttributeList lists UserActiveModeTriggerInstruction %v, want %v", tc.instruction, got, tc.served)
+		}
+		v, ok := s.MatterRead(icddef.AttrUserActiveModeTriggerInstruction)
+		if ok != tc.served || (ok && v != tc.instruction) {
+			t.Errorf("instruction %q: read (%v, %v), want served %v", tc.instruction, v, ok, tc.served)
+		}
+	}
+}
+
+// TestICDRegisterClientHoldsClientTypeToItsEnum: a RegisterClient whose
+// ClientType ClientTypeEnum does not define is refused with
+// CONSTRAINT_ERROR and registers nothing, an existing entry included.
+// matter.js does not refuse the value in the request (its request schema
+// holds an enum to its type only, packages/types/src/tlv/TlvOfModel.ts:221-223
+// at db021da0); the refusal comes when the entry enters the
+// RegisteredClients state (IcdManagementServer.ts:572-583,
+// ListManager.ts:379-386 and :428-432, the enum validator
+// packages/node/src/behavior/state/validation/ValueValidator.ts:167-179:
+// Status.ConstraintError).
+func TestICDRegisterClientHoldsClientTypeToItsEnum(t *testing.T) {
+	t.Parallel()
+	s := newICDServer(t, core.ICDManagementConfig{
+		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
+		ClientsSupportedPerFabric: 2, Store: icdStore(t),
+	})
+	admin := icdInvokeCtx(1, privAdminister)
+	reg := func(node uint64, ct icddef.ClientTypeEnum) error {
+		_, err := s.MatterInvoke(admin, icddef.CmdRegisterClient, icddef.RegisterClientRequest{
+			CheckInNodeId: node, MonitoredSubject: node, Key: icdKey(1), ClientType: ct,
+		})
+		return err
+	}
+	if err := reg(0x10, 7); icdStatus(err) != im.StatusConstraintError {
+		t.Fatalf("RegisterClient with ClientType 7 = %v, want CONSTRAINT_ERROR", err)
+	}
+	if got := s.Registrations(1); len(got) != 0 {
+		t.Fatalf("registrations after the refusal = %+v, want none", got)
+	}
+	if err := reg(0x10, icddef.ClientTypeEphemeral); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg(0x10, 2); icdStatus(err) != im.StatusConstraintError {
+		t.Fatalf("re-registration with ClientType 2 = %v, want CONSTRAINT_ERROR", err)
+	}
+	if got := s.Registrations(1); len(got) != 1 || uint8(got[0].ClientType) != uint8(icddef.ClientTypeEphemeral) {
+		t.Fatalf("registrations after the refused update = %+v, want the Ephemeral entry unchanged", got)
 	}
 }

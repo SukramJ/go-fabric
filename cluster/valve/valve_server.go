@@ -428,12 +428,20 @@ func nullableState(state State, known bool) (any, bool) {
 // value must satisfy constraint "min 1", so zero is a CONSTRAINT_ERROR
 // rather than a duration of no seconds; DefaultOpenLevel is 1 to 100.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], unchanged for the value in effect (chip's
+// no-op) — the comparison that leaves the server's own version.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
-		return err
+		return false, err
 	}
 	if attrID == valvedef.AttrDefaultOpenLevel {
 		return s.writeDefaultOpenLevel(ctx, v)
@@ -444,20 +452,20 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		seconds = &sec
 	}
 	if s.src == nil {
-		return errNoSource("DefaultOpenDuration write")
+		return false, errNoSource("DefaultOpenDuration write")
 	}
 	// An unchanged value is a successful no-op: no host call, no
 	// DataVersion. Mirrors connectedhomeip
 	// src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:165-166
 	// at 6170af84 (kWriteSuccessNoOp; W3-club2-05).
 	if cur, known := s.src.DefaultOpenDuration(); (seconds == nil && !known) || (seconds != nil && known && cur == *seconds) {
-		return nil
+		return false, nil
 	}
 	if err := s.src.SetDefaultOpenDuration(ctx, seconds); err != nil {
-		return fmt.Errorf("valve: DefaultOpenDuration write: %w", err)
+		return false, fmt.Errorf("valve: DefaultOpenDuration write: %w", err)
 	}
 	s.tracker().Bump()
-	return nil
+	return true, nil
 }
 
 // writeDefaultOpenLevel applies a checked DefaultOpenLevel: a level that
@@ -465,20 +473,20 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // one a successful no-op. Mirrors connectedhomeip
 // src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:175-192
 // at 6170af84.
-func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any) error {
+func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any) (changed bool, err error) {
 	n, _ := v.(uint64)
 	level := uint8(n) //nolint:gosec // percent, 1 to 100 per ValidateWrite
 	if !s.compliesWithLevelStep(level) {
-		return constraintError{fmt.Sprintf("valve: DefaultOpenLevel %d is not 100 or a multiple of LevelStep %d", level, s.levelStep)}
+		return false, constraintError{fmt.Sprintf("valve: DefaultOpenLevel %d is not 100 or a multiple of LevelStep %d", level, s.levelStep)}
 	}
 	if s.defaults.DefaultOpenLevel() == level {
-		return nil
+		return false, nil
 	}
 	if err := s.defaults.SetDefaultOpenLevel(ctx, level); err != nil {
-		return fmt.Errorf("valve: DefaultOpenLevel write: %w", err)
+		return false, fmt.Errorf("valve: DefaultOpenLevel write: %w", err)
 	}
 	s.tracker().Bump()
-	return nil
+	return true, nil
 }
 
 // compliesWithLevelStep reports whether level is 100 or a multiple of

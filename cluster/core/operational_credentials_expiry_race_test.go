@@ -122,3 +122,57 @@ func TestOpcreds_ExpiryDuringUpdateNOC_RestoresTheIdentity(t *testing.T) {
 		t.Fatalf("the NOC UpdateNOC wrote while the fail-safe expired survived the expiry (expiry waited for UpdateNOC: %v)", waited)
 	}
 }
+
+// drawnKeyCtx is a request context that runs onDrawn once, on the first
+// value it is asked for after the CSRRequest drew the fail-safe's key pair
+// (the request's session id, read before the CSR is recorded).
+type drawnKeyCtx struct {
+	context.Context
+	oc      *core.OperationalCredentials
+	once    sync.Once
+	onDrawn func()
+}
+
+func (c *drawnKeyCtx) Value(key any) any {
+	if c.oc.CSRKeyPending() {
+		c.once.Do(c.onDrawn)
+	}
+	return c.Context.Value(key)
+}
+
+// TestOpcreds_ExpiryDuringCSRRequest_LeavesNoPendingKey: a fail-safe that
+// ends while a CSRRequest is between drawing the context's key pair and
+// recording its CSR leaves no key pair behind — the end waits for the
+// command, as for AddNOC and UpdateNOC (nocMu), and clears what it
+// recorded. The fail-safe context and its key pair end together (matter.js
+// db021da0 packages/protocol/src/common/FailsafeContext.ts:61, the
+// FabricBuilder created once per context, and :176-185, which builds the
+// CSR and records its session and for-update flag in one step).
+func TestOpcreds_ExpiryDuringCSRRequest_LeavesNoPendingKey(t *testing.T) {
+	t.Parallel()
+	st := memstore.New()
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waits := make(chan struct{})
+	var waitOnce sync.Once
+	oc.OnRollbackWaitsForNOC(func() { waitOnce.Do(func() { close(waits) }) })
+	expiryDone := make(chan struct{})
+	waited := false
+	ctx := sessionChallengeCtx(&drawnKeyCtx{Context: context.Background(), oc: oc, onDrawn: func() {
+		go func() { defer close(expiryDone); oc.OnFailSafeExpiry(context.Background(), 0) }()
+		select {
+		case <-expiryDone:
+		case <-waits:
+			waited = true
+		}
+	}})
+	if _, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+		t.Fatalf("CSRRequest: %v", err)
+	}
+	<-expiryDone
+	if oc.CSRKeyPending() {
+		t.Fatalf("a CSR key pair is pending after the fail-safe ended (the end waited for CSRRequest: %v)", waited)
+	}
+}

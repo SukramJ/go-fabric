@@ -115,10 +115,14 @@ func (v OpenCommissioningWindowRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag)
 func (v *OpenCommissioningWindowRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "OpenCommissioningWindow",
 		spec.Bind(0, "CommissioningTimeout", true, &v.CommissioningTimeout, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "PakePasscodeVerifier", true, &v.PakePasscodeVerifier, spec.DecodeBytesIn(97, 97)),
-		spec.Bind(2, "Discriminator", true, &v.Discriminator, spec.DecodeUintIn[uint16](16, 0, 4095)),
-		spec.Bind(3, "Iterations", true, &v.Iterations, spec.DecodeUintIn[uint32](32, 1000, 100000)),
-		spec.Bind(4, "Salt", true, &v.Salt, spec.DecodeBytesIn(16, 32)),
+		// PakePasscodeVerifier: the constraint "97" is the server's to judge (matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0).
+		spec.Bind(1, "PakePasscodeVerifier", true, &v.PakePasscodeVerifier, spec.DecodeBytes),
+		// Discriminator: the constraint "0 to 4095" is the server's to judge (matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0).
+		spec.Bind(2, "Discriminator", true, &v.Discriminator, spec.DecodeUint[uint16](16)),
+		// Iterations: the constraint "1000 to 100000" is the server's to judge (matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0).
+		spec.Bind(3, "Iterations", true, &v.Iterations, spec.DecodeUint[uint32](32)),
+		// Salt: the constraint "16 to 32" is the server's to judge (matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0).
+		spec.Bind(4, "Salt", true, &v.Salt, spec.DecodeBytes),
 	)
 }
 
@@ -203,10 +207,10 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister, Timed: true},
 			Fields: []spec.Field{
 				{ID: 0, Name: "CommissioningTimeout", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
-				{ID: 1, Name: "PakePasscodeVerifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "97", Value: &spec.Bound{Int: 97}}},
-				{ID: 2, Name: "Discriminator", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 4095", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 4095}}},
-				{ID: 3, Name: "Iterations", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1000 to 100000", Min: &spec.Bound{Int: 1000}, Max: &spec.Bound{Int: 100000}}},
-				{ID: 4, Name: "Salt", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16 to 32", Min: &spec.Bound{Int: 16}, Max: &spec.Bound{Int: 32}}},
+				{ID: 1, Name: "PakePasscodeVerifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "97", Value: &spec.Bound{Int: 97}}, Relaxed: "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"},
+				{ID: 2, Name: "Discriminator", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 4095", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 4095}}, Relaxed: "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"},
+				{ID: 3, Name: "Iterations", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1000 to 100000", Min: &spec.Bound{Int: 1000}, Max: &spec.Bound{Int: 100000}}, Relaxed: "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"},
+				{ID: 4, Name: "Salt", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16 to 32", Min: &spec.Bound{Int: 16}, Max: &spec.Bound{Int: 32}}, Relaxed: "matter.js packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:28-44 at db021da0"},
 			},
 			Decode: decodeOpenCommissioningWindowRequest,
 		},

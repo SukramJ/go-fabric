@@ -4,6 +4,8 @@
 package measurement
 
 import (
+	"context"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -103,7 +105,31 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			spectest.CheckServer(t, tc.srv, tc.def, tc.features)
+			writeChangesNothing(t, tc.srv)
 		})
+	}
+}
+
+// writeChangesNothing holds MatterWriteChanged of a server that stores no
+// written value: every listed attribute, and one the cluster does not
+// define, answers unchanged with the refusal MatterWrite gives.
+func writeChangesNothing(t *testing.T, srv contract.ClusterServer) {
+	t.Helper()
+	w, ok := srv.(contract.ChangeReportingWriter)
+	if !ok {
+		t.Fatalf("%T does not give the write verdict (contract.ChangeReportingWriter)", srv)
+	}
+	lister, ok := srv.(contract.ClusterAttributeLister)
+	if !ok {
+		t.Fatalf("%T lists no attributes", srv)
+	}
+	ctx := context.Background()
+	for _, id := range append(lister.MatterAttributes(), 0x7FF0) {
+		changed, err := w.MatterWriteChanged(ctx, id, uint64(0))
+		werr := srv.MatterWrite(ctx, id, uint64(0))
+		if changed || err == nil || werr == nil || err.Error() != werr.Error() || spec.StatusOf(err) != spec.StatusOf(werr) {
+			t.Errorf("attribute 0x%04X: MatterWriteChanged = %v, %v; want unchanged and MatterWrite's refusal %v", id, changed, err, werr)
+		}
 	}
 }
 
@@ -140,4 +166,112 @@ func TestElectricalValuesDecodeThroughTheGeneratedCodecs(t *testing.T) {
 	}
 	spectest.RoundTrip(t, e, spec.DecodeStruct[EnergyMeasurementStruct])
 	spectest.RoundTripEvent(t, booldef.Definition, BooleanStateEventStateChange, BooleanStateChangeEvent{StateValue: true})
+}
+
+// unobservedFloat, unobservedBool and unobservedReadings are sources that
+// have observed nothing yet.
+type (
+	unobservedFloat    struct{}
+	unobservedBool     struct{}
+	unobservedReadings struct{ unobservedFloat }
+)
+
+func (unobservedFloat) MatterFloatValue() (float64, bool)                 { return 0, false }
+func (unobservedFloat) MatterMeasurementClass() contract.MeasurementClass { return 0 }
+func (unobservedBool) MatterBoolValue() (value, observed bool)            { return false, false }
+func (unobservedBool) MatterMeasurementClass() contract.MeasurementClass  { return 0 }
+func (unobservedReadings) ActivePower() (float64, bool)                   { return 0, false }
+func (unobservedReadings) Voltage() (float64, bool)                       { return 0, false }
+func (unobservedReadings) Current() (float64, bool)                       { return 0, false }
+func (unobservedReadings) Frequency() (float64, bool)                     { return 0, false }
+func (unobservedReadings) Energy() (float64, bool)                        { return 0, false }
+func (unobservedReadings) HasEnergy() bool                                { return true }
+
+// TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows holds every
+// projection of a source that has observed nothing to its matter.js
+// element: an attribute reads null only when the element gives it quality
+// X. A non-nullable attribute reads its default instead — matter.js's
+// default of a non-nullable member is never null (packages/model/src/
+// logic/SelectDefaultValue.ts:155-157 at db021da0, null only
+// `if (member.nullable)`).
+func TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows(t *testing.T) {
+	t.Parallel()
+	f, b := unobservedFloat{}, unobservedBool{}
+	cases := []struct {
+		name string
+		srv  contract.ClusterServer
+		def  *spec.Cluster
+	}{
+		{"Temperature", NewTemperatureServer(f), tmpdef.Definition},
+		{"Humidity", NewHumidityServer(f), rhdef.Definition},
+		{"Illuminance", NewIlluminanceServer(f), illdef.Definition},
+		{"Pressure", NewPressureServer(f), prsdef.Definition},
+		{"Flow", NewFlowServer(f), flowdef.Definition},
+		{"BooleanState", NewBooleanStateServer(b), booldef.Definition},
+		{"OccupancySensing", NewOccupancySensingServer(b), occdef.Definition},
+		{"AirQuality", NewAirQualityServer(contract.MeasurementCO2, f), aqdef.Definition},
+		{"CO2", NewCO2ConcentrationServer(f), co2def.Definition},
+		{"PM2.5", NewPM25ConcentrationServer(f), pm25def.Definition},
+		{"PM10", NewPM10ConcentrationServer(f), pm10def.Definition},
+		{"CO", NewCOConcentrationServer(f), codef.Definition},
+		{"NO2", NewNO2ConcentrationServer(f), no2def.Definition},
+		{"Ozone", NewOzoneConcentrationServer(f), o3def.Definition},
+		{"Formaldehyde", NewFormaldehydeConcentrationServer(f), hchodef.Definition},
+		{"PM1", NewPM1ConcentrationServer(f), pm1def.Definition},
+		{"TVOC", NewTVOCConcentrationServer(f), tvocdef.Definition},
+		{"Radon", NewRadonConcentrationServer(f), radondef.Definition},
+		{"PowerSource bool", NewPowerSourceServer(b), psdef.Definition},
+		{"PowerSource float", NewPowerSourceServerFromFloat(f), psdef.Definition},
+		{"ElectricalPower", NewElectricalPowerServer(f), epmdef.Definition},
+		{"ElectricalPower readings", NewElectricalPowerServerFromReadings(unobservedReadings{}), epmdef.Definition},
+		{"ElectricalEnergy", NewElectricalEnergyServer(f), eemdef.Definition},
+		{"SoilMeasurement", NewSoilMeasurementServer(&soilStub{limits: demoSoilLimits()}), soildef.Definition},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			lister, ok := tc.srv.(contract.ClusterAttributeLister)
+			if !ok {
+				t.Fatalf("%T lists no attributes", tc.srv)
+			}
+			for _, id := range lister.MatterAttributes() {
+				v, ok := tc.srv.MatterRead(id)
+				if !ok || v != nil {
+					continue
+				}
+				a := tc.def.Attribute(id)
+				if a == nil {
+					continue // a global; spectest.CheckServer holds those
+				}
+				if !a.Quality.Nullable {
+					t.Errorf("%s (0x%04X) reads null while unobserved; the element has no quality X", a.Name, id)
+				}
+			}
+		})
+	}
+}
+
+// TestElectricalPowerReportsItsServedReadings: every reading the projected
+// ElectricalPowerMeasurement serves is change-reported. matter.js
+// broadcasts the changes of a behavior's state, a quieter property's when
+// its QuietEvent emits and a changes-omitted one's never
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:163-168,
+// :230-262 at db021da0); Voltage, ActiveCurrent, ActivePower and
+// Frequency are all of
+// the quieter quality (packages/model/src/standard/elements/
+// electrical-power-measurement.element.ts:54-55, :58-59, :70-71, :94-95).
+// Review II, phase 4.
+func TestElectricalPowerReportsItsServedReadings(t *testing.T) {
+	t.Parallel()
+	srv := NewElectricalPowerServerFromReadings(specReadings{})
+	reportable := srv.MatterReportable()
+	for _, id := range srv.MatterAttributes() {
+		a := epmdef.Definition.Attribute(id)
+		if a == nil || !a.Quality.Quieter {
+			continue
+		}
+		if !slices.Contains(reportable, id) {
+			t.Errorf("%s (0x%04X) is served and of the quieter quality, but not change-reported", a.Name, id)
+		}
+	}
 }

@@ -63,7 +63,7 @@ type OperationalCredentials struct {
 	pendingTrustRoot    []byte            // last AddTrustedRootCertificate decoded as the 65-byte EC-P256 pubkey; consumed by AddNOC for CASE lookups + CompressedFabricID HKDF
 	pendingTrustRootDER []byte            // last AddTrustedRootCertificate full Matter RCAC TLV bytes (verbatim); served by TrustedRootCertificates read — Apple validates per-entry, see Bug-I memory
 	pendingCSRNonce     []byte            // for binding AttestationRequest → CSRResponse
-	pendingPrivKey      *ecdsa.PrivateKey // private key generated for next AddNOC
+	pendingPrivKey      *ecdsa.PrivateKey // the fail-safe context's operational key pair, drawn by its first CSRRequest
 	currentFabric       uint8             // FabricIndex of the fabric the current request runs against
 	devAttestKey        *ecdsa.PrivateKey // DAC private key (loaded from config)
 	dacBytes            []byte            // Device Attestation Certificate (X.509 DER)
@@ -85,7 +85,7 @@ type OperationalCredentials struct {
 	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
 	// enforce the matter.js csrSessionId !== session.id guard per
 	// Matter §11.18.7.5.5.
-	// Mirrors matter.js OperationalCredentialsServer.ts:243-248.
+	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0.
 	pendingCSRSessionID uint16
 
 	// pendingCSRForUpdate captures `IsForUpdateNOC` from the CSRRequest
@@ -110,8 +110,9 @@ type OperationalCredentials struct {
 	// owner decision 36). Cleared by clearPendingState.
 	pendingFabric uint8
 
-	// nocMu serialises AddNOC, UpdateNOC, RemoveFabric's store removal,
-	// the fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
+	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
+	// the fail-safe's key pair, RemoveFabric's store removal, the
+	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
 	// last write waits for the command and then rolls its row back (review
@@ -229,7 +230,8 @@ func (o *OperationalCredentials) SetOnAdminEntryInstalled(hook func(entry store.
 // stamps WithInvokeSessionID(ctx, requestHdr.SessionID) on the invoke
 // context before calling the IM dispatcher, so handleCSRRequest and
 // handleAddNOC can enforce the csrSessionId !== session.id binding per
-// Matter §11.18.7.5.5 and matter.js OperationalCredentialsServer.ts:243-248.
+// Matter §11.18.7.5.5 and matter.js OperationalCredentialsServer.ts:240-245
+// at db021da0.
 type invokeSessionCtxKey struct{}
 
 // WithInvokeSessionID returns a derived context carrying the operational
@@ -374,7 +376,9 @@ var errOpcredsInvalidArg error = opcredsInvalidArgErr{}
 // as IM Status::ConstraintError (0x87). Mirrors matter.js
 // OperationalCredentialsServer.ts:247-252 (addNoc after CSRRequest for
 // UpdateNOC) and :329-332 (updateNoc after CSRRequest for AddNOC), both
-// StatusResponseError(..., Status.ConstraintError). Matter §11.18.6.
+// StatusResponseError(..., Status.ConstraintError). Matter §11.18.6. It
+// also answers a request field outside its model constraint, as matter.js's
+// request validation does (UpdateFabricLabel's Label).
 type opcredsConstraintErr struct{ msg string }
 
 func (e opcredsConstraintErr) Error() string { return e.msg }
@@ -1105,8 +1109,26 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		for i := range fabrics {
 			f := &fabrics[i]
 			id, err := o.store.GetIdentity(ctx, f.FabricIndex)
-			if err != nil {
+			switch {
+			case errors.Is(err, store.ErrIdentityNotFound):
+				// AddNOC inserts the fabric's row before its identity
+				// (handleAddNOC: AddFabric, then UpsertIdentity), and a
+				// read takes no nocMu: a fabric
+				// without an identity is one whose AddNOC has not
+				// stored its NOC yet, and the list is the one before
+				// that AddNOC.
 				continue
+			case err != nil:
+				// An identity the store cannot give fails the read, as
+				// the fabric list's failure does above and as the
+				// fabric-filtered read does ([OperationalCredentials.MatterReadFiltered]),
+				// instead of answering SUCCESS without that fabric's
+				// entry (review II, R2-P4-fr-sec-04). matter.js derives
+				// every fabric's NOCStruct from the fabric it holds
+				// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:540-545
+				// at db021da0, #updateFabrics), so its list always
+				// carries every fabric.
+				return nil, false
 			}
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,
@@ -1153,7 +1175,7 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		// Matter §11.18.5.13: list<octet_string<400>> where each entry is
 		// the full Matter Certificate TLV envelope (the RCAC bytes the
 		// commissioner sent via AddTrustedRootCertificate). Mirrors
-		// matter.js OperationalCredentialsServer.ts:470-472. Apple Home
+		// matter.js OperationalCredentialsServer.ts:471-473 at db021da0. Apple Home
 		// validates every entry as a Matter Certificate TLV and silently
 		// drops the entire Subscribe-Initial ReportData stream on schema
 		// mismatch — see Bug-I memory.
@@ -1166,10 +1188,11 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		// Include the pending root (set by AddTrustedRootCertificate but not
 		// yet committed by AddNOC) so a second commissioner reading 0x0004
 		// between AddTrustedRootCertificate and AddNOC sees the same view as
-		// matter.js. matter.js reference: OperationalCredentialsServer.ts:471-474
-		// pushes rootCaCertificate into state.trustedRootCertificates
-		// immediately; go-fabric mirrors by prepending pendingTrustRootDER
-		// to the live list when it is non-nil.
+		// matter.js: the installed fabrics' roots, then the pending one.
+		// Mirrors matter.js db021da0 packages/node/src/behaviors/
+		// operational-credentials/OperationalCredentialsServer.ts:471-473
+		// (`fabrics.map(fabric => fabric.rootCert)`, then
+		// `push(rootCaCertificate)`).
 		fabrics, err := o.store.ListFabrics(ctx)
 		if err != nil {
 			return nil, false
@@ -1178,16 +1201,16 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		pending := o.pendingTrustRootDER
 		o.mu.RUnlock()
 		out := make([][]byte, 0, len(fabrics)+1)
-		// Prepend pending root (pre-AddNOC window) per matter.js semantics.
-		if len(pending) > 0 {
-			out = append(out, append([]byte(nil), pending...))
-		}
 		for i := range fabrics {
 			f := &fabrics[i]
 			if len(f.RootCert) == 0 {
 				continue
 			}
 			out = append(out, append([]byte(nil), f.RootCert...))
+		}
+		// The pending root (pre-AddNOC window) last, per matter.js.
+		if len(pending) > 0 {
+			out = append(out, append([]byte(nil), pending...))
 		}
 		return out, true
 	case opcredsAttrCurrentFabricIndex:
@@ -1342,9 +1365,16 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 			if f.FabricIndex != fabricIndex {
 				continue
 			}
+			// The requester's own entry is the list: an identity the
+			// store cannot give fails the read, as the fabric list's
+			// failure does above, instead of answering SUCCESS without
+			// it. matter.js derives every fabric's NOCStruct from the
+			// fabric it holds
+			// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:540-545
+			// at db021da0, #updateFabrics), so its list always carries it.
 			id, err := o.store.GetIdentity(ctx, f.FabricIndex)
 			if err != nil {
-				continue
+				return nil, false
 			}
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,
@@ -1794,16 +1824,36 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// A CSRRequest requires an armed FailSafe window — the generated CSR is a
 	// FailSafe-scoped ephemeral, so issuing one outside the window leaves
 	// dangling pending state. Mirrors matter.js
-	// OperationalCredentialsServer.ts:118-119 (the `commissioner.failsafeContext`
-	// getter calls assertFailsafeArmed → Status::FailsafeRequired, 0xCA) and
-	// chip operational-credentials-server.cpp CSRRequest failsafe assertion.
+	// OperationalCredentialsServer.ts:131-132 at db021da0 (the
+	// `commissioner.failsafeContext` getter, packages/protocol/src/protocol/
+	// DeviceCommissioner.ts:97-100, calls assertFailsafeArmed →
+	// Status::FailsafeRequired, 0xCA) and chip 6170af84
+	// OperationalCredentialsCluster.cpp:341 (CSRRequest's fail-safe assertion).
 	// A nil accessor is a disarmed fail-safe, as in handleAddNOC /
 	// handleAddTrustedRootCertificate. A window armed for another fabric
 	// is not armed for this one (chip :341, failSafeRequired).
+	//
+	// From the fail-safe check to the record of the CSR, one with the NOC
+	// commands, the commit and the rollback (nocMu): the key pair the
+	// request draws and the CSR it records belong to one fail-safe context,
+	// so a context that ends, or an AddNOC that consumes the pair, either
+	// precedes the request or follows its record.
+	//
+	// The attestation material is asked for before that lock: the host's
+	// provider runs with nothing of this cluster held but attestationMu, and
+	// may call back into it — except into a command that resolves the
+	// attestation itself (AttestationRequest, CertificateChainRequest,
+	// CSRRequest), which blocks on attestationMu. Its error is answered after the fail-safe and
+	// NOC checks, where matter.js asks for the certification
+	// (OperationalCredentialsServer.ts:132-140 at db021da0: the fail-safe
+	// context, then getCertification).
+	attestationErr := o.resolveAttestation(ctx)
+	o.nocMu.Lock()
 	o.mu.RLock()
 	nocInvoked := o.pendingFabric != 0
 	o.mu.RUnlock()
 	if o.failSafeRequired(ctx) {
+		o.nocMu.Unlock()
 		return nil, errOpcredsFailsafeRequired
 	}
 	// A CSRRequest after AddNOC or UpdateNOC has already run in this FailSafe
@@ -1812,29 +1862,39 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// OperationalCredentialsServer.ts:132-138 (`if (failsafeContext.fabricIndex
 	// !== undefined) throw ConstraintError`). Matter §11.18.6.5.
 	if nocInvoked {
+		o.nocMu.Unlock()
 		return nil, opcredsConstraintErr{msg: "core: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
-	if err := o.resolveAttestation(ctx); err != nil {
-		return nil, err
+	if attestationErr != nil {
+		o.nocMu.Unlock()
+		return nil, attestationErr
 	}
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// The operational key pair belongs to the fail-safe context: the first
+	// CSRRequest draws it, every later one signs a CSR over the same pair
+	// until the context ends (clearPendingState) or a NOC command consumes
+	// it. Mirrors matter.js db021da0
+	// packages/protocol/src/common/FailsafeContext.ts:61 (FabricBuilder.create
+	// once per context) and :176-185 (createCertificateSigningRequest over
+	// the builder's pair, packages/protocol/src/fabric/Fabric.ts:549-551).
+	priv, err := o.failSafeKeyPair()
 	if err != nil {
-		return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+		o.nocMu.Unlock()
+		return nil, err
 	}
 	csr, err := buildPKCS10CSR(priv)
 	if err != nil {
+		o.nocMu.Unlock()
 		return nil, fmt.Errorf("core: CSRRequest: build CSR: %w", err)
 	}
 	nocsrElements := encodeNOCSRElements(csr, req.CSRNonce)
 
 	// Store the session ID of this CSRRequest so handleAddNOC can enforce
 	// that AddNOC is issued from the same session per Matter §11.18.7.5.5
-	// (matter.js OperationalCredentialsServer.ts:243-248; chip
+	// (matter.js OperationalCredentialsServer.ts:240-245 at db021da0; chip
 	// operational-credentials-server.cpp CSR failsafe binding).
 	csrSessionID := InvokeSessionIDFromContext(ctx)
 
 	o.mu.Lock()
-	o.pendingPrivKey = priv
 	o.pendingCSRNonce = append([]byte(nil), req.CSRNonce...)
 	o.pendingCSRSessionID = csrSessionID
 	// Capture the IsForUpdateNOC flag so the follow-up AddNOC/UpdateNOC
@@ -1843,6 +1903,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	o.pendingCSRForUpdate = req.IsForUpdateNOC
 	dacKey := o.devAttestKey
 	o.mu.Unlock()
+	o.nocMu.Unlock()
 
 	sig, err := signAttestationPayload(dacKey, nocsrElements, challenge)
 	if err != nil {
@@ -1852,6 +1913,21 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 		NOCSRElements:        nocsrElements,
 		AttestationSignature: sig,
 	}, nil
+}
+
+// failSafeKeyPair returns the fail-safe context's pending operational key
+// pair, drawing it on the context's first CSRRequest. nocMu is held.
+func (o *OperationalCredentials) failSafeKeyPair() (*ecdsa.PrivateKey, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.pendingPrivKey == nil {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+		}
+		o.pendingPrivKey = priv
+	}
+	return o.pendingPrivKey, nil
 }
 
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
@@ -1922,8 +1998,26 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if !ok {
 		return nil, fmt.Errorf("%w: AddNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
+	// The request's length constraints come first: IpkValue "16",
+	// NocValue and IcacValue "max 400" (matter.js db021da0
+	// packages/model/src/standard/elements/operational-credentials.element.ts:96-98),
+	// which matter.js's request validation refuses with ConstraintError
+	// before addNoc runs (packages/protocol/src/action/server/
+	// CommandInvokeResponse.ts:484-487) — before the AdminVendorId and the
+	// fail-safe checks of the handler. chip answers a wrong IPK length
+	// INVALID_COMMAND (OperationalCredentialsCluster.cpp:469 at 6170af84);
+	// matter.js wins (review 2026-11 W3-clusec-07).
+	if len(req.IPKValue) != 16 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC IPKValue of %d bytes, want 16", len(req.IPKValue))}
+	}
+	if len(req.NOCValue) > 400 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC NOCValue of %d bytes, over 400", len(req.NOCValue))}
+	}
+	if len(req.ICACValue) > 400 {
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC ICACValue of %d bytes, over 400", len(req.ICACValue))}
+	}
 	// A reserved AdminVendorId is an IM-level InvalidCommand, checked
-	// before the fail-safe and every other guard. Mirrors matter.js
+	// before the fail-safe and every other guard of the handler. Mirrors matter.js
 	// 0ceb202d packages/node/src/behaviors/operational-credentials/
 	// OperationalCredentialsServer.ts:217-222 (`if
 	// (!VendorId.isOperational(adminVendorId)) throw new
@@ -1963,31 +2057,13 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// it is once it landed (review II, R2-P1-rw-01).
 	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
 	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
-	// IPKValue is "octstr, M, 16" (matter.js
-	// operational-credentials.element.ts:98 at 862ad75f), so a wrong
-	// length is an IM-level CONSTRAINT_ERROR there — the interaction layer
-	// refuses it before addNoc runs; chip answers INVALID_COMMAND
-	// (OperationalCredentialsCluster.cpp:469 at 6170af84). matter.js wins
-	// (review 2026-11 W3-clusec-07); it answered in-band InvalidNOC.
-	if len(req.IPKValue) != 16 {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: AddNOC IPKValue of %d bytes, want 16", len(req.IPKValue))}
-	}
-	// NOC and ICAC byte-length caps per Matter §11.18.6.7 and chip
-	// operational-credentials-server.cpp kMaxCHIPCertLength (400 bytes).
-	// Oversized certificates indicate a malformed or non-Matter cert;
-	// reject early so the TLV decoder never sees unbounded input.
-	if len(req.NOCValue) > 400 {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC exceeds 400-byte limit"}, nil
-	}
-	if len(req.ICACValue) > 400 {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "ICAC exceeds 400-byte limit"}, nil
-	}
-
-	// Mirrors matter.js OperationalCredentialsServer.ts:231-264.
-	// Guard ordering: CSR-pending → trust-root → TableFull →
-	// cert validation. Each failure is reported via
-	// NOCResponse.StatusCode (in-band) per Matter §11.18.6.7,
-	// NOT via the IM error channel.
+	// Mirrors matter.js db021da0 packages/node/src/behaviors/
+	// operational-credentials/OperationalCredentialsServer.ts:233-260 and
+	// FailsafeContext.ts:236-240 / Fabric.ts:614-624. Guard order: trust
+	// root → CSR of this session → CSR not for UpdateNOC → TableFull →
+	// CaseAdminSubject → the NOC's public key → the chain. Each failure
+	// but the for-UpdateNOC one (an IM ConstraintError) is reported via
+	// NOCResponse.StatusCode (in-band) per Matter §11.18.6.7.
 	//
 	// Apple's Multi-Admin flow legitimately invokes AddNOC over an
 	// existing CASE session (Hub#1 facilitates Hub#2's commissioning).
@@ -1997,7 +2073,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// branch covers below.
 	// Enforce CSR session-ID binding per Matter §11.18.7.5.5 — reject
 	// AddNOC from a session that did not issue the pending CSRRequest.
-	// Mirrors matter.js OperationalCredentialsServer.ts:243-248:
+	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0:
 	//   if (failsafeContext.csrSessionId !== this.context.session.id)
 	//       return { statusCode: MissingCsr, debugText: "CSR not found in failsafe context" }
 	//
@@ -2007,7 +2083,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// a rig without WithInvokeSessionID) binds to none; a CSR issued on a
 	// named session is consumed by that session alone — matter.js compares
 	// the ids strictly (OperationalCredentialsServer.ts:240-245 at
-	// 862ad75f), and a request that names no session does not match one
+	// db021da0), and a request that names no session does not match one
 	// that did (review 2026-11 W3-clusec-04).
 	addNOCSessionID := InvokeSessionIDFromContext(ctx)
 
@@ -2019,6 +2095,9 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	rootDER := o.pendingTrustRootDER
 	supportedFabrics := o.supportedFabrics
 	o.mu.Unlock()
+	if len(root) == 0 {
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "no trusted root"}, nil
+	}
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
@@ -2038,11 +2117,30 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if pendingForUpdate {
 		return nil, opcredsConstraintErr{msg: "core: AddNOC illegal after CSRRequest for UpdateNOC in same FailSafe context"}
 	}
-	if len(root) == 0 {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "no trusted root"}, nil
+	// TableFull-Guard before persisting (matter.js
+	// OperationalCredentialsServer.ts:254-260), and before the fabric is
+	// built (CaseAdminSubject, the certificates). Without this, the store
+	// fails the AddFabric INSERT and we'd surface FabricConflict —
+	// semantically wrong: the fabric is not in conflict, the table is
+	// exhausted.
+	//
+	// The one read of the table both guards judge: a table that cannot be
+	// read fails the command before anything is written, since neither
+	// the capacity nor a conflict can be judged (review II, R2-P2-comm-10;
+	// the IM layer answers FAILURE).
+	existing, lerr := o.store.ListFabrics(ctx)
+	if lerr != nil {
+		return nil, fmt.Errorf("core: AddNOC: list fabrics: %w", lerr)
 	}
-	// Validate CaseAdminSubject BEFORE anything is persisted. Mirrors
-	// chip OperationalCredentialsCluster.cpp:452-454:
+	if uint8(len(existing)) >= supportedFabrics { //nolint:gosec // ListFabrics returns ≤ supportedFabrics by spec; see #20
+		return NOCResponse{
+			StatusCode: NOCStatusTableFull,
+			DebugText:  fmt.Sprintf("fabric table at capacity (%d/%d)", len(existing), supportedFabrics),
+		}, nil
+	}
+	// Validate CaseAdminSubject BEFORE anything is persisted, and before
+	// the certificates (matter.js FailsafeContext.ts:236-240, buildFabric).
+	// Mirrors chip OperationalCredentialsCluster.cpp:486-487 at 6170af84:
 	//   VerifyOrExit(IsOperationalNodeId(caseAdminSubject) || IsCASEAuthTag(caseAdminSubject),
 	//                nocResponse = kInvalidAdminSubject)
 	// Operational Node IDs: 0x0000_0000_0000_0001 .. 0xFFFF_FFEF_FFFF_FFFF.
@@ -2068,52 +2166,43 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if !aclIsValidCASESubject(req.CaseAdminSubject) {
 		return NOCResponse{StatusCode: NOCStatusInvalidAdminSubject, DebugText: "CaseAdminSubject is not a valid operational node ID or CASE auth tag"}, nil
 	}
-	// TableFull-Guard before persisting (matter.js
-	// OperationalCredentialsServer.ts:254-260). Without this, the
-	// store fails the AddFabric INSERT and we'd surface FabricConflict
-	// — semantically wrong: the fabric is not in conflict, the table
-	// is exhausted.
-	//
-	// The one read of the table both guards judge: a table that cannot be
-	// read fails the command before anything is written, since neither
-	// the capacity nor a conflict can be judged (review II, R2-P2-comm-10;
-	// the IM layer answers FAILURE).
-	existing, lerr := o.store.ListFabrics(ctx)
-	if lerr != nil {
-		return nil, fmt.Errorf("core: AddNOC: list fabrics: %w", lerr)
-	}
-	if uint8(len(existing)) >= supportedFabrics { //nolint:gosec // ListFabrics returns ≤ supportedFabrics by spec; see #20
-		return NOCResponse{
-			StatusCode: NOCStatusTableFull,
-			DebugText:  fmt.Sprintf("fabric table at capacity (%d/%d)", len(existing), supportedFabrics),
-		}, nil
-	}
 
-	// Verify the NOC chain against the pending trust root before
-	// extracting any subject fields.  The verifier checks:
-	//   • cert type (IsNOC / IsICA), validity window, ECDSA signatures,
-	//   • chain linkage (ICAC.Issuer == Root.Subject when ICAC present).
-	// Mirrors chip OperationalCredentialsCluster.cpp:496-501 and
-	// matter.js Fabric.create(root, icac, noc) → verifyCredentials().
-	verifier, verr := nocVerifier(rootDER, root)
-	if verr != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "trust root invalid: " + verr.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
-	}
-	nocPub, verr := verifier.VerifyAndExtractPubKey(req.NOCValue, req.ICACValue)
-	if verr != nil {
-		return nocVerificationFailure(verr), nil
-	}
-	if !nocCertifiesPendingKey(nocPub, priv) {
-		return NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}, nil
-	}
-
-	// Decode is safe after chain verification has passed.
+	// The NOC is decoded, its CASE Authenticated Tags judged, and its
+	// public key compared with the fail-safe's key pair before the chain
+	// is verified: a NOC for another key is InvalidPublicKey whatever its
+	// chain, unless its CATs already make it InvalidNOC. Mirrors matter.js
+	// db021da0 packages/protocol/src/fabric/Fabric.ts:614-616
+	// (#verifyOperationalCert, `Bytes.areEqual(ellipticCurvePublicKey,
+	// this.#keyPair.publicKey)` → PublicKeyError) before :618-624 (the
+	// chain), after Noc.fromTlv (:602-605) — a NOC that does not decode is
+	// InvalidNOC — and CaseAuthenticatedTag.validateNocTagList (:610-612, a
+	// ValidationError → InvalidNOC, OperationalCredentialsServer.ts:184-192).
 	noc, err := mattercert.Decode(req.NOCValue)
 	if err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	if !noc.IsNOC() {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "not a NOC"}, nil
+	}
+	if err := noc.CheckCASEAuthTags(); err != nil {
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	}
+	if !nocKeyIsPendingKey(noc, priv) {
+		return NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}, nil
+	}
+
+	// Verify the NOC chain against the pending trust root. The verifier
+	// checks:
+	//   • cert type (IsNOC / IsICA), validity window, ECDSA signatures,
+	//   • chain linkage (ICAC.Issuer == Root.Subject when ICAC present).
+	// Mirrors chip OperationalCredentialsCluster.cpp:496-501 and
+	// matter.js Fabric.ts:618-624 (icaCert.verify, nocCert.verify).
+	verifier, verr := nocVerifier(rootDER, root)
+	if verr != nil {
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "trust root invalid: " + verr.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	}
+	if _, verr := verifier.VerifyAndExtractPubKey(req.NOCValue, req.ICACValue); verr != nil {
+		return nocVerificationFailure(verr), nil
 	}
 	if fabricInstalled(existing, noc.Subject.MatterFabricID, root) {
 		return NOCResponse{
@@ -2171,11 +2260,14 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	}
 
 	// Install the IPK as epoch key in GroupKeyManagement KeySetID=0 per
-	// Matter §11.18.6.8.6. chip operational-credentials-server.cpp:484-496
+	// Matter §11.18.6.8.6. chip 6170af84 OperationalCredentialsCluster.cpp:517-529
 	// writes via groupDataProvider.SetKeySet(newFabricIndex, compressed_fabric_id,
 	// keyset{id=0, policy=TrustFirst, num_keys=1, epoch_keys[0].start=0, key=ipk}).
-	// matter.js notes this as a TODO (OperationalCredentialsServer.ts:306-307)
-	// but embeds the IPK in Fabric.create for operational HKDF derivation;
+	// matter.js db021da0 keeps the IPK on the fabric (FailsafeContext.ts:253,
+	// setIdentityProtectionKey) and no key set 0 in its GroupKeyManagement
+	// state, which holds every key set "beside the fabric specific entries of
+	// the groupKeyset 0" (GroupKeyManagementServer.ts:606-610;
+	// keySetReadAllIndices prepends 0, :453);
 	// we match the chip behaviour to populate the GroupKeyManagement table so
 	// KeySetReadAllIndices correctly advertises the IPK slot.
 	ipkRec := store.GroupKeySet{
@@ -2259,14 +2351,12 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
 }
 
-// nocCertifiesPendingKey reports whether the NOC's subject public key
-// equals the pending CSR key pair's public key. A certificate for any
-// other key is unusable for CASE signing. Mirrors matter.js
-// Fabric.ts:557-559 (PublicKeyError → InvalidPublicKey) and chip
-// FabricTable.cpp:890 `existingOpKey->Pubkey().Matches(nocPubKey)` →
-// CHIP_ERROR_INVALID_PUBLIC_KEY.
-func nocCertifiesPendingKey(nocPub *ecdsa.PublicKey, priv *ecdsa.PrivateKey) bool {
-	return nocPub != nil && nocPub.Equal(&priv.PublicKey)
+// nocKeyIsPendingKey reports whether the NOC's subject public key is the
+// fail-safe's pending key pair's, compared as the raw uncompressed point
+// matter.js compares (Fabric.ts:614, Bytes.areEqual).
+func nocKeyIsPendingKey(noc *mattercert.Certificate, priv *ecdsa.PrivateKey) bool {
+	pub, err := priv.PublicKey.Bytes()
+	return err == nil && bytes.Equal(noc.PublicKey, pub)
 }
 
 // fabricInstalled reports whether a fabric of fabrics already uses the
@@ -2299,37 +2389,54 @@ func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 
 // validateUpdateNOCCert verifies an UpdateNOC certificate against the
 // fabric's stored trust root and the pending CSR key pair. Returns the
-// decoded NOC on success, or a non-nil rejection NOCResponse.
+// decoded NOC on success, or a non-nil rejection NOCResponse. The checks
+// run in matter.js's order, as AddNOC's: decode, the public key, the
+// chain, the fabric id — a request that fails more than one gets the
+// status of the first. Mirrors matter.js db021da0
+// packages/protocol/src/common/FailsafeContext.ts:216-222
+// (buildUpdatedFabric) → packages/protocol/src/fabric/Fabric.ts:579-585
+// (updateOperationalCert: #verifyOperationalCert, then the fabric id):
 //
-//   - Chain verification runs against the fabric's STORED root — there
-//     is no AddTrustedRootCertificate on the update path. Mirrors
-//     matter.js FailsafeContext.ts:216-223 buildUpdatedFabric →
-//     Fabric.ts:541-579 setOperationalCert and chip
-//     FabricTable.cpp:854-882 (fabricIdToValidate from the existing
-//     fabric fed into ValidateIncomingNOCChain).
+//   - The NOC is decoded (Fabric.ts:602-605, Noc.fromTlv); one that does
+//     not decode, or is no NOC, is InvalidNOC.
+//   - Its CASE Authenticated Tags meet the NOC rules
+//     ([mattercert.Certificate.CheckCASEAuthTags]; Fabric.ts:610-612,
+//     validateNocTagList → ValidationError → InvalidNOC); else InvalidNOC.
 //   - The NOC must certify the public key of the pending CSR key pair
-//     — anything else is a certificate for a key we do not hold.
-//     Mirrors matter.js Fabric.ts:557-559 (PublicKeyError →
-//     InvalidPublicKey) and chip FabricTable.cpp:890
-//     `existingOpKey->Pubkey().Matches(nocPubKey)`.
+//     — anything else is a certificate for a key we do not hold, whatever
+//     its chain. Fabric.ts:614-616 (`Bytes.areEqual(ellipticCurvePublicKey,
+//     this.#keyPair.publicKey)` → PublicKeyError → InvalidPublicKey);
+//     chip compares it after the chain (FabricTable.cpp:880, :890), and
+//     matter.js decides.
+//   - Chain verification runs against the fabric's STORED root — there
+//     is no AddTrustedRootCertificate on the update path (Fabric.ts:618-624,
+//     icaCert.verify, nocCert.verify; chip FabricTable.cpp:854-882,
+//     fabricIdToValidate from the existing fabric fed into
+//     ValidateIncomingNOCChain). A non-operational node id is
+//     InvalidNodeOpId, every other failure InvalidNOC.
 //   - UpdateNOC SHALL NOT move the fabric to a different FabricID
-//     (Matter §11.18.6.9); chip pins the existing FabricId.
+//     (Matter §11.18.6.9; Fabric.ts:581-585, CertificateError → InvalidNOC).
 func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocValue, icacValue []byte) (*mattercert.Certificate, *NOCResponse) {
+	noc, derr := mattercert.Decode(nocValue)
+	if derr != nil {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: derr.Error()}
+	}
+	if !noc.IsNOC() {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "not a NOC"}
+	}
+	if err := noc.CheckCASEAuthTags(); err != nil {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}
+	}
+	if !nocKeyIsPendingKey(noc, priv) {
+		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
+	}
 	verifier, verr := nocVerifier(fab.RootCert, fab.RootPublicKey)
 	if verr != nil {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "stored trust root invalid: " + verr.Error()}
 	}
-	nocPub, verr := verifier.VerifyAndExtractPubKey(nocValue, icacValue)
-	if verr != nil {
+	if _, verr := verifier.VerifyAndExtractPubKey(nocValue, icacValue); verr != nil {
 		resp := nocVerificationFailure(verr)
 		return nil, &resp
-	}
-	if !nocCertifiesPendingKey(nocPub, priv) {
-		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
-	}
-	noc, derr := mattercert.Decode(nocValue)
-	if derr != nil {
-		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: derr.Error()}
 	}
 	if noc.Subject.MatterFabricID != fab.FabricID {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC FabricID does not match fabric"}
@@ -2505,12 +2612,16 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 		return nil, fmt.Errorf("%w: UpdateFabricLabelRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
 	if len(req.Label) > 32 {
-		// chip OperationalCredentialsCluster.cpp:678-682 returns
-		// IM-InvalidCommand (0x85) for a label that exceeds 32 bytes,
-		// not NOCResponse{LabelConflict}. LabelConflict means the label
-		// is already in use by another fabric; an oversized label is a
-		// constraint violation that maps to InvalidCommand.
-		return nil, opcredsInvalidCommandErr{"UpdateFabricLabel: label exceeds 32 UTF-8 bytes"}
+		// Label carries "max 32" in the model and matter.js's request
+		// validation refuses a longer one with ConstraintError before the
+		// handler runs. Mirrors matter.js db021da0
+		// packages/model/src/standard/elements/operational-credentials.element.ts:124
+		// and packages/protocol/src/action/server/CommandInvokeResponse.ts:484-486
+		// (requestTlv.validate; ValidationError's status,
+		// packages/types/src/common/ValidationError.ts:16-22).
+		// connectedhomeip 6170af84 answers InvalidCommand here under a TODO
+		// that names ConstraintError (OperationalCredentialsCluster.cpp:711-717).
+		return nil, opcredsConstraintErr{"UpdateFabricLabel: label exceeds 32 UTF-8 bytes"}
 	}
 	// Fabric-scoped command (Matter §11.18.6.10): SHALL target the
 	// fabric of the session that issued the Invoke, NOT a globally
@@ -2542,23 +2653,22 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if idx == 0 {
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
 	}
-	// Mirrors matter.js packages/node/src/behaviors/operational-credentials/
-	// OperationalCredentialsServer.ts:394-401 — reject non-empty Labels
-	// already used by another fabric on this node with LabelConflict.
-	// Empty Labels are always allowed; the spec treats a fabric with
-	// empty Label as "unnamed" and multi-fabric admins may legitimately
-	// share that state.
-	if req.Label != "" {
-		fabrics, err := o.store.ListFabrics(ctx)
-		if err == nil {
-			for i := range fabrics {
-				f := &fabrics[i]
-				if f.FabricIndex != idx && f.Label == req.Label {
-					return NOCResponse{
-						StatusCode: NOCStatusLabelConflict,
-						DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
-					}, nil
-				}
+	// A label another fabric on this node already carries — the empty
+	// label every fabric starts with included — is answered LabelConflict.
+	// Mirrors matter.js db021da0 packages/node/src/behaviors/
+	// operational-credentials/OperationalCredentialsServer.ts:396-402
+	// (`fabrics.find(f => f.label === label && f.fabricIndex !==
+	// currentFabricIndex)`, no exception for ""); connectedhomeip 6170af84
+	// OperationalCredentialsCluster.cpp:719-725 compares the same way.
+	fabrics, err := o.store.ListFabrics(ctx)
+	if err == nil {
+		for i := range fabrics {
+			f := &fabrics[i]
+			if f.FabricIndex != idx && f.Label == req.Label {
+				return NOCResponse{
+					StatusCode: NOCStatusLabelConflict,
+					DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
+				}, nil
 			}
 		}
 	}
@@ -2600,8 +2710,9 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 // command fires, in its order — the fabric-removed hook, the mDNS
 // withdraw of the fabric's operational instance, the re-announce of the
 // remaining set. matter.js reaches the same path from the host through
-// Fabric.leave() (packages/protocol/src/fabric/Fabric.ts:423-433), the
-// call the command itself makes (OperationalCredentialsServer.ts:425):
+// Fabric.leave() (packages/protocol/src/fabric/Fabric.ts:447-457 at
+// db021da0), the call the command itself makes
+// (OperationalCredentialsServer.ts:425):
 // the fabric's sessions close with their subscriptions, and the
 // FabricManager's deleting / deleted events fan out to every
 // fabric-scoped holder. A fabric the store does not hold is

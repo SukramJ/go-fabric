@@ -15,9 +15,9 @@ func wildcardPaths(n int) []ConcreteAttributePath {
 
 // TestValidateReadPaths_PathsExhaustedAboveCeiling pins the hard
 // acceptance ceiling on paths in one read / subscribe interaction:
-// matter.js InteractionServer.ts:79-80 MAX_READ_PATHS /
+// matter.js InteractionServer.ts:93-94 MAX_READ_PATHS /
 // MAX_SUBSCRIBE_PATHS = 10 000, rejected with PathsExhausted at
-// :366-369 and :600-604. Attribute and event paths count together.
+// :375-381 and :635-641 at db021da0. Attribute and event paths count together.
 func TestValidateReadPaths_PathsExhaustedAboveCeiling(t *testing.T) {
 	t.Parallel()
 	if got := ValidateReadPaths(wildcardPaths(MaxReadPaths), nil); got != StatusSuccess {
@@ -33,9 +33,11 @@ func TestValidateReadPaths_PathsExhaustedAboveCeiling(t *testing.T) {
 }
 
 // TestValidateReadPaths_IllegalPathWinsOverCeiling pins the check order
-// matter.js uses: validateReadPaths runs before the path count
-// (InteractionServer.ts:362-369), so an illegal path is still
-// InvalidAction even inside an oversized request.
+// matter.js uses for a Read: validateReadPaths runs before the path count
+// (packages/node/src/node/server/InteractionServer.ts:373, then :375-381
+// at db021da0), so an illegal path is still InvalidAction even inside an
+// oversized request. A Subscribe counts first
+// (bridge's TestSubscribeCountsItsPathsBeforeValidatingThem).
 func TestValidateReadPaths_IllegalPathWinsOverCeiling(t *testing.T) {
 	t.Parallel()
 	paths := wildcardPaths(MaxReadPaths + 1)

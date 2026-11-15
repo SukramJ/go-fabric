@@ -186,6 +186,12 @@ func (s *GridConditionsServer) MatterWrite(ctx context.Context, attrID uint32, v
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *GridConditionsServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke answers every command: the cluster has none.
 func (s *GridConditionsServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields) // a host's handler first ([spec.SelfHeld.Handle])

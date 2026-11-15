@@ -245,7 +245,8 @@ func TestUnknownCommandIsUnsupportedCommand(t *testing.T) {
 // TestMatterWriteRefusesEveryAttribute pins the access column: the four
 // implemented attributes are "R V" and report UnsupportedWrite, while
 // the two writable ones this server does not implement report
-// UnsupportedAttribute — absent, not read-only.
+// UnsupportedAttribute — absent, not read-only. MatterWriteChanged answers
+// each with the same status, unchanged: the server stores no written value.
 func TestMatterWriteRefusesEveryAttribute(t *testing.T) {
 	t.Parallel()
 
@@ -274,6 +275,10 @@ func TestMatterWriteRefusesEveryAttribute(t *testing.T) {
 			}
 			if got := sc.MatterStatusCode(); got != tc.want {
 				t.Errorf("MatterStatusCode() = %v, want %v", got, tc.want)
+			}
+			changed, err := srv.MatterWriteChanged(context.Background(), tc.attrID, uint8(1))
+			if !errors.As(err, &sc) || sc.MatterStatusCode() != tc.want || changed {
+				t.Errorf("MatterWriteChanged = %v, %v; want unchanged and %v", changed, err, tc.want)
 			}
 		})
 	}
@@ -317,6 +322,165 @@ type notifyingSource struct {
 func (n *notifyingSource) OnMatterValueChanged(cb func()) func() {
 	n.cb = cb
 	return func() { n.unsub++ }
+}
+
+// TestChangeToModeOfTheCurrentModeLeavesTheDataVersion: a ChangeToMode
+// to the mode the device is in changes no attribute and leaves the
+// DataVersion; one to another mode advances it once. Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode writes state.currentMode) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 and
+// :1476-1480 (#noteIfChanged returns for an equal value; the version
+// advances only when the commit changed something).
+func TestChangeToModeOfTheCurrentModeLeavesTheDataVersion(t *testing.T) {
+	t.Parallel()
+	src := coffeeSource()
+	srv := modeselect.NewServer(modeselect.Config{Source: src})
+	before := srv.MatterDataVersion()
+	if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: src.current}); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before {
+		t.Errorf("ChangeToMode to the current mode moved the DataVersion %d -> %d", before, got)
+	}
+	if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.MatterDataVersion(); got != before+1 {
+		t.Errorf("ChangeToMode to another mode moved the DataVersion %d -> %d, want +1", before, got)
+	}
+}
+
+// notifyingInCommand reports, inside ChangeToMode, the change it just
+// applied, as a host whose port notifies for every change it makes.
+type notifyingInCommand struct{ *notifyingSource }
+
+func (n notifyingInCommand) ChangeToMode(ctx context.Context, mode uint8) error {
+	if err := n.fakeSource.ChangeToMode(ctx, mode); err != nil {
+		return err
+	}
+	if n.cb != nil {
+		n.cb()
+	}
+	return nil
+}
+
+// TestChangeToModeAdvancesTheDataVersionOnceWithTheHostsNotification: a
+// ChangeToMode is one commit, one advance of the DataVersion — whether
+// the host's notifier reports the change while the command runs or not.
+// Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode assigns state.currentMode once) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 (the
+// commit advances the version once `if (changes)`).
+func TestChangeToModeAdvancesTheDataVersionOnceWithTheHostsNotification(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		src       modeselect.ModeSource
+		wantFired int
+	}{
+		{"the notifier fires inside the command", notifyingInCommand{&notifyingSource{fakeSource: coffeeSource()}}, 1},
+		{"the notifier stays silent", &notifyingSource{fakeSource: coffeeSource()}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := modeselect.NewServer(modeselect.Config{Source: tc.src})
+			fired := 0
+			defer srv.OnMatterValueChanged(func() { fired++ })()
+			before := srv.MatterDataVersion()
+			if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+				t.Fatal(err)
+			}
+			if got := srv.MatterDataVersion() - before; got != 1 {
+				t.Errorf("ChangeToMode to another mode moved the DataVersion by %d, want 1", got)
+			}
+			if fired != tc.wantFired {
+				t.Errorf("the subscriber fired %d times, want %d", fired, tc.wantFired)
+			}
+		})
+	}
+}
+
+// earlyNotifying reports, inside ChangeToMode, a change of something else
+// of the same source before the mode moves, and moves it silently.
+type earlyNotifying struct{ *notifyingSource }
+
+func (n earlyNotifying) ChangeToMode(ctx context.Context, mode uint8) error {
+	if n.cb != nil {
+		n.cb()
+	}
+	return n.fakeSource.ChangeToMode(ctx, mode)
+}
+
+// readNotifying is a device that changes its mode by itself to 0, and
+// notifies, while the server reads the mode a command starts from; the
+// command's own change is silent.
+type readNotifying struct {
+	*notifyingSource
+	pending *bool // the device's own change is still to come
+}
+
+func (n readNotifying) CurrentMode() uint8 {
+	if *n.pending && n.cb != nil {
+		*n.pending = false
+		n.current = 0
+		n.cb()
+	}
+	return n.fakeSource.CurrentMode()
+}
+
+// TestChangeToModeServesEveryModeUnderItsOwnDataVersion: no two modes are
+// served under one DataVersion, whenever the host's notifier fires while a
+// ChangeToMode runs — after the change, before it for a change of
+// something else, or for a change of the device's own while the server
+// reads the mode the command starts from. A notification advances the
+// version for the value it saw; the command advances it once more when
+// the mode differs from that value. Mirrors matter.js
+// packages/node/src/behaviors/mode-select/ModeSelectServer.ts:66-70 at
+// db021da0 (changeToMode writes state.currentMode) under
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 (each
+// commit that changed a value advances the version).
+func TestChangeToModeServesEveryModeUnderItsOwnDataVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		src  func(*notifyingSource) modeselect.ModeSource
+	}{
+		{"the notifier reports the change", func(n *notifyingSource) modeselect.ModeSource { return notifyingInCommand{n} }},
+		{"the notifier fires before the change", func(n *notifyingSource) modeselect.ModeSource { return earlyNotifying{n} }},
+		{"the device changes while the command reads its mode", func(n *notifyingSource) modeselect.ModeSource {
+			pending := true
+			return readNotifying{n, &pending}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := modeselect.NewServer(modeselect.Config{Source: tc.src(&notifyingSource{fakeSource: coffeeSource()})})
+			type served struct {
+				version uint32
+				mode    any
+			}
+			now := func() served {
+				v, _ := srv.MatterRead(modeselect.AttrCurrentMode)
+				return served{srv.MatterDataVersion(), v}
+			}
+			seen := []served{now()}
+			defer srv.OnMatterValueChanged(func() { seen = append(seen, now()) })()
+			if _, err := srv.MatterInvoke(t.Context(), modeselect.CmdChangeToMode, modeselect.ChangeToModeRequest{NewMode: 1}); err != nil {
+				t.Fatal(err)
+			}
+			final := now()
+			if final.mode != uint8(1) {
+				t.Fatalf("CurrentMode is %v, want 1", final.mode)
+			}
+			for _, s := range seen {
+				if s.version == final.version && s.mode != final.mode {
+					t.Errorf("CurrentMode %v and %v were both served under DataVersion %d", s.mode, final.mode, final.version)
+				}
+			}
+		})
+	}
 }
 
 // TestDeviceSideChangeReachesSubscribers pins the change hop: a mode the

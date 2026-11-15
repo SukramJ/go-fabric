@@ -329,7 +329,10 @@ type SelfTester interface {
 }
 
 // SensitivitySetter is a StateSource that takes a controller's
-// SmokeSensitivityLevel write.
+// SmokeSensitivityLevel write — only when the written level differs
+// from the one SmokeCOState reads; the held level reaches no setter.
+// A write that reaches it counts as a change whether or not
+// SmokeCOState shows it when the setter returns.
 type SensitivitySetter interface {
 	SetSmokeSensitivityLevel(ctx context.Context, level SensitivityEnum) error
 }

@@ -308,9 +308,13 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // ([light.NewColorControl]), gated on the endpoint's OnOff for the
 // ExecuteIfOff option (ColorControlServer.ts #optionsAllowExecution). Its
 // commands apply their target at once, matter.js's default
-// (managedTransitionTimeHandling false).
+// (managedTransitionTimeHandling false). Bridged as onoff.Config and
+// levelcontrol.HeldConfig are: every device the kit builds is added under
+// the Aggregator, where matter.js does not apply
+// StartUpColorTemperatureMireds (ColorControlServer.ts:378-381 at
+// db021da0, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock, ManageTransitions: b.transitions}
+	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock, ManageTransitions: b.transitions, Bridged: true}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
@@ -437,15 +441,21 @@ func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
 		cfg.MoveStep = coverMoveStep
 	}
 	// Type and EndProductType are the configuration's; the position the
-	// covering starts at is the current and the target position.
+	// covering starts at is the current and the target position. Without
+	// one the position is unknown and reads null, matter.js's default
+	// (window-covering-cluster.element.ts:71-72, :75-76 at db021da0).
 	configFrom(&cfg, b.def, b.initial)
 	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionLiftPercent100ths); ok && v <= math.MaxUint16 {
 		cfg.InitialPositionPercent100ths = uint16(v)
 		delete(b.initial, wcdef.AttrTargetPositionLiftPercent100ths)
+	} else {
+		cfg.InitialPositionUnknown = true
 	}
 	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionTiltPercent100ths); ok && v <= math.MaxUint16 {
 		cfg.InitialTiltPositionPercent100ths = uint16(v)
 		delete(b.initial, wcdef.AttrTargetPositionTiltPercent100ths)
+	} else {
+		cfg.InitialTiltPositionUnknown = true
 	}
 	srv, err := cover.New(cfg)
 	if errors.Is(err, cover.ErrFeatureMap) {

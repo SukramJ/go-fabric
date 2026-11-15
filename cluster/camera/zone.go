@@ -626,6 +626,12 @@ func (z *Zones) MatterWrite(ctx context.Context, attrID uint32, value any) error
 	return z.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (z *Zones) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return z.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches an accepted command; a host's handler runs in
 // its place ([spec.SelfHeld.Handle]).
 func (z *Zones) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

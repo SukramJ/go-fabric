@@ -277,8 +277,8 @@ func asUint64(v any) (uint64, bool) {
 // cluster registers its own #applySceneValues. values holds the scene's
 // non-null values by attribute id (matter.js passes them as a struct and
 // each apply function tests `typeof value === "number"`); transitionMs is
-// the scene's transition in milliseconds. light.ColorControlServer and
-// onoff.Server implement it.
+// the scene's transition in milliseconds. light.ColorControlServer,
+// levelcontrol.Server and onoff.Server implement it.
 type SceneValuesApplier interface {
 	MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32)
 }
@@ -286,9 +286,12 @@ type SceneValuesApplier interface {
 // SceneInvalidator is the optional capability of a scene-able cluster
 // server that invalidates the current scene from its own command logic, as
 // matter.js's OnOffServer does only when OnOff actually changes
-// (OnOffServer.ts:97-100, :119-122). MatterInvalidatesScenes reports
-// whether it does so now; the endpoint then leaves the invalidation after
-// that server's commands to it. cluster/onoff's Server implements it.
+// (OnOffServer.ts:97-100, :119-122) and its LevelControlServer and
+// ColorControlServer only past the ExecuteIfOff gate.
+// MatterInvalidatesScenes reports whether it does so now; the endpoint
+// then leaves the invalidation after that server's commands to it.
+// onoff.Server, levelcontrol.Server and light.ColorControlServer implement
+// it.
 type SceneInvalidator interface {
 	MatterInvalidatesScenes() bool
 }
@@ -304,12 +307,14 @@ func presentValues(cv SceneClusterValues) map[uint32]uint64 {
 	return out
 }
 
-// applyValues recalls a scene through the clusters' own commands, as
-// matter.js's per-cluster apply functions do (OnOffServer, LevelControlServer
-// and ColorControlServer #applySceneValues): OnOff On/Off, LevelControl
-// MoveToLevel with ExecuteIfOff, ColorControl MoveToColorTemperature or
-// MoveToHueAndSaturation for the stored color mode — unless the server
-// recalls its values itself ([SceneValuesApplier]). transitionMs is the
+// applyValues recalls a scene through the servers' own apply functions
+// ([SceneValuesApplier]), as matter.js's per-cluster #applySceneValues do
+// (OnOffServer, LevelControlServer and ColorControlServer). A scene-able
+// server without one — a host's own — is driven through its commands:
+// OnOff On/Off, LevelControl MoveToLevel with ExecuteIfOff (matter.js
+// LevelControlServer.ts:757 at db021da0, moveToLevelLogic with
+// executeIfOff), ColorControl MoveToColorTemperature or
+// MoveToHueAndSaturation for the stored color mode. transitionMs is the
 // scene's transition in milliseconds; the commands take tenths of a second.
 func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneClusterValues, transitionMs uint32) {
 	if s.cfg.Siblings == nil {

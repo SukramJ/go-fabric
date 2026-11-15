@@ -16,7 +16,8 @@
 //     (node/root.go: Localization, Time Format, Unit Localization, Power
 //     Source Configuration, Network Commissioning, Diagnostic Logs, Software
 //     and Ethernet Diagnostics, Time Synchronization, Fixed and User Label)
-//     and BasicInformation serves SerialNumber, which the mock lacks; the
+//     and BasicInformation serves SerialNumber and Reachable, which the mock
+//     lacks; the
 //     nine clusters the mock serves carry the mock's counts exactly, every
 //     other cluster reports each attribute of its AttributeList once;
 //   - the device side is a bridge: endpoint 1 is the Aggregator, a device is
@@ -49,8 +50,9 @@ var rootFullClusterList = map[uint32]int{29: 9, 31: 11, 40: 22, 48: 10, 51: 11, 
 var lightClusterCounts = map[uint32]int{3: 7, 4: 6, 6: 10, 29: 9, 98: 7}
 
 // goRootExtra is what the Go root serves beyond the mock's counts:
-// BasicInformation.SerialNumber.
-const goRootExtra = 1
+// BasicInformation.SerialNumber and Reachable (both default ProductLabel to
+// the ProductName, BasicInformationServer.ts:67 at db021da0).
+const goRootExtra = 2
 
 func TestAttributeReadResponseParity(t *testing.T) {
 	t.Parallel()

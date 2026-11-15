@@ -412,7 +412,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// to be ≤ the subscriber's requested MaxInterval. chip (non-ICD path,
 	// `src/app/ReadHandler.cpp:769-809`) accepts the subscriber's MaxInterval
 	// directly and bounds it only by `kSubscriptionMaxIntervalPublisherLimit`
-	// (3600 s). matter.js (`packages/node/src/node/server/ServerSubscription.ts:269-282`)
+	// (3600 s). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
 	// further clamps to min(subscriptionMaxInterval, maxIntervalCeiling) and
 	// also lifts by minIntervalFloor. go-fabric clamps maxCeil down to
 	// cfg.MaxIntervalCeilingSeconds (default 3600 s, matching chip) and
@@ -431,6 +431,14 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// accepts the requested MaxInterval; such a request was refused as
 	// inverted after the clamp.
 	maxCeil := max(min(req.MaxIntervalCeiling, m.cfg.MaxIntervalCeilingSeconds), req.MinIntervalFloor)
+	// Never below matter.js's minimum interval of 2 s, whatever the
+	// subscriber's ceiling (review II, R2-P4-imread-11): matter.js
+	// packages/node/src/node/server/ServerSubscription.ts at db021da0,
+	// #genericMaxInterval (:326-343) raises the granted MaxInterval to
+	// subscriptionMinInterval, which is MIN_INTERVAL = Seconds(2) (:73) or a
+	// configured value never below it (:111). The ICD branch below keeps
+	// matter.js's #icdIdleMaxInterval, which has no such bound.
+	maxCeil = max(maxCeil, minGrantedIntervalSeconds)
 	if idle := uint16(m.icdIdleMax.Load()); idle > 0 { //nolint:gosec // G115: SetICDIdleModeDuration stores a uint16
 		maxCeil = max(req.MinIntervalFloor, idle)
 	}
@@ -799,15 +807,16 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 }
 
 // CloseEndpoint terminates every subscription that contains at least
-// one AttributePath or EventPath targeting endpointID. Called after a
-// topology Reassemble removes an endpoint so that the engine stops
-// ticking subscriptions that can never match a live cluster again.
+// one AttributePath or EventPath targeting endpointID and returns how
+// many it closed.
 //
-// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
-// lifecycle: when a BridgedNode endpoint is
-// removed from the Aggregator the outer bridge calls
-// `endpoint.lifecycle.remove()` which causes any subscription targeting
-// that endpoint to be closed by the InteractionServer.
+// Deprecated: nothing in this module calls it any more. A Reassemble
+// that removes an endpoint ends no subscription — the paths naming the
+// endpoint select nothing from then on — as matter.js drops a removed
+// endpoint from its protocol collections only
+// (packages/node/src/node/integration/ProtocolService.ts:216-220 at
+// db021da0). Close a subscription with [Manager.Close]; CloseEndpoint is
+// removable in v0.23.0.
 func (m *Manager) CloseEndpoint(endpointID uint16) int {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)

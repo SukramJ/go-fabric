@@ -100,8 +100,10 @@ const (
 	PBKDFSaltMax = spake2.PBKDFMaxSaltSize
 )
 
-// The RegulatoryLocationTypeEnum values [Commissioning].LocationCapability
-// takes (mattercore.RegulatoryIndoor, …).
+// The RegulatoryLocationTypeEnum values (mattercore.RegulatoryIndoor, …).
+// [Commissioning].LocationCapability takes RegulatoryOutdoor or
+// RegulatoryIndoorOutdoor; RegulatoryIndoor is its zero value and reads as
+// the default, IndoorOutdoor — Indoor is [Commissioning].IndoorOnly.
 const (
 	RegulatoryIndoor        = mattercore.RegulatoryIndoor
 	RegulatoryOutdoor       = mattercore.RegulatoryOutdoor

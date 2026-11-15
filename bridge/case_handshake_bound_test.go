@@ -134,13 +134,16 @@ func TestSigma1ThatBeginsNothingTakesNoRecordsPlace(t *testing.T) {
 		return ok
 	}
 
-	b.AttachCaseHandler(&recordingCaseHandler{sigma1Err: errors.New("test: refused")})
+	// The handler refuses the next Sigma1 — set on the handler, not by
+	// attaching another, which would end the handshakes this one began
+	// (Bridge.AttachCaseHandler); dispatch is synchronous here.
+	begins.sigma1Err = errors.New("test: refused")
 	_ = b.dispatchSecureChannel(loopbackSrc(), sigma1From(0x9000), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x02})
 	if !held() {
 		t.Fatal("a refused Sigma1 at the bound took the oldest handshake's record")
 	}
 
-	b.AttachCaseHandler(begins)
+	begins.sigma1Err = nil
 	if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(0x9001), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x03}); err != nil {
 		t.Fatal(err)
 	}

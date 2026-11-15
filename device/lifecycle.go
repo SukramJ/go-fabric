@@ -240,9 +240,10 @@ func (d *Device) Update(ctx context.Context, fn func(*HostStatement)) {
 func ComposeNodeLabel(base, suffix string) string { return endpoint.ComposeNodeLabel(base, suffix) }
 
 // OnChanged calls fn with every change of the device's clusterID server —
-// matter.js's `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:456)
-// with the origin of the change (contract.Change; Datasource.ts:1473-1476
-// hands the observer the session that made it) — delivered through the
+// matter.js's `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:457)
+// with the origin of the change (contract.Change; Datasource.ts:1486-1492
+// at db021da0 hands the observer the session that made it) — delivered
+// through the
 // server's [contract.AttributeChangeNotifier], or through its
 // [contract.ChangeNotifier] with every attribute it reports. fn runs
 // inline, on the goroutine that made the change and before the write,

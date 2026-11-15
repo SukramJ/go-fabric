@@ -63,8 +63,10 @@ type DeviceTypeInfo struct {
 // the root and the Aggregator included — by number, with the PartsList
 // and DeviceTypeList a controller walks. Neither is derived from the
 // other's purpose.
-func (n *Node) Endpoints() []EndpointInfo {
-	topo := n.br.Topology()
+func (n *Node) Endpoints() []EndpointInfo { return endpointInfos(n.br.Topology()) }
+
+// endpointInfos is [Node.Endpoints] over topo.
+func endpointInfos(topo *endpoint.Topology) []EndpointInfo {
 	if topo == nil {
 		return nil
 	}

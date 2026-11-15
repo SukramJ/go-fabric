@@ -102,6 +102,11 @@ type SceneInfoStruct struct {
 	SceneValid        bool
 	RemainingCapacity uint8
 	FabricIndex       uint8
+	// Redacted marks another fabric's entry on a non-fabric-filtered
+	// read: CurrentScene, CurrentGroup and SceneValid are fabric-sensitive
+	// ("S", scenes-management.element.ts SceneInfoStruct) and are left
+	// out; SceneCount, RemainingCapacity and FabricIndex are served.
+	Redacted bool
 }
 
 // ScenesState is an endpoint's scene table and scene info: the server is
@@ -477,13 +482,26 @@ func (s *ScenesManagement) MatterDropFabric(_ context.Context, fabricIndex uint8
 // ([ScenesState.Fabrics]).
 func (s *ScenesManagement) MatterHeldFabrics() []uint8 { return s.cfg.State.Fabrics() }
 
-// MatterRead implements [contract.ClusterServer] (unfiltered).
+// MatterRead implements [contract.ClusterServer]: a read without a
+// request behind it, which sees every fabric's entry whole.
 func (s *ScenesManagement) MatterRead(attrID uint32) (any, bool) {
-	return s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 0), attrID)
+	return s.MatterReadFiltered(context.Background(), attrID)
 }
 
 // MatterReadFiltered implements [contract.FabricScopedReader]:
-// FabricSceneInfo is fabric-scoped ("R F V").
+// FabricSceneInfo is fabric-scoped ("R F V"). A fabric-filtered read lists
+// the accessing fabric's entry; an unfiltered one every fabric's, and an
+// entry of another fabric than the accessing one — every entry, for a
+// session without a fabric — is served Redacted, without CurrentScene,
+// CurrentGroup and SceneValid, the fields that are "S"
+// (packages/model/src/standard/elements/scenes-management.element.ts:179-186).
+// A read without a request sees every entry whole. Mirrors matter.js at
+// db021da0, where FabricSceneInfo is plain behaviour state: a
+// fabric-sensitive field of another owning fabric reads undefined
+// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
+// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
+// mayRead) and the encoder leaves it out
+// (packages/types/src/tlv/TlvObject.ts:128-134).
 func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	st := s.cfg.State
 	switch attrID {
@@ -492,15 +510,22 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		defer st.mu.Unlock()
 		return st.tableSize, true
 	case scenesAttrFabricSceneInfo:
-		filtered, fabric := im.FabricFilterFromContext(ctx)
+		filtered, fabric, request := im.LookupFabricFilter(ctx)
+		// Every fabric of the node has an entry, created on read
+		// (infoFor), also one that never stored a scene. matter.js holds
+		// one for each fabric known when the server initialises and adds
+		// one only when a fabric's scene count is updated
+		// (ScenesManagementServer.ts:978-999 #initializeFabricSceneInfo,
+		// :1003-1023 #updateFabricSceneInfoCountsForFabric at db021da0;
+		// a read creates none), so a fabric commissioned after start
+		// reads an empty list until its first scene or a restart. This
+		// module serves the entry from the start, on purpose (the
+		// by_design entry for FabricSceneInfo). Without the fabric list
+		// the accessing fabric still sees its own entry (W3-clucore-14).
 		var fabrics []uint8
 		if s.cfg.Fabrics != nil {
 			fabrics = s.cfg.Fabrics(ctx)
 		} else if fabric != 0 {
-			// Without the fabric list the accessing fabric still sees
-			// its own entry, as matter.js's fabric-scoped
-			// fabricSceneInfo holds one for every fabric that reads it
-			// (W3-clucore-14).
 			fabrics = []uint8{fabric}
 		}
 		st.mu.Lock()
@@ -510,7 +535,11 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 			if filtered && f != fabric {
 				continue
 			}
-			out = append(out, *st.infoFor(f))
+			info := *st.infoFor(f)
+			if request && (f != fabric || fabric == 0) {
+				info = SceneInfoStruct{SceneCount: info.SceneCount, RemainingCapacity: info.RemainingCapacity, FabricIndex: info.FabricIndex, Redacted: true}
+			}
+			out = append(out, info)
 		}
 		return out, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
@@ -530,6 +559,12 @@ var scenesInst = mustInstance(scenesdef.Definition, spec.Options{
 func (s *ScenesManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := scenesInst.ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("core: ScenesManagement attribute 0x%04X is read-only", attrID), status: err}
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -660,6 +695,9 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 	if fabric == 0 {
 		return nil, scenesStatusError{im.StatusUnsupportedAccess, "command requires an accessing fabric"}
 	}
+	if err := groupZeroInGroupMessage(ctx, fields); err != nil {
+		return nil, err
+	}
 	defer s.cfg.State.reportIfChanged(s.cfg.State.snapshot())
 	bad := func() (any, error) {
 		return nil, scenesStatusError{im.StatusInvalidCommand, fmt.Sprintf("command 0x%02X: unexpected fields %T", cmdID, fields)}
@@ -715,6 +753,43 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return s.copyScene(ctx, fabric, req), nil
 	}
 	return nil, im.UnsupportedCommandf("core: ScenesManagement command 0x%02X not supported", cmdID)
+}
+
+// groupZeroInGroupMessage refuses a scene command that arrived as a group
+// message with a GroupID of 0. Mirrors matter.js
+// packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:229-234
+// at db021da0 (#assertSceneCommandParameter, which every scene command
+// calls, CopyScene for both of its groups, :491-499): `if (isGroupSession
+// && groupIdToValidate === 0) throw new StatusResponse.InvalidCommandError`.
+// The check runs before the command's own, on the request of any of the
+// eight commands (a payload of another shape is left to the command's
+// decoding); matter.js runs some of those
+// first (AddScene's and RecallScene's range checks, :283-285, :435-440),
+// which a group message, answered by no response, cannot tell apart —
+// either way nothing changes.
+func groupZeroInGroupMessage(ctx context.Context, fields any) error {
+	if _, group := im.GroupSubjectFromContext(ctx); !group {
+		return nil
+	}
+	var groupIDs []uint16
+	switch req := fields.(type) {
+	case AddSceneRequest:
+		groupIDs = []uint16{req.GroupID}
+	case SceneRef:
+		groupIDs = []uint16{req.GroupID}
+	case RecallSceneRequest:
+		groupIDs = []uint16{req.GroupID}
+	case SceneGroupRequest:
+		groupIDs = []uint16{req.GroupID}
+	case CopySceneRequest:
+		groupIDs = []uint16{req.GroupFrom, req.GroupTo}
+	}
+	for _, id := range groupIDs {
+		if id == 0 {
+			return scenesStatusError{im.StatusInvalidCommand, "GroupID cannot be 0 in a group message"}
+		}
+	}
+	return nil
 }
 
 // groupValid is matter.js #assertSceneCommandParameter's group check.

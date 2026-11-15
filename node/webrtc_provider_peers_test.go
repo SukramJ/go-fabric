@@ -93,7 +93,14 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctlDev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{ctl}})
+	ctlDev := site.AddDevice(fabrictest.Topology{
+		Bridged: []node.Endpoint{ctl},
+		// The requestor's ACL entry is written only for a fabric the host
+		// grants ([node.WebRTCRequestorConfig].GrantFabric).
+		Configure: func(cfg *node.Config) {
+			cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
+		},
+	})
 	if _, err := pair.Controller.Commission(ctx, ctlDev, fabrictest.CommissionOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +192,14 @@ func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctlDev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{ctl}})
+	ctlDev := site.AddDevice(fabrictest.Topology{
+		Bridged: []node.Endpoint{ctl},
+		// The requestor's ACL entry is written only for a fabric the host
+		// grants ([node.WebRTCRequestorConfig].GrantFabric).
+		Configure: func(cfg *node.Config) {
+			cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
+		},
+	})
 	if _, err := pair.Controller.Commission(ctx, ctlDev, fabrictest.CommissionOptions{}); err != nil {
 		t.Fatal(err)
 	}

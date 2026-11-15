@@ -33,7 +33,7 @@ func originColorControl(tb testing.TB) contract.ClusterServer {
 // server (brief BY-1 §1 and §2): the host's Set, a command and a
 // controller's write of each writable attribute reach the change
 // listeners — the host's OnChanged — at once, with their origin and the
-// attribute that moved (Datasource.ts:1473-1476).
+// attribute that moved (Datasource.ts:1486-1492 at db021da0).
 func TestColorControlOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, originColorControl,
@@ -61,7 +61,7 @@ func TestColorControlOrigins(t *testing.T) {
 // listeners each at once, while the wire (contract.AttributeReportNotifier)
 // reports the first at once and the last after the interval — matter.js's
 // QuietEvent throttles only its `online` view
-// (packages/node/src/behavior/Events.ts:267-297).
+// (packages/node/src/behavior/Events.ts:269-296 at db021da0).
 func TestColorControlHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

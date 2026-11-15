@@ -798,9 +798,11 @@ func (e *Endpoint) ForgetFabricScenes(fabricIndex uint8) {
 // ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid from their
 // state-changing commands. A recall applies its values through the
 // servers directly and keeps the scene valid. A server that invalidates
-// the scene from its own logic ([mattercore.SceneInvalidator], the OnOff
-// server with its scenes port) is left to do so: matter.js's OnOffServer
-// invalidates only when OnOff changes (OnOffServer.ts:97-100, :119-122).
+// the scene from its own logic ([mattercore.SceneInvalidator]: the OnOff,
+// LevelControl and ColorControl servers with their scenes port) is left
+// to do so: matter.js's OnOffServer invalidates only when OnOff changes
+// (OnOffServer.ts:97-100, :119-122), its LevelControlServer and
+// ColorControlServer only past the ExecuteIfOff gate.
 func (e *Endpoint) invalidateSceneOnCommand(srv contract.ClusterServer, clusterID uint32) {
 	if clusterID != 0x0006 && clusterID != 0x0008 && clusterID != 0x0300 {
 		return

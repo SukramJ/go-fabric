@@ -155,3 +155,38 @@ type stubSourceFull struct{}
 func (stubSourceFull) IsJammed() bool                           { return false }
 func (stubSourceFull) IsLocked() (locked, observed bool)        { return true, true }
 func (stubSourceFull) LockInvoke(context.Context, uint32) error { return nil }
+
+// TestLockCommandPinIsCheckedWithoutCOTA holds that the PINCode of a lock
+// command is authorized whatever the features: on a USR|PIN lock without
+// COTA a wrong PIN is refused and counted, a right one names its user.
+// Mirrors matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts
+// at db021da0: unlockDoor passes request.pinCode to #actuate (:198-201),
+// #authorize identifies it without a feature test (:1049-1080), an unknown
+// PIN is #refuseWrongCode (:1175-1190), a known one runs #authorizeUser.
+// matter.js's base fixture carries no COTA either (DoorLockServerTest.ts:62).
+func TestLockCommandPinIsCheckedWithoutCOTA(t *testing.T) {
+	t.Parallel()
+	f := setUpScheduledLock(t, func(c *lock.DoorLockConfig) { c.Features &^= lock.FeatureCOTA },
+		scheduledUser(lockdef.UserTypeUnrestrictedUser, nil))
+
+	f.markEvents()
+	if err := f.unlock("9999"); err == nil {
+		t.Fatal("UnlockDoor with a wrong PIN succeeded, want FAILURE")
+	}
+	if got := f.lockStateNow(); got != stateLocked {
+		t.Errorf("LockState after a wrong PIN = %v, want Locked", got)
+	}
+	ev := f.events()
+	if len(ev.errors) != 1 || ev.errors[0].OperationError != lockdef.OperationErrorInvalidCredential {
+		t.Errorf("LockOperationError after a wrong PIN = %+v, want one InvalidCredential", ev.errors)
+	}
+
+	f.markEvents()
+	if err := f.unlock("1234"); err != nil {
+		t.Fatalf("UnlockDoor with the right PIN: %v", err)
+	}
+	ev = f.events()
+	if len(ev.operations) != 1 || ev.operations[0].UserIndex.Null || ev.operations[0].UserIndex.Value != 1 {
+		t.Errorf("LockOperation after the right PIN = %+v, want UserIndex 1", ev.operations)
+	}
+}

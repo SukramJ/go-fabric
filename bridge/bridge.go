@@ -496,6 +496,15 @@ type Bridge struct {
 	// cleanup) or point at stale topology entries (cleanup but no
 	// re-bind).
 	measurementUnsubscribers []func()
+	// listenerWiring is the wiring measurementUnsubscribers detach: its
+	// memory of the notifiers' last values, which a controller's write
+	// brings up to date ([Bridge.settleWrite]).
+	listenerWiring *listenerSet
+	// quietParked holds the quiet paths a torn-down wiring parked for the
+	// next one to take up ([Bridge.parkQuietPath]); guarded by quietMu, a
+	// leaf lock.
+	quietMu     sync.Mutex
+	quietParked map[im.ConcreteAttributePath]*quietPath
 	// listenerGeneration counts the wirings of the host's notifiers; a
 	// wiring that finds it moved while it registered was overtaken and
 	// detaches what it registered ([Bridge.rewireMeasurementListeners]).
@@ -569,24 +578,31 @@ type Bridge struct {
 	// fires the reply; subsequent arrivals on the same exchange with
 	// matching hash log + drop. Sigma3 receive forgets the exchange so
 	// re-use under the same exchange-id-after-rollover stays correct —
-	// for a handshake a provider completed, once the provider lets its
-	// adapter go ([Bridge.sigma3Handled]).
-	// Mirrors matter.js's `CaseServer.ts::onSigma1` which serialises +
-	// short-circuits replays via `fabric.locked` + per-exchange state.
+	// for a completed handshake, once its record ends
+	// ([Bridge.sigma3Handled]).
+	// The gate is this module's own: matter.js's CASE server has no
+	// replay step (its entry points are onNewExchange and #handleSigma1,
+	// packages/protocol/src/session/case/CaseServer.ts:61-63, :102-146
+	// at db021da0). A retransmitted Sigma1 meets its exchange layer,
+	// where a duplicate is acknowledged
+	// (packages/protocol/src/protocol/MessageExchange.ts:501-511; the
+	// retransmission sent in the acknowledgement's place is for BDX
+	// alone, :580-583), and a message whose id the pending reply
+	// acknowledges gets that reply again (:512-520).
 	sigma1Replied map[HandshakeKey]sigma1Record
 	// sigma1Seq numbers the Sigma1 records in the order they were made,
 	// for the oldest to lose its place past [maxCaseHandshakes]; guarded
 	// by mu.
 	sigma1Seq uint64
 
-	// reportCounterOwner maps an outbound-reliable MessageCounter to
-	// the subscription ID that owns it. Populated by
-	// reportSubscription right after tracker.Track; consumed when the
-	// ACK pump observes [mrp.ErrMaxRetransmissionsReached] so the
-	// peer-vanished subscription can be reaped from the manager
-	// instead of staying live and burning ticks forever. Cleared on
-	// successful Ack via [Bridge.releaseReportCounter].
-	reportCounterOwner sync.Map // map[uint32]uint32  (counter → subscriptionID)
+	// reportCounterOwner maps the outbound-reliable MessageCounter of an
+	// ongoing report's last message ([reportCounterKey]) to what the
+	// report owes its subscription ([Bridge.noteReportSent]). The peer's
+	// acknowledgement takes it as a delivered update
+	// ([Bridge.releaseReportCounter]); the ACK pump's
+	// [mrp.ErrMaxRetransmissionsReached] as a failed one
+	// ([Bridge.noteReportUndelivered]).
+	reportCounterOwner sync.Map // map[uint64]*owedReport
 
 	// subSendErrorCount tracks how many consecutive send failures the
 	// ongoing report path has accumulated per subscription. matter.js's
@@ -594,10 +610,21 @@ type Bridge struct {
 	// before cancelling; this counter implements the same back-off so
 	// a transient send error (e.g. a momentary socket-write hiccup or
 	// fabric reload race) does not immediately reap an otherwise-healthy
-	// subscription. Reset to 0 on the first successful send. Subs that
+	// subscription. Reset by a delivered update: a report the peer
+	// acknowledged, or one sent without a tracked message. Subs that
 	// never reach 0 again — peer truly gone — exceed the cap and get
 	// closed via the existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
+	// subUpdateMu guards every change of subSendErrorCount
+	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates])
+	// and subUpdateSeq: the reporter, the ACK pump and the inbound
+	// acknowledgement change a subscription's count from their own
+	// goroutines. A leaf lock: nothing is called while it is held.
+	subUpdateMu sync.Mutex
+	// subUpdateSeq numbers each subscription's ongoing reports, for their
+	// outcomes to be counted as matter.js counts updates
+	// ([Bridge.beginUpdate]); guarded by subUpdateMu.
+	subUpdateSeq map[uint32]*updateOrder
 
 	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
 	// last found: the ACL and topology the subject last read a path
@@ -687,6 +714,11 @@ type Bridge struct {
 	// command runs against their cluster, so the command advances the
 	// cluster's DataVersion once ([invokeCommitTable]).
 	invokeCommits invokeCommitTable
+
+	// writeHolds holds the changes a host's notifier reports while a
+	// controller's write is applied to their endpoint, so the write
+	// advances each cluster's DataVersion once ([writeHoldTable]).
+	writeHolds writeHoldTable
 
 	// commissioningInstanceName remembers the mDNS instance name the
 	// bridge published via [Bridge.AnnounceCommissioning] so the
@@ -849,13 +881,6 @@ type Bridge struct {
 	// map[mrp.ExchangeKey]uint32 / map[uint32]mrp.ExchangeKey
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
-	// reportExchangeOrigins holds, per report exchange in
-	// reportExchangeOwner, when it was opened and the counter of its first
-	// message (map[mrp.ExchangeKey]reportExchangeOrigin) — what the
-	// peer-loss path needs when that message is never acknowledged
-	// (ackpump.go tickOutboundReliable). Kept and dropped with the two
-	// maps above.
-	reportExchangeOrigins sync.Map
 
 	// resumption holds subscription persistence and the re-establishment
 	// of former subscriptions after a restart (docs/adr/0008). See
@@ -1407,32 +1432,12 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// (review II, R2-P1-rw-04).
 	b.reconcileQuiescers(prevTopology, topology)
 
-	// Reap subscriptions for endpoints that no longer exist in the new
-	// topology. Mirrors matter.js packages/node/src/node/ServerNode.ts
-	// / BridgedDeviceBasicInformation lifecycle where removing an endpoint
-	// tears down its active subscriptions via
-	// `endpoint.lifecycle.remove()` →
-	// packages/node/src/node/server/ServerSubscription.ts close().
-	if prevTopology != nil {
-		newIDs := make(map[uint16]bool, len(topology.Endpoints))
-		for _, ep := range topology.Endpoints {
-			if ep != nil {
-				newIDs[ep.ID] = true
-			}
-		}
-		if m := b.subscriptionManagerLocked(); m != nil {
-			for _, ep := range prevTopology.Endpoints {
-				if ep == nil || newIDs[ep.ID] {
-					continue
-				}
-				if reaped := m.CloseEndpoint(ep.ID); reaped > 0 {
-					b.logger.Info("matter.bridge.reassemble.endpoint_removed",
-						slog.Int("endpoint", int(ep.ID)),
-						slog.Int("subscriptions_reaped", reaped))
-				}
-			}
-		}
-	}
+	// A removed endpoint ends no subscription: the paths that name it
+	// select nothing from then on, and the subscription's other paths go
+	// on being reported. Mirrors matter.js
+	// packages/node/src/node/integration/ProtocolService.ts:216-220 at
+	// db021da0 (deleteEndpoint drops the endpoint from the protocol
+	// collections and nothing else; called at :314).
 
 	// Notify active subscribers that Descriptor.PartsList has changed
 	// on the endpoints that list the parts that moved. Mirrors

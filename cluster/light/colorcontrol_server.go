@@ -66,6 +66,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -112,7 +113,11 @@ type ColorControlServerConfig struct {
 	// MaxMireds is the physical upper bound of the CT range in mireds.
 	// Corresponds to ColorTempPhysicalMaxMireds (0x400C).
 	MaxMireds uint16
-	// InitialMireds is the starting value for ColorTemperatureMireds (0x0007).
+	// InitialMireds is the starting value for ColorTemperatureMireds
+	// (0x0007), cropped to the physical range. Like an applied
+	// StartUpColorTemperatureMireds, the value the server starts with
+	// reaches no writer: the host reads it from [ColorControlServer.Color]
+	// after construction and applies it to its device.
 	InitialMireds uint16
 	// CoupleColorTempToLevelMinMireds is CoupleColorTempToLevelMinMireds
 	// (0x400D): the colour temperature LevelControl's
@@ -166,6 +171,27 @@ type ColorControlServerConfig struct {
 	Clock clock.Clock
 	// Logger receives the server's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
+	// StartUpColorTemperatureMireds is the StartUpColorTemperatureMireds
+	// the server starts with — the host's persisted value (quality N); nil
+	// is null. With CT it is applied at start-up unless the server is
+	// Bridged or BootReason reports SoftwareUpdateCompleted: cropped to
+	// the physical range, a value other than the current colour
+	// temperature becomes ColorTemperatureMireds and switches the colour
+	// mode to it (matter.js ColorControlServer.ts:376-393
+	// initializeColorTemperature). It is state only, as matter.js writes
+	// the state there and runs no logic method or transition (:386-390):
+	// no [ColorTemperatureWriter] is driven with it, and the host applies
+	// the colour temperature [ColorControlServer.Color] reads after
+	// construction to its device.
+	StartUpColorTemperatureMireds *uint16
+	// BootReason optionally returns the node's GeneralDiagnostics
+	// BootReason; StartUpColorTemperatureMireds is not applied after a
+	// software update (ColorControlServer.ts:379). nil applies it.
+	BootReason func() uint8
+	// Bridged marks a server on an endpoint under the Aggregator: matter.js
+	// does not apply StartUpColorTemperatureMireds there
+	// (ColorControlServer.ts:380, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+	Bridged bool
 }
 
 // CIEPoint is a point in the CIE 1931 colour space, X and Y in the
@@ -251,7 +277,10 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 // ColorTemperatureWriter is the optional sink a [ColorControlServer]
 // drives with every colour temperature it applies: the target of a command
 // that applies at once, each step of a transition, or the value a colour
-// mode switch converts to. Implementations translate the cropped mired
+// mode switch converts to — not the value it is constructed with
+// ([ColorControlServerConfig.InitialMireds],
+// [ColorControlServerConfig.StartUpColorTemperatureMireds]), which the
+// host applies itself. Implementations translate the cropped mired
 // value into the device's native unit — HM exposes COLOR_TEMPERATURE in
 // Kelvin (mireds = 1_000_000 / Kelvin) — and push it to the device. A
 // write error fails the command, or ends the transition, and leaves the
@@ -440,7 +469,10 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 		}
 	}
 	s.st = colorState{
-		mireds:        min(max(cfg.InitialMireds, cfg.MinMireds), cfg.MaxMireds),
+		// Cropped to the range the server works in, an unset physical
+		// bound read as matter.js reads it (#cropColorTemperature,
+		// ColorControlServer.ts:1790-1796 at db021da0).
+		mireds:        min(max(cfg.InitialMireds, s.minimumMireds()), s.maximumMireds()),
 		x:             cfg.InitialX,
 		y:             cfg.InitialY,
 		hue:           min(cfg.InitialHue, maxHueValue),
@@ -461,6 +493,13 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 	}
 	s.st.enhancedMode = mode
 	s.st.mode = colorModeOf(mode)
+	if cfg.StartUpColorTemperatureMireds != nil {
+		m := *cfg.StartUpColorTemperatureMireds
+		s.startUpMireds = &m
+	}
+	if s.has(ColorFeatureColorTemperature) {
+		s.initializeColorTemperature()
+	}
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
@@ -493,6 +532,37 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 	})
 	return s, nil
 }
+
+// initializeColorTemperature applies StartUpColorTemperatureMireds at
+// construction. Mirrors matter.js
+// packages/node/src/behaviors/color-control/ColorControlServer.ts:376-393
+// at db021da0 (initializeColorTemperature, run with the CT feature,
+// :364-366): not after a software update, not on an endpoint an
+// Aggregator owns; a non-null value, cropped to the physical range
+// (#cropColorTemperature), that differs from the cropped current value sets
+// ColorMode and EnhancedColorMode to ColorTemperatureMireds and
+// ColorTemperatureMireds to it. The server is being built: nothing is
+// reported.
+func (s *ColorControlServer) initializeColorTemperature() {
+	if s.cfg.Bridged || s.startUpMireds == nil {
+		return
+	}
+	if s.cfg.BootReason != nil && s.cfg.BootReason() == bootReasonSoftwareUpdateCompleted {
+		return
+	}
+	current := s.cropMireds(float64(s.st.mireds))
+	target := s.cropMireds(float64(*s.startUpMireds))
+	if target == current {
+		return
+	}
+	s.st.enhancedMode = ColorModeColorTemperature
+	s.st.mode = colorModeOf(ColorModeColorTemperature)
+	s.st.mireds = uint16(target) //nolint:gosec // cropped to the physical range, at most 0xFEFF
+}
+
+// bootReasonSoftwareUpdateCompleted is GeneralDiagnostics
+// BootReasonEnum.SoftwareUpdateCompleted.
+const bootReasonSoftwareUpdateCompleted = uint8(gddef.BootReasonSoftwareUpdateCompleted)
 
 // initialMode resolves cfg.InitialColorMode against the features.
 func (s *ColorControlServer) initialMode() (ColorMode, error) {
@@ -665,14 +735,24 @@ func (s *ColorControlServer) readColorPoint(attrID uint32) (any, bool) {
 // (UNSUPPORTED_ATTRIBUTE, UNSUPPORTED_WRITE, CONSTRAINT_ERROR — an Options
 // value with an undefined bit included, TC-CC-6.5 step 0a).
 //
-// StartUpColorTemperatureMireds is reported, never applied: a bridged
-// endpoint has no start-up of its own, the same reason matter.js gives for
-// skipping it on an Aggregator-owned endpoint (ColorControlServer.ts
-// initializeColorTemperature: `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+// A written StartUpColorTemperatureMireds takes effect at the next
+// start-up, where [ColorControlServerConfig.StartUpColorTemperatureMireds]
+// carries it back — not on a Bridged endpoint, where matter.js does not
+// apply it (ColorControlServer.ts:376-393 initializeColorTemperature:
+// `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [ColorControlServer.MatterWrite], changed when it moved the
+// attribute — the comparison, made under the server's lock, that decides
+// the change report.
+func (s *ColorControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// The write veto ([ColorControlServer.SetBeforeWrite]) sees the value
 	// in its stored form.
@@ -684,7 +764,7 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 		}
 	}
 	if err := s.veto.Check(ctx, attrID, vetoed); err != nil {
-		return err
+		return false, err
 	}
 	changed := false
 	s.mu.Lock()
@@ -705,11 +785,13 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 	}
 	s.mu.Unlock()
 	// A change is reported to the server's listeners, as matter.js emits
-	// <attribute>$Changed when the write commits (Datasource.ts:1473-1476).
+	// <attribute>$Changed when the write commits (#noteIfChanged queues it,
+	// Datasource.ts:1486-1492, and postCommit emits it, :1302-1317, at
+	// db021da0).
 	if changed {
 		s.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 	}
-	return nil
+	return changed, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:

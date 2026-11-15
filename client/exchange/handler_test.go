@@ -166,7 +166,8 @@ func countInbound(m *Manager) int {
 
 // TestSigma1ReachesHandlerOnInboundSession: a Sigma1 on an unsecured
 // session the peer opens reaches the Secure Channel handler
-// (ExchangeManager.ts:261-264, SecureChannelProtocol.ts:146-148): the
+// (ExchangeManager.ts:308-312, :325-328, SecureChannelProtocol.ts:146-148
+// at db021da0): the
 // session is keyed by the peer's source node id, our messages name it as
 // destination, a retransmitted Sigma1 is acknowledged on the same exchange,
 // the peer's next message reaches the handler's Next, and the session is
@@ -268,7 +269,7 @@ func TestPBKDFParamRequestIsRefused(t *testing.T) {
 }
 
 // TestPeerOpenedExchangeOnClosingSessionDeclined: a session that is lost
-// declines a new exchange (ExchangeManager.ts:386-389) — no handler call,
+// declines a new exchange (ExchangeManager.ts:441-444 at db021da0) — no handler call,
 // no ack.
 func TestPeerOpenedExchangeOnClosingSessionDeclined(t *testing.T) {
 	t.Parallel()

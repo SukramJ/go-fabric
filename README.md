@@ -202,7 +202,9 @@ becomes permissible in:
 | `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |
 | `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.23.0` |
 | `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseEstablished`, which returns the refusal of the arm | `v0.23.0` |
+| `im/subscription.Manager.CloseEndpoint` | `Manager.Close` on each subscription to end; a Reassemble that removes an endpoint ends none | `v0.23.0` |
 | `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.23.0` |
+| `groups.NoKeyError` | `groups.DecodeError`, the outcome of a group message no candidate key passed; `Manager.Decode` no longer returns `NoKeyError` | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

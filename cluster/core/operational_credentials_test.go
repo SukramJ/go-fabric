@@ -259,9 +259,22 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	}
 }
 
+// newOpcredsWithRoot is newOpcreds with a trusted root added in the
+// fail-safe: AddNOC answers a missing root before it looks at the CSR
+// (matter.js OperationalCredentialsServer.ts:233-245 at db021da0).
+func newOpcredsWithRoot(t *testing.T) *core.OperationalCredentials {
+	t.Helper()
+	oc := newOpcreds(t)
+	rootRaw, _, _ := buildTestNOCAndRoot(t)
+	if _, err := oc.MatterInvoke(context.Background(), 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+	return oc
+}
+
 func TestOpcreds_AddNOC_WithoutCSR(t *testing.T) {
 	t.Parallel()
-	oc := newOpcreds(t)
+	oc := newOpcredsWithRoot(t)
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
 		IPKValue:      make([]byte, 16),
 		AdminVendorID: 0xFFF1,
@@ -318,12 +331,12 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 // TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession: a CSR
 // issued on a named session is consumed by that session alone, as
 // matter.js compares csrSessionId with the request's session strictly
-// (OperationalCredentialsServer.ts:240-245 at 862ad75f); the server used to
+// (OperationalCredentialsServer.ts:240-245 at db021da0); the server used to
 // skip the comparison when the AddNOC context named no session
 // (W3-clusec-04).
 func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T) {
 	t.Parallel()
-	oc := newOpcreds(t)
+	oc := newOpcredsWithRoot(t)
 	csrCtx := core.WithInvokeSessionID(context.Background(), 7)
 	if _, err := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
@@ -423,38 +436,21 @@ func TestOpcreds_AddTrustedRoot_Accepts(t *testing.T) {
 	}
 }
 
-// TestOpcreds_AddNOC_NeedsCSRThenRoot exercises the commissioning
-// state machine — AddNOC without a prior CSRRequest fails fast with
-// NOCStatusMissingCsr; with CSR but without trusted root it fails
-// with NOCStatusInvalidNOC. Both signal via NOCResponse.StatusCode,
-// not via the error channel.
-func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
+// TestOpcreds_AddNOC_NeedsRootThenCSR exercises the commissioning
+// state machine in matter.js's order (OperationalCredentialsServer.ts:233-245
+// at db021da0) — AddNOC without a trusted root fails fast with
+// NOCStatusInvalidNOC, CSR or not; with the root but without a prior
+// CSRRequest it fails with NOCStatusMissingCsr. Both signal via
+// NOCResponse.StatusCode, not via the error channel.
+func TestOpcreds_AddNOC_NeedsRootThenCSR(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	ctx := context.Background()
 
-	_, nocRaw, _ := buildTestNOCAndRoot(t)
+	rootRaw, nocRaw, _ := buildTestNOCAndRoot(t)
 
-	// AddNOC before CSR → NOCStatusMissingCsr.
+	// AddNOC before root and CSR → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue:      nocRaw,
-		IPKValue:      make([]byte, 16),
-		AdminVendorID: 0xFFF1,
-	})
-	if err != nil {
-		t.Fatalf("AddNOC (pre-CSR): %v", err)
-	}
-	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusMissingCsr {
-		t.Fatalf("StatusCode = %d, want NOCStatusMissingCsr (%d)", got, core.NOCStatusMissingCsr)
-	}
-
-	// CSRRequest succeeds.
-	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
-		t.Fatalf("CSRRequest: %v", err)
-	}
-
-	// AddNOC with CSR but without trusted root → NOCStatusInvalidNOC.
-	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
 		NOCValue:      nocRaw,
 		IPKValue:      make([]byte, 16),
 		AdminVendorID: 0xFFF1,
@@ -465,6 +461,23 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusInvalidNOC {
 		t.Fatalf("StatusCode = %d, want NOCStatusInvalidNOC (%d)", got, core.NOCStatusInvalidNOC)
 	}
+
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+
+	// AddNOC with the root but before CSR → NOCStatusMissingCsr.
+	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
+	})
+	if err != nil {
+		t.Fatalf("AddNOC (pre-CSR): %v", err)
+	}
+	if got := resp.(core.NOCResponse).StatusCode; got != core.NOCStatusMissingCsr {
+		t.Fatalf("StatusCode = %d, want NOCStatusMissingCsr (%d)", got, core.NOCStatusMissingCsr)
+	}
 }
 
 // TestOpcreds_TrustedRootCertificates_ServesFullRCAC pins the Matter
@@ -474,10 +487,10 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 // as a Matter Certificate TLV — it isn't one, so Apple silently
 // discarded the entire Subscribe-Initial ReportData stream.
 //
-// matter.js HEAD reference: OperationalCredentialsServer.ts:470-472
+// matter.js reference at db021da0: OperationalCredentialsServer.ts:471-473
 // (`fabrics.map(fabric => fabric.rootCert)`) — each entry is the full
 // Matter Certificate TLV envelope received via AddTrustedRootCertificate
-// (Fabric.ts:68 `readonly rootCert: Bytes`).
+// (Fabric.ts:70 `readonly rootCert: Bytes`).
 //
 // The test pokes a fabric with a known `RootCert` into the store and
 // asserts MatterRead(0x0004) returns exactly those bytes, NOT
@@ -559,7 +572,7 @@ func TestAddNOC_InstallsIPKInGroupKeyManagement(t *testing.T) {
 // TestAddNOC_RejectsMismatchedCSRSession verifies that AddNOC from a
 // different session than the one that issued CSRRequest is rejected with
 // MissingCsr per Matter §11.18.7.5.5 and matter.js
-// OperationalCredentialsServer.ts:243-248.
+// OperationalCredentialsServer.ts:240-245 at db021da0.
 func TestAddNOC_RejectsMismatchedCSRSession(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -1206,7 +1219,12 @@ func TestOpcreds_UpdateFabricLabelInvalidArgType(t *testing.T) {
 }
 
 // TestOpcreds_UpdateFabricLabelLabelTooLong verifies UpdateFabricLabel (0x09)
-// with label > 32 bytes returns IM-InvalidCommand (0x85).
+// with label > 32 bytes returns IM-ConstraintError (0x87): the field's
+// "max 32" (matter.js db021da0 packages/model/src/standard/elements/
+// operational-credentials.element.ts:124) is refused by the request
+// validation before the handler runs (packages/protocol/src/action/server/
+// CommandInvokeResponse.ts:484-486; ValidationError's status,
+// packages/types/src/common/ValidationError.ts:16-22).
 func TestOpcreds_UpdateFabricLabelLabelTooLong(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
@@ -1222,8 +1240,8 @@ func TestOpcreds_UpdateFabricLabelLabelTooLong(t *testing.T) {
 	if !ok {
 		t.Fatalf("error type = %T, want StatusCodeError", err)
 	}
-	if sce.MatterStatusCode() != im.StatusInvalidCommand {
-		t.Fatalf("MatterStatusCode() = %v, want StatusInvalidCommand (0x85)", sce.MatterStatusCode())
+	if sce.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("MatterStatusCode() = %v, want StatusConstraintError (0x87)", sce.MatterStatusCode())
 	}
 }
 
@@ -1305,8 +1323,9 @@ func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
 // TestOpcreds_CSRRequestRequiresArmedFailSafe pins that CSRRequest is rejected
 // with Status::FailsafeRequired (0xCA) when no FailSafe window is armed — the
 // generated CSR is FailSafe-scoped ephemeral state. Mirrors matter.js
-// OperationalCredentialsServer.ts:118-119 (`commissioner.failsafeContext`
-// getter → assertFailsafeArmed → Status.FailsafeRequired).
+// OperationalCredentialsServer.ts:131-132 at db021da0
+// (`commissioner.failsafeContext` getter → assertFailsafeArmed →
+// Status.FailsafeRequired).
 func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 	t.Parallel()
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{

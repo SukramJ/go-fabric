@@ -248,3 +248,58 @@ func TestGeneralDiagnosticsNetworkInterfacesSelection(t *testing.T) {
 		}
 	})
 }
+
+// TestGeneralDiagnosticsNetworkInterfacesTypeAndOperational: an entry's
+// InterfaceType is the root's network type — Ethernet unless the node says
+// otherwise — and IsOperational holds for every interface unless the
+// advertiser is restricted, then for the advertised ones alone. Mirrors
+// matter.js GeneralDiagnosticsServer.ts #updateNetworkList (:477-494 the
+// type from the root's NetworkCommissioning feature, :496-503 the
+// operational test against mdnsService.limitedToNetInterface, :521 and
+// :527) at db021da0: the root's type is :527's fallback for an interface
+// the platform gives no type, which every entry takes here, the module
+// having no platform mapping (matter.js's Node.js platform types every
+// interface Ethernet unless configured, NodeJsNetwork.ts:195-202). Read
+// over the host's own interfaces: every entry the host yields is held to
+// the rule.
+func TestGeneralDiagnosticsNetworkInterfacesTypeAndOperational(t *testing.T) {
+	t.Parallel()
+	read := func(t *testing.T, g *GeneralDiagnostics) []NetworkInterfaceStruct {
+		t.Helper()
+		v, ok := g.MatterRead(gendiagAttrNetworkInterfaces)
+		if !ok {
+			t.Fatal("NetworkInterfaces is not served")
+		}
+		return v.([]NetworkInterfaceStruct)
+	}
+
+	t.Run("by default every entry is Ethernet and operational", func(t *testing.T) {
+		t.Parallel()
+		for _, e := range read(t, NewGeneralDiagnostics(BootReasonPowerOnReboot)) {
+			if e.InterfaceType != InterfaceTypeEthernet || !e.IsOperational {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want Ethernet, operational", e.Name, e.InterfaceType, e.IsOperational)
+			}
+		}
+	})
+
+	t.Run("a Wi-Fi node restricted to one interface", func(t *testing.T) {
+		t.Parallel()
+		g := NewGeneralDiagnostics(BootReasonPowerOnReboot)
+		host := read(t, g)
+		if len(host) == 0 {
+			t.Skip("the host has no interface NetworkInterfaces lists")
+		}
+		advertised := host[len(host)-1].Name
+		g.SetNetworkInterfaceType(InterfaceTypeWiFi)
+		g.SetAdvertisedInterfaces([]string{advertised})
+		list := read(t, g)
+		if len(list) == 0 || list[0].Name != advertised {
+			t.Errorf("first entry %v, want the advertised %q first", list, advertised)
+		}
+		for _, e := range list {
+			if e.InterfaceType != InterfaceTypeWiFi || e.IsOperational != (e.Name == advertised) {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want WiFi, operational only for %q", e.Name, e.InterfaceType, e.IsOperational, advertised)
+			}
+		}
+	})
+}

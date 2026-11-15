@@ -149,44 +149,144 @@ func TestOTAProviderNotConfigured(t *testing.T) {
 	}
 }
 
-// TestOTAProviderACLOnEveryFabric: the provider's Operate/CASE entry goes
-// on every fabric's ACL, so a requestor on a second fabric can query — a
-// divergence from matter.js, which grants it on the first fabric only
-// (BD-Matter-OTAProvider-ACLEveryFabric).
-func TestOTAProviderACLOnEveryFabric(t *testing.T) {
+// otaProviderACLFabrics starts a node with an OTA provider on a store of
+// two fabrics, cfg adjusted by adjust, and returns the indexes of the
+// fabrics whose ACL holds the provider's Operate/CASE entry.
+func otaProviderACLFabrics(t *testing.T, adjust func(*node.OTAProviderConfig)) (all, granted []uint8) {
+	t.Helper()
 	ctx := context.Background()
 	db := openDB(t, filepath.Join(t.TempDir(), "node.db"))
 	if err := store.Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
 	st := store.New(db)
-	indexes := make([]uint8, 0, 2)
 	for i := range 2 {
 		idx, err := st.AddFabric(ctx, store.FabricRecord{FabricID: uint64(0x0A00 + i), NodeID: uint64(0x0B00 + i), VendorID: 0xFFF1, RootPublicKey: make([]byte, 65), CompressedID: [8]byte{byte(i + 1)}})
 		if err != nil {
 			t.Fatal(err)
 		}
-		indexes = append(indexes, idx)
+		all = append(all, idx)
 	}
 	cfg := minimalConfig(db)
 	cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: &oneImage{img: mattercore.OTAImage{FileDesignator: bdx.FileDesignator("img.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"}}}
+	if adjust != nil {
+		adjust(cfg.OTAProvider)
+	}
 	n := newNode(t, cfg)
 	if err := n.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, idx := range indexes {
+	for _, idx := range all {
 		acl, err := st.ListACL(ctx, idx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		found := false
 		for _, e := range acl {
-			if e.Privilege == store.PrivilegeOperate && len(e.Targets) == 1 && e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == 0x0029 {
-				found = true
+			if e.Privilege == store.PrivilegeOperate && e.AuthMode == store.AuthModeCASE && len(e.Subjects) == 0 &&
+				len(e.Targets) == 1 && e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == provdef.ClusterID {
+				granted = append(granted, idx)
 			}
 		}
-		if !found {
-			t.Errorf("fabric %d has no OTA provider ACL entry: %+v", idx, acl)
+	}
+	return all, granted
+}
+
+// TestOTAProviderACLNotWrittenUnasked: without
+// OTAProviderConfig.GrantFabric no fabric's ACL gets the provider's entry.
+// matter.js writes it only into the first fabric its own controller
+// administers (OtaSoftwareUpdateProviderServer.ts:116-158 at db021da0,
+// FabricAuthority.ts:112-114, :126-128), and a node has no controller of
+// its own.
+func TestOTAProviderACLNotWrittenUnasked(t *testing.T) {
+	if _, granted := otaProviderACLFabrics(t, nil); len(granted) != 0 {
+		t.Errorf("fabrics %v hold the OTA provider ACL entry without a grant, want none", granted)
+	}
+}
+
+// TestOTAProviderACLOnGrantedFabrics: the provider's entry goes into the
+// ACL of each fabric OTAProviderConfig.GrantFabric grants, and of no other.
+func TestOTAProviderACLOnGrantedFabrics(t *testing.T) {
+	var asked []uint8
+	all, granted := otaProviderACLFabrics(t, func(c *node.OTAProviderConfig) {
+		c.GrantFabric = func(f node.FabricInfo) bool {
+			asked = append(asked, f.FabricIndex)
+			return f.FabricID == 0x0A01
+		}
+	})
+	if !slices.Equal(asked, all) {
+		t.Errorf("GrantFabric asked for fabrics %v, want %v", asked, all)
+	}
+	if want := all[1:]; !slices.Equal(granted, want) {
+		t.Errorf("fabrics %v hold the OTA provider ACL entry, want %v (the granted one)", granted, want)
+	}
+}
+
+// TestOTAProviderACLWithdrawnGrantKeepsTheEntry: a grant withdrawn between
+// two starts — GrantFabric that granted every fabric, as the node granted
+// every fabric before OTAProviderConfig.GrantFabric, then none — removes no
+// ACL entry. The node never deletes an entry from a fabric's ACL: one it
+// wrote cannot be told from one the fabric's administrator wrote, and
+// removing it would again write into that ACL unasked. The administrator
+// removes it.
+func TestOTAProviderACLWithdrawnGrantKeepsTheEntry(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "node.db")
+	db := openDB(t, path)
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(db)
+	all := make([]uint8, 0, 2)
+	for i := range 2 {
+		idx, err := st.AddFabric(ctx, store.FabricRecord{FabricID: uint64(0x0A00 + i), NodeID: uint64(0x0B00 + i), VendorID: 0xFFF1, RootPublicKey: make([]byte, 65), CompressedID: [8]byte{byte(i + 1)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		all = append(all, idx)
+	}
+	start := func(grant func(node.FabricInfo) bool) *node.Node {
+		t.Helper()
+		cfg := minimalConfig(db)
+		cfg.OTAProvider = &node.OTAProviderConfig{
+			ImageSource: &oneImage{img: mattercore.OTAImage{FileDesignator: bdx.FileDesignator("img.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"}},
+			GrantFabric: grant,
+		}
+		n := newNode(t, cfg)
+		if err := n.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	holding := func() (out []uint8) {
+		t.Helper()
+		for _, idx := range all {
+			acl, err := st.ListACL(ctx, idx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.ContainsFunc(acl, func(e store.ACLEntry) bool {
+				return e.Privilege == store.PrivilegeOperate && e.AuthMode == store.AuthModeCASE && len(e.Subjects) == 0 &&
+					len(e.Targets) == 1 && e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == provdef.ClusterID
+			}) {
+				out = append(out, idx)
+			}
+		}
+		return out
+	}
+	first := start(func(node.FabricInfo) bool { return true })
+	if got := holding(); !slices.Equal(got, all) {
+		t.Fatalf("after the granting start fabrics %v hold the entry, want %v", got, all)
+	}
+	if err := first.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, grant := range []func(node.FabricInfo) bool{nil, func(node.FabricInfo) bool { return false }} {
+		n := start(grant)
+		if got := holding(); !slices.Equal(got, all) {
+			t.Errorf("after a start without the grant fabrics %v hold the entry, want %v (the entries stay)", got, all)
+		}
+		if err := n.Stop(ctx); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

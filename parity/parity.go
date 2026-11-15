@@ -13,6 +13,16 @@
 // second step leaves the generated revision maps describing the old extract,
 // which schema.SchemaSnapshotSHA256 is there to catch.
 //
+// Where an order is part of the data, the snapshot states it in a field of
+// its own rather than leaving it to the order of an array: each cluster's
+// "attributeOrder" lists its attribute ids in the order a matter.js server
+// walks them for a wildcard read — the order matter.js's Scope.membersOf
+// yields the cluster model's members, the global attributes the cluster
+// does not define appended after its own — and the top-level
+// "globalAttributeOrder" is that order for a cluster model that defines
+// no attribute (script/extract-from-matter-js.ts, "Order layer"). A
+// cluster's "attributes" array is sorted by id and carries no order.
+//
 // A host application may pin its own expected copy of these bytes to keep an
 // unintended schema change from arriving silently in a dependency bump; the
 // pin belongs to that repository, not here.

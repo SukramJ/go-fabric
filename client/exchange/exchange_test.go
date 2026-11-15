@@ -687,7 +687,8 @@ func TestPeerLostHook(t *testing.T) {
 
 // TestCloseSessionSendsCloseSession: a secure session is closed with an
 // unacknowledged StatusReport (Success, CloseSession) on a fresh exchange
-// (ExchangeManager.ts:716-726, SecureChannelMessenger.ts:193-195), its
+// (ExchangeManager.ts:781-791, SecureChannelMessenger.ts:193-195 at
+// db021da0), its
 // exchanges end with ErrSessionClosed and it leaves the table.
 func TestCloseSessionSendsCloseSession(t *testing.T) {
 	t.Parallel()

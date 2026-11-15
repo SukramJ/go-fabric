@@ -20,8 +20,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -239,5 +241,79 @@ func TestAttestationProvider_IncompleteMaterialIsRetried(t *testing.T) {
 	}
 	if sig := resp.(core.AttestationResponse).AttestationSignature; bytes.Equal(sig, make([]byte, 64)) {
 		t.Fatal("the AttestationResponse carries the zero signature stub")
+	}
+}
+
+// TestCSRRequest_AttestationProviderRunsOutsideTheNOCLock: CSRRequest asks
+// the host's attestation provider before it takes the lock the NOC
+// commands, the fail-safe's commit and its rollback share — while the
+// provider runs, PrepareFreshFailSafe (one of them) completes.
+func TestCSRRequest_AttestationProviderRunsOutsideTheNOCLock(t *testing.T) {
+	t.Parallel()
+	dacKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := core.OpcredsAttestation{DACPrivateKey: dacKey, DAC: []byte{1}, PAI: []byte{2}, CertificationDeclaration: []byte{3}}
+	entered, release := make(chan struct{}), make(chan struct{})
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+		FailSafe: armedFailSafe(0), SupportedFabrics: 5,
+		AttestationProvider: func(context.Context) (core.OpcredsAttestation, error) {
+			close(entered)
+			<-release
+			return full, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait, cancel := context.WithTimeout(t.Context(), 5*time.Second) // a bound on a lock that is never released, not a wait for time
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+		done <- err
+	}()
+	select {
+	case <-entered:
+	case <-wait.Done():
+		t.Fatal("CSRRequest did not ask the attestation provider")
+	}
+	freed := make(chan struct{})
+	go func() {
+		oc.PrepareFreshFailSafe(context.Background())
+		close(freed)
+	}()
+	select {
+	case <-freed:
+		close(release)
+	case <-wait.Done():
+		close(release)
+		t.Fatal("PrepareFreshFailSafe waited for the attestation provider of a CSRRequest")
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("CSRRequest: %v", err)
+	}
+}
+
+// TestCSRRequest_FailsafeRequiredBeforeAttestationError: the attestation
+// material is asked for before the fail-safe is checked, but a disarmed
+// fail-safe still answers FAILSAFE_REQUIRED, as matter.js checks the
+// fail-safe context (OperationalCredentialsServer.ts:132) before it asks
+// for the certification (:140 at db021da0).
+func TestCSRRequest_FailsafeRequiredBeforeAttestationError(t *testing.T) {
+	t.Parallel()
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{
+		SupportedFabrics: 5,
+		AttestationProvider: func(context.Context) (core.OpcredsAttestation, error) {
+			return core.OpcredsAttestation{}, errors.New("attestation material is not ready")
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = oc.MatterInvoke(sessionChallengeCtx(context.Background()), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)})
+	if got := spec.StatusOf(err); got != im.StatusFailsafeRequired {
+		t.Fatalf("CSRRequest on a disarmed fail-safe with failing attestation material: status %v (%v), want %v", got, err, im.StatusFailsafeRequired)
 	}
 }

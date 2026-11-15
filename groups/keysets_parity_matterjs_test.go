@@ -256,9 +256,10 @@ func TestKeySetsCurrentKeyForID(t *testing.T) {
 
 func TestKeySetsContainsOperationalKey(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	// contains decodes a message to group gid sealed under the operational
-	// key of epoch and reports whether gid's mapped key set carries it.
+	// key of epoch and reports whether gid's mapped key set carries it —
+	// Decode refuses the message when it does not (matter.js
+	// GroupSession.ts:431-433 at db021da0).
 	contains := func(t *testing.T, m *Manager, gid uint16, epoch []byte) bool {
 		t.Helper()
 		op := keySetsOpKey(t, epoch)
@@ -266,11 +267,7 @@ func TestKeySetsContainsOperationalKey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		msg, err := m.Decode(ctx, sealGroup(t, op, sid, gid, 0x99, 1, false, []byte{0x01}))
-		if err != nil {
-			t.Fatalf("Decode: %v", err)
-		}
-		return msg.HasValidMapping
+		return decodeOrRefused(t, m, sealGroup(t, op, sid, gid, 0x99, 1, false, []byte{0x01})) != nil
 	}
 	seq := make([]byte, 16) // Uint8Array.from({ length: 16 }, (_, i) => i)
 	for i := range seq {

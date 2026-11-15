@@ -288,9 +288,9 @@ func TestBooleanStateServer_MatterRead_Unknown(t *testing.T) {
 func TestOccupancySensingServer_MatterRead_Unobserved(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewOccupancySensingServer(fakeBool{class: contract.MeasurementOccupancy, val: false, obs: false})
-	v, ok := s.MatterRead(0x0000) // attrOccupancy
-	if !ok || v != nil {
-		t.Fatalf("unobserved: want (nil, true), got (%v, %v)", v, ok)
+	v, ok := s.MatterRead(0x0000) // attrOccupancy, not nullable
+	if !ok || v != uint8(0) {
+		t.Fatalf("unobserved: want (0, true), got (%v, %v)", v, ok)
 	}
 }
 

@@ -97,8 +97,10 @@ func TestAttributeExpansionHoldsOneEndpoint(t *testing.T) {
 }
 
 // TestAttributeExpansionAscendingSortsEachPath pins the priming order: a
-// path's results in ascending (endpoint, cluster, attribute) order, the
-// paths in request order.
+// path's results in ascending (endpoint, cluster) order, a cluster's
+// attributes in [CompareAttributeIDs] order, the paths in request order.
+// Of the fake's OnOff attributes 0-2, only OnOff (0x0000) is in matter.js's
+// model of the cluster; 1 and 2 are not and come before it.
 func TestAttributeExpansionAscendingSortsEachPath(t *testing.T) {
 	t.Parallel()
 	d := &endpointsDispatcher{eps: []uint16{5, 1, 3}, attrs: 3}
@@ -110,7 +112,7 @@ func TestAttributeExpansionAscendingSortsEachPath(t *testing.T) {
 	}
 	want := make([]ConcreteAttributePath, 0, 12)
 	for _, ep := range []uint16{3, 1, 3, 5} {
-		for a := range uint32(3) {
+		for _, a := range []uint32{1, 2, 0} {
 			want = append(want, ConcreteAttributePath{Endpoint: ep, Attribute: a})
 		}
 	}
@@ -172,5 +174,118 @@ func TestAttributeExpansionLeavesTheDispatchersSlice(t *testing.T) {
 				t.Fatalf("ascending=%v read %d: the dispatcher's slice became %+v, want it untouched %+v", ascending, read, d.results, want)
 			}
 		}
+	}
+}
+
+// TestAttributeExpansionStatusOnlyForConcretePath (review II,
+// R2-P4-imread-02, -03): whatever a dispatcher answers, the expansion hands
+// out a status only for a fully concrete request path; a path with a
+// wildcard yields its successful results alone. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at db021da0:
+// addStatus (:489) is reached from addConcrete and #authorize only, a
+// wildcard path (:88-94) skips what does not exist (:190-191, :341,
+// :386-387).
+func TestAttributeExpansionStatusOnlyForConcretePath(t *testing.T) {
+	t.Parallel()
+	at := func(attr uint32) ConcreteAttributePath {
+		return ConcreteAttributePath{Endpoint: 3, Cluster: 6, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	d := &retainedDispatcher{results: []ReadResult{
+		{Path: at(1), Status: StatusUnsupportedAttribute},
+		{Path: at(2), Value: AttributeValue{Value: true}, Status: StatusSuccess},
+	}}
+	for _, tc := range []struct {
+		name string
+		path ConcreteAttributePath
+		want []ReadResult
+	}{
+		{"wildcard attribute", ConcreteAttributePath{Endpoint: 3, Cluster: 6, HasEndpoint: true, HasCluster: true}, d.results[1:]},
+		{"wildcard endpoint", ConcreteAttributePath{Cluster: 6, Attribute: 1, HasCluster: true, HasAttribute: true}, d.results[1:]},
+		{"wildcard cluster", ConcreteAttributePath{Endpoint: 3, Attribute: 1, HasEndpoint: true, HasAttribute: true}, d.results[1:]},
+		{"concrete", at(1), d.results},
+	} {
+		var got []ReadResult
+		e := NewAttributeExpansion(context.Background(), d, []ConcreteAttributePath{tc.path})
+		for _, r, ok := e.Next(); ok; _, r, ok = e.Next() {
+			got = append(got, r)
+		}
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: results %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// statusOrderDispatcher answers endpoint 2: OnOff (0x0006) serves 0x0000
+// and 0xFFFD, cluster 0x0999 is absent, and the fake ACL denies cluster
+// 0x0300 on fabric 1.
+type statusOrderDispatcher struct{ fakeDispatcher }
+
+func (statusOrderDispatcher) Read(_ context.Context, p ConcreteAttributePath) []ReadResult {
+	value := func(attr uint32) ReadResult {
+		return ReadResult{
+			Path:  ConcreteAttributePath{Endpoint: 2, Cluster: p.Cluster, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true},
+			Value: AttributeValue{Value: attr}, Status: StatusSuccess,
+		}
+	}
+	switch {
+	case p.Cluster == 0x0999:
+		return []ReadResult{{Path: p, Status: StatusUnsupportedCluster}}
+	case p.HasAttribute:
+		return []ReadResult{value(p.Attribute)}
+	default:
+		return []ReadResult{value(0x0000), value(0xFFFD)}
+	}
+}
+
+func (statusOrderDispatcher) CheckACL(_ context.Context, _ uint8, _ uint64, _ []uint32, _ uint16, clusterID uint32, _ uint8) StatusCode {
+	if clusterID == 0x0300 {
+		return StatusUnsupportedAccess
+	}
+	return StatusSuccess
+}
+
+// TestReadReportsStatusesFirst (review II, R2-P4-imread-06): the statuses
+// of a read's concrete paths — an existence status and an access denial —
+// precede every value, in request order; the values follow in the
+// request's path order. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at db021da0:
+// process registers every path first (:88-94), addConcrete adds a failing
+// path's status to the chunk at once (:202-274, addStatus :489-501) while a
+// resolving path only installs a producer (:283-308), and the producers run
+// afterwards (:96-100).
+func TestReadReportsStatusesFirst(t *testing.T) {
+	t.Parallel()
+	at := func(cluster, attr uint32) ConcreteAttributePath {
+		return ConcreteAttributePath{Endpoint: 2, Cluster: cluster, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	req := ReadRequest{AttributeRequests: []ConcreteAttributePath{
+		at(0x0006, 0xFFFD),
+		at(0x0999, 0x0000),
+		at(0x0300, 0x0000),
+		{Endpoint: 2, Cluster: 0x0006, HasEndpoint: true, HasCluster: true},
+	}}
+	ctx := WithFabricFilter(context.Background(), true, 1)
+	got := HandleReadRequest(ctx, &statusOrderDispatcher{}, req).Reports
+	type entry struct {
+		path   ConcreteAttributePath
+		status StatusCode
+	}
+	want := []entry{
+		{at(0x0999, 0x0000), StatusUnsupportedCluster},
+		{at(0x0300, 0x0000), StatusUnsupportedAccess},
+		{at(0x0006, 0xFFFD), StatusSuccess},
+		{at(0x0006, 0x0000), StatusSuccess},
+		{at(0x0006, 0xFFFD), StatusSuccess},
+	}
+	order := make([]entry, 0, len(got))
+	for _, r := range got {
+		st := StatusSuccess
+		if r.IsStatus {
+			st = r.Status.Status
+		}
+		order = append(order, entry{r.Path, st})
+	}
+	if !reflect.DeepEqual(order, want) {
+		t.Fatalf("report order %+v, want %+v", order, want)
 	}
 }

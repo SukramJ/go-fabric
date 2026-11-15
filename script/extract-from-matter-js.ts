@@ -20,15 +20,20 @@
 // conditions and composition as matter.js's device type validation reads
 // them), the snapshot "baseDeviceTypes", and each cluster its
 // "classification" — see the section at the end and
-// docs/adr/0016-device-type-validation.md.
+// docs/adr/0016-device-type-validation.md. An order layer gives each
+// cluster its "attributeOrder" and the snapshot "globalAttributeOrder":
+// attribute ids in the order matter.js serves them — see "Order layer".
 import {
     ClusterModel,
     ConditionModel,
     DatatypeModel,
     DeviceTypeModel,
+    ElementTag,
     Matter,
     MatterDefinition,
+    MatterModel,
     RequirementResolver,
+    Scope,
     Specification,
     ValueModel,
 } from "@matter/model";
@@ -653,6 +658,78 @@ for (const raw of out.clusters as any[]) {
     if (model !== undefined && model.effectiveBindable === false) raw.bindable = false;
 }
 
+// ---------------------------------------------------------------------------
+// Order layer.
+//
+// Each cluster's "attributeOrder" is the list of its attribute ids in the
+// order matter.js walks them when a server answers a wildcard read: the
+// order matter.js's own Scope(model).membersOf(model, …) yields for the
+// cluster's model (packages/model/src/logic/Scope.ts:167-200 at db021da0).
+// A server builds its attribute list by iterating exactly that function
+// (clusterTypeProtocolOf, packages/node/src/node/integration/
+// ProtocolService.ts:449-522, through RootSupervisor.membersOf, whose
+// default conformance mode is "deconflicted", RootSupervisor.ts:226-231),
+// and the read response walks that list as it stands
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:378-380).
+// The result is the cluster's own members, inherited ones after a derived
+// cluster's own (findAllMembers, Scope.ts:287-333), then the global
+// attributes the cluster does not define, appended in Scope.ts's GLOBAL_IDS
+// order (:18; injectGlobalAttributes, :339-358). It is not ascending: LevelControl
+// lists Options (0x000F) after OnLevel … DefaultMoveRate (0x0010-0x0014).
+// The list's order is its meaning; the attributes array above stays sorted
+// by id. A server whose schema differs from the cluster's model (a device
+// type's .alter(), a server's schema.extend) walks its own schema instead —
+// that is not the model, and not here.
+//
+// "globalAttributeOrder" is the same function's answer for a cluster model
+// that defines no attribute of its own — what a host's own cluster starts
+// from: the global attributes in the order injectGlobalAttributes appends
+// them. It is computed on a throwaway cluster under a throwaway root that
+// holds copies of the global attributes, so Matter itself is not touched.
+const unordered: string[] = [];
+const attributeOrderOf = (model: any): number[] => {
+    const tags = [ElementTag.Attribute];
+    const scope = Scope(model);
+    const ids = [...scope.membersOf(model, { tags, conformance: "deconflicted" })].map((m: any) => m.id);
+    // "deconflicted" keeps one member per name, the one the scope's feature
+    // selection makes applicable; the snapshot carries no feature selection,
+    // so the order is emitted only where it does not depend on one.
+    const all = [...scope.membersOf(model, { tags, conformance: "ignore" })].map((m: any) => m.id);
+    if (ids.join() !== all.join()) {
+        unordered.push(`${model.name}: the member order depends on the feature selection`);
+    }
+    return ids;
+};
+const globalAttributeIds = new Set<number>();
+for (const c of (Matter as any).children) if (c.tag === "attribute" && typeof c.id === "number") globalAttributeIds.add(c.id);
+for (const raw of out.clusters as any[]) {
+    const model: any = Matter.get(ClusterModel, raw.id);
+    if (model === undefined) continue; // reported by the resolved layer
+    const order = attributeOrderOf(model);
+    const listed = new Set(order);
+    if (listed.size !== order.length) unordered.push(`${raw.name}: an attribute id twice in the member order`);
+    for (const a of raw.attributes) {
+        if (!listed.has(a.id)) unordered.push(`${raw.name}: attribute ${a.name} missing from the member order`);
+    }
+    const own = new Set(raw.attributes.map((a: any) => a.id));
+    for (const id of order) {
+        if (!own.has(id) && !globalAttributeIds.has(id)) unordered.push(`${raw.name}: member ${id} neither the cluster's nor global`);
+    }
+    raw.attributeOrder = order;
+}
+const globalAttributeOrder = (() => {
+    const empty = new ClusterModel({ name: "GoFabricEmptyCluster" });
+    new MatterModel({
+        name: "GoFabricOrderRoot",
+        children: [...(Matter as any).children.filter((c: any) => c.tag === "attribute").map((c: any) => c.clone()), empty],
+    } as any);
+    return attributeOrderOf(empty);
+})();
+if (unordered.length) {
+    console.error("attribute order:\n  " + unordered.join("\n  "));
+    process.exit(1);
+}
+
 // referentOut is what RequirementResolver resolves a requirement to: the
 // cluster, the feature (by code), the attribute / command / event (by
 // name, of the stated kind), the command field, the component device type
@@ -794,6 +871,9 @@ for (const c of (Matter as any).children) {
 }
 definitions.sort((a, b) => a.name.localeCompare(b.name));
 (out as any).definitions = definitions;
+
+// Appended last, after every key above (the order layer).
+(out as any).globalAttributeOrder = globalAttributeOrder;
 
 console.log(JSON.stringify(out, null, 2));
 

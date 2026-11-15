@@ -328,3 +328,35 @@ func TestPresetConfigurationRefused(t *testing.T) {
 		t.Errorf("negative deadband: New error %v, want ErrSetpoints", err)
 	}
 }
+
+// TestLimitWriteThatMovesTheSetpointInEffectEndsThePreset holds that a
+// user setpoint limit write whose reconcile moves a setpoint in effect
+// ends the active preset, and one that moves none keeps it. Mirrors
+// matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts at
+// db021da0: #assertMaxHeatSetpointLimitChanging reconciles (:730-733), and
+// the setpoint the reconcile moved runs its own $Changing as a direct
+// change, which sets activePresetHandle to null (:757-768).
+func TestLimitWriteThatMovesTheSetpointInEffectEndsThePreset(t *testing.T) {
+	t.Parallel()
+	srv := mustNew(t, thermostatConfig(5, []thermo.Preset{setpointPreset(1, 2200, 2700)}))
+	if err := activate(t, srv, []byte{1}); err != nil {
+		t.Fatal(err)
+	}
+	// Above the setpoint in effect: the reconcile moves nothing.
+	if err := srv.MatterWrite(remoteCtx(1, 5), tdef.AttrMaxHeatSetpointLimit, int16(2500)); err != nil {
+		t.Fatal(err)
+	}
+	if h := srv.ActivePresetHandle(); !bytes.Equal(h, []byte{1}) {
+		t.Errorf("active handle %x after a limit write that moved no setpoint, want 01", h)
+	}
+	// Below it: OccupiedHeatingSetpoint follows the limit.
+	if err := srv.MatterWrite(remoteCtx(1, 5), tdef.AttrMaxHeatSetpointLimit, int16(2100)); err != nil {
+		t.Fatal(err)
+	}
+	if got := readInt16(t, srv, tdef.AttrOccupiedHeatingSetpoint); got != 2100 {
+		t.Fatalf("OccupiedHeatingSetpoint %d after MaxHeatSetpointLimit 2100, want 2100", got)
+	}
+	if h := srv.ActivePresetHandle(); h != nil {
+		t.Errorf("active handle %x after a limit write that moved the setpoint in effect, want null", h)
+	}
+}

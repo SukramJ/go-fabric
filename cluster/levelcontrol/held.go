@@ -21,8 +21,8 @@ import (
 // HeldConfig carries the construction parameters of [New]: a LevelControl
 // server that holds its level itself. It is the device layer's default for
 // LevelControl. matter.js's server keeps its attributes in its behavior
-// state (packages/node/src/behaviors/level-control/LevelControlServer.ts:772-799,
-// the State class with managedTransitionTimeHandling).
+// state (packages/node/src/behaviors/level-control/LevelControlServer.ts:783-824
+// at db021da0, the State class with managedTransitionTimeHandling, :791).
 type HeldConfig struct {
 	// Features is the FeatureMap: [FeatureOnOff] and [FeatureLighting],
 	// each optional (matter.js's LevelControlServer without features is a

@@ -2,7 +2,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 119,
+    "line": 120,
     "citation": "camera-controller.ts:133",
     "at": "0bd06f2",
     "error": "file not found"
@@ -10,7 +10,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 132,
+    "line": 133,
     "citation": "NetworkClient.ts:35",
     "at": "0bd06f22",
     "error": "file not found"
@@ -18,7 +18,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 133,
+    "line": 134,
     "citation": "ClientEventEmitter.ts:45-74",
     "at": "0bd06f22",
     "error": "file not found"
@@ -26,8 +26,8 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 134,
-    "citation": "LogDestination.ts:77-93",
+    "line": 135,
+    "citation": "LogDestination.ts:77-91",
     "at": "0bd06f22",
     "error": "file not found"
   },
@@ -49,70 +49,45 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 409,
-    "citation": "DeviceTypeConformance.ts:1189-1215",
-    "error": "line beyond end of file"
-  },
-  {
-    "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 952,
+    "line": 969,
     "citation": "packages/ws-controller/src/server/WebSocketControllerHandler.ts:144",
     "error": "no matterjs-server commit"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 983,
+    "line": 1004,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1012,
+    "line": 1032,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1013,
+    "line": 1033,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1186,
+    "line": 1209,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1975,
-    "citation": "endpoints/ota-provider.ts:57-64",
-    "error": "ambiguous"
-  },
-  {
-    "file": "notes/parity/by_design.md",
-    "line": 2629,
-    "citation": "packages/node/src/devices/.../RequirementGenerator.ts:188-199",
-    "error": "file not found"
-  },
-  {
-    "file": "notes/parity/by_design.md",
-    "line": 2648,
+    "line": 2707,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4148,
+    "line": 4286,
     "citation": "BleScanner.ts:46-52",
-    "at": "862ad75f",
-    "error": "ambiguous"
-  },
-  {
-    "file": "notes/parity/by_design.md",
-    "line": 6075,
-    "citation": "camera-controller.ts:133",
     "at": "862ad75f",
     "error": "ambiguous"
   },
@@ -132,7 +107,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 857,
+    "line": 814,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }

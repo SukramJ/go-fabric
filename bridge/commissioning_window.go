@@ -606,9 +606,10 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 		}
 	}
 	// Derive window status from the mode the window was opened in.
-	// matter.js AdministratorCommissioningServer.ts:114-119 sets
-	// state.windowStatus = BasicWindowOpen (2) for basic windows and
-	// EnhancedWindowOpen (1) for enhanced.
+	// matter.js AdministratorCommissioningServer.ts:199 at db021da0
+	// (#windowOpened) sets state.windowStatus to what its caller passes:
+	// BasicWindowOpen (2) for a basic window (:126) and EnhancedWindowOpen
+	// (1) for an enhanced one (:108-112).
 	status := wire.WindowStatusEnhanced
 	if w.isBasicWindow {
 		status = wire.WindowStatusBasic
@@ -663,9 +664,19 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	maxTimeout := uint32(commissioningWindowMaxSec)
 	if params.IsUncommissioned {
 		// Uncommissioned devices (no fabric installed yet) MAY use an
-		// extended 48-h window per Matter §11.19.8.1, which matches
-		// chip CommissioningWindowManager.cpp::MaxCommissioningTimeout()
-		// and matter.js AdministratorCommissioningServer.ts:196-198 (the cap; :260 its default).
+		// extended 48-h window per Matter §11.19.8.1. The cap on the
+		// command follows connectedhomeip:
+		// src/app/server/CommissioningWindowManager.cpp:318-330 at
+		// 6170af84 (MaxCommissioningTimeout: 48 h while the fabric table
+		// is empty, under CHIP_DEVICE_CONFIG_EXT_ADVERTISING, else 15
+		// min), which
+		// src/app/clusters/administrator-commissioning-server/AdministratorCommissioningLogic.cpp:65,
+		// :95 apply. matter.js caps the command at
+		// maximumCommissioningTimeout
+		// (packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:226-236
+		// at db021da0), the 15-minute STANDARD_COMMISSIONING_TIMEOUT by
+		// default (:283); its 48 h belong to the window the node opens
+		// itself (packages/protocol/src/protocol/DeviceCommissioner.ts:309-314).
 		// Commissioned bridges use the standard 900-s cap.
 		maxTimeout = commissioningWindowMaxSecUncommissioned
 	}

@@ -442,7 +442,10 @@ type EnergyConsumedSetter interface {
 // SetOperationMode applies a controller's OperationMode write. A
 // source that also implements ControlModeSetter,
 // RunningHoursSetter or EnergyConsumedSetter takes those writes
-// (cluster/pump).
+// (cluster/pump). A controller's write reaches a setter only when
+// the written value differs from the one PumpState reads; the held
+// value reaches no setter. A write that reaches one counts as a
+// change whether or not PumpState shows it when the setter returns.
 type StateSource interface {
 	PumpState() State
 	SetOperationMode(ctx context.Context, mode OperationModeEnum) error

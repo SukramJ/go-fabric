@@ -276,6 +276,46 @@ func TestGeneralDiagnosticsServerPayloadTestRequest(t *testing.T) {
 	}
 }
 
+// TestGeneralDiagnosticsServerPayloadTestRequestFitsTheExchange: the bound
+// of the response is the request's exchange, as matter.js compares the
+// encoded one-command InvokeResponse with `exchange.maxPayloadSize`
+// (GeneralDiagnosticsServer.ts:262-292 at db021da0; MessageExchange.ts:465-469,
+// 1232 - 54 = 1178 over UDP). A context the transport stamped nothing on
+// keeps the module's own bound of 1100 bytes.
+func TestGeneralDiagnosticsServerPayloadTestRequestFitsTheExchange(t *testing.T) {
+	t.Parallel()
+	g, _ := gdDevice(t, gdEnableKey)
+	const udp, tcp = 1178, 64000 - 54
+	invoke := func(ctx context.Context, count uint16) im.StatusCode {
+		t.Helper()
+		resp, err := g.MatterInvoke(ctx, 0x03, map[uint8]any{0: gdEnableKey, 1: uint64(0xab), 2: uint64(count)})
+		if err != nil {
+			return gdStatus(t, err)
+		}
+		if n := len(resp.(core.PayloadTestResponse).Payload); n != int(count) {
+			t.Errorf("count %d: payload of %d bytes", count, n)
+		}
+		return im.StatusSuccess
+	}
+	for _, c := range []struct {
+		name  string
+		ctx   context.Context
+		count uint16
+		want  im.StatusCode
+	}{
+		{"UDP exchange, response fits", im.WithMaxPayloadSize(context.Background(), udp), 1120, im.StatusSuccess},
+		{"UDP exchange, payload alone fills the message", im.WithMaxPayloadSize(context.Background(), udp), udp, im.StatusResourceExhausted},
+		{"UDP exchange, Count 2048", im.WithMaxPayloadSize(context.Background(), udp), 2048, im.StatusResourceExhausted},
+		{"TCP exchange, Count 2048", im.WithMaxPayloadSize(context.Background(), tcp), 2048, im.StatusSuccess},
+		{"no stamp, at the module's bound", context.Background(), 1100, im.StatusSuccess},
+		{"no stamp, above the module's bound", context.Background(), 1101, im.StatusResourceExhausted},
+	} {
+		if got := invoke(c.ctx, c.count); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // TestGeneralDiagnosticsServerTimeSnapshot is the describe "TimeSnapshot":
 // PosixTimeMs only with a TimeSynchronization UTC time, and SystemTimeMs
 // on the System Time UpTime reads (GeneralDiagnosticsServer.ts systemTime

@@ -373,6 +373,12 @@ func (s *CommodityPriceServer) MatterWrite(ctx context.Context, attrID uint32, v
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *CommodityPriceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches the two detailed requests.
 func (s *CommodityPriceServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields) // a host's handler first ([spec.SelfHeld.Handle])

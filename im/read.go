@@ -415,9 +415,11 @@ func (r ReportData) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWrite
 	// Always emit SuppressResponse, including the explicit `false`. matter.js
 	// (packages/types/src/protocol/messages/TlvDataReportForSend.ts:27)
 	// declares this as a TlvOptionalField that ServerSubscription always
-	// fills with a concrete value: `false` for non-empty data reports and
-	// `true` for empty keepalives. Apple Home's IM layer treats an absent
-	// SuppressResponse differently from an explicit `false` — without the
+	// fills with a concrete value: `false` for every ongoing report, the
+	// keep-alive included
+	// (packages/node/src/node/server/ServerSubscription.ts:914, :928 at
+	// db021da0). Apple Home's IM layer treats an absent SuppressResponse
+	// differently from an explicit `false` — without the
 	// field the controller answers with only a Standalone MRP-ACK and never
 	// emits the StatusResponse the spec §10.6.4.1 mandates for
 	// non-suppressed reports, which leaves matter.js's waitForSuccess gate
@@ -507,9 +509,9 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	// A plain (non-subscribe) Read's ReportData carries SuppressResponse=true:
 	// the controller answers the final chunk with only a Standalone MRP-Ack, not
 	// an IM StatusResponse. Mirrors matter.js
-	// packages/node/src/node/server/InteractionServer.ts:346-350,371-374
+	// packages/node/src/node/server/InteractionServer.ts:358-363, :383-389 at db021da0
 	// (handleReadRequest returns `dataReport: { suppressResponse: true }`) and
-	// chip src/app/ReadHandler.cpp:340 (`responseExpected = IsType(Subscribe) ||
+	// chip src/app/ReadHandler.cpp:333 at 6170af84 (`responseExpected = IsType(Subscribe) ||
 	// aMoreChunks` → false on a read's final chunk). The chunker propagates this
 	// to the terminal chunk only; intermediate chunks keep SuppressResponse=false
 	// so the per-chunk StatusResponse handshake still runs. Subscribe priming
@@ -654,6 +656,36 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 	return out
 }
 
+// EventPathsForNode returns the event paths that select this node's
+// events: a path naming another node is left out, the node of a path
+// naming this node (localNodeID, its id on the session's fabric, 0
+// without one) is cleared, a path naming no node is kept. The caller
+// hands the result to [BuildEventReports] and to a subscription's stored
+// paths ([ConcreteEventPath.Matches] does not look at the node), and the
+// request's own paths to [DeniedEventPathStatuses], which answers a
+// concrete path naming another node. Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:138-140 and
+// :159-162 at db021da0 (#addWildcard / #addConcrete: a path naming
+// another node registers nothing), the node id per DataResponse.ts:57-62;
+// the attribute paths' twin is [AttributeExpansion] (review II,
+// R2-P4-imread-07).
+func EventPathsForNode(paths []ConcreteEventPath, localNodeID uint64) []ConcreteEventPath {
+	if !slices.ContainsFunc(paths, func(p ConcreteEventPath) bool { return p.HasNode }) {
+		return paths
+	}
+	out := make([]ConcreteEventPath, 0, len(paths))
+	for _, p := range paths {
+		if p.HasNode {
+			if p.Node != localNodeID {
+				continue
+			}
+			p.HasNode, p.Node = false, 0
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 // HandleReadEventRequest evaluates the EventRequests in req against
 // log and returns a slice of EventReports suitable for embedding into a
 // ReportData.
@@ -699,9 +731,11 @@ const matterCommissionerControlClusterID uint32 = 0x0751
 // grant is keyed on that auth mode
 // (matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191),
 // never on the FabricIndex: a zero FabricIndex without PASE is no grant and
-// is refused (checkSubjectACL). A nil Checker disables enforcement
+// is refused (checkSubjectACL). A nil Checker disables the ACL gate
 // (fail-open, matching the attribute path's "dispatcher without ACLChecker"
-// fallback).
+// fallback). Neither lifts the fabric-sensitive drop of
+// [AuthorizeEventReports], which compares a record's fabric with
+// FabricIndex for every session.
 type EventReadAuthorizer struct {
 	Checker       ACLChecker
 	FabricIndex   uint8
@@ -717,6 +751,12 @@ type EventReadAuthorizer struct {
 // answer the existence of a concrete event path: UNSUPPORTED_ENDPOINT,
 // UNSUPPORTED_CLUSTER, UNSUPPORTED_EVENT, or Success — matter.js
 // EventReadResponse.ts #addConcrete's existence checks, in their order.
+// A path with its endpoint and cluster named and no event (HasEvent
+// false) asks whether the cluster has an event a wildcard event path
+// selects: UNSUPPORTED_EVENT when it has none, as matter.js registers a
+// wildcard event path per event of the cluster
+// (packages/protocol/src/action/server/EventReadResponse.ts:277-284 at
+// db021da0).
 type EventPathChecker interface {
 	EventPathStatus(path ConcreteEventPath) StatusCode
 }
@@ -747,8 +787,9 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
 // session (PASE / [IsPASEFromContext], also once AddNOC adopted it onto a
-// fabric) or a nil Checker returns every event unchanged; a session
-// without an accessing fabric that is not PASE reads none.
+// fabric) or a nil Checker passes the ACL gate (a) for every event; a
+// session without an accessing fabric that is not PASE reads none. The
+// fabric-sensitive drop (b) applies to every session.
 //
 // (a) ACL gate: each event is gated at its read privilege — View by default,
 //
@@ -758,19 +799,24 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //
 // (b) Fabric-sensitive drop: a fabric-sensitive record is disclosed only to the
 //
-//	fabric that owns it, independent of the read's FabricFiltered flag. Fails
-//	closed — a record whose fabric cannot be positively matched to the
-//	accessing fabric is never disclosed. Mirrors EventReadResponse.ts
-//	#readAllowedEvents (payload.fabricIndex !== accessingFabricIndex → skip).
+//	fabric that owns it, independent of the read's FabricFiltered flag and of
+//	the auth mode: the accessing fabric is auth.FabricIndex — 0 for a PASE
+//	session before AddNOC, the adopted fabric after it. Fails closed — a
+//	record whose fabric cannot be positively matched to the accessing fabric
+//	is never disclosed. Mirrors matter.js
+//	packages/protocol/src/action/server/EventReadResponse.ts:79 and :344-352
+//	at db021da0 — #accessingFabricIndex = session.fabric ?? NO_FABRIC,
+//	#readAllowedEvents skips a record whose payload.fabricIndex differs; the
+//	file has no auth-mode exception.
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	if auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
-		return append([]EventReport(nil), events...)
-	}
+	aclBypass := auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
-		priv := eventReadPrivilege(ev.Path.Cluster)
-		if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
-			continue // subject not permitted to read this event — omit
+		if !aclBypass {
+			priv := eventReadPrivilege(ev.Path.Cluster)
+			if status := checkSubjectACL(ctx, auth.Checker, auth.FabricIndex, auth.SubjectNodeID, auth.SubjectCATs, ev.Path.Endpoint, ev.Path.Cluster, priv); !status.IsSuccess() {
+				continue // subject not permitted to read this event — omit
+			}
 		}
 		if isFabricSensitiveEventCluster(ev.Path.Cluster) {
 			recFabric, ok := eventPayloadFabricIndex(ev.Data.Value)
@@ -862,10 +908,10 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 // MaxReadPaths is the hard acceptance ceiling for paths (attribute and
 // event paths counted together) in a single Read or Subscribe
 // interaction. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:79-80
+// packages/node/src/node/server/InteractionServer.ts:90-94 at db021da0
 // (MAX_READ_PATHS / MAX_SUBSCRIBE_PATHS = 10 000, the upper bound of the
 // CapabilityMinimaStruct field constraints); a request beyond it is
-// answered with PathsExhausted (:366-369, :600-604).
+// answered with PathsExhausted (:375-381, :635-641).
 const MaxReadPaths = 10_000
 
 // isGlobalAttributeID reports whether attrID is a universal global attribute
@@ -882,11 +928,15 @@ func isGlobalAttributeID(attrID uint32) bool {
 // must be rejected up front with InvalidAction rather than silently expanded.
 // Returns StatusInvalidAction on the first offending path, StatusPathsExhausted
 // when the request names more than [MaxReadPaths] paths in total, else
-// StatusSuccess. Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// validateReadAttributesPath / validateReadEventPath (#3926) followed by the
-// path-count ceiling (:362-369, :600-604) — in that order. Callers (the read
-// and subscribe dispatchers) run this before building any report and answer
-// with the returned status.
+// StatusSuccess. Mirrors a Read's order in matter.js
+// packages/node/src/node/server/InteractionServer.ts at db021da0:
+// validateReadPaths (:138-141, over validateReadAttributesPath :118-128 and
+// validateReadEventPath :130-136; #3926) at :373, then the path-count
+// ceiling (:375-381). The read dispatcher runs this before building any
+// report and answers with the returned status. A Subscribe checks in
+// another order — the count first (:635-641), the paths at :699 after the
+// KeepSubscriptions teardown and the no-paths check — so its dispatcher
+// counts before it calls this.
 func ValidateReadPaths(attrs []ConcreteAttributePath, events []ConcreteEventPath) StatusCode {
 	for _, p := range attrs {
 		if !p.HasCluster && p.HasAttribute && !isGlobalAttributeID(p.Attribute) {
@@ -946,8 +996,14 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // packages/protocol/src/action/server/EventReadResponse.ts:158-224 at
 // 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
 // answered with nothing.
+//
+// With this node's id stamped ([WithLocalNodeID]), a concrete path naming
+// another node answers UNSUPPORTED_NODE before any other check, as
+// matter.js's #addConcrete does (EventReadResponse.ts:159-162 at
+// db021da0); [EventPathsForNode] keeps its events out of the report.
 func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, paths []ConcreteEventPath) []EventReport {
 	const privilegeView uint8 = 1
+	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
 	var out []EventReport
 	for _, p := range paths {
 		if !p.HasEndpoint || !p.HasCluster || !p.HasEvent {
@@ -955,6 +1011,8 @@ func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, path
 		}
 		status := StatusSuccess
 		switch {
+		case p.HasNode && hasLocalNodeID && p.Node != localNodeID:
+			status = StatusUnsupportedNode
 		case !auth.allowsAt(ctx, p.Endpoint, p.Cluster, privilegeView):
 			status = StatusUnsupportedAccess
 		case auth.Paths != nil && !auth.Paths.EventPathStatus(p).IsSuccess():

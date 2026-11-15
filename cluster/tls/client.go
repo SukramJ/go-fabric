@@ -508,6 +508,12 @@ func (m *ClientManagement) MatterWrite(ctx context.Context, attrID uint32, value
 	return m.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (m *ClientManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return m.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches an accepted command; a host's handler runs in
 // its place ([spec.SelfHeld.Handle]).
 func (m *ClientManagement) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

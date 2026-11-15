@@ -82,7 +82,14 @@ import (
 //
 // 404 after review II, phase 2, and 403 after phase 3: the citations each
 // phase's fixes touched were re-read and re-cited at the pin.
-const citecheckDriftRatchet = 403
+//
+// 406 after review II, phase 4: by file, citation and identifier, 40 rows
+// of the committed list are gone with the phase's fixes and its five
+// citation passes and 43 are new. Each of the 43 was read at the pin and
+// its citation holds: the sentence names a word the cited range does not
+// carry — the construct of a neighbouring citation, the function the range
+// lies in, or a model name the source writes in another case.
+const citecheckDriftRatchet = 406
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
@@ -460,7 +467,12 @@ func TestCitecheckSecondTree(t *testing.T) {
 // by_design.md and 3 in the findings register; 8 "file not found", 7
 // "ambiguous", 4 "line beyond end of file" and 1 "no matterjs-server
 // commit"; 7 of them cite matterjs-server.
-const citecheckRegisterRatchet = 20
+//
+// 16 after review II, phase 4: four citations of by_design.md corrected
+// with the phase's re-read of the register (13 left there, 3 in the
+// findings register; 7 "file not found", 5 "ambiguous", 3 "line beyond end
+// of file" and 1 "no matterjs-server commit").
+const citecheckRegisterRatchet = 16
 
 func TestCitecheckRegistersOnRatchet(t *testing.T) {
 	data, err := os.ReadFile("registers.json")

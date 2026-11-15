@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -234,6 +235,17 @@ var (
 //
 // Concrete (non-wildcard) reads return exactly one ReadResult.
 //
+// A status answers a fully concrete request path only (review II,
+// R2-P4-imread-02, -03): a path naming no endpoint returns what exists
+// and nothing else — an endpoint lacking the cluster or the attribute is
+// skipped, an empty node answers nothing. A path naming an endpoint keeps
+// its statuses here (UnsupportedEndpoint, UnsupportedCluster, an
+// attribute whose read fails): node.Node.ReadCluster reports
+// them to the host. On the wire [im.AttributeExpansion] hands out a
+// status for a fully concrete path alone, as matter.js
+// packages/protocol/src/action/server/AttributeReadResponse.ts at
+// db021da0 does (addWildcard :88-94 answers no status).
+//
 // ctx carries the FabricFiltered flag + FabricIndex via
 // [im.WithFabricFilter] / [im.FabricFilterFromContext]. Cluster servers
 // that implement [contract.FabricScopedReader] receive MatterReadFiltered
@@ -244,10 +256,13 @@ var (
 // (:306-326 at 862ad75f).
 func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttributePath) []im.ReadResult {
 	endpoints := d.resolveEndpoints(path)
+	wildcardEndpoint := !path.HasEndpoint
 	if len(endpoints) == 0 {
+		if wildcardEndpoint {
+			return nil
+		}
 		return []im.ReadResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
 	}
-	wildcardEndpoint := !path.HasEndpoint
 	var results []im.ReadResult
 	for _, ep := range endpoints {
 		results = d.readAt(ctx, ep, path, wildcardEndpoint, results)
@@ -281,7 +296,9 @@ func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.Concret
 // readAt appends to results what path reads at ep: one result per
 // attribute of each matching cluster server. A concrete endpoint lacking
 // the cluster answers UnsupportedCluster; under a wildcard endpoint it is
-// skipped.
+// skipped, and so is an attribute whose read does not succeed
+// (AttributeReadResponse.ts:259-261, :341-344, :386-387, :407-414 and
+// :419-424 at db021da0).
 func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
 	ePath := path
 	ePath.Endpoint = ep.ID
@@ -312,7 +329,11 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 			aPath := cPath
 			aPath.Attribute = attrID
 			aPath.HasAttribute = true
-			results = append(results, readOne(ctx, ep, srv, aPath))
+			res := readOne(ctx, ep, srv, aPath)
+			if wildcardEndpoint && res.Status != im.StatusSuccess {
+				continue
+			}
+			results = append(results, res)
 		}
 	}
 	return results
@@ -350,7 +371,7 @@ type WritePersister interface {
 // wildcard-endpoint write can be authorized, since the requested path
 // names no endpoint. authorize may be nil, which dispatches without a
 // gate.
-func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
+func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocyclo,gocognit,funlen // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
@@ -407,16 +428,16 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// through unchanged.
 				// An attribute the cluster does not implement answers
 				// UNSUPPORTED_ATTRIBUTE before its writability is
-				// considered — matter.js AttributeWriteResponse.ts:225-226
+				// considered — matter.js AttributeWriteResponse.ts:227-229
 				// (`if (!attribute) … Status.UnsupportedAttribute`), ahead of
-				// the UnsupportedWrite check at :229-231. Found by the CHIP
+				// the UnsupportedWrite check at :231-234. Found by the CHIP
 				// Python harness (TC-IDM-3.2 step 3 writes a spec attribute
 				// the DUT does not list).
 				// The global attributes (GeneratedCommandList … ClusterRevision)
 				// exist on every cluster and are never writable: UNSUPPORTED_WRITE
 				// on a concrete path, skipped on a wildcard one — matter.js
 				// models them read-only like any other attribute
-				// (AttributeWriteResponse.ts:229-231). They used to reach the
+				// (AttributeWriteResponse.ts:231-234). They used to reach the
 				// cluster server, which answered Failure or
 				// UNSUPPORTED_ATTRIBUTE (TC-ACE-2.2).
 				if isGlobalAttribute(attrID) {
@@ -434,7 +455,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				if writable, known := schema.AttributeWritable(cPath.Cluster, attrID); known && !writable {
 					// "Concrete" means endpoint AND cluster AND attribute are
 					// all named — the split matter.js makes before it picks a
-					// write path (AttributeWriteResponse.ts:65). A wildcard
+					// write path (AttributeWriteResponse.ts:68). A wildcard
 					// endpoint is a wildcard path even with a concrete
 					// attribute, and reporting a status per resolved endpoint
 					// would both diverge from the spec and enumerate which
@@ -442,6 +463,27 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// the gate below has not evaluated yet.
 					if !wildcardEndpoint && path.HasAttribute {
 						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedWrite})
+					}
+					continue
+				}
+
+				// An attribute with the timed access quality outside a
+				// timed interaction (the check below the access gate).
+				timedRefused := timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute)
+				// A path with a numeric ListIndex meets the timed check
+				// before authorize: im's authorizer for it ends the
+				// interaction where the value would be written
+				// (im.listIndexGate), which matter.js does in writeValue,
+				// after the timed check
+				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247,
+				// :343-345 before :419-424 at db021da0). The order against
+				// the access check is kept: on a concrete path im decided
+				// access before dispatch and the authorizer is the gate
+				// alone, on a wildcard path both refusals skip the
+				// attribute without a status.
+				if timedRefused && path.HasListIndex && !path.ListAppend {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
 					}
 					continue
 				}
@@ -472,7 +514,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// (`if (limits.timed && !this.session.timed) … Status.NeedsTimedInteraction`)
 				// and :343-345 for the wildcard path; chip
 				// src/app/WriteHandler.cpp:798-802.
-				if timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute) {
+				if timedRefused {
 					if !wildcardEndpoint && path.HasAttribute {
 						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
 					}
@@ -480,26 +522,54 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				}
 
 				writeCtx := ctx
+				// The value written at this location: the request's own
+				// value, or for an ADD this location's list with the
+				// request's element appended. Every resolved location
+				// starts from the request's value — a group ADD appends
+				// the same element on every member endpoint, as
+				// connectedhomeip gives every mapped endpoint a fresh
+				// reader over the request's data
+				// (src/app/WriteHandler.cpp:555-559 at 6170af84).
+				v := value
 				if path.ListAppend {
 					merged, status := appendListValue(ctx, srv, attrID, value)
 					if status != im.StatusSuccess {
 						results = append(results, im.WriteResult{Path: aPath, Status: status})
 						continue
 					}
-					value = merged
+					v = merged
 					// The server sees the whole list; the mark tells it
 					// only the last element is new (AccessControl reports
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
 				}
-				res := d.writeStored(writeCtx, ep, srv, aPath, value)
-				// A successful write mutated cluster state; advance the
-				// endpoint-hosted DataVersion so DataVersionFilters miss
-				// and subscribers see the change (matter.js
-				// Datasource.ts:1456-1457). A root or Aggregator server with a
-				// tracker of its own bumps it inside the write handler.
-				if _, own := ownDataVersion(ep, srv); res.Status == im.StatusSuccess && !own {
-					ep.BumpClusterDataVersion(cPath.Cluster)
+				// The written value against the cluster's definition,
+				// before any server runs (owner decision 64): what
+				// matter.js validates as the value enters the behavior's
+				// state (packages/node/src/behavior/state/managed/Datasource.ts:667-676
+				// at db021da0), for every server with a generated
+				// definition, the hand-written ones included.
+				if status := writtenHeld(srv, attrID, v); !status.IsSuccess() {
+					results = append(results, im.WriteResult{Path: aPath, Status: status})
+					continue
+				}
+				res, changed := d.writeStored(writeCtx, ep, srv, aPath, v)
+				// A successful write that changed the cluster advances the
+				// endpoint-hosted DataVersion once, so DataVersionFilters
+				// miss and subscribers see the change; one that changed
+				// nothing leaves it, as matter.js advances a datasource's
+				// version only for a commit that changed a value
+				// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+				// at db021da0, an equal value no change at :1479). The
+				// verdict is the server's ([contract.ChangeReportingWriter]);
+				// a server without one changed something. A root or
+				// Aggregator server with a tracker of its own advances it
+				// inside the same write, on the same verdict.
+				if res.Status == im.StatusSuccess {
+					if _, own := ownDataVersion(ep, srv); changed && !own {
+						ep.BumpClusterDataVersion(cPath.Cluster)
+					}
+					writeChangesFrom(ctx).record(aPath, changed)
 				}
 				results = append(results, res)
 			}
@@ -562,10 +632,15 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // EventPathStatus implements [im.EventPathChecker]: UNSUPPORTED_ENDPOINT for
 // an endpoint the topology lacks, UNSUPPORTED_CLUSTER for a cluster the
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
-// not list (a server without an event lister answers for itself), Success
-// otherwise — the existence checks of matter.js
+// not list, Success otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
-// 862ad75f (#addConcrete), in their order.
+// 862ad75f (#addConcrete), in their order. A path that names no event is
+// UNSUPPORTED_EVENT when the server lists none: matter.js registers a
+// wildcard event path per event of the cluster (EventReadResponse.ts:277-284
+// at db021da0), so such a cluster selects nothing (review II,
+// R2-P4-imread-08). A server without a [contract.ClusterEventLister] lists
+// no event, as the contract states, so neither shape of path exists on it
+// (EventReadResponse.ts:216-218 for a named one; review II, R2-P4-nw-05).
 func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
 	ep := d.topology.FindByID(path.Endpoint)
 	if ep == nil {
@@ -575,7 +650,14 @@ func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.Statu
 		if srv == nil || srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		if lister, ok := srv.(contract.ClusterEventLister); ok && !slices.Contains(lister.MatterEvents(), path.Event) {
+		var events []uint32
+		if lister, ok := srv.(contract.ClusterEventLister); ok {
+			events = lister.MatterEvents()
+		}
+		switch {
+		case !path.HasEvent && len(events) == 0:
+			return im.StatusUnsupportedEvent
+		case path.HasEvent && !slices.Contains(events, path.Event):
 			return im.StatusUnsupportedEvent
 		}
 		return im.StatusSuccess
@@ -766,9 +848,6 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 		// HAP service map from these reports.
 		extra = srv.MatterReportable()
 	}
-	if len(extra) == 0 {
-		return out
-	}
 	seen := make(map[uint32]struct{}, len(out)+len(extra))
 	for _, id := range out {
 		seen[id] = struct{}{}
@@ -780,7 +859,13 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 		seen[id] = struct{}{}
 		out = append(out, id)
 	}
-	slices.Sort(out)
+	// The cluster's attribute order is the one every report uses
+	// (im.CompareAttributeIDs) — a cluster without attributes of its own
+	// included, whose globals matter.js lists in its model's order too
+	// (packages/node/src/node/integration/ProtocolService.ts:449-522 at
+	// db021da0).
+	clusterID := srv.MatterClusterID()
+	slices.SortFunc(out, func(a, b uint32) int { return im.CompareAttributeIDs(clusterID, a, b) })
 	return out
 }
 
@@ -796,7 +881,9 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // fabric-sensitive lists (e.g. OperationalCredentials.Fabrics) to
 // the requesting fabric. Mirrors matter.js InteractionServer.ts
 // #executeReadInteraction → #prepareOnlineContext(…, isFabricFiltered)
-// (:306-326 at 862ad75f).
+// (:306-326 at 862ad75f). A reader's (nil, false) hands the attribute to
+// MatterRead, except on a request for a fabric-scoped attribute
+// ([fabricScopedReadFailed]).
 //
 // DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
 // is stamped on the ReadResult with HasDataVersion. The IM layer uses
@@ -814,9 +901,12 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 			}
 			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 		}
-		// FabricScopedReader returned (nil, false) — fall through to
-		// the universal MatterRead path so non-fabric attributes on
-		// the same server are still served.
+		if status, failed := fabricScopedReadFailed(ctx, srv, path.Attribute); failed {
+			return im.ReadResult{Path: path, Status: status}
+		}
+		// FabricScopedReader returned (nil, false) for an attribute it
+		// does not scope — fall through to the universal MatterRead path
+		// so non-fabric attributes on the same server are still served.
 	}
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
@@ -835,6 +925,33 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
+}
+
+// fabricScopedReadFailed decides a [contract.FabricScopedReader]'s
+// (nil, false) on a request — a context [im.LookupFabricFilter] finds a
+// filter in — for an attribute whose access is fabric-scoped
+// ([schema.IsFabricScopedRead]). The reader is the only read such a request
+// may get: MatterRead has no request behind it and answers what a local
+// actor sees, every fabric's entries whole. So the request answers FAILURE
+// when the server lists the attribute — its scoped read failed — and
+// UNSUPPORTED_ATTRIBUTE when the server's [contract.ClusterAttributeLister]
+// leaves it out; a server without a lister answers FAILURE. Every other
+// (nil, false) — an attribute that is not fabric-scoped, or a read with no
+// request behind it — reports failed=false and is MatterRead's to answer.
+//
+// Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:425-459 at
+// db021da0 (InteractionServerMessenger.handleRequest: a read that throws
+// is answered with Status.Failure, no other read stands in for it). There
+// the whole interaction answers it; here the attribute's path does.
+func fabricScopedReadFailed(ctx context.Context, srv contract.ClusterServer, attrID uint32) (im.StatusCode, bool) {
+	if _, _, request := im.LookupFabricFilter(ctx); !request || !schema.IsFabricScopedRead(srv.MatterClusterID(), attrID) {
+		return im.StatusSuccess, false
+	}
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok && !slices.Contains(lister.MatterAttributes(), attrID) {
+		return im.StatusUnsupportedAttribute, true
+	}
+	return im.StatusFailure, true
 }
 
 // synthesizeGlobalRead returns the default value for a Matter global
@@ -889,14 +1006,18 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		}
 		slices.Sort(out)
 		return out, true
+	// The two command lists read in ascending id order, whatever order the
+	// server lists them in; the server's own slice stays as it is. Mirrors
+	// matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:135-136
+	// at db021da0 (acceptedIds.sort, [...generatedIds].sort, ascending).
 	case cluster.AttrGlobalAcceptedCommandList:
 		if lister, ok := srv.(contract.ClusterCommandLister); ok {
-			return lister.MatterAcceptedCommands(), true
+			return ascending(lister.MatterAcceptedCommands()), true
 		}
 		return []uint32{}, true
 	case cluster.AttrGlobalGeneratedCommandList:
 		if lister, ok := srv.(contract.ClusterCommandLister); ok {
-			return lister.MatterGeneratedCommands(), true
+			return ascending(lister.MatterGeneratedCommands()), true
 		}
 		return []uint32{}, true
 	case cluster.AttrGlobalEventList:
@@ -913,6 +1034,14 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		return nil, false
 	}
 	return nil, false
+}
+
+// ascending returns a copy of ids in ascending order — an empty list stays
+// an empty list, not nil.
+func ascending(ids []uint32) []uint32 {
+	out := append(make([]uint32, 0, len(ids)), ids...)
+	slices.Sort(out)
+	return out
 }
 
 // attributeListed reports whether attrID is one of the attributes srv
@@ -943,15 +1072,16 @@ func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
 // writeStored is [writeOne] behind the topology's [WritePersister]: a
 // nonvolatile attribute the module holds is stored before the server
 // takes it; a refused store write answers FAILURE and the server never
-// sees the value, a write the server refuses puts the store back.
-func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+// sees the value, a write the server refuses puts the store back. changed
+// is [writeOne]'s.
+func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
 	p := d.topology.Persister
 	if p == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	done, err := p.PersistWrite(ctx, ep, srv, path.Attribute, value)
 	if err != nil {
-		return im.WriteResult{Path: path, Status: im.StatusFailure}
+		return im.WriteResult{Path: path, Status: im.StatusFailure}, false
 	}
 	return persistedWrite(ctx, srv, path, value, done)
 }
@@ -959,30 +1089,67 @@ func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv 
 // persistedWrite is [writeOne] followed by done, the [WritePersister]'s
 // settlement, with whether srv applied the write — also when srv panics,
 // so the persister is never left waiting. A nil done is writeOne alone.
-func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) im.WriteResult {
+func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) (res im.WriteResult, changed bool) {
 	if done == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	applied := false
 	defer func() { done(applied) }()
-	res := writeOne(ctx, srv, path, value)
+	res, changed = writeOne(ctx, srv, path, value)
 	applied = res.Status == im.StatusSuccess
-	return res
+	return res, changed
 }
 
-// writeOne dispatches a single Write against srv. Errors are mapped
-// to spec-coded status values where the cluster surfaces them
-// distinctly; the catch-all is StatusFailure.
-func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
+// writtenHeld is the status the definition of srv's cluster answers a
+// controller's written value of attrID with ([spec.CheckWritten]): the
+// server's FeatureMap selects the enum values and conformance, its
+// attributes resolve the ones a constraint names. Success for a cluster
+// without a registered definition.
+func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeValue) im.StatusCode {
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return im.StatusSuccess
+	}
+	var features uint32
+	if v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap); ok {
+		if fm, ok := v.(uint32); ok {
+			features = fm
+		}
+	}
 	v := value.Value
 	if value.IsNull {
 		v = nil
 	}
-	if err := srv.MatterWrite(contract.WithOrigin(ctx, contract.OriginControllerWrite), path.Attribute, v); err != nil {
-		status, cs, hasCS := classifyError(err)
-		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
+	if err := spec.CheckWritten(def, features, attrID, v, srv.MatterRead); err != nil {
+		return spec.StatusOf(err)
 	}
-	return im.WriteResult{Path: path, Status: im.StatusSuccess}
+	return im.StatusSuccess
+}
+
+// writeOne dispatches a single Write against srv. Errors are mapped
+// to spec-coded status values where the cluster surfaces them
+// distinctly; the catch-all is StatusFailure. changed is whether a
+// successful write changed the cluster: the server's own verdict when it
+// gives one ([contract.ChangeReportingWriter] — decided inside the write,
+// so a change another writer makes around it never stands in for it),
+// true for a server that gives none; false for a refused write.
+func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
+	v := value.Value
+	if value.IsNull {
+		v = nil
+	}
+	ctx = contract.WithOrigin(ctx, contract.OriginControllerWrite)
+	var err error
+	if cw, ok := srv.(contract.ChangeReportingWriter); ok {
+		changed, err = cw.MatterWriteChanged(ctx, path.Attribute, v)
+	} else {
+		changed, err = true, srv.MatterWrite(ctx, path.Attribute, v)
+	}
+	if err != nil {
+		status, cs, hasCS := classifyError(err)
+		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}, false
+	}
+	return im.WriteResult{Path: path, Status: im.StatusSuccess}, changed
 }
 
 // classifyError maps a cluster server's write or invoke error to the
@@ -1562,6 +1729,14 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 // appended. matter.js AttributeWriteResponse applies a ListIndex-null write
 // as an append to the current list the same way. A value that is not a
 // one-element list of the attribute's element type is a CONSTRAINT_ERROR.
+//
+// An attribute whose value is not a list — a slice other than an octet
+// string — answers INVALID_ACTION. Mirrors matter.js
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:436-443 at
+// db021da0 (`if (!(tlv instanceof ArraySchema)) throw … Status.InvalidAction`,
+// inside the try of writeValue, so the path's status). The attribute's type
+// is read from its current value: a nil one (a null list, or none) stays
+// CONSTRAINT_ERROR.
 func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
 	var current any
 	var ok bool
@@ -1570,6 +1745,11 @@ func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uin
 		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
 	} else {
 		current, ok = srv.MatterRead(attrID)
+	}
+	if ok && current != nil {
+		if _, octets := current.([]byte); octets || reflect.ValueOf(current).Kind() != reflect.Slice {
+			return value, im.StatusInvalidAction
+		}
 	}
 	item := reflect.ValueOf(value.Value)
 	if !ok || current == nil || item.Kind() != reflect.Slice || item.Len() != 1 {

@@ -221,7 +221,7 @@ type Config struct {
 	ManufacturingDate  string // ISO 8601 YYYYMMDD
 	PartNumber         string
 	SerialNumber       string
-	NodeLabel          string // user-writable; supplied default
+	NodeLabel          string // user-writable; empty is the ProductName, as matter.js
 	Location           string // user-writable; "XX" for unset per spec
 	// UniqueID pins the UniqueID attribute (Matter §11.1.5.13) to a
 	// previously persisted value. Empty means "derive one"
@@ -241,8 +241,8 @@ type Config struct {
 }
 
 // NewBasicInformation constructs the cluster from cfg. Returns an
-// error when mandatory fields (VendorID, ProductID, NodeLabel) are
-// missing or zero-valued.
+// error when the mandatory fields (VendorID, ProductID) are missing or
+// zero-valued; an empty NodeLabel is the ProductName.
 func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// VendorID must be a valid device identity: non-zero and within the
 	// CSA-assignable range. Mirrors matter.js
@@ -254,9 +254,6 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	}
 	if cfg.ProductID == 0 {
 		return nil, errors.New("core: BasicInformation Config.ProductID must be non-zero")
-	}
-	if cfg.NodeLabel == "" {
-		return nil, errors.New("core: BasicInformation Config.NodeLabel must be non-empty")
 	}
 	// A pinned UniqueID goes on the wire verbatim, so it has to satisfy
 	// the attribute's own constraint: Matter §11.1.5.13 caps UniqueID at
@@ -306,15 +303,23 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// SoftwareVersionString carry `constraint: "1 to 64"` — empty
 	// strings violate the spec's lower bound. Apple Home's HAP service
 	// mapper enforces the constraint silently and aborts pair after
-	// Subscribe-Initial. Fall back to printable defaults derived from
-	// the numeric versions so the wire output always honours `min 1`.
+	// Subscribe-Initial. The default is the decimal rendering of the
+	// numeric version, one byte even for 0. Mirrors matter.js
+	// packages/node/src/behaviors/basic-information/BasicInformationServer.ts:70
+	// at db021da0 — setDefault("hardwareVersionString",
+	// state.hardwareVersion.toString()).
 	hwStr := cfg.HardwareVersionStr
 	if hwStr == "" {
-		hwStr = fmt.Sprintf("%d.0", cfg.HardwareVersion)
-		if cfg.HardwareVersion == 0 {
-			hwStr = "1.0"
-		}
+		hwStr = strconv.FormatUint(uint64(cfg.HardwareVersion), 10)
 	}
+	// ProductLabel defaults to the ProductName, and is then served. Mirrors
+	// matter.js BasicInformationServer.ts:67 at db021da0 —
+	// setDefault("productLabel", state.productName).
+	productLabel := cmp.Or(cfg.ProductLabel, cfg.ProductName)
+	// NodeLabel defaults to the ProductName as well. Mirrors matter.js
+	// BasicInformationServer.ts:68 at db021da0 —
+	// setDefault("nodeLabel", state.productName).
+	nodeLabel := cmp.Or(cfg.NodeLabel, cfg.ProductName)
 	// SoftwareVersion (0x0009) and SoftwareVersionString (0x000A) must
 	// describe the same release. matter.js holds that invariant by
 	// deriving the string from the numeric value —
@@ -348,7 +353,7 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		vendorID:             cfg.VendorID,
 		productName:          cfg.ProductName,
 		productID:            cfg.ProductID,
-		productLabel:         cfg.ProductLabel,
+		productLabel:         productLabel,
 		productURL:           cfg.ProductURL,
 		productAppearance:    cfg.ProductAppearance,
 		hardwareVersion:      cfg.HardwareVersion,
@@ -358,8 +363,8 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		manufacturingDate:    cfg.ManufacturingDate,
 		partNumber:           cfg.PartNumber,
 		serialNumber:         cfg.SerialNumber,
-		nodeLabel:            cfg.NodeLabel,
-		identityLabel:        cfg.NodeLabel,
+		nodeLabel:            nodeLabel,
+		identityLabel:        nodeLabel,
 		pinnedUniqueID:       cfg.UniqueID,
 		location:             loc,
 		capabilityMinima:     defaultCapabilityMinima(cfg.CapabilityMinima),
@@ -374,10 +379,11 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 // instanceOptions declares the optional elements this instance serves:
 // the revision-gated attributes, Reachable (Apple's HMAccessory.Reachable signal depends on it),
 // SerialNumber (served with a UniqueID-derived fallback), the four
-// optional strings and ProductAppearance when the host set them, and the
-// ShutDown, Leave and ReachableChanged events the server emits.
-// LocalConfigDisabled is not listed — matter.js's bridge sample does not
-// emit it — though a write to it is accepted.
+// optional strings and ProductAppearance when the host set them (ProductLabel
+// defaulted to the ProductName), and the ShutDown, Leave and
+// ReachableChanged events the server emits. LocalConfigDisabled is not
+// listed — matter.js's bridge sample does not emit it — so a write to it is
+// refused with the definition's status, UNSUPPORTED_ATTRIBUTE.
 func (b *BasicInformation) instanceOptions() spec.Options {
 	opts := spec.Options{
 		// UniqueID ("Rev >= v4, O"), SpecificationVersion and
@@ -794,30 +800,39 @@ func (b *BasicInformation) uniqueID() string {
 // advanceVersion (:1456-1466), commit1 (:1232, store.set :1261) writes
 // the store fields, and postCommit (:1286) emits the change events.
 func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := b.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [BasicInformation.MatterWrite], changed when it committed a new
+// NodeLabel or Location ([BasicInformation.commitLabel], whose comparison
+// advances the server's own version).
+func (b *BasicInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	switch attrID {
 	case basicInfoAttrNodeLabel:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
-			return err
+			return false, err
 		}
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
+			return false, fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 		}
 		return b.commitLabel(ctx, attrID, s)
 	case basicInfoAttrLocation:
 		if err := b.checkLabelWrite(attrID, value); err != nil {
-			return err
+			return false, err
 		}
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("core: Location write expected string, got %T", value)
+			return false, fmt.Errorf("core: Location write expected string, got %T", value)
 		}
 		return b.commitLabel(ctx, attrID, s)
 	}
 	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
 	// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 	_, err := b.inst().ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
+	return false, refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
 }
 
 // commitLabel sets NodeLabel or Location to s. An unchanged value commits
@@ -846,7 +861,7 @@ func (b *BasicInformation) MatterWrite(ctx context.Context, attrID uint32, value
 // the order of two writers' reports does not matter, and an inline
 // observer that writes the label from OnAttributeChanged does not
 // deadlock on its own write.
-func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) error {
+func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s string) (changed bool, err error) {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	label, loc, persist := b.nodeLabel, b.location, b.onPersistentWrite
@@ -857,13 +872,13 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 	}
 	if *cur == s {
 		b.writeMu.Unlock()
-		return nil
+		return false, nil
 	}
 	*cur = s
 	if persist != nil {
 		if err := persist(label, loc); err != nil {
 			b.writeMu.Unlock()
-			return fmt.Errorf("core: BasicInformation 0x%04X write not persisted: %w", attrID, err)
+			return false, fmt.Errorf("core: BasicInformation 0x%04X write not persisted: %w", attrID, err)
 		}
 	}
 	b.mu.Lock()
@@ -876,7 +891,7 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 	b.dataVersion.Bump()
 	b.writeMu.Unlock()
 	b.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
-	return nil
+	return true, nil
 }
 
 // checkLabelWrite holds a NodeLabel or Location write to the attribute's
@@ -1102,7 +1117,7 @@ func (b *BasicInformation) EmitStartUp() {
 // EmitShutDown fires the Matter §11.1.8.2 ShutDown event (id 0x0001,
 // priority Critical, no fields). No-op when the emitter has not been
 // wired yet — the daemon calls this in its shutdown hook. Mirrors
-// matter.js basic-information.element.ts:91-95.
+// matter.js basic-information.element.ts:111 at db021da0.
 func (b *BasicInformation) EmitShutDown() {
 	b.mu.RLock()
 	emitter := b.emitter

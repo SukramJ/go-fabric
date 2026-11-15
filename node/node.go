@@ -243,6 +243,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if err != nil {
 		return nil, err
 	}
+	cfg.BasicInformation.defaultNodeLabel()
 	attestationErr, err := cfg.resolveAttestation()
 	if err != nil {
 		return nil, err
@@ -252,7 +253,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: cfg.BootReason,
 		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -395,6 +396,8 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
 	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	n.bootReason = n.root.bootReason
+	n.setNetworkInterfaceRules()
 	// DiagnosticLogs hands logs over BDX on the requesting session
 	// (ADR 0021).
 	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
@@ -434,6 +437,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
+		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
 	}
@@ -559,7 +563,9 @@ func (n *Node) closeOwnedDB() {
 
 // advertisement is the commissionable record of the node's own window
 // (main.go:329-347 at b4ea1f96^): CM=1, the configured discriminator, the product
-// description's name and device type.
+// description's name and device type — zero when the host states none,
+// which the window infers each time it advertises
+// (commissionableDeviceType).
 func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	var instanceID [8]byte
 	if _, err := rand.Read(instanceID[:]); err != nil {
@@ -569,10 +575,6 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	name := pd.Name
 	if name == "" {
 		name = bi.NodeLabel
-	}
-	deviceType := uint32(pd.DeviceType)
-	if deviceType == 0 {
-		deviceType = deviceTypeRootNode
 	}
 	return bridge.CommissioningAdvertisement{
 		InstanceID:    instanceID,
@@ -584,7 +586,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 			mdns.DeriveUniqueIDFromIdentity(pd.VendorID, pd.ProductID, bi.SerialNumber, bi.NodeLabel), 0,
 		),
 		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
-		DeviceTypeID:      deviceType,
+		DeviceTypeID:      uint32(pd.DeviceType),
 	}, nil
 }
 
@@ -1476,10 +1478,30 @@ func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
 // process, this boot's value).
 func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
+// setNetworkInterfaceRules states GeneralDiagnostics NetworkInterfaces'
+// rules: the root's network type for every entry — matter.js's fallback for
+// an interface the platform gives no type (GeneralDiagnosticsServer.ts:527,
+// :477-494 at db021da0), which every entry takes here because the module
+// has no platform mapping; matter.js's Node.js platform types every
+// interface Ethernet unless configured (cluster/core
+// enumerateNetworkInterfaces) — and the interfaces the node's own
+// advertiser is restricted to as the operational ones (:496-503). A host's
+// advertiser restricts nothing the node knows of.
+func (n *Node) setNetworkInterfaceRules() {
+	if n.cfg.Network.WiFi != nil {
+		n.root.GeneralDiagnostics.SetNetworkInterfaceType(mattercore.InterfaceTypeWiFi)
+	}
+	if n.ownsAdvertiser && !n.cfg.Network.MDNS.Off {
+		n.root.GeneralDiagnostics.SetAdvertisedInterfaces(n.cfg.Network.MDNS.Interfaces)
+	}
+}
+
 // BootReason returns the GeneralDiagnostics BootReason the node was built
-// with — the value [Node.Start]'s EmitBootReason reports. The device layer
-// passes it to the default OnOff servers (onoff.Config.BootReason), which
-// skip StartUpOnOff after a software update (OnOffServer.ts:36, :326-331).
+// with — the value [Node.Start]'s EmitBootReason reports: [Config].BootReason,
+// or SoftwareUpdateCompleted for a start into the update the node's OTA
+// requestor recorded. A host passes it to a lighting OnOff server it builds
+// (onoff.Config.BootReason), which skips StartUpOnOff after a software
+// update (OnOffServer.ts:33-37, :324-329 at db021da0).
 func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.

@@ -9,7 +9,9 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -315,6 +317,9 @@ func TestInvokeRefusals(t *testing.T) {
 	if err := full.MatterWrite(ctx, sa.AttrSelectedAreas, []uint32{}); spec.StatusOf(err) != im.StatusUnsupportedWrite {
 		t.Errorf("a write to SelectedAreas: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
+	if changed, err := full.MatterWriteChanged(ctx, sa.AttrSelectedAreas, []uint32{}); changed || spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWriteChanged of SelectedAreas: %v, %v; want unchanged and %v", changed, err, im.StatusUnsupportedWrite)
+	}
 }
 
 // TestSetters holds every host setter to the reactor it mirrors.
@@ -435,6 +440,45 @@ func TestEstimatedEndTime(t *testing.T) {
 	if got := srv.MatterReportable(); slices.Contains(got, sa.AttrEstimatedEndTime) || !slices.Contains(got, sa.AttrCurrentArea) {
 		t.Errorf("MatterReportable %v", got)
 	}
+}
+
+// TestEstimatedEndTimeAdvancesTheDataVersionAtTheChange: every change of
+// EstimatedEndTime advances the DataVersion when it happens, a throttled
+// one included, and the throttle's deferred report advances nothing more.
+// EstimatedEndTime is ordinary state in matter.js: the commit that
+// changed it advances the version
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), and the quiet emit adds an advance only for a dynamic
+// property (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261
+// calls advanceVersionFor, Datasource.ts:679-688), which
+// ServiceAreaServer declares none of.
+func TestEstimatedEndTimeAdvancesTheDataVersionAtTheChange(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(5000, 0))
+	cfg := vacuum(&device{})
+	cfg.Clock = clk
+	srv := newServer(t, cfg)
+	seen := notifications(srv)
+	v0 := srv.MatterDataVersion()
+	step := func(when string, advance uint32, reports int) {
+		t.Helper()
+		if got := srv.MatterDataVersion(); got != v0+advance {
+			t.Fatalf("%s: DataVersion %d, want %d", when, got, v0+advance)
+		}
+		if n := len(*seen); n != reports {
+			t.Fatalf("%s: %d reports, want %d", when, n, reports)
+		}
+	}
+	if err := srv.SetEstimatedEndTime(ptr[uint32](1000)); err != nil {
+		t.Fatal(err)
+	}
+	step("from null, reported at once", 1, 1)
+	if err := srv.SetEstimatedEndTime(ptr[uint32](1050)); err != nil {
+		t.Fatal(err)
+	}
+	step("an increase the throttle holds", 2, 1)
+	clk.Advance(time.Second)
+	step("the throttle's deferred report", 2, 2)
 }
 
 // TestRemoveEntries is matter.js removeSupportedAreasEntry and

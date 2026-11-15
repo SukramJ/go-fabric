@@ -96,6 +96,33 @@ type RootClusters struct {
 	TLSClientManagement      *tls.ClientManagement
 
 	servers []contract.ClusterServer
+	// bootReason is the GeneralDiagnostics BootReason of this start
+	// (startBootReason).
+	bootReason uint8
+}
+
+// startBootReason is the BootReason of this start: SoftwareUpdateCompleted
+// when the node's OTA requestor recorded an update in progress to the
+// version basicInfo now serves — the start that update brought about,
+// which the requestor reports as VersionApplied (mattercore.OTAUpdateApplied)
+// — else the configured one ([Config].BootReason). matter.js leaves the
+// value to the application after an update
+// (OtaSoftwareUpdateRequestorServer.ts:153-155 at db021da0); the node has
+// the record and states it. A record that cannot be read is logged and
+// leaves the configured value.
+func startBootReason(ctx context.Context, d rootDeps, basicInfo *mattercore.BasicInformation) uint8 {
+	if d.cfg.OTA == nil || d.st == nil {
+		return d.bootReason
+	}
+	applied, err := mattercore.OTAUpdateApplied(ctx, d.st, basicInfo.OtaNodeInformation().SoftwareVersion)
+	if err != nil {
+		d.logger.Warn("matter.ota.boot_reason_unknown", slog.Any("err", err))
+		return d.bootReason
+	}
+	if applied {
+		return mattercore.BootReasonSoftwareUpdate
+	}
+	return d.bootReason
 }
 
 // Servers returns the mounted set, in mount order.
@@ -156,12 +183,13 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	coreseam.SetSpecificationVersion(basicInfo, cfg.specificationVersion)
 	r.BasicInformation = basicInfo
 
+	r.bootReason = startBootReason(ctx, d, basicInfo)
 	// RebootCount and the operational time carry over from the previous
 	// boots (wiring.go:118-128 at b4ea1f96^).
 	if f := cfg.GeneralDiagnosticsFeatures; f != nil {
-		r.GeneralDiagnostics = mattercore.NewGeneralDiagnosticsWith(d.bootReason, *f)
+		r.GeneralDiagnostics = mattercore.NewGeneralDiagnosticsWith(r.bootReason, *f)
 	} else {
-		r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
+		r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(r.bootReason)
 	}
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
 	r.GeneralDiagnostics.SetLogger(d.logger)
@@ -254,10 +282,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	r.AccessControl.SetLogger(d.logger)
 	r.AccessControl.SetLimits(cfg.Limits.accessControl())
-	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{
+	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{ //nolint:contextcheck // the constructor takes no context; it repairs the store once
 		MaxGroupsPerFabric:    cfg.Limits.MaxGroupsPerFabric,
 		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,
 		Groups:                d.groups,
+		Logger:                d.logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)
@@ -711,7 +740,7 @@ func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.Gener
 	cfg := d.cfg
 	gc, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		Logger:                       d.logger,
-		LocationCapability:           cfg.Commissioning.LocationCapability,
+		LocationCapability:           cfg.Commissioning.locationCapability(),
 		SupportsConcurrentConnection: true,
 		TermsAndConditions:           cfg.Commissioning.TermsAndConditions.core(),
 		Settings:                     d.st,

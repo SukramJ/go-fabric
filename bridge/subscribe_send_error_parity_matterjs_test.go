@@ -11,13 +11,19 @@ package bridge
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
@@ -136,4 +142,272 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 			t.Error("paths left on the subscription after the reports")
 		}
 	})
+}
+
+// undeliveredReportRig is a device with a subscription whose peer never
+// acknowledges a report: two sessions of the subscriber, the
+// subscription on the first.
+type undeliveredReportRig struct {
+	dev        *resumeDevice
+	outbound   *outboundReliableTracker
+	sub        *subscription.Subscription
+	reportSID  uint16
+	siblingSID uint16
+	graceful   *atomic.Int32
+}
+
+func newUndeliveredReportRig(t *testing.T, base uint16) *undeliveredReportRig {
+	t.Helper()
+	stamp := &stampClock{}
+	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, sessions *operational.Manager) {
+		onStampClock(br, sessions, stamp)
+		br.AttachAckTracker(mrp.NewAckTracker(0))
+	})
+	r := &undeliveredReportRig{dev: dev, reportSID: base, siblingSID: base + 1, graceful: &atomic.Int32{}}
+	dev.sessions.SetGracefulCloseNotifier(func(uint16, *channel.Session) { r.graceful.Add(1) })
+	silent, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = silent.Close() })
+	peerAddr, ok := silent.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		t.Fatalf("peer address %T", silent.LocalAddr())
+	}
+	for _, sid := range []uint16{r.reportSID, r.siblingSID} {
+		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil {
+			t.Fatal(err)
+		}
+		dev.br.sessionPeerAddrs.Store(sid, peerAddr)
+	}
+	r.sub, err = dev.subs.Subscribe(subscription.SubscribeArgs{
+		FabricIndex: resumeFabricIndex, PeerNodeID: resumeCtrlNode, SessionID: r.reportSID,
+		MaxIntervalCeiling: 3600, KeepSubscriptions: true,
+		AttributePaths: []im.ConcreteAttributePath{undeliveredReportPath},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev.br.routing.subTargets.Store(r.sub.ID, subTarget{
+		src: peerAddr, sessionID: r.reportSID, fabricIndex: resumeFabricIndex, subjectNodeID: resumeCtrlNode,
+	})
+	dev.br.mu.RLock()
+	r.outbound = dev.br.outboundReliable
+	dev.br.mu.RUnlock()
+	if r.outbound == nil {
+		t.Fatal("no outbound-reliable tracker")
+	}
+	return r
+}
+
+var undeliveredReportPath = im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x001F, Attribute: 0x0000, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+
+// report sends one ongoing report of the subscription's path.
+func (r *undeliveredReportRig) report() {
+	r.dev.br.reportSubscription(context.Background(), r.sub, []im.ConcreteAttributePath{undeliveredReportPath})
+}
+
+// pending waits for the subscription's next report to be tracked for
+// retransmission and returns the counter of its message. After a failed
+// update it is the device's subscription engine that sends it, with what
+// the failed report owed: nothing else is due (no change, the keep-alive
+// half an hour away).
+func (r *undeliveredReportRig) pending(t *testing.T) uint32 {
+	t.Helper()
+	var counter uint32
+	waitFor(t, "a report tracked for retransmission", func() bool {
+		r.outbound.mu.Lock()
+		defer r.outbound.mu.Unlock()
+		for key := range r.outbound.pending {
+			if key.sessionID == r.reportSID {
+				counter = key.counter
+				return true
+			}
+		}
+		return false
+	})
+	return counter
+}
+
+// exhaust drives every tracked message past its last retransmission.
+func (r *undeliveredReportRig) exhaust() {
+	now := time.Now()
+	for i := 0; i <= mrp.MaxRetransmissions+1; i++ {
+		r.dev.br.tickOutboundReliable(r.outbound, now.Add(time.Duration(i+1)*time.Hour))
+	}
+}
+
+// sessionsKept fails the test when a session of the subscriber was closed
+// or a CloseSession was sent.
+func (r *undeliveredReportRig) sessionsKept(t *testing.T, when string) {
+	t.Helper()
+	for _, sid := range []uint16{r.reportSID, r.siblingSID} {
+		if _, err := r.dev.sessions.Get(sid); err != nil {
+			t.Errorf("%s: session %#x closed: %v", when, sid, err)
+		}
+	}
+	if n := r.graceful.Load(); n != 0 {
+		t.Errorf("%s: CloseSession sent %d times", when, n)
+	}
+}
+
+// TestUndeliveredReportIsOneFailedUpdateParity ports matter.js
+// packages/node/test/node/ServerSubscriptionTest.ts "abandons the
+// subscription after repeated MRP exhaustion, leaving the session alone"
+// at db021da0: a report whose message runs out of retransmissions is one
+// failed update — its data is owed again, and the subscription ends after
+// the third (ServerSubscription.ts:563-603). It is no peer loss: report
+// exchanges are opened with suppressPeerLoss (InteractionServer.ts:96-97,
+// :785-797), so every session of the subscriber stays and no CloseSession
+// is sent.
+func TestUndeliveredReportIsOneFailedUpdateParity(t *testing.T) {
+	t.Parallel()
+	r := newUndeliveredReportRig(t, 0x1401)
+	r.report()
+	for failed := 1; failed <= 3; failed++ {
+		r.pending(t)
+		r.exhaust()
+		r.sessionsKept(t, fmt.Sprintf("after %d failed updates", failed))
+		_, err := r.dev.subs.Get(r.sub.ID)
+		if failed < 3 && err != nil {
+			t.Fatalf("subscription ended after %d failed updates, want after 3: %v", failed, err)
+		}
+		if failed == 3 && err == nil {
+			t.Fatal("subscription still open after 3 failed updates")
+		}
+	}
+}
+
+// TestDeliveredReportRestartsTheFailedUpdateCount: an acknowledged report
+// is a delivered update, and the count of failed ones starts again.
+// matter.js ServerSubscription.ts:554-557 at db021da0 resets
+// #sendUpdateErrorCounter when #sendUpdateMessage returns, which is after
+// the peer's StatusResponse to the report
+// (packages/protocol/src/interaction/InteractionMessenger.ts:838-845,
+// waitForSuccess at :844); this module counts the update as delivered at
+// the report's acknowledgement (F-db021da0-36).
+func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
+	t.Parallel()
+	r := newUndeliveredReportRig(t, 0x1501)
+	r.report()
+	for range 2 {
+		r.pending(t)
+		r.exhaust()
+	}
+	counter := r.pending(t)
+	if !r.outbound.Ack(r.reportSID, counter) {
+		t.Fatal("the report's acknowledgement found no entry")
+	}
+	r.dev.br.releaseReportCounter(r.reportSID, counter)
+	r.report()
+	for range 2 {
+		r.pending(t)
+		r.exhaust()
+	}
+	if _, err := r.dev.subs.Get(r.sub.ID); err != nil {
+		t.Fatalf("subscription ended after two failed updates following a delivered one: %v", err)
+	}
+	r.sessionsKept(t, "after a delivered and four failed updates")
+}
+
+// inFlight counts the subscription's report messages that wait for the
+// peer's acknowledgement.
+func (r *undeliveredReportRig) inFlight() int {
+	r.outbound.mu.Lock()
+	defer r.outbound.mu.Unlock()
+	n := 0
+	for key := range r.outbound.pending {
+		if key.sessionID == r.reportSID {
+			n++
+		}
+	}
+	return n
+}
+
+// TestOverlappingUndeliveredReportsAreOneFailedUpdateParity: reports sent
+// while an earlier one still waits for its acknowledgement belong to the
+// update that earlier one is part of — matter.js sends no next update
+// while one is in progress (packages/node/src/node/server/ServerSubscription.ts:520-529
+// at db021da0, #triggerSendUpdate returns while #currentUpdatePromise is
+// set), and an update ends only when its message is acknowledged or given
+// up (:553-557 awaits #sendUpdateMessage). Three reports that run out of
+// retransmissions in one window are one failed update, and the
+// subscription ends at the third failed update in a row, three windows
+// one after the other (:563-603).
+func TestOverlappingUndeliveredReportsAreOneFailedUpdateParity(t *testing.T) {
+	t.Parallel()
+	r := newUndeliveredReportRig(t, 0x1601)
+	for want := 1; want <= 3; want++ {
+		r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		waitFor(t, fmt.Sprintf("%d reports in flight", want), func() bool { return r.inFlight() >= want })
+	}
+	r.exhaust()
+	if _, err := r.dev.subs.Get(r.sub.ID); err != nil {
+		t.Fatalf("subscription ended by three reports given up in one window: %v", err)
+	}
+	if raw, _ := r.dev.br.subSendErrorCount.Load(r.sub.ID); raw != 1 {
+		t.Fatalf("failed updates counted after one window: %v, want 1", raw)
+	}
+	r.sessionsKept(t, "after one window")
+}
+
+// TestFailedUpdatesCountedInSequenceParity: the outcomes of a
+// subscription's reports are counted as matter.js counts updates, which
+// follow one another (ServerSubscription.ts:520-529, :553-603 at
+// db021da0). A failure of a report begun before the last counted failure
+// is part of that failed update; a failure of a report older than a
+// delivered one is no failed update in a row; a delivered report starts
+// the count again; the third failure in a row, each of a report begun
+// after the one before was counted, ends the subscription.
+func TestFailedUpdatesCountedInSequenceParity(t *testing.T) {
+	t.Parallel()
+	const (
+		subID     = uint32(31)
+		sessionID = uint16(7)
+	)
+	b := &Bridge{}
+	b.routing.subTargets.Store(subID, subTarget{})
+	var counter uint32
+	send := func() uint32 {
+		counter++
+		b.reportCounterOwner.Store(reportCounterKey(sessionID, counter), &owedReport{subID: subID, seq: b.beginUpdate(subID)})
+		return counter
+	}
+	counted := func(when string, want int) {
+		t.Helper()
+		raw, ok := b.subSendErrorCount.Load(subID)
+		got := 0
+		if ok {
+			got, _ = raw.(int)
+		}
+		if got != want {
+			t.Fatalf("%s: %d failed updates counted, want %d", when, got, want)
+		}
+		if _, live := b.routing.subTargets.Load(subID); !live {
+			t.Fatalf("%s: subscription ended", when)
+		}
+	}
+
+	overlapping := []uint32{send(), send(), send()}
+	for _, c := range overlapping {
+		b.noteReportUndelivered(sessionID, c)
+	}
+	counted("three reports given up in one window", 1)
+
+	b.noteReportUndelivered(sessionID, send())
+	counted("a report begun after the first failure given up", 2)
+
+	older, newer := send(), send()
+	b.releaseReportCounter(sessionID, newer)
+	counted("a later report delivered", 0)
+	b.noteReportUndelivered(sessionID, older)
+	counted("a report older than a delivered one given up", 0)
+
+	b.noteReportUndelivered(sessionID, send())
+	b.noteReportUndelivered(sessionID, send())
+	counted("two failed updates in a row", 2)
+	b.noteReportUndelivered(sessionID, send())
+	if _, live := b.routing.subTargets.Load(subID); live {
+		t.Fatal("subscription open after the third failed update in a row")
+	}
 }

@@ -1062,7 +1062,10 @@ func TestPM10ConcentrationServerHappyPath(t *testing.T) {
 
 // --- PowerSourceServer ---
 
-// TestPowerSourceServerStatusActive verifies Status=uint8(1), Order=uint8(1), and Description="Battery".
+// TestPowerSourceServerStatusActive verifies Status=uint8(1), Order=uint8(1), and
+// Description="Battery power", matter.js PowerSourceServer.initialize's
+// default for BAT (packages/node/src/behaviors/power-source/PowerSourceServer.ts:40-46
+// at db021da0).
 func TestPowerSourceServerStatusActive(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewPowerSourceServer(fakeBool{class: contract.MeasurementBattery, val: false, obs: true})
@@ -1091,7 +1094,7 @@ func TestPowerSourceServerStatusActive(t *testing.T) {
 	if !ok {
 		t.Fatal("MatterRead(0x0002) ok = false")
 	}
-	if got, want := desc.(string), "Battery"; got != want {
+	if got, want := desc.(string), "Battery power"; got != want {
 		t.Errorf("Description = %q, want %q", got, want)
 	}
 }

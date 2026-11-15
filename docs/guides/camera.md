@@ -70,16 +70,25 @@ deletion, and the port's `End` is told of each with UnknownReason, so the
 host tears the stream down (`contract.FabricScopedState`).
 
 The four commands are large messages, so a controller sends them over
-TCP. `CurrentSessions` is fabric-sensitive: a peer reads its own fabric's
-sessions only.
+TCP; the node serves them on the session they arrive on, whatever its
+transport. `CurrentSessions` is fabric-sensitive: a peer reads its own
+fabric's sessions only.
 
-**The ACL entry.** The node installs the access the camera needs. At
-`Start` and after each commissioning, on the first fabric, it adds one
-Operate entry for CASE with no subject, targeting the requestor's
-endpoint and cluster. It adds the entry only when the fabric's ACL does
-not hold it yet. This follows matter.js `#nodeOnline`. The node emits no
-AccessControlEntryChanged event for the entry, because matter.js emits
-none for a change without a remote actor.
+**The ACL entry.** The camera needs Operate access to the requestor. The
+node writes that entry only into the fabrics the host grants through
+`node.Config.WebRTCRequestor.GrantFabric`, and into no fabric by default.
+At `Start` and after each commissioning the node asks `GrantFabric` for each
+of its fabrics. Into each granted one it adds one Operate entry for CASE
+with no subject, targeting the requestor's endpoint and cluster, unless the
+fabric's ACL holds it already. Without a grant the fabric's administrator
+writes the access itself. matter.js's `#nodeOnline` writes the entry into
+the first fabric its node's own controller administers; a `Node` has no
+controller of its own, so it asks the host. A grant only adds: an entry
+written while a grant stood, or by a version that wrote it into the first
+fabric, stays when the grant goes, until the fabric's administrator writes
+the ACL without it. The node emits no AccessControlEntryChanged event for
+the entry, because matter.js emits none for a change without a remote
+actor.
 
 ### The camera's signals
 
@@ -120,16 +129,22 @@ A session id `CurrentSessions` does not hold is `camera.ErrUnknownSession`.
 The peer's refusal comes back as an error carrying its status
 (`im.StatusCodeError`): `NOT_FOUND` when the requestor holds no session of
 that id from this node, `UNSUPPORTED_ACCESS` when its ACL lacks the Operate
-entry (the node installs it on its own requestors, see above). The signals
-carry an SDP, so they can exceed one UDP message (1178 bytes of payload).
-The node initiates CASE over UDP only and reuses the newest live session
-with the peer, of either transport; a signal that does not fit the session
-it would go over is refused with `camera.ErrPayloadTooLarge` and not sent
+entry (the node installs it on its own requestors in the fabrics its
+host grants, see above). The signals carry an SDP, so they can exceed one
+UDP message (1178 bytes of payload). The node initiates CASE over UDP only
+and reuses the newest live session with the peer, of either transport; a
+signal that does not fit one message of the session it would go over —
+over TCP the connection's largest message, at most the MaxTcpMessageSize
+the peer stated — is refused with `camera.ErrPayloadTooLarge` and not sent
 (`bridge.ErrPayloadTooLarge` is the same value; a camera host needs
-`cluster/camera` alone).
-connectedhomeip establishes a TCP session for them
-(`TransportPayloadCapability::kLargePayload`); a controller that reached
-the camera over TCP leaves the session the signals need.
+`cluster/camera` alone). connectedhomeip's session setup takes TCP for a
+session asked for with `TransportPayloadCapability::kLargePayload` when the
+peer advertises a TCP server (`src/transport/SessionManager.h:72-74`,
+`src/app/OperationalSessionSetup.cpp:324-329` at `6170af84`); that its
+camera app asks for such a session for these signals
+(`webrtc-provider-manager.cpp`) was not read at the pin (unverified). A
+controller that reached the camera over TCP leaves the session the signals
+need.
 
 ## Chime
 
@@ -379,7 +394,12 @@ a host, a path that ends in `/`, no query or fragment, `InvalidURL`;
 (`InvalidStreamUsage`), the motion zones (unique, within MaxZones, the
 camera's zones, `InvalidZone`), the streams, the segment duration against
 the key-frame interval (`InvalidOptions`), the bandwidth (the port) and
-the pre-roll (`InvalidPreRollLength`). The port then allocates the
+the pre-roll (`InvalidPreRollLength`). Three of the model's request
+constraints are the server's to judge, as chip judges them: an empty
+VideoStreams or AudioStreams list counts as no stream field, more than 16
+streams is `CONSTRAINT_ERROR`, and a MotionSensitivity on a camera with
+PERZONESENS is `INVALID_COMMAND` whatever its value (without PERZONESENS
+it must lie in 1 to 10, `CONSTRAINT_ERROR`). The port then allocates the
 transport with its `TLSCredentials`, the endpoint and its DER
 certificates; without the node's TLS servers or the declaration's
 lookups every allocation is InvalidTLSEndpoint. The transport starts inactive; `SetTransportStatus`

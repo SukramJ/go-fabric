@@ -326,6 +326,12 @@ func (s *TemperatureServer) MatterWrite(_ context.Context, attrID uint32, value 
 	return refuseWrite(tempInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *TemperatureServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Temperature Measurement cluster has no commands.
 func (s *TemperatureServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -400,6 +406,12 @@ func (s *HumidityServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Relative Humidity Measurement cluster is read-only at the wire layer.
 func (s *HumidityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(humidityInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *HumidityServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Relative Humidity Measurement cluster has no commands.
@@ -483,6 +495,12 @@ func (s *IlluminanceServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Illuminance Measurement cluster is read-only at the wire layer.
 func (s *IlluminanceServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(illuminanceInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *IlluminanceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Illuminance Measurement cluster has no commands.
@@ -587,6 +605,12 @@ func (s *PressureServer) MatterWrite(_ context.Context, attrID uint32, value any
 	return refuseWrite(pressureInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PressureServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Pressure Measurement cluster has no commands.
 func (s *PressureServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -668,10 +692,7 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 		// rejection (chip CHIP Error 0x26). Default to false (not active)
 		// before the first CCU push, matching the safe-state convention used
 		// by OnOffServer for non-nullable bool attributes.
-		v, ok := s.src.MatterBoolValue()
-		if !ok {
-			return false, true
-		}
+		v, _ := s.ObservedStateValue()
 		return v, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
 		return booleanStateInst.ReadGlobal(attrID)
@@ -679,9 +700,25 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 	return nil, false
 }
 
+// ObservedStateValue returns StateValue as the source reads it and whether
+// the source observes one. An unobserved source reads false on the wire
+// ([BooleanStateServer.MatterRead]) but has taken no reading: the
+// bridge's StateChange observer neither emits nor remembers it, as for
+// [OccupancySensingServer.ObservedOccupancy].
+func (s *BooleanStateServer) ObservedStateValue() (value, observed bool) {
+	v, ok := s.src.MatterBoolValue()
+	return v && ok, ok
+}
+
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Boolean State cluster is read-only at the wire layer.
 func (s *BooleanStateServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(booleanStateInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *BooleanStateServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Boolean State cluster has no commands.
@@ -808,15 +845,15 @@ func (s *OccupancySensingServer) MatterClusterID() uint32 { return ClusterOccupa
 func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrOccupancy:
-		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
-		v, ok := s.src.MatterBoolValue()
-		if !ok {
-			return nil, true
-		}
-		if v {
-			return uint8(1), true
-		}
-		return uint8(0), true
+		// Occupancy is a map8 with conformance M and no quality X
+		// (matter.js packages/model/src/standard/elements/
+		// occupancy-sensing.element.ts:36 at db021da0), so an unobserved
+		// source reads 0, unoccupied — matter.js's default of a
+		// non-nullable bitmap, `{}` with no bit set (packages/model/src/
+		// logic/SelectDefaultValue.ts:155-171) — as
+		// BooleanStateServer.MatterRead answers false.
+		v, _ := s.ObservedOccupancy()
+		return v, true
 	case attrOccupancySensorType:
 		// A type the features leave unset reads as the enum's
 		// SelectDefaultValue, Pir (0), as the kit's server does.
@@ -831,9 +868,28 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 	return nil, false
 }
 
+// ObservedOccupancy returns the Occupancy bitmap of the source's reading
+// and whether the source observes one. An unobserved source reads 0 on
+// the wire ([OccupancySensingServer.MatterRead]) but has taken no
+// reading: the bridge's OccupancyChanged observer neither emits nor
+// remembers it.
+func (s *OccupancySensingServer) ObservedOccupancy() (bitmap uint8, observed bool) {
+	v, ok := s.src.MatterBoolValue()
+	if ok && v {
+		return 1, true
+	}
+	return 0, ok
+}
+
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Occupancy Sensing cluster is read-only at the wire layer.
 func (s *OccupancySensingServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(s.inst(), attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *OccupancySensingServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Occupancy Sensing cluster has no commands.
@@ -1019,13 +1075,27 @@ func (s *ElectricalPowerServer) MatterWrite(_ context.Context, attrID uint32, va
 	return refuseWrite(electricalPowerInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ElectricalPowerServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Electrical Power Measurement cluster has no commands.
 func (s *ElectricalPowerServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
 }
 
-// MatterReportable returns the attribute IDs that the Matter Electrical Power Measurement cluster reports on change.
-func (s *ElectricalPowerServer) MatterReportable() []uint32 { return []uint32{attrElPwrActivePower} }
+// MatterReportable returns the attribute IDs that the Matter Electrical
+// Power Measurement cluster reports on change: every reading it serves —
+// Voltage, ActiveCurrent, ActivePower and Frequency, each of the quieter
+// quality (packages/model/src/standard/elements/electrical-power-measurement.element.ts:54-55,
+// :58-59, :70-71, :94-95 at db021da0), which the bridge reports through
+// its throttle. A reading the source does not carry reads null and never
+// changes.
+func (s *ElectricalPowerServer) MatterReportable() []uint32 {
+	return []uint32{attrElPwrVoltage, attrElPwrActiveCurrnt, attrElPwrActivePower, attrElPwrFrequency}
+}
 
 // MatterAttributes lists every ElectricalPowerMeasurement (0x0090)
 // attribute the server implements via MatterRead. Apple Home's HAP
@@ -1034,6 +1104,21 @@ func (s *ElectricalPowerServer) MatterReportable() []uint32 { return []uint32{at
 func (s *ElectricalPowerServer) MatterAttributes() []uint32 {
 	return electricalPowerInst.MatterAttributes()
 }
+
+// Compile-time assertion: ElectricalPowerServer lists its events.
+var _ contract.ClusterEventLister = (*ElectricalPowerServer)(nil)
+
+// MatterEvents implements [contract.ClusterEventLister]: none.
+// MeasurementPeriodRanges is mandatory with the optional Ranges attribute
+// (matter.js
+// packages/model/src/standard/elements/electrical-power-measurement.element.ts:124,
+// :47 at db021da0), which the server does not serve, the server emits no
+// event, and matter.js ElectricalPowerMeasurementServer emits none either
+// (packages/node/src/behaviors/electrical-power-measurement/ElectricalPowerMeasurementServer.ts:18),
+// so its cluster type carries no event
+// (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
+// path on the cluster selects nothing (review II, R2-P4-nw-05).
+func (s *ElectricalPowerServer) MatterEvents() []uint32 { return electricalPowerInst.MatterEvents() }
 
 // The constraints of the readings ElectricalPowerMeasurement serves:
 // "-2^62 to 2^62" for Voltage, ActiveCurrent and ActivePower, "0 to
@@ -1161,6 +1246,12 @@ func (s *ElectricalEnergyServer) MatterWrite(_ context.Context, attrID uint32, v
 	return refuseWrite(electricalEnergyInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *ElectricalEnergyServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Electrical Energy Measurement cluster has no commands.
 func (s *ElectricalEnergyServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1178,6 +1269,23 @@ func (s *ElectricalEnergyServer) MatterReportable() []uint32 {
 func (s *ElectricalEnergyServer) MatterAttributes() []uint32 {
 	return electricalEnergyInst.MatterAttributes()
 }
+
+// MatterEvents implements [contract.ClusterEventLister]:
+// CumulativeEnergyMeasured, mandatory with the CumulativeEnergy feature
+// ("CUME", matter.js
+// packages/model/src/standard/elements/electrical-energy-measurement.element.ts:56-59
+// at db021da0). The server is rebuilt on every dispatch and keeps no
+// reading, so the bridge emits the event when the source's cumulative
+// value changes (review II, R2-P4-nv-05a).
+func (s *ElectricalEnergyServer) MatterEvents() []uint32 { return electricalEnergyInst.MatterEvents() }
+
+// ElectricalEnergyEventCumulativeMeasured is the CumulativeEnergyMeasured
+// event (0x00).
+const ElectricalEnergyEventCumulativeMeasured = eemdef.EventCumulativeEnergyMeasured
+
+// CumulativeEnergyMeasuredEvent is CumulativeEnergyMeasured's payload: the
+// cumulative energy imported (the server binds no ExportedEnergy).
+type CumulativeEnergyMeasuredEvent = eemdef.CumulativeEnergyMeasuredEvent
 
 func whToMilliWattHours(wh float64) int64 {
 	v := math.Round(wh * 1000)
@@ -1279,6 +1387,12 @@ func (s *AirQualityServer) level() uint8 {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite) — AirQuality carries a single "R V" attribute.
 func (s *AirQualityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(s.inst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *AirQualityServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Air Quality cluster has no commands.
@@ -1398,6 +1512,12 @@ func (s *concentrationServer) MatterWrite(_ context.Context, attrID uint32, valu
 	return refuseWrite(s.inst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *concentrationServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 func (s *concentrationServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
 }
@@ -1491,11 +1611,11 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 // A mains-powered device's source states [contract.PowerSourceSelection]
 // Wired ([NewWiredPowerSourceServer]): the Wired feature in place of
 // Battery, as the model's "O.a" admits one of the two per cluster
-// (power-source-cluster.element.ts:24-25 at 862ad75f). It serves no
+// (power-source-cluster.element.ts:24-25 at db021da0). It serves no
 // battery reading; its current type and its Description "Mains power" are
 // matter.js PowerSourceServer.initialize's defaults for WIRED
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:40-46,
-// :57-61 at 862ad75f).
+// :57-61 at db021da0).
 //
 // PowerSourceServer embeds [cluster.DataVersionTracker] and implements
 // [contract.ClusterDataVersion]. See TemperatureServer for the
@@ -1597,10 +1717,13 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 	case attrPwrOrder:
 		return uint8(1), true // primary source
 	case attrPwrDescription:
+		// matter.js PowerSourceServer.initialize's defaults for WIRED and
+		// BAT (packages/node/src/behaviors/power-source/
+		// PowerSourceServer.ts:40-46 at db021da0).
 		if s.wired {
 			return "Mains power", true
 		}
-		return "Battery", true
+		return "Battery power", true
 	case attrPwrWiredCurrentType:
 		if !s.wired {
 			return nil, false
@@ -1681,6 +1804,12 @@ func (s *PowerSourceServer) MatterWrite(_ context.Context, attrID uint32, value 
 	return refuseWrite(s.inst(), attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PowerSourceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — the Matter Power Source cluster has no commands.
 func (s *PowerSourceServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)
@@ -1708,6 +1837,21 @@ func (s *PowerSourceServer) MatterReportable() []uint32 {
 // instance genuinely does not implement it rather than reporting null
 // forever.
 func (s *PowerSourceServer) MatterAttributes() []uint32 { return s.inst().MatterAttributes() }
+
+// Compile-time assertion: PowerSourceServer lists its events.
+var _ contract.ClusterEventLister = (*PowerSourceServer)(nil)
+
+// MatterEvents implements [contract.ClusterEventLister]: none. The three
+// PowerSource events are optional under every feature ("[WIRED]", "[BAT]",
+// "[RECHG]", matter.js
+// packages/model/src/standard/elements/power-source-cluster.element.ts:135,
+// :147, :159 at db021da0), the server emits none, and matter.js
+// PowerSourceServer emits none either
+// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63), so
+// its cluster type carries no event
+// (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
+// path on the cluster selects nothing (review II, R2-P4-nw-05).
+func (s *PowerSourceServer) MatterEvents() []uint32 { return s.inst().MatterEvents() }
 
 // percentToHalfPercent converts a 0-100 battery percentage to Matter's
 // BatPercentRemaining wire encoding — half-percent units, uint8
@@ -1779,6 +1923,12 @@ func (s *PowerTopologyServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the PowerTopology is read-only at the wire layer.
 func (s *PowerTopologyServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	return refuseWrite(powerTopologyInst, attrID, value)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *PowerTopologyServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — PowerTopology has no commands.

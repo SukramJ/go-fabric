@@ -36,8 +36,8 @@ func (s stubTransports) TransportParametersFor(sessionID uint16) (transports uin
 // TestChunkLimitsForRoute: replies over UDP keep the datagram budget; over
 // a reliable connection the chunker may fill the connection's frame,
 // bounded by the peer's stated MaxTcpMessageSize (matter.js keeps it on
-// the Session, Session.ts:86, :118; TcpChannel.ts:125-126 refuses a larger
-// message), never below the UDP limits.
+// the Session, Session.ts:87, :119; MessageChannel.ts:86-92 and :106-112
+// refuse a larger message, at db021da0), never below the UDP limits.
 func TestChunkLimitsForRoute(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	udp := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}

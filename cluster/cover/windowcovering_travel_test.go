@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -87,6 +88,59 @@ func TestParityMatterJS_WindowCovering_TravellingMovement(t *testing.T) {
 		synctest.Wait()
 		if read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths) != cur {
 			t.Fatal("the lift moved after StopMotion")
+		}
+	})
+}
+
+// TestTravelFromAPositionTheHostMadeUnknown: the host sets the lift's
+// position unknown during a travel. The remaining steps move nothing and
+// report nothing — the position stays null — and the travel still ends
+// after its sixth step: a position the host reports afterwards stays put
+// (the tick's unknown-position branch, windowcovering_server.go tick).
+func TestTravelFromAPositionTheHostMadeUnknown(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		const step = 950 * time.Millisecond
+		srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0b101, InitialPositionPercent100ths: 10000, MoveStep: step})
+		typed := wcdef.Wrap(srv)
+		ctx := context.Background()
+		if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdUpOrOpen, nil); err != nil {
+			t.Fatal(err)
+		}
+		read := func(id uint32) any { v, _ := srv.MatterRead(id); return v }
+		time.Sleep(step)
+		synctest.Wait()
+		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(8334) {
+			t.Fatalf("position after one step = %v, want 8334", cur)
+		}
+		if err := typed.Set(wcdef.Patch{Null: []uint32{wcdef.AttrCurrentPositionLiftPercent100ths}}); err != nil {
+			t.Fatal(err)
+		}
+		var mu sync.Mutex
+		var reported [][]uint32
+		srv.OnAttributeChange(func(change contract.Change) {
+			mu.Lock()
+			reported = append(reported, change.Attributes)
+			mu.Unlock()
+		})
+		time.Sleep(2 * step)
+		synctest.Wait()
+		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != nil {
+			t.Errorf("position two steps after the host made it unknown = %v, want null", cur)
+		}
+		time.Sleep(3 * step) // the sixth step ends the travel
+		synctest.Wait()
+		mu.Lock()
+		steps := len(reported)
+		mu.Unlock()
+		if steps != 0 {
+			t.Errorf("the steps over an unknown position reported %v, want nothing", reported)
+		}
+		srv.SetCurrentPosition(new(uint16(5000)), nil)
+		time.Sleep(10 * step)
+		synctest.Wait()
+		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(5000) {
+			t.Errorf("the host's position after the travel ended = %v, want 5000 kept", cur)
 		}
 	})
 }

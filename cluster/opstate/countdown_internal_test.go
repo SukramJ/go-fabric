@@ -13,10 +13,15 @@ import (
 )
 
 // TestCountdownTimeIsReportedAsAQuieterAttribute: the value is read back
-// at once, but its change report follows matter.js's QuietEvent — at once
-// from or to null, else at most once a second with the latest value — and
-// a held change advances neither the DataVersion nor anything a
-// subscriber sees.
+// at once and its change advances the DataVersion at once, but its change
+// report follows matter.js's QuietEvent — at once from or to null, else
+// at most once a second with the latest value — and the deferred report
+// advances nothing more. CountdownTime is ordinary state in matter.js: the
+// commit that changed it advances the version
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), and the quiet emit adds an advance only for a dynamic
+// property (ServerBehaviorBacking.ts:258-261 calls advanceVersionFor,
+// Datasource.ts:679-688), which OperationalStateServer declares none of.
 func TestCountdownTimeIsReportedAsAQuieterAttribute(t *testing.T) {
 	t.Parallel()
 	srv, err := NewServer(Config{States: []StateEntry{{ID: StateStopped}, {ID: StateError}}, CountdownTime: true})
@@ -45,12 +50,18 @@ func TestCountdownTimeIsReportedAsAQuieterAttribute(t *testing.T) {
 	if v, _ := srv.MatterRead(AttrCountdownTime); v != uint32(599) {
 		t.Errorf("CountdownTime read %v, want 599 at once", v)
 	}
-	if len(reports) != 1 || srv.MatterDataVersion() != version || clk.Pending() != 1 {
-		t.Fatalf("a held change reported: %v (version moved %v, timers %d)", reports, srv.MatterDataVersion() != version, clk.Pending())
+	if got := srv.MatterDataVersion(); got != version+1 {
+		t.Fatalf("the held change moved the DataVersion %d -> %d, want +1 at once", version, got)
+	}
+	if len(reports) != 1 || clk.Pending() != 1 {
+		t.Fatalf("a held change reported: %v (timers %d)", reports, clk.Pending())
 	}
 	clk.Advance(time.Second)
-	if len(reports) != 2 || srv.MatterDataVersion() == version {
+	if len(reports) != 2 {
 		t.Fatalf("the deferred report did not go out: %v", reports)
+	}
+	if got := srv.MatterDataVersion(); got != version+1 {
+		t.Fatalf("the deferred report moved the DataVersion %d -> %d, want no further advance", version+1, got)
 	}
 	set(nil) // → null: at once
 	if len(reports) != 3 {

@@ -101,6 +101,14 @@ type FabricScopedReader interface {
 	// [im.FabricFilterFromContext]; implementations extract it and, when
 	// filtered=true and fabricIndex != 0, return only the entries that
 	// belong to fabricIndex.
+	//
+	// (nil, false) hands the attribute to MatterRead — except on an
+	// Interaction Model request for an attribute whose access is
+	// fabric-scoped ("F" or "S" in the cluster's schema): MatterRead has
+	// no request behind it, so the dispatcher never lets it stand in for
+	// one. There (nil, false) means the scoped read failed, and the
+	// request answers FAILURE, or UNSUPPORTED_ATTRIBUTE for an attribute
+	// the server's [ClusterAttributeLister] does not list.
 	MatterReadFiltered(ctx context.Context, attrID uint32) (value any, ok bool)
 }
 
@@ -146,7 +154,8 @@ type ClusterCommandLister interface {
 // on every AttributeDataIB returned for that cluster. Without this
 // capability the endpoint keeps the cluster's version: every (endpoint,
 // cluster) has one, which the stack advances on every change it sees — a
-// write, a change the server reports, a command that moved an attribute.
+// write that changed a value ([ChangeReportingWriter]), a change the
+// server reports, a command that moved an attribute.
 // A server of the root or the Aggregator that implements it advances its
 // own; a bridged endpoint's servers are versioned by the endpoint always.
 //
@@ -160,12 +169,67 @@ type ClusterDataVersion interface {
 	MatterDataVersion() uint32
 }
 
+// ChangeReportingWriter is the optional capability a [ClusterServer]
+// implements to say whether a controller's write changed anything. The
+// endpoint dispatcher calls MatterWriteChanged instead of MatterWrite
+// when a server implements it: a successful write that changed nothing
+// advances no DataVersion and is reported to no subscriber, as matter.js
+// advances a datasource's version only for a commit that changed a value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), tells no one of a commit that changed none (postCommit,
+// :1287-1289) and holds an equal value as no change (:1479, oldval ===
+// newval or isDeepEqual). A server without it is taken to have changed
+// something with every successful write: its cluster's version advances
+// and the written attribute is reported.
+//
+// "Unchanged" means this write stored nothing: the written value, in its
+// stored form, equalled the one the server holds, so the server kept what
+// it held and the host heard nothing of it — no setter of a state the
+// host holds and no write port (a Sink) the host is told writes through
+// was called. A write that stored, or one the server cannot tell, answers
+// changed: an over-report costs a version and a report, a missed change a
+// subscriber's view of the attribute. The verdict is the write's own: the
+// read of the held value, the comparison and the store are one step under
+// whatever serialises the server's writes, or the comparison comes first
+// and an equal value is not stored, so a change another writer makes
+// around the write — a host's Set, a second controller, a timer — is
+// never undone by a write that answers unchanged, and a write that stored
+// is never judged by what a host's state reads afterwards. A server with
+// its own [ClusterDataVersion] advances that version exactly when it
+// answers changed.
+//
+// A type that embeds a server implementing this and declares its own
+// MatterWrite declares its own MatterWriteChanged as well: the promoted
+// method would apply the write without the type's MatterWrite.
+type ChangeReportingWriter interface {
+	// MatterWriteChanged applies the write as MatterWrite does and
+	// reports whether it changed any attribute of the cluster — the
+	// written one or another the write moves with it (FanMode moves
+	// PercentSetting). A list written as the list the server holds is no
+	// change; an appended element always is. changed is ignored with a
+	// non-nil err: a refused write has changed nothing.
+	MatterWriteChanged(ctx context.Context, attrID uint32, value any) (changed bool, err error)
+}
+
 // ClusterEventLister is the optional capability a
 // [ClusterServer] can implement to advertise the cluster's
 // event surface. The dispatcher consults it to synthesise the global
-// `EventList` (0xFFFA) attribute per Matter Core Spec §7.13.2.5.
-// Clusters that don't implement this interface report an empty
-// EventList, which is spec-compliant for clusters that emit no events.
+// `EventList` (0xFFFA) attribute per Matter Core Spec §7.13.2.5, and to
+// decide which event paths exist on the cluster: a path that names an
+// event the server does not list, and a path that names no event on a
+// server that lists none, is UNSUPPORTED_EVENT. Clusters that don't
+// implement this interface report an empty EventList and have no event
+// path, which is spec-compliant for clusters that emit no events.
+//
+// The list gates existence only. An event a server emits through its
+// [EventEmitter] is recorded and reported as emitted, so a server emits
+// only events it lists — as the generated servers do (cluster/spec
+// Server.Emit refuses an event outside EventList). matter.js gives a
+// behavior an event that records and reports only for the cluster's
+// conformant events it supports, so nothing else reaches a subscriber
+// there
+// (packages/node/src/behavior/internal/ClusterDerivation.ts:174-200 at
+// db021da0, createDerivedEvents).
 type ClusterEventLister interface {
 	// MatterEvents returns the cluster event IDs the server may
 	// surface via subscribed event reports.
@@ -840,15 +904,18 @@ type AttributeChangeNotifier interface {
 // the host of every change at once. OnAttributeReport delivers the
 // changes that go on the wire: every change of the server's other
 // attributes as it happens, a quieter attribute's when its throttle
-// emits. The bridge subscribes here in place of
-// [AttributeChangeNotifier.OnAttributeChange] when a server implements
-// it. Mirrors matter.js's OnlineEvent.online — the observable "that emits
-// only those events conveyed between nodes", the event itself normally
-// and its QuietObservable for a server-side quieter element
-// (packages/node/src/behavior/Events.ts:228-236, :267-297;
-// cluster/ClusterBehaviorType.ts:343-344) — to which
-// ServerBehaviorBacking subscribes the report of a quieter property
-// (internal/ServerBehaviorBacking.ts:223-262).
+// emits. The bridge marks a server's attributes dirty from here when a
+// server implements it, and advances the cluster's DataVersion from
+// [AttributeChangeNotifier.OnAttributeChange], when the change happens, as
+// matter.js advances it at the commit
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0). Mirrors matter.js's OnlineEvent.online — the observable "that
+// emits only those events conveyed between nodes", the event itself
+// normally and its QuietObservable for a server-side quieter element
+// (packages/node/src/behavior/Events.ts:231-239, :269-300;
+// internal/ClusterDerivation.ts:171-172, :182 at db021da0) — which
+// ServerBehaviorBacking subscribes, as the event's `quiet`, for the report
+// of a quieter property (internal/ServerBehaviorBacking.ts:253-261).
 //
 // A type that forwards OnAttributeChange to a server implementing this
 // forwards OnAttributeReport too, or the bridge reports every change of

@@ -314,10 +314,19 @@ func TestLifetimeCounterWrites(t *testing.T) {
 	}
 	var tracker cluster.DataVersionTracker
 	tracked, _ := pump.NewServer(pump.Config{Source: d, Features: pump.FeatureConstantFlow, DataVersion: &tracker})
+	d.mu.Lock()
+	d.st.OperationMode = pump.OperationLocal
+	d.mu.Unlock()
 	before := tracker.Current()
 	_ = tracked.MatterWrite(ctx, pump.AttrOperationMode, uint64(0))
 	if tracker.Current() == before || tracked.MatterDataVersion() != tracker.Current() {
 		t.Error("the host tracker did not move")
+	}
+	// The mode the pump holds, written again, changes nothing and leaves
+	// the version (Datasource.ts:1456-1457, :1479 at db021da0).
+	before = tracker.Current()
+	if changed, err := tracked.MatterWriteChanged(ctx, pump.AttrOperationMode, uint64(0)); err != nil || changed || tracker.Current() != before {
+		t.Errorf("an unchanged OperationMode: changed %v, %v, version %d → %d", changed, err, before, tracker.Current())
 	}
 }
 

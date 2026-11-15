@@ -473,11 +473,16 @@ func (s *Server) changed(attrIDs ...uint32) {
 }
 
 // reported is the wire report of a quieter attribute when its throttle
-// emits: the data version advances and the report listeners are told; the
-// change listeners saw the change when it happened
-// ([Server.SetEstimatedEndTime]).
+// emits: the report listeners are told. The data version advanced, and the
+// change listeners were told, when the change happened
+// ([Server.SetEstimatedEndTime]): EstimatedEndTime is ordinary state in
+// matter.js, whose commit advances the version
+// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0), and the quiet emit adds an advance only for a dynamic
+// property (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-261
+// calls advanceVersionFor, Datasource.ts:679-688), which ServiceAreaServer
+// declares none of.
 func (s *Server) reported(attrIDs ...uint32) {
-	s.tracker().Bump()
 	s.ReportFrom(s.origin(), attrIDs...)
 }
 
@@ -548,6 +553,12 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		return err
 	}
 	return s.hooks.CheckWrite(ctx, attrID, v)
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: every
+// attribute is read-only, so no write changes the server.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke carries out SelectAreas and SkipArea; a host handler
@@ -719,8 +730,9 @@ func (s *Server) SetCurrentArea(id *uint32) error {
 }
 
 // SetEstimatedEndTime records when the device expects to finish the
-// current area, in seconds since the Unix epoch; nil is null. The change
-// listeners (the host's OnChanged) see the change at once; on the wire it
+// current area, in seconds since the Unix epoch; nil is null. The data
+// version advances and the change listeners (the host's OnChanged) see the
+// change at once; on the wire it
 // is reported per matter.js's shouldEmit: at once to or from null or 0 or
 // when it decreases, otherwise through the quiet throttle.
 func (s *Server) SetEstimatedEndTime(t *uint32) error {
@@ -736,6 +748,7 @@ func (s *Server) SetEstimatedEndTime(t *uint32) error {
 	s.endTime = clonePtr(t)
 	s.mu.Unlock()
 	now := old == nil || *old == 0 || t == nil || *t == 0 || *t < *old
+	s.tracker().Bump()
 	s.ChangedFrom(s.origin(), sa.AttrEstimatedEndTime)
 	// Quieter reports at once for a change from or to null; "now" covers
 	// 0 and a decrease as well.

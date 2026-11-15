@@ -93,6 +93,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "RINSE", Op: spec.ConfName, Name: "RINSE"},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Relaxed:     "connectedhomeip src/app/clusters/laundry-washer-controls-server/LaundryWasherControlsCluster.cpp:132-145 at 6170af84 (owner decision 69)",
 		},
 		{
 			ID: AttrSupportedRinses, Name: "SupportedRinses",

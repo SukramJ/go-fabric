@@ -256,7 +256,7 @@ func TestGKMSurfacesStoreFailures(t *testing.T) {
 	t.Run("GroupKeyMap read fails", func(t *testing.T) {
 		t.Parallel()
 		gkm := newBrokenGKM(t, &brokenGroupStore{failListMappings: true})
-		if _, ok := gkm.MatterRead(0x0000); ok {
+		if _, ok := gkm.MatterReadFiltered(im.WithFabricFilter(ctx, true, 1), 0x0000); ok {
 			t.Fatal("GroupKeyMap answered ok=true while the store was down")
 		}
 	})
@@ -386,7 +386,7 @@ func TestGKMKeySetWriteDisablesASlotOnTheSentinelStartTime(t *testing.T) {
 }
 
 // TestGKMKeySetWriteEpochSlotOrdering pins the ordering rules matter.js
-// GroupKeyManagementServer.ts:280-352 enforces between the three epoch
+// GroupKeyManagementServer.ts:291-357 at db021da0 enforces between the three epoch
 // slots. Each case names one broken relationship; a bridge that accepted
 // them would rotate onto a key at a time no controller agreed on.
 func TestGKMKeySetWriteEpochSlotOrdering(t *testing.T) {

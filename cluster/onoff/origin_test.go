@@ -14,7 +14,8 @@ import (
 // TestOnOffWriteOrigins is the controller-write rows of the OnOff
 // server's origin audit (brief BY-1 §2): each writable attribute of the
 // Lighting feature reaches the change listeners — the host's OnChanged —
-// as the written attribute, from the write (Datasource.ts:1473-1476).
+// as the written attribute, from the write (Datasource.ts:1486-1492 at
+// db021da0).
 func TestOnOffWriteOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {

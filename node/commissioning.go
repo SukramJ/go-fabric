@@ -51,6 +51,9 @@ type commissioningHost struct {
 	// (security.go responderSessionParams).
 	responderParams *sessionparams.Parameters
 	advert          bridge.CommissioningAdvertisement
+	// deviceType is the record's device type when advert carries none
+	// ([ProductDescription].DeviceType zero).
+	deviceType *commissionableDeviceType
 	// installMu guards active and stopped.
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
@@ -162,7 +165,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// window's acceptor (installed, so attachPase leaves it) and its
 		// discriminator.
 		h.attachPase(h.baseline)
-		adv := h.advert
+		adv := h.advertisement()
 		if basic != nil {
 			adv.Discriminator = basic.discriminator
 		}
@@ -174,7 +177,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		return false
 	}
 	if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
-		adv := h.advert
+		adv := h.advertisement()
 		adv.Discriminator = window.Discriminator()
 		adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
 		if window.IsJointFabric() {
@@ -203,7 +206,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (:236-256), the status BasicWindowOpen.
 		h.attachPase(h.baseline)
 		if live {
-			h.announce(ctx, h.advert, "commissioning.basic_window.announce")
+			h.announce(ctx, h.advertisement(), "commissioning.basic_window.announce")
 			h.withdrawBLE(ctx)
 		}
 		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
@@ -293,6 +296,17 @@ func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierCo
 		return err
 	}
 	return nil
+}
+
+// advertisement is the node's commissionable record, its device type
+// resolved now: the configured one, else the one the endpoints served
+// give (commissionableDeviceType).
+func (h *commissioningHost) advertisement() bridge.CommissioningAdvertisement {
+	adv := h.advert
+	if adv.DeviceTypeID == 0 && h.deviceType != nil {
+		adv.DeviceTypeID = h.deviceType.resolve()
+	}
+	return adv
 }
 
 // announce publishes adv and, once published, records what the node

@@ -399,6 +399,12 @@ func (d *DiagnosticLogs) MatterWrite(_ context.Context, attrID uint32, value any
 	return refusedWrite{sentinel: fmt.Errorf("core: DiagnosticLogs is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (d *DiagnosticLogs) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, d.MatterWrite(ctx, attrID, value)
+}
+
 // diaglogsInst is the definition bound to what the server serves: no
 // attribute but the globals, RetrieveLogsRequest and its response.
 var diaglogsInst = mustInstance(diaglogsdef.Definition, spec.Options{})

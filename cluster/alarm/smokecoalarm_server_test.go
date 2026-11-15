@@ -307,14 +307,20 @@ func TestSmokeSensitivityLevelWrite(t *testing.T) {
 	d := &device{}
 	srv := newFull(t, d)
 	before := srv.MatterDataVersion()
-	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityHigh)); err != nil {
-		t.Fatalf("write High: %v", err)
+	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil {
+		t.Fatalf("write Low: %v", err)
 	}
-	if !slices.Equal(d.written, []alarm.Sensitivity{alarm.SensitivityHigh}) {
+	if !slices.Equal(d.written, []alarm.Sensitivity{alarm.SensitivityLow}) {
 		t.Errorf("device received %v", d.written)
 	}
 	if srv.MatterDataVersion() == before {
-		t.Error("DataVersion did not move on a successful write")
+		t.Error("DataVersion did not move on a write that changed the level")
+	}
+	// The level the alarm holds, written again, changes nothing and leaves
+	// the version (Datasource.ts:1456-1457, :1479 at db021da0).
+	before = srv.MatterDataVersion()
+	if changed, err := srv.MatterWriteChanged(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil || changed || srv.MatterDataVersion() != before {
+		t.Errorf("an unchanged level: changed %v, %v, version %d → %d", changed, err, before, srv.MatterDataVersion())
 	}
 	for _, bad := range []any{uint64(3), int64(-1), nil, "high"} {
 		if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, bad); statusOf(t, err) != im.StatusConstraintError {

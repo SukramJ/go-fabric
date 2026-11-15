@@ -151,7 +151,7 @@ type WindowStatusSnapshot struct {
 // AdminFabricIndex / AdminVendorID are populated by the cluster server
 // from the IM dispatcher's fabric context so the bridge can reflect
 // them back via [AdministratorCommissioning.MatterRead]. Mirrors
-// matter.js AdministratorCommissioningServer.ts:176-180
+// matter.js AdministratorCommissioningServer.ts:200 at db021da0
 // `this.state.adminFabricIndex = adminFabric.fabricIndex`.
 type OpenWindowParams struct {
 	CommissioningTimeoutSeconds uint16
@@ -223,7 +223,7 @@ type AdministratorCommissioningConfig struct {
 // VendorIDResolver returns the rootVendorId of a fabric. The daemon
 // wires this to the fabric store so a Multi-Admin OpenCommissioningWindow
 // over CASE reflects the calling admin's VendorID in AdminVendorId per
-// matter.js AdministratorCommissioningServer.ts:176-180
+// matter.js AdministratorCommissioningServer.ts:201 at db021da0
 // (`adminFabric.rootVendorId`). Return 0 if the fabric is unknown.
 type VendorIDResolver func(ctx context.Context, fabricIndex uint8) uint16
 
@@ -384,6 +384,12 @@ func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint3
 	return err
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (a *AdministratorCommissioning) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, a.MatterWrite(ctx, attrID, value)
+}
+
 // assertNoCommissioningInProgress is Busy while the fail-safe is armed
 // or an administrator's window is open, and without a controller to
 // open one. Mirrors matter.js
@@ -454,12 +460,14 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		}
 		// Populate AdminFabricIndex from IM dispatcher context per
 		// Matter §11.19.5.2 and matter.js
-		// AdministratorCommissioningServer.ts:176-180
+		// AdministratorCommissioningServer.ts:200 at db021da0
 		// `this.state.adminFabricIndex = adminFabric.fabricIndex`.
 		// AdminVendorID comes from the daemon-wired VendorIDResolver
-		// (fabric store lookup); fabricIndex==0 (PASE) keeps the
-		// VendorID at zero, which the bridge controller surfaces as
-		// AdminVendorIsNull.
+		// (fabric store lookup; matter.js :201 takes the admin fabric's
+		// rootVendorId). A session without a fabric never gets here — it
+		// was refused above (#adminFabric) — so fabIdx is never 0; a
+		// VendorID left at zero (no resolver wired, or one that answers
+		// 0) is what the bridge controller surfaces as AdminVendorIsNull.
 		params.AdminFabricIndex = fabIdx
 		if fabIdx != 0 && vr != nil && params.AdminVendorID == 0 {
 			params.AdminVendorID = vr(ctx, fabIdx)

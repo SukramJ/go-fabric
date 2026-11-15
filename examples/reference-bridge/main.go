@@ -343,7 +343,14 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 			return nil, nil, err
 		}
 		devices.otaImages = images
-		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: images, Consent: images}
+		// The test provider is for every fabric that commissions the daemon:
+		// the node writes its ACL entry into no fabric unasked
+		// (node.OTAProviderConfig.GrantFabric), and a harness requestor has
+		// no administrator to write it.
+		cfg.OTAProvider = &node.OTAProviderConfig{
+			ImageSource: images, Consent: images,
+			GrantFabric: func(node.FabricInfo) bool { return true },
+		}
 		// The ledger lookup of the offered image (dcl.go), off by default.
 		if ledger, err := dclClient(f.dcl); err != nil {
 			return nil, nil, err

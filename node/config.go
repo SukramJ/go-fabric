@@ -77,6 +77,18 @@ type Config struct {
 	// OTA mounts the OTA Software Update Requestor on the root when set;
 	// nil leaves it out (and the OtaRequestor device type with it).
 	OTA *OTAConfig
+	// BootReason is the GeneralDiagnostics BootReason this start reports
+	// (the BootReason event [Node.Start] emits, [Node.BootReason]): a
+	// BootReasonEnum value of cluster/core (mattercore.BootReasonUnspecified
+	// … BootReasonSoftwareReset). The zero value is Unspecified, matter.js's
+	// default (GeneralDiagnosticsServer.ts:417-420 at db021da0, `bootReason
+	// ?? BootReason.Unspecified`). A start into the version an update of
+	// the node's own OTA requestor installed is SoftwareUpdateCompleted
+	// whatever this states: the requestor's record of the update in
+	// progress names the version that now runs, the record the requestor
+	// reports VersionApplied on (OtaSoftwareUpdateRequestorServer.ts:255-280
+	// at db021da0).
+	BootReason uint8
 	// ICD makes the node an intermittently connected device: ICD
 	// Management on the root, Check-Ins to its registered clients, the
 	// ICD advertisement ([ICDConfig], [Node.ICD]). nil, the default, is a
@@ -93,6 +105,12 @@ type Config struct {
 	// Topology set the node builds the provider ([Node.OTAProvider]) and
 	// the host mounts it.
 	OTAProvider *OTAProviderConfig
+	// WebRTCRequestor is the node's part of the WebRtcTransportRequestor
+	// servers its topology mounts (camera.Requestor, the default of
+	// device.NewCameraController): the fabrics whose ACL gets the entry
+	// that lets a camera of the fabric invoke them
+	// ([WebRTCRequestorConfig].GrantFabric). nil grants none.
+	WebRTCRequestor *WebRTCRequestorConfig
 	// CommissionerControl mounts the CommissionerControl server on the
 	// Aggregator (ADR 0020 stage 6); nil mounts none. The reference daemon
 	// mounts none.
@@ -417,10 +435,18 @@ type Commissioning struct {
 	Salt []byte
 	// LocationCapability is GeneralCommissioning's LocationCapability
 	// (Matter §11.10.5.3), the regulatory locations the node supports and
-	// SetRegulatoryConfig admits (GeneralCommissioningServer.ts:172-191):
-	// mattercore.RegulatoryIndoor (the zero value, the facade's default),
-	// RegulatoryOutdoor or RegulatoryIndoorOutdoor.
+	// SetRegulatoryConfig admits (GeneralCommissioningServer.ts:172-191),
+	// and the RegulatoryConfig the node starts with: [RegulatoryOutdoor] or
+	// [RegulatoryIndoorOutdoor]. The zero value is IndoorOutdoor, matter.js's
+	// default (packages/model/src/standard/elements/
+	// general-commissioning.element.ts:31-38 at db021da0, LocationCapability
+	// `default: 2`, RegulatoryConfig defaulting to it) — so
+	// [RegulatoryIndoor], which is 0, reads as the default here; a node
+	// that supports indoor operation alone sets [Commissioning].IndoorOnly.
 	LocationCapability uint8
+	// IndoorOnly states LocationCapability Indoor: SetRegulatoryConfig then
+	// admits Indoor alone. It excludes a non-zero LocationCapability.
+	IndoorOnly bool
 	// BasicCommissioning serves AdministratorCommissioning's Basic feature
 	// (BC): an administrator's OpenBasicCommissioningWindow opens a
 	// commissioning window against this Passcode under this Discriminator,
@@ -441,6 +467,20 @@ type Commissioning struct {
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
 	TermsAndConditions *TermsAndConditions
+}
+
+// locationCapability is the LocationCapability the root's
+// GeneralCommissioning serves: Indoor with IndoorOnly, IndoorOutdoor for the
+// zero value (matter.js's model default,
+// general-commissioning.element.ts:35-38 at db021da0), else the value set.
+func (c Commissioning) locationCapability() uint8 {
+	switch {
+	case c.IndoorOnly:
+		return mattercore.RegulatoryIndoor
+	case c.LocationCapability == mattercore.RegulatoryIndoor:
+		return mattercore.RegulatoryIndoorOutdoor
+	}
+	return c.LocationCapability
 }
 
 // TermsAndConditions is the requirement [Commissioning].TermsAndConditions
@@ -469,8 +509,15 @@ type ProductDescription struct {
 	// Name is the advertised device name; empty is
 	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
 	Name string
-	// DeviceType is the advertised device type; 0 is RootNode (0x0016),
-	// as the daemon advertises (main.go:290 at b4ea1f96^).
+	// DeviceType is the device type the commissionable advertisement
+	// carries (the DT key and the _T<id> subtype). 0 infers it from the
+	// endpoints the node serves when it advertises, as matter.js's
+	// ProductDescriptionServer does (ProductDescriptionServer.ts:43-63,
+	// :93-126 at db021da0): the first device type of the first endpoint of
+	// a simple device type below the root and the Aggregator — a bridged
+	// device's type. The first type found stays for the node's lifetime;
+	// while no such endpoint is served the node advertises RootNode
+	// (0x0016).
 	DeviceType uint16
 	// VendorID and ProductID are the node's identity; both mandatory.
 	VendorID, ProductID uint16
@@ -483,7 +530,10 @@ type BasicInformation struct {
 	VendorName   string
 	ProductName  string
 	ProductLabel string
-	NodeLabel    string // mandatory
+	// NodeLabel is the label the node serves on its first boot; empty is
+	// the ProductName, as matter.js's BasicInformationServer.ts:68 at
+	// db021da0 (setDefault("nodeLabel", state.productName)).
+	NodeLabel    string
 	SerialNumber string
 	// UniqueID pins BasicInformation.UniqueID (quality F, Matter
 	// §11.1.5.13) to a value the host persisted itself; at most 32 UTF-8
@@ -503,6 +553,18 @@ type BasicInformation struct {
 	HardwareVersionString string
 	SoftwareVersion       uint32
 	SoftwareVersionString string
+}
+
+// defaultNodeLabel sets an empty NodeLabel to the ProductName, before
+// anything reads it: the root serves it, the commissionable record
+// advertises it when ProductDescription.Name is empty, and the first
+// boot derives UniqueID from it. Mirrors matter.js
+// packages/node/src/behaviors/basic-information/BasicInformationServer.ts:68
+// at db021da0 — setDefault("nodeLabel", state.productName).
+func (b *BasicInformation) defaultNodeLabel() {
+	if b.NodeLabel == "" {
+		b.NodeLabel = b.ProductName
+	}
 }
 
 // Store names the node's persistence. With DB the node applies both
@@ -650,6 +712,9 @@ func checkPBKDF(iterations int64, saltLen int) []error {
 // [PBKDFSaltMin] and [PBKDFSaltMax]; the passcode check is
 // [ValidateSetupPIN] — a host checks its own configuration against them
 // before New.
+//
+// An empty BasicInformation.NodeLabel is valid: New serves the
+// ProductName ([BasicInformation.defaultNodeLabel]).
 func (c *Config) Validate() error {
 	var errs []error
 	cm := c.Commissioning
@@ -662,9 +727,6 @@ func (c *Config) Validate() error {
 	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
-	}
-	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
-		errs = append(errs, errors.New("node: BasicInformation.NodeLabel must be non-empty"))
 	}
 	switch {
 	case c.Store.Path != "" && c.Store.DB != nil:
@@ -681,8 +743,14 @@ func (c *Config) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("node: DeviceTypeValidation %d is not a mode; it must be one of warn, strict, off", int(c.DeviceTypeValidation)))
 	}
+	if c.BootReason > mattercore.BootReasonSoftwareReset {
+		errs = append(errs, fmt.Errorf("node: BootReason %d is not a BootReasonEnum value", c.BootReason))
+	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
+	}
+	if cm.IndoorOnly && cm.LocationCapability != mattercore.RegulatoryIndoor {
+		errs = append(errs, fmt.Errorf("node: Commissioning.IndoorOnly excludes LocationCapability %d", cm.LocationCapability))
 	}
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))

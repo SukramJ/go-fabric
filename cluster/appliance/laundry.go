@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -175,7 +174,10 @@ func (s *WasherServer) checkSpin(spin *uint8) error {
 }
 
 // checkRinses is chip's NumberOfRinsesValidity: one of SupportedRinses —
-// INVALID_IN_STATE otherwise (LaundryWasherControlsCluster.cpp:132-145).
+// INVALID_IN_STATE otherwise (LaundryWasherControlsCluster.cpp:132-145),
+// an undefined rinse count included: the definition relaxes the enum of a
+// written NumberOfRinses for it (owner decision 69, the relaxation table
+// of script/clustergen), so TC-WASHERCTRL-2.2 step 6 gets chip's answer.
 func (s *WasherServer) checkRinses(r NumberOfRinses) error {
 	if !slices.Contains(s.rinses, r) {
 		return spec.Errorf(im.StatusInvalidInState, "laundrywashercontrols: NumberOfRinses %d not supported", r)
@@ -217,13 +219,17 @@ func (s *WasherServer) MatterRead(attrID uint32) (any, bool) { return s.srv.Matt
 // write: the definition's checks, then chip's, then the listener hears of
 // a change (LaundryWasherControlsCluster.cpp:49-67, :83-113).
 func (s *WasherServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	before, _ := s.srv.Value(attrID)
-	if err := s.srv.MatterWrite(ctx, attrID, value); err != nil {
-		return err
-	}
-	after, _ := s.srv.Value(attrID)
-	if s.listener == nil || reflect.DeepEqual(before, after) {
-		return nil
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [WasherServer.MatterWrite] with the generated server's verdict,
+// which also decides whether the listener hears of it.
+func (s *WasherServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	changed, err := s.srv.MatterWriteChanged(ctx, attrID, value)
+	if err != nil || !changed || s.listener == nil {
+		return changed, err
 	}
 	switch attrID {
 	case lwc.AttrSpinSpeedCurrent:
@@ -231,7 +237,7 @@ func (s *WasherServer) MatterWrite(ctx context.Context, attrID uint32, value any
 	case lwc.AttrNumberOfRinses:
 		s.listener.NumberOfRinsesChanged(s.NumberOfRinses())
 	}
-	return nil
+	return true, nil
 }
 
 // MatterInvoke answers every command: the cluster has none.
@@ -342,15 +348,19 @@ func (s *DryerServer) MatterRead(attrID uint32) (any, bool) { return s.srv.Matte
 // definition's checks, then chip's, then the listener hears of a change
 // (LaundryDryerControlsCluster.cpp:115-128).
 func (s *DryerServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	before, _ := s.srv.Value(attrID)
-	if err := s.srv.MatterWrite(ctx, attrID, value); err != nil {
-		return err
-	}
-	after, _ := s.srv.Value(attrID)
-	if s.listener != nil && !reflect.DeepEqual(before, after) {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [DryerServer.MatterWrite] with the generated server's verdict,
+// which also decides whether the listener hears of it.
+func (s *DryerServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	changed, err := s.srv.MatterWriteChanged(ctx, attrID, value)
+	if err == nil && changed && s.listener != nil {
 		s.listener.SelectedDrynessLevelChanged(s.SelectedDrynessLevel())
 	}
-	return nil
+	return changed, err
 }
 
 // MatterInvoke answers every command: the cluster has none.

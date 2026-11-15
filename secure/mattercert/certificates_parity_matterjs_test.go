@@ -177,7 +177,9 @@ func TestCertificatesVerifiesCertificates(t *testing.T) {
 // encoding cases" (CertificatesTest.ts:442). matter.js refuses more than
 // three or duplicate CATs when encoding (CaseAuthenticatedTag
 // validateNocTagList); Go never encodes a NOC it receives and refuses the
-// same lists in the NOC predicate (checkNOCShape).
+// same lists in Certificate.CheckCASEAuthTags, which AddNOC and UpdateNOC
+// run after the decode and the NOC predicate (checkNOCShape) runs in the
+// chain verification.
 func TestCertificatesSpecialNocEncodingCases(t *testing.T) {
 	general := certificatesSetByName(t, "General Test Certificates")
 	withCATs := func(t *testing.T, cats ...uint32) *Certificate {
@@ -202,15 +204,19 @@ func TestCertificatesSpecialNocEncodingCases(t *testing.T) {
 		}
 	})
 	t.Run("throws error if more then 3 tags are provided", func(t *testing.T) {
-		err := checkNOCShape(withCATs(t, 0x12345678, 0x56789012, 0x90123456, 0x12345678))
-		if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "4 CATs") {
-			t.Fatalf("checkNOCShape = %v, want too many CATs (4)", err)
+		c := withCATs(t, 0x12345678, 0x56789012, 0x90123456, 0x12345678)
+		for name, err := range map[string]error{"CheckCASEAuthTags": c.CheckCASEAuthTags(), "checkNOCShape": checkNOCShape(c)} {
+			if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "4 CATs") {
+				t.Errorf("%s = %v, want too many CATs (4)", name, err)
+			}
 		}
 	})
 	t.Run("throws error if tags contain duplicate identifier values", func(t *testing.T) {
-		err := checkNOCShape(withCATs(t, 0x12345678, 0x56789012, 0x12341234))
-		if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "appears twice") {
-			t.Fatalf("checkNOCShape = %v, want a duplicate CAT identifier", err)
+		c := withCATs(t, 0x12345678, 0x56789012, 0x12341234)
+		for name, err := range map[string]error{"CheckCASEAuthTags": c.CheckCASEAuthTags(), "checkNOCShape": checkNOCShape(c)} {
+			if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "appears twice") {
+				t.Errorf("%s = %v, want a duplicate CAT identifier", name, err)
+			}
 		}
 	})
 }

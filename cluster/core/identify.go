@@ -193,9 +193,12 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // cannot hold Close.
 //
 // Mirrors matter.js
-// packages/node/src/behaviors/identify/IdentifyServer.ts
-// [Symbol.asyncDispose], which stops the identify timer when the
-// behavior — and with it the endpoint — is destroyed.
+// packages/node/src/behaviors/identify/IdentifyServer.ts:116-119 at
+// db021da0 ([Symbol.asyncDispose] → #stopIdentifying, :100-106), which
+// stops the identify timer when the behavior — and with it the endpoint —
+// is destroyed. There it also clears isIdentifying and emits
+// stopIdentifying, which Close does not (F-db021da0-9,
+// notes/parity/matter_behaviour_findings.md).
 func (i *Identify) Close() {
 	i.timerMu.Lock()
 	if !i.closed {
@@ -269,44 +272,57 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // runs the handler as the Identify command does and a refusal refuses the
 // write with its status.
 func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := i.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Identify.MatterWrite], changed when it moved IdentifyTime —
+// the comparison, made where the value is stored, that advances the
+// server's own version (matter.js Datasource.ts:1456-1457, :1479 at
+// db021da0: an equal value is no change).
+func (i *Identify) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != identifyAttrTime {
 		// IdentifyType is "R V": UNSUPPORTED_WRITE; any other id
 		// UNSUPPORTED_ATTRIBUTE, as the definition judges them.
 		_, err := identifyInst.ValidateWrite(attrID, value, nil)
-		return err
+		return false, err
 	}
 	t, err := coerceUint16(value)
 	if err != nil {
-		return fmt.Errorf("core: Identify.IdentifyTime: %w", err)
+		return false, fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
 	// Mirrors matter.js packages/node/src/behaviors/identify/
 	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
 	// command reach one reactor (#identifyTimeChangedHandler).
-	if err := i.setIdentifyTime(ctx, t); err != nil {
-		return err
+	changed, err := i.setIdentifyTime(ctx, t)
+	if err != nil {
+		return false, err
 	}
 	i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
-	// Bump DataVersion after a successful IdentifyTime write so
-	// DataVersionFilter evaluation correctly detects the cluster changed.
-	i.dataVersion.Bump()
-	return nil
+	// A changed IdentifyTime advances DataVersion so DataVersionFilter
+	// evaluation detects the cluster changed.
+	if changed {
+		i.dataVersion.Bump()
+	}
+	return changed, nil
 }
 
 // setIdentifyTime is a request's change of IdentifyTime: the host's
 // handler first, the stored value when it consents — one step for the
 // countdown (op), which therefore sees the value before the request or
-// after it and never the handler's call without its store.
-func (i *Identify) setIdentifyTime(ctx context.Context, t uint16) error {
+// after it and never the handler's call without its store. changed is
+// whether the stored value moved.
+func (i *Identify) setIdentifyTime(ctx context.Context, t uint16) (changed bool, err error) {
 	op := i.opQueue()
 	op <- struct{}{}
 	defer func() { <-op }()
 	if h := i.hostHandler(); h != nil {
 		if err := h.MatterIdentify(ctx, t); err != nil {
-			return err
+			return false, err
 		}
 	}
-	i.identifyTime.Store(uint32(t))
-	return nil
+	return i.identifyTime.Swap(uint32(t)) != uint32(t), nil
 }
 
 // MatterInvoke dispatches Identify and TriggerEffect commands.
@@ -323,7 +339,7 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 		if err != nil {
 			return nil, err
 		}
-		if err := i.setIdentifyTime(ctx, t); err != nil {
+		if _, err := i.setIdentifyTime(ctx, t); err != nil {
 			return nil, err
 		}
 		i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it

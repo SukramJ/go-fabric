@@ -359,9 +359,12 @@ func (v AddSceneRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *AddSceneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AddScene",
 		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUintIn[uint8](8, 0, 254)),
-		spec.Bind(2, "TransitionTime", true, &v.TransitionTime, spec.DecodeUintIn[uint32](32, 0, 60000000)),
-		spec.Bind(3, "SceneName", true, &v.SceneName, spec.DecodeStringIn(0, 16)),
+		// SceneId: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUint[uint8](8)),
+		// TransitionTime: the constraint "max 60000000" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(2, "TransitionTime", true, &v.TransitionTime, spec.DecodeUint[uint32](32)),
+		// SceneName: the constraint "max 16" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(3, "SceneName", true, &v.SceneName, spec.DecodeString),
 		spec.Bind(4, "ExtensionFieldSetStructs", true, &v.ExtensionFieldSetStructs, spec.DecodeList(spec.DecodeStruct[ExtensionFieldSetStruct])),
 	)
 }
@@ -414,7 +417,8 @@ func (v ViewSceneRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *ViewSceneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "ViewScene",
 		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUintIn[uint8](8, 0, 254)),
+		// SceneId: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUint[uint8](8)),
 	)
 }
 
@@ -475,7 +479,8 @@ func (v RemoveSceneRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *RemoveSceneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RemoveScene",
 		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUintIn[uint8](8, 0, 254)),
+		// SceneId: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUint[uint8](8)),
 	)
 }
 
@@ -573,7 +578,8 @@ func (v StoreSceneRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *StoreSceneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "StoreScene",
 		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
-		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUintIn[uint8](8, 0, 254)),
+		// SceneId: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(1, "SceneId", true, &v.SceneId, spec.DecodeUint[uint8](8)),
 	)
 }
 
@@ -709,9 +715,11 @@ func (v *CopySceneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CopyScene",
 		spec.Bind(0, "Mode", true, &v.Mode, spec.DecodeUint[CopyModeBitmap](8)),
 		spec.Bind(1, "GroupIdentifierFrom", true, &v.GroupIdentifierFrom, spec.DecodeUint[uint16](16)),
-		spec.Bind(2, "SceneIdentifierFrom", true, &v.SceneIdentifierFrom, spec.DecodeUintIn[uint8](8, 0, 254)),
+		// SceneIdentifierFrom: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(2, "SceneIdentifierFrom", true, &v.SceneIdentifierFrom, spec.DecodeUint[uint8](8)),
 		spec.Bind(3, "GroupIdentifierTo", true, &v.GroupIdentifierTo, spec.DecodeUint[uint16](16)),
-		spec.Bind(4, "SceneIdentifierTo", true, &v.SceneIdentifierTo, spec.DecodeUintIn[uint8](8, 0, 254)),
+		// SceneIdentifierTo: the constraint "max 254" is the server's to judge (matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0).
+		spec.Bind(4, "SceneIdentifierTo", true, &v.SceneIdentifierTo, spec.DecodeUint[uint8](8)),
 	)
 }
 
@@ -840,9 +848,9 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
-				{ID: 2, Name: "TransitionTime", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 60000000", Max: &spec.Bound{Int: 60000000}}},
-				{ID: 3, Name: "SceneName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
+				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
+				{ID: 2, Name: "TransitionTime", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 60000000", Max: &spec.Bound{Int: 60000000}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
+				{ID: 3, Name: "SceneName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 				{ID: 4, Name: "ExtensionFieldSetStructs", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ExtensionFieldSetStruct", Kind: spec.KindStruct, Struct: ExtensionFieldSetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 			},
 			Decode: decodeAddSceneRequest,
@@ -865,7 +873,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 			},
 			Decode: decodeViewSceneRequest,
 		},
@@ -890,7 +898,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 			},
 			Decode: decodeRemoveSceneRequest,
 		},
@@ -932,7 +940,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 			},
 			Decode: decodeStoreSceneRequest,
 		},
@@ -989,9 +997,9 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "Mode", Type: spec.Type{Name: "CopyModeBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: CopyModeBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 				{ID: 1, Name: "GroupIdentifierFrom", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "SceneIdentifierFrom", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 2, Name: "SceneIdentifierFrom", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 				{ID: 3, Name: "GroupIdentifierTo", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 4, Name: "SceneIdentifierTo", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 4, Name: "SceneIdentifierTo", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Relaxed: "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"},
 			},
 			Decode: decodeCopySceneRequest,
 		},

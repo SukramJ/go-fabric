@@ -157,6 +157,12 @@ func (*SoilMeasurementServer) MatterWrite(_ context.Context, attrID uint32, valu
 	return refuseWrite(soilInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *SoilMeasurementServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — SoilMeasurement has no commands.
 func (*SoilMeasurementServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)

@@ -6,6 +6,7 @@ package levelcontrol_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -57,6 +58,7 @@ func (h *fakeHost) SetOptions(_ context.Context, options lvldef.OptionsBitmap) e
 		return h.setErr
 	}
 	h.optionSets = append(h.optionSets, uint8(options))
+	h.options = uint8(options)
 	return nil
 }
 
@@ -336,8 +338,11 @@ func TestEveryCommandReachesThePort(t *testing.T) {
 			if !reflect.DeepEqual(host.calls, []string{tc.want}) {
 				t.Errorf("port saw %v, want [%s]", host.calls, tc.want)
 			}
-			if got := srv.MatterDataVersion(); got == before {
-				t.Errorf("DataVersion stayed %d across an accepted %s", got, tc.want)
+			// The port recorded the command and moved nothing: no
+			// attribute changed, so the DataVersion stays
+			// (TestDataVersionAdvancesOnlyOnAChange).
+			if got := srv.MatterDataVersion(); got != before {
+				t.Errorf("DataVersion %d -> %d across an accepted %s that changed nothing", before, got, tc.want)
 			}
 		})
 	}
@@ -553,6 +558,154 @@ func TestDeviceSideChangeBumpsTheVersion(t *testing.T) {
 	}
 }
 
+// movingHost is a port that moves to the level a MoveToLevel names and,
+// with notifies, reports the change through its notifier while the
+// command runs, as a host whose device pushes every change does.
+type movingHost struct {
+	*fakeHost
+	notifies bool
+}
+
+func (h movingHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	h.level, h.levelKnown = req.Level, true
+	if h.notifies && h.notify != nil {
+		h.notify()
+	}
+	return nil
+}
+
+// TestHandOffCommandAdvancesTheDataVersionOnce: on the hand-off path a
+// command — or a scene recall handed to the port — that moved
+// CurrentLevel is one commit, one advance of the DataVersion, whether the
+// host's notifier reports the move while the port runs it or not.
+// Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (the commit advances the version once `if (changes)`).
+func TestHandOffCommandAdvancesTheDataVersionOnce(t *testing.T) {
+	t.Parallel()
+	for _, notifies := range []bool{true, false} {
+		for _, scene := range []bool{false, true} {
+			t.Run(fmt.Sprintf("notifies=%v scene=%v", notifies, scene), func(t *testing.T) {
+				t.Parallel()
+				host := movingHost{observedHost(), notifies}
+				srv := levelcontrol.NewServer(levelcontrol.Config{Source: host})
+				fired := 0
+				defer srv.OnMatterValueChanged(func() { fired++ })()
+				before := srv.MatterDataVersion()
+				if scene {
+					srv.MatterApplySceneValues(context.Background(), map[uint32]uint64{levelcontrol.AttrCurrentLevel: 60}, 0)
+				} else if _, err := srv.MatterInvoke(context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60}); err != nil {
+					t.Fatal(err)
+				}
+				if lvl, _ := host.CurrentLevel(); lvl != 60 {
+					t.Fatalf("the port is at %d, want 60", lvl)
+				}
+				if got := srv.MatterDataVersion() - before; got != 1 {
+					t.Errorf("the move advanced the DataVersion by %d, want 1", got)
+				}
+				if want := map[bool]int{true: 1, false: 0}[notifies]; fired != want {
+					t.Errorf("the subscriber fired %d times, want %d", fired, want)
+				}
+			})
+		}
+	}
+}
+
+// earlyNotifyHost reports, inside MoveToLevel, a change of something else
+// of the same source before it moves the level, and moves it silently.
+type earlyNotifyHost struct{ *fakeHost }
+
+func (h earlyNotifyHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	if h.notify != nil {
+		h.notify()
+	}
+	h.level, h.levelKnown = req.Level, true
+	return nil
+}
+
+// readNotifyHost is a device that changes its level by itself to 100, and
+// notifies, while the server reads the level a command starts from; the
+// command's own move is silent.
+type readNotifyHost struct {
+	*fakeHost
+	pending *bool // the device's own change is still to come
+}
+
+func (h readNotifyHost) CurrentLevel() (uint8, bool) {
+	if *h.pending && h.notify != nil {
+		*h.pending = false
+		h.level, h.levelKnown = 100, true
+		h.notify()
+	}
+	return h.fakeHost.CurrentLevel()
+}
+
+func (h readNotifyHost) MoveToLevel(ctx context.Context, req lvldef.MoveToLevelRequest) error {
+	if err := h.fakeHost.MoveToLevel(ctx, req); err != nil {
+		return err
+	}
+	h.level, h.levelKnown = req.Level, true
+	return nil
+}
+
+// TestHandOffCommandServesEveryLevelUnderItsOwnDataVersion: on the
+// hand-off path no two levels are served under one DataVersion, whenever
+// the host's notifier fires while a command runs — after the move, before
+// it for a change of something else, or for a change of the device's own
+// while the server reads the level the command starts from. A notification
+// advances the version for the value it saw; the command's move advances
+// it once more when the level differs from that value. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (each commit that changed a value advances the version).
+func TestHandOffCommandServesEveryLevelUnderItsOwnDataVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		src  func(*fakeHost) levelcontrol.LevelSource
+	}{
+		{"the notifier reports the move", func(h *fakeHost) levelcontrol.LevelSource { return movingHost{h, true} }},
+		{"the notifier fires before the move", func(h *fakeHost) levelcontrol.LevelSource { return earlyNotifyHost{h} }},
+		{"the device moves while the command reads its level", func(h *fakeHost) levelcontrol.LevelSource {
+			pending := true
+			return readNotifyHost{h, &pending}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			host := observedHost()
+			srv := levelcontrol.NewServer(levelcontrol.Config{Source: tc.src(host)})
+			type served struct {
+				version uint32
+				level   any
+			}
+			now := func() served {
+				v, _ := srv.MatterRead(levelcontrol.AttrCurrentLevel)
+				return served{srv.MatterDataVersion(), v}
+			}
+			seen := []served{now()}
+			defer srv.OnMatterValueChanged(func() { seen = append(seen, now()) })()
+			if _, err := srv.MatterInvoke(context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60}); err != nil {
+				t.Fatal(err)
+			}
+			final := now()
+			if final.level != uint8(60) {
+				t.Fatalf("CurrentLevel is %v, want 60", final.level)
+			}
+			for _, s := range seen {
+				if s.version == final.version && s.level != final.level {
+					t.Errorf("CurrentLevel %v and %v were both served under DataVersion %d", s.level, final.level, final.version)
+				}
+			}
+		})
+	}
+}
+
 // TestChangeNotifierIsOptional pins that a port which cannot notify
 // still yields a usable, releasable subscription.
 func TestChangeNotifierIsOptional(t *testing.T) {
@@ -581,13 +734,12 @@ func TestWritesReachThePort(t *testing.T) {
 		host := observedHost()
 		srv := levelcontrol.NewServer(levelcontrol.Config{Source: host})
 		before := srv.MatterDataVersion()
-		if err := srv.MatterWrite(
-			context.Background(), levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff),
-		); err != nil {
+		// The host starts with ExecuteIfOff; the write clears it.
+		if err := srv.MatterWrite(context.Background(), levelcontrol.AttrOptions, uint64(0)); err != nil {
 			t.Fatalf("MatterWrite(Options): %v", err)
 		}
-		if !reflect.DeepEqual(host.optionSets, []uint8{levelcontrol.OptionExecuteIfOff}) {
-			t.Errorf("port saw %v, want [%d]", host.optionSets, levelcontrol.OptionExecuteIfOff)
+		if !reflect.DeepEqual(host.optionSets, []uint8{0}) {
+			t.Errorf("port saw %v, want [0]", host.optionSets)
 		}
 		if srv.MatterDataVersion() == before {
 			t.Error("DataVersion stayed put across an accepted Options write")
@@ -819,3 +971,67 @@ func TestSurfaceLists(t *testing.T) {
 		t.Errorf("Revision() = %d, want the snapshot's %d", got, schema.ClusterRevisions[levelcontrol.ClusterID])
 	}
 }
+
+// TestDataVersionAdvancesOnlyOnAChange holds the cluster's DataVersion to
+// matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+// at db021da0 (a commit advances the version only `if (changes)`) and
+// :1476-1480 (#noteIfChanged notes no change for an equal value): a
+// command or a write that changes no attribute leaves the version, one
+// that changes an attribute advances it.
+func TestDataVersionAdvancesOnlyOnAChange(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	lvl := uint8(100)
+	srv, err := levelcontrol.New(levelcontrol.HeldConfig{
+		Features: levelcontrol.FeatureOnOff | levelcontrol.FeatureLighting, CurrentLevel: &lvl,
+		OnOff: offSwitch{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged := func(what string, act func() error) {
+		t.Helper()
+		before := srv.MatterDataVersion()
+		if err := act(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if got := srv.MatterDataVersion(); got != before {
+			t.Errorf("%s changed nothing but advanced the DataVersion %d -> %d", what, before, got)
+		}
+	}
+	advanced := func(what string, act func() error) {
+		t.Helper()
+		before := srv.MatterDataVersion()
+		if err := act(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if srv.MatterDataVersion() == before {
+			t.Errorf("%s changed an attribute but left the DataVersion", what)
+		}
+	}
+	invoke := func(cmd uint32, fields any) func() error {
+		return func() error { _, err := srv.MatterInvoke(ctx, cmd, fields); return err }
+	}
+	write := func(attr uint32, v any) func() error {
+		return func() error { return srv.MatterWrite(ctx, attr, v) }
+	}
+	unchanged("MoveToLevel the ExecuteIfOff gate refused", invoke(levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200}))
+	unchanged("Stop the ExecuteIfOff gate refused", invoke(levelcontrol.CmdStop, wire.StopRequest{}))
+	execute := wire.MoveToLevelRequest{Level: 100, OptionsMask: levelcontrol.OptionExecuteIfOff, OptionsOverride: levelcontrol.OptionExecuteIfOff}
+	unchanged("MoveToLevel to the current level", invoke(levelcontrol.CmdMoveToLevel, execute))
+	execute.Level = 150
+	advanced("MoveToLevel to a new level", invoke(levelcontrol.CmdMoveToLevel, execute))
+
+	advanced("an Options write of a new value", write(levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff)))
+	unchanged("an Options write of the same value", write(levelcontrol.AttrOptions, uint64(levelcontrol.OptionExecuteIfOff)))
+	advanced("an OnLevel write of a new value", write(levelcontrol.AttrOnLevel, uint64(64)))
+	unchanged("an OnLevel write of the same value", write(levelcontrol.AttrOnLevel, uint64(64)))
+	advanced("a StartUpCurrentLevel write of a new value", write(levelcontrol.AttrStartUpCurrentLevel, uint64(20)))
+	unchanged("a StartUpCurrentLevel write of the same value", write(levelcontrol.AttrStartUpCurrentLevel, uint64(20)))
+}
+
+// offSwitch is an On/Off cluster that stays off.
+type offSwitch struct{}
+
+func (offSwitch) OnOff() bool                          { return false }
+func (offSwitch) SetOnOff(context.Context, bool) error { return nil }

@@ -218,6 +218,12 @@ func (s *PreferenceServer) MatterWrite(ctx context.Context, attrID uint32, value
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *PreferenceServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke answers UNSUPPORTED_COMMAND: the cluster has no commands.
 func (s *PreferenceServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return s.srv.MatterInvoke(ctx, cmdID, fields)

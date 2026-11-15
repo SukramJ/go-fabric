@@ -20,7 +20,20 @@ against matter.js `origin/main` and goes red with the finding "caught up?"
 naming the row as soon as a marker text is gone there — between lifts, not
 only at one. The manual re-read at the lift is the confirmation: a row gets
 the verdict **caught up** only after the new pin has been read and the
-behaviour compared, never on the check's finding alone. Owner's work (Fable
+behaviour compared, never on the check's finding alone. Since review II's
+phase 4 a lift has two further steps. The list of matter.js's certification
+cases is held to the pin: `internal/chiptool:TestCertifiabilityDocument`
+fails on a case file of `support/chip-testing/test/cert` at the snapshot's
+pin that the Go-TH leg neither runs nor classifies, so a lift regenerates
+`internal/chiptool/testdata/matterjs-cert-cases.json` (`go test
+./internal/chiptool/ -update-matterjs-cert-cases`, against the matter.js
+checkout at the new pin) and classifies or ports what the list gained. And
+the snapshot carries each cluster's `attributeOrder` and the
+`globalAttributeOrder`, matter.js's `Scope.membersOf` order, which every
+report follows (`im.CompareAttributeIDs`): a lift reads that part of the
+snapshot's diff as it reads the model's, a moved order being a change on
+the wire, and the extractor stops when a cluster's order would depend on a
+feature selection the snapshot does not carry. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
@@ -51,6 +64,12 @@ a peer with no address); no topology service appeared, the row stays and
 its marker is re-read at the new pin. Every other marker holds. Also
 caught up outside the register: `BD-Matter-CaseInitiatorPeerCATs` (#4884,
 the initiator takes the responder's CATs from its NOC, `CaseClient.ts:282-290`).
+Found by the re-read of review II's phase 4 (2026-11-14), also outside the
+register: `BD-Matter-Controller-InboundWithoutSourceNodeIDDropped` (#4843,
+the header row under Security below: the packet decoder refuses an
+unsecured unicast message with neither node id, `MessageCodec.ts:234-238`,
+which this module's exchange manager already dropped); the entry is retired
+in `by_design.md`.
 
 Citations that resolve at the pin — the bare `path:line` form without an
 `at <sha>` — now resolve at db021da0: 18 pointed beyond the end of a
@@ -125,7 +144,10 @@ the cases they add (TC-CADMIN-1.1/1.2/1.18, TC-DA-1.3/1.4/1.8, TC-DD-1.9/
 2.2/3.5, TC-CC-x.4/x.5, TC-TSTAT-3.2, TC-DRLK-3.2, TC-OO-3.2, TC-I-3.2,
 TC-MOD-2.2, TC-LOWPOWER-2.2, TC-WNCV-6.1/7.1, TC-DGETH/DGSW/DGTHREAD/DGWIFI
 3.x) are the Go-TH leg's next candidates (`internal/chiptool/gocert_*`),
-tracked in `docs/certifiability.md`.
+tracked in `docs/certifiability.md` and, since review II's phase 4, held
+there by `TestCertifiabilityDocument` against
+`internal/chiptool/testdata/matterjs-cert-cases.json`: each case at the pin
+is run or classified with what a port needs.
 
 ## Milestone 6 (2026-10-28, wave 27-C) — what the next lift re-reads
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // recordingServer records every attribute ID passed to MatterWrite so a
@@ -59,7 +60,7 @@ func recordedWrite(calls []uint32, attr uint32) bool {
 // WriteRequest to a schema-read-only attribute (OnOff.OnOff 0x0000, access
 // "R V") returns UNSUPPORTED_WRITE and never reaches the cluster server —
 // so the write cannot be dispatched to the CCU. Mirrors matter.js
-// AttributeWriteResponse.ts:229-231.
+// AttributeWriteResponse.ts:231-234 at db021da0.
 func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 	t.Parallel()
 	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}} // OnOff
@@ -197,7 +198,7 @@ func TestWrite_UnlistedAttributeIsUnsupportedAttribute(t *testing.T) {
 // server — on a cluster outside the read-only table too (ValveConfiguration).
 // TC-ACE-2.2 writes every one of them and accepts only UNSUPPORTED_WRITE or
 // UNSUPPORTED_ACCESS; matter.js models them read-only
-// (AttributeWriteResponse.ts:229-231).
+// (AttributeWriteResponse.ts:231-234 at db021da0).
 func TestWrite_GlobalAttributesAreNeverWritable(t *testing.T) {
 	t.Parallel()
 	srv := &recordingServer{id: 0x0081, attrs: []uint32{0x0000}}
@@ -270,5 +271,45 @@ func TestWrite_ListAppendAppendsToTheCurrentList(t *testing.T) {
 	res = d.Write(context.Background(), path, im.AttributeValue{Value: []string{"x"}})
 	if len(res) != 1 || res[0].Status != im.StatusConstraintError {
 		t.Fatalf("append of a mistyped element: %+v, want CONSTRAINT_ERROR", res)
+	}
+}
+
+// TestWrite_GroupListAppendOnEveryMemberEndpoint pins a group write's list
+// ADD over several member endpoints: every endpoint appends the request's
+// own element to its own list, as connectedhomeip hands every mapped
+// endpoint a fresh reader over the request's value
+// (src/app/WriteHandler.cpp:555 `chip::TLV::TLVReader tmpDataReader(dataReader);`,
+// :559 WriteClusterData at 6170af84; owner decision 63). A list chunked
+// into a REPLACE and ADDs ends equal on every member.
+func TestWrite_GroupListAppendOnEveryMemberEndpoint(t *testing.T) {
+	t.Parallel()
+	const cl, listAttr = uint32(0xFFF1FC01), uint32(0x0005)
+	a := &gateServer{id: cl, attrs: []uint32{listAttr}, vals: map[uint32]any{listAttr: []uint16{1, 2}}}
+	b := &gateServer{id: cl, attrs: []uint32{listAttr}, vals: map[uint32]any{listAttr: []uint16{1, 2}}}
+	d := NewTopologyDispatcher(makeTopology(
+		&Endpoint{ID: 2, Source: gateSource{srvs: []contract.ClusterServer{a}}},
+		&Endpoint{ID: 3, Source: gateSource{srvs: []contract.ClusterServer{b}}},
+	))
+	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{groupEntry(1, store.PrivilegeManage, nil, nil)}})
+	gctx := im.WithGroupSubject(im.WithFabricFilter(context.Background(), true, 1), im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{2, 3}})
+	replace := im.ConcreteAttributePath{Cluster: cl, Attribute: listAttr, HasCluster: true, HasAttribute: true}
+	add := replace
+	add.HasListIndex, add.ListAppend = true, true
+	st := im.HandleGroupWriteRequest(gctx, d, im.WriteRequest{SuppressResponse: true, Writes: []im.AttributeWrite{
+		{Path: replace, Value: im.AttributeValue{Value: []uint16{}}},
+		{Path: add, Value: im.AttributeValue{Value: []uint16{7}}},
+		{Path: add, Value: im.AttributeValue{Value: []uint16{8}}},
+		{Path: add, Value: im.AttributeValue{Value: []uint16{9}}},
+	}})
+	if st != im.StatusSuccess {
+		t.Fatalf("group write: status %v, want Success", st)
+	}
+	for _, m := range []struct {
+		ep  uint16
+		srv *gateServer
+	}{{2, a}, {3, b}} {
+		if got := m.srv.vals[listAttr]; !slices.Equal(got.([]uint16), []uint16{7, 8, 9}) || m.srv.writes != 4 {
+			t.Errorf("endpoint %d: list %v after %d writes, want [7 8 9] after 4", m.ep, got, m.srv.writes)
+		}
 	}
 }

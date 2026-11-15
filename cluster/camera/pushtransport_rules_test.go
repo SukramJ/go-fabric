@@ -389,3 +389,61 @@ func TestPushAttachTLS(t *testing.T) {
 	p.AttachTLS(fakeTLS{nullCCDID: true}, nil)
 	allocatePush(t, p, motionOptions())
 }
+
+// TestPushEmptyStreamListIsStoredAbsent: an empty VideoStreams or
+// AudioStreams list is stored absent — in the allocate response, in
+// CurrentConnections and after a modify — beside a deprecated stream id
+// as beside the other list. Mirrors connectedhomeip
+// src/app/clusters/push-av-stream-transport-server/push-av-stream-transport-storage.h:436-462
+// at 6170af84 (TransportOptionsStorage copies the request's lists stream
+// by stream) and :501-511, :545-556 (a list with no stream is cleared,
+// not set empty).
+func TestPushEmptyStreamListIsStoredAbsent(t *testing.T) {
+	p, _ := newPush(t)
+	read := func(id uint16) padef.TransportOptionsStruct {
+		t.Helper()
+		v, _ := p.MatterRead(padef.AttrCurrentConnections)
+		var conns []padef.TransportConfigurationStruct
+		if !spec.Assign(&conns, v) {
+			t.Fatalf("CurrentConnections %v", v)
+		}
+		for _, c := range conns {
+			if c.ConnectionId == id {
+				return *c.TransportOptions
+			}
+		}
+		t.Fatalf("connection %d is not in CurrentConnections %v", id, v)
+		return padef.TransportOptionsStruct{}
+	}
+	absent := func(what string, o padef.TransportOptionsStruct, video bool) {
+		t.Helper()
+		if video && o.VideoStreams != nil {
+			t.Errorf("%s: VideoStreams %v, want absent", what, *o.VideoStreams)
+		}
+		if !video && o.AudioStreams != nil {
+			t.Errorf("%s: AudioStreams %v, want absent", what, *o.AudioStreams)
+		}
+	}
+
+	o := motionOptions()
+	o.AudioStreamId = nil
+	o.AudioStreams = &[]padef.AudioStreamStruct{}
+	conn := allocatePush(t, p, o)
+	absent("beside the deprecated video id, the response", *conn.TransportOptions, false)
+	absent("beside the deprecated video id, CurrentConnections", read(conn.ConnectionId), false)
+
+	o = motionOptions()
+	o.VideoStreamId, o.AudioStreamId = nil, nil
+	o.VideoStreams = &[]padef.VideoStreamStruct{{VideoStreamName: "main", VideoStreamId: 1}}
+	o.AudioStreams = &[]padef.AudioStreamStruct{}
+	conn = allocatePush(t, p, o)
+	absent("beside a video list, the response", *conn.TransportOptions, false)
+	absent("beside a video list, CurrentConnections", read(conn.ConnectionId), false)
+
+	o = motionOptions()
+	o.VideoStreamId = nil
+	o.VideoStreams = &[]padef.VideoStreamStruct{}
+	_, err := pushInvoke(p, padef.CmdModifyPushTransport, padef.ModifyPushTransportRequest{ConnectionId: conn.ConnectionId, TransportOptions: o})
+	wantCode(t, "ModifyPushTransport", statusOf(err), im.StatusSuccess)
+	absent("a modify beside the deprecated audio id, CurrentConnections", read(conn.ConnectionId), true)
+}

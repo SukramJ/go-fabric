@@ -155,7 +155,8 @@ type CommandInvocation struct {
 	// [HandleInvokeRequest] answers the command with that status instead
 	// of invoking it — the per-command outcome matter.js produces when
 	// requestTlv.validate throws (packages/protocol/src/action/server/
-	// CommandInvokeResponse.ts:446-448, :472-496).
+	// CommandInvokeResponse.ts:484-487 at db021da0, the failure the
+	// command's status :509-546).
 	DecodeStatus StatusCode
 }
 
@@ -207,12 +208,25 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 		return InvokeRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidInvokeRequest, open.Type)
 	}
 	var req InvokeRequest
+	var hasSuppress, hasTimed, hasInvokes bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 		}
 		if el.IsEndContainer {
+			// SuppressResponse, TimedRequest and InvokeRequests are
+			// mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvInvokeRequest.ts:19,
+			// :22, :25 at db021da0 (TlvField).
+			switch {
+			case !hasSuppress:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqSuppressResponse, "SuppressResponse"))
+			case !hasTimed:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqTimedRequest, "TimedRequest"))
+			case !hasInvokes:
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqInvokeRequests, "InvokeRequests"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -228,8 +242,10 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidInvokeRequest)
 			}
 			req.SuppressResponse = el.Bool
+			hasSuppress = true
 		case tagInvokeReqTimedRequest:
 			req.TimedRequest = el.Bool
+			hasTimed = true
 		case tagInvokeReqInvokeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return InvokeRequest{}, fmt.Errorf("%w: InvokeRequests not array", ErrInvalidInvokeRequest)
@@ -239,6 +255,7 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, err
 			}
 			req.Invokes = invokes
+			hasInvokes = true
 		case tagInvokeReqDelayReportData:
 			drd, err := readDelayReportData(dec, el)
 			if err != nil {
@@ -282,12 +299,19 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 
 func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (CommandInvocation, error) {
 	var inv CommandInvocation
+	hasPath := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return CommandInvocation{}, err
 		}
 		if el.IsEndContainer {
+			// CommandPath is mandatory: matter.js
+			// packages/types/src/protocol/types/TlvCommandData.ts:17 at
+			// db021da0 (TlvField).
+			if !hasPath {
+				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagCmdDataPath, "CommandDataIB.CommandPath"))
+			}
 			return inv, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -303,6 +327,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				return CommandInvocation{}, err
 			}
 			inv.Path = p
+			hasPath = true
 		case tagCmdDataFields:
 			if err := readCommandFields(dec, el, fieldsReader, &inv); err != nil {
 				return CommandInvocation{}, err
@@ -456,7 +481,7 @@ type InvokeResponseEntry struct {
 // Matter §8.8.3.2.1 a SuppressResponse invoke still ships a response when a
 // CommandDataIB is generated; when the response carries only status entries
 // the server sends nothing. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:1043-1074
+// packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
 // (`suppressedBuffer` is flushed on the first `cmd-response`; otherwise the
 // invoke returns without sending).
 func (ir InvokeResponse) HasCommandData() bool {
@@ -472,11 +497,12 @@ func (ir InvokeResponse) HasCommandData() bool {
 // violate when it packs more than one CommandDataIB into a single
 // InvokeRequest. Returns StatusInvalidAction on the first offending command,
 // else StatusSuccess. A single-command invoke always passes. Mirrors matter.js
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:64-92,171-185
-// (CommandInvokeResponse.process / #processConcrete):
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:68-99 at
+// db021da0 (CommandInvokeResponse.process) and :196-212 (the duplicate
+// checks of #processConcrete):
 //   - the batch must not exceed [DefaultMaxPathsPerInvoke] paths, checked
 //     before any per-command validation or dispatch (matter.js
-//     packages/node/src/node/server/InteractionServer.ts:950-955
+//     packages/node/src/node/server/InteractionServer.ts:1017-1022
 //     `if (invokeRequests.length > this.#maxPathsPerInvoke) throw
 //     new StatusResponseError(..., Status.InvalidAction)`);
 //   - a wildcard-endpoint path is illegal in a batch (matter.js "Wildcard path
@@ -595,10 +621,12 @@ func pathStatusEntry(inv CommandInvocation, status StatusCode) InvokeResponseEnt
 // HandleInvokeRequest dispatches a parsed InvokeRequest through d and
 // returns the assembled InvokeResponse.
 //
-// ACL gate: mirrors matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts
-// FabricAccessControl.forRequest and chip src/app/CommandHandler.cpp
-// "Execute the ACL Access Granting Algorithm before existence checks".
+// ACL gate: mirrors matter.js's access passes of an invoke,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:257-260 (the
+// Operate pass before existence) and :273-279 (the command's privilege) at
+// db021da0, and connectedhomeip's order,
+// src/app/InteractionModelEngine.cpp:1810-1851 at 6170af84
+// (ValidateCommandCanBeDispatched).
 // When d implements [ACLChecker], the requesting fabric's privilege is
 // verified before each command path is dispatched. The required
 // privilege for a plain Invoke is Operate (3) per Matter §9.10.4.4;
@@ -631,7 +659,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 
 	var ir InvokeResponse
 	// The InvokeResponseMessage.SuppressResponse field is deprecated and matter.js
-	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:987-988
+	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:1111-1112
 	// `emptyInvokeResponse.suppressResponse: false`). The controller's suppress-response
 	// intent governs whether the bridge sends the InvokeResponse at all (handled at the
 	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
@@ -645,7 +673,11 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
 		// #wildcardTargetOf: the command's privilege, its fabric scope,
 		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
-		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint && inv.DecodeStatus.IsSuccess() {
+		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint {
+			if !inv.DecodeStatus.IsSuccess() {
+				ir.Responses = append(ir.Responses, undecodedWildcardEntries(ctx, wild, g, inv)...)
+				continue
+			}
 			for _, res := range wild.InvokeAuthorized(ctx, inv.Path, inv.Fields, g.wildcardTarget) {
 				ir.Responses = append(ir.Responses, resultEntry(inv, res))
 			}
@@ -658,7 +690,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// Fields the reader rejected never reach the cluster server: the
 		// command owes the status the reader attached (ConstraintError for
 		// an out-of-range value), the way matter.js answers a failed
-		// requestTlv.validate (CommandInvokeResponse.ts:472-496).
+		// requestTlv.validate (CommandInvokeResponse.ts:484-487, :509-546).
 		if !inv.DecodeStatus.IsSuccess() {
 			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue
@@ -666,6 +698,30 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		ir.Responses = append(ir.Responses, resultEntry(inv, d.Invoke(ctx, inv.Path, inv.Fields)))
 	}
 	return ir
+}
+
+// undecodedWildcardEntries answers a wildcard-endpoint command whose fields
+// the reader refused: the decode status once for every endpoint the
+// command targets, the command run nowhere. The endpoints are the ones its
+// expansion admits ([invokeGate.wildcardTarget]); the authorizer answers
+// the decode status for an admitted endpoint, which the dispatcher treats as
+// "do not invoke", as the group path does ([HandleGroupInvoke]). Mirrors
+// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:330-361
+// at db021da0 (#processEndpointForWildcard selects the endpoints first) and
+// :484-487, :509-546 (#invokeCommand validates per endpoint and adds the
+// failure as that endpoint's status); no target, no status.
+func undecodedWildcardEntries(ctx context.Context, wild AuthorizingInvoker, g *invokeGate, inv CommandInvocation) []InvokeResponseEntry {
+	var out []InvokeResponseEntry
+	wild.InvokeAuthorized(ctx, inv.Path, nil, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+		if status := g.wildcardTarget(endpoint, clusterID, commandID); !status.IsSuccess() {
+			return status
+		}
+		at := inv
+		at.Path.Endpoint, at.Path.HasEndpoint = endpoint, true
+		out = append(out, pathStatusEntry(at, inv.DecodeStatus))
+		return inv.DecodeStatus
+	})
+	return out
 }
 
 // DispatchEndpoints returns the endpoints req would dispatch a command to
@@ -779,6 +835,25 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 			return status
 		}
 	}
+	// Existence after the access check and before the command's flag
+	// gates and the payload check: matter.js answers UnsupportedEndpoint /
+	// UnsupportedCluster / UnsupportedCommand right after the Operate pass
+	// and before the command privilege, the fabric scope and the timed
+	// quality (packages/protocol/src/action/server/CommandInvokeResponse.ts:263-271
+	// at db021da0; connectedhomeip the same,
+	// src/app/InteractionModelEngine.cpp:1846-1851 at 6170af84,
+	// ValidateCommandCanBeDispatched returns the existence status before
+	// CheckCommandFlags). The access check above uses the
+	// Operate floor for a path that does not resolve
+	// (CommandInvokePrivilegeProvider), so it discloses no more than
+	// matter.js's Operate pass. A payload a generated decoder refused on a
+	// cluster the endpoint does not serve still answers UnsupportedCluster
+	// (TC-IDM-1.2).
+	if g.hasPathChecker && inv.Path.HasEndpoint {
+		if status := g.pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
+			return status
+		}
+	}
 	// A fabric-scoped command needs an accessing fabric: invoked on a
 	// session without one — PASE before AddNOC, or a session whose fabric
 	// the caller could not resolve ([HasAccessingFabric]) — it answers
@@ -795,26 +870,13 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 	if g.timedKnown && !g.timed && g.isTimed(inv.Path) {
 		return StatusNeedsTimedInteraction
 	}
-	// Existence before the payload check: matter.js
-	// CommandInvokeResponse.ts #processConcrete answers
-	// UnsupportedEndpoint / UnsupportedCluster / UnsupportedCommand
-	// before it validates the request, so a payload a generated decoder
-	// refused on a cluster the endpoint does not serve still answers
-	// UnsupportedCluster (TC-IDM-1.2). matter.js checks existence ahead
-	// of the fabric-scope and timed gates above too; those keep their
-	// place here, pinned by the bridge's timed conformance tests.
-	if g.hasPathChecker && inv.Path.HasEndpoint {
-		if status := g.pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
-			return status
-		}
-	}
 	return StatusSuccess
 }
 
 // wildcardTarget is the [CommandAuthorizer] of a wildcard path's
 // endpoints: the command's privilege, its fabric scope and its timed
 // quality at the endpoint (#wildcardTargetOf,
-// CommandInvokeResponse.ts:367-412 at 862ad75f).
+// CommandInvokeResponse.ts:367-398 at db021da0).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
 	if g.hasACL && !g.pase {

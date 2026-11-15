@@ -5,9 +5,9 @@ package bridge
 
 // White-box test for the keepalive half of reportSubscription: an
 // ongoing report whose dirty-path set drained to zero attribute reports
-// (a max-interval heartbeat with nothing changed) must carry
-// SuppressResponse=true on the wire so the peer does not owe an IM
-// StatusResponse for a no-op. Lives in package bridge to reach
+// (a max-interval heartbeat with nothing changed) carries
+// SuppressResponse=false on the wire, so the peer answers it with an IM
+// StatusResponse as it answers a report with data. Lives in package bridge to reach
 // reportSubscription and subTargets directly; reuses the real-session
 // wire-capture pattern from TestSendInitiatedReport_FreshExchange in
 // subscribe_initiated_test.go.
@@ -63,13 +63,14 @@ func decodeReportDataSuppressResponse(body []byte) (value, present bool, err err
 	return false, false, nil
 }
 
-// TestReportSubscription_EmptyPathsSetsSuppressResponse verifies that
+// TestReportSubscription_EmptyPathsRequestsAStatus verifies that
 // reportSubscription, driven with an empty path set (the keepalive case
 // — nothing dirty, or every dirty path was dropped by the ACL gate),
-// ships a ReportData with SuppressResponse=true. Mirrors matter.js
-// ServerSubscription.ts:782, which suppresses the peer's obligation to
-// answer a no-op heartbeat with an IM StatusResponse.
-func TestReportSubscription_EmptyPathsSetsSuppressResponse(t *testing.T) {
+// ships a ReportData with SuppressResponse present and false. Mirrors
+// matter.js packages/node/src/node/server/ServerSubscription.ts:909-920 at
+// db021da0 (`suppressResponse: false` at :914); what the bridge does with
+// the answer is TestKeepAliveStatusParity.
+func TestReportSubscription_EmptyPathsRequestsAStatus(t *testing.T) {
 	t.Parallel()
 
 	bridgeKey := bytes.Repeat([]byte{0x11}, 16)
@@ -166,7 +167,7 @@ func TestReportSubscription_EmptyPathsSetsSuppressResponse(t *testing.T) {
 	if !present {
 		t.Fatal("SuppressResponse tag (context tag 4) absent from the wire ReportData")
 	}
-	if !suppress {
-		t.Error("SuppressResponse = false, want true for an empty-payload keepalive report")
+	if suppress {
+		t.Error("SuppressResponse = true, want false for an empty-payload keepalive report")
 	}
 }

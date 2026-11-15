@@ -44,12 +44,13 @@ const peerConnectTimeout = 90 * time.Second
 // exchangeMaxPayloadSize is what one message on a UDP session carries:
 // matter.js MAX_UDP_MESSAGE_SIZE (packages/general/src/net/udp/
 // UdpSocket.ts:12, 1280 - 48) minus MATTER_MESSAGE_OVERHEAD
-// (packages/protocol/src/protocol/MessageExchange.ts:156, 26 + 12 + the
-// 16-byte MIC), as MessageExchange.maxPayloadSize computes it (:435-439).
+// (packages/protocol/src/protocol/MessageExchange.ts:182, 26 + 12 + the
+// 16-byte MIC), as MessageExchange.maxPayloadSize computes it (:465-469),
+// at db021da0.
 const exchangeMaxPayloadSize = (1280 - 48) - matterMessageOverhead
 
 // matterMessageOverhead is matter.js MATTER_MESSAGE_OVERHEAD
-// (MessageExchange.ts:156, 26 + 12 + the 16-byte MIC).
+// (MessageExchange.ts:182 at db021da0, 26 + 12 + the 16-byte MIC).
 const matterMessageOverhead = 26 + 12 + 16
 
 // ErrExchangeClosed is a send or receive on an exchange already closed.
@@ -57,7 +58,9 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 
 // ErrPayloadTooLarge is an Invoke whose request does not fit one message
 // of the session it would go over: over UDP [exchangeMaxPayloadSize], over
-// a TCP connection the connection's largest message. connectedhomeip's
+// a TCP connection the connection's largest message, bounded by the
+// MaxTcpMessageSize the session's peer stated
+// ([initiatedSecureExchange.MaxPayloadSize]). connectedhomeip's
 // camera sends its WebRTC signals with TransportPayloadCapability::
 // kLargePayload, which establishes the session over TCP
 // (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
@@ -126,7 +129,7 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 
 // Invoke implements [core.OtaProviderSession]: one InvokeRequest on a new
 // exchange, the InvokeResponse awaited for as long as matter.js's exchange
-// waits for a peer's response (MessageExchange.ts:839-850,
+// waits for a peer's response (MessageExchange.ts:877-886 at db021da0,
 // calculateMaximumPeerResponseTime — [Bridge.chunkStatusResponseTimeout]).
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it
@@ -374,12 +377,13 @@ type peerLossCloser interface {
 // [Bridge.ConnectOtaProvider] then runs a fresh CASE instead of reusing
 // a session the peer no longer knows (a provider restarted under the same
 // node id answers nothing on the old keys). Mirrors matter.js
-// MessageExchange.ts:620 (retransmissions exhausted → context.peerLost) →
-// ExchangeManager.ts:561-585 (a commissioned peer: SessionManager.
-// handlePeerLoss for the peer address, asOf the exchange context's
-// creation; otherwise the session alone) → SessionManager.ts:677-695.
-// An exhausted counter of a subscription report takes the same path
-// through [Bridge.reportPeerLoss].
+// MessageExchange.ts:643-651 at db021da0 (the send failed with a peer
+// communication error → context.peerLost) → ExchangeManager.ts:621-644
+// (a commissioned peer: SessionManager.handlePeerLoss for the peer
+// address, asOf the exchange context's creation; otherwise the session
+// alone) → SessionManager.ts:686-688.
+// An exhausted counter of a subscription report is no peer loss
+// ([Bridge.noteReportUndelivered]).
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: sessionID, exchangeID: exchangeID})
 	if !ok {
@@ -391,30 +395,6 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	}
 	b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
 	ex.fail(mrp.ErrMaxRetransmissionsReached)
-}
-
-// reportPeerLoss reports whether the exhausted message (sessionID,
-// exchangeID, counter) is evidence that the peer is lost, and the exchange's
-// creation time to bound the sweep: the message is a live ongoing report's
-// (its counter is still owned) and the first one sent on its exchange, so
-// nothing was heard from the peer on it. matter.js reports peer loss when a
-// send fails "only if we never heard from it on this exchange"
-// (MessageExchange.ts:616-621, #reportsPeerLoss :630-633,
-// #messageReceivedCounter === 0); a later chunk is sent only after the
-// peer's StatusResponse to the previous one, so its loss is not.
-func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (time.Duration, bool) {
-	if _, owned := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); !owned {
-		return 0, false
-	}
-	raw, ok := b.reportExchangeOrigins.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
-	if !ok {
-		return 0, false
-	}
-	origin, ok := raw.(reportExchangeOrigin)
-	if !ok || origin.firstCounter != counter {
-		return 0, false
-	}
-	return origin.createdAtMono, true
 }
 
 // closeLostPeer force-closes the sessions of the peer of sessionID that
@@ -590,12 +570,26 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 
 // MaxPayloadSize implements [bdx.Exchange]: the channel's maximum less the
 // message overhead, as matter.js MessageExchange.maxPayloadSize computes
-// it (MessageExchange.ts:435-439) — over UDP [exchangeMaxPayloadSize],
-// over a TCP connection the connection's largest message
-// (tcp.Conn.MaxMessageSize, MAX_TCP_MESSAGE_SIZE without the length
-// prefix, TcpChannel.ts:37-41 at db021da0) less the same overhead.
+// it (packages/protocol/src/protocol/MessageExchange.ts:465-469 at
+// db021da0) — over UDP [exchangeMaxPayloadSize], over a TCP connection the
+// connection's largest message (tcp.Conn.MaxMessageSize,
+// MAX_TCP_MESSAGE_SIZE without the length prefix, TcpChannel.ts:37-41)
+// capped at the MaxTcpMessageSize the session's peer stated, less the same
+// overhead: matter.js's MessageChannel.maxPayloadSize caps a TCP channel at
+// Session.peerMaxTcpMessageSize (MessageChannel.ts:86-92), never below the
+// UDP size (Session.ts:237-239). [Bridge.invokeMaxPayloadSize] computes
+// it, the bound a reply on the session keeps too ([Bridge.chunkLimitsFor]).
 func (e *initiatedSecureExchange) MaxPayloadSize() int {
-	if r, ok := e.route().(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
+	return e.b.invokeMaxPayloadSize(e.route(), e.sessionID)
+}
+
+// routeMaxPayloadSize is the largest payload one message on route carries:
+// over a TCP connection the connection's largest message less the message
+// overhead, otherwise [exchangeMaxPayloadSize] — matter.js
+// MessageExchange.maxPayloadSize (packages/protocol/src/protocol/MessageExchange.ts:465-469
+// at db021da0).
+func routeMaxPayloadSize(route net.Addr) int {
+	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
 		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
 			if n := m.MaxMessageSize() - matterMessageOverhead; n > exchangeMaxPayloadSize {
 				return n
@@ -603,6 +597,33 @@ func (e *initiatedSecureExchange) MaxPayloadSize() int {
 		}
 	}
 	return exchangeMaxPayloadSize
+}
+
+// invokeMaxPayloadSize is the largest payload one message of a request's
+// exchange carries, for the invoke context ([im.WithMaxPayloadSize]) and
+// for an exchange of the session this node opens or answers on
+// ([initiatedSecureExchange.MaxPayloadSize]): as
+// [routeMaxPayloadSize], over TCP also bounded by the MaxTcpMessageSize the
+// session's peer stated — matter.js MessageChannel.maxPayloadSize, the
+// channel's maximum and over TCP `Math.min(channelMax,
+// this.session.peerMaxTcpMessageSize)`
+// (packages/protocol/src/protocol/MessageChannel.ts:86-92 at db021da0),
+// less MATTER_MESSAGE_OVERHEAD (MessageExchange.ts:465-469); never below
+// the UDP bound, as [Bridge.chunkLimitsFor].
+func (b *Bridge) invokeMaxPayloadSize(route net.Addr, sessionID uint16) int {
+	n := routeMaxPayloadSize(route)
+	if n == exchangeMaxPayloadSize {
+		return n
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if res, ok := lookup.(SessionTransportResolver); ok {
+		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && int(peerMax)-matterMessageOverhead < n {
+			n = max(int(peerMax)-matterMessageOverhead, exchangeMaxPayloadSize)
+		}
+	}
+	return n
 }
 
 // Close implements [bdx.Exchange]: the exchange stops receiving, and an

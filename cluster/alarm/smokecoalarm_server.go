@@ -290,7 +290,11 @@ type StateSource = sdef.StateSource
 type SelfTester = sdef.SelfTester
 
 // SensitivitySetter is the capability [OptionalSmokeSensitivityLevel]
-// requires: a write that reaches the device.
+// requires: a write that reaches the device. A controller's write reaches
+// it only when the written level differs from the one SmokeCOState reads
+// at that moment; such a write counts as a change — its DataVersion
+// advances and it is reported — whether or not SmokeCOState shows it when
+// the setter returns, so a host may apply it later.
 type SensitivitySetter = sdef.SensitivitySetter
 
 // DefaultExpressedStatePriority is the order ExpressedState is derived
@@ -657,20 +661,42 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 // SensitivityEnum member, as matter.js validates an enum write before any
 // behavior runs and answers ConstraintError otherwise.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when it reached the host's
+// setter. The written level, checked, is compared with the one the host's
+// state holds before the host is called: the held level reaches no setter
+// and answers unchanged; another is applied and answers changed,
+// advancing the server's own version once, whatever the host's state
+// reads when the setter returns. A host's setter is therefore called only
+// for a level that differs from what its state read. matter.js notes a
+// change, and runs a reactor, only for a value that differs from the held
+// one (packages/node/src/behavior/state/managed/Datasource.ts:1476-1492 at
+// db021da0, #noteIfChanged); its SmokeCoAlarmServer adds no behaviour to
+// a write (packages/node/src/behaviors/smoke-co-alarm/
+// SmokeCoAlarmServer.ts:18-42).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
-		return err
+		return false, err
 	}
-	n, _ := v.(uint64)                                                           // an enum8 per ValidateWrite
-	setter, _ := s.src.(SensitivitySetter)                                       // guaranteed by NewServer
-	if err := setter.SetSmokeSensitivityLevel(ctx, Sensitivity(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
-		return fmt.Errorf("alarm: SmokeSensitivityLevel write: %w", err)
+	n, _ := v.(uint64)      // an enum8 per ValidateWrite
+	level := Sensitivity(n) //nolint:gosec // an enum8 per ValidateWrite
+	if s.state().SmokeSensitivityLevel == level {
+		return false, nil
+	}
+	setter, _ := s.src.(SensitivitySetter) // guaranteed by NewServer
+	if err := setter.SetSmokeSensitivityLevel(ctx, level); err != nil {
+		return false, fmt.Errorf("alarm: SmokeSensitivityLevel write: %w", err)
 	}
 	s.tracker().Bump()
-	return nil
+	return true, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:

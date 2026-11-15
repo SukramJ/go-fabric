@@ -323,6 +323,48 @@ func TestServeWrite(t *testing.T) {
 	})
 }
 
+// TestServeWriteEndedAtAnElement: a write whose element ends the
+// interaction — a path with a numeric ListIndex, INVALID_ACTION — is
+// answered with that status in a StatusResponse, the element before it
+// written, nothing after it; a suppressed one with nothing. matter.js
+// throws the StatusResponseError out of AttributeWriteResponse.process
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66 at
+// db021da0) and the messenger answers it as a StatusResponse unless the
+// request suppressed its response (InteractionMessenger.ts:458-460,
+// :317-322 at db021da0), as the device side does
+// ([im.WriteResponse.Status]).
+func TestServeWriteEndedAtAnElement(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, _, d := serverRig(t, 0)
+		indexed := servedAttr(21)
+		indexed.HasListIndex, indexed.ListIndex = true, 3
+		ended := func(suppress bool) []byte {
+			req := im.WriteRequest{SuppressResponse: suppress, Writes: []im.AttributeWrite{
+				{Path: servedAttr(20), Value: im.AttributeValue{Value: uint8(4)}},
+				{Path: indexed, Value: im.AttributeValue{Value: uint8(5)}},
+				{Path: servedAttr(22), Value: im.AttributeValue{Value: uint8(6)}},
+			}}
+			return encode(t, func(e *tlv.Encoder) { req.MarshalTLV(e, wire.AttributeValueWriter) })
+		}
+
+		s.push(t, 0x7235, im.OpcodeWriteRequest, ended(false))
+		s.ackPushed(t, expectStatus(t, s, im.StatusInvalidAction))
+		s.push(t, 0x7236, im.OpcodeWriteRequest, ended(true))
+		// A plain write after it: the first message on the wire answers it,
+		// so the suppressed one was answered with nothing.
+		s.push(t, 0x7237, im.OpcodeWriteRequest, writeRequest(t, false, false))
+		s.ackPushed(t, expectOpcode(t, s, im.OpcodeWriteResponse))
+		synctest.Wait()
+
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if len(d.writes) != 3 {
+			t.Fatalf("%d writes reached the dispatcher, want 3 (the element before the ended one, twice, and the plain write)", len(d.writes))
+		}
+	})
+}
+
 // TestServeInvoke: the response names its own command; a batch above
 // MaxPathsPerInvoke is InvalidAction; a suppressed invoke is answered with
 // nothing; a timed flag without a timed interaction is

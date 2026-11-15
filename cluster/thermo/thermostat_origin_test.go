@@ -19,7 +19,8 @@ import (
 // write of each writable attribute reaches the change listeners — the
 // host's OnChanged — as the written attribute from OriginControllerWrite,
 // as the matter.js Datasource queues a change notification on the
-// write's commit (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476).
+// write's commit (packages/node/src/behavior/state/managed/Datasource.ts:1486-1492
+// at db021da0).
 func TestThermostatOrigins(t *testing.T) {
 	t.Parallel()
 	cfg := thermo.DefaultThermostatConfig()

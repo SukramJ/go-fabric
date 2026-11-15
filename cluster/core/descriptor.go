@@ -201,7 +201,7 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		// arrives for a cluster that is NOT in ServerList — or when a
 		// cluster IS in ServerList but never produces an AttributeReport.
 		// Mirrors matter.js DescriptorServer.#serverList
-		// (DescriptorServer.ts:241-250): always derived from the set of
+		// (DescriptorServer.ts:275-284 at db021da0): always derived from the set of
 		// mounted behaviors, never hardcoded. The provider closure is
 		// the go-fabric equivalent — set after endpoint composition
 		// is complete so the list cannot drift from the actual mounted
@@ -338,6 +338,12 @@ func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, value any) er
 	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errDescriptorReadOnly, attrID), status: err}
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (d *Descriptor) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, d.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke always rejects — Descriptor has no commands.
 func (d *Descriptor) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, im.UnsupportedCommandf("core: Descriptor has no commands (got 0x%02X)", cmdID)
@@ -418,7 +424,7 @@ func (d *Descriptor) SetPartsListProvider(p func() []uint16) {
 // the advertised ServerList cannot drift from it.
 //
 // Mirrors matter.js DescriptorServer.#serverList
-// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:241-250):
+// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275-284 at db021da0):
 // always derived from `endpoint.behaviors.supported`, never hardcoded.
 //
 // Pass nil to revert to the static list (only used by unit tests that

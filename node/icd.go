@@ -84,7 +84,8 @@ type ICDConfig struct {
 
 // ICDUserActiveModeTrigger is the UserActiveModeTriggerHint bitmap and its
 // instruction; a hint that names a count or a duration needs the
-// instruction.
+// instruction. An empty Instruction leaves UserActiveModeTriggerInstruction
+// out of the cluster, as matter.js does.
 type ICDUserActiveModeTrigger struct {
 	Hint        icddef.UserActiveModeTriggerBitmap
 	Instruction string

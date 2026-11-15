@@ -106,6 +106,12 @@ func (s *FlowServer) MatterWrite(_ context.Context, attrID uint32, value any) er
 	return refuseWrite(flowInst, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// server stores no written value, so no write changes it.
+func (s *FlowServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke returns errNoCommands — FlowMeasurement has no commands.
 func (*FlowServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, fmt.Errorf("%w (cmd 0x%02X)", errNoCommands, cmdID)

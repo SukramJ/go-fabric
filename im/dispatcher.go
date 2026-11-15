@@ -41,11 +41,14 @@ type DataVersionReader interface {
 // (permissive default — preserves v1.0 behaviour for callers that have not
 // wired an ACL store).
 //
-// Mirrors connectedhomeip/src/access/AccessControl.cpp:415-560 and matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts FabricAccessControl
-// forRequest gate. chip src/app/WriteHandler.cpp:780 enforces "Execute the
-// ACL Access Granting Algorithm before existence checks" — the IM gate calls
-// this BEFORE attribute dispatch.
+// Mirrors connectedhomeip src/access/AccessControl.cpp:359-554 at 6170af84
+// (Check, CheckACL) and the
+// access passes of matter.js at db021da0 — a write's
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:215-218 and
+// :236-241, an invoke's CommandInvokeResponse.ts:257-260 and :273-279. chip
+// src/app/WriteHandler.cpp:770 at 6170af84 says "Execute the ACL Access
+// Granting Algorithm before existence checks" — the IM gate calls this
+// BEFORE attribute dispatch.
 type ACLChecker interface {
 	// CheckACL returns [StatusUnsupportedAccess] when the requesting fabric
 	// does not hold the required privilege for (endpoint, clusterID) on
@@ -260,4 +263,28 @@ type InvokeResult struct {
 	// envelope semantics.
 	ClusterStatus    uint8
 	HasClusterStatus bool
+}
+
+// maxPayloadCtxKey carries the largest payload one message of the
+// request's exchange carries.
+type maxPayloadCtxKey struct{}
+
+// WithMaxPayloadSize stamps the largest payload one message of the
+// request's exchange carries: its channel's largest message less the
+// message overhead — matter.js MessageExchange.maxPayloadSize
+// (packages/protocol/src/protocol/MessageExchange.ts:465-469 at db021da0,
+// MATTER_MESSAGE_OVERHEAD :182), 1232 - 54 over UDP and BLE, the
+// connection's largest message less 54 over TCP. A server that sizes a
+// response by its exchange reads it with [MaxPayloadSizeFromContext], as
+// matter.js's GeneralDiagnostics payloadTestRequest reads
+// `exchange.maxPayloadSize`.
+func WithMaxPayloadSize(ctx context.Context, n int) context.Context {
+	return context.WithValue(ctx, maxPayloadCtxKey{}, n)
+}
+
+// MaxPayloadSizeFromContext reports the stamp of [WithMaxPayloadSize];
+// ok is false when the caller stamped nothing.
+func MaxPayloadSizeFromContext(ctx context.Context) (n int, ok bool) {
+	n, ok = ctx.Value(maxPayloadCtxKey{}).(int)
+	return n, ok
 }

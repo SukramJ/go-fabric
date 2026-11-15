@@ -98,6 +98,7 @@ package levelcontrol
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -224,6 +225,13 @@ const (
 // generated requests of cluster/spec/levelcontrol — what
 // levelcontroldef.Declare carries. The documentation of its methods
 // follows.
+//
+// A controller's Options or OnLevel write reaches SetOptions or
+// SetOnLevel only when the written value differs from the one Options or
+// OnLevel reads at that moment; a write of the held value reaches no
+// setter. A write that reaches a setter counts as a change — its
+// DataVersion advances and it is reported — whether or not the getter
+// shows it when the setter returns, so a host may apply it later.
 type LevelSource = lvldef.LevelSource
 
 // source is the LevelSource the server drives, in cluster/wire's requests. The
@@ -263,10 +271,12 @@ type source interface {
 	OnLevel() (level uint8, known bool)
 
 	// SetOptions persists a bitmap the server has already checked
-	// against the advertised FeatureMap.
+	// against the advertised FeatureMap; it is called only for a bitmap
+	// that differs from what Options read.
 	SetOptions(ctx context.Context, options uint8) error
 	// SetOnLevel persists a new on-level; level is nil for a null write,
-	// which is the spec's "OnLevel has no effect".
+	// which is the spec's "OnLevel has no effect". It is called only for
+	// an on-level that differs from what OnLevel read.
 	SetOnLevel(ctx context.Context, level *uint8) error
 
 	// MoveToLevel drives the device to req.Level without touching OnOff.
@@ -395,6 +405,14 @@ type Server struct {
 	// hand-off path and the levels the engine is handing it, so a change
 	// the host's notifier reports meanwhile is the command's.
 	forwarding atomic.Int32
+	// noteMu guards noted and makes a notification's count, the level it
+	// read and its advance of the DataVersion one step.
+	noteMu sync.Mutex
+	// noted is the last host notification [Server.OnMatterValueChanged]
+	// advanced the DataVersion for — their count and the level it read —,
+	// against which a hand-off command's move is compared
+	// ([Server.bumpIfMoved]).
+	noted levelReading
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -406,12 +424,22 @@ type Server struct {
 	levelKnown bool
 	// coupling is what the running transition couples to.
 	coupling coupling
-	// listeners counts the change listeners; the host's notifier is
-	// subscribed while there is one.
-	listeners int
-	unsubSrc  func()
+	// listeners counts the change listeners and forwards holds the
+	// callbacks [Server.OnMatterValueChanged] forwards the host's
+	// notifications to, in registration order; the host's notifier is
+	// subscribed once while either has one ([Server.reconcileHost]).
+	listeners  int
+	forwards   []forward
+	forwardSeq uint64
+	unsubSrc   func()
+	// subMu serialises subscribing to and leaving the host's notifier.
+	subMu sync.Mutex
 	// wasOn is the OnOff a held server last saw (followOnOff).
 	wasOn bool
+
+	// scenes is the endpoint's ScenesManagement ([Server.SetScenes]); nil
+	// without one.
+	scenes atomic.Pointer[scenesRef]
 }
 
 // Compile-time assertions.
@@ -516,17 +544,94 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 //
 // Under the engine the server reports CurrentLevel itself (see
 // [Server.OnAttributeChange]) and this hop stays silent.
+//
+// A host notification reaches every forwarded callback before the server
+// observes CurrentLevel for its change listeners ([Server.observeLevel]):
+// a notifier wiring that compares the values it reads sees the change
+// first, and the change the listeners are told of after is one it saw —
+// the bridge advances the cluster's DataVersion once for it, not again
+// for the listeners' change (bridge quieterChanged).
 func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	n, ok := s.src.(contract.ChangeNotifier)
 	if !ok || n == nil || s.engine != nil {
 		return func() {}
 	}
-	return n.OnMatterValueChanged(func() {
+	s.mu.Lock()
+	id := s.forwardSeq
+	s.forwardSeq++
+	s.forwards = append(s.forwards, forward{id: id, cb: cb})
+	s.mu.Unlock()
+	s.reconcileHost()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			s.forwards = slices.DeleteFunc(s.forwards, func(f forward) bool { return f.id == id })
+			s.mu.Unlock()
+			s.reconcileHost()
+		})
+	}
+}
+
+// forward is one callback [Server.OnMatterValueChanged] forwards to.
+type forward struct {
+	id uint64
+	cb func()
+}
+
+// onHost is the server's one subscription to the host's notifier: the
+// forwarded callbacks first, each after the version moved, then, while a
+// change listener is registered, the server's own observation of
+// CurrentLevel.
+func (s *Server) onHost() {
+	s.mu.Lock()
+	cbs := make([]func(), len(s.forwards))
+	for i, f := range s.forwards {
+		cbs[i] = f.cb
+	}
+	follow := s.listeners > 0
+	s.mu.Unlock()
+	for _, cb := range cbs {
+		level, known := s.sourceLevel()
+		s.noteMu.Lock()
+		s.noted = levelReading{level, known, s.noted.notified + 1}
 		s.tracker().Bump()
+		s.noteMu.Unlock()
 		if cb != nil {
 			cb()
 		}
-	})
+	}
+	if follow {
+		s.observeLevel(s.sourceOrigin())
+	}
+}
+
+// reconcileHost subscribes to the host's notifier while a change listener
+// or a forwarded callback is registered and leaves it when neither is.
+func (s *Server) reconcileHost() {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return
+	}
+	s.subMu.Lock()
+	defer s.subMu.Unlock()
+	s.mu.Lock()
+	need := s.listeners > 0 || len(s.forwards) > 0
+	have := s.unsubSrc != nil
+	s.mu.Unlock()
+	switch {
+	case need && !have:
+		stop := n.OnMatterValueChanged(s.onHost)
+		s.mu.Lock()
+		s.unsubSrc = stop
+		s.mu.Unlock()
+	case !need && have:
+		s.mu.Lock()
+		stop := s.unsubSrc
+		s.unsubSrc = nil
+		s.mu.Unlock()
+		stop()
+	}
 }
 
 // Revision returns the cluster revision of the generated definition.
@@ -615,12 +720,20 @@ func nullableLevel(level uint8, known bool) (any, bool) {
 // nullable uint8 range of StartUpCurrentLevel; the Options bits the
 // FeatureMap does not make conformant are the server's to refuse.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [Server.MatterWrite], changed when it moved the attribute — the
+// comparison that advances the server's own version and notifies.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := s.veto.Check(ctx, attrID, storedUint8(v)); err != nil {
-		return err
+		return false, err
 	}
 	switch attrID {
 	case AttrOptions:
@@ -634,11 +747,14 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		changed := !equalLevel(s.startUp, next)
 		s.startUp = next
 		s.mu.Unlock()
-		s.tracker().Bump()
+		// A write of the value in effect changes nothing and leaves the
+		// DataVersion (Datasource.ts:1456-1457, :1476-1480 at db021da0
+		// #noteIfChanged).
 		if changed {
+			s.tracker().Bump()
 			s.changes.NotifyFrom(contract.OriginControllerWrite, AttrStartUpCurrentLevel)
 		}
-		return nil
+		return changed, nil
 	}
 }
 
@@ -679,43 +795,49 @@ func nullableUint8Of(v any) *uint8 {
 // writeOptions forwards an Options write. The bitmap carries constraint
 // "desc"; what "desc" resolves to here is [Server.optionsMask] — the bits
 // whose conformance the advertised FeatureMap satisfies.
-func (s *Server) writeOptions(ctx context.Context, options uint8) error {
+func (s *Server) writeOptions(ctx context.Context, options uint8) (changed bool, err error) {
 	if options&^s.optionsMask() != 0 {
-		return constraintErr{fmt.Sprintf(
+		return false, constraintErr{fmt.Sprintf(
 			"levelcontrol: Options 0x%02X sets a bit that is not conformant under FeatureMap 0x%02X", options, s.features(),
 		)}
 	}
 	if s.src == nil {
-		return errNoSource("Options write")
+		return false, errNoSource("Options write")
 	}
-	before := s.src.Options()
+	// The value in effect, written again, reaches no setter and changes
+	// nothing; another reaches the setter, advances the DataVersion and is
+	// reported to the server's listeners, whatever the host's state reads
+	// when the setter returns (Datasource.ts:1456-1457, :1476-1492 at
+	// db021da0 #noteIfChanged; LevelControlServer.ts:253-255 reacts to no
+	// Options write).
+	if s.src.Options() == options {
+		return false, nil
+	}
 	if err := s.src.SetOptions(ctx, options); err != nil {
-		return fmt.Errorf("levelcontrol: Options write: %w", err)
+		return false, fmt.Errorf("levelcontrol: Options write: %w", err)
 	}
 	s.tracker().Bump()
-	// A change is reported to the server's listeners, as matter.js emits
-	// options$Changed after the write commits (Datasource.ts:1473-1476).
-	if s.src.Options() != before {
-		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
-	}
-	return nil
+	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
+	return true, nil
 }
 
 // writeOnLevel forwards an OnLevel write. A null clears the on-level,
 // which the spec reads as "it has no effect" (resource :146-149).
-func (s *Server) writeOnLevel(ctx context.Context, level *uint8) error {
+func (s *Server) writeOnLevel(ctx context.Context, level *uint8) (changed bool, err error) {
 	if s.src == nil {
-		return errNoSource("OnLevel write")
+		return false, errNoSource("OnLevel write")
 	}
-	before, knownBefore := s.src.OnLevel()
+	// The on-level in effect, written again, reaches no setter and changes
+	// nothing, as for Options above.
+	if held, known := s.src.OnLevel(); known == (level != nil) && (!known || held == *level) {
+		return false, nil
+	}
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
-		return fmt.Errorf("levelcontrol: OnLevel write: %w", err)
+		return false, fmt.Errorf("levelcontrol: OnLevel write: %w", err)
 	}
 	s.tracker().Bump()
-	if after, known := s.src.OnLevel(); after != before || known != knownBefore {
-		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
-	}
-	return nil
+	s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
+	return true, nil
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
@@ -729,10 +851,21 @@ func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWrite
 // the command (transitions.go) and the host receives the levels it steps
 // through.
 //
-// The DataVersion is bumped only after the command succeeded: a refused
-// command changed nothing a subscriber caches.
+// The DataVersion advances only after a command that succeeded and moved
+// CurrentLevel ([Server.finish]).
+//
+// A command the host replaced through [Server.Handle] ends the current
+// scene when its handler succeeds: matter.js invalidates in the command
+// method before it calls the logic a host overrides
+// (packages/node/src/behaviors/level-control/LevelControlServer.ts:276-277,
+// :293-294, :359-360, :373-374, :426-427, :442-443, :487-488, :498 at
+// db021da0), and the handler applies its own gate, as a host's port does
+// ([Server.handOffExecutes]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		if err == nil {
+			s.invalidateScenes()
+		}
 		return resp, err
 	}
 	switch cmdID {
@@ -765,14 +898,16 @@ func (s *Server) invokeMoveToLevel(ctx context.Context, cmdID uint32, fields any
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	before := s.levelNow()
 	if s.engine != nil {
-		return s.finish(name, s.runMoveToLevel(ctx, req, cmdID == CmdMoveToLevelWithOnOff))
+		return s.finish(name, s.runMoveToLevel(ctx, req, cmdID == CmdMoveToLevelWithOnOff), before)
 	}
 	call := s.src.MoveToLevel
 	if cmdID == CmdMoveToLevelWithOnOff {
 		call = s.src.MoveToLevelWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdMoveToLevelWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, before, func() error { return call(ctx, req) })
 }
 
 // invokeMove handles Move (0x1) and MoveWithOnOff (0x5), which share a
@@ -794,14 +929,16 @@ func (s *Server) invokeMove(ctx context.Context, cmdID uint32, fields any) (any,
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	before := s.levelNow()
 	if s.engine != nil {
-		return s.finish(name, s.runMove(ctx, req, cmdID == CmdMoveWithOnOff))
+		return s.finish(name, s.runMove(ctx, req, cmdID == CmdMoveWithOnOff), before)
 	}
 	call := s.src.Move
 	if cmdID == CmdMoveWithOnOff {
 		call = s.src.MoveWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdMoveWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, before, func() error { return call(ctx, req) })
 }
 
 // invokeStep handles Step (0x2) and StepWithOnOff (0x6), which share a
@@ -818,14 +955,16 @@ func (s *Server) invokeStep(ctx context.Context, cmdID uint32, fields any) (any,
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	before := s.levelNow()
 	if s.engine != nil {
-		return s.finish(name, s.runStep(ctx, req, cmdID == CmdStepWithOnOff))
+		return s.finish(name, s.runStep(ctx, req, cmdID == CmdStepWithOnOff), before)
 	}
 	call := s.src.Step
 	if cmdID == CmdStepWithOnOff {
 		call = s.src.StepWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdStepWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, before, func() error { return call(ctx, req) })
 }
 
 // invokeStop handles Stop (0x3) and StopWithOnOff (0x7), which share a
@@ -839,38 +978,108 @@ func (s *Server) invokeStop(ctx context.Context, cmdID uint32, fields any) (any,
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	before := s.levelNow()
 	if s.engine != nil {
-		return s.finish(name, s.runStop(req, cmdID == CmdStopWithOnOff))
+		return s.finish(name, s.runStop(req, cmdID == CmdStopWithOnOff), before)
 	}
 	call := s.src.Stop
 	if cmdID == CmdStopWithOnOff {
 		call = s.src.StopWithOnOff
 	}
-	return s.forward(name, func() error { return call(ctx, req) })
+	executes := s.handOffExecutes(cmdID == CmdStopWithOnOff, req.OptionsMask, req.OptionsOverride)
+	return s.forward(name, executes, before, func() error { return call(ctx, req) })
 }
 
 // forward runs a command on the hand-off path — call hands it to the
 // port — and reports the level the port moved, from the command
 // ([Server.observeLevel]); a change the host's notifier reports while
-// call runs is the command's too.
-func (s *Server) forward(name string, call func() error) (any, error) {
+// call runs is the command's too. A command that executes
+// ([Server.handOffExecutes]) and that the port accepted ends the current
+// scene ([Server.MatterInvalidatesScenes]).
+func (s *Server) forward(name string, executes bool, before levelReading, call func() error) (any, error) {
 	s.forwarding.Add(1)
 	err := call()
 	s.forwarding.Add(-1)
 	if err == nil {
 		s.observeLevel(contract.OriginCommand)
+		if executes {
+			s.invalidateScenes()
+		}
 	}
-	return s.finish(name, err)
+	return s.finish(name, err, before)
 }
 
 // finish turns a port result into the (response, error) pair the
-// dispatcher expects. A refusal keeps the DataVersion where it was.
-func (s *Server) finish(name string, err error) (any, error) {
+// dispatcher expects. On the hand-off path the DataVersion advances when
+// the command changed CurrentLevel from before, once
+// ([Server.bumpIfMoved]) — the one attribute of this cluster's state a
+// command changes (RemainingTime is computed, as matter.js's virtual
+// remainingTime is, LevelControlServer.ts:806-823 at db021da0) — and a
+// refusal keeps it where it was. Under the engine every
+// change of CurrentLevel advanced it already ([Server.observeLevel]), and
+// every report of RemainingTime ([Server.initEngine]).
+// Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:1456-1457 at
+// db021da0 (a commit advances the version only `if (changes)`).
+func (s *Server) finish(name string, err error, before levelReading) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("levelcontrol: %s: %w", name, err)
 	}
-	s.tracker().Bump()
+	if s.engine == nil {
+		s.bumpIfMoved(before)
+	}
 	return nil, nil
+}
+
+// levelReading is CurrentLevel as the source reports it — the level of
+// an unknown one is 0 — and the count of host notifications that had
+// advanced the DataVersion before it was read ([Server.noted]).
+type levelReading struct {
+	level    uint8
+	known    bool
+	notified uint64
+}
+
+// sourceLevel reads CurrentLevel from the source, which is not nil; the
+// level of an unknown one is 0.
+func (s *Server) sourceLevel() (uint8, bool) {
+	level, known := s.src.CurrentLevel()
+	if !known {
+		level = 0
+	}
+	return level, known
+}
+
+// levelNow reads CurrentLevel from the source after the count of host
+// notifications, so a notification between the two is one the reading
+// may already show and [Server.bumpIfMoved] compares with its value.
+func (s *Server) levelNow() levelReading {
+	s.noteMu.Lock()
+	notified := s.noted.notified
+	s.noteMu.Unlock()
+	level, known := s.sourceLevel()
+	return levelReading{level, known, notified}
+}
+
+// bumpIfMoved advances the DataVersion once for the command when
+// CurrentLevel now differs from the level last served under a version of
+// its own: the level the last host notification since before read — that
+// notification advanced the version for it —, or before's when none
+// fired. A notification that fired before the port moved the level, for
+// a change of something else, leaves the move to this advance. Mirrors
+// matter.js packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
+// at db021da0 (a commit advances the version once `if (changes)`).
+func (s *Server) bumpIfMoved(before levelReading) {
+	level, known := s.sourceLevel()
+	s.noteMu.Lock()
+	defer s.noteMu.Unlock()
+	last := before
+	if s.noted.notified != before.notified {
+		last = s.noted
+	}
+	if level != last.level || known != last.known {
+		s.tracker().Bump()
+	}
 }
 
 // commandName renders a command id for error messages. Only the eight

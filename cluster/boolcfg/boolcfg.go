@@ -272,6 +272,12 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches an accepted command; the generated server
 // answers any other with UNSUPPORTED_COMMAND — SuppressAlarm without SPRS
 // and EnableDisableAlarm without VIS or AUD, as chip's AcceptedCommands

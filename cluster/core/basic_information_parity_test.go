@@ -573,3 +573,67 @@ func TestParityMatterJS_BasicInfoServer_UniqueIDStabilityAcrossReconstruction(t 
 		t.Errorf("UniqueID changed across reconstruction: %q vs %q — must be deterministic from Config", s1, s2)
 	}
 }
+
+// TestParityMatterJS_BasicInfoServer_InitializeDefaults: a host that sets
+// neither HardwareVersionString, ProductLabel nor NodeLabel is served the
+// defaults matter.js's initialize sets — the decimal rendering of
+// HardwareVersion and the ProductName for both labels, ProductLabel listed
+// in AttributeList.
+//
+// Mirrors matter.js packages/node/src/behaviors/basic-information/
+// BasicInformationServer.ts:67 setDefault("productLabel",
+// state.productName), :68 setDefault("nodeLabel", state.productName) and
+// :70 setDefault("hardwareVersionString", state.hardwareVersion.toString())
+// at db021da0.
+func TestParityMatterJS_BasicInfoServer_InitializeDefaults(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		hw   uint16
+		want string
+	}{{0, "0"}, {7, "7"}, {1234, "1234"}} {
+		cfg := validBasicInfoConfig()
+		cfg.HardwareVersion, cfg.HardwareVersionStr = tc.hw, ""
+		b, err := core.NewBasicInformation(cfg)
+		if err != nil {
+			t.Fatalf("NewBasicInformation: %v", err)
+		}
+		v, _ := b.MatterRead(0x0008)
+		if s, _ := v.(tlv.BoundedString); s.Value != tc.want {
+			t.Errorf("HardwareVersion %d: HardwareVersionString %#v, want %q", tc.hw, v, tc.want)
+		}
+	}
+
+	b, err := core.NewBasicInformation(validBasicInfoConfig())
+	if err != nil {
+		t.Fatalf("NewBasicInformation: %v", err)
+	}
+	if v, ok := b.MatterRead(0x000E); !ok || v != validBasicInfoConfig().ProductName {
+		t.Errorf("ProductLabel (%v, %v), want the ProductName %q", v, ok, validBasicInfoConfig().ProductName)
+	}
+	if !slices.Contains(b.MatterAttributes(), 0x000E) {
+		t.Error("AttributeList lacks ProductLabel (0x000E)")
+	}
+	// A host's own label stays its own.
+	cfg := validBasicInfoConfig()
+	cfg.ProductLabel = "Label"
+	if b, err = core.NewBasicInformation(cfg); err != nil {
+		t.Fatalf("NewBasicInformation: %v", err)
+	}
+	if v, _ := b.MatterRead(0x000E); v != "Label" {
+		t.Errorf("ProductLabel %v, want the host's %q", v, "Label")
+	}
+
+	// NodeLabel: empty is the ProductName, and the node starts; a host's
+	// own label stays its own.
+	cfg = validBasicInfoConfig()
+	cfg.NodeLabel = ""
+	if b, err = core.NewBasicInformation(cfg); err != nil {
+		t.Fatalf("NewBasicInformation with no NodeLabel: %v", err)
+	}
+	if v, _ := b.MatterRead(0x0005); v != (tlv.BoundedString{Value: cfg.ProductName, MaxBytes: 32}) {
+		t.Errorf("NodeLabel %#v, want the ProductName %q", v, cfg.ProductName)
+	}
+	if v, _ := newValidBasicInfo(t).MatterRead(0x0005); v != (tlv.BoundedString{Value: validBasicInfoConfig().NodeLabel, MaxBytes: 32}) {
+		t.Errorf("NodeLabel %#v, want the host's %q", v, validBasicInfoConfig().NodeLabel)
+	}
+}

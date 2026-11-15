@@ -406,6 +406,66 @@ var fabricScopedWritePaths = map[uint32]map[uint32]struct{}{
 	},
 }
 
+// fabricScopedReadPaths lists every readable attribute whose effective
+// access in parity/schema.json is fabric-scoped ("F") or
+// fabric-sensitive ("S"): what a request reads of it depends on the
+// accessing fabric.
+var fabricScopedReadPaths = map[uint32]map[uint32]struct{}{
+	0x001E: { // Binding
+		0x0000: {}, // Binding "RW F VM"
+	},
+	0x001F: { // AccessControl
+		0x0000: {}, // Acl "RW F A"
+		0x0001: {}, // Extension "RW F A"
+		0x0006: {}, // Arl "R F V"
+		0x0007: {}, // AuxiliaryAcl "R F A"
+	},
+	0x002A: { // OtaSoftwareUpdateRequestor
+		0x0000: {}, // DefaultOtaProviders "RW F VA"
+	},
+	0x003E: { // OperationalCredentials
+		0x0000: {}, // Nocs "R F A"
+		0x0001: {}, // Fabrics "R F V"
+	},
+	0x003F: { // GroupKeyManagement
+		0x0000: {}, // GroupKeyMap "RW F VM"
+		0x0001: {}, // GroupTable "R F V"
+		0x0004: {}, // GroupcastAdoption "RW F A"
+	},
+	0x0046: { // IcdManagement
+		0x0003: {}, // RegisteredClients "R F A"
+	},
+	0x0062: { // ScenesManagement
+		0x0002: {}, // FabricSceneInfo "R F V"
+	},
+	0x0065: { // Groupcast
+		0x0000: {}, // Membership "R F V"
+	},
+	0x0097: { // Messages
+		0x0000: {}, // Messages "R F V"
+	},
+	0x0553: { // WebRtcTransportProvider
+		0x0000: {}, // CurrentSessions "R S M"
+	},
+	0x0554: { // WebRtcTransportRequestor
+		0x0000: {}, // CurrentSessions "R S A"
+	},
+	0x0555: { // PushAvStreamTransport
+		0x0001: {}, // CurrentConnections "R S V"
+	},
+	0x0750: { // EcosystemInformation
+		0x0000: {}, // DeviceDirectory "R F M"
+		0x0001: {}, // LocationDirectory "R F M"
+	},
+	0x0801: { // TlsCertificateManagement
+		0x0001: {}, // ProvisionedRootCertificates "R S V"
+		0x0003: {}, // ProvisionedClientCertificates "R S V"
+	},
+	0x0802: { // TlsClientManagement
+		0x0001: {}, // ProvisionedEndpoints "R S V"
+	},
+}
+
 // readOnlyAttributes lists every attribute below the global range
 // (0xFFF8) that a remote party may not write: its effective access in
 // parity/schema.json is not writable, or its effective quality is fixed

@@ -55,6 +55,6 @@ func DecodeRequest(clusterID, cmdID uint32, dec *tlv.Decoder, open tlv.Element) 
 	if err != nil {
 		return nil, true, fmt.Errorf("%s.%s: %w", def.Name, cmd.Name, err)
 	}
-	fields, err = cmd.Decode(n)
+	fields, err = cmd.DecodeRequest(n)
 	return fields, true, err
 }

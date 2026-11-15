@@ -194,11 +194,16 @@ func (a *AccessControl) auxiliaryACLRead(ctx context.Context, filtered bool, fab
 	if err != nil {
 		return nil, false
 	}
+	// Split by the configured limits, the ones the capacity attributes
+	// advertise. Mirrors matter.js db021da0 packages/node/src/behaviors/
+	// access-control/AccessControlServer.ts:67-70 (auxiliaryEntryLimits from
+	// the state) and :671, :681-682 (#auxiliaryAclFor).
+	maxSubjects, maxTargets := int(a.subjectsPerEntry()), int(a.targetsPerEntry())
 	out := []AccessControlAuxiliaryEntryStruct{}
 	for _, e := range entries {
 		redacted := !local && e.FabricIndex != fabricIndex
-		for _, subjects := range chunked(e.Subjects, int(accessControlSubjectsPerEntry)) {
-			for _, targets := range chunked(e.Targets, int(accessControlTargetsPerEntry)) {
+		for _, subjects := range chunked(e.Subjects, maxSubjects) {
+			for _, targets := range chunked(e.Targets, maxTargets) {
 				chunk := e
 				chunk.Subjects, chunk.Targets = subjects, targets
 				out = append(out, AccessControlAuxiliaryEntryStruct{

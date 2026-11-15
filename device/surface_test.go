@@ -531,3 +531,44 @@ func TestSurfaceTypeMandatedElementDeclared(t *testing.T) {
 	}
 	t.Fatal("no device type mandates an attribute of a cluster")
 }
+
+// TestEveryKitServerListsItsCommandsAscending: on every endpoint the kit
+// builds — each device type with its fixture, the assembler's own servers
+// beside it — AcceptedCommandList and GeneratedCommandList read in
+// ascending id order. Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:135-136 at
+// db021da0 (acceptedIds.sort, [...generatedIds].sort, ascending).
+func TestEveryKitServerListsItsCommandsAscending(t *testing.T) {
+	t.Parallel()
+	var devices []*Device
+	for _, ty := range Types() {
+		if _, refused := refusedDefaults[ty.Name]; refused {
+			continue
+		}
+		if _, skip := noFixture[ty.Name]; skip {
+			continue
+		}
+		devices = append(devices, build(t, ty))
+	}
+	topo := assemble(t, devices...)
+	d := endpoint.NewTopologyDispatcher(topo)
+	lists := 0
+	for _, ep := range topo.Bridged() {
+		for _, r := range d.Read(context.Background(), im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) {
+			if r.Status != im.StatusSuccess || (r.Path.Attribute != cluster.AttrGlobalAcceptedCommandList && r.Path.Attribute != cluster.AttrGlobalGeneratedCommandList) {
+				continue
+			}
+			ids, ok := r.Value.Value.([]uint32)
+			if !ok {
+				t.Fatalf("endpoint %d 0x%04X/0x%04X reads %#v, no id list", ep.ID, r.Path.Cluster, r.Path.Attribute, r.Value.Value)
+			}
+			lists++
+			if !slices.IsSorted(ids) {
+				t.Errorf("endpoint %d (%s) cluster 0x%04X attribute 0x%04X: %v, want ascending", ep.ID, endpoint.RenderSourceKey(ep.SourceKey), r.Path.Cluster, r.Path.Attribute, ids)
+			}
+		}
+	}
+	if lists == 0 {
+		t.Fatal("no command list read")
+	}
+}

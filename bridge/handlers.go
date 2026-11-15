@@ -806,7 +806,19 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			caseFailureProtocolCode(err),
 			nil,
 		)
-		a.handshakeFailed()
+		// A refused Sigma1 changes nothing of the responder
+		// ([sigma.Responder.ProcessSigma1WithResume] commits only a
+		// Sigma1 it accepts), so it ends no handshake of this adapter:
+		// an adapter whose handshake is in progress or established its
+		// session stays with its provider, and the handshake's record
+		// with it (review II, R2-P4-rr-sec-04, R2-P4-fr-sec-03). An
+		// adapter without a handshake was made for this Sigma1 and goes.
+		a.mu.RLock()
+		begun := a.established || a.lastSigma2 != nil
+		a.mu.RUnlock()
+		if !begun {
+			a.handshakeFailed()
+		}
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 
@@ -848,12 +860,14 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	// Full Sigma path — reset established so the Sigma3 completion
 	// fires onEstablished correctly even if a prior handshake or resume
 	// on this adapter had already set it to true. Only a Sigma1 that
-	// restarted the handshake counts: the responder answers an MRP
-	// retransmit of the same Sigma1 with its cached Sigma2
-	// (secure/sigma/protocol.go processSigma1Locked, mirroring matter.js
-	// CaseServer.ts onSigma1), and reopening the gate there would let
+	// restarted the handshake counts: while the handshake is in progress
+	// the responder answers an MRP retransmit of the same Sigma1 with its
+	// cached Sigma2 (secure/sigma/protocol.go processSigma1Locked; the
+	// cache is this module's own), and reopening the gate there would let
 	// the Sigma3 retransmit that follows re-register the session and
-	// displace the live one.
+	// displace the live one. Once the handshake finished, the same Sigma1
+	// gets a fresh Sigma2 and reopens the gate; the finished handshake's
+	// Sigma3 then fails against it (review II, R2-P4-fr-sec-01).
 	out := result.Sigma2.Marshal()
 	a.mu.Lock()
 	if !bytes.Equal(out, a.lastSigma2) {
@@ -889,9 +903,14 @@ func caseFailureProtocolCode(err error) uint16 {
 //
 // Once the handshake established its session, a Sigma3 of the same bytes
 // as the one that established it is answered with the success report
-// again, and any other Sigma3 with StatusReport(FAILURE, InvalidParameter);
-// neither reaches the responder or changes the session (review II,
-// R2-P3-rr-dev-01).
+// again, and any other Sigma3 is not answered — it is acknowledged, as the
+// router acknowledges a Sigma3 of a completed handshake that is not the
+// completing one ([Bridge.handleSigma3OfCompleted]); neither reaches the
+// responder or changes the session (review II, R2-P3-rr-dev-01,
+// R2-P4-nv-03). The bridge's router does not send that report on: it
+// answers a Sigma3 of a completed handshake itself, for the bytes and the
+// route that completed it, and a Sigma3 that reaches the adapter after
+// establishment is acknowledged and not answered (R2-P4-nw-01).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	opcode, respPayload, _, err = a.processSigma3(payload)
 	return opcode, respPayload, err
@@ -908,8 +927,8 @@ const (
 	sigma3Established
 	// sigma3OfCompleted: the handshake had established its session
 	// before; the Sigma3 changed nothing (answered with the success
-	// report when it is the accepted Sigma3's retransmission, refused
-	// otherwise).
+	// report when it is the accepted Sigma3's retransmission, not
+	// answered otherwise).
 	sigma3OfCompleted
 )
 
@@ -934,7 +953,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		if retransmitted {
 			return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3OfCompleted, nil
 		}
-		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3OfCompleted, nil
+		return 0, nil, sigma3OfCompleted, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
 		a.mu.Unlock()

@@ -149,19 +149,28 @@ const QuietMinimumInterval = time.Second
 //
 //   - at once when the value changes from null, or to null from a
 //     non-null value (QuietEvent's shouldEmit returns "now");
-//   - otherwise at once when the last report is older than
-//     [QuietMinimumInterval], and else once, with the latest value, when
-//     that interval has passed since the last report.
+//   - otherwise at once when the last report is older than its interval
+//     ([Quieter.Interval], [QuietMinimumInterval] by default), and else
+//     once, with the latest value, when that interval has passed since the
+//     last report.
 //
 // A change the throttle holds back is still the attribute's value — a
-// read sees it — but neither advances the DataVersion nor marks the
-// attribute dirty until the deferred report goes out
-// (ServerBehaviorBacking reports a quieter property only on its quiet
-// emit). The throttle stands in front of the wire only: the host's
+// read sees it — and is not reported until the deferred report goes out:
+// matter.js broadcasts a quieter property only on its quiet emit
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:163-168,
+// :242, :253-261 at db021da0). The throttle holds back the report, not the
+// change: matter.js
+// advances the cluster's DataVersion at the commit that changed the value,
+// a quieter property's as any other's
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
+// #noteIfChanged :1476-1493), and the quiet emit adds an advance for a
+// dynamic property alone (advanceVersionFor, Datasource.ts:679-688) — so
+// the version is advanced at the change, by the throttle's user, and not
+// by Report. The throttle stands in front of the wire only: the host's
 // listeners see every change at once ([AttributeChanges.ChangedFrom]), as
-// every observer of a QuietEvent itself does (Events.ts:267-297, the
-// QuietObservable is only its `online` view); Report is the wire's
-// ([AttributeChanges.ReportFrom]).
+// every observer of a QuietEvent itself does (Events.ts:269-296 at
+// db021da0, the QuietObservable is only its `online` view); Report is the
+// wire's ([AttributeChanges.ReportFrom]).
 //
 // A last report later than the clock's now — the clock changed beneath
 // the throttle, as a device's does when it is added to a node and its
@@ -174,6 +183,13 @@ type Quieter struct {
 	Report func()
 	// Clock is the throttle's time source; nil is [clock.System].
 	Clock clock.Clock
+	// Interval is the minimum time between two reports; zero is
+	// [QuietMinimumInterval]. matter.js sets it per event through
+	// QuietObservable's minimumEmitInterval — ten seconds for PowerSource's
+	// BatPercentRemaining, BatTimeRemaining and BatTimeToFullCharge
+	// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34
+	// at db021da0). Set before the first change.
+	Interval time.Duration
 
 	// mu guards gen, lastEmit, pending and timer.
 	mu       sync.Mutex
@@ -190,7 +206,8 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	q.mu.Lock()
 	now := q.now()
 	immediate := wasNull || isNull
-	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(QuietMinimumInterval).Before(now) || now.Before(q.lastEmit) {
+	interval := q.interval()
+	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(interval).Before(now) || now.Before(q.lastEmit) {
 		q.emitLocked(now)
 		q.mu.Unlock()
 		q.Report()
@@ -200,7 +217,7 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	if q.timer == nil {
 		q.gen++
 		gen := q.gen
-		q.timer = q.afterFunc(q.lastEmit.Add(QuietMinimumInterval).Sub(now), func() { q.flush(gen) })
+		q.timer = q.afterFunc(q.lastEmit.Add(interval).Sub(now), func() { q.flush(gen) })
 	}
 	q.mu.Unlock()
 }
@@ -263,6 +280,14 @@ func (q *Quieter) emitLocked(now time.Time) {
 }
 
 func (q *Quieter) now() time.Time { return clock.Or(q.Clock).Now() }
+
+// interval is [Quieter.Interval], [QuietMinimumInterval] when unset.
+func (q *Quieter) interval() time.Duration {
+	if q.Interval > 0 {
+		return q.Interval
+	}
+	return QuietMinimumInterval
+}
 
 // afterFunc arms f after d on the throttle's clock and returns its stop.
 func (q *Quieter) afterFunc(d time.Duration, f func()) func() bool {

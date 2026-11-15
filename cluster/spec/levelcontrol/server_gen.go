@@ -304,7 +304,11 @@ func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req M
 // LevelSource is the device's level: the kit's LevelControl server
 // reads it and hands it the eight commands, after its own checks
 // (cluster/levelcontrol). A device that holds no level of its own
-// needs none: the kit's server holds it.
+// needs none: the kit's server holds it. A controller's Options or
+// OnLevel write reaches SetOptions or SetOnLevel only when the
+// written value differs from the one Options or OnLevel reads; the
+// held value reaches no setter. A write that reaches one counts as a
+// change whether or not the getter shows it when the setter returns.
 type LevelSource interface {
 	CurrentLevel() (level uint8, known bool)
 	Options() OptionsBitmap

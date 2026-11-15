@@ -45,7 +45,7 @@ import (
 //	func (c *MyCluster) MatterDataVersion() uint32 { return c.DataVersionTracker.Current() }
 //
 //	func (c *MyCluster) MatterWrite(...) error {
-//	    // do mutation ...
+//	    // do mutation; when it changed a value:
 //	    c.DataVersionTracker.Bump()
 //	    return nil
 //	}

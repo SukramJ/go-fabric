@@ -146,7 +146,7 @@ func TestNewRefusesAnInitialHoldOutsideItsType(t *testing.T) {
 // TestTemperatureSetpointHoldWriteGoesThroughTheSink: a controller's hold
 // write reaches the Sink before it is stored and is reported as the
 // controller's write; the same value again is no change and does not call
-// the Sink (Datasource.ts:760-762 at 0ceb202d). matter.js stores the hold
+// the Sink (Datasource.ts:1476-1481 at db021da0). matter.js stores the hold
 // only (ThermostatServer.ts:381) — the Sink call is this module's port.
 func TestTemperatureSetpointHoldWriteGoesThroughTheSink(t *testing.T) {
 	t.Parallel()

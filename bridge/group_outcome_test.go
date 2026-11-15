@@ -5,12 +5,13 @@ package bridge
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // TestGroupMessageOutcomes pins the reports matter.js derives from a group
@@ -26,14 +27,9 @@ func TestGroupMessageOutcomes(t *testing.T) {
 	if evs := invokeOutcomeEvents(&groups.Message{}, src, im.GroupInvokeReport{}); evs != nil {
 		t.Errorf("unprocessed: %+v", evs)
 	}
-	// A key that is not the group's mapped one: FailedAuth, no group id.
-	evs := invokeOutcomeEvents(&groups.Message{FabricIndex: 1, GroupID: 5}, src, im.GroupInvokeReport{Processed: true, Requested: []im.ConcreteCommandPath{path}})
-	if len(evs) != 1 || evs[0].Result != groups.TestResultFailedAuth || evs[0].HasGroupID || evs[0].FabricIndex != 1 {
-		t.Errorf("invalid mapping: %+v", evs)
-	}
-	// Valid mapping, no endpoint ran it: with members AccessAllowed false,
+	// No endpoint ran it: with members AccessAllowed false,
 	// without members no access evaluation and the field absent.
-	evs = invokeOutcomeEvents(&groups.Message{FabricIndex: 1, GroupID: 5, HasValidMapping: true, Endpoints: []uint16{3}}, src,
+	evs := invokeOutcomeEvents(&groups.Message{FabricIndex: 1, GroupID: 5, HasValidMapping: true, Endpoints: []uint16{3}}, src,
 		im.GroupInvokeReport{Processed: true, Requested: []im.ConcreteCommandPath{path}})
 	if len(evs) != 1 || evs[0].Result != groups.TestResultSuccess || evs[0].AccessAllowed == nil || *evs[0].AccessAllowed || evs[0].HasEndpoint {
 		t.Errorf("denied everywhere: %+v", evs)
@@ -44,34 +40,24 @@ func TestGroupMessageOutcomes(t *testing.T) {
 		t.Errorf("no members: %+v", evs)
 	}
 
-	// Decode failures.
-	hdr := message.Header{
-		SessionID: 9, MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 1,
-		DestSize: message.DestGroup, DestGroupID: 0x0303, SessionType: message.SessionGroup,
+	// Decode failures: a rejection names no fabric and carries the
+	// candidate fabrics and the group with its owner (matter.js
+	// SessionManager.ts:811-820 at db021da0).
+	ev, ok := decodeFailureEvent(src, &groups.DecodeError{
+		CandidateFabrics: []uint8{2}, GroupID: 0x0303, HasGroupID: true, GroupFabricIndex: 2,
+	})
+	if !ok || ev.FabricIndex != 0 || ev.HasGroupID || !slices.Equal(ev.CandidateFabrics, []uint8{2}) ||
+		!ev.HasHeaderGroupID || ev.HeaderGroupID != 0x0303 || ev.HeaderGroupFabricIndex != 2 || !ev.SourceIP.Equal(src) ||
+		ev.ResultFor(2) != groups.TestResultFailedAuth || ev.ResultFor(1) != groups.TestResultNoAvailableKey {
+		t.Errorf("rejection: %+v", ev)
 	}
-	plain := append(hdr.Marshal(), make([]byte, 20)...)
-	ev, ok := decodeFailureEvent(plain, src, groups.ErrDecrypt)
-	if !ok || ev.Result != groups.TestResultFailedAuth || !ev.HasHeaderGroupID || ev.HeaderGroupID != 0x0303 {
-		t.Errorf("FailedAuth without privacy: %+v", ev)
+	if ev, ok = decodeFailureEvent(src, fmt.Errorf("wrapped: %w", &groups.DecodeError{})); !ok || ev.HasHeaderGroupID || ev.ResultFor(1) != groups.TestResultNoAvailableKey {
+		t.Errorf("rejection without candidates or group: %+v", ev)
 	}
-	ev, _ = decodeFailureEvent(plain, src, &groups.NoKeyError{Authenticated: true, FabricIndex: 2, GroupID: 0x0404})
-	if ev.Result != groups.TestResultNoAvailableKey || ev.FabricIndex != 2 || ev.HeaderGroupID != 0x0303 {
-		t.Errorf("NoKey with a readable header: %+v", ev)
-	}
-	hdr.Privacy = true
-	private := append(hdr.Marshal(), make([]byte, 20)...)
-	ev, _ = decodeFailureEvent(private, src, &groups.NoKeyError{Authenticated: true, FabricIndex: 2, GroupID: 0x0404})
-	if !ev.HasHeaderGroupID || ev.HeaderGroupID != 0x0404 || ev.HasGroupID {
-		t.Errorf("NoKey behind privacy: %+v, want the unmapped key's group as the header group", ev)
-	}
-	if ev, _ = decodeFailureEvent(private, src, groups.ErrNoKey); ev.Result != groups.TestResultNoAvailableKey || ev.HasHeaderGroupID {
-		t.Errorf("bare ErrNoKey: %+v", ev)
-	}
-	if _, ok := decodeFailureEvent(plain, src, groups.ErrMalformed); ok {
-		t.Error("a malformed message was reported")
-	}
-	if _, ok := decodeFailureEvent(plain, src, errors.New("other")); ok {
-		t.Error("an unrelated failure was reported")
+	for _, err := range []error{groups.ErrMalformed, groups.ErrNoKey, groups.ErrDecrypt, errGroupMessagingMissing, errors.New("other")} {
+		if _, ok := decodeFailureEvent(src, err); ok {
+			t.Errorf("%v was reported", err)
+		}
 	}
 	noopGroupMessaging{}.ReportGroupMessage(groups.GroupMessageEvent{})
 }

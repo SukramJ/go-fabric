@@ -122,7 +122,7 @@ ActiveScheduleChange with MSCH, ActivePresetChange with PRES).
 | RunningStateChange | ThermostatRunningState changes | the previous and the current relays |
 | RunningModeChange | ThermostatRunningMode changes (`SetThermostatRunningMode`) | the previous and the current mode |
 | ActiveScheduleChange | `SetActiveScheduleRequest` succeeds | the previous and the new handle |
-| ActivePresetChange | `SetActivePresetRequest` succeeds (the same handle again included), or a write of a setpoint in effect clears the active preset | the previous and the new handle |
+| ActivePresetChange | `SetActivePresetRequest` succeeds (the same handle again included), or a write of a setpoint in effect — or of a setpoint limit whose reconcile moves that setpoint — clears the active preset | the previous and the new handle |
 | OccupancyChange | never: connectedhomeip does not emit it | |
 
 With TEVT and AUTO the server serves `ThermostatRunningMode` (0x001E),

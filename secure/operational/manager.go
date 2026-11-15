@@ -467,7 +467,7 @@ func (e *Entry) PeerMRPIntervals() (idleMs, activeMs, activeThresholdMs uint32) 
 // MaxTCPMessageSize, already passed through the Matter 1.5 gate
 // ([sessionparams.Parameters.EffectiveTransports]). A TCP sender bounds
 // its messages to the peer's size, as matter.js keeps
-// `maxTCPMessageSize` on the Session (Session.ts:86, :118).
+// `maxTcpMessageSize` on the Session (Session.ts:87, :119 at db021da0).
 func (e *Entry) SetPeerTransportParameters(transports uint16, maxTCPMessageSize uint32) {
 	e.mu.Lock()
 	e.peerTransports = transports

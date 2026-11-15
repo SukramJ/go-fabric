@@ -164,9 +164,9 @@ func TestInboundCloseSessionStatusReport_ClosesSession(t *testing.T) {
 
 // TestSendCloseSessionReport_WireShapeMatchesMatterJS decrypts the
 // farewell datagram with the peer's half of the session and pins the
-// wire shape to matter.js SecureChannelMessenger.ts:156 sendCloseSession
+// wire shape to matter.js SecureChannelMessenger.ts:193-195 sendCloseSession
 // → #sendStatusReport(Success, CloseSession, requiresAck=false) on a
-// fresh bridge-initiated exchange (ExchangeManager.ts:716-726).
+// fresh bridge-initiated exchange (ExchangeManager.ts:781-791 at db021da0).
 func TestSendCloseSessionReport_WireShapeMatchesMatterJS(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)

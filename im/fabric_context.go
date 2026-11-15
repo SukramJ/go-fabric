@@ -219,7 +219,8 @@ type timedCtxKey struct{}
 // window has not expired). The transport stamps it once the timed gate has
 // passed; [HandleInvokeRequest] then answers a timed-required command
 // outside one with NeedsTimedInteraction for that path — matter.js
-// CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`;
+// CommandInvokeResponse.ts:292-295 at db021da0, `limits.timed &&
+// !this.session.timed`;
 // the dispatcher's write path answers an attribute with the timed quality
 // the same way (AttributeWriteResponse.ts:243-247).
 func WithTimedInteraction(ctx context.Context, timed bool) context.Context {

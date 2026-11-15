@@ -131,11 +131,13 @@ func TestAuthorizeEventReports_PlainEventReturnedToAuthorized(t *testing.T) {
 	}
 }
 
-// TestAuthorizeEventReports_PASEBypass verifies that a PASE session
-// receives every event unchanged — ACL/fabric filtering does not apply
-// before commissioning — and that fabric 0 alone is no grant (review
-// 2026-11 W2-sec-03; matter.js FabricAccessControl.ts:189-191 keys the
-// implicit grant on the PASE auth mode).
+// TestAuthorizeEventReports_PASEBypass verifies that a PASE session before
+// AddNOC passes the ACL gate — the plain event is disclosed — but reads no
+// fabric-sensitive record of another fabric: its accessing fabric is 0
+// (matter.js EventReadResponse.ts:79, :344-352; review II, R2-P4-imread-01).
+// Fabric 0 alone is no grant (review 2026-11 W2-sec-03; matter.js
+// FabricAccessControl.ts:189-191 keys the implicit grant on the PASE auth
+// mode).
 func TestAuthorizeEventReports_PASEBypass(t *testing.T) {
 	t.Parallel()
 	auth := EventReadAuthorizer{
@@ -145,8 +147,8 @@ func TestAuthorizeEventReports_PASEBypass(t *testing.T) {
 	}
 	in := []EventReport{acEventReport(1), plainEventReport()}
 	got := AuthorizeEventReports(context.Background(), auth, in)
-	if len(got) != 2 {
-		t.Fatalf("PASE bypass: want 2 events, got %d", len(got))
+	if len(got) != 1 || got[0].Path.Cluster != tstOnOffCluster {
+		t.Fatalf("PASE without a fabric: want the plain event only, got %+v", got)
 	}
 	auth.PASE = false
 	if got := AuthorizeEventReports(context.Background(), auth, in); len(got) != 0 {
@@ -214,21 +216,32 @@ func TestEventPayloadFabricIndex(t *testing.T) {
 // TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister verifies that a
 // PASE session AddNOC adopted onto fabric 2 (FabricIndex != 0, PASE set —
 // either on the authorizer or stamped into ctx) keeps the commissioning
-// channel's implicit Administer grant: the AccessControl event of fabric 1
-// is disclosed although the ACL grants nothing on fabric 2. The CASE
-// negative control (same fabric, no PASE marker) is denied.
+// channel's implicit Administer grant: the AccessControl event of fabric 2
+// and the plain event are disclosed although the ACL grants nothing on
+// fabric 2. The AccessControl event of fabric 1 is not: the fabric-sensitive
+// filter compares with the adopted fabric (matter.js EventReadResponse.ts:79,
+// :344-352; review II, R2-P4-imread-01). The CASE negative control (same
+// fabric, no PASE marker) is denied.
 func TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister(t *testing.T) {
 	t.Parallel()
-	in := []EventReport{acEventReport(1), plainEventReport()}
+	in := []EventReport{acEventReport(1), acEventReport(2), plainEventReport()}
 	checker := fakeEventACL{allowFabric: 1, maxPriv: 5} // nothing on fabric 2
+	ownRecords := func(got []EventReport) bool {
+		for _, ev := range got {
+			if ev.Path.Cluster == tstAccessControlCluster && ev.Data.Value.(fakeACEvent).FabricIndex != 2 {
+				return false
+			}
+		}
+		return len(got) == 2
+	}
 
 	got := AuthorizeEventReports(context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 2, PASE: true}, in)
-	if len(got) != 2 {
-		t.Fatalf("adopted PASE (authorizer flag): want 2 events, got %d", len(got))
+	if !ownRecords(got) {
+		t.Fatalf("adopted PASE (authorizer flag): want fabric 2's AccessControl event and the plain event, got %+v", got)
 	}
 	got = AuthorizeEventReports(WithAuthModePASE(context.Background()), EventReadAuthorizer{Checker: checker, FabricIndex: 2}, in)
-	if len(got) != 2 {
-		t.Fatalf("adopted PASE (ctx stamp): want 2 events, got %d", len(got))
+	if !ownRecords(got) {
+		t.Fatalf("adopted PASE (ctx stamp): want fabric 2's AccessControl event and the plain event, got %+v", got)
 	}
 	got = AuthorizeEventReports(context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 2}, in)
 	if len(got) != 0 {

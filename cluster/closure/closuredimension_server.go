@@ -459,6 +459,12 @@ func (s *DimensionServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: every
+// attribute is read-only, so no write changes the server.
+func (s *DimensionServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke carries out SetTarget and Step; both answer with a status
 // only.
 func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

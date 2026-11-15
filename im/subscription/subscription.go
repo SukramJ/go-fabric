@@ -4,6 +4,8 @@
 package subscription
 
 import (
+	"cmp"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -201,13 +203,13 @@ func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 // Caller must hold s.mu.
 //
 // Mirrors matter.js's `#determineSendingIntervals` formula in
-// `packages/node/src/node/server/ServerSubscription.ts:259-300`
+// `packages/node/src/node/server/ServerSubscription.ts:270-292` at db021da0
 //
 //	sendInterval = maxInterval / 2           // ideally half
 //	if sendInterval < 60 s:
 //	    sendInterval = max(MinIntervalFloor, maxInterval × 0.8)
-//	if sendInterval < MinIntervalFloor:
-//	    sendInterval = MinIntervalFloor
+//	if sendInterval < subscriptionMinInterval:   // the publisher's, 2 s by default
+//	    sendInterval = subscriptionMinInterval
 //
 // The previous 5 s hard cap was an empirical workaround for a
 // chip-tool `ExchangeContext` timeout observed at ~10.45 s — the
@@ -221,8 +223,9 @@ func (s *Subscription) markDirty(path im.ConcreteAttributePath) {
 //
 // Randomisation window (by-design):
 // matter.js adds `subscriptionRandomizationWindow * Math.random()` to
-// the send interval
-// (`packages/node/src/node/server/ServerSubscription.ts:282`) to
+// the max interval the send interval is taken from
+// (`packages/node/src/node/server/ServerSubscription.ts:326-343` at
+// db021da0, the term at :338; the send interval at :278) to
 // distribute heartbeat traffic across a fleet of subscriptions that
 // share the same JS event loop. chip (`src/app/ReadHandler.cpp:769`)
 // does NOT apply any randomisation — it uses the negotiated
@@ -269,16 +272,24 @@ func (s *Subscription) sendIntervalLocked() time.Duration {
 		send = maxSendInterval
 	}
 	// Final clamp: never below the requested MinIntervalFloor
-	// (commissioner-side rate limit) and never below 1 s.
+	// (commissioner-side rate limit) and never below matter.js's minimum
+	// interval of 2 s (ServerSubscription.ts:285-290 at db021da0,
+	// #determineSendingIntervals; review II, R2-P4-imread-11).
 	floor := time.Duration(s.MinIntervalFloor) * time.Second
 	if send < floor {
 		send = floor
 	}
-	if send < time.Second {
-		send = time.Second
+	if minSend := minGrantedIntervalSeconds * time.Second; send < minSend {
+		send = minSend
 	}
 	return send
 }
+
+// minGrantedIntervalSeconds is the shortest MaxInterval a subscription is
+// granted and the shortest interval its reports are sent at: matter.js
+// packages/node/src/node/server/ServerSubscription.ts:73 at db021da0,
+// MIN_INTERVAL = Seconds(2).
+const minGrantedIntervalSeconds = 2
 
 // SendInterval returns the publisher heartbeat cadence the engine uses for
 // this subscription — matter.js ServerSubscription.sendInterval.
@@ -449,8 +460,18 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	return work, true
 }
 
-// takeDirtyLocked hands out the dirty attribute paths. Caller must hold
-// s.mu.
+// takeDirtyLocked hands out the dirty attribute paths in the priming
+// report's order: by the first of the subscription's request paths that
+// selects them, then ascending endpoint and cluster, then the cluster's
+// attribute order ([im.CompareAttributeIDs]). Caller must hold s.mu.
+//
+// matter.js builds every update by running the subscription's request
+// through AttributeSubscriptionResponse with the changed paths as a filter
+// (packages/node/src/node/server/ServerSubscription.ts:860-868 at
+// db021da0): the request's paths in order
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:88-100),
+// each walked as the priming report walks it — a deterministic order, the
+// priming report's (review II, R2-P4-imread-10).
 func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 	if len(s.pendingDirty) == 0 {
 		return nil
@@ -460,7 +481,30 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 		out = append(out, p)
 	}
 	s.pendingDirty = nil
+	slices.SortFunc(out, func(a, b im.ConcreteAttributePath) int {
+		if c := cmp.Compare(s.requestPathIndex(a), s.requestPathIndex(b)); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Endpoint, b.Endpoint); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Cluster, b.Cluster); c != 0 {
+			return c
+		}
+		return im.CompareAttributeIDs(a.Cluster, a.Attribute, b.Attribute)
+	})
 	return out
+}
+
+// requestPathIndex returns the index of the first of the subscription's
+// request paths that selects p, or their count when none does.
+func (s *Subscription) requestPathIndex(p im.ConcreteAttributePath) int {
+	for i, sp := range s.AttributePaths {
+		if pathMatches(sp, p) {
+			return i
+		}
+	}
+	return len(s.AttributePaths)
 }
 
 // offerDuePaths holds paths for the [EventReporter] the engine is about

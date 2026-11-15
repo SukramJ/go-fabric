@@ -43,6 +43,8 @@ func attrIn(attrs []spec.Attribute, id uint32) *spec.Attribute {
 // TestMatterWriteRunsTheVetoOnAWritableAttribute: a write that passed the
 // definition's checks reaches the host's veto. The shipped definition has
 // no writable attribute, so SelectedAreas is made one for the test.
+// MatterWriteChanged answers the veto's refusal unchanged, and a write the
+// veto lets through unchanged too: the server stores no written value.
 func TestMatterWriteRunsTheVetoOnAWritableAttribute(t *testing.T) {
 	t.Parallel()
 
@@ -61,6 +63,13 @@ func TestMatterWriteRunsTheVetoOnAWritableAttribute(t *testing.T) {
 	}
 	if seen != sa.AttrSelectedAreas {
 		t.Errorf("the veto saw attribute 0x%04X", seen)
+	}
+	if changed, err := s.MatterWriteChanged(context.Background(), sa.AttrSelectedAreas, []uint32{7}); changed || !errors.Is(err, veto) {
+		t.Errorf("MatterWriteChanged = %v, %v; want unchanged and the veto", changed, err)
+	}
+	s.SetBeforeWrite(func(context.Context, uint32, any) error { return nil })
+	if changed, err := s.MatterWriteChanged(context.Background(), sa.AttrSelectedAreas, []uint32{7}); changed || err != nil {
+		t.Errorf("MatterWriteChanged past the veto = %v, %v; want unchanged without an error", changed, err)
 	}
 }
 

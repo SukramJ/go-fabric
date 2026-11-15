@@ -28,7 +28,15 @@ func writeNode(enc *tlv.Encoder, tag tlv.Tag, n Node) {
 			enc.StartStruct(tag)
 		}
 		for _, c := range n.Children {
-			writeNode(enc, c.El.Tag, c)
+			// An array's elements are anonymous whatever tag a node
+			// carries: the encoder refuses a context tag inside an
+			// array, and a tree read from a peer is refused before it
+			// gets here ([ErrArrayElementTag]).
+			childTag := c.El.Tag
+			if el.Type == tlv.TypeArray {
+				childTag = tlv.AnonymousTag()
+			}
+			writeNode(enc, childTag, c)
 		}
 		_ = enc.EndContainer()
 	case el.IsNull || el.Type == tlv.TypeNull:

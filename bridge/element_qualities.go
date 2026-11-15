@@ -19,7 +19,7 @@ var diagnosticsClusters = map[uint32]struct{}{
 	0x0034: {}, // SoftwareDiagnostics, software-diagnostics.element.ts:20
 	0x0035: {}, // ThreadNetworkDiagnostics, thread-network-diagnostics.element.ts:20
 	0x0036: {}, // WiFiNetworkDiagnostics, wi-fi-network-diagnostics.element.ts:20
-	0x0037: {}, // EthernetNetworkDiagnostics, ethernet-network-diagnostics.element.ts:20
+	0x0037: {}, // EthernetNetworkDiagnostics, ethernet-network-diagnostics.element.ts:19
 }
 
 // specElementQualities answers [im.ElementQualities] from the generated

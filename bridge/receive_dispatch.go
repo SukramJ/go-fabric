@@ -29,12 +29,12 @@ import (
 // errChunkRejected is returned by a chunk loop when the peer answered a
 // ReportData chunk with an error StatusResponse; the interaction is
 // abandoned, exactly as matter.js's waitForSuccess throws
-// (packages/protocol/src/interaction/InteractionMessenger.ts:183-196).
+// (packages/protocol/src/interaction/InteractionMessenger.ts:221-227 at db021da0).
 var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 
 // errChunkUnanswered is returned by a chunk loop when the peer never
 // answered a ReportData chunk within the exchange timeout. matter.js
-// aborts the interaction on that timeout (MessageExchange.ts:834-863
+// aborts the interaction on that timeout (MessageExchange.ts:872-898 at db021da0,
 // PeerMessageMissingError); continuing would stream every remaining
 // chunk to a peer that is not listening, holding the dispatch slot for
 // the whole report.
@@ -192,7 +192,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// InvalidAction StatusResponse, and a request beyond the path ceiling
 	// with PathsExhausted. Mirrors matter.js InteractionServer.ts
 	// validateReadPaths (#3926, Matter §8.4.3.2) and the MAX_READ_PATHS
-	// check that follows it (:366-369).
+	// check that follows it (:373, :375-381 at db021da0).
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 		if err != nil {
@@ -262,9 +262,14 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 		events = func() []im.EventReport {
 			auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
 			// One EventFilterIB applies: the first for this node (matter.js
-			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05).
-			eventReq := req
-			eventReq.EventFilters = im.EventFiltersFor(req.EventFilters, readLocalNodeID)
+			// EventReadResponse.ts:68-77; review 2026-11 W2-wire-05). A
+			// path naming another node reads no event; a concrete one is
+			// answered UNSUPPORTED_NODE by DeniedEventPathStatuses, which
+			// reads the request's own paths (review II, R2-P4-imread-07).
+			eventReq := im.ReadRequest{
+				EventRequests: im.EventPathsForNode(req.EventRequests, readLocalNodeID),
+				EventFilters:  im.EventFiltersFor(req.EventFilters, readLocalNodeID),
+			}
 			evs := append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
 				im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(eventReq, b.eventLog))...)
 			if len(evs) > 0 {
@@ -399,7 +404,7 @@ func readWaitsForChunks(chunks []im.ReportData) bool {
 // awaitChunkStatusResponse blocks until the peer answers the chunk just
 // sent on (session, exchange) with an IM StatusResponse, then decides
 // whether the chunk loop may go on. Mirrors matter.js
-// InteractionMessenger.ts:719-721 sendDataReportMessage →
+// InteractionMessenger.ts:839-844 at db021da0, sendDataReportMessage →
 // waitForSuccess: a non-Success status or a missing answer aborts the
 // interaction — the caller returns the error and sends nothing more on
 // the exchange. op names the loop for the log line ("read" /
@@ -474,33 +479,63 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 			slog.Any("attribute", w.Path.Attribute),
 			slog.String("value_type", fmt.Sprintf("%T", w.Value.Value)))
 	}
+	txKey := mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
+	// A chunk that continues a chunked write is not judged as a new
+	// request: of it matter.js reads only its writes, MoreChunkedMessages
+	// and SuppressResponse (packages/node/src/node/server/InteractionServer.ts:582-584
+	// at db021da0) — its Timed flag is not looked at, the timed checks ran
+	// for the first chunk, and a chunked write is never timed (:417-424).
+	// A SuppressResponse on it ends the interaction with InvalidAction,
+	// the chunk not applied and the status itself suppressed (:594-599;
+	// InteractionMessenger.ts:317-322 sends no status for a suppressed request).
+	if b.writeContinues(txKey) {
+		if req.SuppressResponse {
+			b.endWriteInteraction(txKey)
+			return b.replyStatusUnlessSuppressed(true, src, requestHdr, proto, "write_chunk_suppress", im.StatusInvalidAction)
+		}
+		req.TimedRequest = false
+		return b.applyWrite(ctx, src, requestHdr, proto, dispatcher, req, txKey)
+	}
 	// A chunked write may not suppress the response — matter.js
-	// InteractionServer.ts:397-402 rejects the combination with
-	// InvalidAction before any timed-interaction handling.
+	// packages/node/src/node/server/InteractionServer.ts:410-415 at
+	// db021da0 rejects the combination with InvalidAction before any
+	// timed-interaction handling.
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_suppress", im.StatusInvalidAction)
+	}
+	// A write inside a running timed window may not be chunked, whatever
+	// its own Timed flag says, and this is judged before the timed gate —
+	// matter.js InteractionServer.ts:417-424 at db021da0
+	// (`receivedWithinTimedInteraction && moreChunkedMessages`, "Write
+	// Request action that is part of a Timed Write Interaction SHALL NOT
+	// be chunked"). The window goes with the refusal, as the exchange does
+	// in matter.js.
+	if req.MoreChunkedMessages && b.timedWindowRunning(requestHdr.SessionID, proto.ExchangeID) {
+		b.routing.timedDeadlines.Delete(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID})
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
 	}
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write", status)
 	}
-	// A write inside a timed interaction may not be chunked — matter.js
-	// InteractionServer.ts:408-413 ("Write Request action that is part
-	// of a Timed Write Interaction SHALL NOT be chunked"). The gate
-	// above passed, so a set TimedRequest flag means the timed window
-	// existed and was valid.
-	if req.TimedRequest && req.MoreChunkedMessages {
-		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
+	return b.applyWrite(ctx, src, requestHdr, proto, dispatcher, req, txKey)
+}
+
+// writeContinues reports whether key's exchange has a chunked write in
+// progress — a previous chunk announced more and the interaction has not
+// lapsed ([writeTxTTL]) — so the chunk that arrives on it continues that
+// write.
+func (b *Bridge) writeContinues(key mrp.ExchangeKey) bool {
+	v, ok := b.routing.writeTxs.Load(key)
+	if !ok {
+		return false
 	}
-	// WildcardPathFlags belong to Read and Subscribe only: a write path
-	// that carries them refuses the whole interaction with InvalidAction.
-	// Mirrors matter.js packages/protocol/src/action/server/
-	// AttributeWriteResponse.ts:60-66 ("WildcardPathFlags are not allowed
-	// in write interactions").
-	for _, w := range req.Writes {
-		if w.Path.WildcardPathFlags != 0 {
-			return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_wildcard_path_flags", im.StatusInvalidAction)
-		}
-	}
+	w, isTx := v.(*writeTx)
+	return isTx && b.clk().Now().Sub(time.Unix(0, w.lastChunk.Load())) <= writeTxTTL
+}
+
+// applyWrite runs a WriteRequest that passed the interaction's checks —
+// a first message, or a chunk that continues one — and answers it.
+func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.WriteRequest, txKey mrp.ExchangeKey) error {
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
 	// same way reads do via [im.FabricFilterFromContext]. Without
@@ -520,6 +555,9 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	writeSubjectNodeID, writeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	writeCtx := im.WithFabricFilter(ctx, false, writeFabricIndex)
 	writeCtx = im.WithSubject(writeCtx, writeSubjectNodeID, writeSubjectCATs)
+	// A path naming another node is not written ([im.HandleWriteRequest]),
+	// against this node's id on the session's fabric, as for a read.
+	writeCtx = im.WithLocalNodeID(writeCtx, b.localNodeIDFor(requestHdr.SessionID, writeFabricIndex))
 	// The ACL write Apple sends right after AddNOC still travels the PASE
 	// channel; without this stamp it is evaluated as fabric N / node-id 0
 	// and denied.
@@ -536,23 +574,39 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// A chunk that would open one chunked write more than the session may
 	// have is answered Busy before anything is held or written
 	// ([maxChunkedWritesPerSession]).
-	txKey := mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}
 	tx := b.routing.writeTransaction(txKey, req.MoreChunkedMessages, b.clk().Now())
 	if tx == nil {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
-	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
+	// The dispatcher records which written attributes changed nothing
+	// (endpoint.WriteChanges); their report is left out. A host notifier's
+	// changes of the endpoints written meanwhile are settled against the
+	// same record when the write ends ([Bridge.applyWriteHeld]).
+	changes := &endpointpkg.WriteChanges{}
+	writeCtx = endpointpkg.WithWriteChanges(writeCtx, changes)
+	resp := b.applyWriteHeld(writeCtx, dispatcher, req, changes)
+	// An interaction that ended at a data element (im.WriteResponse.Status)
+	// ends the transaction: the elements before it were written and are
+	// reported, and the controller gets the StatusResponse — matter.js's
+	// handleWriteRequest leaves with the error, the messenger answers it
+	// (InteractionMessenger.ts:431-460 at db021da0).
+	if !resp.Status.IsSuccess() {
+		b.endWriteInteraction(txKey)
+		b.reportWrittenAttributes(resp, changes)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
+	}
 	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
-	b.reportWrittenAttributes(resp)
+	b.reportWrittenAttributes(resp, changes)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
 	// WriteHandler.cpp both gate the reply on this flag. We still
 	// drive the side-effects (cluster writes already happened
-	// inside HandleWriteRequest) and discharge any owed MRP ack.
+	// inside HandleWriteRequest) and send the owed MRP ack, which no
+	// reply carries ([Bridge.ackUnansweredRequest]).
 	if req.SuppressResponse {
-		b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.write.suppressed",
 			slog.String("src", srcString(src)),
 			slog.Int("attribute_statuses", len(resp.Responses)))
@@ -603,7 +657,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 // Timed interactions, as matter.js splits them: the interaction-level gate
 // compares the request's own Timed flag with the exchange's timed window
 // (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
-// TIMEOUT — InteractionServer.ts:940-950), and a command marked "T" in the
+// TIMEOUT — InteractionServer.ts:993-1004 at db021da0), and a command marked "T" in the
 // matter.js model (the resolved server's contract.TimedCommander, else
 // schema.IsTimedInvoke) invoked outside a timed interaction answers
 // NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
@@ -617,8 +671,8 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// CommandRef, or a duplicate concrete path) is rejected up front with a
 	// top-level StatusResponse(InvalidAction) instead of dispatching any
 	// command. Mirrors matter.js
-	// packages/protocol/src/action/server/CommandInvokeResponse.ts:64-92
-	// (process/#processConcrete), whose StatusResponseError(InvalidAction)
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:68-99 at
+	// db021da0 (process) and :196-212 (#processConcrete), whose StatusResponseError(InvalidAction)
 	// aborts the whole invoke before a producer runs. Runs after the timed gate
 	// because matter.js validates the timed window first (InteractionServer.ts
 	// handleInvokeRequest).
@@ -674,6 +728,10 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	}
 	// The gate above passed, so a set Timed flag means a valid window.
 	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	// A server that sizes its response by the exchange (GeneralDiagnostics
+	// PayloadTestRequest) reads the largest payload one message of it
+	// carries ([Bridge.invokeMaxPayloadSize]).
+	invokeCtx = im.WithMaxPayloadSize(invokeCtx, b.invokeMaxPayloadSize(src, requestHdr.SessionID))
 	// Work a command defers until its response is out — the PASE session
 	// a RevokeCommissioning over PASE closes — runs when this returns,
 	// whichever way: the reply sent, suppressed, or failed.
@@ -699,14 +757,14 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// SuppressResponse handling per Matter §8.8.3.2.1: a suppress-response invoke
 	// still ships its InvokeResponse when a CommandDataIB was generated, but sends
 	// nothing when the response carries only CommandStatusIB entries. Mirrors
-	// matter.js packages/node/src/node/server/InteractionServer.ts:1043-1074
+	// matter.js packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
 	// (the held `suppressedBuffer` is discarded — no message sent — when no
 	// cmd-response is produced). The command side-effects already ran inside
-	// HandleInvokeRequest; we only elide the wire reply and discharge the owed
+	// HandleInvokeRequest; we only elide the wire reply and send the owed
 	// MRP ack (the controller opted out of the StatusResponse handshake, so the
-	// Standalone Ack is all it expects).
+	// Standalone Ack is all it expects; [Bridge.ackUnansweredRequest]).
 	if req.SuppressResponse && !resp.HasCommandData() {
-		b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.suppressed",
 			slog.String("src", srcString(src)),
 			slog.Int("statuses", len(resp.Responses)))
@@ -779,6 +837,16 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	return nil
 }
 
+// endWriteInteraction ends the Write interaction of key: its transaction
+// leaves the exchange's table and gives back every hold, as matter.js's
+// handleWriteRequest releases its held paths whichever way it leaves
+// (packages/node/src/node/server/InteractionServer.ts:460-469 at db021da0,
+// the disposal of `_held`). A transaction no longer in the table is a
+// fresh one, whose release is a no-op.
+func (b *Bridge) endWriteInteraction(key mrp.ExchangeKey) {
+	b.routing.writeTransaction(key, false, b.clk().Now()).Release()
+}
+
 // dispatchTimedRequest handles a decoded TimedRequest.
 // TimedRequest gates a follow-up Write / Invoke against a
 // per-exchange deadline (Matter §8.7). The bridge captures
@@ -796,6 +864,18 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	// (src/app/InteractionModelEngine.cpp:963-973 at 6170af84).
 	if b.routing.pendingTimedRequests(requestHdr.SessionID, proto.ExchangeID, now) >= maxPendingTimedRequests {
 		return b.replyTimedStatus(src, requestHdr, proto, "too_many_pending", im.StatusBusy)
+	}
+	// A TimedRequest on an exchange whose timed window still runs ends
+	// that window and is answered InvalidAction. Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:1066-1070 at
+	// db021da0 (startTimedInteraction stops the running timer and throws
+	// "Timed interaction already running for this exchange"); connectedhomeip
+	// src/app/TimedHandler.cpp:91-96 at 6170af84 answers anything but the
+	// Invoke or Write the window waits for InvalidAction. A window that
+	// expired is replaced.
+	if b.timedWindowRunning(requestHdr.SessionID, proto.ExchangeID) {
+		b.routing.timedDeadlines.Delete(timedKey{sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID})
+		return b.replyTimedStatus(src, requestHdr, proto, "already_running", im.StatusInvalidAction)
 	}
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot
@@ -838,10 +918,22 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 // to fire a change notification of its own; a root attribute such as
 // BasicInformation.NodeLabel was never reported at all. Found by the CHIP
 // Python harness (TC-IDM-2.3 step 4).
-func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse) {
+//
+// An attribute changes records as unchanged — every write of it in the
+// interaction left the cluster as it was, by its server's verdict
+// (contract.ChangeReportingWriter) — is not marked: matter.js broadcasts
+// only the properties a commit changed
+// (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
+// db021da0, onChange with the change list :1484 fills) and advances no
+// version for an equal value (:1456-1457, :1479), and the dispatcher left
+// the version as it was.
+func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse, changes *endpointpkg.WriteChanges) {
 	mgr := b.subscriptionManagerLocked()
 	for _, r := range resp.Responses {
 		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
+			continue
+		}
+		if changes.Unchanged(r.Path) {
 			continue
 		}
 		if mgr != nil {
@@ -907,6 +999,10 @@ type invokeCommitTable struct {
 type invokeCommit struct {
 	running int
 	held    []uint32
+	// advance: a server changed an attribute meanwhile whose report waits
+	// for its throttle ([Bridge.quieterChanged]); the commit advances the
+	// version for it without marking it dirty.
+	advance bool
 }
 
 // begin opens (or joins) the commit of key for one command.
@@ -942,21 +1038,23 @@ func (t *invokeCommitTable) hold(endpoint uint16, cluster uint32, attrs []uint32
 }
 
 // end ends one command's part in the commit of key and returns the
-// attributes held so far; the commit closes with its last command.
-func (t *invokeCommitTable) end(key invokedCluster) []uint32 {
+// attributes held so far and whether an advance without a report is owed
+// ([invokeCommitTable.advanceAtEnd]); the commit closes with its last
+// command.
+func (t *invokeCommitTable) end(key invokedCluster) (held []uint32, advance bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	c, ok := t.open[key]
 	if !ok {
-		return nil
+		return nil, false
 	}
-	held := c.held
-	c.held = nil
+	held, advance = c.held, c.advance
+	c.held, c.advance = nil, false
 	c.running--
 	if c.running <= 0 {
 		delete(t.open, key)
 	}
-	return held
+	return held, advance
 }
 
 // reportInvokeChanges marks dirty every attribute whose value a command
@@ -992,20 +1090,26 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 	// cluster (review II, R2-P2-rr-dev-04).
 	ended := make(map[invokedCluster]bool, len(before))
 	defer func() {
-		held := make(map[invokedCluster][]uint32)
+		type endedCommit struct {
+			held    []uint32
+			advance bool
+		}
+		left := make(map[invokedCluster]endedCommit)
 		for key := range before {
 			if !ended[key] {
 				ended[key] = true
-				held[key] = b.invokeCommits.end(key)
+				var e endedCommit
+				e.held, e.advance = b.invokeCommits.end(key)
+				left[key] = e
 			}
 		}
-		for key, changed := range held {
-			reportCommandChange(topo, mgr, key, changed)
+		for key, e := range left {
+			reportCommandChange(topo, mgr, key, e.held, e.advance)
 		}
 	}()
 	for key, old := range before {
 		now := readCluster(ctx, d, key)
-		changed := b.invokeCommits.end(key)
+		changed, advance := b.invokeCommits.end(key)
 		ended[key] = true
 		selfReported := selfReportedAttributes(topo, key)
 		for attr, v := range now {
@@ -1019,14 +1123,19 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 				changed = append(changed, attr)
 			}
 		}
-		reportCommandChange(topo, mgr, key, changed)
+		reportCommandChange(topo, mgr, key, changed, advance)
 	}
 }
 
 // reportCommandChange advances key's DataVersion once and marks changed
-// dirty; nothing changed moves nothing.
-func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32) {
-	if len(changed) == 0 {
+// dirty; advance owes the advance with nothing to mark — a quieter
+// attribute whose report waits for its throttle — and nothing changed
+// without it moves nothing. matter.js advances the version at the commit
+// that changed a value, a quieter one's included
+// (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
+// db021da0).
+func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, key invokedCluster, changed []uint32, advance bool) {
+	if len(changed) == 0 && !advance {
 		return
 	}
 	if topo != nil {
@@ -1087,11 +1196,20 @@ func readCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[u
 
 // chunkInvokeResponse encodes an InvokeResponse into one message, or — when
 // its responses do not fit one — into as many as needed, every one but the
-// last carrying MoreChunkedMessages. Responses are never split; a single
-// response too large for a message on its own is replaced by a
-// ResourceExhausted status for its path, as matter.js answers a response it
-// cannot send. Mirrors matter.js InteractionServer invoke chunking (the
-// InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
+// last carrying MoreChunkedMessages. Responses are never split. Mirrors
+// matter.js InteractionServer invoke chunking (the InvokeResponse split by
+// maxPayloadSize between responses,
+// packages/node/src/node/server/InteractionServer.ts:1123-1151 at db021da0).
+//
+// A single response too large for a message on its own (hardCap, from
+// udp.MaxDatagramSize over UDP) is replaced by a ResourceExhausted status
+// for its path — after the command ran. That is this module's own answer:
+// matter.js has none, it pushes a lone response whatever its size and sends
+// the oversized message over UDP with a warning ("This only works if both
+// nodes support it"), throwing MessageTooLargeError over TCP
+// (packages/protocol/src/protocol/MessageChannel.ts:106-116); here the UDP
+// listener refuses a datagram above its cap, so the controller would get
+// nothing at all. Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
 func chunkInvokeResponse(resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one

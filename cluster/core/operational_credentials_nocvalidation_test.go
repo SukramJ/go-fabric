@@ -25,7 +25,7 @@ import (
 
 // TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey verifies that
 // AddNOC rejects a NOC minted over a key other than the pending CSR key
-// with NOCStatusInvalidPublicKey. Mirrors matter.js Fabric.ts:557-559
+// with NOCStatusInvalidPublicKey. Mirrors matter.js Fabric.ts:614-616 at db021da0
 // (PublicKeyError → InvalidPublicKey) and chip FabricTable.cpp:890
 // `existingOpKey->Pubkey().Matches(nocPubKey)`.
 func TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
@@ -152,8 +152,8 @@ func TestUpdateNOC_SignedByDifferentRootRejectedAsInvalidNOC(t *testing.T) {
 // TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey verifies
 // that UpdateNOC rejects a NOC minted over a key other than the pending
 // IsForUpdateNOC CSR key, even when correctly signed by the fabric's
-// real root. Mirrors matter.js Fabric.ts:557-559 and chip
-// FabricTable.cpp:890.
+// real root. Mirrors matter.js Fabric.ts:614-616 at db021da0
+// (#verifyOperationalCert, PublicKeyError) and chip FabricTable.cpp:890.
 func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

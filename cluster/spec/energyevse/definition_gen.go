@@ -106,7 +106,7 @@ func (v ChargingTargetScheduleStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *ChargingTargetScheduleStruct) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "ChargingTargetScheduleStruct",
 		spec.Bind(0, "DayOfWeekForSequence", true, &v.DayOfWeekForSequence, spec.DecodeUint[TargetDayOfWeekBitmap](8)),
-		// ChargingTargets: the constraint "max 10" is the server's to judge, as chip src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565 does (owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld).
+		// ChargingTargets: the constraint "max 10" is the server's to judge (connectedhomeip src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565 at 6170af84 (owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld)).
 		spec.Bind(1, "ChargingTargets", true, &v.ChargingTargets, spec.DecodeList(spec.DecodeStruct[ChargingTargetStruct])),
 	)
 }
@@ -116,7 +116,7 @@ func (v *ChargingTargetScheduleStruct) DecodeTLV(n spec.Node) error {
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChargingTargetScheduleStructDef = &spec.Struct{Name: "ChargingTargetScheduleStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DayOfWeekForSequence", Type: spec.Type{Name: "TargetDayOfWeekBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: TargetDayOfWeekBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-	{ID: 1, Name: "ChargingTargets", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChargingTargetStruct", Kind: spec.KindStruct, Struct: ChargingTargetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}},
+	{ID: 1, Name: "ChargingTargets", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChargingTargetStruct", Kind: spec.KindStruct, Struct: ChargingTargetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}, Relaxed: "connectedhomeip src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565 at 6170af84 (owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld)"},
 }}
 
 // TargetDayOfWeekBitmap is the TargetDayOfWeekBitmap map8.

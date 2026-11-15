@@ -169,29 +169,49 @@ func TestUniqueIDPinned(t *testing.T) {
 	}
 }
 
-// TestLocationCapability: GeneralCommissioning LocationCapability is the
-// configured value, Indoor when unset; an undefined enum value is refused.
+// TestLocationCapability: GeneralCommissioning LocationCapability and the
+// RegulatoryConfig the node starts with are the configured value,
+// IndoorOutdoor when unset as matter.js's model default
+// (general-commissioning.element.ts:31-38 at db021da0); IndoorOnly states
+// Indoor; an undefined enum value, or IndoorOnly beside another value, is
+// refused.
 func TestLocationCapability(t *testing.T) {
 	t.Parallel()
-	for name, tc := range map[string]struct{ set, want uint8 }{
-		"default":        {0, mattercore.RegulatoryIndoor},
-		"indoor outdoor": {mattercore.RegulatoryIndoorOutdoor, mattercore.RegulatoryIndoorOutdoor},
+	for name, tc := range map[string]struct {
+		set        uint8
+		indoorOnly bool
+		want       uint8
+	}{
+		"default":        {0, false, mattercore.RegulatoryIndoorOutdoor},
+		"indoor only":    {0, true, mattercore.RegulatoryIndoor},
+		"outdoor":        {mattercore.RegulatoryOutdoor, false, mattercore.RegulatoryOutdoor},
+		"indoor outdoor": {mattercore.RegulatoryIndoorOutdoor, false, mattercore.RegulatoryIndoorOutdoor},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
-			cfg.Commissioning.LocationCapability = tc.set
+			cfg.Commissioning.LocationCapability, cfg.Commissioning.IndoorOnly = tc.set, tc.indoorOnly
 			n := newNode(t, cfg)
-			v, ok := n.Root().GeneralCommissioning.MatterRead(gencommdef.AttrLocationCapability)
-			if got, _ := v.(uint8); !ok || got != tc.want {
-				t.Errorf("LocationCapability %v (%v), want %d", v, ok, tc.want)
+			for _, attr := range []uint32{gencommdef.AttrLocationCapability, gencommdef.AttrRegulatoryConfig} {
+				v, ok := n.Root().GeneralCommissioning.MatterRead(attr)
+				if got, _ := v.(uint8); !ok || got != tc.want {
+					t.Errorf("attribute 0x%04X %v (%v), want %d", attr, v, ok, tc.want)
+				}
 			}
 		})
 	}
-	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
-	cfg.Commissioning.LocationCapability = mattercore.RegulatoryIndoorOutdoor + 1
-	if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
-		t.Errorf("LocationCapability 3 passed Validate: %v", err)
+	for name, set := range map[string]func(*node.Commissioning){
+		"an undefined value":        func(c *node.Commissioning) { c.LocationCapability = mattercore.RegulatoryIndoorOutdoor + 1 },
+		"IndoorOnly beside Outdoor": func(c *node.Commissioning) { c.LocationCapability, c.IndoorOnly = mattercore.RegulatoryOutdoor, true },
+		"IndoorOnly beside IndoorOutdoor": func(c *node.Commissioning) {
+			c.LocationCapability, c.IndoorOnly = mattercore.RegulatoryIndoorOutdoor, true
+		},
+	} {
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		set(&cfg.Commissioning)
+		if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
+			t.Errorf("%s passed Validate: %v", name, err)
+		}
 	}
 }
 

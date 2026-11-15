@@ -43,6 +43,15 @@ type AccessControl struct {
 	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
 	log atomic.Pointer[slog.Logger]
 
+	// writeMu serialises a controller's writes of Acl and Extension: one
+	// write's read of the held list, its comparison and its store are one
+	// step, so a write that answers unchanged has stored nothing and a
+	// concurrent write's change is never undone under it (matter.js holds
+	// the datasource across a write's change and the commit's comparison,
+	// packages/node/src/behavior/state/managed/Datasource.ts:1345-1350 and
+	// :1446-1457 at db021da0). It is taken before mu, never under it, and
+	// the store is called under it.
+	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric and the cached
 	// ACL state the handlers read; the store is not called under it.
 	mu            sync.RWMutex
@@ -386,8 +395,11 @@ func (*AccessControl) MinWritePrivilege(attrID uint32) uint8 {
 	}
 }
 
-// SetCurrentFabric is called by the IM dispatcher before fabric-scoped
-// reads so the cluster filters the ACL list to the requesting fabric.
+// SetCurrentFabric sets the fabric a local write of Acl or Extension —
+// [AccessControl.MatterWrite] with no Interaction Model request behind it
+// — lands on (see writeFabric). It scopes no read: a read with no request
+// behind it sees every fabric's entries whole, and a request's read is
+// scoped by the request's own fabric. Nothing in this module calls it.
 func (a *AccessControl) SetCurrentFabric(idx uint8) {
 	a.mu.Lock()
 	a.currentFabric = idx
@@ -421,7 +433,12 @@ func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
 // Extension entry leaves memory and its setting
 // ([AccessControl.RemoveFabricExtension]); the error is the setting's.
 // The ACL entries are the store's rows, which its fabric cascade removes.
+// It holds writeMu, as a write of the Extension does: the entry's removal
+// from memory and from its setting is one step against such a write, so
+// none in flight leaves the removed fabric's entry behind in either.
 func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
 	a.mu.Lock()
 	_, had := a.extensions[fabricIndex]
 	if had {
@@ -452,49 +469,15 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 	return out
 }
 
-// MatterRead implements [contract.ClusterServer].
+// MatterRead implements [contract.ClusterServer]. It has no request behind
+// it: Acl and Extension carry every fabric's entries whole, as
+// [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
-	case accessControlAttrACL:
-		ctx := context.Background()
-		a.mu.RLock()
-		fabric := a.currentFabric
-		a.mu.RUnlock()
-		entries, err := a.store.ListACL(ctx, fabric)
-		if err != nil {
-			return nil, false
-		}
-		out := make([]AccessControlEntryStruct, 0, len(entries))
-		for _, e := range entries {
-			ace := AccessControlEntryStruct{
-				Privilege:   uint8(e.Privilege),
-				AuthMode:    uint8(e.AuthMode),
-				Subjects:    append([]uint64(nil), e.Subjects...),
-				FabricIndex: e.FabricIndex,
-			}
-			if len(e.Targets) > 0 {
-				ace.Targets = make([]ACLTargetStruct, 0, len(e.Targets))
-				for _, t := range e.Targets {
-					ace.Targets = append(ace.Targets, ACLTargetStruct{
-						Cluster:    t.Cluster,
-						Endpoint:   t.Endpoint,
-						DeviceType: t.DeviceType,
-					})
-				}
-			}
-			out = append(out, ace)
-		}
-		return out, true
-	case accessControlAttrExtension:
-		a.mu.RLock()
-		exts := a.extensions[a.currentFabric]
-		a.mu.RUnlock()
-		if len(exts) == 0 {
-			return []AccessControlExtensionEntry{}, true
-		}
-		out := make([]AccessControlExtensionEntry, len(exts))
-		copy(out, exts)
-		return out, true
+	case accessControlAttrACL, accessControlAttrExtension:
+		// A read without an IM request behind it is a local one and
+		// sees every fabric's entries whole (localListRead).
+		return a.localListRead(context.Background(), attrID)
 	case accessControlAttrSubjectsPerAccessControl:
 		return a.subjectsPerEntry(), true
 	case accessControlAttrTargetsPerAccessControl:
@@ -528,11 +511,9 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // — every entry carries a FabricIndex and the wire MUST return only
 // entries for the requesting fabric when FabricFiltered=true. Apple
 // Home reads ACL on the CASE session immediately after Subscribe-
-// Initial; without this filter the read falls back to MatterRead's
-// `a.currentFabric` (only ever set by ACL writes — zero on a fresh
-// CASE session), ListACL returns `[]`, and Apple interprets the empty
-// list as "this subject has no Administer privilege" and tears the
-// fabric down via RemoveFabric.
+// Initial; a list without the session's own entries is "this subject
+// has no Administer privilege" to it, and it tears the fabric down via
+// RemoveFabric.
 //
 // A non-fabric-filtered read returns every fabric's entries, another
 // fabric's redacted to its FabricIndex (see unfilteredFabrics).
@@ -547,9 +528,9 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // `session.fabric` (packages/node/src/behavior/state/managed/values/
 // ListManager.ts, packages/protocol/src/action/server/AccessControl.ts).
 // A read with no request behind it ([im.LookupFabricFilter] reports no
-// filter) is a local one and keeps [AccessControl.MatterRead]; the two
-// are not allowed to stand for one another, because the local read
-// answers with the entries of the fabric the last write targeted, whole.
+// filter) is a local one: every fabric's entries, whole
+// (localListRead). The two are not allowed to stand for one another,
+// because the local read sees what a session without a fabric may not.
 //
 // Mirrors matter.js packages/node/src/behaviors/access-control/
 // AccessControlServer.ts: every read of `acl` and `extension` consults
@@ -567,9 +548,8 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	}
 	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
 	if !request {
-		// No Interaction Model request behind the read: a local caller,
-		// served by MatterRead's scope.
-		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
+		// No Interaction Model request behind the read: a local caller.
+		return a.localListRead(ctx, attrID)
 	}
 	var fabrics []uint8
 	switch {
@@ -583,12 +563,37 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 			return nil, false
 		}
 	}
+	return a.listRead(ctx, attrID, fabrics, fabricIndex, false)
+}
+
+// localListRead is the Acl or Extension read of a local actor — a read
+// with no Interaction Model request behind it (the node facade's
+// ReadAttribute, a host's MatterRead): every fabric's entries, each
+// whole. The fabric last set with [AccessControl.SetCurrentFabric] scopes
+// nothing here. Mirrors matter.js
+// packages/protocol/src/action/server/AccessControl.ts:250-253 and
+// :342-345 at db021da0 (mayRead grants a local actor every attribute and
+// every fabric-sensitive field before any fabric check) and
+// packages/node/src/behavior/state/managed/values/ListManager.ts:609-616
+// (createProxy filters a fabric-scoped list only for a remote actor).
+func (a *AccessControl) localListRead(ctx context.Context, attrID uint32) (any, bool) {
+	fabrics, err := a.unfilteredFabrics(ctx, 0)
+	if err != nil {
+		return nil, false
+	}
+	return a.listRead(ctx, attrID, fabrics, 0, true)
+}
+
+// listRead lists the Acl or Extension entries of fabrics in their order;
+// unless whole, an entry of a fabric other than accessing goes out
+// redacted to its FabricIndex.
+func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []uint8, accessing uint8, whole bool) (any, bool) {
 	if attrID == accessControlAttrExtension {
 		out := []AccessControlExtensionEntry{}
 		a.mu.RLock()
 		for _, fabric := range fabrics {
 			for _, e := range a.extensions[fabric] {
-				e.Redacted = fabric != fabricIndex
+				e.Redacted = !whole && fabric != accessing
 				if e.Redacted {
 					e.Data = nil
 				}
@@ -605,7 +610,7 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 			return nil, false
 		}
 		for _, e := range entries {
-			if fabric != fabricIndex {
+			if !whole && fabric != accessing {
 				out = append(out, AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true})
 				continue
 			}
@@ -699,11 +704,23 @@ func (a *AccessControl) writeFabric(ctx context.Context, attr string, entryFabri
 // checks — at most one entry for the fabric, its Data a well-formed TLV
 // list (AccessControlServer.ts:344-362, :416-434 at db021da0) — and to
 // the model's 128 bytes of Data (access-control.element.ts:206).
-func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value any) error { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
+func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := a.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// write of [AccessControl.MatterWrite], changed when it stored a list —
+// the accessing fabric's ACL or Extension list differed from the one it
+// held. A list equal to the held one is not stored, fires no change event
+// and leaves the server's own version (matter.js Datasource.ts:1456-1457,
+// :1476-1492 at db021da0); the read, the comparison and the store hold
+// writeMu, so a concurrent write is never undone under an unchanged verdict.
+func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) { //nolint:gocognit,gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)
 		if !ok {
-			return fmt.Errorf("core: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
+			return false, fmt.Errorf("core: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
 		}
 		var entryFabric uint8
 		if len(entries) > 0 {
@@ -711,7 +728,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		}
 		fabric, err := a.writeFabric(ctx, "ACL", entryFabric)
 		if err != nil {
-			return err
+			return false, err
 		}
 		// An auxiliary entry is synthesised, never written. Mirrors
 		// matter.js AccessControlServer #validateAccessControlListChanges:
@@ -719,7 +736,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// answers FAILURE".
 		for i, e := range entries {
 			if e.AuxiliaryType != nil {
-				return aclStatusError{im.StatusFailure, fmt.Sprintf("ACL[%d] must not include AuxiliaryType", i)}
+				return false, aclStatusError{im.StatusFailure, fmt.Sprintf("ACL[%d] must not include AuxiliaryType", i)}
 			}
 		}
 		// Validation — Mirrors chip src/access/AccessControl.cpp:680-764
@@ -757,14 +774,14 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// entries tagged with a foreign index pass the limit and then be
 		// stored, all of them, on the writer's fabric.
 		if fabricACLs := len(entries); fabricACLs > int(a.entriesPerFabric()) {
-			return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, a.entriesPerFabric())
+			return false, spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, a.entriesPerFabric())
 		}
 		for i, e := range entries {
 			if len(e.Subjects) > int(a.subjectsPerEntry()) {
-				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), a.subjectsPerEntry())
+				return false, spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), a.subjectsPerEntry())
 			}
 			if len(e.Targets) > int(a.targetsPerEntry()) {
-				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), a.targetsPerEntry())
+				return false, spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), a.targetsPerEntry())
 			}
 			// Enum validity: reject out-of-range Privilege / AuthMode values
 			// before the semantic checks below. matter.js enforces these via
@@ -773,34 +790,34 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// Privilege=7 / AuthMode=9. Mirrors chip AccessControl.cpp
 			// Entry::IsValid() privilege/authMode guards.
 			if e.Privilege < accessControlPrivilegeView || e.Privilege > accessControlPrivilegeAdminister {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Privilege=%d not in 1..5 (View..Administer)", i, e.Privilege)
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Privilege=%d not in 1..5 (View..Administer)", i, e.Privilege)
 			}
 			if e.AuthMode < accessControlAuthModePASE || e.AuthMode > accessControlAuthModeGroup {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=%d not in 1..3 (PASE/CASE/Group)", i, e.AuthMode)
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=%d not in 1..3 (PASE/CASE/Group)", i, e.AuthMode)
 			}
 			if e.AuthMode == accessControlAuthModePASE {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=PASE is forbidden in ACL", i)
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=PASE is forbidden in ACL", i)
 			}
 			if e.AuthMode == accessControlAuthModeGroup && e.Privilege == accessControlPrivilegeAdminister {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Group authmode + Administer privilege rejected", i)
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Group authmode + Administer privilege rejected", i)
 			}
 			// Subject range validation per AuthMode.
 			// Mirrors chip src/access/AccessControl.cpp:735 IsValidCaseNodeId /
 			// IsValidGroupNodeId per-subject checks inside Entry::IsValid().
 			for j, subj := range e.Subjects {
 				if subj == 0 {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: subject 0 is the undefined node ID", i, j)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: subject 0 is the undefined node ID", i, j)
 				}
 				if e.AuthMode == accessControlAuthModeCASE {
 					// CASE subjects: operational node ID or CASE Auth Tag (CAT).
 					if !aclIsValidCASESubject(subj) {
-						return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: CASE subject 0x%016X is not a valid operational node ID or CASE auth tag", i, j, subj)
+						return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: CASE subject 0x%016X is not a valid operational node ID or CASE auth tag", i, j, subj)
 					}
 				}
 				if e.AuthMode == accessControlAuthModeGroup {
 					// Group subjects: a Group ID, 0x0001 .. 0xFFFF.
 					if !aclIsValidGroupSubject(subj) {
-						return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X is not a group id", i, j, subj)
+						return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X is not a group id", i, j, subj)
 					}
 				}
 			}
@@ -810,29 +827,29 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// Additionally validate cluster/endpoint/device-type ID ranges.
 			for j, t := range e.Targets {
 				if t.DeviceType != nil && t.Endpoint != nil {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType and Endpoint mutually exclusive", i, j)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType and Endpoint mutually exclusive", i, j)
 				}
 				if t.Cluster == nil && t.Endpoint == nil && t.DeviceType == nil {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: at least one of Cluster/Endpoint/DeviceType must be set", i, j)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: at least one of Cluster/Endpoint/DeviceType must be set", i, j)
 				}
 				// Cluster / Endpoint / DeviceType ID validity, in the same
 				// order matter.js checks them. Mirrors matter.js
-				// packages/node/src/behaviors/access-control/AccessControlServer.ts:266-278
+				// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at db021da0
 				// (ClusterId.isValid / EndpointNumber.isValid / DeviceTypeId.isValid,
 				// each throwing ConstraintError). Cross-check chip
 				// AccessControl.cpp:746-748 IsValidClusterId / IsValidEndpointId /
 				// IsValidDeviceTypeId guards in Entry::IsValid().
 				if t.Cluster != nil && !aclIsValidClusterID(*t.Cluster) {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: Cluster 0x%08X is not a valid ClusterId", i, j, *t.Cluster)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: Cluster 0x%08X is not a valid ClusterId", i, j, *t.Cluster)
 				}
 				// EndpointNumber.isValid rejects 0xFFFF (the reserved wildcard);
 				// a uint16 endpoint cannot exceed that, so 0xFFFF is the only
 				// invalid value.
 				if t.Endpoint != nil && *t.Endpoint == 0xFFFF {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: EndpointId 0xFFFF is reserved", i, j)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: EndpointId 0xFFFF is reserved", i, j)
 				}
 				if t.DeviceType != nil && !aclIsValidDeviceTypeID(*t.DeviceType) {
-					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType 0x%08X is not a valid DeviceTypeId", i, j, *t.DeviceType)
+					return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType 0x%08X is not a valid DeviceTypeId", i, j, *t.DeviceType)
 				}
 			}
 		}
@@ -860,15 +877,28 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			}
 			out = append(out, rec)
 		}
+		// The read of the held list, the comparison and the store are one
+		// step under writeMu: a write that answers unchanged has stored
+		// nothing, so it cannot undo a change another write made.
+		a.writeMu.Lock()
+		defer a.writeMu.Unlock()
 		// Snapshot old ACL before the replace so we can classify the
 		// change type for the spec-mandated AccessControlEntryChanged event
 		// (§9.10.7.1). We read before write; a store error here is
 		// non-fatal for the write itself — we fall back to ChangeType=Changed
 		// if the snapshot fails.
-		oldEntries, _ := a.store.ListACL(ctx, fabric)
+		oldEntries, listErr := a.store.ListACL(ctx, fabric)
+		// A write of the list the fabric holds changes nothing: it is not
+		// stored, advances no version and fires no event, as matter.js
+		// notes no change and queues no $Changed for an equal value
+		// (Datasource.ts:1476-1492 at db021da0, #noteIfChanged). Without
+		// the old list the write is stored and counts as a change.
+		if listErr == nil && aclEntriesEqual(oldEntries, out) {
+			return false, nil
+		}
 
 		if err := a.store.ReplaceACL(ctx, fabric, out); err != nil {
-			return fmt.Errorf("core: AccessControl.ACL write: %w", err)
+			return false, fmt.Errorf("core: AccessControl.ACL write: %w", err)
 		}
 		// Bump DataVersion after a successful mutation so DataVersionFilter
 		// evaluation correctly detects the cluster changed. Must happen
@@ -889,8 +919,10 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		a.mu.RUnlock()
 		// matter.js reports an ACL change on acl$Changed, which a write of
 		// the list it already holds does not fire — the replace-with-empty
-		// a chunked list write opens with included (TC-ACL-2.5).
-		if emitter != nil && !aclEntriesEqual(oldEntries, out) {
+		// a chunked list write opens with included (TC-ACL-2.5); that write
+		// returned above. A list the store could not read is compared as
+		// empty.
+		if emitter != nil {
 			nodeID, passcodeID := aclAdminFromContext(ctx)
 			emit := func(changeType uint8, latest store.ACLEntry) {
 				v := aclEntryStruct(latest)
@@ -926,7 +958,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				emit(AccessControlChangeTypeRemoved, oldEntries[j])
 			}
 		}
-		return nil
+		return true, nil
 	}
 	if attrID == accessControlAttrExtension {
 		// Extension (0x0001) write path: replace the per-fabric extension
@@ -935,11 +967,11 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// Mirrors matter.js AccessControlServer.ts in-memory extension state.
 		entries, ok := value.([]AccessControlExtensionEntry)
 		if !ok {
-			return fmt.Errorf("core: AccessControl.Extension write: value type %T not []AccessControlExtensionEntry", value)
+			return false, fmt.Errorf("core: AccessControl.Extension write: value type %T not []AccessControlExtensionEntry", value)
 		}
 		fabric, err := a.writeFabric(ctx, "Extension", 0)
 		if err != nil {
-			return err
+			return false, err
 		}
 		// Every entry this write stores is re-stamped to the writer's own
 		// fabric below (v1.1 has no cross-fabric write path to begin
@@ -949,11 +981,11 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
 		// most one AccessControlExtensionStruct.
 		if len(entries) > 1 {
-			return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension write: constraint error: a fabric may hold at most one entry, got %d", len(entries))
+			return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension write: constraint error: a fabric may hold at most one entry, got %d", len(entries))
 		}
 		for i, e := range entries {
 			if len(e.Data) > 128 {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
 			}
 			// Data must itself decode as a well-formed TLV List — mirrors
 			// matter.js AccessControlServer.ts:416-434 at db021da0
@@ -961,7 +993,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// that fails this is rejected rather than stored, so a
 			// garbage write cannot wedge a later fabric-scoped read.
 			if err := validateAccessControlExtensionData(e.Data); err != nil {
-				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: %w", i, err)
+				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: %w", i, err)
 			}
 		}
 		stamped := make([]AccessControlExtensionEntry, len(entries))
@@ -971,14 +1003,25 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				FabricIndex: fabric,
 			}
 		}
+		// The read of the held entries, the comparison and the store are
+		// one step under writeMu, as for Acl above: entries equal to the
+		// held ones are neither persisted nor stored, advance no version
+		// and fire no event (Datasource.ts:1476-1492 at db021da0).
+		a.writeMu.Lock()
+		defer a.writeMu.Unlock()
+		a.mu.RLock()
+		oldExtensions := a.extensions[fabric]
+		a.mu.RUnlock()
+		if extensionsEqual(oldExtensions, stamped) {
+			return false, nil
+		}
 		if err := a.persistExtension(ctx, fabric, stamped); err != nil {
-			return fmt.Errorf("core: AccessControl.Extension write: persist: %w", err)
+			return false, fmt.Errorf("core: AccessControl.Extension write: persist: %w", err)
 		}
 		a.mu.Lock()
 		if a.extensions == nil {
 			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
 		}
-		oldExtensions := a.extensions[fabric]
 		a.extensions[fabric] = stamped
 		emitter := a.emitter
 		endpoint := a.endpoint
@@ -991,7 +1034,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// list-length delta, LatestValue=nil for a bulk-replace (spec
 		// quality X — permitted to omit) unless exactly one entry is
 		// involved on either side of the change.
-		if emitter != nil && !extensionsEqual(oldExtensions, stamped) {
+		if emitter != nil {
 			changeType := AccessControlChangeTypeChanged
 			switch {
 			case len(stamped) > len(oldExtensions):
@@ -1023,9 +1066,9 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				contract.EventPriorityInfo,
 			)
 		}
-		return nil
+		return true, nil
 	}
-	return fmt.Errorf("core: AccessControl attribute 0x%04X not writable", attrID)
+	return false, fmt.Errorf("core: AccessControl attribute 0x%04X not writable", attrID)
 }
 
 // MatterInvoke — no commands; AccessControl in 1.5.1 is attribute-only.
@@ -1117,9 +1160,9 @@ func aclIsValidCASESubject(id uint64) bool {
 	// CASE Auth Tag: upper 32 bits == 0xFFFF_FFFD. The low 16 bits carry
 	// the CAT version, which MUST NOT be 0 — a version-0 CAT is rejected
 	// with ConstraintError. Mirrors matter.js
-	// packages/node/src/behaviors/access-control/AccessControlServer.ts:211-220
+	// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at db021da0
 	// (CaseAuthenticatedTag.getVersion(cat) === 0 → ConstraintError) and
-	// packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33
+	// packages/types/src/datatype/CaseAuthenticatedTag.ts:76
 	// (getVersion = tag & 0xffff). Matter §6.6.2.1.2.
 	return (id>>32) == 0xFFFF_FFFD && (id&0xFFFF) != 0
 }

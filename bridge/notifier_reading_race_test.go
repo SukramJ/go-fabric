@@ -87,9 +87,9 @@ func TestPathValuesKeepTheLatestReading(t *testing.T) {
 	<-first
 	<-second
 
-	v.mu.Lock()
-	got := v.last[path]
-	v.mu.Unlock()
+	v.mem.mu.Lock()
+	got := v.mem.last[path]
+	v.mem.mu.Unlock()
 	if !got.equal(readingOf(im.AttributeValue{Value: true})) {
 		t.Fatalf("the remembered value is %+v after the device moved to true; the older reading was stored last", got)
 	}

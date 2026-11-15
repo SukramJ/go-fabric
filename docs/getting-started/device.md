@@ -157,7 +157,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the discriminator fits 12 bits;
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
-- `VendorID`, `ProductID` and `NodeLabel` are set;
+- `VendorID` and `ProductID` are set;
 - a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
   and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
 - `Attestation.Files` is not combined with `Chain` or the CD, and
@@ -165,7 +165,8 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
-- `LocationCapability` is a valid regulatory location;
+- `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
+  matter.js's default), and `IndoorOnly` comes with no other value;
 - `Network.WiFi` comes with its `Reporter`;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is;
@@ -196,8 +197,13 @@ Defaults worth knowing:
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
+| `BootReason` | Unspecified, matter.js's default; a start into the version the node's own OTA requestor recorded as its update in progress reports SoftwareUpdateCompleted whatever this states |
+| `Commissioning.LocationCapability` | IndoorOutdoor, matter.js's default; `Commissioning.IndoorOnly` states Indoor |
+| `OTAProvider.GrantFabric` | with `OTAProvider` set: the provider's ACL entry is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics it opens the provider to. A grant only adds: an entry written while a grant stood, or by a version that wrote it into every fabric, stays when the grant goes, until the fabric's administrator writes the ACL without it |
+| `WebRTCRequestor.GrantFabric` | the ACL entry that lets a camera reach a WebRtcTransportRequestor the topology serves is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics its cameras signal on. A grant only adds: an entry written while a grant stood, or by a version that wrote it into the first fabric, stays when the grant goes, until the fabric's administrator writes the ACL without it |
+| `BasicInformation.NodeLabel` | `BasicInformation.ProductName` |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
-| `ProductDescription.DeviceType` | RootNode (0x0016) |
+| `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type — or of a device type outside the schema snapshot, which matter.js also treats as simple — below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
@@ -214,7 +220,8 @@ Defaults worth knowing:
 ### The node's own name
 
 `BasicInformation.NodeLabel` is the label the node serves on its first
-boot. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
+boot; empty, it is `BasicInformation.ProductName`, as matter.js defaults
+it. `Node.SetNodeLabel(ctx, label)` changes it at run time with a
 controller's write semantics: a label over 32 bytes is refused with
 `CONSTRAINT_ERROR` (an `im.StatusCodeError`), and an accepted one is
 persisted where a controller's written label is — a store failure fails
@@ -305,7 +312,7 @@ cluster is declared with `<cluster>def.Declare` of its generated package
 | `Declare` field | Effect |
 | --- | --- |
 | `Initial` | initial state over the device type's defaults; an optional attribute with a value is served |
-| `Features` | the cluster's feature selection (zero is the device type's) |
+| `Features` | the cluster's feature selection (zero is the default: the device type's mandated features and the ones matter.js's default server enables — ChangeEvent on BooleanState) |
 | `OnWrite` | a veto on a controller's write |
 | `Handle<Command>` | your handler in place of the server's own (an optional command is then accepted) |
 | a host port (`Sink`, `LevelSource`, `Mover`, …) | the device the kit's server drives |
@@ -365,8 +372,8 @@ calls:
   and reported to subscribers, and the sink is not called. An attribute
   Matter marks quieter — LevelControl's `CurrentLevel`, ColorControl's
   current colour — is reported at most once a second with its latest
-  value, at once from or to null, as matter.js throttles it; a read and
-  `OnChanged` see every change at once. `Set` is safe from any goroutine,
+  value, at once from or to null, as matter.js throttles it; a read, the
+  cluster's DataVersion and `OnChanged` see every change at once. `Set` is safe from any goroutine,
   including from inside the sink.
 
 *Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/measurement.go` (`Measurement`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*

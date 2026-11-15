@@ -15,9 +15,11 @@ package device_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
@@ -72,6 +74,29 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 			Features: powersourcedef.FeatureWired, Initial: powersourcedef.Patch{Order: new(uint8(1))},
 		}); err != nil {
 			t.Errorf("Wired: %v", err)
+		}
+	})
+
+	// "enable only features matter.js implements unconditionally"
+	// (:201-232) with its INTENTIONALLY_ENABLED table (:27-37):
+	// BooleanStateServer enables ChangeEvent (:29;
+	// packages/node/src/behaviors/boolean-state/BooleanStateServer.ts:11-13
+	// at db021da0), so a device that declares nothing about BooleanState
+	// serves the feature and lists StateChange.
+	t.Run("BooleanState serves ChangeEvent by default", func(t *testing.T) {
+		t.Parallel()
+		d, err := device.NewContactSensor(opts("contact"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := d.BooleanState().Underlying()
+		fm, _ := srv.MatterRead(spec.AttrFeatureMap)
+		if fm != uint32(booleanstatedef.FeatureChangeEvent) {
+			t.Errorf("FeatureMap %v, want ChangeEvent (%d)", fm, booleanstatedef.FeatureChangeEvent)
+		}
+		lister, ok := srv.(interface{ MatterEvents() []uint32 })
+		if !ok || !slices.Contains(lister.MatterEvents(), booleanstatedef.EventStateChange) {
+			t.Error("StateChange is not among the server's events")
 		}
 	})
 

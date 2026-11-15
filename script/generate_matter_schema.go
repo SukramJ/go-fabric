@@ -13,7 +13,9 @@
 //     attributeReadPrivileges (attributes whose effective read privilege is
 //     above View), changesOmittedAttributes,
 //     fabricScopedWritePaths (writable attributes whose effective access
-//     is fabric-scoped or fabric-sensitive) and readOnlyAttributes (every
+//     is fabric-scoped or fabric-sensitive), fabricScopedReadPaths
+//     (readable attributes whose effective access is fabric-scoped or
+//     fabric-sensitive) and readOnlyAttributes (every
 //     attribute below the global range that matter.js does not let a remote
 //     party write)
 //   - devicetype_requirements_gen.go — deviceTypeDefinitions (each device
@@ -25,6 +27,9 @@
 //     timedWritePaths (every attribute whose effective access carries it)
 //   - large_message_gen.go — largeMessageCommands (every request command
 //     whose effective quality carries "L", the Large Message quality)
+//   - attribute_order_gen.go — attributeOrder (each cluster's attribute
+//     ids ranked in the order matter.js serves them, the snapshot's
+//     attributeOrder) and globalAttributeOrder
 //   - schema_provenance_gen.go — SchemaSnapshotSHA256
 //
 // It reads the same bytes package parity embeds rather than a second copy of
@@ -73,6 +78,7 @@ const (
 	timedFile       = "schema/timed_gen.go"
 	largeMsgFile    = "schema/large_message_gen.go"
 	namesFile       = "schema/element_names_gen.go"
+	orderFile       = "schema/attribute_order_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -110,6 +116,9 @@ type snapshotCluster struct {
 	Features       []snapshotFeature   `json:"features"`
 	Classification string              `json:"classification"`
 	Bindable       *bool               `json:"bindable"`
+	// AttributeOrder is the cluster's attribute ids in the order matter.js
+	// serves them in a wildcard read (the extractor's "Order layer").
+	AttributeOrder []uint32 `json:"attributeOrder"`
 }
 
 // snapshotFeature mirrors one feature of a cluster in parity/schema.json.
@@ -273,6 +282,9 @@ type snapshot struct {
 	Clusters        []snapshotCluster    `json:"clusters"`
 	DeviceTypes     []snapshotDeviceType `json:"deviceTypes"`
 	BaseDeviceTypes []snapshotDeviceType `json:"baseDeviceTypes"`
+	// GlobalAttributeOrder is the order matter.js gives a cluster model
+	// that defines no attribute of its own.
+	GlobalAttributeOrder []uint32 `json:"globalAttributeOrder"`
 }
 
 func main() {
@@ -358,6 +370,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", namesFile)
+
+	if err := writeOrderFile(snap); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", orderFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", orderFile)
 
 	if err := writeRequirementsFile(snap); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", requirementFile, err)
@@ -714,6 +732,45 @@ func writeAccessFile(clusters []snapshotCluster) error {
 				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): %w", c.Name, c.ID, a.Name, a.ID, err)
 			}
 			if p == 0 {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	// fabricScopedReadPaths: matter.js's limits.fabricScoped
+	// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0,
+	// fabric "F" or "S") on an attribute that is readable — the attributes
+	// whose value a remote read gets scoped to its session (ListManager.ts
+	// createProxy, :609-616 at db021da0).
+	buf.WriteString("// fabricScopedReadPaths lists every readable attribute whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\") or\n")
+	buf.WriteString("// fabric-sensitive (\"S\"): what a request reads of it depends on the\n")
+	buf.WriteString("// accessing fabric.\n")
+	buf.WriteString("var fabricScopedReadPaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): the snapshot carries no effective layer", c.Name, c.ID, a.Name, a.ID)
+			}
+			acc := a.Effective.Access
+			switch acc.Fabric {
+			case "":
+				continue
+			case "F", "S":
+			default:
+				return fmt.Errorf("%s (0x%04X) attribute %s (0x%04X): effective access fabric %q is not one this generator knows", c.Name, c.ID, a.Name, a.ID, acc.Fabric)
+			}
+			if acc.RW == "W" {
 				continue
 			}
 			rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, acc))
@@ -1306,4 +1363,53 @@ func writeNamesFile(clusters []snapshotCluster) error {
 			return out
 		})
 	return writeIfChanged(namesFile, buf.Bytes())
+}
+
+// writeOrderFile writes each cluster's attribute order (attributeOrder in
+// parity/schema.json) as a rank per attribute id, the ids in that order,
+// and the order of a cluster the snapshot does not define
+// (globalAttributeOrder). A cluster without an order, or an order that
+// names an id twice, ends the run: the generated table must hold the
+// order the snapshot states, never one made up for it.
+func writeOrderFile(snap snapshot) error {
+	if len(snap.GlobalAttributeOrder) == 0 {
+		return fmt.Errorf("snapshot has no globalAttributeOrder")
+	}
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	ranks := func(indent string, ids []uint32) error {
+		seen := make(map[uint32]struct{}, len(ids))
+		for i, id := range ids {
+			if _, dup := seen[id]; dup {
+				return fmt.Errorf("attribute 0x%04X twice in an order", id)
+			}
+			seen[id] = struct{}{}
+			fmt.Fprintf(&buf, "%s0x%04X: %d,\n", indent, id, i)
+		}
+		return nil
+	}
+	buf.WriteString("// attributeOrder ranks every cluster's attribute ids in the order\n")
+	buf.WriteString("// matter.js serves them in a wildcard read: rank 0 first. Generated from\n")
+	buf.WriteString("// each cluster's attributeOrder in parity/schema.json.\n")
+	buf.WriteString("var attributeOrder = map[uint32]map[uint32]int{\n")
+	for _, c := range snap.Clusters {
+		if len(c.AttributeOrder) == 0 {
+			return fmt.Errorf("cluster %s (0x%04X) has no attributeOrder", c.Name, c.ID)
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		if err := ranks("\t\t", c.AttributeOrder); err != nil {
+			return fmt.Errorf("cluster %s: %w", c.Name, err)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// globalAttributeOrder ranks the global attributes in the order matter.js\n")
+	buf.WriteString("// gives a cluster model that defines no attribute of its own. Generated\n")
+	buf.WriteString("// from globalAttributeOrder in parity/schema.json.\n")
+	buf.WriteString("var globalAttributeOrder = map[uint32]int{\n")
+	if err := ranks("\t", snap.GlobalAttributeOrder); err != nil {
+		return err
+	}
+	buf.WriteString("}\n")
+	return writeIfChanged(orderFile, buf.Bytes())
 }

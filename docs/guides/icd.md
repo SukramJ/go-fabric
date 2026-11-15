@@ -36,7 +36,7 @@ configured timings:
 | `ActiveModeThreshold` | how long network activity keeps the device active; at least 5 s for LIT |
 | `MaximumCheckInBackoff` | the longest gap between Check-Ins to a client that does not answer; zero means `IdleModeDuration` |
 | `ClientsSupportedPerFabric` | the Check-In clients a fabric may register; zero means 1 |
-| `UserActiveModeTrigger` | the hint, and its instruction, for how a user wakes the device; required for LIT |
+| `UserActiveModeTrigger` | the hint, and its instruction, for how a user wakes the device; required for LIT. An empty instruction leaves UserActiveModeTriggerInstruction out of the cluster |
 | `DynamicSITLIT` | lets the host switch a LIT device between SIT and LIT at run time |
 
 A zero timing takes the schema default. `node.New` validates the

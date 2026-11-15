@@ -76,8 +76,8 @@ func newFabriclessFixture(t *testing.T) *fabriclessFixture {
 	if f.oc, err = core.NewOperationalCredentials(f.fs, core.OpcredsConfig{SupportedFabrics: 5}); err != nil {
 		t.Fatal(err)
 	}
-	// The legacy hooks a local read is scoped by. A fabric-less request
-	// must not fall back to them.
+	// The legacy hooks a local write is scoped by. Neither a fabric-less
+	// request nor a local read may fall back to them.
 	f.acl.SetCurrentFabric(1)
 	f.gkm.SetCurrentFabric(1)
 	return f
@@ -201,24 +201,70 @@ func TestCurrentFabricIndexOnFabriclessSessionIsZero(t *testing.T) {
 	}
 }
 
-// TestLocalReadKeepsItsScope pins the other half: a read with no request
-// behind it is not a fabric-less session and keeps the scope of the
-// legacy SetCurrentFabric hook.
-func TestLocalReadKeepsItsScope(t *testing.T) {
+// TestLocalReadSeesEveryFabricWhole pins the other half: a read with no
+// request behind it — a host's MatterRead, or MatterReadFiltered with no
+// fabric filter stamped, the facade's Node.ReadAttribute — is not a
+// fabric-less session but a local actor, and sees every fabric's entries
+// whole, whatever the SetCurrentFabric hooks hold (the fixture sets them
+// to fabric 1). Mirrors matter.js
+// packages/protocol/src/action/server/AccessControl.ts:250-253 and
+// :342-345 at db021da0 (mayRead grants a local actor every attribute and
+// every fabric-sensitive field) and
+// packages/node/src/behavior/state/managed/values/ListManager.ts:609-616
+// (createProxy filters a fabric-scoped list for a remote actor only).
+func TestLocalReadSeesEveryFabricWhole(t *testing.T) {
 	t.Parallel()
 	f := newFabriclessFixture(t)
 	local := context.Background()
+	direct := func(r interface{ MatterRead(uint32) (any, bool) }, attr uint32) any {
+		v, ok := r.MatterRead(attr)
+		if !ok {
+			t.Fatalf("MatterRead(0x%04X) unreadable", attr)
+		}
+		return v
+	}
 
-	acl := read[core.AccessControlEntryStruct](local, t, f.acl, 0x0000)
-	if len(acl) != 1 || acl[0].FabricIndex != 1 || acl[0].Redacted || acl[0].Privilege != uint8(mstore.PrivilegeAdminister) {
-		t.Errorf("local Acl read = %+v, want fabric 1's entry whole", acl)
+	for name, acl := range map[string][]core.AccessControlEntryStruct{
+		"MatterReadFiltered": read[core.AccessControlEntryStruct](local, t, f.acl, 0x0000),
+		"MatterRead":         direct(f.acl, 0x0000).([]core.AccessControlEntryStruct),
+	} {
+		if got := fabricsOf(acl, func(e core.AccessControlEntryStruct) uint8 { return e.FabricIndex }); len(acl) != 2 || !slices.Equal(got, []uint8{1, 2}) {
+			t.Errorf("local Acl read (%s) = %+v, want one entry of each fabric", name, acl)
+		}
+		for _, e := range acl {
+			if e.Redacted || e.Privilege != uint8(mstore.PrivilegeAdminister) || len(e.Subjects) != 1 || e.Subjects[0] != 0x1000+uint64(e.FabricIndex) {
+				t.Errorf("local Acl read (%s): the entry of fabric %d is not whole: %+v", name, e.FabricIndex, e)
+			}
+		}
 	}
-	ext := read[core.AccessControlExtensionEntry](local, t, f.acl, 0x0001)
-	if len(ext) != 1 || ext[0].Data == nil {
-		t.Errorf("local Extension read = %+v, want fabric 1's entry whole", ext)
+	for name, ext := range map[string][]core.AccessControlExtensionEntry{
+		"MatterReadFiltered": read[core.AccessControlExtensionEntry](local, t, f.acl, 0x0001),
+		"MatterRead":         direct(f.acl, 0x0001).([]core.AccessControlExtensionEntry),
+	} {
+		if got := fabricsOf(ext, func(e core.AccessControlExtensionEntry) uint8 { return e.FabricIndex }); len(ext) != 2 || !slices.Equal(got, []uint8{1, 2}) {
+			t.Errorf("local Extension read (%s) = %+v, want one entry of each fabric", name, ext)
+		}
+		for _, e := range ext {
+			if e.Redacted || e.Data == nil {
+				t.Errorf("local Extension read (%s): the entry of fabric %d is not whole: %+v", name, e.FabricIndex, e)
+			}
+		}
 	}
-	if v, ok := f.gkm.MatterRead(0x0000); !ok || len(v.([]core.GroupKeyMapStruct)) != 1 {
-		t.Errorf("local GroupKeyMap read = %v, want fabric 1's entry", v)
+	for name, gkm := range map[string][]core.GroupKeyMapStruct{
+		"MatterReadFiltered": read[core.GroupKeyMapStruct](local, t, f.gkm, 0x0000),
+		"MatterRead":         direct(f.gkm, 0x0000).([]core.GroupKeyMapStruct),
+	} {
+		if got := fabricsOf(gkm, func(m core.GroupKeyMapStruct) uint8 { return m.FabricIndex }); !slices.Equal(got, []uint8{1, 2}) {
+			t.Errorf("local GroupKeyMap read (%s) covers fabrics %v, want [1 2]", name, got)
+		}
+	}
+	for name, table := range map[string][]core.GroupInfoMapStruct{
+		"MatterReadFiltered": read[core.GroupInfoMapStruct](local, t, f.gkm, 0x0001),
+		"MatterRead":         direct(f.gkm, 0x0001).([]core.GroupInfoMapStruct),
+	} {
+		if got := fabricsOf(table, func(m core.GroupInfoMapStruct) uint8 { return m.FabricIndex }); !slices.Equal(got, []uint8{1, 2}) {
+			t.Errorf("local GroupTable read (%s) covers fabrics %v, want [1 2]", name, got)
+		}
 	}
 }
 

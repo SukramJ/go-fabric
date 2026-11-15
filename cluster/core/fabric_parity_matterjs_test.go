@@ -9,7 +9,8 @@ package core_test
 //
 // matter.js calls Fabric.setLabel; the Go label is set by the
 // UpdateFabricLabel command of the Operational Credentials server on the
-// invoking session's fabric. A rejection is IM InvalidCommand there.
+// invoking session's fabric. A rejection is IM ConstraintError there, the
+// status of matter.js's request validation (ValidationError.ts:16-22).
 
 import (
 	"context"

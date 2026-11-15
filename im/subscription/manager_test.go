@@ -1320,11 +1320,13 @@ func TestStart_TickLoop_ReporterFires(t *testing.T) {
 		m.Start(context.Background())
 		defer m.Stop()
 
-		// With MaxIntervalCeiling = 1 s the heartbeat cadence is
-		// max(floor, 0.8 s) = 1 s from the admission stamp, and the engine
-		// reports once now-lastReport >= 1 s. The tick one interval before
-		// the deadline must stay silent, the tick at the deadline must fire.
-		time.Sleep(time.Second - tick)
+		// MaxIntervalCeiling = 1 s is granted as 2 s, matter.js's minimum
+		// interval, and the heartbeat cadence is not below it either
+		// (review II, R2-P4-imread-11): the engine reports once
+		// now-lastReport >= 2 s from the admission stamp. The tick one
+		// interval before the deadline must stay silent, the tick at the
+		// deadline must fire.
+		time.Sleep(2*time.Second - tick)
 		synctest.Wait()
 		select {
 		case <-ch:

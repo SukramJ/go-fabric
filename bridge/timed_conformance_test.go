@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -79,14 +80,20 @@ func decodeStatusResponseCode(t *testing.T, body []byte) im.StatusCode {
 // whose own TimedRequest flag is clear and with no preceding TimedRequest,
 // and asserts the reply is an InvokeResponse whose entry for that path
 // carries NEEDS_TIMED_INTERACTION (0xC6) — matter.js answers it per path
-// (CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`), not
+// (CommandInvokeResponse.ts:292 `limits.timed && !this.session.timed`), not
 // with an interaction-level StatusResponse, which matter.js reserves for a
 // Timed flag that disagrees with the exchange (TIMED_REQUEST_MISMATCH).
+// The command goes to the root endpoint, which serves the cluster: at an
+// endpoint without it both references answer UNSUPPORTED_CLUSTER before the
+// timed quality is looked at (CommandInvokeResponse.ts:263-271 at db021da0;
+// connectedhomeip src/app/InteractionModelEngine.cpp:1844-1851 at 6170af84
+// returns the existence status before CheckCommandFlags).
 // Uses SessionID=0 (unsecured), matching TestDispatch_IMReadRoutes's
 // precedent, so no CASE session pair is needed.
 func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
+	b.AttachRootClusters([]contract.ClusterServer{&noopCluster{id: 0x003C}}) // AdministratorCommissioning
 
 	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
@@ -100,7 +107,7 @@ func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(
 
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
 	payload := encodeTimedTestInvokeRequest(t, false, im.ConcreteCommandPath{
-		Endpoint: 1, Cluster: 0x003C, Command: 0x0, // AdministratorCommissioning.OpenCommissioningWindow
+		Endpoint: 0, Cluster: 0x003C, Command: 0x0, // AdministratorCommissioning.OpenCommissioningWindow on the root, which serves it here
 		HasEndpoint: true, HasCluster: true, HasCommand: true,
 	})
 	buf := secureTestDatagram(t, b, proto, payload)

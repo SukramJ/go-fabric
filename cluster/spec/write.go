@@ -134,11 +134,12 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 	if !a.Writable() {
 		return nil, Errorf(im.StatusUnsupportedWrite, "%s: attribute %s is read-only", i.def.Name, a.Name)
 	}
-	v, err := i.checkValue(a.Name, a.Type, a.Quality.Nullable, a.Constraint, value, peers)
+	t, c := held(a.Type, a.Constraint, a.Relaxed)
+	v, err := i.checkValue(a.Name, t, a.Quality.Nullable, c, value, peers)
 	if err != nil {
 		return nil, err
 	}
-	if a.Constraint.In != "" && v != nil && !i.inPeer(a.Constraint.In, v, peers) {
+	if c.In != "" && v != nil && !i.inPeer(c.In, v, peers) {
 		return nil, Errorf(im.StatusConstraintError, "%s: %s %v is not one of the values allowed by %q", i.def.Name, a.Name, v, a.Constraint.Text)
 	}
 	return v, nil
@@ -437,6 +438,9 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // (createConformanceValidator) and conformance-compiler.ts:87-220
 // (astToFunction) at 862ad75f.
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
+	if d, ok := value.(DefinitionFormer); ok {
+		value = d.DefinitionForm()
+	}
 	rv := reflect.ValueOf(value)
 	if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 		rv = rv.Elem()
@@ -454,7 +458,13 @@ func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScop
 	}
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
-		fv := rv.FieldByName(goFieldName(f.Name))
+		if scope.written && f.ID == fabricIndexFieldID {
+			continue
+		}
+		fv, mapped := mappedField(rv, f.Name)
+		if !mapped {
+			continue
+		}
 		if !fv.IsValid() {
 			return Errorf(im.StatusConstraintError, "%s: %s has no field %s", i.def.Name, name, f.Name)
 		}
@@ -464,7 +474,8 @@ func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScop
 			}
 			fv = fv.Elem()
 		}
-		if _, err := i.checkValueIn(name+"."+f.Name, f.Type, f.Quality.Nullable, f.Constraint, entryValue(fv.Interface()), nil, scope); err != nil {
+		t, c := held(f.Type, f.Constraint, f.Relaxed)
+		if _, err := i.checkValueIn(name+"."+f.Name, t, f.Quality.Nullable, c, entryValue(fv.Interface()), nil, scope); err != nil {
 			return err
 		}
 	}

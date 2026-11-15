@@ -7,10 +7,12 @@
 //   - a malformed batch invoke (concrete paths in a batch that omit their
 //     CommandRef) is rejected up front with StatusResponse(InvalidAction)
 //     instead of dispatching any command — mirrors matter.js
-//     CommandInvokeResponse.ts:64-92 (process/#processConcrete);
+//     CommandInvokeResponse.ts:68-99, :196-212 at db021da0
+//     (process/#processConcrete);
 //   - a SuppressResponse invoke that yields only CommandStatusIB entries
 //     (no CommandDataIB) sends nothing — mirrors matter.js
-//     InteractionServer.ts:1043-1074 (the held suppressedBuffer is discarded).
+//     InteractionServer.ts:1168-1199 at db021da0 (the held suppressedBuffer
+//     is discarded).
 //
 // Lives in package bridge so it can call [Bridge.dispatch] directly, matching
 // timed_conformance_test.go / write_chunked_dispatch_test.go.
@@ -147,7 +149,7 @@ func TestDispatchInvokeRequest_BatchMissingCommandRef_RejectsInvalidAction(t *te
 // CommandRef — and asserts the wire reply is a top-level
 // StatusResponse(InvalidAction), proving dispatchInvokeRequest's batch
 // guard rejects an over-sized batch before dispatching any command in
-// it. Mirrors matter.js InteractionServer.ts:950-955
+// it. Mirrors matter.js InteractionServer.ts:1017-1022 at db021da0
 // (`if (invokeRequests.length > this.#maxPathsPerInvoke) throw new
 // StatusResponseError(..., Status.InvalidAction)`).
 func TestDispatchInvokeRequest_BatchExceedsMaxPaths_RejectsInvalidAction(t *testing.T) {

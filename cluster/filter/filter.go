@@ -356,6 +356,12 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return s.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // lastChangedSink hands a controller's LastChangedTime write to the host.
 type lastChangedSink struct{ w LastChangedTimeWriter }
 

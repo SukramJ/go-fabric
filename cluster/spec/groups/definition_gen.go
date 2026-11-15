@@ -169,8 +169,10 @@ func (v AddGroupRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *AddGroupRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AddGroup",
-		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUintIn[uint16](16, 1, 65535)),
-		spec.Bind(1, "GroupName", true, &v.GroupName, spec.DecodeStringIn(0, 16)),
+		// GroupId: the constraint "min 1" is the server's to judge (matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0).
+		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
+		// GroupName: the constraint "max 16" is the server's to judge (matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0).
+		spec.Bind(1, "GroupName", true, &v.GroupName, spec.DecodeString),
 	)
 }
 
@@ -373,8 +375,10 @@ func (v AddGroupIfIdentifyingRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *AddGroupIfIdentifyingRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AddGroupIfIdentifying",
-		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUintIn[uint16](16, 1, 65535)),
-		spec.Bind(1, "GroupName", true, &v.GroupName, spec.DecodeStringIn(0, 16)),
+		// GroupId: the constraint "min 1" is the server's to judge (matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0).
+		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
+		// GroupName: the constraint "max 16" is the server's to judge (matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0).
+		spec.Bind(1, "GroupName", true, &v.GroupName, spec.DecodeString),
 	)
 }
 
@@ -435,8 +439,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
-				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
-				{ID: 1, Name: "GroupName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
+				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}, Relaxed: "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"},
+				{ID: 1, Name: "GroupName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"},
 			},
 			Decode: decodeAddGroupRequest,
 		},
@@ -524,8 +528,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
-				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
-				{ID: 1, Name: "GroupName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
+				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}, Relaxed: "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"},
+				{ID: 1, Name: "GroupName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"},
 			},
 			Decode: decodeAddGroupIfIdentifyingRequest,
 		},

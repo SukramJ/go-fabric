@@ -395,3 +395,29 @@ func TestThermostatUIDefaultTakesItsSettingStore(t *testing.T) {
 		}
 	}
 }
+
+// TestWindowCoveringDefaultUnknownPosition: a covering whose Initial
+// carries no position reads null on the position attributes of each
+// position-aware axis and on its target — matter.js's defaults for them
+// (window-covering-cluster.element.ts:47-48, :51-52, :59-64, :71-72,
+// :75-76 at db021da0) — until the host reports one.
+func TestWindowCoveringDefaultUnknownPosition(t *testing.T) {
+	t.Parallel()
+	b := defaultBuild{
+		def: wcdef.Definition, sibling: noSiblings,
+		opts:    spec.Options{Features: uint32(wcdef.FeatureLift | wcdef.FeatureTilt | wcdef.FeaturePositionAwareLift | wcdef.FeaturePositionAwareTilt)},
+		initial: map[uint32]any{wcdef.AttrType: uint8(wcdef.TypeTiltBlindLift), wcdef.AttrEndProductType: uint8(wcdef.EndProductTypeInteriorBlind)},
+	}
+	srv, err := selfHeldDefaults[wcdef.ClusterID](b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []uint32{
+		wcdef.AttrCurrentPositionLiftPercent100ths, wcdef.AttrCurrentPositionLiftPercentage, wcdef.AttrTargetPositionLiftPercent100ths,
+		wcdef.AttrCurrentPositionTiltPercent100ths, wcdef.AttrCurrentPositionTiltPercentage, wcdef.AttrTargetPositionTiltPercent100ths,
+	} {
+		if v, ok := srv.MatterRead(id); !ok || v != nil {
+			t.Errorf("attribute 0x%04X reads %v (served %v), want null", id, v, ok)
+		}
+	}
+}

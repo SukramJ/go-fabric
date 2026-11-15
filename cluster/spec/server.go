@@ -43,8 +43,11 @@ type Source interface {
 }
 
 // Sink is the optional write port: told about every controller write that
-// passed the definition's checks, before the server stores it; an error
-// refuses the write and leaves the stored value as it was.
+// passed the definition's checks and changes the value the server holds,
+// before the server stores it; an error refuses the write and leaves the
+// stored value as it was. A write of the held value reaches no Sink and
+// answers unchanged (matter.js observes no field whose value is equal,
+// Datasource.ts:1406-1407 and :1479 at db021da0).
 //
 // value is the stored form described on [Server] — the Go type of the
 // attribute's width (a uint32 for an epoch-s, a uint8 for an enum8), nil
@@ -143,6 +146,7 @@ type Server struct {
 var (
 	_ contract.ClusterServer                  = (*Server)(nil)
 	_ contract.ClusterDataVersion             = (*Server)(nil)
+	_ contract.ChangeReportingWriter          = (*Server)(nil)
 	_ contract.ClusterAttributeLister         = (*Server)(nil)
 	_ contract.ClusterCommandLister           = (*Server)(nil)
 	_ contract.ClusterEventLister             = (*Server)(nil)
@@ -304,19 +308,30 @@ func (s *Server) peers(attrID uint32) (any, bool) { return s.MatterRead(attrID) 
 
 // MatterWrite implements [contract.ClusterServer]: [Instance.ValidateWrite]
 // answers the status of a write the definition refuses; the
-// [ServerConfig.BeforeWrite] veto, when set, may refuse it next, then the
-// Sink, each handed the value in its stored form; then the value is
-// stored, and a change bumps the data version and is notified.
+// [ServerConfig.BeforeWrite] veto, when set, may refuse it next; a value
+// the server holds then ends the write, unchanged; another goes to the
+// Sink, each handed the value in its stored form, and is stored, and a
+// change bumps the data version and is notified.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the write
+// of [Server.MatterWrite], and whether its store changed the value — the
+// comparison that bumps the data version, made under the lock that stores
+// it (matter.js Datasource.ts:1479 at db021da0: an equal value, a list
+// deep-equal to the one held included, is no change).
+func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	v, err := s.ValidateWrite(attrID, value, s.peers)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// A struct's fields are held to their conformance as well (matter.js
 	// validates the written state,
 	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
 	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
-		return err
+		return false, err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	s.mu.Lock()
@@ -326,16 +341,44 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		if err := veto(ctx, attrID, v); err != nil {
 			// As given: its IM status when it carries one, FAILURE
 			// otherwise (the dispatcher reads no status from the text).
-			return err
+			return false, err
 		}
+	}
+	// The value the server holds reaches no Sink and stores nothing:
+	// matter.js emits neither `$Changing` (Datasource.ts:1406-1407 at
+	// db021da0, #computePreCommitChange) nor `$Changed` (:1479,
+	// #noteIfChanged) for a field equal to the held value and stores only
+	// the noted fields (:1447-1451). The store's comparison below, under
+	// the lock that stores, stays the deciding one: this check skips only
+	// when every answer the server gives equals the value, so a write it
+	// lets through at worst stores an equal value and answers unchanged.
+	if s.holds(attrID, v) {
+		return false, nil
 	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
-			return err
+			return false, err
 		}
 	}
-	s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v})
-	return nil
+	return s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v}), nil
+}
+
+// holds reports whether the server holds v for attrID: its stored value
+// is v (the comparison [Server.store] makes) and, when a Source answers
+// the attribute, the Source's answer is v too.
+func (s *Server) holds(attrID uint32, v any) bool {
+	s.mu.Lock()
+	old, ok := s.values[attrID]
+	s.mu.Unlock()
+	if !ok || !reflect.DeepEqual(old, v) {
+		return false
+	}
+	if s.source != nil {
+		if answer, ok := s.source.MatterAttribute(attrID); ok && !reflect.DeepEqual(answer, v) {
+			return false
+		}
+	}
+	return true
 }
 
 // Set records a change the device made to attrID. The value is checked
@@ -460,8 +503,9 @@ func defaultOf(t Type, d any) (any, bool) {
 	return nil, false
 }
 
-// store keeps values and reports the ones that changed, from origin.
-func (s *Server) store(origin contract.Origin, values map[uint32]any) {
+// store keeps values and reports the ones that changed, from origin; it
+// returns whether any changed.
+func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 	var changed []uint32
 	s.mu.Lock()
 	for id, v := range values {
@@ -473,11 +517,12 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) {
 	}
 	s.mu.Unlock()
 	if len(changed) == 0 {
-		return
+		return false
 	}
 	slices.Sort(changed)
 	s.tracker().Bump()
 	s.NotifyFrom(origin, changed...)
+	return true
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command
@@ -653,25 +698,38 @@ func underlying(v any) any {
 func stored(t Type, v any) any {
 	// The width check ran before (checkUnsigned / checkSigned), but the
 	// bound is stated here again so the narrowing is correct on its own: a
-	// value outside the width is returned unchanged, never truncated.
+	// value outside the width is returned unchanged, never truncated. Each
+	// bound stands directly around its conversion.
 	switch x := v.(type) {
 	case uint64:
 		switch {
-		case t.Bits > 0 && t.Bits <= 8 && x <= math.MaxUint8:
-			return uint8(x)
-		case t.Bits > 8 && t.Bits <= 16 && x <= math.MaxUint16:
-			return uint16(x)
-		case t.Bits > 16 && t.Bits <= 32 && x <= math.MaxUint32:
-			return uint32(x)
+		case t.Bits > 0 && t.Bits <= 8:
+			if x <= math.MaxUint8 {
+				return uint8(x)
+			}
+		case t.Bits > 8 && t.Bits <= 16:
+			if x <= math.MaxUint16 {
+				return uint16(x)
+			}
+		case t.Bits > 16 && t.Bits <= 32:
+			if x <= math.MaxUint32 {
+				return uint32(x)
+			}
 		}
 	case int64:
 		switch {
-		case t.Bits > 0 && t.Bits <= 8 && x >= math.MinInt8 && x <= math.MaxInt8:
-			return int8(x)
-		case t.Bits > 8 && t.Bits <= 16 && x >= math.MinInt16 && x <= math.MaxInt16:
-			return int16(x)
-		case t.Bits > 16 && t.Bits <= 32 && x >= math.MinInt32 && x <= math.MaxInt32:
-			return int32(x)
+		case t.Bits > 0 && t.Bits <= 8:
+			if x >= math.MinInt8 && x <= math.MaxInt8 {
+				return int8(x)
+			}
+		case t.Bits > 8 && t.Bits <= 16:
+			if x >= math.MinInt16 && x <= math.MaxInt16 {
+				return int16(x)
+			}
+		case t.Bits > 16 && t.Bits <= 32:
+			if x >= math.MinInt32 && x <= math.MaxInt32 {
+				return int32(x)
+			}
 		}
 	case float64:
 		if t.Kind == KindFloat32 {

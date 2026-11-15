@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 const testPasscode = 20202021
@@ -496,7 +497,6 @@ func TestConfigValidate(t *testing.T) {
 		{"iterations high", func(c *node.Config) { c.Commissioning.PBKDFIterations = 100001 }},
 		{"salt short", func(c *node.Config) { c.Commissioning.Salt = []byte("short") }},
 		{"vendor", func(c *node.Config) { c.ProductDescription.VendorID = 0 }},
-		{"label", func(c *node.Config) { c.BasicInformation.NodeLabel = " " }},
 		{"store", func(c *node.Config) { c.Store = node.Store{} }},
 		{"ota dir", func(c *node.Config) { c.OTA = &node.OTAConfig{} }},
 	}
@@ -513,6 +513,25 @@ func TestConfigValidate(t *testing.T) {
 	cfg := minimalConfig(db)
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("minimal config: %v", err)
+	}
+}
+
+// TestEmptyNodeLabelIsTheProductName: a node configured without a
+// NodeLabel starts and serves its ProductName as the NodeLabel. Mirrors
+// matter.js packages/node/src/behaviors/basic-information/
+// BasicInformationServer.ts:68 at db021da0 — setDefault("nodeLabel",
+// state.productName).
+func TestEmptyNodeLabelIsTheProductName(t *testing.T) {
+	t.Parallel()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.BasicInformation.NodeLabel = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	n := newNode(t, cfg)
+	v, ok := n.Root().BasicInformation.MatterRead(0x0005)
+	if s, _ := v.(tlv.BoundedString); !ok || s.Value != cfg.BasicInformation.ProductName {
+		t.Errorf("NodeLabel (%#v, %v), want the ProductName %q", v, ok, cfg.BasicInformation.ProductName)
 	}
 }
 
@@ -576,23 +595,76 @@ func TestStoredNumbersSurviveAbsence(t *testing.T) {
 	}
 }
 
-// TestBootReason: the node reports the BootReason its GeneralDiagnostics
-// emits — PowerOnReboot (1) for a node the facade builds.
+// TestBootReason: the node reports the configured BootReason, Unspecified
+// when unset as matter.js's (GeneralDiagnosticsServer.ts:417-420 at
+// db021da0); a start into the version the node's OTA requestor recorded as
+// the update in progress is SoftwareUpdateCompleted, which keeps a lighting
+// OnOff server from applying StartUpOnOff (OnOffServer.ts:33-37, :324-329).
 func TestBootReason(t *testing.T) {
 	t.Parallel()
-	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
-	if got := n.BootReason(); got != mattercore.BootReasonPowerOnReboot {
-		t.Errorf("BootReason %d, want %d", got, mattercore.BootReasonPowerOnReboot)
+	startUpApplied := func(t *testing.T, n *node.Node) bool {
+		t.Helper()
+		srv, err := onoff.New(onoff.Config{
+			Features: onoff.FeatureLT, BootReason: n.BootReason,
+			Initial: map[uint32]any{onoff.AttrStartUpOnOff: onoff.StartUpOn},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return srv.OnOff()
 	}
-	srv, err := onoff.New(onoff.Config{
-		Features: onoff.FeatureLT, BootReason: n.BootReason,
-		Initial: map[uint32]any{onoff.AttrStartUpOnOff: onoff.StartUpOn},
+	t.Run("unset is Unspecified", func(t *testing.T) {
+		t.Parallel()
+		n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+		if got := n.BootReason(); got != mattercore.BootReasonUnspecified {
+			t.Errorf("BootReason %d, want Unspecified", got)
+		}
+		if !startUpApplied(t, n) {
+			t.Error("StartUpOnOff not applied")
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !srv.OnOff() {
-		t.Error("StartUpOnOff not applied after a power-on reboot")
+	t.Run("the host's value", func(t *testing.T) {
+		t.Parallel()
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		cfg.BootReason = mattercore.BootReasonSoftwareReset
+		if got := newNode(t, cfg).BootReason(); got != mattercore.BootReasonSoftwareReset {
+			t.Errorf("BootReason %d, want SoftwareReset", got)
+		}
+		cfg.BootReason = mattercore.BootReasonSoftwareReset + 1
+		if err := cfg.Validate(); !errors.Is(err, node.ErrInvalidConfig) {
+			t.Errorf("BootReason 7 passed Validate: %v", err)
+		}
+	})
+	for name, tc := range map[string]struct {
+		recorded uint32
+		want     uint8
+	}{
+		"a start into the recorded update": {1, mattercore.BootReasonSoftwareUpdate},
+		"a start that did not reach it":    {2, mattercore.BootReasonPowerOnReboot},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "node.db")
+			cfg := minimalConfig(openDB(t, path))
+			cfg.OTA = &node.OTAConfig{Dir: filepath.Join(t.TempDir(), "ota")}
+			cfg.BootReason = mattercore.BootReasonPowerOnReboot
+			n := newNode(t, cfg)
+			state := fmt.Sprintf(`{"activeOtaProviders":[],"updateInProgressDetails":{"newSoftwareVersion":%d}}`, tc.recorded)
+			if err := n.Store().SaveOTARequestorState(t.Context(), []byte(state)); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.Stop(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			cfg.Store.DB = openDB(t, path)
+			m := newNode(t, cfg) // SoftwareVersion 1 runs
+			if got := m.BootReason(); got != tc.want {
+				t.Errorf("BootReason %d, want %d", got, tc.want)
+			}
+			if got, want := startUpApplied(t, m), tc.want != mattercore.BootReasonSoftwareUpdate; got != want {
+				t.Errorf("StartUpOnOff applied %v, want %v", got, want)
+			}
+		})
 	}
 }
 
@@ -738,4 +810,47 @@ func TestAggregatorAfterStop(t *testing.T) {
 	if err := agg.RetirePartition(ctx, "gone"); !errors.Is(err, node.ErrStopped) {
 		t.Errorf("RetirePartition after Stop: %v, want ErrStopped", err)
 	}
+}
+
+// TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser: every entry of
+// GeneralDiagnostics NetworkInterfaces carries the root's network type —
+// Ethernet, WiFi for a Wi-Fi node: matter.js's fallback for an interface
+// the platform gives no type (GeneralDiagnosticsServer.ts:527, :477-494 at
+// db021da0), which every entry takes here, the module having no platform
+// mapping (matter.js's Node.js platform types every interface Ethernet
+// unless configured, NodeJsNetwork.ts:195-202) — and IsOperational holds
+// for the interfaces the node's advertiser is restricted to, every
+// interface without a restriction (:496-503). Read over the host's own
+// interfaces.
+func TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser(t *testing.T) {
+	t.Parallel()
+	read := func(t *testing.T, n *node.Node) []mattercore.NetworkInterfaceStruct {
+		t.Helper()
+		v, ok := n.Root().GeneralDiagnostics.MatterRead(0x0000)
+		if !ok {
+			t.Fatal("NetworkInterfaces is not served")
+		}
+		return v.([]mattercore.NetworkInterfaceStruct)
+	}
+	t.Run("an Ethernet node without a restriction", func(t *testing.T) {
+		t.Parallel()
+		n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+		for _, e := range read(t, n) {
+			if e.InterfaceType != mattercore.InterfaceTypeEthernet || !e.IsOperational {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want Ethernet, operational", e.Name, e.InterfaceType, e.IsOperational)
+			}
+		}
+	})
+	t.Run("a Wi-Fi node advertising on an interface the host lacks", func(t *testing.T) {
+		t.Parallel()
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		cfg.Network.WiFi = &node.WiFi{Reporter: wifiLink{}}
+		cfg.Network.MDNS = node.MDNS{Interfaces: []string{"gf-absent0"}}
+		n := newNode(t, cfg)
+		for _, e := range read(t, n) {
+			if e.InterfaceType != mattercore.InterfaceTypeWiFi || e.IsOperational {
+				t.Errorf("%s: InterfaceType %d, IsOperational %v; want WiFi, not operational", e.Name, e.InterfaceType, e.IsOperational)
+			}
+		}
+	})
 }

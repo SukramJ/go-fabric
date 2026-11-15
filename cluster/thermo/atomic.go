@@ -261,7 +261,7 @@ func atomicRequest(fields any) (tdef.AtomicRequestRequest, error) {
 }
 
 // handleAtomicRequest is matter.js ThermostatBaseServer.atomicRequest
-// (ThermostatServer.ts:1602-1620): BeginWrite, CommitWrite or
+// (ThermostatServer.ts:1588-1605 at db021da0): BeginWrite, CommitWrite or
 // RollbackWrite.
 func (s *ThermostatServer) handleAtomicRequest(ctx context.Context, fields any) (any, error) {
 	req, err := atomicRequest(fields)
@@ -547,8 +547,13 @@ func atomicAttributeName(attr uint32) string {
 }
 
 // precommitAtomic checks a staged value before anything is committed:
-// Presets as matter.js validates and normalises its commit
-// (ThermostatServer.ts:1289-1291, :1508-1595 at 862ad75f) and, with MSCH,
+// Presets as matter.js checks an atomic commit before its transaction
+// commits — validated as staged against the stored presets
+// (presets$AtomicChanging, ThermostatServer.ts:1289-1291) and refused when
+// it removes a built-in or the active preset (presets$AtomicChanged,
+// :1500-1502, #validatePresetCommit :1544-1580, at db021da0), here on a
+// normalised copy; matter.js normalises in the stored write's pre-commit
+// (:1300-1320) — and, with MSCH,
 // chip's check that no schedule uses a removed preset
 // (ThermostatClusterPresets.cpp:708-724 at 645b267a); Schedules as chip's
 // PrecommitSchedules.
@@ -652,7 +657,7 @@ func (s *ThermostatServer) stageAtomicAttribute(ctx context.Context, attrID uint
 // pendingAtomicValue is the value the peer of ctx staged for attrID, if it
 // holds the attribute — matter.js pendingValueForAttributeAndPeer
 // (AtomicWriteHandler.ts:425-450), which the Presets getter consults
-// (ThermostatServer.ts:1680-1692).
+// (ThermostatServer.ts:1665-1677 at db021da0).
 func (s *ThermostatServer) pendingAtomicValue(ctx context.Context, attrID uint32) (any, bool) {
 	peer, ok := atomicPeerOf(ctx)
 	if !ok {

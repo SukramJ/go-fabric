@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -397,6 +398,41 @@ func TestRead_WildcardAttributeReturnsGlobals(t *testing.T) {
 	}
 }
 
+// TestRead_WildcardAttribute_GlobalsOnlyInModelOrder: a wildcard read of a
+// cluster that lists no attribute of its own reports the globals in the
+// order of the cluster model's members (im.CompareAttributeIDs), the order
+// a priming report and a change report use for the same cluster. matter.js
+// builds every cluster's attribute list in Scope.membersOf order, a
+// globals-only cluster's included
+// (packages/node/src/node/integration/ProtocolService.ts:449-522 at
+// db021da0); DiagnosticLogs (0x0032) is one, OnOff served without a lister
+// another.
+func TestRead_WildcardAttribute_GlobalsOnlyInModelOrder(t *testing.T) {
+	t.Parallel()
+	want := []uint32{
+		cluster.AttrGlobalClusterRevision,
+		cluster.AttrGlobalFeatureMap,
+		cluster.AttrGlobalAttributeList,
+		cluster.AttrGlobalAcceptedCommandList,
+		cluster.AttrGlobalGeneratedCommandList,
+	}
+	for _, clusterID := range []uint32{0x0032, 0x0006} {
+		ep := &Endpoint{ID: 2, Source: singleServerSource{srv: &globalAttrServer{id: clusterID}}}
+		d := NewTopologyDispatcher(makeTopology(ep))
+		results := d.Read(context.Background(), im.ConcreteAttributePath{Endpoint: 2, Cluster: clusterID, HasEndpoint: true, HasCluster: true})
+		got := make([]uint32, len(results))
+		for i, r := range results {
+			got[i] = r.Path.Attribute
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("cluster 0x%04X: attributes %#x, want %#x", clusterID, got, want)
+		}
+		if !slices.IsSortedFunc(got, func(a, b uint32) int { return im.CompareAttributeIDs(clusterID, a, b) }) {
+			t.Errorf("cluster 0x%04X: attributes %#x not in im.CompareAttributeIDs order", clusterID, got)
+		}
+	}
+}
+
 // listingAttrServer is a globalAttrServer extended with a
 // MatterAttributes() lister that advertises two cluster-specific
 // attributes (0x0000 OnOff, 0x4001 OnTime). Used to verify that a
@@ -500,17 +536,21 @@ func TestRead_WildcardAttribute_ListerExpands(t *testing.T) {
 	if len(results) != 7 {
 		t.Fatalf("want 7 results (2 cluster attrs + 5 Matter-1.3 globals, deduped, no EventList), got %d", len(results))
 	}
+	// In matter.js's order of OnOff's members (im.CompareAttributeIDs,
+	// review II, R2-P4-imread-12): ClusterRevision, FeatureMap, the
+	// cluster's own attributes, then the global lists — the order a
+	// matter.js node at db021da0 serves a wildcard read of OnOff in.
 	want := []uint32{
-		0x0000, 0x4001,
-		cluster.AttrGlobalGeneratedCommandList,
-		cluster.AttrGlobalAcceptedCommandList,
-		cluster.AttrGlobalAttributeList,
-		cluster.AttrGlobalFeatureMap,
 		cluster.AttrGlobalClusterRevision,
+		cluster.AttrGlobalFeatureMap,
+		0x0000, 0x4001,
+		cluster.AttrGlobalAttributeList,
+		cluster.AttrGlobalAcceptedCommandList,
+		cluster.AttrGlobalGeneratedCommandList,
 	}
 	for i, r := range results {
 		if r.Path.Attribute != want[i] {
-			t.Errorf("result[%d].Attribute = 0x%04X, want sorted 0x%04X", i, r.Path.Attribute, want[i])
+			t.Errorf("result[%d].Attribute = 0x%04X, want 0x%04X (matter.js's order)", i, r.Path.Attribute, want[i])
 		}
 	}
 }
@@ -1523,5 +1563,37 @@ func TestInvokeUnsupportedCommandMapsTo0x81(t *testing.T) {
 		if r.Status != im.StatusUnsupportedCommand {
 			t.Errorf("%s: status = %v, want StatusUnsupportedCommand (0x81)", name, r.Status)
 		}
+	}
+}
+
+// unsortedCommands is a host's own server that lists its commands out of
+// id order.
+type unsortedCommands struct{ dtServer }
+
+func (unsortedCommands) MatterGeneratedCommands() []uint32 { return []uint32{0x0B, 0x01, 0x05} }
+
+// TestCommandListsReadAscending: AcceptedCommandList and
+// GeneratedCommandList read in ascending id order whatever order the
+// server lists them in, and the server's own slice is left as it is.
+// Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:135-136 at
+// db021da0 (acceptedIds.sort, [...generatedIds].sort, ascending).
+func TestCommandListsReadAscending(t *testing.T) {
+	t.Parallel()
+	own := []uint32{0x40, 0x00, 0x02}
+	srv := unsortedCommands{dtServer{id: 0x0008, cmds: own}}
+	for attr, want := range map[uint32][]uint32{
+		cluster.AttrGlobalAcceptedCommandList:  {0x00, 0x02, 0x40},
+		cluster.AttrGlobalGeneratedCommandList: {0x01, 0x05, 0x0B},
+	} {
+		if got, ok := synthesizeGlobalRead(srv, attr); !ok || !slices.Equal(got.([]uint32), want) {
+			t.Errorf("0x%04X reads %v, want %v", attr, got, want)
+		}
+		if got := GlobalList(srv, attr); !slices.Equal(got, want) {
+			t.Errorf("GlobalList 0x%04X = %v, want %v", attr, got, want)
+		}
+	}
+	if !slices.Equal(own, []uint32{0x40, 0x00, 0x02}) {
+		t.Errorf("the server's own list was reordered: %v", own)
 	}
 }

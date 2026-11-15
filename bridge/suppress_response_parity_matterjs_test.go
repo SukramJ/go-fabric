@@ -6,11 +6,13 @@ package bridge
 import (
 	"context"
 	"net"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // SuppressResponse also suppresses error statuses — matter.js
@@ -266,6 +268,68 @@ func TestSuppressResponseErrorPathsParityMatterJS(t *testing.T) {
 				t.Fatal("no reply")
 			}
 			decodeWriteChunkedStatusResponse(t, reply) // fails unless a StatusResponse
+		})
+	}
+}
+
+// TestSuppressedRequestAcknowledgedParity: a reliable Write or Invoke that
+// ends without a reply because of its SuppressResponse is acknowledged when
+// it ends — one standalone acknowledgement and no other message. matter.js
+// suppresses only the status (packages/protocol/src/interaction/InteractionMessenger.ts:317-322
+// at db021da0) and closes the exchange after the handler (:462), and the
+// close sends the standalone acknowledgement of the message it still owes
+// one for (packages/protocol/src/protocol/MessageExchange.ts:1150-1156). The
+// tracker's grace outlasts the test, so the acknowledgement the pump sends
+// is due when the request ends, not when the grace runs out.
+func TestSuppressedRequestAcknowledgedParity(t *testing.T) {
+	t.Parallel()
+	onOff := im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	write := func(more, suppress bool, path im.ConcreteAttributePath) []byte {
+		return writeRequestBytes(t, im.WriteRequest{MoreChunkedMessages: more, SuppressResponse: suppress, Writes: []im.AttributeWrite{
+			{Path: path, Value: im.AttributeValue{Value: uint16(5)}},
+		}})
+	}
+	flagged := onTimePath()
+	flagged.WildcardPathFlags = 1
+	for _, c := range []struct {
+		name string
+		// first is a message answered before the suppressed one on the
+		// same exchange, whose reply carries its acknowledgement.
+		first      []byte
+		firstReply uint8
+		opcode     uint8
+		payload    []byte
+		undecoded  bool // dispatch returns the decode error
+	}{
+		{name: "write applied", opcode: im.OpcodeWriteRequest, payload: write(false, true, onTimePath())},
+		{name: "write ended at an element", opcode: im.OpcodeWriteRequest, payload: write(false, true, flagged)},
+		{name: "write refused before dispatch", opcode: im.OpcodeWriteRequest, payload: write(true, true, onTimePath())},
+		{name: "write undecodable", opcode: im.OpcodeWriteRequest, payload: onlySuppressResponse(true), undecoded: true},
+		{name: "continuation chunk", first: write(true, false, onTimePath()), firstReply: im.OpcodeWriteResponse, opcode: im.OpcodeWriteRequest, payload: write(false, true, onTimePath())},
+		{name: "invoke answered by statuses only", opcode: im.OpcodeInvokeRequest, payload: encodeInvokeWith(t, true, false, onOff)},
+		{name: "invoke refused before dispatch", opcode: im.OpcodeInvokeRequest, payload: encodeInvokeWith(t, true, true, onOff)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			b, _ := onTimeBridge(t)
+			b.AttachAckTracker(mrp.NewAckTracker(time.Hour)) // attached after Start: no pump
+			p := newIMPeer(t, b)
+			const x = 0x4301
+			var want []uint8
+			if c.first != nil {
+				if err := p.sendReliable(x, c.opcode, true, c.first); err != nil {
+					t.Fatalf("dispatch: %v", err)
+				}
+				want = append(want, c.firstReply)
+			}
+			if err := p.sendReliable(x, c.opcode, true, c.payload); (err != nil) != c.undecoded {
+				t.Fatalf("dispatch: %v", err)
+			}
+			b.RunAckPumpOnce(b.clk().Now())
+			acks, others := p.received(300 * time.Millisecond)
+			if acks != 1 || !slices.Equal(others, want) {
+				t.Errorf("the bridge sent %d standalone acks and the messages %v, want one standalone ack and %v", acks, others, want)
+			}
 		})
 	}
 }

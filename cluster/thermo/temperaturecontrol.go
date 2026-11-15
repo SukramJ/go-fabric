@@ -269,6 +269,12 @@ func (s *TemperatureControlServer) MatterWrite(ctx context.Context, attrID uint3
 	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: every
+// attribute is read-only, so no write changes the server.
+func (s *TemperatureControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return false, s.MatterWrite(ctx, attrID, value)
+}
+
 // MatterInvoke carries out SetTemperature: the request is checked against
 // the rules above, the host applies it, and the setpoint or level becomes
 // the requested one. The command answers with a status only.

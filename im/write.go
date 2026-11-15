@@ -40,10 +40,10 @@ type WriteRequest struct {
 	// MoreChunkedMessages signals that further WriteRequest chunks
 	// follow on the same exchange (Matter §10.6.5 tag 3). Each chunk
 	// is answered with its own WriteResponse — matter.js
-	// InteractionServer.ts:521-532 sends a per-chunk WriteResponse
-	// and then reads the next chunk. The flag is invalid in
+	// InteractionServer.ts:563-575 at db021da0 sends a per-chunk
+	// WriteResponse and then reads the next chunk. The flag is invalid in
 	// combination with SuppressResponse or a timed interaction
-	// (InteractionServer.ts:397/:408 → InvalidAction).
+	// (InteractionServer.ts:410-415, :419-424 → InvalidAction).
 	MoreChunkedMessages bool
 }
 
@@ -84,12 +84,22 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		return WriteRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidWriteRequest, open.Type)
 	}
 	var req WriteRequest
+	var hasTimed, hasWrites bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		if el.IsEndContainer {
+			// TimedRequest and WriteRequests are mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvWriteRequest.ts:21, :24
+			// at db021da0 (TlvField; SuppressResponse :18 is optional).
+			switch {
+			case !hasTimed:
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqTimedRequest, "TimedRequest"))
+			case !hasWrites:
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqWriteRequests, "WriteRequests"))
+			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -107,6 +117,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			req.SuppressResponse = el.Bool
 		case tagWriteReqTimedRequest:
 			req.TimedRequest = el.Bool
+			hasTimed = true
 		case tagWriteReqMoreChunked:
 			req.MoreChunkedMessages = el.Bool
 		case tagWriteReqWriteRequests:
@@ -118,6 +129,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 				return WriteRequest{}, err
 			}
 			req.Writes = ws
+			hasWrites = true
 		default:
 			if el.IsContainer {
 				if err := skipContainer(dec); err != nil {
@@ -151,12 +163,23 @@ func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]
 
 func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeWrite, error) {
 	var w AttributeWrite
+	var hasPath, hasData bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeWrite{}, err
 		}
 		if el.IsEndContainer {
+			// Path and Data are mandatory: matter.js
+			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
+			// db021da0 (TlvField). Without the check an AttributeDataIB
+			// without Data reached the server as a write of nil.
+			switch {
+			case !hasPath:
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataPath, "AttributeDataIB.Path"))
+			case !hasData:
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataValue, "AttributeDataIB.Data"))
+			}
 			return w, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -180,7 +203,9 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 				return AttributeWrite{}, err
 			}
 			w.Path = p
+			hasPath = true
 		case tagAttributeDataValue:
+			hasData = true
 			if valueReader == nil {
 				// Without a cluster-aware reader we cannot turn the
 				// element tree into a Go value. Drain the container so
@@ -206,6 +231,16 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 // WriteResponse is the in-memory form of a WriteResponseMessage.
 type WriteResponse struct {
 	Responses []AttributeStatus
+	// Status is not Success when the interaction ended at a data element
+	// with this status ([HandleWriteRequest]): the elements before it were
+	// handled and Responses holds their statuses, the elements after it
+	// were not, and the server answers a StatusResponse with Status in
+	// place of the WriteResponse. matter.js throws a StatusResponseError out
+	// of AttributeWriteResponse.process there
+	// (packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66
+	// at db021da0), which the messenger answers as a StatusResponse. It is
+	// not part of the wire message.
+	Status StatusCode
 }
 
 // AttributeStatus is one entry in WriteResponses.
@@ -233,17 +268,19 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // returns the assembled WriteResponse.
 //
 // DataVersion mismatch check: mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts DataVersion check
-// before write dispatch, and chip src/app/WriteHandler.cpp
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:254-257 at
+// db021da0 (the DataVersion check before the value is written), and chip
+// src/app/WriteHandler.cpp
 // AttributeAccessInterface DataVersion verification. When the caller
 // supplies a DataVersion in an AttributeDataIB (0 included) and d implements
 // [DataVersionReader], the cluster's current version is queried; a mismatch
 // returns StatusDataVersionMismatch (0x92) instead of dispatching the write.
 //
-// ACL gate: mirrors matter.js
-// packages/node/src/node/server/OnlineServerInteraction.ts
-// FabricAccessControl.forRequest and chip src/app/WriteHandler.cpp:780
-// "Execute the ACL Access Granting Algorithm before existence checks". When
+// ACL gate: mirrors matter.js's access passes of a write,
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:215-218 (the
+// View pass before existence) and :236-241 (the write privilege) at
+// db021da0, and chip src/app/WriteHandler.cpp:770 at 6170af84 "Execute the
+// ACL Access Granting Algorithm before existence checks". When
 // d implements [ACLChecker], the requesting fabric's privilege is verified
 // before each write path is dispatched, at the location the path resolves
 // to. The required privilege for a plain Write is Operate (3) per Matter
@@ -253,7 +290,7 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // [IsPASEFromContext] after it, mirroring matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
 // keys the implicit Administer grant on the session's auth mode.
-func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,funlen // the write interaction's per-path gates in matter.js order
+func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo,gocognit,funlen // the write interaction's per-path gates in matter.js order
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
@@ -307,6 +344,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	}
 	lastWritten := tx.lastWritten
 	defer func() { tx.lastWritten = lastWritten }()
+	localNodeID, hasLocalNodeID := LocalNodeIDFromContext(ctx)
 	var wr WriteResponse
 	for _, w := range req.Writes {
 		// The interaction's BUSY checks come first (busyBefore).
@@ -315,6 +353,31 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				Path:   w.Path,
 				Status: StatusIB{Status: StatusBusy},
 			})
+			continue
+		}
+		// WildcardPathFlags belong to Read and Subscribe only: a write path
+		// that carries them ends the interaction with InvalidAction when it
+		// is reached, the elements before it written. Mirrors matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66
+		// at db021da0 ("WildcardPathFlags are not allowed in write
+		// interactions"), the first check of each element of process(),
+		// which runs after the interaction's BUSY checks
+		// (packages/node/src/node/server/InteractionServer.ts:505-531).
+		if w.Path.WildcardPathFlags != 0 {
+			wr.Status = StatusInvalidAction
+			break
+		}
+		// A path that names another node is not written. A wildcard path
+		// — one without its endpoint, cluster or attribute — is dropped
+		// without a status (matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:121-123
+		// at db021da0, #processWildcard); a concrete one answers
+		// UnsupportedNode below, once the interaction has accepted it.
+		// The node is this node's id on the session's fabric
+		// ([WithLocalNodeID]; DataResponse.ts:54-63); without the stamp the
+		// field is not looked at.
+		otherNode := hasLocalNodeID && w.Path.HasNode && w.Path.Node != localNodeID
+		if otherNode && (!w.Path.HasEndpoint || !w.Path.HasCluster || !w.Path.HasAttribute) {
 			continue
 		}
 		// A write path MUST name a concrete cluster and attribute. Matter
@@ -340,6 +403,15 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// InteractionServer.ts:533-537 at db021da0); it is held only once
 		// the access checks below have granted the write ([WriteTransaction.hold]).
 		tx.accept(w.Path, fabricIndex)
+		// A concrete path naming another node: UnsupportedNode, the first
+		// check of #writeConcrete (AttributeWriteResponse.ts:171-173).
+		if otherNode {
+			wr.Responses = append(wr.Responses, AttributeStatus{
+				Path:   w.Path,
+				Status: StatusIB{Status: StatusUnsupportedNode},
+			})
+			continue
+		}
 		// ACL gate for a concrete path. The required privilege is
 		// per-attribute (AccessControl.ACL → Administer,
 		// BasicInformation.NodeLabel → Manage) rather than a flat Operate,
@@ -435,10 +507,24 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// A wildcard write skips, silently, an attribute another
 		// interaction's chunked write holds (matter.js
 		// AttributeWriteResponse.ts:355-358 isHeldByOtherWrite).
+		//
+		// A path with a numeric ListIndex is never written: where its
+		// value would be written — past every other gate, the dispatcher's
+		// existence, writability, access and timed checks included — the
+		// interaction ends with InvalidAction ([listIndexGate]).
 		var results []WriteResult
+		var indexGate listIndexGate
+		numericIndex := w.Path.HasListIndex && !w.Path.ListAppend
 		switch {
+		case w.Path.HasEndpoint && numericIndex && hasAuthWriter:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(nil))
+		case numericIndex && !hasAuthWriter:
+			// No dispatcher gate to wait for: the element ends here.
+			indexGate.reached = true
 		case w.Path.HasEndpoint:
 			results = d.Write(ctx, w.Path, w.Value)
+		case hasAuthWriter && numericIndex:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(authorizeWildcard))
 		case hasAuthWriter:
 			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, authorizeWildcard)
 		case !aclActive:
@@ -454,6 +540,10 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 			continue
 		}
+		if indexGate.reached {
+			wr.Status = StatusInvalidAction
+			break
+		}
 		lastWritten = nil
 		if w.Path.HasEndpoint && len(results) > 0 && allSucceeded(results) {
 			p := w.Path
@@ -463,8 +553,8 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			// When a cluster-specific status is conveyed, the outer global
 			// status MUST be FAILURE (not a more specific global code).
 			// Mirrors matter.js
-			// packages/protocol/src/action/server/AttributeWriteResponse.ts:32
-			// (#3988, Matter §7.10.7).
+			// packages/protocol/src/action/server/AttributeWriteResponse.ts:387-390
+			// at db021da0 (#3988, Matter §7.10.7).
 			if res.HasClusterStatus && res.Status != StatusSuccess {
 				res.Status = StatusFailure
 			}
@@ -478,12 +568,41 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 	// the hold of its last accepted attribute, the interaction's final
 	// message releases every hold (InteractionServer.ts:555-560
 	// releaseHeldPaths(previousProcessedAttributePath), :469 the disposal).
-	if req.MoreChunkedMessages {
+	// An interaction that ended at an element releases every hold too: the
+	// error leaves handleWriteRequest through the same disposal.
+	if req.MoreChunkedMessages && wr.Status.IsSuccess() {
 		tx.releaseHolds(tx.lastQueued)
 	} else {
 		tx.releaseHolds(nil)
 	}
 	return wr
+}
+
+// listIndexGate ends a write whose path carries a numeric ListIndex at the
+// point its value would be written. matter.js answers such a path in
+// writeValue, after the existence, writability, access, timed and
+// DataVersion checks and outside the try that turns errors into a path
+// status, so the interaction ends with StatusResponse(InvalidAction) and
+// nothing is written for the path (packages/protocol/src/action/server/
+// AttributeWriteResponse.ts:419-424 at db021da0, "Unsupported Write path
+// provided: listIndex"); on a wildcard or group path the first endpoint
+// that reaches writeValue ends it (:360). The gate rides on the
+// dispatcher's authorizer, which endpoint.TopologyDispatcher asks for such
+// a path after its timed check, not before it.
+type listIndexGate struct{ reached bool }
+
+// wrap returns the authorizer the dispatcher asks where the value would be
+// written: inner's verdict first, then the end of the interaction.
+func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
+	return func(endpoint uint16, clusterID, attrID uint32) StatusCode {
+		if inner != nil {
+			if status := inner(endpoint, clusterID, attrID); !status.IsSuccess() {
+				return status
+			}
+		}
+		g.reached = true
+		return StatusInvalidAction
+	}
 }
 
 // namesStaleDataVersion is the DataVersion gate of [HandleWriteRequest],

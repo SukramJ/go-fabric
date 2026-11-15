@@ -270,7 +270,14 @@ func (s *server) awaitChunkStatus(ctx context.Context, x *exchange.Exchange) boo
 // write is InteractionServer.handleWriteRequest (InteractionServer.ts:392-452):
 // the timed flag must match the exchange's timed interaction
 // (TimedRequestMismatch, :434), then the writes run and the response goes
-// back unless suppressed.
+// back unless suppressed. An interaction that ended at a data element
+// ([im.WriteResponse.Status]) is answered with that status in a
+// StatusResponse instead, unless suppressed: matter.js throws it out of
+// AttributeWriteResponse.process
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:59-66 at
+// db021da0) and the messenger answers it
+// (packages/protocol/src/interaction/InteractionMessenger.ts:457-459),
+// sending no status for a request that suppressed its response (:317-322).
 func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRequest, timed bool) im.StatusCode {
 	if req.TimedRequest != timed {
 		return im.StatusTimedRequestMismatch
@@ -278,6 +285,9 @@ func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRe
 	wctx := s.requestContext(ctx, x, false)
 	wctx = im.WithTimedInteraction(wctx, timed)
 	resp := im.HandleWriteRequest(wctx, s.cfg.Dispatcher, req)
+	if !resp.Status.IsSuccess() && !req.SuppressResponse {
+		return resp.Status
+	}
 	if req.SuppressResponse {
 		return im.StatusSuccess
 	}

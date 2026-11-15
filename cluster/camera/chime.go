@@ -269,6 +269,12 @@ func (c *Chime) MatterWrite(ctx context.Context, attrID uint32, value any) error
 	return c.srv.MatterWrite(ctx, attrID, value)
 }
 
+// MatterWriteChanged implements [contract.ChangeReportingWriter]: the
+// generated server's write and its verdict.
+func (c *Chime) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	return c.srv.MatterWriteChanged(ctx, attrID, value)
+}
+
 // MatterInvoke dispatches PlayChimeSound; a host's handler runs in its
 // place ([spec.SelfHeld.Handle]).
 func (c *Chime) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {

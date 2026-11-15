@@ -46,6 +46,28 @@ type WiFiLinkReporter interface {
 	CurrentNetwork(ctx context.Context) (ssid []byte, known bool)
 }
 
+// WiFiInterfaceSwitcher is an optional extension of a [WiFiDriver]: it
+// switches the radio's network interface on and off — connectedhomeip's
+// optional driver feature SetEnabled
+// (src/include/platform/NetworkCommissioning.h:225-228 at the harness
+// pin), which the cluster calls for a write of InterfaceEnabled. With it a
+// write that changes InterfaceEnabled switches the interface, and the
+// attribute takes the value once the driver switched it; while it is
+// false the cluster joins no network of its own accord. Without it the
+// interface is not switchable: a write of false answers INVALID_ACTION
+// (NetworkCommissioningCluster.cpp:1120-1132) and InterfaceEnabled stays
+// true.
+type WiFiInterfaceSwitcher interface {
+	// SetInterfaceEnabled switches the interface on (true) or off (false)
+	// and returns once it did. An error leaves the interface as it was:
+	// one that wraps errors.ErrUnsupported says the driver cannot switch
+	// it so (the write answers INVALID_ACTION), a [StatusError] names the
+	// write's status, any other answers FAILURE. It may be called while a
+	// ScanNetworks or ConnectNetwork runs. The driver bounds its own wait;
+	// ctx may carry no deadline.
+	SetInterfaceEnabled(ctx context.Context, enabled bool) error
+}
+
 // WiFiScanResult is one network a [WiFiDriver] scan found — Matter
 // WiFiInterfaceScanResultStruct.
 type WiFiScanResult struct {

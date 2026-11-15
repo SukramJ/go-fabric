@@ -112,7 +112,7 @@ var areaKeys = []string{
 	// ble/esphome (brief BP1): the proxy, its advertisement and its link.
 	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
-	"subscriptions_reaped", "subsystem", "supported", "suppress_response",
+	"subsystem", "supported", "suppress_response",
 	"sw_version", "system_mode", "target", "targets", "tcp", "test", "timed", "timeout",
 	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "uri_node", "url", "valid",
