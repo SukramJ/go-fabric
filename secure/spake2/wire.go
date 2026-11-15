@@ -202,6 +202,22 @@ func decodeSingleOctet(payload []byte, wantTag uint8, msgName string) ([]byte, e
 	return found, nil
 }
 
+// uint16Member returns el's value when el is an unsigned integer of at
+// most 0xFFFF, [ErrWireMalformed] otherwise: matter.js's TlvUInt16 refuses
+// an element of another type (packages/types/src/tlv/TlvNumber.ts:124-131
+// at db021da0) and a value above its maximum (:155) instead of masking it.
+func uint16Member(el tlv.Element, name string) (uint16, error) {
+	if !isUnsignedInt(el.Type) || el.Uint > 0xFFFF {
+		return 0, fmt.Errorf("%w: %s not a UInt16", ErrWireMalformed, name)
+	}
+	return uint16(el.Uint), nil
+}
+
+// isUnsignedInt reports whether t is a TLV unsigned integer of any width.
+func isUnsignedInt(t tlv.ElementType) bool {
+	return t >= tlv.TypeUnsignedInt1 && t <= tlv.TypeUnsignedInt8
+}
+
 // appendOctets is a defensive copy. The TLV decoder's Octets slice
 // aliases the input buffer which the caller may recycle; the
 // adapter must take ownership before returning to the caller.
@@ -250,8 +266,17 @@ type PBKDFParamRequest struct {
 // payload, including the optional InitiatorSessionParams field (tag 5)
 // so the eventual PASE session can honour the commissioner's
 // retransmit intervals (matter.js PaseServer.ts:135-157).
+//
+// Tags 1-4 are mandatory and typed, as matter.js's TlvPbkdfParamRequest
+// declares them (packages/protocol/src/session/pase/PaseMessages.ts:70-73
+// at db021da0: ByteString of 32, UInt16, UInt16, Boolean): a request that
+// lacks one, or carries one of another type or above its width, is
+// [ErrWireMalformed] — matter.js's decode throws (TlvObject.ts:252-261,
+// TlvNumber.ts:124-131, :155, TlvBoolean.ts:22-24), and a missing
+// PasscodeID or HasPBKDFParameters is never read as 0 or false.
 func DecodePBKDFParamRequest(payload []byte) (PBKDFParamRequest, error) {
 	var req PBKDFParamRequest
+	var hasSessionID, hasPasscodeID, hasHasParams bool
 	dec := tlv.NewDecoder(payload)
 	open, err := dec.Next()
 	if err != nil {
@@ -275,20 +300,41 @@ func DecodePBKDFParamRequest(payload []byte) (PBKDFParamRequest, error) {
 		case tagPBKDFReqInitiatorRandom:
 			req.InitiatorRandom = appendOctets(req.InitiatorRandom, el.Octets)
 		case tagPBKDFReqInitiatorSessionID:
-			req.InitiatorSessionID = uint16(el.Uint & 0xFFFF)
-		case tagPBKDFReqPasscodeID:
-			req.PasscodeID = uint16(el.Uint & 0xFFFF)
-		case tagPBKDFReqHasPBKDFParameters:
-			req.HasPBKDFParameters = el.Bool
-		case tagPBKDFReqInitiatorMRPParams:
-			if el.IsContainer {
-				params, perr := sessionparams.DecodeFields(dec)
-				if perr != nil {
-					return req, fmt.Errorf("%w: InitiatorSessionParams: %w", ErrWireMalformed, perr)
-				}
-				req.InitiatorSessionParams = &params
+			if req.InitiatorSessionID, err = uint16Member(el, "PBKDFParamRequest.InitiatorSessionID"); err != nil {
+				return req, err
 			}
+			hasSessionID = true
+		case tagPBKDFReqPasscodeID:
+			if req.PasscodeID, err = uint16Member(el, "PBKDFParamRequest.PasscodeID"); err != nil {
+				return req, err
+			}
+			hasPasscodeID = true
+		case tagPBKDFReqHasPBKDFParameters:
+			if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
+				return req, fmt.Errorf("%w: PBKDFParamRequest.HasPBKDFParameters not a boolean", ErrWireMalformed)
+			}
+			req.HasPBKDFParameters = el.Bool
+			hasHasParams = true
+		case tagPBKDFReqInitiatorMRPParams:
+			// TlvOptionalField(5, TlvSessionParameters), PaseMessages.ts:74:
+			// a structure when present.
+			if el.Type != tlv.TypeStructure {
+				return req, fmt.Errorf("%w: InitiatorSessionParams not a structure", ErrWireMalformed)
+			}
+			params, perr := sessionparams.DecodeFields(dec)
+			if perr != nil {
+				return req, fmt.Errorf("%w: InitiatorSessionParams: %w", ErrWireMalformed, perr)
+			}
+			req.InitiatorSessionParams = &params
 		}
+	}
+	switch {
+	case !hasSessionID:
+		return req, fmt.Errorf("%w: PBKDFParamRequest missing field tag %d (InitiatorSessionID)", ErrWireMalformed, tagPBKDFReqInitiatorSessionID)
+	case !hasPasscodeID:
+		return req, fmt.Errorf("%w: PBKDFParamRequest missing field tag %d (PasscodeID)", ErrWireMalformed, tagPBKDFReqPasscodeID)
+	case !hasHasParams:
+		return req, fmt.Errorf("%w: PBKDFParamRequest missing field tag %d (HasPBKDFParameters)", ErrWireMalformed, tagPBKDFReqHasPBKDFParameters)
 	}
 	if len(req.InitiatorRandom) != PBKDFRandomSize {
 		return req, fmt.Errorf("%w: PBKDFParamRequest.InitiatorRandom length %d, want %d",
@@ -394,8 +440,13 @@ func (resp PBKDFParamResponse) Marshal() []byte {
 // DecodePBKDFParamResponse parses a Matter PBKDFParamResponse TLV
 // payload. Provided for symmetry with the encoder + tests; the
 // bridge itself only encodes responses (it never receives them).
+//
+// ResponderSessionID (tag 3) is mandatory and a UInt16
+// (PaseMessages.ts:83 at db021da0), so a response without it, or with
+// one of another type or width, is [ErrWireMalformed], never session 0.
 func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 	var resp PBKDFParamResponse
+	var hasSessionID bool
 	dec := tlv.NewDecoder(payload)
 	open, err := dec.Next()
 	if err != nil {
@@ -421,7 +472,10 @@ func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 		case tagPBKDFRespResponderRandom:
 			resp.ResponderRandom = appendOctets(resp.ResponderRandom, el.Octets)
 		case tagPBKDFRespResponderSessionID:
-			resp.ResponderSessionID = uint16(el.Uint & 0xFFFF)
+			if resp.ResponderSessionID, err = uint16Member(el, "PBKDFParamResponse.ResponderSessionID"); err != nil {
+				return resp, err
+			}
+			hasSessionID = true
 		case tagPBKDFRespPBKDFParameters:
 			if !el.IsContainer {
 				return resp, fmt.Errorf("%w: PBKDFParameters not a container", ErrWireMalformed)
@@ -441,6 +495,9 @@ func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 			}
 			resp.ResponderSessionParams = &params
 		}
+	}
+	if !hasSessionID {
+		return resp, fmt.Errorf("%w: PBKDFParamResponse missing field tag %d (ResponderSessionID)", ErrWireMalformed, tagPBKDFRespResponderSessionID)
 	}
 	if len(resp.InitiatorRandom) != PBKDFRandomSize {
 		return resp, fmt.Errorf("%w: PBKDFParamResponse.InitiatorRandom length %d, want %d",
@@ -472,7 +529,12 @@ func decodePBKDFParameters(dec *tlv.Decoder) (PBKDFParameters, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagPBKDFParamsIterations:
-			p.Iterations = uint32(el.Uint & 0xFFFFFFFF)
+			// TlvUInt32 (PaseMessages.ts:87-90): never masked into the
+			// bounds [PBKDFParameters.Validate] holds.
+			if !isUnsignedInt(el.Type) || el.Uint > 0xFFFFFFFF {
+				return p, fmt.Errorf("%w: PBKDFParameters.Iterations not a UInt32", ErrWireMalformed)
+			}
+			p.Iterations = uint32(el.Uint)
 		case tagPBKDFParamsSalt:
 			p.Salt = appendOctets(p.Salt, el.Octets)
 		}
