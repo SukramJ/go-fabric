@@ -55,6 +55,7 @@ no encryption of its own; one from `store.NewSealed` seals every one of them
 | --- | --- |
 | each fabric's operational private key and its IPK | `matter_node_identities` |
 | the group key sets, up to three epoch keys each | `matter_group_keys` |
+| on a JointFabricDatastore server given a store: the joint fabric's group key sets | `matter_settings`, keys `jointfabric.datastore:<key>`, as JSON |
 | the CASE resumption records: one shared secret per fabric and peer, which lets a returning peer skip the full CASE handshake | `matter_resumption`, column `shared_secret` |
 | on a Wi-Fi node (`node.Network.WiFi`): the committed networks, each SSID with its credentials — a secret of the home network, not only of this node | `matter_settings`, key `netcomm.wifi.networks`, as JSON |
 | while an UpdateNOC waits for CommissioningComplete: the operational private key it replaced, so a restart inside the fail-safe window can restore it | `matter_node_identities`, column `prior_private_key` (since v8); cleared when CommissioningComplete commits the update or the fail-safe's end or a start rolls it back. A database a release before v8 left in the middle of an UpdateNOC holds it, with the IPK, in `matter_settings`, key `operational_credentials.pending_noc_update`, until the first start clears it |
@@ -91,24 +92,43 @@ blocks of a deleted journal, backups — are outside what it can promise.
 
 `store.NewSealed(ctx, db, sealer)` returns a store that seals every secret
 of the table above, the ICD keys, DoorLock credential data (over the lock's
-own encryption), the two sealing keys and the pending-NOC settings of a
-release before v8, under a `store.Sealer` the host supplies;
-`store.NewAESGCMSealer(key)` is the standard-library one (AES-256-GCM, a
-random nonce per value, a 32-byte key). The key must live outside the
-database — a file of its own, the operating system's keychain, a TPM or a
-KMS: only then is a copy of the file, its free pages and its `-wal`
-included, unreadable without it. Each value is bound to its table, column
-and row, so a value moved to another row or column does not open, and each
-row carries its seal mark (schema v10), so a clear row and a sealed one never
-pass for each other.
+own encryption), the two sealing keys, the pending-NOC settings of a
+release before v8 and the JointFabricDatastore record (settings under
+`jointfabric.datastore:`, which carry the joint fabric's group key sets),
+under a `store.Sealer` the host supplies; `store.NewAESGCMSealer(key)` is
+the standard-library one (AES-256-GCM, a random nonce per value, a 32-byte
+key). The key must live outside the database — a file of its own, the
+operating system's keychain, a TPM or a KMS: only then are the secrets in a
+copy of the file, its free pages and its `-wal` included, unreadable without
+it; the rest of the file — certificates, fabric and node ids, ACLs — stays
+readable. Each value is bound to its table, column and row, so a value moved
+to another row or column does not open.
+
+Sealing protects the confidentiality of the secrets in a copy of the
+database. It gives no integrity or rollback protection: the non-secret
+columns and the seal marks are not authenticated, and an older sealed value
+of the same row, written back into the file, opens.
 
 On the way in `NewSealed` seals every clear row in one transaction and then
 scrubs the file as the factory reset does, so the clear values of an
-existing database do not stay behind; a second call writes nothing. A store
-without the sealer reads a sealed value as an error, never as the secret,
-and refuses a write that would leave a sealed identity half clear; every
-store of the database needs the sealer. Migration v10's `Down` refuses a
-database that holds a sealed row.
+existing database do not stay behind — measured in WAL mode and in the
+rollback journal's `DELETE` (SQLite's default) and `TRUNCATE` modes; in
+`PERSIST` mode the kept `-journal` still holds clear pages. Copies taken
+before the upgrade — backups, snapshots, the blocks of the truncated
+`-wal` — keep the clear values, as for the factory reset above. A second call
+writes nothing.
+
+After that the store is strict: it writes no secret in clear, and a secret
+row it reads without the seal mark — a mark edited in the file, a clear row
+planted or written by a store without the sealer — is refused with
+`store.ErrUnseal`, never read as the secret; so is a value under another key
+or moved to another row. A store without the sealer reads a sealed value as
+`store.ErrNoSealer` and refuses a write that would leave a sealed identity
+half clear. Every store of the database needs the sealer; a concurrent
+writer without it on the same database is not supported. A secret of the
+wrong length is refused on read, with or without a sealer (the resumption
+secret, the IPK, the epoch keys). Migration v10's `Down` refuses a database
+that holds a sealed row.
 
 Wiring: apply the schema (`store.Apply`), build the store with
 `store.NewSealed`, and hand it to the node as `node.Store{DB: db,
@@ -119,7 +139,8 @@ records — is not sealed.
 *Source: `store/seal.go` (`Sealer`, `AESGCMSealer`, `NewSealed`;
 `TestSealedStoreLeavesNoClearSecret`, `TestNewSealedSealsAClearDatabase`,
 `TestSealedStoreWrongKeyOrNoSealer`, `TestSealedValueMovedDoesNotOpen`,
-`TestMigrationV10DownRefusesSealedRows`), `store/migrations/v10.up.sql`,
+`TestSealedStoreRefusesClearRows`, `TestNewSealedLeavesNoClearSecretPerJournalMode`,
+`TestReadSideLengthChecks`, `TestMigrationV10DownRefusesSealedRows`), `store/migrations/v10.up.sql`,
 `store/schema.sql:205-209`, `store/resumption.go:39`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side

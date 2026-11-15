@@ -211,7 +211,12 @@ key renders, the row is orphaned and the source gets a new endpoint number.
 ### Settings keys
 
 `matter_settings` holds the controller-written attribute values and the
-facade's own state.
+facade's own state. A store from `store.NewSealed` seals the values of the
+keys that hold secrets — `netcomm.wifi.networks`, `door_lock.credential_key`,
+`icd_management.key`, the two `operational_credentials.pending_noc*` keys and
+every `jointfabric.datastore:` key — and marks their rows (`sealed`, v10);
+the other values stay as they are ([sealing at
+rest](../security.md#sealing-at-rest)).
 
 | Key | Written by | Holds |
 | --- | --- | --- |
@@ -228,8 +233,8 @@ facade's own state.
 | `gendiag.reboot_count` | the facade | RebootCount: 0 on a database's first boot, then one more per boot |
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |
-| `door_lock.credential_key` | `cluster/lock` | the key the DoorLock server encrypts credential data with |
-| `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
+| `door_lock.credential_key` | `cluster/lock` | the key the DoorLock server encrypts credential data with; sealed under `store.NewSealed` |
+| `icd_management.key` (`store.SettingICDKey`) | `store` | the key a store without a sealer seals the ICD registrations' keys with; created with the first registration. A store from `store.NewSealed` creates none (its sealer seals the ICD keys) and seals one an earlier store left |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
 | `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` (releases before v8) | the VID verification statement and VVSC per fabric, hex, as releases before v8 kept them; the data now lives in `matter_fabrics` (`UpdateFabricVIDVerification`), `store.Upgrade` moves every such key into its fabric's columns and deletes it, and nothing writes the keys any more |
@@ -239,10 +244,10 @@ facade's own state.
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
 | `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names; the offset of the node's UTC over its clock is not stored |
 | `general_commissioning.tc_acceptance` (`store.SettingTermsAcceptance`) | `cluster/core` | the committed terms-and-conditions acceptance (`<version>:<bits>`) of GeneralCommissioning's TC feature (`node.Commissioning.TermsAndConditions`); written at CommissioningComplete or by a SetTCAcknowledgements outside a fail-safe window, deleted with the last fabric, erased by the factory reset |
-| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
+| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys, unless the store seals them: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
 | `thermostat_user_interface_configuration.keypad_lockout` (`thermo.DefaultKeypadLockoutSetting`) | `cluster/thermo` | ThermostatUserInterfaceConfiguration's KeypadLockout, when the server is given `Settings`; `ThermostatUIConfig.SettingKey` names another key, which a second endpoint with the cluster needs |
 | `tls.certificates:<key>`, `tls.endpoints:<key>` | `cluster/tls` | the certificate tables of TlsCertificateManagement and the provisioned endpoints of TlsClientManagement, when the servers are given a `Store`; `<key>` is the server's `Key` |
-| `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key` |
+| `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key`. It carries the joint fabric's group key sets; sealed under `store.NewSealed` |
 
 `<key>` is the endpoint's stable key in `String()` form, the same identity
 endpoint numbers are kept under. `Aggregator.Forget` deletes, in one
