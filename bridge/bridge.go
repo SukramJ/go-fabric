@@ -351,7 +351,17 @@ type Config struct {
 	// [Bridge.StartBLE] and [Bridge.StopBLE] — matter.js `network.ble`
 	// (NetworkServer.ts:28-34 at db021da0) with the platform's peripheral
 	// installed. nil is no BLE: the bridge never touches a radio.
-	BLE contract.BLEPeripheral
+	//
+	// Deprecated: set GATT, whose service registration [Bridge.StartBLE]
+	// answers before it advertises; removable in the next minor release.
+	// BLE keeps its meaning while GATT is nil; both set fail [New].
+	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
+
+	// GATT is the host's Bluetooth LE peripheral, on which the bridge
+	// serves BTP and advertises a commissioning window between
+	// [Bridge.StartBLE] and [Bridge.StopBLE]. nil (with BLE nil) is no
+	// BLE: the bridge never touches a radio.
+	GATT contract.GATTPeripheral
 
 	// AdvertiseTimeout caps the per-call timeout for mDNS publish /
 	// withdraw operations. Defaults to 5 seconds when zero. Each
@@ -930,6 +940,9 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	}
 	if cfg.TCP.MaxInboundConnections < 0 {
 		return nil, fmt.Errorf("bridge: TCP.MaxInboundConnections %d is negative", cfg.TCP.MaxInboundConnections)
+	}
+	if cfg.GATT != nil && cfg.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
+		return nil, errors.New("bridge: Config takes GATT or the deprecated BLE, not both")
 	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second

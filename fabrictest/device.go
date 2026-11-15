@@ -70,7 +70,7 @@ type Topology struct {
 	// node.start().
 	Prepare func(n *node.Node)
 	// BLE gives the device a Bluetooth radio of the in-memory BLE model
-	// (node.Network.BLE): while uncommissioned it is commissionable over
+	// (node.Network.GATT): while uncommissioned it is commissionable over
 	// BLE through its own bridge, as a device with a radio is, and its QR
 	// code says so. [Device.BLE] is the radio as a central reaches it.
 	BLE bool
@@ -316,7 +316,7 @@ func (d *Device) config() node.Config {
 		d.siteClient(&cfg)
 	}
 	if d.topo.BLE {
-		cfg.Network.BLE = d.blePeripheral(cfg).Radio()
+		cfg.Network.GATT = d.blePeripheral(cfg).Radio()
 	}
 	return cfg
 }

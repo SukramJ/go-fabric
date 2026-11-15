@@ -302,7 +302,19 @@ type Network struct {
 	// for a window an administrator opens (:255-275); when its last fabric
 	// is removed, the own window that reopens is on BLE again. nil is no
 	// BLE.
-	BLE contract.BLEPeripheral
+	//
+	// Deprecated: set GATT, whose service registration is answered before
+	// the node advertises; removable in the next minor release. BLE keeps
+	// its meaning while GATT is nil; both set fail [Config.Validate].
+	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
+	// GATT is the node's Bluetooth LE peripheral ([contract.GATTPeripheral]),
+	// with what BLE describes: an uncommissioned node is commissionable
+	// over it, the onboarding payload says so, and the node leaves the
+	// radio once it is commissioned. The node registers the Matter GATT
+	// service before it advertises; a registration the platform refuses
+	// leaves the node off the air, logged as commissioning.ble.start. nil
+	// (with BLE nil) is no BLE.
+	GATT contract.GATTPeripheral
 	// WiFi is the node's Wi-Fi interface: its Driver joins the network a
 	// commissioner hands it (NetworkCommissioning with the Wi-Fi feature),
 	// its Reporter answers WiFiNetworkDiagnostics (0x0036). Either or both;
@@ -856,6 +868,9 @@ func (c *Config) Validate() error {
 	}
 	errs = append(errs, c.limitsPairErrors()...)
 	errs = append(errs, c.advertisementErrors()...)
+	if c.Network.GATT != nil && c.Network.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
+		errs = append(errs, errors.New("node: Network takes GATT or the deprecated BLE, not both"))
+	}
 	if f := max(c.SupportedFabrics, c.Limits.SupportedFabrics); f > maxSupportedFabrics { //nolint:staticcheck // the deprecated field is still honoured
 		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", f, maxSupportedFabrics))
 	}
@@ -947,4 +962,10 @@ func (c *Config) timeSynchronizationErrors() []error {
 		return []error{errors.New("node: TimeSynchronization.Config excludes TimeSynchronization.Off")}
 	}
 	return nil
+}
+
+// hasBLE reports whether the node has a Bluetooth LE peripheral
+// ([Network].GATT or the deprecated [Network].BLE).
+func (n Network) hasBLE() bool {
+	return n.GATT != nil || n.BLE != nil //nolint:staticcheck // the deprecated port is still honoured
 }

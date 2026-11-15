@@ -339,7 +339,8 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		Listen:     cfg.Network.Listen,
 		PreferIPv4: cfg.Network.PreferIPv4,
 		TCP:        cfg.Network.TCP,
-		BLE:        cfg.Network.BLE,
+		BLE:        cfg.Network.BLE, //nolint:staticcheck // the deprecated port is still honoured
+		GATT:       cfg.Network.GATT,
 		Clock:      n.cfg.Clock,
 		// The invoke path refuses what BasicInformation does not advertise.
 		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
@@ -443,7 +444,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		baseline: n.sec.pase, advert: advert, observers: n.observerList,
 		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
-		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
+		ble: cfg.Network.hasBLE(), clk: clock.Or(n.cfg.Clock),
 		onDemand: cm.WindowOnDemand,
 	}
 	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
@@ -1045,7 +1046,7 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 // CommissioningComplete response does not wait for the radio, and Stop
 // waits for it.
 func (n *Node) leaveRadioWhenCommissioned() {
-	if n.cfg.Network.BLE == nil {
+	if !n.cfg.Network.hasBLE() {
 		return
 	}
 	n.goKeeper(func() {

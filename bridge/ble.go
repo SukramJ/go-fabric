@@ -118,16 +118,19 @@ func (b *Bridge) setBLERunning(on bool) {
 // BLE announces a basic window only: adv.CommissioningMode must be 1
 // (matter.js BleAdvertiser.getAdvertisement, BleAdvertiser.ts:37-45).
 //
-// A service the platform refuses or withdraws ends the advertisement as
-// well — StartBLE cannot report it, Serve fails on its own goroutine
-// (logged as matter.ble.serve) — and the next StartBLE registers the
-// service again.
+// The service is registered before the advertisement starts: a service
+// the platform refuses is StartBLE's error, and nothing is advertised
+// ([contract.GATTPeripheral]; with the deprecated [Config].BLE the
+// registration happens inside Serve, which reports a refusal on its own
+// goroutine, logged as matter.ble.serve). A service the platform withdraws
+// later ends the advertisement as well, and the next StartBLE registers
+// the service again.
 //
 // A service or advertisement still ending after a [Bridge.StopBLE] that
 // gave up waiting is waited for first, until ctx ends. The bridge must be
 // started; [Bridge.Stop] ends what StartBLE started.
 func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) error {
-	p := b.cfg.BLE
+	p := b.gattPeripheral()
 	if p == nil {
 		return errNoBLE
 	}
@@ -154,10 +157,18 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		}
 	}
 	if b.ble.serveCancel == nil {
+		// The service first: a refusal is this call's error, and no
+		// advertisement announces a service that is not there (review II,
+		// R2-P5-apidev-05, decision 114).
+		svc, err := p.RegisterService(ctx, nil)
+		if err != nil {
+			b.ble.mu.Unlock()
+			return fmt.Errorf("bridge: BLE: register the Matter GATT service: %w", err)
+		}
 		serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 		done := make(chan struct{})
 		b.ble.serveCancel, b.ble.serveDone = cancel, done
-		go b.serveBLE(serveCtx, cancel, done, p)
+		go b.serveBLE(serveCtx, cancel, done, svc)
 		b.logger.Info("matter.ble.serving")
 	}
 	if b.ble.advCancel != nil && b.ble.adv == want {
@@ -198,9 +209,9 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 
 // serveBLE runs the GATT service of one StartBLE until it ends, then
 // closes done.
-func (b *Bridge) serveBLE(serveCtx context.Context, cancel context.CancelFunc, done chan struct{}, p contract.BLEPeripheral) {
+func (b *Bridge) serveBLE(serveCtx context.Context, cancel context.CancelFunc, done chan struct{}, svc contract.GATTService) {
 	defer close(done)
-	err := p.Serve(serveCtx, nil, b.acceptBLE)
+	err := svc.Serve(serveCtx, b.acceptBLE)
 	if err != nil {
 		b.logger.Warn("matter.ble.serve", slog.Any("err", err))
 	}
@@ -395,7 +406,7 @@ func waitBLE(ctx context.Context, done chan struct{}) error {
 // advertiseBLE runs the advertisement's schedule until ctx ends or the
 // timeout passed, then stops advertising — matter.js BleAdvertisement.run
 // (BleAdvertisement.ts:29-72).
-func (b *Bridge) advertiseBLE(ctx context.Context, p contract.BLEPeripheral, adv bleAdvert) {
+func (b *Bridge) advertiseBLE(ctx context.Context, p contract.GATTPeripheral, adv bleAdvert) {
 	clk := b.clk()
 	start := clk.Now()
 	defer b.stopAdvertisingBLE(p) //nolint:contextcheck // the schedule's own context has ended; stopping runs on a fresh bounded one
@@ -438,7 +449,7 @@ func (b *Bridge) advertiseBLE(ctx context.Context, p contract.BLEPeripheral, adv
 // stopAdvertisingBLE ends the advertisement, bounded by
 // [Config].AdvertiseTimeout — matter.js's `finally` of
 // BleAdvertisement.run (BleAdvertisement.ts:69-71).
-func (b *Bridge) stopAdvertisingBLE(p contract.BLEPeripheral) {
+func (b *Bridge) stopAdvertisingBLE(p contract.GATTPeripheral) {
 	stopCtx, cancel := clock.WithTimeout(context.Background(), b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
 	if err := p.StopAdvertising(stopCtx); err != nil {
@@ -663,3 +674,41 @@ func (r *connReceiver) close() {
 
 // wait waits for every delivered message's handler to return.
 func (r *connReceiver) wait() { r.wg.Wait() }
+
+// gattPeripheral is the host's peripheral: [Config].GATT, else the
+// deprecated [Config].BLE adapted to it, nil without either.
+func (b *Bridge) gattPeripheral() contract.GATTPeripheral {
+	if b.cfg.GATT != nil {
+		return b.cfg.GATT
+	}
+	if p := b.cfg.BLE; p != nil { //nolint:staticcheck // the deprecated port is still honoured
+		return legacyGATT{p}
+	}
+	return nil
+}
+
+// legacyGATT adapts a deprecated [contract.BLEPeripheral] to
+// [contract.GATTPeripheral]: its Serve registers the service and serves it
+// in one call, so the registration is reported by Serve, on its own
+// goroutine, as before — RegisterService answers nil at once.
+type legacyGATT struct{ p contract.BLEPeripheral } //nolint:staticcheck // the adapter of the deprecated port
+
+func (l legacyGATT) Advertise(ctx context.Context, adv contract.BLEAdvertisement) error {
+	return l.p.Advertise(ctx, adv)
+}
+
+func (l legacyGATT) StopAdvertising(ctx context.Context) error { return l.p.StopAdvertising(ctx) }
+
+func (l legacyGATT) RegisterService(_ context.Context, c3 []byte) (contract.GATTService, error) {
+	return legacyService{p: l.p, c3: append([]byte(nil), c3...)}, nil
+}
+
+// legacyService is a [legacyGATT] registration: Serve registers and serves.
+type legacyService struct {
+	p  contract.BLEPeripheral //nolint:staticcheck // as above
+	c3 []byte
+}
+
+func (l legacyService) Serve(ctx context.Context, accept func(contract.BLEConnection)) error {
+	return l.p.Serve(ctx, l.c3, accept)
+}

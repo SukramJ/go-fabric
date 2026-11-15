@@ -87,10 +87,10 @@ func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredential
 // of a window the host opens with its own credentials
 // ([Node.OpenBasicWindow]): creds' passcode and discriminator under the
 // node's vendor and product, on-network discovery and, with a BLE radio
-// (Network.BLE), BLE discovery — what [Node.SetupPayload] returns for the
+// (Network.GATT), BLE discovery — what [Node.SetupPayload] returns for the
 // configured secret.
 func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err error) {
-	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode, n.cfg.Network.BLE != nil, n.cfg.Commissioning.Flow)
+	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode, n.cfg.Network.hasBLE(), n.cfg.Commissioning.Flow)
 }
 
 // pairingCodes encodes one passcode and discriminator as the QR payload

@@ -12,7 +12,7 @@ import (
 
 // BLE is the device's Bluetooth radio as a peripheral of the in-memory BLE
 // model (controller/ble/bletest) — the radio its node is built with
-// ([Topology].BLE, node.Network.BLE). The node runs it as it runs a
+// ([Topology].BLE, node.Network.GATT). The node runs it as it runs a
 // platform's: while uncommissioned it advertises its commissionable
 // payload — its discriminator, vendor id and product id — on the
 // advertisement's schedule and serves each central's BTP session through

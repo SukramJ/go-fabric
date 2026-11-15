@@ -76,7 +76,7 @@ type commissioningHost struct {
 	basicMu sync.Mutex
 	basic   *basicWindow // the open OpenBasicWindow window, nil without one
 
-	// ble is whether the node has a BLE radio (Network.BLE); clk paces
+	// ble is whether the node has a BLE radio (Network.GATT); clk paces
 	// the bound of leaving it. fabricCount counts the node's fabrics
 	// (set by wireCommissioningWindow).
 	ble         bool

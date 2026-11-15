@@ -63,7 +63,7 @@ func wifiNode(t *testing.T, name string, drv *liveWiFi, radio *bletest.Radio) *n
 	return liveNode(t, name, func(c *node.Config) {
 		c.Network.WiFi = &node.WiFi{Driver: drv}
 		if radio != nil {
-			c.Network.BLE = radio
+			c.Network.GATT = radio
 		}
 	})
 }
