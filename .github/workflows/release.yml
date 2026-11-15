@@ -63,10 +63,11 @@ jobs:
           # a run on another ref could have written.
           cache: false
 
-      # The tagged commit is on main, and the ci workflow ran green on it —
-      # race detector included (script/release-provenance.sh). Otherwise a
-      # tag could publish a commit no pull request and no required check
-      # ever saw.
+      # The tagged commit is on main, and a ci run on it passed every
+      # required check ci.yml defines — race detector included
+      # (script/release-provenance.sh; a ci job not yet required does not
+      # block). Otherwise a tag could publish a commit no pull request and
+      # no required check ever saw.
       - name: verify where the tag points
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

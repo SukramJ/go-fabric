@@ -19,7 +19,7 @@ name: Dependabot auto-merge
 # A merge by this workflow is made with the GitHub Actions token, and such a
 # push starts no workflow: main gets no push run of ci for it (61a14ef5).
 # The pull request's own runs are what the branch protection read; a
-# release tag needs a commit with a successful ci run
+# release tag needs a commit with a ci run whose required checks passed
 # (script/release-provenance.sh), so such a commit is not tagged as is.
 
 # yamllint disable-line rule:truthy

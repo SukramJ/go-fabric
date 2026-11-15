@@ -136,7 +136,9 @@ merge to `main` is still immediately consumable by anyone who runs
 release is a commit that turns `## [Unreleased]` into a dated
 `## [x.y.z]` section, followed by the `vx.y.z` tag on that commit; the
 release workflow refuses a tag without its CHANGELOG section, and a tag
-whose commit is not on `main` or has no successful run of the `ci` workflow
-(`script/release-provenance.sh`). A nested module's tag (`ble/bluez/vX.Y.Z`)
-gets no GitHub release; the workflow checks that the module builds against
-the versions it requires (`script/nested-release-check.sh`).
+whose commit is not on `main` or has no run of the `ci` workflow in which
+every required check `ci.yml` defines passed (`script/release-provenance.sh`;
+the required checks are `script/requiredchecks/required.txt`). A nested
+module's tag (`ble/bluez/vX.Y.Z`) gets no GitHub release; the workflow
+checks that the module builds against the versions it requires
+(`script/nested-release-check.sh`).

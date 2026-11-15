@@ -8,18 +8,53 @@
 #
 #   - be on main: an ancestor of origin/main, so it went through the branch
 #     protection's required checks as a pull request;
-#   - have a successful run of the ci workflow (.github/workflows/ci.yml)
-#     on that very commit — the push run on main, which also ran the race
-#     detector (job `test (linux, race)`). A merge whose push run was
-#     cancelled by the next merge, or a merge that started none (a merge by
-#     the GitHub Actions app starts no workflow), has none: re-run ci on
-#     the commit, or tag a commit that has one.
+#   - have a run of the ci workflow (.github/workflows/ci.yml) on that
+#     very commit in which every required check that ci.yml defines passed
+#     — the push run on main, which also ran the race detector (job
+#     `test (linux, race)`). The required checks are the branch
+#     protection's copy, script/requiredchecks/required.txt, read from the
+#     checkout this script is in (the tag's, in release.yml), intersected
+#     with ci.yml's job names there. A ci job that is not a required check
+#     (a guard still pending its promotion) does not block a release, as it
+#     does not block a merge (review II, DR5a-ci-04). A merge whose push
+#     run was cancelled by the next merge, or a merge that started none (a
+#     merge by the GitHub Actions app starts no workflow), has none: re-run
+#     ci on the commit, or tag a commit that has one.
 #
 # Usage: script/release-provenance.sh <tag>
+#        script/release-provenance.sh --required-ci   (print the required
+#        checks ci.yml defines, one per line; no network)
 # Needs git, gh with a token that may read the repository's workflow runs
 # (GH_TOKEN), and GITHUB_REPOSITORY (owner/name). Exit 1: the tag fails a
-# check; 2: the environment.
+# check; 2: the environment, an unreadable answer included — never a pass.
 set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+
+# required_ci prints the contexts of required.txt that are job names of
+# ci.yml: the `name:` of a job sits at four spaces under `jobs:` (the
+# shape script/requiredchecks reads, TestProvenanceRequiredCI holds this
+# reader to it).
+required_ci() {
+	local required="$root/script/requiredchecks/required.txt" ci="$root/.github/workflows/ci.yml"
+	[ -r "$required" ] && [ -r "$ci" ] || { echo "release-provenance: cannot read $required or $ci" >&2; return 2; }
+	local names
+	names=$(sed -n -e '/^jobs:/,$ s/^    name: *//p' "$ci" | sed -e 's/ *#.*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")
+	local ctx found=0
+	while IFS= read -r ctx || [ -n "$ctx" ]; do
+		[ -n "$ctx" ] || continue
+		if printf '%s\n' "$names" | grep -Fxq -- "$ctx"; then
+			printf '%s\n' "$ctx"
+			found=1
+		fi
+	done <"$required"
+	[ "$found" -eq 1 ] || { echo "release-provenance: no context of required.txt is a job of ci.yml" >&2; return 2; }
+}
+
+if [ "${1:-}" = "--required-ci" ]; then
+	required_ci || exit 2
+	exit 0
+fi
 
 tag="${1:-}"
 repo="${GITHUB_REPOSITORY:-}"
@@ -30,6 +65,7 @@ fi
 for tool in git gh; do
 	command -v "$tool" >/dev/null || { echo "release-provenance: $tool not found"; exit 2; }
 done
+required=$(required_ci) || exit 2
 
 commit=$(git rev-parse --verify -q "refs/tags/$tag^{commit}") || {
 	echo "release-provenance: no tag $tag in this clone"
@@ -48,12 +84,64 @@ if ! git merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
 fi
 echo "tag $tag: $commit is on main"
 
-runs=$(gh api "repos/$repo/actions/workflows/ci.yml/runs?head_sha=$commit&status=success&per_page=1" --jq '.total_count') || {
+# is_count: a non-negative integer, as the API's counts are. Anything else
+# (null, empty, a message) is the environment, never a pass (DR5a-ci-05).
+is_count() {
+	case "$1" in '' | *[!0-9]*) return 1 ;; esac
+}
+
+listing=$(gh api "repos/$repo/actions/workflows/ci.yml/runs?head_sha=$commit&per_page=100" \
+	--jq '.total_count, (.workflow_runs[] | .id)') || {
 	echo "release-provenance: cannot list the ci runs of $commit"
 	exit 2
 }
-if [ "${runs:-0}" -lt 1 ]; then
-	echo "::error::tag $tag: no successful run of the ci workflow on $commit; re-run ci on it, or tag a commit that has one"
+total=$(printf '%s\n' "$listing" | sed -n 1p)
+ids=$(printf '%s\n' "$listing" | sed 1d)
+is_count "$total" || { echo "release-provenance: unexpected total_count '$total' for the ci runs of $commit"; exit 2; }
+if [ "$total" -gt 100 ]; then
+	echo "release-provenance: $total ci runs on $commit; this check reads one page of 100"
+	exit 2
+fi
+n=0
+for id in $ids; do
+	is_count "$id" || { echo "release-provenance: unexpected run id '$id'"; exit 2; }
+	n=$((n + 1))
+done
+if [ "$n" -ne "$total" ]; then
+	echo "release-provenance: the listing names $n runs, its total_count $total"
+	exit 2
+fi
+if [ "$total" -eq 0 ]; then
+	echo "::error::tag $tag: no run of the ci workflow on $commit; re-run ci on it, or tag a commit that has one"
 	exit 1
 fi
-echo "tag $tag: $commit has a successful ci run"
+
+# A run proves the commit when each required ci check is one of its jobs
+# (the latest attempt) with conclusion success. The runs are listed newest
+# first; the first that proves it is enough.
+for id in $ids; do
+	jobs=$(gh api "repos/$repo/actions/runs/$id/jobs?filter=latest&per_page=100" \
+		--jq '.total_count, (.jobs[] | "\(.conclusion // "none")\t\(.name)")') || {
+		echo "release-provenance: cannot list the jobs of ci run $id"
+		exit 2
+	}
+	jtotal=$(printf '%s\n' "$jobs" | sed -n 1p)
+	is_count "$jtotal" || { echo "release-provenance: unexpected total_count '$jtotal' for the jobs of ci run $id"; exit 2; }
+	if [ "$jtotal" -gt 100 ]; then
+		echo "release-provenance: ci run $id has $jtotal jobs; this check reads one page of 100"
+		exit 2
+	fi
+	missing=""
+	while IFS= read -r ctx; do
+		if ! printf '%s\n' "$jobs" | sed 1d | grep -Fxq -- "$(printf 'success\t%s' "$ctx")"; then
+			missing="$missing${missing:+, }$ctx"
+		fi
+	done <<<"$required"
+	if [ -z "$missing" ]; then
+		echo "tag $tag: $commit has ci run $id with every required ci check passed ($(printf '%s\n' "$required" | wc -l | tr -d ' ') checks)"
+		exit 0
+	fi
+	echo "ci run $id on $commit: not passed: $missing"
+done
+echo "::error::tag $tag: no ci run on $commit passed every required check of ci.yml; re-run ci on it, or tag a commit that has one"
+exit 1
