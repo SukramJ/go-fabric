@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-package quiescecheck
+package device_test
 
 import (
 	"fmt"
@@ -12,7 +12,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 )
 
 // quieterExceptions are the servers of the kit that serve a quieter ("Q")
@@ -27,15 +26,17 @@ var quieterExceptions = map[string]string{}
 // contract.AttributeReportNotifier — so the bridge reports the attribute
 // through its throttle, not at every change — and a
 // contract.ClusterQuiescer, so the throttle's deferred report ends with
-// the server.
+// the server. Each type is built with the values New requires of it
+// (device.InitialFor, decision 17); the walk moved here from
+// script/quiescecheck for them.
 func TestQuieterServersReportAndQuiesce(t *testing.T) {
 	t.Parallel()
 	seen := map[string]string{}
 	built := 0
 	for _, ty := range device.Types() {
-		dev, err := device.New(ty, device.Options{StableKey: endpoint.StringKey("q:" + ty.Name), Name: ty.Name, Logger: slog.New(slog.DiscardHandler)})
+		dev, err := device.New(ty, device.Options{StableKey: device.StringKey("q:" + ty.Name), Name: ty.Name, Logger: slog.New(slog.DiscardHandler)}, device.InitialFor(ty.Name)...)
 		if err != nil {
-			continue // a type whose defaults need the host's declarations
+			continue // a type whose defaults need a feature selection or a port
 		}
 		built++
 		for _, srv := range dev.Servers() {
