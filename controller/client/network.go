@@ -404,10 +404,12 @@ func (n *Node) announceSubscriptionStatus(active bool, owner *subscriptionOwner)
 	if active {
 		// matter.js goes live only once the priming report's updated has
 		// drained (ClientInteraction.ts:1173-1174, SustainedSubscription.ts:224,
-		// :282 at db021da0), and emits alive after that
-		// (NetworkClient.ts:224-234); here the priming report's hooks may
-		// still be queued, so the alive queues behind them. It needs no
-		// subscription id: the priming report's own alive has none yet.
+		// :282 at db021da0), and emits alive after that, unconditionally
+		// (NetworkClient.ts:226-236 at db021da0); here the priming report's
+		// hooks may still be queued, so the alive queues behind them. It
+		// needs no subscription id, and it is the only alive of a
+		// subscription going live: the priming report's was dropped when it
+		// was queued (see queueAlive).
 		n.queueAlive(owner, false)
 		if n.cfg.FlushInterval > 0 {
 			n.persist.flush()
@@ -426,20 +428,37 @@ func (n *Node) announceSubscriptionStatus(active bool, owner *subscriptionOwner)
 // Called inline, it ran before the report's EndpointInstalled and Event
 // hooks, and the camera service's sweep missed an endpoint the batch added
 // (brief FP2 §2). A keepalive's alive queues behind the reports before it.
-// The job asks what matter.js asks after the drain (NetworkClient.ts:184-187):
-// whether owner's subscription is still the node's, and, for a report's
-// alive (needID), whether it has a subscription id — so a subscription
-// ended meanwhile (Stop, a replacement) emits no alive for its successor.
+//
+// matter.js gates a report's alive on the subscription id
+// (NetworkClient.ts:179-191 at db021da0), and the id is assigned only after
+// the priming report's updated returned (ClientInteraction.ts:1083 before
+// :1086, SustainedSubscription.ts:224 before :226 at db021da0): the
+// priming report emits no alive, and a subscription going live emits
+// exactly one, the going-live one. Here the report's hooks drain later, on
+// the job queue, by when the SubscribeResponse has usually set the id, so
+// a report's alive (needID) is decided by the id when it is queued — while
+// the report's Updated runs, before the SubscribeResponse is read — not
+// when its job runs. The job still asks whether owner's subscription is
+// the node's, so a subscription ended meanwhile (Stop, a replacement)
+// emits no alive for its successor.
 func (n *Node) queueAlive(owner *subscriptionOwner, needID bool) {
 	h := n.cfg.Hooks.SubscriptionAlive
 	if h == nil {
 		return
 	}
+	if needID {
+		n.mu.RLock()
+		s := n.sub
+		n.mu.RUnlock()
+		if s == nil || s.ID() == interaction.NoSubscription {
+			return
+		}
+	}
 	n.jobs.enqueue(func() {
 		n.mu.RLock()
-		s, current := n.sub, n.subOwner == owner
+		current := n.subOwner == owner
 		n.mu.RUnlock()
-		if !current || (needID && (s == nil || s.ID() == interaction.NoSubscription)) {
+		if !current {
 			return
 		}
 		h()
