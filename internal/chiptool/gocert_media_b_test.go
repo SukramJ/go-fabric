@@ -50,6 +50,7 @@ func init() {
 		caseKEYPADINPUT31,
 		caseLOWPOWER22,
 		caseMEDIAINPUT314, caseMEDIAINPUT315, caseMEDIAINPUT316, caseMEDIAINPUT317,
+		caseMEDIAPLAYBACK65, caseMEDIAPLAYBACK67, caseMEDIAPLAYBACK610,
 	} {
 		registerGoCert(c)
 	}
@@ -340,6 +341,140 @@ func caseMEDIAINPUT317() goCertCase {
 						}
 						return fmt.Errorf("InputList lists no input %d: %s", index, describeNode(v))
 					}),
+			},
+		},
+	}
+}
+
+// mediaBPlayback is a MediaPlayback command step whose request has no
+// fields and whose PlaybackResponse carries a Status.
+func (r *mediaBRun) mediaBPlayback(cmd uint32, name string) func(th *goTH) error {
+	return r.mediaBSend(mediaplayback.ClusterID, cmd, name, emptyFields, true, nil)
+}
+
+// caseMEDIAPLAYBACK65 mirrors TC-MEDIAPLAYBACK-6.5: Play, Pause, Stop.
+func caseMEDIAPLAYBACK65() goCertCase {
+	r := &mediaBRun{}
+	return goCertCase{
+		tc: "TC-MEDIAPLAYBACK-6.5", line: 17, pics: []string{"MEDIAPLAYBACK.C"}, at: "MEDIAPLAYBACK.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 18, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{n: "1", line: 21, pics: "MEDIAPLAYBACK.C.C00.Tx", title: "DUT sends Play command to TH", run: r.mediaBPlayback(mediaplayback.CmdPlay, "Play")},
+			{n: "2", line: 25, pics: "MEDIAPLAYBACK.C.C01.Tx", title: "DUT sends Pause command to TH", run: r.mediaBPlayback(mediaplayback.CmdPause, "Pause")},
+			{n: "3", line: 29, pics: "MEDIAPLAYBACK.C.C02.Tx", title: "DUT sends Stop command to TH", run: r.mediaBPlayback(mediaplayback.CmdStop, "Stop")},
+		},
+	}
+}
+
+// caseMEDIAPLAYBACK67 mirrors TC-MEDIAPLAYBACK-6.7: Play, StartOver, Next,
+// Previous, SkipForward and SkipBackward 10 s.
+func caseMEDIAPLAYBACK67() goCertCase {
+	r := &mediaBRun{}
+	const delta = 10_000 // DELTA_POSITION_MS (:16)
+	var before uint64
+	// skip reads the position before the command (pre) and holds the one
+	// after it to want(before, duration) — the payload's delta as chip's
+	// tv-app applies it.
+	skip := func(cmd uint32, name string, fields spec.Encodable, want func(pos, duration uint64) uint64, cite string) func(th *goTH) error {
+		send := r.mediaBSend(mediaplayback.ClusterID, cmd, name, fields, true, func(th *goTH, ep uint16) error {
+			pos, duration, err := r.mediaBPosition(th, ep)
+			if err != nil {
+				return err
+			}
+			if w := want(before, duration); pos != w {
+				return fmt.Errorf("SampledPosition %d -> %d after %s, want %d (%s, Duration %d)", before, pos, name, w, cite, duration)
+			}
+			th.note("SampledPosition %d -> %d", before, pos)
+			return nil
+		})
+		return func(th *goTH) error {
+			if r.n == nil {
+				return errors.New("step 0 did not commission the daemon")
+			}
+			ep, err := mediaBPlayer(th)
+			if err != nil {
+				return err
+			}
+			if before, _, err = r.mediaBPosition(th, ep); err != nil {
+				return err
+			}
+			return send(th)
+		}
+	}
+	return goCertCase{
+		tc: "TC-MEDIAPLAYBACK-6.7", line: 20, pics: []string{"MEDIAPLAYBACK.C"}, at: "MEDIAPLAYBACK.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 21, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{n: "1", line: 24, pics: "MEDIAPLAYBACK.C.C00.Tx", title: "DUT sends Play command to TH", run: r.mediaBPlayback(mediaplayback.CmdPlay, "Play")},
+			{n: "2", line: 28, pics: "MEDIAPLAYBACK.C.C03.Tx", title: "DUT sends StartOver command to TH", run: r.mediaBPlayback(mediaplayback.CmdStartOver, "StartOver")},
+			{n: "3", line: 32, pics: "MEDIAPLAYBACK.C.C05.Tx", title: "DUT sends Next command to TH", run: r.mediaBPlayback(mediaplayback.CmdNext, "Next")},
+			{n: "4", line: 36, pics: "MEDIAPLAYBACK.C.C04.Tx", title: "DUT sends Previous command to TH", run: r.mediaBPlayback(mediaplayback.CmdPrevious, "Previous")},
+			{
+				n: "5", line: 40, pics: "MEDIAPLAYBACK.C.C08.Tx", title: "DUT sends SkipForward command to TH",
+				run: skip(mediaplayback.CmdSkipForward, "SkipForward 10000", mediaplayback.SkipForwardRequest{DeltaPositionMilliseconds: delta},
+					func(pos, duration uint64) uint64 { return min(pos+delta, duration) },
+					"HandleSkipForward, MediaPlaybackManager.cpp:245-257"),
+			},
+			{
+				n: "6", line: 46, pics: "MEDIAPLAYBACK.C.C09.Tx", title: "DUT sends SkipBackward command to TH",
+				run: skip(mediaplayback.CmdSkipBackward, "SkipBackward 10000", mediaplayback.SkipBackwardRequest{DeltaPositionMilliseconds: delta},
+					func(pos, _ uint64) uint64 {
+						if pos > delta {
+							return pos - delta
+						}
+						return 0
+					},
+					"HandleSkipBackward, MediaPlaybackManager.cpp:230-243"),
+			},
+		},
+	}
+}
+
+// caseMEDIAPLAYBACK610 mirrors TC-MEDIAPLAYBACK-6.10: ActivateAudioTrack,
+// ActivateTextTrack, DeactivateTextTrack.
+func caseMEDIAPLAYBACK610() goCertCase {
+	r := &mediaBRun{}
+	const (
+		audioTrackID     = "activeAudioTrackId_1" // AUDIO_TRACK_ID (:19)
+		audioOutputIndex = 1                      // AUDIO_OUTPUT_INDEX (:20)
+		textTrackID      = "activeTextTrackId_1"  // TEXT_TRACK_ID (:21)
+	)
+	// active holds a track attribute's Id to the one the command named:
+	// chip's HandleActivateAudioTrack / HandleActivateTextTrack make the
+	// listed track of that id active (MediaPlaybackManager.cpp:305-333).
+	active := func(attr uint32, what, want string) func(th *goTH, ep uint16) error {
+		return func(th *goTH, ep uint16) error {
+			got, err := r.mediaBTrackID(th, ep, attr)
+			if err != nil {
+				return err
+			}
+			if got != want {
+				return fmt.Errorf("%s reads track %q after activating %q", what, got, want)
+			}
+			th.note("%s %q", what, got)
+			return nil
+		}
+	}
+	return goCertCase{
+		tc: "TC-MEDIAPLAYBACK-6.10", line: 25, pics: []string{"MEDIAPLAYBACK.C"}, at: "MEDIAPLAYBACK.S", finalize: r.finalize,
+		steps: []goStep{
+			{n: "0", line: 26, title: "Test setup: commission TH to DUT.", run: r.commission},
+			{
+				n: "1", line: 29, pics: "MEDIAPLAYBACK.C.C0c.Tx", title: "DUT sends ActivateAudioTrack command to TH",
+				run: r.mediaBSend(mediaplayback.ClusterID, mediaplayback.CmdActivateAudioTrack, "ActivateAudioTrack "+audioTrackID,
+					mediaplayback.ActivateAudioTrackRequest{TrackId: audioTrackID, AudioOutputIndex: &spec.Nullable[uint8]{Value: audioOutputIndex}},
+					false, active(mediaplayback.AttrActiveAudioTrack, "ActiveAudioTrack", audioTrackID)),
+			},
+			{
+				n: "2", line: 38, pics: "MEDIAPLAYBACK.C.C0d.Tx", title: "DUT sends ActivateTextTrack command to TH",
+				run: r.mediaBSend(mediaplayback.ClusterID, mediaplayback.CmdActivateTextTrack, "ActivateTextTrack "+textTrackID,
+					mediaplayback.ActivateTextTrackRequest{TrackId: textTrackID},
+					false, active(mediaplayback.AttrActiveTextTrack, "ActiveTextTrack", textTrackID)),
+			},
+			{
+				n: "3", line: 44, pics: "MEDIAPLAYBACK.C.C0e.Tx", title: "DUT sends DeactivateTextTrack command to TH",
+				run: r.mediaBSend(mediaplayback.ClusterID, mediaplayback.CmdDeactivateTextTrack, "DeactivateTextTrack",
+					mediaplayback.DeactivateTextTrackRequest{}, false, nil),
 			},
 		},
 	}
