@@ -22,8 +22,9 @@
 #     consumer's build does, through GOPROXY;
 #   - no replace to a local path may remain;
 #   - go mod download first: a module that cannot be fetched (GOPROXY,
-#     the checksum database, the network) is the environment, exit 2, not
-#     a module out of release shape (review II, DR5a-ci-08);
+#     the checksum database, the network — or a require of a version the
+#     proxy does not serve, a go.sum hash it does not match) exits 2, red
+#     wherever the check runs (review II, DR5a-ci-08, RR5a-04);
 #   - go build ./... and go vet ./... with GOWORK=off and GOFLAGS=-mod=mod.
 #
 # With --tag <dir>/vX.Y.Z (a pushed nested tag) it checks that one module
@@ -112,7 +113,7 @@ for dir in "${modules[@]}"; do
 		fi
 	fi
 	if [ "$ok" = true ] && ! (cd "$work" && GOWORK=off GOFLAGS=-mod=mod go mod download); then
-		echo "nested-release-check: $dir: the modules it requires cannot be downloaded (above); the environment, not the release shape"
+		echo "nested-release-check: $dir: the modules it requires cannot be downloaded (above): the environment, or a require or go.sum line the proxy does not serve; either way not released"
 		exit 2
 	fi
 	if [ "$ok" = true ]; then
