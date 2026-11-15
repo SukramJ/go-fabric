@@ -355,8 +355,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/sigma",
-		min: 86,
-		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (89.1 % to 86.7 %)",
+		min: 89,
+		why: "raised to 89 in review II phase 5b (wave H round 2): the session members' strict decoding moved the package's coverage up; 86 before, set when Go 1.27.2 counted statements per cover block differently (89.1 % to 86.7 % without a code change)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/secure/sessionparams", min: 100},
