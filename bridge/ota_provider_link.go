@@ -164,7 +164,7 @@ func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	if err := ex.Send(ctx, im.InteractionModelProtocolID, im.OpcodeInvokeRequest, payload); err != nil {
 		return nil, err
 	}
-	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(s.link.sessionID))
+	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(ex.route(), s.link.sessionID))
 	defer cancel()
 	for {
 		msg, err := ex.Receive(waitCtx)

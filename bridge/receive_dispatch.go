@@ -416,7 +416,7 @@ func readWaitsForChunks(chunks []im.ReportData) bool {
 // close), and when the wait is disarmed by another hand: the close of
 // its session ([Bridge.SessionClosed]). Review II, R2-P1-req2-01.
 func (b *Bridge) awaitChunkStatusResponse(ctx context.Context, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
-	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), ctx.Done(), abort, waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
+	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(src, sessionID), ctx.Done(), abort, waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
 }
 
 // errChunkWaitAborted ends a chunk wait whose sender stopped: the

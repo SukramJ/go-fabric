@@ -52,14 +52,19 @@ var (
 // (packages/protocol/src/protocol/MRP.ts:55 DEFAULT_EXPECTED_PROCESSING_TIME,
 // :61 PEER_RESPONSE_TIME_BUFFER); the third term is the summed MRP
 // retransmission backoff, see [Bridge.chunkStatusResponseTimeout].
+// chunkStatusResponseReliable is the term that replaces the backoff over a
+// reliable connection (TCP, BLE): matter.js takes max(30 s, expected
+// processing time) there (MRP.ts:90-92, :111-113 at db021da0).
 const (
 	chunkStatusResponseExpectedProcessing = 2 * time.Second
 	chunkStatusResponseBuffer             = 5 * time.Second
+	chunkStatusResponseReliable           = 30 * time.Second
 )
 
 // chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
 // Initial and Read-response) waits for the peer's IM StatusResponse on
-// one ReportData chunk before abandoning the interaction. Mirrors matter.js
+// one ReportData chunk before abandoning the interaction — the ongoing
+// report and the read and initial-report chunks. Mirrors matter.js
 // MRP.maxPeerResponseTimeOf for a UDP/MRP session (MRP.ts:100-108 at
 // db021da0): the worst-case time until the peer received our last
 // retransmission and its answer came back — the peer's retransmission
@@ -75,11 +80,20 @@ const (
 // peer's active threshold, as matter.js's does: the session port names one
 // base interval, not the peer's three parameters.
 //
+// Over a reliable connection (TCP, BLE) no retransmission runs: the bound
+// is max(30 s, the expected processing time) plus the response buffer,
+// 35 s, as matter.js's maxPeerResponseTimeOf for such a channel (MRP.ts:90-92,
+// :111-113 at db021da0). route is where the wait's message went (nil: a
+// UDP peer).
+//
 // A test may pin the bound through chunkStatusResponseTimeoutOverride;
 // zero means derive it.
-func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
+func (b *Bridge) chunkStatusResponseTimeout(route net.Addr, sessionID uint16) time.Duration {
 	if b.chunkStatusResponseTimeoutOverride > 0 {
 		return b.chunkStatusResponseTimeoutOverride
+	}
+	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
+		return max(chunkStatusResponseReliable, chunkStatusResponseExpectedProcessing) + chunkStatusResponseBuffer
 	}
 	base := b.outboundBaseInterval(sessionID, b.clk().Now())
 	if base <= 0 {
@@ -975,9 +989,10 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 
 // sendErrorRetryLimit is how many consecutive failed updates an ongoing
 // report path tolerates before the subscription is reaped: the third
-// ends it. Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:569 at db021da0
-// (`#sendUpdateErrorCounter <= 2` requeues, the third gives up, :585-603).
+// ends it. matter.js requeues while `#sendUpdateErrorCounter <= 2`
+// (packages/node/src/node/server/ServerSubscription.ts:569 at db021da0);
+// at the third it closes for a communication failure only (:590-603) —
+// here every kind closes ([Bridge.noteSubscriptionSendError]).
 const sendErrorRetryLimit = 2
 
 // noteSubscriptionSendError records one failed ongoing report for subID
@@ -994,11 +1009,18 @@ const sendErrorRetryLimit = 2
 // StatusResponse does not come within the wait, and one whose last
 // message ran out of retransmissions ([Bridge.noteReportUndelivered]).
 // A subscription has one report in flight ([Bridge.deliverOngoingReport]),
-// so its failures arrive in order, one per update. Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:558-608 at db021da0
-// (#sendUpdateErrorCounter: the failed update owed again while the count
-// is at most 2, the third closes the subscription, "The session is left
-// alone").
+// so its failures arrive in order, one per update. matter.js counts every
+// failed update and owes its data again while the count is at most 2
+// (packages/node/src/node/server/ServerSubscription.ts:564, :569-584 at
+// db021da0); at the third it closes the subscription, leaving the session
+// alone, only when the failure is one of its four communication classes
+// (:590-603) — no answer, retransmissions run out, the session closed, a
+// network error — and otherwise keeps the subscription with the update's
+// data dropped (:605). Here the third failure closes the subscription
+// whatever its kind: the communication kinds as matter.js, the local ones
+// (an encode or chunking failure, a message above the TCP limit, a missing
+// listener, an encryption failure) by the module's own rule, so that a
+// subscriber is not left with data it will never receive.
 //
 // op names the reporter for the log line ("report" / "event_report").
 func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
@@ -1205,6 +1227,12 @@ func (b *Bridge) recordOngoingReport(sessionID uint16, counters []uint32, owed *
 	return key
 }
 
+// reportAnswerBoundForTests, when set, replaces the bound of
+// [Bridge.awaitReportAnswer] — set by this package's tests only, so the
+// many that leave a report unanswered do not wait out the production bound.
+// Zero in production.
+var reportAnswerBoundForTests time.Duration
+
 // awaitReportAnswer waits for the peer's StatusResponse to an ongoing
 // report's last message, armed by [Bridge.sendInitiatedReportArmed]:
 // answered with its status, or not — the wait ran out, or it was disarmed
@@ -1212,7 +1240,14 @@ func (b *Bridge) recordOngoingReport(sessionID uint16, counters []uint32, owed *
 // up) — or aborted by the engine's stop. An answer's standalone ack goes
 // out at once: nothing of ours follows on the exchange to piggyback it on.
 func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan im.StatusCode, op string) (status im.StatusCode, answered, aborted bool) {
-	timeout := b.chunkStatusResponseTimeout(target.sessionID)
+	// One timer from the send: an upper bound never shorter than
+	// matter.js's, whose wait starts at the report's acknowledgement
+	// (MessageExchange.ts:822-830 at db021da0) — the peer's retransmission
+	// term covers the time before it.
+	timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
+	if reportAnswerBoundForTests > 0 {
+		timeout = reportAnswerBoundForTests
+	}
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(target.sessionID, exchangeID, true)
@@ -1247,9 +1282,10 @@ func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-c
 // packages/node/src/node/server/InteractionServer.ts:96-97 at db021da0
 // ("a report we cannot push does not prove they are" gone:
 // SUBSCRIPTION_EXCHANGE_OPTIONS = { suppressPeerLoss: true }, the options
-// of every report exchange, :785-797) and ServerSubscription.ts:558-608
-// (the failed update requeued while #sendUpdateErrorCounter <= 2, the
-// subscription given up after the third, "The session is left alone").
+// of every report exchange, :785-797) and ServerSubscription.ts:569-584,
+// :590-603 (the failed update requeued while #sendUpdateErrorCounter <= 2;
+// at the third, a failure of this communication kind gives the
+// subscription up, "The session is left alone").
 func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 	raw, ok := b.reportCounterOwner.LoadAndDelete(reportCounterKey(sessionID, counter))
 	if !ok {
@@ -1515,7 +1551,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			counters = append(counters, counter)
 		}
 		if waitCh != nil {
-			timeout := b.chunkStatusResponseTimeout(target.sessionID)
+			timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
 			if target.flush {
 				timeout = flushStatusResponseTimeout
 			}

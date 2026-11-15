@@ -342,7 +342,7 @@ func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) err
 			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
 			return fmt.Errorf("%w: %w", errPeerGone, err)
 		}
-		timeout := b.chunkStatusResponseTimeout(target.sessionID)
+		timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
 		timer := b.clk().NewTimer(timeout)
 		select {
 		case status, ok := <-waitCh:
