@@ -349,6 +349,13 @@ func TestPASEDecodersSkipUnknownMembersWholeAndKeepTheLast(t *testing.T) {
 			[]wireMember{pB, cB, {tag: ctx(9), structure: true, nested: []wireMember{{tag: ctx(1), octets: b(4, 0xA5)}}}},
 			fmt.Sprintf("%d×5a %d×5b", spake2.PointSize, spake2.ConfirmTagSize),
 		},
+		// A declared member of another type is refused.
+		{"Pake2: pB an integer", pake2, []wireMember{{tag: ctx(1), u: 5}, cB}, ""},
+		{"Pake2: cB an integer", pake2, []wireMember{pB, {tag: ctx(2), u: 5}}, ""},
+		{"Pake3: cA an integer", pake3, []wireMember{{tag: ctx(1), u: 5}}, ""},
+		{"response: InitiatorRandom an integer", response, with([]wireMember{{tag: ctx(1), u: 5}}, respBase[1:]...), ""},
+		{"response: ResponderRandom an integer", response, with(respBase, wireMember{tag: ctx(2), u: 5}), ""},
+		{"response: the salt an integer", response, with(respBase, params(iterations, wireMember{tag: ctx(2), u: 5})), ""},
 		{
 			"Pake2: cB twice", pake2,
 			[]wireMember{pB, cB, {tag: ctx(2), octets: b(spake2.ConfirmTagSize, 0xA5)}},
@@ -363,6 +370,31 @@ func TestPASEDecodersSkipUnknownMembersWholeAndKeepTheLast(t *testing.T) {
 			t.Errorf("%s: refused: %v", tc.name, err)
 		case tc.want != "" && got != tc.want:
 			t.Errorf("%s: decoded %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	// An unknown structure cut before its end is a truncated message, not
+	// a member skipped short.
+	unknown := wireMember{tag: ctx(9), structure: true, nested: inner[:1]}
+	for _, tc := range []struct {
+		name    string
+		decode  func([]byte) (string, error)
+		members []wireMember
+	}{
+		{"request", request, with(wellFormed, unknown)},
+		{"response", response, with(respBase, unknown)},
+		{"PBKDFParameters", response, with(respBase, params(iterations, salt, unknown))},
+		{"Pake1", pake1, []wireMember{{tag: ctx(1), octets: b(spake2.PointSize, 0x5A)}, unknown}},
+		{"Pake2", pake2, []wireMember{pB, cB, unknown}},
+	} {
+		raw := encodeWire(t, false, tc.members...)
+		// Drop the outer end and the unknown structure's own end (and, for
+		// PBKDFParameters, the end of the structure around it).
+		cut := 2
+		if tc.name == "PBKDFParameters" {
+			cut = 3
+		}
+		if got, err := tc.decode(raw[:len(raw)-cut]); !errors.Is(err, spake2.ErrWireMalformed) {
+			t.Errorf("%s with a truncated unknown structure: decoded %q, err = %v, want ErrWireMalformed", tc.name, got, err)
 		}
 	}
 }
