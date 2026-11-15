@@ -124,7 +124,8 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   line, in CHIP's shape: `{"Name": "SimulateLongPress", ...}`,
   `SetBooleanState`, `SetOccupancy`, `OperationalStateChange`,
   `ErrorEvent`, `Docked`, `Reset`, `ChargerFound`, `Charging`, `Charged`,
-  plus this fleet's own (`SetSensorValue`,
+  `UserIntentCommissioningStart` (opens the node's own commissioning
+  window, see `--custom-flow`), plus this fleet's own (`SetSensorValue`,
   `SetLocalTemperature`, `SetLockJammed`, `PumpEvent`, …). The CHIP Python
   certification cases drive a device through exactly this pipe. The pipe
   is owner- and group-writable only (0660); a pipe already at the path is
@@ -175,6 +176,17 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   network). The committed network is kept in the database and rejoined
   when the daemon starts, as chip's Linux driver does. Without the flag
   the composition is unchanged.
+
+- `--custom-flow N` states the commissioning flow in the onboarding
+  payload (`node.Commissioning.Flow`): 0 Standard (the default), 1
+  User-Intent, 2 Custom; flows 1 and 2 print the long manual code with
+  the vendor and product id. Under 1 an uncommissioned daemon opens no
+  commissioning window by itself (`node.Commissioning.WindowOnDemand`):
+  it publishes no commissionable record and accepts no PASE until the app
+  pipe's `{"Name": "UserIntentCommissioningStart"}` opens its own window —
+  the user action the flow stands for, so the flag needs `--app-pipe` to
+  be commissionable at all. Under 2 the window opens at start as under 0.
+  Any other value stops the daemon. A commissioned daemon is unaffected.
 
 - `--tc-required` (TESTING ONLY) serves GeneralCommissioning's
   TermsAndConditions feature with version 1 and acknowledgement bit 1
