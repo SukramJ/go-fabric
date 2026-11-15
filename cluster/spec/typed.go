@@ -35,10 +35,16 @@ type (
 	AttributeSetter interface {
 		SetAttributes(values map[uint32]any) error
 	}
-	// CommandRegistrar is a server that takes command handlers: the
-	// host's handler replaces the server's own handling of the command,
-	// nil hands it back, and a command the server does not accept is
-	// refused ([ErrNotAccepted]) — [Server.Handle], [HostHandlers].
+	// CommandRegistrar is a server that takes command handlers. The
+	// host's handler is the whole command method: once registered, the
+	// server runs nothing of its own for the command — no gate, no scene
+	// invalidation, no transition — and holds only the handler's response
+	// to the definition (FAILURE on a broken one); a host that wants the
+	// server's logic with its own effect implements the server's port
+	// instead. A scene recall never reaches the handler: it goes to the
+	// server's logic. nil hands the command back, and a command the server
+	// does not accept is refused ([ErrNotAccepted]) — [Server.Handle],
+	// [HostHandlers].
 	CommandRegistrar interface {
 		Handle(cmdID uint32, fn CommandHandler) error
 	}

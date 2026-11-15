@@ -29,16 +29,15 @@ var (
 )
 
 // HostHandlers holds the command handlers a host registers over a
-// self-held server's own command logic. A registered handler replaces the
-// server's handling of its command — the request's checks included — as a
-// matter.js host overrides the behavior's command method
-// (packages/node/src/behaviors/level-control/LevelControlServer.ts:256-261
-// names the override point of its commands); nil hands the command back
-// to the server.
+// self-held server's own command logic, with the meaning
+// [CommandRegistrar] states; nil hands the command back to the server.
 type HostHandlers struct {
-	// mu guards m.
+	// mu guards m and inst.
 	mu sync.Mutex
 	m  map[uint32]CommandHandler
+	// inst is the instance the handlers were registered against, whose
+	// definition holds their responses ([HostHandlers.Invoke]).
+	inst *Instance
 }
 
 // Register sets fn as the host's handler of cmdID; nil removes it. A
@@ -49,6 +48,7 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.inst = inst
 	if fn == nil {
 		delete(h.m, cmdID)
 		return nil
@@ -61,16 +61,33 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 }
 
 // Invoke runs the host's handler of cmdID; handled is false when the host
-// registered none, and the server's own logic runs.
+// registered none, and the server's own logic runs. A response the
+// handler returns is held to the definition as [Server.MatterInvoke]
+// holds a handler's: one that breaks its fields' conformance answers
+// FAILURE. A name the response's conformance takes from the cluster's
+// attributes is not resolved here (the handlers hold no read of the
+// server's state).
 func (h *HostHandlers) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
+	return h.invoke(ctx, cmdID, fields, nil)
+}
+
+// invoke is [HostHandlers.Invoke] with the server's attributes resolving
+// the response's conformance names.
+func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any, peers Peers) (resp any, handled bool, err error) {
 	h.mu.Lock()
-	fn := h.m[cmdID]
+	fn, inst := h.m[cmdID], h.inst
 	h.mu.Unlock()
 	if fn == nil {
 		return nil, false, nil
 	}
 	resp, err = fn(ctx, fields)
-	return resp, true, err
+	if err != nil || inst == nil {
+		return resp, true, err
+	}
+	if err := inst.checkResponse(cmdID, fields, resp, peers); err != nil {
+		return nil, true, err
+	}
+	return resp, true, nil
 }
 
 // Events is a self-held server's event path: the emitter the endpoint
@@ -191,7 +208,7 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 // server's own logic — otherwise. It is a function rather than a method so
 // that embedding [SelfHeld] promotes no second invoke onto the server.
 func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
-	if resp, handled, err := h.host.Invoke(ctx, cmdID, fields); handled {
+	if resp, handled, err := h.host.invoke(ctx, cmdID, fields, h.srv.peers); handled {
 		return resp, err
 	}
 	return h.srv.MatterInvoke(ctx, cmdID, fields)

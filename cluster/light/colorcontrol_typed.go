@@ -157,12 +157,9 @@ func equalMireds(a, b *uint16) bool {
 	return *a == *b
 }
 
-// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
-// handling of cmdID — the request's checks, the ExecuteIfOff gate, the
-// colour mode switch, the transition and the writers — as a matter.js
-// host overrides the ColorControlServer command method; fn runs outside
-// the server's command queue. nil hands the command back. A command the
-// feature selection does not accept is refused with [spec.ErrNotAccepted].
+// Handle implements [spec.CommandRegistrar]; fn runs outside the server's
+// command queue. A scene recall reaches the server's own logic, never fn
+// ([ColorControlServer.MatterApplySceneValues]).
 func (s *ColorControlServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.inst, cmdID, fn)
 }

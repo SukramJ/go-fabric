@@ -362,13 +362,9 @@ func equalTemperature(a, b *int16) bool {
 	return *a == *b
 }
 
-// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
-// handling of cmdID — the request's checks, the setpoint reconcile, the
-// presets and the [Sink] — as a matter.js host overrides the
-// ThermostatServer command method; fn runs outside the server's queue.
-// nil hands the command back. A command the selection does not accept
-// (SetActivePresetRequest and AtomicRequest without PRES) is refused with
-// [spec.ErrNotAccepted].
+// Handle implements [spec.CommandRegistrar]; fn runs outside the server's
+// queue. A command the selection does not accept (SetActivePresetRequest
+// and AtomicRequest without PRES) is refused with [spec.ErrNotAccepted].
 func (s *ThermostatServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.inst, cmdID, fn)
 }

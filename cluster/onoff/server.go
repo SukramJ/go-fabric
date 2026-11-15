@@ -762,14 +762,11 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	return s.srv.MatterInvoke(ctx, cmdID, fields)
 }
 
-// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
-// handling of cmdID — the command's state change, its timers, the scene
-// invalidation and the [Sink] — as a matter.js host overrides the
-// OnOffServer command method (OnOffServer.ts:97-225 are the methods it
-// overrides); fn runs outside the server's queue. nil hands the command
-// back. A command the selection does not accept (On and Toggle with
+// Handle implements [spec.CommandRegistrar]; fn runs outside the server's
+// queue. A command the selection does not accept (On and Toggle with
 // OFFONLY, the LT commands without LT) is refused with
-// [spec.ErrNotAccepted].
+// [spec.ErrNotAccepted]. A scene recall reaches the server's own on and
+// off, never fn ([Server.MatterApplySceneValues]).
 func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.Instance, cmdID, fn)
 }

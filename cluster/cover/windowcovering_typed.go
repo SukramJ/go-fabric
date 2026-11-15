@@ -97,12 +97,8 @@ func (s *WindowCoveringServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
-// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
-// handling of cmdID — the request's checks, the MaintenanceMode refusal,
-// the [Mover] and the simulated travel — as a matter.js host overrides the
-// WindowCoveringServer command method; fn runs outside the server's
-// command queue. nil hands the command back. A command the feature
-// selection does not accept is refused with [spec.ErrNotAccepted].
+// Handle implements [spec.CommandRegistrar]; fn runs outside the server's
+// command queue.
 func (s *WindowCoveringServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.host.Register(s.inst, cmdID, fn)
 }

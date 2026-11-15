@@ -36,7 +36,8 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 	return h.handlers.Register(h.inst, cmdID, fn)
 }
 
-// Invoke runs the host's handler of cmdID; handled is false when the host
+// Invoke runs the host's handler of cmdID, its response held to the
+// definition ([HostHandlers.Invoke]); handled is false when the host
 // registered none, and the server's own logic runs.
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	return h.handlers.Invoke(ctx, cmdID, fields)
