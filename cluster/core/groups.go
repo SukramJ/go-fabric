@@ -361,7 +361,7 @@ func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) 
 		return RemoveGroupResponse{Status: im.StatusNotFound, GroupID: groupID}, nil
 	}
 	if s.scenes != nil {
-		s.scenes.RemoveScenesForGroup(fabric, groupID)
+		s.scenes.removeScenesForGroup(ctx, false, fabric, groupID)
 	}
 	return RemoveGroupResponse{Status: im.StatusSuccess, GroupID: groupID}, nil
 }
@@ -372,7 +372,7 @@ func (s *Groups) removeAllGroups(ctx context.Context, fabric uint8) (any, error)
 		return nil, fmt.Errorf("core: Groups.RemoveAllGroups: %w", err)
 	}
 	if s.scenes != nil {
-		s.scenes.RemoveScenesForFabric(fabric)
+		s.scenes.removeScenesForFabric(ctx, fabric)
 	}
 	return nil, nil
 }

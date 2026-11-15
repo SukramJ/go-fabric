@@ -44,7 +44,7 @@ import (
 // The new node starts uncommissioned, with a fresh random UniqueID pinned
 // (unless UniqueID rotation is on) and a device-type validation that
 // reports every endpoint again. A host's own
-// [Config].EndpointPersistence is the host's to erase.
+// [Config].EndpointState (or EndpointPersistence) is the host's to erase.
 //
 // A reset whose stop does not complete — its context ends while a bridge
 // Start or Stop the host runs holds the bridge's lifecycle — erases and

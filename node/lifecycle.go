@@ -51,12 +51,13 @@ func (h nodeHost) NotifyReachable(_ context.Context, key endpoint.SourceKey, rea
 // Rename implements [deviceseam.Host]: the assembled endpoint's NodeLabel,
 // or, before the node assembled it, the persisted label the assembly
 // restores (Aggregator.snapshot).
-func (h nodeHost) Rename(_ context.Context, key endpoint.SourceKey, name string) {
+func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) {
 	if ep := h.n.assembled(key); ep != nil {
-		h.n.br.NotifyEndpointNodeLabel(ep.ID, name)
+		h.n.br.NotifyEndpointNodeLabel(ep.ID, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
 		return
 	}
-	h.n.endpoints.OnNodeLabelWritten(key, name)
+	// The host's rename: a refused save is the persistence's to log.
+	_ = h.n.endpoints.SaveNodeLabel(ctx, key, name)
 }
 
 // HostName implements [deviceseam.Host]: the host's current name of the

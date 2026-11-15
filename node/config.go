@@ -145,11 +145,18 @@ type Config struct {
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
 	Snapshotter Snapshotter
-	// EndpointPersistence, when set, replaces the facade's own scene and
-	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
-	// node's store) in the facade's assembler and [Aggregator], for a host
-	// that keeps that state itself; [Node.Persistence] returns it. nil is
-	// the facade's own.
+	// EndpointState, when set, replaces the facade's own scene and
+	// bridged-NodeLabel persistence ([NewEndpointState] over the node's
+	// store) in the facade's assembler and [Aggregator], for a host that
+	// keeps that state itself. nil is the facade's own (or, while it is
+	// set, EndpointPersistence adapted).
+	EndpointState EndpointState
+	// EndpointPersistence, when set and EndpointState is not, replaces the
+	// facade's own scene and bridged-NodeLabel persistence; its hooks
+	// cannot refuse a save. [Node.Persistence] returns it.
+	//
+	// Deprecated: use EndpointState, whose saves refuse a controller's
+	// change the store refuses. Removable in the next minor release.
 	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,

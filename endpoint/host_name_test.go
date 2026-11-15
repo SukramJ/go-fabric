@@ -13,7 +13,7 @@ import (
 func TestHostName(t *testing.T) {
 	t.Parallel()
 	var written []string
-	e := &Endpoint{FriendlyName: "spec", onNodeLabelWritten: func(_ SourceKey, l string) { written = append(written, l) }}
+	e := &Endpoint{FriendlyName: "spec", persistence: hookPersistence{onLabel: func(_ SourceKey, l string) { written = append(written, l) }}}
 	if got := e.NodeLabel(); got != "spec" {
 		t.Fatalf("NodeLabel %q", got)
 	}

@@ -49,8 +49,10 @@ func hostNode(t *testing.T, db *sql.DB) (*node.Node, node.EndpointPersistence) {
 	cfg := minimalConfig(db)
 	asm, err := endpoint.New(sqlitestore.New(db), endpoint.Config{
 		VendorID: cfg.ProductDescription.VendorID, ProductID: cfg.ProductDescription.ProductID,
-		OnNodeLabelWritten: ep.OnNodeLabelWritten,
-		Scenes:             ep,
+		// The deprecated hooks keep their behaviour until removed; this
+		// test holds it.
+		OnNodeLabelWritten: ep.OnNodeLabelWritten, //nolint:staticcheck // the deprecated hook, held until removed
+		Scenes:             ep,                    //nolint:staticcheck // the deprecated store, held until removed
 	}, logger)
 	if err != nil {
 		t.Fatal(err)

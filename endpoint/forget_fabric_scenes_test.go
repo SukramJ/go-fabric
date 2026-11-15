@@ -70,7 +70,7 @@ func TestForgetFabricScenesReachesEveryTable(t *testing.T) {
 	t.Run("persisted, not loaded", func(t *testing.T) {
 		t.Parallel()
 		store, key := seeded(t)
-		e := &Endpoint{ID: 7, SourceKey: key, scenesStore: store}
+		e := &Endpoint{ID: 7, SourceKey: key, persistence: hookPersistence{scenes: store}}
 		e.ForgetFabricScenes(2)
 		if got := store.fabricsIn(t, key); !slices.Equal(got, []uint8{1}) {
 			t.Fatalf("persisted scene table holds fabrics %v after fabric 2 was forgotten, want [1]", got)
@@ -80,9 +80,9 @@ func TestForgetFabricScenesReachesEveryTable(t *testing.T) {
 	t.Run("loaded, store detached", func(t *testing.T) {
 		t.Parallel()
 		store, key := seeded(t)
-		e := &Endpoint{ID: 7, SourceKey: key, scenesStore: store}
+		e := &Endpoint{ID: 7, SourceKey: key, persistence: hookPersistence{scenes: store}}
 		e.scenesState() // a dispatch loaded the table
-		e.scenesStore = nil
+		e.persistence = nil
 		e.ForgetFabricScenes(2)
 		if got := store.fabricsIn(t, key); !slices.Equal(got, []uint8{1}) {
 			t.Fatalf("loaded scene table holds fabrics %v after fabric 2 was forgotten, want [1]", got)

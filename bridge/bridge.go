@@ -1923,7 +1923,7 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if topo := b.Topology(); topo != nil {
 		for _, ep := range topo.Endpoints {
 			if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
-				ep.ForgetFabricScenes(fabricIndex) // parts included
+				ep.ForgetFabricScenes(fabricIndex) //nolint:contextcheck // parts included; a removal's consequence, which no request bounds (store/doc.go, store errors)
 				// And the state a device's cluster server keeps for the
 				// fabric's peers: the Thermostat's atomic writes (matter.js
 				// AtomicWriteHandler observes FabricManager.events.deleting,

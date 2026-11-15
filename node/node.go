@@ -127,8 +127,9 @@ type Node struct {
 	bootReason uint8
 	persisted  persisted
 	// endpoints is the endpoint-level persistence the facade's assembler
-	// and Aggregator use: Config.EndpointPersistence, else persisted.
-	endpoints EndpointPersistence
+	// and Aggregator use: Config.EndpointState, else the deprecated
+	// Config.EndpointPersistence adapted, else persisted.
+	endpoints EndpointState
 	// groupTx is the socket group messages leave through (groupsend.go).
 	groupTx  *udp.Listener
 	client   *clientStack
@@ -287,10 +288,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	n.cfg.Store.Credentials = n.st
 	n.persisted = persisted{st: n.st, logger: n.logger}
 	n.nonVolatile = &nonVolatile{n: n}
-	n.endpoints = cfg.EndpointPersistence
-	if n.endpoints == nil {
-		n.endpoints = n.persisted
-	}
+	n.endpoints = cfg.endpointState(n.persisted)
 	// The host's group manager when it supplies one (its assembler mounts
 	// the Groups servers over it), else the facade's own.
 	n.groups = cfg.Groups
@@ -308,12 +306,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	snapshotter := cfg.Snapshotter
 	if snapshotter == nil {
 		n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
-			VendorID:           pd.VendorID,
-			ProductID:          pd.ProductID,
-			VendorName:         bi.VendorName,
-			Groups:             n.groups,
-			OnNodeLabelWritten: n.endpoints.OnNodeLabelWritten,
-			Scenes:             n.endpoints,
+			VendorID:    pd.VendorID,
+			ProductID:   pd.ProductID,
+			VendorName:  bi.VendorName,
+			Groups:      n.groups,
+			Persistence: n.endpoints,
 			// The node's own conditions on the root: WiFi with a Wi-Fi
 			// reporter (Network.WiFi).
 			RootDeviceConditions: n.cfg.rootDeviceConditions(),
@@ -940,7 +937,8 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		n.logger.Warn("fabric.owed_events.list_failed", slog.Any("err", err))
 	}
 	removed := map[uint8]bool{}
-	for _, ev := range owed {
+	for i := range owed {
+		ev := &owed[i]
 		idx := ev.Fabric.FabricIndex
 		switch ev.Kind {
 		case store.FabricPendingAdd:
@@ -1542,10 +1540,17 @@ func (n *Node) BootReason() uint8 { return n.bootReason }
 func (n *Node) Store() store.Port { return n.st }
 
 // Persistence is the endpoint-level persistence (scene tables, bridged
-// NodeLabels) the facade's assembler uses: [Config].EndpointPersistence
-// when set, else the facade's own over [Node.Store] — what a host with its
-// own assembler ([Config].Snapshotter) hands that assembler (issue #117).
-func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
+// NodeLabels) the facade's assembler uses, seen through the deprecated
+// [EndpointPersistence]: [Config].EndpointPersistence when it is the one
+// in use, else [Config].EndpointState or the facade's own over
+// [Node.Store] — what a host with its own assembler ([Config].Snapshotter)
+// hands that assembler (issue #117).
+func (n *Node) Persistence() EndpointPersistence {
+	if h, ok := n.endpoints.(hostEndpoints); ok {
+		return h.p
+	}
+	return legacyEndpoints{n.endpoints}
+}
 
 // Groups returns the group state the node runs on — [Config].Groups, or
 // the manager the facade built. A host that assembles its own topology

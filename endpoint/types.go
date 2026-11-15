@@ -4,6 +4,7 @@
 package endpoint
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -270,10 +271,9 @@ type Endpoint struct {
 	// endpoints from [Config.Groups]. Non-nil makes [ClusterServers]
 	// mount the stack's Groups server — see [Config.Groups].
 	groups *groups.Manager
-	// onNodeLabelWritten is [Config.OnNodeLabelWritten].
-	onNodeLabelWritten func(key SourceKey, label string)
-	// scenesStore is [Config.Scenes].
-	scenesStore ScenesStore
+	// persistence is [Config.Persistence] (or the deprecated hooks it
+	// adapts); nil keeps the label and the scene table in memory.
+	persistence Persistence
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -640,24 +640,40 @@ func (e *Endpoint) IncreaseConfigurationVersion() uint32 {
 	return v
 }
 
+// nodeLabelSaver returns the hook a BridgedDeviceBasicInformation server
+// calls with a controller's NodeLabel before it holds it: the label goes
+// to [Persistence.SaveNodeLabel], whose error refuses the write; nil
+// without a persistence or a stable key.
+func (e *Endpoint) nodeLabelSaver() func(context.Context, string) error {
+	if e.persistence == nil || e.SourceKey == nil {
+		return nil
+	}
+	p, key := e.persistence, e.SourceKey
+	return func(ctx context.Context, label string) error {
+		return p.SaveNodeLabel(ctx, key, label)
+	}
+}
+
 // nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server
-// calls with a written NodeLabel: it stores the label in the endpoint's
-// state and hands it to the host's OnNodeLabelWritten.
+// calls with a written NodeLabel once it is stored: the label goes to the
+// endpoint's state, which outlives the per-dispatch server.
 func (e *Endpoint) nodeLabelWriter() func(string) {
-	return e.SetNodeLabel
+	return func(label string) { e.endpointState().setLabel(label) }
 }
 
 // SetNodeLabel sets the endpoint's BridgedDeviceBasicInformation
-// NodeLabel to label (capped at the Matter maximum), as a controller's
-// write does: stored in the endpoint's state, so every later read serves
-// it, and handed to [Config.OnNodeLabelWritten] to persist. It is the
-// host's rename (device.Device.Rename through the node); the caller marks
-// the attribute changed for subscriptions (bridge.Bridge.NotifyEndpointNodeLabel).
+// NodeLabel to label (capped at the Matter maximum): stored in the
+// endpoint's state, so every later read serves it, and handed to
+// [Persistence.SaveNodeLabel]. It is the host's rename
+// (device.Device.Rename through the node), which no store refuses: the
+// label is served whatever the save answers, and the persistence reports
+// its own failure. The caller marks the attribute changed for
+// subscriptions (bridge.Bridge.NotifyEndpointNodeLabel).
 func (e *Endpoint) SetNodeLabel(label string) {
 	label = truncateLabel(label)
 	e.endpointState().setLabel(label)
-	if e.onNodeLabelWritten != nil {
-		e.onNodeLabelWritten(e.SourceKey, label)
+	if e.persistence != nil && e.SourceKey != nil {
+		_ = e.persistence.SaveNodeLabel(context.Background(), e.SourceKey, label)
 	}
 }
 
@@ -762,19 +778,16 @@ func (e *Endpoint) scenesState() *mattercore.ScenesState {
 	if st.scenes != nil {
 		return st.scenes
 	}
-	var persist func([]byte)
-	var data []byte
-	if e.scenesStore != nil && e.SourceKey != nil {
-		store, key := e.scenesStore, e.SourceKey
-		persist = func(table []byte) { store.SaveScenes(key, table) }
-		data = store.LoadScenes(key)
+	if e.persistence == nil || e.SourceKey == nil {
+		st.scenes = mattercore.NewScenesState(nil)
+		return st.scenes
 	}
-	scenes, err := mattercore.LoadScenesState(data, persist)
-	if err != nil {
-		scenes = mattercore.NewScenesState(persist)
-	}
-	st.scenes = scenes
-	return scenes
+	p, key := e.persistence, e.SourceKey
+	st.scenes = mattercore.NewPersistedScenesState(
+		func(ctx context.Context) ([]byte, error) { return p.LoadScenes(ctx, key) },
+		func(ctx context.Context, table []byte) error { return p.SaveScenes(ctx, key, table) },
+	)
+	return st.scenes
 }
 
 // ForgetFabricScenes drops a removed fabric's scenes from the endpoint's
@@ -785,7 +798,7 @@ func (e *Endpoint) ForgetFabricScenes(fabricIndex uint8) {
 	st.mu.Lock()
 	loaded := st.scenes != nil
 	st.mu.Unlock()
-	if loaded || e.scenesStore != nil {
+	if loaded || e.persistence != nil {
 		// A persisted table that no dispatch has loaded yet is loaded now,
 		// so the removed fabric's entries cannot survive in it.
 		e.scenesState().RemoveScenesForFabric(fabricIndex)

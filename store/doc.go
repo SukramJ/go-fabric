@@ -50,6 +50,24 @@
 // an open architecture question of the 2026-11 review; this list is what
 // holds today.
 //
+// # Store errors
+//
+// One rule decides what a refused store write does to state the node
+// serves. Every change a controller causes — an attribute write, a
+// command's change of a table such as a scene, a NodeLabel — is stored
+// with the change: the store write comes first, and a refused store
+// answers FAILURE and applies nothing, so nothing a controller was told
+// failed is served or comes back after a restart. matter.js hands a change
+// to its store in the commit's first phase (Datasource.ts:1224-1262 at
+// db021da0); the rollback on a refused store is the entry
+// BD-Matter-NonVolatileWrite-StoredBeforeApplied of
+// notes/parity/by_design.md. The internal consequences of a change — the
+// OTA requestor's progress, what a removal takes along (a removed group's
+// or fabric's scenes), the controller role's node cache — are applied
+// whatever the store answers, logged when it refuses, and stored again
+// with the next change. endpoint.Persistence states the rule for a bridged
+// endpoint's NodeLabel and scene table.
+//
 // The factory reset ([Store.Erase]) deletes every matter_* row and then
 // rewrites the file (VACUUM) and empties the write-ahead log
 // (wal_checkpoint(TRUNCATE)), so the erased bytes, and those of rows
