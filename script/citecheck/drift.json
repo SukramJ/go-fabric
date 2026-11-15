@@ -1350,7 +1350,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 216,
+    "line": 225,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -1404,7 +1404,7 @@
   },
   {
     "file": "cluster/core/fabric_sensitive_parity_matterjs_test.go",
-    "line": 136,
+    "line": 126,
     "citation": "IcdManagementServer.ts:572-577",
     "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
     "identifier": "FabricIndex",
@@ -1452,7 +1452,7 @@
   },
   {
     "file": "cluster/core/groupcast.go",
-    "line": 194,
+    "line": 195,
     "citation": "GroupcastServer.ts:933",
     "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
     "identifier": "maxMcastAddrCount",
@@ -1461,7 +1461,7 @@
   },
   {
     "file": "cluster/core/groupcast.go",
-    "line": 586,
+    "line": 585,
     "citation": "GroupcastServer.ts:268-277",
     "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
     "identifier": "GroupKeyMap",
@@ -1470,7 +1470,7 @@
   },
   {
     "file": "cluster/core/groupcast.go",
-    "line": 709,
+    "line": 708,
     "citation": "GroupcastServer.ts:269",
     "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
     "identifier": "retainedSenderOnly",
@@ -1488,16 +1488,7 @@
   },
   {
     "file": "cluster/core/icd_management.go",
-    "line": 922,
-    "citation": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts:572-577",
-    "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
-    "identifier": "registerClient",
-    "nearest": 551,
-    "occurrences": 1
-  },
-  {
-    "file": "cluster/core/icd_management.go",
-    "line": 1100,
+    "line": 1080,
     "citation": "IcdManagementServer.ts:572-583",
     "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
     "at": "db021da0",
@@ -1507,7 +1498,7 @@
   },
   {
     "file": "cluster/core/icd_management_test.go",
-    "line": 499,
+    "line": 500,
     "citation": "IcdManagementServer.ts:572-583",
     "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
     "at": "db021da0",
@@ -1590,7 +1581,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 536,
+    "line": 539,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1599,7 +1590,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 547,
+    "line": 550,
     "citation": "OnOffServer.ts:114-117",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1993,7 +1984,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 882,
+    "line": 886,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -2491,7 +2482,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 947,
+    "line": 991,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2746,7 +2737,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 501,
+    "line": 520,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",
@@ -3014,7 +3005,7 @@
   },
   {
     "file": "schema/fabric_scoped.go",
-    "line": 21,
+    "line": 23,
     "citation": "operational-credentials.element.ts:104",
     "resolved": "packages/model/src/standard/elements/operational-credentials.element.ts",
     "identifier": "SetVidVerificationStatement",
@@ -3023,7 +3014,7 @@
   },
   {
     "file": "schema/fabric_scoped.go",
-    "line": 31,
+    "line": 33,
     "citation": "scenes-management.element.ts:37-156",
     "resolved": "packages/model/src/standard/elements/scenes-management.element.ts",
     "identifier": "ScenesManagement",
