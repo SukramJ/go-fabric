@@ -85,7 +85,9 @@ import (
 // is read at that commit instead.
 const goCertReadAt = "db021da0"
 
-// goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
+// goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2"), or
+// leaves some out ("-CADMIN,-DD"); selectGoCert reads it, and an entry
+// that names no registered case fails the test.
 const goCertEnv = "GOFABRIC_GOCERT"
 
 // goCertLongEnv runs the steps matter.js marks longRunning, which cost
@@ -298,6 +300,24 @@ func (c goCertCase) source() string {
 // TestGoCertificationCases runs the Go-TH leg: every registered case,
 // against a fresh reference daemon each, with a fresh Go controller as TH.
 func TestGoCertificationCases(t *testing.T) {
+	ids := make([]string, 0, len(goCertCases))
+	for id := range goCertCases {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	// The selection is judged before anything starts: an entry that names
+	// nothing would otherwise run zero cases and pass (R2-P5-sup-10), and
+	// CI splits the leg by this variable.
+	if v := os.Getenv(goCertEnv); v != "" {
+		selected, unmatched := selectGoCert(ids, v)
+		if len(unmatched) > 0 {
+			t.Fatalf("%s=%q: %s names no registered Go-TH case or family", goCertEnv, v, strings.Join(unmatched, ", "))
+		}
+		if len(selected) == 0 {
+			t.Fatalf("%s=%q selects no case", goCertEnv, v)
+		}
+		ids = selected
+	}
 	bin := requireBridgeBinary(t)
 	flags := requireBridgeFlags(t, bin, "db", "listen", "wifi", "media", "app-pipe")
 	if os.Getenv(goCertEnv) != "" && *updateChipCases {
@@ -309,24 +329,11 @@ func TestGoCertificationCases(t *testing.T) {
 	}
 	_ = names.Close()
 	pics := loadCommittedPICS(t)
-	var only []string
-	if v := os.Getenv(goCertEnv); v != "" {
-		only = strings.Split(v, ",")
-	}
 	if goCertLong() {
 		t.Logf("%s is set: the long-running steps run, and the golden counts are neither checked nor written", goCertLongEnv)
 	}
-	ids := make([]string, 0, len(goCertCases))
-	for id := range goCertCases {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	ran := map[string]goCertCounts{}
 	for _, id := range ids {
-		fam, _, _ := strings.Cut(id, "/")
-		if only != nil && !slices.Contains(only, fam) && !slices.Contains(only, id) {
-			continue
-		}
 		t.Run(id, func(t *testing.T) {
 			c := goCertCases[id]()
 			counts, ok := runGoCertCase(t, bin, flags, pics, c)

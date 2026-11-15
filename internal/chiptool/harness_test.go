@@ -8,12 +8,10 @@ package chiptool
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -81,12 +79,10 @@ var (
 	harnessErr  error
 )
 
-// reMakefileChipImage reads the pinned harness image out of the Makefile,
-// the single source the CI workflow reads too.
-var reMakefileChipImage = regexp.MustCompile(`(?m)^CHIP_TEST_IMAGE\s*\?=\s*(\S+)`)
-
-// pinnedChipImage returns the harness image: $GOFABRIC_CHIP_IMAGE or the
-// Makefile's CHIP_TEST_IMAGE.
+// pinnedChipImage returns the harness image: $GOFABRIC_CHIP_IMAGE, which
+// is the caller's own and taken as given, or the Makefile's
+// CHIP_TEST_IMAGE, the single source the CI workflow reads too, which
+// must be pinned by digest (makefileImagePin).
 func pinnedChipImage() (string, error) {
 	if img := os.Getenv(chipImageEnv); img != "" {
 		return img, nil
@@ -95,11 +91,7 @@ func pinnedChipImage() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	m := reMakefileChipImage.FindSubmatch(data)
-	if m == nil {
-		return "", errors.New("no CHIP_TEST_IMAGE pin in the Makefile")
-	}
-	return string(m[1]), nil
+	return makefileImagePin(data, "CHIP_TEST_IMAGE")
 }
 
 // imageHarnessWanted reports whether the suite should use the container.

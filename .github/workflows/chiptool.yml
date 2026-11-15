@@ -10,10 +10,18 @@
 # commit. The image is amd64, as the runners are. The
 # container shares the host network and the runner's avahi over /run/dbus.
 #
-# Four jobs, and the second is the point:
+# Seven jobs besides `code touched` and the gate, and the second is the
+# point:
 #
 #   - chiptool: `make chiptool-test` — commission the daemon for real, then
-#     the chip-tool suite over one interactive session.
+#     the chip-tool suite over one interactive session. The Go-TH leg
+#     (TestGoCertificationCases) is left to the gocert job.
+#   - gocert: the Go-TH leg (`make chiptool-gocert`), matter.js's cert cases
+#     with the Go controller as TH and as DUT, in three groups by family
+#     (GOFABRIC_GOCERT): gocert-cadmin, gocert-dd and gocert-rest, one
+#     runner each — the cases share the daemon's fixed port, so they run
+#     in parallel only across runners. TestWorkflowGoCertGroups holds the
+#     groups to a partition of the golden file's families.
 #   - chiptool-control: the CONTROL LEG. The same image, the same runner
 #     setup, chip-tool pairing CHIP's own all-clusters app instead of the
 #     reference daemon — no go-fabric code in the path at all. Green control
@@ -47,10 +55,13 @@
 #     (TC-DGGEN-2.1 sits through 3 h 10 min of literal waits for
 #     TotalOperationalHours). The split keeps every job under the runner
 #     limit. A group an event does not run gets no job.
+#   - nested-release: a release pull request only — `make
+#     nested-release-check`, each nested module built against the go-fabric
+#     version its go.mod requires, its replace dropped (R2-P5-sup-01).
 #
 # Not a blanket per-PR gate — the runs are slow and the image is large. It
 # runs nightly, on manual dispatch, on the `needs-chiptool` label, and
-# automatically whenever a pull request touches Go code.
+# automatically whenever a pull request changes anything but documentation.
 #
 # A RELEASE PULL REQUEST (head branch `release/*`, issue 495) runs the full
 # set: every job above, and every family group the nightly run covers,
@@ -61,17 +72,23 @@
 # every condition, `release` widens the family selection to `long`. The
 # required check `chip certification cases against the reference daemon`
 # (chip-families-gate) is the gate: on a release pull request it is red
-# unless the suite, the control leg, the BLE-Wi-Fi leg and every family
-# group ran and passed; on any other event it judges the families alone,
-# as before. No new check name. ble-virtual.yml and otbr-virtual.yml stay
-# outside the gate: they need kernel modules a hosted runner may lack and
-# run weekly.
+# unless the suite, the control leg, the BLE-Wi-Fi leg, the BLE cases leg,
+# the Go-TH groups, the nested modules' release shape and every family
+# group ran and passed; on any other event it judges the families and the
+# Go-TH groups. No new check name. ble-virtual.yml and otbr-virtual.yml
+# stay outside the gate: they need kernel modules a hosted runner may lack
+# and run weekly.
 #
 # That last trigger is wider here than in a consuming daemon, and deliberately
 # so: this module IS the Matter stack, so almost any change to it can move
-# commissioning. A path list would be a list of nearly every directory, which
-# is a filter that reads as one and is not. Documentation, the changelog and
-# the notes tree do not start it; anything the binary is built from does.
+# commissioning. The rule is inverted for that reason: the run is skipped
+# when every changed path is documentation (docs/, notes/, a Markdown file,
+# mkdocs.yml, the .github files that are not workflows), and starts for
+# everything else — Go code, the Makefile (the harness image's digest, the
+# timeouts, the skip lists), and every file the daemon embeds (the SQL
+# migrations, parity/schema.json, the DCL trust roots). A list of what
+# starts it missed exactly those (R2-P5-sup-03); TestWorkflowCodeFilter
+# holds the rule.
 
 on:
   schedule:
@@ -105,7 +122,6 @@ concurrency:
 
 env:
   CGO_ENABLED: "0"
-  GO_VERSION: "1.27.4"
 
 jobs:
   # Decides whether this pull request touches anything that can move
@@ -128,6 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       # Whether this pull request runs the full set (issue 495). `release`: a
       # release pull request, head branch `release/*`. `full`: labelled
@@ -164,19 +181,18 @@ jobs:
           fi
           changed=$(git diff --name-only "$BASE" "$HEAD")
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          # Anything the binary is built from, plus this workflow so a change
-          # to it is tested by it. Everything else -- markdown, the notes
-          # tree, the changelog -- leaves the suite to the label.
-          if echo "$changed" | grep -Eq \
-            -e '\.go$' \
-            -e '^go\.(mod|sum)$' \
-            -e '^\.github/workflows/chiptool\.yml$' \
-            -e '^internal/chiptool/'; then
+          # Documentation only: the documentation trees, Markdown anywhere,
+          # the site's configuration, the .github files that are not
+          # workflows. Any other changed path starts the suite -- the Go
+          # code, the Makefile, every embedded file, every workflow
+          # (TestWorkflowCodeFilter holds this pattern).
+          docs_only='^(docs/|notes/|mkdocs\.yml$|\.github/(dependabot\.yml|FUNDING\.yml|PULL_REQUEST_TEMPLATE\.md|SPONSORING\.md)$)|\.md$'
+          if [ -n "$changed" ] && echo "$changed" | grep -Evq "$docs_only"; then
             echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "-> commissioner suite runs without a label"
+            echo "-> a path that is not documentation changed; the suite runs without a label"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "-> no Go code touched; suite runs only if labelled"
+            echo "-> documentation only; the suite runs only if labelled"
           fi
       # The certification-family groups, and which of them this event runs.
       # One place for the split (TestWorkflowRunsEveryFamily holds it to the
@@ -258,14 +274,17 @@ jobs:
       needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
-    # Above CHIPTOOL_TIMEOUT (Makefile, 90 minutes), which bounds the test
-    # binary: the Go-TH leg holds 104 cases since 2026-11-15.
-    timeout-minutes: 110
+    # Without the Go-TH leg (the gocert job's), the suite step ran about
+    # two minutes on 2026-11-15 (run 43707934752: 42 minutes for the step,
+    # 2453 s of it TestGoCertificationCases).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
 
       # chip-tool resolves the daemon's operational record after AddNOC
@@ -307,10 +326,16 @@ jobs:
           key: matterjs-${{ steps.matterjs.outputs.sha }}-node22
       - name: build matter.js at the pin
         if: steps.matterjs-cache.outputs.cache-hit != 'true'
+        # The pin is read from the pull request's own tree: it reaches the
+        # script through the environment, never as an expression inside it
+        # (R2-P5-sup-15).
+        env:
+          MATTERJS_SHA: ${{ steps.matterjs.outputs.sha }}
         run: |
+          set -euo pipefail
           git clone --filter=blob:none https://github.com/matter-js/matter.js "$GITHUB_WORKSPACE/../matter.js"
           cd "$GITHUB_WORKSPACE/../matter.js"
-          git checkout --detach "${{ steps.matterjs.outputs.sha }}"
+          git checkout --detach "$MATTERJS_SHA"
           npm ci --no-audit --no-fund
           npm run build
 
@@ -320,21 +345,14 @@ jobs:
       - name: chip-tool suite
         run: |
           set -o pipefail
-          GOFABRIC_CHIP_HARNESS=image make chiptool-test 2>&1 | tee /tmp/chiptool.log
+          # The Go-TH leg runs in the gocert job, in groups.
+          GOFABRIC_CHIP_HARNESS=image make chiptool-test CHIPTOOL_TEST_SKIP_GOCERT=1 2>&1 | tee /tmp/chiptool.log
           if grep -q -- "--- SKIP: TestChipTool" /tmp/chiptool.log; then
             echo "::error::the chip-tool suite skipped itself; the harness was not usable"
             exit 1
           fi
           if grep -q -- "--- SKIP: TestMatterJSController" /tmp/chiptool.log; then
             echo "::error::the matter.js controller leg skipped itself; matter.js was not built"
-            exit 1
-          fi
-          # The Go-TH leg (TestGoCertificationCases, `make chiptool-gocert`)
-          # runs inside chiptool-test: matter.js's controller-side cert
-          # cases, read mirrored, against the reference daemon. A skip of
-          # the whole leg means the runner had no multicast.
-          if grep -q -- "--- SKIP: TestGoCertificationCases " /tmp/chiptool.log; then
-            echo "::error::the Go-TH certification leg skipped itself; the runner has no multicast"
             exit 1
           fi
           # The chip-tool group leg (TestChipToolSuite/groups) sends a
@@ -353,6 +371,86 @@ jobs:
           path: /tmp/chiptool.log
           if-no-files-found: ignore
 
+  # The Go-TH leg (TestGoCertificationCases): matter.js's cert cases with
+  # the Go controller as TH, read mirrored, and as DUT. Each case starts a
+  # fresh reference daemon on the fixed port 5540, so the cases of one
+  # runner run one after the other, and the leg is split across runners by
+  # family (GOFABRIC_GOCERT, gocert_test.go). The three groups, measured
+  # on a runner (run 43707934752, 2026-11-15): CADMIN 1134 s, whose cases
+  # wait out commissioning windows; DD, SC, BDX and BIND 586 s; the rest
+  # 733 s. The rest group is an exclusion, so a new family joins it without
+  # an edit here; TestWorkflowGoCertGroups holds the three to a partition
+  # of the golden file's families. A matrix job cannot be a required check
+  # (its check names are the expanded ones); the gate below holds it.
+  gocert:
+    name: Go-TH certification cases (${{ matrix.group }})
+    needs: changes
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.full == 'true' ||
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: gocert-cadmin
+            families: "CADMIN"
+          - group: gocert-dd
+            families: "DD,SC,BDX,BIND"
+          - group: gocert-rest
+            families: "-CADMIN,-DD,-SC,-BDX,-BIND"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      # The same runner setup as the suite's: the leg ran inside it until
+      # the split, avahi included.
+      - name: start avahi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
+          systemctl is-active dbus avahi-daemon
+      # CAMERA-GO starts CHIP's camera app from the harness image
+      # (gocert_camera_test.go); its family is in the rest group.
+      - name: pull the pinned CHIP image
+        if: matrix.group == 'gocert-rest'
+        run: make chiptool-image
+      # The leg skips itself without multicast; in CI that would be a
+      # silent green, so the run is checked for it. An entry of
+      # GOFABRIC_GOCERT that names no registered case fails the test.
+      - name: Go-TH cases
+        env:
+          GOFABRIC_GOCERT: ${{ matrix.families }}
+        run: |
+          set -o pipefail
+          make chiptool-gocert CHIPTOOL_TIMEOUT=40m 2>&1 | tee /tmp/gocert.log
+          if grep -q -- "--- SKIP: TestGoCertificationCases " /tmp/gocert.log; then
+            echo "::error::the Go-TH certification leg skipped itself; the runner has no multicast"
+            exit 1
+          fi
+      - name: upload logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gocert-logs-${{ matrix.group }}
+          path: /tmp/gocert.log
+          if-no-files-found: ignore
+
   chiptool-control:
     # The name is a required status check on main (branch protection); keep
     # it byte-for-byte, or every pull request waits on a check nobody reports.
@@ -367,6 +465,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: start avahi
         run: |
           sudo apt-get update
@@ -435,9 +535,11 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       - name: pull the pinned CHIP image
         run: make chiptool-image
@@ -459,9 +561,11 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       - name: pull the pinned CHIP image
         run: make chiptool-image
@@ -487,9 +591,11 @@ jobs:
       matrix: ${{ fromJSON(needs.changes.outputs.families) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       - name: start avahi
         run: |
@@ -544,40 +650,88 @@ jobs:
             bin/chip-harness/logs
           if-no-files-found: ignore
 
+  # A release pull request only (R2-P5-sup-01): each nested module built
+  # with its replace of go-fabric dropped, against the versions its go.mod
+  # requires — the build a consumer gets once the module is tagged. A
+  # nested release pull request (head branch release/nested-*, the shape
+  # of release/nested-v0.22.0 and release/nested-v0.22.1) bumps those
+  # requires to published tags, and a module that does not compile against
+  # them fails here. A root release pull request tags no nested module as
+  # a rule, so a module out of release shape is a warning there: the next
+  # nested release must bump its require.
+  nested-release:
+    name: nested modules against the versions they require
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The requires are checked against this repository's tags.
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: release shape of the nested modules
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -uo pipefail
+          rc=0
+          script/nested-release-check.sh || rc=$?
+          if [ "$rc" -eq 0 ]; then exit 0; fi
+          if [ "$rc" -eq 1 ] && [[ "$HEAD_REF" != release/nested-* ]]; then
+            echo "::warning::a nested module is not in release shape (above); this root release does not tag it, but the next nested release must bump its require"
+            exit 0
+          fi
+          echo "::error::the nested modules are not in release shape (exit $rc, above)"
+          exit 1
+
   # The required status check for the certification families. Branch
   # protection on main names it, and a matrix job cannot serve: its check
   # names depend on the groups an event runs, and a skipped matrix job
   # reports under its unexpanded name. This job always reports, under one
-  # fixed name: green when every family group that ran passed (or the suite
-  # was not due at all), red when one failed or was cancelled.
+  # fixed name: green when every family group and every Go-TH group that
+  # ran passed (or the suite was not due at all), red when one failed or
+  # was cancelled. The Go-TH groups (job gocert) are held here since they
+  # left the suite's job (review II, phase 5a): they run exactly when the
+  # family groups do, so skipped is accepted only with the families
+  # skipped too.
   #
   # On a release pull request (issue 495) it is the release gate and fails
   # closed: every job of the full run — the suite, the control leg, the
-  # BLE-Wi-Fi leg, the BLE cases leg and the family groups — must have run
-  # and passed; a skipped, failed or cancelled one is red. That is why it
-  # needs the four legs too; on every other event their results are not
-  # read, and the verdict is the families' alone, as before.
+  # BLE-Wi-Fi leg, the BLE cases leg, the Go-TH groups, the nested modules'
+  # release shape and the family groups — must have run and passed; a
+  # skipped, failed or cancelled one is red. That is why it needs every
+  # leg; on every other event only the families and the Go-TH groups are
+  # read.
   chip-families-gate:
     name: chip certification cases against the reference daemon
-    needs: [changes, chiptool, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families]
+    needs: [changes, chiptool, gocert, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families, nested-release]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - env:
           FAMILIES: ${{ needs.chip-families.result }}
+          GOCERT: ${{ needs.gocert.result }}
           CHANGES: ${{ needs.changes.result }}
           RELEASE: ${{ needs.changes.outputs.release }}
           SUITE: ${{ needs.chiptool.result }}
           CONTROL: ${{ needs.chiptool-control.result }}
           BLE_WIFI: ${{ needs.chiptool-ble-wifi.result }}
           BLE_CASES: ${{ needs.chiptool-ble-cases.result }}
+          NESTED: ${{ needs.nested-release.result }}
         run: |
-          echo "code touched: $CHANGES; certification families: $FAMILIES"
+          echo "code touched: $CHANGES; certification families: $FAMILIES; Go-TH groups: $GOCERT"
           if [ "$RELEASE" = "true" ]; then
-            echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI, BLE cases leg $BLE_CASES"
+            echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI, BLE cases leg $BLE_CASES, nested modules $NESTED"
             failed=0
-            for leg in "chip-tool suite=$SUITE" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "certification families=$FAMILIES"; do
+            for leg in "chip-tool suite=$SUITE" "Go-TH groups=$GOCERT" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "nested modules' release shape=$NESTED" "certification families=$FAMILIES"; do
               if [ "${leg#*=}" != "success" ]; then
                 echo "::error::release gate: the ${leg%%=*} did not pass (${leg#*=})"
                 failed=1
@@ -585,7 +739,7 @@ jobs:
             done
             if [ "$failed" -ne 0 ]; then exit 1; fi
           fi
-          case "$CHANGES/$FAMILIES" in
-            success/success|success/skipped) exit 0 ;;
-            *) echo "::error::a certification family group did not pass ($FAMILIES)"; exit 1 ;;
+          case "$CHANGES/$FAMILIES/$GOCERT" in
+            success/success/success|success/skipped/skipped) exit 0 ;;
+            *) echo "::error::the certification families ($FAMILIES) and the Go-TH groups ($GOCERT) did not both pass or both stay undue (code touched: $CHANGES)"; exit 1 ;;
           esac

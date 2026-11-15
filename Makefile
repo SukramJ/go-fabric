@@ -18,6 +18,13 @@ MATTERJS_SERVER_DIR ?= ../matterjs-server
 # both, run the linter locally, fix what it finds, in one commit.
 GOFUMPT_VERSION       ?= v0.12.0
 GOLANGCI_LINT_VERSION ?= v2.14.0
+# The workflow linters (`make workflow-lint`): actionlint is a Go tool
+# `make setup` installs; zizmor is a Python package (pip install
+# zizmor==$(ZIZMOR_VERSION)), which ci.yml installs into a venv.
+ACTIONLINT_VERSION    ?= v1.7.12
+ZIZMOR_VERSION        ?= 1.32.0
+ACTIONLINT            ?= actionlint
+ZIZMOR                ?= zizmor
 
 # govulncheck is deliberately NOT pinned (setup installs @latest, and so does
 # the nightly workflow). The inverse of the lint argument: a newly published
@@ -81,6 +88,7 @@ help: ## show this help
 setup: ## install the developer tooling (lint pinned, govulncheck floating)
 	$(GO) install mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
 	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	$(GO) install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 	$(GO) install golang.org/x/vuln/cmd/govulncheck@latest
 
 .PHONY: build
@@ -97,6 +105,21 @@ build-32bit: ## compile for linux/armv7 and vet for linux/386 — an int is 32 b
 	@# type-checks the test files as well.
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GO) build -gcflags=-e ./...
 	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GO) vet ./...
+
+# The packages that parse wire input with hand-argued length and integer
+# arithmetic (tlv/ and secure/ hold most of the G115 suppressions outside
+# controller/), and transport/, where an int(uint32) of a frame length was
+# a pre-authentication crash on a 32-bit int (R2-P1-req-02,
+# transport/tcp/frame.go). Their tests run on linux/386, where an int is
+# 32 bits. The test binaries are static (CGO_ENABLED=0) and run directly
+# on a linux/amd64 host; darwin has no 386 port, so the target refuses a
+# host that is not Linux rather than failing on the first exec.
+TEST_32BIT_PKGS ?= ./tlv/... ./transport/... ./im/... ./secure/... ./bdx/...
+
+.PHONY: test-32bit
+test-32bit: ## run the wire-parsing packages' tests on linux/386, where an int is 32 bits (a linux/amd64 host)
+	@test "$$($(GO) env GOHOSTOS)" = linux || { echo "test-32bit: linux/386 test binaries need a Linux host; this one is $$($(GO) env GOHOSTOS)"; exit 1; }
+	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GO) test -count=1 $(TEST_32BIT_PKGS)
 
 .PHONY: archcheck
 archcheck: ## layers and dependency direction (ADR 0026)
@@ -178,9 +201,21 @@ fuzz: ## run every fuzz target for $(FUZZTIME) executions as a smoke test
 	if [ "$$ran" -eq 0 ]; then echo "fuzz: fuzz files found but no target ran — check build tags"; exit 1; fi; \
 	echo "fuzz: $$ran target(s) completed at $(FUZZTIME)"
 
+# Every Go module of the tree: the root and the nested modules the root's
+# ./... does not reach. script/requiredchecks holds the list to the go.mod
+# files of the tree (TestEveryModuleIsScanned).
+GO_MODULES ?= . ble/bluez ble/esphome wifi/wpasupplicant examples/ble-wifi-light
+
 .PHONY: vuln
-vuln: ## report known vulnerabilities on code paths this module actually calls
-	$(GOVULNCHECK) ./...
+vuln: ## report known vulnerabilities on code paths this module and its nested modules actually call
+	@# Each nested module in its own build list: its third-party requires
+	@# (flynn/noise and golang.org/x/crypto in ble/esphome, godbus in
+	@# ble/bluez and wifi/wpasupplicant) are in no other. Every module is
+	@# scanned; the target fails when one of them reports.
+	@rc=0; for m in $(GO_MODULES); do \
+		echo "-> govulncheck $$m"; \
+		(cd $$m && $(GOVULNCHECK) ./...) || rc=1; \
+	done; exit $$rc
 
 .PHONY: reachability
 reachability: ## regenerate script/reachability/inventory.json — which exported API no test reaches
@@ -364,6 +399,11 @@ chipdm-report: ## rewrite the generated block of docs/chip-datamodel-crosscheck.
 
 .PHONY: chiptool-image
 chiptool-image: ## pull the pinned CHIP test harness image (the suite also pulls it on first use)
+	@# The pin in this file is a digest, never a tag (the comment over
+	@# CHIP_BASE_IMAGE); a value set on the command line or in the
+	@# environment is the caller's own and is not checked.
+	@case "$(origin CHIP_TEST_IMAGE)/$(CHIP_TEST_IMAGE)" in file/*@sha256:*|command\ line/*|environment*) ;; *) \
+		echo "chiptool-image: CHIP_TEST_IMAGE in the Makefile ($(CHIP_TEST_IMAGE)) is not pinned by digest (@sha256:…)"; exit 1;; esac
 	docker pull $(CHIP_TEST_IMAGE)
 
 .PHONY: chiptool-build
@@ -374,10 +414,19 @@ chiptool-build: ## build the reference daemon the chip-tool guard commissions
 # CHIP_FAMILIES_TIMEOUT the certification families, which run for hours in
 # full. Raise them rather than trimming tests. The Go-TH leg alone ran
 # 36 minutes on a developer machine once it held 104 cases (2026-11-15),
-# several of which wait out a three-minute commissioning window, and did
-# not finish in 40 on a runner.
+# several of which wait out a three-minute commissioning window, and
+# 2453 s on a runner (chiptool.yml run 43707934752); CI runs it in three
+# groups of its own (chiptool.yml, job gocert).
 CHIPTOOL_TIMEOUT      ?= 5400s
 CHIP_FAMILIES_TIMEOUT ?= 10h
+
+# The top-level tests `make chiptool-test` leaves to their own targets.
+# CI's chip-tool job adds TestGoCertificationCases, which its gocert job
+# runs in groups (`make chiptool-test CHIPTOOL_TEST_SKIP_GOCERT=1`).
+CHIPTOOL_TEST_SKIP := TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases
+ifeq ($(CHIPTOOL_TEST_SKIP_GOCERT),1)
+CHIPTOOL_TEST_SKIP := $(CHIPTOOL_TEST_SKIP)|TestGoCertificationCases
+endif
 
 .PHONY: chiptool-test
 chiptool-test: chiptool-build ## commission the reference daemon and run the chip-tool suite (Linux + Docker, or a host chip-tool)
@@ -385,7 +434,7 @@ chiptool-test: chiptool-build ## commission the reference daemon and run the chi
 	@# chip-tool; fails loudly on a missing daemon binary, which
 	@# chiptool-build has just produced.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
-		-skip '^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$' ./internal/chiptool/...
+		-skip '^($(CHIPTOOL_TEST_SKIP))$$' ./internal/chiptool/...
 
 # `make chiptool-container`: the chip-tool suite's host fallback inside one
 # linux/arm64 container on a user-defined IPv6 bridge network, never the
@@ -451,9 +500,13 @@ chiptool-ble-cases: ## chip's Python certification cases that commission over BL
 		-run '^TestChipToolBLECases$$' ./internal/chiptool/...
 
 .PHONY: chiptool-gocert
-chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's cert cases with the Go controller as TH (read mirrored) and as DUT (GOFABRIC_GOCERT=DD,ICDM narrows)
+chiptool-gocert: chiptool-build ## run the Go-TH leg alone: matter.js's cert cases with the Go controller as TH (read mirrored) and as DUT (GOFABRIC_GOCERT=DD,ICDM narrows, -CADMIN leaves a family out)
 	@# Part of chiptool-test's scope as well; needs the daemon binary and
-	@# the host's multicast, not the CHIP harness image.
+	@# the host's multicast, and Docker with the CHIP harness image for
+	@# CAMERA-GO alone (gocert_camera_test.go pulls CHIP_TEST_IMAGE).
+	@# GOFABRIC_GOCERT takes families and case ids, comma-separated; an
+	@# entry with a leading - excludes, and an entry that names no
+	@# registered case fails the test.
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
 		-run '^TestGoCertificationCases$$' ./internal/chiptool/...
 
@@ -472,11 +525,18 @@ chiptool-families-update: chiptool-build ## the families run that rewrites its f
 fmt: ## format with gofumpt
 	$(GOFUMPT) -w .
 
-.PHONY: lint
-lint: ## gofumpt check + golangci-lint + module hygiene
+.PHONY: fmt-check
+fmt-check: ## fail when gofumpt would reformat a file, or when gofumpt itself fails
 	@# .claude/worktrees holds agent worktrees: other branches' files, not this tree's.
-	@$(GOFUMPT) -l . | grep -v '^\.claude/' | tee /tmp/gofabric-gofumpt.out
-	@test ! -s /tmp/gofabric-gofumpt.out || { echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
+	@# gofumpt's own status is read before its list is filtered, so a
+	@# missing or failing formatter is a failure, not an empty list; no
+	@# temporary file, so concurrent runs do not share one.
+	@out=$$($(GOFUMPT) -l .) || { echo "gofumpt: '$(GOFUMPT) -l .' failed (installed? make setup)"; exit 1; }; \
+		out=$$(printf '%s\n' "$$out" | grep -v '^\.claude/' || true); \
+		test -z "$$out" || { printf '%s\n' "$$out"; echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
+
+.PHONY: lint
+lint: fmt-check ## gofumpt check + golangci-lint + module hygiene
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=$(GOLANGCI_TIMEOUT) ./...
 	@# The chip-tool harness builds only with the chiptool tag; lint it under
@@ -632,5 +692,35 @@ ble-wifi-light-check: ## the examples/ble-wifi-light module: build (linux amd64,
 	cd $(BLEWIFI_DIR) && $(GO) mod tidy -diff
 	cd $(BLEWIFI_DIR) && $(GO) mod verify
 
+# The release shape of the nested modules (R2-P5-sup-01): each one built
+# with its replace of go-fabric dropped, against the versions its go.mod
+# requires — what a consumer's build resolves. Needs the tags (git fetch
+# --tags) and the module proxy. A release pull request runs it
+# (chiptool.yml, job nested-release), and so does the push of a nested
+# tag (release.yml). NESTED_MODULES narrows.
+NESTED_MODULES ?= ble/bluez ble/esphome wifi/wpasupplicant examples/ble-wifi-light
+
+.PHONY: nested-release-check
+nested-release-check: ## build each nested module against the go-fabric version it requires, its replace dropped (needs the tags and the module proxy)
+	script/nested-release-check.sh $(NESTED_MODULES)
+
+.PHONY: workflow-lint
+workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLINT_VERSION, ZIZMOR_VERSION)
+	@# shellcheck and pyflakes inside actionlint are off: the run scripts'
+	@# shell style is a decision of its own, not this guard's.
+	$(ACTIONLINT) -shellcheck= -pyflakes=
+	$(ZIZMOR) --offline .github/workflows
+
+# What ci.yml runs, as make targets: `make ci` the guards that need no
+# network beyond the module proxy, `make ci-net` the two that read a clone
+# at a pinned commit (matter.js and matterjs-server for cite-check, the
+# connectedhomeip data model for chipdm-check; MATTERJS_DIR,
+# MATTERJS_SERVER_DIR and CHIP_ROOT name them, `make chiptool-setup`
+# makes the last). Not in either, each for a reason script/requiredchecks
+# records (TestMakeCIRunsWhatCIRuns): test-32bit needs a Linux host,
+# workflow-lint needs zizmor, which is no Go tool.
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check test lint cover-check surface-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the two guards that read a pinned clone)
+
+.PHONY: ci-net
+ci-net: cite-check chipdm-check ## the pipeline's two guards that read a clone at a pinned commit (matter.js, connectedhomeip's data model)
