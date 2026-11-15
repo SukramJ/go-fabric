@@ -21,7 +21,7 @@ type unsealedSettings struct {
 	writes atomic.Int32
 }
 
-func (u *unsealedSettings) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (u *unsealedSettings) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
 	if key == wifiNetworksKey {
 		return "", false, store.ErrUnseal
 	}

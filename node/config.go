@@ -685,6 +685,19 @@ type Store struct {
 	Sealer store.Sealer
 }
 
+// validate checks which stores the node opens and builds.
+func (s Store) validate() error {
+	switch {
+	case s.Path != "" && s.DB != nil:
+		return errors.New("node: Store takes Path or DB, not both")
+	case s.Path == "" && s.DB == nil && (s.Credentials == nil || s.Endpoints == nil):
+		return errors.New("node: Store needs Path, DB, or both Credentials and Endpoints")
+	case s.Sealer != nil && (s.Credentials != nil || (s.Path == "" && s.DB == nil)):
+		return errors.New("node: Store.Sealer seals the store the node builds on Path or DB; it excludes Credentials")
+	}
+	return nil
+}
+
 // Attestation is the device attestation material.
 type Attestation struct {
 	// Files names a vendor chain on disk; [New] loads it into Chain and
@@ -848,13 +861,8 @@ func (c *Config) Validate() error {
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
 	}
-	switch {
-	case c.Store.Path != "" && c.Store.DB != nil:
-		errs = append(errs, errors.New("node: Store takes Path or DB, not both"))
-	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
-		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
-	case c.Store.Sealer != nil && (c.Store.Credentials != nil || (c.Store.Path == "" && c.Store.DB == nil)):
-		errs = append(errs, errors.New("node: Store.Sealer seals the store the node builds on Path or DB; it excludes Credentials"))
+	if err := c.Store.validate(); err != nil {
+		errs = append(errs, err)
 	}
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
