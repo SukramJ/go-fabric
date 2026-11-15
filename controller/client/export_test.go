@@ -32,7 +32,18 @@ func SaveRecord(st Store, id string, rec Record) error {
 }
 
 // WaitRegistry waits for the registry's background work (the reactions
-// and the label reconciliation) to end.
+// and the label reconciliation) to end. The work it is to cover must have
+// started before the call: an Add from a zero counter concurrent with
+// Wait is a misuse of sync.WaitGroup ("calls with a positive delta that
+// occur when the counter is zero must happen before a Wait",
+// sync/waitgroup.go:68-69 at go1.27.4), which the race detector reports
+// as a read in Registry.goWork against the write in Wait. In a synctest
+// bubble, call synctest.Wait first: a bubble goroutine that parks or
+// exits happens before it returns (runtime/synctest.go:89-93,
+// runtime/proc.go:4491-4494, and the Wait's acquire at
+// runtime/synctest.go:307-311, go1.27.4). Review II, phase 5: the
+// alive-order tests waited right after the subscribe, while the
+// going-live alive could still start the label reconciliation.
 func WaitRegistry(r *Registry) { r.work.Wait() }
 
 // HoldOperation registers a fabric operation of kind on n, as Commission

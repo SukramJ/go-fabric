@@ -4,7 +4,7 @@
 package im
 
 // A mandatory IM field that is absent is InvalidAction (review 2026-11
-// W2-wire-04): matter.js packages/types/src/tlv/TlvObject.ts:258 throws
+// W2-wire-04): matter.js packages/types/src/tlv/TlvObject.ts:261 throws
 // ValidationMandatoryFieldMissingError for a TlvField, chip's parsers
 // return CHIP_END_OF_TLV and src/app/ReadHandler.cpp:208-214 answers it
 // InvalidAction.

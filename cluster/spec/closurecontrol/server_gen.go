@@ -272,8 +272,9 @@ type SpeedMover interface {
 
 // Calibrator is an optional interface of a [Mover] for Calibration (CL):
 // Calibrate starts the calibration after the server's checks; on success
-// the server sets MainState Calibrating, and the drive reports Stopped
-// when it is done. An error answers FAILURE and leaves MainState.
+// the server sets MainState Calibrating unless the drive reported a
+// MainState meanwhile (that report stands), and the drive reports
+// Stopped when it is done. An error answers FAILURE and leaves MainState.
 type Calibrator interface {
 	Calibrate(ctx context.Context) error
 }

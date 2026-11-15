@@ -729,26 +729,6 @@ func TestManager_AllocateID_WrapAround(t *testing.T) {
 	}
 }
 
-// TestManager_OpenFromSigma_BadKeyReturnsError verifies that
-// OpenFromSigma propagates a channel.New error when the key material
-// in sigma.SessionKeys has the wrong length. This exercises the
-// "build session: %w" error path.
-func TestManager_OpenFromSigma_BadKeyReturnsError(t *testing.T) {
-	t.Parallel()
-	m, _ := newTestManager()
-
-	// sigma.SessionKeys has [16]byte fields so we cannot make them
-	// wrong-length directly; but we can exercise via OpenFromPase
-	// which builds keys via HKDF from the sharedSecret — any non-empty
-	// secret produces valid 16-byte HKDF output so channel.New always
-	// succeeds there. For OpenFromSigma the keys come from the
-	// [16]byte arrays and are always 16 bytes — channel.New cannot fail
-	// in that path. The error in OpenFromSigma is therefore unreachable
-	// without modifying production code. We skip this test.
-	_ = m
-	t.Skip("channel.New cannot fail with [16]byte key arrays — error path structurally unreachable without production change")
-}
-
 // TestManager_OpenFromPase_ChannelNewError verifies the
 // "operational: build PASE session" error path is reachable.
 // Because hkdf.Key always produces the right length output,
@@ -1238,7 +1218,11 @@ func TestManager_ConcurrentOpenCloseGet(t *testing.T) {
 			defer wg.Done()
 			e, err := m.OpenFromSigma(uint8(idx%5+1), uint64(idx), uint64(idx+100), keys)
 			if err != nil {
-				return // session exhausted is theoretically possible but won't happen here
+				// 20 sessions are far below the table's capacity: an open
+				// that fails here leaves the race below nothing to race
+				// on (review II, R2-P5-tassert-05).
+				t.Errorf("OpenFromSigma(%d): %v", idx, err)
+				return
 			}
 			mu.Lock()
 			entries[idx] = e

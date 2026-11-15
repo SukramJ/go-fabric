@@ -117,8 +117,10 @@ func holdJobQueue(t *testing.T) *heldQueue {
 	h.n = sr.reg.Get("peer1")
 	const id = 0x54
 	sr.subscribe(t, h.n, sr.imageWithOpCreds("ours"), id)
-	client.WaitRegistry(sr.reg)
+	// The going-live alive may still start the label reconciliation: the
+	// bubble settles first (see client.WaitRegistry).
 	synctest.Wait()
+	client.WaitRegistry(sr.reg)
 	armed.Store(true)
 
 	sr.send(t, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7104, ProtocolID: im.InteractionModelProtocolID},

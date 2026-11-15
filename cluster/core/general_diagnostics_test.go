@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -372,8 +374,23 @@ func TestGenDiag_EmitBootReason_FiresEvent(t *testing.T) {
 func TestGenDiag_EmitBootReason_NoOpWhenEmitterNil(t *testing.T) {
 	t.Parallel()
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
-	// No emitter wired — must not panic.
+	var buf bytes.Buffer
+	g.SetLogger(slog.New(slog.NewTextHandler(&buf, nil)))
+	// No emitter wired — must not panic, and says so in the log.
 	g.EmitBootReason()
+	if !strings.Contains(buf.String(), "matter.general_diagnostics.emit_bootreason_skipped") {
+		t.Fatalf("log = %q, want the skipped-emit record", buf.String())
+	}
+	// Nothing was held back for a later emitter (review II,
+	// R2-P5-tassert-05).
+	emitter := &fakeEmitter{}
+	g.SetMatterEventEmitter(emitter)
+	emitter.mu.Lock()
+	n := len(emitter.events)
+	emitter.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("an emitter wired after the skipped emit received %d events, want 0", n)
+	}
 }
 
 func TestGenDiag_UpTimeSeconds(t *testing.T) {

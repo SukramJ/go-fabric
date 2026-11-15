@@ -33,6 +33,12 @@
 # Dockerfile at matter.js 862ad75f, stages base, build and source; its
 # clone-chip, bootstrap-chip and build-one scripts are fetched at that
 # commit), so the apps are built the way the image's other apps were.
+# Two inputs differ from matter.js's stages, both pins of what that
+# Dockerfile takes floating (review II, R2-P5-sup-07): ubuntu:24.04 by its
+# digest of 2026-11-15 (Dependabot's docker entry proposes newer ones), and
+# crudini at the commit its default branch pointed to on 2026-11-15
+# (a6b83377, committed 2025-06-03) rather than at whatever HEAD is when
+# the image is rebuilt.
 # Build it with .github/workflows/chip-image.yml or, locally:
 #
 #   docker buildx build --load -t go-fabric-chip:local internal/chiptool/image
@@ -40,7 +46,7 @@
 ARG CHIP_TEST_IMAGE=ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
 ARG MATTERJS_COMMIT=862ad75f4d3c7ab528b8a3954168146082cad8a6
 
-FROM ubuntu:24.04 AS base
+FROM ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5 AS base
 SHELL [ "/bin/bash", "-c" ]
 ENV TZ=Etc/UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -58,7 +64,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         git curl clang pkg-config libssl-dev libdbus-1-dev libavahi-client-dev \
         ninja-build cmake python3-venv python3-dev unzip libreadline-dev python3-pip \
         g++ libglib2.0-dev libglib2.0-dev-bin libpcsclite-dev libevent-dev ca-certificates
-RUN pip install --break-system-packages git+https://github.com/pixelb/crudini.git#egg=crudini
+RUN pip install --break-system-packages git+https://github.com/pixelb/crudini.git@a6b833779bbf01356a9ee8d3256a6a39979af1ad#egg=crudini
 
 FROM --platform=$BUILDPLATFORM build AS source
 ARG MATTERJS_COMMIT

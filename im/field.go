@@ -34,7 +34,7 @@ func (e *FieldError) MatterStatusCode() StatusCode { return e.Status }
 
 // ErrMissingField is the error a request decoder returns, wrapped with
 // the field's name, when a mandatory field is absent; it answers
-// InvalidAction. matter.js packages/types/src/tlv/TlvObject.ts:258
+// InvalidAction. matter.js packages/types/src/tlv/TlvObject.ts:261
 // throws ValidationMandatoryFieldMissingError (InvalidAction,
 // packages/types/src/common/ValidationError.ts:45-48); chip's parsers
 // return CHIP_END_OF_TLV, which src/app/ReadHandler.cpp:208-214 answers
@@ -63,6 +63,31 @@ func missingField(tag uint8, name string) error {
 func boolField(el tlv.Element) (bool, error) {
 	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
 		return false, &FieldError{Status: StatusInvalidAction, Tag: fieldTag(el), Reason: fmt.Sprintf("TLV type 0x%02X, want a boolean", uint8(el.Type))}
+	}
+	return el.Bool, nil
+}
+
+// requestBoolField returns el's value when el is a boolean. A request
+// field of another TLV type fails the decode with a plain error, which
+// carries no status, so the bridge answers it FAILURE
+// (bridge.replyDecodeError). Mirrors matter.js at db021da0:
+// packages/types/src/tlv/TlvBoolean.ts:22-24 throws UnexpectedDataError for
+// any element that is not a boolean, TlvObject.ts:222 decodes every known
+// field through it, and InteractionMessenger.handleRequest
+// (packages/protocol/src/interaction/InteractionMessenger.ts:344) answers
+// an error that carries no status with Status.Failure (:425-460). The
+// thrown error is a plain MatterError (packages/general/src/MatterError.ts:188).
+// The fields:
+// TlvReadRequest.ts:30, TlvSubscribeRequest.ts:21, :39,
+// TlvInvokeRequest.ts:19, :22, TlvWriteRequest.ts:18, :21, :25 (under
+// packages/types/src/protocol/messages/), TlvAttributePath.ts:21 and
+// TlvEventPath.ts:22 (under packages/types/src/protocol/types/). The
+// response decoders keep [boolField], except the event path, which
+// readEventPathFields shares with the request side: the client's
+// DataReport decoding reads a received EventPathIB's IsUrgent here too.
+func requestBoolField(el tlv.Element, name string) (bool, error) {
+	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
+		return false, fmt.Errorf("im: %s (tag %d) not a boolean: TLV type 0x%02X", name, fieldTag(el), uint8(el.Type))
 	}
 	return el.Bool, nil
 }

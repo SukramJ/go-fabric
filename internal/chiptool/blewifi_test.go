@@ -68,7 +68,7 @@ func TestChipToolBLEWiFi(t *testing.T) {
 		if mode == "require" {
 			t.Fatalf("required leg cannot run: "+format, args...)
 		}
-		t.Skipf(format, args...)
+		t.Skipf("the BLE-Wi-Fi leg cannot run on this host: "+format, args...)
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
 		skip("docker not on PATH: %v", err)

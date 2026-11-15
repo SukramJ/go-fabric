@@ -27,7 +27,7 @@ func TestBridge_EmitEvent_AppendsToLog(t *testing.T) {
 		wbEmptySnapshotter,
 		nil, // noop advertiser
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)
@@ -83,7 +83,7 @@ func TestBridge_EmitEvent_EventLogNumberConsistency(t *testing.T) {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)

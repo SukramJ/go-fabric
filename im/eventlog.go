@@ -117,9 +117,10 @@ func (c bufferConfig) normalized() bufferConfig {
 //
 // Matter §10.6.6 requires Critical events to be persisted; this
 // implementation is an in-memory buffer (survives the session, not
-// reboots). A persistent layer can be layered on top by draining the
-// buffer at shutdown and replaying on boot — v1.1 leaves that for a
-// later milestone.
+// reboots). The records are not persisted. What is, once the host wires
+// [EventLog.SetCeilingPersistence] and seeds the log from the stored
+// value ([EventLog.SeedNumber]), is the event number's ceiling, so the
+// numbering continues after a reboot instead of restarting.
 //
 // Mirrors matter.js packages/protocol/src/interaction/EventHandler.ts.
 type EventLog struct {

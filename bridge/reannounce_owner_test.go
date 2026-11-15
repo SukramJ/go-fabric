@@ -34,7 +34,7 @@ func TestStopWaitsForTheSessionReannounce(t *testing.T) {
 	t.Parallel()
 	adv := &slowReannouncer{Noop: mdns.NewNoop(), entered: make(chan struct{})}
 	b, err := New(wbEmptySnapshotter, adv, Config{
-		Listen:           ":0",
+		Listen:           "127.0.0.1:0",
 		AdvertiseTimeout: time.Hour, // only Stop's cancel ends the round
 	}, nil)
 	if err != nil {

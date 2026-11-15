@@ -12,7 +12,11 @@ of `node.Config.Limits` (`node.Limits`) or as a field of `node.Config`.
 Where matter.js keeps a constant, the value is a constant here too.
 `SupportedFabrics` and `MaxPathsPerInvoke` were configurable before
 `node.Limits` existed and stay where they were, on `node.Config`, so no
-host has to change its configuration in a patch release.
+host has to change its configuration in a patch release. One `node.Limits`
+field is a margin, not a bound, and has no row:
+`node.Limits.BDXAdditionalMrpDelay`, which the node adds to a peer's MRP
+base interval on the exchange of every inbound BDX transfer (none by
+default; [Configuration](../getting-started/device.md#configuration)).
 "Module's own" marks a limit matter.js does not have, with the reason the
 module keeps it. The matter.js references were read at `db021da0`, the
 snapshot's pin (`parity/schema.json`), which the parity tests and

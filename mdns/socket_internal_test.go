@@ -96,20 +96,31 @@ func TestListMulticastInterfaces_ReturnsNonNilOnAnyOS(t *testing.T) {
 // the host having a non-loopback IPv4 interface.
 func TestIsPrimaryV4_AllSystemInterfaces(t *testing.T) {
 	t.Parallel()
-	ifaces, _ := net.Interfaces()
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatalf("net.Interfaces: %v", err)
+	}
 	for i := range ifaces {
 		ifi := &ifaces[i]
-		// Must not panic.
-		_ = isPrimaryV4(ifi)
+		// A loopback or point-to-point link is never primary (review II,
+		// R2-P5-tassert-05).
+		if isPrimaryV4(ifi) && ifi.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 {
+			t.Errorf("isPrimaryV4(%s) = true on a %v link", ifi.Name, ifi.Flags)
+		}
 	}
 }
 
 func TestIsPrimaryV6_AllSystemInterfaces(t *testing.T) {
 	t.Parallel()
-	ifaces, _ := net.Interfaces()
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatalf("net.Interfaces: %v", err)
+	}
 	for i := range ifaces {
 		ifi := &ifaces[i]
-		_ = isPrimaryV6(ifi)
+		if isPrimaryV6(ifi) && ifi.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 {
+			t.Errorf("isPrimaryV6(%s) = true on a %v link", ifi.Name, ifi.Flags)
+		}
 	}
 }
 

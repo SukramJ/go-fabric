@@ -941,7 +941,8 @@ of its commands has matter.js's Large Message quality, as
 address. `TCPConfig.MaxInboundConnections` bounds the connections the
 listener holds in all (zero is 256; a negative value is
 `ErrConfiguration`): at the bound a new connection takes the place of the
-oldest one that has delivered no message yet, or is closed.
+held one idle longest past the 5-minute grace, or is closed
+([Limits](../guides/limits.md#transport-and-reliability)).
 
 ### Network profiles
 

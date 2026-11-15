@@ -49,7 +49,7 @@ func newBenchBridge(tb testing.TB, snap Snapshotter) *Bridge {
 		snap,
 		nil,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		slog.New(slog.DiscardHandler),
 	)

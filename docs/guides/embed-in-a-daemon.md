@@ -20,10 +20,13 @@ It does the work of go-fabric's `script/archcheck` in one function.
 go get github.com/SukramJ/go-fabric@v0.10.8
 ```
 
-A daemon pins a tag, never a commit. go-fabric is Apache-2.0. Its direct
-dependencies are six permissive modules (see
-[`THIRD-PARTY-NOTICES.md`](https://github.com/SukramJ/go-fabric/blob/main/THIRD-PARTY-NOTICES.md)),
-and the pure-Go SQLite driver is the largest of them. A daemon with a
+A daemon pins a tag, never a commit. go-fabric is Apache-2.0. A daemon
+that imports it links four of its direct dependencies —
+`filippo.io/nistec`, `github.com/miekg/dns`, `golang.org/x/net` and
+`modernc.org/sqlite` — and their indirect modules, all permissive (see
+[`THIRD-PARTY-NOTICES.md`](https://github.com/SukramJ/go-fabric/blob/main/THIRD-PARTY-NOTICES.md));
+the fifth, `golang.org/x/tools`, serves only the repository's own tooling.
+The pure-Go SQLite driver is the largest of them. A daemon with a
 licence gate runs it over the new graph. go-licenses does not classify
 `modernc.org/mathutil`'s BSD-3-Clause LICENSE file, so the daemon ignores
 that one module by name, with the reason in its Makefile.
@@ -168,7 +171,7 @@ err := dev.ElectricalPowerMeasurement().Set(electricalpowermeasurementdef.Patch{
 
 ActivePower is in milliwatts, and its sign follows the cluster: positive
 for power imported, negative for power exported (matter.js
-`electrical-power-measurement.resource.ts:159-162` at `862ad75f`). The
+`electrical-power-measurement.resource.ts:160-163` at `db021da0`). The
 battery level is a percentage, and PowerSource serves it as
 BatPercentRemaining in half-percent (80 % is 160). The kit stores each
 `Set`, advances the cluster's data version and reports the change to
@@ -212,8 +215,9 @@ puts them in three places:
 - the diagnostic web UI's status line, served from `/api/health`.
 
 A Home Assistant entity for the code was left out: the code pairs only
-while the commissioning window is open, and the window is open only until
-the first controller has paired.
+while the commissioning window is open, and the window is open until the
+first controller has paired or for 48 hours, and again at each start while
+the node is unpaired.
 
 Commit: [`f603c28`](https://github.com/SukramJ/go-zendure2mqtt/commit/f603c281a09d94205c2eb5ba2c92e1241c7db513).
 

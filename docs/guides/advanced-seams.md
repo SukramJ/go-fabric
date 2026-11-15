@@ -102,7 +102,7 @@ semantics, the persistence the facade threads through. A host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
-*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1647-1670` (`AttachACLLister` replaces, on a running bridge at once), `bridge/bridge.go:1025` (`Reassemble`), `:1317` (`SetOnReassembled`), `:2062` (`Topology`), `:2083` (`EventLog`), `:2549` (`ControllerRTT`), `bridge/receive.go:593` (`NotifyDeviceReachable`).*
+*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go` (`AttachACLLister` replaces, on a running bridge at once; `Reassemble`, `SetOnReassembled`, `Topology`, `EventLog`, `ControllerRTT`), `bridge/receive.go` (`NotifyDeviceReachable`).*
 
 ## `endpoint`
 
@@ -152,7 +152,15 @@ version 5, `v0.8.3`, the Thermostat presets) and `matter_doorlock_users`,
 `matter_doorlock_credentials` and `matter_doorlock_schedules` (version 6,
 `v0.8.4`, the DoorLock server's users, credentials and schedules) and
 `matter_icd_registrations` (version 7, `v0.12.0`, an ICD node's Check-In
-clients); `store/migrations/v5.up.sql`, `v6.up.sql` and `v7.up.sql` hold
+clients), and version 8 added columns: to `matter_fabrics` the row's commit
+state (`pending`), its VID verification statement and VVSC and the values a
+pending UpdateNOC replaced, to `matter_node_identities` the NOC, ICAC and
+private key a pending UpdateNOC replaced, and to
+`matter_server_subscriptions` the save order (`save_seq`). `store.Store`
+reads and writes fabrics on a version 8 database only; a host that runs
+`store.Migrations()` with its own tool runs `v8` and then calls
+`store.Upgrade` once, which moves the per-fabric VID settings keys into
+their fabric's columns. `store/migrations/v5.up.sql` to `v8.up.sql` hold
 the statements.
 
 **Costs.** The node writes the same tables. A host that writes a fabric,

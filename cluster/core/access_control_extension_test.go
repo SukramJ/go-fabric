@@ -221,6 +221,10 @@ func TestAccessControl_ExtensionWriteEmitsExtensionChanged(t *testing.T) {
 		core.AccessControlChangeTypeChanged,
 		core.AccessControlChangeTypeRemoved,
 	}
+	// LatestValue is the entry written, or for a removal the entry removed
+	// (R2-P5-tmut-18: the selection of the entry by change type was held
+	// by nothing).
+	wantLatest := [][]byte{data, other, other}
 	if len(got) != len(wantChangeTypes) {
 		t.Fatalf("expected %d emitted events, got %d", len(wantChangeTypes), len(got))
 	}
@@ -243,6 +247,9 @@ func TestAccessControl_ExtensionWriteEmitsExtensionChanged(t *testing.T) {
 		}
 		if payload.FabricIndex != 1 {
 			t.Errorf("event %d: FabricIndex = %d, want 1", i, payload.FabricIndex)
+		}
+		if payload.LatestValue == nil || !bytes.Equal(payload.LatestValue.Data, wantLatest[i]) {
+			t.Errorf("event %d: LatestValue = %+v, want the entry with Data % X", i, payload.LatestValue, wantLatest[i])
 		}
 	}
 }

@@ -51,7 +51,7 @@ func (r *deviceAdvertiserRecorder) operational() []mdns.Service {
 func deviceAdvertiserBridge(t *testing.T, tcp TCPConfig) (*Bridge, *deviceAdvertiserRecorder) {
 	t.Helper()
 	rec := &deviceAdvertiserRecorder{fakeAdvertiser: newFakeAdvertiser()}
-	b, err := New(wbEmptySnapshotter, rec, Config{Listen: ":0", TCP: tcp}, nil)
+	b, err := New(wbEmptySnapshotter, rec, Config{Listen: "127.0.0.1:0", TCP: tcp}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

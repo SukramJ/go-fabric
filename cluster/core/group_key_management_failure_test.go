@@ -306,20 +306,33 @@ func TestGKMGroupKeyMapWriteRejectsTheWrongValueType(t *testing.T) {
 }
 
 // TestGKMKeySetWriteEpochKeyLengthConstraint pins the 16-byte epoch-key
-// constraint on all three slots. A short key is a ConstraintError in chip
-// (src/app/clusters/group-key-mgmt-server: epochKey.size() == 16 →
-// CHIP_ERROR_INVALID_ARGUMENT); storing one would leave the bridge
-// deriving group session keys from material the controller never sent.
+// constraint on all three slots: CONSTRAINT_ERROR. In matter.js the length
+// is the request schema's, not the handler's — the model bounds each epoch
+// key to 16 bytes (packages/model/src/standard/elements/group-key-management.element.ts:117,
+// :119, :121 at db021da0), TlvOfModel builds the bound into the request
+// TLV (packages/types/src/tlv/TlvOfModel.ts:213-214, :320-326), and
+// CommandInvokeResponse validates it before the handler
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:486), a
+// ValidationOutOfBoundsError answered CONSTRAINT_ERROR (TlvString.ts:82-90,
+// ValidationError.ts:16-20); GroupKeyManagementServer.ts:291-357 has no
+// length check. chip answers the same
+// (src/app/clusters/group-key-mgmt-server/GroupKeyManagementCluster.cpp:300-305,
+// :332-337, :371-376 at 6170af84). Storing a short key would leave the
+// bridge deriving group session keys from material the controller never
+// sent. Each subtest sets the accessing fabric, so the length check, not a
+// missing fabric (UNSUPPORTED_ACCESS), is what refuses.
 func TestGKMKeySetWriteEpochKeyLengthConstraint(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("EpochKey0 too short", func(t *testing.T) {
 		t.Parallel()
+		gkm := newGKM(t)
+		gkm.SetCurrentFabric(1)
 		req := validKeySet(7)
 		req.GroupKeySet.EpochKey0 = make([]byte, 8)
-		if _, err := newGKM(t).MatterInvoke(ctx, 0x00, req); err == nil {
-			t.Fatal("an 8-byte EpochKey0 was accepted")
+		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+			t.Fatalf("an 8-byte EpochKey0: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
 	t.Run("EpochKey1 too long", func(t *testing.T) {
@@ -329,8 +342,8 @@ func TestGKMKeySetWriteEpochKeyLengthConstraint(t *testing.T) {
 		req := validKeySet(7)
 		req.GroupKeySet.EpochKey1 = make([]byte, 17)
 		req.GroupKeySet.EpochStartTime1 = 2000
-		if _, err := gkm.MatterInvoke(ctx, 0x00, req); err == nil {
-			t.Fatal("a 17-byte EpochKey1 was accepted")
+		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+			t.Fatalf("a 17-byte EpochKey1: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
 	t.Run("EpochKey2 too short", func(t *testing.T) {
@@ -342,8 +355,8 @@ func TestGKMKeySetWriteEpochKeyLengthConstraint(t *testing.T) {
 		req.GroupKeySet.EpochStartTime1 = 2000
 		req.GroupKeySet.EpochKey2 = make([]byte, 4)
 		req.GroupKeySet.EpochStartTime2 = 3000
-		if _, err := gkm.MatterInvoke(ctx, 0x00, req); err == nil {
-			t.Fatal("a 4-byte EpochKey2 was accepted")
+		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+			t.Fatalf("a 4-byte EpochKey2: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
 }
@@ -387,8 +400,12 @@ func TestGKMKeySetWriteDisablesASlotOnTheSentinelStartTime(t *testing.T) {
 
 // TestGKMKeySetWriteEpochSlotOrdering pins the ordering rules matter.js
 // GroupKeyManagementServer.ts:291-357 at db021da0 enforces between the three epoch
-// slots. Each case names one broken relationship; a bridge that accepted
-// them would rotate onto a key at a time no controller agreed on.
+// slots, each answered INVALID_COMMAND by the handler: EpochStartTime1 not
+// after EpochStartTime0 :329-334, EpochStartTime1 without EpochKey1
+// :335-337, EpochKey2 without EpochKey1 :339-341, EpochStartTime2 not after
+// EpochStartTime1 :342-350, EpochStartTime2 without EpochKey2 :351-353.
+// Each case names one broken relationship; a bridge that accepted them
+// would rotate onto a key at a time no controller agreed on.
 func TestGKMKeySetWriteEpochSlotOrdering(t *testing.T) {
 	t.Parallel()
 	cases := map[string]func(*core.GroupKeySetStruct){
@@ -422,8 +439,8 @@ func TestGKMKeySetWriteEpochSlotOrdering(t *testing.T) {
 			gkm.SetCurrentFabric(1)
 			req := validKeySet(7)
 			mutate(&req.GroupKeySet)
-			if _, err := gkm.MatterInvoke(context.Background(), 0x00, req); err == nil {
-				t.Fatalf("KeySetWrite accepted %s", name)
+			if _, err := gkm.MatterInvoke(context.Background(), 0x00, req); statusOf(err) != im.StatusInvalidCommand {
+				t.Fatalf("KeySetWrite with %s: %v (status %v), want INVALID_COMMAND", name, err, statusOf(err))
 			}
 		})
 	}

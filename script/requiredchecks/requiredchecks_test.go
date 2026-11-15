@@ -121,6 +121,29 @@ var notRequired = []decision{
 			"the gate job reports for it under one required name.",
 	},
 	{
+		"chiptool.yml", "Go-TH certification cases (${{ matrix.group }})", advisory,
+		"a matrix job cannot serve as a required check: \"A matrix job cannot be a required check (its check names are " +
+			"the expanded ones); the gate below holds it\" (the comment over the gocert job in chiptool.yml). The required gate " +
+			"job needs it and fails unless it passed or, with the family groups, was not due (review II, phase 5a).",
+	},
+	{
+		"chiptool.yml", "nested modules against the versions they require", advisory,
+		"runs on a release pull request only (\"A release pull request only\", the comment over the job in chiptool.yml); " +
+			"the required gate job needs it and fails a release pull request unless it passed.",
+	},
+	{
+		"ci.yml", "test (linux/386)", pending,
+		"a guard (R2-P5-sup-02) that \"enters the protection after its first green run\" (the comment over the job in " +
+			"ci.yml): whether the hosted runner executes the 386 test binaries was not measurable where it was written " +
+			"(darwin has no 386 port). Adding it to the branch protection is the owner's.",
+	},
+	{
+		"ci.yml", "workflow lint", pending,
+		"a guard (R2-P5-sup-15) that \"enters the branch protection after a green run\" (the comment over the job in " +
+			"ci.yml): neither actionlint nor zizmor ran where it was written, so its first run's findings are not known. " +
+			"Adding it to the branch protection is the owner's.",
+	},
+	{
 		"pages.yml", "build", sharesName,
 		"no entry of its own in the branch protection: the job (mkdocs build --strict, path-filtered to the " +
 			"documentation) shares the name `build` with ci.yml's job. What GitHub does with two check " +

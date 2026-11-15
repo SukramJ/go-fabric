@@ -357,9 +357,9 @@ const (
 // or a mis-typed TLV payload — surfaces as IM Status::InvalidCommand (0x85),
 // NOT a generic Failure. Mirrors matter.js
 // packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:98-100
-// (bad attestation-nonce length), :121-128 (bad CSR-nonce length / unknown
-// certificate type), and :453 (undecodable root cert) — each raises
-// StatusResponseError(..., Status.InvalidCommand).
+// (bad attestation-nonce length), :121-123 (bad CSR-nonce length),
+// :160-164 (unknown certificate type) and :456-469 (undecodable root
+// cert, :466) — each raises StatusResponseError(..., Status.InvalidCommand).
 type opcredsInvalidArgErr struct{}
 
 func (opcredsInvalidArgErr) Error() string {

@@ -238,13 +238,16 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 			// fails the decode, and the request is answered
 			// (packages/types/src/protocol/messages/TlvInvokeRequest.ts:19;
 			// SuppressResponseTest.ts:337-343).
-			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
-				return InvokeRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidInvokeRequest)
+			if req.SuppressResponse, err = requestBoolField(el, "SuppressResponse"); err != nil {
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 			}
-			req.SuppressResponse = el.Bool
 			hasSuppress = true
 		case tagInvokeReqTimedRequest:
-			req.TimedRequest = el.Bool
+			// TlvField(1, TlvBoolean), TlvInvokeRequest.ts:22: a TimedRequest
+			// of another type fails the decode (FAILURE), never reads as false.
+			if req.TimedRequest, err = requestBoolField(el, "TimedRequest"); err != nil {
+				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
+			}
 			hasTimed = true
 		case tagInvokeReqInvokeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {

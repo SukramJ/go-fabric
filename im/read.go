@@ -103,8 +103,9 @@ func (r ReadRequest) MarshalTLV(enc *tlv.Encoder) {
 	_ = enc.EndContainer()
 }
 
-// UnmarshalReadRequestTLV reads a ReadRequestMessage. Skips the
-// optional Event* fields — they're not consumed by v1.1.
+// UnmarshalReadRequestTLV reads a ReadRequestMessage: its attribute and
+// event paths, its event filters, FabricFiltered and its data-version
+// filters. A field it does not know is skipped.
 func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:gocognit,gocyclo // wire/dispatch table over many attribute/opcode cases
 	open, err := dec.Next()
 	if err != nil {
@@ -178,7 +179,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			req.EventFilters = filters
 		case tagReadReqFabricFiltered:
-			if req.FabricFiltered, err = boolField(el); err != nil {
+			if req.FabricFiltered, err = requestBoolField(el, "FabricFiltered"); err != nil {
 				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 			}
 			hasFabricFiltered = true
@@ -290,18 +291,20 @@ func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttribu
 		// TlvUInt32, TlvAttributePath.ts:28.
 		p.WildcardFilterConfigurationVersion, err = uint32Field(el)
 		p.HasWildcardFilterConfigurationVersion = true
+	case tagAttrPathEnableTagCompression:
+		// An encoder-side optimisation a receiver may ignore (§A.7), but
+		// typed: TlvOptionalField(0, TlvBoolean), TlvAttributePath.ts:21.
+		_, err = requestBoolField(el, "EnableTagCompression")
 	default:
-		// EnableTagCompression and unknown tags: an encoder-side
-		// optimisation a receiver may ignore (§A.7), and forward
-		// compatibility.
+		// Unknown tags: forward compatibility.
 		err = skipField(dec, el)
 	}
 	return err
 }
 
 // skipContainer drains every nested element until a balancing
-// EndContainer is reached. Used to skip optional fields the v1.1
-// implementation does not need.
+// EndContainer is reached. Used to skip the fields a decoder does not
+// read.
 func skipContainer(dec *tlv.Decoder) error {
 	depth := 1
 	for depth > 0 {

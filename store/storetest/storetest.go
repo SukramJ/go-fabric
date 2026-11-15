@@ -97,17 +97,52 @@ var cases = []testCase{
 	{"erase", eraseCase},
 }
 
-// eraseCase: Erase leaves the store as a fresh one — no fabric, no ACL, no
-// setting or counter, no subscription — and the next fabric index back at 1
-// (store.Eraser, the factory reset).
+// eraseCase: Erase leaves the store as a fresh one (store.Eraser, the
+// factory reset). One row goes in through every family of the port — the
+// fabric, its identity and ACL, the group key sets, key map, group table and
+// groupcast groups, a resumption record, the default OTA providers and the
+// requestor state, an ICD registration and the counter, a subscription,
+// thermostat presets, door-lock auth, a setting and a metadata counter —
+// and after Erase none of them is read back. The fabric-owned rows are read
+// again under a fabric added after the Erase, which takes index 1 again: a
+// store that dropped the fabric rows but kept what hangs off them would
+// hand the old fabric's keys to the new one (review II, R2-P5-tassert-13).
 func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
 	idx := addFabric(ctx, t, p, 1)
 	addFabric(ctx, t, p, 2)
+	key := bytes.Repeat([]byte{5}, 16)
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: idx, NOC: []byte{1, 2}, PrivateKey: bytes.Repeat([]byte{3}, 32), IPK: bytes.Repeat([]byte{4}, 16)}))
 	must(t, p.ReplaceACL(ctx, idx, []store.ACLEntry{{FabricIndex: idx, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}))
+	must(t, p.UpsertGroupKeySet(ctx, keySet(idx, 1)))
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: idx, GroupID: 0x20, GroupKeySetID: 1}))
+	must(t, p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: idx, GroupID: 0x20, GroupName: "g", Endpoints: []uint16{1}}))
+	must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: idx, GroupID: 0x20}))
+	rec := resumptionRec(idx, 5, 1)
+	must(t, p.UpsertResumption(ctx, rec))
+	must(t, p.ReplaceDefaultOTAProviders(ctx, idx, []store.OTAProviderLocation{{ProviderNodeID: 0x11, Endpoint: 1}}))
+	must(t, p.SaveOTARequestorState(ctx, []byte{1, 2, 3}))
+	must(t, p.ReplaceICDRegistrations(ctx, idx, []store.ICDRegistration{{CheckInNodeID: 0x11, MonitoredSubject: 0x11, Key: key}}))
+	must(t, p.SaveICDCounter(ctx, 7))
+	must(t, p.SaveServerSubscription(ctx, 9, idx, 1, []byte{1}))
+	must(t, p.SaveThermostatPresets(ctx, "erase.t", []byte{0x15, 0x18}, []byte{0xAA}))
+	must(t, p.SaveDoorLockAuth(ctx, "erase.lock", store.DoorLockAuth{Users: []store.DoorLockUser{{UserIndex: 1, UserName: "a", UserStatus: 1}}}))
 	must(t, p.SetSetting(ctx, "erase.key", "v"))
 	must(t, p.SetMetadataCounter(ctx, "erase.counter", 7))
-	must(t, p.SaveServerSubscription(ctx, 9, idx, 1, []byte{1}))
+
 	must(t, p.Erase(ctx))
+	wantNodeTablesErased(ctx, t, p, rec.ResumptionID)
+
+	again := addFabric(ctx, t, p, 3)
+	wantEqual(t, "first fabric index after erase", again, uint8(1))
+	wantEqual(t, "the new fabric reuses the erased one's index", again, idx)
+	wantFabricTablesErased(ctx, t, p, again)
+}
+
+// wantNodeTablesErased: after Erase no fabric, setting, counter,
+// subscription, resumption record, OTA provider or state, ICD registration
+// or counter, thermostat presets or door-lock auth is read back.
+func wantNodeTablesErased(ctx context.Context, t *testing.T, p store.Port, resumptionID []byte) {
+	t.Helper()
 	fabrics, err := p.ListFabrics(ctx)
 	must(t, err)
 	wantEqual(t, "fabrics after erase", len(fabrics), 0)
@@ -120,7 +155,55 @@ func eraseCase(ctx context.Context, t *testing.T, p store.Port) {
 	subs, err := p.LoadServerSubscriptions(ctx)
 	must(t, err)
 	wantEqual(t, "subscriptions after erase", len(subs), 0)
-	wantEqual(t, "first fabric index after erase", addFabric(ctx, t, p, 3), uint8(1))
+	if _, err := p.GetResumptionByID(ctx, resumptionID); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Fatalf("GetResumptionByID after erase = %v, want ErrResumptionNotFound", err)
+	}
+	if got, err := p.ListDefaultOTAProviders(ctx); err != nil || len(got) != 0 {
+		t.Fatalf("ListDefaultOTAProviders after erase = %v, %v", got, err)
+	}
+	if state, ok, err := p.LoadOTARequestorState(ctx); err != nil || ok || state != nil {
+		t.Fatalf("LoadOTARequestorState after erase = %v, %v, %v", state, ok, err)
+	}
+	if got, err := p.ListICDRegistrations(ctx); err != nil || len(got) != 0 {
+		t.Fatalf("ListICDRegistrations after erase = %v, %v", got, err)
+	}
+	if c, ok, err := p.LoadICDCounter(ctx); err != nil || ok || c != 0 {
+		t.Fatalf("LoadICDCounter after erase = %d, %v, %v", c, ok, err)
+	}
+	if pr, act, ok, err := p.LoadThermostatPresets(ctx, "erase.t"); err != nil || ok || pr != nil || act != nil {
+		t.Fatalf("LoadThermostatPresets after erase = %v, %v, %v, %v", pr, act, ok, err)
+	}
+	if auth, saved, err := p.LoadDoorLockAuth(ctx, "erase.lock"); err != nil || saved || !reflect.DeepEqual(auth, store.DoorLockAuth{}) {
+		t.Fatalf("LoadDoorLockAuth after erase = %+v, %v, %v", auth, saved, err)
+	}
+}
+
+// wantFabricTablesErased: a fabric added after Erase, under the erased
+// fabric's index, holds no identity, ACL, key set, key map, group table,
+// groupcast group or resumption record.
+func wantFabricTablesErased(ctx context.Context, t *testing.T, p store.Port, again uint8) {
+	t.Helper()
+	if _, err := p.GetIdentity(ctx, again); !errors.Is(err, store.ErrIdentityNotFound) {
+		t.Fatalf("GetIdentity after erase = %v, want ErrIdentityNotFound", err)
+	}
+	if got, err := p.ListACL(ctx, again); err != nil || len(got) != 0 {
+		t.Fatalf("ListACL after erase = %+v, %v", got, err)
+	}
+	if _, err := p.GetGroupKeySet(ctx, again, 1); !errors.Is(err, store.ErrGroupKeySetNotFound) {
+		t.Fatalf("GetGroupKeySet after erase = %v, want ErrGroupKeySetNotFound", err)
+	}
+	if got, err := p.ListGroupKeyMappings(ctx, again); err != nil || len(got) != 0 {
+		t.Fatalf("ListGroupKeyMappings after erase = %+v, %v", got, err)
+	}
+	if got, err := p.ListGroupTable(ctx, again); err != nil || len(got) != 0 {
+		t.Fatalf("ListGroupTable after erase = %+v, %v", got, err)
+	}
+	if got, err := p.ListGroupcastGroups(ctx, again); err != nil || len(got) != 0 {
+		t.Fatalf("ListGroupcastGroups after erase = %+v, %v", got, err)
+	}
+	if _, err := p.GetResumptionByPeer(ctx, again, 5); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Fatalf("GetResumptionByPeer after erase = %v, want ErrResumptionNotFound", err)
+	}
 }
 
 // fabric returns a distinct fabric record; the index is left to the store.

@@ -167,40 +167,42 @@ func TestReassembleOverlappingStopLeavesNoHostListeners(t *testing.T) {
 // tears the run down — only its waits are bounded by ctx — on every call,
 // not on the half of them a select between the free lifecycle slot and
 // ctx.Done() picks the slot. A bridge is single-run (R2-P2-stop-05), so
-// every run is a new bridge; each binds the same port, so each Start
-// succeeding shows the Stop before it released the socket.
+// every run is a new bridge, each on a socket of its own that the test
+// hands it (openUDP) and sees closed when Stop returns; the last one's
+// address is bound again once. Before review II, phase 5 every run bound
+// one probed port, and another process could take it between two runs
+// (F-db021da0-37).
 func TestStopWithDoneContextTearsDown(t *testing.T) {
 	t.Parallel()
-	probe, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := probe.LocalAddr().String()
-	if err := probe.Close(); err != nil {
-		t.Fatal(err)
-	}
 	snap := newHeldSnapshotter(t, 0)
 	done, cancel := context.WithCancel(t.Context())
 	cancel()
 	const runs = 200
+	var last *net.UDPAddr
 	for i := range runs {
-		b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: addr}, nil)
+		b, err := New(snap.snapshot, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
+		socket := useOwnedSocket(t, b)
 		if err := b.Start(t.Context()); err != nil {
-			t.Fatalf("run %d: Start on %s: %v", i, addr, err)
+			t.Fatalf("run %d: Start: %v", i, err)
 		}
+		sock := socket()
 		if err := b.Stop(done); err != nil {
 			t.Fatalf("run %d: Stop with a done context: %v", i, err)
+		}
+		if !sock.closed.Load() {
+			t.Fatalf("run %d: Stop with a done context returned with the bridge's socket %v open", i, sock.LocalAddr())
 		}
 		if b.isStarted() || b.LocalAddr() != "" || b.startClaim.Load() {
 			t.Fatalf("run %d: after Stop with a done context: started=%v addr=%q claim=%v", i, b.isStarted(), b.LocalAddr(), b.startClaim.Load())
 		}
+		last, _ = sock.LocalAddr().(*net.UDPAddr)
 	}
-	free, err := net.ListenPacket("udp", addr)
+	free, err := net.ListenUDP("udp4", last)
 	if err != nil {
-		t.Fatalf("the port after the last Stop: %v", err)
+		t.Fatalf("the last run's address %v after its Stop: %v", last, err)
 	}
 	_ = free.Close()
 }

@@ -139,11 +139,12 @@ func (noopAckHandler) Discharge(uint16, uint16, bool) bool { return false }
 // AttachPaseHandler wires the PASE port. Pass nil to revert to noop.
 // Calling this twice replaces the previous handler.
 //
-// The handler is shared across every PASE exchange — appropriate for
-// the v1.1 single-Commissioner-window flow. For concurrent PASE
-// dispatch (multiple commissioners pairing in parallel) use
-// [Bridge.AttachPaseHandlerProvider] instead; when a provider is
-// wired the singleton handler is ignored.
+// The handler is shared across every PASE exchange. The bridge admits
+// one PASE handshake at a time (claimPaseInFlight), so commissioners
+// pair one after another; a handler scoped to one handshake — its
+// initiator and exchange — comes from [Bridge.AttachPaseHandlerProvider]
+// instead, and when a provider is wired the singleton handler is
+// ignored.
 func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	// A fresh acceptor marks a commissioning-window boundary; give the new
 	// window its own PASE brute-force budget and a free
@@ -416,8 +417,7 @@ func (b *Bridge) AttachAckHandler(h AckHandler) {
 }
 
 // dispatchSecureChannel is the inbound router for ProtocolID==0x0000
-// datagrams. Replaces the v1.1.0 logging stub with a full opcode
-// fan-out:
+// datagrams, an opcode fan-out:
 //
 //   - 0x10 StandaloneAck         → AckHandler.Discharge (no reply)
 //   - 0x20 PBKDFParamRequest     → PaseHandler.ProcessPBKDFParamRequest → 0x21 PBKDFParamResponse

@@ -105,7 +105,7 @@ func TestParityMatterJS_CompressedFabricID_IKMStripsPrefix(t *testing.T) {
 	keyA := fabricParityRootPubKey(t)
 	keyB := fabricParityRootPubKey(t)
 	if hex.EncodeToString(keyA) == hex.EncodeToString(keyB) {
-		t.Skip("random key collision — re-run")
+		t.Fatal("two freshly generated P-256 root keys are equal: the key source is broken")
 	}
 
 	gotA, err := computeCompressedFabricID(keyA, 1)

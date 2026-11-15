@@ -22,7 +22,7 @@ Alliance, and nothing built on it may be described as certified.
 
 ## At a glance
 
-- **One module, five runtime dependencies, no cgo.** (`golang.org/x/tools` in `go.mod` serves only the repository's own tooling.) It builds with
+- **One module, four direct runtime dependencies, no cgo.** (`go.mod` requires five modules directly; the fifth, `golang.org/x/tools`, serves only the repository's own tooling.) It builds with
   `CGO_ENABLED=0`; SQLite is the pure-Go `modernc.org/sqlite`.
 - **Matter 1.6.1** data model, extracted from matter.js at a pinned commit
   and embedded; all 135 clusters of the snapshot served and all 91 device

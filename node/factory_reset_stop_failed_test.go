@@ -25,7 +25,9 @@ func TestFactoryResetThatDidNotStopTheBridgeErasesNothing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "n.db")
 	cfg := minimalConfig(nil)
 	cfg.Store = node.Store{Path: path}
-	cfg.Network.Listen = freeUDPAddr(t)
+	// An OS-assigned port: the test never needs the number again, and a
+	// probed one could be taken before the bridge binds it (F-db021da0-37).
+	cfg.Network.Listen = "127.0.0.1:0"
 	n := newNode(t, cfg)
 	ctx, cancelCtx := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancelCtx()

@@ -34,7 +34,6 @@ import (
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
@@ -270,22 +269,24 @@ func TestDecommissionParity(t *testing.T) {
 
 	t.Run("accepts another decommission after a failed one", func(t *testing.T) {
 		t.Parallel()
+		// DecommissionTest.ts:205-222 at db021da0: removeFabric patched to
+		// throw PeerUnresponsiveError, two decommissions in a row, each
+		// rejected with it — the first failed attempt does not block the
+		// second — and the node kept. The patch, not a dropped datagram,
+		// fails both, so the second attempt meets the session the first
+		// left, as matter.js's does (review N-rw2-1).
 		cp := newClientPair(t, clientPairOptions{})
-		unacknowledged(cp)
-		expectKept(t, cp, cp.decommission(t))
-		// The unacknowledged RemoveFabric showed the peer gone and lost
-		// its session (client/exchange Manager.handlePeerLoss), so the
-		// second attempt is accepted and ends while connecting, transient
-		// too. matter.js's case (DecommissionTest.ts:205-222) throws from
-		// a patched removeFabric and loses no session.
-		err := cp.decommission(t)
-		var ue *peer.UnreachableError
-		if !errors.As(err, &ue) {
-			t.Fatalf("second decommission: %v, want the peer unreachable", err)
-		}
-		addr, _ := cp.node.PeerAddress()
-		if cp.pair.Controller.Registry().Size() != 1 || fabrictestseam.Peers(cp.pair.Controller).Get(addr) == nil || !cp.node.IsCommissioned() {
-			t.Fatal("the node or its peer was not kept")
+		calls := 0
+		restore := client.PatchRemoveFabric(cp.pair.Controller.Registry(), func(uint8, func(uint8) (client.Result, error)) (client.Result, error) {
+			calls++
+			return client.Result{}, &exchange.PeerUnresponsiveError{Waited: 11 * time.Second}
+		})
+		first, second := cp.decommission(t), cp.decommission(t)
+		restore()
+		expectKept(t, cp, first)
+		expectKept(t, cp, second)
+		if calls != 2 {
+			t.Fatalf("RemoveFabric called %d times, want 2", calls)
 		}
 	})
 

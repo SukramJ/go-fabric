@@ -140,9 +140,10 @@ the peer stated — is refused with `camera.ErrPayloadTooLarge` and not sent
 `cluster/camera` alone). connectedhomeip's session setup takes TCP for a
 session asked for with `TransportPayloadCapability::kLargePayload` when the
 peer advertises a TCP server (`src/transport/SessionManager.h:72-74`,
-`src/app/OperationalSessionSetup.cpp:324-329` at `6170af84`); that its
+`src/app/OperationalSessionSetup.cpp:324-329` at `6170af84`), and its
 camera app asks for such a session for these signals
-(`webrtc-provider-manager.cpp`) was not read at the pin (unverified). A
+(`examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:860-861`,
+`:887-888`, `:914-915`, `:941-942`). A
 controller that reached the camera over TCP leaves the session the signals
 need.
 
@@ -543,7 +544,9 @@ Concept v10 §D (owner decision, 2026-10-27), verbatim:
 In English: no host device carries a camera cluster until a live test
 with Apple Home has passed. Apple Home is the only ecosystem with Matter
 camera support in 2026. The same rule applies to MSCH. The reference
-bridge composes none of these clusters.
+bridge's default composition carries none of these clusters;
+`--camera-sim` adds a simulated Camera and Chime for the camera
+certification families only.
 
 Reworded for the controller side (owner decision 2026-11-05, issue 410
 decision 5): the gate keeps applying to host devices that show themselves

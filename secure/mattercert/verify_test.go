@@ -64,7 +64,11 @@ type verifyTestCertOpts struct {
 // it (matter.js CertificateAuthority.ts): NOC → not a CA, keyUsage
 // digitalSignature, EKU serverAuth+clientAuth, 20-byte SKID; ICAC / RCAC
 // → CA, keyUsage keyCertSign|cRLSign, 20-byte SKID. Explicit opts fields
-// override the shape so tests can build the malformed variants.
+// override the shape so tests can build the malformed variants. A shape
+// case changes one property: the CA bit drives keyUsage and the EKU here,
+// so a case that flips it pins extKeyUsage and extEKU to the valid shape
+// (an empty, non-nil extEKU writes none), or a neighbouring check refuses
+// it first and the predicate it is named for is held by nothing.
 func putTestExtensions(t *testing.T, e *tlv.Encoder, opts verifyTestCertOpts) {
 	t.Helper()
 	e.StartList(tlv.ContextTag(10))

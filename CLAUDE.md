@@ -21,7 +21,9 @@ make test           # go test -count=1 ./...
 make race           # go test -race (needs CGO_ENABLED=1) — not optional, see below
 make lint           # gofumpt check + golangci-lint + go mod tidy -diff + go mod verify
 make fmt            # gofumpt -w .
-make ci             # build vet test lint cover-check — everything the pipeline runs
+make ci             # what ci.yml runs offline: build build-32bit vet archcheck apidiff-check race lint cover-check
+                    # bench-smoke reachability-check surface-check testparity-check + the four nested-module checks
+make ci-net         # cite-check + chipdm-check: the guards that read a clone at a pinned commit
 make setup          # install the pinned gofumpt / golangci-lint, plus govulncheck
 ```
 
@@ -50,9 +52,12 @@ make fuzz             # every fuzz target, iteration-budgeted (FUZZTIME=100000x)
 number legitimately, regenerate, read the diff, and commit the new snapshot —
 adjusting the ratchet constant in the *same* commit.
 
-The chip-tool guard needs Linux. CI runs it (`.github/workflows/chiptool.yml`,
-three jobs including a control leg that separates our defects from
-environment failures); it also runs locally without exports:
+The chip-tool guard needs Linux. CI runs it (`.github/workflows/chiptool.yml`:
+besides `code touched` and the gate `chip-families-gate`, seven jobs — the
+suite, the Go-TH cases in three groups (`gocert`), a control leg that
+separates our defects from environment failures, the BLE-Wi-Fi leg, the BLE
+cases, the certification families, and on a release pull request the nested
+modules' release shape); it also runs locally without exports:
 
 ```sh
 make chiptool-test       # build examples/reference-bridge, commission it for real, run the chip-tool suite
@@ -491,10 +496,10 @@ are what keeps that from doubling.
   on: `/clear`, the model to switch to (`/model`), and the first message
   to send, which names the files to read.
 - **The pipeline's guards before the pull request, not after.** The local
-  guard set is the list of `make` targets CI runs (`.github/workflows/`),
-  and a composition change of the reference daemon — `make surface` shows
-  it — gets its fixture run (`chiptool.yml` with `update_fixtures`) before
-  the pull request opens. A red pipeline costs a round of coordinator
+  guard set is `make ci` and `make ci-net` (held to `ci.yml` by
+  `TestMakeCIRunsWhatCIRuns`), and a composition change of the reference
+  daemon — `make surface` shows it — gets its fixture run (`chiptool.yml`
+  with `update_fixtures`) before the pull request opens. A red pipeline costs a round of coordinator
   turns.
 - **Agents read what the brief names.** An implementing agent gets the
   file list and the pinned sources in the brief, reads those, and reports
@@ -509,8 +514,10 @@ the GitHub Pages site (`mkdocs.yml`, `.github/workflows/pages.yml`;
 `mkdocs build --strict` runs on every pull request that touches it).
 Write it for someone who embeds or evaluates the module: what it does,
 how to wire it, what it guarantees — every behavioural claim checkable
-against the code. A link from a page to a file outside `docs/` is an
-absolute GitHub URL (the strict build rejects relative ones). Planning
+against the code. A link from a page to a file outside `docs/` may be
+relative: the hook `script/mkdocs/repo_links.py` (`mkdocs.yml` → `hooks`)
+rewrites it to its GitHub URL when the target exists, and the strict build
+fails on one whose target does not. Planning
 concepts move to `docs/history/` once executed (not published); owner
 test plans, briefs, audits and parity registers live under `notes/`.
 A change that alters behaviour a page describes updates the page in the

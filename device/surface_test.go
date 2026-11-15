@@ -353,7 +353,8 @@ func TestSurfaceRemoveElementAndCluster(t *testing.T) {
 		}
 	}
 	if optional == 0 {
-		t.Skip("OnOffLight has no buildable optional cluster")
+		// The fixture this test removes must exist (review II, phase 5a, G2).
+		t.Fatal("OnOffLight has no buildable optional cluster")
 	}
 	opts.Surface = surface.Policies{Custom: []surface.Policy{surfacetest.Remove(surface.KindCluster, surfacetest.Match{ID: optional})}}
 	d, err = New(OnOffLightType(), opts, withOptional(optional))

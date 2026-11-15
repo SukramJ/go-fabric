@@ -247,7 +247,11 @@ func TestCancelledWriteEndsTheConnection(t *testing.T) {
 		_ = conn.Disconnect()
 		return
 	}
-	t.Skip("every reply beat the cancel")
+	// do() selects among ready cases at random, so a reply that is already
+	// in when the select runs may win over the cancelled context once in a
+	// while; twenty times in a row means WriteC1 ignores a context that
+	// ended before the call (review II, R2-P5-tassert-10).
+	t.Fatal("WriteC1 succeeded on an already-cancelled context 20 times in a row")
 }
 
 // A C1 write the proxy answers with BluetoothGATTErrorResponse is the

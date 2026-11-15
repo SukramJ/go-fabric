@@ -235,25 +235,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	opCreds := r.OperationalCredentials
 
-	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
-	// A fresh fail-safe context starts before its arm is recorded, so an
-	// arm from a fabric whose earlier rollback it lands arms nothing
-	// (review II, R2-P2-dr-noc-04).
-	generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
-	// CommissioningComplete commits the fabric row the fail-safe's NOC
-	// command wrote, as its last store write (owner decision 36); a Wi-Fi
-	// node stores its network list before it (below).
-	generalCom.SetFailSafeCommit(opCreds.CommitFailSafe)
-	// The topology's fail-safe participants revert after the root's own
-	// rollback (failsafe.go).
-	participants := d.onFailSafeExpired
-	expired := func(ctx context.Context, fi uint8) {
-		opCreds.OnFailSafeExpiry(ctx, fi)
-		if participants != nil {
-			participants(ctx, fi)
-		}
-	}
-	generalCom.SetOnFailSafeExpired(expired)
+	without := cfg.withoutFailSafeHooks
+	expired := wireFailSafeHooks(generalCom, opCreds, d.onFailSafeExpired, without)
 
 	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeRootNode))}}
 	if cfg.OTA != nil {
@@ -338,7 +321,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		// The network list is stored before the fabric row is committed,
 		// and written back when that commit fails (review II,
 		// R2-P2-store-01).
-		generalCom.SetFailSafeCommit(wifiFailSafeCommit(opCreds, wifiNC))
+		if !without.has(failSafeHookCommit) {
+			generalCom.SetFailSafeCommit(wifiFailSafeCommit(opCreds, wifiNC))
+		}
 		netComm = wifiNC
 	} else {
 		r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
@@ -757,6 +742,52 @@ func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.Gener
 	}
 	return gc, nil
 }
+
+// wireFailSafeHooks wires the fail-safe hooks between the two clusters
+// (wiring.go:184-200 at b4ea1f96^) but those without names, and returns
+// the expiry handler it installed, which a Wi-Fi node extends. A fresh
+// fail-safe context starts before its arm is recorded, so an arm from a
+// fabric whose earlier rollback it lands arms nothing (review II,
+// R2-P2-dr-noc-04). CommissioningComplete commits the fabric row the
+// fail-safe's NOC command wrote, as its last store write (owner decision
+// 36); a Wi-Fi node stores its network list before it (buildRoot). The
+// topology's fail-safe participants revert after the root's own rollback
+// (failsafe.go).
+func wireFailSafeHooks(generalCom *mattercore.GeneralCommissioning, opCreds *mattercore.OperationalCredentials, participants func(ctx context.Context, fabricIndex uint8), without failSafeHooks) func(ctx context.Context, fabricIndex uint8) {
+	if !without.has(failSafeHookStarting) {
+		generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
+	}
+	if !without.has(failSafeHookCommit) {
+		generalCom.SetFailSafeCommit(opCreds.CommitFailSafe)
+	}
+	expired := func(ctx context.Context, fi uint8) {
+		if !without.has(failSafeHookExpiry) {
+			opCreds.OnFailSafeExpiry(ctx, fi)
+		}
+		if participants != nil {
+			participants(ctx, fi)
+		}
+	}
+	generalCom.SetOnFailSafeExpired(expired)
+	return expired
+}
+
+// failSafeHooks names fail-safe hooks between GeneralCommissioning and
+// OperationalCredentials, each a path that clears the pending credential
+// state: CommissioningComplete's commit (CommitFailSafe, through
+// wifiFailSafeCommit on a Wi-Fi node), a fresh fail-safe's start
+// (PrepareFreshFailSafe) and the fail-safe's expiry (OnFailSafeExpiry).
+// Config.withoutFailSafeHooks, TESTING ONLY, leaves the named ones
+// unwired.
+type failSafeHooks uint8
+
+const (
+	failSafeHookCommit failSafeHooks = 1 << iota
+	failSafeHookStarting
+	failSafeHookExpiry
+)
+
+func (h failSafeHooks) has(hook failSafeHooks) bool { return h&hook != 0 }
 
 // wifiFailSafeCommit is CommissioningComplete's durable commit on a Wi-Fi
 // node: the network list is stored, then the fabric row committed; a

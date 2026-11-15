@@ -86,7 +86,9 @@ func newStartedBridgeWithSnapshotter(t *testing.T, snap Snapshotter) *Bridge {
 		snap,
 		nil,
 		Config{
-			Listen: ":0",
+			// 127.0.0.1, where the tests reach it: a wildcard bind may share
+			// its port with another socket on 127.0.0.1 (owned_socket_test.go).
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)

@@ -15,7 +15,6 @@ concurrency:
 
 env:
   CGO_ENABLED: "0"
-  GO_VERSION: "1.27.4"
   # The lint tools are pinned on purpose, and pinned to the same versions
   # the reference daemon uses. A new lint release adds checks that are style
   # decisions, and floating on @latest makes this gate report on the calendar
@@ -28,6 +27,15 @@ env:
   # golangci-lint bundles, so check `gofumpt -l .` against GOFUMPT_VERSION too.
   GOFUMPT_VERSION: "v0.12.0"
   GOLANGCI_LINT_VERSION: "v2.14.0"
+  # The workflow linters (job workflow-lint), pinned the same way and to
+  # the Makefile's versions.
+  ACTIONLINT_VERSION: "v1.7.12"
+  ZIZMOR_VERSION: "1.32.0"
+  # The SHA-256 of zizmor's manylinux_2_28_x86_64 wheel at ZIZMOR_VERSION
+  # (PyPI's digest, the wheel pip picks on ubuntu-latest); zizmor has no
+  # dependencies, so pip --require-hashes installs exactly this file. A
+  # bump of ZIZMOR_VERSION bumps this with it.
+  ZIZMOR_SHA256: "84a6acb975accc13408786a2bd274b572537ca19c933ebbc13e78f3988562071"
 
 jobs:
   build:
@@ -35,9 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # This module is a library — there is no binary to smoke-test, so
       # compiling the whole package graph is the whole of the build leg.
@@ -49,9 +59,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # An int is 32 bits on arm and 386, so an untyped constant past
       # math.MaxInt32 that converts to int compiles on amd64 and fails here
@@ -59,19 +71,43 @@ jobs:
       # type-checks the test files too.
       - name: go build (linux/armv7), go vet (linux/386)
         run: make build-32bit
+
+  # The build leg above only compiles and vets; no test of it ran where an
+  # int is 32 bits (review II, R2-P1-req-02 / R2-P5-sup-02). This leg runs
+  # the tests of the wire-parsing packages as linux/386 binaries
+  # (TEST_32BIT_PKGS in the Makefile). They are static (CGO_ENABLED=0) and
+  # run directly on the amd64 runner, whose kernel executes 386 ELF without
+  # an emulator. Its own job, not a step of `build (32-bit)`: that one is a
+  # required check, and this one enters the protection after its first
+  # green run (script/requiredchecks, a pending row).
+  test-32bit:
+    name: test (linux/386)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test (linux/386)
+        run: make test-32bit
+
   apidiff:
     name: apidiff
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # The guard compares with the last tag: the full history and the
           # tags, not the shallow checkout.
           fetch-depth: 0
           fetch-tags: true
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # A break is announced before it ships (README, How a consumer
       # learns about a break): every incompatible change against the last
@@ -85,9 +121,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Overlaps with the govet linter in the lint job, but runs even when a
       # lint failure elsewhere in the config stops that job early, and vets
@@ -100,9 +138,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # The race detector is not optional for this module: it is a protocol
       # stack whose session, subscription and MRP paths are concurrent by
@@ -120,9 +160,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Per-package statement coverage against the floors in
       # script/coverfloor/floors.go. Per package rather than one module-wide
@@ -142,9 +184,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Ten iterations per benchmark: this leg measures nothing — a shared
       # runner's numbers are not comparable between runs — it proves the
@@ -159,9 +203,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Regenerates the inventory and fails on the two things a committed
       # snapshot cannot catch by itself: a snapshot that no longer matches the
@@ -186,9 +232,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Holds the matter.js test-porting register (script/testparity) against
       # the committed snapshot of matter.js's test files at the schema pin: no
@@ -204,9 +252,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # script/citecheck (concept v4 §A.2) checks every `<file>.ts:<line>`
       # the Go code cites against matter.js at the pin, parity/schema.json →
@@ -245,16 +295,18 @@ jobs:
           git -C "$MATTERJS_SERVER_DIR" sparse-checkout set packages/ws-controller packages/ws-client
           git -C "$MATTERJS_SERVER_DIR" -c advice.detachedHead=false checkout -q 0bd06f22
       - name: cite-check
-        run: make cite-check MATTERJS_DIR="${{ runner.temp }}/matter.js" MATTERJS_SERVER_DIR="${{ runner.temp }}/matterjs-server"
+        run: make cite-check MATTERJS_DIR="$RUNNER_TEMP/matter.js" MATTERJS_SERVER_DIR="$RUNNER_TEMP/matterjs-server"
 
   chipdm:
     name: chip data model cross-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # The cross-check (internal/chipdm, ADR 0015) reads connectedhomeip's
       # data_model/<version> XML at test time; nothing derived from it is
@@ -298,19 +350,21 @@ jobs:
           git -C "$CHIP_DIR" -c advice.detachedHead=false checkout -q FETCH_HEAD
           du -sh "$CHIP_DIR"
       - name: cross-check
-        run: make chipdm-check CHIP_ROOT="${{ runner.temp }}/connectedhomeip"
+        run: make chipdm-check CHIP_ROOT="$RUNNER_TEMP/connectedhomeip"
 
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       - name: install pinned lint tooling
-        run: go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
+        run: go install "mvdan.cc/gofumpt@$GOFUMPT_VERSION"
       # Install golangci-lint v2 from source with the Go toolchain set up
       # above. The prebuilt binary ships built with an older Go and refuses
       # to run against a module targeting a newer one; golangci-lint-action@v6
@@ -318,7 +372,7 @@ jobs:
       # (version/formatters/linters.default keys). A direct `go install` of
       # the /v2/ module avoids both problems.
       - name: golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
       # make lint runs the same gofumpt check, config verify, linter run and
       # module-hygiene steps a contributor gets locally, so the two cannot
       # drift apart. The versions above are the ones the Makefile pins.
@@ -327,20 +381,53 @@ jobs:
       - name: lint
         run: make lint
 
+  # The workflows themselves (review II, R2-P5-sup-15): actionlint reads
+  # the workflow model (expressions, contexts, the job graph), zizmor the
+  # supply-chain and injection rules (unpinned actions, permissions,
+  # template injection, persisted credentials, dangerous triggers). Both
+  # pinned, like the lint tools above, and the same versions as the
+  # Makefile's. Not a required check yet: neither tool ran where this job
+  # was written, so its first run's findings are not known; it enters the
+  # branch protection after a green run (script/requiredchecks, a pending
+  # row). script/requiredchecks holds the one rule that needs no tool: no
+  # ${{ }} expression inside a run script.
+  workflow-lint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: install actionlint and zizmor
+        run: |
+          set -euo pipefail
+          go install "github.com/rhysd/actionlint/cmd/actionlint@$ACTIONLINT_VERSION"
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          printf 'zizmor==%s --hash=sha256:%s\n' "$ZIZMOR_VERSION" "$ZIZMOR_SHA256" >"$RUNNER_TEMP/zizmor-requirements.txt"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --quiet --require-hashes --only-binary :all: -r "$RUNNER_TEMP/zizmor-requirements.txt"
+      - name: workflow lint
+        run: make workflow-lint ZIZMOR="$RUNNER_TEMP/zizmor/bin/zizmor"
+
   bluez:
     name: ble/bluez
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
           cache-dependency-path: |
             go.sum
             ble/bluez/go.sum
       - name: golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
       # ble/bluez is a module of its own (ADR 0024 decision 3), so no other
       # job's ./... reaches it: build (Linux and the !linux stub), vet, test,
       # lint and module hygiene inside it. Its tests run over an in-process
@@ -353,16 +440,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
           cache-dependency-path: |
             go.sum
             wifi/wpasupplicant/go.sum
             examples/ble-wifi-light/go.sum
       - name: golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
       # wifi/wpasupplicant and examples/ble-wifi-light are modules of their
       # own (brief 28b), so no other job's ./... reaches them: build, vet,
       # test (the driver over an in-process bus, -race), lint and module
@@ -378,15 +467,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
           cache-dependency-path: |
             go.sum
             ble/esphome/go.sum
       - name: golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
       # ble/esphome is a module of its own (ADR 0024 decision 3), so no other
       # job's ./... reaches it: build (Linux, darwin, windows), vet, the tests
       # under the race detector against the in-process fake proxy, lint and

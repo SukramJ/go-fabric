@@ -26,7 +26,7 @@ import (
 func TestFabricLeavingFlushesTheInvokingSession(t *testing.T) {
 	t.Parallel()
 	const invoking, other uint16 = 41, 42
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0"}, nil)
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

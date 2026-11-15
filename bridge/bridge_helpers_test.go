@@ -264,7 +264,9 @@ func TestAnnounceCommissioning_NilBridge_NoPanic(t *testing.T) {
 	var b *Bridge
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	_ = b.AnnounceCommissioning(ctx, CommissioningAdvertisement{})
+	if err := b.AnnounceCommissioning(ctx, CommissioningAdvertisement{}); err != nil {
+		t.Fatalf("AnnounceCommissioning on a nil bridge = %v, want nil", err)
+	}
 }
 
 func TestAnnounceAndWithdrawCommissioning_RoundTrip(t *testing.T) {
@@ -345,7 +347,7 @@ func newBridgeWithAdvertiser(t *testing.T, advertiser mdns.Advertiser, buf *byte
 		wbEmptySnapshotter,
 		advertiser,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		logger,
 	)

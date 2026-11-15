@@ -61,7 +61,13 @@ var errUnknownFabric = errors.New("memstore: no such fabric")
 // [New].
 type Store struct {
 	mu sync.Mutex
+	tables
+}
 
+// tables is everything the store holds. Erase replaces it whole with a
+// fresh one, so a field added here is erased without a second edit
+// (review II, R2-P5-tassert-13).
+type tables struct {
 	fabrics    map[uint8]store.FabricRecord
 	identities map[uint8]store.IdentityRecord
 	// priors are the values an uncommitted UpdateNOC replaced, by fabric:
@@ -113,7 +119,13 @@ var _ store.Port = (*Store)(nil)
 // New returns an empty store. Like a freshly applied SQLite schema it holds
 // the next-fabric-index counter at 1 (store/schema.sql, matter_metadata).
 func New() *Store {
-	return &Store{
+	return &Store{tables: newTables()}
+}
+
+// newTables returns empty tables. Like a freshly applied SQLite schema they
+// hold the next-fabric-index counter at 1.
+func newTables() tables {
+	return tables{
 		fabrics:    map[uint8]store.FabricRecord{},
 		identities: map[uint8]store.IdentityRecord{},
 		priors:     map[uint8]fabricPrior{},
@@ -136,15 +148,10 @@ func New() *Store {
 
 // Erase empties the store, as [New] returns it ([store.Eraser]).
 func (s *Store) Erase(context.Context) error {
-	fresh := New()
+	fresh := newTables()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.fabrics, s.identities, s.acl, s.aclNextID = fresh.fabrics, fresh.identities, fresh.acl, fresh.aclNextID
-	s.priors = fresh.priors
-	s.keySets, s.keyMap, s.groupTable, s.groupcast = fresh.keySets, fresh.keyMap, fresh.groupTable, fresh.groupcast
-	s.resumption, s.otaDefault, s.icd = fresh.resumption, fresh.otaDefault, fresh.icd
-	s.subs, s.subsSeq, s.settings, s.metadata = fresh.subs, 0, fresh.settings, fresh.metadata
-	s.presets, s.locks = fresh.presets, fresh.locks
+	s.tables = fresh
 	return nil
 }
 

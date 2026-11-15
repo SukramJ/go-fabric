@@ -29,7 +29,7 @@ func TestBuildInitialReport_EmptyRequest_EmptyReport(t *testing.T) {
 	dispatcher := b.Dispatcher()
 	if dispatcher == nil {
 		// Start wires the dispatcher via Reassemble.
-		t.Skip("dispatcher nil after start — topology not yet assembled")
+		t.Fatal("Start left no dispatcher")
 	}
 	req := im.SubscribeRequest{}
 	report, matched := b.buildInitialReport(context.Background(), dispatcher, req)
@@ -57,7 +57,7 @@ func TestBuildInitialReport_SortOrder(t *testing.T) {
 	b := newStartedBridge(t)
 	dispatcher := b.Dispatcher()
 	if dispatcher == nil {
-		t.Skip("dispatcher nil after start")
+		t.Fatal("Start left no dispatcher")
 	}
 
 	// Wildcard read across all endpoints + clusters — let the real
@@ -110,7 +110,7 @@ func TestBuildInitialReport_EventOnlyEmptyLog_Establishes(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	dispatcher := b.Dispatcher()
 	if dispatcher == nil {
-		t.Skip("dispatcher nil after start — topology not yet assembled")
+		t.Fatal("Start left no dispatcher")
 	}
 
 	// No EmitEvent calls precede this — the event log is empty, matching

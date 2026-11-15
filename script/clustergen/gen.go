@@ -1912,11 +1912,36 @@ func (g *generator) test() ([]byte, error) {
 	w.p("\tt.Parallel()")
 	w.p("\tspectest.CheckDefinition(t, Definition)")
 	w.p("}")
-	w.p("")
-	w.p("// TestCodecsRoundTrip encodes a populated value of every generated")
-	w.p("// struct and payload and decodes it back.")
-	w.p("func TestCodecsRoundTrip(t *testing.T) {")
-	w.p("\tt.Parallel()")
+	trips := g.roundTrips()
+	if len(trips) > 0 {
+		w.p("")
+		w.p("// TestCodecsRoundTrip encodes a populated value of every generated")
+		w.p("// struct and payload and decodes it back.")
+		w.p("func TestCodecsRoundTrip(t *testing.T) {")
+		w.p("\tt.Parallel()")
+		for _, line := range trips {
+			w.p("%s", line)
+		}
+		w.p("}")
+	}
+	if g.definitionOnly {
+		g.stateTest(w)
+	} else {
+		g.serverTest(w)
+	}
+	out, err := format.Source(w.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())
+	}
+	return out, nil
+}
+
+// roundTrips is the body of the generated TestCodecsRoundTrip, one line
+// per struct, payload and struct-typed attribute. A cluster with none of
+// them gets no TestCodecsRoundTrip, rather than one whose body cannot fail
+// (review II, R2-P5-tassert-04).
+func (g *generator) roundTrips() []string {
+	var trips []string
 	var structs []*payload
 	for _, di := range g.dataList {
 		if di.kind == kindStruct {
@@ -1925,16 +1950,16 @@ func (g *generator) test() ([]byte, error) {
 	}
 	structs = append(structs, g.anon...)
 	for _, p := range structs {
-		w.p("\tspectest.RoundTrip(t, %s, spec.DecodeStruct[%s])", g.sample(p, 0), p.goName)
+		trips = append(trips, fmt.Sprintf("\tspectest.RoundTrip(t, %s, spec.DecodeStruct[%s])", g.sample(p, 0), p.goName))
 	}
 	for _, p := range g.payloads {
 		switch {
 		case p.response != nil:
-			w.p("\tspectest.RoundTripCommand(t, Definition, Cmd%s, spec.Response, %s)", exportName(p.command.Name), g.sample(p, 0))
+			trips = append(trips, fmt.Sprintf("\tspectest.RoundTripCommand(t, Definition, Cmd%s, spec.Response, %s)", exportName(p.command.Name), g.sample(p, 0)))
 		case p.command != nil:
-			w.p("\tspectest.RoundTripCommand(t, Definition, Cmd%s, spec.Request, %s)", exportName(p.command.Name), g.sample(p, 0))
+			trips = append(trips, fmt.Sprintf("\tspectest.RoundTripCommand(t, Definition, Cmd%s, spec.Request, %s)", exportName(p.command.Name), g.sample(p, 0)))
 		default:
-			w.p("\tspectest.RoundTripEvent(t, Definition, Event%s, %s)", exportName(p.event.Name), g.sample(p, 0))
+			trips = append(trips, fmt.Sprintf("\tspectest.RoundTripEvent(t, Definition, Event%s, %s)", exportName(p.event.Name), g.sample(p, 0)))
 		}
 	}
 	for _, a := range g.attributes() {
@@ -1946,19 +1971,9 @@ func (g *generator) test() ([]byte, error) {
 		if t.kind == kindList {
 			sample = "spec.List[" + t.elem.t.goType + "](" + sample + ")"
 		}
-		w.p("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample)
+		trips = append(trips, fmt.Sprintf("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample))
 	}
-	w.p("}")
-	if g.definitionOnly {
-		g.stateTest(w)
-	} else {
-		g.serverTest(w)
-	}
-	out, err := format.Source(w.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())
-	}
-	return out, nil
+	return trips
 }
 
 // sample is a Go expression of a populated value of p: every optional

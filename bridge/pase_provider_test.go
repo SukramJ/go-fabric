@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -173,12 +174,27 @@ func TestPerExchangePaseProvider_StartReaper_Cancels(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		p := NewPerExchangePaseProvider(func() *PaseAdapter { return NewPaseAdapter(nil) })
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
 
 		p.StartReaper(ctx, 5*time.Millisecond, time.Millisecond)
 		p.StartReaper(ctx, 5*time.Millisecond, time.Millisecond) // idempotent
-		p.Stop()
-		p.Stop() // idempotent
+		// With the context still live, only Stop can end the reaper: a
+		// reaper the second StartReaper left running would hold Stop's
+		// wait (review II, R2-P5-tassert-05).
+		stopped := make(chan struct{})
+		go func() {
+			p.Stop()
+			p.Stop() // idempotent
+			close(stopped)
+		}()
+		synctest.Wait()
+		select {
+		case <-stopped:
+		default:
+			cancel() // let the bubble drain before failing
+			t.Fatal("Stop did not return: a reaper outlived it")
+		}
 	})
 }
 

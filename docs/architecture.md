@@ -83,8 +83,9 @@ model-and-protocol layer and `binding` and `node` import them downward
 They lived under `controller/` before v0.10.0; the old import paths
 forwarded to them until v0.12.0, which removed them.
 
-The order of [`examples/reference-controller`](https://github.com/SukramJ/go-fabric/tree/main/examples/reference-controller)'s
-`open()` is the canonical construction order.
+The order of `openStack` in
+[`examples/reference-controller/cli/stack.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/reference-controller/cli/stack.go)
+is the canonical construction order.
 
 ## Where the data model comes from
 
@@ -185,7 +186,7 @@ The layers and their allowed direction are held by `script/archcheck`
 | Out | Why | Record |
 | --- | --- | --- |
 | Thread radio | needs hardware and a border router; a commissioner can still hand a device a Thread dataset; an existing OpenThread Border Router is managed over its REST API instead (`thread/otbr`, `cluster/threadbr`) | concept v3, [ADR 0027](adr/0027-thread-border-router-over-otbr-rest.md) |
-| Bluetooth on the device side | a LAN-attached node has no use for it; the commissioner's BLE is decided | [ADR 0024](adr/0024-ble-commissioning-in-the-controller.md) |
+| Bluetooth on a commissioned node | the device side serves BLE only while the node has no fabric: an uncommissioned node is commissioned over BLE through a `contract.BLEPeripheral` (`node.Config.Network.BLE`), and a node with a fabric never touches the radio; the commissioner's BLE is decided | [ADR 0031](adr/0031-ble-and-wifi-provisioning-on-the-device-side.md), [ADR 0024](adr/0024-ble-commissioning-in-the-controller.md) |
 | The camera's media path | the module serves the camera and WebRTC clusters (milestone 6); capturing, encoding and streaming the media are the host's, behind `camera.*Port` ([camera guide](guides/camera.md)) | [matter.js comparison](matterjs-comparison.md) |
 | CSA certification | not pursued; certifiability is the goal | [ADR 0011](adr/0011-certifiability-is-a-goal.md) |
 

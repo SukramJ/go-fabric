@@ -70,8 +70,16 @@ func TestIdentify_ClusterID(t *testing.T) {
 func TestIdentify_MatterDataVersionInitialZero(t *testing.T) {
 	t.Parallel()
 	id := core.NewIdentify()
-	// Not bumped until a write/invoke occurs — starts at 0.
-	_ = id.MatterDataVersion() // must not panic
+	// The name is historical: the initial DataVersion is a random non-zero
+	// uint32 (cluster/dataversion.go), never 0, and a read does not bump it
+	// (review II, R2-P5-tassert-05).
+	v := id.MatterDataVersion()
+	if v == 0 {
+		t.Fatal("initial DataVersion is 0, want a random non-zero value")
+	}
+	if again := id.MatterDataVersion(); again != v {
+		t.Fatalf("DataVersion moved from %d to %d without a write", v, again)
+	}
 }
 
 func TestIdentify_ReadAllAttributes(t *testing.T) {

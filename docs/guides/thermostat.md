@@ -45,8 +45,9 @@ it.
 ## Week programs (MSCH)
 
 matter.js does not implement MatterScheduleConfiguration. This server
-implements it after connectedhomeip's `ThermostatSchedules`, which is the
-behavioural authority for this feature.
+implements it after connectedhomeip's `ThermostatClusterSchedules.cpp` at
+`645b267a`, which is the behavioural authority for this feature; the
+harness commit `6170af84` has no schedules server yet.
 
 **Configuration.** `ThermostatConfig`, or the declaration's `Initial`
 under the attribute names, holds:
@@ -109,7 +110,8 @@ With the Events feature (TEVT), `SetActiveScheduleRequest` emits
 
 matter.js's server emits none of the cluster's eight events. The server
 follows connectedhomeip (`ThermostatClusterEvents.cpp` and its call sites
-at `6170af84`): every event needs TEVT, and the EventList carries the
+at `6170af84`; ActiveScheduleChange's call site is in
+`ThermostatClusterSchedules.cpp` at `645b267a`): every event needs TEVT, and the EventList carries the
 events of the selection (LocalTemperatureChange without LTNE,
 OccupancyChange with OCC, RunningModeChange with AUTO,
 ActiveScheduleChange with MSCH, ActivePresetChange with PRES).
@@ -182,8 +184,8 @@ return the refusal.
 
 *Source: `cluster/thermo/schedules.go`, `cluster/thermo/schedules_write.go`
 (MSCH), `cluster/thermo/atomic.go` (`commitWrite`, `precommitAtomic`);
-`cluster/thermo/thermostat_server.go:82-83` (features),
-`:128-211` (`ThermostatConfig`), `:261-288` (`Sink`), `:548-562` (the
-optional attributes), `:602-683` and `:1460`, `:1480` (inbound setters),
-`:1001-1018` (the hold write); `cluster/thermo/thermostat_typed.go:74`
-(`SetAttributes`); `cluster/thermo/presets.go:394`, `:421`.*
+`cluster/thermo/thermostat_server.go` (the `ThermostatFeature…`
+constants, `ThermostatConfig`, `Sink`, `servedOptional`, the inbound
+`Set…` methods, `writeHold`); `cluster/thermo/thermostat_typed.go`
+(`SetAttributes`); `cluster/thermo/presets.go` (`SetPresets`,
+`SetActivePresetHandle`).*

@@ -93,6 +93,10 @@ operations guide.
   the example over BLE onto Wi-Fi under connectedhomeip's own BlueZ and
   wpa_supplicant mocks, then reads NetworkCommissioning and switches the
   light, with chip's all-clusters app under the same mocks as the control;
+- `make chiptool-ble-cases` (and its CI job): connectedhomeip's Python
+  certification cases whose TH commissions over BLE onto Wi-Fi in the
+  test, run against the example under the same mocks with the harness
+  image's BLE-capable Python controller;
 - the weekly `ble-virtual` job: the example on real bluetoothd over virtual
   HCI controllers, commissioned by the module's controller and by
   matter.js's, its Wi-Fi a real wpa_supplicant with hostapd on
@@ -100,9 +104,11 @@ operations guide.
 - the owner's hardware test on a Raspberry Pi with chip-tool, the reference
   controller and Apple Home.
 
-The certification cases that commission over BLE inside the test do not
-run: the harness's Python controller is built without BLE
-([certifiability](../certifiability.md)).
+What does not run: the DD and SC cases that discover the node over BLE,
+which are manual YAML cases at the harness pin
+([certifiability](../certifiability.md#families-this-module-does-not-run-yet));
+the cases that do commission over BLE are listed under
+[Cases that commission over BLE](../certifiability.md#cases-that-commission-over-ble).
 
 *Source: [`examples/ble-wifi-light/main.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/ble-wifi-light/main.go),
 [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Network.BLE`, `WiFi.Driver`),

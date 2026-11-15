@@ -4,7 +4,9 @@ A node keeps its state behind a port, `store.Port`. The shipped backend is
 SQLite: the `store` package works on a `*sql.DB` it is handed — the host
 opens the database, picks the driver and owns the handle, or the node opens
 it for `Config.Store.Path` — and embeds the DDL its queries are written
-against and applies it; it never opens a database itself. The second backend, `store/memstore`,
+against and applies it. `store.OpenSQLite` is the module's opener (the
+pure-Go driver and its pragmas), which `Config.Store.Path` and
+`controller.OpenDB` use; `store.New` itself never opens a database. The second backend, `store/memstore`,
 keeps the same state in memory. This page describes the port and what a
 backend of a host's own must guarantee, then lists what SQLite stores
 where, what survives a restart, and how schema changes reach a host.

@@ -24,11 +24,11 @@
 //     per-fabric MaxSubscriptions quota; a request admitted at the quota
 //     with [SubscribeArgs.EvictAtQuota] ends the fabric's oldest.
 //
-// go-fabric v1.1 ships a baseline implementation: subscriptions
-// live in RAM, reports are produced by a single Tick goroutine that
-// drives every Subscription's MaxInterval timer, and attribute
-// changes flow in via [Manager.OnAttributeChanged] (called by the
-// bridge core when the source DP fires).
+// A [Manager] holds the live subscriptions in memory; its tick
+// goroutine ([Manager.Start]) drives every Subscription's MaxInterval
+// timer and starts the reports that are due, and attribute changes
+// flow in via [Manager.OnAttributeChanged], which the bridge calls for
+// a changed attribute.
 //
 // Subscriptions survive a restart the way matter.js keeps them
 // (docs/adr/0008): [Subscription.PeerSubscription] captures the persisted

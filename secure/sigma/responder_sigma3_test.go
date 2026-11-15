@@ -36,9 +36,13 @@ func (v nocSubjectVerifier) PeerCATsFromNOC(noc []byte) ([]uint32, error) {
 }
 
 // newTestNOC returns a fresh uncompressed P-256 public key usable as a
-// NOC fixture for [testVerifier] — chain verification accepts it, so a
-// forged Sigma3 built around it reaches the transcript signature check.
-func newTestNOC(t *testing.T) []byte {
+// NOC fixture for [testVerifier] and records its subject in
+// [testSubjects] — chain verification accepts it and the responder's
+// fabric-id check reads fabricID back from it, so a forged Sigma3 built
+// around it reaches the transcript signature check. Without the subject
+// the fabric-id check refuses the forgery first and a test that expects
+// the signature to reject it holds nothing (R2-P5-tmut-04).
+func newTestNOC(t *testing.T, nodeID, fabricID uint64) []byte {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -48,6 +52,7 @@ func newTestNOC(t *testing.T) []byte {
 	if err != nil {
 		t.Fatalf("PublicKey.Bytes: %v", err)
 	}
+	testSubjects.Store(string(noc), testSubject{nodeID: nodeID, fabricID: fabricID})
 	return noc
 }
 
@@ -93,7 +98,7 @@ func TestResponderSigma3SignatureFailureCommitsNoPeerIdentity(t *testing.T) {
 	const fabricID = uint64(0x2A)
 
 	attackerID := newTestIdentity(t, 0xAAAA, fabricID, ipk)
-	victimNOC := newTestNOC(t)
+	victimNOC := newTestNOC(t, 0x5151, fabricID)
 	ver := nocSubjectVerifier{
 		nodeIDs: map[string]uint64{
 			string(attackerID.NOC): 0xAAAA,
@@ -116,8 +121,8 @@ func TestResponderSigma3SignatureFailureCommitsNoPeerIdentity(t *testing.T) {
 	}
 
 	forged := forgeSigma3(t, responder, ipk, sigma1Bytes, sigma2, victimNOC)
-	if err := responder.ProcessSigma3(forged); err == nil {
-		t.Fatal("ProcessSigma3 accepted a Sigma3 with an unverifiable transcript signature")
+	if err := responder.ProcessSigma3(forged); !errors.Is(err, ErrSignatureInvalid) {
+		t.Fatalf("ProcessSigma3(forged) err = %v, want ErrSignatureInvalid — only the transcript signature may reject this Sigma3", err)
 	}
 
 	if got := responder.PeerCATs(); got != nil {
@@ -143,7 +148,7 @@ func TestResponderSigma3FailureEndsHandshakeUntilNewSigma1(t *testing.T) {
 	const fabricID = uint64(0x2A)
 
 	attackerID := newTestIdentity(t, 0xAAAA, fabricID, ipk)
-	victimNOC := newTestNOC(t)
+	victimNOC := newTestNOC(t, 0x5151, fabricID)
 	ver := nocSubjectVerifier{
 		nodeIDs: map[string]uint64{
 			string(attackerID.NOC): 0xAAAA,
@@ -170,8 +175,8 @@ func TestResponderSigma3FailureEndsHandshakeUntilNewSigma1(t *testing.T) {
 	}
 
 	forged := forgeSigma3(t, responder, ipk, sigma1Bytes, sigma2, victimNOC)
-	if err := responder.ProcessSigma3(forged); err == nil {
-		t.Fatal("ProcessSigma3 accepted a forged Sigma3")
+	if err := responder.ProcessSigma3(forged); !errors.Is(err, ErrSignatureInvalid) {
+		t.Fatalf("ProcessSigma3(forged) err = %v, want ErrSignatureInvalid", err)
 	}
 	if err := responder.ProcessSigma3(honestSigma3); !errors.Is(err, ErrSessionState) {
 		t.Fatalf("second Sigma3 after a failed one: err = %v, want ErrSessionState — the failed handshake stayed open", err)

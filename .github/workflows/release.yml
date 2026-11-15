@@ -10,14 +10,28 @@ name: release
 # published module version is immutable. Once proxy.golang.org has served
 # v1.2.3, that tree is what every consumer gets forever; retracting it is a
 # follow-up release, never an edit.
+#
+# Three jobs (review II, R2-P5-sup-04, -12, -01):
+#
+#   - verify (a root tag vX.Y.Z): where the tag points, the version, the
+#     tagged tree's build and tests, the changelog section. Read-only: the
+#     tree's code and its test dependencies run here, and no token that can
+#     write is in reach.
+#   - release (needs verify): the GitHub release. The one job that may
+#     write; it builds and tests nothing.
+#   - nested (a nested tag <dir>/vX.Y.Z): where the tag points, and the
+#     module it names in release shape (script/nested-release-check.sh).
+#     A nested tag gets no GitHub release.
 
 on:
   push:
     tags:
       - "v*"
+      # A nested module's tag (ble/bluez/v0.22.1): `*` does not match a
+      # slash, so "v*" never fires for one.
+      - "**/v*"
 
-permissions:
-  contents: write # create the GitHub release
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -25,20 +39,39 @@ concurrency:
 
 env:
   CGO_ENABLED: "0"
-  GO_VERSION: "1.27.4"
 
 jobs:
-  release:
-    name: release
+  verify:
+    name: verify
+    if: ${{ !contains(github.ref_name, '/') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # the ci runs of the tagged commit
+    outputs:
+      modpath: ${{ steps.version.outputs.modpath }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # full history: the tag object and the changelog
+          persist-credentials: false
+          fetch-depth: 0 # full history: the tag object, main and the changelog
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          go-version-file: go.mod
+          # No cache in the release workflow: a cache entry is the one input
+          # a run on another ref could have written.
+          cache: false
+
+      # The tagged commit is on main, and a ci run on it passed every
+      # required check ci.yml defines — race detector included
+      # (script/release-provenance.sh; a ci job not yet required does not
+      # block). Otherwise a tag could publish a commit no pull request and
+      # no required check ever saw.
+      - name: verify where the tag points
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: script/release-provenance.sh "$GITHUB_REF_NAME"
 
       # The module-version rules are not advisory: a tag the toolchain cannot
       # parse is invisible to `go get`, and a v2+ tag on a module path without
@@ -47,6 +80,7 @@ jobs:
       # so they fail loudly here instead. The module path is read from the
       # module itself rather than restated.
       - name: verify the tag is a usable module version
+        id: version
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
@@ -74,54 +108,54 @@ jobs:
                 ;;
             esac
           fi
-          {
-            echo "PRERELEASE="
-            echo "MODPATH=${MODPATH}"
-          } >> "$GITHUB_ENV"
+          PRERELEASE=""
           case "$TAG" in
-            *-*) echo "PRERELEASE=--prerelease" >> "$GITHUB_ENV" ;;
+            *-*) PRERELEASE="--prerelease" ;;
           esac
+          {
+            echo "modpath=${MODPATH}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "$GITHUB_OUTPUT"
           echo "tag ${TAG} is a valid version for module ${MODPATH}"
 
       # A tagged tree that does not compile cannot be withdrawn, only
       # superseded. This is cheaper than that. The race detector is not
-      # repeated: it ran on this commit through ci before the tag was cut,
-      # and a green race run does not become stale in the minutes since.
+      # repeated: the ci run the provenance step above requires ran it on
+      # this commit.
       - name: build and test the tagged tree
         run: |
           make build
           make vet
           make test
 
-      # The release body is the curated CHANGELOG section, not a commit dump.
-      # The tag is vX.Y.Z and the changelog headers are Keep a Changelog
-      # "## [X.Y.Z] …", so strip the leading v and slice from that header to
-      # the next "## [". A missing section fails the release: shipping a
-      # version whose changelog nobody wrote is the thing this prevents.
+      # A missing changelog section fails here, before anything is published.
+      - name: the CHANGELOG section exists
+        run: script/release-notes.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/RELEASE_NOTES.md"
+
+  release:
+    name: release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # The release body is the curated CHANGELOG section, not a commit dump
+      # (script/release-notes.sh).
       - name: extract release notes from CHANGELOG.md
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          awk -v ver="$VERSION" '
-            /^## \[/ {
-              if (insec) exit
-              if (index($0, "## [" ver "]") == 1) { insec=1; next }
-            }
-            insec { print }
-          ' CHANGELOG.md > RELEASE_NOTES.md
-          # Trim leading blank lines.
-          sed -i -e '/./,$!d' RELEASE_NOTES.md
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "::error::No '## [${VERSION}]' section in CHANGELOG.md — add it in the release commit."
-            exit 1
-          fi
-          echo "Release notes for ${VERSION}:" >&2
-          cat RELEASE_NOTES.md >&2
+        run: script/release-notes.sh "$GITHUB_REF_NAME" RELEASE_NOTES.md
 
       # Stable releases open with the one-line sponsoring note in
       # .github/SPONSORING.md; a prerelease tag does not.
       - name: Prepend sponsoring note
-        if: env.PRERELEASE == ''
+        if: needs.verify.outputs.prerelease == ''
         run: |
           set -euo pipefail
           { cat .github/SPONSORING.md; cat RELEASE_NOTES.md; } > notes.tmp
@@ -133,6 +167,7 @@ jobs:
       - name: create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           set -euo pipefail
           gh release create "${GITHUB_REF_NAME}" \
@@ -148,6 +183,8 @@ jobs:
       # Non-blocking: the release is already published, and the proxy will
       # serve the version on first request regardless.
       - name: warm the module proxy
+        env:
+          MODPATH: ${{ needs.verify.outputs.modpath }}
         run: |
           set -euo pipefail
           tmp="$(mktemp -d)"
@@ -158,3 +195,32 @@ jobs:
           else
             echo "::warning::${MODPATH}@${GITHUB_REF_NAME} is not resolvable from proxy.golang.org yet; it will be on the first consumer request"
           fi
+
+  nested:
+    name: nested module tag
+    if: ${{ contains(github.ref_name, '/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # the ci runs of the tagged commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The requires are checked against this repository's tags.
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: verify where the tag points
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: script/release-provenance.sh "$GITHUB_REF_NAME"
+      # The tag names a nested module with a Go module version, and that
+      # module builds against the versions it requires, its replace dropped.
+      # The version is already published when this runs; a red run here is
+      # the signal to supersede it.
+      - name: the module in release shape
+        run: script/nested-release-check.sh --tag "$GITHUB_REF_NAME"

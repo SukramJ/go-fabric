@@ -410,12 +410,36 @@ func TestLastFabricReopenWaitsForTheFailSafe(t *testing.T) {
 	if err := n.Root().GeneralCommissioning.ArmFailSafeFor(ctx, 60, 0); err != nil {
 		t.Fatalf("arm the fail-safe over PASE: %v", err)
 	}
+	// The pending reopen's checks: two that found no session and the
+	// fail-safe armed are two decisions the fail-safe alone kept the
+	// window closed by (before review II, phase 5 a fixed 1 s sleep stood
+	// here, R2-P5-tassert-12).
+	held := make(chan struct{}, 64)
+	node.OnReopenCheck(n, func(armed bool, sessions int) {
+		if armed && sessions == 0 {
+			select {
+			case held <- struct{}{}:
+			default:
+			}
+		}
+	})
 	if err := n.RemoveFabric(ctx, c.FabricIndex()); err != nil {
 		t.Fatalf("RemoveFabric: %v", err)
 	}
-	time.Sleep(4 * 250 * time.Millisecond)
-	if n.Bridge().CommissioningWindow().IsOpen() {
-		t.Fatal("the own window reopened while a fail-safe was armed")
+	wait, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for range 2 {
+		select {
+		case <-held:
+		case <-wait.Done():
+			if n.Bridge().CommissioningWindow().IsOpen() {
+				t.Fatal("the own window reopened while a fail-safe was armed")
+			}
+			t.Fatal("the pending reopen never checked the node with the fail-safe armed and no session")
+		}
+		if n.Bridge().CommissioningWindow().IsOpen() {
+			t.Fatal("the own window reopened while a fail-safe was armed")
+		}
 	}
 	n.Root().GeneralCommissioning.ExpireFailSafe(ctx)
 	waitRecord(t, adv, "own window after the fail-safe ended", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })

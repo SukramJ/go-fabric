@@ -375,7 +375,7 @@ func TestPBKDFParamResponseWrongResponderRandomLength(t *testing.T) {
 }
 
 // TestPBKDFParamResponseDefensiveSaltCopy — mutating the source payload
-// after decode must not affect the decoded Salt slice (appendOctets
+// after decode must not affect the decoded Salt slice (octetMember
 // copies on every read). Use a 16-byte salt (smallest spec-valid
 // length per Matter §3.10.3) so the decoder accepts it.
 func TestPBKDFParamResponseDefensiveSaltCopy(t *testing.T) {

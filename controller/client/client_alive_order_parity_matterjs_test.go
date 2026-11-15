@@ -35,9 +35,9 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		var (
-			armed atomic.Bool
-			mu    sync.Mutex
-			order []string
+			armed, live atomic.Bool
+			mu          sync.Mutex
+			order       []string
 		)
 		record := func(s string) {
 			if armed.Load() {
@@ -62,14 +62,16 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 						}
 						record("changed")
 					},
-					Event:             func(uint16, uint32, uint32, client.EventData, any) { record("event") },
-					SubscriptionAlive: func() { record("alive") },
+					Event:                     func(uint16, uint32, uint32, client.EventData, any) { record("event") },
+					SubscriptionStatusChanged: func(active bool) { live.Store(active) },
+					SubscriptionAlive:         func() { record("alive") },
 				}
 			}
 		})
 		n := sr.reg.Get("peer1")
 		const id = 0x52
 		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), id)
+		waitGoneLive(t, &live)
 		client.WaitRegistry(sr.reg)
 		armed.Store(true)
 
@@ -120,7 +122,7 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		var armed, alive atomic.Bool
+		var armed, alive, live atomic.Bool
 		entered := make(chan struct{}, 1)
 		release := make(chan struct{})
 		sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) {
@@ -136,6 +138,7 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 						default:
 						}
 					},
+					SubscriptionStatusChanged: func(active bool) { live.Store(active) },
 					SubscriptionAlive: func() {
 						if armed.Load() {
 							alive.Store(true)
@@ -147,6 +150,7 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 		n := sr.reg.Get("peer1")
 		const id = 0x53
 		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), id)
+		waitGoneLive(t, &live)
 		client.WaitRegistry(sr.reg)
 		armed.Store(true)
 
@@ -175,6 +179,22 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 			t.Fatal("the alive hook queued behind the report ran after the node stopped")
 		}
 	})
+}
+
+// waitGoneLive waits until the subscription went live and the alives it
+// queued before it went live — the priming report's, which runs when its
+// job finds the subscription id already set, and the going-live one,
+// queued right after the status hook (network.go announceSubscriptionStatus)
+// — have run: SubscriptionActive may read true before either is queued.
+// Armed before they ran, a test took one for the report's alive (review
+// II, phase 5: TestSubscriptionAliveNotAfterStop twice under
+// `make race`). It must run in the bubble. The first alive starts the
+// registry's label reconciliation (Registry.hooksFor), so a
+// client.WaitRegistry comes after it, never before.
+func waitGoneLive(t *testing.T, live *atomic.Bool) {
+	t.Helper()
+	waitUntil(t, "the subscription's going-live announcement", live.Load)
+	synctest.Wait()
 }
 
 // TestEstablishedAliveFollowsThePrimingReportsHooks: the alive of a
@@ -260,6 +280,10 @@ func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
 		if len(early) != 0 {
 			t.Fatalf("hooks %v ran while the priming report's EndpointInstalled held the queue", early)
 		}
+		// The alive the release lets run starts the label reconciliation:
+		// the bubble settles before the registry's work is waited for (see
+		// client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		waitUntil(t, "the alive hook", func() bool {
 			mu.Lock()

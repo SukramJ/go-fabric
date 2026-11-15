@@ -14,7 +14,6 @@ permissions:
 
 env:
   CGO_ENABLED: "0"
-  GO_VERSION: "1.27.4"
 
 jobs:
   fuzz:
@@ -22,9 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # The module's fuzz targets sit on the Interaction Model decoders, which
       # is where attacker-controlled bytes first become structs. 2000000x is a
@@ -57,9 +58,11 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # make stress sets CGO_ENABLED=1 for the race build itself.
       - name: make stress-flakes
@@ -77,9 +80,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # make race sets CGO_ENABLED=1 itself; the race detector needs cgo.
       - name: go test (race)
@@ -90,9 +95,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
       # Deliberately unpinned, which is the inverse of the lint-tool argument
       # in ci.yml: a newly published advisory SHOULD turn this red without a
@@ -112,6 +119,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # parity/schema.json is an extract from a matter.js checkout, and it
       # records the commit it came from: script/extract-from-matter-js.ts runs
       # `git rev-parse HEAD` inside that checkout and stores it as

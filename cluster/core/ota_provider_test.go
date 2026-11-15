@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -234,7 +235,24 @@ func (f *otaFixture) startDownload(t *testing.T, sessionID uint16, uri string) (
 	if _, _, err := m.Next(context.Background(), bdx.MessageReceiveAccept); err != nil {
 		t.Fatalf("ReceiveAccept: %v", err)
 	}
-	return m, done
+	// The responder stamps the transfer's last activity when it records
+	// the negotiation, after it sent the ReceiveAccept read above
+	// (serveSender in bdx/serve.go); a test that moves the clock next
+	// would otherwise race the stamp and find the transfer active at the
+	// new time (review II, F-db021da0-37).
+	peer := bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if s := f.bdx.SessionFor(peer, otaScope); s != nil {
+			if _, ok := s.Negotiated(); ok {
+				return m, done
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the transfer was accepted and its negotiation never recorded")
+		}
+		runtime.Gosched()
+	}
 }
 
 // TestOTAProvider_BusyWhileDownloading: a query while the peer's transfer

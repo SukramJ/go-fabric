@@ -111,11 +111,13 @@ type Observers struct {
 	// give values. It hears the servers that notify their own changes
 	// (contract.AttributeChangeNotifier, every generated server among
 	// them); a host port that only signals contract.ChangeNotifier is the
-	// host's own and is not repeated here. matter.js has no node-wide
-	// event: it emits per endpoint and behavior, `<attribute>$Changed`
-	// and `stateChanged` (packages/node/src/behavior/Events.ts:52-56,
-	// emitted by Datasource.ts:1444-1446 at 862ad75f) — this hook is
-	// their union for a host that shows every change.
+	// host's own and is not repeated here. matter.js has the same
+	// node-wide path beside its per-behavior `$Changed` events:
+	// ChangeNotificationService.change reports each state update with the
+	// endpoint, the behavior, the data version and the property names, no
+	// values (packages/node/src/node/integration/ChangeNotificationService.ts:79-94
+	// at db021da0). This hook is its counterpart, for a host that shows
+	// every change.
 	OnAttributeChanged func(AttributeChange)
 	// OnEvent runs after a cluster server on any endpoint emitted an
 	// event and the node's event log recorded it ([Node.Events] holds it)

@@ -106,7 +106,7 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 		exchangeID  uint16 = 0x3091
 	)
 	var logs syncBuffer
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0"},
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"},
 		slog.New(slog.NewTextHandler(&logs, nil)))
 	if err != nil {
 		t.Fatalf("New: %v", err)

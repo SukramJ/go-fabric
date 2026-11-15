@@ -28,7 +28,7 @@ func paseCloseBridge(t *testing.T) (*Bridge, *operational.Manager, *clocktest.Fa
 		t.Fatalf("AdoptFabricIndex: %v", err)
 	}
 	clk := clocktest.New(time.Unix(0, 0))
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: clk}, nil)
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", Clock: clk}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

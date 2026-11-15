@@ -170,7 +170,8 @@ type writeRequestJSON struct {
 	} `json:"writeRequests"`
 }
 
-// encodeClientRequest encodes a request fixture with the client encoder;
+// encodeClientRequest encodes a request fixture with the client encoder
+// (InvokeRequest with commandFields left out, as the fixtures carry none);
 // ok is false for a type that is not a client request.
 func encodeClientRequest(t *testing.T, rec fixtureRecord) (got []byte, ok bool) {
 	t.Helper()
@@ -217,6 +218,29 @@ func encodeClientRequest(t *testing.T, rec fixtureRecord) (got []byte, ok bool) 
 			t.Fatal(err)
 		}
 		TimedRequest{TimeoutMs: f.Timeout}.MarshalTLV(enc)
+	case "InvokeRequest":
+		var fx struct {
+			SuppressResponse bool `json:"suppressResponse"`
+			TimedRequest     bool `json:"timedRequest"`
+			InvokeRequests   []struct {
+				CommandPath struct {
+					EndpointID uint16 `json:"endpointId"`
+					ClusterID  uint32 `json:"clusterId"`
+					CommandID  uint32 `json:"commandId"`
+				} `json:"commandPath"`
+			} `json:"invokeRequests"`
+		}
+		if err := json.Unmarshal(rec.Fixture, &fx); err != nil {
+			t.Fatal(err)
+		}
+		req := InvokeRequest{SuppressResponse: fx.SuppressResponse, TimedRequest: fx.TimedRequest}
+		for _, r := range fx.InvokeRequests {
+			req.Invokes = append(req.Invokes, CommandInvocation{Path: ConcreteCommandPath{
+				Endpoint: r.CommandPath.EndpointID, Cluster: r.CommandPath.ClusterID, Command: r.CommandPath.CommandID,
+				HasEndpoint: true, HasCluster: true, HasCommand: true,
+			}})
+		}
+		MarshalInvokeRequestTLV(enc, req, func(*tlv.Encoder, tlv.Tag, any) {})
 	default:
 		return nil, false
 	}
@@ -238,6 +262,9 @@ func TestParityClientRequestFixtures(t *testing.T) {
 	t.Parallel()
 	seen := map[string]int{}
 	for _, rec := range loadFixtures(t) {
+		if rec.Type == "InvokeRequest" {
+			continue // TestInvokeClientRequestParityMatterJS
+		}
 		got, ok := encodeClientRequest(t, rec)
 		if !ok {
 			continue

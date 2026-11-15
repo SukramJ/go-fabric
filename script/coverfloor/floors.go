@@ -14,6 +14,12 @@ type packageFloor struct {
 	// low enough that a reader would otherwise assume it was a typo. Left
 	// empty for the ordinary case, where the number speaks for itself.
 	why string
+	// unmeasurable states that go reports the package as having no
+	// statements or no test files, so there is no percentage to hold: the
+	// check fails when such a package starts to measure, and when a package
+	// that is not marked reports nothing (review II, R2-P1-misc-05). Only a
+	// zero floor may carry it.
+	unmeasurable bool
 	// spread is the run-to-run spread of the measurement, in points, for a
 	// package whose coverage depends on goroutine scheduling: the floor
 	// sits below the lowest measurement, and the stale-floor check allows
@@ -42,7 +48,7 @@ type packageFloor struct {
 // — and raising them means deciding what to test, which is a change of its
 // own and not something to fold into a ratchet.
 var floors = []packageFloor{
-	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric", min: 0, unmeasurable: true, why: "module doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/binding", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 86},
@@ -96,8 +102,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller",
-		min: 84,
-		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. Measures 84.6 since 2026-11-12 (six concurrent local runs; CI cannot measure more, it never heard the LAN). The earlier spread of 3 (CI 79.8-81.9 against local 80.9-85.2) had one cause left at that date: TestOperationalPortParityMatterJS opened the real DNS-SD socket, and a Thread border router announcing itself on a developer's LAN reached the border-router arm of watchDiscovery, which CI never hears; the test now runs on an offline Names, and the six profiles differ in no block",
+		min: 87,
+		why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client. Measures 87.2-87.3 since review II phase 5a (the port-pair retry of R2-P5-tassert-02 and its tests); 84.6 since 2026-11-12 (six concurrent local runs; CI cannot measure more, it never heard the LAN). The earlier spread of 3 (CI 79.8-81.9 against local 80.9-85.2) had one cause left at that date: TestOperationalPortParityMatterJS opened the real DNS-SD socket, and a Thread border router announcing itself on a developer's LAN reached the border-router arm of watchDiscovery, which CI never hears; the test now runs on an offline Names, and the six profiles differ in no block",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
@@ -158,7 +164,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/diag", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/examples", min: 0, why: "test only, no statements to cover: the small examples' import guard (review 2026-11 W5-ex-02)"},
+	{pkg: "github.com/SukramJ/go-fabric/examples", min: 0, unmeasurable: true, why: "test only, no statements to cover: the small examples' import guard (review 2026-11 W5-ex-02)"},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 96, why: "phase 34: measured 96.9 — the generated root accessors of the clusters the second compositions add (ThreadNetworkDiagnostics, TlsCertificateManagement, TlsClientManagement) are reached by the reference daemon, not by this package's tests"},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 93},
 	// Brief BG: measured 86.9; the uncovered part is the error paths of a
@@ -208,56 +214,65 @@ var floors = []packageFloor{
 	// gate that fails on a good day teaches people to re-run it.
 	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 95},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/bridgeseam",
-		min: 0,
-		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/bridgeseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/chiptool",
-		min: 0,
-		why: "the CHIP certification harness: its untagged files are the family table and the certifiability-document check, test files only, so the package holds no statement; the harness itself runs behind the chiptool build tag",
+		pkg:          "github.com/SukramJ/go-fabric/internal/chiptool",
+		min:          0,
+		unmeasurable: true,
+		why:          "the CHIP certification harness: its untagged files are the family table and the certifiability-document check, test files only, so the package holds no statement; the harness itself runs behind the chiptool build tag",
 	},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/channelseam",
-		min: 0,
-		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/channelseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/coreseam",
-		min: 0,
-		why: "declaration-only seam (M9 module wave): a function variable cluster/core installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/coreseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam (M9 module wave): a function variable cluster/core installs from its init, so the package holds no statement a test could execute",
 	},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/exchangeseam",
-		min: 0,
-		why: "declaration-only seam (phase 32): a function variable client/exchange installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/exchangeseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam (phase 32): a function variable client/exchange installs from its init, so the package holds no statement a test could execute",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
+	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, unmeasurable: true, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/netwatch", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/deviceseam",
-		min: 0,
-		why: "declaration-only seam: an interface and a function variable device installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/deviceseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: an interface and a function variable device installs from its init, so the package holds no statement a test could execute",
 	},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/nodeseam",
-		min: 0,
-		why: "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/nodeseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/surfaceseam",
-		min: 0,
-		why: "declaration-only seam: a function variable surface installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/surfaceseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: a function variable surface installs from its init, so the package holds no statement a test could execute",
 	},
 	{
-		pkg: "github.com/SukramJ/go-fabric/internal/udpseam",
-		min: 0,
-		why: "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
+		pkg:          "github.com/SukramJ/go-fabric/internal/udpseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/valuejson", min: 87},
 	{pkg: "github.com/SukramJ/go-fabric/logring", min: 99},
@@ -271,7 +286,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/script/aheadcheck", min: 93, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
-	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 39, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
@@ -283,14 +298,16 @@ var floors = []packageFloor{
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
-	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 55},
-	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/fabricscopecheck", min: 0, why: "doc and test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/refusalcheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 58},
+	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/fabricscopecheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/refusalcheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/quiescecheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/testquality", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/script/profilegen", min: 95},
@@ -310,7 +327,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "the analyzer's own tests read the committed inventory rather than running the analysis, so none of its statements execute under go test",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, why: "package doc only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, unmeasurable: true, why: "package doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
@@ -357,7 +374,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/surface", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/surface/surfacetest", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
-	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, why: "the Conn interface only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, unmeasurable: true, why: "the Conn interface only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},

@@ -94,13 +94,26 @@ func TestSetForTest_EnablesRotation(t *testing.T) {
 	}
 }
 
-// TestEnableRotation_Idempotent verifies that calling EnableRotation
-// twice does not panic.
+// TestEnableRotation_Idempotent verifies that a second EnableRotation
+// keeps rotation on and the salt the first one drew (review II,
+// R2-P5-tassert-05).
 func TestEnableRotation_Idempotent(t *testing.T) {
 	// Not t.Parallel() — mutates package-level state.
+	defer func() {
+		rotationGuard.Lock()
+		rotationEnabled = false
+		rotationGuard.Unlock()
+		once = sync.Once{}
+	}()
 	EnableRotation()
+	first := Salt()
+	if first == ([16]byte{}) {
+		t.Fatal("Salt() is zero after EnableRotation")
+	}
 	EnableRotation()
-	// Just confirming no panic — no assertions beyond this.
+	if got := Salt(); got != first {
+		t.Fatalf("Salt() after a second EnableRotation = %v, want the first salt %v", got, first)
+	}
 }
 
 // TestEnsure_DirectCryptoRandPath exercises the once.Do body inside

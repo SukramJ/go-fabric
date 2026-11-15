@@ -231,7 +231,8 @@ func readEventPathFields(dec *tlv.Decoder) (ConcreteEventPath, error) {
 			p.Event, err = uint32Field(el)
 			p.HasEvent = true
 		case tagEventPathIsUrgent:
-			p.IsUrgent = el.Bool
+			// TlvOptionalField(4, TlvBoolean), TlvEventPath.ts:22.
+			p.IsUrgent, err = requestBoolField(el, "IsUrgent")
 		default:
 			err = skipField(dec, el)
 		}

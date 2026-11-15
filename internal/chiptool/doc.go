@@ -33,7 +33,9 @@
 //     cases with GOFABRIC_CHIP_CASES=FAN/3.1,… and repeated with
 //     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases);
 //   - TestGoCertificationCases — the Go-TH leg below (`make chiptool-gocert`,
-//     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2);
+//     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2
+//     and -CADMIN leaving a family out; in CI the gocert job of chiptool.yml
+//     runs it in three groups by family, the suite's job skips it);
 //   - TestChipToolBLEWiFi — chip-tool-ble commissions examples/ble-wifi-light
 //     over BLE onto Wi-Fi under chip's BlueZ and wpa_supplicant mocks, with
 //     all-clusters-app-ble as the control (`make chiptool-ble-wifi`,

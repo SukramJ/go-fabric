@@ -5,13 +5,16 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"strconv"
+	"syscall"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/tcp"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // TCPConfig selects the controller's Matter TCP roles — matter.js
@@ -91,18 +94,73 @@ func (c *Controller) dialTCP() func(ctx context.Context, addr *net.UDPAddr) (exc
 	}
 }
 
-// listenTCP opens the TCP listener on the UDP socket's port and serves it
-// into the exchange manager (ServerNetworkRuntime.ts:203-226).
-func (c *Controller) listenTCP(ctx context.Context) error {
-	ua := c.udp.LocalAddr()
-	l, err := tcp.Listen(tcp.Config{
-		LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
-		Logger:    c.log, Clock: c.clock,
-		MaxInboundConnections: c.tcp.maxInboundConnections(),
-	})
-	if err != nil {
-		return err
+// maxPortAssignmentRetries bounds the attempts to find a port free for
+// both UDP and TCP when the port is auto-assigned. Mirrors matter.js
+// packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:54
+// (MAX_PORT_ASSIGNMENT_RETRIES = 10) at db021da0, applied only to an
+// auto-assigned port (:165); the bridge's openTransports
+// (bridge/tcp_listen.go) applies the same bound.
+const maxPortAssignmentRetries = 10
+
+// tcpListen is the TCP listener's constructor; a test replaces it to make
+// a bind fail (export_test.go).
+var tcpListen = tcp.Listen
+
+// bindTransports binds the UDP socket — the one given, or one per listen —
+// and the TCP listener on its port. Mirrors matter.js
+// ServerNetworkRuntime.ts:212-231 at db021da0 (MatterController.ts:349
+// runs the controller as a ServerNode, whose runtime it is,
+// ServerNode.ts:130-132): the TCP transport listens on the UDP
+// interface's port, and when that port is taken for TCP and was
+// auto-assigned the UDP socket is closed and the pair is bound again
+// (matter.js closes its UDP interfaces, :224-227; the TCP listener that
+// failed was never open), up to maxPortAssignmentRetries times. A socket the host gave is not
+// replaced: its port is the host's choice, as a configured one is.
+func (c *Controller) bindTransports(listen string, given *udp.Listener) (udpListener *udp.Listener, tcpListener *tcp.Listener, err error) {
+	attempts := 1
+	if given == nil && autoAssignedPort(listen) {
+		attempts = maxPortAssignmentRetries
 	}
+	for attempt := 1; ; attempt++ {
+		udpListener = given
+		if udpListener == nil {
+			if udpListener, err = udp.New(udp.Config{LocalAddr: listen}); err != nil {
+				return nil, nil, err
+			}
+		}
+		ua := udpListener.LocalAddr()
+		tcpListener, err = tcpListen(tcp.Config{
+			LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
+			Logger:    c.log, Clock: c.clock,
+			MaxInboundConnections: c.tcp.maxInboundConnections(),
+		})
+		if err == nil {
+			return udpListener, tcpListener, nil
+		}
+		if given == nil {
+			_ = udpListener.Close()
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) || attempt >= attempts {
+			return nil, nil, err
+		}
+		c.log.Info("matter.tcp.port_in_use",
+			slog.Int("port", ua.Port),
+			slog.Int("attempt", attempt),
+			slog.Int("max_attempts", attempts))
+	}
+}
+
+// autoAssignedPort reports whether listen leaves the port to the OS
+// (ServerNetworkRuntime.ts:165, a port of 0). A listen without a port is
+// not auto-assigned here: it fails SplitHostPort.
+func autoAssignedPort(listen string) bool {
+	_, port, err := net.SplitHostPort(listen)
+	return err == nil && port == "0"
+}
+
+// serveTCP serves the bound TCP listener into the exchange manager
+// (ServerNetworkRuntime.ts:212-231).
+func (c *Controller) serveTCP(ctx context.Context, l *tcp.Listener) {
 	mgr := c.mgr
 	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	served := make(chan struct{})
@@ -117,7 +175,6 @@ func (c *Controller) listenTCP(ctx context.Context) error {
 	}()
 	c.tcpAddr = l.Addr()
 	c.stopTCP = func() { cancel(); _ = l.Close(); <-served }
-	return nil
 }
 
 // TCPAddr is the controller's TCP listener address, nil without

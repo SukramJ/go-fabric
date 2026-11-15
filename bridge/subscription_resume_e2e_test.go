@@ -934,13 +934,21 @@ func TestSubscriptionResumption_DisabledRecordsNothing(t *testing.T) {
 	fab := newResumeFabric(t)
 	st := newMemSubscriptionStore()
 	ctrl := newFakeController(t, fab)
-	run1 := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) { br.SetSubscriptionPersistence(false) })
+	var socket func() *ownedSocket
+	run1 := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) {
+		br.SetSubscriptionPersistence(false)
+		socket = useOwnedSocket(t, br)
+	})
 	if run1.br.SubscriptionPersistenceEnabled() {
 		t.Fatal("switch did not take")
 	}
 	ctrl.setBridge(run1.addr(t))
 	_ = subscribeOverCASE(t, run1, ctrl)
-	time.Sleep(50 * time.Millisecond)
+	// The bridge decides on the record after it sent the SubscribeResponse,
+	// still in the request's handler: once the handler of every datagram
+	// the bridge read has returned, the decision is made (before review
+	// II, phase 5 a 50 ms sleep stood here, R2-P5-tassert-12).
+	socket().waitHandled(t)
 	if got := st.ids(); len(got) != 0 {
 		t.Fatalf("persistence disabled, store holds %v", got)
 	}

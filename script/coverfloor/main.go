@@ -248,11 +248,22 @@ func check(measurements []measurement, table []packageFloor) result {
 		switch {
 		case !m.measurable:
 			res.rows = append(res.rows, row{pkg: m.pkg, measured: m.note, floor: floorString(f.min), status: "exempt — " + f.why})
-			if f.min > 0 {
+			switch {
+			case f.min > 0:
 				res.problems = append(res.problems, fmt.Sprintf(
 					"%s reports %q but carries a floor of %.1f%% — the floor can never be met", m.pkg, m.note, f.min,
 				))
+			case !f.unmeasurable:
+				res.problems = append(res.problems, fmt.Sprintf(
+					"%s reports %q but its floor is not marked unmeasurable — mark it, so the day it starts to measure is noticed", m.pkg, m.note,
+				))
 			}
+		case f.unmeasurable:
+			res.rows = append(res.rows, row{pkg: m.pkg, measured: pctString(m), floor: floorString(f.min), status: "MARKED UNMEASURABLE"})
+			res.problems = append(res.problems, fmt.Sprintf(
+				"%s is marked unmeasurable but measures %.1f%% — it gained statements: give it a floor at or below %.1f%%, or a zero floor and the reason it measures 0",
+				m.pkg, m.pct, math.Floor(m.pct),
+			))
 		case m.pct+1e-9 < f.min:
 			res.rows = append(res.rows, row{pkg: m.pkg, measured: pctString(m), floor: floorString(f.min), status: "BELOW FLOOR"})
 			res.problems = append(res.problems, fmt.Sprintf(
@@ -261,13 +272,19 @@ func check(measurements []measurement, table []packageFloor) result {
 			))
 		default:
 			res.rows = append(res.rows, row{pkg: m.pkg, measured: pctString(m), floor: floorString(f.min), status: "ok"})
-			// A zero floor is held to the slack too: a package entered at 0
-			// for having no statements or only a main that now measures
-			// coverage has gained tested code and needs a real floor.
-			if m.pct-f.min > staleFloorSlack+f.spread {
+			// A zero floor is held without slack: a package entered at 0 for
+			// having only a main, or code its own tests do not run, that
+			// measures anything has gained tested code and needs a real
+			// floor (review II, R2-P1-misc-05: under the slack a zero floor
+			// let up to three points of coverage come and go unseen).
+			slack := staleFloorSlack + f.spread
+			if f.min == 0 {
+				slack = 0
+			}
+			if m.pct-f.min > slack {
 				res.problems = append(res.problems, fmt.Sprintf(
 					"%s is %.1f points above its floor (more than %.1f) — raise it to %.1f%% in script/coverfloor/floors.go to keep the ratchet biting",
-					m.pkg, m.pct-f.min, staleFloorSlack+f.spread, math.Floor(m.pct),
+					m.pkg, m.pct-f.min, slack, math.Floor(m.pct),
 				))
 			}
 		}

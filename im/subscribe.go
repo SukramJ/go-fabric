@@ -167,7 +167,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagSubReqKeepSubscriptions:
-			if req.KeepSubscriptions, err = boolField(el); err != nil {
+			if req.KeepSubscriptions, err = requestBoolField(el, "KeepSubscriptions"); err != nil {
 				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 			}
 			hasKeep = true
@@ -225,7 +225,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 			}
 			req.EventFilters = filters
 		case tagSubReqFabricFiltered:
-			if req.FabricFiltered, err = boolField(el); err != nil {
+			if req.FabricFiltered, err = requestBoolField(el, "FabricFiltered"); err != nil {
 				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 			}
 			hasFabricFiltered = true

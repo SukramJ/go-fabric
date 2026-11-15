@@ -109,3 +109,37 @@ func TestInvokeAuthorizedExpandsToHostingEndpoints(t *testing.T) {
 		t.Fatalf("concrete path: %+v / %v", res, invoked)
 	}
 }
+
+// TestCheckGroupACLIgnoresCASEEntries pins checkGroupACL's AuthMode filter
+// (matter.js FabricAccessControl #getIsdFromMessage gives a group message
+// the Group auth mode, so only Group entries can match it). The CASE
+// entries here are the shapes that would grant a group message without the
+// filter: no subjects (any subject), and a subject equal to the group id.
+// A CASE Administer entry is no test of it, since checkGroupACL denies a
+// best privilege of Administer anyway (R2-P5-tmut-01).
+func TestCheckGroupACLIgnoresCASEEntries(t *testing.T) {
+	t.Parallel()
+	const groupID = 5
+	group := im.WithGroupSubject(context.Background(), im.GroupSubject{GroupID: groupID, HasValidMapping: true, Endpoints: []uint16{3}})
+	onOff := uint32(0x0006)
+	cases := []struct {
+		name    string
+		entries []store.ACLEntry
+		priv    uint8
+		want    im.StatusCode
+	}{
+		{"CASE Operate without subjects", []store.ACLEntry{caseEntry(1, store.PrivilegeOperate, nil)}, privOperate, im.StatusUnsupportedAccess},
+		{"CASE Operate naming the group id", []store.ACLEntry{caseEntryWithSubjects(1, store.PrivilegeOperate, []uint64{groupID}, nil)}, privOperate, im.StatusUnsupportedAccess},
+		{"CASE View without subjects", []store.ACLEntry{caseEntry(1, store.PrivilegeView, nil)}, privView, im.StatusUnsupportedAccess},
+		{"CASE Manage does not lift a Group Operate entry", []store.ACLEntry{caseEntry(1, store.PrivilegeManage, nil), groupEntry(1, store.PrivilegeOperate, nil, nil)}, privManage, im.StatusUnsupportedAccess},
+		{"control: a Group entry for the group", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, []uint64{groupID}, nil)}, privOperate, im.StatusSuccess},
+		{"control: a Group entry beside CASE entries", []store.ACLEntry{caseEntry(1, store.PrivilegeOperate, nil), groupEntry(1, store.PrivilegeOperate, nil, nil)}, privOperate, im.StatusSuccess},
+	}
+	for _, tc := range cases {
+		d := NewTopologyDispatcher(&Topology{})
+		d.SetACLLister(fakeACLLister{entries: tc.entries})
+		if got := d.CheckACL(group, 1, 0, nil, 3, onOff, tc.priv); got != tc.want {
+			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

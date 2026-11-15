@@ -570,7 +570,9 @@ func (s *ControlServer) drive(ctx context.Context, target *wire.ClosureTargetPos
 // without another call; in any MainState other than Stopped and
 // SetupRequired INVALID_IN_STATE; otherwise the mover's
 // [closuredef.Calibrator] starts it and, on its success, MainState is
-// Calibrating — the drive reports Stopped when it is done. matter.js has
+// Calibrating unless the drive reported a MainState while the calibrator
+// had the command (that report stands) — the drive reports Stopped when
+// it is done. matter.js has
 // no Calibrate logic (ClosureControlServer.ts:17, the empty subclass).
 func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
 	if !s.has(wire.ClosureControlFeatureCalibration) {

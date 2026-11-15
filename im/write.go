@@ -111,15 +111,21 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			// type fails the decode, and the request is answered
 			// (packages/types/src/protocol/messages/TlvWriteRequest.ts:18;
 			// SuppressResponseTest.ts:399-403).
-			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
-				return WriteRequest{}, fmt.Errorf("%w: SuppressResponse not a boolean", ErrInvalidWriteRequest)
+			if req.SuppressResponse, err = requestBoolField(el, "SuppressResponse"); err != nil {
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 			}
-			req.SuppressResponse = el.Bool
 		case tagWriteReqTimedRequest:
-			req.TimedRequest = el.Bool
+			// TlvField(1, TlvBoolean), TlvWriteRequest.ts:21: a TimedRequest
+			// of another type fails the decode (FAILURE), never reads as false.
+			if req.TimedRequest, err = requestBoolField(el, "TimedRequest"); err != nil {
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
+			}
 			hasTimed = true
 		case tagWriteReqMoreChunked:
-			req.MoreChunkedMessages = el.Bool
+			// TlvOptionalField(3, TlvBoolean), TlvWriteRequest.ts:25.
+			if req.MoreChunkedMessages, err = requestBoolField(el, "MoreChunkedMessages"); err != nil {
+				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
+			}
 		case tagWriteReqWriteRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return WriteRequest{}, fmt.Errorf("%w: WriteRequests not array", ErrInvalidWriteRequest)

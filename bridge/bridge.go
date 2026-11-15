@@ -13,7 +13,7 @@
 // model and this package imports none of it.
 //
 // Lifecycle: [New] → [Start] → (optional) [Reassemble] → [Stop].
-// Start is idempotent (returns ErrAlreadyStarted on a second call).
+// A second Start returns [ErrAlreadyStarted].
 // Stop is idempotent and safe to call after a failed Start. A bridge is
 // single-run, as node.Node is: Start after Stop returns [ErrStopped], and
 // a host that comes back builds a new bridge.
@@ -158,6 +158,20 @@
 //     with no Descriptor mounted, they return false and wire nothing —
 //     check the bool, because the only other symptom is a PartsList
 //     frozen at whatever the Descriptor was constructed with.
+//   - AttachCommissioningWindow — silent, and fails open on one check.
+//     The window is wired into the root's GeneralCommissioning by
+//     whichever of this call and AttachRootClusters comes second: a
+//     CommissioningComplete ends the window, and ArmFailSafe over CASE
+//     answers BusyWithOtherAdmin while the window is open. The bridge
+//     also becomes the window's session owner, so a revoke closes the
+//     PASE sessions, and reports WindowStatus, AdminFabricIndex and
+//     AdminVendorId changes to subscribers. Without it the window stays
+//     open after a commissioning completes, until its timeout; ArmFailSafe
+//     over CASE is not refused while a window is open; a revoke closes
+//     the PASE sessions only through a host-wired [PaseSessionCloser];
+//     and those attribute changes reach no subscriber. The mDNS
+//     commissionable record does not depend on it:
+//     [Bridge.AnnounceCommissioning] publishes it from its own argument.
 //
 // Group communication — needed by any node with a Groups server, which
 // a node with lights or plugs has:
@@ -183,11 +197,6 @@
 //
 // Genuinely optional — a skip costs exactly the named feature:
 //
-//   - AttachCommissioningWindow stores the tracker for
-//     [Bridge.CommissioningWindow] to hand back; the bridge itself never
-//     reads it. Skipping it does not affect the mDNS commissionable
-//     record, which [Bridge.AnnounceCommissioning] publishes from its
-//     own argument.
 //   - AttachCaseInitiatorProvider and AttachOperationalResolver, then a
 //     call to [Bridge.ReestablishFormerSubscriptions] once the host's CASE
 //     identities are loaded (before it announces its operational
@@ -972,10 +981,10 @@ func (b *Bridge) seedCounters() error {
 }
 
 // Start brings the bridge online: assembles the initial topology,
-// constructs the dispatcher, opens the UDP listener, and publishes
-// the operational mDNS record (when the topology has at least one
-// fabric — for v1.1 GA the operational record is emitted
-// unconditionally; commissioning-window logic lands in v1.1.x).
+// constructs the dispatcher and opens the UDP listener. It publishes
+// no operational mDNS record: that waits for a fabric identity, which
+// [Bridge.AnnounceFabric] publishes (publishOperationalRecord only logs
+// the deferral).
 //
 // Start blocks only on the synchronous setup steps; the receive loop
 // runs in a background goroutine. Returns immediately when the
@@ -1992,10 +2001,13 @@ func (b *Bridge) Clock() clock.Clock { return b.clk() }
 // [New] (white-box tests).
 func (b *Bridge) clk() clock.Clock { return clock.Or(b.clock) }
 
-// AttachCommissioningWindow parks the bridge-side [CommissioningWindow]
-// tracker where [Bridge.CommissioningWindow] can hand it back. That is
-// the whole effect: no bridge path reads the field, and [Reassemble]
-// does not re-emit from it. Callers must therefore also attach the
+// AttachCommissioningWindow attaches the bridge-side [CommissioningWindow]
+// tracker: [Bridge.CommissioningWindow] hands it back, the bridge becomes
+// its session owner (a revoke closes the PASE sessions), its state changes
+// reach the subscribers of AdministratorCommissioning's WindowStatus,
+// AdminFabricIndex and AdminVendorId, and it is wired into the root's
+// GeneralCommissioning (wireCommissioned) by whichever of this call and
+// [Bridge.AttachRootClusters] comes second. Callers must also attach the
 // AdministratorCommissioning cluster server (with the window as its
 // WindowController) to the root endpoint via [AttachRootClusters], and
 // drive the mDNS side through [Bridge.AnnounceCommissioning] /

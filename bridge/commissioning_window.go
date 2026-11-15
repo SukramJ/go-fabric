@@ -631,10 +631,12 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 }
 
 // OpenWindow implements [wire.WindowController]. The cluster command
-// path supplies a verifier-based [wire.OpenWindowParams]; v1.1 stores
-// the resulting state but does not yet swap a per-window verifier
-// into the bridge's PASE adapter (the bridge already accepts PASE
-// against the configured passcode for `duration_seconds`).
+// path supplies the [wire.OpenWindowParams]. For an enhanced window (a
+// PAKE passcode verifier, not a basic window) the attached
+// [PaseVerifierInstaller] installs a PASE acceptor built from that
+// verifier before OpenWindow returns, and the configured acceptor is
+// restored when the window closes; a basic window, or one opened with
+// no installer attached, keeps the configured passcode.
 //
 // A second OpenWindow while one is already live returns BUSY per
 // Matter §11.19.7.1.

@@ -9,6 +9,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -75,7 +77,10 @@ func TestVerifyAndExtractPubKey_StructuralPredicates(t *testing.T) {
 		{"well-formed chain verifies", nil, nil, nil},
 		{"ICAC fabric id differs from NOC fabric id", func(o *verifyTestCertOpts) { o.subjectFabricID = 0xCCCC }, nil, mattercert.ErrChainBroken},
 		{"ICAC without fabric id is allowed", func(o *verifyTestCertOpts) { o.subjectHasFabricID = false }, nil, nil},
-		{"NOC flagged as CA", nil, func(o *verifyTestCertOpts) { o.extIsCA = &bTrue }, mattercert.ErrMalformed},
+		// The CA cases flip the CA bit alone: putTestExtensions derives
+		// keyUsage and the EKU from it, and a coupled change lets the
+		// keyUsage check refuse first (R2-P5-tmut-05).
+		{"NOC flagged as CA", nil, func(o *verifyTestCertOpts) { o.extIsCA, o.extKeyUsage, o.extEKU = &bTrue, ku(0x0001), []uint8{1, 2} }, mattercert.ErrMalformed},
 		{"NOC without digitalSignature keyUsage", nil, func(o *verifyTestCertOpts) { o.extKeyUsage = ku(0x0060) }, mattercert.ErrMalformed},
 		{"NOC without serverAuth/clientAuth EKU", nil, func(o *verifyTestCertOpts) { o.extEKU = []uint8{3} }, mattercert.ErrMalformed},
 		// Pin db021da0: Noc.ts:148-154 requires serverAuth (CHIP's rule); clientAuth alone no longer passes.
@@ -91,7 +96,7 @@ func TestVerifyAndExtractPubKey_StructuralPredicates(t *testing.T) {
 		{"NOC fabric id 0", nil, func(o *verifyTestCertOpts) { o.subjectFabricID = 0 }, mattercert.ErrMalformed},
 		{"NOC node id outside the operational range", nil, func(o *verifyTestCertOpts) { o.subjectNodeID = 0xFFFF_FFF0_0000_0001 }, mattercert.ErrMalformed},
 		{"NOC carrying an ICAC id in its subject", nil, func(o *verifyTestCertOpts) { o.subjectHasICACID, o.subjectICACID = true, 0x0002 }, mattercert.ErrMalformed},
-		{"ICAC not a CA", func(o *verifyTestCertOpts) { o.extIsCA = &bFalse }, nil, mattercert.ErrMalformed},
+		{"ICAC not a CA", func(o *verifyTestCertOpts) { o.extIsCA, o.extKeyUsage, o.extEKU = &bFalse, ku(0x0060), []uint8{} }, nil, mattercert.ErrMalformed},
 		{"ICAC keyUsage without keyCertSign", func(o *verifyTestCertOpts) { o.extKeyUsage = ku(0x0001) }, nil, mattercert.ErrMalformed},
 		{"ICAC with digitalSignature added is allowed", func(o *verifyTestCertOpts) { o.extKeyUsage = ku(0x0061) }, nil, nil},
 		{"ICAC carrying an EKU", func(o *verifyTestCertOpts) { o.extEKU = []uint8{1} }, nil, mattercert.ErrMalformed},
@@ -139,5 +144,49 @@ func TestVerifyAndExtractPubKey_CapsTLVSize(t *testing.T) {
 	big := append(append([]byte(nil), noc...), make([]byte, mattercert.MaxOperationalCertTLVBytes)...)
 	if _, err := v.VerifyAndExtractPubKey(big, icac); !errors.Is(err, mattercert.ErrMalformed) {
 		t.Fatalf("a %d-byte NOC was not refused: %v", len(big), err)
+	}
+}
+
+// TestVerifyAndExtractPubKey_ShapePredicateThatFires holds each NOC / ICAC
+// shape predicate on its own: every case changes one property of an
+// otherwise valid chain and names the predicate that must refuse it, so a
+// case cannot pass on a neighbouring check that rejects with the same
+// sentinel (R2-P5-tmut-05). The ICAC position is IsICA's — an ICAC id
+// and no node id (decode.go IsICA) — which checkICACShape does not repeat.
+func TestVerifyAndExtractPubKey_ShapePredicateThatFires(t *testing.T) {
+	t.Parallel()
+	bTrue, bFalse := true, false
+	ku := func(v uint16) *uint16 { return &v }
+	// asICAC keeps the CA extensions of an ICAC whatever the subject says:
+	// putTestExtensions reads "no node id" as "CA".
+	asICAC := func(o *verifyTestCertOpts) { o.extIsCA, o.extKeyUsage, o.extEKU = &bTrue, ku(0x0060), []uint8{} }
+	cases := []struct {
+		name      string
+		icac, noc func(*verifyTestCertOpts)
+		wantErr   error
+		wantMsg   string
+	}{
+		{"NOC with the CA bit set", nil, func(o *verifyTestCertOpts) { o.extIsCA, o.extKeyUsage, o.extEKU = &bTrue, ku(0x0001), []uint8{1, 2} }, mattercert.ErrMalformed, "NOC must not be a CA"},
+		{"ICAC with the CA bit clear", func(o *verifyTestCertOpts) { o.extIsCA, o.extKeyUsage, o.extEKU = &bFalse, ku(0x0060), []uint8{} }, nil, mattercert.ErrMalformed, "ICAC must be a CA"},
+		{"ICAC position holding a certificate with a node id", func(o *verifyTestCertOpts) {
+			asICAC(o)
+			o.subjectHasNodeID, o.subjectNodeID = true, 0xCCCC
+		}, nil, mattercert.ErrMalformed, "cert is not an ICAC"},
+		// Without IsICA the NOC's issuer ICAC-ID check still refuses this
+		// one (ChainBroken); the node-id case above has no second guard.
+		{"ICAC position holding a certificate without an ICAC id", func(o *verifyTestCertOpts) {
+			asICAC(o)
+			o.subjectHasICACID = false
+		}, nil, mattercert.ErrMalformed, "cert is not an ICAC"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			v, noc, icac := nocChain(t, tc.icac, tc.noc)
+			_, err := v.VerifyAndExtractPubKey(noc, icac)
+			if !errors.Is(err, tc.wantErr) || !strings.Contains(fmt.Sprint(err), tc.wantMsg) {
+				t.Fatalf("err = %v, want %v from the predicate %q", err, tc.wantErr, tc.wantMsg)
+			}
+		})
 	}
 }

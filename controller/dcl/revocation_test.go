@@ -31,12 +31,25 @@ type revocationFixture struct {
 
 func newRevocationFixture(t *testing.T) *revocationFixture {
 	t.Helper()
+	return newRevocationFixtureWith(t, nil)
+}
+
+// newRevocationFixtureWith is newRevocationFixture whose store reaches the
+// ledger through wrap's transport around the fake's, with a wrap.
+func newRevocationFixtureWith(t *testing.T, wrap func(http.RoundTripper) http.RoundTripper) *revocationFixture {
+	t.Helper()
 	f := newFakeDCL(t)
 	pki := newTestPKI(t)
 	f.addRoot(pki.paa)
 	clock := newManualClock()
 	log := &logRecorder{}
-	s := openStore(t, CertificateOptions{Client: f.client(), Clock: clock, UpdateInterval: -1, Logger: slog.New(log)})
+	client := f.client()
+	if wrap != nil {
+		hc := *client.HTTPClient
+		hc.Transport = wrap(hc.Transport)
+		client.HTTPClient = &hc
+	}
+	s := openStore(t, CertificateOptions{Client: client, Clock: clock, UpdateInterval: -1, Logger: slog.New(log)})
 	return &revocationFixture{log: log, f: f, pki: pki, clock: clock, s: s}
 }
 

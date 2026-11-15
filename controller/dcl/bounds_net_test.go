@@ -26,32 +26,30 @@ import (
 // TestRevocationLookupBoundsItsConcurrentDownloads: however many CRL
 // distribution points the ledger lists for an issuer, one lookup holds
 // at most maxConcurrentCRLDownloads downloads open at once.
+//
+// The downloads are counted where the lookup holds them, at the client:
+// from the request until its response body is closed or the request
+// failed. A request that failed on its own deadline has closed its
+// connection when it returns (net/http persistConn.roundTrip closes it
+// in cancelRequest before it returns), but the host's handler learns of
+// the close only when its connection's background read does, after the
+// next download may have arrived — a count at the host's handlers saw
+// five (review II, R2-P5-sup-17).
 func TestRevocationLookupBoundsItsConcurrentDownloads(t *testing.T) {
 	t.Parallel()
 	const points = 64
-	x := newRevocationFixture(t)
-	crl := signCRL(t, x.pki.pai, crlSpec{revoked: []*big.Int{big.NewInt(7)}})
-
-	var inflight, peak atomic.Int32
 	release := make(chan struct{})
 	var once sync.Once
 	open := func() { once.Do(func() { close(release) }) }
 	t.Cleanup(open) // before the server's Close, which waits for the handlers
+	downloads := &countedDownloads{limit: maxConcurrentCRLDownloads, broken: open}
+	x := newRevocationFixtureWith(t, downloads.wrap)
+	crl := signCRL(t, x.pki.pai, crlSpec{revoked: []*big.Int{big.NewInt(7)}})
+
 	list := make([]map[string]any, 0, points)
 	for i := range points {
 		path := fmt.Sprintf("/crl/%d", i)
 		x.f.route(path, func(w http.ResponseWriter, r *http.Request) {
-			n := inflight.Add(1)
-			defer inflight.Add(-1)
-			for {
-				p := peak.Load()
-				if n <= p || peak.CompareAndSwap(p, n) {
-					break
-				}
-			}
-			if n > maxConcurrentCRLDownloads {
-				open() // the bound is broken: let every download end
-			}
 			// The host holds each download until the bound is broken or
 			// the request's own timeout (revocationTimeout) ends the
 			// first ones, which lets the rest through.
@@ -68,9 +66,60 @@ func TestRevocationLookupBoundsItsConcurrentDownloads(t *testing.T) {
 
 	x.dacRevoked(t)
 
-	if p := peak.Load(); p > maxConcurrentCRLDownloads {
+	if p := downloads.peak.Load(); p > maxConcurrentCRLDownloads {
 		t.Fatalf("one revocation lookup held %d CRL downloads open at the same time (the ledger listed %d points for the issuer), want at most %d", p, points, maxConcurrentCRLDownloads)
+	} else if p < maxConcurrentCRLDownloads {
+		t.Fatalf("one revocation lookup held at most %d CRL downloads open at the same time, want the bound %d reached: the count saw no concurrency", p, maxConcurrentCRLDownloads)
 	}
+}
+
+// countedDownloads counts the CRL downloads in flight through the
+// client's transport — from RoundTrip until the response body is closed,
+// or RoundTrip's error — and their peak; broken runs once the count
+// passes limit.
+type countedDownloads struct {
+	limit          int32
+	broken         func()
+	inflight, peak atomic.Int32
+}
+
+func (d *countedDownloads) wrap(rt http.RoundTripper) http.RoundTripper {
+	return roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if !strings.HasPrefix(r.URL.Path, "/crl/") {
+			return rt.RoundTrip(r)
+		}
+		n := d.inflight.Add(1)
+		for p := d.peak.Load(); n > p && !d.peak.CompareAndSwap(p, n); p = d.peak.Load() {
+		}
+		if n > d.limit {
+			d.broken() // let every download end
+		}
+		var done sync.Once
+		end := func() { done.Do(func() { d.inflight.Add(-1) }) }
+		resp, err := rt.RoundTrip(r)
+		if err != nil {
+			end()
+			return nil, err
+		}
+		resp.Body = &endOnClose{ReadCloser: resp.Body, end: end}
+		return resp, nil
+	})
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// endOnClose runs end when the body is closed.
+type endOnClose struct {
+	io.ReadCloser
+	end func()
+}
+
+func (b *endOnClose) Close() error {
+	err := b.ReadCloser.Close()
+	b.end()
+	return err
 }
 
 // TestOTADownloadRefusesARedirectFromHTTPSToHTTP: an image named by an

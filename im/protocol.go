@@ -32,8 +32,9 @@ const (
 // message the bridge must respond to (Read / Write / Invoke /
 // Subscribe / Timed). Response opcodes (StatusResponse, ReportData,
 // WriteResponse, InvokeResponse, SubscribeResponse) return false —
-// the bridge receives those only as the initiator of a peer-side
-// operation, which v1.1 does not perform.
+// they answer an exchange this node initiated: a report it sends, or a
+// command it invokes itself (the OTA provider link reads an
+// InvokeResponse, bridge/ota_provider_link.go).
 func IsRequestOpcode(op uint8) bool {
 	switch op {
 	case OpcodeReadRequest,
