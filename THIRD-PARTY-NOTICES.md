@@ -101,23 +101,21 @@ each copyright line is quoted verbatim from it.
 
 ### Linked into a build that imports this module
 
+Measured with `go list -deps` over every package outside `script/`. The
+first four are the direct runtime dependencies in `go.mod`; the rest are
+reached through them. `modernc.org/sqlite` is the pure-Go SQLite driver:
+`store.OpenSQLite` (`store/sqlite.go`) imports it, and the node
+(`Config.Store.Path`) and the controller (`controller.OpenDB`) open their
+databases with it, so a build that imports `node` or `controller` links it
+and the modules it depends on.
+
 | Module | License |
 | --- | --- |
 | `filippo.io/nistec` | BSD-3-Clause |
 | `github.com/miekg/dns` | BSD-3-Clause |
 | `golang.org/x/net` | BSD-3-Clause |
-| `golang.org/x/sys` | BSD-3-Clause |
-
-### Test-only (reached by `go test ./...`, never by a consumer's build)
-
-`modernc.org/sqlite` is the pure-Go SQLite driver this module's `store`
-package tests open a scratch database with. The package itself takes an
-already-migrated `*sql.DB` and imports no driver, so nothing in a consumer's
-build links it.
-
-| Module | License |
-| --- | --- |
 | `modernc.org/sqlite` | BSD-3-Clause |
+| `golang.org/x/sys` | BSD-3-Clause |
 | `modernc.org/libc` | BSD-3-Clause |
 | `modernc.org/mathutil` | BSD-3-Clause |
 | `modernc.org/memory` | BSD-3-Clause |
