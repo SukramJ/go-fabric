@@ -5,9 +5,13 @@ package node
 
 import (
 	"context"
+	"net/netip"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/peer"
 )
 
 // TestPeerClientFollowsTheFabricHooks: the client stack a node builds for
@@ -52,4 +56,46 @@ func TestPeerClientFollowsTheFabricHooks(t *testing.T) {
 	if _, err := n.peerStack(); err == nil {
 		t.Error("a stopped node built a client stack")
 	}
+}
+
+// TestFabricUpdateEndsAHandshakeInFlight: UpdateNOC ends a client-stack
+// connection process to a peer of the fabric — a handshake that started
+// under the old NOC does not complete after the sweep; a caller still
+// waiting connects again in a new process, under the new identity
+// (review II, Fable P-3). A connection process takes an address hint once
+// (peer.Peer.HintAddresses), so a hint taken again shows the new process.
+func TestFabricUpdateEndsAHandshakeInFlight(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	n := clientNode(t)
+	addr := handshake.PeerAddress{FabricIndex: 3, NodeID: 0x77}
+	p, err := n.client.peers.For(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: time.Hour})
+	}()
+	// The process runs once it takes the hint (the silent DNS-SD cache
+	// answers nothing; nobody answers at the address either).
+	hint := netip.MustParseAddrPort("[::1]:9")
+	for p.HintAddresses(hint) == 0 {
+		runtime.Gosched()
+	}
+	if p.HintAddresses(hint) != 0 {
+		t.Fatal("one process took the same hint twice")
+	}
+	n.closeClientFabricSessions(ctx, addr.FabricIndex)
+	deadline := time.Now().Add(5 * time.Second)
+	for p.HintAddresses(hint) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("UpdateNOC left the connection process under the old NOC running")
+		}
+		runtime.Gosched()
+	}
+	cancel()
+	<-done
 }

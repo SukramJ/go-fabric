@@ -649,9 +649,12 @@ func (n *Node) fabricLeaving(ctx context.Context, fabricIndex uint8) {
 // last fabric is gone. The Leave event went out in [Node.fabricLeaving].
 func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	n.dropFabricState(ctx, fabricIndex)
-	// The client stack's peers of the fabric, while its identity lasts.
+	compressedID, nodeID, hadIdentity := n.caseIDs.forget(fabricIndex)
+	// The client stacks' peers of the fabric, after its identity went: no
+	// handshake starts for the fabric from here on, and the sweep ends one
+	// that started before (review II, Fable P-3).
 	n.forgetClientPeers(ctx, fabricIndex)
-	if compressedID, nodeID, ok := n.caseIDs.forget(fabricIndex); ok {
+	if hadIdentity {
 		n.br.WithdrawFabric(ctx, fabricIndex, compressedID, nodeID)
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
@@ -791,13 +794,17 @@ func (n *Node) goKeeper(fn func()) bool {
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
+	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
+	loadErr := n.caseIDs.load(ctx, n.st, fabricIndex)
+	// The identity moved first: a handshake from here on runs under the
+	// new NOC, and the sweep below takes every record, session and
+	// handshake in flight made under the old one (review II, Fable P-3).
 	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
 		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 	}
 	n.closeClientFabricSessions(ctx, fabricIndex)
-	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
-	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
-		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
+	if loadErr != nil {
+		n.logger.Warn("case.identity.reload_failed", slog.Any("err", loadErr))
 		return
 	}
 	if newCompressed, newNode, ok := n.caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {

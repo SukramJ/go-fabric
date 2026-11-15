@@ -351,10 +351,11 @@ func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
 	}
 }
 
-// closeClientFabricSessions ends the client stack's sessions to the peers
-// of a fabric whose operational identity UpdateNOC replaced, and forgets
-// their resumption records, so no session or resumption made under the
-// old NOC outlives it; the peers stay and connect again under the new
+// closeClientFabricSessions ends the client stack's connection processes
+// and sessions to the peers of a fabric whose operational identity
+// UpdateNOC replaced, and forgets their resumption records, so no session
+// or resumption made under the old NOC outlives it — it runs after the
+// identity moved (Node.fabricUpdated); the peers stay and connect again under the new
 // one. Mirrors matter.js FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric) with the fabric's
 // sessions, which every role registers with it (NodeSession.ts:153-156).
@@ -365,6 +366,9 @@ func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8)
 			if addr.FabricIndex != fabricIndex {
 				continue
 			}
+			// A handshake in flight ran under the old NOC: its connection
+			// process ends first, then its sessions and record go.
+			p.Disconnect(ctx, nil)
 			for _, s := range cs.exchanges.SessionsFor(addr) {
 				cs.exchanges.CloseSession(ctx, s)
 			}
