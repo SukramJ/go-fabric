@@ -80,7 +80,13 @@ type PaseAdapter struct {
 	mu              sync.Mutex
 	verifierFactory func(context []byte) *spake2.Verifier
 	verifier        *spake2.Verifier // set on Pake1, cleared on Pake3 / next Pake1
-	onEstablished   PaseSessionEstablished
+	// callerVerifier marks the verifier of [NewPaseAdapter]: the caller's,
+	// reused for every Pake1, so the adapter does not close it.
+	callerVerifier bool
+	// verifierClosed, when set, observes each verifier the adapter closes
+	// (in-package tests, assigned before the handshake starts).
+	verifierClosed func(*spake2.Verifier)
+	onEstablished  PaseSessionEstablished
 
 	// PBKDF response config — populated via [PaseAdapter.SetPBKDFParams].
 	pbkdfIterations    uint32
@@ -163,10 +169,15 @@ type PaseSessionEstablished func(sharedSecret []byte, peerSessionID uint16) erro
 // A nil verifier produces an adapter that returns errors from every
 // Pake* call — useful for tests of the missing-verifier defensive
 // path.
+//
+// v stays the caller's: the adapter does not close it when a handshake
+// ends, as it closes the verifiers a factory makes; the caller closes it
+// ([spake2.Verifier.Close]).
 func NewPaseAdapter(v *spake2.Verifier) *PaseAdapter {
 	return &PaseAdapter{
 		verifierFactory: func([]byte) *spake2.Verifier { return v },
 		verifier:        v,
+		callerVerifier:  true,
 	}
 }
 
@@ -378,6 +389,10 @@ func (a *PaseAdapter) ProcessPake1(payload []byte) (opcode uint8, respPayload []
 	if v == nil {
 		return 0, nil, errors.New("bridge: PaseAdapter factory returned nil verifier")
 	}
+	if a.verifier != v {
+		// A verifier of an earlier Pake1 on this adapter is dropped here.
+		a.closeVerifierLocked()
+	}
 	a.verifier = v
 	pA, err := spake2.DecodePake1(payload)
 	if err != nil {
@@ -411,16 +426,35 @@ func (a *PaseAdapter) ProcessPake1(payload []byte) (opcode uint8, respPayload []
 // a confirmed Pake3 — ended: the verifier and the PBKDFParamRequest/Response
 // transcript. The
 // router ends the handshake on every refusal — failure report, count, the
-// single-active-PASE claim freed ([Bridge.handlePase]) — and hands the
-// singleton handler of [Bridge.AttachPaseHandler] the next Pake1 whatever
-// began it, so a transcript kept here would let that Pake1 run against
-// the ended handshake without a new PBKDFParamRequest (R2-P5 Fable F3).
-// The next handshake starts with its own PBKDFParamRequest. Caller holds
-// a.mu.
+// single-active-PASE claim freed ([Bridge.handlePase]) — and drops a Pake1
+// no PBKDFParamRequest began ([Bridge.resolvePaseContinuation]); a Pake1
+// that still reaches the adapter — from a host that drives it directly —
+// must not run against the ended handshake either, which a transcript kept
+// here would let it do (R2-P5 Fable F3). The next handshake starts with
+// its own PBKDFParamRequest. The verifier
+// is closed, so what it still holds of the handshake — Ke after a success,
+// the confirmation keys, Ke and the ephemeral secrets after a refusal — is
+// overwritten when the handshake ends ([spake2.Verifier.Close]). Caller
+// holds a.mu.
 func (a *PaseAdapter) endHandshakeLocked() {
-	a.verifier = nil
+	a.closeVerifierLocked()
 	a.pbkdfReqBytes = nil
 	a.pbkdfRespBytes = nil
+}
+
+// closeVerifierLocked closes and drops the handshake's verifier, unless it
+// is the caller's ([NewPaseAdapter]), which is only dropped. Caller holds
+// a.mu.
+func (a *PaseAdapter) closeVerifierLocked() {
+	v := a.verifier
+	a.verifier = nil
+	if v == nil || a.callerVerifier {
+		return
+	}
+	v.Close()
+	if a.verifierClosed != nil {
+		a.verifierClosed(v)
+	}
 }
 
 // computePaseContextLocked derives the SPAKE2+ context per Matter

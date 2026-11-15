@@ -1029,3 +1029,110 @@ func TestPaseAdapter_NewPaseAdapter_SingleShotBackcompat(t *testing.T) {
 	// May succeed or error (verifier already-advanced) — must not panic.
 	_, _, _ = a.ProcessPake1(spake2.EncodePake1(pA2))
 }
+
+// TestPaseAdapter_ClosesTheVerifiersItDrops: the adapter closes each
+// verifier its factory made when the handshake ends — after a confirmed
+// Pake3, after a refused one and when a later Pake1 replaces it — so Ke
+// and the handshake's secrets are overwritten (spake2.Verifier.Close)
+// rather than left to the collector (review II, R2-P5-port-01, W1-sec-05).
+// The callback still receives the shared secret: it is a copy.
+func TestPaseAdapter_ClosesTheVerifiersItDrops(t *testing.T) {
+	t.Parallel()
+	observe := func(a *PaseAdapter) (made, closed *[]*spake2.Verifier) {
+		made, closed = new([]*spake2.Verifier), new([]*spake2.Verifier)
+		factory := newVerifierFactory(t, nil)
+		a.verifierFactory = func(c []byte) *spake2.Verifier {
+			v := factory(c)
+			*made = append(*made, v)
+			return v
+		}
+		a.verifierClosed = func(v *spake2.Verifier) { *closed = append(*closed, v) }
+		return made, closed
+	}
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+		a := NewPaseAdapterWithFactory(nil)
+		made, closed := observe(a)
+		var secret []byte
+		a.SetOnSessionEstablished(func(s []byte, _ uint16) error { secret = s; return nil })
+		if _, _, err := paseRoundTrip(t, a); err != nil {
+			t.Fatal(err)
+		}
+		if len(*made) != 1 || len(*closed) != 1 || (*closed)[0] != (*made)[0] {
+			t.Fatalf("made %d, closed %d verifiers; want the one closed", len(*made), len(*closed))
+		}
+		if (*made)[0].SharedSecret() != nil {
+			t.Fatal("the verifier still yields Ke after the handshake ended")
+		}
+		if len(secret) == 0 || bytes.Equal(secret, make([]byte, len(secret))) {
+			t.Fatalf("the callback's shared secret %x was overwritten", secret)
+		}
+	})
+
+	t.Run("refused Pake3", func(t *testing.T) {
+		t.Parallel()
+		a := NewPaseAdapterWithFactory(nil)
+		made, closed := observe(a)
+		pake3 := paseHandshakeToPake3(t, a)
+		pake3[len(pake3)-2] ^= 0xFF // inside cA: the key confirmation fails
+		if _, _, err := a.ProcessPake3(pake3); err == nil {
+			t.Fatal("a corrupted Pake3 was accepted")
+		}
+		if len(*made) != 1 || len(*closed) != 1 || (*closed)[0] != (*made)[0] {
+			t.Fatalf("made %d, closed %d verifiers; want the one closed", len(*made), len(*closed))
+		}
+	})
+
+	t.Run("refused Pake1", func(t *testing.T) {
+		t.Parallel()
+		a := NewPaseAdapterWithFactory(nil)
+		made, closed := observe(a)
+		a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
+		if _, _, err := a.ProcessPBKDFParamRequest(buildTestPBKDFParamRequest(t, bytes.Repeat([]byte{0x44}, spake2.PBKDFRandomSize))); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := a.ProcessPake1([]byte{0x15, 0x18}); err == nil {
+			t.Fatal("a malformed Pake1 was accepted")
+		}
+		if len(*made) != 1 || len(*closed) != 1 || (*closed)[0] != (*made)[0] {
+			t.Fatalf("made %d, closed %d verifiers; want the one closed", len(*made), len(*closed))
+		}
+	})
+
+	t.Run("replaced by a later Pake1", func(t *testing.T) {
+		t.Parallel()
+		a := NewPaseAdapterWithFactory(nil)
+		made, closed := observe(a)
+		_ = paseHandshakeToPake3(t, a) // Pake1 answered, Pake3 not sent
+		prover, err := spake2.NewProver(20202021, []byte("SPAKE2P Key Salt"), 1000, nil, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pA, err := prover.GeneratePake1()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := a.ProcessPake1(spake2.EncodePake1(pA)); err != nil {
+			t.Fatal(err)
+		}
+		if len(*made) != 2 || len(*closed) != 1 || (*closed)[0] != (*made)[0] {
+			t.Fatalf("made %d, closed %d verifiers; want the first closed", len(*made), len(*closed))
+		}
+	})
+
+	t.Run("the caller's verifier is not closed", func(t *testing.T) {
+		t.Parallel()
+		vc, err := spake2.NewVerifierContext(20202021, []byte("SPAKE2P Key Salt"), 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := NewPaseAdapter(spake2.NewVerifier(vc, nil, nil, []byte(spake2.MatterContext)))
+		var closed int
+		a.verifierClosed = func(*spake2.Verifier) { closed++ }
+		_, _, _ = a.ProcessPake3([]byte{0x15, 0x18})
+		if closed != 0 {
+			t.Fatalf("closed %d verifiers of NewPaseAdapter's caller, want 0", closed)
+		}
+	})
+}
