@@ -104,7 +104,10 @@ type ServerConfig struct {
 	// command the conformance makes mandatory for the feature selection
 	// must have one, or construction fails with [ErrMissingHandler];
 	// an optional command's handler may also be registered later with
-	// [Server.Handle].
+	// [Server.Handle]. An accepted command without a handler is left out of
+	// AcceptedCommandList (and its response out of GeneratedCommandList)
+	// until [Server.Handle] registers one: the lists name the commands the
+	// server implements.
 	Handlers map[uint32]CommandHandler
 	// Unimplemented marks every accepted command Handlers leaves out as
 	// the generated behavior's unimplemented one (matter.js
@@ -156,8 +159,11 @@ type Server struct {
 	// own are the handlers construction was given ([ServerConfig.Handlers]),
 	// which [Server.Handle] with a nil handler restores.
 	own map[uint32]CommandHandler
-	// stubs are the accepted commands construction found unimplemented
-	// ([ServerConfig.Unimplemented]); one is listed once it has a handler.
+	// stubs are the mandatory commands construction found unimplemented
+	// ([ServerConfig.Unimplemented]) — the ones
+	// [Server.UnimplementedMandatoryCommands] reports while they have no
+	// handler. Every accepted command without a handler is unlisted
+	// ([Server.unimplementedLocked]), a stub or not.
 	stubs   []uint32
 	emitter contract.EventEmitter
 }
@@ -223,10 +229,10 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	var missing []error
 	for _, id := range inst.accepted {
 		switch {
-		case s.handlers[id] != nil:
+		case s.handlers[id] != nil, !slices.Contains(inst.required, id):
 		case cfg.Unimplemented:
 			s.stubs = append(s.stubs, id)
-		case slices.Contains(inst.required, id):
+		default:
 			missing = append(missing, fmt.Errorf("%w: %s command %s (0x%02X)", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id))
 		}
 	}
@@ -585,11 +591,12 @@ func (s *Server) Handles(cmdID uint32) bool {
 	return s.Instance.Accepts(cmdID) && s.handlers[cmdID] != nil
 }
 
-// unimplementedLocked reports whether cmdID is a stub still without a
-// handler.
-func (s *Server) unimplementedLocked(cmdID uint32) bool {
-	return slices.Contains(s.stubs, cmdID) && s.handlers[cmdID] == nil
-}
+// unimplementedLocked reports whether the accepted command cmdID has no
+// handler — a mandatory stub ([ServerConfig.Unimplemented]) or an
+// optional command nobody implemented: either stays out of the command
+// lists until [Server.Handle] registers it, as matter.js lists the
+// commands a behavior implements.
+func (s *Server) unimplementedLocked(cmdID uint32) bool { return s.handlers[cmdID] == nil }
 
 // UnimplementedMandatoryCommands returns the request commands the
 // conformance requires for the feature selection that are still the
@@ -613,7 +620,7 @@ func (s *Server) UnimplementedMandatoryCommands() []uint32 {
 }
 
 // Accepts reports whether the server accepts the request command: the
-// instance accepts it and it is not an unimplemented stub.
+// instance accepts it and it has a handler.
 func (s *Server) Accepts(cmdID uint32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -621,17 +628,13 @@ func (s *Server) Accepts(cmdID uint32) bool {
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]: the
-// instance's accepted commands without the unimplemented stubs
+// instance's accepted commands that have a handler
 // (ServerBehaviorBacking.ts:127-147 at 0ceb202d lists the implemented
 // commands only).
 func (s *Server) MatterAcceptedCommands() []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := s.Instance.MatterAcceptedCommands()
-	if len(s.stubs) == 0 {
-		return out
-	}
-	return slices.DeleteFunc(out, s.unimplementedLocked)
+	return slices.DeleteFunc(s.Instance.MatterAcceptedCommands(), s.unimplementedLocked)
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
@@ -639,9 +642,6 @@ func (s *Server) MatterAcceptedCommands() []uint32 {
 func (s *Server) MatterGeneratedCommands() []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.stubs) == 0 {
-		return s.Instance.MatterGeneratedCommands()
-	}
 	out := []uint32{}
 	for _, id := range s.Instance.MatterAcceptedCommands() {
 		if s.unimplementedLocked(id) {
@@ -651,6 +651,7 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 			out = append(out, r.ID)
 		}
 	}
+	slices.Sort(out) // ascending, as the instance lists it
 	return out
 }
 
