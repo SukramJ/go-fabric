@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/sukramj/go-fabric-chip@sha256:482f8caf68ff7921c7b7ffeeea4fb4f2afc6d04fb831e7b69b44b2d6de0234e4",
+  "image": "ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff",
   "cases": {
     "ACE/1.1": {
       "steps": 38,
@@ -290,7 +290,7 @@
     "BINFO/2.1": {
       "tests": 1,
       "steps": 30,
-      "stepsSkipped": 22
+      "stepsSkipped": 20
     },
     "BINFO/2.2": {
       "tests": 1,
@@ -1827,6 +1827,11 @@
       "steps": 10,
       "stepsSkipped": 0
     },
+    "PAVST/2.11": {
+      "tests": 1,
+      "steps": 37,
+      "stepsSkipped": 2
+    },
     "PAVST/2.12": {
       "tests": 1,
       "steps": 18,
@@ -1847,9 +1852,24 @@
       "steps": 8,
       "stepsSkipped": 0
     },
+    "PAVST/2.3": {
+      "tests": 1,
+      "steps": 35,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.4": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
     "PAVST/2.5": {
       "tests": 1,
       "steps": 7,
+      "stepsSkipped": 0
+    },
+    "PAVST/2.6": {
+      "tests": 1,
+      "steps": 10,
       "stepsSkipped": 0
     },
     "PAVST/2.7": {
@@ -2485,6 +2505,10 @@
     "WASHERCTRL/2.1": {
       "tests": 1,
       "steps": 5,
+      "stepsSkipped": 0
+    },
+    "WASHERCTRL/2.2": {
+      "steps": 7,
       "stepsSkipped": 0
     },
     "WEBRTCP/2.10": {

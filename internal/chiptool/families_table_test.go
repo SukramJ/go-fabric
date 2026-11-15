@@ -885,12 +885,7 @@ var chipFamilies = []family{
 	},
 	{name: "LVL", deviceType: dtColorTempLight},
 	{name: "LWM", deviceType: dtLaundryWasher},
-	{
-		name: "WASHERCTRL", deviceType: dtLaundryWasher,
-		exclude: map[string]gap{
-			"2.2": runPending("WASHERCTRL/2.2", "TC-WASHERCTRL-2.2 step 6 writes NumberOfRinses 4, a value NumberOfRinsesEnum does not define, and expects INVALID_IN_STATE (Test_TC_WASHERCTRL_2_2.yaml:86-95 at 6170af84), chip's answer for a rinse count the device does not support (LaundryWasherControlsCluster.cpp:132-145); the server judges NumberOfRinses itself and answers so (owner decision 69, script/clustergen/relaxed.go)"),
-		},
-	},
+	{name: "WASHERCTRL", deviceType: dtLaundryWasher},
 	{name: "DRYERCTRL", deviceType: dtLaundryDryer},
 	{
 		name: "MOD", deviceType: dtModeSelect,
@@ -1124,11 +1119,7 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
-			"2.3":  runPending("PAVST/2.3", "TC-PAVST-2.3 step 25 allocates a motion transport with MotionSensitivity 11 on a camera with PERZONESENS and expects INVALID_COMMAND (TC_PAVST_2_3.py:435-443), connectedhomeip's answer (PushAVStreamTransportLogic.cpp:573-574 at 6170af84); the server judges MotionSensitivity itself and answers so (owner decision 69, script/clustergen/relaxed.go)"),
-			"2.6":  runPending("PAVST/2.6", "TC-PAVST-2.6 step 8 modifies the transport with empty VideoStreams and AudioStreams lists and expects SUCCESS (TC_PAVST_2_6.py:283-297); connectedhomeip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84), and the server takes it as no stream field (owner decision 69, script/clustergen/relaxed.go)"),
-			"2.11": runPending("PAVST/2.11", "TC-PAVST-2.11 step 21a allocates with VideoStreamID and a VideoStreams list naming the same stream beside an empty AudioStreams list and expects INVALID_COMMAND (TC_PAVST_2_11.py:468-479); connectedhomeip's server treats the empty list as absent and refuses the old and new stream fields together (PushAVStreamTransportLogic.cpp:671-682 at 6170af84), and the server answers so (owner decision 69, script/clustergen/relaxed.go)"),
 			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
-			"2.4":  runPending("PAVST/2.4", "TC-PAVST-2.4 step 5 modifies the transport with empty VideoStreams and AudioStreams lists and expects SUCCESS (TC_PAVST_2_4.py:203-213); connectedhomeip's server treats an empty list as absent (PushAVStreamTransportLogic.cpp:671-680 at 6170af84), and the server takes it as no stream field (owner decision 69, script/clustergen/relaxed.go)"),
 		},
 	},
 	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},

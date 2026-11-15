@@ -29,13 +29,11 @@ type pendingRun struct {
 // certification run is pending (status "not ported yet", owner decision
 // 82), case id → the unit test that holds the step's answer. The family run
 // runs them; once one passes there, its row leaves the family's exclude.
-var runPendingEvidence = map[string]pendingRun{
-	"PAVST/2.3":      {"cluster/camera", "TestPushTransportCertificationSteps"},
-	"PAVST/2.4":      {"cluster/camera", "TestPushTransportCertificationSteps"},
-	"PAVST/2.6":      {"cluster/camera", "TestPushTransportCertificationSteps"},
-	"PAVST/2.11":     {"cluster/camera", "TestPushTransportCertificationSteps"},
-	"WASHERCTRL/2.2": {"cluster/appliance", "TestLaundryWasherControlsCertificationStep"},
-}
+//
+// None is pending now: TC-PAVST-2.3, 2.4, 2.6, 2.11 and TC-WASHERCTRL-2.2,
+// the first rows of this kind, passed in the family run of 2026-11-15 and
+// are cases of the golden file.
+var runPendingEvidence = map[string]pendingRun{}
 
 // runPending is the exclude row of a family case whose fix is in the tree
 // and whose certification run is pending: what is the step, the answer it
@@ -211,8 +209,12 @@ func TestNotPortedYetRowsAreHeld(t *testing.T) {
 	}
 
 	// A run-pending row of PAVST/2.3 with its evidence, set here so the
-	// test does not depend on which rows the family table carries.
+	// test does not depend on which rows the family table carries — nor on
+	// the golden file: the case passed its run since (2026-11-15), so its
+	// entry is taken out of the copy the guard reads here.
 	pendingRow := gap{class: classNotPortedYet, reason: "run pending: TestPushTransportCertificationSteps (cluster/camera)"}
+	g.Cases = maps.Clone(g.Cases)
+	delete(g.Cases, "PAVST/2.3")
 	base := func() statusTables {
 		st := currentStatusTables()
 		st.notRun = maps.Clone(st.notRun)
