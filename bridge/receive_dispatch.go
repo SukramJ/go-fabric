@@ -21,6 +21,7 @@ import (
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -723,6 +724,13 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// the session that issued the CSRRequest (matter.js
 	// OperationalCredentialsServer.ts session-ID binding guard).
 	invokeCtx = core.WithInvokeSessionID(invokeCtx, requestHdr.SessionID)
+	// And the session's identity, which a session of another stack (a
+	// node's client stack) never shares: the CSR of a fail-safe binds to it
+	// whichever stack holds the session ([core.WithInvokeSession]; review
+	// II, Fable R2-1).
+	if sess := b.lookupSession(requestHdr.SessionID); sess != nil {
+		invokeCtx = core.WithInvokeSession(invokeCtx, sess)
+	}
 	if challenge, ok := b.sessionAttestationChallenge(requestHdr.SessionID); ok {
 		invokeCtx = core.WithInvokeAttestationChallenge(invokeCtx, challenge)
 	}
@@ -1322,6 +1330,25 @@ func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeRespon
 				slog.Int("session_id", int(sessionID)), slog.Any("err", err))
 		}
 	}
+}
+
+// lookupSession is the live session of the id, nil for none (or the
+// unsecured id 0).
+func (b *Bridge) lookupSession(sessionID uint16) *channel.Session {
+	if sessionID == 0 {
+		return nil
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lookup == nil {
+		return nil
+	}
+	sess, ok := lookup.Lookup(sessionID)
+	if !ok {
+		return nil
+	}
+	return sess
 }
 
 // sessionAttestationChallenger is the optional capability of the session

@@ -4,14 +4,20 @@
 package node
 
 import (
+	"bytes"
 	"context"
+	"net"
 	"net/netip"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/peer"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/channel"
 )
 
 // TestPeerClientFollowsTheFabricHooks: the client stack a node builds for
@@ -98,4 +104,90 @@ func TestFabricUpdateEndsAHandshakeInFlight(t *testing.T) {
 	}
 	cancel()
 	<-done
+}
+
+// clientSessionTo opens a secure session of the node's configured client
+// stack to addr and adopts it into the peer set: a session the node opened.
+// Nobody answers at its address, so a failed send does not count as the
+// peer's loss (SuppressPeerLoss): only the sweep under test closes it.
+func clientSessionTo(t *testing.T, n *Node, id uint16, addr handshake.PeerAddress) *exchange.Session {
+	t.Helper()
+	key := bytes.Repeat([]byte{byte(id)}, 16)
+	s, err := n.client.exchanges.NewSecureSession(exchange.SecureSessionConfig{
+		ID: id, Addr: &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}, FabricIndex: addr.FabricIndex,
+		Channel:          channel.Config{EncryptKey: key, DecryptKey: key, LocalNodeID: 0x1111, PeerNodeID: addr.NodeID, PeerSessionID: 0x7000 + id},
+		SuppressPeerLoss: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.client.peers.Adopt(s) == nil {
+		t.Fatal("the session was not adopted")
+	}
+	return s
+}
+
+// TestClientSessionCommandGetsItsResponse: an UpdateNOC or a RemoveFabric
+// invoked on a client-stack session sweeps the fabric's client sessions —
+// and its own after its response (im.DeferAfterResponse), as the bridge
+// closes its invoking session; another session of the fabric goes at once
+// (review II, Fable R2-1).
+func TestClientSessionCommandGetsItsResponse(t *testing.T) {
+	t.Parallel()
+	addr := handshake.PeerAddress{FabricIndex: 3, NodeID: 0x77}
+	invokeOn := func(s *exchange.Session) (context.Context, *im.AfterResponse) {
+		after := &im.AfterResponse{}
+		return im.WithAfterResponse(mattercore.WithInvokeSession(context.Background(), s), after), after
+	}
+	t.Run("UpdateNOC", func(t *testing.T) {
+		t.Parallel()
+		n := clientNode(t)
+		invoking := clientSessionTo(t, n, 0x0301, addr)
+		other := clientSessionTo(t, n, 0x0302, addr)
+		if invoking.IsClosed() || other.IsClosed() {
+			t.Fatalf("closed before the sweep: invoking %v, other %v", invoking.IsClosed(), other.IsClosed())
+		}
+		ctx, after := invokeOn(invoking)
+		n.closeClientFabricSessions(ctx, addr.FabricIndex)
+		if invoking.IsClosed() {
+			t.Fatal("the invoking session closed before the response")
+		}
+		if !other.IsClosed() {
+			t.Error("another session of the fabric outlived the sweep")
+		}
+		after.Run()
+		if !invoking.IsClosed() {
+			t.Error("the invoking session outlived the response")
+		}
+	})
+	t.Run("RemoveFabric", func(t *testing.T) {
+		t.Parallel()
+		n := clientNode(t)
+		invoking := clientSessionTo(t, n, 0x0303, addr)
+		ctx, after := invokeOn(invoking)
+		n.forgetClientPeers(ctx, addr.FabricIndex)
+		if invoking.IsClosed() || n.client.peers.Get(addr) == nil {
+			t.Fatal("the invoking session's peer went before the response")
+		}
+		after.Run()
+		if !invoking.IsClosed() || n.client.peers.Get(addr) != nil {
+			t.Error("the invoking session's peer outlived the response")
+		}
+	})
+}
+
+// TestClientServerStampsTheSessionIdentity: a request on a client-stack
+// session carries the *exchange.Session as its identity and no bridge id
+// (review II, Fable R2-1).
+func TestClientServerStampsTheSessionIdentity(t *testing.T) {
+	t.Parallel()
+	n := clientNode(t)
+	s := clientSessionTo(t, n, 0x0304, handshake.PeerAddress{FabricIndex: 3, NodeID: 0x77})
+	ctx := n.clientServerConfig().RequestContext(context.Background(), s)
+	if got, _ := mattercore.InvokeSessionFromContext(ctx).(*exchange.Session); got != s {
+		t.Errorf("identity %v, want the session", mattercore.InvokeSessionFromContext(ctx))
+	}
+	if id := mattercore.InvokeSessionIDFromContext(ctx); id != 0 {
+		t.Errorf("bridge id %d stamped on a client-stack request", id)
+	}
 }

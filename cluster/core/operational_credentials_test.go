@@ -375,6 +375,97 @@ func TestOpcreds_AddNOC_CSRSessionBindsEvenWhenAddNOCNamesNoSession(t *testing.T
 	}
 }
 
+// TestOpcreds_CSRBindsToTheSessionIdentity: a CSR made on a session that
+// carries an identity ([core.WithInvokeSession] — a node's client-stack
+// session, which names no bridge id) is consumed by that session alone: not
+// from another identity, not from a bridge session (an id, with or without
+// its own identity), not from a request that names none — the binding used
+// to fall back to fabric-wide for a CSR without an id (review II, Fable
+// R2-1; matter.js binds the CSR to the requesting session whoever opened
+// it, OperationalCredentialsServer.ts:143-146 → FailsafeContext.ts:176-185,
+// compared at :240-245 at db021da0). A bridge session that carries both
+// stamps binds to its identity.
+func TestOpcreds_CSRBindsToTheSessionIdentity(t *testing.T) {
+	t.Parallel()
+	type clientSession struct{ n int }
+	own, other := &clientSession{1}, &clientSession{2}
+	type bridgeSession struct{ n int }
+	bridgeA := &bridgeSession{1}
+	add := core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1}
+	for _, csr := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{"client-stack session", core.WithInvokeSession(context.Background(), own)},
+		{"bridge session", core.WithInvokeSession(core.WithInvokeSessionID(context.Background(), 7), bridgeA)},
+	} {
+		t.Run(csr.name, func(t *testing.T) {
+			t.Parallel()
+			oc := newOpcredsWithRoot(t)
+			if _, err := oc.MatterInvoke(sessionChallengeCtx(csr.ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+				t.Fatalf("CSRRequest: %v", err)
+			}
+			for _, tc := range []struct {
+				name string
+				ctx  context.Context
+				want bool // MissingCsr
+			}{
+				{"no session named", context.Background(), true},
+				{"another client-stack session", core.WithInvokeSession(context.Background(), other), true},
+				{"a bridge session by id only", core.WithInvokeSessionID(context.Background(), 7), true},
+				{"another bridge session", core.WithInvokeSession(core.WithInvokeSessionID(context.Background(), 8), &bridgeSession{2}), true},
+				{"the CSR's session", csr.ctx, false},
+			} {
+				resp, err := oc.MatterInvoke(tc.ctx, 0x06, add)
+				if err != nil {
+					t.Fatalf("%s: AddNOC: %v", tc.name, err)
+				}
+				if got := resp.(core.NOCResponse).StatusCode == core.NOCStatusMissingCsr; got != tc.want {
+					t.Errorf("%s: MissingCsr = %v, want %v (status %d)", tc.name, got, tc.want, resp.(core.NOCResponse).StatusCode)
+				}
+			}
+		})
+	}
+}
+
+// TestOpcreds_UpdateNOCCSRBindsToTheSession: as AddNOC, UpdateNOC consumes
+// the CSR of the session that issued it alone (review II, Fable R2-1).
+func TestOpcreds_UpdateNOCCSRBindsToTheSession(t *testing.T) {
+	t.Parallel()
+	type clientSession struct{ n int }
+	ctx := context.Background()
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, fabricIndex := commissionTestFabric(ctx, t, oc)
+	oc.SetFailSafe(func() (uint8, bool) { return fabricIndex, true })
+	commitForTest(t, oc)
+	oc.ClearPendingState()
+	fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
+	csrCtx := core.WithInvokeSession(fabCtx, &clientSession{1})
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(csrCtx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32), IsForUpdateNOC: true}); err != nil {
+		t.Fatalf("CSRRequest: %v", err)
+	}
+	for name, other := range map[string]context.Context{
+		"another client-stack session": core.WithInvokeSession(fabCtx, &clientSession{2}),
+		"a bridge session":             core.WithInvokeSessionID(fabCtx, 7),
+		"no session named":             fabCtx,
+	} {
+		resp, err := oc.MatterInvoke(other, 0x07, core.UpdateNOCRequest{NOCValue: []byte{0x15, 0x18}})
+		if err != nil {
+			t.Fatalf("%s: UpdateNOC: %v", name, err)
+		}
+		if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusMissingCsr {
+			t.Errorf("%s: UpdateNOC status %d, want MissingCsr", name, nr.StatusCode)
+		}
+	}
+	resp, err := oc.MatterInvoke(csrCtx, 0x07, core.UpdateNOCRequest{NOCValue: []byte{0x15, 0x18}})
+	if nr, ok := resp.(core.NOCResponse); err == nil && ok && nr.StatusCode == core.NOCStatusMissingCsr {
+		t.Errorf("UpdateNOC on the CSR's own session refused as MissingCsr (%s)", nr.DebugText)
+	}
+}
+
 func TestOpcreds_AddTrustedRoot_MalformedCert(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)

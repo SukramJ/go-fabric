@@ -9,8 +9,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/channel"
 )
 
 // largeMessageFactServer records the Large Message fact its command ran
@@ -106,5 +108,47 @@ func TestRouteCarriesLargeMessages(t *testing.T) {
 	}
 	if routeCarriesLargeMessages(nil) {
 		t.Error("no route carries large messages")
+	}
+}
+
+// sessionIdentityServer records the session identity its command ran with.
+type sessionIdentityServer struct {
+	countingInvokeServer
+	got atomic.Pointer[channel.Session]
+	id  atomic.Uint32
+}
+
+func (s *sessionIdentityServer) MatterInvoke(ctx context.Context, cmd uint32, fields any) (any, error) {
+	if sess, ok := core.InvokeSessionFromContext(ctx).(*channel.Session); ok {
+		s.got.Store(sess)
+	}
+	s.id.Store(uint32(core.InvokeSessionIDFromContext(ctx)))
+	return s.countingInvokeServer.MatterInvoke(ctx, cmd, fields)
+}
+
+// TestInvokeStampsTheSessionIdentity: the bridge names the invoking session
+// both by its registry id and by its identity — the session itself — so a
+// CSR binds to it as to a session of another stack (review II, Fable R2-1).
+func TestInvokeStampsTheSessionIdentity(t *testing.T) {
+	t.Parallel()
+	path := im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	b := newStartedBridge(t)
+	srv := &sessionIdentityServer{countingInvokeServer: countingInvokeServer{id: 0x0006}}
+	b.AttachRootClusters([]contract.ClusterServer{srv})
+	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = peerConn.Close() })
+	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
+	if err := b.dispatch(context.Background(), secureTestDatagram(t, b, proto, encodeTimedTestInvokeRequest(t, false, path)), peerConn.LocalAddr()); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	id := uint16(srv.id.Load())
+	if id == 0 {
+		t.Fatal("no session id stamped")
+	}
+	if want := b.lookupSession(id); want == nil || srv.got.Load() != want {
+		t.Errorf("identity %p, want the session of id %d (%p)", srv.got.Load(), id, want)
 	}
 }

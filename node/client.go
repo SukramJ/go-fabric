@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -166,13 +167,14 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 // PASE), the timed interaction and the Large Message fact, the largest
 // payload of the session's messages and its attestation challenge.
 //
-// What the bridge's server adds beyond the gates is not on this path: no
-// session id is stamped (core.WithInvokeSessionID names a session of the
-// bridge's registry, whose id space the client stack does not share — a
-// session-bound flow treats the request as naming none), events are not
-// reported in a read, a SubscribeRequest answers InvalidAction, and a
-// write or invoke reaches the bridge's subscriptions through the servers'
-// own change notifications only.
+// The session is named by its identity (core.WithInvokeSession, the
+// *exchange.Session), not by a bridge session id: core.WithInvokeSessionID
+// names a session of the bridge's registry, whose id space the client stack
+// does not share, so a flow that means one (a DiagnosticLogs transfer)
+// finds none. What the bridge's server adds beyond the gates is not on this
+// path: events are not reported in a read, a SubscribeRequest answers
+// InvalidAction, and a write or invoke reaches the bridge's subscriptions
+// through the servers' own change notifications only.
 func (n *Node) clientServerConfig() interaction.ServerConfig {
 	maxPaths := int(n.cfg.MaxPathsPerInvoke)
 	if maxPaths == 0 {
@@ -183,6 +185,9 @@ func (n *Node) clientServerConfig() interaction.ServerConfig {
 		Qualities:         n.br.ElementQualities(),
 		MaxPathsPerInvoke: maxPaths,
 		RequestContext: func(ctx context.Context, s *exchange.Session) context.Context {
+			// The session's identity, which no bridge session shares: the
+			// CSR of a fail-safe binds to it (review II, Fable R2-1).
+			ctx = mattercore.WithInvokeSession(ctx, s)
 			ctx = im.WithMaxPayloadSize(ctx, s.MaxPayloadSize())
 			if c := s.AttestationChallenge(); len(c) > 0 {
 				ctx = mattercore.WithInvokeAttestationChallenge(ctx, c)
@@ -341,14 +346,35 @@ func (n *Node) clientFabric(addr handshake.PeerAddress) (handshake.Fabric, bool)
 // the fabric's deletion force-closes them all (Fabric.ts:478-488) and
 // SessionManager deletes the fabric's resumption records
 // (SessionManager.ts:308-310, :537-552 at db021da0).
+//
+// A RemoveFabric invoked on one of the peer's own client-stack sessions
+// gets its response first: that peer is deleted once the response is out
+// ([im.DeferAfterResponse]), as the bridge closes its invoking session
+// after the response (review II, Fable R2-1).
 func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
+	invoking := invokingClientSession(ctx)
 	for _, cs := range n.clientStacks() {
 		for _, p := range cs.peers.Peers() {
-			if p.Address().FabricIndex == fabricIndex {
-				p.Delete(ctx)
+			if p.Address().FabricIndex != fabricIndex {
+				continue
 			}
+			if invoking != nil && slices.Contains(p.Sessions(), invoking) {
+				later := context.WithoutCancel(ctx)
+				if im.DeferAfterResponse(ctx, func() { p.Delete(later) }) {
+					continue
+				}
+			}
+			p.Delete(ctx)
 		}
 	}
+}
+
+// invokingClientSession is the client-stack session the request of ctx
+// arrived on ([mattercore.WithInvokeSession]), nil when it arrived on
+// another stack or none.
+func invokingClientSession(ctx context.Context) *exchange.Session {
+	s, _ := mattercore.InvokeSessionFromContext(ctx).(*exchange.Session)
+	return s
 }
 
 // closeClientFabricSessions ends the client stack's connection processes
@@ -360,6 +386,7 @@ func (n *Node) forgetClientPeers(ctx context.Context, fabricIndex uint8) {
 // SessionManager.deleteResumptionRecordsForFabric) with the fabric's
 // sessions, which every role registers with it (NodeSession.ts:153-156).
 func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8) {
+	invoking := invokingClientSession(ctx)
 	for _, cs := range n.clientStacks() {
 		for _, p := range cs.peers.Peers() {
 			addr := p.Address()
@@ -370,6 +397,15 @@ func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8)
 			// process ends first, then its sessions and record go.
 			p.Disconnect(ctx, nil)
 			for _, s := range cs.exchanges.SessionsFor(addr) {
+				// The UpdateNOC's own session closes once its response is
+				// out, as the bridge's invoking session does (review II,
+				// Fable R2-1).
+				if s == invoking {
+					mgr, later := cs.exchanges, context.WithoutCancel(ctx)
+					if im.DeferAfterResponse(ctx, func() { mgr.CloseSession(later, s) }) {
+						continue
+					}
+				}
 				cs.exchanges.CloseSession(ctx, s)
 			}
 			if _, err := cs.resumption.DeleteResumptionRecord(addr); err != nil {

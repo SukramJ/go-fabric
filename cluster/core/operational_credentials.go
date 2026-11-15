@@ -81,12 +81,12 @@ type OperationalCredentials struct {
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
 	onAdminEntryInstalled  func(entry store.ACLEntry)
 
-	// pendingCSRSessionID is the session ID that issued the pending
-	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
-	// enforce the matter.js csrSessionId !== session.id guard per
-	// Matter §11.18.7.5.5.
+	// pendingCSRSession is the session that issued the pending
+	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest, compared
+	// strictly in handleAddNOC and handleUpdateNOC — the matter.js
+	// csrSessionId !== session.id guard per Matter §11.18.7.5.5.
 	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0.
-	pendingCSRSessionID uint16
+	pendingCSRSession any
 
 	// pendingCSRForUpdate captures `IsForUpdateNOC` from the CSRRequest
 	// that produced [pendingPrivKey]. handleUpdateNOC requires it to be
@@ -248,6 +248,48 @@ func WithInvokeSessionID(ctx context.Context, sessionID uint16) context.Context 
 func InvokeSessionIDFromContext(ctx context.Context) uint16 {
 	v, _ := ctx.Value(invokeSessionCtxKey{}).(uint16)
 	return v
+}
+
+// invokeSessionKeyCtxKey is the context key of [WithInvokeSession].
+type invokeSessionKeyCtxKey struct{}
+
+// WithInvokeSession returns a derived context carrying an opaque identity of
+// the session the invoke arrived on: a comparable value unique to that
+// session among every session of the node, whichever stack holds it — the
+// bridge stamps its session, a node's client stack its *exchange.Session.
+// It sits beside [WithInvokeSessionID], whose uint16 names a session of the
+// bridge's registry only: a request on a client-stack session carries the
+// identity and no id. A nil key stamps nothing.
+//
+// The CSR of a fail-safe is bound to it (OperationalCredentials): matter.js
+// binds the CSR to the requesting session whoever opened it
+// (OperationalCredentialsServer.ts:143-146 → FailsafeContext.ts:176-185 at
+// db021da0, compared at OperationalCredentialsServer.ts:240-245), its ids
+// drawn from one SessionManager for every session (SessionManager.ts:581-606).
+func WithInvokeSession(ctx context.Context, key any) context.Context {
+	if key == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, invokeSessionKeyCtxKey{}, key)
+}
+
+// InvokeSessionFromContext returns the identity [WithInvokeSession]
+// stamped, nil when none.
+func InvokeSessionFromContext(ctx context.Context) any {
+	return ctx.Value(invokeSessionKeyCtxKey{})
+}
+
+// invokeSessionBinding is what a CSR binds to and AddNOC / UpdateNOC compare
+// with: the session's identity when stamped ([WithInvokeSession]), else its
+// bridge id when one is stamped ([WithInvokeSessionID]), else nil.
+func invokeSessionBinding(ctx context.Context) any {
+	if key := InvokeSessionFromContext(ctx); key != nil {
+		return key
+	}
+	if id := InvokeSessionIDFromContext(ctx); id != 0 {
+		return id
+	}
+	return nil
 }
 
 // StoreFacade is the subset of [store.Store] this cluster consumes.
@@ -704,7 +746,7 @@ func (o *OperationalCredentials) clearPendingState() {
 	o.pendingTrustRoot = nil
 	o.pendingTrustRootDER = nil
 	o.pendingCSRNonce = nil
-	o.pendingCSRSessionID = 0
+	o.pendingCSRSession = nil
 	o.pendingCSRForUpdate = false
 	o.pendingFabric = 0
 }
@@ -1927,11 +1969,11 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// that AddNOC is issued from the same session per Matter §11.18.7.5.5
 	// (matter.js OperationalCredentialsServer.ts:240-245 at db021da0; chip
 	// operational-credentials-server.cpp CSR failsafe binding).
-	csrSessionID := InvokeSessionIDFromContext(ctx)
+	csrSession := invokeSessionBinding(ctx)
 
 	o.mu.Lock()
 	o.pendingCSRNonce = append([]byte(nil), req.CSRNonce...)
-	o.pendingCSRSessionID = csrSessionID
+	o.pendingCSRSession = csrSession
 	// Capture the IsForUpdateNOC flag so the follow-up AddNOC/UpdateNOC
 	// handler can verify that the CSR was produced for the matching command.
 	// Without this both commands happily consume any pending CSR.
@@ -2114,17 +2156,18 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	//
 	// chip: operational-credentials-server.cpp CSR failsafe context check.
 	//
-	// A CSR issued on a session the context did not name (sessionID 0:
-	// a rig without WithInvokeSessionID) binds to none; a CSR issued on a
-	// named session is consumed by that session alone — matter.js compares
-	// the ids strictly (OperationalCredentialsServer.ts:240-245 at
-	// db021da0), and a request that names no session does not match one
-	// that did (review 2026-11 W3-clusec-04).
-	addNOCSessionID := InvokeSessionIDFromContext(ctx)
+	// A CSR is consumed by the session that issued it alone — matter.js
+	// compares the ids strictly (OperationalCredentialsServer.ts:240-245 at
+	// db021da0). The session is its identity when stamped, else its bridge
+	// id ([invokeSessionBinding]); a request that names no session matches
+	// only a CSR that named none (a rig without either stamp), and one that
+	// names a session matches no CSR that named none (review 2026-11
+	// W3-clusec-04; review II, Fable R2-1).
+	addNOCSession := invokeSessionBinding(ctx)
 
 	o.mu.Lock()
 	priv := o.pendingPrivKey
-	pendingCSRSessID := o.pendingCSRSessionID
+	pendingCSRSession := o.pendingCSRSession
 	pendingForUpdate := o.pendingCSRForUpdate
 	root := o.pendingTrustRoot
 	rootDER := o.pendingTrustRootDER
@@ -2136,9 +2179,10 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
-	// Session-ID mismatch: the AddNOC session must be the CSR's whenever
-	// the CSR named one.
-	if pendingCSRSessID != 0 && addNOCSessionID != pendingCSRSessID {
+	// Session mismatch: the AddNOC session must be the CSR's, strictly —
+	// a CSR on one session is consumed from no other, whichever stack
+	// holds either (review II, Fable R2-1).
+	if addNOCSession != pendingCSRSession {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not found in failsafe context"}, nil
 	}
 	// A CSR issued with IsForUpdateNOC=true must NOT be consumed by AddNOC
@@ -2531,6 +2575,15 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// same failsafe context", Status.ConstraintError)).
 	if !pendingForUpdate {
 		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
+	}
+	// As AddNOC, the CSR is consumed by the session that issued it alone,
+	// whichever stack holds it ([invokeSessionBinding]; review II, Fable
+	// R2-1).
+	o.mu.RLock()
+	pendingCSRSession := o.pendingCSRSession
+	o.mu.RUnlock()
+	if invokeSessionBinding(ctx) != pendingCSRSession {
+		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not found in failsafe context"}, nil
 	}
 	// A root added in this fail-safe (AddTrustedRootCertificate) belongs
 	// to an AddNOC: in-band MissingCsr, matter.js's certification
