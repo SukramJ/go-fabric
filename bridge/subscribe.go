@@ -1521,7 +1521,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 				// honour ([Bridge.replyChunkLeg]). matter.js gets it for
 				// free: its MessageExchange piggybacks the pending ack on
 				// the next send (packages/protocol/src/protocol/MessageExchange.ts:711-716
-				// at db021da0, where #send takes the pending ack).
+				// at db021da0, the pending ack taken for the message).
 				target = b.piggybackOwedAck(target, ourRole)
 			}
 			return b.sendUnsolicitedIM(target, im.OpcodeReportData, body)

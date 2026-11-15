@@ -237,23 +237,26 @@ func TestReestablishStopsWithTheBridge(t *testing.T) {
 	sentBefore := run2.br.load.imSent.Load()
 	done := make(chan ReestablishResult, 1)
 	go func() { done <- run2.br.ReestablishFormerSubscriptions(context.Background()) }()
+	wait, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
 	select {
 	case res := <-done:
 		if len(res.Reestablished) != 0 {
 			t.Errorf("re-established %v after the bridge stopped, want none", res.Reestablished)
 		}
-	case <-time.After(10 * time.Second):
+	case <-wait.Done():
 		t.Fatal("the re-establishment still runs 10 s after the bridge stopped")
 	}
 	// A chunk the bridge sent before it returned reaches the controller
 	// within this window.
-	for {
+	late, stop := context.WithTimeout(t.Context(), time.Second)
+	defer stop()
+	for drained := false; !drained; {
 		select {
 		case <-seen:
-			continue
-		case <-time.After(time.Second):
+		case <-late.Done():
+			drained = true
 		}
-		break
 	}
 	mu.Lock()
 	defer mu.Unlock()

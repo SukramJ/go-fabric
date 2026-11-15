@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9015,
+  "entry_points": 9021,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18776,
-    "reachable": 12619,
-    "whitelisted": 6157,
+    "total_exported": 18782,
+    "reachable": 12621,
+    "whitelisted": 6161,
     "unreachable": 0
   },
   "by_package": [],
@@ -3818,7 +3818,7 @@
       "identifier": "TestGroupJoinFailureIsRetried",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 449
+      "line": 450
     },
     {
       "package": "bridge",
@@ -3853,7 +3853,7 @@
       "identifier": "TestGroupMessageArrivesOverRealMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 482
+      "line": 483
     },
     {
       "package": "bridge",
@@ -3867,14 +3867,14 @@
       "identifier": "TestGroupMessagesAreDroppedWithoutGroupMessaging",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 428
+      "line": 429
     },
     {
       "package": "bridge",
       "identifier": "TestGroupMessagingEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 234
+      "line": 235
     },
     {
       "package": "bridge",
@@ -3889,6 +3889,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_write_node_parity_matterjs_test.go",
       "line": 50
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupWriteReachesASubscriber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 599
     },
     {
       "package": "bridge",
@@ -4113,6 +4120,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/host_change_version_test.go",
       "line": 45
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHostChangeInsideARootWriteAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 450
     },
     {
       "package": "bridge",
@@ -5722,7 +5736,14 @@
       "identifier": "TestReestablishPrimingWaitEnds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
-      "line": 247
+      "line": 248
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishStopsWithTheBridge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_order_test.go",
+      "line": 197
     },
     {
       "package": "bridge",
@@ -6737,7 +6758,7 @@
       "identifier": "TestStopGroupNetworkingLeavesWithoutTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 566
+      "line": 567
     },
     {
       "package": "bridge",
@@ -7466,6 +7487,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
       "line": 31
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWrittenChangesOmittedAttributeIsNotReported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 505
     },
     {
       "package": "client/discovery",
@@ -32385,14 +32413,14 @@
       "identifier": "TestCustomFlowFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/custom_flow_test.go",
-      "line": 31
+      "line": 30
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCustomFlowOpensAtStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/custom_flow_test.go",
-      "line": 132
+      "line": 129
     },
     {
       "package": "examples/reference-bridge",
@@ -32917,14 +32945,14 @@
       "identifier": "TestUserIntentCommissioningStartReportsTheNodesError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/custom_flow_test.go",
-      "line": 161
+      "line": 158
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestUserIntentFlowWaitsForThePipe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/custom_flow_test.go",
-      "line": 102
+      "line": 99
     },
     {
       "package": "examples/reference-bridge",

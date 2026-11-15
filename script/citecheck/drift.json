@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1760,
+    "line": 1762,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1762,
+    "line": 1764,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1799,
+    "line": 1801,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1822,
+    "line": 1824,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -412,7 +412,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 594,
+    "line": 605,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -422,7 +422,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 623,
+    "line": 634,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -431,7 +431,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 665,
+    "line": 676,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -543,7 +543,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2092,
+    "line": 2095,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -552,7 +552,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2168,
+    "line": 2171,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -580,7 +580,7 @@
   },
   {
     "file": "bridge/subscribe_dispatch.go",
-    "line": 741,
+    "line": 732,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "waitForSuccess",
@@ -1185,7 +1185,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 184,
+    "line": 185,
     "citation": "AttributeReadResponse.ts:160-162",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "at": "db021da0",
@@ -1195,7 +1195,7 @@
   },
   {
     "file": "client/interaction/server_test.go",
-    "line": 333,
+    "line": 334,
     "citation": "InteractionMessenger.ts:458-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -1984,7 +1984,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 886,
+    "line": 890,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -2472,7 +2472,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 482,
+    "line": 514,
     "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",
@@ -2482,7 +2482,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 991,
+    "line": 1024,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2746,7 +2746,7 @@
   },
   {
     "file": "im/read_expansion.go",
-    "line": 308,
+    "line": 354,
     "citation": "packages/node/src/node/integration/ProtocolService.ts:449-522",
     "resolved": "packages/node/src/node/integration/ProtocolService.ts",
     "at": "db021da0",
@@ -2830,7 +2830,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 515,
+    "line": 541,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",
