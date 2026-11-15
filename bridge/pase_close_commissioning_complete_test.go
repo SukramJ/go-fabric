@@ -5,7 +5,9 @@ package bridge
 
 import (
 	"context"
+	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -92,7 +95,9 @@ func (l caseOnFabricLookup) IsPASE(id uint16) (pase, ok bool) { return false, id
 // packages/protocol/src/common/FailsafeContext.ts:152-153 at db021da0
 // (completeCommission: "The Secure Session Context of any PASE session
 // still established at the Server SHALL be cleared" → closePaseSession).
-// The CASE session the command arrived on stays.
+// The CASE session the command arrived on stays, and the close is logged
+// with the PASE session's id (matter.session.pase_close, the line the
+// Go-TH leg's TC-DD-3.5 step 15 reads).
 func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T) {
 	t.Parallel()
 	const (
@@ -100,7 +105,22 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 		paseSession uint16 = 77
 		exchangeID  uint16 = 0x3091
 	)
-	b := newStartedBridge(t)
+	var logs syncBuffer
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0"},
+		slog.New(slog.NewTextHandler(&logs, nil)))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	startCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := b.Start(startCtx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() {
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer stopCancel()
+		_ = b.Stop(stopCtx)
+	})
 	b.AttachACLLister(endpoint.UnenforcedACL{})
 	gc, err := core.NewGeneralCommissioning(core.GeneralCommissioningConfig{
 		LocationCapability: core.RegulatoryIndoor, FailSafeMaxSeconds: 600,
@@ -142,5 +162,16 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 	reg.awaitClose(t) // the close follows the response by paseCloseGrace
 	if got := reg.closedIDs(); !slices.Equal(got, []uint16{paseSession}) {
 		t.Fatalf("sessions closed after CommissioningComplete = %v, want the PASE session [%d] alone", got, paseSession)
+	}
+	// The line is written before the first close, so it is there now.
+	found := false
+	for line := range strings.Lines(logs.String()) {
+		if strings.Contains(line, "msg=matter.session.pase_close ") &&
+			strings.Contains(line, " reason=commissioning_complete ") && strings.HasSuffix(line, " ids=77\n") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the bridge's log holds no matter.session.pase_close line naming session 77:\n%s", logs.String())
 	}
 }

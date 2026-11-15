@@ -52,7 +52,7 @@ const icdCheckInTimeout = 90 * time.Second
 
 // icdRun is an ICD case's DUT controller and the node it commissioned the
 // TH as, with the ICD client's events in arrival order (matter.js
-// InProcessIcdClient's #events, InProcessControllerAdapter.ts:1137-1170, :1267-1272).
+// InProcessIcdClient's #events, InProcessControllerAdapter.ts:1292-1325, :1422-1427).
 type icdRun struct {
 	ctrl *gocontroller.Controller
 	n    *client.Node
@@ -79,7 +79,7 @@ func (r *icdRun) snapshot() []icdEvent {
 	return append([]icdEvent(nil), r.events...)
 }
 
-// waitFor is InProcessIcdClient.waitFor (:1224-1265): the first event of
+// waitFor is InProcessIcdClient.waitFor (:1379-1420): the first event of
 // the kind at or after index from, within the timeout.
 func (r *icdRun) waitFor(th *goTH, checkIn bool, from int, d time.Duration) (icdEvent, int, error) {
 	var found icdEvent
@@ -103,7 +103,7 @@ func (r *icdRun) waitFor(th *goTH, checkIn bool, from int, d time.Duration) (icd
 	return found, at, nil
 }
 
-// commission is step 0's commissionChecked (tc-dd-support.ts:130-155)
+// commission is step 0's commissionChecked (tc-dd-support.ts:137-162)
 // with the TH's passcode and discriminator, as the QR code names them,
 // and the DUT's default subscription up — which a registration needs
 // (IcdClient.register, controller/client/icd.go Register).

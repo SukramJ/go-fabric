@@ -43,9 +43,14 @@ import (
 // Which cases those are is held to the snapshot's pin (parity/schema.json
 // matter.sourceCommit) by TestCertifiabilityDocument: testdata/
 // matterjs-cert-cases.json lists them at the pin, and each is run here or
-// classified (controllerRoleCases, matterJSCasesNotRun). The ports' line
-// citations were read at [goCertReadAt]; a case file that moved since is
-// re-read when its port is next touched.
+// classified (controllerRoleCases, matterJSCasesNotRun). The ports are
+// ports of the cases as they stand at [goCertReadAt], which is that pin,
+// and their line citations — of the case files, their support files and
+// the cert engine — were read there. A case that states a commit of its
+// own (goCertCase.readAt) is the exception: it is still the port of the
+// case as it stood at that commit, and says what the pin's version needs.
+// When the pin moves, every case file and cited support file that differs
+// between the two commits is re-read, and goCertReadAt moves with it.
 //
 // In matter.js's cert suite the DUT is, in most cases, a controller — its
 // own CommissioningController — and the TH a device app
@@ -74,10 +79,11 @@ import (
 // daemon, or a daemon log line — because matter.js proves its DUT by the
 // TH device's log, which a Go TH does not print.
 
-// goCertReadAt is the matter.js commit the ports' TS line citations were
-// read at; the case list itself is the snapshot pin's
-// (testdata/matterjs-cert-cases.json).
-const goCertReadAt = "862ad75f"
+// goCertReadAt is the matter.js commit the ports mirror and their TS line
+// citations were read at: the snapshot's pin, whose case list
+// testdata/matterjs-cert-cases.json holds. A case with a readAt of its own
+// is read at that commit instead.
+const goCertReadAt = "db021da0"
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2").
 const goCertEnv = "GOFABRIC_GOCERT"
@@ -85,7 +91,7 @@ const goCertEnv = "GOFABRIC_GOCERT"
 // goCertLongEnv runs the steps matter.js marks longRunning, which cost
 // minutes of real time each: matter.js skips them unless
 // MATTER_CERT_LONG_RUNNING is set (packages/testing/src/chip/cert/
-// cert-test.ts:318-322, longRunningEnabled :728-731). A run with it set
+// cert-test.ts:317-321, longRunningEnabled :702-705). A run with it set
 // checks no golden counts and writes none: the golden records the default
 // run.
 const goCertLongEnv = "GOFABRIC_GOCERT_LONG"
@@ -130,7 +136,7 @@ type goCertCase struct {
 	multicast bool
 	// finalize runs after the last step whatever happened, as the cert
 	// engine runs a case's finalizer in its finally block
-	// (packages/testing/src/chip/cert/cert-test.ts:498-502).
+	// (packages/testing/src/chip/cert/cert-test.ts:472-476).
 	finalize func(th *goTH)
 	// failureLog is the last log lines of the case's own TH-side
 	// participants (a container the case runs), printed beside the Go
@@ -163,6 +169,12 @@ type goCertCase struct {
 	// one the case starts itself (chip's camera-app): no daemon is started,
 	// and the case's PICS and steps' gates name nothing of the daemon's.
 	noDaemon bool
+	// readAt is the matter.js commit the case mirrors and its citations
+	// were read at where that is not [goCertReadAt]: a case whose file
+	// moved on in a way the leg cannot follow yet. It stays the port of
+	// the case as it stood at readAt, and names at its definition what the
+	// pin's version needs. "" is goCertReadAt.
+	readAt string
 }
 
 // goStep is one TS step.
@@ -213,7 +225,7 @@ type goStepRecord struct {
 }
 
 // errGoSkip is a step that skips itself at run time (matter.js
-// notApplicableAtRun, cert-dsl.ts:156-206), with its reason.
+// notApplicableAtRun, cert-dsl.ts:163-213), with its reason.
 type errGoSkip struct{ reason string }
 
 func (e errGoSkip) Error() string { return "skipped: " + e.reason }
@@ -266,6 +278,14 @@ func goCertID(tc string) string {
 	s := strings.TrimPrefix(tc, "TC-")
 	i := strings.LastIndex(s, "-")
 	return s[:i] + "/" + s[i+1:]
+}
+
+// readCommit is the matter.js commit the case was read at.
+func (c goCertCase) readCommit() string {
+	if c.readAt != "" {
+		return c.readAt
+	}
+	return goCertReadAt
 }
 
 func (c goCertCase) source() string {
@@ -339,9 +359,9 @@ func runGoCertCase(t *testing.T, bin string, flags map[string]bool, pics *commit
 	case c.origin != "":
 		t.Logf("%s: %s (the Go controller is the DUT)", c.tc, c.origin)
 	case c.role == roleDUT:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line, goCertReadAt)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, in its own direction (the Go controller is the DUT, the daemon the TH)", c.tc, c.source(), c.line, c.readCommit())
 	default:
-		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line, goCertReadAt)
+		t.Logf("%s: support/chip-testing/test/cert/%s:%d at matter.js %s, read mirrored (the daemon is the DUT)", c.tc, c.source(), c.line, c.readCommit())
 	}
 	if expr := strings.Join(c.pics, " & "); expr != "" {
 		if missing := th.undeclared(expr); len(missing) > 0 {
@@ -466,7 +486,7 @@ func (b *syncBuffer) tail(n int) string {
 }
 
 // runStep runs one step through the gates matter.js's engine applies in
-// order (cert-test.ts): notApplicable, then the step's PICS (:272), then
+// order (cert-test.ts): notApplicable, then the step's PICS (:271), then
 // the step itself.
 func (th *goTH) runStep(s goStep) goStepRecord {
 	th.t.Helper()
@@ -512,7 +532,7 @@ func (th *goTH) runStep(s goStep) goStepRecord {
 		}
 	}
 	// matter.js's next gate: a longRunning step is skipped unless the run
-	// asked for them (cert-test.ts:318-322).
+	// asked for them (cert-test.ts:317-321).
 	if s.long != "" && !goCertLong() {
 		rec.verdict, rec.detail = goSkipped, fmt.Sprintf("long-running: %s; set %s=1 to run it", s.long, goCertLongEnv)
 		return rec
@@ -552,7 +572,7 @@ func newGoTH(ctx context.Context, t *testing.T, bin string, flags map[string]boo
 	}
 	pipe := filepath.Join(t.TempDir(), "app-pipe")
 	// The Matter port: a group message goes to it (groups/sender.go
-	// groupPort, GroupSession.ts:150-153), and the cases run one at a time.
+	// groupPort, GroupSession.ts:190-193), and the cases run one at a time.
 	listen := c.listen
 	if listen == "" {
 		listen = fmt.Sprintf(":%d", matterPort)
@@ -614,7 +634,7 @@ func (th *goTH) note(format string, args ...any) {
 
 // device starts the run's index-th further device as matter.js's
 // identityFor gives it its identity (packages/testing/src/chip/cert/
-// cert-dsl.ts:297-312): the primary's discriminator and passcode plus the
+// cert-dsl.ts:304-319): the primary's discriminator and passcode plus the
 // index, with the daemon's further flags (bridgeOptions.extraArgs), on a
 // port of its own.
 func (th *goTH) device(index int, args ...string) *bridgeProcess {
@@ -723,7 +743,7 @@ func (th *goTH) undeclared(expr string) []string {
 // and BDX sender and responder, the administrator that announces a
 // provider, the commissioner that scans a QR code or reads a manual code,
 // the ICD client — after matter.js's declarations for its own controller
-// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:177-308,
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:179-462,
 // MATTERJS_CONTROLLER_PICS), each with the line matter.js declares it at.
 // A code matter.js leaves to the CHIP PICS file its runs load
 // (src/app/tests/suites/certification/ci-pics-values at connectedhomeip
@@ -734,10 +754,10 @@ func (th *goTH) undeclared(expr string) []string {
 // except where the mirror table names a code (picsSpecial), which a TH case
 // keeps mirroring. A DUT case may only name codes declared here (undeclared).
 var goTHPICS = map[string]string{
-	"MCORE.ROLE.COMMISSIONER":          "1", // :179
-	"MCORE.DD.QR_COMMISSIONING":        "1", // :180
-	"MCORE.DD.MANUAL_PC_COMMISSIONING": "1", // :181
-	"MCORE.DD.SCAN_QR_CODE":            "1", // :184
+	"MCORE.ROLE.COMMISSIONER":          "1", // :181
+	"MCORE.DD.QR_COMMISSIONING":        "1", // :182
+	"MCORE.DD.MANUAL_PC_COMMISSIONING": "1", // :183
+	"MCORE.DD.SCAN_QR_CODE":            "1", // :186
 	// Own: ParsePairingCode reads both manual code lengths
 	// (secure/setup.DecodeManualCode); ci-pics-values:1117-1118.
 	"MCORE.DD.11_MANUAL_PC": "1",
@@ -754,27 +774,27 @@ var goTHPICS = map[string]string{
 	"MCORE.DD.DISCOVERY_PAF": "0",
 	// Own: client.Node.ICD() is the IcdManagement client; ci-pics-values:2761.
 	"ICDM.C":                       "1",
-	"ICDM.C.C00.Tx":                "1", // :214
-	"ICDM.C.C02.Tx":                "1", // :215
-	"ICDM.C.C03.Tx":                "1", // :216
-	"ICDB.C":                       "1", // :240
-	"MCORE.BDX.Sender":             "1", // :262
-	"MCORE.BDX.Responder":          "1", // :263
-	"MCORE.BDX.SynchronousSender":  "1", // :264
-	"MCORE.OTA.Provider":           "1", // :276
-	"MCORE.OTA.HTTPS":              "0", // :281
-	"MCORE.ACL.Administrator":      "1", // :286
-	"OTAR.C.M.AnnounceOTAProvider": "1", // :287
-	"OTAP.S.M.DelayedActionTime":   "1", // :296
-	"OTAP.S.M.UserConsentNeeded":   "1", // :297
+	"ICDM.C.C00.Tx":                "1", // :216
+	"ICDM.C.C02.Tx":                "1", // :217
+	"ICDM.C.C03.Tx":                "1", // :218
+	"ICDB.C":                       "1", // :394
+	"MCORE.BDX.Sender":             "1", // :416
+	"MCORE.BDX.Responder":          "1", // :417
+	"MCORE.BDX.SynchronousSender":  "1", // :418
+	"MCORE.OTA.Provider":           "1", // :430
+	"MCORE.OTA.HTTPS":              "0", // :435
+	"MCORE.ACL.Administrator":      "1", // :440
+	"OTAR.C.M.AnnounceOTAProvider": "1", // :441
+	"OTAP.S.M.DelayedActionTime":   "1", // :450
+	"OTAP.S.M.UserConsentNeeded":   "1", // :451
 	// The bridge client: client.Node holds a bridge's endpoints, their
 	// names, state and battery in its image, kept by its sustained
 	// subscription (controller/client doc.go).
-	"MCORE.BRIDGECLIENT":           "1", // :303
-	"MCORE.DEVLIST.UseDevices":     "1", // :304
-	"MCORE.DEVLIST.UseDeviceName":  "1", // :305
-	"MCORE.DEVLIST.UseDeviceState": "1", // :306
-	"MCORE.DEVLIST.UseBatInfo":     "1", // :307
+	"MCORE.BRIDGECLIENT":           "1", // :457
+	"MCORE.DEVLIST.UseDevices":     "1", // :458
+	"MCORE.DEVLIST.UseDeviceName":  "1", // :459
+	"MCORE.DEVLIST.UseDeviceState": "1", // :460
+	"MCORE.DEVLIST.UseBatInfo":     "1", // :461
 }
 
 // declares is picsHolds for one code on the step's endpoint.
@@ -919,7 +939,7 @@ func (th *goTH) write(n *client.Node, p im.ConcreteAttributePath, v spec.Encodab
 // invoke invokes a command and fails on any status but Success; with
 // statusField it also holds the response's status field (tag 0) to 0, as
 // tc-support.ts invokeCommand does for a response that carries one
-// (:1609-1622).
+// (:1646-1659).
 func (th *goTH) invoke(n *client.Node, p client.CommandPath, fields spec.Encodable, statusField bool, opts client.InvokeOptions) (client.Result, error) {
 	ctx, cancel := context.WithTimeout(th.ctx, time.Minute)
 	defer cancel()

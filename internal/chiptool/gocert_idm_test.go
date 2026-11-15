@@ -93,7 +93,10 @@ func caseIDM11() goCertCase {
 
 // caseIDM13 mirrors TC-IDM-1.3: a batched Invoke Request with two unique
 // paths, answered in one InvokeResponse; the steps that need the TH to
-// answer wrongly on purpose need chip's FaultInjection cluster.
+// answer wrongly on purpose need chip's FaultInjection cluster. The case
+// declares the controller capability batch-invoke (:130) beside its PICS:
+// matter.js skips it for a controller that cannot batch. The Go controller
+// can (client.Node.InvokeBatch), and step 1 is that batch.
 func caseIDM13() goCertCase {
 	var n *client.Node
 	noFaults := func(th *goTH) error {
@@ -113,7 +116,7 @@ func caseIDM13() goCertCase {
 	return goCertCase{
 		tc: "TC-IDM-1.3", line: 127, pics: []string{"MCORE.IDM.C.InvokeRequest.BatchCommands"}, at: "OO.S",
 		steps: []goStep{
-			{n: "0.1", line: 135, title: "Commission TH Client and DUT to TH device (Server)", run: func(th *goTH) error {
+			{n: "0.1", line: 136, title: "Commission TH Client and DUT to TH device (Server)", run: func(th *goTH) error {
 				var err error
 				_, n, err = th.commission("dut")
 				if err == nil {
@@ -121,8 +124,8 @@ func caseIDM13() goCertCase {
 				}
 				return err
 			}},
-			{n: "0.2", line: 166, title: "TH Client sends FailAtFault to the FaultInjection cluster", at: "", run: noFaults},
-			{n: "1", line: 213, title: "Invoke Request with multiple valid unique paths, answered in one response", run: func(th *goTH) error {
+			{n: "0.2", line: 167, title: "TH Client sends FailAtFault to the FaultInjection cluster", at: "", run: noFaults},
+			{n: "1", line: 214, title: "Invoke Request with multiple valid unique paths, answered in one response", run: func(th *goTH) error {
 				if limit := n.MaxPathsPerInvoke(); limit < 2 {
 					return fmt.Errorf("the daemon admits %d paths per invoke: a batch of two cannot travel in one message", limit)
 				}
@@ -140,10 +143,10 @@ func caseIDM13() goCertCase {
 				th.note("On and Off on endpoint %d in one Invoke Request: both Success", th.ep)
 				return nil
 			}},
-			{n: "2", line: 235, title: "TH answers each command in its own Invoke Response Message", run: noFaults},
-			{n: "3", line: 261, title: "TH answers each command in its own message, in inverted order", run: noFaults},
-			{n: "4", line: 292, title: "TH answers only the first command", run: noFaults},
-			{n: "5", line: 318, title: "Invoke Request with one valid CommandDataIB, answered normally", run: func(th *goTH) error {
+			{n: "2", line: 236, title: "TH answers each command in its own Invoke Response Message", run: noFaults},
+			{n: "3", line: 262, title: "TH answers each command in its own message, in inverted order", run: noFaults},
+			{n: "4", line: 293, title: "TH answers only the first command", run: noFaults},
+			{n: "5", line: 319, title: "Invoke Request with one valid CommandDataIB, answered normally", run: func(th *goTH) error {
 				if _, err := th.invoke(n, cmdPath(th.ep, onoff.ClusterID, onoff.CmdOn), nil, false, client.InvokeOptions{}); err != nil {
 					return err
 				}

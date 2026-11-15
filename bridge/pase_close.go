@@ -5,6 +5,9 @@ package bridge
 
 import (
 	"context"
+	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -51,7 +54,7 @@ type sessionLister interface {
 // clearing any associated Secure Session Context at the Server" →
 // closePaseSession with the current exchange).
 func (b *Bridge) FailSafeExpired(ctx context.Context) {
-	b.closePASESessions(ctx, 0)
+	b.closePASESessions(ctx, 0, nil)
 }
 
 // wireFailSafeExpiry has the root's GeneralCommissioning clear the PASE
@@ -82,7 +85,7 @@ func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 // terminate PASE sessions and expire PASE-held fail-safe":
 // `SessionManager.getPaseSession()` → `paseSession.initiateClose()`).
 func (b *Bridge) closePASESessionsOnRevoke() {
-	if closeNow := b.paseSessionsCloser(); closeNow != nil {
+	if closeNow, _ := b.paseSessionsCloser(); closeNow != nil {
 		closeNow()
 	}
 }
@@ -98,6 +101,13 @@ func (b *Bridge) closePASESessionsOnRevoke() {
 // at db021da0 (completeCommission, step 4: "The Secure Session Context of
 // any PASE session still established at the Server SHALL be cleared" →
 // closePaseSession).
+//
+// It logs the ids it closes (matter.session.pase_close,
+// reason=commissioning_complete) as they close: the line a test harness
+// reads for "Commissioning channel … is terminated" (TC-DD-3.5 step 15),
+// where matter.js logs "Session ended" for the PASE session and chip
+// "Released - Type:1 LSID" (matter.js
+// support/chip-testing/test/cert/TC-DD-3.5.test.ts:71-74 at db021da0).
 func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, resp im.InvokeResponse) {
 	for _, e := range resp.Responses {
 		if e.Path.Cluster != generalCommissioningClusterID || !e.HasResponse {
@@ -107,7 +117,15 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, r
 		if !ok || done.ErrorCode != core.CommissioningErrorOK {
 			continue
 		}
-		b.closePASESessions(ctx, paseCloseGrace)
+		b.closePASESessions(ctx, paseCloseGrace, func(ids []uint16) {
+			named := make([]string, len(ids))
+			for i, id := range ids {
+				named[i] = strconv.Itoa(int(id))
+			}
+			b.logger.Info("matter.session.pase_close",
+				slog.String("reason", "commissioning_complete"),
+				slog.String("ids", strings.Join(named, ",")))
+		})
 		return
 	}
 }
@@ -120,11 +138,19 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, r
 // closed by id: a PASE session a new commissioning establishes within the
 // grace is not this fail-safe context's and stays (matter.js closes the
 // PASE session it finds when the hook runs, FailsafeContext.ts:187-192 at
-// db021da0, closePaseSession).
-func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration) {
-	closeNow := b.paseSessionsCloser()
+// db021da0, closePaseSession). closing, when set, runs with the named ids
+// just before they close.
+func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, closing func(ids []uint16)) {
+	closeNow, ids := b.paseSessionsCloser()
 	if closeNow == nil {
 		return
+	}
+	if closing != nil {
+		closeIDs := closeNow
+		closeNow = func() {
+			closing(ids)
+			closeIDs()
+		}
 	}
 	run := closeNow
 	if grace > 0 {
@@ -136,24 +162,23 @@ func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration) {
 }
 
 // paseSessionsCloser names the PASE sessions open now and returns what
-// closes exactly those, by id; nil when there is none, or when the
-// [SessionRegistry] does not list its sessions.
-func (b *Bridge) paseSessionsCloser() func() {
+// closes exactly those, by id, with the ids; nil when there is none, or
+// when the [SessionRegistry] does not list its sessions.
+func (b *Bridge) paseSessionsCloser() (closeNow func(), ids []uint16) {
 	b.mu.RLock()
 	reg := b.sessionRegistry
 	b.mu.RUnlock()
 	lister, ok := reg.(sessionLister)
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	var ids []uint16
 	for _, s := range lister.Sessions() {
 		if s.IsPASE {
 			ids = append(ids, s.SessionID)
 		}
 	}
 	if len(ids) == 0 {
-		return nil
+		return nil, nil
 	}
 	// Named for closing, the sessions are closing: no new PASE exchange
 	// waits for their grace ([Bridge.paseSessionExists]).
@@ -174,5 +199,5 @@ func (b *Bridge) paseSessionsCloser() func() {
 			delete(b.paseClosing, id)
 		}
 		b.mu.Unlock()
-	}
+	}, ids
 }

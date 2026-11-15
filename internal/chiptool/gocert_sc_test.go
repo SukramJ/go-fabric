@@ -56,13 +56,24 @@ func (th *goTH) names() (*discovery.Names, error) {
 }
 
 // commissionable finds the commissionable record of a long discriminator
-// (matter.js mdns-check.ts:141 discoverCommissionable) that the daemon on
+// (matter.js mdns-check.ts:171 discoverCommissionable) that the daemon on
 // port of this host advertises: a record counts only with an address at
 // that port on one of the host's interface addresses ([isDaemon]). Any
 // other record with the discriminator is a foreign device on the LAN —
 // the default discriminator 3840 on the Matter port 5540 is the Go-TH
 // DUT's own identity too (issue 481) — and is logged and passed over.
 func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeout time.Duration) (*discovery.Device, error) {
+	return th.commissionableAmong(names, d, port, timeout, nil)
+}
+
+// commissionableAmong is commissionable narrowed to the DNS-SD instances
+// the device itself names, as matter.js's expectMdns narrows its scan to
+// its option commissionableInstanceNames (mdns-check.ts:79, in
+// checkCommissionable :139-159; isInstance :162-164: DNS names compare
+// without case): a record of another instance — one an earlier device left
+// for the same discriminator — is passed over. No instances: every record
+// of the daemon counts.
+func (th *goTH) commissionableAmong(names *discovery.Names, d uint16, port int, timeout time.Duration, instances []string) (*discovery.Device, error) {
 	if th.local == nil {
 		local, err := localHostAddrs()
 		if err != nil {
@@ -75,7 +86,7 @@ func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeo
 	ctx, cancel := context.WithTimeout(th.ctx, timeout)
 	defer cancel()
 	var found *discovery.Device
-	foreign := 0
+	foreign, other := 0, 0
 	_, err := sc.FindCommissionable(ctx, discovery.ByLongDiscriminator(d), func(dev discovery.Device) {
 		if found != nil {
 			return
@@ -85,6 +96,11 @@ func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeo
 			th.log.Info("ignoring a foreign commissionable device", "discriminator", dev.D, "instance", dev.InstanceID, "addresses", fmt.Sprint(dev.Addresses), "want_port", port)
 			return
 		}
+		if len(instances) > 0 && !slices.ContainsFunc(instances, func(name string) bool { return strings.EqualFold(name, dev.InstanceID) }) {
+			other++
+			th.log.Info("ignoring a commissionable record of an instance the device does not name", "discriminator", dev.D, "instance", dev.InstanceID, "want_instances", fmt.Sprint(instances))
+			return
+		}
 		found = &dev
 		cancel()
 	})
@@ -92,6 +108,9 @@ func (th *goTH) commissionable(names *discovery.Names, d uint16, port int, timeo
 		return found, nil
 	}
 	msg := fmt.Sprintf("no commissionable record for discriminator %d at port %d on this host within %s (%d foreign record(s) ignored)", d, port, timeout, foreign)
+	if len(instances) > 0 {
+		msg += fmt.Sprintf(" under the instance(s) %v the device names (%d record(s) of another instance ignored)", instances, other)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", msg, err)
 	}
@@ -106,7 +125,7 @@ func (th *goTH) browse(names *discovery.Names, serviceType string, d time.Durati
 }
 
 // qrWith is the daemon's QR payload with the discriminator replaced
-// (matter.js tc-dd-support.ts:513 qrPayloadWith).
+// (matter.js tc-dd-support.ts:560 qrPayloadWith).
 func qrWith(qr string, d uint16) (string, error) {
 	p, err := setup.DecodeQRCode(qr)
 	if err != nil {
@@ -126,7 +145,7 @@ func caseSC42() goCertCase {
 		alias *mdns.Responder
 		ctrl  *gocontroller.Controller
 	)
-	aliasD := func(th *goTH) uint16 { return th.dut.info.discriminator ^ 0xAAA } // aliasDiscriminator (TC-SC-4.2.test.ts:36-43)
+	aliasD := func(th *goTH) uint16 { return th.dut.info.discriminator ^ 0xAAA } // aliasDiscriminator (TC-SC-4.2.test.ts:42-54)
 	return goCertCase{
 		tc: "TC-SC-4.2", line: 63, pics: []string{"MCORE.ROLE.COMMISSIONER"},
 		steps: []goStep{
@@ -138,7 +157,7 @@ func caseSC42() goCertCase {
 				if own, err = th.commissionable(names, th.dut.info.discriminator, th.dut.info.port, 30*time.Second); err != nil {
 					return err
 				}
-				// absentDiscriminator (tc-dd-support.ts:895-905): no device
+				// absentDiscriminator (tc-dd-support.ts:949-959): no device
 				// advertises it, so the daemon must not be reached by it.
 				absent := th.dut.info.discriminator ^ 0xFFF
 				code, err := qrWith(th.dut.info.qrCode, absent)
@@ -148,7 +167,7 @@ func caseSC42() goCertCase {
 				if ctrl, err = th.controller("dut"); err != nil {
 					return err
 				}
-				ctx, cancel := context.WithTimeout(th.ctx, 20*time.Second) // ABSENT_DEVICE_GIVE_UP (tc-dd-support.ts:873)
+				ctx, cancel := context.WithTimeout(th.ctx, 20*time.Second) // ABSENT_DEVICE_GIVE_UP (tc-dd-support.ts:927)
 				defer cancel()
 				off := false
 				if _, err := ctrl.Pair(ctx, code, gocontroller.PairOptions{AutoSubscribe: &off}); !errors.Is(err, gocontroller.ErrNoDevice) {
@@ -317,7 +336,7 @@ func caseSC48() goCertCase {
 			if err := th.awaitOperational(names, inst, false, 30*time.Second); err != nil {
 				return err
 			}
-			// recordBackInCommissioningMode (tc-dd-support.ts:1358): the
+			// recordBackInCommissioningMode (tc-dd-support.ts:1679): the
 			// device with no fabric left opens its window again.
 			if _, err := th.commissionable(names, d.b.info.discriminator, d.b.info.port, 30*time.Second); err != nil {
 				return fmt.Errorf("after RemoveFabric: %w", err)
@@ -347,7 +366,7 @@ func caseSC48() goCertCase {
 				return commission(th, devs[0])
 			}},
 			{n: "2", line: 137, title: "Commission TH2 to DUT's Fabric", run: func(th *goTH) error {
-				// identityFor(1) (cert-dsl.ts:297-318): the next device's
+				// identityFor(1) (cert-dsl.ts:304-325): the next device's
 				// discriminator.
 				b := startBridgeWith(th.t, th.bin, th.flags, bridgeOptions{listen: ":0", extraArgs: []string{"--discriminator", strconv.FormatUint(uint64(th.dut.info.discriminator)+1, 10)}})
 				th.extra = append(th.extra, b)

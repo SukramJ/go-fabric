@@ -63,13 +63,21 @@ import (
 // "Operation":"Playing"|"Paused"|"NotPlaying"|"Buffering"} (a command of
 // this daemon; the tv-app has no app pipe).
 
-// The test suite's content app (AppTv.cpp:548-551, :667-669).
+// The test suite's content app (AppTv.cpp:548-551, :667-669). Its setup
+// PIN is the one matter.js's test device returns and accepts,
+// CHIP_TV_SETUP_PIN (support/chip-testing/src/cluster/
+// TestAccountLoginServer.ts:12 at db021da0), the default of chip's
+// AccountLoginManager (examples/tv-app/tv-common/clusters/account-login/
+// AccountLoginManager.h:35 at 6170af84): TC-ALOGIN-12.2 logs in with it
+// (TC-ALOGIN-12.2.test.ts:51). chip's own dynamically installed content
+// app carries another, "34567890" (AppTv.cpp:667), which chip's cases
+// never state — they send back what GetSetupPIN returned.
 const (
 	mediaCatalogVendorID uint16 = 123
 	mediaAppID                  = "exampleid"
 	mediaAppVendorID     uint16 = 1
 	mediaAppProductID    uint16 = 11
-	mediaAppSetupPIN            = "34567890"
+	mediaAppSetupPIN            = "tempPin123"
 )
 
 // demoMedia is the --media pair: the player and the app, and the

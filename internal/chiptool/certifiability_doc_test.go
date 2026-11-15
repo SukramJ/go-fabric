@@ -77,19 +77,21 @@ func TestCertifiabilityDocument(t *testing.T) {
 	checkNotPortedYet(t, g, ts, ports, currentStatusTables(), filepath.Join("..", ".."))
 
 	var unclassified []string
-	inFamily := map[string]bool{}
-	for _, fam := range chipFamilies {
-		for _, n := range g.Families[fam.name] {
-			inFamily[fam.name+"/"+n] = true
-		}
-	}
-	for id, c := range g.GoCert {
-		// A DUT case may name a case no family of the image has (matter.js
-		// automates controller cases CHIP's descriptor does not list): it is
-		// listed under the controller role and counted in no family.
-		if !inFamily[id] && !c.dut() {
-			t.Errorf("Go-TH case %s is in no declared family's case list", id)
-		}
+	for id := range g.GoCert {
+		// A Go-TH case may carry an id no family of the image lists, in
+		// either role: matter.js automates controller cases CHIP's
+		// descriptor does not list, and it automates client cases under the
+		// plan's id where chip's families carry the plan's steps under
+		// another (`CC/3.4` — `CC/3.4.Simulated`, `APPLAUNCHER/3.7.1` —
+		// `APPLAUNCHER/3.7`). Such a case counts in no family: a DUT case is
+		// listed under the controller role, a TH case in the page's table of
+		// Go-TH cases no family lists (goCertOutsideFamilies), and no
+		// correspondence to a family case is asserted. What the family
+		// membership check held is held elsewhere: a case a family lists
+		// passed or is a classified gap (the loop below, which a Go-TH case
+		// passes only under the family's own id), and every golden entry is
+		// a registered port of a matter.js case at the pin
+		// (checkMatterJSCertCases).
 		if _, hs := g.HostSkipped[id]; hs {
 			t.Errorf("Go-TH case %s also has a host-skipped row: a case the leg runs is not one nobody automates", id)
 		}
@@ -309,6 +311,17 @@ func renderCertifiability(g docGolden, ts matterJSCertCases) string {
 		}
 		fmt.Fprintf(&b, "| %s | %d | %d | Go controller as TH, %s%s |\n", id, c.Steps, c.StepsSkipped, goSourceCell(c.Source), also)
 	}
+	if outside := goCertOutsideFamilies(g); len(outside) > 0 {
+		b.WriteString("\n#### Go-TH cases the families list under no case of that id\n\n")
+		b.WriteString("matter.js automates these cases under the test plan's id; chip's families carry the plan's steps under\n")
+		b.WriteString("other ids (`X.Simulated`, `3.7`), and no correspondence between the two is asserted here. Each case passed\n")
+		b.WriteString("with the Go controller as TH and is counted in no family.\n\n")
+		b.WriteString("| Case | Steps run | Steps skipped | Source |\n| --- | ---: | ---: | --- |\n")
+		for _, id := range outside {
+			c := g.GoCert[id]
+			fmt.Fprintf(&b, "| %s | %d | %d | %s |\n", id, c.Steps, c.StepsSkipped, goSourceCell(c.Source))
+		}
+	}
 	b.WriteString("\n### Controller role\n\n")
 	b.WriteString("matter.js's certification cases in their own direction: the module's controller is the DUT and the\n")
 	b.WriteString("reference daemon the TH device the TS file names (`internal/chiptool` TestGoCertificationCases). Such a\n")
@@ -394,6 +407,29 @@ func renderMatterJSNotRun(b *strings.Builder, g docGolden, ts matterJSCertCases)
 
 // inFamilies reports whether a case id is in the case list of a family
 // of the last run.
+// goCertOutsideFamilies are the Go-TH cases with the Go controller as TH
+// whose id no declared family's case list holds, sorted.
+func goCertOutsideFamilies(g docGolden) []string {
+	var out []string
+	for id, c := range g.GoCert {
+		if !c.dut() && !inDeclaredFamilies(g, id) {
+			out = append(out, id)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// inDeclaredFamilies is whether a declared family (chipFamilies) lists id.
+func inDeclaredFamilies(g docGolden, id string) bool {
+	for i := range chipFamilies {
+		if strings.HasPrefix(id, chipFamilies[i].name+"/") && inFamilies(g, id) {
+			return true
+		}
+	}
+	return false
+}
+
 func inFamilies(g docGolden, id string) bool {
 	fam, name, _ := strings.Cut(id, "/")
 	return slices.Contains(g.Families[fam], name)

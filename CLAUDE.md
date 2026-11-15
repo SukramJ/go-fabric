@@ -412,24 +412,27 @@ its family (go-fabric-ui, go-fabric-server, the hosts) is held to:
 
 ## Which model does which work
 
-Set on 2026-10-10. The rule follows from the parity discipline above: a
+Set on 2026-10-10, re-cut by the owner on 2026-11-15 (in the owner's words:
+"Wichtig ist, dass die Qualität hoch ist, aber Fable gezielt für die Dinge
+eingesetzt wird, die es wirklich besser kann"). The bar is unchanged — a
 statement about matter.js or chip behaviour that lands in the repo is cited
-later as fact, so the work that produces such statements gets the strongest
-model, and the work a guard checks may use a cheaper one.
+later as fact, so it comes from the strongest model — but the strongest model
+does only the part that needs it: reading the reference and judging. The
+writing, the mechanics and the code review are Opus.
 
 | Work | Model |
 | --- | --- |
-| Analysis, planning, parity audits; anything written into `notes/parity/by_design.md`, the findings register, an ADR, or a `// Mirrors matter.js …` comment; rebases and merge conflicts where upstream may have overtaken the change; `secure/`, `commissioning/`, ACL and the four `cluster/core` servers ADR 0013 skips | **Fable** (the default for this repo) |
-| Implementation of a finished plan with guards behind it: a tranche of generated servers after the first exists as the pattern, a server migration whose parity tests already hold the definition against the snapshot, a CHANGELOG entry for a finished diff | **Opus** (also what fast mode runs on) |
-| **Review of a wave's pull request, split (owner decision 2026-11-08).** The code review — correctness, concurrency, error paths, tests, the fixed report shape — is **Opus**. On top of it **Fable** reads, bounded: every new citation line against the pinned source, every line that enters `by_design.md`, the findings register or an ADR, the security paths of the first row, and the brief's decisions against matter.js — the behavioural gaps a code review does not see (the unchanged-write parity of #454 came from reading `Datasource.ts`, not from the review). The load-bearing claims of the Opus review are verified before they reach the implementer. | **Opus**, then **Fable** |
-| Work a test or generator checks immediately: `make generate-matter-schema`, `gofumpt`, regenerating a ratchet, adding a parity case to an existing pattern; search and first reading of a source tree whose result a stronger model or the owner reads again | **Sonnet**, including as the model of a delegated search subagent |
+| **Coordination** of a phase or a wave: starting agents, integrating, guards, pull requests, status | **Opus**, in a fresh session per phase (the state is in the notes and the memory, never in a long context) |
+| **Planning and decisions:** the phase plan; the decision briefs behind the owner's wizard, with the architecture reasoning; the verdict on a finding where matter.js, connectedhomeip and the specification contradict each other | **Fable**, as a targeted agent |
+| **Reading the reference and judging:** what matter.js or chip does at the pin, and whether a difference is a deliberate divergence or a gap — for `notes/parity/by_design.md`, the findings register, an ADR and every `// Mirrors matter.js …` comment | **Fable** gives the verdict with the lines as a short fact note; **Opus** writes the entry or the comment in the file's form; **Fable** reads the finished text once against its note. Every reference statement comes from Fable. |
+| **Implementation**, also on `secure/`, `commissioning/`, ACL and the `cluster/core` servers; test ports; CHANGELOG and docs; rebases | **Opus** (also what fast mode runs on) — with the Fable read of the next row before it merges where it touches a security path or mirrors a reference |
+| **Review** of a wave's pull request and of a review phase's own units | **Opus** does the code review — correctness, concurrency, error paths, tests, the fixed report shape. **Fable** reads on top, bounded: behaviour against matter.js and chip at the pin, the security paths (`secure/`, `commissioning/`, ACL, the handshakes), and every finding of high or medium severity for confirmation before it reaches an implementer. |
+| **Citations** | A script and **Opus** check every range (the file, the lines, the construct the sentence names). **Fable** reads every citation that is the reason for behaviour ("as matter.js", "mirrors"), every doubtful one and a sample of the rest. |
+| Work a test or generator checks immediately: `make generate-matter-schema`, `gofumpt`, regenerating a ratchet, adding a parity case to an existing pattern; search and first reading of a source tree whose result a stronger model reads again | **Sonnet**, including as the model of a delegated search subagent |
 
-Sonnet never writes a fact about matter.js or chip into the repo, and never
-touches the security-relevant paths named in the first row. When in doubt
-about which row a task is in, it is in the first. One owner-decided
-exception: the behaviour-test ports of phase 18 (concept v5, E.0 18.1,
-2026-10-19) are Opus work on those paths too, with Fable reading every
-cited fix line against the pin before the pull request merges.
+Sonnet never writes a fact about matter.js or chip into the repo. Opus does
+not either: it writes what Fable's fact note states. When in doubt whether a
+statement is a reference fact, it is one.
 
 ## Token use
 
@@ -467,6 +470,32 @@ are what keeps that from doubling.
 - **Edit by script.** Several replacements in several files are one
   scripted call with asserted anchors, not a chain of interactive
   edits; a generated file is regenerated, never patched.
+- **The strongest model for the part that needs it.** Set by the owner on
+  2026-11-15. Fable reads references, judges and plans (the table above);
+  it does not coordinate, format, write prose or run mechanics. A Fable
+  agent's brief is bounded: the lines to read, the question to answer, a
+  fact note back.
+- **Few turns in a long session.** A coordinator waits for several agents
+  at once and integrates them together; a status message carries new
+  information or is not sent; a phase starts in a fresh session.
+- **The assistant says when to clear the context.** Set by the owner on
+  2026-11-15. It does not wait to be asked: it proposes a fresh session
+  when a phase or a pull request is merged; when the context has been
+  summarised once and the work that remains is of another kind; or when
+  what it still needs fits in a short hand-over and the turns are mostly
+  waiting for agents or pipelines. It does NOT propose one while agents of
+  the session are running or a decision of the owner is open. The proposal
+  comes with the hand-over already written — the state, the open points
+  with where each goes, the next step, the lessons — into the memory file
+  and the notes (never only into the chat), and with the exact way to go
+  on: `/clear`, the model to switch to (`/model`), and the first message
+  to send, which names the files to read.
+- **The pipeline's guards before the pull request, not after.** The local
+  guard set is the list of `make` targets CI runs (`.github/workflows/`),
+  and a composition change of the reference daemon — `make surface` shows
+  it — gets its fixture run (`chiptool.yml` with `update_fixtures`) before
+  the pull request opens. A red pipeline costs a round of coordinator
+  turns.
 - **Agents read what the brief names.** An implementing agent gets the
   file list and the pinned sources in the brief, reads those, and reports
   in the fixed shape; it does not survey the tree. One agent per brief;

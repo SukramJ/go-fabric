@@ -23,7 +23,7 @@ import (
 
 // The TCP cases: matter.js's TC-SC-8.x run the device as the DUT and a
 // helper controller as the TH over TCP (support/chip-testing/test/cert/
-// tc-sc-8-support.ts:36-54 at 862ad75f, TCP_ROLES), the direction of the
+// tc-sc-8-support.ts:36-54 at db021da0, TCP_ROLES), the direction of the
 // Go-TH leg: the reference daemon is the DUT — its --tcp default "true"
 // accepts TCP on the Matter port (examples/reference-bridge/main.go,
 // tcp.go), so no daemonArgs —, the Go controller the TH, built with
@@ -434,7 +434,7 @@ func caseSC86() goCertCase {
 		// tc-sc-8-support.ts:299-361); the reference daemon's attributes are
 		// more than one TCP message carries — 64000 bytes, the maximum both
 		// sides state (matter.js DEFAULT_MAX_TCP_MESSAGE_SIZE,
-		// packages/general/src/net/tcp/TcpConnection.ts:11) —, so its report
+		// packages/general/src/net/tcp/TcpConnection.ts:15) —, so its report
 		// comes in as few ReportData as that allows: one when it fits, and
 		// otherwise every ReportData but the last fills the TCP message far
 		// beyond what MRP could have carried (LARGE_PAYLOAD_FLOOR).

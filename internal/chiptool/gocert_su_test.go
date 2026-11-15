@@ -53,7 +53,7 @@ func init() {
 }
 
 // The adapter's budgets (support/chip-testing/src/cert/
-// InProcessControllerAdapter.ts:420-437) and the staged image's size
+// InProcessControllerAdapter.ts:574-591) and the staged image's size
 // (support/chip-testing/src/OtaTestIdentity.ts:30).
 const (
 	otaTransferTimeout = 90 * time.Second
@@ -78,7 +78,7 @@ func otaTestPayload(size int) []byte {
 // serving the provider, the answers a case scripts per requestor, and the
 // record of what the provider answered and what its BDX transfers carried
 // — matter.js's RecordingOtaProviderServer and OtaExchangeRecording
-// (InProcessControllerAdapter.ts:456-762).
+// (InProcessControllerAdapter.ts:610-916).
 type otaTH struct {
 	th       *goTH
 	ctrl     *gocontroller.Controller
@@ -97,7 +97,7 @@ type otaTH struct {
 // observeEvents has fn told of every event the default subscription of a
 // node reports — matter.js's observeEvents, which watches the subscription
 // its controller sustains rather than opening one of its own
-// (InProcessControllerAdapter.ts:2190-2201): a second subscription is
+// (InProcessControllerAdapter.ts:2330-2341): a second subscription is
 // cleared when the default one is set up again on a new session.
 func (o *otaTH) observeEvents(fn func(cluster, event uint32, number uint64, value any)) {
 	o.mu.Lock()
@@ -170,7 +170,7 @@ func (o *otaTH) commission(code string) (*client.Node, softwareupdate.Peer, erro
 
 // script installs a requestor's scripted answers, replacing earlier ones:
 // one entry per command, in order; a spent list lets the provider answer
-// for itself (scriptOtaProvider, InProcessControllerAdapter.ts:1737-1748).
+// for itself (scriptOtaProvider, InProcessControllerAdapter.ts:1877-1888).
 func (o *otaTH) script(p softwareupdate.Peer, queries []softwareupdate.QueryImageScript, applies []softwareupdate.ApplyUpdateScript) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -215,7 +215,7 @@ func (o *otaTH) mark() int {
 
 // otaExchanges are the commands one requestor sent in a window, with the
 // provider's answers — matter.js OtaProviderExchanges (packages/testing/
-// src/chip/cert/controller-adapter.ts:480-484).
+// src/chip/cert/controller-adapter.ts:481-485).
 type otaExchanges struct {
 	query  []softwareupdate.ProviderExchange
 	apply  []softwareupdate.ProviderExchange
@@ -245,8 +245,8 @@ func (o *otaTH) since(p softwareupdate.Peer, mark int) otaExchanges {
 // bdxTransfer is one transfer the provider served: the ReceiveInit that
 // opened it and every message after it, as the TH sent and received them —
 // the sender's account matter.js's OtaBdxTransfer gives
-// (controller-adapter.ts:492-547) and the per-message record the cert
-// suite reads from the message log (tc-bdx-support.ts:273-296).
+// (controller-adapter.ts:493-548) and the per-message record the cert
+// suite reads from the message log (tc-bdx-support.ts:271-294).
 type bdxTransfer struct {
 	peer bdx.Peer
 	init bdx.Init
@@ -337,7 +337,7 @@ func (t *bdxTransfer) state() (finished, closed bool, transferred uint64) {
 }
 
 // otaServed is one served update: matter.js's OtaBdxTransfer
-// (controller-adapter.ts:492-547).
+// (controller-adapter.ts:493-548).
 type otaServed struct {
 	version  uint32
 	fileSize int
@@ -357,7 +357,7 @@ type serveOpts struct {
 
 // otaIdentity is the requestor's vendor, product and running version, read
 // from its BasicInformation (#otaIdentity, InProcessControllerAdapter.ts:
-// 1988-2000).
+// 2128-2140).
 type otaIdentity struct {
 	vendor, product uint16
 	version         uint32
@@ -386,7 +386,7 @@ func (o *otaTH) identity(n *client.Node) (otaIdentity, error) {
 // update manager push it (forceUpdate: the consent and the announcement)
 // and waits for the transfer, the apply decision and the notification —
 // serveOtaUpdate and #serveStagedImage (InProcessControllerAdapter.ts:
-// 1869-1977), stageOtaImage (:842-880) and #runOtaTransfer (:2038-2105).
+// 2009-2117), stageOtaImage (:996-1034) and #runOtaTransfer (:2178-2245).
 func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*otaServed, error) {
 	id, err := o.identity(n)
 	if err != nil {
@@ -435,7 +435,7 @@ func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*o
 	})
 	if !done || t == nil {
 		// Anything but a completed transfer leaves the update queued
-		// (:2081-2103): the consent goes.
+		// (:2221-2243): the consent goes.
 		mgr.RemoveConsent(p, version)
 		if t == nil {
 			return nil, fmt.Errorf("node %d did not take the offered OTA image within %s — it opened no BDX transfer at all", p.NodeID, budget)
@@ -452,7 +452,7 @@ func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*o
 		if at == 0 {
 			at = otaApplyTimeout
 		}
-		// awaitApplyDecision (:708-715): the last answer that is not an
+		// awaitApplyDecision (:862-869): the last answer that is not an
 		// AwaitNextAction decides.
 		waitFor(o.th.ctx, at, func() bool {
 			for _, x := range o.since(p, mark).apply {
@@ -490,7 +490,7 @@ func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*o
 }
 
 // announceOpts are AnnounceOtaProviderOptions (controller-adapter.ts:
-// 623-663).
+// 624-664).
 type announceOpts struct {
 	reason   otar.AnnouncementReasonEnum
 	noQuery  bool
@@ -509,8 +509,8 @@ type announced struct {
 
 // announce sends AnnounceOTAProvider to the requestor — this TH's provider
 // unless opts names another — and waits for its QueryImage
-// (announceOtaProvider, InProcessControllerAdapter.ts:1750-1812; the
-// default reason UpdateAvailable, :1819-1821).
+// (announceOtaProvider, InProcessControllerAdapter.ts:1890-1952; the
+// default reason UpdateAvailable, :1959-1961).
 func (o *otaTH) announce(n *client.Node, p softwareupdate.Peer, opts announceOpts) (*announced, error) {
 	reason := opts.reason
 	req := otar.AnnounceOtaProviderRequest{
@@ -796,10 +796,10 @@ func (th *goTH) endpointServing(n *client.Node, cluster uint32) (uint16, error) 
 func caseSU21() goCertCase {
 	r := &suRun{}
 	return goCertCase{
-		tc: "TC-SU-2.1", line: 261, pics: suPICS, native: true,
+		tc: "TC-SU-2.1", line: 260, pics: suPICS, native: true,
 		steps: []goStep{
-			{n: "0", line: 274, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
-			{n: "1", line: 296, title: "DUT sends a QueryImage command to the TH/OTA-P", run: func(th *goTH) error {
+			{n: "0", line: 273, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
+			{n: "1", line: 295, title: "DUT sends a QueryImage command to the TH/OTA-P", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -862,7 +862,7 @@ func caseSU21() goCertCase {
 				return nil
 			}},
 			{
-				n: "2", line: 307, long: "the plan watches the DUT for two minutes after a Busy answer (TC-SU-2.1.test.ts:312)",
+				n: "2", line: 306, long: "the plan watches the DUT for two minutes after a Busy answer (TC-SU-2.1.test.ts:311)",
 				title: "DUT sends a QueryImage command, wait for 2 minutes", run: func(th *goTH) error {
 					if err := r.ready(); err != nil {
 						return err
@@ -878,7 +878,7 @@ func caseSU21() goCertCase {
 					return noQueryWithin(th, a.ex, provdef.StatusBusy, suQueryWindow)
 				},
 			},
-			{n: "3", line: 317, title: "TH2/Administrator sends an AnnounceOTAProvider command to the DUT", run: func(th *goTH) error {
+			{n: "3", line: 316, title: "TH2/Administrator sends an AnnounceOTAProvider command to the DUT", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -911,7 +911,7 @@ func deref[T any](p *T) any {
 }
 
 // noQueryWithin is recordNoQueryInWindow's check (TC-SU-2.2.test.ts:
-// 109-160, TC-SU-2.1.test.ts:196-234): the first query was answered as
+// 108-159, TC-SU-2.1.test.ts:195-233): the first query was answered as
 // scripted, and no further query came within the window.
 func noQueryWithin(th *goTH, e otaExchanges, want provdef.StatusEnum, window time.Duration) error {
 	if len(e.query) == 0 {
@@ -957,7 +957,7 @@ func caseSU22() goCertCase {
 			return noQueryWithin(th, a.ex, want, suQueryWindow)
 		}
 	}
-	// recordNoTransferOf (:255-304): an offer the requestor must turn down.
+	// recordNoTransferOf (:254-303): an offer the requestor must turn down.
 	noTransfer := func(offer func(th *goTH) (*provdef.QueryImageResponse, error), offered func(resp provdef.QueryImageResponse) error) func(th *goTH) error {
 		return func(th *goTH) error {
 			if err := r.ready(); err != nil {
@@ -997,10 +997,10 @@ func caseSU22() goCertCase {
 		return r.o.unheldUpdate(version, uri)
 	}
 	return goCertCase{
-		tc: "TC-SU-2.2", line: 329, pics: suPICS, native: true,
+		tc: "TC-SU-2.2", line: 328, pics: suPICS, native: true,
 		steps: []goStep{
-			{n: "0", line: 340, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
-			{n: "1", line: 361, title: "QueryImageResponse UpdateAvailable: the image transfers", run: func(th *goTH) error {
+			{n: "0", line: 339, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
+			{n: "1", line: 360, title: "QueryImageResponse UpdateAvailable: the image transfers", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1008,14 +1008,14 @@ func caseSU22() goCertCase {
 				return err
 			}},
 			{
-				n: "2", line: 369, long: "the plan watches the DUT for two minutes after a Busy answer (TC-SU-2.2.test.ts:374)", title: "QueryImageResponse Busy, 60 s",
+				n: "2", line: 368, long: "the plan watches the DUT for two minutes after a Busy answer (TC-SU-2.2.test.ts:373)", title: "QueryImageResponse Busy, 60 s",
 				run: noQuery(busy(60), provdef.StatusBusy),
 			}, // STEP_2_DELAYED_ACTION_TIME (:57)
 			{
-				n: "3", line: 380, long: "the plan watches the DUT for two minutes after a NotAvailable answer (TC-SU-2.2.test.ts:385)", title: "QueryImageResponse NotAvailable",
+				n: "3", line: 379, long: "the plan watches the DUT for two minutes after a NotAvailable answer (TC-SU-2.2.test.ts:384)", title: "QueryImageResponse NotAvailable",
 				run: noQuery(status(provdef.StatusNotAvailable), provdef.StatusNotAvailable),
 			},
-			{n: "4", line: 391, long: "the DUT waits out the three minutes the TH named (TC-SU-2.2.test.ts:396)", title: "QueryImageResponse Busy, 180 s, then the transfer", run: func(th *goTH) error {
+			{n: "4", line: 390, long: "the DUT waits out the three minutes the TH named (TC-SU-2.2.test.ts:395)", title: "QueryImageResponse Busy, 180 s, then the transfer", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1038,10 +1038,10 @@ func caseSU22() goCertCase {
 				return nil
 			}},
 			{
-				n: "5", line: 404, title: "QueryImageResponse UpdateAvailable with an https ImageURI",
-				na: "the TH's provider offers images over BDX only, so it cannot give the https ImageURI this step needs (TC-SU-2.2.test.ts:409-411)",
+				n: "5", line: 403, title: "QueryImageResponse UpdateAvailable with an https ImageURI",
+				na: "the TH's provider offers images over BDX only, so it cannot give the https ImageURI this step needs (TC-SU-2.2.test.ts:408-410)",
 			},
-			{n: "6", line: 414, title: "UpdateAvailable with a version no newer than the running one", run: noTransfer(func(th *goTH) (*provdef.QueryImageResponse, error) {
+			{n: "6", line: 413, title: "UpdateAvailable with a version no newer than the running one", run: noTransfer(func(th *goTH) (*provdef.QueryImageResponse, error) {
 				id, err := r.o.identity(r.n)
 				if err != nil {
 					return nil, err
@@ -1057,7 +1057,7 @@ func caseSU22() goCertCase {
 				}
 				return nil
 			})},
-			{n: "7", line: 422, title: "UpdateAvailable with an invalid BDX ImageURI", run: noTransfer(func(th *goTH) (*provdef.QueryImageResponse, error) {
+			{n: "7", line: 421, title: "UpdateAvailable with an invalid BDX ImageURI", run: noTransfer(func(th *goTH) (*provdef.QueryImageResponse, error) {
 				id, err := r.o.identity(r.n)
 				if err != nil {
 					return nil, err
@@ -1085,10 +1085,10 @@ func isHex16(s string) bool {
 	return true
 }
 
-// unheldUpdate is #unheldUpdate (InProcessControllerAdapter.ts:552-573):
+// unheldUpdate is #unheldUpdate (InProcessControllerAdapter.ts:706-727):
 // an UpdateAvailable for an image the provider does not hold, its open
 // fields filled as the provider fills its own — version, an "ota/unheld-<v>"
-// BDX URI naming the provider, a 32-byte token (:765).
+// BDX URI naming the provider, a 32-byte token (:919).
 func (o *otaTH) unheldUpdate(version uint32, uri string) *provdef.QueryImageResponse {
 	if uri == "" {
 		uri = bdx.FileDesignator(fmt.Sprintf("ota/unheld-%d", version)).BdxURI(o.nodeID)
@@ -1111,10 +1111,10 @@ const suUpdateTimeout = 210 * time.Second
 func caseSU23() goCertCase {
 	r := &suRun{}
 	return goCertCase{
-		tc: "TC-SU-2.3", line: 211, pics: suPICS, native: true,
+		tc: "TC-SU-2.3", line: 210, pics: suPICS, native: true,
 		steps: []goStep{
-			{n: "0", line: 219, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
-			{n: "1", line: 240, pics: "MCORE.OTA.RequestorConsent", title: "RequestorCanConsent True, UserConsentNeeded True", run: func(th *goTH) error {
+			{n: "0", line: 218, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
+			{n: "1", line: 239, pics: "MCORE.OTA.RequestorConsent", title: "RequestorCanConsent True, UserConsentNeeded True", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1152,7 +1152,7 @@ func caseSU23() goCertCase {
 				th.note("DelayedOnUserConsent (event %d) before Downloading (event %d); %d bytes taken", consented, downloading, moved)
 				return nil
 			}},
-			{n: "2", line: 252, title: "UpdateAvailable: the transfer and its block size", run: func(th *goTH) error {
+			{n: "2", line: 251, title: "UpdateAvailable: the transfer and its block size", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1174,16 +1174,16 @@ func caseSU23() goCertCase {
 				return nil
 			}},
 			{
-				n: "3", line: 265, title: "UpdateAvailable with an https ImageURI",
-				na: "the TH's provider offers images over BDX only, so it cannot give the https ImageURI this step needs (TC-SU-2.3.test.ts:272-273)",
+				n: "3", line: 264, title: "UpdateAvailable with an https ImageURI",
+				na: "the TH's provider offers images over BDX only, so it cannot give the https ImageURI this step needs (TC-SU-2.3.test.ts:271-272)",
 			},
 			{
-				n: "4", line: 279, title: "force fail the transfer, wait for the Idle timeout",
-				na: "the harness cannot fail a transfer part way (TC-SU-2.3.test.ts:286-288)",
+				n: "4", line: 278, title: "force fail the transfer, wait for the Idle timeout",
+				na: "the harness cannot fail a transfer part way (TC-SU-2.3.test.ts:285-287)",
 			},
 			{
-				n: "5", line: 294, title: "force fail the transfer, resume with STARTOFS",
-				na: "as step 4: with no transfer the harness can abort, there is nothing to resume (TC-SU-2.3.test.ts:302-304)",
+				n: "5", line: 293, title: "force fail the transfer, resume with STARTOFS",
+				na: "as step 4: with no transfer the harness can abort, there is nothing to resume (TC-SU-2.3.test.ts:301-303)",
 			},
 		},
 	}
@@ -1332,14 +1332,14 @@ func caseSU25() goCertCase {
 	}
 	d180, d60 := uint32(su25PlanDelay), uint32(su25ShortDelay)
 	return goCertCase{
-		tc: "TC-SU-2.5", line: 482, pics: suPICS, native: true,
+		tc: "TC-SU-2.5", line: 481, pics: suPICS, native: true,
 		steps: []goStep{
-			{n: "0", line: 498, title: "TH and DUT are on the same fabric, no OTA process, StartUp observed", run: func(th *goTH) error {
+			{n: "0", line: 497, title: "TH and DUT are on the same fabric, no OTA process, StartUp observed", run: func(th *goTH) error {
 				if err := r.precondition(th); err != nil {
 					return err
 				}
 				// The StartUp events the default subscription delivers
-				// (observeEvents, TC-SU-2.5.test.ts:513-517).
+				// (observeEvents, TC-SU-2.5.test.ts:512-516).
 				r.o.observeEvents(func(cluster, event uint32, _ uint64, value any) {
 					if cluster != basicinfo.ClusterID || event != basicinfo.EventStartUp {
 						return
@@ -1362,7 +1362,7 @@ func caseSU25() goCertCase {
 				})
 				return nil
 			}},
-			{n: "1", line: 535, title: "ApplyUpdateResponse Proceed, DelayedActionTime 0", run: func(th *goTH) error {
+			{n: "1", line: 534, title: "ApplyUpdateResponse Proceed, DelayedActionTime 0", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1387,11 +1387,11 @@ func caseSU25() goCertCase {
 				return nil
 			}},
 			{
-				n: "2", line: 548, long: "the DUT waits out the three minutes the TH named before it applies (TC-SU-2.5.test.ts:554)",
+				n: "2", line: 547, long: "the DUT waits out the three minutes the TH named before it applies (TC-SU-2.5.test.ts:553)",
 				title: "ApplyUpdateResponse Proceed, DelayedActionTime 3 minutes", run: deferred(applyAnswer(provdef.ApplyUpdateActionProceed, &d180), false),
 			},
 			{
-				n: "3", line: 561, long: "the plan watches the DUT for the two-minute floor it owes (TC-SU-2.5.test.ts:567)",
+				n: "3", line: 560, long: "the plan watches the DUT for the two-minute floor it owes (TC-SU-2.5.test.ts:566)",
 				title: "ApplyUpdateResponse AwaitNextAction, 1 minute", run: func(th *goTH) error {
 					if err := r.ready(); err != nil {
 						return err
@@ -1424,10 +1424,10 @@ func caseSU25() goCertCase {
 				},
 			},
 			{
-				n: "4", line: 574, long: "the DUT waits out the three minutes the TH named before it asks again (TC-SU-2.5.test.ts:581)",
+				n: "4", line: 573, long: "the DUT waits out the three minutes the TH named before it asks again (TC-SU-2.5.test.ts:580)",
 				title: "ApplyUpdateResponse AwaitNextAction, 3 minutes, then Proceed", run: deferred(applyAnswer(provdef.ApplyUpdateActionAwaitNextAction, &d180), true),
 			},
-			{n: "5", line: 589, title: "ApplyUpdateResponse Discontinue", run: func(th *goTH) error {
+			{n: "5", line: 588, title: "ApplyUpdateResponse Discontinue", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1536,7 +1536,7 @@ func caseSU27() goCertCase {
 			return nil
 		}
 		// The requestor's events the default subscription delivers
-		// (observeEvents, TC-SU-2.7.test.ts:74-97).
+		// (observeEvents, TC-SU-2.7.test.ts:74-96).
 		r.o.observeEvents(func(cluster, event uint32, number uint64, value any) {
 			if cluster != otar.ClusterID || event != otar.EventStateTransition {
 				return
@@ -1583,10 +1583,10 @@ func caseSU27() goCertCase {
 	}
 	busyDelay := uint32(60) // BUSY_DELAYED_ACTION_TIME (:64)
 	return goCertCase{
-		tc: "TC-SU-2.7", line: 360, pics: suPICS, native: true,
+		tc: "TC-SU-2.7", line: 359, pics: suPICS, native: true,
 		steps: []goStep{
-			{n: "0", line: 376, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
-			{n: "1", line: 400, title: "Perform a software update on the DUT", run: func(th *goTH) error {
+			{n: "0", line: 375, title: "TH and DUT are on the same fabric, no OTA process", run: r.precondition},
+			{n: "1", line: 399, title: "Perform a software update on the DUT", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1599,11 +1599,11 @@ func caseSU27() goCertCase {
 				if err := saw(th, otar.UpdateStateQuerying, otar.UpdateStateDownloading, otar.UpdateStateApplying); err != nil {
 					return err
 				}
-				// Idle is optional (:162-182).
+				// Idle is optional (:161-181).
 				waitFor(th.ctx, 45*time.Second, func() bool { return slices.Contains(seen(), uint64(otar.UpdateStateIdle)) })
 				return nil
 			}},
-			{n: "2", line: 405, title: "QueryImageResponse Busy", run: func(th *goTH) error {
+			{n: "2", line: 404, title: "QueryImageResponse Busy", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1620,8 +1620,8 @@ func caseSU27() goCertCase {
 				}
 				return saw(th, otar.UpdateStateDelayedOnQuery)
 			}},
-			{n: "3", line: 416, title: "TH/OTA-P does not respond", na: "the TH's provider answers every QueryImage it receives (TC-SU-2.7.test.ts:421-423)"},
-			{n: "4", line: 429, pics: "MCORE.OTA.RequestorConsent", title: "UserConsentNeeded True", run: func(th *goTH) error {
+			{n: "3", line: 415, title: "TH/OTA-P does not respond", na: "the TH's provider answers every QueryImage it receives (TC-SU-2.7.test.ts:420-422)"},
+			{n: "4", line: 428, pics: "MCORE.OTA.RequestorConsent", title: "UserConsentNeeded True", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1634,8 +1634,8 @@ func caseSU27() goCertCase {
 				}
 				return saw(th, otar.UpdateStateDelayedOnUserConsent)
 			}},
-			{n: "5", line: 441, title: "Force an error during the download", na: "the harness cannot fail a transfer part way (TC-SU-2.7.test.ts:447-449)"},
-			{n: "6", line: 456, title: "ApplyUpdateResponse AwaitNextAction", run: func(th *goTH) error {
+			{n: "5", line: 440, title: "Force an error during the download", na: "the harness cannot fail a transfer part way (TC-SU-2.7.test.ts:446-448)"},
+			{n: "6", line: 455, title: "ApplyUpdateResponse AwaitNextAction", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}
@@ -1648,7 +1648,7 @@ func caseSU27() goCertCase {
 				}
 				return saw(th, otar.UpdateStateDelayedOnApply)
 			}},
-			{n: "7", line: 467, title: "read the VersionApplied event", run: func(th *goTH) error {
+			{n: "7", line: 466, title: "read the VersionApplied event", run: func(th *goTH) error {
 				if err := r.ready(); err != nil {
 					return err
 				}

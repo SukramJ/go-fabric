@@ -24,23 +24,23 @@ import (
 // module's controller is the DUT commissioner, the reference daemon the
 // all-clusters TH whose QR and manual codes the TS reads (here the
 // daemon's banner, built by secure/setup from its --passcode and
-// --discriminator). The helpers mirror tc-dd-support.ts at 862ad75f:
+// --discriminator). The helpers mirror tc-dd-support.ts at db021da0:
 //
 //   - a refusal counts only as a refusal of the payload itself
-//     (CommissioningRefusals.requireRefusal :734, isPayloadRefusal :972):
+//     (CommissioningRefusals.requireRefusal :787, isPayloadRefusal :1027):
 //     Pair returns gocontroller.ErrPairingCode within REFUSAL_TIMEOUT
-//     (:86), and the daemon logged no PASE attempt — ParsePairingCode runs
+//     (:93), and the daemon logged no PASE attempt — ParsePairingCode runs
 //     before any network step (controller/controller.go Pair);
 //   - a well-formed code naming a device that is not there ends in a
-//     give-up within ABSENT_DEVICE_GIVE_UP (:873; requireGiveUp :783,
-//     isCommissioningGiveUp :1165): Pair returns gocontroller.ErrNoDevice
+//     give-up within ABSENT_DEVICE_GIVE_UP (:927; requireGiveUp :836,
+//     isCommissioningGiveUp :1485): Pair returns gocontroller.ErrNoDevice
 //     when its context, set to that bound, ends with no attempt
 //     (controller/pair_race.go pairDiscovered), the TH having been seen
 //     advertising first;
 //   - a commissioning parses the code first, then commissions and holds
-//     the TH's completion line (commissionByTarget :1474, commissionChecked
-//     :130), returning the TH to commissioning mode when an earlier step
-//     commissioned it (restoreCommissioningMode :1421).
+//     the TH's completion line (commissionByTarget :1795, commissionChecked
+//     :137), returning the TH to commissioning mode when an earlier step
+//     commissioned it (restoreCommissioningMode :1742).
 
 func init() {
 	for _, c := range []func() goCertCase{caseDD18, caseDD311, caseDD312, caseDD313, caseDD314, caseDD315, caseDD316, caseDD317} {
@@ -50,21 +50,21 @@ func init() {
 
 // The budgets and constants of tc-dd-support.ts.
 const (
-	ddRefusalTimeout        = 15 * time.Second // REFUSAL_TIMEOUT :86
+	ddRefusalTimeout        = 15 * time.Second // REFUSAL_TIMEOUT :93
 	ddVendorOutcomeTimeout  = 20 * time.Second // TC-DD-3.17.test.ts VENDOR_OUTCOME_TIMEOUT :31
-	ddDiscriminatorMSB      = 0x100            // DISCRIMINATOR_MSB :1097
-	ddShortDiscriminatorBit = 8                // SHORT_DISCRIMINATOR_SHIFT :1091
-	ddOnNetworkOnly         = 1 << 2           // ON_NETWORK_ONLY :313
+	ddDiscriminatorMSB      = 0x100            // DISCRIMINATOR_MSB :1152
+	ddShortDiscriminatorBit = 8                // SHORT_DISCRIMINATOR_SHIFT :1146
+	ddOnNetworkOnly         = 1 << 2           // ON_NETWORK_ONLY :360
 	ddBLEOnly               = 1 << 1           // DiscoveryCapabilitiesSchema {ble}
 	ddWiFiPAFOnly           = 1 << 3           // DiscoveryCapabilitiesSchema {wifiPublicActionFrame}
-	ddStandardFlow          = 0                // STANDARD_FLOW :331
-	ddUserIntentFlow        = 1                // USER_INTENT_FLOW :334
-	ddCustomFlow            = 2                // CUSTOM_FLOW :337
+	ddStandardFlow          = 0                // STANDARD_FLOW :378
+	ddUserIntentFlow        = 1                // USER_INTENT_FLOW :381
+	ddCustomFlow            = 2                // CUSTOM_FLOW :384
 )
 
 // ddInvalidPasscodes are the trivial passcodes the plans list
-// (INVALID_PASSCODES :100-102); ddTestVendorIDs the test vendor ids
-// (TEST_VENDOR_IDS :105).
+// (INVALID_PASSCODES :107-109); ddTestVendorIDs the test vendor ids
+// (TEST_VENDOR_IDS :112).
 var (
 	ddInvalidPasscodes = []int{0, 11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888, 99999999, 12345678, 87654321}
 	ddTestVendorIDs    = []int{0xfff1, 0xfff2, 0xfff3, 0xfff4}
@@ -93,9 +93,9 @@ func (d *dutRun) setup(th *goTH) error {
 
 // pair is the DUT's commission(target): with the registry's default
 // subscription, as matter.js's adapter commissions with autoSubscribe
-// (InProcessControllerAdapter.ts:2745-2756), and test devices' attestation
+// (InProcessControllerAdapter.ts:2919-2930), and test devices' attestation
 // accepted, as its judgeAttestation does without an attestation option
-// (:2799-2801).
+// (:2973-2975).
 func (d *dutRun) pair(ctx context.Context, code string) (*client.Node, error) {
 	return d.ctrl.Pair(ctx, code, gocontroller.PairOptions{OnAttestationFailure: attestation.Accept()})
 }
@@ -118,7 +118,7 @@ func noPASE(th *goTH, from int) error {
 	return nil
 }
 
-// refuse is CommissioningRefusals.requireRefusal (tc-dd-support.ts:734-748).
+// refuse is CommissioningRefusals.requireRefusal (tc-dd-support.ts:787-801).
 func (d *dutRun) refuse(th *goTH, code, what string) error {
 	if err := d.setup(th); err != nil {
 		return err
@@ -134,7 +134,7 @@ func (d *dutRun) refuse(th *goTH, code, what string) error {
 		_ = d.ctrl.Registry().Decommission(th.ctx, n)
 		return fmt.Errorf("%s: the DUT commissioned the TH from %s", what, code)
 	case !errors.Is(err, gocontroller.ErrPairingCode):
-		return fmt.Errorf("%s: commissioning from %s failed after %s for a reason that is no refusal of the payload (isPayloadRefusal, tc-dd-support.ts:972): %w", what, code, took, err)
+		return fmt.Errorf("%s: commissioning from %s failed after %s for a reason that is no refusal of the payload (isPayloadRefusal, tc-dd-support.ts:1027): %w", what, code, took, err)
 	}
 	if err := noPASE(th, from); err != nil {
 		return fmt.Errorf("%s: %w", what, err)
@@ -143,7 +143,7 @@ func (d *dutRun) refuse(th *goTH, code, what string) error {
 	return nil
 }
 
-// refuseEach is requireEachRefused (:754-772): every code is tried and
+// refuseEach is requireEachRefused (:807-825): every code is tried and
 // recorded before the step fails.
 func (d *dutRun) refuseEach(th *goTH, codes, whats []string) error {
 	var failures []string
@@ -158,20 +158,24 @@ func (d *dutRun) refuseEach(th *goTH, codes, whats []string) error {
 	return nil
 }
 
-// advertising is recordCommissionable (:1108-1114): the TH's
-// commissionable record, so a give-up is about the code, not about a TH
-// that is not there.
+// advertising is recordCommissionable (:1227-1233): the TH's
+// commissionable record, under the instance its own log names
+// (commissionableCheck :1218-1221, [goTH.commissionableOf]), so a give-up
+// is about the code, not about a TH that is not there.
 func (d *dutRun) advertising(th *goTH) error {
-	if _, err := th.commissionable(d.names, th.dut.info.discriminator, th.dut.info.port, ddMDNSTimeout); err != nil {
+	if _, err := th.commissionableOf(d.names, th.dut); err != nil {
 		return fmt.Errorf("the TH is not advertising before the attempt: %w", err)
 	}
 	return nil
 }
 
-// giveUp is requireGiveUp (:783-820): the TH is seen advertising, then a
+// giveUp is requireGiveUp (:836-873): the TH is seen advertising, then a
 // well-formed code naming a device that is not there ends in
 // gocontroller.ErrNoDevice once ABSENT_DEVICE_GIVE_UP passes; a payload
-// refusal is no give-up.
+// refusal is no give-up. Stricter than requireGiveUp: a candidate tried
+// and failed (DiscoveryAggregateError, tc-dd-support.ts:1485-1495) is not
+// accepted, and the TH must log no PASE attempt, which the TS does not
+// check.
 func (d *dutRun) giveUp(th *goTH, code, what string) error {
 	if err := d.setup(th); err != nil {
 		return err
@@ -195,7 +199,7 @@ func (d *dutRun) giveUp(th *goTH, code, what string) error {
 	case errors.Is(err, gocontroller.ErrPairingCode):
 		return fmt.Errorf("%s: the DUT refused %s as a payload, which is no give-up — the code is well formed: %w", what, code, err)
 	case !errors.Is(err, gocontroller.ErrNoDevice):
-		return fmt.Errorf("%s: commissioning from %s failed after %s for a reason that is no give-up (isCommissioningGiveUp, tc-dd-support.ts:1165): %w", what, code, took, err)
+		return fmt.Errorf("%s: commissioning from %s failed after %s for a reason that is no give-up (isCommissioningGiveUp, tc-dd-support.ts:1485): %w", what, code, took, err)
 	case took > ddAbsentWait:
 		return fmt.Errorf("%s: the DUT gave up after %s, past ABSENT_DEVICE_WAIT %s", what, took, ddAbsentWait)
 	}
@@ -207,9 +211,9 @@ func (d *dutRun) giveUp(th *goTH, code, what string) error {
 	return nil
 }
 
-// honored is recordDiscriminatorHonored (:931-958): the TH's own QR code
+// honored is recordDiscriminatorHonored (:986-1013): the TH's own QR code
 // with a discriminator no device of the run advertises
-// (absentDiscriminator :895-905, the TH's XOR 0xFFF) ends in a give-up.
+// (absentDiscriminator :949-959, the TH's XOR 0xFFF) ends in a give-up.
 func (d *dutRun) honored(th *goTH) error {
 	absent := int(th.dut.info.discriminator ^ 0xFFF)
 	code, err := qrPayloadWith(th.dut.info.qrCode, map[string]int{"discriminator": absent})
@@ -219,10 +223,10 @@ func (d *dutRun) honored(th *goTH) error {
 	return d.giveUp(th, code, fmt.Sprintf("DUT commissions the device its code names (discriminator %d replaced by %d)", th.dut.info.discriminator, absent))
 }
 
-// restore is restoreCommissioningMode (:1421-1439): a TH an earlier step
+// restore is restoreCommissioningMode (:1742-1760): a TH an earlier step
 // commissioned is decommissioned and seen back in commissioning mode —
 // its log opens its own window again, and its commissionable record is
-// back (recordBackInCommissioningMode :1358-1412).
+// back (recordBackInCommissioningMode :1679-1733).
 func (d *dutRun) restore(th *goTH) (bool, error) {
 	if d.node == nil {
 		return false, nil
@@ -241,17 +245,17 @@ func (d *dutRun) restore(th *goTH) (bool, error) {
 }
 
 // offering is a per-transport leg's claim on a parse (PayloadOffering
-// :248-252): the capability bit and the flow.
+// :295-299): the capability bit and the flow.
 type offering struct {
 	bit  int
 	name string
 	flow int
 }
 
-// parse is recordParse (:264-293): the DUT reads the payload — its own
+// parse is recordParse (:311-340): the DUT reads the payload — its own
 // parse, not the harness's — as the TH's discriminator and passcode, and,
 // for a leg, as offering the leg's capability over its flow
-// (offeringCheck :369-398).
+// (offeringCheck :416-445).
 func (d *dutRun) parse(th *goTH, payload string, o *offering) error {
 	p, err := gocontroller.ParsePairingCode(payload)
 	if err != nil {
@@ -272,7 +276,7 @@ func (d *dutRun) parse(th *goTH, payload string, o *offering) error {
 	return nil
 }
 
-// manualParse is recordManualParse (:1055-1088): the DUT reads the code as
+// manualParse is recordManualParse (:1110-1143): the DUT reads the code as
 // the TH's short discriminator and passcode and the vendor and product
 // the code carries.
 func (d *dutRun) manualParse(th *goTH, code string) error {
@@ -298,9 +302,9 @@ func (d *dutRun) manualParse(th *goTH, code string) error {
 	return nil
 }
 
-// commission is commissionByTarget (:1474-1501): the TH back in
+// commission is commissionByTarget (:1795-1822): the TH back in
 // commissioning mode if an earlier step commissioned it, the DUT's parse
-// of the code, then commissionChecked (:130-155) — the DUT's result
+// of the code, then commissionChecked (:137-162) — the DUT's result
 // naming the node, and the TH's own line that a commissioning completed
 // (its CommissioningComplete answered, bridge's matter.gencomm.cmd_ok).
 func (d *dutRun) commission(th *goTH, code string) error {
@@ -337,7 +341,7 @@ func (d *dutRun) commission(th *goTH, code string) error {
 	return nil
 }
 
-// vendorOutcome is recordVendorOutcome (:1195-1280): either outcome
+// vendorOutcome is recordVendorOutcome (:1515-1600): either outcome
 // passes — a give-up, or the TH onboarded with the user aware of the
 // risk — but only a give-up counts as termination, and the TH is seen
 // advertising first.
@@ -388,7 +392,7 @@ func (d *dutRun) finalize(th *goTH) {
 }
 
 // generated records a harness-built QR payload (recordGeneratedPayload
-// :675-682).
+// :722-729).
 func generated(th *goTH, payload string, stated map[string]string, from string) error {
 	detail, err := checkGeneratedPayload(payload, stated, from)
 	if err != nil {
@@ -399,7 +403,7 @@ func generated(th *goTH, payload string, stated map[string]string, from string) 
 }
 
 // generatedManual records a harness-built manual code
-// (recordGeneratedManualCode :1714-1721).
+// (recordGeneratedManualCode :2035-2042).
 func generatedManual(th *goTH, code string, stated map[string]string, unchangedFrom, differsFrom string) error {
 	detail, err := checkGeneratedManualCode(code, stated, unchangedFrom, differsFrom)
 	if err != nil {
@@ -411,7 +415,7 @@ func generatedManual(th *goTH, code string, stated map[string]string, unchangedF
 
 func itoa(v int) string { return strconv.Itoa(v) }
 
-// thQR is thQrPayload (:227-245): the TH's own QR code.
+// thQR is thQrPayload (:274-292): the TH's own QR code.
 func thQR(th *goTH) string { return th.dut.info.qrCode }
 
 // qrWithFields is qrPayloadWith over the TH's QR code; a failure is the
@@ -424,12 +428,12 @@ func qrWithFields(th *goTH, fields map[string]int) string {
 	return code
 }
 
-// thElevenDigitParts is thElevenDigitCodeParts (:1009-1016).
+// thElevenDigitParts is thElevenDigitCodeParts (:1064-1071).
 func thElevenDigitParts(th *goTH) manualParts {
 	return manualParts{discriminator: int(th.dut.info.discriminator), passcode: int(th.dut.info.passcode)}
 }
 
-// thCodeParts is thCodeParts (:1026-1047): the 21-digit form's parts,
+// thCodeParts is thCodeParts (:1081-1102): the 21-digit form's parts,
 // with the vendor and product the TH's QR code names, which must be set.
 func thCodeParts(th *goTH) (manualParts, error) {
 	f, err := qrPayloadFields(thQR(th))
@@ -466,7 +470,7 @@ func ddDUTPICS(codes ...string) []string {
 }
 
 // noRadio is the reason the TS gives a per-transport commissioning step
-// it cannot run (TC-DD-3.11.test.ts:33-39, tc-dd-flow-support.ts:32-38;
+// it cannot run (TC-DD-3.11.test.ts:33-39, tc-dd-flow-support.ts:33-39;
 // cite names the one of the case), with the leg's own fact: the DUT runs
 // without a BLE central or a Wi-Fi PAF radio here (PairOptions.BLE unset).
 func noRadio(transport, cite string) string {
@@ -596,10 +600,40 @@ func caseDD311() goCertCase {
 // ddFlowSupport is the support file the flow cases' steps are defined in.
 const ddFlowSupport = "tc-dd-flow-support.ts"
 
-// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:72-189): per leg
-// (BLE, Wi-Fi PAF, IP network, :77-99) a generated payload offering the
-// leg's capability over the flow, two parses, and — on the IP leg only —
-// the commissioning.
+// ddFlowReadAt is the matter.js commit the flow cases (TC-DD-3.12, 3.13)
+// are ports of, which is not the snapshot's pin: every tc-dd-flow-support.ts
+// and TC-DD-3.12/3.13.test.ts line cited from here to caseDD313 is that
+// commit's. At the pin (db021da0) the two cases start their TH without a
+// commissioning window and open it by a user action, which the reference
+// daemon cannot do yet:
+//
+//   - the case starts the TH with USER_INTENT_TH_ARGS, "--custom-flow 1"
+//     (tc-dd-flow-support.ts:46 at db021da0; TC-DD-3.12.test.ts:16 and
+//     TC-DD-3.13.test.ts:16, appArgs) — the daemon has no flag that keeps
+//     an uncommissioned node's own window closed at its start
+//     (examples/reference-bridge/main.go parseFlags; node.Start opens it,
+//     node/node.go);
+//   - each leg's .a holds the TH to not having advertised in commissioning
+//     mode (recordNotCommissionable, tc-dd-support.ts:1329-1337, called at
+//     tc-dd-flow-support.ts:129), where the port below notes the opposite
+//     as unverified;
+//   - the IP leg's .d is the user action (recordUserIntentCommissioningStart,
+//     tc-dd-support.ts:1371-1385, at tc-dd-flow-support.ts:167: the
+//     backchannel command userIntentCommissioningStart, packages/testing/
+//     src/device/backchannel.ts:176-178) — the daemon's --app-pipe takes no
+//     such command (examples/reference-bridge/control.go) —, then the
+//     discriminator check, which the pin moved here from a step 0 it no
+//     longer has (:168; the port's step 0 below), then the commissioning.
+//
+// So the pin's case has 12 steps where this port has 13, and the port
+// stays the case as it stood at ddFlowReadAt until the daemon has the flag
+// and the pipe command; it is not a port of the pin's case.
+const ddFlowReadAt = "862ad75f"
+
+// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:72-189 at 862ad75f,
+// [ddFlowReadAt]): per leg (BLE, Wi-Fi PAF, IP network, :77-99) a
+// generated payload offering the leg's capability over the flow, two
+// parses, and — on the IP leg only — the commissioning.
 func flowCase(tc string, flow int, flowPICS string) goCertCase {
 	d := &dutRun{}
 	legs := []struct {
@@ -648,21 +682,23 @@ func flowCase(tc string, flow int, flowPICS string) goCertCase {
 				return d.commission(th, qrWithFields(th, fields))
 			}})
 		} else {
-			steps = append(steps, goStep{n: leg.n + ".d", line: 182, file: ddFlowSupport, na: noRadio(leg.transport, "tc-dd-flow-support.ts:32-38"), title: "commission over " + leg.transport})
+			steps = append(steps, goStep{n: leg.n + ".d", line: 182, file: ddFlowSupport, na: noRadio(leg.transport, "tc-dd-flow-support.ts:32-38 at "+ddFlowReadAt), title: "commission over " + leg.transport})
 		}
 	}
 	return goCertCase{
-		tc: tc, line: 12, role: roleDUT, pics: ddDUTPICS("MCORE.DD.QR_COMMISSIONING", flowPICS),
+		tc: tc, line: 12, readAt: ddFlowReadAt, role: roleDUT, pics: ddDUTPICS("MCORE.DD.QR_COMMISSIONING", flowPICS),
 		finalize: d.finalize, steps: steps,
 	}
 }
 
-// caseDD312 is TC-DD-3.12, the User-Intent flow (TC-DD-3.12.test.ts:11-18).
+// caseDD312 is TC-DD-3.12, the User-Intent flow (TC-DD-3.12.test.ts:11-18
+// at 862ad75f, [ddFlowReadAt]).
 func caseDD312() goCertCase {
 	return flowCase("TC-DD-3.12", ddUserIntentFlow, "MCORE.DD.USER_INTENT_COMM_FLOW")
 }
 
-// caseDD313 is TC-DD-3.13, the Custom flow (TC-DD-3.13.test.ts:11-18).
+// caseDD313 is TC-DD-3.13, the Custom flow (TC-DD-3.13.test.ts:11-18 at
+// 862ad75f, [ddFlowReadAt]).
 func caseDD313() goCertCase {
 	return flowCase("TC-DD-3.13", ddCustomFlow, "MCORE.DD.CUSTOM_COMM_FLOW")
 }
@@ -677,7 +713,7 @@ func caseDD314() goCertCase {
 		return qrWithFields(th, map[string]int{"discoveryCapabilities": ddOnNetworkOnly})
 	}
 	absent := func(bit int, name string) func(th *goTH) error {
-		// recordDiscoveryCapabilityAbsent (tc-dd-support.ts:410-453): derived
+		// recordDiscoveryCapabilityAbsent (tc-dd-support.ts:457-500): derived
 		// from step 1's payload, and the DUT reads no such capability.
 		return func(th *goTH) error {
 			src, err := qrPayloadFields(thQR(th))
@@ -740,10 +776,10 @@ func caseDD314() goCertCase {
 			// Pair takes the code as one string and reads one without the MT:
 			// prefix as a manual code, its other characters dropped
 			// (controller.ParsePairingCode) — as matter.js's own commission
-			// does with a pairingCode string (CommissioningClient.ts:1352-1353,
+			// does with a pairingCode string (CommissioningClient.ts:1358-1359,
 			// ManualPairingCodeCodec.decode); its cert adapter hands the
 			// payload to the QR decoder instead, as the target names it a QR
-			// code (InProcessControllerAdapter.ts:1056-1065). Refused before
+			// code (InProcessControllerAdapter.ts:1210-1219). Refused before
 			// the network either way, which is what the step asks; the
 			// evidence names the reason.
 			{n: "6.b", line: 211, title: "the DUT refuses it", run: func(th *goTH) error {
@@ -879,7 +915,7 @@ func caseDD317() goCertCase {
 		}
 		return p
 	}
-	// thManualPairingCode (tc-dd-support.ts:983-988): the TH's parts with
+	// thManualPairingCode (tc-dd-support.ts:1038-1043): the TH's parts with
 	// overrides, laid out.
 	code := func(th *goTH, edit func(*manualParts)) string { return mustManual(th, parts(th).with(edit)) }
 	same := func(*manualParts) {}
