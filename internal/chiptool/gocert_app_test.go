@@ -342,10 +342,10 @@ func caseACT32() goCertCase {
 func caseG32() goCertCase {
 	var n *client.Node
 	const (
-		keySet      uint16 = 1      // GROUP_KEY_SET_ID (TC-G-3.2.test.ts:22)
-		removed     uint16 = 0x0002 // REMOVED_GROUP (:26)
-		identifying uint16 = 0x0003 // IDENTIFYING_GROUP (:27)
-		identifyFor uint16 = 0x0078 // IDENTIFY_TIME (:29)
+		keySet      uint16 = 1      // GROUP_KEY_SET_ID (TC-G-3.2.test.ts:23)
+		removed     uint16 = 0x0002 // REMOVED_GROUP (:29)
+		identifying uint16 = 0x0003 // IDENTIFYING_GROUP (:30)
+		identifyFor uint16 = 0x0078 // IDENTIFY_TIME (:33)
 	)
 	start := epochUs(1_600_000_000_000_000)
 	keySetOf := func() groupkeymanagement.GroupKeySetStruct { // groupKeySet (:64-76)
@@ -457,7 +457,7 @@ func caseLVL81() goCertCase {
 		}
 		return uint8(v.El.Uint), nil //nolint:gosec // a uint8 attribute
 	}
-	zero := spec.ValueOf(uint16(0)) // NO_TRANSITION (TC-LVL-8.1.test.ts:31)
+	zero := spec.ValueOf(uint16(0)) // NO_TRANSITION (TC-LVL-8.1.test.ts:41)
 	return goCertCase{
 		tc: "TC-LVL-8.1", line: 161, pics: []string{"LVL.C"}, at: "LVL.S & OO.S",
 		steps: []goStep{
@@ -476,8 +476,8 @@ func caseLVL81() goCertCase {
 				if err != nil {
 					return err
 				}
-				lighting = fm.El.Uint&(1<<1) != 0 // LIGHTING_FEATURE (:20)
-				// boundsConform (:107-115).
+				lighting = fm.El.Uint&(1<<1) != 0 // LIGHTING_FEATURE (:28)
+				// boundsConform (:113-121).
 				if lo > hi || hi > 254 {
 					return fmt.Errorf("%d-%d is not a range CurrentLevel can take", lo, hi)
 				}
@@ -492,7 +492,7 @@ func caseLVL81() goCertCase {
 				if err != nil {
 					return err
 				}
-				// levelOtherThan (:121-127).
+				// levelOtherThan (:128-134).
 				level := lo + (hi-lo)/2
 				if !before.El.IsNull && before.El.Uint == uint64(level) {
 					if level == hi {
@@ -513,14 +513,14 @@ func caseLVL81() goCertCase {
 					return fmt.Errorf("CurrentLevel %s -> %d, commanded %d", describeNode(before), got, level)
 				}
 				if _, err := th.invoke(n, cmdPath(th.ep, levelcontrol.ClusterID, levelcontrol.CmdMove),
-					levelcontrol.MoveRequest{MoveMode: 0, Rate: spec.ValueOf(uint8(20))}, false, client.InvokeOptions{}); err != nil { // MOVE_MODE_UP, MOVE_RATE (:32-33)
+					levelcontrol.MoveRequest{MoveMode: 0, Rate: spec.ValueOf(uint8(20))}, false, client.InvokeOptions{}); err != nil { // MOVE_MODE_UP, MOVE_RATE (:46, :43)
 					return err
 				}
 				if _, err := th.invoke(n, cmdPath(th.ep, levelcontrol.ClusterID, levelcontrol.CmdStop), levelcontrol.StopRequest{}, false, client.InvokeOptions{}); err != nil {
 					return err
 				}
 				if _, err := th.invoke(n, cmdPath(th.ep, levelcontrol.ClusterID, levelcontrol.CmdStep),
-					levelcontrol.StepRequest{StepMode: 1, StepSize: 10, TransitionTime: zero}, false, client.InvokeOptions{}); err != nil { // STEP_MODE_DOWN, STEP_SIZE (:34-35)
+					levelcontrol.StepRequest{StepMode: 1, StepSize: 10, TransitionTime: zero}, false, client.InvokeOptions{}); err != nil { // STEP_MODE_DOWN, STEP_SIZE (:47, :44)
 					return err
 				}
 				th.note("MoveToLevelWithOnOff %d reached (from %s); Move up, Stop, Step down 10: Success", level, describeNode(before))
@@ -534,14 +534,14 @@ func caseLVL81() goCertCase {
 func caseS31() goCertCase {
 	var n *client.Node
 	const (
-		keySet  uint16 = 0x01a1 // GROUP_KEY_SET_ID (TC-S-3.1.test.ts:19)
-		group   uint16 = 0x0001 // GROUP (:20)
-		scene   uint8  = 0x01   // SCENE_ID (:21)
-		copied  uint8  = 0x02   // COPIED_SCENE_ID (:22)
+		keySet  uint16 = 0x01a1 // GROUP_KEY_SET_ID (TC-S-3.1.test.ts:35)
+		group   uint16 = 0x0001 // GROUP (:36)
+		scene   uint8  = 0x01   // SCENE_ID (:38)
+		copied  uint8  = 0x02   // COPIED_SCENE_ID (:39)
 		sceneNm        = "scene1"
 	)
 	start := epochUs(1_600_000_000_000_000)
-	one := uint8(1) // SCENE_ON_OFF_VALUE (:26)
+	one := uint8(1) // SCENE_ON_OFF_VALUE (:49)
 	invoke := func(cmd uint32, fields spec.Encodable, statusField bool) func(th *goTH) error {
 		return func(th *goTH) error {
 			if _, err := th.invoke(n, cmdPath(th.ep, scenesmanagement.ClusterID, cmd), fields, statusField, client.InvokeOptions{}); err != nil {
@@ -562,7 +562,7 @@ func caseS31() goCertCase {
 				}
 				k0 := []byte{0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf}
 				k1 := []byte{0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf}
-				ks := groupkeymanagement.GroupKeySetStruct{ // groupKeySet (:36-48)
+				ks := groupkeymanagement.GroupKeySetStruct{ // groupKeySet (:69-81)
 					GroupKeySetId: keySet, EpochKey0: spec.ValueOf(k0), EpochStartTime0: spec.ValueOf(start),
 					EpochKey1: spec.ValueOf(k1), EpochStartTime1: spec.ValueOf(start + 1_000_000),
 					EpochKey2: spec.NullOf[[]byte](), EpochStartTime2: spec.NullOf[uint64](),
@@ -764,7 +764,7 @@ func caseSWTCH32() goCertCase {
 				if err != nil {
 					return err
 				}
-				// MOMENTARY_FEATURE_MAPS (:32): MS|MSR|MSL|MSM or MS|MSL|MSM|AS.
+				// MOMENTARY_FEATURE_MAPS (:51): MS|MSR|MSL|MSM or MS|MSL|MSM|AS.
 				if fm != swFeatureMS|swFeatureMSR|swFeatureMSL|swFeatureMSM && fm != swFeatureMS|swFeatureMSL|swFeatureMSM|swFeatureAS {
 					return fmt.Errorf("FeatureMap 0x%02X, want 0x1E or 0x3A", fm)
 				}

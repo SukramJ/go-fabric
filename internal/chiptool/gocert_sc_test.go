@@ -145,7 +145,7 @@ func caseSC42() goCertCase {
 		alias *mdns.Responder
 		ctrl  *gocontroller.Controller
 	)
-	aliasD := func(th *goTH) uint16 { return th.dut.info.discriminator ^ 0xAAA } // aliasDiscriminator (TC-SC-4.2.test.ts:36-43)
+	aliasD := func(th *goTH) uint16 { return th.dut.info.discriminator ^ 0xAAA } // aliasDiscriminator (TC-SC-4.2.test.ts:42-54)
 	return goCertCase{
 		tc: "TC-SC-4.2", line: 63, pics: []string{"MCORE.ROLE.COMMISSIONER"},
 		steps: []goStep{
