@@ -115,30 +115,29 @@ var tcpListen = tcp.Listen
 // auto-assigned both sockets are closed and the pair is tried again, up
 // to maxPortAssignmentRetries times. A socket the host gave is not
 // replaced: its port is the host's choice, as a configured one is.
-func (c *Controller) bindTransports(listen string, given *udp.Listener) (*udp.Listener, *tcp.Listener, error) {
+func (c *Controller) bindTransports(listen string, given *udp.Listener) (udpListener *udp.Listener, tcpListener *tcp.Listener, err error) {
 	attempts := 1
 	if given == nil && autoAssignedPort(listen) {
 		attempts = maxPortAssignmentRetries
 	}
 	for attempt := 1; ; attempt++ {
-		l := given
-		if l == nil {
-			var err error
-			if l, err = udp.New(udp.Config{LocalAddr: listen}); err != nil {
+		udpListener = given
+		if udpListener == nil {
+			if udpListener, err = udp.New(udp.Config{LocalAddr: listen}); err != nil {
 				return nil, nil, err
 			}
 		}
-		ua := l.LocalAddr()
-		tl, err := tcpListen(tcp.Config{
+		ua := udpListener.LocalAddr()
+		tcpListener, err = tcpListen(tcp.Config{
 			LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
 			Logger:    c.log, Clock: c.clock,
 			MaxInboundConnections: c.tcp.maxInboundConnections(),
 		})
 		if err == nil {
-			return l, tl, nil
+			return udpListener, tcpListener, nil
 		}
 		if given == nil {
-			_ = l.Close()
+			_ = udpListener.Close()
 		}
 		if !errors.Is(err, syscall.EADDRINUSE) || attempt >= attempts {
 			return nil, nil, err
