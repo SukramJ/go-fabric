@@ -52,6 +52,15 @@ var noticesPlatforms = []struct{ goos, goarch string }{
 // and its eight dependencies test-only while package store linked the
 // driver (review II, R2-P5-sup-06); measured on darwin alone it was red on
 // every linux runner (DR5a-ci-01).
+//
+// The measurement needs the modules of every platform, those of darwin
+// and windows a linux build never fetches among them. CI runs with the
+// network: setup-go restores the module cache its jobs built, and go list
+// fetches what is missing through GOPROXY. Offline (GOPROXY=off), a cache
+// primed by a build is not enough and the test fails naming the module;
+// `go mod download` fetches every platform's modules, and the test passes
+// offline from a cache it primed (RR5a-03, measured on a fresh cache each
+// way).
 func TestNoticesListEveryLinkedModule(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs go list over the module")
@@ -125,7 +134,11 @@ func goListEnv(t *testing.T, env []string, args ...string) []string {
 		if ee := (*exec.ExitError)(nil); errors.As(err, &ee) {
 			stderr = ee.Stderr
 		}
-		t.Fatalf("go %s: %v\n%s", args[0], err, stderr)
+		hint := ""
+		if bytes.Contains(stderr, []byte("module lookup disabled")) {
+			hint = "\nthe module cache lacks a measured platform's modules: run `go mod download`, which fetches every platform's, before running this offline"
+		}
+		t.Fatalf("go %s: %v\n%s%s", args[0], err, stderr, hint)
 	}
 	var lines []string
 	for _, l := range strings.Split(string(out), "\n") {
