@@ -133,8 +133,17 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandleGoHome: a command the server does not accept was registered")
 	}
-	_ = s.EmitOperationalError(0, OperationalErrorEvent{})       // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
+	_ = s.EmitOperationalError(0, OperationalErrorEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordOperationalError(OperationalErrorEvent{})  // the same, through EmitEvent
+	if err := bare.RecordOperationalError(OperationalErrorEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordOperationalError on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitOperationCompletion(0, OperationCompletionEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordOperationCompletion(OperationCompletionEvent{})  // the same, through EmitEvent
+	if err := bare.RecordOperationCompletion(OperationCompletionEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordOperationCompletion on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

@@ -137,6 +137,12 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandleSetTcAcknowledgements: a command the server does not accept was registered")
 	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

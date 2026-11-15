@@ -148,11 +148,38 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleSetDefaultNtp: a command the server does not accept was registered")
 	}
-	_ = s.EmitDstTableEmpty(0, DstTableEmptyEvent{})                       // not in the empty definition's EventList: refused
-	_ = s.EmitDstStatus(0, DstStatusEvent{})                               // not in the empty definition's EventList: refused
-	_ = s.EmitTimeZoneStatus(0, TimeZoneStatusEvent{})                     // not in the empty definition's EventList: refused
-	_ = s.EmitTimeFailure(0, TimeFailureEvent{})                           // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitDstTableEmpty(0, DstTableEmptyEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordDstTableEmpty(DstTableEmptyEvent{})     // the same, through EmitEvent
+	if err := bare.RecordDstTableEmpty(DstTableEmptyEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDstTableEmpty on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitDstStatus(0, DstStatusEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordDstStatus(DstStatusEvent{})  // the same, through EmitEvent
+	if err := bare.RecordDstStatus(DstStatusEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDstStatus on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitTimeZoneStatus(0, TimeZoneStatusEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordTimeZoneStatus(TimeZoneStatusEvent{})  // the same, through EmitEvent
+	if err := bare.RecordTimeZoneStatus(TimeZoneStatusEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordTimeZoneStatus on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitTimeFailure(0, TimeFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordTimeFailure(TimeFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordTimeFailure(TimeFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordTimeFailure on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitMissingTrustedTimeSource(0, MissingTrustedTimeSourceEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordMissingTrustedTimeSource(MissingTrustedTimeSourceEvent{})  // the same, through EmitEvent
+	if err := bare.RecordMissingTrustedTimeSource(MissingTrustedTimeSourceEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordMissingTrustedTimeSource on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

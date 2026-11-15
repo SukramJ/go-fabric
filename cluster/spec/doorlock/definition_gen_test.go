@@ -284,11 +284,38 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleClearAliroReaderConfig: a command the server does not accept was registered")
 	}
-	_ = s.EmitDoorLockAlarm(0, DoorLockAlarmEvent{})           // not in the empty definition's EventList: refused
-	_ = s.EmitDoorStateChange(0, DoorStateChangeEvent{})       // not in the empty definition's EventList: refused
-	_ = s.EmitLockOperation(0, LockOperationEvent{})           // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitDoorLockAlarm(0, DoorLockAlarmEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordDoorLockAlarm(DoorLockAlarmEvent{})     // the same, through EmitEvent
+	if err := bare.RecordDoorLockAlarm(DoorLockAlarmEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDoorLockAlarm on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitDoorStateChange(0, DoorStateChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordDoorStateChange(DoorStateChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordDoorStateChange(DoorStateChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDoorStateChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLockOperation(0, LockOperationEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLockOperation(LockOperationEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLockOperation(LockOperationEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLockOperation on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitLockOperationError(0, LockOperationErrorEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitLockUserChange(0, LockUserChangeEvent{})         // not in the empty definition's EventList: refused
+	_ = s.RecordLockOperationError(LockOperationErrorEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLockOperationError(LockOperationErrorEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLockOperationError on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLockUserChange(0, LockUserChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLockUserChange(LockUserChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLockUserChange(LockUserChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLockUserChange on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

@@ -116,7 +116,18 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleSetTemperatureAlarmThresholds(func(context.Context, SetTemperatureAlarmThresholdsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleSetTemperatureAlarmThresholds: a command the server does not accept was registered")
 	}
-	_ = s.EmitNotify(0, NotifyEvent{}) // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitNotify(0, NotifyEvent{})                  // not in the empty definition's EventList: refused
+	_ = s.RecordNotify(NotifyEvent{})                   // the same, through EmitEvent
+	if err := bare.RecordNotify(NotifyEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordNotify on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

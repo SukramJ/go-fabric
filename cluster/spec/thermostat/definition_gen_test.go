@@ -271,14 +271,53 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil }); err == nil {
 		t.Error("HandleAtomicRequest: a command the server does not accept was registered")
 	}
-	_ = s.EmitSystemModeChange(0, SystemModeChangeEvent{})             // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
+	_ = s.EmitSystemModeChange(0, SystemModeChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSystemModeChange(SystemModeChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSystemModeChange(SystemModeChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSystemModeChange on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitLocalTemperatureChange(0, LocalTemperatureChangeEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitOccupancyChange(0, OccupancyChangeEvent{})               // not in the empty definition's EventList: refused
-	_ = s.EmitSetpointChange(0, SetpointChangeEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitRunningStateChange(0, RunningStateChangeEvent{})         // not in the empty definition's EventList: refused
-	_ = s.EmitRunningModeChange(0, RunningModeChangeEvent{})           // not in the empty definition's EventList: refused
-	_ = s.EmitActiveScheduleChange(0, ActiveScheduleChangeEvent{})     // not in the empty definition's EventList: refused
-	_ = s.EmitActivePresetChange(0, ActivePresetChangeEvent{})         // not in the empty definition's EventList: refused
+	_ = s.RecordLocalTemperatureChange(LocalTemperatureChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLocalTemperatureChange(LocalTemperatureChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLocalTemperatureChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitOccupancyChange(0, OccupancyChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordOccupancyChange(OccupancyChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordOccupancyChange(OccupancyChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordOccupancyChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSetpointChange(0, SetpointChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSetpointChange(SetpointChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSetpointChange(SetpointChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSetpointChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitRunningStateChange(0, RunningStateChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordRunningStateChange(RunningStateChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordRunningStateChange(RunningStateChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordRunningStateChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitRunningModeChange(0, RunningModeChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordRunningModeChange(RunningModeChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordRunningModeChange(RunningModeChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordRunningModeChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitActiveScheduleChange(0, ActiveScheduleChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordActiveScheduleChange(ActiveScheduleChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordActiveScheduleChange(ActiveScheduleChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordActiveScheduleChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitActivePresetChange(0, ActivePresetChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordActivePresetChange(ActivePresetChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordActivePresetChange(ActivePresetChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordActivePresetChange on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

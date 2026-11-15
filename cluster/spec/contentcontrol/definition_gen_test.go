@@ -196,8 +196,23 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleRemoveBlockContentTimeWindow(func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleRemoveBlockContentTimeWindow: a command the server does not accept was registered")
 	}
-	_ = s.EmitRemainingScreenTimeExpired(0, RemainingScreenTimeExpiredEvent{})         // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv})                        // no EmitEvent
+	_ = s.EmitRemainingScreenTimeExpired(0, RemainingScreenTimeExpiredEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordRemainingScreenTimeExpired(RemainingScreenTimeExpiredEvent{})  // the same, through EmitEvent
+	if err := bare.RecordRemainingScreenTimeExpired(RemainingScreenTimeExpiredEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordRemainingScreenTimeExpired on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitEnteringBlockContentTimeWindow(0, EnteringBlockContentTimeWindowEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordEnteringBlockContentTimeWindow(EnteringBlockContentTimeWindowEvent{})  // the same, through EmitEvent
+	if err := bare.RecordEnteringBlockContentTimeWindow(EnteringBlockContentTimeWindowEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEnteringBlockContentTimeWindow on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

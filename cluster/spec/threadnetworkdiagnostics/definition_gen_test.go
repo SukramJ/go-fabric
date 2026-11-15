@@ -234,8 +234,23 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleResetCounts: a command the server does not accept was registered")
 	}
-	_ = s.EmitConnectionStatus(0, ConnectionStatusEvent{})     // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
+	_ = s.EmitConnectionStatus(0, ConnectionStatusEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordConnectionStatus(ConnectionStatusEvent{})  // the same, through EmitEvent
+	if err := bare.RecordConnectionStatus(ConnectionStatusEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordConnectionStatus on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitNetworkFaultChange(0, NetworkFaultChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordNetworkFaultChange(NetworkFaultChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordNetworkFaultChange(NetworkFaultChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordNetworkFaultChange on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

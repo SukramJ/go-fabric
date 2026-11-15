@@ -113,8 +113,23 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleClose(func(context.Context, CloseRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleClose: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})      // no EmitEvent
 	_ = s.EmitValveStateChanged(0, ValveStateChangedEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitValveFault(0, ValveFaultEvent{})               // not in the empty definition's EventList: refused
+	_ = s.RecordValveStateChanged(ValveStateChangedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordValveStateChanged(ValveStateChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordValveStateChanged on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitValveFault(0, ValveFaultEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordValveFault(ValveFaultEvent{})  // the same, through EmitEvent
+	if err := bare.RecordValveFault(ValveFaultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordValveFault on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

@@ -97,7 +97,12 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandleNavigateTarget: a command the server does not accept was registered")
 	}
-	_ = s.EmitTargetUpdated(0, TargetUpdatedEvent{}) // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitTargetUpdated(0, TargetUpdatedEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordTargetUpdated(TargetUpdatedEvent{})     // the same, through EmitEvent
+	if err := bare.RecordTargetUpdated(TargetUpdatedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordTargetUpdated on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

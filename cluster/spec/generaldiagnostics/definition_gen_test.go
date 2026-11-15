@@ -129,10 +129,33 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandlePayloadTestRequest: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})          // no EmitEvent
 	_ = s.EmitHardwareFaultChange(0, HardwareFaultChangeEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitRadioFaultChange(0, RadioFaultChangeEvent{})       // not in the empty definition's EventList: refused
-	_ = s.EmitNetworkFaultChange(0, NetworkFaultChangeEvent{})   // not in the empty definition's EventList: refused
-	_ = s.EmitBootReason(0, BootReasonEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.RecordHardwareFaultChange(HardwareFaultChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordHardwareFaultChange(HardwareFaultChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordHardwareFaultChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitRadioFaultChange(0, RadioFaultChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordRadioFaultChange(RadioFaultChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordRadioFaultChange(RadioFaultChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordRadioFaultChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitNetworkFaultChange(0, NetworkFaultChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordNetworkFaultChange(NetworkFaultChangeEvent{})  // the same, through EmitEvent
+	if err := bare.RecordNetworkFaultChange(NetworkFaultChangeEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordNetworkFaultChange on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitBootReason(0, BootReasonEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordBootReason(BootReasonEvent{})  // the same, through EmitEvent
+	if err := bare.RecordBootReason(BootReasonEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordBootReason on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

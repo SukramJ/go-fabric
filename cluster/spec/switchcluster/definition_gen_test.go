@@ -96,13 +96,48 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	_ = s.EmitSwitchLatched(0, SwitchLatchedEvent{})           // not in the empty definition's EventList: refused
-	_ = s.EmitInitialPress(0, InitialPressEvent{})             // not in the empty definition's EventList: refused
-	_ = s.EmitLongPress(0, LongPressEvent{})                   // not in the empty definition's EventList: refused
-	_ = s.EmitShortRelease(0, ShortReleaseEvent{})             // not in the empty definition's EventList: refused
-	_ = s.EmitLongRelease(0, LongReleaseEvent{})               // not in the empty definition's EventList: refused
-	_ = s.EmitMultiPressOngoing(0, MultiPressOngoingEvent{})   // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitSwitchLatched(0, SwitchLatchedEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordSwitchLatched(SwitchLatchedEvent{})     // the same, through EmitEvent
+	if err := bare.RecordSwitchLatched(SwitchLatchedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSwitchLatched on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitInitialPress(0, InitialPressEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordInitialPress(InitialPressEvent{})  // the same, through EmitEvent
+	if err := bare.RecordInitialPress(InitialPressEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordInitialPress on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLongPress(0, LongPressEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLongPress(LongPressEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLongPress(LongPressEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLongPress on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitShortRelease(0, ShortReleaseEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordShortRelease(ShortReleaseEvent{})  // the same, through EmitEvent
+	if err := bare.RecordShortRelease(ShortReleaseEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordShortRelease on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLongRelease(0, LongReleaseEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLongRelease(LongReleaseEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLongRelease(LongReleaseEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLongRelease on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitMultiPressOngoing(0, MultiPressOngoingEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordMultiPressOngoing(MultiPressOngoingEvent{})  // the same, through EmitEvent
+	if err := bare.RecordMultiPressOngoing(MultiPressOngoingEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordMultiPressOngoing on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitMultiPressComplete(0, MultiPressCompleteEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordMultiPressComplete(MultiPressCompleteEvent{})  // the same, through EmitEvent
+	if err := bare.RecordMultiPressComplete(MultiPressCompleteEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordMultiPressComplete on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

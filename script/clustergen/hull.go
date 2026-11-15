@@ -431,8 +431,23 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 		w.p("\t\tt.Error(\"%s: a command the server does not accept was registered\")", hc.method)
 		w.p("\t}")
 	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\tbare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent")
+	}
 	for _, he := range g.hullEvents() {
 		w.p("\t_ = s.%s(0, %s{}) // not in the empty definition's EventList: refused", he.method, he.payload)
+		w.p("\t_ = s.%s(%s{})      // the same, through EmitEvent", he.record, he.payload)
+		w.p("\tif err := bare.%s(%s{}); err != spec.ErrNoEvents {", he.record, he.payload)
+		w.p("\t\tt.Errorf(\"%s on a server without EmitEvent: %%v\", err)", he.record)
+		w.p("\t}")
+	}
+	if len(g.c.Features) > 0 {
+		w.p("\tif decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {")
+		w.p("\t\tt.Error(\"Declare: NoFeatures selects no feature\")")
+		w.p("\t}")
+		w.p("\tif decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {")
+		w.p("\t\tt.Error(\"Declare: NoFeatures beside Features is not refused\")")
+		w.p("\t}")
 	}
 	w.p("\t// The declaration: its cluster, its kit form, its veto installed.")
 	w.p("\td := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}")

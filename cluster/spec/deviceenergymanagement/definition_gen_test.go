@@ -145,10 +145,33 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleCancelRequest(func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleCancelRequest: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
 	_ = s.EmitPowerAdjustStart(0, PowerAdjustStartEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitPowerAdjustEnd(0, PowerAdjustEndEvent{})     // not in the empty definition's EventList: refused
-	_ = s.EmitPaused(0, PausedEvent{})                     // not in the empty definition's EventList: refused
-	_ = s.EmitResumed(0, ResumedEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.RecordPowerAdjustStart(PowerAdjustStartEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPowerAdjustStart(PowerAdjustStartEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPowerAdjustStart on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPowerAdjustEnd(0, PowerAdjustEndEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPowerAdjustEnd(PowerAdjustEndEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPowerAdjustEnd(PowerAdjustEndEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPowerAdjustEnd on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPaused(0, PausedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPaused(PausedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPaused(PausedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPaused on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitResumed(0, ResumedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordResumed(ResumedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordResumed(ResumedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordResumed on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()
