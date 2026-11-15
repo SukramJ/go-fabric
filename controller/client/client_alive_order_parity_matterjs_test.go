@@ -71,8 +71,8 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 		n := sr.reg.Get("peer1")
 		const id = 0x52
 		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), id)
-		client.WaitRegistry(sr.reg)
 		waitGoneLive(t, &live)
+		client.WaitRegistry(sr.reg)
 		armed.Store(true)
 
 		sr.send(t, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7102, ProtocolID: im.InteractionModelProtocolID},
@@ -150,8 +150,8 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 		n := sr.reg.Get("peer1")
 		const id = 0x53
 		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), id)
-		client.WaitRegistry(sr.reg)
 		waitGoneLive(t, &live)
+		client.WaitRegistry(sr.reg)
 		armed.Store(true)
 
 		sr.send(t, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7103, ProtocolID: im.InteractionModelProtocolID},
@@ -188,7 +188,9 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 // — have run: SubscriptionActive may read true before either is queued.
 // Armed before they ran, a test took one for the report's alive (review
 // II, phase 5: TestSubscriptionAliveNotAfterStop twice under
-// `make race`). It must run in the bubble.
+// `make race`). It must run in the bubble. The first alive starts the
+// registry's label reconciliation (Registry.hooksFor), so a
+// client.WaitRegistry comes after it, never before.
 func waitGoneLive(t *testing.T, live *atomic.Bool) {
 	t.Helper()
 	waitUntil(t, "the subscription's going-live announcement", live.Load)
@@ -278,6 +280,10 @@ func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
 		if len(early) != 0 {
 			t.Fatalf("hooks %v ran while the priming report's EndpointInstalled held the queue", early)
 		}
+		// The alive the release lets run starts the label reconciliation:
+		// the bubble settles before the registry's work is waited for (see
+		// client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		waitUntil(t, "the alive hook", func() bool {
 			mu.Lock()
