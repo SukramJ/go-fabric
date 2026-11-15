@@ -226,6 +226,18 @@ func (a *PaseAdapter) SetOnUnfinished(fn func(sessionID uint16)) {
 	a.onUnfinished = fn
 }
 
+// dropped ends the adapter's handshake when its provider lets the adapter
+// go ([PerExchangePaseProvider]: the 60 s exchange timeout, the reaper,
+// Forget, Reset): a verifier still held is closed, as at every other end
+// of a handshake ([PaseAdapter.endHandshakeLocked]), and the staked
+// session id is returned ([PaseAdapter.releaseStakedID]).
+func (a *PaseAdapter) dropped() {
+	a.mu.Lock()
+	a.endHandshakeLocked()
+	a.mu.Unlock()
+	a.releaseStakedID()
+}
+
 // releaseStakedID calls the [PaseAdapter.SetOnUnfinished] hook with the
 // announced session id, unless a session was established under it or the
 // id was returned already.

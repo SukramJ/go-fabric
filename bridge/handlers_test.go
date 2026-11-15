@@ -1136,3 +1136,46 @@ func TestPaseAdapter_ClosesTheVerifiersItDrops(t *testing.T) {
 		}
 	})
 }
+
+// TestPaseProviderDropClosesTheVerifier: a provider that lets an adapter go
+// in the middle of its handshake — Forget (the 60 s exchange timeout calls
+// it), Reset — ends the handshake: the verifier the adapter holds after
+// Pake1 is closed, as at every other end of a handshake.
+func TestPaseProviderDropClosesTheVerifier(t *testing.T) {
+	t.Parallel()
+	for _, drop := range []struct {
+		name string
+		do   func(p *PerExchangePaseProvider, key HandshakeKey)
+	}{
+		{"Forget", func(p *PerExchangePaseProvider, key HandshakeKey) { p.Forget(key) }},
+		{"Reset", func(p *PerExchangePaseProvider, _ HandshakeKey) { p.Reset() }},
+	} {
+		t.Run(drop.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var closed []*spake2.Verifier
+			provider := NewPerExchangePaseProvider(func() *PaseAdapter {
+				a := newPaseAdapterWithVerifier(t)
+				a.verifierClosed = func(v *spake2.Verifier) {
+					mu.Lock()
+					closed = append(closed, v)
+					mu.Unlock()
+				}
+				return a
+			})
+			key := HandshakeKey{InitiatorNodeID: 0x77, ExchangeID: 0x4242}
+			h := provider.Resolve(key)
+			a, ok := h.(*PaseAdapter)
+			if !ok {
+				t.Fatalf("provider resolved %T", h)
+			}
+			_ = paseHandshakeToPake3(t, a) // Pake1 answered: the adapter holds a verifier
+			drop.do(provider, key)
+			mu.Lock()
+			defer mu.Unlock()
+			if len(closed) != 1 {
+				t.Fatalf("verifiers closed on %s: %d, want 1", drop.name, len(closed))
+			}
+		})
+	}
+}
