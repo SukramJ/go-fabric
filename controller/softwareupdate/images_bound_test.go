@@ -27,7 +27,7 @@ func TestImagesHonourTheLedgersMaxImageSize(t *testing.T) {
 	f := newFetchMock(t)
 	img := createOtaImage(t, 0xfff1, 0x8000, 3)
 	url := f.add("/ota.bin", img)
-	info := ledgerUpdate(url, 0xfff1, 0x8000, 3, len(img), 0)
+	info := withChecksum(ledgerUpdate(url, 0xfff1, 0x8000, 3, len(img), 0), img)
 
 	blobs := &MemoryBlobs{}
 	bounded := NewImages(ImagesConfig{Blobs: blobs, Ledger: hostLedger(int64(len(img)) - 1), Logger: quietLog()})

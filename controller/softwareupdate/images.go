@@ -207,6 +207,8 @@ type Images struct {
 	ledger  *dcl.OTAVersions
 	offline bool
 	log     *slog.Logger
+	// allowUnverified is ImagesConfig.AllowUnverifiedLedgerImages.
+	allowUnverified bool
 	// download fetches a ledger image into w; nil is the ledger's
 	// Download. A test seam.
 	download func(ctx context.Context, v dcl.SoftwareVersion, w io.Writer) error
@@ -233,6 +235,17 @@ type ImagesConfig struct {
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger
+	// AllowUnverifiedLedgerImages admits a ledger update (of the
+	// production or the test-net ledger) whose record states no
+	// whole-file checksum (OTAChecksum). Without it [Images.DownloadUpdate]
+	// refuses such an update before it downloads anything or reuses a
+	// stored image of it, with [ErrOTA] and a warning line
+	// (dcl.ota.no_checksum): the checksum is what binds the image to the
+	// ledger's record. With it each update so made available is logged
+	// (dcl.ota.no_checksum_admitted). An image the host supplies itself
+	// ([UpdateInfoFromImage], [Images.UpdateInfoFromURL]) needs no
+	// checksum either way.
+	AllowUnverifiedLedgerImages bool
 }
 
 // NewImages returns the image store.
@@ -245,7 +258,10 @@ func NewImages(cfg ImagesConfig) *Images {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Images{blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log, hidden: map[string]int{}}
+	return &Images{
+		blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log, allowUnverified: cfg.AllowUnverifiedLedgerImages,
+		hidden: map[string]int{},
+	}
 }
 
 // openBlob opens the stored file name: in place through the backend's
@@ -733,7 +749,33 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 // [ErrOTA] unless a stored image validates: after removing one that failed
 // validation, when none is stored, and — keeping the stored image, since
 // nothing could replace it — when it cannot be read or force is set.
+//
+// A ledger update whose record states no whole-file checksum is refused
+// with [ErrOTA] before anything else, unless
+// [ImagesConfig].AllowUnverifiedLedgerImages admits it: nothing is
+// downloaded, and a stored image of that update is kept but not reused.
+// An update of a stored image (from [Images.CheckForUpdate] with
+// IncludeStored) carries no ledger record, and the store keeps none, so
+// the rule does not reach it.
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
+	unverified := info.ledger != nil && modeOf(info.Source) != ModeLocal && info.ledger.OTAChecksum == ""
+	if unverified && !i.allowUnverified {
+		name := fileName(info.VendorID, info.ProductID, modeOf(info.Source), info.SoftwareVersion)
+		i.log.Warn("dcl.ota.no_checksum", slog.String("file", name), slog.String("source", info.Source),
+			slog.String("message", fmt.Sprintf("OTA image %s (%s): the ledger record states no checksum; not downloaded or served", name, info.SoftwareVersionString)))
+		return "", fmt.Errorf("%w: the ledger record of OTA image %s (%s) states no checksum (otaChecksum), so the image is not downloaded or served; ImagesConfig.AllowUnverifiedLedgerImages admits it",
+			ErrOTA, name, info.SoftwareVersionString)
+	}
+	name, err := i.downloadUpdate(ctx, info, force)
+	if err == nil && unverified {
+		i.log.Warn("dcl.ota.no_checksum_admitted", slog.String("file", name), slog.String("source", info.Source),
+			slog.String("message", fmt.Sprintf("OTA image %s (%s): the ledger record states no checksum; admitted by AllowUnverifiedLedgerImages", name, info.SoftwareVersionString)))
+	}
+	return name, err
+}
+
+// downloadUpdate is DownloadUpdate past the checksum rule.
+func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	mode := modeOf(info.Source)
 	name := fileName(info.VendorID, info.ProductID, mode, info.SoftwareVersion)
 	b, getErr := i.openBlob(ctx, name)

@@ -107,8 +107,11 @@ func ledgerUpdate(url string, vid, pid uint16, version uint32, size int, spec ui
 
 func quietLog() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
+// onlineImages is an online store. The ported cases' ledger records
+// carry no checksum (ledgerUpdate), which the store admits only under
+// AllowUnverifiedLedgerImages.
 func onlineImages(b Blobs) *Images {
-	return NewImages(ImagesConfig{Blobs: b, Ledger: hostLedger(0), Logger: quietLog()})
+	return NewImages(ImagesConfig{Blobs: b, Ledger: hostLedger(0), Logger: quietLog(), AllowUnverifiedLedgerImages: true})
 }
 
 // noLedgerHost is the ledger host of hostLedger: a request to it fails
@@ -146,8 +149,10 @@ func (n noLedger) RoundTrip(req *http.Request) (*http.Response, error) {
 	return n.RoundTripper.RoundTrip(req)
 }
 
+// offlineImages is an offline store, admitting the ported cases' records
+// as onlineImages does.
 func offlineImages(b Blobs) *Images {
-	return NewImages(ImagesConfig{Blobs: b, Logger: quietLog()})
+	return NewImages(ImagesConfig{Blobs: b, Logger: quietLog(), AllowUnverifiedLedgerImages: true})
 }
 
 func filenames(st []StoredImage) []string {

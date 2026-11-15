@@ -931,7 +931,25 @@ images := softwareupdate.NewImages(softwareupdate.ImagesConfig{
 })
 ```
 
-*Source: `controller/dcl/ota.go` (`OTAVersions.Download`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`).*
+Where an image comes from decides how it is fetched and checked. A ledger
+record's image is fetched over `https:` only and, unless the `dcl.Client`
+carries the host's own `HTTPClient`, from a public address only: a
+loopback, private, link-local, unspecified or multicast destination is
+refused when it is dialled, for the URL and each redirect hop
+(`dcl.Client.AllowPrivateDestinations` admits them for a lab; under a proxy
+from the environment the guard dials the proxy, and what lies behind it is
+the proxy's to check). A ledger record must also state the image's
+whole-file checksum: `DownloadUpdate` refuses one without it — production
+or test-net ledger — with `softwareupdate.ErrOTA` and the warning
+`dcl.ota.no_checksum` before it downloads anything, and does not reuse a
+stored image of that update (the file is kept).
+`ImagesConfig.AllowUnverifiedLedgerImages` admits such records and logs
+each admission (`dcl.ota.no_checksum_admitted`). An image the host names
+itself — `UpdateInfoFromURL` (`dcl.OTAVersions.DownloadHostURL`), or
+`UpdateInfoFromImage` — may come over `http:` from any address and needs
+no checksum.
+
+*Source: `controller/dcl/ota.go` (`OTAVersions.Download`, `OTAVersions.DownloadHostURL`), `controller/dcl/client.go` (`Client.AllowPrivateDestinations`, `newGuardedClient`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`, `ImagesConfig.AllowUnverifiedLedgerImages`).*
 
 ### TCP
 
