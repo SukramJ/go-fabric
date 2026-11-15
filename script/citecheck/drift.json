@@ -2884,24 +2884,6 @@
     "occurrences": 3
   },
   {
-    "file": "internal/chiptool/gocert_commissioning_test.go",
-    "line": 505,
-    "citation": "tc-cadmin-window-support.ts:279-317",
-    "resolved": "support/chip-testing/test/cert/tc-cadmin-window-support.ts",
-    "identifier": "requireRefused",
-    "nearest": 261,
-    "occurrences": 4
-  },
-  {
-    "file": "internal/chiptool/gocert_commissioning_test.go",
-    "line": 509,
-    "citation": "tc-dd-support.ts:1218-1226",
-    "resolved": "support/chip-testing/test/cert/tc-dd-support.ts",
-    "identifier": "isCommissioningGiveUp",
-    "nearest": 977,
-    "occurrences": 6
-  },
-  {
     "file": "internal/chiptool/gocert_light_test.go",
     "line": 394,
     "citation": "TC-I-3.2.test.ts:20",
