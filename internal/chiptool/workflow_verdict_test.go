@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -105,33 +106,40 @@ func runStepScript(t *testing.T, script string, env []string) int {
 // with two multicast cases skipped: the step matched only the leg's own
 // skip line (DR5a-ci-03). The samples are `go test -v` output as Go
 // prints it (a case's SKIP line is indented under the leg's PASS line;
-// a -run that matches nothing prints no PASS line for the leg).
+// a -run that matches nothing prints no PASS line for the leg). make's
+// exit status is kept: the stand-in prints the sample and exits with the
+// row's status inside the step's own pipeline, so a go test that fails
+// after the leg's PASS line (a panic in a goroutine the leg left, TestMain)
+// fails the step through `set -o pipefail` (RR5a-02).
 func TestWorkflowGoCertStepVerdict(t *testing.T) {
 	const makeLine = "make chiptool-gocert CHIPTOOL_TIMEOUT=40m 2>&1 | tee /tmp/gocert.log"
 	script := runBlockAfter(t, chiptoolWorkflow(t), "- name: Go-TH cases")
 	if strings.Count(script, makeLine) != 1 {
 		t.Fatalf("the Go-TH step does not run %q once:\n%s", makeLine, script)
 	}
+	passed := "=== RUN   TestGoCertificationCases\n" +
+		"--- PASS: TestGoCertificationCases (586.12s)\n" +
+		"    --- PASS: TestGoCertificationCases/BIND/2.3 (12.01s)\n" +
+		"    --- PASS: TestGoCertificationCases/SC/5.3 (9.40s)\nPASS\n"
 	for _, tc := range []struct {
-		name string
-		log  string
-		want int
+		name   string
+		log    string
+		makeRC int
+		want   int
 	}{
-		{"every case passed", "=== RUN   TestGoCertificationCases\n" +
-			"--- PASS: TestGoCertificationCases (586.12s)\n" +
-			"    --- PASS: TestGoCertificationCases/BIND/2.3 (12.01s)\n" +
-			"    --- PASS: TestGoCertificationCases/SC/5.3 (9.40s)\nPASS\n", 0},
+		{"every case passed", passed, 0, 0},
+		{"every case passed, make exits 2", passed, 2, 2},
 		{"a case skipped", "=== RUN   TestGoCertificationCases\n" +
 			"--- PASS: TestGoCertificationCases (586.12s)\n" +
 			"    --- SKIP: TestGoCertificationCases/BIND/2.3 (0.00s)\n" +
-			"    --- PASS: TestGoCertificationCases/SC/5.3 (9.40s)\nPASS\n", 1},
+			"    --- PASS: TestGoCertificationCases/SC/5.3 (9.40s)\nPASS\n", 0, 1},
 		{"the leg skipped", "=== RUN   TestGoCertificationCases\n" +
 			"    gocert_test.go:328: no multicast here: x\n" +
-			"--- SKIP: TestGoCertificationCases (0.01s)\nPASS\n", 1},
-		{"no test ran", "testing: warning: no tests to run\nPASS\n", 1},
+			"--- SKIP: TestGoCertificationCases (0.01s)\nPASS\n", 0, 1},
+		{"no test ran", "testing: warning: no tests to run\nPASS\n", 0, 1},
 		{"a case's log names the leg", "=== RUN   TestGoCertificationCases\n" +
 			"    x_test.go:1: --- PASS: TestGoCertificationCases (quoted)\n" +
-			"--- FAIL: TestGoCertificationCases (1.00s)\nFAIL\n", 1},
+			"--- FAIL: TestGoCertificationCases (1.00s)\nFAIL\n", 0, 1}, // make's status 0: the row holds the anchored grep alone
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -140,9 +148,11 @@ func TestWorkflowGoCertStepVerdict(t *testing.T) {
 				t.Fatal(err)
 			}
 			log := filepath.Join(dir, "gocert.log")
-			s := strings.Replace(script, makeLine, `cat "$SAMPLE" > /tmp/gocert.log`, 1)
+			stand := `{ cat "$SAMPLE"; exit "$MAKE_RC"; } 2>&1 | tee /tmp/gocert.log`
+			s := strings.Replace(script, makeLine, stand, 1)
 			s = strings.ReplaceAll(s, "/tmp/gocert.log", `"$LOG"`)
-			if got := runStepScript(t, s, []string{"SAMPLE=" + sample, "LOG=" + log}); got != tc.want {
+			env := []string{"SAMPLE=" + sample, "LOG=" + log, "MAKE_RC=" + strconv.Itoa(tc.makeRC)}
+			if got := runStepScript(t, s, env); got != tc.want {
 				t.Errorf("exit %d, want %d", got, tc.want)
 			}
 		})
